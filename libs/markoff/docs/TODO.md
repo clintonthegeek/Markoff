@@ -243,11 +243,6 @@ no runtime benefit.
 
 ## Testing
 
-- [ ] **TextControl has zero direct test coverage.** The 2,572-line Qt
-  fork is exercised only indirectly through MarkdownTextItem. No tests
-  for cursor movement edge cases, input method handling, drag-and-drop,
-  link activation, preedit composition, or triple-click behavior. This
-  is the single largest risk in the codebase.
 - [ ] **MarkdownHighlighter has no tests.** AST-to-format application,
   delimiter hiding, code-block KSyntaxHighlighting integration,
   cursor-aware visibility — all untested.
@@ -277,6 +272,16 @@ no runtime benefit.
 
 ## Recently fixed (for context)
 
+- **TextControl direct test coverage** (2026-04-16): six new test files —
+  cursor (13 slots), selection (8), editing (10), input (10, absorbs
+  tst_cjk_autocorrect), links (6), integration through MarkdownTextItem
+  (6) — plus header-only `tests/support/textcontrol_testutil.{h,cpp}`
+  with factories and event-synthesis helpers. 53 slots covering Tier 1
+  (fork-specific / known-risky) + Tier 2 (general correctness).
+  `tst_cjk_autocorrect.cpp` removed; its cases live in
+  `tst_textcontrol_input`. Plan:
+  `docs/plans/2026-04-16-textcontrol-test-coverage.md`. Spec:
+  `docs/specs/2026-04-16-textcontrol-test-coverage-design.md`.
 - **Foundation pass** (2026-04-16): doc refresh (architecture.md,
   TODO.md, spec status headers for QAction shortcuts + editable
   tables); `Editor::toggleCheckbox()` rewritten to inspect
