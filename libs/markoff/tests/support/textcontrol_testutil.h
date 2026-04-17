@@ -16,6 +16,7 @@
 #include <QTextFormat>
 #include <QTextObjectInterface>
 #include <QWidget>
+#include <algorithm>
 #include <memory>
 
 #include "TextControl.h"
@@ -71,7 +72,7 @@ inline TextControlFixture makeFixture(const QString &text = {},
     TextControlFixture fx;
     fx.control.setPlainText(text);
     QTextCursor c(fx.document.get());
-    c.setPosition(std::min(cursorPos, text.size()));
+    c.setPosition(std::min<qsizetype>(cursorPos, text.size()));
     fx.control.setTextCursor(c);
     return fx;
 }
