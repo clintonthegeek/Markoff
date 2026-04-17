@@ -20,6 +20,13 @@ if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()
 
+# Collect every executable (tests, test app, scene-demo) in build/bin/
+# so paths stay short. Parent projects that consume Markoff as a subdir
+# can override by setting CMAKE_RUNTIME_OUTPUT_DIRECTORY before us.
+if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
+endif()
+
 # rapidyaml uses exceptions in its default callback — required for our
 # error-propagation contract in MarkoffParser.
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "" FORCE)
