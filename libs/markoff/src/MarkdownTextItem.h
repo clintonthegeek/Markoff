@@ -14,6 +14,13 @@ namespace Markoff {
 class TextControl;
 class MathTextObject;
 class CheckboxTextObject;
+} // namespace Markoff
+
+QT_BEGIN_NAMESPACE
+class QTextTable;
+QT_END_NAMESPACE
+
+namespace Markoff {
 
 /// Editable markdown text region in the graphics scene.
 /// Wraps TextControl + QTextDocument. Implements SelectableItem
@@ -99,6 +106,13 @@ public:
     /// rendered with zero height so they take no space in the layout.
     /// Exposed for SceneCoordinator's applyFoldVisibility.
     void setBlockFolded(int blockNumber, bool folded);
+
+    /// Fold or unfold an entire QTextTable atomically: hides all cell
+    /// blocks AND collapses the table frame's cell-padding / cell-spacing
+    /// / border so the table occupies zero vertical space when folded.
+    /// The frame-format knobs are restored from the stash on unfold.
+    /// Exposed for SceneCoordinator's applyFoldVisibility.
+    void setTableFolded(QTextTable *table, bool folded);
 
 Q_SIGNALS:
     void textChanged();

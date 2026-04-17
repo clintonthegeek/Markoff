@@ -819,12 +819,20 @@ void SceneCoordinator::ensureHeadingMap() const
     }
 
     // Walk items in order, tracking the running source-line offset.
-    // A single QTextBlock can expand to MULTIPLE source lines when it
-    // holds an ObjectReplacementCharacter whose RawProperty is a
-    // multi-line string (e.g. display math `$$\n...\n$$`). So we can't
-    // use block.blockNumber() as the line offset within an item; we
-    // must accumulate per-block newline counts that match
-    // allMarkdown()'s expansion.
+    //
+    // Within a text item we iterate the ROOT frame (not `doc->begin()`
+    // / `block.next()`) so that `QTextTable` child frames are treated
+    // as single atomic elements. That matches `allMarkdown()`'s
+    // serialization: a table emits via `TableSerializer::serialize()`
+    // rather than one line per cell-block. Iterating per-block would
+    // over-count source lines at every table, misaligning the heading
+    // map (and the gutter triangles) for every heading past the first
+    // table in a document.
+    //
+    // A single QTextBlock can still expand to MULTIPLE source lines
+    // when it holds an ObjectReplacementCharacter whose RawProperty is
+    // a multi-line string (display math `$$\n...\n$$`), so we keep the
+    // ORC-expansion branch.
     int srcLine = 0;
     for (int itemIdx = 0; itemIdx < m_items.size(); ++itemIdx) {
         if (itemIdx > 0) {
@@ -835,8 +843,28 @@ void SceneCoordinator::ensureHeadingMap() const
         if (m_items[itemIdx]->isTextItem()) {
             auto *mti = static_cast<MarkdownTextItem *>(m_items[itemIdx]);
             int blockLine = srcLine;
-            for (QTextBlock block = mti->document()->begin();
-                 block.isValid(); block = block.next()) {
+            QTextFrame *root = mti->document()->rootFrame();
+            bool firstElem = true;
+            for (auto fit = root->begin(); fit != root->end(); ++fit) {
+                if (!firstElem) blockLine += 1; // inter-element separator newline
+                firstElem = false;
+
+                if (auto *childFrame = fit.currentFrame()) {
+                    if (auto *table = qobject_cast<QTextTable *>(childFrame)) {
+                        // Tree-sitter sees `TableSerializer::serialize(table)`,
+                        // not the raw cell blocks. A table produces
+                        // (newline-count + 1) source lines; advance by the
+                        // newline count since the "+1" is the separator added
+                        // by the next iteration.
+                        const QString serialized = TableSerializer::serialize(table);
+                        blockLine += int(serialized.count(QLatin1Char('\n')));
+                    }
+                    continue;
+                }
+
+                QTextBlock block = fit.currentBlock();
+                if (!block.isValid()) continue;
+
                 auto it = lineToHeadingIdx.constFind(blockLine);
                 if (it != lineToHeadingIdx.constEnd())
                     m_blockToHeadingIdx.insert({itemIdx, block.blockNumber()}, *it);
@@ -865,7 +893,6 @@ void SceneCoordinator::ensureHeadingMap() const
                     }
                 }
                 blockLine += blockNewlines;
-                if (block.next().isValid()) blockLine += 1; // separator
             }
             srcLine = blockLine;
         } else {
@@ -973,12 +1000,35 @@ void SceneCoordinator::applyFoldVisibility()
             continue;
         }
 
-        // Text item: walk its QTextBlocks.
+        // Text item: walk its root frame so that QTextTable child frames
+        // are handled atomically. Per-cell block iteration would leak the
+        // table's borders / padding through on fold — setTableFolded()
+        // zeros those out.
         auto *mti = static_cast<MarkdownTextItem *>(m_items[itemIdx]);
         QTextDocument *doc = mti->document();
-        QTextBlock block = doc->begin();
         bool anyBlockVisible = false;
-        while (block.isValid()) {
+
+        QTextFrame *root = doc->rootFrame();
+        for (auto fit = root->begin(); fit != root->end(); ++fit) {
+            if (auto *childFrame = fit.currentFrame()) {
+                if (auto *table = qobject_cast<QTextTable *>(childFrame)) {
+                    // A table inherits the currently-enclosing heading's
+                    // fold state; it is body content, not a heading.
+                    bool hidden = false;
+                    if (hIdx >= 0) {
+                        const QStringList &path = hs[hIdx].path;
+                        hidden = m_foldingModel->isFolded(path)
+                              || m_foldingModel->isHiddenByFold(path);
+                    }
+                    mti->setTableFolded(table, hidden);
+                    if (!hidden) anyBlockVisible = true;
+                }
+                continue;
+            }
+
+            QTextBlock block = fit.currentBlock();
+            if (!block.isValid()) continue;
+
             const int h = headingAtBlock(itemIdx, block.blockNumber());
             const bool isHeading = (h >= 0);
             if (isHeading) hIdx = h;
@@ -1000,7 +1050,6 @@ void SceneCoordinator::applyFoldVisibility()
 
             mti->setBlockFolded(block.blockNumber(), hidden);
             if (!hidden) anyBlockVisible = true;
-            block = block.next();
         }
 
         // The item stays in the scene (we never remove it); its QGraphicsItem

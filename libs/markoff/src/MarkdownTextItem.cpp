@@ -269,6 +269,102 @@ QString MarkdownTextItem::toMarkdown() const
     return allMarkdown();
 }
 
+// Stash of frame-format knobs we zero when collapsing a table, keyed by
+// QTextTable *. Restored on unfold so the table re-inflates to its
+// original visual geometry.
+namespace {
+struct FoldedFrameStash {
+    qreal cellPadding = 0;
+    qreal cellSpacing = 0;
+    qreal border = 0;
+    qreal topMargin = 0;
+    qreal bottomMargin = 0;
+    qreal padding = 0;
+    QTextLength height;
+};
+static QHash<QTextTable *, FoldedFrameStash> &stashMap()
+{
+    static QHash<QTextTable *, FoldedFrameStash> m;
+    return m;
+}
+} // namespace
+
+void MarkdownTextItem::setTableFolded(QTextTable *table, bool folded)
+{
+    if (!table) return;
+
+    // Hide or show every block inside every cell. Blocks inside QTextTable
+    // frames still support setVisible(); we just have to walk frame-by-cell
+    // rather than relying on document-wide block iteration.
+    for (int r = 0; r < table->rows(); ++r) {
+        for (int c = 0; c < table->columns(); ++c) {
+            QTextTableCell cell = table->cellAt(r, c);
+            if (!cell.isValid()) continue;
+            for (auto it = cell.begin(); !it.atEnd(); ++it) {
+                QTextBlock b = it.currentBlock();
+                if (!b.isValid()) continue;
+                if (b.isVisible() != !folded)
+                    b.setVisible(!folded);
+            }
+        }
+    }
+
+    // Hiding cell blocks collapses text height but the frame's cell-padding /
+    // cell-spacing / border still reserve a strip of space, so a folded
+    // heading would visually leave a skinny ghost table behind. Zero those
+    // knobs on fold (stashing originals) and restore on unfold.
+    //
+    // QTextTableFormat inherits QTextFrameFormat, so we set BOTH the
+    // frame-format knobs and the table-format knobs on a single
+    // QTextTableFormat value and push it through setFormat(). Pushing a
+    // bare QTextFrameFormat via setFrameFormat() would slice off the
+    // table-specific properties (cellPadding/cellSpacing) and silently
+    // revert them to their defaults.
+    auto &stash = stashMap();
+    QTextTableFormat tfmt = table->format();
+    if (folded) {
+        if (!stash.contains(table)) {
+            FoldedFrameStash s;
+            s.cellPadding = tfmt.cellPadding();
+            s.cellSpacing = tfmt.cellSpacing();
+            s.border = tfmt.border();
+            s.topMargin = tfmt.topMargin();
+            s.bottomMargin = tfmt.bottomMargin();
+            s.padding = tfmt.padding();
+            s.height = tfmt.height();
+            stash.insert(table, s);
+        }
+        tfmt.setCellPadding(0);
+        tfmt.setCellSpacing(0);
+        tfmt.setBorder(0);
+        tfmt.setTopMargin(0);
+        tfmt.setBottomMargin(0);
+        tfmt.setPadding(0);
+        // Force the frame to a fixed zero height. Without this, Qt's
+        // QTextTable layout guarantees each row at least one line of
+        // font-metric height even if every cell block is setVisible(false),
+        // so a two-table section collapses to ~two lines instead of nothing.
+        tfmt.setHeight(QTextLength(QTextLength::FixedLength, 0));
+        table->setFormat(tfmt);
+    } else if (stash.contains(table)) {
+        const FoldedFrameStash s = stash.take(table);
+        tfmt.setCellPadding(s.cellPadding);
+        tfmt.setCellSpacing(s.cellSpacing);
+        tfmt.setBorder(s.border);
+        tfmt.setTopMargin(s.topMargin);
+        tfmt.setBottomMargin(s.bottomMargin);
+        tfmt.setPadding(s.padding);
+        tfmt.setHeight(s.height);
+        table->setFormat(tfmt);
+    }
+
+    prepareGeometryChange();
+    m_document->markContentsDirty(
+        table->firstPosition(),
+        table->lastPosition() - table->firstPosition());
+    update();
+}
+
 void MarkdownTextItem::setBlockFolded(int blockNumber, bool folded)
 {
     QTextBlock block = m_document->findBlockByNumber(blockNumber);
