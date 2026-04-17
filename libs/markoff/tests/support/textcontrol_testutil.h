@@ -48,16 +48,22 @@ public:
 /// RAII fixture. `control` targets `document`; `contextWidget` is needed
 /// by processEvent() for IME + clipboard focus affordances. The
 /// placeholder handler is pre-registered on the document.
+///
+/// TextControl has Q_DISABLE_COPY_MOVE, so we heap-allocate it and expose
+/// it by reference to keep call sites reading as `fx.control.foo()`.
 struct TextControlFixture {
     std::unique_ptr<QTextDocument> document;
     std::unique_ptr<QWidget> contextWidget;
     std::unique_ptr<TestPlaceholderObject> placeholder;
-    Markoff::TextControl control;
+    std::unique_ptr<Markoff::TextControl> controlPtr;
+    Markoff::TextControl &control;
 
     TextControlFixture()
         : document(std::make_unique<QTextDocument>()),
           contextWidget(std::make_unique<QWidget>()),
-          placeholder(std::make_unique<TestPlaceholderObject>())
+          placeholder(std::make_unique<TestPlaceholderObject>()),
+          controlPtr(std::make_unique<Markoff::TextControl>()),
+          control(*controlPtr)
     {
         document->documentLayout()->registerHandler(
             TestPlaceholderObject::TypeId, placeholder.get());
