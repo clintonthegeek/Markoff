@@ -198,10 +198,6 @@ implementation; the rest are implementation tasks.
   (periodic, replaces span map). Intentional but worth documenting.
   (Previously triply-redundant — the table offset mapping was removed
   in April 2026.)
-- [ ] **`dynamic_cast` pattern for item type dispatch is inconsistent.**
-  Some callsites check `isTextItem()` then `static_cast`, others use
-  `dynamic_cast` without checking. Standardize on `isTextItem()` +
-  `static_cast`.
 ## Dead / orphaned code
 
 Handled in the 2026-04-16 foundation pass. `TableStyle.h` and
@@ -224,8 +220,6 @@ no runtime benefit.
 - [ ] **SceneCoordinator has no direct tests.** Item lifecycle,
   reparse, serialization round-trip, heading map building,
   applyFoldVisibility are tested only indirectly through Editor.
-- [ ] **CheckboxTextObject has no tests.** Related: `toggleCheckbox()`
-  bug above persists because nothing checks it.
 - [ ] **Cross-item undo** (see Editor API gaps) has no test coverage.
 
 ## Accessibility
@@ -246,6 +240,18 @@ no runtime benefit.
   consumers with stricter toolchains.
 
 ## Recently fixed (for context)
+
+- **Small-item sweep — part 2** (2026-04-17):
+  - All 7 `dynamic_cast<MarkdownTextItem *>` callsites in
+    `SceneCoordinator` replaced with `isTextItem()` + `static_cast`.
+    The two remaining `dynamic_cast` uses in `Editor.cpp` start from
+    `QGraphicsScene::focusItem()` (raw `QGraphicsItem *`), so
+    `SelectableItem::isTextItem()` isn't reachable from them — those
+    are the correct place for a runtime type check.
+  - New direct test file `tst_checkbox_text_object.cpp` (8 slots):
+    intrinsic size from doc font, null-doc and pixel-sized-font
+    fallbacks, `CheckedProperty` round-trip, and two paint tests
+    (checked vs unchecked divergence; rect-bounds honoured).
 
 - **Small-item sweep** (2026-04-17):
   - `Editor::setFontSize()` no longer mutates `m_theme`. New private

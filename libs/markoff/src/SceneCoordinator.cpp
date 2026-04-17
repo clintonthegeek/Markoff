@@ -832,8 +832,8 @@ void SceneCoordinator::ensureHeadingMap() const
             const bool currBlock = !m_items[itemIdx]->isTextItem();
             srcLine += (prevBlock || currBlock) ? 2 : 1;
         }
-        auto *mti = dynamic_cast<MarkdownTextItem *>(m_items[itemIdx]);
-        if (mti) {
+        if (m_items[itemIdx]->isTextItem()) {
+            auto *mti = static_cast<MarkdownTextItem *>(m_items[itemIdx]);
             int blockLine = srcLine;
             for (QTextBlock block = mti->document()->begin();
                  block.isValid(); block = block.next()) {
@@ -902,8 +902,8 @@ QStringList SceneCoordinator::enclosingHeadingPath(int itemIndex) const
     // Use the AST-derived map; ties broken by document order.
     int hIdx = -1;
     for (int i = 0; i <= itemIndex && i < m_items.size(); ++i) {
-        auto *mti = dynamic_cast<MarkdownTextItem *>(m_items[i]);
-        if (!mti) continue;
+        if (!m_items[i]->isTextItem()) continue;
+        auto *mti = static_cast<MarkdownTextItem *>(m_items[i]);
         QTextBlock block = mti->document()->begin();
         while (block.isValid()) {
             const int h = headingAtBlock(i, block.blockNumber());
@@ -924,8 +924,8 @@ QStringList SceneCoordinator::enclosingHeadingPathAtBlock(int itemIndex, int blo
     // so headings later in the same item don't supersede the match position.
     int hIdx = -1;
     for (int i = 0; i <= itemIndex && i < m_items.size(); ++i) {
-        auto *mti = dynamic_cast<MarkdownTextItem *>(m_items[i]);
-        if (!mti) continue;
+        if (!m_items[i]->isTextItem()) continue;
+        auto *mti = static_cast<MarkdownTextItem *>(m_items[i]);
 
         QTextBlock block = mti->document()->begin();
         while (block.isValid()) {
@@ -943,8 +943,8 @@ int SceneCoordinator::headingIndexForItem(int itemIndex) const
 {
     if (!m_foldingModel) return -1;
     if (itemIndex < 0 || itemIndex >= m_items.size()) return -1;
-    auto *mti = dynamic_cast<MarkdownTextItem *>(m_items[itemIndex]);
-    if (!mti) return -1;
+    if (!m_items[itemIndex]->isTextItem()) return -1;
+    auto *mti = static_cast<MarkdownTextItem *>(m_items[itemIndex]);
     // The item is a "heading item" iff its first block is a heading.
     return headingAtBlock(itemIndex, 0);
 }
@@ -963,8 +963,7 @@ void SceneCoordinator::applyFoldVisibility()
     int hIdx = -1;  // index of current enclosing heading in hs[]
 
     for (int itemIdx = 0; itemIdx < m_items.size(); ++itemIdx) {
-        auto *mti = dynamic_cast<MarkdownTextItem *>(m_items[itemIdx]);
-        if (!mti) {
+        if (!m_items[itemIdx]->isTextItem()) {
             // Non-text item: hide/show based on enclosing heading.
             const QStringList path = (hIdx >= 0) ? hs[hIdx].path : QStringList{};
             bool hidden = !path.isEmpty()
@@ -975,6 +974,7 @@ void SceneCoordinator::applyFoldVisibility()
         }
 
         // Text item: walk its QTextBlocks.
+        auto *mti = static_cast<MarkdownTextItem *>(m_items[itemIdx]);
         QTextDocument *doc = mti->document();
         QTextBlock block = doc->begin();
         bool anyBlockVisible = false;
@@ -1013,8 +1013,8 @@ void SceneCoordinator::applyFoldVisibility()
 int SceneCoordinator::headingIndexAtSceneY(qreal sceneY) const
 {
     for (int itemIdx = 0; itemIdx < m_items.size(); ++itemIdx) {
-        auto *mti = dynamic_cast<MarkdownTextItem *>(m_items[itemIdx]);
-        if (!mti) continue;
+        if (!m_items[itemIdx]->isTextItem()) continue;
+        auto *mti = static_cast<MarkdownTextItem *>(m_items[itemIdx]);
 
         QGraphicsItem *gi = mti->asGraphicsItem();
         if (!gi) continue;
@@ -1046,8 +1046,8 @@ qreal SceneCoordinator::headingSceneY(int headingIndex) const
     if (headingIndex < 0) return -1.0;
 
     for (int itemIdx = 0; itemIdx < m_items.size(); ++itemIdx) {
-        auto *mti = dynamic_cast<MarkdownTextItem *>(m_items[itemIdx]);
-        if (!mti) continue;
+        if (!m_items[itemIdx]->isTextItem()) continue;
+        auto *mti = static_cast<MarkdownTextItem *>(m_items[itemIdx]);
 
         QGraphicsItem *gi = mti->asGraphicsItem();
         if (!gi) continue;

@@ -133,6 +133,12 @@ target_link_libraries(tst_markoff_checkbox_toggle PRIVATE Qt6::Test Qt6::Widgets
 target_include_directories(tst_markoff_checkbox_toggle PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 set_tests_properties(tst_markoff_checkbox_toggle PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_markoff_checkbox_text_object tst_checkbox_text_object.cpp)
+add_test(NAME tst_markoff_checkbox_text_object COMMAND tst_markoff_checkbox_text_object)
+target_link_libraries(tst_markoff_checkbox_text_object PRIVATE Qt6::Test Qt6::Widgets markoff)
+target_include_directories(tst_markoff_checkbox_text_object PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+set_tests_properties(tst_markoff_checkbox_text_object PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_markoff_completion_triggers tst_completion_triggers.cpp)
 add_test(NAME tst_markoff_completion_triggers COMMAND tst_markoff_completion_triggers)
 target_link_libraries(tst_markoff_completion_triggers PRIVATE Qt6::Test Qt6::Widgets markoff)
