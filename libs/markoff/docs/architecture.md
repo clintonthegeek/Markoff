@@ -69,19 +69,21 @@ navigation, completion popups, session management) remain in the host.
                     +-------------------------------+-----+
                     |                 |                    |
           +---------+-------+  +-----+--------+  +-------+--------+
-          | MarkdownTextItem|  | TableBlockItem|  | (future items) |
-          | (SelectableItem)|  | (SelectableItem) | ImageItem, etc |
+          | MarkdownTextItem|  | ImageBlockItem|  | (future items) |
+          | (SelectableItem)|  | (SelectableItem) | Mermaid, etc.  |
           +--------+--------+  +-----+--------+  +----------------+
-                   |                  |
-          +--------+--------+        |
-          |   TextControl   |   custom QPainter
-          |  (Qt fork)      |   rendering
+                   |
+          +--------+--------+
+          |   TextControl   |
+          |   (Qt fork)     |
           +--------+--------+
                    |
           +--------+--------+
           |  QTextDocument  |
           |  + Highlighter  |
           |  + MathObject   |
+          |  + CheckboxObj  |
+          |  + QTextTable * |
           +--------+--------+
                    |
           +--------+--------+
@@ -154,14 +156,43 @@ cross-boundary selection. Text items provide `hitTest`, `setSelection`,
 **MarkdownTextItem** (QGraphicsObject + SelectableItem):
 - Wraps TextControl (forked QWidgetTextControl) + QTextDocument
 - Each item has its own MarkdownHighlighter instance
-- Registers MathTextObject for inline LaTeX glyph rendering
+- Registers MathTextObject + CheckboxTextObject for inline glyph
+  rendering (U+FFFC object replacement characters)
+- Hosts `QTextTable` frames inline — pipe-table markdown is converted
+  into a real `QTextTable` at load time via `TableConverter`, providing
+  native cell editing with cursor/undo/selection
 - Detects and paints DecoratedRanges (code block backgrounds, callout
-  borders, blockquote indicators)
+  borders, blockquote indicators, horizontal rules)
 - Emits `cursorAtBoundary(Qt::Edge)` for focus transfer between items
 
 **BlockItem** (QGraphicsObject + SelectableItem) base class:
 - Paints selection overlay when fully selected
-- Subclasses: TableBlockItem (read-only table rendering)
+- Subclasses: **ImageBlockItem** (read-only image rendering via
+  ResourceProvider). Tables used to have their own `TableBlockItem`
+  subclass; they are now embedded inside MarkdownTextItem — see the
+  block-type decision framework below for why.
+
+### Block type decision framework
+
+When adding a new visual element (embed, Mermaid, custom diagram, ...),
+pick the host based on the element's interactive content:
+
+| Content shape | Host | Examples |
+|---|---|---|
+| Fundamentally non-textual (raster, canvas, SVG) | separate `BlockItem` subclass | `ImageBlockItem`, future `MermaidItem` |
+| Rich-text frame with interior cursors/selection/undo | `QTextFrame` / `QTextTable` **inside** `MarkdownTextItem` | Tables (v1) |
+| Opaque single-glyph substitution for inline source | `QTextObjectInterface` on `MarkdownTextItem`'s document | Inline math (`$x$`), display math (`$$...$$`), task checkboxes |
+| Visual decoration around otherwise-normal text | painter pass in `MarkdownTextItem` via `DecoratedRange` | Code block background, callout borders, blockquote bars, horizontal rule |
+
+**Rule of thumb**: default to the lightest option that can hold the
+content. Only promote to a separate `BlockItem` when the content is
+genuinely not text — i.e., you would never want a cursor inside it.
+
+This is why tables moved out of `TableBlockItem` and into
+`MarkdownTextItem`: cells have interior text, and `QTextTable` gives us
+native cell cursors, selection, and undo without any cross-boundary
+protocol. It also unifies the editing surface — Tab/Shift+Tab navigate
+cells via the same TextControl that drives paragraph typing.
 
 ### Layer 4: Text Editing
 
@@ -275,17 +306,22 @@ the same pipeline:
    and `drawObject()` for each U+FFFC. These delegate to
    `MathRenderer::render()`, which compiles the LaTeX and returns a cached
    QImage.
-4. **Cursor reveal**: When the cursor enters a math region,
-   `updateMathReveal()` expands the U+FFFC back to raw LaTeX so the user
-   can edit it. On cursor exit, it re-substitutes the glyph.
+4. **Cursor reveal** (click-only): When the user **mouse-clicks** on a
+   math glyph, `updateReveal()` expands the U+FFFC back to raw LaTeX
+   source so the math can be edited. Arrow-key navigation just steps
+   past the 1-char U+FFFC naturally — no reveal fires. On cursor exit
+   (e.g., click elsewhere, or a subsequent reparse), the source
+   collapses back to a glyph.
 
-**Open question**: The reveal/collapse mechanism is the most complex
-subsystem in the codebase (~300 lines with reentrancy guards and deferred
-flag clearing). Should we explore a simpler model — e.g., always showing
-source in the focused text item and only substituting in unfocused items?
-This would trade per-glyph reveal for per-item reveal, dramatically
-simplifying the state machine at the cost of slightly different UX from
-Obsidian.
+   This click-only design replaced an earlier arrow-key-triggered
+   reveal that had ~300 LOC of reentrancy guards and deferred
+   flag-clearing. The current mechanism is small enough that the
+   per-glyph / per-item simplification debated in earlier drafts is no
+   longer a pressing question. Guards that remain: `m_inSubstitution`
+   (prevents recursive substitution passes), `m_inCursorUpdate`
+   (prevents reveal from re-entering during cursor-snap), and
+   `m_snappingCursor` (suppresses reveal while snap-past-delimiter is
+   repositioning the caret).
 
 ---
 
@@ -301,11 +337,18 @@ Themes propagate through: `Editor::setTheme()` -> `SceneCoordinator::setTheme()`
 Factory methods: `Theme::defaultLight()`, `Theme::defaultDark()`,
 `Theme::fromSchemeFile()` (QOwnNotes INI format).
 
-**Open question**: Should the Theme system absorb the hardcoded visual
-constants currently scattered across rendering code (table grid colors,
-code block backgrounds, selection overlay, callout type colors)? This
-would make themes fully control all visual output but adds ~20 new
-Element values or a separate decoration color map.
+**Known gap**: several visual constants are currently hardcoded rather
+than Theme-driven. Consolidating these into `Theme` (either as new
+`Element` values or as a separate decoration-color map) would make the
+editor fully skinnable. Specifically:
+
+- Code block background / border / language label color
+  (`MarkdownTextItem::paintDecoratedRanges`)
+- Search match highlight yellow / current-match orange
+  (`Editor::highlightAllMatches`)
+- Callout type → accent color table (`DecoratedRange::colorForCalloutType`)
+- Checkbox checked/unchecked glyph colors (`CheckboxTextObject::drawObject`)
+- `TableStyle` struct (currently unused, awaiting integration)
 
 **Open question**: Should `Theme::fromSchemeFile()` be extended to read
 KDE color schemes (Breeze, etc.) for native desktop integration?
@@ -330,25 +373,26 @@ markdown.
 
 | Type | Status | Capabilities |
 |------|--------|-------------|
-| MarkdownTextItem | Shipped | Full editing, highlighting, math, checkboxes, decorated ranges |
-| TableBlockItem | Shipped (read-only) | Custom-painted table grid, column alignment |
-| ImageBlockItem | Shipped (read-only) | Rendered image via ResourceProvider, missing-image fallback |
+| MarkdownTextItem | Shipped | Full editing, highlighting, math, checkboxes, decorated ranges, embedded QTextTable frames |
+| ImageBlockItem | Shipped (read-only) | Rendered image via ResourceProvider, missing-image fallback. Does not currently respond to viewport width changes post-construction. |
 
-## Planned Block Item Types
+## Embedded rich elements (inside MarkdownTextItem)
 
-| Type | Purpose | Key Questions |
-|------|---------|---------------|
-| Editable table | Cell editing, row/column ops | Per-cell QTextDocument + QTextLayout, or simpler model? Context menu vs hover handles? |
-| CodeBlockItem | Syntax-highlighted code editing | Separate item or just a decorated MarkdownTextItem with enhanced rendering? |
-| MermaidItem | SVG diagram rendering | External renderer dependency? Async rendering? |
-| EmbedItem | Embedded note preview | Recursive rendering depth limit? |
+| Element | Mechanism | Status |
+|---------|-----------|--------|
+| Inline math `$x$` | `MathTextObject` (QTextObjectInterface), U+FFFC with `RawProperty` for round-trip | Shipped, cursor-click reveals source for editing |
+| Display math `$$...$$` | Same, `DisplayProperty = true` | Shipped |
+| Pipe tables | `QTextTable` frame, converted at load via `TableConverter`, serialized via `TableSerializer` | **Shipped — v1 editable.** Cell editing, Tab/Shift+Tab navigation, context menu for insert/delete row/column, column alignment preserved through serialize/reparse. |
+| Task checkboxes `- [ ]` / `- [x]` | `CheckboxTextObject` (QTextObjectInterface), click-to-toggle in `MarkdownTextItem::mousePressEvent` | Shipped graphic; `Editor::toggleCheckbox()` action is broken against the substitution layer (tracked in TODO) |
 
-**Design note**: Not all visual elements need to be separate BlockItem
-types. Code blocks and display math work well as decorated regions within
-MarkdownTextItem. The split-into-separate-item approach is necessary when
-the visual representation has fundamentally different geometry from the
-source text (tables, images). For code blocks, the source text IS the
-visual text — just with different styling.
+## Future block item types
+
+| Type | Expected host (per framework above) | Notes |
+|------|-------------------------------------|-------|
+| MermaidItem | Separate `BlockItem` (diagram is non-textual) | External renderer, likely async — consider cache keyed by source text + theme |
+| EmbedItem (`![[note]]`) | Host depends on editability: opaque navigate-to-source → `QTextObjectInterface`; interactive live-preview → `QTextFrame` subclass; full recursive editor → separate `BlockItem` with nested `Editor` | Grammar support needs `![[...]]` node (see Obsidian extensions below) |
+| HorizontalRuleItem | Currently handled as `DecoratedRange::HorizontalRule` painter pass | Only promote to a separate item if we need drag-resize or richer styling |
+| CodeBlockItem | Stay in `MarkdownTextItem` — source text IS the visual text, just styled | Handled today as `DecoratedRange::CodeBlock` + KSyntaxHighlighting |
 
 ---
 
@@ -362,11 +406,35 @@ query API (headings, links, tags) via separate CST traversals:
 - `TreeSitterParser::buildDocumentQueries()` — structured HeadingInfo/LinkInfo/TagInfo
 - `TreeSitterParser::findBlockBoundaries()` — table/code block split points
 
+### Known issue: redundant parses per reparse cycle
+
+A single debounced reparse currently drives **2–4 independent
+tree-sitter parses** of the full document:
+
+1. `SceneCoordinator::reparse()` calls `MarkdownSplitter::split()` on the
+   full source via the shared `m_parser`.
+2. For every text segment that might contain a table,
+   `detectTableRegions()` re-parses the segment's text to find table
+   boundaries.
+3. `ensureHeadingMap()` constructs a **fresh** local `TreeSitterParser`
+   and parses the full document again (the comment explains why:
+   `Document::fromMarkdown` strips frontmatter + footnote definitions
+   before parsing, so its offsets do not align with `toMarkdown()`'s
+   byte space).
+4. `onDocumentReparsed()` then calls `Document::fromMarkdown(toPlainText())`
+   to rebuild the `Document` model for headings/links/tags signals —
+   a fourth parse of the full source.
+
+Collapsing these into a single shared parser / AST is the highest-leverage
+performance win on the board. It also unifies the "one grammar"
+invariant so future Obsidian grammar extensions (embeds, block refs)
+need to be taught exactly one parser path.
+
 **Open question**: tree-sitter supports incremental parsing via
 `ts_tree_edit()`. The current implementation does a full reparse on every
 debounced keystroke. At what document size does this become a bottleneck?
-Should incremental parsing be prioritized, or is 150ms debounce + full
-reparse fast enough for typical note sizes (< 10,000 lines)?
+Should incremental parsing be prioritized alongside the parse-path
+unification above, or deferred until the single-parser refactor lands?
 
 ---
 
@@ -412,23 +480,42 @@ extending into adjacent items.
 
 ## What's Not Built Yet
 
-Roughly ordered by dependency and value:
+See `TODO.md` for the canonical backlog. The architecturally-significant
+gaps, roughly ordered by dependency and value:
 
-1. **Incremental tree-sitter parsing** — `ts_tree_edit()` for keystroke-level
-   performance on large documents
-2. **Incremental rehighlight** — only rehighlight blocks whose spans changed
-3. **Theme-driven visual constants** — move hardcoded colors/layout values
-   into Theme/EditorSettings
-4. **Editable tables** — the biggest missing interactive feature
-5. **Horizontal rules as graphical lines** — not just styled `---`
-6. **Blockquote left border** — visual indicator beyond color
-7. **Obsidian grammar fork** — native AST nodes for embeds, block refs
-8. **Round-trip fidelity** — blank lines lost in serialization
-9. **QAction-based shortcuts** — replace hardcoded keyPressEvent checks
-10. **Highlighter test suite** — tst_highlighter.cpp
-11. **TextControl test suite** — the 2000-line Qt fork has zero direct tests
-12. **Performance benchmarks** — large document stress tests
-13. **Accessibility** — screen reader, keyboard-only navigation
+1. **Parse-path unification** — collapse the 2–4 independent tree-sitter
+   parses per reparse cycle (SceneCoordinator + detectTableRegions +
+   ensureHeadingMap + Document::fromMarkdown) into one shared AST. Also
+   retires the MD4C-backed `DocumentBuilder` path so Obsidian grammar
+   extensions (embeds, block refs) only need to be taught one parser.
+2. **Incremental tree-sitter parsing** — `ts_tree_edit()` for keystroke-level
+   performance on large documents. Land after (1).
+3. **Cross-item undo coordination** — each `MarkdownTextItem` has its own
+   undo stack today, so multi-item edits (e.g., selectAll + toggleBold)
+   cannot be atomically undone.
+4. **Round-trip fidelity** — blank lines between blocks are normalized
+   by `SceneCoordinator::toMarkdown()`; affects line-number precision.
+5. **Incremental rehighlight** — targeted `rehighlightBlock()` calls
+   instead of full-document rehighlights on reparse.
+6. **Theme-driven visual constants** — code block bg/border, search
+   highlight yellow/orange, callout colors, `TableStyle` struct currently
+   hardcoded.
+7. **Highlighter + SceneCoordinator + TextControl test suites** — large
+   untested surfaces. TextControl (2,572-line Qt fork) is the biggest risk.
+8. **Performance benchmarks** — no harness exists for large-document
+   keystroke-latency or reparse-time measurement.
+9. **Obsidian grammar additions** — `![[embed]]` and `^block-id` still
+   need grammar nodes; `==highlight==` and `%%comment%%` already work.
+10. **Accessibility** — zero `QAccessibleInterface` coverage on scene
+    items; a screen reader sees opaque shapes.
+
+Shipped since earlier drafts of this document:
+- Heading folding v1 with gutter, per-block visibility, JSON persistence.
+- Editable tables v1 (`QTextTable` + `TableConverter` + `TableSerializer`).
+- QAction-based shortcuts with `ActionId` registry (Editor::action(id)).
+- Audit top-4 fixes for `selectAll` / `cut` / `goToLine` / `cursorLine`.
+- Math reveal simplified to click-only expansion (arrow-key reveal removed).
+- LinkRenderer typed emission surface for wikilinks and external URLs.
 
 ---
 
@@ -473,45 +560,49 @@ libs/markoff-parser/                    # MarkoffParser library
 
 libs/markoff/                           # MarkoffEditor library
 +-- include/markoff/
-|   +-- Editor.h                        # QGraphicsView widget
+|   +-- Editor.h                        # QGraphicsView widget + ActionId enum
 |   +-- Theme.h                         # Colors, fonts, element formats
-|   +-- EditorSettings.h               # Editor behavior config
+|   +-- EditorSettings.h                # Editor behavior config (currently unapplied; tracked in TODO)
 |   +-- ResourceProvider.h              # Image/link/embed resolution
 |   +-- SearchBar.h                     # Embedded find/replace bar
 |   +-- LinkRenderer.h                  # Typed link emission surface
-|   +-- FoldingTypes.h                  # Heading path computation
+|   +-- FoldingTypes.h                  # Heading path computation (has an include-order wart, tracked in TODO)
 +-- src/
-|   +-- Editor.cpp
-|   +-- SceneCoordinator.h/cpp          # Scene item management, reparse, coordinate mapping
-|   +-- SelectionScene.h/cpp            # QGraphicsScene + SelectionManager
-|   +-- SelectionManager.h/cpp          # Cross-boundary selection
-|   +-- SelectableItem.h               # Item interface
-|   +-- MarkdownTextItem.h/cpp          # Editable text region
+|   +-- Editor.cpp                      # God class: scene mgmt, QActions, shortcuts, formatting, search, folding bridge
+|   +-- SceneCoordinator.h/cpp          # Scene item management, reparse, coordinate mapping, heading map
+|   +-- SelectionScene.h/cpp            # QGraphicsScene + SelectionManager host
+|   +-- SelectionManager.h/cpp          # Cross-boundary selection state machine
+|   +-- SelectableItem.h                # Item interface (isTextItem, hitTest, selection, markdown)
+|   +-- MarkdownTextItem.h/cpp          # Editable text region, hosts rich inline objects + QTextTable frames
 |   +-- BlockItem.h/cpp                 # Non-text item base
-|   +-- TableBlockItem.h/cpp            # Read-only table rendering
 |   +-- ImageBlockItem.h/cpp            # Read-only image rendering
-|   +-- StubBlockItem.h/cpp             # Testing placeholder
-|   +-- TextControl.h/cpp              # Forked from Qt
+|   +-- StubBlockItem.h/cpp             # Testing placeholder (only used by tests/demo; lives in prod lib currently — tracked in TODO)
+|   +-- TextControl.h/cpp               # Forked from Qt's QWidgetTextControl
 |   +-- TextControl_p.h
-|   +-- MarkdownHighlighter.h/cpp       # AST-driven syntax highlighting
-|   +-- MathRenderer.h/cpp             # LaTeX rendering
-|   +-- MathTextObject.h/cpp            # QTextObjectInterface for math
-|   +-- CheckboxTextObject.h/cpp        # QTextObjectInterface for checkboxes
-|   +-- DecoratedRange.h/cpp            # Block decoration ranges
-|   +-- FoldingModel.h/cpp              # Heading fold state management
-|   +-- FoldGutter.h/cpp                # Viewport-pinned fold UI
-|   +-- GutterColumn.h                  # Abstract gutter column + FoldArrowColumn
-|   +-- FoldArrowColumn.cpp
-|   +-- SearchBar.cpp
-|   +-- LinkRenderer.cpp
-|   +-- FoldingTypes.cpp
-|   +-- ResourceProvider.cpp
-|   +-- Theme.cpp
-|   +-- MarkoffBlockData.h
+|   +-- MarkdownHighlighter.h/cpp       # AST-driven syntax highlighting, cursor-aware delimiter hiding
+|   +-- MathRenderer.h/cpp              # LaTeX→QImage via JKQTMathText, process-wide cache
+|   +-- MathTextObject.h/cpp            # QTextObjectInterface for math glyphs
+|   +-- CheckboxTextObject.h/cpp        # QTextObjectInterface for task checkboxes
+|   +-- DecoratedRange.h/cpp            # Painter decoration metadata (code blocks, callouts, HR, blockquote bars)
+|   +-- TableConverter.h/cpp            # Pipe-text → QTextTable conversion + doc-frame reconciliation
+|   +-- TableSerializer.h/cpp           # QTextTable → pretty pipe-text (column widths, alignment markers)
+|   +-- TableStyle.h                    # UNUSED struct — awaiting Theme integration (tracked in TODO)
+|   +-- FoldingModel.h/cpp              # Heading fold state, path-based identity, reconcile on reparse
+|   +-- FoldGutter.h/cpp                # Viewport-pinned gutter item hosting GutterColumns
+|   +-- FoldArrowColumn.cpp             # Fold-arrow column implementation
+|   +-- GutterColumn.h                  # Abstract gutter column interface
+|   +-- SearchBar.cpp                   # Find/replace UI
+|   +-- LinkRenderer.cpp                # Typed link emission
+|   +-- FoldingTypes.cpp                # Heading path normalization / dedup
+|   +-- ResourceProvider.cpp            # Base implementation + default file resolver
+|   +-- Theme.cpp                       # Default light/dark factories + QOwnNotes scheme import
+|   +-- MarkoffBlockData.h              # DEAD — QTextBlockUserData subclass never instantiated (tracked in TODO)
 +-- tests/
-+-- app/
++-- app/                                # markoff-testapp + scene-demo
 +-- docs/
-    +-- archive/
+    +-- plans/                          # Per-feature implementation plans (dated)
+    +-- specs/                          # Design specs (dated; implemented ones marked at top)
+    +-- archive/                        # Superseded material
 ```
 
 ---

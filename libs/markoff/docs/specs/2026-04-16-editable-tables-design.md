@@ -1,7 +1,7 @@
 # Editable Tables via QTextTable Layout Graft
 
 **Date:** 2026-04-16
-**Status:** Draft
+**Status:** IMPLEMENTED (v1) — see `TableConverter`, `TableSerializer`, `Editor::table*()` ops. Column-alignment UI from §"Future" still deferred. Notable deviation from this spec: no `PlainTextDocumentLayout` fork was needed — `QTextDocument`'s stock `QTextDocumentLayout` already handles `QTextTable` rendering correctly, reducing the implementation surface dramatically.
 **Scope:** V1 (minimal editable tables)
 
 ## Overview

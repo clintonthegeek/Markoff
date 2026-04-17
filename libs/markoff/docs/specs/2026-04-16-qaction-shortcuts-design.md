@@ -1,7 +1,7 @@
 # QAction Shortcut Registry & Tab Smart-Indent — Design Spec
 
 **Date:** 2026-04-16
-**Status:** Approved
+**Status:** IMPLEMENTED — see `Editor::createActions()` and the `ActionId` enum in `include/markoff/Editor.h`.
 **Scope:** markoff library (`Editor` widget) + host integration guidance
 
 ## Goal
