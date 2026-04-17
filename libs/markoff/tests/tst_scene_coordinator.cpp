@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QApplication>
+#include <QMimeData>
+#include <QScopedPointer>
 #include <QSignalSpy>
 #include <QTest>
 #include <QTextBlock>
@@ -11,6 +13,8 @@
 #include "MarkdownTextItem.h"
 #include "SceneCoordinator.h"
 #include "SelectableItem.h"
+#include "SelectionManager.h"
+#include "SelectionScene.h"
 #include "TextControl.h"
 
 using namespace Markoff;
@@ -25,6 +29,7 @@ private Q_SLOTS:
     void roundTripPreservesBlankLinesAroundImage();
     void roundTripPreservesTrailingNewlines();
     void roundTripPureText();
+    void clipboardRoundTripPreservesEightBlankLines();
 };
 
 /// Regression: `SceneCoordinator::reparse()` used to schedule the
@@ -151,6 +156,32 @@ void TstSceneCoordinator::roundTripPureText()
 {
     const QString src = QStringLiteral("line1\nline2\n\nline4\n\n\nline7");
     QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::clipboardRoundTripPreservesEightBlankLines()
+{
+    // select-all + the cross-boundary clipboard path must reproduce
+    // the source byte-for-byte, including 8 blank lines between blocks.
+    const QString src = QStringLiteral(
+        "before\n\n\n\n\n\n\n\n\n![alt](img.png)\n\n\nafter");
+
+    Editor editor;
+    editor.resize(800, 400);
+    editor.setPlainText(src);
+    editor.show();
+    QApplication::processEvents();
+
+    auto *scene = static_cast<SelectionScene *>(editor.scene());
+    QVERIFY(scene);
+    auto *mgr = scene->selectionManager();
+    QVERIFY(mgr);
+
+    mgr->selectAll();
+    QApplication::processEvents();
+
+    QScopedPointer<QMimeData> data(mgr->createMimeData());
+    QVERIFY(data);
+    QCOMPARE(data->text(), src);
 }
 
 QTEST_MAIN(TstSceneCoordinator)

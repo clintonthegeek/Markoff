@@ -174,7 +174,11 @@ QString MarkdownTextItem::selectedMarkdown() const
 
             const int blockStart = block.position();
             const int blockEnd = blockStart + block.length() - 1; // exclude paragraph sep
-            if (blockEnd < selStart || blockStart >= selEnd)
+            // blockStart > selEnd (strict) so trailing empty blocks at exactly
+            // selEnd are still included — under the splitter's join-identity
+            // contract they represent trailing blank lines in the source that
+            // must survive the clipboard round-trip.
+            if (blockEnd < selStart || blockStart > selEnd)
                 continue;
 
             const int sliceStart = qMax(selStart, blockStart);

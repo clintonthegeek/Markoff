@@ -404,14 +404,14 @@ void SceneCoordinator::removeBlockItem(int index)
 
 QString SceneCoordinator::toMarkdown() const
 {
+    // Invariant: MarkdownSplitter guarantees the source is reproduced
+    // byte-for-byte by joining each segment's text with a single '\n'
+    // between segments. Every inter-item blank line lives inside some
+    // text item's QTextDocument as empty QTextBlocks.
     QString result;
     for (int i = 0; i < m_items.size(); ++i) {
-        if (i > 0) {
-            // Use the separator captured from the source markdown during
-            // splitting — preserves the exact inter-item blank-line count
-            // instead of normalizing every boundary to "\n\n".
-            result += m_items[i]->leadSeparator();
-        }
+        if (i > 0)
+            result += QLatin1Char('\n');
         result += m_items[i]->toMarkdown();
     }
     return result;

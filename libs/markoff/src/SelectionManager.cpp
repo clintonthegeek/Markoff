@@ -303,12 +303,8 @@ QString SelectionManager::serializeAsMarkdown() const
     QString result;
 
     for (int i = lo; i <= hi; ++i) {
-        if (i > lo) {
-            bool prevIsBlock = !m_items[i - 1]->isTextItem();
-            bool currIsBlock = !m_items[i]->isTextItem();
-            result += (prevIsBlock || currIsBlock)
-                ? QStringLiteral("\n\n") : QStringLiteral("\n");
-        }
+        if (i > lo)
+            result += QLatin1Char('\n');
         SelectableItem *item = m_items[i];
         if (i == anchorIdx || i == currentIdx) {
             if (item->isTextItem())
