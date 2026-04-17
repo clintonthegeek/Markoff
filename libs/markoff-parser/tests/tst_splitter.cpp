@@ -11,6 +11,21 @@
 
 using namespace Markoff;
 
+namespace {
+    /// Concatenate every segment's text with a single '\n' between
+    /// segments. Per the splitter invariant, the result must equal
+    /// the source exactly.
+    QString joinIdentity(const QList<MarkdownSegment> &segs)
+    {
+        QString out;
+        for (int i = 0; i < segs.size(); ++i) {
+            if (i > 0) out += QLatin1Char('\n');
+            out += segs[i].text;
+        }
+        return out;
+    }
+}
+
 class TestSplitter : public QObject
 {
     Q_OBJECT
@@ -25,6 +40,19 @@ private Q_SLOTS:
     void testBlockAtStart();
     void testBlockAtEnd();
     void testShowcaseFile();
+    void testJoinIdentity_empty();
+    void testJoinIdentity_textOnly();
+    void testJoinIdentity_blockOnly();
+    void testJoinIdentity_blockAtStart();
+    void testJoinIdentity_blockAtEnd();
+    void testJoinIdentity_leadingBlanks();
+    void testJoinIdentity_trailingNewline();
+    void testJoinIdentity_trailingBlanks();
+    void testJoinIdentity_twoBlocksAdjacent();
+    void testJoinIdentity_twoBlocksOneBlank();
+    void testJoinIdentity_twoBlocksEightBlanks();
+    void testJoinIdentity_threeBlocksMixedGaps();
+    void testJoinIdentity_textWithBlockAndBlanks();
 };
 
 void TestSplitter::testNoBlocks()
@@ -156,6 +184,103 @@ void TestSplitter::testShowcaseFile()
 
     // Last segment should contain "Frontmatter" (near end of file)
     QVERIFY(segments.last().text.contains(QStringLiteral("Frontmatter")));
+}
+
+void TestSplitter::testJoinIdentity_empty()
+{
+    TreeSitterParser parser;
+    const QString src;
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_textOnly()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("line1\nline2\n\nline4\n\n\nline7");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_blockOnly()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("![alt](img.png)");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_blockAtStart()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("![alt](img.png)\n\nafter");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_blockAtEnd()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("before\n\n\n![alt](img.png)");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_leadingBlanks()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("\n\n![alt](img.png)\n\nafter");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_trailingNewline()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("![alt](img.png)\n");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_trailingBlanks()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("A\n\n\n\n");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_twoBlocksAdjacent()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("![a](a.png)\n![b](b.png)");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_twoBlocksOneBlank()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral("![a](a.png)\n\n![b](b.png)");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_twoBlocksEightBlanks()
+{
+    // The banner case the user called out: 8 blank lines between blocks
+    // in the source must survive the whole stack end-to-end.
+    TreeSitterParser parser;
+    const QString src = QStringLiteral(
+        "![a](a.png)\n\n\n\n\n\n\n\n\n![b](b.png)");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_threeBlocksMixedGaps()
+{
+    // a and b adjacent (single '\n'); b and c separated by three blanks.
+    TreeSitterParser parser;
+    const QString src = QStringLiteral(
+        "![a](a.png)\n![b](b.png)\n\n\n\n![c](c.png)");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
+}
+
+void TestSplitter::testJoinIdentity_textWithBlockAndBlanks()
+{
+    TreeSitterParser parser;
+    const QString src = QStringLiteral(
+        "# Title\n\n\nIntro paragraph.\n\n\n\n![a](a.png)\n\nOutro.");
+    QCOMPARE(joinIdentity(MarkdownSplitter::split(src, parser)), src);
 }
 
 QTEST_MAIN(TestSplitter)

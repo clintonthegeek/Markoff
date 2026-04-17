@@ -122,10 +122,26 @@ Rules:
 ### Byte-accounting reference
 
 Given source `S`, a sequence of non-text block boundaries
-`(b₀, b₁, …, bₙ)` where each `bᵢ` has `[startᵢ, endᵢ)` byte range.
+`(b₀, b₁, …, bₙ)` where each `bᵢ` has `[startᵢ, endᵢ)` byte range as
+reported by tree-sitter. Tree-sitter's `endᵢ` may or may not include
+the block's terminating `\n`; the splitter normalizes by stripping a
+single trailing `\n` from the block's content.
+
+For each block `bₖ`, define the **content-end**:
+
+> `contentEndₖ = endₖ - 1` if `endₖ > startₖ` and `S[endₖ - 1] == '\n'`;
+> else `contentEndₖ = endₖ`.
+
+The block's emitted `text` is `S[startₖ … contentEndₖ)` (no trailing
+`\n`). The post-block **cursor** advances to `contentEndₖ`, not `endₖ`.
+This invariant makes every trailing `\n` in the source show up in
+exactly one place: either as a join separator consumed by the next
+segment, or inside a pre/post-block region that the rules below decide
+what to do with.
 
 For each block `bₖ`, consider the **pre-block region** `R = S[aₖ … startₖ)`
-where `aₖ = 0` if `k = 0`, else `aₖ = endₖ₋₁`. The strip rule differs by `k`:
+where `aₖ = 0` if `k = 0`, else `aₖ = contentEndₖ₋₁`. The strip rule
+differs by `k`:
 
 - **`k = 0`** (pre-first-block): strip at most one **trailing** `\n`
   from `R` (the join separator to the following block). There is no
@@ -135,20 +151,19 @@ where `aₖ = 0` if `k = 0`, else `aₖ = endₖ₋₁`. The strip rule differs 
     so the join can reconstruct that `\n`).
 - **`k > 0`** (between two blocks): strip at most one **leading** `\n`
   *and* at most one **trailing** `\n` from `R`. The leading `\n` is the
-  join separator from the prior block; the trailing `\n` is the join
-  separator to the following block. Emit iff:
+  join separator from the prior block's content-end; the trailing `\n`
+  is the join separator to the following block. Emit iff:
   - (a) the stripped content is non-empty, **or**
   - (c) `|R| ≥ 2` (two or more `\n`s between the blocks ⇒ at least
     one blank line ⇒ emit an empty-content spacer text segment).
-  - If `|R| = 1` (the blocks are separated by a single `\n`), skip —
-    the blocks are directly adjacent in the segment list.
+  - If `|R| = 1` (exactly one `\n` between content-ends, i.e. the blocks
+    are directly adjacent on consecutive lines), skip — the blocks stay
+    adjacent in the segment list.
 
-**Block segment** emits `S[startₖ … endₖ)` with a trailing `\n` stripped
-if present (same as today).
-
-**Post-last-block region** `R = S[endₙ₋₁ … |S|)`: strip at most one
-**leading** `\n` (join separator from the last block). There is no
-following segment, so no trailing boundary to strip. Emit iff:
+**Post-last-block region** `R = S[contentEndₙ₋₁ … |S|)`: strip at most
+one **leading** `\n` (join separator from the last block's content-end).
+There is no following segment, so no trailing boundary to strip.
+Emit iff:
 - (a) the stripped content is non-empty, **or**
 - (b) `|R| ≥ 1` (a lone trailing `\n` becomes an empty trailing text
   segment).
