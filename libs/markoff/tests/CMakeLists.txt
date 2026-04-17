@@ -200,3 +200,13 @@ target_include_directories(tst_markoff_textcontrol_links
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
             ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(tst_markoff_textcontrol_links PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_textcontrol_integration
+    tst_textcontrol_integration.cpp
+    support/textcontrol_testutil.cpp)
+add_test(NAME tst_markoff_textcontrol_integration COMMAND tst_markoff_textcontrol_integration)
+target_link_libraries(tst_markoff_textcontrol_integration PRIVATE Qt6::Test Qt6::Widgets markoff)
+target_include_directories(tst_markoff_textcontrol_integration
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
+            ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(tst_markoff_textcontrol_integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
