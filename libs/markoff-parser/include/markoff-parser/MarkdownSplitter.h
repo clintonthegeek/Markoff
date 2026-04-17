@@ -16,11 +16,6 @@ struct MarkdownSegment {
     QString text;       ///< The raw markdown for this segment
     int sourceStart = 0; ///< QString char offset of this segment's content in the original document
     int sourceEnd = 0;   ///< QString char offset end of this segment's content (exclusive)
-    /// Whitespace (typically newlines) between the previous emitted
-    /// segment's content end and this segment's content start. Empty for
-    /// the first segment. Used to reconstruct the original inter-segment
-    /// blank-line count on serialization.
-    QString leadSeparator;
 };
 
 /// Splits markdown into segments at block boundaries (tables, code blocks).

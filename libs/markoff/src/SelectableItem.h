@@ -36,19 +36,6 @@ public:
 
     // --- Common ---
     virtual QString toMarkdown() const = 0;
-
-    /// Whitespace (typically newlines) that separated this item from
-    /// the previous item in the source markdown. Populated by
-    /// `SceneCoordinator` from `MarkdownSegment::leadSeparator` when
-    /// items are created or rebuilt. Empty for the first item. Used by
-    /// `SceneCoordinator::toMarkdown()` to reconstruct the exact
-    /// inter-item blank-line count instead of normalizing to a
-    /// heuristic default.
-    const QString &leadSeparator() const { return m_leadSeparator; }
-    void setLeadSeparator(const QString &sep) { m_leadSeparator = sep; }
-
-private:
-    QString m_leadSeparator;
 };
 
 } // namespace Markoff

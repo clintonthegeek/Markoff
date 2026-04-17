@@ -179,7 +179,6 @@ void SceneCoordinator::loadMarkdown(const QString &markdown)
     for (const auto &seg : segments) {
         if (seg.type == MarkdownSegment::Text) {
             auto *item = createTextItem(seg.text);
-            item->setLeadSeparator(seg.leadSeparator);
 
             // Detect and convert any pipe tables within this text item.
             // The document may contain U+FFFC inline substitutions (math,
@@ -227,7 +226,6 @@ void SceneCoordinator::loadMarkdown(const QString &markdown)
             }
         } else if (seg.type == MarkdownSegment::Image) {
             auto *item = new ImageBlockItem(seg.text, m_itemWidth, m_resourceProvider);
-            item->setLeadSeparator(seg.leadSeparator);
             m_scene->addItem(item);
             m_items.append(item);
         }
@@ -675,8 +673,7 @@ void SceneCoordinator::reparse()
         for (const auto &seg : newSegments) {
             if (seg.type == MarkdownSegment::Text) {
                 auto *item = createTextItem(seg.text);
-                item->setLeadSeparator(seg.leadSeparator);
-
+    
                 // Detect and convert pipe tables (same logic as loadMarkdown)
                 if (m_parser->parse(seg.text)) {
                     auto regions = detectTableRegions(seg.text);
@@ -706,8 +703,7 @@ void SceneCoordinator::reparse()
                 }
             } else if (seg.type == MarkdownSegment::Image) {
                 auto *item = new ImageBlockItem(seg.text, m_itemWidth, m_resourceProvider);
-                item->setLeadSeparator(seg.leadSeparator);
-                m_scene->addItem(item);
+                    m_scene->addItem(item);
                 m_items.append(item);
             }
             // No more TableBlockItem creation — tables live inside text items
