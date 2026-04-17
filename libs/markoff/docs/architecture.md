@@ -524,21 +524,19 @@ gaps, roughly ordered by dependency and value:
 3. **Cross-item undo coordination** — each `MarkdownTextItem` has its own
    undo stack today, so multi-item edits (e.g., selectAll + toggleBold)
    cannot be atomically undone.
-4. **Round-trip fidelity** — blank lines between blocks are normalized
-   by `SceneCoordinator::toMarkdown()`; affects line-number precision.
-5. **Incremental rehighlight** — targeted `rehighlightBlock()` calls
+4. **Incremental rehighlight** — targeted `rehighlightBlock()` calls
    instead of full-document rehighlights on reparse.
-6. **Theme-driven visual constants** — code block bg/border, search
+5. **Theme-driven visual constants** — code block bg/border, search
    highlight yellow/orange, callout colors, `TableStyle` struct currently
    hardcoded.
-7. **Highlighter + SceneCoordinator + TextControl test suites** — large
+6. **Highlighter + SceneCoordinator + TextControl test suites** — large
    untested surfaces. TextControl (2,572-line Qt fork) is the biggest risk.
-8. **Performance benchmarks** — no harness exists for large-document
+7. **Performance benchmarks** — no harness exists for large-document
    keystroke-latency or reparse-time measurement.
-9. **Obsidian grammar additions** — `![[embed]]` and `^block-id` still
+8. **Obsidian grammar additions** — `![[embed]]` and `^block-id` still
    need grammar nodes; `==highlight==` and `%%comment%%` already work.
-10. **Accessibility** — zero `QAccessibleInterface` coverage on scene
-    items; a screen reader sees opaque shapes.
+9. **Accessibility** — zero `QAccessibleInterface` coverage on scene
+   items; a screen reader sees opaque shapes.
 
 Shipped since earlier drafts of this document:
 - Heading folding v1 with gutter, per-block visibility, JSON persistence.
@@ -547,6 +545,9 @@ Shipped since earlier drafts of this document:
 - Audit top-4 fixes for `selectAll` / `cut` / `goToLine` / `cursorLine`.
 - Math reveal simplified to click-only expansion (arrow-key reveal removed).
 - LinkRenderer typed emission surface for wikilinks and external URLs.
+- Round-trip fidelity: byte-for-byte source preservation across
+  `toPlainText()`, file save, and select-all + clipboard copy. Blank
+  lines render as real cursor-editable `QTextBlock`s (2026-04-17).
 
 ---
 

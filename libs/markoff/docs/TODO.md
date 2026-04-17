@@ -291,23 +291,29 @@ no runtime benefit.
   full-document tree-sitter parse on dirty heading maps now uses
   cached data. Existing folding tests pass unchanged (tst_folding_*).
 
-- **Round-trip fidelity: blank lines around block items** (2026-04-17):
-  `MarkdownSegment` now carries a `leadSeparator` field capturing the
-  exact whitespace between a segment's content start and the previous
-  segment's content end in the source. `MarkdownSplitter` populates it
-  from source positions; `SceneCoordinator::loadMarkdown()` /
-  `reparse()` propagate it onto items via
-  `SelectableItem::setLeadSeparator`; `SceneCoordinator::toMarkdown()`
-  emits `item->leadSeparator()` instead of the hardcoded 1/2-newline
-  heuristic. Previously, `selectAll+copy` around an image added an
-  extra blank line on each side — any inter-item gap was normalized to
-  exactly "\n\n". New tests in `tst_scene_coordinator`: six
-  round-trip cases (fence with 0/1/multi blank lines, image with
-  multi blank lines, trailing newlines, pure text). Note:
-  `globalPositionOf` / `itemAtGlobalLine` / `ensureHeadingMap` still
-  use the `interItemNewlines` heuristic for line counting — scope
-  kept minimal. Fence/table splitting doesn't currently trigger in
-  the splitter, so only image-containing documents observed the bug.
+- **Round-trip fidelity: full stack** (2026-04-17):
+  `MarkdownSplitter::split()` now guarantees that concatenating every
+  segment's `text` with a single `"\n"` between segments reproduces
+  the source byte-for-byte. Every inter-item blank line lives inside
+  a text segment as empty `QTextBlock`s — editable, cursor-reachable.
+  The `leadSeparator` field and the `interItemNewlines` 1/2 heuristic
+  are gone. `SelectionManager::serializeAsMarkdown()` (cross-boundary
+  clipboard) and `SceneCoordinator::toMarkdown()` (file save / 
+  `toPlainText`) both use pure `"\n"` joins. Line math in
+  `globalPositionOf` / `itemAtGlobalLine` / `ensureHeadingMap`
+  simplifies to exact per-block newline counts + constant inter-item
+  transition (or none, where the item's own line span already advances
+  past the boundary). `MarkdownTextItem::selectedMarkdown` now treats
+  `blockStart > selEnd` as the skip predicate (was `>=`), so a
+  trailing empty block sitting exactly at `selEnd` still emits its
+  separator `\n` — required for clipboard round-trip when an item
+  ends with blank lines. New tests: 13 splitter join-identity cases
+  (`tst_splitter.cpp`), 10 additional `tst_scene_coordinator` cases
+  (clipboard round-trip of 8 blank lines, blank-line editability,
+  heading line math across blank-line gaps, leading / trailing
+  blanks, two-image gaps, 8-blank-line banner).
+  Spec: `docs/specs/2026-04-17-roundtrip-fidelity-design.md`.
+  Plan: `docs/plans/2026-04-17-roundtrip-fidelity.md`.
 
 - **TextControl direct test coverage** (2026-04-16): six new test files —
   cursor (13 slots), selection (8), editing (10), input (10, absorbs
