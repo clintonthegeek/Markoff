@@ -160,3 +160,13 @@ target_include_directories(tst_markoff_textcontrol_cursor
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
             ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(tst_markoff_textcontrol_cursor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_textcontrol_selection
+    tst_textcontrol_selection.cpp
+    support/textcontrol_testutil.cpp)
+add_test(NAME tst_markoff_textcontrol_selection COMMAND tst_markoff_textcontrol_selection)
+target_link_libraries(tst_markoff_textcontrol_selection PRIVATE Qt6::Test Qt6::Widgets markoff)
+target_include_directories(tst_markoff_textcontrol_selection
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
+            ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(tst_markoff_textcontrol_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
