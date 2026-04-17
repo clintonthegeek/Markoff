@@ -1,0 +1,45 @@
+cmake_minimum_required(VERSION 3.19)
+project(markoff_parser_tests LANGUAGES CXX)
+enable_testing()
+find_package(Qt6 REQUIRED COMPONENTS Test Gui Widgets)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+
+add_executable(tst_markoff_parser_document tst_document.cpp)
+add_test(NAME tst_markoff_parser_document COMMAND tst_markoff_parser_document)
+target_link_libraries(tst_markoff_parser_document PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_markoff_parser_document PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_parser_document_queries tst_document_queries.cpp)
+add_test(NAME tst_markoff_parser_document_queries COMMAND tst_markoff_parser_document_queries)
+target_link_libraries(tst_markoff_parser_document_queries PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_markoff_parser_document_queries PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_parser_splitter tst_splitter.cpp)
+add_test(NAME tst_markoff_parser_splitter COMMAND tst_markoff_parser_splitter)
+target_link_libraries(tst_markoff_parser_splitter PRIVATE Qt6::Test markoff-parser)
+target_compile_definitions(tst_markoff_parser_splitter PRIVATE
+    SHOWCASE_PATH="${CMAKE_CURRENT_SOURCE_DIR}/showcase.md"
+)
+set_tests_properties(tst_markoff_parser_splitter PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_parser_table tst_table.cpp)
+add_test(NAME tst_markoff_parser_table COMMAND tst_markoff_parser_table)
+target_link_libraries(tst_markoff_parser_table PRIVATE Qt6::Test Qt6::Gui Qt6::Widgets markoff-parser)
+set_tests_properties(tst_markoff_parser_table PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_parser_linktext tst_linktext.cpp)
+add_test(NAME tst_markoff_parser_linktext COMMAND tst_markoff_parser_linktext)
+target_link_libraries(tst_markoff_parser_linktext PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_markoff_parser_linktext PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_parser_frontmatter tst_frontmatter.cpp)
+add_test(NAME tst_markoff_parser_frontmatter COMMAND tst_markoff_parser_frontmatter)
+target_link_libraries(tst_markoff_parser_frontmatter PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_markoff_parser_frontmatter PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_parser_splitter_table_passthrough tst_splitter_table_passthrough.cpp)
+add_test(NAME tst_markoff_parser_splitter_table_passthrough COMMAND tst_markoff_parser_splitter_table_passthrough)
+target_link_libraries(tst_markoff_parser_splitter_table_passthrough PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_markoff_parser_splitter_table_passthrough PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.19)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Widgets)
+add_executable(markoff-scene-demo main.cpp)
+target_link_libraries(markoff-scene-demo PRIVATE Qt6::Widgets markoff)
+target_include_directories(markoff-scene-demo PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../../src)
