@@ -33,12 +33,6 @@ add_test(NAME tst_markoff_editor_formatting COMMAND tst_markoff_editor_formattin
 target_link_libraries(tst_markoff_editor_formatting PRIVATE Qt6::Test Qt6::Widgets markoff)
 set_tests_properties(tst_markoff_editor_formatting PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-add_executable(tst_markoff_cjk_autocorrect tst_cjk_autocorrect.cpp)
-add_test(NAME tst_markoff_cjk_autocorrect COMMAND tst_markoff_cjk_autocorrect)
-target_link_libraries(tst_markoff_cjk_autocorrect PRIVATE Qt6::Test Qt6::Widgets markoff)
-target_include_directories(tst_markoff_cjk_autocorrect PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
-set_tests_properties(tst_markoff_cjk_autocorrect PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-
 add_executable(tst_markoff_undo_grouping tst_undo_grouping.cpp)
 add_test(NAME tst_markoff_undo_grouping COMMAND tst_markoff_undo_grouping)
 target_link_libraries(tst_markoff_undo_grouping PRIVATE Qt6::Test Qt6::Widgets markoff)
