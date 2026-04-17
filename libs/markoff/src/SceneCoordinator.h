@@ -117,7 +117,6 @@ Q_SIGNALS:
     void reparsed();
 
 private:
-    static int interItemNewlines(bool prevIsText, bool currIsText);
     static int sourceLineCount(const MarkdownTextItem *item);
 
     MarkdownTextItem *createTextItem(const QString &text);

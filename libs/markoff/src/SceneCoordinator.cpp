@@ -238,11 +238,6 @@ void SceneCoordinator::loadMarkdown(const QString &markdown)
     emit reparsed();
 }
 
-int SceneCoordinator::interItemNewlines(bool prevIsText, bool currIsText)
-{
-    return (prevIsText && currIsText) ? 1 : 2;
-}
-
 int SceneCoordinator::sourceLineCount(const MarkdownTextItem *item)
 {
     QTextDocument *doc = item->document();
@@ -280,9 +275,10 @@ SceneCoordinator::globalPositionOf(const MarkdownTextItem *item,
 {
     int line = 1;
     for (int i = 0; i < m_items.size(); ++i) {
-        if (i > 0)
-            line += interItemNewlines(m_items[i - 1]->isTextItem(),
-                                      m_items[i]->isTextItem());
+        // No inter-item transition: sourceLineCount (for text items) and
+        // `1 + block.count('\n')` (for block items) already advance line by
+        // the item's full source-line span, which equals the distance from
+        // this item's first line to the next item's first line.
 
         if (m_items[i]->isTextItem()) {
             auto *mti = static_cast<MarkdownTextItem *>(m_items[i]);
@@ -328,9 +324,7 @@ SceneCoordinator::itemAtGlobalLine(int globalLine) const
 {
     int line = 1;
     for (int i = 0; i < m_items.size(); ++i) {
-        if (i > 0)
-            line += interItemNewlines(m_items[i - 1]->isTextItem(),
-                                      m_items[i]->isTextItem());
+        // See globalPositionOf: no inter-item transition needed.
 
         if (m_items[i]->isTextItem()) {
             auto *mti = static_cast<MarkdownTextItem *>(m_items[i]);
@@ -836,11 +830,8 @@ void SceneCoordinator::ensureHeadingMap() const
     // ORC-expansion branch.
     int srcLine = 0;
     for (int itemIdx = 0; itemIdx < m_items.size(); ++itemIdx) {
-        if (itemIdx > 0) {
-            const bool prevBlock = !m_items[itemIdx - 1]->isTextItem();
-            const bool currBlock = !m_items[itemIdx]->isTextItem();
-            srcLine += (prevBlock || currBlock) ? 2 : 1;
-        }
+        if (itemIdx > 0)
+            srcLine += 1;
         if (m_items[itemIdx]->isTextItem()) {
             auto *mti = static_cast<MarkdownTextItem *>(m_items[itemIdx]);
             int blockLine = srcLine;

@@ -30,6 +30,7 @@ private Q_SLOTS:
     void roundTripPreservesTrailingNewlines();
     void roundTripPureText();
     void clipboardRoundTripPreservesEightBlankLines();
+    void cursorLineAccountsForBlankLineGaps();
 };
 
 /// Regression: `SceneCoordinator::reparse()` used to schedule the
@@ -182,6 +183,50 @@ void TstSceneCoordinator::clipboardRoundTripPreservesEightBlankLines()
     QScopedPointer<QMimeData> data(mgr->createMimeData());
     QVERIFY(data);
     QCOMPARE(data->text(), src);
+}
+
+void TstSceneCoordinator::cursorLineAccountsForBlankLineGaps()
+{
+    // 5 blank lines between a heading and an image, then 2 more before
+    // the second heading. Every '\n' in the source must count as one
+    // source line when computing cursorLine.
+    const QString src = QStringLiteral(
+        "# First\n\n\n\n\n\n![alt](img.png)\n\n\n# Second\n");
+    //     line 1: "# First"
+    //     lines 2-6: blanks (5)
+    //     line 7: image
+    //     lines 8-9: blanks (2)
+    //     line 10: "# Second"
+    //     line 11: trailing ""
+
+    Editor editor;
+    editor.resize(800, 400);
+    editor.setPlainText(src);
+    editor.show();
+    QApplication::processEvents();
+
+    auto *coord = editor.coordinatorForTesting();
+    QVERIFY(coord);
+
+    bool placed = false;
+    for (auto *item : coord->items()) {
+        if (!item->isTextItem()) continue;
+        auto *ti = static_cast<MarkdownTextItem *>(item);
+        const QString all = ti->allMarkdown();
+        const int pos = all.indexOf(QStringLiteral("# Second"));
+        if (pos >= 0) {
+            QTextCursor c(ti->document());
+            c.setPosition(pos);
+            ti->textControl()->setTextCursor(c);
+            ti->setFocus(Qt::MouseFocusReason);
+            placed = true;
+            break;
+        }
+    }
+    QVERIFY2(placed, "Could not locate '# Second' in any text item");
+    QApplication::processEvents();
+
+    QCOMPARE(editor.cursorLine(), 10);
 }
 
 QTEST_MAIN(TstSceneCoordinator)
