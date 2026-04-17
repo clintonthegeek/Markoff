@@ -132,9 +132,12 @@ Provides:
   `QMouseEvent` and routes via `processEvent(..., coordinateOffset)`.
 - **`sendInputMethod(tc, commit, preedit, attributes = {})`** — builds
   `QInputMethodEvent` and routes.
-- **`editorFirstTextControl(editor)`** — integration helper; walks
-  `coordinatorForTesting()->items()` and returns the first text item's
-  `TextControl *` (or the item + TextControl pair).
+- Integration-suite editor construction is handled inline in
+  `tst_textcontrol_integration.cpp` via a local `makeEditor()` helper
+  that builds an `Editor`, waits for reparse debounce, and returns the
+  first `MarkdownTextItem`. It is not placed in `textcontrol_testutil.h`
+  because including `Editor.h` there would pull widget-level deps into
+  every direct-test TU that needs only `TextControl.h`.
 
 The helpers intentionally stay thin: they synthesize events the same way
 Qt would in production, so the tests exercise the real event path, not a
