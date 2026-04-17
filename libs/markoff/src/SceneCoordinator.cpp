@@ -744,10 +744,14 @@ void SceneCoordinator::reparse()
         repositionItems();
     }
 
-    // Clear inReparse on next event loop so deferred signals are suppressed
-    QTimer::singleShot(0, this, [this]() {
-        m_inReparse = false;
-    });
+    // Clear `m_inReparse` synchronously before emitting. A prior
+    // version deferred the clear via `QTimer::singleShot(0, ...)`
+    // which caused any synchronous `reparsed` handler that edited
+    // text to have its follow-up reparse suppressed:
+    // `onItemTextChanged` saw the still-true guard and bailed out
+    // without restarting the debounce timer. Edits from reparsed
+    // handlers now correctly restart the timer.
+    m_inReparse = false;
     emit reparsed();
 }
 

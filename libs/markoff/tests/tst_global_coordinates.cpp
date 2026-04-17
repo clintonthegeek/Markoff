@@ -2,11 +2,14 @@
 #include <QApplication>
 #include <QClipboard>
 #include <QTest>
+#include <QTextCursor>
+#include <QTextDocument>
 #include <markoff/Editor.h>
 #include "SceneCoordinator.h"
 #include "MarkdownTextItem.h"
 #include "SelectionManager.h"
 #include "SelectionScene.h"
+#include "TextControl.h"
 
 using namespace Markoff;
 
@@ -26,6 +29,8 @@ private Q_SLOTS:
     void goToLinePastEnd();
     void cursorLineFirstItem();
     void cursorLineSecondItem();
+    void cursorColumnIsLineLocal();
+    void cursorColumnAfterSubstitutedMath();
     void endToEndAllFixes();
 };
 
@@ -392,6 +397,81 @@ void TstGlobalCoordinates::cursorLineSecondItem()
     editor.goToLine(gpDD.line);
     QApplication::processEvents();
     QCOMPARE(editor.cursorLine(), gpDD.line);
+}
+
+void TstGlobalCoordinates::cursorColumnIsLineLocal()
+{
+    // Contract: cursorColumn() returns the column within the current
+    // line (1-based), regardless of which item/block the cursor is in.
+    // Columns do not accumulate across items or across lines — each
+    // new line resets the column to 1. This documents the post-
+    // audit-top-4 behavior; cursorColumn did NOT need a fix
+    // (contrary to an early draft of the 2026-04-15 audit) because
+    // it routes through QTextCursor::columnNumber() which is
+    // inherently line-local.
+    Editor editor;
+    editor.resize(800, 600);
+    editor.setPlainText(QStringLiteral("alpha\nhello world\ngamma"));
+    editor.show();
+    QApplication::processEvents();
+
+    auto *coord = editor.coordinatorForTesting();
+    MarkdownTextItem *ti = nullptr;
+    for (auto *item : coord->items()) {
+        if (item->isTextItem()) {
+            ti = static_cast<MarkdownTextItem *>(item);
+            break;
+        }
+    }
+    QVERIFY(ti);
+    ti->setFocus();
+
+    // Place cursor at "hello |world" on line 2 (char position 12
+    // in the document: 6 chars of "alpha\n" + 6 chars of "hello ").
+    QTextCursor c(ti->document());
+    c.movePosition(QTextCursor::Start);
+    c.movePosition(QTextCursor::Right, QTextCursor::MoveAnchor, 12);
+    ti->textControl()->setTextCursor(c);
+    QApplication::processEvents();
+
+    // cursorLine is 2, cursorColumn is position 6 in line 2 → col 7.
+    QCOMPARE(editor.cursorLine(), 2);
+    QCOMPARE(editor.cursorColumn(), 7);
+}
+
+void TstGlobalCoordinates::cursorColumnAfterSubstitutedMath()
+{
+    // When the line contains a U+FFFC glyph (substituted from inline
+    // math), the document-coord column within the line differs from
+    // the source-coord column. Establish the current contract: we
+    // report the document-coord column. If we ever want source-coord
+    // columns, this test needs to be updated along with the fix.
+    Editor editor;
+    editor.resize(800, 600);
+    editor.setPlainText(QStringLiteral("hello $x^2$ world"));
+    editor.show();
+    QApplication::processEvents();
+
+    auto *coord = editor.coordinatorForTesting();
+    MarkdownTextItem *ti = nullptr;
+    for (auto *item : coord->items()) {
+        if (item->isTextItem()) {
+            ti = static_cast<MarkdownTextItem *>(item);
+            break;
+        }
+    }
+    QVERIFY(ti);
+    ti->setFocus();
+
+    // After substitution, `$x^2$` is one U+FFFC. Document text becomes
+    // `hello \uFFFC world` (13 chars). Place cursor at the end.
+    QTextCursor c(ti->document());
+    c.movePosition(QTextCursor::End);
+    ti->textControl()->setTextCursor(c);
+    QApplication::processEvents();
+
+    // Document length is 13; 1-based column = 14.
+    QCOMPARE(editor.cursorColumn(), 14);
 }
 
 void TstGlobalCoordinates::endToEndAllFixes()

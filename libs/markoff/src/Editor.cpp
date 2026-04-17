@@ -11,6 +11,8 @@
 #include "FoldingModel.h"
 #include "FoldGutter.h"
 #include "GutterColumn.h"
+#include "CheckboxTextObject.h"
+#include "MathTextObject.h"
 
 #include <QCursor>
 
@@ -1251,27 +1253,124 @@ void Editor::decreaseHeadingLevel()
 
 void Editor::toggleCheckbox()
 {
+    // Three-state cycle per block in the selection:
+    //   plain line  →  "- [ ] <line>"            (prepend unchecked)
+    //   unchecked   →  "- [x] <line>"            (flip CheckedProperty)
+    //   checked     →  "<line>"                  (strip "- " and glyph)
+    //
+    // The document is in substituted form — `[ ]` and `[x]` have already
+    // been replaced with U+FFFC glyphs carrying CheckboxTextObject format.
+    // We must inspect the glyph's format, not the block's text, because
+    // the literal "- [ ]" / "- [x]" strings no longer appear in the
+    // block's character stream after substitution.
     auto *ti = focusedTextItem();
     if (!ti) return;
     auto *tc = ti->textControl();
     QTextCursor cursor = tc->textCursor();
-    int startBlock = cursor.document()->findBlock(cursor.selectionStart()).blockNumber();
-    int endBlock = cursor.document()->findBlock(cursor.selectionEnd()).blockNumber();
+    QTextDocument *doc = cursor.document();
+    const int startBlock = doc->findBlock(cursor.selectionStart()).blockNumber();
+    const int endBlock = doc->findBlock(cursor.selectionEnd()).blockNumber();
 
     cursor.beginEditBlock();
     for (int b = startBlock; b <= endBlock; ++b) {
-        QTextBlock block = cursor.document()->findBlockByNumber(b);
-        QTextCursor bc(block);
-        bc.movePosition(QTextCursor::StartOfBlock);
-        bc.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
-        QString line = bc.selectedText();
-        if (line.contains(QStringLiteral("- [ ]"))) {
-            bc.insertText(line.replace(QStringLiteral("- [ ]"), QStringLiteral("- [x]")));
-        } else if (line.contains(QStringLiteral("- [x]")) || line.contains(QStringLiteral("- [X]"))) {
-            bc.insertText(line.replace(QStringLiteral("- [x]"), QStringLiteral("- [ ]"))
-                                 .replace(QStringLiteral("- [X]"), QStringLiteral("- [ ]")));
+        QTextBlock block = doc->findBlockByNumber(b);
+        if (!block.isValid()) continue;
+
+        // Look for a substituted checkbox glyph first, then fall back
+        // to literal source markdown. Both paths can appear in the
+        // document depending on whether a reparse + substitution has
+        // run since the text was last edited (the reparse is debounced
+        // 150 ms, so a user rapidly re-toggling may still be looking
+        // at the pre-substitution form).
+        int glyphPos = -1;
+        bool wasChecked = false;
+        for (auto it = block.begin(); !it.atEnd(); ++it) {
+            const QTextFragment frag = it.fragment();
+            if (!frag.isValid()) continue;
+            const QTextCharFormat fmt = frag.charFormat();
+            if (fmt.objectType() != CheckboxTextObject::TypeId) continue;
+            const QString t = frag.text();
+            for (int i = 0; i < t.size(); ++i) {
+                if (t.at(i) == QChar::ObjectReplacementCharacter) {
+                    glyphPos = frag.position() + i;
+                    wasChecked = fmt.property(
+                        CheckboxTextObject::CheckedProperty).toBool();
+                    break;
+                }
+            }
+            if (glyphPos >= 0) break;
+        }
+
+        const int blockStart = block.position();
+        const int blockEnd = blockStart + block.length() - 1;
+
+        if (glyphPos >= 0 && !wasChecked) {
+            // Unchecked → checked: flip glyph format in place.
+            QTextCursor c(doc);
+            c.setPosition(glyphPos);
+            c.setPosition(glyphPos + 1, QTextCursor::KeepAnchor);
+            QTextCharFormat newFmt;
+            newFmt.setObjectType(CheckboxTextObject::TypeId);
+            newFmt.setProperty(CheckboxTextObject::CheckedProperty, true);
+            newFmt.setProperty(MathTextObject::RawProperty,
+                               QStringLiteral("[x]"));
+            c.setCharFormat(newFmt);
+            continue;
+        }
+
+        if (glyphPos >= 0 && wasChecked) {
+            // Checked → plain: strip the list-marker + glyph + trailing
+            // space from the block's start. Returns the line to plain
+            // text; re-adding a list marker needs an explicit toggle.
+            QTextCursor c(doc);
+            c.setPosition(blockStart);
+            int endStrip = glyphPos + 1;
+            if (endStrip < blockEnd
+                && doc->characterAt(endStrip) == QLatin1Char(' ')) {
+                ++endStrip;
+            }
+            c.setPosition(endStrip, QTextCursor::KeepAnchor);
+            c.removeSelectedText();
+            continue;
+        }
+
+        // No glyph — look at the literal source text. Substitution
+        // may not have run yet (reparse is debounced 150 ms).
+        const QString lineText = block.text();
+        const int unchecked = lineText.indexOf(QStringLiteral("- [ ]"));
+
+        int checkedIdx = -1;
+        {
+            const int lower = lineText.indexOf(QStringLiteral("- [x]"));
+            const int upper = lineText.indexOf(QStringLiteral("- [X]"));
+            if (lower >= 0 && upper >= 0) checkedIdx = std::min(lower, upper);
+            else if (lower >= 0)          checkedIdx = lower;
+            else if (upper >= 0)          checkedIdx = upper;
+        }
+
+        if (unchecked >= 0) {
+            // Literal "- [ ]" → replace the middle char with 'x'.
+            QTextCursor c(doc);
+            c.setPosition(blockStart + unchecked + 3); // after "- ["
+            c.setPosition(blockStart + unchecked + 4, QTextCursor::KeepAnchor);
+            c.insertText(QStringLiteral("x"));
+        } else if (checkedIdx >= 0) {
+            // Literal "- [x]" → strip "- [x] " prefix (back to plain).
+            QTextCursor c(doc);
+            c.setPosition(blockStart + checkedIdx);
+            int endStrip = blockStart + checkedIdx + 5; // past "- [x]"
+            if (endStrip < blockEnd
+                && doc->characterAt(endStrip) == QLatin1Char(' ')) {
+                ++endStrip;
+            }
+            c.setPosition(endStrip, QTextCursor::KeepAnchor);
+            c.removeSelectedText();
         } else {
-            bc.insertText(QStringLiteral("- [ ] ") + line);
+            // Plain line → prepend "- [ ] ". Reparse will eventually
+            // substitute the bracket text to a glyph.
+            QTextCursor c(doc);
+            c.setPosition(blockStart);
+            c.insertText(QStringLiteral("- [ ] "));
         }
     }
     cursor.endEditBlock();
