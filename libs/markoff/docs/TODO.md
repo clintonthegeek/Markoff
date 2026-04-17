@@ -173,24 +173,11 @@ implementation; the rest are implementation tasks.
   link reveals the raw markdown and makes it unfollowable. Right-click
   offers "Edit Link" which selects the link destination text.
 
-- [ ] **EditorSettings is declared but never applied.** The struct has
-  fields for `tabSize`, `lineNumbers`, `lineWrap`, `highlightCurrentLine`,
-  `highlightingEnabled`, `tripleClickSelectsLine`, but `setEditorSettings()`
-  just stores the struct — nothing reads or applies any of these values.
-  Either wire them up or remove the dead API surface.
 - [ ] **`FoldingTypes.h` has hidden include-order dependency.** The
   public header forward-declares `HeadingInfo` but `computeHeadingPaths()`
   takes `const QList<HeadingInfo> &`. The consuming TU must have
   already included the markoff-parser header. Should either include
   the header or move the function to a non-public header.
-- [ ] **`setFontSize()` mutates the theme.** `Editor::setFontSize()`
-  modifies `m_theme.textFont` directly, so `editor->theme()` returns a
-  theme reflecting the current font size regardless of what was set via
-  `setTheme()`.
-- [ ] **`ImageBlockItem` doesn't respond to width changes.**
-  `SceneCoordinator::setItemWidth()` calls `setTextWidth()` for text
-  items but ImageBlockItem is created with a `maxWidth` at
-  construction and never updated on viewport resize.
 - [ ] Cross-item find/replace wraparound works but doesn't surface
   "wrapped" feedback to the caller — UI can't show "End of file
   reached, search wrapped".
@@ -215,10 +202,6 @@ implementation; the rest are implementation tasks.
   Some callsites check `isTextItem()` then `static_cast`, others use
   `dynamic_cast` without checking. Standardize on `isTextItem()` +
   `static_cast`.
-- [ ] **`goto` in `MarkdownTextItem::keyPressEvent`.** The CJK autocorrect
-  logic uses `goto cjk_done;`. Restructure as a helper function or
-  early-return.
-
 ## Dead / orphaned code
 
 Handled in the 2026-04-16 foundation pass. `TableStyle.h` and
@@ -263,6 +246,23 @@ no runtime benefit.
   consumers with stricter toolchains.
 
 ## Recently fixed (for context)
+
+- **Small-item sweep** (2026-04-17):
+  - `Editor::setFontSize()` no longer mutates `m_theme`. New private
+    helper `applyEffectiveFont()` composes the theme's `textFont` with
+    `m_fontSize` and applies it to the coordinator; `theme()` now
+    returns the saved theme unchanged regardless of zoom state.
+  - `ImageBlockItem::setMaxWidth(qreal)` added and dispatched from
+    `SceneCoordinator::setItemWidth()` so image blocks rescale on
+    viewport resize (preserving aspect ratio).
+  - `goto cjk_done` removed from `MarkdownTextItem::keyPressEvent`;
+    the full-width bracket autocorrect logic lives in
+    `applyCjkBracketAutocorrect()` with early-returns.
+  - Dead `EditorSettings` surface removed: `EditorSettings.h` header,
+    `Editor::setEditorSettings()` / `editorSettings()` API, and the
+    `m_editorSettings` field are all gone (no host code or tests
+    referenced them). Any future settings knob should be wired up the
+    moment it's exposed.
 
 - **`ensureHeadingMap()` no longer parses independently** (2026-04-17):
   `SceneCoordinator::captureFullDocumentParse()` now captures the

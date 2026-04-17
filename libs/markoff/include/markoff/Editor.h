@@ -7,7 +7,6 @@
 #include <QJsonObject>
 #include <QTextDocument>
 #include <markoff/Theme.h>
-#include <markoff/EditorSettings.h>
 #include <markoff-parser/Document.h>
 
 class QAction;
@@ -61,9 +60,6 @@ public:
     // --- Configuration ---
     void setTheme(const Theme &theme);
     Theme theme() const;
-
-    void setEditorSettings(const EditorSettings &settings);
-    EditorSettings editorSettings() const;
 
     void setResourceProvider(ResourceProvider *provider);
 
@@ -242,6 +238,7 @@ private:
     void createActions();
     bool handleTabKey(QKeyEvent *e);
     void rebuildScene();
+    void applyEffectiveFont();
     void ensureFocusedCursorVisible();
     void startAutoScroll(int mouseY);
     void stopAutoScroll();
@@ -273,7 +270,6 @@ private:
     bool m_inTable = false;
 
     Theme m_theme;
-    EditorSettings m_editorSettings;
     ResourceProvider *m_resourceProvider = nullptr;
     std::unique_ptr<Document> m_document;
 

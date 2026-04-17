@@ -670,41 +670,8 @@ void MarkdownTextItem::keyPressEvent(QKeyEvent *event)
 
     m_control->processEvent(event);
 
-    // CJK full-width bracket autocorrect (Obsidian compat).
-    // Longest match first: ！【【 before 【【.
-    if (!event->text().isEmpty()) {
-        QTextCursor c = m_control->textCursor();
-        int pos = c.position();
-        if (pos >= 3) {
-            c.setPosition(pos - 3);
-            c.setPosition(pos, QTextCursor::KeepAnchor);
-            if (c.selectedText() == QStringLiteral("\uff01\u3010\u3010")) {
-                c.beginEditBlock();
-                c.removeSelectedText();
-                c.insertText(QStringLiteral("![["));
-                c.endEditBlock();
-                goto cjk_done;
-            }
-        }
-        if (pos >= 2) {
-            c = m_control->textCursor();
-            c.setPosition(pos - 2);
-            c.setPosition(pos, QTextCursor::KeepAnchor);
-            QString sel = c.selectedText();
-            if (sel == QStringLiteral("\u3010\u3010")) {
-                c.beginEditBlock();
-                c.removeSelectedText();
-                c.insertText(QStringLiteral("[["));
-                c.endEditBlock();
-            } else if (sel == QStringLiteral("\u3011\u3011")) {
-                c.beginEditBlock();
-                c.removeSelectedText();
-                c.insertText(QStringLiteral("]]"));
-                c.endEditBlock();
-            }
-        }
-    }
-    cjk_done:
+    if (!event->text().isEmpty())
+        applyCjkBracketAutocorrect();
 
     // If cursor didn't move for arrow keys, we're at a boundary
     if (event->key() == Qt::Key_Up || event->key() == Qt::Key_Home) {
@@ -713,6 +680,42 @@ void MarkdownTextItem::keyPressEvent(QKeyEvent *event)
     } else if (event->key() == Qt::Key_Down || event->key() == Qt::Key_End) {
         if (atEnd && m_control->textCursor().atEnd())
             emit cursorAtBoundary(Qt::BottomEdge);
+    }
+}
+
+void MarkdownTextItem::applyCjkBracketAutocorrect()
+{
+    // Obsidian compat: replace full-width brackets with ASCII just-typed.
+    // Longest match first: ！【【 before 【【.
+    QTextCursor c = m_control->textCursor();
+    int pos = c.position();
+    if (pos >= 3) {
+        c.setPosition(pos - 3);
+        c.setPosition(pos, QTextCursor::KeepAnchor);
+        if (c.selectedText() == QStringLiteral("\uff01\u3010\u3010")) {
+            c.beginEditBlock();
+            c.removeSelectedText();
+            c.insertText(QStringLiteral("![["));
+            c.endEditBlock();
+            return;
+        }
+    }
+    if (pos >= 2) {
+        c = m_control->textCursor();
+        c.setPosition(pos - 2);
+        c.setPosition(pos, QTextCursor::KeepAnchor);
+        const QString sel = c.selectedText();
+        if (sel == QStringLiteral("\u3010\u3010")) {
+            c.beginEditBlock();
+            c.removeSelectedText();
+            c.insertText(QStringLiteral("[["));
+            c.endEditBlock();
+        } else if (sel == QStringLiteral("\u3011\u3011")) {
+            c.beginEditBlock();
+            c.removeSelectedText();
+            c.insertText(QStringLiteral("]]"));
+            c.endEditBlock();
+        }
     }
 }
 

@@ -519,15 +519,18 @@ QString Editor::toPlainText() const
 
 void Editor::setFontSize(int pointSize)
 {
-    // Keep the editor's font-size knob in sync with its theme: bumping
-    // the size mutates the theme's textFont and re-applies. This way
-    // setTheme()/setFontSize() never disagree about which font is in use.
     m_fontSize = pointSize;
-    m_theme.textFont.setPointSize(pointSize);
-    if (m_coordinator) {
-        m_coordinator->setFont(m_theme.textFont);
-        m_coordinator->setTheme(m_theme);
-    }
+    applyEffectiveFont();
+}
+
+void Editor::applyEffectiveFont()
+{
+    if (!m_coordinator)
+        return;
+    QFont font = m_theme.textFont;
+    if (m_fontSize > 0)
+        font.setPointSize(m_fontSize);
+    m_coordinator->setFont(font);
 }
 
 void Editor::resizeEvent(QResizeEvent *e)
@@ -937,23 +940,14 @@ void Editor::setTheme(const Theme &theme)
     m_theme = theme;
     m_fontSize = theme.textFont.pointSize() > 0 ? theme.textFont.pointSize() : 14;
     if (m_coordinator) {
-        // Apply both the per-element char formats AND the document default
-        // font, otherwise body text would render at the old font size while
-        // the highlighter colors come from the new theme.
-        if (theme.textFont != QFont())
-            m_coordinator->setFont(theme.textFont);
         m_coordinator->setTheme(theme);
+        // Apply the document default font AFTER setTheme so body text
+        // renders at the theme's font size alongside the highlighter colors.
+        applyEffectiveFont();
     }
 }
 
 Theme Editor::theme() const { return m_theme; }
-
-void Editor::setEditorSettings(const EditorSettings &settings)
-{
-    m_editorSettings = settings;
-}
-
-EditorSettings Editor::editorSettings() const { return m_editorSettings; }
 
 void Editor::setResourceProvider(ResourceProvider *provider)
 {

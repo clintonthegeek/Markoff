@@ -422,6 +422,8 @@ void SceneCoordinator::setItemWidth(qreal width)
         if (item->isTextItem()) {
             auto *textItem = static_cast<MarkdownTextItem *>(item);
             textItem->setTextWidth(width);
+        } else if (auto *image = dynamic_cast<ImageBlockItem *>(item->asGraphicsItem())) {
+            image->setMaxWidth(width);
         }
         // StubBlockItems have fixed width — they'll be replaced by real items later
     }

@@ -115,4 +115,20 @@ QString ImageBlockItem::toMarkdown() const
     return m_markdown;
 }
 
+void ImageBlockItem::setMaxWidth(qreal maxWidth)
+{
+    if (qFuzzyCompare(m_maxWidth, maxWidth))
+        return;
+    m_maxWidth = maxWidth;
+    prepareGeometryChange();
+    if (m_missing || m_image.isNull()) {
+        m_displayWidth = m_maxWidth;
+    } else {
+        m_displayWidth = qMin(static_cast<qreal>(m_image.width()), m_maxWidth);
+        qreal scale = m_displayWidth / m_image.width();
+        m_displayHeight = m_image.height() * scale;
+    }
+    update();
+}
+
 } // namespace Markoff

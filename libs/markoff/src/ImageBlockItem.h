@@ -23,6 +23,10 @@ public:
                QWidget *widget) override;
     QString toMarkdown() const override;
 
+    /// Update the maximum render width (called on viewport resize).
+    /// Recomputes display dimensions preserving aspect ratio.
+    void setMaxWidth(qreal maxWidth);
+
 private:
     void parseMarkdown();
     void loadImage();

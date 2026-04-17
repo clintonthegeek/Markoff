@@ -108,6 +108,10 @@ Q_SIGNALS:
 private:
     void updateGeometry();
     void onCursorPositionChanged();
+    /// CJK full-width bracket autocorrect (Obsidian compat). Called after
+    /// each keypress; inspects the characters just left of the cursor and
+    /// replaces full-width brackets with ASCII equivalents when matched.
+    void applyCjkBracketAutocorrect();
     void snapCursorPastDelimiters();
     void detectDecoratedRanges();
     void paintDecoratedRanges(QPainter *painter);
