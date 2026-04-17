@@ -98,6 +98,16 @@ MarkdownTextItem *SceneCoordinator::createTextItem(const QString &text)
     return item;
 }
 
+void SceneCoordinator::captureFullDocumentParse(const QString &markdown)
+{
+    // `MarkdownSplitter::split()` already parsed `markdown` through
+    // `m_parser`, so the parser is in full-document state right after
+    // the call. Capture the headings and raw UTF-8 here before any
+    // per-item parse replaces the parser's tree.
+    m_rawHeadings = m_parser->buildDocumentQueries().headings;
+    m_rawUtf8 = markdown.toUtf8();
+}
+
 QList<TableConverter::TableRegion>
 SceneCoordinator::detectTableRegions(const QString &markdown) const
 {
@@ -159,10 +169,12 @@ void SceneCoordinator::loadMarkdown(const QString &markdown)
     m_tableConverters.clear();
 
     auto segments = MarkdownSplitter::split(markdown, *m_parser);
+    captureFullDocumentParse(markdown);
 
     for (const auto &seg : segments) {
         if (seg.type == MarkdownSegment::Text) {
             auto *item = createTextItem(seg.text);
+            item->setLeadSeparator(seg.leadSeparator);
 
             // Detect and convert any pipe tables within this text item.
             // The document may contain U+FFFC inline substitutions (math,
@@ -210,6 +222,7 @@ void SceneCoordinator::loadMarkdown(const QString &markdown)
             }
         } else if (seg.type == MarkdownSegment::Image) {
             auto *item = new ImageBlockItem(seg.text, m_itemWidth, m_resourceProvider);
+            item->setLeadSeparator(seg.leadSeparator);
             m_scene->addItem(item);
             m_items.append(item);
         }
@@ -389,10 +402,10 @@ QString SceneCoordinator::toMarkdown() const
     QString result;
     for (int i = 0; i < m_items.size(); ++i) {
         if (i > 0) {
-            int nlCount = interItemNewlines(m_items[i - 1]->isTextItem(),
-                                            m_items[i]->isTextItem());
-            for (int n = 0; n < nlCount; ++n)
-                result += QLatin1Char('\n');
+            // Use the separator captured from the source markdown during
+            // splitting — preserves the exact inter-item blank-line count
+            // instead of normalizing every boundary to "\n\n".
+            result += m_items[i]->leadSeparator();
         }
         result += m_items[i]->toMarkdown();
     }
@@ -632,6 +645,7 @@ void SceneCoordinator::reparse()
 
     // Check if block boundaries changed
     auto newSegments = MarkdownSplitter::split(markdown, *m_parser);
+    captureFullDocumentParse(markdown);
 
     // Compare segment count and types to current items
     bool structureChanged = false;
@@ -654,6 +668,7 @@ void SceneCoordinator::reparse()
         for (const auto &seg : newSegments) {
             if (seg.type == MarkdownSegment::Text) {
                 auto *item = createTextItem(seg.text);
+                item->setLeadSeparator(seg.leadSeparator);
 
                 // Detect and convert pipe tables (same logic as loadMarkdown)
                 if (m_parser->parse(seg.text)) {
@@ -684,6 +699,7 @@ void SceneCoordinator::reparse()
                 }
             } else if (seg.type == MarkdownSegment::Image) {
                 auto *item = new ImageBlockItem(seg.text, m_itemWidth, m_resourceProvider);
+                item->setLeadSeparator(seg.leadSeparator);
                 m_scene->addItem(item);
                 m_items.append(item);
             }
@@ -780,21 +796,17 @@ void SceneCoordinator::ensureHeadingMap() const
     if (hs.isEmpty()) return;
 
 
-    // Use sourceOffsets from a fresh parse of the raw toMarkdown() output.
-    // Document::fromMarkdown (which populates FoldingModel's headings)
-    // strips frontmatter AND footnote definitions before parsing, so its
-    // offsets don't align with toMarkdown()'s byte space.
-    // SceneCoordinator's m_parser is per-item (its last parse was the
-    // last segment's text, not the whole document), so we run a one-shot
-    // parse here. We match to FoldingModel headings by document-order
-    // index — both parses use the same tree-sitter grammar so they agree
-    // on heading count and order.
-    const QString md = toMarkdown();
-    const QByteArray utf8 = md.toUtf8();
-    TreeSitterParser rawParser;
-    rawParser.parse(md);
-    const QList<HeadingInfo> rawHeadings =
-        rawParser.buildDocumentQueries().headings;
+    // Use sourceOffsets captured during the last full-document parse
+    // (see `captureFullDocumentParse()`, populated by
+    // `loadMarkdown()` / `reparse()` right after `MarkdownSplitter::split()`).
+    // `Document::fromMarkdown` — which populates `FoldingModel`'s
+    // headings — strips frontmatter and footnote definitions before
+    // parsing, so its offsets don't align with `toMarkdown()`'s byte
+    // space. The cached raw-document headings match `toMarkdown()`'s
+    // byte space directly, and we match them against
+    // `FoldingModel::headings()` by document-order index.
+    const QByteArray &utf8 = m_rawUtf8;
+    const QList<HeadingInfo> &rawHeadings = m_rawHeadings;
     if (rawHeadings.size() != hs.size()) return;
 
     QHash<int, int> lineToHeadingIdx;

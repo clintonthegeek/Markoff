@@ -408,27 +408,25 @@ query API (headings, links, tags) via separate CST traversals:
 
 ### Known issue: redundant parses per reparse cycle
 
-A single debounced reparse currently drives **2–4 independent
-tree-sitter parses** of the full document:
+A single debounced reparse currently drives these tree-sitter parses of
+the full document:
 
 1. `SceneCoordinator::reparse()` calls `MarkdownSplitter::split()` on the
    full source via the shared `m_parser`.
-2. For every text segment that might contain a table,
-   `detectTableRegions()` re-parses the segment's text to find table
-   boundaries.
-3. `ensureHeadingMap()` constructs a **fresh** local `TreeSitterParser`
-   and parses the full document again (the comment explains why:
-   `Document::fromMarkdown` strips frontmatter + footnote definitions
-   before parsing, so its offsets do not align with `toMarkdown()`'s
-   byte space).
+2. Per text segment, `m_parser` is reused to parse each segment's text
+   (per-item parses — not redundant, each segment is a distinct input).
+   `detectTableRegions()` reads `findBlockBoundaries()` off that same
+   per-segment parser state.
+3. `ensureHeadingMap()` reuses the full-document heading list captured
+   by `captureFullDocumentParse()` at the top of `reparse()` /
+   `loadMarkdown()` — **no longer parses independently**. This removed
+   one full-document parse per fold/outline query.
 4. `onDocumentReparsed()` then calls `Document::fromMarkdown(toPlainText())`
    to rebuild the `Document` model for headings/links/tags signals —
-   a fourth parse of the full source.
-
-Collapsing these into a single shared parser / AST is the highest-leverage
-performance win on the board. It also unifies the "one grammar"
-invariant so future Obsidian grammar extensions (embeds, block refs)
-need to be taught exactly one parser path.
+   still a second full-source parse. `Document::fromMarkdown` strips
+   frontmatter + footnote definitions before parsing, so collapsing
+   this with the editor's `m_parser` would require teaching the
+   editor pipeline about those strips too. Not done yet.
 
 **Open question**: tree-sitter supports incremental parsing via
 `ts_tree_edit()`. The current implementation does a full reparse on every

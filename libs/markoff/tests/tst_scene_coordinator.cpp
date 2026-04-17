@@ -19,6 +19,12 @@ class TstSceneCoordinator : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void reparsedHandlerEditIsNotSwallowed();
+    void roundTripPreservesBlankLinesAroundFence();
+    void roundTripPreservesNoBlankLineAroundFence();
+    void roundTripPreservesMultipleBlankLinesAroundFence();
+    void roundTripPreservesBlankLinesAroundImage();
+    void roundTripPreservesTrailingNewlines();
+    void roundTripPureText();
 };
 
 /// Regression: `SceneCoordinator::reparse()` used to schedule the
@@ -92,6 +98,59 @@ void TstSceneCoordinator::reparsedHandlerEditIsNotSwallowed()
     QVERIFY2(spy.count() >= 2,
              qPrintable(QStringLiteral("expected ≥2 reparse emissions, got %1")
                         .arg(spy.count())));
+}
+
+/// Round-trip fidelity: `toPlainText()` (which calls
+/// `SceneCoordinator::toMarkdown()`) must reproduce the exact source
+/// markdown, byte for byte, when no edits have been made. Historically
+/// `interItemNewlines()` hardcoded the gap between a text item and a
+/// block item to "\n\n", losing the real blank-line count from the
+/// source.
+
+static QString roundTrip(const QString &input)
+{
+    Editor editor;
+    editor.resize(800, 400);
+    editor.setPlainText(input);
+    editor.show();
+    QApplication::processEvents();
+    return editor.toPlainText();
+}
+
+void TstSceneCoordinator::roundTripPreservesBlankLinesAroundFence()
+{
+    const QString src = QStringLiteral("A\n\n```\ncode\n```\n\nB");
+    QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::roundTripPreservesNoBlankLineAroundFence()
+{
+    const QString src = QStringLiteral("A\n```\ncode\n```\nB");
+    QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::roundTripPreservesMultipleBlankLinesAroundFence()
+{
+    const QString src = QStringLiteral("A\n\n\n```\ncode\n```\n\n\nB");
+    QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::roundTripPreservesBlankLinesAroundImage()
+{
+    const QString src = QStringLiteral("before\n\n\n![alt](img.png)\n\n\nafter");
+    QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::roundTripPreservesTrailingNewlines()
+{
+    const QString src = QStringLiteral("A\n\nB\n\n");
+    QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::roundTripPureText()
+{
+    const QString src = QStringLiteral("line1\nline2\n\nline4\n\n\nline7");
+    QCOMPARE(roundTrip(src), src);
 }
 
 QTEST_MAIN(TstSceneCoordinator)

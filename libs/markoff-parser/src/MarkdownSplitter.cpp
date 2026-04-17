@@ -44,6 +44,10 @@ QList<MarkdownSegment> MarkdownSplitter::split(const QString &markdown,
     }
 
     int pos = 0; // current char position in markdown
+    // Track where the last EMITTED segment's content ended in source.
+    // leadSeparator of the next segment = markdown[prevContentEnd ..
+    // thisContentStart], capturing the exact blank-line count from source.
+    int prevContentEnd = 0;
 
     for (const auto &boundary : boundaries) {
         // Tables stay in text segments — they'll be converted to
@@ -56,13 +60,19 @@ QList<MarkdownSegment> MarkdownSplitter::split(const QString &markdown,
             MarkdownSegment textSeg;
             textSeg.type = MarkdownSegment::Text;
             textSeg.text = markdown.mid(pos, boundary.startChar - pos);
-            textSeg.sourceStart = pos;
-            textSeg.sourceEnd = boundary.startChar;
             // Trim trailing newline from text segment (it belongs to the block boundary)
             if (textSeg.text.endsWith(QLatin1Char('\n')))
                 textSeg.text.chop(1);
-            if (!textSeg.text.isEmpty())
+            const int contentStart = pos;
+            const int contentEnd = contentStart + textSeg.text.length();
+            textSeg.sourceStart = contentStart;
+            textSeg.sourceEnd = contentEnd;
+            textSeg.leadSeparator = markdown.mid(prevContentEnd,
+                                                 contentStart - prevContentEnd);
+            if (!textSeg.text.isEmpty()) {
                 segments.append(textSeg);
+                prevContentEnd = contentEnd;
+            }
         }
 
         // The block itself
@@ -83,9 +93,14 @@ QList<MarkdownSegment> MarkdownSplitter::split(const QString &markdown,
         // Trim trailing newline
         if (blockSeg.text.endsWith(QLatin1Char('\n')))
             blockSeg.text.chop(1);
-        blockSeg.sourceStart = boundary.startChar;
-        blockSeg.sourceEnd = boundary.endChar;
+        const int blockContentStart = boundary.startChar;
+        const int blockContentEnd = blockContentStart + blockSeg.text.length();
+        blockSeg.sourceStart = blockContentStart;
+        blockSeg.sourceEnd = blockContentEnd;
+        blockSeg.leadSeparator = markdown.mid(prevContentEnd,
+                                               blockContentStart - prevContentEnd);
         segments.append(blockSeg);
+        prevContentEnd = blockContentEnd;
 
         pos = boundary.endChar;
     }
@@ -95,13 +110,21 @@ QList<MarkdownSegment> MarkdownSplitter::split(const QString &markdown,
         MarkdownSegment textSeg;
         textSeg.type = MarkdownSegment::Text;
         textSeg.text = markdown.mid(pos);
-        textSeg.sourceStart = pos;
-        textSeg.sourceEnd = markdown.length();
+        int contentStart = pos;
         // Trim leading newline (it belonged to the previous block)
-        if (textSeg.text.startsWith(QLatin1Char('\n')))
+        if (textSeg.text.startsWith(QLatin1Char('\n'))) {
             textSeg.text.remove(0, 1);
-        if (!textSeg.text.isEmpty())
+            contentStart += 1;
+        }
+        const int contentEnd = contentStart + textSeg.text.length();
+        textSeg.sourceStart = contentStart;
+        textSeg.sourceEnd = contentEnd;
+        textSeg.leadSeparator = markdown.mid(prevContentEnd,
+                                              contentStart - prevContentEnd);
+        if (!textSeg.text.isEmpty()) {
             segments.append(textSeg);
+            prevContentEnd = contentEnd;
+        }
     }
 
     // Ensure at least one text segment exists (for cursor placement)

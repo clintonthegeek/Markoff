@@ -4,11 +4,13 @@
 
 #include <markoff/Theme.h>
 #include "TableConverter.h"
+#include <markoff-parser/Document.h>
 #include <QObject>
 #include <QList>
 #include <QFont>
 #include <QHash>
 #include <QPair>
+#include <QByteArray>
 
 class QTimer;
 
@@ -137,6 +139,15 @@ private:
     mutable bool m_headingMapDirty = true;
     void ensureHeadingMap() const;
     int headingAtBlock(int itemIdx, int blockNumber) const;
+
+    /// Full-document parse artifacts captured by `loadMarkdown()` /
+    /// `reparse()` right after `MarkdownSplitter::split()`. Reused by
+    /// `ensureHeadingMap()` so fold operations don't trigger an
+    /// independent full-document tree-sitter parse. Both fields are
+    /// refreshed whenever the document is re-split.
+    QList<HeadingInfo> m_rawHeadings;
+    QByteArray m_rawUtf8;
+    void captureFullDocumentParse(const QString &markdown);
 
     QList<TableConverter::TableRegion> detectTableRegions(const QString &markdown) const;
 

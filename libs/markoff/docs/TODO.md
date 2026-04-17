@@ -19,12 +19,17 @@ implementation; the rest are implementation tasks.
   edits, or (b) document as a known limitation. Coordinator is the
   better long-term fix — it's a one-time plumbing cost that pays off
   for every future cross-item operation. **(blocked: spec)**
-- [ ] **Parse-path unification.** `SceneCoordinator::reparse()`,
-  `detectTableRegions()`, `ensureHeadingMap()`, and
-  `Document::fromMarkdown()` each run independent full-document
-  tree-sitter parses per reparse cycle. Collapsing to one shared AST
-  also retires the remaining MD4C path. Prerequisite to incremental
-  parsing and to any new Obsidian grammar extension work.
+- [ ] **Parse-path unification — step 2 (Document).** The editor's
+  `m_parser` now captures full-document headings once per reparse
+  (see `captureFullDocumentParse()`), which retired the one-shot parse
+  inside `ensureHeadingMap()`. `onDocumentReparsed()` still calls
+  `Document::fromMarkdown(toPlainText())` for the public headings /
+  links / tags signals — that's a second full-doc parse per reparse
+  cycle. Collapsing it requires teaching the editor pipeline about
+  frontmatter and footnote-definition stripping (which
+  `Document::fromMarkdown` does internally before parsing). Not
+  blocking any current feature. Note: MD4C is not in the codebase —
+  all markdown parsing already flows through tree-sitter.
 - [ ] **Obsidian-flavored grammar additions** in the vendored
   tree-sitter grammar:
   - `![[embed]]` (embed prefix on wikilinks)
@@ -42,12 +47,6 @@ implementation; the rest are implementation tasks.
   actually changed, not the entire document. Compare old and new span
   maps to find dirty blocks. Currently `applyInlineSubstitutions` calls
   `hl->rehighlight()` per text item per reparse — expensive.
-- [ ] **`ensureHeadingMap()` does a full tree-sitter reparse.** Every
-  call to `enclosingHeadingPath`, `headingAtBlock`, `headingIndexForItem`
-  triggers `ensureHeadingMap()` which — when dirty — runs a **fresh**
-  `TreeSitterParser` over the entire document. The heading map is
-  marked dirty on every `foldStateChanged`, so folding a single heading
-  re-parses the full document. Fold when parse-path unification lands.
 - [ ] **Search highlight walks the full item list multiple times per
   keystroke.** `highlightAllMatches()` walks all items finding matches,
   then `updateMatchCount()` walks them again to recompute the current
@@ -152,13 +151,6 @@ implementation; the rest are implementation tasks.
   no-selection toggle-off case using `SourceSpan::parentCharStart/End`;
   add the two missing action IDs and wire them up.
 
-- [ ] **Round-trip fidelity: blank lines lost in selectAll+copy.**
-  Copying the full document via selectAll+copy produces markdown that
-  differs from the original source — blank lines between blocks are
-  dropped or normalized. Root cause likely in
-  `SceneCoordinator::toMarkdown()` which joins items with a hardcoded
-  `\n` or `\n\n`, discarding original inter-block whitespace. Affects
-  line-number precision for cross-tool integrations.
 - [ ] **Context menu lacks formatting actions.** Right-click with a
   selection offers only Undo/Redo/Cut/Copy/Paste/Select All. You can't
   right-click a selection and Bold/Italic/etc. Minor UX gap.
@@ -271,6 +263,34 @@ no runtime benefit.
   consumers with stricter toolchains.
 
 ## Recently fixed (for context)
+
+- **`ensureHeadingMap()` no longer parses independently** (2026-04-17):
+  `SceneCoordinator::captureFullDocumentParse()` now captures the
+  full-document headings + UTF-8 bytes at the top of `loadMarkdown()`
+  and `reparse()` (right after `MarkdownSplitter::split()` leaves
+  `m_parser` in full-document state). `ensureHeadingMap()` reads from
+  that cache instead of allocating a local `TreeSitterParser` and
+  reparsing. Every fold / outline query that previously forced a
+  full-document tree-sitter parse on dirty heading maps now uses
+  cached data. Existing folding tests pass unchanged (tst_folding_*).
+
+- **Round-trip fidelity: blank lines around block items** (2026-04-17):
+  `MarkdownSegment` now carries a `leadSeparator` field capturing the
+  exact whitespace between a segment's content start and the previous
+  segment's content end in the source. `MarkdownSplitter` populates it
+  from source positions; `SceneCoordinator::loadMarkdown()` /
+  `reparse()` propagate it onto items via
+  `SelectableItem::setLeadSeparator`; `SceneCoordinator::toMarkdown()`
+  emits `item->leadSeparator()` instead of the hardcoded 1/2-newline
+  heuristic. Previously, `selectAll+copy` around an image added an
+  extra blank line on each side — any inter-item gap was normalized to
+  exactly "\n\n". New tests in `tst_scene_coordinator`: six
+  round-trip cases (fence with 0/1/multi blank lines, image with
+  multi blank lines, trailing newlines, pure text). Note:
+  `globalPositionOf` / `itemAtGlobalLine` / `ensureHeadingMap` still
+  use the `interItemNewlines` heuristic for line counting — scope
+  kept minimal. Fence/table splitting doesn't currently trigger in
+  the splitter, so only image-containing documents observed the bug.
 
 - **TextControl direct test coverage** (2026-04-16): six new test files —
   cursor (13 slots), selection (8), editing (10), input (10, absorbs
