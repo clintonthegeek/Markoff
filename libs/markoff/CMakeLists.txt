@@ -55,7 +55,6 @@ add_library(markoff STATIC
     src/TableSerializer.cpp
     src/TableConverter.h
     src/TableConverter.cpp
-    src/TableStyle.h
 )
 set_target_properties(markoff PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(Markoff::Markoff ALIAS markoff)
