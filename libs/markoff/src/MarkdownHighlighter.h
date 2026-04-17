@@ -52,6 +52,10 @@ public:
         return m_theme.formats.value(Element::H1).background().color();
     }
 
+    /// Active theme. Used by `MarkdownTextItem` paint-time code so it can
+    /// read `theme.paint.*` non-format colors without owning a Theme copy.
+    const Theme &theme() const { return m_theme; }
+
 protected:
     void highlightBlock(const QString &text) override;
 

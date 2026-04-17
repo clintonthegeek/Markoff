@@ -30,9 +30,6 @@ struct DecoratedRange {
 
     // Heading
     QColor headingBackground;
-
-    /// Get the accent color for a callout type
-    static QColor colorForCalloutType(const QString &type);
 };
 
 } // namespace Markoff

@@ -6,6 +6,47 @@
 
 namespace Markoff {
 
+// Obsidian-compatible callout accent colors, shared between light and dark
+// themes. The table mirrors `DecoratedRange::colorForCalloutType` pre-theme
+// and is the canonical source of truth now that callouts are theme-driven.
+static QHash<QString, QColor> defaultCalloutAccents()
+{
+    return {
+        {QStringLiteral("note"),      QColor(0x44, 0x8a, 0xff)},
+        {QStringLiteral("info"),      QColor(0x44, 0x8a, 0xff)},
+        {QStringLiteral("todo"),      QColor(0x44, 0x8a, 0xff)},
+        {QStringLiteral("abstract"),  QColor(0x00, 0xb8, 0xd4)},
+        {QStringLiteral("summary"),   QColor(0x00, 0xb8, 0xd4)},
+        {QStringLiteral("tldr"),      QColor(0x00, 0xb8, 0xd4)},
+        {QStringLiteral("tip"),       QColor(0x00, 0xbf, 0xa5)},
+        {QStringLiteral("hint"),      QColor(0x00, 0xbf, 0xa5)},
+        {QStringLiteral("important"), QColor(0x00, 0xbf, 0xa5)},
+        {QStringLiteral("success"),   QColor(0x00, 0xc8, 0x53)},
+        {QStringLiteral("check"),     QColor(0x00, 0xc8, 0x53)},
+        {QStringLiteral("done"),      QColor(0x00, 0xc8, 0x53)},
+        {QStringLiteral("question"),  QColor(0xff, 0xab, 0x00)},
+        {QStringLiteral("help"),      QColor(0xff, 0xab, 0x00)},
+        {QStringLiteral("faq"),       QColor(0xff, 0xab, 0x00)},
+        {QStringLiteral("warning"),   QColor(0xff, 0x91, 0x00)},
+        {QStringLiteral("caution"),   QColor(0xff, 0x91, 0x00)},
+        {QStringLiteral("attention"), QColor(0xff, 0x91, 0x00)},
+        {QStringLiteral("failure"),   QColor(0xff, 0x52, 0x52)},
+        {QStringLiteral("fail"),      QColor(0xff, 0x52, 0x52)},
+        {QStringLiteral("missing"),   QColor(0xff, 0x52, 0x52)},
+        {QStringLiteral("danger"),    QColor(0xff, 0x17, 0x44)},
+        {QStringLiteral("error"),     QColor(0xff, 0x17, 0x44)},
+        {QStringLiteral("bug"),       QColor(0xff, 0x17, 0x44)},
+        {QStringLiteral("example"),   QColor(0x7c, 0x4d, 0xff)},
+        {QStringLiteral("quote"),     QColor(0x9e, 0x9e, 0x9e)},
+        {QStringLiteral("cite"),      QColor(0x9e, 0x9e, 0x9e)},
+    };
+}
+
+QColor Theme::calloutColor(const QString &type) const
+{
+    return paint.calloutAccents.value(type.toLower(), paint.calloutDefault);
+}
+
 // Helper to create a format with foreground color
 static QTextCharFormat fgFormat(const QColor &color)
 {
@@ -160,6 +201,27 @@ Theme Theme::defaultLight()
     trailingFmt.setBackground(QColor(235, 235, 235));
     t.formats[Element::TrailingSpace] = trailingFmt;
 
+    // --- Paint colors ---
+    t.paint.codeBlockBg            = QColor(0xf5, 0xf5, 0xf5);
+    t.paint.codeBlockBorder        = QColor(0xe0, 0xe0, 0xe0);
+    t.paint.codeBlockLanguageLabel = QColor(0x9e, 0x9e, 0x9e);
+
+    t.paint.searchMatchBg        = QColor(255, 255,   0, 120); // translucent yellow
+    t.paint.searchCurrentMatchBg = QColor(255, 150,  50, 180); // translucent orange
+
+    t.paint.checkboxCheckedFill     = QColor( 76, 175,  80); // #4caf50
+    t.paint.checkboxCheckMark       = QColor(255, 255, 255); // white
+    t.paint.checkboxUncheckedOutline = QColor(158, 158, 158);
+
+    t.paint.imagePlaceholderBg     = QColor(0xf8, 0xf8, 0xf8);
+    t.paint.imagePlaceholderBorder = QColor(0xcc, 0xcc, 0xcc);
+    t.paint.imagePlaceholderText   = QColor(0x99, 0x99, 0x99);
+
+    t.paint.blockSelectionOverlay = QColor(51, 153, 255, 80);
+
+    t.paint.calloutAccents = defaultCalloutAccents();
+    t.paint.calloutDefault = QColor(0x44, 0x8a, 0xff); // same as "note"
+
     return t;
 }
 
@@ -286,6 +348,27 @@ Theme Theme::defaultDark()
     QTextCharFormat trailingFmt;
     trailingFmt.setBackground(QColor(55, 60, 68));
     t.formats[Element::TrailingSpace] = trailingFmt;
+
+    // --- Paint colors ---
+    t.paint.codeBlockBg            = QColor( 50,  60,  50);
+    t.paint.codeBlockBorder        = QColor( 70,  80,  70);
+    t.paint.codeBlockLanguageLabel = QColor(130, 130, 130);
+
+    t.paint.searchMatchBg        = QColor(255, 215,   0, 110); // amber
+    t.paint.searchCurrentMatchBg = QColor(255, 120,  40, 200); // brighter orange
+
+    t.paint.checkboxCheckedFill     = QColor(100, 200, 100);
+    t.paint.checkboxCheckMark       = QColor( 25,  30,  25);
+    t.paint.checkboxUncheckedOutline = QColor(160, 160, 160);
+
+    t.paint.imagePlaceholderBg     = QColor( 45,  48,  55);
+    t.paint.imagePlaceholderBorder = QColor( 80,  88,  95);
+    t.paint.imagePlaceholderText   = QColor(140, 155, 165);
+
+    t.paint.blockSelectionOverlay = QColor(100, 180, 255, 80);
+
+    t.paint.calloutAccents = defaultCalloutAccents();
+    t.paint.calloutDefault = QColor(0x44, 0x8a, 0xff);
 
     return t;
 }
@@ -448,6 +531,13 @@ Theme Theme::fromSchemeFile(const QString &path)
         fFmt.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
         t.formats[Element::FootnoteRef] = fFmt;
     }
+
+    // The QOwnNotes INI format does not represent the non-QTextCharFormat
+    // paint colors (checkbox glyph, code-block backdrop, callouts, search,
+    // ...), so borrow them from the light defaults. Host apps that want
+    // to override specific paint colors should do so on the returned
+    // Theme before handing it to Editor::setTheme().
+    t.paint = Theme::defaultLight().paint;
 
     return t;
 }

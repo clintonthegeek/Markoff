@@ -1712,12 +1712,11 @@ void Editor::highlightAllMatches(const QString &text)
 
     QTextDocument::FindFlags flags = searchFlags();
 
-    // Highlight formats
     QTextCharFormat matchFmt;
-    matchFmt.setBackground(QColor(255, 255, 0, 120)); // yellow
+    matchFmt.setBackground(m_theme.paint.searchMatchBg);
 
     QTextCharFormat currentFmt;
-    currentFmt.setBackground(QColor(255, 150, 50, 180)); // orange
+    currentFmt.setBackground(m_theme.paint.searchCurrentMatchBg);
 
     // Find the focused item and cursor position for current-match tracking
     auto *focusedItem = focusedTextItem();

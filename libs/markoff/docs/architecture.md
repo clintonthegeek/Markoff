@@ -327,31 +327,64 @@ the same pipeline:
 
 ## Theme System
 
-The Theme struct contains a `QHash<Element, QTextCharFormat>` with 57
-element types covering all markdown constructs, plus base text and code
-fonts.
+`Markoff::Theme` is a two-part value: a `QHash<Element, QTextCharFormat>`
+that drives highlighter-applied formatting (57 element types covering
+every markdown construct), and a `PaintColors` sub-struct that drives
+every surface a `QTextCharFormat` can't express — custom-painted glyphs,
+ExtraSelection overlays, rounded backdrops, callout accent bars, etc.
+Together those two pieces cover every color in the editor.
 
-Themes propagate through: `Editor::setTheme()` -> `SceneCoordinator::setTheme()`
--> each item's `MarkdownHighlighter::setTheme()` -> immediate rehighlight.
+```
+Theme
+├── formats[Element]  → QTextCharFormat, applied by MarkdownHighlighter
+├── textFont, codeFont
+└── paint             → PaintColors, read at paint time by graphics items
+    ├── codeBlockBg / codeBlockBorder / codeBlockLanguageLabel
+    ├── searchMatchBg / searchCurrentMatchBg      (ExtraSelection backgrounds)
+    ├── checkboxCheckedFill / checkboxCheckMark /
+    │   checkboxUncheckedOutline                  (CheckboxTextObject glyph)
+    ├── imagePlaceholderBg / imagePlaceholderBorder /
+    │   imagePlaceholderText                      (ImageBlockItem fallback)
+    ├── blockSelectionOverlay                     (BlockItem "fully selected")
+    └── calloutAccents{type→color} + calloutDefault
+```
 
-Factory methods: `Theme::defaultLight()`, `Theme::defaultDark()`,
-`Theme::fromSchemeFile()` (QOwnNotes INI format).
+### Propagation
 
-**Known gap**: several visual constants are currently hardcoded rather
-than Theme-driven. Consolidating these into `Theme` (either as new
-`Element` values or as a separate decoration-color map) would make the
-editor fully skinnable. Specifically:
+`Editor::setTheme(theme)` stores the theme and pushes it to
+`SceneCoordinator::setTheme(theme)`. The coordinator stores the active
+theme in `m_theme` (so freshly-created items inherit it on first paint)
+and, for each existing item, dispatches:
 
-- Code block background / border / language label color
-  (`MarkdownTextItem::paintDecoratedRanges`)
-- Search match highlight yellow / current-match orange
-  (`Editor::highlightAllMatches`)
-- Callout type → accent color table (`DecoratedRange::colorForCalloutType`)
-- Checkbox checked/unchecked glyph colors (`CheckboxTextObject::drawObject`)
-- `TableStyle` struct (currently unused, awaiting integration)
+- Text items → `MarkdownTextItem::setTheme()` which fans out to the
+  item's `MarkdownHighlighter` (rehighlight with new `formats`) and to
+  its `CheckboxTextObject` (glyph colors), then re-runs
+  `detectDecoratedRanges()` so callout accents pick up the new palette.
+- `BlockItem` subclasses (ImageBlockItem, etc.) → virtual
+  `BlockItem::setTheme()` which handles `blockSelectionOverlay` in the
+  base class; subclasses override to pull their own `paint` fields.
 
-**Open question**: Should `Theme::fromSchemeFile()` be extended to read
-KDE color schemes (Breeze, etc.) for native desktop integration?
+### Resolving callout colors
+
+`Theme::calloutColor("warning")` lowercases the type and looks it up in
+`paint.calloutAccents`, returning `paint.calloutDefault` when missing.
+Obsidian-compatible type names (`note`/`info`/`todo`,
+`abstract`/`summary`/`tldr`, `tip`/`hint`/`important`, `success`/`check`/
+`done`, `question`/`help`/`faq`, `warning`/`caution`/`attention`,
+`failure`/`fail`/`missing`, `danger`/`error`/`bug`, `example`, `quote`/
+`cite`) are populated by `defaultLight()` / `defaultDark()`.
+
+### Factory methods
+
+- `Theme::defaultLight()` / `Theme::defaultDark()` — built-in palettes.
+- `Theme::fromSchemeFile(path)` — QOwnNotes-style INI format. The INI
+  describes `formats` only; the paint colors are inherited from
+  `defaultLight()` so host apps never receive a partially-initialized
+  Theme. A host that wants custom paint colors should assign them on
+  the returned `Theme::paint` before handing it to `Editor::setTheme`.
+
+**Open question**: extend `fromSchemeFile()` to read KDE color schemes
+(Breeze, etc.) for native desktop integration.
 
 ---
 
@@ -374,7 +407,7 @@ markdown.
 | Type | Status | Capabilities |
 |------|--------|-------------|
 | MarkdownTextItem | Shipped | Full editing, highlighting, math, checkboxes, decorated ranges, embedded QTextTable frames |
-| ImageBlockItem | Shipped (read-only) | Rendered image via ResourceProvider, missing-image fallback. Does not currently respond to viewport width changes post-construction. |
+| ImageBlockItem | Shipped (read-only) | Rendered image via ResourceProvider, missing-image fallback. Rescales on viewport resize via `setMaxWidth`. Placeholder colors driven by `Theme::paint`. |
 
 ## Embedded rich elements (inside MarkdownTextItem)
 

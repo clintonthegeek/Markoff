@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "ImageBlockItem.h"
 #include <markoff/ResourceProvider.h>
+#include <markoff/Theme.h>
 
 #include <QPainter>
 #include <QRegularExpression>
@@ -89,13 +90,12 @@ void ImageBlockItem::paint(QPainter *painter,
     painter->save();
 
     if (m_missing) {
-        // Placeholder: rounded rect with text
         QRectF rect = boundingRect();
         painter->setRenderHint(QPainter::Antialiasing);
-        painter->setPen(QPen(QColor(0xcc, 0xcc, 0xcc), 1));
-        painter->setBrush(QColor(0xf8, 0xf8, 0xf8));
+        painter->setPen(QPen(m_placeholderBorder, 1));
+        painter->setBrush(m_placeholderBg);
         painter->drawRoundedRect(rect.adjusted(0.5, 0.5, -0.5, -0.5), 4, 4);
-        painter->setPen(QColor(0x99, 0x99, 0x99));
+        painter->setPen(m_placeholderText);
         QString label = m_imageName.isEmpty()
             ? QStringLiteral("Image not found")
             : QStringLiteral("Image not found: %1").arg(m_imageName);
@@ -113,6 +113,18 @@ void ImageBlockItem::paint(QPainter *painter,
 QString ImageBlockItem::toMarkdown() const
 {
     return m_markdown;
+}
+
+void ImageBlockItem::setTheme(const Theme &theme)
+{
+    BlockItem::setTheme(theme);
+    if (theme.paint.imagePlaceholderBg.isValid())
+        m_placeholderBg = theme.paint.imagePlaceholderBg;
+    if (theme.paint.imagePlaceholderBorder.isValid())
+        m_placeholderBorder = theme.paint.imagePlaceholderBorder;
+    if (theme.paint.imagePlaceholderText.isValid())
+        m_placeholderText = theme.paint.imagePlaceholderText;
+    if (m_missing) update();
 }
 
 void ImageBlockItem::setMaxWidth(qreal maxWidth)

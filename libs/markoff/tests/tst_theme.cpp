@@ -17,6 +17,16 @@ private Q_SLOTS:
     void testDefaultDarkBackgroundIsDark();
     void testDefaultLightBoldIsBold();
     void testFromSchemeFileLoadsColors();
+
+    // Paint colors (non-QTextCharFormat surfaces: checkboxes, code-block
+    // backdrop, search highlights, callouts, image placeholder, block
+    // selection overlay).
+    void testDefaultLightHasPaintColors();
+    void testDefaultDarkHasPaintColors();
+    void testPaintColorsDifferBetweenLightAndDark();
+    void testCalloutColorResolvesKnownTypes();
+    void testCalloutColorFallsBackToDefault();
+    void testFromSchemeFileInheritsPaintColors();
 };
 
 void TestTheme::testDefaultLightHasTextFormat()
@@ -105,6 +115,86 @@ void TestTheme::testFromSchemeFileLoadsColors()
 
     // H1 should be bold
     QVERIFY(theme.formats[Markoff::Element::H1].fontWeight() >= QFont::Bold);
+}
+
+void TestTheme::testDefaultLightHasPaintColors()
+{
+    auto t = Markoff::Theme::defaultLight();
+    QVERIFY(t.paint.codeBlockBg.isValid());
+    QVERIFY(t.paint.codeBlockBorder.isValid());
+    QVERIFY(t.paint.codeBlockLanguageLabel.isValid());
+    QVERIFY(t.paint.searchMatchBg.isValid());
+    QVERIFY(t.paint.searchCurrentMatchBg.isValid());
+    QVERIFY(t.paint.checkboxCheckedFill.isValid());
+    QVERIFY(t.paint.checkboxCheckMark.isValid());
+    QVERIFY(t.paint.checkboxUncheckedOutline.isValid());
+    QVERIFY(t.paint.imagePlaceholderBg.isValid());
+    QVERIFY(t.paint.imagePlaceholderBorder.isValid());
+    QVERIFY(t.paint.imagePlaceholderText.isValid());
+    QVERIFY(t.paint.blockSelectionOverlay.isValid());
+    QVERIFY(t.paint.calloutDefault.isValid());
+    QVERIFY(!t.paint.calloutAccents.isEmpty());
+}
+
+void TestTheme::testDefaultDarkHasPaintColors()
+{
+    auto t = Markoff::Theme::defaultDark();
+    QVERIFY(t.paint.codeBlockBg.isValid());
+    QVERIFY(t.paint.searchMatchBg.isValid());
+    QVERIFY(t.paint.checkboxCheckedFill.isValid());
+    QVERIFY(t.paint.blockSelectionOverlay.isValid());
+    QVERIFY(!t.paint.calloutAccents.isEmpty());
+}
+
+void TestTheme::testPaintColorsDifferBetweenLightAndDark()
+{
+    auto light = Markoff::Theme::defaultLight();
+    auto dark = Markoff::Theme::defaultDark();
+    // Code-block backdrop is the most visually divergent — light uses near-white,
+    // dark uses a dark olive. They must not coincide.
+    QVERIFY(light.paint.codeBlockBg != dark.paint.codeBlockBg);
+    QVERIFY(light.paint.imagePlaceholderBg != dark.paint.imagePlaceholderBg);
+}
+
+void TestTheme::testCalloutColorResolvesKnownTypes()
+{
+    auto t = Markoff::Theme::defaultLight();
+    // Obsidian-compatible types. At minimum, these must be present and
+    // must not all collapse to the default (they drive section accenting).
+    QColor note = t.calloutColor(QStringLiteral("note"));
+    QColor warning = t.calloutColor(QStringLiteral("warning"));
+    QColor danger = t.calloutColor(QStringLiteral("danger"));
+    QVERIFY(note.isValid());
+    QVERIFY(warning.isValid());
+    QVERIFY(danger.isValid());
+    QVERIFY(note != warning);
+    QVERIFY(warning != danger);
+
+    // Lookup is case-insensitive.
+    QCOMPARE(t.calloutColor(QStringLiteral("NOTE")), note);
+    QCOMPARE(t.calloutColor(QStringLiteral("Note")), note);
+}
+
+void TestTheme::testCalloutColorFallsBackToDefault()
+{
+    auto t = Markoff::Theme::defaultLight();
+    QColor unknown = t.calloutColor(QStringLiteral("thisTypeDoesNotExist"));
+    QCOMPARE(unknown, t.paint.calloutDefault);
+}
+
+// QOwnNotes INI files don't describe the non-QTextCharFormat paint colors.
+// `fromSchemeFile` should fill them in from the light defaults so host
+// apps never hand a partially-initialized Theme to the editor.
+void TestTheme::testFromSchemeFileInheritsPaintColors()
+{
+    QString schemePath = QStringLiteral("/home/clinton/src/QOwnNotes/src/configurations/schemes.conf");
+    if (!QFile::exists(schemePath))
+        QSKIP("QOwnNotes schemes.conf not found — skipping");
+
+    auto t = Markoff::Theme::fromSchemeFile(schemePath);
+    QVERIFY(t.paint.codeBlockBg.isValid());
+    QVERIFY(t.paint.checkboxCheckedFill.isValid());
+    QVERIFY(!t.paint.calloutAccents.isEmpty());
 }
 
 QTEST_MAIN(TestTheme)

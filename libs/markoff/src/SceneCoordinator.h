@@ -162,6 +162,7 @@ private:
     qreal m_leftMargin = 16.0;
     qreal m_topMargin = 12.0;
     QFont m_font;
+    Theme m_theme;
     bool m_inReparse = false;
     int m_keyboardCurrentIdx = -1;
     int m_keyboardAnchorIdx = -1;

@@ -80,16 +80,6 @@ implementation; the rest are implementation tasks.
 
 ## Style / Theme API
 
-- [ ] **Consolidate hardcoded visual constants into `Theme`.** See
-  `architecture.md` Theme System §. Affects:
-  - `MarkdownTextItem::paintDecoratedRanges` (code block bg
-    `0xf5f5f5`, border `0xe0e0e0`, language label `0x9e9e9e`)
-  - `Editor::highlightAllMatches` (search yellow + current-match orange)
-  - `DecoratedRange::colorForCalloutType` (callout accent table)
-  - `CheckboxTextObject::drawObject` (checked green, unchecked gray)
-  - `TableStyle` struct is already defined but unused — either wire it
-    in as the table grid/header/padding theme, or delete it (see Dead
-    Code section).
 - [ ] KDE color scheme integration (Breeze Dark, etc.) — load via
   `Theme::fromSchemeFile()` extended to read KDE color schemes alongside
   the existing QOwnNotes INI format.
@@ -240,6 +230,27 @@ no runtime benefit.
   consumers with stricter toolchains.
 
 ## Recently fixed (for context)
+
+- **Theme paint-color API** (2026-04-17): `Theme` gained a `PaintColors`
+  sub-struct covering every color the highlighter's `QTextCharFormat`
+  map couldn't reach: `codeBlock{Bg,Border,LanguageLabel}`,
+  `search{Match,CurrentMatch}Bg`, `checkbox{CheckedFill,CheckMark,
+  UncheckedOutline}`, `imagePlaceholder{Bg,Border,Text}`,
+  `blockSelectionOverlay`, and a `calloutAccents` map +
+  `calloutDefault` fallback. `Theme::calloutColor(type)` resolves the
+  accent case-insensitively. `defaultLight()` / `defaultDark()` populate
+  the whole struct; `fromSchemeFile()` borrows `paint` from
+  `defaultLight()` since QOwnNotes INI files don't describe any of
+  these. Propagation: `Editor::setTheme` → `SceneCoordinator::setTheme`
+  (stores `m_theme` so fresh items inherit) → per-item
+  `MarkdownTextItem::setTheme` (fans out to highlighter + checkbox +
+  re-detects decorated ranges) or `BlockItem::setTheme` (virtual; base
+  handles selection overlay, `ImageBlockItem` overrides for
+  placeholder). The static `DecoratedRange::colorForCalloutType` table
+  is gone (replaced by theme lookup); `DecoratedRange.cpp` removed.
+  New tests: six paint-color slots in `tst_markoff_theme` plus
+  `setThemeSwapsCheckboxColors` pixel-diff test in
+  `tst_markoff_checkbox_text_object`.
 
 - **Small-item sweep — part 2** (2026-04-17):
   - All 7 `dynamic_cast<MarkdownTextItem *>` callsites in

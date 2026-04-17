@@ -45,7 +45,6 @@ add_library(markoff STATIC
     src/LinkRenderer.cpp
     src/SearchBar.cpp
     src/MarkdownHighlighter.cpp
-    src/DecoratedRange.cpp
     src/FoldingTypes.cpp
     src/FoldingModel.cpp
     src/FoldArrowColumn.cpp

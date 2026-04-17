@@ -7,6 +7,7 @@
 #include <QTextCursor>
 #include <QTextDocument>
 
+#include <markoff/Theme.h>
 #include "CheckboxTextObject.h"
 
 using namespace Markoff;
@@ -20,6 +21,7 @@ private Q_SLOTS:
     void checkedPropertyRoundTripsThroughFormat();
     void drawObjectCheckedDiffersFromUnchecked();
     void drawObjectHonoursRectBounds();
+    void setThemeSwapsCheckboxColors();
 };
 
 void TstCheckboxTextObject::intrinsicSizeMatchesDocFontPointSize()
@@ -124,6 +126,45 @@ void TstCheckboxTextObject::drawObjectHonoursRectBounds()
     // A pixel far outside the draw rect must still be red.
     QCOMPARE(img.pixel(80, 80), qRgb(255, 0, 0));
     QCOMPARE(img.pixel(5, 5), qRgb(255, 0, 0));
+}
+
+// Swapping the theme should change the painted fill color. Proves the
+// Theme → CheckboxTextObject wiring actually flows through to drawObject.
+void TstCheckboxTextObject::setThemeSwapsCheckboxColors()
+{
+    const QRectF rect(0, 0, 40, 40);
+    QImage defaultImg(40, 40, QImage::Format_ARGB32_Premultiplied);
+    QImage themedImg(40, 40, QImage::Format_ARGB32_Premultiplied);
+    defaultImg.fill(Qt::transparent);
+    themedImg.fill(Qt::transparent);
+
+    QTextCharFormat fmtChecked;
+    fmtChecked.setProperty(CheckboxTextObject::CheckedProperty, true);
+
+    CheckboxTextObject cb;
+    {
+        QPainter p(&defaultImg);
+        cb.drawObject(&p, rect, nullptr, 0, fmtChecked);
+    }
+
+    // Construct a theme that forces the checked fill to bright red.
+    Theme t = Theme::defaultLight();
+    t.paint.checkboxCheckedFill = QColor(255, 0, 0);
+    cb.setTheme(t);
+    {
+        QPainter p(&themedImg);
+        cb.drawObject(&p, rect, nullptr, 0, fmtChecked);
+    }
+
+    QVERIFY(defaultImg != themedImg);
+
+    // Sample a point inside the fill that's well clear of the checkmark
+    // stroke — (8, 8) is in the upper-left of the fill, nowhere near the
+    // diagonal path.
+    const QRgb pixel = themedImg.pixel(8, 8);
+    QCOMPARE(qRed(pixel), 255);
+    QVERIFY2(qGreen(pixel) < 50, qPrintable(QStringLiteral("green=%1").arg(qGreen(pixel))));
+    QVERIFY2(qBlue(pixel) < 50, qPrintable(QStringLiteral("blue=%1").arg(qBlue(pixel))));
 }
 
 QTEST_MAIN(TstCheckboxTextObject)

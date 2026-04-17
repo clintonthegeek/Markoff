@@ -14,6 +14,7 @@ namespace Markoff {
 class TextControl;
 class MathTextObject;
 class CheckboxTextObject;
+struct Theme;
 } // namespace Markoff
 
 QT_BEGIN_NAMESPACE
@@ -40,6 +41,12 @@ public:
 
     /// Set the text width (for word wrap). Triggers relayout.
     void setTextWidth(qreal width);
+
+    /// Propagate the active Theme to this item's highlighter and its
+    /// custom text-object handlers (checkbox, math). Also forces a
+    /// re-detect of decorated ranges so callout accents pick up the new
+    /// callout palette.
+    void setTheme(const Theme &theme);
 
     /// Decorated ranges detected in this item's document.
     const QList<DecoratedRange> &decoratedRanges() const { return m_decoratedRanges; }

@@ -57,6 +57,21 @@ MarkdownTextItem::MarkdownTextItem(QGraphicsItem *parent)
 
 MarkdownTextItem::~MarkdownTextItem() = default;
 
+void MarkdownTextItem::setTheme(const Theme &theme)
+{
+    if (auto *hl = qobject_cast<MarkdownHighlighter *>(
+            m_document->findChild<QSyntaxHighlighter *>())) {
+        hl->setTheme(theme);
+    }
+    if (m_checkboxObject)
+        m_checkboxObject->setTheme(theme);
+    // Callout accent colors are stamped onto each DecoratedRange during
+    // detect; re-detect so the new palette takes effect without waiting
+    // for the next reparse.
+    detectDecoratedRanges();
+    update();
+}
+
 void MarkdownTextItem::setPlainText(const QString &text)
 {
     m_document->setPlainText(text);
@@ -1143,7 +1158,12 @@ void MarkdownTextItem::detectDecoratedRanges()
                 dr.calloutType = type;
                 dr.calloutTitle = title.isEmpty()
                     ? type.at(0).toUpper() + type.mid(1) : title;
-                dr.calloutColor = DecoratedRange::colorForCalloutType(type);
+                if (auto *hl = qobject_cast<MarkdownHighlighter *>(
+                        m_document->findChild<QSyntaxHighlighter *>())) {
+                    dr.calloutColor = hl->theme().calloutColor(type);
+                } else {
+                    dr.calloutColor = Theme::defaultLight().calloutColor(type);
+                }
                 m_decoratedRanges.append(dr);
 
                 block = bodyBlock;
@@ -1275,18 +1295,20 @@ void MarkdownTextItem::paintDecoratedRanges(QPainter *painter)
         QRectF bgRect(margin - 4, rangeTop, m_width - margin * 2 + 8, rangeHeight);
 
         if (dr.type == DecoratedRange::CodeBlock) {
+            const PaintColors &pc = hl ? hl->theme().paint
+                                        : Theme::defaultLight().paint;
             painter->setPen(Qt::NoPen);
-            painter->setBrush(QColor(0xf5, 0xf5, 0xf5));
+            painter->setBrush(pc.codeBlockBg);
             painter->setRenderHint(QPainter::Antialiasing);
             painter->drawRoundedRect(bgRect, 4, 4);
-            painter->setPen(QPen(QColor(0xe0, 0xe0, 0xe0), 1));
+            painter->setPen(QPen(pc.codeBlockBorder, 1));
             painter->setBrush(Qt::NoBrush);
             painter->drawRoundedRect(bgRect.adjusted(0.5, 0.5, -0.5, -0.5), 4, 4);
             if (!dr.language.isEmpty()) {
                 QFont labelFont = painter->font();
                 labelFont.setPointSize(qMax(8, labelFont.pointSize() - 2));
                 painter->setFont(labelFont);
-                painter->setPen(QColor(0x9e, 0x9e, 0x9e));
+                painter->setPen(pc.codeBlockLanguageLabel);
                 QRectF labelRect(bgRect.right() - 80, bgRect.top() + 2, 72, 16);
                 painter->drawText(labelRect, Qt::AlignRight | Qt::AlignVCenter,
                                   dr.language);

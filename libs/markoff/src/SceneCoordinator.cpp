@@ -61,6 +61,11 @@ MarkdownTextItem *SceneCoordinator::createTextItem(const QString &text)
         item->document()->setDefaultFont(m_font);
 
     auto *highlighter = new MarkdownHighlighter(item->document());
+    // Apply the coordinator's current theme to the new highlighter +
+    // text-object handlers so freshly-created items pick up host-supplied
+    // colors on first paint instead of flashing the light defaults.
+    highlighter->setTheme(m_theme);
+    item->setTheme(m_theme);
 
     // Set span map and decorated ranges BEFORE setPlainText. When
     // setPlainText triggers Qt's automatic highlightBlock calls,
@@ -437,13 +442,13 @@ void SceneCoordinator::setResourceProvider(ResourceProvider *provider)
 
 void SceneCoordinator::setTheme(const Theme &theme)
 {
+    m_theme = theme;
     for (auto *item : m_items) {
         if (item->isTextItem()) {
             auto *textItem = static_cast<MarkdownTextItem *>(item);
-            auto *highlighter = qobject_cast<MarkdownHighlighter *>(
-                textItem->document()->findChild<QSyntaxHighlighter *>());
-            if (highlighter)
-                highlighter->setTheme(theme);
+            textItem->setTheme(theme);
+        } else if (auto *block = dynamic_cast<BlockItem *>(item->asGraphicsItem())) {
+            block->setTheme(theme);
         }
     }
 }

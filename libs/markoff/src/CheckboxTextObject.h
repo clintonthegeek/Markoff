@@ -2,11 +2,14 @@
 #ifndef MARKOFF_CHECKBOXTEXTOBJECT_H
 #define MARKOFF_CHECKBOXTEXTOBJECT_H
 
+#include <QColor>
 #include <QObject>
 #include <QTextFormat>
 #include <QTextObjectInterface>
 
 namespace Markoff {
+
+struct Theme;
 
 /// Custom text object that renders task list checkboxes as icons.
 ///
@@ -25,12 +28,21 @@ public:
 
     explicit CheckboxTextObject(QObject *parent = nullptr);
 
+    /// Update the paint colors used for the checked fill, check-mark
+    /// stroke, and unchecked outline. Reads `theme.paint`.
+    void setTheme(const Theme &theme);
+
     QSizeF intrinsicSize(QTextDocument *doc, int posInDocument,
                           const QTextFormat &format) override;
 
     void drawObject(QPainter *painter, const QRectF &rect,
                      QTextDocument *doc, int posInDocument,
                      const QTextFormat &format) override;
+
+private:
+    QColor m_checkedFill;
+    QColor m_checkMark;
+    QColor m_uncheckedOutline;
 };
 
 } // namespace Markoff

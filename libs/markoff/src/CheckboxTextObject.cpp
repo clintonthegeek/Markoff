@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "CheckboxTextObject.h"
 
+#include <markoff/Theme.h>
+
 #include <QPainter>
 #include <QPainterPath>
 #include <QTextDocument>
@@ -10,7 +12,20 @@ namespace Markoff {
 
 CheckboxTextObject::CheckboxTextObject(QObject *parent)
     : QObject(parent)
+    , m_checkedFill(76, 175, 80)
+    , m_checkMark(255, 255, 255)
+    , m_uncheckedOutline(158, 158, 158)
 {
+}
+
+void CheckboxTextObject::setTheme(const Theme &theme)
+{
+    if (theme.paint.checkboxCheckedFill.isValid())
+        m_checkedFill = theme.paint.checkboxCheckedFill;
+    if (theme.paint.checkboxCheckMark.isValid())
+        m_checkMark = theme.paint.checkboxCheckMark;
+    if (theme.paint.checkboxUncheckedOutline.isValid())
+        m_uncheckedOutline = theme.paint.checkboxUncheckedOutline;
 }
 
 static qreal checkboxSize(QTextDocument *doc)
@@ -42,12 +57,10 @@ void CheckboxTextObject::drawObject(QPainter *painter, const QRectF &rect,
     painter->setRenderHint(QPainter::Antialiasing, true);
 
     if (checked) {
-        // Green filled box with white checkmark
         painter->setPen(Qt::NoPen);
-        painter->setBrush(QColor(76, 175, 80)); // #4caf50
+        painter->setBrush(m_checkedFill);
         painter->drawRoundedRect(box, radius, radius);
 
-        // Checkmark path
         QPainterPath check;
         const qreal x = box.left();
         const qreal y = box.top();
@@ -57,13 +70,12 @@ void CheckboxTextObject::drawObject(QPainter *painter, const QRectF &rect,
         check.lineTo(x + w * 0.4, y + h * 0.72);
         check.lineTo(x + w * 0.8, y + h * 0.28);
 
-        painter->setPen(QPen(Qt::white, box.height() * 0.15, Qt::SolidLine,
+        painter->setPen(QPen(m_checkMark, box.height() * 0.15, Qt::SolidLine,
                              Qt::RoundCap, Qt::RoundJoin));
         painter->setBrush(Qt::NoBrush);
         painter->drawPath(check);
     } else {
-        // Gray outline box
-        painter->setPen(QPen(QColor(158, 158, 158), 1.5));
+        painter->setPen(QPen(m_uncheckedOutline, 1.5));
         painter->setBrush(Qt::NoBrush);
         painter->drawRoundedRect(box, radius, radius);
     }
