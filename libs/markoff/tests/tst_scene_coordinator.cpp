@@ -31,6 +31,11 @@ private Q_SLOTS:
     void roundTripPureText();
     void clipboardRoundTripPreservesEightBlankLines();
     void cursorLineAccountsForBlankLineGaps();
+    void blankLinesAreEditableParagraphs();
+    void roundTripLeadingBlankLines();
+    void roundTripSingleTrailingNewline();
+    void roundTripTwoAdjacentImagesWithGap();
+    void roundTripEightBlankLinesBeforeImage();
 };
 
 /// Regression: `SceneCoordinator::reparse()` used to schedule the
@@ -227,6 +232,82 @@ void TstSceneCoordinator::cursorLineAccountsForBlankLineGaps()
     QApplication::processEvents();
 
     QCOMPARE(editor.cursorLine(), 10);
+}
+
+void TstSceneCoordinator::blankLinesAreEditableParagraphs()
+{
+    // 3 blank lines between a paragraph and an image. The first-item
+    // text segment absorbs the blanks as empty QTextBlocks. Typing 'X'
+    // into the 2nd block (first blank paragraph) must reflect in the
+    // serialized source.
+    const QString src = QStringLiteral("A\n\n\n\n![alt](img.png)");
+    //     text segment content: "A\n\n\n" → 4 blocks: "A", "", "", ""
+
+    Editor editor;
+    editor.resize(800, 400);
+    editor.setPlainText(src);
+    editor.show();
+    QApplication::processEvents();
+
+    auto *coord = editor.coordinatorForTesting();
+    QVERIFY(coord);
+
+    MarkdownTextItem *target = nullptr;
+    for (auto *item : coord->items()) {
+        if (!item->isTextItem()) continue;
+        auto *ti = static_cast<MarkdownTextItem *>(item);
+        if (ti->allMarkdown().contains(QLatin1Char('A'))) {
+            target = ti;
+            break;
+        }
+    }
+    QVERIFY(target);
+
+    QTextDocument *doc = target->document();
+    int blockCount = 0;
+    for (QTextBlock b = doc->begin(); b.isValid(); b = b.next())
+        ++blockCount;
+    QCOMPARE(blockCount, 4);
+
+    QTextBlock secondBlock = doc->findBlockByNumber(1);
+    QVERIFY(secondBlock.isValid());
+    QTextCursor c(doc);
+    c.setPosition(secondBlock.position());
+    target->textControl()->setTextCursor(c);
+    target->setFocus(Qt::MouseFocusReason);
+    QApplication::processEvents();
+
+    c.insertText(QStringLiteral("X"));
+    QApplication::processEvents();
+
+    QCOMPARE(editor.toPlainText(),
+             QStringLiteral("A\nX\n\n\n![alt](img.png)"));
+}
+
+void TstSceneCoordinator::roundTripLeadingBlankLines()
+{
+    const QString src = QStringLiteral("\n\n\n![alt](img.png)\n\nafter");
+    QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::roundTripSingleTrailingNewline()
+{
+    const QString src = QStringLiteral("A\n\n![alt](img.png)\n");
+    QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::roundTripTwoAdjacentImagesWithGap()
+{
+    const QString src = QStringLiteral(
+        "![a](a.png)\n\n\n\n![b](b.png)");
+    QCOMPARE(roundTrip(src), src);
+}
+
+void TstSceneCoordinator::roundTripEightBlankLinesBeforeImage()
+{
+    const QString src = QStringLiteral(
+        "# Heading\n\n\n\n\n\n\n\n\n![alt](img.png)\n\nbottom");
+    QCOMPARE(roundTrip(src), src);
 }
 
 QTEST_MAIN(TstSceneCoordinator)
