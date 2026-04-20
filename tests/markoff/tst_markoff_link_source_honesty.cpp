@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Regression gate for Cluster J phase 3 — enforce that no source file
-// in libs/markoff/ ever fabricates `"bases"` as a hover-link source
+// in libs/markoff-live/ ever fabricates `"bases"` as a hover-link source
 // string. That value is reserved for the Bases plugin surface
 // (Cluster N); Markoff emissions must identify themselves honestly as
 // "markoff:editor" / "markoff:livepreview" / "markoff:reading".
@@ -25,14 +25,14 @@ private Q_SLOTS:
         // test is location-independent (works from build/ and ctest).
         const QString thisFile = QString::fromUtf8(__FILE__);
         QDir dir(QFileInfo(thisFile).absolutePath());
-        // tests/markoff/tst_*.cpp -> ../../libs/markoff/src
+        // tests/markoff/tst_*.cpp -> ../../libs/markoff-live/src
         dir.cdUp(); // tests/
         dir.cdUp(); // repo root
-        dir.cd(QStringLiteral("libs/markoff/src"));
+        dir.cd(QStringLiteral("libs/markoff-live/src"));
 
         const QString srcRoot = dir.absolutePath();
         QVERIFY2(QFileInfo::exists(srcRoot),
-                 qPrintable(QStringLiteral("libs/markoff/src not found at %1")
+                 qPrintable(QStringLiteral("libs/markoff-live/src not found at %1")
                                 .arg(srcRoot)));
 
         QDirIterator it(srcRoot, {QStringLiteral("*.cpp"), QStringLiteral("*.h")},

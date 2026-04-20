@@ -8,6 +8,6 @@ add_executable(markoff-testapp
     MainWindow.h
     MainWindow.cpp
 )
-target_link_libraries(markoff-testapp PRIVATE Qt6::Widgets markoff)
+target_link_libraries(markoff-testapp PRIVATE Qt6::Widgets markoff_live)
 
 add_subdirectory(scene-demo)

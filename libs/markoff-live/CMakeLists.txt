@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-project(markoff VERSION 0.1.0 LANGUAGES C CXX)
+project(markoff_live VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
@@ -16,8 +16,8 @@ if(NOT TARGET jkqtmathtext)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../jkqtmathtext ${CMAKE_CURRENT_BINARY_DIR}/jkqtmathtext)
 endif()
 
-# Markoff editor library
-add_library(markoff STATIC
+# Markoff live-preview editor library
+add_library(markoff_live STATIC
     include/markoff/Editor.h
     include/markoff/FoldingTypes.h
     include/markoff/LinkRenderer.h
@@ -57,15 +57,15 @@ add_library(markoff STATIC
     src/TableConverter.h
     src/TableConverter.cpp
 )
-set_target_properties(markoff PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_library(Markoff::Markoff ALIAS markoff)
+set_target_properties(markoff_live PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_library(Markoff::Live ALIAS markoff_live)
 
-target_include_directories(markoff
+target_include_directories(markoff_live
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(markoff
+target_link_libraries(markoff_live
     PUBLIC
         Qt6::Core
         Qt6::Gui

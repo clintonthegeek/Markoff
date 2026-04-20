@@ -19,11 +19,11 @@ target_link_libraries(tst_markoff_link_source_honesty PRIVATE Qt6::Test)
 add_executable(tst_markoff_wikilink_clickable tst_markoff_wikilink_clickable.cpp)
 add_test(NAME tst_markoff_wikilink_clickable COMMAND tst_markoff_wikilink_clickable)
 target_link_libraries(tst_markoff_wikilink_clickable PRIVATE
-    Qt6::Test Qt6::Widgets markoff KF6::SyntaxHighlighting)
+    Qt6::Test Qt6::Widgets markoff_live KF6::SyntaxHighlighting)
 # Internal headers (MarkdownTextItem, SelectableItem) are in src/ and
 # needed for the end-to-end anchorHref check; mirrors the existing
-# libs/markoff/tests/ test-target convention.
+# libs/markoff-live/tests/ test-target convention.
 target_include_directories(tst_markoff_wikilink_clickable PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/markoff/src)
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/markoff-live/src)
 set_tests_properties(tst_markoff_wikilink_clickable PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
