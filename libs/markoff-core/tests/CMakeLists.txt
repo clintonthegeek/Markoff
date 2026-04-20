@@ -36,3 +36,8 @@ add_executable(tst_markoff_search_bar tst_search_bar.cpp)
 add_test(NAME tst_markoff_search_bar COMMAND tst_markoff_search_bar)
 target_link_libraries(tst_markoff_search_bar PRIVATE Qt6::Test Qt6::Widgets markoff_core)
 set_tests_properties(tst_markoff_search_bar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_markdown_view tst_markdown_view_compile.cpp)
+add_test(NAME tst_markoff_markdown_view COMMAND tst_markoff_markdown_view)
+target_link_libraries(tst_markoff_markdown_view PRIVATE Qt6::Test Qt6::Widgets markoff_core)
+set_tests_properties(tst_markoff_markdown_view PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

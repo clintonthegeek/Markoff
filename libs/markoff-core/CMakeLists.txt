@@ -25,6 +25,7 @@ add_library(markoff_core STATIC
     include/markoff/SearchAdapter.h
     include/markoff/SearchController.h
     include/markoff/SearchBar.h
+    include/markoff/MarkdownView.h
 )
 
 target_include_directories(markoff_core
