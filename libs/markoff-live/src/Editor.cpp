@@ -2,6 +2,7 @@
 #include "markoff/Editor.h"
 #include "markoff/LinkRenderer.h"
 #include "markoff/SearchBar.h"
+#include "LiveSearchAdapter.h"
 #include "SelectionScene.h"
 #include "SelectionManager.h"
 #include "SceneCoordinator.h"
@@ -14,8 +15,13 @@
 #include "CheckboxTextObject.h"
 #include "MathTextObject.h"
 
+#include <markoff/MarkoffDocument.h>
+
 #include <QCursor>
 
+#include <QGraphicsView>
+#include <QMouseEvent>
+#include <QVBoxLayout>
 #include <QResizeEvent>
 #include <QContextMenuEvent>
 #include <QFontMetricsF>
@@ -34,31 +40,57 @@
 #include <QGraphicsSceneMouseEvent>
 #include <QMimeData>
 #include <QRegularExpression>
+#include <QWheelEvent>
 #include <limits>
 #include <memory>
 
 namespace Markoff {
 
+// Subclass of QGraphicsView used as Editor's composed child, exposing the
+// normally-protected setViewportMargins() so the Editor can reserve space
+// at the bottom for its SearchBar.
+class EditorGraphicsView : public QGraphicsView {
+public:
+    using QGraphicsView::QGraphicsView;
+    using QGraphicsView::setViewportMargins;
+};
+
 Editor::Editor(QWidget *parent)
-    : QGraphicsView(parent)
+    : MarkdownView(parent)
+    , m_view(new EditorGraphicsView(this))
     , m_scene(new SelectionScene(this))
     , m_coordinator(new SceneCoordinator(m_scene, this))
 {
-    setScene(m_scene);
-    setAlignment(Qt::AlignLeft | Qt::AlignTop);
-    setDragMode(QGraphicsView::NoDrag);
-    setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
-    setFrameShape(QFrame::NoFrame);
+    // Compose the QGraphicsView child and fill the widget with it.
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->setSpacing(0);
+    layout->addWidget(m_view);
+
+    m_view->setScene(m_scene);
+    m_view->setAlignment(Qt::AlignLeft | Qt::AlignTop);
+    m_view->setDragMode(QGraphicsView::NoDrag);
+    m_view->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    m_view->setFrameShape(QFrame::NoFrame);
 
     m_scene->setItemIndexMethod(QGraphicsScene::NoIndex);
-    setOptimizationFlag(QGraphicsView::DontSavePainterState, true);
-    setViewportUpdateMode(QGraphicsView::MinimalViewportUpdate);
-    setCacheMode(QGraphicsView::CacheNone);
+    m_view->setOptimizationFlag(QGraphicsView::DontSavePainterState, true);
+    m_view->setViewportUpdateMode(QGraphicsView::MinimalViewportUpdate);
+    m_view->setCacheMode(QGraphicsView::CacheNone);
 
-    viewport()->setBackgroundRole(QPalette::Base);
-    viewport()->setCursor(Qt::IBeamCursor);
+    m_view->viewport()->setBackgroundRole(QPalette::Base);
+    m_view->viewport()->setCursor(Qt::IBeamCursor);
 
-    verticalScrollBar()->setSingleStep(20);
+    m_view->verticalScrollBar()->setSingleStep(20);
+
+    // Route key / context-menu events from the graphics view back to us,
+    // and capture mouse / wheel on the viewport for auto-scroll + zoom.
+    m_view->installEventFilter(this);
+    m_view->viewport()->installEventFilter(this);
+    m_view->setFocusPolicy(Qt::StrongFocus);
+    setFocusProxy(m_view);
+
+    m_searchAdapter = std::make_unique<LiveSearchAdapter>(this);
 
     m_autoScrollTimer = new QTimer(this);
     m_autoScrollTimer->setInterval(50);
@@ -123,15 +155,15 @@ Editor::Editor(QWidget *parent)
     m_scene->addItem(m_foldGutter);
     m_foldGutter->setZValue(1.0);  // render above text items
 
-    connect(horizontalScrollBar(), &QScrollBar::valueChanged,
+    connect(m_view->horizontalScrollBar(), &QScrollBar::valueChanged,
             this, &Editor::repositionFoldGutter);
-    connect(verticalScrollBar(), &QScrollBar::valueChanged,
+    connect(m_view->verticalScrollBar(), &QScrollBar::valueChanged,
             this, &Editor::repositionFoldGutter);
 
     // Cluster E Phase 2 — bridge the pixel-granular scrollbar signal to the
     // visual-line float contract. Reading scrollPositionVisualLine() at the
     // moment of emission means consumers always see a consistent value.
-    connect(verticalScrollBar(), &QScrollBar::valueChanged,
+    connect(m_view->verticalScrollBar(), &QScrollBar::valueChanged,
             this, [this](int) {
         Q_EMIT scrollPositionVisualLineChanged(scrollPositionVisualLine());
     });
@@ -361,7 +393,46 @@ bool Editor::event(QEvent *e)
             return true;
         }
     }
-    return QGraphicsView::event(e);
+    return MarkdownView::event(e);
+}
+
+bool Editor::eventFilter(QObject *watched, QEvent *event)
+{
+    // Events flowing through the composed QGraphicsView child and its
+    // viewport — intercept key/mouse/wheel/context-menu so the Editor's
+    // behavior survives the composition change.
+    if (watched == m_view) {
+        switch (event->type()) {
+        case QEvent::ContextMenu: {
+            auto *ce = static_cast<QContextMenuEvent *>(event);
+            contextMenuEvent(ce);
+            if (ce->isAccepted())
+                return true;
+            break;
+        }
+        default:
+            break;
+        }
+    } else if (watched == m_view->viewport()) {
+        switch (event->type()) {
+        case QEvent::MouseMove:
+            handleMouseMoveOnViewport(static_cast<QMouseEvent *>(event));
+            break;
+        case QEvent::MouseButtonRelease:
+            handleMouseReleaseOnViewport(static_cast<QMouseEvent *>(event));
+            break;
+        case QEvent::Wheel: {
+            auto *we = static_cast<QWheelEvent *>(event);
+            handleWheelOnViewport(we);
+            if (we->isAccepted())
+                return true;
+            break;
+        }
+        default:
+            break;
+        }
+    }
+    return MarkdownView::eventFilter(watched, event);
 }
 
 // =========================================================================
@@ -540,8 +611,8 @@ void Editor::resetZoom()
 
 void Editor::resizeEvent(QResizeEvent *e)
 {
-    QGraphicsView::resizeEvent(e);
-    qreal width = viewport()->width() - 32;
+    MarkdownView::resizeEvent(e);
+    qreal width = m_view->viewport()->width() - 32;
     if (width > 100)
         m_coordinator->setItemWidth(width);
     repositionSearchBar();
@@ -552,24 +623,21 @@ void Editor::resizeEvent(QResizeEvent *e)
 // Auto-scroll during drag selection
 // =========================================================================
 
-void Editor::mouseMoveEvent(QMouseEvent *e)
+void Editor::handleMouseMoveOnViewport(QMouseEvent *e)
 {
-    QGraphicsView::mouseMoveEvent(e);
-
     if (e->buttons() & Qt::LeftButton) {
         int y = e->pos().y();
         if (y < 0)
             startAutoScroll(y);
-        else if (y > viewport()->height())
-            startAutoScroll(y - viewport()->height());
+        else if (y > m_view->viewport()->height())
+            startAutoScroll(y - m_view->viewport()->height());
         else
             stopAutoScroll();
     }
 }
 
-void Editor::mouseReleaseEvent(QMouseEvent *e)
+void Editor::handleMouseReleaseOnViewport(QMouseEvent *)
 {
-    QGraphicsView::mouseReleaseEvent(e);
     stopAutoScroll();
 }
 
@@ -590,7 +658,7 @@ void Editor::stopAutoScroll()
 
 void Editor::doAutoScroll()
 {
-    QScrollBar *vbar = verticalScrollBar();
+    QScrollBar *vbar = m_view->verticalScrollBar();
     int oldVal = vbar->value();
     vbar->setValue(oldVal + m_autoScrollDelta);
     if (vbar->value() == oldVal)
@@ -598,11 +666,11 @@ void Editor::doAutoScroll()
 
     QPoint viewportEdge;
     if (m_autoScrollDelta < 0)
-        viewportEdge = QPoint(viewport()->width() / 2, 0);
+        viewportEdge = QPoint(m_view->viewport()->width() / 2, 0);
     else
-        viewportEdge = QPoint(viewport()->width() / 2, viewport()->height() - 1);
+        viewportEdge = QPoint(m_view->viewport()->width() / 2, m_view->viewport()->height() - 1);
 
-    QPointF scenePos = mapToScene(viewportEdge);
+    QPointF scenePos = m_view->mapToScene(viewportEdge);
     QGraphicsSceneMouseEvent moveEvent(QEvent::GraphicsSceneMouseMove);
     moveEvent.setScenePos(scenePos);
     moveEvent.setScreenPos(mapToGlobal(viewportEdge));
@@ -697,8 +765,10 @@ void Editor::keyPressEvent(QKeyEvent *e)
     // Tab smart-indent (handled here because it's context-dependent:
     // inside a table TextControl handles cell navigation; outside,
     // Editor handles indent/dedent).
-    if (handleTabKey(e))
+    if (handleTabKey(e)) {
+        e->accept();
         return;
+    }
 
     bool shift = e->modifiers() & Qt::ShiftModifier;
     bool ctrl  = e->modifiers() & Qt::ControlModifier;
@@ -707,18 +777,24 @@ void Editor::keyPressEvent(QKeyEvent *e)
     // selection extension) — can't be modeled as static QActions.
     if (e->key() == Qt::Key_Home && ctrl) {
         jumpToDocumentEdge(true, shift);
+        e->accept();
         return;
     }
     if (e->key() == Qt::Key_End && ctrl) {
         jumpToDocumentEdge(false, shift);
+        e->accept();
         return;
     }
     if (e->key() == Qt::Key_PageUp || e->key() == Qt::Key_PageDown) {
         pageUpDown(e->key() == Qt::Key_PageUp, shift);
+        e->accept();
         return;
     }
 
-    QGraphicsView::keyPressEvent(e);
+    // Forward to the composed QGraphicsView so its default key handling
+    // (scene -> focus item) runs unchanged. Using sendEvent (not
+    // postEvent) so it runs synchronously before we check e->text() etc.
+    QApplication::sendEvent(m_view, e);
 
     // Ensure cursor visible after cursor-moving keys
     switch (e->key()) {
@@ -790,14 +866,14 @@ void Editor::pageUpDown(bool up, bool select)
     int anchorPos = sourceItem->textControl()->textCursor().anchor();
 
     // Scroll by viewport height
-    QScrollBar *vbar = verticalScrollBar();
-    int pageStep = viewport()->height();
+    QScrollBar *vbar = m_view->verticalScrollBar();
+    int pageStep = m_view->viewport()->height();
     vbar->setValue(vbar->value() + (up ? -pageStep : pageStep));
 
     // Find the text item nearest to viewport center (same nearest-by-Y
     // logic as SelectionManager::itemAt).
-    QPointF sceneTarget = mapToScene(viewport()->width() / 2,
-                                      viewport()->height() / 2);
+    QPointF sceneTarget = m_view->mapToScene(m_view->viewport()->width() / 2,
+                                             m_view->viewport()->height() / 2);
     MarkdownTextItem *targetItem = nullptr;
     int targetPos = -1;
     qreal bestDist = std::numeric_limits<qreal>::max();
@@ -870,7 +946,7 @@ void Editor::pageUpDown(bool up, bool select)
 // Zoom
 // =========================================================================
 
-void Editor::wheelEvent(QWheelEvent *e)
+void Editor::handleWheelOnViewport(QWheelEvent *e)
 {
     if (e->modifiers() & Qt::ControlModifier) {
         int delta = e->angleDelta().y();
@@ -881,7 +957,9 @@ void Editor::wheelEvent(QWheelEvent *e)
         e->accept();
         return;
     }
-    QGraphicsView::wheelEvent(e);
+    // Leave the event unaccepted so QGraphicsView's default wheel
+    // handling (vertical scroll) runs.
+    e->ignore();
 }
 
 // =========================================================================
@@ -898,7 +976,7 @@ void Editor::ensureFocusedCursorVisible()
 
     QRectF cursorRect = ti->textControl()->cursorRect();
     QRectF sceneRect = ti->mapToScene(cursorRect).boundingRect();
-    ensureVisible(sceneRect, 0, 50);
+    m_view->ensureVisible(sceneRect, 0, 50);
 }
 
 MarkdownTextItem *Editor::focusedTextItem() const
@@ -916,7 +994,7 @@ void Editor::rebuildScene()
 {
     m_coordinator->loadMarkdown(m_sourceText);
 
-    qreal width = viewport()->width() - 32;
+    qreal width = m_view->viewport()->width() - 32;
     if (width > 100)
         m_coordinator->setItemWidth(width);
     if (m_fontSize > 0) {
@@ -966,7 +1044,7 @@ void Editor::setResourceProvider(ResourceProvider *provider)
 // Read-only mode
 // =========================================================================
 
-void Editor::setReadOnly(bool readOnly)
+bool Editor::setReadOnly(bool readOnly)
 {
     m_readOnly = readOnly;
     // TextBrowserInteraction allows link clicking and selection but not editing
@@ -994,6 +1072,7 @@ void Editor::setReadOnly(bool readOnly)
         if (auto *a = m_actions.value(id))
             a->setEnabled(!readOnly);
     }
+    return true;
 }
 
 bool Editor::isReadOnly() const
@@ -1005,7 +1084,7 @@ bool Editor::isReadOnly() const
 // Document accessor
 // =========================================================================
 
-const Document *Editor::document() const { return m_document.get(); }
+const Document *Editor::parsedDocument() const { return m_document.get(); }
 
 // =========================================================================
 // Document reparsed
@@ -1405,9 +1484,10 @@ QRect Editor::cursorScreenRect() const
     if (!ti) return {};
     QRectF itemRect = ti->textControl()->cursorRect();
     QRectF sceneRect = ti->mapToScene(itemRect).boundingRect();
-    QPoint viewTL = mapFromScene(sceneRect.topLeft());
-    QPoint viewBR = mapFromScene(sceneRect.bottomRight());
-    return QRect(mapToGlobal(viewTL), mapToGlobal(viewBR));
+    QPoint viewTL = m_view->mapFromScene(sceneRect.topLeft());
+    QPoint viewBR = m_view->mapFromScene(sceneRect.bottomRight());
+    return QRect(m_view->viewport()->mapToGlobal(viewTL),
+                 m_view->viewport()->mapToGlobal(viewBR));
 }
 
 void Editor::goToLine(int line)
@@ -1679,7 +1759,7 @@ void Editor::showReplaceBar()
 void Editor::hideSearchBar()
 {
     m_searchBar->hide();
-    setViewportMargins(0, 0, 0, 0);
+    static_cast<EditorGraphicsView *>(m_view)->setViewportMargins(0, 0, 0, 0);
     clearSearchHighlights();
     setFocus();
 }
@@ -1687,18 +1767,18 @@ void Editor::hideSearchBar()
 void Editor::repositionSearchBar()
 {
     if (!m_searchBar->isVisible()) {
-        setViewportMargins(0, 0, 0, 0);
+        static_cast<EditorGraphicsView *>(m_view)->setViewportMargins(0, 0, 0, 0);
         return;
     }
     int barHeight = m_searchBar->sizeHint().height();
     // Reserve space at the bottom of the viewport so scene content
     // cannot scroll under the bar.
-    setViewportMargins(0, 0, 0, barHeight);
+    static_cast<EditorGraphicsView *>(m_view)->setViewportMargins(0, 0, 0, barHeight);
     // Position the bar in the reserved strip, spanning the viewport's
     // horizontal extent (so it doesn't cover the vertical scrollbar).
-    QPoint vpTopLeft = viewport()->mapTo(this, QPoint(0, 0));
-    int vw = viewport()->width();
-    int vh = viewport()->height();
+    QPoint vpTopLeft = m_view->viewport()->mapTo(this, QPoint(0, 0));
+    int vw = m_view->viewport()->width();
+    int vh = m_view->viewport()->height();
     m_searchBar->setGeometry(vpTopLeft.x(), vpTopLeft.y() + vh,
                              vw, barHeight);
     m_searchBar->raise();
@@ -1923,7 +2003,7 @@ void Editor::restoreFoldState(const QJsonObject &state)
 void Editor::repositionFoldGutter()
 {
     if (m_foldGutter)
-        m_foldGutter->setPos(mapToScene(viewport()->rect().topLeft()));
+        m_foldGutter->setPos(m_view->mapToScene(m_view->viewport()->rect().topLeft()));
 }
 
 void Editor::setGutterVisible(bool visible)
@@ -1979,7 +2059,7 @@ float Editor::scrollPositionVisualLine() const
         return 0.0f;
 
     const qreal lineH = editorLineHeight(m_theme);
-    const qreal y = verticalScrollBar()->value();
+    const qreal y = m_view->verticalScrollBar()->value();
 
     qreal linesSoFar = 0.0;
     for (auto *item : items) {
@@ -2033,7 +2113,7 @@ void Editor::setScrollPositionVisualLine(float visualLine)
         pixelY = std::max<qreal>(0.0, pixelY);
     }
 
-    QScrollBar *vbar = verticalScrollBar();
+    QScrollBar *vbar = m_view->verticalScrollBar();
     const int clamped = std::clamp<int>(static_cast<int>(std::round(pixelY)),
                                         vbar->minimum(), vbar->maximum());
     vbar->setValue(clamped);
@@ -2294,6 +2374,166 @@ void Editor::tableSelectColumn()
     QTextCursor last = table->cellAt(rows - 1, col).lastCursorPosition();
     first.setPosition(last.position(), QTextCursor::KeepAnchor);
     tc->setTextCursor(first);
+}
+
+// =========================================================================
+// QGraphicsView passthrough (tests + internal helpers)
+// =========================================================================
+
+QGraphicsScene *Editor::scene() const { return m_view->scene(); }
+QWidget *Editor::viewport() const { return m_view->viewport(); }
+QScrollBar *Editor::verticalScrollBar() const { return m_view->verticalScrollBar(); }
+QScrollBar *Editor::horizontalScrollBar() const { return m_view->horizontalScrollBar(); }
+QPointF Editor::mapToScene(const QPoint &p) const { return m_view->mapToScene(p); }
+QPointF Editor::mapToScene(int x, int y) const { return m_view->mapToScene(x, y); }
+QPoint Editor::mapFromScene(const QPointF &p) const { return m_view->mapFromScene(p); }
+
+// =========================================================================
+// MarkdownView overrides (Phase A forwarding)
+// =========================================================================
+
+void Editor::setDocument(MarkoffDocument *doc) { m_markoffDoc = doc; }
+MarkoffDocument *Editor::document() const { return m_markoffDoc; }
+
+void Editor::setViewTheme(const Theme &) {}
+void Editor::setViewResourceProvider(ResourceProvider *) {}
+void Editor::setViewLinkResolver(LinkResolver *) {}
+
+float Editor::scrollPosition() const
+{
+    return scrollPositionVisualLine();
+}
+
+void Editor::setScrollPosition(float visualLine)
+{
+    setScrollPositionVisualLine(visualLine);
+}
+
+void Editor::zoomIn()  { setFontSize(m_fontSize + 1); }
+void Editor::zoomOut() { setFontSize(m_fontSize - 1); }
+
+QJsonObject Editor::ephemeralState() const
+{
+    QJsonObject j;
+    j.insert(QStringLiteral("scroll"), scrollPosition());
+    return j;
+}
+
+void Editor::setEphemeralState(const QJsonObject &j)
+{
+    setScrollPosition(static_cast<float>(
+        j.value(QStringLiteral("scroll")).toDouble(0.0)));
+}
+
+SearchAdapter *Editor::searchAdapter()
+{
+    return m_searchAdapter.get();
+}
+
+CursorPos Editor::cursorPosition() const
+{
+    return {cursorLine(), cursorColumn()};
+}
+
+bool Editor::setCursorPosition(CursorPos p)
+{
+    goToLine(p.line);
+    return true;
+}
+
+QVector<FoldSpec> Editor::foldedHeadings() const
+{
+    QVector<FoldSpec> out;
+    if (!m_foldingModel) return out;
+    const auto paths = m_foldingModel->foldedPaths();
+    const auto &headings = m_foldingModel->headings();
+    for (const auto &path : paths) {
+        for (const auto &h : headings) {
+            if (h.path == path) {
+                // Convert UTF-8 byte offset to 1-based line number.
+                const QByteArray utf8 = toPlainText().toUtf8();
+                int line = 1;
+                for (int i = 0; i < h.info.sourceOffset && i < utf8.size(); ++i)
+                    if (utf8[i] == '\n') ++line;
+                out.append({line, h.info.level});
+                break;
+            }
+        }
+    }
+    return out;
+}
+
+void Editor::setFoldedHeadings(const QVector<FoldSpec> &v)
+{
+    if (!m_foldingModel) return;
+    m_foldingModel->unfoldAll();
+    const auto &headings = m_foldingModel->headings();
+    const QByteArray utf8 = toPlainText().toUtf8();
+    for (const auto &spec : v) {
+        // Convert 1-based line to UTF-8 byte offset.
+        int line = 1;
+        int offset = 0;
+        for (int i = 0; i < utf8.size(); ++i) {
+            if (line == spec.line) { offset = i; break; }
+            if (utf8[i] == '\n') ++line;
+        }
+        for (const auto &h : headings) {
+            if (h.info.level == spec.level && h.info.sourceOffset == offset) {
+                m_foldingModel->fold(h.path);
+                break;
+            }
+        }
+    }
+}
+
+// =========================================================================
+// LiveSearchAdapter bridges
+// =========================================================================
+
+int Editor::sourceOffsetAtCursor() const
+{
+    // Phase A approximation: byte offset to the start of the cursor's line.
+    const QByteArray utf8 = toPlainText().toUtf8();
+    const int line = cursorLine();  // 1-based
+    int currentLine = 1;
+    int offset = 0;
+    for (int i = 0; i < utf8.size(); ++i) {
+        if (currentLine == line) { offset = i; break; }
+        if (utf8[i] == '\n') {
+            ++currentLine;
+            if (currentLine == line) { offset = i + 1; break; }
+        }
+    }
+    return offset + cursorColumn() - 1;
+}
+
+void Editor::highlightSearchSpans(const QVector<TextSpan> &spans)
+{
+    // Phase A: spans carry source offsets but live highlighting works
+    // per-item. Defer to the existing machinery by clearing and running
+    // highlightAllMatches for the first span's text representation.
+    // For now, clear when empty; otherwise no-op forwarding.
+    if (spans.isEmpty()) {
+        clearSearchHighlights();
+    }
+    // Full source-offset-driven highlighting lands in Phase C.
+}
+
+void Editor::clearSearchHighlightsPublic()
+{
+    clearSearchHighlights();
+}
+
+void Editor::scrollSourceSpanIntoView(TextSpan span)
+{
+    // Phase A: convert source offset to a line number and scroll there.
+    const QByteArray utf8 = toPlainText().toUtf8();
+    if (span.offset < 0 || span.offset > utf8.size()) return;
+    int line = 1;
+    for (int i = 0; i < span.offset && i < utf8.size(); ++i) {
+        if (utf8[i] == '\n') ++line;
+    }
+    goToLine(line);
 }
 
 } // namespace Markoff

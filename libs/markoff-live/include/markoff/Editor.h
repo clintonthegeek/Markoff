@@ -2,15 +2,22 @@
 #ifndef MARKOFF_EDITOR_H
 #define MARKOFF_EDITOR_H
 
-#include <QGraphicsView>
 #include <QHash>
 #include <QJsonObject>
 #include <QTextDocument>
+#include <memory>
+#include <markoff/MarkdownView.h>
 #include <markoff/Theme.h>
 #include <markoff-parser/Document.h>
 
+#include <markoff/TextSpan.h>
+
 class QAction;
+class QGraphicsScene;
+class QGraphicsView;
+class QScrollBar;
 class QTimer;
+class QVBoxLayout;
 
 namespace Markoff {
 
@@ -37,8 +44,9 @@ class SearchBar;
 class FoldingModel;
 class FoldGutter;
 class LinkRenderer;
+class LiveSearchAdapter;
 
-class Editor : public QGraphicsView {
+class Editor : public MarkdownView {
     Q_OBJECT
 
 public:
@@ -55,7 +63,21 @@ public:
     void setPlainText(const QString &text);
     void clear();
     QString toPlainText() const;
-    const Document *document() const;
+    /// Returns the live-preview parser Document (headings, links, tags).
+    /// Distinct from MarkdownView::document() which returns the shared
+    /// MarkoffDocument pointer set via setDocument().
+    const Document *parsedDocument() const;
+
+    // --- QGraphicsView passthrough (tests + internal helpers) ---
+    QGraphicsScene *scene() const;
+    QWidget *viewport() const;
+    QScrollBar *verticalScrollBar() const;
+    QScrollBar *horizontalScrollBar() const;
+    QPointF mapToScene(const QPoint &p) const;
+    QPointF mapToScene(int x, int y) const;
+    QPoint mapFromScene(const QPointF &p) const;
+    /// Access the composed QGraphicsView child (internal/test use).
+    QGraphicsView *graphicsView() const { return m_view; }
 
     // --- Configuration ---
     void setTheme(const Theme &theme);
@@ -73,8 +95,36 @@ public:
     /// underlying markdown. These are ephemeral viewport affordances for
     /// readability, not editing operations, and are not persisted or
     /// serialized.
-    void setReadOnly(bool readOnly);
-    bool isReadOnly() const;
+    bool setReadOnly(bool readOnly) override;
+    bool isReadOnly() const override;
+
+    // --- MarkdownView overrides (Phase A forwarding) ---
+    void setDocument(MarkoffDocument *doc) override;
+    MarkoffDocument *document() const override;
+    void setViewTheme(const Theme &theme) override;
+    void setViewResourceProvider(ResourceProvider *rp) override;
+    void setViewLinkResolver(LinkResolver *lr) override;
+    float scrollPosition() const override;
+    void setScrollPosition(float visualLine) override;
+    void zoomIn() override;
+    void zoomOut() override;
+    void resetZoom() override;
+    QJsonObject ephemeralState() const override;
+    void setEphemeralState(const QJsonObject &) override;
+    SearchAdapter *searchAdapter() override;
+    bool hasCursor() const override { return true; }
+    bool hasEditing() const override { return true; }
+    bool hasFold() const override { return true; }
+    CursorPos cursorPosition() const override;
+    bool setCursorPosition(CursorPos) override;
+    QVector<FoldSpec> foldedHeadings() const override;
+    void setFoldedHeadings(const QVector<FoldSpec> &) override;
+
+    // --- LiveSearchAdapter bridge (public so the adapter can call) ---
+    int sourceOffsetAtCursor() const;
+    void highlightSearchSpans(const QVector<TextSpan> &spans);
+    void clearSearchHighlightsPublic();
+    void scrollSourceSpanIntoView(TextSpan span);
 
     // --- Editing actions ---
     void undo();
@@ -120,11 +170,6 @@ public:
 
     // --- Font size (kept for test-app use) ---
     void setFontSize(int pointSize);
-
-    /// Reset the font size to the theme-supplied default, undoing any
-    /// `ZoomIn`/`ZoomOut` offsets the user has accumulated. The default is
-    /// captured whenever `setTheme()` is applied (falls back to 14 pt).
-    void resetZoom();
 
     // --- Scroll position (visual-line float) ---
     /// Current scroll position as a floating-point count of visual lines from
@@ -233,11 +278,9 @@ Q_SIGNALS:
 protected:
     bool event(QEvent *e) override;
     void resizeEvent(QResizeEvent *e) override;
-    void mouseMoveEvent(QMouseEvent *e) override;
-    void mouseReleaseEvent(QMouseEvent *e) override;
     void contextMenuEvent(QContextMenuEvent *e) override;
     void keyPressEvent(QKeyEvent *e) override;
-    void wheelEvent(QWheelEvent *e) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
 
 private:
     void createActions();
@@ -261,7 +304,11 @@ private:
     void repositionSearchBar();
     void repositionFoldGutter();
     QTextDocument::FindFlags searchFlags() const;
+    void handleMouseMoveOnViewport(QMouseEvent *e);
+    void handleMouseReleaseOnViewport(QMouseEvent *e);
+    void handleWheelOnViewport(QWheelEvent *e);
 
+    QGraphicsView *m_view = nullptr;
     QHash<ActionId, QAction*> m_actions;
 
     SelectionScene *m_scene = nullptr;
@@ -295,6 +342,10 @@ private:
     void handleLinkHovered(const QString &href);
     void subscribeLinkSignalsForItems();
     void onCursorMoved();
+
+    // MarkdownView bridge
+    MarkoffDocument *m_markoffDoc = nullptr;
+    std::unique_ptr<LiveSearchAdapter> m_searchAdapter;
 };
 
 } // namespace Markoff

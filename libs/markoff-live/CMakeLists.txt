@@ -45,6 +45,8 @@ add_library(markoff_live STATIC
     src/Theme.cpp
     src/TextControl.cpp
     src/Editor.cpp
+    src/LiveSearchAdapter.h
+    src/LiveSearchAdapter.cpp
     src/LinkRenderer.cpp
     src/MarkdownHighlighter.cpp
     src/FoldingTypes.cpp

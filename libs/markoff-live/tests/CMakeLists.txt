@@ -211,3 +211,9 @@ target_include_directories(tst_markoff_textcontrol_integration
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src
             ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(tst_markoff_textcontrol_integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_editor_markdown_view tst_editor_markdown_view.cpp)
+add_test(NAME tst_markoff_editor_markdown_view COMMAND tst_markoff_editor_markdown_view)
+target_link_libraries(tst_markoff_editor_markdown_view PRIVATE Qt6::Test Qt6::Widgets markoff_live)
+target_include_directories(tst_markoff_editor_markdown_view PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+set_tests_properties(tst_markoff_editor_markdown_view PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

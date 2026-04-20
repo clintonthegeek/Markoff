@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QTest>
 #include <QApplication>
+#include <QGraphicsScene>
 #include <QTextTable>
 #include <markoff/Editor.h>
 #include "MarkdownTextItem.h"

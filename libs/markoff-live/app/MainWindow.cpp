@@ -251,7 +251,7 @@ void MainWindow::updateStatusBar()
     int line = m_editor->cursorLine();
     int col = m_editor->cursorColumn();
 
-    const auto *doc = m_editor->document();
+    const auto *doc = m_editor->parsedDocument();
     int words = doc ? doc->wordCount() : 0;
 
     const QString text = m_editor->toPlainText();
@@ -269,7 +269,7 @@ void MainWindow::updateStatusBar()
 void MainWindow::updateMetadata()
 {
     m_metadataTree->clear();
-    const auto *doc = m_editor->document();
+    const auto *doc = m_editor->parsedDocument();
     if (!doc) return;
 
     // Headings
