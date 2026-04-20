@@ -1,48 +1,204 @@
 # Phase C Status
 
-Living status board for the four Phase C work-units. The Corbomite agent
+Living status board for the Phase C work-units. The Corbomite agent
 updates this file in every Phase C commit touching either repo. Entries
 are append-only in the "Activity log" section; the work-unit status table
 gets edited in place.
 
 ## Scope agreement
 
-Phase C replaces Phase B's bridge code and delivers the final shape of
-the tri-view API. Four work-units:
+Phase C delivers the final shape of the tri-view API and absorbs the
+Corbomite-prescribed features the original four work-units didn't cover.
+Seven work-units total:
 
-| ID   | Work-unit                                     | Markoff tag on completion |
-| ---- | --------------------------------------------- | ------------------------- |
-| C1   | DI seam (retires `MARKOFF_READING_USE_REAL_COREDEPS`) | `v0.3.0`          |
-| C2   | Theme / ResourceProvider / LinkResolver consolidation | `v0.5.0`          |
-| C3   | MarkoffDocument becomes content-authoritative | `v0.4.0`                  |
-| C4   | Renderer unification (Code/Math/Mermaid)      | `v0.6.0`                  |
+| ID   | Work-unit                                              | Markoff tag on completion |
+| ---- | ------------------------------------------------------ | ------------------------- |
+| C1   | DI seam (retires `MARKOFF_READING_USE_REAL_COREDEPS`)  | `v0.3.0`                  |
+| C5   | Reading-mode interaction parity (Cluster V Phase 4)    | `v0.4.0`                  |
+| C6   | Editor state + context-menu contribution surface       | `v0.5.0`                  |
+| C3   | `MarkoffDocument` becomes content-authoritative        | `v0.6.0`                  |
+| C7   | Source feature completion (find/replace + fold-gutter) | `v0.7.0`                  |
+| C2   | Theme / ResourceProvider / LinkResolver consolidation  | `v0.8.0`                  |
+| C4   | Renderer unification (Code/Math/Mermaid)               | `v0.9.0`                  |
+
+Original IDs (C1–C4) preserved. **New IDs: C5, C6, C7** — added
+2026-04-20 when the Corbomite agent took the Phase C baton and folded in
+Corbomite's outstanding Markoff-side prescriptions. The ID numbering is
+deliberately non-monotonic: it reflects the original handoff order
+(C1→C3→C2→C4) with C5/C6/C7 slotted where they fit topologically.
 
 ## Ordering rationale
 
 **C1 first** — it closes the Phase B bridge cleanly and establishes
-the interface-injection pattern the rest of Phase C reuses.
+the interface-injection pattern the rest of Phase C reuses. Nothing
+else can land cleanly until `MARKOFF_READING_USE_REAL_COREDEPS` is
+retired because mid-flight refactors would have to serve both the
+option'd and de-option'd worlds.
 
-**C3 before C2** — shared-document adoption is the biggest user-visible
-unlock and is mostly orthogonal to Theme/Provider/Resolver shapes. Doing
-it in isolation avoids cross-coupling two large refactors.
+**C5 and C6 come next** — they are small, high-user-visibility
+unlocks that finish Cluster V (the Corbomite-side UI cluster that was
+deferred to let Phase C run). Doing them right after C1 lets Corbomite
+ship user-visible progress while the larger C3 is drafted. C5 is
+ReadingView polish; C6 is a pure signal-addition to `Markoff::Editor`.
+
+**C3 before C2** — shared-document adoption is the biggest
+user-visible unlock and is mostly orthogonal to Theme/Provider/Resolver
+shapes. Doing it in isolation avoids cross-coupling two large
+refactors. Also closes the door on Corbomite `NoteDocument` shaping
+decisions that would otherwise drift while C2 is in flight.
+
+**C7 before C2** — find/replace is the last Qutepart-fork Phase 3
+deliverable and completes the Source-mode UI (Corbomite's Cluster R
+menus have a disabled "Find…"/"Replace…" placeholder waiting on it).
+Landing it before C2 means C2's Theme consolidation only has to touch
+finished surfaces.
 
 **C2 late** — Theme consolidation is the most likely source of
 CorbomiteApp call-site breakage. Do it once the rest of Phase C is
 stable so there's only one high-breakage coordination beat.
 
 **C4 last** — smallest, mostly internal, no consumer-facing surface.
-Polish.
+Polish. Absorbs any renderer-unification follow-ups that surfaced
+during C1–C7.
 
 ## Work-unit status
 
 | ID   | Status       | Spec                                   | Plan                                   | Markoff PR/branch    | Corbomite PR/branch  | Tag       |
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
 | C1   | not started  | —                                      | —                                      | —                    | —                    | —         |
-| C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
+| C5   | requirements — see inputs | —                         | —                                      | —                    | —                    | —         |
+| C6   | requirements — see inputs | [consumer editor-state surface §1-8 + §9 context-menu](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
+| C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
+| C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C4   | not started  | —                                      | —                                      | —                    | —                    | —         |
 
-Status values: `not started` → `spec drafted` → `spec approved` → `markoff implementing` → `markoff ready` (tag exists) → `corbomite adapting` → `corbomite shipped` → `markoff cleanup` → `done`.
+Status values: `not started` → `requirements — see inputs` → `spec drafted` → `spec approved` → `markoff implementing` → `markoff ready` (tag exists) → `corbomite adapting` → `corbomite shipped` → `markoff cleanup` → `done`.
+
+## Work-unit input prescriptions (Corbomite side)
+
+The Corbomite app team prescribed these features before the Phase C
+handoff. Each bullet is a must-land requirement — specs get drafted to
+satisfy them, not to re-negotiate them.
+
+### C1 — DI seam
+
+- Replace the `MARKOFF_READING_USE_REAL_COREDEPS` CMake option with
+  interface injection. Interfaces Markoff defines: `IEmbedRegistry`,
+  `ICodeBlockProcessorRegistry`, `IPostProcessorRegistry`,
+  `IVaultResourceProvider`, `IEmbedDepthGuard`,
+  `IMarkdownRenderChildFactory`, `IMermaidRenderer`, `ILinkResolver`,
+  `IMetadataCache` (Corbomite implements each).
+- Retire the `libs/markoff-reading/stubs/corbomite/` shim tree.
+- Host plugs interfaces in at runtime (setter on `ReadingView` / a
+  `Context` object consumed at construction — shape to be designed).
+- Non-host consumers get default no-op implementations that work
+  standalone (`MermaidRenderer` without mmdr → placeholder; `EmbedRegistry`
+  empty → no embeds resolve).
+
+### C5 — Reading-mode interaction parity (Cluster V Phase 4 absorption)
+
+From `Corbomite/docs/superpowers/plans/2026-04-20-cluster-v-editor-workspace-ui-surfacing.md` Phase 4:
+
+- **`ReadingView::linkHovered(QString href, QPoint globalPos)` signal.**
+  Today `ReadingView` emits `wikiLinkHovered` which is too narrow; the
+  rename/alias covers regular links too. Preserve existing emit sites;
+  add a unified signal. Corbomite's `HoverPopover` wires to the new
+  signal.
+- **Click-to-fold on `HeadingItem`.** Clicking a heading's visual
+  marker toggles its fold. Uses the existing fold-state infrastructure
+  (`foldedHeadings()` / `setFoldedHeadings()`).
+- **`codeBlockProcessorRegistry` routing in `ReadingView`'s pipeline.**
+  ReadingView's `SectionLayout` must consult the registry when a code
+  block's language matches a registered processor, same as Markoff
+  Live already does. Today code blocks always fall through to the
+  default syntax-highlighting path.
+- **`ReadingView::zoomIn() / zoomOut() / resetZoom()` virtuals.**
+  Override the `MarkdownView` default no-op implementations. ReadingView
+  already has internal zoom state; the virtuals expose it. Corbomite's
+  `View::zoomIn/Out/Reset` dispatches to this.
+
+### C6 — Editor state + context-menu contribution surface
+
+Full spec already drafted — see
+[`libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md`](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md)
+(recovered from Corbomite's submodule at v0.2.8 after being stranded
+on the local ahead-master for three weeks).
+
+- `EditorContext` struct covering: inline-span membership
+  (bold/italic/strike/inline-code/highlight/link/wiki-link/tag/embed/
+  footnote/math), block kind (paragraph/heading-N/code/blockquote/
+  callout/list-item/task-item), heading level (0–6), table coords
+  (row/col, header flag), and link/tag/footnote URIs.
+- `Q_SIGNAL void contextChanged(const EditorContext &)` — debounced
+  to ~50 ms or "cursor-settled" equivalent per the spec's §4.
+- Pull accessor `EditorContext Editor::context() const` — for host
+  code that can't use the signal (e.g. menu-open callbacks).
+- Default impls are fine to ship first; full classification is the
+  main engineering cost and can be built incrementally.
+- **Context-menu contribution point (§9):**
+  `Q_SIGNAL void aboutToShowContextMenu(QMenu *menu,
+  const EditorContext &ctx, QPoint globalPos)` emitted
+  mid-`contextMenuEvent` after Markoff's built-ins are inserted and
+  before `menu->exec()`. Corbomite's `MainWindow` wraps the menu in
+  `MenuSectionHelper` and injects Format/Heading/Insert/Table
+  entries. Same signal is the natural hook for third-party plugin
+  `editor-menu` contributions later.
+
+### C3 — `MarkoffDocument` becomes content-authoritative
+
+- `MarkoffDocument` owns the text buffer. All three leaves subscribe
+  to changes via Qt signals and update their views.
+- Corbomite's `NoteDocument` becomes a thin wrapper over
+  `MarkoffDocument` (or pools — the right shape to be decided in the
+  C3 spec).
+- Per-leaf ephemeral state (cursor, selection, scroll, fold) stays
+  with the leaf — only text + frontmatter + parse tree are shared.
+- Closes out the deferred items in
+  `Markoff/docs/plans/2026-04-20-tri-view-phase-a.md` §"Deferred to
+  Phase C": async parse worker sharing, precise pixel↔visual-line
+  scroll conversion, source-offset↔per-block cursor translation.
+
+### C7 — Source feature completion
+
+- **Public find/replace API** on `Markoff::Source::SourceEditor`.
+  Absorbs what was planned as "Qutepart-fork Phase 3" on the
+  Corbomite side. See
+  [`libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md`](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md)
+  for the UI shape Markoff Live already targets; Source mode shares
+  most of it modulo Qutepart's peculiarities.
+- **Fold-gutter coordinator** — complete `FoldGutter::paint()`
+  (the Cluster V.2 scouting flagged this is not a theme concern;
+  the Qutepart-fork Phase 6 reference was a misread) and wire the
+  Markoff-internal fold coordinator across Source and Live.
+- Corbomite's Cluster R "Find…" / "Replace…" menu slots (today
+  disabled placeholders with a tooltip pointing at Qutepart-fork P3)
+  light up when this lands.
+
+### C2 — Theme / ResourceProvider / LinkResolver consolidation
+
+- One `Theme` type in `Markoff::Core`. Replaces the three in
+  `Markoff::Live`, `Markoff::Reading`, and `Markoff::Source`.
+  Corbomite's `KColorSchemeManager` (Cluster V Phase 1) drives it.
+- `IVaultResourceProvider` from C1 is the abstract surface;
+  Corbomite's concrete `VaultResourceProvider` (promoted to
+  `libs/core/` in Cluster J) implements it.
+- `ILinkResolver` — same pattern; Corbomite's concrete resolver
+  stays in `libs/storage/`.
+- **Breaking:** Corbomite call sites using per-library Theme types
+  migrate to the unified one. Most are in `NoteEditorWidget` and
+  `MainWindow`.
+
+### C4 — Renderer unification
+
+- Collapse the two-path code-block rendering (Markoff Live's
+  registry vs. Reading's direct dispatch) into a single registry
+  pattern.
+- Collapse the two-path math rendering (JKQTMathText direct
+  embed vs. registry-routed).
+- Audit Mermaid dispatch — today it's registry-routed in Reading
+  only; evaluate whether Live should also gain mermaid support.
+- Smallest work-unit; final polish.
 
 ## Recipe per work-unit
 
@@ -54,7 +210,7 @@ Status values: `not started` → `spec drafted` → `spec approved` → `markoff
 2. **Update the table above** to `spec drafted`. Commit the spec.
 3. **User or a parallel reviewer reads the spec**, either approves or sends back. (For unit-sized changes with no ambiguity, the Corbomite agent may self-approve and proceed — note in the activity log.)
 4. **Draft plan** in `docs/plans/YYYY-MM-DD-phase-c<N>-<topic>.md`. Task-by-task with explicit files + commit messages, per the Phase A/B convention.
-5. **Implement on a Markoff branch**; land commits one at a time with green tests after each. Set status to `markoff implementing`.
+5. **Implement on Markoff `master`** (per Corbomite's no-feature-branches convention; commits land directly). Green tests after each commit. Set status to `markoff implementing`.
 6. **Tag** the Markoff SHA once all Phase-C-<N> tasks are done. Set status to `markoff ready`.
 7. **Bump Corbomite's submodule pin** and write the CorbomiteApp-side adaptation. Set status to `corbomite adapting`.
 8. **Ship on the Corbomite side**, run CorbomiteApp end-to-end smoke. Set status to `corbomite shipped`.
@@ -63,15 +219,44 @@ Status values: `not started` → `spec drafted` → `spec approved` → `markoff
 
 ## Invariants (copy from handoff doc — repeat for visibility)
 
-1. Standalone Markoff build + ctest always green.
+1. Standalone Markoff build + ctest always green. `MARKOFF_READING_USE_REAL_COREDEPS=OFF` is the standalone default; it retires in C1 and whatever replaces it inherits the invariant.
 2. No `Corbomite`-named types in Markoff public interfaces (Phase B stubs excepted; retire in C1).
-3. Tests that need Corbomite concretes gate on the appropriate CMake option.
+3. Tests that need Corbomite concretes gate on the appropriate CMake option / injection mechanism.
 4. Every work-unit tags a Markoff version.
 5. `master` is append-only. No force-push.
+6. Commit identity stays unified across both repos (Corbomite agent, co-author trailer).
 
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — scope expanded: C5, C6, C7 added by Corbomite agent
+
+Corbomite agent took the Phase C baton per the handoff. Scope expanded
+from four work-units to seven by folding in:
+
+- **Cluster V Phase 4** (Corbomite's deferred UI cluster — ReadingView
+  interactions that need Markoff-side signal and virtual additions).
+  Now C5.
+- **The consumer editor-state surface spec** (443 + 203 lines of
+  Corbomite-prescribed requirements that had been stranded on Corbomite's
+  submodule ahead-master; recovered in Markoff commits `8d92247` and
+  `245bd56`; tagged `v0.2.8`). Now C6.
+- **Qutepart-fork Phase 3** (public find/replace API — was tracked on
+  Corbomite's "Parallel long-term internal refactors" table under the
+  Qutepart-Corbomite fork banner; now absorbed into Markoff since
+  `Markoff::Source` owns the widget). Now C7.
+- **Cluster V.2 fold-gutter coordinator** — also absorbed into C7
+  after the V.2 scouting doc flagged the Qutepart-fork-Phase-6 reference
+  as a misread.
+
+Ordering revised: `C1 → C5 → C6 → C3 → C7 → C2 → C4`. C5 and C6 are
+small user-visible unlocks that complete Cluster V and can ship as
+back-to-back v0.4.0 / v0.5.0 releases after C1 lands. C7 gets slotted
+before C2 so find/replace and fold-gutter don't suffer Theme-refactor
+churn. C3/C2/C4 retain their original C1→C3→C2→C4 sequencing.
+
+Markoff `master` at `v0.2.8`. C1 is the next work-unit to spec.
 
 ### 2026-04-20 — handoff
 
