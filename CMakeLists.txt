@@ -5,6 +5,7 @@ project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 #   - libs/rapidyaml       (ryml::ryml — YAML parser, vendored from biojppm/rapidyaml)
 #   - libs/markoff-parser  (MarkoffParser::MarkoffParser — tree-sitter Markdown AST + YAML frontmatter)
 #   - libs/markoff-core    (Markoff::Core — shared primitives)
+#   - libs/markoff-source  (Markoff::Source — Qutepart-based source-mode editor)
 #   - libs/markoff-live    (Markoff::Live — live-preview editor widget)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project
@@ -35,6 +36,7 @@ set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "" FORCE)
 add_subdirectory(libs/rapidyaml)
 add_subdirectory(libs/markoff-parser)
 add_subdirectory(libs/markoff-core)
+add_subdirectory(libs/markoff-source)
 add_subdirectory(libs/markoff-live)
 
 # Markoff's own integration tests. Parent projects may skip these by setting

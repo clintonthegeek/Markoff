@@ -2,10 +2,10 @@
 #
 # Corbomite-style CMakeLists.txt for the vendored, shaped-in-place qutepart-cpp
 # fork. See PROVENANCE.md for upstream details and the 8-phase plan under
-# ../../docs/superpowers/plans/2026-04-15-qutepart-corbomite-fork.md.
+# ../../docs/superpowers/plans/2026-04-15-markoff_source-fork.md.
 
 cmake_minimum_required(VERSION 3.19)
-project(qutepart-corbomite VERSION 0.1.0 LANGUAGES CXX)
+project(markoff_source VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -18,7 +18,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Widgets)
 # Inherited sources (mirrors upstream's CMake SRC list, 1:1).
 # Kept verbatim for Phase 1. Trimming happens in Phases 4 (hl/), 5 (indent/),
 # 6 (theme.cpp + theme.qrc).
-set(qutepart_corbomite_SRCS
+set(markoff_source_SRCS
     # Resources (kept for Phase 1; deleted in Phases 4 & 6).
     qutepart-syntax-files.qrc
     qutepart-theme-data.qrc
@@ -66,7 +66,7 @@ set(qutepart_corbomite_SRCS
 
 # Headers listed so AUTOMOC sees Q_OBJECT declarations and the generator
 # picks them up even when not referenced by a translation unit directly.
-set(qutepart_corbomite_HDRS
+set(markoff_source_HDRS
     include/qutepart/qutepart.h
     include/qutepart/theme.h
 
@@ -104,14 +104,14 @@ set(qutepart_corbomite_HDRS
     src/indent/indenter.h
 )
 
-add_library(qutepart-corbomite STATIC
-    ${qutepart_corbomite_SRCS}
-    ${qutepart_corbomite_HDRS}
+add_library(markoff_source STATIC
+    ${markoff_source_SRCS}
+    ${markoff_source_HDRS}
 )
-set_target_properties(qutepart-corbomite PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_library(Corbomite::QutepartSource ALIAS qutepart-corbomite)
+set_target_properties(markoff_source PROPERTIES POSITION_INDEPENDENT_CODE ON)
+add_library(Markoff::Source ALIAS markoff_source)
 
-target_include_directories(qutepart-corbomite
+target_include_directories(markoff_source
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include/qutepart>
@@ -119,7 +119,7 @@ target_include_directories(qutepart-corbomite
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(qutepart-corbomite
+target_link_libraries(markoff_source
     PUBLIC
         Qt6::Core
         Qt6::Widgets

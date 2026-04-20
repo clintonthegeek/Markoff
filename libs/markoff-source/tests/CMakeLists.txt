@@ -12,7 +12,7 @@ target_link_libraries(tst_qutepart_smoke
         Qt6::Core
         Qt6::Widgets
         Qt6::Test
-        qutepart-corbomite
+        markoff_source
 )
 
 add_test(NAME tst_qutepart_smoke COMMAND tst_qutepart_smoke)
