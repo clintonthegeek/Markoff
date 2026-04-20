@@ -12,6 +12,7 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 add_library(markoff_core STATIC
     src/EphemeralState.cpp
     src/MarkoffDocument.cpp
+    src/ReplaceController.cpp
     src/SearchController.cpp
     include/markoff/CursorPos.h
     include/markoff/TextSpan.h
@@ -19,6 +20,7 @@ add_library(markoff_core STATIC
     include/markoff/EphemeralState.h
     include/markoff/MarkoffCoreExport.h
     include/markoff/MarkoffDocument.h
+    include/markoff/ReplaceController.h
     include/markoff/SearchAdapter.h
     include/markoff/SearchController.h
 )
