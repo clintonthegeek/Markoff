@@ -1270,10 +1270,23 @@ void Editor::insertCodeBlock()     { insertAtCursor(QStringLiteral("```\n\n```")
 void Editor::insertBlockQuote()    { insertAtCursor(QStringLiteral("> ")); }
 void Editor::insertHorizontalRule(){ insertAtCursor(QStringLiteral("\n---\n")); }
 void Editor::insertCallout(const QString &type) {
-    insertAtCursor(QStringLiteral("> [!%1]\n> ").arg(type));
+    insertCallout(type, QString());
+}
+
+void Editor::insertCallout(const QString &type, const QString &title) {
+    QString head = QStringLiteral("> [!%1]").arg(type);
+    if (!title.isEmpty())
+        head += QLatin1Char(' ') + title;
+    head += QStringLiteral("\n> ");
+    insertAtCursor(head);
 }
 
 void Editor::insertTable(int rows, int cols)
+{
+    insertTable(rows, cols, true);
+}
+
+void Editor::insertTable(int rows, int cols, bool hasHeader)
 {
     auto *ti = focusedTextItem();
     if (!ti || m_readOnly) return;
@@ -1291,12 +1304,12 @@ void Editor::insertTable(int rows, int cols)
     fmt.setCellSpacing(0);
     fmt.setBorder(1);
 
-    auto *table = cursor.insertTable(rows + 1, cols, fmt); // +1 for header row
+    const int totalRows = hasHeader ? rows + 1 : rows;
+    auto *table = cursor.insertTable(totalRows, cols, fmt);
 
-    // Position cursor in first header cell so the user can start typing
-    // column names immediately.
-    QTextCursor firstHeader = table->cellAt(0, 0).firstCursorPosition();
-    ti->textControl()->setTextCursor(firstHeader);
+    // Position cursor in first cell so the user can start typing immediately.
+    QTextCursor firstCell = table->cellAt(0, 0).firstCursorPosition();
+    ti->textControl()->setTextCursor(firstCell);
 
     cursor.endEditBlock();
 }
@@ -1380,6 +1393,22 @@ void Editor::setHeadingLevel(int level)
         bc.insertText(replacement);
     }
     cursor.endEditBlock();
+}
+
+int Editor::currentHeadingLevel() const
+{
+    auto *ti = focusedTextItem();
+    if (!ti) return 0;
+    QTextCursor cursor = ti->textControl()->textCursor();
+    QString line = cursor.block().text();
+    int level = 0;
+    while (level < line.size() && line.at(level) == QLatin1Char('#'))
+        ++level;
+    if (level == 0 || level > 6) return 0;
+    // Require the canonical "# " form: leading '#'s followed by a space.
+    if (level >= line.size() || line.at(level) != QLatin1Char(' '))
+        return 0;
+    return level;
 }
 
 void Editor::toggleCheckbox()

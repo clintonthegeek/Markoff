@@ -147,14 +147,27 @@ public:
     void insertBlockQuote();
     void insertHorizontalRule();
     void insertTable(int rows, int cols);
+    /// Insert a table with an explicit header-row flag. When `hasHeader`
+    /// is true the table is built with `rows` data rows plus a header
+    /// row (matching the two-arg overload); when false the table is built
+    /// with exactly `rows` rows and no separator. `rows` is always the
+    /// count the caller asked for, not the count including a header.
+    void insertTable(int rows, int cols, bool hasHeader);
     void increaseHeadingLevel();
     void decreaseHeadingLevel();
     /// Set the heading level of each selected block to exactly `level`
     /// (1–6). Pass 0 to strip heading markers. Blocks already at the
     /// target level are left unchanged.
     void setHeadingLevel(int level);
+    /// Return the heading level (1–6) of the block under the cursor, or
+    /// 0 if the block is not a heading. Uses the focused text item's
+    /// current block — returns 0 when there is no focused item.
+    int currentHeadingLevel() const;
     void toggleCheckbox();
     void insertCallout(const QString &type);
+    /// Insert a callout with an explicit title. Empty title matches the
+    /// single-arg overload.
+    void insertCallout(const QString &type, const QString &title);
 
     /// True when the focused text item's cursor sits inside a GFM pipe table.
     /// Returns false when there is no focused editor or no cursor.
