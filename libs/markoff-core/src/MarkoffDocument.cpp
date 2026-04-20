@@ -17,7 +17,7 @@ struct MarkoffDocument::Private {
 };
 
 MarkoffDocument::MarkoffDocument(QObject *parent)
-    : QObject(parent), d(new Private)
+    : QObject(parent), d(std::make_unique<Private>())
 {
     d->textDoc = new QTextDocument(this);
     connect(d->textDoc, &QTextDocument::contentsChanged,
@@ -28,7 +28,7 @@ MarkoffDocument::MarkoffDocument(QObject *parent)
             });
 }
 
-MarkoffDocument::~MarkoffDocument() { delete d; }
+MarkoffDocument::~MarkoffDocument() = default;
 
 QString MarkoffDocument::plainText() const
 {

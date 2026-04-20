@@ -3,6 +3,7 @@
 
 #include <QObject>
 #include <QString>
+#include <memory>
 
 class QTextDocument;
 
@@ -16,6 +17,7 @@ class Document;                          // markoff-parser
 /// pointer but doesn't yet bind text. Phase C flips that.
 class MarkoffDocument : public QObject {
     Q_OBJECT
+    Q_DISABLE_COPY_MOVE(MarkoffDocument)
 public:
     explicit MarkoffDocument(QObject *parent = nullptr);
     ~MarkoffDocument() override;
@@ -45,7 +47,7 @@ Q_SIGNALS:
 
 private:
     struct Private;
-    Private *d;
+    std::unique_ptr<Private> d;
 };
 
 }  // namespace Markoff
