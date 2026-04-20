@@ -85,13 +85,15 @@ target_include_directories(markoff_reading
 )
 
 if(MARKOFF_READING_USE_REAL_COREDEPS)
-    # Real-deps mode (CorbomiteApp): host must provide Corbomite::Core and
-    # an mmdr target. Corbomite::Storage is intentionally omitted — Phase A
-    # survey found zero direct includes from readingview sources; Phase B
-    # Task 5 validates this empirically and drops the stub if so.
+    # Real-deps mode (CorbomiteApp): host must provide Corbomite::Core,
+    # Corbomite::Storage, and an mmdr target. (Phase B Task 5 validated
+    # empirically: EmbedRenderer.cpp directly includes
+    # `<corbomite/storage/CachedMetadata.h>`, so Storage is live. The
+    # stubs/corbomite/storage/ tree stays for standalone Markoff builds.)
     target_link_libraries(markoff_reading
         PRIVATE
             Corbomite::Core
+            Corbomite::Storage
             mmdr
     )
 else()
