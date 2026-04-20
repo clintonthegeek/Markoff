@@ -34,6 +34,7 @@ enum class ActionId {
     InsertCodeBlock, InsertBlockQuote, InsertHorizontalRule, InsertTable,
     IncreaseHeading, DecreaseHeading, ToggleCheckbox,
     ToggleFoldAtCursor, FoldAll, UnfoldAll,
+    SetHeading1, SetHeading2, SetHeading3, SetHeading4, SetHeading5, SetHeading6,
 };
 
 class SelectionScene;
@@ -148,6 +149,10 @@ public:
     void insertTable(int rows, int cols);
     void increaseHeadingLevel();
     void decreaseHeadingLevel();
+    /// Set the heading level of each selected block to exactly `level`
+    /// (1–6). Pass 0 to strip heading markers. Blocks already at the
+    /// target level are left unchanged.
+    void setHeadingLevel(int level);
     void toggleCheckbox();
     void insertCallout(const QString &type);
 

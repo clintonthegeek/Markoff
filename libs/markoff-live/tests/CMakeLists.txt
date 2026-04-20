@@ -33,6 +33,11 @@ add_test(NAME tst_markoff_editor_formatting COMMAND tst_markoff_editor_formattin
 target_link_libraries(tst_markoff_editor_formatting PRIVATE Qt6::Test Qt6::Widgets markoff_live)
 set_tests_properties(tst_markoff_editor_formatting PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_markoff_set_heading_actions tst_set_heading_actions.cpp)
+add_test(NAME tst_markoff_set_heading_actions COMMAND tst_markoff_set_heading_actions)
+target_link_libraries(tst_markoff_set_heading_actions PRIVATE Qt6::Test Qt6::Widgets markoff)
+set_tests_properties(tst_markoff_set_heading_actions PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_markoff_undo_grouping tst_undo_grouping.cpp)
 add_test(NAME tst_markoff_undo_grouping COMMAND tst_markoff_undo_grouping)
 target_link_libraries(tst_markoff_undo_grouping PRIVATE Qt6::Test Qt6::Widgets markoff_live)

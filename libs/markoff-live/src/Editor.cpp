@@ -348,6 +348,24 @@ void Editor::createActions()
     connect(a, &QAction::triggered, this, &Editor::decreaseHeadingLevel);
     reg(ActionId::DecreaseHeading, a);
 
+    // Direct-select H1..H6 (Ctrl+1..Ctrl+6).
+    static const ActionId setHeadingIds[6] = {
+        ActionId::SetHeading1, ActionId::SetHeading2, ActionId::SetHeading3,
+        ActionId::SetHeading4, ActionId::SetHeading5, ActionId::SetHeading6,
+    };
+    for (int level = 1; level <= 6; ++level) {
+        a = makeAction(
+            this,
+            QStringLiteral("markoff_set_heading_%1").arg(level),
+            tr("Heading %1").arg(level),
+            QStringLiteral("format-text-heading"),
+            QKeySequence(Qt::CTRL | static_cast<Qt::Key>(Qt::Key_0 + level)));
+        connect(a, &QAction::triggered, this, [this, level]() {
+            setHeadingLevel(level);
+        });
+        reg(setHeadingIds[level - 1], a);
+    }
+
     a = makeAction(this, QStringLiteral("markoff_toggle_checkbox"),
                    tr("Toggle Checkbox"), QStringLiteral("checkbox"));
     connect(a, &QAction::triggered, this, &Editor::toggleCheckbox);
@@ -1326,6 +1344,40 @@ void Editor::decreaseHeadingLevel()
         QString line = bc.selectedText();
         if (line.startsWith(QLatin1Char('#')))
             bc.insertText(line.mid(1));
+    }
+    cursor.endEditBlock();
+}
+
+void Editor::setHeadingLevel(int level)
+{
+    auto *ti = focusedTextItem();
+    if (!ti) return;
+    auto *tc = ti->textControl();
+    QTextCursor cursor = tc->textCursor();
+    int startBlock = cursor.document()->findBlock(cursor.selectionStart()).blockNumber();
+    int endBlock = cursor.document()->findBlock(cursor.selectionEnd()).blockNumber();
+
+    cursor.beginEditBlock();
+    for (int b = startBlock; b <= endBlock; ++b) {
+        QTextBlock block = cursor.document()->findBlockByNumber(b);
+        QTextCursor bc(block);
+        bc.movePosition(QTextCursor::StartOfBlock);
+        bc.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+        QString line = bc.selectedText();
+        int existing = 0;
+        while (existing < line.size() && line.at(existing) == QLatin1Char('#'))
+            ++existing;
+        // Skip the single space after the existing marker, if present.
+        int stripTo = existing;
+        if (stripTo < line.size() && line.at(stripTo) == QLatin1Char(' '))
+            ++stripTo;
+        QString body = line.mid(stripTo);
+        QString replacement;
+        if (level >= 1 && level <= 6)
+            replacement = QString(level, QLatin1Char('#')) + QLatin1Char(' ') + body;
+        else
+            replacement = body;
+        bc.insertText(replacement);
     }
     cursor.endEditBlock();
 }
