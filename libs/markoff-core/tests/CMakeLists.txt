@@ -11,3 +11,8 @@ add_executable(tst_markoff_value_types tst_value_types.cpp)
 add_test(NAME tst_markoff_value_types COMMAND tst_markoff_value_types)
 target_link_libraries(tst_markoff_value_types PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_markoff_value_types PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_ephemeral_state tst_ephemeral_state.cpp)
+add_test(NAME tst_markoff_ephemeral_state COMMAND tst_markoff_ephemeral_state)
+target_link_libraries(tst_markoff_ephemeral_state PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markoff_ephemeral_state PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

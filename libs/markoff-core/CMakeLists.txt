@@ -10,7 +10,12 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(KF6SyntaxHighlighting REQUIRED)
 
 add_library(markoff_core STATIC
-    src/_placeholder.cpp
+    src/EphemeralState.cpp
+    include/markoff/CursorPos.h
+    include/markoff/TextSpan.h
+    include/markoff/FoldSpec.h
+    include/markoff/EphemeralState.h
+    include/markoff/MarkoffCoreExport.h
 )
 
 target_include_directories(markoff_core
