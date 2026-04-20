@@ -22,3 +22,16 @@ add_test(NAME tst_qutepart_smoke COMMAND tst_qutepart_smoke)
 set_tests_properties(tst_qutepart_smoke PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
+
+# Tri-view MarkdownView wrapper test (Phase A Task 12).
+qt_add_executable(tst_markoff_source_markdown_view tst_source_markdown_view.cpp)
+target_link_libraries(tst_markoff_source_markdown_view
+    PRIVATE
+        Qt6::Test
+        Qt6::Widgets
+        markoff_source
+)
+add_test(NAME tst_markoff_source_markdown_view COMMAND tst_markoff_source_markdown_view)
+set_tests_properties(tst_markoff_source_markdown_view PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)

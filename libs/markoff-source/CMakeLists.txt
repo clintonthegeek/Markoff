@@ -62,6 +62,10 @@ set(markoff_source_SRCS
     src/indent/alg_python.cpp
     src/indent/alg_ruby.cpp
     src/indent/alg_cstyle.cpp
+
+    # Tri-view MarkdownView wrapper (Phase A).
+    src/SourceEditor.cpp
+    src/SourceSearchAdapter.cpp
 )
 
 # Headers listed so AUTOMOC sees Q_OBJECT declarations and the generator
@@ -102,6 +106,9 @@ set(markoff_source_HDRS
     src/indent/alg_xml.h
     src/indent/indent_funcs.h
     src/indent/indenter.h
+
+    include/markoff/source/SourceEditor.h
+    src/SourceSearchAdapter.h
 )
 
 add_library(markoff_source STATIC
@@ -123,6 +130,7 @@ target_link_libraries(markoff_source
     PUBLIC
         Qt6::Core
         Qt6::Widgets
+        markoff_core
 )
 
 # No install rules: this is an internal static library consumed via
