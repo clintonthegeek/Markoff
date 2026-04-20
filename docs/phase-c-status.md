@@ -65,7 +65,7 @@ during C1–C7.
 
 | ID   | Status       | Spec                                   | Plan                                   | Markoff PR/branch    | Corbomite PR/branch  | Tag       |
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
-| C1   | spec drafted | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | —                                      | —                    | —                    | `v0.3.0`  |
+| C1   | plan drafted — ready to implement | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | —                    | —                    | `v0.3.0`  |
 | C5   | requirements — see inputs | —                         | —                                      | —                    | —                    | —         |
 | C6   | requirements — see inputs | [consumer editor-state surface §1-8 + §9 context-menu](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,25 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C1 plan drafted
+
+`docs/plans/2026-04-20-phase-c1-di-seam.md` — 26-task self-contained
+execution plan written for a fresh-context agent. Covers C1a
+(Tasks 1–9, Markoff side, introduce types + default impls +
+retargeted markoff-reading, tag `v0.3.0-alpha.1`), Corbomite adapter
+commit (Tasks 10–16, inheritance-based adapters + MainWindow wiring),
+C1b (Tasks 17–22, delete stubs + retire CMake option, tag `v0.3.0`),
+and Corbomite cleanup (Tasks 23–26). Includes orientation §0 with
+build commands, invariants, submodule pin-bump protocol, header
+template, and commit-message convention. Troubleshooting appendix
+covers the four known thorns (registerExtension name collision,
+MetadataParser static-vs-instance, mermaid test assertions,
+MarkdownRenderChild MI).
+
+Timeline estimate: 2.5 days across both repos.
+
+Ready to execute. Next: Task 1 in a fresh-context session.
 
 ### 2026-04-20 — C1 spec drafted
 
