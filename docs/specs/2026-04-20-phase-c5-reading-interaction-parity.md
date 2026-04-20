@@ -18,11 +18,35 @@ documentation plus (for zoom) a Corbomite-side dispatch beat.
 | --------------------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------- |
 | Unified `linkHovered`                   | new signal with `(href, globalPos)`             | `ReadingView` emits `wikiLinkHovered(target)`; `Editor` emits one-arg form  | **Replace** on Reading; **widen** on Editor         |
 | Click-to-fold on heading                | heading fold toggle from click                  | `eventFilter` already toggles via fold-arrow hit-test                       | Documented as done; regression test added           |
-| `codeBlockProcessorRegistry` routing    | `SectionLayout` consults registry               | Registry populated by `registerBuiltinCodeBlockProcessors`, never read      | Dispatch path through registry; default fallback intact |
+| `codeBlockProcessorRegistry` routing    | `SectionLayout` consults registry               | Registry is a `bool`-returning feature-flag map; render output discarded; Live doesn't consume it either | **Deferred** — revisit under C3 or C4 with a redesigned registry contract |
 | `zoomIn / zoomOut / resetZoom` virtuals | override `MarkdownView` defaults on ReadingView | Overrides already present + `zoomChanged` signal (QGraphicsView xform scale) | Documented as done; Corbomite dispatch beat lands in adaptation commit |
+
+**Why `codeBlockProcessorRegistry` routing deferred:** post-C1 inspection
+showed the registry's `CodeBlockProcessor` type is
+`std::function<bool(source, node, ctx)>` — a handler returns `bool`
+indicating "I handled this language" but produces no render payload
+the layout can mount. Markoff Live, which the original prescription
+cited as precedent, doesn't consume the registry at all (zero
+`dispatch()` call sites). Today `SectionLayout` hardcodes mermaid
+rendering via `ctx.mermaidRenderer` and plain-code rendering via
+`CodeBlockHighlighter`; math/latex fenced blocks fall through to the
+default path and render as inert code. The intended design — "registry-
+driven fenced-block dispatch" — requires a signature redesign
+(processor returns a mount payload, or SectionLayout gets an
+out-parameter protocol) plus migrations of the existing hardcoded
+branches. That belongs under C3 (`MarkoffDocument` content-
+authoritative, which reshapes the render pipeline anyway) or C4
+(renderer unification). No user currently relies on math fenced-block
+rendering in Corbomite; the deferral has no observable regression.
 
 ### Out of scope (deferred)
 
+- **`codeBlockProcessorRegistry` render-pipeline routing.** See the
+  "Why … deferred" paragraph above. Revisit under C3 or C4 with a
+  redesigned processor contract.
+- **Math / LaTeX fenced-block rendering.** Symptom of the registry
+  deferral — `math` / `latex` fenced blocks remain inert until the
+  registry redesign ships. Nobody currently relies on this.
 - **Zoom-policy harmonization** across leaves (Live/Source font-size
   vs. Reading transform-scale). Cosmetic; revisit post-Phase-C if
   demand surfaces.
@@ -94,42 +118,7 @@ pass `QCursor::pos()` at emit time. `TextControl::linkHovered`
 fires synchronously inside mouse-move handling, so `QCursor::pos()`
 is current. Hover-leave case: pass `QPoint()`.
 
-### 2.3 `SectionLayout` — code-block registry routing
-
-Extend `SectionLayout::Context` (which already carries
-`mermaidRenderer *` after C1):
-
-```cpp
-Markoff::CodeBlockProcessorRegistry *codeBlockProcessorRegistry = nullptr;
-```
-
-`ReadingView` populates this from its owned registry at layout-
-construction time (same pattern as `mermaidRenderer`).
-
-**Code-block branch in `SectionLayout`** gains the dispatch:
-
-```cpp
-if (ctx.codeBlockProcessorRegistry) {
-    if (auto *proc = ctx.codeBlockProcessorRegistry->processorFor(language)) {
-        // proc produces the QGraphicsItem to mount for this block.
-        return proc->process(/* CodeBlockContext: source, language, styleManager, parent */);
-    }
-}
-// existing fallback
-return defaultCodeBlockHighlighter(source, language, ...);
-```
-
-Method names mirror Markoff Live's existing consumption of the
-registry; if signatures drift during implementation, follow the Live
-side and capture the drift in the plan.
-
-**Consequence:** mermaid / math / syntax processors registered by
-`ReadingView::registerBuiltinCodeBlockProcessors()` become
-actually-used. Today those registrations are inert; post-C5 they are
-the canonical render path. The `CodeBlockHighlighter` fallback
-remains for languages no processor handles.
-
-### 2.4 Click-to-fold — no API change
+### 2.3 Click-to-fold — no API change
 
 Current flow stays:
 
@@ -140,7 +129,7 @@ Current flow stays:
 
 C5 adds only a regression test (§4.2). No code change.
 
-### 2.5 Zoom virtuals — no API change
+### 2.4 Zoom virtuals — no API change
 
 Already present at `ReadingView.{h,cpp}` — see C1-era lines:
 
@@ -196,27 +185,22 @@ Ctrl+= / Ctrl+− / Ctrl+0 shortcut wiring already exists (Cluster V
 Phase 2+3). After this beat the chain reaches real per-leaf
 implementations in Reading + Live + Source.
 
-### 3.3 Un-gate four Phase-B-style tests
+### 3.3 Four gated tests stay gated
 
 The four tests still sitting behind
 `if(FALSE AND MARKOFF_READING_USE_REAL_COREDEPS)` in
-`libs/markoff-reading/tests/CMakeLists.txt`:
+`libs/markoff-reading/tests/CMakeLists.txt` (`tst_sectionlayout_mermaid`,
+`tst_readingview_embedrenderer`, `tst_readingview_mermaid_registered`,
+`tst_readingview_embed_builtins`) assert on real processor-dispatch
+behavior that the deferred §2.3 redesign would unlock. They stay
+gated through C5 and un-gate when the registry routing lands (C3 or
+C4).
 
-- `tst_sectionlayout_mermaid`
-- `tst_readingview_embedrenderer`
-- `tst_readingview_mermaid_registered`
-- `tst_readingview_embed_builtins`
-
-Un-gate once §2.3 routing lands — they assert on real processor
-dispatch, which SectionLayout now performs.
-
-**Separately** (tracked as a C1 follow-up in PROJECT-STATE §Markoff
-Phase C): `NoteEditorWidget`'s per-note `ReadingView` currently
-injects via HoverPopover's EmbedRenderer path only; C5 is a good beat
-to add `setMermaidRenderer` / `setVault*Parser` calls at
-`NoteEditorWidget` construction. If it doesn't land in the same
-adaptation commit, the test un-gate stays deferred and is explicitly
-tracked.
+Per-note `NoteEditorWidget` injection of `setMermaidRenderer` /
+`setVault*Parser` is still a good idea (hovered mermaid in wiki-links
+works today because HoverPopover owns its own `EmbedRenderer`; the
+per-note ReadingView doesn't render mermaid). Track as a C5
+nice-to-have: land if trivial, defer otherwise.
 
 ### 3.4 Cluster V Phase 4 closeout
 
@@ -252,12 +236,11 @@ be two-arg.
 | `tst_textcontrol_links`                 | retype spy + global-pos assertion                                                                 |
 | Editor signal tests (any observers)     | retype as above                                                                                   |
 | **New:** `tst_readingview_click_to_fold` | simulate click on a fold-arrow item; assert `foldedHeadingsChanged()` emits + `foldedHeadings()` reflects the toggle |
-| **New:** `tst_readingview_codeblock_routing` | register a fake `CodeBlockProcessor` for language `"foo"`; feed a ```` ```foo ```` block; assert the processor's returned item is mounted (not the default highlighter's) |
 
 ### 4.3 Acceptance criteria
 
 1. Standalone Markoff build green (`MARKOFF_READING_USE_REAL_COREDEPS=OFF`),
-   full ctest pass including the four new/widened tests above.
+   full ctest pass including the three new/widened tests above.
 2. `grep -rn wikiLinkHovered libs/` returns zero source hits across
    Markoff; only spec-doc mentions remain.
 3. Corbomite submodule bumped to `v0.4.0`; build green (modulo the
@@ -270,8 +253,9 @@ be two-arg.
 
 1. Draft C5 plan in `docs/plans/2026-04-20-phase-c5-reading-interaction-parity.md`.
 2. Implement on Markoff `master`:
-   - Commit A — §2.1 (`linkHovered` on Reading) + §2.2 (Editor widen) + test updates. Tag `v0.4.0-alpha.1`.
-   - Commit B — §2.3 (SectionLayout routing) + new routing test. Tag `v0.4.0`.
+   - Single commit series — §2.1 (`linkHovered` on Reading) + §2.2
+     (Editor widen) + §2.3 click-to-fold regression test + test
+     updates. Tag `v0.4.0` when standalone ctest is green.
 3. Bump Corbomite submodule to `v0.4.0`; ship §3 in one or two commits.
 4. Return to Markoff only if cleanup is non-trivial (none expected —
    no bridge code here).
@@ -289,12 +273,14 @@ be two-arg.
   without breaking contract.
 - **D4** Zoom policy is per-leaf. Rationale: harmonization is
   cosmetic; deferred.
-- **D5** Code-block routing falls back to `CodeBlockHighlighter` when
-  no processor matches. Rationale: preserves current behavior for
-  languages without a registered processor; no regression.
-- **D6** `SectionLayout::Context::codeBlockProcessorRegistry` is a
-  borrowed pointer (not owned). Rationale: mirrors the existing
-  `mermaidRenderer *` pattern introduced in C1.
-- **D7** Cluster V Phase 4 closeout happens in the Corbomite
+- **D5** `codeBlockProcessorRegistry` routing deferred to C3/C4.
+  Rationale: the registry's current `bool`-returning `CodeBlockProcessor`
+  signature can't produce mount payloads; Markoff Live doesn't consume
+  the registry either (contradicting the original prescription);
+  redesign belongs under the render-pipeline-touching work-units
+  (C3 `MarkoffDocument` or C4 renderer unification). No user depends
+  on math/latex fenced rendering today, so deferral has no observable
+  regression.
+- **D6** Cluster V Phase 4 closeout happens in the Corbomite
   adaptation commit, not on the Markoff side. Rationale: the phase
   is a Corbomite UI cluster; Markoff only provides the primitives.
