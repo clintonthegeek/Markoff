@@ -1,0 +1,556 @@
+// SPDX-License-Identifier: MIT AND GPL-3.0-or-later
+//
+// Originally from qutepart-cpp (https://github.com/diegoiast/qutepart-cpp)
+// (c) 2024 Diego Iastrubni, MIT-licensed.
+// Fork point: commit eec2e9ae5b50b591f017296ee743ee2860a280e4, 2026-04-12.
+//
+// Modifications (c) 2026 Corbomite contributors, GPL-3.0-or-later.
+
+#include <QAbstractItemModel>
+#include <QDebug>
+#include <QListView>
+#include <QRegularExpression>
+#include <QScrollBar>
+
+#include "completer.h"
+#include "html_delegate.h"
+#include "qutepart.h"
+
+/* Autocompletion widget and logic
+ */
+
+namespace Qutepart {
+
+namespace {
+
+const QString wordPattern("\\w+");
+const QRegularExpression wordRegExp(wordPattern);
+const QRegularExpression wordAtEndRegExp(wordPattern + '$');
+const QRegularExpression wordAtStartRegExp("^" + wordPattern);
+
+// Maximum count of words, for which completion will be shown. Ignored, if
+// completion invoked manually.
+const int MAX_VISIBLE_WORD_COUNT = 256;
+
+const int MAX_VISIBLE_ROWS = 7; // no any technical reason, just for better UI
+
+const int WIDGET_BORDER_MARGIN = 5;
+
+} // anonymous namespace
+
+/* QAbstractItemModel implementation for a list of completion variants
+
+words attribute contains all words
+canCompleteText attribute contains text, which may be inserted with tab
+*/
+class CompletionModel : public QAbstractItemModel {
+    Q_OBJECT
+  public:
+    CompletionModel(const QSet<CompletionItem> &wordSet) : wordSet_(wordSet) {}
+
+    // Set model information
+    void setCompletionData(const QString &wordBeforeCursor, const QString wholeWord) {
+        beginResetModel();
+        typedText_ = wordBeforeCursor;
+        words_ = makeListOfCompletions(wordBeforeCursor, wholeWord);
+        commonStart_ = commonWordStart(words_);
+        canCompleteText_ = commonStart_.mid(wordBeforeCursor.length());
+        endResetModel();
+    }
+
+    bool hasWords() const { return !words_.isEmpty(); }
+
+    const QVector<CompletionItem> &words() const { return words_; }
+
+    bool tooManyWords() const { return words_.length() > MAX_VISIBLE_WORD_COUNT; }
+
+    // QAbstractItemModel method implementation
+    QVariant data(const QModelIndex &index, int role) const override {
+        if (role == Qt::DisplayRole && index.row() < words_.length()) {
+            const CompletionItem& item = words_[index.row()];
+            QString text = item.text;
+            QString typed = text.left(typedText_.length());
+            QString canComplete = text.mid(typedText_.length(), canCompleteText_.length());
+            QString rest = text.mid(typedText_.length() + canCompleteText_.length());
+            
+            QString display;
+            if (!canComplete.isEmpty()) {
+                display = QString("%1<font color=\"#e80000\">%2</font>%3")
+                    .arg(typed, canComplete, rest);
+            } else {
+                display = typed + rest;
+            }
+
+            if (!item.source.isEmpty()) {
+                return QString("<html><table width=\"100%\"><tr><td>%1</td><td align=\"right\"><font color=\"gray\"><i>[%2]</i></font></td></tr></table></html>")
+                    .arg(display, item.source);
+            } else {
+                return QString("<html>%1</html>").arg(display);
+            }
+        } else {
+            return QVariant();
+        }
+    }
+
+    // QAbstractItemModel method implementation
+    int rowCount(const QModelIndex & = QModelIndex()) const override { return words_.length(); }
+
+    // Get current typed text
+    QString typedText() const { return typedText_; }
+
+    /*Get common start of all words.
+    i.e. for ['blablaxxx', 'blablayyy', 'blazzz'] common start is 'bla'
+    TODO optimize performance?
+    */
+    QString commonWordStart(const QVector<CompletionItem> &words) const {
+        if (words.isEmpty()) {
+            return "";
+        }
+
+        QString firstWord = words[0].text;
+        for (int chIndex = 0; chIndex < firstWord.length(); chIndex++) {
+            QChar ch = firstWord[chIndex];
+            for (int wordIndex = 1; wordIndex < words.length(); wordIndex++) {
+                if (words[wordIndex].text.length() <= chIndex || words[wordIndex].text[chIndex] != ch) {
+                    return firstWord.left(chIndex);
+                }
+            }
+        }
+
+        return firstWord;
+    }
+
+    // Make list of completions, which shall be shown
+    QVector<CompletionItem> makeListOfCompletions(const QString &wordBeforeCursor,
+                                           const QString &wholeWord) const {
+        QVector<CompletionItem> result;
+        for (auto const &item : std::as_const(wordSet_)) {
+            if (item.text.startsWith(wordBeforeCursor, Qt::CaseInsensitive) && item.text != wholeWord) {
+                result << item;
+            }
+        }
+
+        std::sort(result.begin(), result.end(), [](const CompletionItem& a, const CompletionItem& b) {
+            return a.text < b.text;
+        });
+
+        return result;
+    }
+
+    // Trivial QAbstractItemModel methods implementation
+    Qt::ItemFlags flags(const QModelIndex &) const override {
+        return Qt::ItemIsEnabled | Qt::ItemIsSelectable;
+    }
+
+    QVariant headerData(int, Qt::Orientation, int = Qt::DisplayRole) const override {
+        return QVariant();
+    }
+
+    int columnCount(const QModelIndex &) const override { return 1; }
+
+    QModelIndex index(int row, int column, const QModelIndex & = QModelIndex()) const override {
+        return createIndex(row, column);
+    }
+
+    QModelIndex parent(const QModelIndex &) const override { return QModelIndex(); }
+
+    QString canCompleteText() const { return canCompleteText_; }
+
+    QString commonStart() const { return commonStart_; }
+
+  private:
+    const QSet<CompletionItem> &wordSet_;
+    QString typedText_;
+    QVector<CompletionItem> words_;
+    QString canCompleteText_;
+    QString commonStart_;
+};
+
+// Completion list widget
+class CompletionList : public QListView {
+    Q_OBJECT
+  public:
+    CompletionList(Qutepart *qpart, CompletionModel *model)
+        : QListView(qpart->viewport()), qpart_(qpart), completionModel_(model), selectedIndex_(-1) {
+        // ensure good selected item background on Windows
+        QPalette newPalette = palette();
+        newPalette.setColor(QPalette::Inactive, QPalette::Highlight,
+                            newPalette.color(QPalette::Active, QPalette::Highlight));
+        setPalette(newPalette);
+
+        setAttribute(Qt::WA_DeleteOnClose);
+        setFrameStyle(QFrame::Raised);
+        setFrameShape(QFrame::Box);
+        setFrameShadow(QFrame::Raised);
+        setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+
+        setItemDelegate(new HTMLDelegate(this));
+
+        setFont(qpart_->font());
+
+        setCursor(QCursor(Qt::PointingHandCursor));
+        setFocusPolicy(Qt::NoFocus);
+
+        setModel(model);
+
+        // if cursor moved, we shall close widget, if its position (and model)
+        // hasn't been updated
+        closeIfNotUpdatedTimer_.setInterval(200);
+        closeIfNotUpdatedTimer_.setSingleShot(true);
+
+        connect(&closeIfNotUpdatedTimer_, &QTimer::timeout, this,
+                &CompletionList::afterCursorPositionChanged);
+
+        qpart_->installEventFilter(this);
+
+        connect(qpart, &Qutepart::cursorPositionChanged, this,
+                &CompletionList::onCursorPositionChanged);
+
+        connect(this, &QListView::clicked,
+                [this](QModelIndex index) { emit(this->itemSelected(index.row())); });
+
+        updateGeometry();
+        show();
+
+        qpart_->setFocus();
+    }
+
+    ~CompletionList() {
+        closeIfNotUpdatedTimer_.stop();
+        qpart_->removeEventFilter(this);
+    }
+
+    /* QWidget.sizeHint implementation
+    Automatically resizes the widget according to rows count
+    */
+    QSize sizeHint() const override {
+        const int rowCount = std::min(model()->rowCount(), MAX_VISIBLE_ROWS);
+        int height = 0;
+        if (rowCount > 0) {
+            height = sizeHintForRow(0) * rowCount + frameWidth() * 2;
+        }
+
+        int maxWidth = 0;
+        const QFontMetrics fm = fontMetrics();
+        for (const auto &item : std::as_const(completionModel_->words())) {
+            int width = fm.horizontalAdvance(item.text);
+            if (!item.source.isEmpty()) {
+                width += fm.horizontalAdvance(item.source) + 50; // extra space for source and alignment
+            }
+            maxWidth = std::max(maxWidth, width);
+        }
+        // Add some margin for HTML delegate and frame
+        int width = maxWidth + frameWidth() * 2 + 30;
+        if (model()->rowCount() > MAX_VISIBLE_ROWS) {
+            width += verticalScrollBar()->sizeHint().width();
+        }
+
+        return QSize(width, height);
+    }
+
+    CompletionModel *completionModel() const { return completionModel_; }
+
+    // Move widget to point under cursor
+    void updateGeometry() {
+        auto hint = sizeHint();
+        auto width = hint.width();
+        auto height = hint.height();
+        auto const cursorRect = qpart_->QPlainTextEdit::cursorRect(qpart_->textCursor());
+        auto const parentSize = parentWidget()->size();
+        auto const spaceBelow = parentSize.height() - cursorRect.bottom();
+        auto const spaceAbove = cursorRect.top();
+
+        int yPos;
+        if (height <= spaceBelow) {
+            // fits below
+            yPos = cursorRect.bottom();
+        } else if (height <= spaceAbove) {
+            // fits above
+            yPos = cursorRect.top() - height;
+        } else {
+            // doesn't fit either way, resize it in the larger space
+            if (spaceBelow > spaceAbove) {
+                yPos = cursorRect.bottom();
+                height = spaceBelow - WIDGET_BORDER_MARGIN;
+            } else {
+                height = spaceAbove - WIDGET_BORDER_MARGIN;
+                yPos = cursorRect.top() - height;
+            }
+        }
+
+        int xPos = cursorRect.right() - horizontalShift();
+        if (xPos + width > parentSize.width()) {
+            xPos = parentSize.width() - width;
+        }
+        if (xPos < 0) {
+            xPos = 0;
+        }
+
+        setGeometry(xPos, yPos, width, height);
+        closeIfNotUpdatedTimer_.stop();
+    }
+
+  private:
+    /* List should be placed such way, that typed text in the list is under
+    typed text in the editor
+    */
+    int horizontalShift() const {
+        int strangeAdjustment = 2; // I don't know why. Probably, won't work on
+                                   // other systems and versions
+        return fontMetrics().horizontalAdvance(completionModel_->typedText()) + strangeAdjustment;
+    }
+
+    /* Cursor position changed. Schedule closing.
+    Timer will be stopped, if widget position is being updated
+    */
+    void onCursorPositionChanged() { closeIfNotUpdatedTimer_.start(); }
+
+    // Widget position hasn't been updated after cursor position change, close
+    // widget
+    void afterCursorPositionChanged() { emit(closeMe()); }
+
+    /* Catch events from qpart
+    Move selection, select item, or close themselves
+    */
+    bool eventFilter(QObject * /*object*/, QEvent *event) override {
+        if (event->type() == QEvent::KeyPress &&
+            dynamic_cast<QKeyEvent *>(event)->modifiers() == Qt::NoModifier) {
+            switch (dynamic_cast<QKeyEvent *>(event)->key()) {
+            case Qt::Key_Escape:
+                emit(closeMe());
+                return true;
+            case Qt::Key_Down:
+                if (selectedIndex_ + 1 < model()->rowCount()) {
+                    selectItem(selectedIndex_ + 1);
+                }
+                return true;
+            case Qt::Key_Up:
+                if (selectedIndex_ - 1 >= 0) {
+                    selectItem(selectedIndex_ - 1);
+                }
+                return true;
+            case Qt::Key_Enter:
+            case Qt::Key_Return:
+                if (selectedIndex_ != -1) {
+                    emit(itemSelected(selectedIndex_));
+                    return true;
+                }
+                return false;
+            case Qt::Key_Tab:
+                emit(tabPressed());
+                return true;
+            }
+        } else if (event->type() == QEvent::FocusOut) {
+            emit(closeMe());
+        }
+
+        return false;
+    }
+
+    // Select item in the list
+    void selectItem(int index) {
+        selectedIndex_ = index;
+        setCurrentIndex(model()->index(index, 0));
+    }
+
+  signals:
+    void closeMe();
+    void itemSelected(int);
+    void tabPressed();
+
+  private:
+    Qutepart *qpart_;
+    CompletionModel *completionModel_; // equals to model() but is typed
+    int selectedIndex_;
+    QTimer closeIfNotUpdatedTimer_;
+};
+
+// Object listens Qutepart widget events, computes and shows autocompletion
+// lists
+
+Completer::Completer(Qutepart *qpart)
+    : QObject(qpart), qpart_(qpart), widget_(nullptr), completionOpenedManually_(false) {
+    connect(qpart, &Qutepart::textChanged, this, &Completer::onTextChanged);
+    connect(qpart->document(), &QTextDocument::modificationChanged, this,
+            &Completer::onModificationChanged);
+
+    updateWordSetTimer_.setSingleShot(true);
+    connect(&updateWordSetTimer_, &QTimer::timeout, this, &Completer::updateWordSet);
+}
+
+// Object deleted. Cancel timer
+Completer::~Completer() { updateWordSetTimer_.stop(); }
+
+void Completer::setKeywords(const QSet<QString> &keywords) {
+    keywords_ = keywords;
+    updateWordSet();
+}
+
+void Completer::setCustomCompletions(const QSet<CompletionItem> &wordSet) {
+    customCompletions_ = wordSet;
+    updateWordSet();
+}
+
+bool Completer::isVisible() const { return widget_ != nullptr; }
+
+// Text in the qpart changed. Update word set
+void Completer::onTextChanged() { updateWordSetTimer_.start(); }
+
+void Completer::onModificationChanged(bool modified) {
+    if (!modified) {
+        closeCompletion();
+    }
+}
+
+// Make a set of words, which shall be completed, from text
+void Completer::updateWordSet() {
+    if (!qpart_->lastCompletionSeparator().isEmpty() && !customCompletions_.isEmpty()) {
+        wordSet_ = customCompletions_;
+        return;
+    }
+    
+    wordSet_.clear();
+    for (const auto& kw : keywords_) wordSet_.insert(CompletionItem(kw, "Keyword"));
+    wordSet_.unite(customCompletions_);
+
+    // TODO check for timeout
+    for (const Line &line : qpart_->lines()) {
+        QRegularExpressionMatchIterator it = wordRegExp.globalMatch(line.text());
+
+        while (it.hasNext()) {
+            QRegularExpressionMatch match = it.next();
+            wordSet_.insert(CompletionItem(match.captured(), "File"));
+        }
+    }
+}
+
+// Invoke completion manually
+void Completer::invokeCompletion() {
+    if (invokeCompletionIfAvailable(true)) {
+        completionOpenedManually_ = true;
+    }
+}
+
+bool Completer::shouldShowModel(CompletionModel *model, bool forceShow) {
+    if (!model->hasWords()) {
+        return false;
+    }
+
+    return forceShow || (!model->tooManyWords());
+}
+
+void Completer::createWidget(CompletionModel *model) {
+    delete widget_;
+    widget_ = new CompletionList(qpart_, model);
+    connect(widget_, &CompletionList::closeMe, this, &Completer::closeCompletion);
+    connect(widget_, &CompletionList::itemSelected, this, &Completer::onCompletionListItemSelected);
+    connect(widget_, &CompletionList::tabPressed, this, &Completer::onCompletionListTabPressed);
+}
+
+/* Invoke completion, if available. Called after text has been typed in qpart
+Returns True, if invoked
+*/
+bool Completer::invokeCompletionIfAvailable(bool requestedByUser) {
+    if (qpart_->completionEnabled() && (!wordSet_.isEmpty())) {
+        QString wordBeforeCursor = getWordBeforeCursor();
+        QString wholeWord = wordBeforeCursor + getWordAfterCursor();
+
+        bool forceShow = requestedByUser || completionOpenedManually_;
+        if (!wordBeforeCursor.isEmpty() || forceShow) {
+            if (wordBeforeCursor.length() >= qpart_->completionThreshold() || forceShow) {
+                if (widget_ == nullptr) {
+                    CompletionModel *model = new CompletionModel(wordSet_);
+                    model->setCompletionData(wordBeforeCursor, wholeWord);
+                    if (shouldShowModel(model, forceShow)) {
+                        createWidget(model);
+                        return true;
+                    }
+                } else {
+                    widget_->completionModel()->setCompletionData(wordBeforeCursor, wholeWord);
+                    if (shouldShowModel(widget_->completionModel(), forceShow)) {
+                        widget_->updateGeometry();
+
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    closeCompletion();
+    return false;
+}
+
+/* Close completion, if visible.
+Delete widget
+*/
+void Completer::closeCompletion() {
+    if (widget_) {
+        widget_->deleteLater();
+        widget_ = nullptr;
+        completionOpenedManually_ = false;
+    }
+}
+
+// Get word, which is located before cursor
+QString Completer::getWordBeforeCursor() const {
+    auto cursor = qpart_->textCursor();
+    auto textBeforeCursor = cursor.block().text().left(cursor.positionInBlock());
+    auto match = wordAtEndRegExp.match(textBeforeCursor);
+    if (match.hasMatch()) {
+        return match.captured();
+    } else {
+        return QString();
+    }
+}
+
+// Get word, which is located before cursor
+QString Completer::getWordAfterCursor() const {
+    QTextCursor cursor = qpart_->textCursor();
+    QString textAfterCursor = cursor.block().text().mid(cursor.positionInBlock());
+    QRegularExpressionMatch match = wordAtStartRegExp.match(textAfterCursor);
+    if (match.hasMatch()) {
+        return match.captured();
+    } else {
+        return QString();
+    }
+}
+
+// Item selected. Insert completion to editor
+void Completer::onCompletionListItemSelected(int index) {
+    auto model = widget_->completionModel();
+    CompletionItem selectedItem = model->words()[index];
+    QString selectedWord = selectedItem.text;
+    auto cursor = qpart_->textCursor();
+
+
+    cursor.beginEditBlock();
+    cursor.movePosition(QTextCursor::Left, QTextCursor::MoveAnchor, model->typedText().length());
+    cursor.movePosition(QTextCursor::Right, QTextCursor::KeepAnchor,
+                        model->typedText().length() + getWordAfterCursor().length());
+    cursor.insertText(selectedWord);
+    cursor.endEditBlock();
+    qpart_->setTextCursor(cursor);
+    closeCompletion();
+}
+
+/* Tab pressed on completion list
+Insert completable text, if available
+*/
+void Completer::onCompletionListTabPressed() {
+    auto model = widget_->completionModel();
+    auto commonStart = model->commonStart();
+    if (commonStart != model->typedText() && (!commonStart.isEmpty())) {
+        auto cursor = qpart_->textCursor();
+        cursor.beginEditBlock();
+        cursor.movePosition(QTextCursor::Left, QTextCursor::KeepAnchor, model->typedText().length());
+        cursor.insertText(commonStart);
+        cursor.endEditBlock();
+        qpart_->setTextCursor(cursor);
+        invokeCompletionIfAvailable(false);
+    }
+}
+
+} // namespace Qutepart
+
+#include "completer.moc"
