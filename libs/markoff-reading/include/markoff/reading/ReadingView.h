@@ -153,7 +153,12 @@ Q_SIGNALS:
     void zoomChanged();
     void scrollPositionVisualLineChanged(float visualLine);
     void wikiLinkActivated(const QString &target);
-    void wikiLinkHovered(const QString &target);
+    /// Phase C5 — unified link-hover signal. Fires for both wiki-links
+    /// and external URLs. `href` is the target (resolved wiki-target
+    /// string for wiki-links; raw URL for regular links). Empty `href`
+    /// indicates hover-leave — subscribers should hide their popover.
+    /// `globalPos` is the hover position in global screen coordinates.
+    void linkHovered(const QString &href, const QPoint &globalPos);
     /// Emitted when every section of the most recent parse has been
     /// considered for mount.
     void mountingFinished();
@@ -236,6 +241,7 @@ private:
 
     QTimer *m_hoverTimer = nullptr;
     QString m_pendingHoverTarget;
+    QPoint m_pendingHoverViewportPos;
 
     // Cumulative user-applied zoom factor. 1.0 == no user zoom.
     double m_userZoom = 1.0;

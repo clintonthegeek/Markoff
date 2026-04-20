@@ -124,8 +124,12 @@ ReadingView::ReadingView(QWidget *parent)
     m_hoverTimer->setSingleShot(true);
     m_hoverTimer->setInterval(300);
     connect(m_hoverTimer, &QTimer::timeout, this, [this] {
-        if (!m_pendingHoverTarget.isEmpty())
-            Q_EMIT wikiLinkHovered(m_pendingHoverTarget);
+        if (!m_pendingHoverTarget.isEmpty()) {
+            const QPoint globalPos = m_graphicsView && m_graphicsView->viewport()
+                ? m_graphicsView->viewport()->mapToGlobal(m_pendingHoverViewportPos)
+                : m_pendingHoverViewportPos;
+            Q_EMIT linkHovered(m_pendingHoverTarget, globalPos);
+        }
     });
 
     if (auto *vbar = m_graphicsView->verticalScrollBar()) {
@@ -340,6 +344,7 @@ bool ReadingView::eventFilter(QObject *watched, QEvent *event)
             const QString target = wikiLinkTargetAt(me->pos());
             if (target != m_pendingHoverTarget) {
                 m_pendingHoverTarget = target;
+                m_pendingHoverViewportPos = me->pos();
                 if (!target.isEmpty())
                     m_hoverTimer->start();
                 else

@@ -27,6 +27,13 @@ void TstReadingViewHoverSignal::signalShapeIsTwoArg()
     ReadingView rv;
     QSignalSpy spy(&rv, &ReadingView::linkHovered);
     QVERIFY(spy.isValid());
+    // Directly emit the signal (testing the shape, not hover detection).
+    Q_EMIT rv.linkHovered(QStringLiteral("Target"), QPoint(42, 17));
+    QCOMPARE(spy.count(), 1);
+    const auto args = spy.first();
+    QCOMPARE(args.size(), 2);
+    QCOMPARE(args.at(0).toString(), QStringLiteral("Target"));
+    QCOMPARE(args.at(1).value<QPoint>(), QPoint(42, 17));
 }
 
 void TstReadingViewHoverSignal::emptyHrefOnLeave()
@@ -34,6 +41,11 @@ void TstReadingViewHoverSignal::emptyHrefOnLeave()
     ReadingView rv;
     QSignalSpy spy(&rv, &ReadingView::linkHovered);
     QVERIFY(spy.isValid());
+    // Empty-href emit represents hover-leave — subscribers treat this
+    // as "hide popover" regardless of globalPos.
+    Q_EMIT rv.linkHovered(QString(), QPoint());
+    QCOMPARE(spy.count(), 1);
+    QVERIFY(spy.first().at(0).toString().isEmpty());
 }
 
 QTEST_MAIN(TstReadingViewHoverSignal)
