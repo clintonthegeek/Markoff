@@ -35,6 +35,9 @@ add_rv_test(tst_sectionlayout_math)
 if(MARKOFF_READING_USE_REAL_COREDEPS)
     add_rv_test(tst_sectionlayout_mermaid)
     add_rv_test(tst_readingview_embedrenderer)
+    # This test includes <corbomite/storage/...> headers directly; Storage
+    # is PRIVATE on markoff_reading, so the test needs its own link.
+    target_link_libraries(tst_readingview_embedrenderer PRIVATE Corbomite::Storage)
     add_rv_test(tst_readingview_mermaid_registered)
     add_rv_test(tst_readingview_embed_builtins)
 endif()
