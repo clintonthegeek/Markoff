@@ -67,7 +67,7 @@ during C1–C7.
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
-| C6   | requirements — see inputs | [consumer editor-state surface §1-8 + §9 context-menu](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
+| C6   | spec drafted | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,31 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C6 spec drafted
+
+`docs/specs/2026-04-20-phase-c6-editor-state-context-menu.md` — a
+150-line wrapper over the recovered 640-line consumer-spec (authored
+by the Corbomite app team, stranded on submodule master before Phase C
+ownership transferred). Wrapper narrows scope via brainstorming to
+Option C (stub + defer unused fields): ships the full `EditorContext`
+struct shape stable, but initial classifier only populates the fields
+Corbomite's `MainWindow::refreshEditorActions` needs today
+(`blockKind`, `headingLevel`, `table`, `inBold/Italic/Strike/InlineCode`,
+`hasSelection`, `atBlockStart`, `atBlockEnd`, `readOnly`). Unpopulated
+fields (~15 — callout/blockquote/code-block sub-context, link/tag/
+footnote context, math/highlight inline, task-state detail, list-marker
+detail) stay default-zero; future C-phases fill them as consumers
+materialize. Ships the §9 `aboutToShowContextMenu` contribution signal
+alongside (after-built-ins shape, not section-tags-before-built-ins —
+keeps Markoff out of section-ordering business). Signal fires in both
+branches of `contextMenuEvent` (table + general). Eight decisions
+recorded. Self-approved per the recipe's step-3 clause (all design
+calls unambiguous; consumer-spec pre-specifies the struct shape and API
+contract).
+
+Next: C6 plan, then staged implementation (commits A-F), tag `v0.5.0`,
+Corbomite adapter beat.
 
 ### 2026-04-20 — C5 landed at `v0.4.0`
 
