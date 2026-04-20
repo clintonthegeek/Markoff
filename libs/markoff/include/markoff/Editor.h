@@ -121,6 +121,11 @@ public:
     // --- Font size (kept for test-app use) ---
     void setFontSize(int pointSize);
 
+    /// Reset the font size to the theme-supplied default, undoing any
+    /// `ZoomIn`/`ZoomOut` offsets the user has accumulated. The default is
+    /// captured whenever `setTheme()` is applied (falls back to 14 pt).
+    void resetZoom();
+
     // --- Scroll position (visual-line float) ---
     /// Current scroll position as a floating-point count of visual lines from
     /// the top of the scene. A "visual line" corresponds to a wrapped display
@@ -263,6 +268,7 @@ private:
     SceneCoordinator *m_coordinator = nullptr;
     QString m_sourceText;
     int m_fontSize = 14;
+    int m_defaultFontSize = 14;
     QTimer *m_autoScrollTimer = nullptr;
     int m_autoScrollDelta = 0;
     bool m_autoScrollActive = false;

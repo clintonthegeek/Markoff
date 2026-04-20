@@ -533,6 +533,11 @@ void Editor::applyEffectiveFont()
     m_coordinator->setFont(font);
 }
 
+void Editor::resetZoom()
+{
+    setFontSize(m_defaultFontSize);
+}
+
 void Editor::resizeEvent(QResizeEvent *e)
 {
     QGraphicsView::resizeEvent(e);
@@ -939,6 +944,7 @@ void Editor::setTheme(const Theme &theme)
 {
     m_theme = theme;
     m_fontSize = theme.textFont.pointSize() > 0 ? theme.textFont.pointSize() : 14;
+    m_defaultFontSize = m_fontSize;
     if (m_coordinator) {
         m_coordinator->setTheme(theme);
         // Apply the document default font AFTER setTheme so body text
