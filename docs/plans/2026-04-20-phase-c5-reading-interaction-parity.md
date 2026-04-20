@@ -291,82 +291,20 @@ EOF
 
 ---
 
-### Task 3: Forward `LinkRenderer::linkHovered` to the unified signal (regular URLs)
+### Task 3: DEFERRED — LinkRenderer forwarding dropped from C5
 
-**Files:**
-- Modify: `libs/markoff-family/libs/markoff-reading/src/ReadingView.cpp`
+**Status:** Deferred during execution (2026-04-20).
 
-**Context:** `LinkRenderer` already emits `linkHovered(target, sourceId, anchorHint)` for regular external URLs (see `libs/markoff-reading/include/markoff/reading/LinkRenderer.h:57`). ReadingView currently doesn't connect to it — only wiki-links (detected via `wikiLinkTargetAt`) drive `m_pendingHoverTarget`. This task forwards LinkRenderer's hover into the same debounce path so regular URLs also fire `ReadingView::linkHovered`.
+**Reason:** T3 implementer discovered `Markoff::Reading::LinkRenderer`
+is orphaned — nothing in the reading pipeline constructs or connects
+to it. Forwarding its signal would have no observable effect. See
+spec §2.1 "Scope widen — regular-link hover (DEFERRED)" paragraph
+and decision **D5b** for the full rationale.
 
-**First: locate the `LinkRenderer` instance.** In `ReadingView.cpp`, grep for `LinkRenderer` and find where the renderer is constructed / held. If it lives inside `ReadingPipeline` (most likely, given the `m_pipeline` member), the wiring goes in the pipeline-construction block in the `ReadingView` constructor. If no `LinkRenderer` instance is held directly by `ReadingView`, read `ReadingPipeline.h` / `.cpp` to find where it lives.
-
-- [ ] **Step 1: Locate LinkRenderer ownership**
-
-```bash
-cd libs/markoff-family
-grep -rn "LinkRenderer" libs/markoff-reading/src/ libs/markoff-reading/include/
-```
-
-Read the owner (likely `ReadingPipeline.cpp`). Note the access path (e.g. `m_pipeline->linkRenderer()` or similar).
-
-- [ ] **Step 2: Add the connect**
-
-In `ReadingView.cpp` constructor, after the pipeline is constructed (inspect the constructor order — likely after `m_hoverTimer` is set up), add:
-
-```cpp
-    // Phase C5 — forward LinkRenderer's regular-URL hovers into the
-    // same debounce path used by wiki-link hover. `anchorHint` is the
-    // viewport-local pos captured by LinkRenderer at hover detection.
-    if (auto *lr = m_pipeline->linkRenderer()) {  // adjust accessor to reality
-        connect(lr, &LinkRenderer::linkHovered, this,
-                [this](const QString &target,
-                       const QString & /*sourceId*/,
-                       const QPoint &anchorHint) {
-            if (target != m_pendingHoverTarget) {
-                m_pendingHoverTarget = target;
-                m_pendingHoverViewportPos = anchorHint;
-                if (!target.isEmpty())
-                    m_hoverTimer->start();
-                else
-                    m_hoverTimer->stop();
-            }
-        });
-    }
-```
-
-If `m_pipeline->linkRenderer()` doesn't exist, add an accessor (`LinkRenderer *linkRenderer() const { return m_linkRenderer.get(); }`) in `ReadingPipeline.h` — one-line addition, consistent with other accessors.
-
-- [ ] **Step 3: Build**
-
-```bash
-cd libs/markoff-family && cmake --build build-dev -j 2>&1 | tail -20
-```
-
-- [ ] **Step 4: Run tests**
-
-```bash
-cd libs/markoff-family/build-dev && ctest --output-on-failure
-```
-
-Expected: all green. No test exists specifically for this forwarding; the existing tests exercise the shape.
-
-- [ ] **Step 5: Commit**
-
-```bash
-cd libs/markoff-family
-git add libs/markoff-reading/src/ReadingView.cpp
-# plus ReadingPipeline files if a new accessor was added
-git commit -m "$(cat <<'EOF'
-markoff-reading: forward LinkRenderer::linkHovered into ReadingView::linkHovered
-
-Regular URLs (not wiki-links) now drive the same hover-debounce path
-as wiki-links. Previously only wiki-link hover fired ReadingView's
-hover signal; external URL hovers never surfaced to consumers.
-
-Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>
-EOF
-)"
-```
+**What T3 became:** a one-line test improvement — `QCOMPARE(args.size(), 2)`
+added to `tst_readingview_hover_signal::emptyHrefOnLeave` (fold-in
+from T2 code review). This ships as part of T4's commit (or a
+trivial standalone commit at the T3 implementer's discretion).
 
 ---
 

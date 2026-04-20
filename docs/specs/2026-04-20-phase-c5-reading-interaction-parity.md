@@ -47,6 +47,13 @@ rendering in Corbomite; the deferral has no observable regression.
 - **Math / LaTeX fenced-block rendering.** Symptom of the registry
   deferral — `math` / `latex` fenced blocks remain inert until the
   registry redesign ships. Nobody currently relies on this.
+- **Regular-URL hover in Reading mode.** `Markoff::Reading::LinkRenderer`
+  is orphaned (no production wiring) so forwarding its signal would be a
+  no-op. The real gap is a URL-span hit-test equivalent to
+  `wikiLinkTargetAt`, or integrating LinkRenderer into the section
+  pipeline — both out of scope for a signal-unification work-unit.
+  Revisit under C3/C4. Markoff Live is unaffected (its path already
+  handles both link kinds).
 - **Zoom-policy harmonization** across leaves (Live/Source font-size
   vs. Reading transform-scale). Cosmetic; revisit post-Phase-C if
   demand surfaces.
@@ -83,13 +90,24 @@ void linkHovered(const QString &href, const QPoint &globalPos);
   QPoint())`. Consumers treat an empty `href` as "popover should hide"
   regardless of `globalPos`.
 
-**Scope widen — regular-link hover:**
+**Scope widen — regular-link hover (DEFERRED):**
 
-Today only wiki-links drive the hover timer. `LinkRenderer::linkHovered`
-already emits for regular URLs too but ReadingView ignores it.
-Subscribe `ReadingView`'s hover pipeline to `LinkRenderer::linkHovered`
-and funnel it through the same `m_hoverTimer` debounce + emit path.
-One new connection in the pipeline-wiring code. No new rendering work.
+Original plan: subscribe `ReadingView` to `LinkRenderer::linkHovered` so regular
+URLs drive the same hover pipeline as wiki-links. **Deferred** —
+implementation discovered `Markoff::Reading::LinkRenderer` is orphaned:
+the class exists but nothing in the reading pipeline instantiates or
+connects to it, so wiring `ReadingView` to its signal would have no
+observable effect. The real gap is one layer earlier — production
+code needs a URL-span hit-test (mirror of `wikiLinkTargetAt`) or
+LinkRenderer needs to be integrated into the section/pipeline path.
+Neither is C5-sized. Since Reading mode has no hover popover wired
+today either, no user is relying on this behavior. Revisit under C3
+or C4 when the pipeline shape gets touched.
+
+Consequence: C5 ships wiki-link hover only on ReadingView (same
+coverage as before, just with the unified two-arg signal shape).
+Regular-URL hover continues to work in Markoff Live (where
+`Editor::linkHovered` already fires for both kinds).
 
 **Href normalization** stays what it is today:
 
@@ -281,6 +299,15 @@ be two-arg.
   (C3 `MarkoffDocument` or C4 renderer unification). No user depends
   on math/latex fenced rendering today, so deferral has no observable
   regression.
+- **D5b** Regular-URL hover in Reading mode deferred. Rationale:
+  `Markoff::Reading::LinkRenderer` is orphaned (constructed nowhere,
+  connected nowhere); forwarding its signal into `ReadingView` would
+  be a no-op. Real fix is either a URL-span hit-test mirroring
+  `wikiLinkTargetAt` or integrating LinkRenderer into the section
+  pipeline — both belong under C3/C4 (render-pipeline touching),
+  not a signal-unification work-unit. Nobody relies on this today
+  since Reading mode has no hover popover wired at all; C5 ships
+  the popover wiring in Corbomite regardless.
 - **D6** Cluster V Phase 4 closeout happens in the Corbomite
   adaptation commit, not on the Markoff side. Rationale: the phase
   is a Corbomite UI cluster; Markoff only provides the primitives.
