@@ -47,6 +47,8 @@ add_library(markoff_reading STATIC
     src/EmbedRenderer.cpp
     src/SpanRenderer.h
     src/SpanRenderer.cpp
+    src/ReadingSearchAdapter.h
+    src/ReadingSearchAdapter.cpp
     src/ReadingMathObject.h
     src/ReadingMathObject.cpp
     src/MermaidRenderer.h
@@ -87,6 +89,7 @@ target_link_libraries(markoff_reading
         Qt6::Svg
         Qt6::SvgWidgets
         KF6::SyntaxHighlighting
+        markoff_core
     PRIVATE
         MarkoffParser::MarkoffParser
         jkqtmathtext

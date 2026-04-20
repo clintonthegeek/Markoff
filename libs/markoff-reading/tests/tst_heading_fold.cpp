@@ -120,14 +120,14 @@ void TestHeadingFold::foldPersistsViaFoldedHeadings()
     const int srcLineB = rv.sections().at(idxB)->sourceLine();
 
     rv.toggleFold(idxB);
-    QVector<int> folded = rv.foldedHeadings();
+    QVector<int> folded = rv.foldedHeadingLines();
     QCOMPARE(folded.size(), 1);
     QCOMPARE(folded.at(0), srcLineB);
 
     // Clearing fold state unfolds.
-    rv.setFoldedHeadings(QVector<int>{});
+    rv.setFoldedHeadingLines(QVector<int>{});
     QVERIFY(!rv.sections().at(idxB)->headingCollapsed());
-    QVERIFY(rv.foldedHeadings().isEmpty());
+    QVERIFY(rv.foldedHeadingLines().isEmpty());
 }
 
 void TestHeadingFold::foldSurvivesSetPlainTextReload()
@@ -143,7 +143,7 @@ void TestHeadingFold::foldSurvivesSetPlainTextReload()
     QVERIFY(idxB >= 0);
     const int srcLineB = rv.sections().at(idxB)->sourceLine();
     rv.toggleFold(idxB);
-    QVERIFY(rv.foldedHeadings().contains(srcLineB));
+    QVERIFY(rv.foldedHeadingLines().contains(srcLineB));
 
     // Idempotent reload — B should still be folded.
     setPlainTextAndWaitForMount(rv, md);
@@ -151,7 +151,7 @@ void TestHeadingFold::foldSurvivesSetPlainTextReload()
     QVERIFY(idxB2 >= 0);
     QVERIFY2(rv.sections().at(idxB2)->headingCollapsed(),
              "B should still be folded after idempotent reload");
-    QVERIFY(rv.foldedHeadings().contains(srcLineB));
+    QVERIFY(rv.foldedHeadingLines().contains(srcLineB));
 }
 
 void TestHeadingFold::foldNestedHeadings()
@@ -201,7 +201,7 @@ void TestHeadingFold::ephemeralRoundTrip()
     const int srcLineB = rv.sections().at(idxB)->sourceLine();
 
     rv.toggleFold(idxB);
-    const QVector<int> saved = rv.foldedHeadings();
+    const QVector<int> saved = rv.foldedHeadingLines();
     QCOMPARE(saved.size(), 1);
     QCOMPARE(saved.at(0), srcLineB);
 
@@ -209,13 +209,13 @@ void TestHeadingFold::ephemeralRoundTrip()
     // restore folded heading state.
     ReadingView rv2;
     setPlainTextAndWaitForMount(rv2, md);
-    rv2.setFoldedHeadings(saved);
+    rv2.setFoldedHeadingLines(saved);
 
     const int idxB2 = findSectionAtLevel(rv2, 1, 1);
     QVERIFY(idxB2 >= 0);
     QVERIFY2(rv2.sections().at(idxB2)->headingCollapsed(),
              "After setFoldedHeadings, B should be folded.");
-    QCOMPARE(rv2.foldedHeadings(), saved);
+    QCOMPARE(rv2.foldedHeadingLines(), saved);
 }
 
 QTEST_MAIN(TestHeadingFold)
