@@ -18,24 +18,15 @@ endif()
 
 # markoff-reading library — Obsidian-compatible Reading-mode widget.
 #
-# Phase A of the tri-view absorption: Corbomite::Core, Corbomite::Storage,
-# and the mmdr Rust crate are replaced by compile-only shim headers under
-# `stubs/`. Runtime features that depend on those deps (embeds, mermaid
-# rendering) are broken until Phase B absorbs the real sources.
+# Phase C (DI seam): host-provided `Markoff::EmbedRegistry`,
+# `Markoff::CodeBlockProcessorRegistry`, `Markoff::MermaidRenderer`,
+# `Markoff::Vault::ResourceProvider`, `Markoff::Vault::LinkResolver`,
+# `Markoff::Vault::MetadataCache`, `Markoff::Vault::MetadataParser` plug
+# in at runtime via `ReadingView` setters. Standalone builds fall back
+# to the `Default*` no-op concretes in markoff-core.
 #
-# Phase B bridge: a consuming project (CorbomiteApp) can set
-# MARKOFF_READING_USE_REAL_COREDEPS=ON before adding this subdirectory to
-# drop the stubs and link the real Corbomite::Core + mmdr targets it
-# provides. Default OFF keeps standalone Markoff builds on the stubs.
-# See docs/specs/2026-04-20-phase-b-corbomite-migration.md for the
-# full migration shape; the DI seam that retires this option lands in
-# Phase C.
-option(MARKOFF_READING_USE_REAL_COREDEPS
-    "Drop the Corbomite::Core / mmdr stub headers and link the real \
-implementations provided by a consuming project (e.g. CorbomiteApp). \
-OFF for standalone Markoff builds; ON when Markoff is a submodule inside \
-a host that supplies these types."
-    OFF)
+# Phase B bridge (`MARKOFF_READING_USE_REAL_COREDEPS` CMake option +
+# `stubs/corbomite/` shim tree) retired in v0.3.0.
 add_library(markoff_reading STATIC
     include/markoff/reading/CodeBlockHighlighter.h
     src/CodeBlockHighlighter.cpp
@@ -81,35 +72,6 @@ target_include_directories(markoff_reading
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
-
-if(MARKOFF_READING_USE_REAL_COREDEPS)
-    # Real-deps mode (CorbomiteApp): host must provide Corbomite::Core,
-    # Corbomite::Storage, and an mmdr target. (Phase B Task 5 validated
-    # empirically: EmbedRenderer.cpp directly includes
-    # `<corbomite/storage/CachedMetadata.h>`, so Storage is live. The
-    # stubs/corbomite/storage/ tree stays for standalone Markoff builds.)
-    # Corbomite::Core is PUBLIC because markoff/reading/VaultResourceProvider.h
-    # (a public header) forwards to `corbomite/core/VaultResourceProvider.h`;
-    # consumers and tests must resolve that include transitively, matching
-    # the standalone-mode stubs dir which is also PUBLIC.
-    target_link_libraries(markoff_reading
-        PUBLIC
-            Corbomite::Core
-        PRIVATE
-            Corbomite::Storage
-            mmdr
-    )
-else()
-    # Standalone mode: compile against the Phase-A stub shims. Exposed
-    # PUBLIC (build-tree only) so in-tree tests that subclass
-    # `Corbomite::Core::VaultResourceProvider` or mention
-    # `Corbomite::Core::EmbedRegistry` can still compile. `mmdr_ffi.h`
-    # lives at the stubs dir root so MermaidRenderer.cpp's
-    # `#include "mmdr_ffi.h"` picks up the shim.
-    target_include_directories(markoff_reading PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/stubs>
-    )
-endif()
 
 target_link_libraries(markoff_reading
     PUBLIC
