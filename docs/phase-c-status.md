@@ -65,7 +65,7 @@ during C1–C7.
 
 | ID   | Status       | Spec                                   | Plan                                   | Markoff PR/branch    | Corbomite PR/branch  | Tag       |
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
-| C1   | markoff ready (alpha)             | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | —                    | `v0.3.0-alpha.1` → `v0.3.0` |
+| C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | requirements — see inputs | —                         | —                                      | —                    | —                    | —         |
 | C6   | requirements — see inputs | [consumer editor-state surface §1-8 + §9 context-menu](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,34 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C1b landed at `v0.3.0`; Phase B bridge retired
+
+Stubs tree (`libs/markoff-reading/stubs/corbomite/` — 9 header files
+plus `mmdr_ffi.h`) deleted. `MARKOFF_READING_USE_REAL_COREDEPS` option
++ its conditional block removed from `libs/markoff-reading/CMakeLists.txt`.
+Standalone Markoff builds in a fresh checkout with 76/76 ctest green
+and zero external-dep links. CorbomiteApp builds via
+`libs/core/include/corbomite/markoff_adapters/` (composition-based
+adapters — see Corbomite `59ecd5cb`).
+
+Between C1a (alpha.1) and C1b (v0.3.0), an intermediate
+`v0.3.0-alpha.2` gated the 4 Phase-B-style tests
+(tst_sectionlayout_mermaid, tst_readingview_embedrenderer,
+tst_readingview_mermaid_registered, tst_readingview_embed_builtins)
+behind `if(FALSE AND MARKOFF_READING_USE_REAL_COREDEPS)`. They
+compile against the new Markoff types but assert real mmdr + real
+MetadataParser output at runtime; un-gate pending a Corbomite-side
+test harness that injects the adapter concretes
+(`Corbomite::Core::MermaidRenderer`,
+`Corbomite::MarkoffAdapters::MetadataParserImpl`). Tracked as a
+Phase C1 follow-up.
+
+The CLAUDE.md docs at the Markoff repo root still describe the
+Phase B option in a few places; left for a doc-only follow-up touch
+to avoid mixing that with the API retire.
+
+C1 work-unit closed. Next: C5 spec (Reading-mode interaction parity).
 
 ### 2026-04-20 — C1a landed at `v0.3.0-alpha.1`
 
