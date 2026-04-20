@@ -27,3 +27,16 @@ target_include_directories(tst_markoff_wikilink_clickable PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/markoff-live/src)
 set_tests_properties(tst_markoff_wikilink_clickable PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Task 15 — Cross-leaf smoke test: polymorphic MarkdownView dispatch across
+# live/source/reading leaves through the MarkdownView base interface.
+add_executable(tst_tri_view_smoke tst_tri_view_smoke.cpp)
+add_test(NAME tst_tri_view_smoke COMMAND tst_tri_view_smoke)
+target_link_libraries(tst_tri_view_smoke PRIVATE
+    Qt6::Test Qt6::Widgets
+    markoff_core
+    markoff_live
+    markoff_source
+    markoff_reading
+)
+set_tests_properties(tst_tri_view_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
