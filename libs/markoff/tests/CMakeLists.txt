@@ -38,11 +38,6 @@ add_test(NAME tst_markoff_undo_grouping COMMAND tst_markoff_undo_grouping)
 target_link_libraries(tst_markoff_undo_grouping PRIVATE Qt6::Test Qt6::Widgets markoff)
 set_tests_properties(tst_markoff_undo_grouping PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-add_executable(tst_markoff_search_bar tst_search_bar.cpp)
-add_test(NAME tst_markoff_search_bar COMMAND tst_markoff_search_bar)
-target_link_libraries(tst_markoff_search_bar PRIVATE Qt6::Test Qt6::Widgets markoff)
-set_tests_properties(tst_markoff_search_bar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-
 add_executable(tst_markoff_folding_model tst_folding_model.cpp)
 add_test(NAME tst_markoff_folding_model COMMAND tst_markoff_folding_model)
 target_link_libraries(tst_markoff_folding_model PRIVATE Qt6::Test markoff)

@@ -8,6 +8,10 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(KF6SyntaxHighlighting REQUIRED)
 
+if(NOT TARGET markoff_core)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../markoff-core ${CMAKE_CURRENT_BINARY_DIR}/markoff-core)
+endif()
+
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../jkqtmathtext ${CMAKE_CURRENT_BINARY_DIR}/jkqtmathtext)
 endif()
@@ -17,7 +21,6 @@ add_library(markoff STATIC
     include/markoff/Editor.h
     include/markoff/FoldingTypes.h
     include/markoff/LinkRenderer.h
-    include/markoff/SearchBar.h
     src/SelectableItem.h
     src/BlockItem.h
     src/BlockItem.cpp
@@ -43,7 +46,6 @@ add_library(markoff STATIC
     src/TextControl.cpp
     src/Editor.cpp
     src/LinkRenderer.cpp
-    src/SearchBar.cpp
     src/MarkdownHighlighter.cpp
     src/FoldingTypes.cpp
     src/FoldingModel.cpp
@@ -69,6 +71,7 @@ target_link_libraries(markoff
         Qt6::Gui
         Qt6::Widgets
         MarkoffParser::MarkoffParser
+        markoff_core
     PRIVATE
         KF6::SyntaxHighlighting
         jkqtmathtext

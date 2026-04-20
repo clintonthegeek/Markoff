@@ -14,6 +14,7 @@ add_library(markoff_core STATIC
     src/MarkoffDocument.cpp
     src/ReplaceController.cpp
     src/SearchController.cpp
+    src/SearchBar.cpp
     include/markoff/CursorPos.h
     include/markoff/TextSpan.h
     include/markoff/FoldSpec.h
@@ -23,6 +24,7 @@ add_library(markoff_core STATIC
     include/markoff/ReplaceController.h
     include/markoff/SearchAdapter.h
     include/markoff/SearchController.h
+    include/markoff/SearchBar.h
 )
 
 target_include_directories(markoff_core
