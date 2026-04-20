@@ -156,6 +156,10 @@ public:
     void toggleCheckbox();
     void insertCallout(const QString &type);
 
+    /// True when the focused text item's cursor sits inside a GFM pipe table.
+    /// Returns false when there is no focused editor or no cursor.
+    bool cursorInTable() const;
+
     // --- Table operations (no-op if cursor not in a table) ---
     void tableInsertRowAbove();
     void tableInsertRowBelow();

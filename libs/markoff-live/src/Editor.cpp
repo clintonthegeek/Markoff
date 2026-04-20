@@ -2314,6 +2314,13 @@ static QTextTable *currentTableInEditor(Editor *editor)
     return cursor.currentTable();
 }
 
+bool Editor::cursorInTable() const
+{
+    auto *ti = focusedTextItem();
+    if (!ti) return false;
+    return ti->textControl()->textCursor().currentTable() != nullptr;
+}
+
 void Editor::tableInsertRowAbove()
 {
     if (m_readOnly) return;
