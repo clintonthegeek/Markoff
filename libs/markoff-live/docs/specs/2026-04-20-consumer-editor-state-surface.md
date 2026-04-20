@@ -389,11 +389,6 @@ consumer side:
 
 ## 7. Out of scope (things we are **not** asking for)
 
-- A plugin-facing equivalent of Obsidian's `editor-menu` hook — that's
-  a separate Corbomite concern (see outer repo `docs/backlog.md` §3
-  "Markoff editor right-click menu enrichment"). Markoff just needs to
-  offer the context surface; Corbomite owns injecting menu items into
-  its right-click menu.
 - Serialization of the context into workspace state — this is
   transient runtime info, not something to persist.
 - Fine-grained per-format transaction hooks for plugin content
@@ -428,7 +423,209 @@ UX.
 
 ---
 
-## 9. Related existing docs
+## 9. Context-menu contribution point (same theme, different surface)
+
+The `contextChanged` signal above drives **passive** UI state —
+toolbar checkstate, menu enable/disable. There is a second, **active**
+surface that's the same theme (cursor context shapes the UX) but
+needs a different API: the **right-click editor menu**.
+
+Markoff today builds its own context menu in
+`Editor::contextMenuEvent()` with Cut/Copy/Paste/Select-All plus a
+fixed set of table row/col operations if the cursor is in a GFM
+table. Everything else the user might want to do at the cursor (Bold,
+Italic, Heading 1–6, Insert Callout, Toggle Checkbox, fold here…) is
+reachable only from the menubar, toolbar, command palette, or
+keyboard — not from the right-click menu. That mismatch is
+particularly jarring for Obsidian users, whose muscle memory reaches
+for the right-click menu as the primary editing surface (Obsidian
+emits `workspace.trigger("editor-menu", menu, editor, view)`
+mid-construction so plugins can inject items into exactly that menu).
+
+### 9.1 What we need
+
+A contribution point Markoff fires mid-construction of the context
+menu, giving subscribers — first the host, later plugin proxies — the
+chance to **append** items (and, within Obsidian's section-ordering
+contract, influence their placement). Subscribers must see:
+
+- the `QMenu` under construction,
+- the current `EditorContext` snapshot (so a subscriber can
+  conditionally add "Rename heading…" only when
+  `ctx.blockKind == Heading`, or "Copy link URL" only when
+  `ctx.link` is populated),
+- the global cursor position, so a subscriber can anchor sub-dialogs.
+
+### 9.2 Proposed API shape
+
+```cpp
+namespace Markoff {
+
+class Editor : public QGraphicsView {
+    // ...
+Q_SIGNALS:
+    /// Emitted from contextMenuEvent() after Markoff's built-in
+    /// items have been appended but before menu.exec() is called.
+    /// Subscribers may add QActions / submenus / separators directly
+    /// to `menu`. The emission is single-shot per right-click; the
+    /// passed `menu` is a stack-local QMenu that dies when exec()
+    /// returns, so don't capture pointers across the emission.
+    void aboutToShowContextMenu(QMenu *menu,
+                                const EditorContext &ctx,
+                                const QPoint &globalPos);
+};
+
+} // namespace Markoff
+```
+
+This matches Obsidian's `workspace.trigger("editor-menu", menu,
+editor, view)` shape (signal fires *after* core items are appended,
+*before* the menu is shown). It's deliberately a plain QMenu rather
+than a typed builder — a `QMenu` pointer is the closest Qt primitive
+to what Obsidian's `Menu` object is to its plugin API, and it keeps
+Markoff out of the section-ordering business.
+
+Alternative shape if the built-in items must remain reorderable: emit
+the signal *before* adding built-ins, let subscribers declare their
+intent with section tags, then Markoff sorts and appends its own
+items tagged with the canonical section ids. This is closer to
+Obsidian's internal protocol but carries more API surface; we'd
+accept either.
+
+### 9.3 Section ordering (host's concern, not Markoff's)
+
+Obsidian's menu protocol orders items by *section id* (`title`,
+`close`, `pane`, `open`, `action-primary`, `action`, `find`,
+`selection`, `info`, `view`, `view.linked`, `system`, `""`,
+`danger`). Corbomite already has `Corbomite::MenuSectionHelper`
+(Cluster R, `libs/core/`) which implements this sort. The host's
+`aboutToShowContextMenu` slot will:
+
+1. Wrap the incoming `QMenu *` in a `MenuSectionHelper`.
+2. Add Corbomite's Format/Heading/Insert/Table entries with section
+   tags (`action` for format toggles, `action-primary` for
+   heading/insert, `selection` for cut/copy/paste if we re-section
+   the built-ins, `view` for fold toggles).
+3. Call `helper.flush()` to reorder.
+
+Markoff itself doesn't need to know about sections; it just needs to
+emit the signal at a stable point in `contextMenuEvent()`. Corbomite
+does the rest. Future plugin `editor-menu` contributions will hang
+off the same signal via a proxy in Corbomite's plugin system — no
+further Markoff work.
+
+### 9.4 What Markoff's existing context menu should become
+
+A reasonable final state for `Editor::contextMenuEvent()`:
+
+```cpp
+void Editor::contextMenuEvent(QContextMenuEvent *e)
+{
+    if (m_readOnly) { e->ignore(); return; }
+
+    QMenu menu(this);
+    appendBuiltInItems(&menu);     // cut/copy/paste/select-all + table
+                                   // ops when in a table
+    EditorContext ctx = context();
+    emit aboutToShowContextMenu(&menu, ctx, e->globalPos());
+    menu.exec(e->globalPos());
+    e->accept();
+}
+```
+
+The built-in items stay (they're the "minimum functional menu" if no
+host subscribes), but every consumer that cares about parity with
+Obsidian's editor-menu — and every plugin author — hooks the signal.
+
+### 9.5 Consumer sketch (host side)
+
+```cpp
+// src/app/MainWindow.cpp (sketch, post-Markoff-rewrite)
+void MainWindow::connectEditorContextMenu(NoteEditorWidget *editor)
+{
+    auto *ed = editor->editor();
+    connect(ed, &Markoff::Editor::aboutToShowContextMenu,
+            this, &MainWindow::onAboutToShowContextMenu);
+}
+
+void MainWindow::onAboutToShowContextMenu(QMenu *menu,
+                                          const Markoff::EditorContext &ctx,
+                                          const QPoint &)
+{
+    using BK = Markoff::EditorContext::BlockKind;
+    MenuSectionHelper helper(menu);
+    KActionCollection *ac = actionCollection();
+
+    auto add = [&](const char *section, const QString &id) {
+        if (auto *a = ac->action(id)) helper.addItem(section, a);
+    };
+
+    // Format section — always available while active view is markdown.
+    add("action", QStringLiteral("format_bold"));
+    add("action", QStringLiteral("format_italic"));
+    add("action", QStringLiteral("format_strikethrough"));
+    add("action", QStringLiteral("format_inline_code"));
+
+    // Heading / Insert — primary action grouping.
+    for (int i = 1; i <= 6; ++i)
+        add("action-primary", QStringLiteral("heading_%1").arg(i));
+    add("action-primary", QStringLiteral("insert_link"));
+    add("action-primary", QStringLiteral("insert_wiki_link"));
+    add("action-primary", QStringLiteral("insert_callout"));
+    add("action-primary", QStringLiteral("insert_table"));
+
+    // Context-specific entries keyed off the snapshot.
+    if (ctx.blockKind == BK::Heading) {
+        // "Rename heading…" — Obsidian equivalent; we'll wire it when
+        // Corbomite has the rename-with-wikilink-rewrite path.
+    }
+    if (ctx.link) {
+        // "Copy link URL" / "Open external"
+    }
+    if (ctx.blockKind == BK::Table) {
+        add("action", QStringLiteral("table_row_above"));
+        add("action", QStringLiteral("table_row_below"));
+        add("action", QStringLiteral("table_col_left"));
+        add("action", QStringLiteral("table_col_right"));
+        add("action", QStringLiteral("table_delete_row"));
+        add("action", QStringLiteral("table_delete_col"));
+    }
+
+    helper.flush();   // apply section order, drop trailing separators
+}
+```
+
+### 9.6 Why this belongs in the same spec
+
+The contextChanged signal and aboutToShowContextMenu are the passive
+and active halves of the same question: *"given the cursor's
+surroundings, what editing affordances should the UI expose right
+now?"* Passive state colours menus + toolbars; active state populates
+the right-click menu. Markoff owns the cursor and the parse; a
+consumer needs both surfaces to deliver real word-processor UX.
+
+Shipping one without the other is a half-fix. Shipping them together
+in the rewrite means the Markoff API doesn't churn twice.
+
+### 9.7 Acceptance
+
+In addition to §8:
+
+5. `Markoff::Editor::aboutToShowContextMenu` fires once per
+   right-click, after Markoff's built-in items and before
+   `menu.exec()`.
+6. The passed `EditorContext` matches what `Editor::context()` would
+   return at the cursor position on that same right-click.
+7. Subscribers can append items and separators; order within the
+   menu is controlled by the subscriber (Corbomite using
+   `MenuSectionHelper`).
+8. Markoff's default built-in items remain present so an
+   unsubscribed Markoff (e.g. the standalone markoff-testapp) still
+   has a functional context menu.
+
+---
+
+## 10. Related existing docs
 
 - `libs/markoff-family/libs/markoff/docs/specs/2026-04-02-markoff-public-api-design.md`
   — the broader public-API shaping doc this spec extends.
