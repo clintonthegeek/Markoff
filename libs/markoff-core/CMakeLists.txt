@@ -11,10 +11,12 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 
 add_library(markoff_core STATIC
     src/EphemeralState.cpp
+    src/MarkoffDocument.cpp
     include/markoff/CursorPos.h
     include/markoff/TextSpan.h
     include/markoff/FoldSpec.h
     include/markoff/EphemeralState.h
+    include/markoff/MarkoffDocument.h
     include/markoff/MarkoffCoreExport.h
 )
 
