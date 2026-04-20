@@ -65,7 +65,7 @@ during C1–C7.
 
 | ID   | Status       | Spec                                   | Plan                                   | Markoff PR/branch    | Corbomite PR/branch  | Tag       |
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
-| C1   | plan drafted — ready to implement | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | —                    | —                    | `v0.3.0`  |
+| C1   | markoff ready (alpha)             | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | —                    | `v0.3.0-alpha.1` → `v0.3.0` |
 | C5   | requirements — see inputs | —                         | —                                      | —                    | —                    | —         |
 | C6   | requirements — see inputs | [consumer editor-state surface §1-8 + §9 context-menu](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,48 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C1a landed at `v0.3.0-alpha.1`
+
+Sub-phase C1a shipped in 5 commits on `master` (`fe655b0` → `2956ee7`)
+and tagged `v0.3.0-alpha.1`. Concrete deliverables:
+
+- `markoff-core`: 10 new public headers (5 primitives
+  `EmbedRegistry` / `CodeBlockProcessorRegistry` / `MarkdownRenderChild` /
+  `EmbedDepthGuard` / `MermaidRenderer` + 5 vault abstracts under
+  `Markoff::Vault::` namespace), 5 Default* no-op concretes, and 4 new
+  unit tests. `MarkdownRenderChild.cpp` is the sole new .cpp.
+- `markoff-reading`: every `<corbomite/...>` include dropped from src/
+  and include/; types rename to `Markoff::*` / `Markoff::Vault::*`.
+  `ReadingView` gains 5 new setters (`setEmbedRegistry`,
+  `setVaultLinkResolver`, `setVaultMetadataCache`,
+  `setVaultMetadataParser`, `setMermaidRenderer`) plus lazy-default
+  fallbacks via a fwd-declared `LazyDefaults` struct. `EmbedRenderer`
+  gains `setMetadataParser`. `SectionLayout::Context` gains
+  `mermaidRenderer *`; the two Mermaid callers route through it. Old
+  internal `src/MermaidRenderer.{h,cpp}` deleted (mmdr-coupled path is
+  now host-side only, via the `Markoff::MermaidRenderer` abstract).
+- Tests: 9 test files retyped via mechanical sed (Corbomite::Core::X →
+  Markoff::X; Corbomite::Storage::X → Markoff::Vault::X). Includes
+  switched to angle-bracket `<markoff/...>` form.
+
+The Phase B CMake option `MARKOFF_READING_USE_REAL_COREDEPS` stays in
+place but is now a no-op for link shape (markoff-reading no longer
+includes any corbomite/ headers from its sources). The stubs tree
+under `libs/markoff-reading/stubs/corbomite/` is unused by
+markoff-reading but still compiles; C1b (Tasks 17-21) deletes it.
+
+Task 8 (un-gate Phase-B tests) is a conscious no-op in C1a: the 4
+gated tests all assert on real SVG output or real metadata slicing,
+which `Default*` impls cannot provide. Un-gating blocked on Task 13
+writing Corbomite-side adapter tests, or on the host injecting real
+parser/renderer concretes.
+
+Standalone `ctest` green: 76/76. Tag append-only.
+
+Next: Corbomite-side adapter commit (Tasks 10-16) bumps submodule pin
+to `v0.3.0-alpha.1` and retypes Corbomite's Core/Storage primitives to
+inherit the new Markoff interfaces.
 
 ### 2026-04-20 — C1 plan drafted
 
