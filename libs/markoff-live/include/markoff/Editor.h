@@ -278,7 +278,10 @@ Q_SIGNALS:
     void redoAvailable(bool available);
     void modificationChanged(bool modified);
     void linkClicked(const QString &target);
-    void linkHovered(const QString &target);
+    /// Phase C5 — unified link-hover signal. `globalPos` is the
+    /// global-screen position of the cursor at hover time.
+    /// Empty `href` indicates hover-leave.
+    void linkHovered(const QString &href, const QPoint &globalPos);
     void wikiLinkTrigger(int cursorPosition);
     void tagTrigger(int cursorPosition);
     void completionDismissHint();

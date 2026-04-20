@@ -2293,12 +2293,13 @@ void Editor::handleLinkHovered(const QString &href)
 {
     if (!m_linkRenderer) return;
     static const QString kWikilinkPrefix = QStringLiteral("wikilink://");
+    const QPoint globalPos = QCursor::pos();
     if (href.isEmpty()) {
         // "leave" event — still emit so subscribers can clear popovers.
         LinkRenderer::FileLinkRequest req;
         req.sourceId = QStringLiteral("markoff:editor");
         m_linkRenderer->emitFileLinkHovered(req);
-        Q_EMIT linkHovered(QString());
+        Q_EMIT linkHovered(QString(), QPoint());
         return;
     }
     if (href.startsWith(kWikilinkPrefix)) {
@@ -2307,13 +2308,13 @@ void Editor::handleLinkHovered(const QString &href)
         req.linkText = target;
         req.fromPath = m_currentNotePath;
         req.sourceId = QStringLiteral("markoff:editor");
-        req.anchorHint = QCursor::pos();
+        req.anchorHint = globalPos;
         m_linkRenderer->emitFileLinkHovered(req);
-        Q_EMIT linkHovered(target);
+        Q_EMIT linkHovered(target, globalPos);
     } else {
         m_linkRenderer->emitExternalLinkHovered(QUrl(href),
                                                  QStringLiteral("markoff:editor"));
-        Q_EMIT linkHovered(href);
+        Q_EMIT linkHovered(href, globalPos);
     }
 }
 

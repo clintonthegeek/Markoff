@@ -45,7 +45,9 @@ void TstReadingViewHoverSignal::emptyHrefOnLeave()
     // as "hide popover" regardless of globalPos.
     Q_EMIT rv.linkHovered(QString(), QPoint());
     QCOMPARE(spy.count(), 1);
-    QVERIFY(spy.first().at(0).toString().isEmpty());
+    const auto args = spy.first();
+    QCOMPARE(args.size(), 2);
+    QVERIFY(args.at(0).toString().isEmpty());
 }
 
 QTEST_MAIN(TstReadingViewHoverSignal)
