@@ -65,8 +65,6 @@ add_library(markoff_reading STATIC
     src/ReadingSearchAdapter.cpp
     src/ReadingMathObject.h
     src/ReadingMathObject.cpp
-    src/MermaidRenderer.h
-    src/MermaidRenderer.cpp
     include/markoff/reading/styling/ParagraphStyle.h
     src/styling/ParagraphStyle.cpp
     include/markoff/reading/styling/CharacterStyle.h

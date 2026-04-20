@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "markoff/reading/ReadingView.h"
 
-#include "MermaidRenderer.h"
 #include "ReadingSearchAdapter.h"
 #include "SpanRenderer.h"
 #include "markoff/reading/CodeBlockHighlighter.h"
@@ -14,6 +13,11 @@
 #include "markoff/reading/VaultResourceProvider.h"
 #include "markoff/reading/VirtualScrollController.h"
 #include "markoff/reading/styling/StyleManager.h"
+
+#include <markoff/DefaultMermaidRenderer.h>
+#include <markoff/vault/DefaultLinkResolver.h>
+#include <markoff/vault/DefaultMetadataCache.h>
+#include <markoff/vault/DefaultMetadataParser.h>
 
 #include <jkqtmathtext/jkqtmathtext.h>
 
@@ -46,6 +50,18 @@ constexpr qreal kSectionVerticalGap = 4.0;
 
 } // namespace
 
+/// Lazy-default holders. Allocated on first accessor call for each
+/// abstract when the host hasn't injected a real implementation. Hidden
+/// behind a forward declaration in ReadingView.h to keep that header
+/// light.
+struct ReadingView::LazyDefaults
+{
+    std::unique_ptr<Markoff::Vault::DefaultLinkResolver> linkResolver;
+    std::unique_ptr<Markoff::Vault::DefaultMetadataCache> metadataCache;
+    std::unique_ptr<Markoff::Vault::DefaultMetadataParser> metadataParser;
+    std::unique_ptr<Markoff::DefaultMermaidRenderer> mermaidRenderer;
+};
+
 ReadingView::ReadingView(QWidget *parent)
     : Markoff::MarkdownView(parent)
     , m_pipeline(std::make_unique<ReadingPipeline>(this))
@@ -56,7 +72,8 @@ ReadingView::ReadingView(QWidget *parent)
     , m_worker(std::make_unique<ReadingParseWorker>())
     , m_controller(std::make_unique<VirtualScrollController>(this))
     , m_codeBlockRegistry(
-          std::make_unique<Corbomite::Core::CodeBlockProcessorRegistry>())
+          std::make_unique<Markoff::CodeBlockProcessorRegistry>())
+    , m_lazyDefaults(std::make_unique<LazyDefaults>())
 {
     // Composed QGraphicsView. The baseline (QGraphicsView-as-base) tests
     // construct a ReadingView without `show()` or `resize()` and still
@@ -125,17 +142,63 @@ ReadingView::ReadingView(QWidget *parent)
 
 ReadingView::~ReadingView() = default;
 
-Corbomite::Core::CodeBlockProcessorRegistry *
+Markoff::CodeBlockProcessorRegistry *
 ReadingView::codeBlockProcessorRegistry()
 {
     return m_codeBlockRegistry.get();
 }
 
-const Corbomite::Core::CodeBlockProcessorRegistry *
+const Markoff::CodeBlockProcessorRegistry *
 ReadingView::codeBlockProcessorRegistry() const
 {
     return m_codeBlockRegistry.get();
 }
+
+// --- Phase C1 DI-seam setters --------------------------------------
+
+void ReadingView::setEmbedRegistry(Markoff::EmbedRegistry *registry)
+{
+    m_embedRegistry = registry;
+}
+
+void ReadingView::setVaultLinkResolver(Markoff::Vault::LinkResolver *resolver)
+{
+    m_vaultLinkResolver = resolver;
+}
+
+void ReadingView::setVaultMetadataCache(Markoff::Vault::MetadataCache *cache)
+{
+    m_vaultMetadataCache = cache;
+}
+
+void ReadingView::setVaultMetadataParser(Markoff::Vault::MetadataParser *parser)
+{
+    m_vaultMetadataParser = parser;
+}
+
+void ReadingView::setMermaidRenderer(Markoff::MermaidRenderer *renderer)
+{
+    m_mermaidRenderer = renderer;
+}
+
+Markoff::EmbedDepthGuard *ReadingView::embedDepthGuard()
+{
+    return &m_embedDepthGuard;
+}
+
+namespace {
+
+// Internal convenience: fall back to a lazily-constructed Default* when
+// the host has not injected a concrete implementation.
+template <typename Iface, typename Default>
+Iface *resolveOrDefault(Iface *host, std::unique_ptr<Default> &slot)
+{
+    if (host) return host;
+    if (!slot) slot = std::make_unique<Default>();
+    return slot.get();
+}
+
+} // namespace
 
 // --- QGraphicsView passthroughs ---
 QGraphicsScene *ReadingView::scene() const { return m_graphicsView ? m_graphicsView->scene() : nullptr; }
@@ -153,17 +216,19 @@ void ReadingView::registerBuiltinCodeBlockProcessors()
 
     m_codeBlockRegistry->registerLanguage(
         QStringLiteral("mermaid"),
-        [](const QString &source,
-           void * /*node*/,
-           const Corbomite::Core::CodeBlockContext & /*ctx*/) -> bool {
-            const QByteArray svg = MermaidRenderer::renderSvg(source);
+        [this](const QString &source,
+               void * /*node*/,
+               const Markoff::CodeBlockContext & /*ctx*/) -> bool {
+            Markoff::MermaidRenderer *renderer = resolveOrDefault(
+                m_mermaidRenderer, m_lazyDefaults->mermaidRenderer);
+            const QByteArray svg = renderer->renderSvg(source);
             return !svg.isEmpty();
         });
 
     auto mathProcessor =
         [](const QString &source,
            void * /*node*/,
-           const Corbomite::Core::CodeBlockContext & /*ctx*/) -> bool {
+           const Markoff::CodeBlockContext & /*ctx*/) -> bool {
             JKQTMathText mt;
             mt.parse(source);
             return !source.trimmed().isEmpty();
@@ -177,7 +242,7 @@ void ReadingView::registerBuiltinCodeBlockProcessors()
         QStringLiteral("default"),
         [](const QString & /*source*/,
            void * /*node*/,
-           const Corbomite::Core::CodeBlockContext & /*ctx*/) -> bool {
+           const Markoff::CodeBlockContext & /*ctx*/) -> bool {
             CodeBlockHighlighter hl(Theme::Light);
             Q_UNUSED(hl);
             return true;
@@ -414,6 +479,8 @@ QGraphicsItem *ReadingView::layoutSectionForController(int sectionIdx)
         ctx.theme = m_theme;
         ctx.contentWidth = m_contentWidth;
         ctx.vaultProvider = m_vaultProvider;
+        ctx.mermaidRenderer = resolveOrDefault(
+            m_mermaidRenderer, m_lazyDefaults->mermaidRenderer);
         ctx.headingCollapsedIndicator = true;
         ctx.sectionIndex = sectionIdx;
 

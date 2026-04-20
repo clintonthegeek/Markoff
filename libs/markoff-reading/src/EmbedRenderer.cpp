@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// (c) 2026 Corbomite contributors, GPL-3.0-or-later.
+// (c) 2026 Markoff contributors, GPL-3.0-or-later.
 
 #include "markoff/reading/EmbedRenderer.h"
 
@@ -8,11 +8,12 @@
 #include <QRegularExpression>
 #include <QWidget>
 
-#include "corbomite/core/VaultResourceProvider.h"
-#include "corbomite/storage/CachedMetadata.h"
-#include "corbomite/storage/LinkResolver.h"
-#include "corbomite/storage/MetadataCache.h"
-#include "corbomite/storage/MetadataParser.h"
+#include <markoff/vault/CachedMetadata.h>
+#include <markoff/vault/DefaultLinkResolver.h>
+#include <markoff/vault/LinkResolver.h>
+#include <markoff/vault/MetadataCache.h>
+#include <markoff/vault/MetadataParser.h>
+#include <markoff/vault/ResourceProvider.h>
 
 namespace Markoff::Reading {
 
@@ -24,8 +25,9 @@ namespace {
 /// is empty (first-touch / test-harness path). The sync fallback uses
 /// an empty LinkResolver — heading/block extraction does not need link
 /// resolution, so this is harmless.
-Corbomite::CachedMetadata
-fetchMetadata(Corbomite::MetadataCache *cache,
+Markoff::Vault::CachedMetadata
+fetchMetadata(Markoff::Vault::MetadataCache *cache,
+              Markoff::Vault::MetadataParser *parser,
               const QString &targetPath,
               const QByteArray &content)
 {
@@ -36,20 +38,20 @@ fetchMetadata(Corbomite::MetadataCache *cache,
             return *cached;
         }
     }
-    // Sync fallback — MetadataParser is a pure function, safe to call on
-    // any thread. LinkResolver doesn't participate in heading/block
-    // slicing so an empty resolver suffices here.
-    Corbomite::LinkResolver resolver;
-    return Corbomite::MetadataParser::parse(content, targetPath, resolver)
-        .cache;
+    if (!parser) return {};
+    // Sync fallback — parser is expected to be pure; LinkResolver doesn't
+    // participate in heading/block slicing so an empty resolver suffices.
+    Markoff::Vault::DefaultLinkResolver resolver;
+    return parser->parse(content, targetPath, resolver).cache;
 }
 
 /// Slice `content` from `start` up to (but not including) the next heading
 /// of the same-or-lesser level after `start`. If no later heading exists,
 /// returns the suffix from `start` onward.
-QString sliceHeadingSection(const QString &content,
-                            const QVector<Corbomite::HeadingCache> &headings,
-                            int headingIndex)
+QString sliceHeadingSection(
+    const QString &content,
+    const QVector<Markoff::Vault::HeadingCache> &headings,
+    int headingIndex)
 {
     const auto &h = headings[headingIndex];
     const int start = h.position.start.offset;
@@ -72,7 +74,7 @@ QString sliceHeadingSection(const QString &content,
 /// the marker's line as an anchor and expand outward to the nearest
 /// blank lines (or file boundaries) to recover the full block body.
 QString sliceBlock(const QString &content,
-                   const Corbomite::CachedMetadata &meta,
+                   const Markoff::Vault::CachedMetadata &meta,
                    const QString &blockId)
 {
     if (!meta.blocks) return {};
@@ -159,33 +161,38 @@ void splitWikiEmbed(const QString &raw, QString *target, QString *subpath)
 
 } // namespace
 
-EmbedRenderer::EmbedRenderer(Corbomite::Core::EmbedRegistry *registry,
-                             Corbomite::MetadataCache *cache,
-                             Corbomite::Core::VaultResourceProvider *resources)
+EmbedRenderer::EmbedRenderer(Markoff::EmbedRegistry *registry,
+                             Markoff::Vault::MetadataCache *cache,
+                             Markoff::Vault::ResourceProvider *resources)
     : m_registry(registry), m_cache(cache), m_resources(resources)
 {
 }
 
-void EmbedRenderer::setMetadataCache(Corbomite::MetadataCache *cache)
+void EmbedRenderer::setMetadataCache(Markoff::Vault::MetadataCache *cache)
 {
     m_cache = cache;
 }
 
-void EmbedRenderer::setResources(Corbomite::Core::VaultResourceProvider *resources)
+void EmbedRenderer::setResources(Markoff::Vault::ResourceProvider *resources)
 {
     m_resources = resources;
 }
 
-std::unique_ptr<Corbomite::Core::MarkdownRenderChild>
-EmbedRenderer::render(const Corbomite::Core::EmbedRequest &req)
+void EmbedRenderer::setMetadataParser(Markoff::Vault::MetadataParser *parser)
+{
+    m_parser = parser;
+}
+
+std::unique_ptr<Markoff::MarkdownRenderChild>
+EmbedRenderer::render(const Markoff::EmbedRequest &req)
 {
     // Depth guard — attempted 6th level lands on placeholder. The caller
     // contract (per docs/superpowers/research/2026-04-15-embed-depth-findings.md)
     // is: depth is incremented before the call, so `allow(5)` is false.
     if (!m_guard.allow(req.depth)) {
-        auto child = std::make_unique<Corbomite::Core::MarkdownRenderChild>();
+        auto child = std::make_unique<Markoff::MarkdownRenderChild>();
         child->setRenderedText(
-            Corbomite::Core::EmbedDepthGuard::placeholder(req.targetPath));
+            Markoff::EmbedDepthGuard::placeholder(req.targetPath));
         return child;
     }
 
@@ -203,21 +210,21 @@ EmbedRenderer::render(const Corbomite::Core::EmbedRequest &req)
     }
 
     // Unknown extension — stub placeholder (real factories land in Phase 5).
-    auto child = std::make_unique<Corbomite::Core::MarkdownRenderChild>();
+    auto child = std::make_unique<Markoff::MarkdownRenderChild>();
     child->setRenderedText(QStringLiteral("[unknown embed type: ") + ext
                            + QStringLiteral("]"));
     return child;
 }
 
-std::unique_ptr<Corbomite::Core::MarkdownRenderChild>
-EmbedRenderer::renderMarkdown(const Corbomite::Core::EmbedRequest &req)
+std::unique_ptr<Markoff::MarkdownRenderChild>
+EmbedRenderer::renderMarkdown(const Markoff::EmbedRequest &req)
 {
-    auto child = std::make_unique<Corbomite::Core::MarkdownRenderChild>();
+    auto child = std::make_unique<Markoff::MarkdownRenderChild>();
 
     // Pull raw markdown from the resource provider. Callers supply the
     // provider via `req.resources`; fall back to the EmbedRenderer's
     // member provider when the request did not carry one.
-    Corbomite::Core::VaultResourceProvider *resources =
+    Markoff::Vault::ResourceProvider *resources =
         req.resources ? req.resources : m_resources;
     if (!resources) {
         child->setRenderedText(QStringLiteral("[missing resources]"));
@@ -237,8 +244,8 @@ EmbedRenderer::renderMarkdown(const Corbomite::Core::EmbedRequest &req)
     // nested-embed expansion pass below runs against this slice.
     const QString subpath = req.subpath;
     QString sliced;
-    const Corbomite::CachedMetadata meta =
-        fetchMetadata(m_cache, req.targetPath, bytes);
+    const Markoff::Vault::CachedMetadata meta =
+        fetchMetadata(m_cache, m_parser, req.targetPath, bytes);
 
     if (subpath.isEmpty()) {
         sliced = content;
@@ -280,17 +287,17 @@ EmbedRenderer::renderMarkdown(const Corbomite::Core::EmbedRequest &req)
         QString nestedTarget;
         QString nestedSubpath;
         splitWikiEmbed(m.captured(1), &nestedTarget, &nestedSubpath);
-        Corbomite::Core::EmbedRequest nestedReq{nestedTarget,
-                                                nestedSubpath,
-                                                resources,
-                                                req.depth + 1};
+        Markoff::EmbedRequest nestedReq{nestedTarget,
+                                        nestedSubpath,
+                                        resources,
+                                        req.depth + 1};
         if (!m_guard.allow(nestedReq.depth)) {
-            out.append(Corbomite::Core::EmbedDepthGuard::placeholder(
+            out.append(Markoff::EmbedDepthGuard::placeholder(
                 nestedReq.targetPath));
         } else {
             // Prefer registry; fall back to self's renderMarkdown for
             // the `.md` case if registry has no factory registered.
-            std::unique_ptr<Corbomite::Core::MarkdownRenderChild> nested;
+            std::unique_ptr<Markoff::MarkdownRenderChild> nested;
             if (m_registry) nested = m_registry->dispatch(nestedReq);
             if (!nested) nested = renderMarkdown(nestedReq);
             out.append(nested->renderedText());
@@ -322,11 +329,11 @@ namespace {
 /// intentionally ignored — Obsidian's image-embed syntax does not use
 /// subpath the same way markdown-embed does; the target path becomes
 /// the img src directly.
-Corbomite::Core::EmbedFactory imageWikilinkShim()
+Markoff::EmbedFactory imageWikilinkShim()
 {
-    return [](const Corbomite::Core::EmbedRequest &req)
-        -> std::unique_ptr<Corbomite::Core::MarkdownRenderChild> {
-        auto child = std::make_unique<Corbomite::Core::MarkdownRenderChild>();
+    return [](const Markoff::EmbedRequest &req)
+        -> std::unique_ptr<Markoff::MarkdownRenderChild> {
+        auto child = std::make_unique<Markoff::MarkdownRenderChild>();
         child->setRenderedText(QStringLiteral("![](") + req.targetPath
                                + QStringLiteral(")"));
         return child;
@@ -340,11 +347,11 @@ Corbomite::Core::EmbedFactory imageWikilinkShim()
 /// strings ("PDF", "Audio", "Video") — distinct prefixes are the
 /// only distinguishing signal, so translators must keep them distinct
 /// within a locale.
-Corbomite::Core::EmbedFactory mediaPlaceholderFactory(const QString &kind)
+Markoff::EmbedFactory mediaPlaceholderFactory(const QString &kind)
 {
-    return [kind](const Corbomite::Core::EmbedRequest &req)
-        -> std::unique_ptr<Corbomite::Core::MarkdownRenderChild> {
-        auto child = std::make_unique<Corbomite::Core::MarkdownRenderChild>();
+    return [kind](const Markoff::EmbedRequest &req)
+        -> std::unique_ptr<Markoff::MarkdownRenderChild> {
+        auto child = std::make_unique<Markoff::MarkdownRenderChild>();
         child->setRenderedText(
             QCoreApplication::translate(
                 "Markoff::Reading",
@@ -356,7 +363,7 @@ Corbomite::Core::EmbedFactory mediaPlaceholderFactory(const QString &kind)
 
 } // namespace
 
-void registerBuiltinEmbedFactories(Corbomite::Core::EmbedRegistry &reg,
+void registerBuiltinEmbedFactories(Markoff::EmbedRegistry &reg,
                                    EmbedRenderer &renderer)
 {
     // .md — delegate to the recursive markdown renderer. The lambda
@@ -364,8 +371,8 @@ void registerBuiltinEmbedFactories(Corbomite::Core::EmbedRegistry &reg,
     // lifetime of the registry (documented in EmbedRenderer.h).
     reg.registerExtension(
         QStringLiteral("md"),
-        [&renderer](const Corbomite::Core::EmbedRequest &req)
-            -> std::unique_ptr<Corbomite::Core::MarkdownRenderChild> {
+        [&renderer](const Markoff::EmbedRequest &req)
+            -> std::unique_ptr<Markoff::MarkdownRenderChild> {
             return renderer.renderMarkdown(req);
         });
 

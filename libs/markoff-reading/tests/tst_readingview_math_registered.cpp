@@ -3,7 +3,7 @@
 
 #include <QTest>
 
-#include "corbomite/core/CodeBlockProcessorRegistry.h"
+#include <markoff/CodeBlockProcessorRegistry.h>
 #include "markoff/reading/ReadingView.h"
 
 using namespace Markoff::Reading;
@@ -27,7 +27,7 @@ void TstReadingViewMathRegistered::testMathIsRegistered()
     const auto *reg = rv.codeBlockProcessorRegistry();
     QVERIFY(reg != nullptr);
 
-    Corbomite::Core::CodeBlockContext ctx;
+    Markoff::CodeBlockContext ctx;
     const bool handled =
         reg->dispatch(QStringLiteral("math"),
                       QStringLiteral("\\frac{a}{b}"), nullptr, ctx);
@@ -42,7 +42,7 @@ void TstReadingViewMathRegistered::testLatexIsRegisteredSameHandler()
     const auto *reg = rv.codeBlockProcessorRegistry();
     QVERIFY(reg != nullptr);
 
-    Corbomite::Core::CodeBlockContext ctx;
+    Markoff::CodeBlockContext ctx;
     const bool handled =
         reg->dispatch(QStringLiteral("latex"),
                       QStringLiteral("x^2 + y^2 = z^2"), nullptr, ctx);
@@ -56,7 +56,7 @@ void TstReadingViewMathRegistered::testEmptySourceFallsThrough()
     const auto *reg = rv.codeBlockProcessorRegistry();
     QVERIFY(reg != nullptr);
 
-    Corbomite::Core::CodeBlockContext ctx;
+    Markoff::CodeBlockContext ctx;
     const bool handled =
         reg->dispatch(QStringLiteral("math"),
                       QStringLiteral("   \n  "), nullptr, ctx);

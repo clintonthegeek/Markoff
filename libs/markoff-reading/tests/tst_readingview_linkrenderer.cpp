@@ -5,7 +5,7 @@
 #include <QTest>
 #include <QUrl>
 
-#include "corbomite/core/VaultResourceProvider.h"
+#include <markoff/vault/ResourceProvider.h>
 #include "markoff/reading/LinkRenderer.h"
 
 using namespace Markoff::Reading;
@@ -15,7 +15,7 @@ namespace {
 /// Minimal VaultResourceProvider stub for LinkRenderer unit tests.
 /// Resolves wikilinks to `vault:///<target>` URLs; everything else
 /// returns a stub value. No filesystem / metadata touched.
-class StubResources : public Corbomite::Core::VaultResourceProvider
+class StubResources : public Markoff::Vault::ResourceProvider
 {
 public:
     QUrl resolveImage(const QString &name) const override

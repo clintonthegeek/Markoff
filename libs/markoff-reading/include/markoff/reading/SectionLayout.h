@@ -7,6 +7,8 @@
 #include "markoff/reading/CodeBlockHighlighter.h"
 #include "markoff/reading/VaultResourceProvider.h"
 
+#include <markoff/MermaidRenderer.h>
+
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -35,6 +37,11 @@ public:
         Theme theme = Theme::Light;
         qreal contentWidth = 800.0;                    // pixel width for wrap
         VaultResourceProvider *vaultProvider = nullptr; // not owned
+
+        /// Phase C1 DI seam — Mermaid renderer pulled through from
+        /// ReadingView. Nullable; SectionLayout checks for null and
+        /// falls back to a plain code-block render when absent.
+        Markoff::MermaidRenderer *mermaidRenderer = nullptr; // not owned
 
         /// Phase 6: when true, heading sections get a clickable gutter
         /// arrow (▶ collapsed, ▼ expanded) at the left edge. The arrow

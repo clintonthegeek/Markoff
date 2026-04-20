@@ -4,9 +4,14 @@
 #include "markoff/reading/CodeBlockHighlighter.h"
 #include "markoff/reading/VaultResourceProvider.h"
 
-#include "corbomite/core/CodeBlockProcessorRegistry.h"
-
+#include <markoff/CodeBlockProcessorRegistry.h>
+#include <markoff/EmbedDepthGuard.h>
+#include <markoff/EmbedRegistry.h>
 #include <markoff/MarkdownView.h>
+#include <markoff/MermaidRenderer.h>
+#include <markoff/vault/LinkResolver.h>
+#include <markoff/vault/MetadataCache.h>
+#include <markoff/vault/MetadataParser.h>
 
 #include <QMultiHash>
 #include <QString>
@@ -62,6 +67,20 @@ public:
     void setVaultResourceProvider(VaultResourceProvider *provider);
     VaultResourceProvider *vaultResourceProvider() const;
 
+    /// Phase C1 DI seam: inject host-owned implementations of the
+    /// Markoff::* and Markoff::Vault:: abstracts. All setters accept
+    /// `nullptr` (reverts to the lazy-constructed no-op default from
+    /// markoff-core). Caller retains ownership.
+    void setEmbedRegistry(Markoff::EmbedRegistry *registry);
+    void setVaultLinkResolver(Markoff::Vault::LinkResolver *resolver);
+    void setVaultMetadataCache(Markoff::Vault::MetadataCache *cache);
+    void setVaultMetadataParser(Markoff::Vault::MetadataParser *parser);
+    void setMermaidRenderer(Markoff::MermaidRenderer *renderer);
+
+    /// Depth guard used for embed dispatch. Exposed so hosts can share
+    /// state with their own embed pipeline.
+    Markoff::EmbedDepthGuard *embedDepthGuard();
+
     const QVector<std::shared_ptr<ReadingSection>> &sections() const
     {
         return m_sections;
@@ -89,8 +108,8 @@ public:
     int mountedCount() const;
 
     /// Cluster J phase 5 — built-in code-block processor registry.
-    Corbomite::Core::CodeBlockProcessorRegistry *codeBlockProcessorRegistry();
-    const Corbomite::Core::CodeBlockProcessorRegistry *
+    Markoff::CodeBlockProcessorRegistry *codeBlockProcessorRegistry();
+    const Markoff::CodeBlockProcessorRegistry *
     codeBlockProcessorRegistry() const;
 
     // --- QGraphicsView passthroughs (tests + internal helpers) ---
@@ -183,8 +202,24 @@ private:
     std::unique_ptr<SectionRecyclePool> m_recyclePool;
     std::unique_ptr<ReadingParseWorker> m_worker;
     std::unique_ptr<VirtualScrollController> m_controller;
-    std::unique_ptr<Corbomite::Core::CodeBlockProcessorRegistry>
+    std::unique_ptr<Markoff::CodeBlockProcessorRegistry>
         m_codeBlockRegistry;
+
+    // Phase C1 DI seam — host-injected pointers (not owned) + lazy-
+    // constructed Default* fallbacks. The public accessors below pick
+    // whichever is current.
+    Markoff::EmbedRegistry *m_embedRegistry = nullptr;
+    Markoff::Vault::LinkResolver *m_vaultLinkResolver = nullptr;
+    Markoff::Vault::MetadataCache *m_vaultMetadataCache = nullptr;
+    Markoff::Vault::MetadataParser *m_vaultMetadataParser = nullptr;
+    Markoff::MermaidRenderer *m_mermaidRenderer = nullptr;
+    Markoff::EmbedDepthGuard m_embedDepthGuard;
+
+    // Lazy-defaults for the above. Allocated on first accessor call when
+    // no host injection has occurred. Header forward-declares the types
+    // to keep ReadingView.h light.
+    struct LazyDefaults;
+    std::unique_ptr<LazyDefaults> m_lazyDefaults;
 
     QVector<std::shared_ptr<ReadingSection>> m_sections;
 

@@ -14,7 +14,6 @@
 
 #include "markoff/reading/SectionLayout.h"
 
-#include "MermaidRenderer.h"
 #include "ReadingMathObject.h"
 #include "SpanRenderer.h"
 #include "markoff/reading/ReadingSection.h"
@@ -641,7 +640,9 @@ QGraphicsItemGroup *SectionLayout::layoutSection(ReadingSection &section,
         }
 
         case BlockKind::Mermaid: {
-            const QByteArray svg = MermaidRenderer::renderSvg(br.code.content);
+            const QByteArray svg = ctx.mermaidRenderer
+                ? ctx.mermaidRenderer->renderSvg(br.code.content)
+                : QByteArray{};
             if (svg.isEmpty()) {
                 // Fallback: treat as a plain code block.
                 BlockRecord fb;

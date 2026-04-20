@@ -9,16 +9,16 @@
 
 #include <optional>
 
-#include "corbomite/core/EmbedRegistry.h"
-#include "corbomite/core/MarkdownRenderChild.h"
-#include "corbomite/core/VaultResourceProvider.h"
+#include <markoff/EmbedRegistry.h>
+#include <markoff/MarkdownRenderChild.h>
+#include <markoff/vault/ResourceProvider.h>
 #include "markoff/reading/EmbedRenderer.h"
 
 using namespace Markoff::Reading;
 
 namespace {
 
-class InMemoryResources : public Corbomite::Core::VaultResourceProvider
+class InMemoryResources : public Markoff::Vault::ResourceProvider
 {
 public:
     QUrl resolveImage(const QString &name) const override
@@ -58,11 +58,11 @@ private slots:
 void TstReadingViewEmbedImageShim::testImageShimPng()
 {
     InMemoryResources resources;
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer renderer(&reg, nullptr, &resources);
     registerBuiltinEmbedFactories(reg, renderer);
 
-    Corbomite::Core::EmbedRequest req{QStringLiteral("foo.png"),
+    Markoff::EmbedRequest req{QStringLiteral("foo.png"),
                                       QString(), &resources, 1};
     auto child = reg.dispatch(req);
     QVERIFY2(child != nullptr, "png extension must be registered");
@@ -72,13 +72,13 @@ void TstReadingViewEmbedImageShim::testImageShimPng()
 void TstReadingViewEmbedImageShim::testImageShimAllExtensions()
 {
     InMemoryResources resources;
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer renderer(&reg, nullptr, &resources);
     registerBuiltinEmbedFactories(reg, renderer);
 
     for (const char *ext : {"png", "jpg", "jpeg", "gif", "svg", "webp"}) {
         const QString path = QStringLiteral("img.") + QLatin1String(ext);
-        Corbomite::Core::EmbedRequest req{path, QString(), &resources, 1};
+        Markoff::EmbedRequest req{path, QString(), &resources, 1};
         auto child = reg.dispatch(req);
         QVERIFY2(child != nullptr, ext);
         const QString expected = QStringLiteral("![](") + path
@@ -95,12 +95,12 @@ void TstReadingViewEmbedImageShim::testShimMatchesInlineImageSource()
     // consumer would see from a native `![](...)` source — no alias,
     // no subpath processing.
     InMemoryResources resources;
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer renderer(&reg, nullptr, &resources);
     registerBuiltinEmbedFactories(reg, renderer);
 
     const QString path = QStringLiteral("path/to/diagram.svg");
-    Corbomite::Core::EmbedRequest req{path, QString(), &resources, 1};
+    Markoff::EmbedRequest req{path, QString(), &resources, 1};
     auto child = reg.dispatch(req);
     QVERIFY(child);
     // Expected shim output matches what a markdown source `![](...)` parse

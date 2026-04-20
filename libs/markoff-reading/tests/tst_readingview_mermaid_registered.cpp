@@ -3,7 +3,7 @@
 
 #include <QTest>
 
-#include "corbomite/core/CodeBlockProcessorRegistry.h"
+#include <markoff/CodeBlockProcessorRegistry.h>
 #include "markoff/reading/ReadingView.h"
 
 using namespace Markoff::Reading;
@@ -28,7 +28,7 @@ void TstReadingViewMermaidRegistered::testMermaidIsRegistered()
     const auto *reg = rv.codeBlockProcessorRegistry();
     QVERIFY(reg != nullptr);
 
-    Corbomite::Core::CodeBlockContext ctx;
+    Markoff::CodeBlockContext ctx;
     const bool handled =
         reg->dispatch(QStringLiteral("mermaid"),
                       QStringLiteral("graph TD;\nA-->B;\n"), nullptr, ctx);
@@ -43,7 +43,7 @@ void TstReadingViewMermaidRegistered::testUnknownLanguageFallsThrough()
     const auto *reg = rv.codeBlockProcessorRegistry();
     QVERIFY(reg != nullptr);
 
-    Corbomite::Core::CodeBlockContext ctx;
+    Markoff::CodeBlockContext ctx;
     const bool handled =
         reg->dispatch(QStringLiteral("no-such-lang-42"),
                       QStringLiteral("nothing"), nullptr, ctx);

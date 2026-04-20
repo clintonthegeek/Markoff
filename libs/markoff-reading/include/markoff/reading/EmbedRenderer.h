@@ -1,37 +1,37 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// (c) 2026 Corbomite contributors, GPL-3.0-or-later.
+// (c) 2026 Markoff contributors, GPL-3.0-or-later.
 
-#ifndef CORBOMITE_READINGVIEW_EMBEDRENDERER_H
-#define CORBOMITE_READINGVIEW_EMBEDRENDERER_H
+#ifndef MARKOFF_READING_EMBEDRENDERER_H
+#define MARKOFF_READING_EMBEDRENDERER_H
 
 #include <QString>
 
 #include <memory>
 
-#include "corbomite/core/EmbedDepthGuard.h"
-#include "corbomite/core/EmbedRegistry.h"
-#include "corbomite/core/MarkdownRenderChild.h"
+#include <markoff/EmbedDepthGuard.h>
+#include <markoff/EmbedRegistry.h>
+#include <markoff/MarkdownRenderChild.h>
 
 class QWidget;
 
-namespace Corbomite {
+namespace Markoff::Vault {
 class MetadataCache;
-}
-namespace Corbomite::Core {
-class VaultResourceProvider;
-}
+class MetadataParser;
+class ResourceProvider;
+} // namespace Markoff::Vault
 
 namespace Markoff::Reading {
 
 /// Per-embed mini-renderer for `![[Target]]`, `![[Target#heading]]` and
 /// `![[Target#^blockid]]`. Resolves subpaths via `MetadataCache` when a
 /// cache entry exists, otherwise falls back to a synchronous on-demand
-/// parse (needed for tests and first-touch fallback).
+/// parse via the injected `MetadataParser` (needed for tests and
+/// first-touch fallback).
 ///
-/// Depth is tracked via `Corbomite::Core::EmbedDepthGuard` — an attempted
-/// sixth embed level ( `depth >= 5` ) produces the clickable placeholder
-/// child via `EmbedDepthGuard::placeholder(target)`. Host widgets can
-/// read `EmbedDepthGuard::placeholderTarget(target)` to wire an onClick
+/// Depth is tracked via `Markoff::EmbedDepthGuard` — an attempted sixth
+/// embed level ( `depth >= 5` ) produces the clickable placeholder child
+/// via `EmbedDepthGuard::placeholder(target)`. Host widgets can read
+/// `EmbedDepthGuard::placeholderTarget(target)` to wire an onClick
 /// handler that opens `target` in a new pane (Obsidian parity).
 ///
 /// Lifecycle: the returned `MarkdownRenderChild` is an owning unique_ptr
@@ -41,9 +41,9 @@ namespace Markoff::Reading {
 class EmbedRenderer
 {
 public:
-    EmbedRenderer(Corbomite::Core::EmbedRegistry *registry,
-                  Corbomite::MetadataCache *cache,
-                  Corbomite::Core::VaultResourceProvider *resources);
+    EmbedRenderer(Markoff::EmbedRegistry *registry,
+                  Markoff::Vault::MetadataCache *cache,
+                  Markoff::Vault::ResourceProvider *resources);
 
     /// Cluster J Phase 6 — late-bind the per-vault metadata cache and
     /// resource provider after construction. Hosts (e.g., HoverPopover)
@@ -51,8 +51,15 @@ public:
     /// lambdas can capture `&renderer` once, then re-point the resource
     /// adapter on every vault open / close. Caller retains ownership;
     /// pass `nullptr` to clear.
-    void setMetadataCache(Corbomite::MetadataCache *cache);
-    void setResources(Corbomite::Core::VaultResourceProvider *resources);
+    void setMetadataCache(Markoff::Vault::MetadataCache *cache);
+    void setResources(Markoff::Vault::ResourceProvider *resources);
+
+    /// Phase C1 addition — inject the `MetadataParser` used as the
+    /// synchronous fallback when the cache has no entry for a target.
+    /// Pre-C1, markoff-reading called a static `Corbomite::MetadataParser::parse`
+    /// directly; C1 makes the parser injectable so standalone builds can
+    /// get away with a no-op default.
+    void setMetadataParser(Markoff::Vault::MetadataParser *parser);
 
     /// Resolve and render an embed request. Returns a non-null
     /// `MarkdownRenderChild` in all paths: on depth-cap-rejection the
@@ -60,8 +67,8 @@ public:
     /// unknown-extension the child carries a `[unknown embed type: X]`
     /// placeholder; on normal success the child's `renderedText()`
     /// carries the subpath-sliced markdown.
-    std::unique_ptr<Corbomite::Core::MarkdownRenderChild>
-    render(const Corbomite::Core::EmbedRequest &req);
+    std::unique_ptr<Markoff::MarkdownRenderChild>
+    render(const Markoff::EmbedRequest &req);
 
     /// Convenience: render `targetPath#subpath` directly into an existing
     /// QWidget parent. Used by Phase 6 HoverPopover.
@@ -76,14 +83,15 @@ public:
     /// - `"#heading"`  → MetadataCache.headings (or sync-parse fallback).
     /// - empty         → whole note.
     /// Returns a child whose `renderedText()` is the sliced markdown.
-    std::unique_ptr<Corbomite::Core::MarkdownRenderChild>
-    renderMarkdown(const Corbomite::Core::EmbedRequest &req);
+    std::unique_ptr<Markoff::MarkdownRenderChild>
+    renderMarkdown(const Markoff::EmbedRequest &req);
 
 private:
-    Corbomite::Core::EmbedDepthGuard m_guard;
-    Corbomite::Core::EmbedRegistry *m_registry;
-    Corbomite::MetadataCache *m_cache;
-    Corbomite::Core::VaultResourceProvider *m_resources;
+    Markoff::EmbedDepthGuard m_guard;
+    Markoff::EmbedRegistry *m_registry;
+    Markoff::Vault::MetadataCache *m_cache;
+    Markoff::Vault::ResourceProvider *m_resources;
+    Markoff::Vault::MetadataParser *m_parser = nullptr;
 };
 
 /// Cluster J phase 5 — populate `reg` with the built-in EmbedRegistry
@@ -106,9 +114,9 @@ private:
 /// alive for as long as the registry is used. Returning unique handles
 /// is out of scope; callers who need de-registration should use
 /// `EmbedRegistry::registerExtension` directly.
-void registerBuiltinEmbedFactories(Corbomite::Core::EmbedRegistry &reg,
+void registerBuiltinEmbedFactories(Markoff::EmbedRegistry &reg,
                                    EmbedRenderer &renderer);
 
 } // namespace Markoff::Reading
 
-#endif // CORBOMITE_READINGVIEW_EMBEDRENDERER_H
+#endif // MARKOFF_READING_EMBEDRENDERER_H

@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// (c) 2026 Corbomite contributors, GPL-3.0-or-later.
+// (c) 2026 Markoff contributors, GPL-3.0-or-later.
 
-#ifndef CORBOMITE_READINGVIEW_VAULTRESOURCEPROVIDER_H
-#define CORBOMITE_READINGVIEW_VAULTRESOURCEPROVIDER_H
+#ifndef MARKOFF_READING_VAULTRESOURCEPROVIDER_H
+#define MARKOFF_READING_VAULTRESOURCEPROVIDER_H
 
-// Forwarding typedef: the VaultResourceProvider interface was promoted to
-// libs/core/ during Cluster J Phase 1 so embed renderers, Markoff and
-// ReadingView can share a single contract. ReadingView-scoped code keeps
+// Forwarding typedef. The real `Markoff::Vault::ResourceProvider` interface
+// lives in markoff-core; markoff-reading-internal code and tests keep
 // referencing `Markoff::Reading::VaultResourceProvider` unchanged.
+//
+// Pre-Phase-C this header forwarded to `Corbomite::Core::VaultResourceProvider`
+// (Corbomite-owned type under the Phase B stub bridge). Phase C1 retires the
+// Corbomite-named stub in favor of the DI seam shape.
 
-#include "corbomite/core/VaultResourceProvider.h"
+#include <markoff/vault/ResourceProvider.h>
 
 namespace Markoff::Reading {
 
-using VaultResourceProvider = Corbomite::Core::VaultResourceProvider;
+using VaultResourceProvider = Markoff::Vault::ResourceProvider;
 
 } // namespace Markoff::Reading
 
-#endif // CORBOMITE_READINGVIEW_VAULTRESOURCEPROVIDER_H
+#endif // MARKOFF_READING_VAULTRESOURCEPROVIDER_H

@@ -3,11 +3,11 @@
 
 #include "markoff/reading/LinkRenderer.h"
 
-#include "corbomite/core/VaultResourceProvider.h"
+#include <markoff/vault/ResourceProvider.h>
 
 namespace Markoff::Reading {
 
-LinkRenderer::LinkRenderer(Corbomite::Core::VaultResourceProvider *resources,
+LinkRenderer::LinkRenderer(Markoff::Vault::ResourceProvider *resources,
                            QObject *parent)
     : QObject(parent), m_resources(resources)
 {

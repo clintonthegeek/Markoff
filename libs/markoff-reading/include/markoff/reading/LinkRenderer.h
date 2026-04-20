@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#ifndef CORBOMITE_READINGVIEW_LINKRENDERER_H
-#define CORBOMITE_READINGVIEW_LINKRENDERER_H
+#ifndef MARKOFF_READING_LINKRENDERER_H
+#define MARKOFF_READING_LINKRENDERER_H
 
 #include <QObject>
 #include <QPoint>
 #include <QString>
 #include <QUrl>
 
-namespace Corbomite::Core {
-class VaultResourceProvider;
+namespace Markoff::Vault {
+class ResourceProvider;
 }
 
 namespace Markoff::Reading {
@@ -36,7 +36,7 @@ public:
         QPoint anchorHint; ///< optional: pixel anchor for hover emission
     };
 
-    explicit LinkRenderer(Corbomite::Core::VaultResourceProvider *resources,
+    explicit LinkRenderer(Markoff::Vault::ResourceProvider *resources,
                           QObject *parent = nullptr);
 
     /// Wikilink / internal-link emission. Resolves `linkText` via the
@@ -62,9 +62,9 @@ Q_SIGNALS:
     void externalLinkActivated(const QUrl &url, const QString &sourceId);
 
 private:
-    Corbomite::Core::VaultResourceProvider *m_resources;
+    Markoff::Vault::ResourceProvider *m_resources;
 };
 
 } // namespace Markoff::Reading
 
-#endif // CORBOMITE_READINGVIEW_LINKRENDERER_H
+#endif // MARKOFF_READING_LINKRENDERER_H

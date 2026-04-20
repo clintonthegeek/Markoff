@@ -9,16 +9,16 @@
 
 #include <optional>
 
-#include "corbomite/core/EmbedRegistry.h"
-#include "corbomite/core/MarkdownRenderChild.h"
-#include "corbomite/core/VaultResourceProvider.h"
+#include <markoff/EmbedRegistry.h>
+#include <markoff/MarkdownRenderChild.h>
+#include <markoff/vault/ResourceProvider.h>
 #include "markoff/reading/EmbedRenderer.h"
 
 using namespace Markoff::Reading;
 
 namespace {
 
-class InMemoryResources : public Corbomite::Core::VaultResourceProvider
+class InMemoryResources : public Markoff::Vault::ResourceProvider
 {
 public:
     QUrl resolveImage(const QString &name) const override
@@ -59,12 +59,12 @@ private slots:
 static QString placeholderTextFor(const QString &ext)
 {
     static InMemoryResources resources;
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer renderer(&reg, nullptr, &resources);
     registerBuiltinEmbedFactories(reg, renderer);
 
     const QString path = QStringLiteral("sample.") + ext;
-    Corbomite::Core::EmbedRequest req{path, QString(), &resources, 1};
+    Markoff::EmbedRequest req{path, QString(), &resources, 1};
     auto child = reg.dispatch(req);
     return child ? child->renderedText() : QString();
 }

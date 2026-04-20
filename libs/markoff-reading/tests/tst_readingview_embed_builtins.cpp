@@ -9,16 +9,16 @@
 
 #include <optional>
 
-#include "corbomite/core/EmbedRegistry.h"
-#include "corbomite/core/MarkdownRenderChild.h"
-#include "corbomite/core/VaultResourceProvider.h"
+#include <markoff/EmbedRegistry.h>
+#include <markoff/MarkdownRenderChild.h>
+#include <markoff/vault/ResourceProvider.h>
 #include "markoff/reading/EmbedRenderer.h"
 
 using namespace Markoff::Reading;
 
 namespace {
 
-class InMemoryResources : public Corbomite::Core::VaultResourceProvider
+class InMemoryResources : public Markoff::Vault::ResourceProvider
 {
 public:
     void addNote(const QString &path, const QString &content)
@@ -70,11 +70,11 @@ void TstReadingViewEmbedBuiltins::testMarkdownBuiltinWholeNote()
     resources.addNote(QStringLiteral("Target.md"),
                       QStringLiteral("# Title\n\nBody paragraph.\n"));
 
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer renderer(&reg, nullptr, &resources);
     registerBuiltinEmbedFactories(reg, renderer);
 
-    Corbomite::Core::EmbedRequest req{
+    Markoff::EmbedRequest req{
         QStringLiteral("Target.md"), QString(), &resources, 1};
     auto child = reg.dispatch(req);
     QVERIFY2(child != nullptr,
@@ -91,11 +91,11 @@ void TstReadingViewEmbedBuiltins::testMarkdownBuiltinHeadingEmbed()
             "# First\nIgnored body.\n\n## Second\nWanted body.\n\n## Third\n"
             "Also ignored.\n"));
 
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer renderer(&reg, nullptr, &resources);
     registerBuiltinEmbedFactories(reg, renderer);
 
-    Corbomite::Core::EmbedRequest req{QStringLiteral("Target.md"),
+    Markoff::EmbedRequest req{QStringLiteral("Target.md"),
                                       QStringLiteral("#Second"),
                                       &resources, 1};
     auto child = reg.dispatch(req);
@@ -112,11 +112,11 @@ void TstReadingViewEmbedBuiltins::testMarkdownBuiltinBlockEmbed()
         QStringLiteral("Target.md"),
         QStringLiteral("intro paragraph\n\nblock body ^blk\n\nouter\n"));
 
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer renderer(&reg, nullptr, &resources);
     registerBuiltinEmbedFactories(reg, renderer);
 
-    Corbomite::Core::EmbedRequest req{QStringLiteral("Target.md"),
+    Markoff::EmbedRequest req{QStringLiteral("Target.md"),
                                       QStringLiteral("#^blk"),
                                       &resources, 1};
     auto child = reg.dispatch(req);

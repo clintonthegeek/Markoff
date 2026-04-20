@@ -10,13 +10,13 @@
 
 #include <optional>
 
-#include "corbomite/core/EmbedDepthGuard.h"
-#include "corbomite/core/EmbedRegistry.h"
-#include "corbomite/core/MarkdownRenderChild.h"
-#include "corbomite/core/VaultResourceProvider.h"
+#include <markoff/EmbedDepthGuard.h>
+#include <markoff/EmbedRegistry.h>
+#include <markoff/MarkdownRenderChild.h>
+#include <markoff/vault/ResourceProvider.h>
 #include "markoff/reading/EmbedRenderer.h"
-#include "corbomite/storage/LinkResolver.h"
-#include "corbomite/storage/MetadataCache.h"
+#include <markoff/vault/LinkResolver.h>
+#include <markoff/vault/MetadataCache.h>
 
 using namespace Markoff::Reading;
 
@@ -25,7 +25,7 @@ namespace {
 /// In-memory VaultResourceProvider: maps path -> markdown text. Used
 /// by EmbedRenderer tests so the renderer can call `resolveEmbed(path)`
 /// without touching the filesystem.
-class InMemoryResources : public Corbomite::Core::VaultResourceProvider
+class InMemoryResources : public Markoff::Vault::ResourceProvider
 {
 public:
     void addNote(const QString &path, const QString &content)
@@ -76,7 +76,7 @@ void TstReadingViewEmbedRenderer::testEmbedWholeNote()
     resources.addNote(QStringLiteral("Target.md"),
                       QStringLiteral("# Target\n\nBody text.\n"));
 
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer r(&reg, /*cache=*/nullptr, &resources);
     auto child = r.render({QStringLiteral("Target.md"),
                            QString(),
@@ -95,7 +95,7 @@ void TstReadingViewEmbedRenderer::testEmbedHeadingSection()
             "# First\nIgnored.\n\n## Second\nWanted.\n\n## Third\nAlso "
             "ignored.\n"));
 
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer r(&reg, /*cache=*/nullptr, &resources);
     auto child = r.render({QStringLiteral("Target.md"),
                            QStringLiteral("#Second"),
@@ -114,7 +114,7 @@ void TstReadingViewEmbedRenderer::testEmbedBlockRef()
         QStringLiteral("Target.md"),
         QStringLiteral("intro paragraph\n\nblock body ^blk\n\nouter\n"));
 
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer r(&reg, /*cache=*/nullptr, &resources);
     auto child = r.render({QStringLiteral("Target.md"),
                            QStringLiteral("#^blk"),
@@ -136,13 +136,13 @@ void TstReadingViewEmbedRenderer::testSelfEmbedStopsAtCap()
     InMemoryResources resources;
     resources.addNote(QStringLiteral("Self.md"), QStringLiteral("![[Self]]\n"));
 
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer r(&reg, /*cache=*/nullptr, &resources);
     // Register a .md factory that delegates back to renderMarkdown; this
     // lets the nested-embed expansion pass route through the registry.
     reg.registerExtension(
         QStringLiteral("md"),
-        [&](const Corbomite::Core::EmbedRequest &req) {
+        [&](const Markoff::EmbedRequest &req) {
             return r.renderMarkdown(req);
         });
 
@@ -163,13 +163,13 @@ void TstReadingViewEmbedRenderer::testDepthGuardPlaceholderCarriesTarget()
     // `placeholderTarget` returns the raw target string so host widgets
     // can wire a clickable onClick handler (Obsidian `oJ` parity).
     const QString label = QStringLiteral("Note.md");
-    QCOMPARE(Corbomite::Core::EmbedDepthGuard::placeholderTarget(label), label);
+    QCOMPARE(Markoff::EmbedDepthGuard::placeholderTarget(label), label);
 
     // A request at exactly the cap (`depth >= 5`) produces the placeholder
     // text embedded in the rendered child.
     InMemoryResources resources;
     resources.addNote(QStringLiteral("Note.md"), QStringLiteral("body\n"));
-    Corbomite::Core::EmbedRegistry reg;
+    Markoff::EmbedRegistry reg;
     EmbedRenderer r(&reg, /*cache=*/nullptr, &resources);
     auto child = r.render({QStringLiteral("Note.md"),
                            QString(),

@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include "markoff/MarkdownRenderChild.h"
+
 #include <QHash>
 #include <QString>
 
@@ -10,8 +12,6 @@
 #include <memory>
 
 namespace Markoff {
-
-class MarkdownRenderChild;
 
 namespace Vault {
 class ResourceProvider;

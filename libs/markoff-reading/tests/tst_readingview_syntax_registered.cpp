@@ -3,7 +3,7 @@
 
 #include <QTest>
 
-#include "corbomite/core/CodeBlockProcessorRegistry.h"
+#include <markoff/CodeBlockProcessorRegistry.h>
 #include "markoff/reading/ReadingView.h"
 
 using namespace Markoff::Reading;
@@ -30,7 +30,7 @@ void TstReadingViewSyntaxRegistered::testDefaultSyntaxIsRegistered()
     const auto *reg = rv.codeBlockProcessorRegistry();
     QVERIFY(reg != nullptr);
 
-    Corbomite::Core::CodeBlockContext ctx;
+    Markoff::CodeBlockContext ctx;
     const bool handled =
         reg->dispatch(QStringLiteral("default"),
                       QStringLiteral("int x = 42;"), nullptr, ctx);
@@ -55,12 +55,12 @@ void TstReadingViewSyntaxRegistered::testPerLanguageProcessorStillPreferred()
         QStringLiteral("python"),
         [&pythonCalled](const QString &,
                         void *,
-                        const Corbomite::Core::CodeBlockContext &) {
+                        const Markoff::CodeBlockContext &) {
             pythonCalled = true;
             return true;
         });
 
-    Corbomite::Core::CodeBlockContext ctx;
+    Markoff::CodeBlockContext ctx;
     QVERIFY(reg->dispatch(QStringLiteral("python"),
                           QStringLiteral("print('hi')"), nullptr, ctx));
     QVERIFY(pythonCalled);
