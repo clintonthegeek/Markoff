@@ -119,11 +119,15 @@ Also: four reading tests marked `# TODO Phase B:` in `libs/markoff-reading/tests
 - **Corbomite::Storage**: likely dead. If a clean Phase B build with `Markoff::Reading` linked into CorbomiteApp runs all tests green without a `Storage` link, drop the link + the stub.
 - **mmdr**: Rust FFI crate lives in `/home/clinton/dev/Corbomite/libs/mmdr/`. Two options in Phase B: (a) vendor it into Markoff as `libs/mmdr/` (Rust toolchain requirement bleeds into Markoff), or (b) keep mmdr in Corbomite and have markoff-reading pick it up the same way it picks up `Corbomite::Core` — via the override mechanism.
 
-### Stub override mechanism (to design and ship in Phase B, task 1)
+### Stub override mechanism — CMake option in Phase B, DI seam in Phase C
 
-Markoff's `libs/markoff-reading/stubs/` header tree is on the include path only when the real library isn't available. Proposed switch: a CMake option `MARKOFF_READING_USE_REAL_COREDEPS` (default OFF). When ON, `target_include_directories` drops the stubs dir and `target_link_libraries(markoff_reading PRIVATE Corbomite::Core Corbomite::Storage mmdr)` is added. CorbomiteApp turns this ON; standalone Markoff builds leave it OFF.
+**Phase B ships a CMake option.** A new option `MARKOFF_READING_USE_REAL_COREDEPS` (default OFF) flips Markoff's `libs/markoff-reading/` between stubs and Corbomite-provided real types at configure time. When ON: `target_include_directories` drops the stubs dir and `target_link_libraries(markoff_reading PRIVATE Corbomite::Core mmdr)` is added (Storage omitted — see below). CorbomiteApp turns this ON; standalone Markoff builds leave it OFF.
 
-The alternative is a dependency-injection seam (markoff-reading accepts function pointers or virtual registries at runtime from Corbomite). Heavier, but avoids build-time coupling. Defer the choice to Phase B Task 1.
+This is deliberately the smaller of the two options available. It reuses the stub headers Phase A already shipped, has near-zero refactor cost on the Markoff side, and gets Corbomite off its own readingview/qutepart-corbomite copies on a predictable timeline. The cost is a two-configuration build matrix (stubs-on, stubs-off) that only exercises fully across both codebases.
+
+**Phase C replaces it with a dependency-injection seam.** Markoff will own abstract interfaces (`IEmbedRegistry`, `ICodeBlockProcessorRegistry`, `IVaultResourceProvider`, etc.); Corbomite writes adapters that implement them; the stub becomes the default no-op impl — one exercised code path instead of a build-mode switch. This is the correct long-term shape, and Phase C is already scoped to consolidate `Theme` / `ResourceProvider` / `LinkResolver` — the DI refactor touches the same files as that consolidation, so bundling them is one pass instead of two. Phase B's CMake option retires cleanly when Phase C lands.
+
+Corbomite devs should treat the Phase B `MARKOFF_READING_USE_REAL_COREDEPS=ON` build as a temporary bridge, not a long-term API. Don't grow new Markoff-side code that hardcodes `Corbomite::Core::X` in response to this option — Phase C will reshape those call sites into interface dispatch. Adding new consumers should wait for Phase C or use the existing seven symbols only.
 
 ---
 
@@ -172,16 +176,16 @@ The alternative is a dependency-injection seam (markoff-reading accepts function
 
 ## Recommended ordering for the Phase B task list
 
-1. **Markoff side**: design + ship the stub override mechanism (new commit on `main` / post-Phase-A). Bumps Markoff's next tag.
-2. **Corbomite side**, all on one branch:
-   a. Bump the submodule pin.
-   b. Update `src/CMakeLists.txt` to the new targets + enable the real-deps switch.
-   c. Rename `Corbomite::ReadingView::` → `Markoff::Reading::` in `src/editor/`.
-   d. Build. Fix any test breakage (expect very little — the survey shows no other consumers).
-   e. Delete `libs/qutepart-corbomite/` and `libs/readingview/` from Corbomite.
-   f. Resolve mmdr (vendor vs keep).
-   g. Decide whether `Corbomite::Storage` is actually needed; drop if not.
-3. **Re-enable the four Phase-A-skipped tests** in `libs/markoff-reading/tests/CMakeLists.txt` on the Corbomite side once `MARKOFF_READING_USE_REAL_COREDEPS=ON` is in effect (they'll pass only in that mode — probably worth a conditional).
+1. **Markoff side, one commit on `master`**: add the `MARKOFF_READING_USE_REAL_COREDEPS` CMake option. Default OFF preserves the current standalone build (stubs in use). When ON, the stubs dir is dropped from `target_include_directories`, and `target_link_libraries(markoff_reading PRIVATE Corbomite::Core mmdr)` is added. No change to library sources. Tag the resulting SHA `v0.2.0`.
+2. **Corbomite side**, one branch, commits in this order:
+   a. Bump the `libs/markoff-family` submodule pin to Markoff `v0.2.0`.
+   b. Set `MARKOFF_READING_USE_REAL_COREDEPS=ON` (in Corbomite's top-level CMakeLists, above the submodule's `add_subdirectory`).
+   c. Update `src/CMakeLists.txt:73–75`: `Markoff::Markoff` → `Markoff::Live`; add `Markoff::Source` + `Markoff::Reading`; remove `Corbomite::QutepartSource` + `Corbomite::ReadingView`.
+   d. Rename `Corbomite::ReadingView::` → `Markoff::Reading::` and `#include <corbomite/readingview/...>` → `#include <markoff/reading/...>` in `src/editor/MarkdownView.cpp` and `src/editor/NoteEditorWidget.{h,cpp}`.
+   e. Build CorbomiteApp. Fix any test breakage — expect very little; the survey shows no other consumers.
+   f. Delete `libs/qutepart-corbomite/` and `libs/readingview/` (entire directories) plus their CMake registration.
+   g. Validate the `Corbomite::Storage` drop by doing one clean build without the old readingview CMakeLists' storage link. If green, no further action; if something breaks, keep Storage linked but document why.
+   h. Commit.
 
 ---
 
@@ -195,12 +199,12 @@ The alternative is a dependency-injection seam (markoff-reading accepts function
 
 ---
 
-## Open questions
+## Decisions recorded
 
-1. **Stub switch name and default.** `MARKOFF_READING_USE_REAL_COREDEPS` is a placeholder. If the final answer is DI instead of CMake option, the migration map changes shape.
-2. **mmdr ownership**: vendor into Markoff or keep in Corbomite?
-3. **`Corbomite::Storage` linkage on readingview**: confirmed-unused-in-sources but linked in the CMakeLists. Clean Phase B build will resolve.
-4. **Markoff version tag** for the Phase-A SHA Corbomite bumps to. `v0.2.0`? `v1.0.0-alpha.1`? Needs a decision on the Markoff side before the Corbomite pin bump.
+1. **Switch mechanism**: CMake option `MARKOFF_READING_USE_REAL_COREDEPS` for Phase B. DI seam in Phase C (see "Stub override mechanism" above).
+2. **mmdr ownership**: stays in Corbomite. Reason: dragging the Rust toolchain into Markoff is heavier than the override mechanism we're already using for `Corbomite::Core`. Corbomite's `libs/mmdr/` continues to provide the `mmdr_ffi.h` surface that markoff-reading's `MermaidRenderer` consumes; when `MARKOFF_READING_USE_REAL_COREDEPS=ON`, markoff-reading's CMakeLists adds an mmdr link and drops the `stubs/mmdr_ffi.h` shim from the include path. Phase C revisits if/when Mermaid rendering gets abstracted.
+3. **`Corbomite::Storage` linkage**: drop it. Phase A survey confirmed readingview sources have zero direct `<corbomite/storage/...>` includes; the link is dead weight inherited from an older state. Phase B Task 1 validates this by building CorbomiteApp with `Corbomite::Storage` omitted; if that passes, delete `stubs/corbomite/storage/` and the corresponding target_link entry. Revert if anything breaks.
+4. **Markoff version tag**: `v0.2.0`. Cut on the Markoff-side Phase A merge commit (after the `MARKOFF_READING_USE_REAL_COREDEPS` option lands). Corbomite's Phase B branch bumps the submodule pin to this tag in its first commit.
 
 ---
 
