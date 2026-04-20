@@ -22,6 +22,20 @@ endif()
 # and the mmdr Rust crate are replaced by compile-only shim headers under
 # `stubs/`. Runtime features that depend on those deps (embeds, mermaid
 # rendering) are broken until Phase B absorbs the real sources.
+#
+# Phase B bridge: a consuming project (CorbomiteApp) can set
+# MARKOFF_READING_USE_REAL_COREDEPS=ON before adding this subdirectory to
+# drop the stubs and link the real Corbomite::Core + mmdr targets it
+# provides. Default OFF keeps standalone Markoff builds on the stubs.
+# See docs/specs/2026-04-20-phase-b-corbomite-migration.md for the
+# full migration shape; the DI seam that retires this option lands in
+# Phase C.
+option(MARKOFF_READING_USE_REAL_COREDEPS
+    "Drop the Corbomite::Core / mmdr stub headers and link the real \
+implementations provided by a consuming project (e.g. CorbomiteApp). \
+OFF for standalone Markoff builds; ON when Markoff is a submodule inside \
+a host that supplies these types."
+    OFF)
 add_library(markoff_reading STATIC
     include/markoff/reading/CodeBlockHighlighter.h
     src/CodeBlockHighlighter.cpp
@@ -63,23 +77,34 @@ add_library(markoff_reading STATIC
 set_target_properties(markoff_reading PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(Markoff::Reading ALIAS markoff_reading)
 
-# Phase-A stubs live under `stubs/`. Because they use the original
-# `corbomite/core/...` / `corbomite/storage/...` include paths, adding the
-# stubs dir to the PRIVATE include path is enough — no source edits needed
-# to re-route includes. `mmdr_ffi.h` lives at the stubs dir root so
-# MermaidRenderer.cpp's `#include "mmdr_ffi.h"` picks up the shim.
 target_include_directories(markoff_reading
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        # Phase-A stub shims. Exposed PUBLIC (build-tree only) so in-tree
-        # tests that subclass `Corbomite::Core::VaultResourceProvider` or
-        # mention `Corbomite::Core::EmbedRegistry` can still compile.
-        # Remove when the real Corbomite::Core / Corbomite::Storage
-        # sources land in Phase B.
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/stubs>
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+if(MARKOFF_READING_USE_REAL_COREDEPS)
+    # Real-deps mode (CorbomiteApp): host must provide Corbomite::Core and
+    # an mmdr target. Corbomite::Storage is intentionally omitted — Phase A
+    # survey found zero direct includes from readingview sources; Phase B
+    # Task 5 validates this empirically and drops the stub if so.
+    target_link_libraries(markoff_reading
+        PRIVATE
+            Corbomite::Core
+            mmdr
+    )
+else()
+    # Standalone mode: compile against the Phase-A stub shims. Exposed
+    # PUBLIC (build-tree only) so in-tree tests that subclass
+    # `Corbomite::Core::VaultResourceProvider` or mention
+    # `Corbomite::Core::EmbedRegistry` can still compile. `mmdr_ffi.h`
+    # lives at the stubs dir root so MermaidRenderer.cpp's
+    # `#include "mmdr_ffi.h"` picks up the shim.
+    target_include_directories(markoff_reading PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/stubs>
+    )
+endif()
 
 target_link_libraries(markoff_reading
     PUBLIC
