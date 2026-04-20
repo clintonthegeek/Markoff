@@ -21,3 +21,8 @@ add_executable(tst_markoff_document tst_markoff_document.cpp)
 add_test(NAME tst_markoff_document COMMAND tst_markoff_document)
 target_link_libraries(tst_markoff_document PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_markoff_document PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_search_controller tst_search_controller.cpp)
+add_test(NAME tst_markoff_search_controller COMMAND tst_markoff_search_controller)
+target_link_libraries(tst_markoff_search_controller PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markoff_search_controller PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
