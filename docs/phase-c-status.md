@@ -66,7 +66,7 @@ during C1–C7.
 | ID   | Status       | Spec                                   | Plan                                   | Markoff PR/branch    | Corbomite PR/branch  | Tag       |
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
-| C5   | requirements — see inputs | —                         | —                                      | —                    | —                    | —         |
+| C5   | spec drafted | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | —                                      | —                    | —                    | —         |
 | C6   | requirements — see inputs | [consumer editor-state surface §1-8 + §9 context-menu](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
@@ -229,6 +229,31 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C5 spec drafted
+
+`docs/specs/2026-04-20-phase-c5-reading-interaction-parity.md` landed.
+Post-C1 code inspection narrowed the four prescribed items to two
+real Markoff-side features (unified `linkHovered(href, globalPos)`
+replacing `wikiLinkHovered` + widening `Markoff::Editor::linkHovered`
+to match; `SectionLayout` dispatch through
+`codeBlockProcessorRegistry` — today the registry is populated but
+never consulted during layout) plus two already-landed items
+(click-to-fold via fold-arrow hit-test; `zoomIn/Out/resetZoom`
+virtuals on `ReadingView` with `zoomChanged` emission). Zoom-policy
+harmonization across leaves and click-on-heading-text folding are
+explicitly deferred. Corbomite-side adaptation beat absorbs Cluster V
+Phase 4: HoverPopover rewire (now hovers regular URLs too, not just
+wiki-links), `View::zoomIn/Out/Reset` default-no-op virtuals +
+`MarkdownView` delegation, and un-gating the four
+`MARKOFF_READING_USE_REAL_COREDEPS`-gated tests that now exercise real
+processor dispatch. Seven decisions recorded in §5; self-approved per
+the recipe's step-3 clause (unambiguous design; signatures follow
+Markoff Live precedent).
+
+Next: plan file, then C5a implementation (signal rename/widen + tests,
+tag `v0.4.0-alpha.1`), then C5b (SectionLayout routing, tag
+`v0.4.0`), then Corbomite adaptation.
 
 ### 2026-04-20 — C1b landed at `v0.3.0`; Phase B bridge retired
 
