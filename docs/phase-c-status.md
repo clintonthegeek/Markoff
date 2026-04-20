@@ -65,7 +65,7 @@ during C1–C7.
 
 | ID   | Status       | Spec                                   | Plan                                   | Markoff PR/branch    | Corbomite PR/branch  | Tag       |
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
-| C1   | not started  | —                                      | —                                      | —                    | —                    | —         |
+| C1   | spec drafted | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | —                                      | —                    | —                    | `v0.3.0`  |
 | C5   | requirements — see inputs | —                         | —                                      | —                    | —                    | —         |
 | C6   | requirements — see inputs | [consumer editor-state surface §1-8 + §9 context-menu](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,24 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C1 spec drafted
+
+`docs/specs/2026-04-20-phase-c1-di-seam.md` landed. Lays out the two-
+sub-phase migration (`v0.3.0-alpha.1` introduces new Markoff types
+alongside Phase B's CMake option; `v0.3.0` retires the option + stubs
+after Corbomite ships the adapter layer). Interfaces split across
+`Markoff::` (rendering primitives: EmbedRegistry, CodeBlockProcessor-
+Registry, MarkdownRenderChild, EmbedDepthGuard, MermaidRenderer) and
+`Markoff::Vault::` (vault-level abstractions: ResourceProvider,
+LinkResolver, MetadataCache, MetadataParser). Setter-style injection
+on `ReadingView` with lazy-default fallbacks in `markoff-core`. Ten
+decisions recorded in §9. Self-approved per the recipe's step-3
+clause for unambiguous design calls — signatures are 1:1 with existing
+Corbomite::Core types.
+
+Next action: C1a implementation on Markoff master, then Corbomite
+adapter, then C1b cleanup. Plan file next.
 
 ### 2026-04-20 — scope expanded: C5, C6, C7 added by Corbomite agent
 
