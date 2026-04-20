@@ -11,6 +11,7 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 
 add_library(markoff_core STATIC
     src/EphemeralState.cpp
+    src/MarkdownRenderChild.cpp
     src/MarkoffDocument.cpp
     src/ReplaceController.cpp
     src/SearchController.cpp
@@ -26,6 +27,11 @@ add_library(markoff_core STATIC
     include/markoff/SearchController.h
     include/markoff/SearchBar.h
     include/markoff/MarkdownView.h
+    include/markoff/CodeBlockProcessorRegistry.h
+    include/markoff/EmbedDepthGuard.h
+    include/markoff/EmbedRegistry.h
+    include/markoff/MarkdownRenderChild.h
+    include/markoff/MermaidRenderer.h
 )
 
 target_include_directories(markoff_core
