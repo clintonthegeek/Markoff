@@ -12,15 +12,15 @@
 //   (4) reuse sections across reorderings via the cross-reparse pool;
 //   (5) not grow the pool unboundedly across many re-parses.
 
-#include "corbomite/readingview/ReadingSection.h"
-#include "corbomite/readingview/ReadingView.h"
+#include "markoff/reading/ReadingSection.h"
+#include "markoff/reading/ReadingView.h"
 
 #include <QGraphicsItem>
 #include <QGraphicsScene>
 #include <QSignalSpy>
 #include <QTest>
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 class TestSectionRecycle : public QObject
 {

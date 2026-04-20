@@ -8,14 +8,14 @@
 
 #include "SpanRenderer.h"
 
-#include "corbomite/readingview/styling/CharacterStyle.h"
-#include "corbomite/readingview/styling/StyleManager.h"
+#include "markoff/reading/styling/CharacterStyle.h"
+#include "markoff/reading/styling/StyleManager.h"
 
 #include <QChar>
 #include <QTextCharFormat>
 #include <QTextCursor>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 namespace {
 
@@ -267,4 +267,4 @@ bool SpanRenderer::renderInline(QTextCursor &cursor,
     return producedObjectRuns;
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

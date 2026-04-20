@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/LinkRenderer.h"
+#include "markoff/reading/LinkRenderer.h"
 
 #include "corbomite/core/VaultResourceProvider.h"
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 LinkRenderer::LinkRenderer(Corbomite::Core::VaultResourceProvider *resources,
                            QObject *parent)
@@ -41,4 +41,4 @@ void LinkRenderer::emitFileLinkClicked(const QString &target,
     Q_EMIT linkClicked(target, sourceId);
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

@@ -7,6 +7,8 @@ project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 #   - libs/markoff-core    (Markoff::Core — shared primitives)
 #   - libs/markoff-source  (Markoff::Source — Qutepart-based source-mode editor)
 #   - libs/markoff-live    (Markoff::Live — live-preview editor widget)
+#   - libs/jkqtmathtext    (jkqtmathtext — LaTeX math rendering, used by markoff-reading)
+#   - libs/markoff-reading (Markoff::Reading — Obsidian-compatible reading-mode widget)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project
 # (e.g., Corbomite). Qt6 / KF6 / optional helper libs (jkqtmathtext, mmdr) are
@@ -38,6 +40,10 @@ add_subdirectory(libs/markoff-parser)
 add_subdirectory(libs/markoff-core)
 add_subdirectory(libs/markoff-source)
 add_subdirectory(libs/markoff-live)
+# jkqtmathtext is pulled in defensively by libs/markoff-live and
+# libs/markoff-reading via `if(NOT TARGET jkqtmathtext)` — don't add it
+# again here or CMake sees duplicate add_library calls.
+add_subdirectory(libs/markoff-reading)
 
 # Markoff's own integration tests. Parent projects may skip these by setting
 # MARKOFF_BUILD_TESTS=OFF before add_subdirectory().

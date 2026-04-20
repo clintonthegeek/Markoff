@@ -8,7 +8,7 @@
 
 class QGraphicsItem;
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// A rendered unit of the reading pipeline — a contiguous span of source
 /// markdown bounded by heading boundaries (or by document / frontmatter
@@ -93,6 +93,6 @@ private:
     bool m_hidden = false;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_READINGSECTION_H

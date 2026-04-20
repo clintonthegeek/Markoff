@@ -14,11 +14,11 @@
 #include "corbomite/core/EmbedRegistry.h"
 #include "corbomite/core/MarkdownRenderChild.h"
 #include "corbomite/core/VaultResourceProvider.h"
-#include "corbomite/readingview/EmbedRenderer.h"
+#include "markoff/reading/EmbedRenderer.h"
 #include "corbomite/storage/LinkResolver.h"
 #include "corbomite/storage/MetadataCache.h"
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 namespace {
 

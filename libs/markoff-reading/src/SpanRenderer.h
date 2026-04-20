@@ -11,7 +11,7 @@
 class QTextCursor;
 class QTextCharFormat;
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 class StyleManager;
 
@@ -79,6 +79,6 @@ public:
                       StyleManager &styles) const;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_SPANRENDERER_H

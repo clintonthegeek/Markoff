@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include "corbomite/readingview/CodeBlockHighlighter.h"
-#include "corbomite/readingview/VaultResourceProvider.h"
+#include "markoff/reading/CodeBlockHighlighter.h"
+#include "markoff/reading/VaultResourceProvider.h"
 
 #include "corbomite/core/CodeBlockProcessorRegistry.h"
 
@@ -15,7 +15,7 @@
 class QGraphicsScene;
 class QTimer;
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 class ReadingParseWorker;
 class ReadingPipeline;
@@ -187,4 +187,4 @@ private:
     double m_userZoom = 1.0;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

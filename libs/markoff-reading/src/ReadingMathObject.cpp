@@ -15,7 +15,7 @@
 
 #include <jkqtmathtext/jkqtmathtext.h>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 namespace {
 
@@ -130,4 +130,4 @@ void ReadingMathObject::drawObject(QPainter *painter, const QRectF &rect,
     painter->restore();
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

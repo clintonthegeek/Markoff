@@ -12,15 +12,15 @@
 //     data), math (inline via QTextObject + display as a QGraphicsPixmapItem)
 //     and Mermaid fenced blocks (via `mmdr` + QGraphicsSvgItem).
 
-#include "corbomite/readingview/SectionLayout.h"
+#include "markoff/reading/SectionLayout.h"
 
 #include "MermaidRenderer.h"
 #include "ReadingMathObject.h"
 #include "SpanRenderer.h"
-#include "corbomite/readingview/ReadingSection.h"
-#include "corbomite/readingview/ReadingViewConstants.h"
-#include "corbomite/readingview/VaultResourceProvider.h"
-#include "corbomite/readingview/styling/StyleManager.h"
+#include "markoff/reading/ReadingSection.h"
+#include "markoff/reading/ReadingViewConstants.h"
+#include "markoff/reading/VaultResourceProvider.h"
+#include "markoff/reading/styling/StyleManager.h"
 
 #include <QAbstractTextDocumentLayout>
 #include <QBrush>
@@ -59,7 +59,7 @@
 
 #include <jkqtmathtext/jkqtmathtext.h>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 namespace {
 
@@ -1003,4 +1003,4 @@ QGraphicsItemGroup *SectionLayout::layoutSection(ReadingSection &section,
     return group;
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

@@ -8,7 +8,7 @@
 // Penelope's ThemeManager to a local Theme enum; namespace rebadged.
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/CodeBlockHighlighter.h"
+#include "markoff/reading/CodeBlockHighlighter.h"
 
 #include <KSyntaxHighlighting/Definition>
 #include <KSyntaxHighlighting/Format>
@@ -20,7 +20,7 @@
 #include <QTextCharFormat>
 #include <QTextCursor>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 CodeBlockHighlighter::CodeBlockHighlighter(Theme theme)
 {
@@ -96,4 +96,4 @@ void CodeBlockHighlighter::applyFormat(
     cursor.mergeCharFormat(cf);
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

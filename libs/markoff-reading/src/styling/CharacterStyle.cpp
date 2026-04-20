@@ -8,9 +8,9 @@
 // OpenType font-features stripped; namespace rebadged.
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/styling/CharacterStyle.h"
+#include "markoff/reading/styling/CharacterStyle.h"
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 CharacterStyle::CharacterStyle(const QString &name)
     : m_name(name)
@@ -61,4 +61,4 @@ void CharacterStyle::inheritFrom(const CharacterStyle &parent)
     if (!m_hasLetterSpacing) { m_letterSpacing = parent.m_letterSpacing; m_hasLetterSpacing = parent.m_hasLetterSpacing; }
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

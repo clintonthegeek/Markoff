@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/VirtualScrollController.h"
+#include "markoff/reading/VirtualScrollController.h"
 
-#include "corbomite/readingview/ReadingSection.h"
+#include "markoff/reading/ReadingSection.h"
 
 #include <QGraphicsItem>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 VirtualScrollController::VirtualScrollController(QObject *parent)
     : QObject(parent)
@@ -104,4 +104,4 @@ void VirtualScrollController::remountSection(int sectionIdx)
         updateMounted(m_lastViewportTop, m_lastViewportHeight);
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

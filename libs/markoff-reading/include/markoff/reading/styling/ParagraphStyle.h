@@ -6,7 +6,7 @@
 // Penelope is GPL-3.0 (see ~/dev/Penelope/COPYING).
 // Adapted for Corbomite's libs/readingview/ — print/PDF-specific fields
 // stripped (page templates, footnote layout, master-page coupling, OpenType
-// font-features); namespace rebadged to Corbomite::ReadingView; cross-type
+// font-features); namespace rebadged to Markoff::Reading; cross-type
 // character-style base reference preserved for the StyleManager resolve path.
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
@@ -19,7 +19,7 @@
 #include <QTextBlockFormat>
 #include <QTextCharFormat>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 class ParagraphStyle
 {
@@ -140,6 +140,6 @@ private:
     bool m_hasForeground = false;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_PARAGRAPHSTYLE_H

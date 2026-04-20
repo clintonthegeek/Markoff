@@ -4,14 +4,14 @@
 #ifndef CORBOMITE_READINGVIEW_READINGPIPELINE_H
 #define CORBOMITE_READINGVIEW_READINGPIPELINE_H
 
-#include "corbomite/readingview/ReadingSection.h"
+#include "markoff/reading/ReadingSection.h"
 
 #include <QObject>
 #include <QString>
 #include <QVector>
 #include <memory>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// Parse → section-split driver. Phase 3a is synchronous; Phase 5 will
 /// promote ≥ 10240-byte parses onto a worker thread.
@@ -36,6 +36,6 @@ public:
                                         const QString &newMarkdown);
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_READINGPIPELINE_H

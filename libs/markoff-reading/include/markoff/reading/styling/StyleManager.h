@@ -15,15 +15,15 @@
 #ifndef CORBOMITE_READINGVIEW_STYLEMANAGER_H
 #define CORBOMITE_READINGVIEW_STYLEMANAGER_H
 
-#include "corbomite/readingview/CodeBlockHighlighter.h"
-#include "corbomite/readingview/styling/CharacterStyle.h"
-#include "corbomite/readingview/styling/ParagraphStyle.h"
+#include "markoff/reading/CodeBlockHighlighter.h"
+#include "markoff/reading/styling/CharacterStyle.h"
+#include "markoff/reading/styling/ParagraphStyle.h"
 
 #include <QHash>
 #include <QObject>
 #include <QString>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 class StyleManager : public QObject
 {
@@ -67,6 +67,6 @@ private:
     QHash<QString, CharacterStyle> m_charStyles;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_STYLEMANAGER_H

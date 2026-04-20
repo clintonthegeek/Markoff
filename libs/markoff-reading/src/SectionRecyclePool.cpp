@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/SectionRecyclePool.h"
+#include "markoff/reading/SectionRecyclePool.h"
 
 #include <QGraphicsItem>
 #include <QGraphicsScene>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 namespace {
 
@@ -73,4 +73,4 @@ void SectionRecyclePool::clear()
     m_pool.clear();
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

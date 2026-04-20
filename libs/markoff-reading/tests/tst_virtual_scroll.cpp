@@ -9,9 +9,9 @@
 //  4. 100k-line note opens fast: < 500 ms, mountedCount <= 50.
 //  5. Recycle pool reuses on scroll-back: same pointers.
 
-#include "corbomite/readingview/ReadingSection.h"
-#include "corbomite/readingview/ReadingView.h"
-#include "corbomite/readingview/ReadingViewConstants.h"
+#include "markoff/reading/ReadingSection.h"
+#include "markoff/reading/ReadingView.h"
+#include "markoff/reading/ReadingViewConstants.h"
 
 #include <QApplication>
 #include <QElapsedTimer>
@@ -21,7 +21,7 @@
 #include <QSignalSpy>
 #include <QTest>
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 namespace {
 

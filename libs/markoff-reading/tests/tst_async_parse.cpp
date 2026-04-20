@@ -11,9 +11,9 @@
 //  4. Large notes yield the main thread — no single tick > 16 ms.
 //  5. Scrolling while a mount is in progress does not crash.
 
-#include "corbomite/readingview/ReadingSection.h"
-#include "corbomite/readingview/ReadingView.h"
-#include "corbomite/readingview/ReadingViewConstants.h"
+#include "markoff/reading/ReadingSection.h"
+#include "markoff/reading/ReadingView.h"
+#include "markoff/reading/ReadingViewConstants.h"
 
 #include <QApplication>
 #include <QElapsedTimer>
@@ -23,7 +23,7 @@
 #include <QTest>
 #include <QTimer>
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 namespace {
 

@@ -9,7 +9,7 @@
 
 class QGraphicsItem;
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// Pool of unmounted, already-rendered `QGraphicsItem` subtrees keyed by
 /// the `ReadingSection::renderedShape()` SHA-256 digest.
@@ -46,6 +46,6 @@ private:
     QHash<QByteArray, QGraphicsItem *> m_pool;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_SECTIONRECYCLEPOOL_H

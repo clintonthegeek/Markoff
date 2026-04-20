@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/EmbedRenderer.h"
+#include "markoff/reading/EmbedRenderer.h"
 
 #include <QCoreApplication>
 #include <QFileInfo>
@@ -14,7 +14,7 @@
 #include "corbomite/storage/MetadataCache.h"
 #include "corbomite/storage/MetadataParser.h"
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 namespace {
 
@@ -347,7 +347,7 @@ Corbomite::Core::EmbedFactory mediaPlaceholderFactory(const QString &kind)
         auto child = std::make_unique<Corbomite::Core::MarkdownRenderChild>();
         child->setRenderedText(
             QCoreApplication::translate(
-                "Corbomite::ReadingView",
+                "Markoff::Reading",
                 "%1 preview not yet available — %2")
                 .arg(kind, req.targetPath));
         return child;
@@ -384,23 +384,23 @@ void registerBuiltinEmbedFactories(Corbomite::Core::EmbedRegistry &reg,
     // Real preview widgets land in a future cluster; these are the
     // Obsidian-parity "preview not yet available" placeholders.
     const QString pdfKind = QCoreApplication::translate(
-        "Corbomite::ReadingView", "PDF");
+        "Markoff::Reading", "PDF");
     reg.registerExtension(QStringLiteral("pdf"),
                           mediaPlaceholderFactory(pdfKind));
 
     const QString audioKind = QCoreApplication::translate(
-        "Corbomite::ReadingView", "Audio");
+        "Markoff::Reading", "Audio");
     reg.registerExtension(QStringLiteral("mp3"),
                           mediaPlaceholderFactory(audioKind));
     reg.registerExtension(QStringLiteral("wav"),
                           mediaPlaceholderFactory(audioKind));
 
     const QString videoKind = QCoreApplication::translate(
-        "Corbomite::ReadingView", "Video");
+        "Markoff::Reading", "Video");
     reg.registerExtension(QStringLiteral("mp4"),
                           mediaPlaceholderFactory(videoKind));
     reg.registerExtension(QStringLiteral("webm"),
                           mediaPlaceholderFactory(videoKind));
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

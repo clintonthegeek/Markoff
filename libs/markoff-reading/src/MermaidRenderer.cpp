@@ -7,7 +7,7 @@
 
 #include "mmdr_ffi.h"
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 QByteArray MermaidRenderer::renderSvg(const QString &mermaidText)
 {
@@ -28,4 +28,4 @@ QByteArray MermaidRenderer::renderSvg(const QString &mermaidText)
     return svg;
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

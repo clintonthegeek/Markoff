@@ -21,7 +21,7 @@ namespace Corbomite::Core {
 class VaultResourceProvider;
 }
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// Per-embed mini-renderer for `![[Target]]`, `![[Target#heading]]` and
 /// `![[Target#^blockid]]`. Resolves subpaths via `MetadataCache` when a
@@ -109,6 +109,6 @@ private:
 void registerBuiltinEmbedFactories(Corbomite::Core::EmbedRegistry &reg,
                                    EmbedRenderer &renderer);
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_EMBEDRENDERER_H

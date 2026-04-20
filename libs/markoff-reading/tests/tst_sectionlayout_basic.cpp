@@ -3,10 +3,10 @@
 // Phase 3a SectionLayout test: lays out each of the six MVP content types
 // in isolation and asserts a single-graphics-item-subtree result.
 
-#include "corbomite/readingview/CodeBlockHighlighter.h"
-#include "corbomite/readingview/ReadingSection.h"
-#include "corbomite/readingview/SectionLayout.h"
-#include "corbomite/readingview/styling/StyleManager.h"
+#include "markoff/reading/CodeBlockHighlighter.h"
+#include "markoff/reading/ReadingSection.h"
+#include "markoff/reading/SectionLayout.h"
+#include "markoff/reading/styling/StyleManager.h"
 
 #include <QGraphicsItemGroup>
 #include <QGraphicsLineItem>
@@ -16,7 +16,7 @@
 #include <QTextCursor>
 #include <QTextDocument>
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 class TestSectionLayoutBasic : public QObject
 {

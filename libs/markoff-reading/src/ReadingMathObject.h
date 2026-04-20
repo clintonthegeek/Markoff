@@ -13,7 +13,7 @@
 #include <QTextFormat>
 #include <QTextObjectInterface>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// Custom QTextObject that renders inline LaTeX math via JKQTMathText.
 ///
@@ -46,6 +46,6 @@ public:
                     const QTextFormat &format) override;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_READINGMATHOBJECT_H

@@ -4,8 +4,8 @@
 #ifndef CORBOMITE_READINGVIEW_SECTIONLAYOUT_H
 #define CORBOMITE_READINGVIEW_SECTIONLAYOUT_H
 
-#include "corbomite/readingview/CodeBlockHighlighter.h"
-#include "corbomite/readingview/VaultResourceProvider.h"
+#include "markoff/reading/CodeBlockHighlighter.h"
+#include "markoff/reading/VaultResourceProvider.h"
 
 #include <QList>
 #include <QObject>
@@ -13,7 +13,7 @@
 
 class QGraphicsItemGroup;
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 class ReadingSection;
 class StyleManager;
@@ -70,6 +70,6 @@ private:
     QList<QObject *> m_textObjects;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_SECTIONLAYOUT_H

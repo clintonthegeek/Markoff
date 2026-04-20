@@ -7,7 +7,7 @@
 #include <QByteArray>
 #include <QString>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// Invoke the `mmdr` Rust FFI to render a mermaid diagram to SVG. Empty on
 /// failure. Cross-reference: `libs/core/src/MarkdownRenderer.cpp` —
@@ -18,6 +18,6 @@ public:
     static QByteArray renderSvg(const QString &mermaidText);
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_MERMAIDRENDERER_H

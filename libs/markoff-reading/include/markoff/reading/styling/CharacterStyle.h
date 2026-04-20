@@ -5,7 +5,7 @@
 // Penelope HEAD at transplant time: 6b9c32344032c9eb54c041970a5a3e2feff7caff
 // Penelope is GPL-3.0 (see ~/dev/Penelope/COPYING).
 // Adapted for Corbomite's libs/readingview/ — OpenType font-features stripped
-// (Phase 3a does not need them); namespace rebadged to Corbomite::ReadingView.
+// (Phase 3a does not need them); namespace rebadged to Markoff::Reading.
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
 #ifndef CORBOMITE_READINGVIEW_CHARACTERSTYLE_H
@@ -16,7 +16,7 @@
 #include <QString>
 #include <QTextCharFormat>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 class CharacterStyle
 {
@@ -94,6 +94,6 @@ private:
     bool m_hasLetterSpacing = false;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_CHARACTERSTYLE_H

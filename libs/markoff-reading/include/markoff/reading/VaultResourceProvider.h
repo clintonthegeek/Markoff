@@ -7,14 +7,14 @@
 // Forwarding typedef: the VaultResourceProvider interface was promoted to
 // libs/core/ during Cluster J Phase 1 so embed renderers, Markoff and
 // ReadingView can share a single contract. ReadingView-scoped code keeps
-// referencing `Corbomite::ReadingView::VaultResourceProvider` unchanged.
+// referencing `Markoff::Reading::VaultResourceProvider` unchanged.
 
 #include "corbomite/core/VaultResourceProvider.h"
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 using VaultResourceProvider = Corbomite::Core::VaultResourceProvider;
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_VAULTRESOURCEPROVIDER_H

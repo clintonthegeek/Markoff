@@ -4,14 +4,14 @@
 // through ReadingView::setPlainText() and asserts the scene is non-empty
 // and every section got a mounted QGraphicsItem.
 
-#include "corbomite/readingview/ReadingSection.h"
-#include "corbomite/readingview/ReadingView.h"
+#include "markoff/reading/ReadingSection.h"
+#include "markoff/reading/ReadingView.h"
 
 #include <QGraphicsScene>
 #include <QSignalSpy>
 #include <QTest>
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 class TestReadingViewEndToEnd : public QObject
 {

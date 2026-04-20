@@ -6,9 +6,9 @@
 #include <QUrl>
 
 #include "corbomite/core/VaultResourceProvider.h"
-#include "corbomite/readingview/LinkRenderer.h"
+#include "markoff/reading/LinkRenderer.h"
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 namespace {
 

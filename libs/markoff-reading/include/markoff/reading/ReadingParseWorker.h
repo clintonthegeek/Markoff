@@ -10,7 +10,7 @@
 #ifndef CORBOMITE_READINGVIEW_READINGPARSEWORKER_H
 #define CORBOMITE_READINGVIEW_READINGPARSEWORKER_H
 
-#include "corbomite/readingview/ReadingSection.h"
+#include "markoff/reading/ReadingSection.h"
 
 #include <QAtomicInteger>
 #include <QObject>
@@ -20,7 +20,7 @@
 
 class QThread;
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 class ReadingPipeline;
 
@@ -71,8 +71,8 @@ private:
     QAtomicInteger<quint64> m_latestRequestId{0};
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
-Q_DECLARE_METATYPE(QVector<std::shared_ptr<Corbomite::ReadingView::ReadingSection>>)
+Q_DECLARE_METATYPE(QVector<std::shared_ptr<Markoff::Reading::ReadingSection>>)
 
 #endif // CORBOMITE_READINGVIEW_READINGPARSEWORKER_H

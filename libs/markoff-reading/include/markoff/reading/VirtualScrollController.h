@@ -12,7 +12,7 @@
 
 class QGraphicsItem;
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 class ReadingSection;
 
@@ -93,6 +93,6 @@ private:
     bool m_hasLastWindow = false;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_VIRTUALSCROLLCONTROLLER_H

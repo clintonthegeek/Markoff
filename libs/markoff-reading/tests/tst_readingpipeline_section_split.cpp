@@ -3,12 +3,12 @@
 // Phase 3a pipeline test: verifies that ReadingPipeline splits a markdown
 // fixture into the expected section count and boundary offsets.
 
-#include "corbomite/readingview/ReadingPipeline.h"
-#include "corbomite/readingview/ReadingSection.h"
+#include "markoff/reading/ReadingPipeline.h"
+#include "markoff/reading/ReadingSection.h"
 
 #include <QTest>
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 class TestReadingPipelineSectionSplit : public QObject
 {

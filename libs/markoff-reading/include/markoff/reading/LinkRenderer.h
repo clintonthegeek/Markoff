@@ -13,7 +13,7 @@ namespace Corbomite::Core {
 class VaultResourceProvider;
 }
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// Typed inline-link-emission surface for ReadingView's section-mount
 /// pipeline. Sibling to Markoff::LinkRenderer — same contract shape,
@@ -65,6 +65,6 @@ private:
     Corbomite::Core::VaultResourceProvider *m_resources;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_LINKRENDERER_H

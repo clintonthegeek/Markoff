@@ -9,9 +9,9 @@
 // stripped; namespace rebadged.
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/styling/ParagraphStyle.h"
+#include "markoff/reading/styling/ParagraphStyle.h"
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 ParagraphStyle::ParagraphStyle(const QString &name)
     : m_name(name)
@@ -80,4 +80,4 @@ void ParagraphStyle::inheritFrom(const ParagraphStyle &parent)
     if (!m_hasFirstLineIndent) { m_firstLineIndent = parent.m_firstLineIndent; m_hasFirstLineIndent = parent.m_hasFirstLineIndent; }
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

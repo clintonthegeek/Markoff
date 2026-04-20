@@ -8,7 +8,7 @@
 #ifndef CORBOMITE_READINGVIEW_READINGVIEWCONSTANTS_H
 #define CORBOMITE_READINGVIEW_READINGVIEWCONSTANTS_H
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// Notes at or above this size parse off the main thread (ReadingParseWorker).
 /// Smaller notes parse synchronously on the calling thread.
@@ -29,6 +29,6 @@ constexpr int kFrameBudgetSections = 10;
 /// hex literal for ASCII "FOLD".
 constexpr int kFoldArrowSectionIdxProperty = 0x464F4C44;
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_READINGVIEWCONSTANTS_H

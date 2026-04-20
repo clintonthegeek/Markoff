@@ -4,9 +4,9 @@
 #include <QTest>
 
 #include "corbomite/core/CodeBlockProcessorRegistry.h"
-#include "corbomite/readingview/ReadingView.h"
+#include "markoff/reading/ReadingView.h"
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 /// Cluster J phase 5 — verify Mermaid is registered onto ReadingView's
 /// `CodeBlockProcessorRegistry` at construction. Test contract:

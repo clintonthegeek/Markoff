@@ -4,7 +4,7 @@
 // These values are NOT hints — they are the wire contract, so they must not
 // drift without updating the audit docs + all cross-compat tests.
 
-#include "corbomite/readingview/ReadingViewConstants.h"
+#include "markoff/reading/ReadingViewConstants.h"
 
 #include <QTest>
 
@@ -20,17 +20,17 @@ private slots:
 
 void TestFrameBudgetConstants::asyncParseThresholdIsExactly10240Bytes()
 {
-    QCOMPARE(Corbomite::ReadingView::kAsyncParseThresholdBytes, 10240);
+    QCOMPARE(Markoff::Reading::kAsyncParseThresholdBytes, 10240);
 }
 
 void TestFrameBudgetConstants::frameBudgetIsExactly5Milliseconds()
 {
-    QCOMPARE(Corbomite::ReadingView::kFrameBudgetMs, 5);
+    QCOMPARE(Markoff::Reading::kFrameBudgetMs, 5);
 }
 
 void TestFrameBudgetConstants::frameBudgetIsExactly10Sections()
 {
-    QCOMPARE(Corbomite::ReadingView::kFrameBudgetSections, 10);
+    QCOMPARE(Markoff::Reading::kFrameBudgetSections, 10);
 }
 
 QTEST_MAIN(TestFrameBudgetConstants)

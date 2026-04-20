@@ -18,7 +18,7 @@
 #include <QTextBlock>
 #include <QTextDocument>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 /// Theme selector for Reading-mode code-block highlighting.
 ///
@@ -51,6 +51,6 @@ private:
     QTextBlock m_currentBlock;
 };
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
 
 #endif // CORBOMITE_READINGVIEW_CODEBLOCKHIGHLIGHTER_H

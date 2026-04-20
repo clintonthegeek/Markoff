@@ -9,14 +9,14 @@
 //  4. Fold nested headings (level-based scope).
 //  5. Ephemeral round-trip.
 
-#include "corbomite/readingview/ReadingSection.h"
-#include "corbomite/readingview/ReadingView.h"
+#include "markoff/reading/ReadingSection.h"
+#include "markoff/reading/ReadingView.h"
 
 #include <QGraphicsItem>
 #include <QSignalSpy>
 #include <QTest>
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 namespace {
 

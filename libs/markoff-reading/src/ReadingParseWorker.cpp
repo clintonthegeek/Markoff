@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/ReadingParseWorker.h"
+#include "markoff/reading/ReadingParseWorker.h"
 
-#include "corbomite/readingview/ReadingPipeline.h"
+#include "markoff/reading/ReadingPipeline.h"
 
 #include <QMetaObject>
 #include <QThread>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 ReadingParseWorker::ReadingParseWorker(QObject *parent)
     : QObject(parent)
@@ -16,7 +16,7 @@ ReadingParseWorker::ReadingParseWorker(QObject *parent)
     // Register the section-vector type so queued connections can marshal it
     // through the meta-object system. Safe to call repeatedly; idempotent.
     qRegisterMetaType<QVector<std::shared_ptr<ReadingSection>>>(
-        "QVector<std::shared_ptr<Corbomite::ReadingView::ReadingSection>>");
+        "QVector<std::shared_ptr<Markoff::Reading::ReadingSection>>");
     qRegisterMetaType<QVector<std::shared_ptr<ReadingSection>>>(
         "QVector<std::shared_ptr<ReadingSection>>");
     qRegisterMetaType<quint64>("quint64");
@@ -122,4 +122,4 @@ ReadingParseWorker::parseSync(const QString &markdown)
     return pipeline.splitIntoSections(markdown);
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading

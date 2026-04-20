@@ -12,9 +12,9 @@
 #include "corbomite/core/EmbedRegistry.h"
 #include "corbomite/core/MarkdownRenderChild.h"
 #include "corbomite/core/VaultResourceProvider.h"
-#include "corbomite/readingview/EmbedRenderer.h"
+#include "markoff/reading/EmbedRenderer.h"
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 namespace {
 

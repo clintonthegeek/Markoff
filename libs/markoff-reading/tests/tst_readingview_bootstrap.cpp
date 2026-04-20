@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Phase 0b bootstrap test: validates that the readingview library links,
-// that Corbomite::ReadingView::CodeBlockHighlighter constructs cleanly,
+// that Markoff::Reading::CodeBlockHighlighter constructs cleanly,
 // and that a simple fenced-code QTextDocument can be fed through
 // highlight() without crashing. No rendering assertions yet — this test
 // exists to prove the build wiring is sound end-to-end.
 
-#include "corbomite/readingview/CodeBlockHighlighter.h"
+#include "markoff/reading/CodeBlockHighlighter.h"
 
 #include <QTest>
 #include <QTextBlockFormat>
@@ -25,7 +25,7 @@ private slots:
 
 void TestReadingViewBootstrap::constructsCleanly()
 {
-    Corbomite::ReadingView::CodeBlockHighlighter hl;
+    Markoff::Reading::CodeBlockHighlighter hl;
     Q_UNUSED(hl);
     QVERIFY(true);
 }
@@ -52,8 +52,8 @@ void TestReadingViewBootstrap::highlightsFencedCodeBlockWithoutCrashing()
         block = block.next();
     }
 
-    Corbomite::ReadingView::CodeBlockHighlighter hl(
-        Corbomite::ReadingView::Theme::Light);
+    Markoff::Reading::CodeBlockHighlighter hl(
+        Markoff::Reading::Theme::Light);
     hl.highlight(&doc);
 
     QVERIFY(true);

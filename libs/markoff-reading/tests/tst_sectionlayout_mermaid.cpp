@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/ReadingSection.h"
-#include "corbomite/readingview/SectionLayout.h"
-#include "corbomite/readingview/styling/StyleManager.h"
+#include "markoff/reading/ReadingSection.h"
+#include "markoff/reading/SectionLayout.h"
+#include "markoff/reading/styling/StyleManager.h"
 
 #include <QGraphicsItem>
 #include <QGraphicsItemGroup>
 #include <QTest>
 #include <QtSvgWidgets/QGraphicsSvgItem>
 
-using namespace Corbomite::ReadingView;
+using namespace Markoff::Reading;
 
 class TestSectionLayoutMermaid : public QObject
 {

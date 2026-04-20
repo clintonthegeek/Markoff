@@ -10,11 +10,11 @@
 // Namespace rebadged.
 // (c) 2026 Corbomite contributors, GPL-3.0-or-later.
 
-#include "corbomite/readingview/styling/StyleManager.h"
+#include "markoff/reading/styling/StyleManager.h"
 
 #include <QSet>
 
-namespace Corbomite::ReadingView {
+namespace Markoff::Reading {
 
 StyleManager::StyleManager(QObject *parent)
     : QObject(parent)
@@ -255,4 +255,4 @@ StyleManager *StyleManager::makeObsidianDefault(Theme theme, QObject *parent)
     return mgr;
 }
 
-} // namespace Corbomite::ReadingView
+} // namespace Markoff::Reading
