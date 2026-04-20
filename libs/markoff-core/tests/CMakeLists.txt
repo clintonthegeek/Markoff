@@ -41,3 +41,23 @@ add_executable(tst_markoff_markdown_view tst_markdown_view_compile.cpp)
 add_test(NAME tst_markoff_markdown_view COMMAND tst_markoff_markdown_view)
 target_link_libraries(tst_markoff_markdown_view PRIVATE Qt6::Test Qt6::Widgets markoff_core)
 set_tests_properties(tst_markoff_markdown_view PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_embed_registry tst_markoff_embed_registry.cpp)
+add_test(NAME tst_markoff_embed_registry COMMAND tst_markoff_embed_registry)
+target_link_libraries(tst_markoff_embed_registry PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markoff_embed_registry PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_codeblock_registry tst_markoff_codeblock_registry.cpp)
+add_test(NAME tst_markoff_codeblock_registry COMMAND tst_markoff_codeblock_registry)
+target_link_libraries(tst_markoff_codeblock_registry PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markoff_codeblock_registry PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_embed_depth_guard tst_markoff_embed_depth_guard.cpp)
+add_test(NAME tst_markoff_embed_depth_guard COMMAND tst_markoff_embed_depth_guard)
+target_link_libraries(tst_markoff_embed_depth_guard PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markoff_embed_depth_guard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_default_vault_provider tst_markoff_default_vault_provider.cpp)
+add_test(NAME tst_markoff_default_vault_provider COMMAND tst_markoff_default_vault_provider)
+target_link_libraries(tst_markoff_default_vault_provider PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markoff_default_vault_provider PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
