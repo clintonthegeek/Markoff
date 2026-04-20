@@ -1411,6 +1411,15 @@ int Editor::currentHeadingLevel() const
     return level;
 }
 
+EditorContext Editor::context() const
+{
+    // Phase C6 stub — later tasks (T2 block classifier, T3 inline
+    // classifier) wire the real population.
+    EditorContext ctx;
+    ctx.readOnly = isReadOnly();
+    return ctx;
+}
+
 void Editor::toggleCheckbox()
 {
     // Three-state cycle per block in the selection:

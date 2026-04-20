@@ -6,6 +6,7 @@
 #include <QJsonObject>
 #include <QTextDocument>
 #include <memory>
+#include <markoff/EditorContext.h>
 #include <markoff/MarkdownView.h>
 #include <markoff/Theme.h>
 #include <markoff-parser/Document.h>
@@ -15,6 +16,7 @@
 class QAction;
 class QGraphicsScene;
 class QGraphicsView;
+class QMenu;
 class QScrollBar;
 class QTimer;
 class QVBoxLayout;
@@ -173,6 +175,12 @@ public:
     /// Returns false when there is no focused editor or no cursor.
     bool cursorInTable() const;
 
+    /// Phase C6 — O(1) snapshot of the cursor's contextual state,
+    /// used by hosts to drive toolbar/menu enable + check state.
+    /// See `contextChanged` for the reactive pull, or call on demand
+    /// (e.g. when the active leaf changes and no signal has fired).
+    EditorContext context() const;
+
     // --- Table operations (no-op if cursor not in a table) ---
     void tableInsertRowAbove();
     void tableInsertRowBelow();
@@ -299,6 +307,23 @@ Q_SIGNALS:
     /// with a tiny dead-band so micro-pixel jitter from viewport updates
     /// doesn't spam the signal.
     void scrollPositionVisualLineChanged(float visualLine);
+
+    /// Phase C6 — emitted whenever the cursor position, selection,
+    /// document structure, or inline/block classification of the
+    /// cursor's surroundings changes. Debounced to at most one
+    /// emission per ~16 ms so hosts don't thrash on rapid arrow-key
+    /// navigation.
+    void contextChanged(const EditorContext &ctx);
+
+    /// Phase C6 — emitted from contextMenuEvent() after Markoff's
+    /// built-in items have been appended but before menu.exec() is
+    /// called. Subscribers may add QActions / submenus / separators
+    /// directly to `menu`. The emission is single-shot per right-
+    /// click; `menu` is stack-local and dies when exec() returns, so
+    /// do not capture the pointer across the emission.
+    void aboutToShowContextMenu(QMenu *menu,
+                                const EditorContext &ctx,
+                                const QPoint &globalPos);
 
 protected:
     bool event(QEvent *e) override;

@@ -19,6 +19,7 @@ endif()
 # Markoff live-preview editor library
 add_library(markoff_live STATIC
     include/markoff/Editor.h
+    include/markoff/EditorContext.h
     include/markoff/FoldingTypes.h
     include/markoff/LinkRenderer.h
     src/SelectableItem.h
