@@ -32,11 +32,16 @@ add_library(markoff_core STATIC
     include/markoff/EmbedRegistry.h
     include/markoff/MarkdownRenderChild.h
     include/markoff/MermaidRenderer.h
+    include/markoff/DefaultMermaidRenderer.h
     include/markoff/vault/CachedMetadata.h
     include/markoff/vault/LinkResolver.h
     include/markoff/vault/MetadataCache.h
     include/markoff/vault/MetadataParser.h
     include/markoff/vault/ResourceProvider.h
+    include/markoff/vault/DefaultLinkResolver.h
+    include/markoff/vault/DefaultMetadataCache.h
+    include/markoff/vault/DefaultMetadataParser.h
+    include/markoff/vault/DefaultResourceProvider.h
 )
 
 target_include_directories(markoff_core
