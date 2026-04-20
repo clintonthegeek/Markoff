@@ -66,7 +66,7 @@ during C1–C7.
 | ID   | Status       | Spec                                   | Plan                                   | Markoff PR/branch    | Corbomite PR/branch  | Tag       |
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
-| C5   | spec drafted | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | —                                      | —                    | —                    | —         |
+| C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
 | C6   | requirements — see inputs | [consumer editor-state surface §1-8 + §9 context-menu](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
@@ -229,6 +229,46 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C5 landed at `v0.4.0`
+
+5 commits on `master` (b8d24ec → b2514ac). Deliverables:
+
+- `ReadingView::wikiLinkHovered(QString)` replaced by unified
+  `linkHovered(QString href, QPoint globalPos)`. Breaking to
+  Corbomite's HoverPopover consumer — rewires in the submodule-bump
+  commit.
+- `Markoff::Editor::linkHovered(QString)` widened to the same
+  two-arg shape. `TextControl::linkHovered` deliberately unchanged
+  (internal leaf signal, not part of the tri-view contract).
+- New `tst_readingview_click_to_fold` regression guard exercising
+  the full click-dispatch path (eventFilter → sectionIndexAt →
+  toggleFold) via `QTest::mouseClick` against the graphicsView's
+  viewport at the fold-arrow's scene-mapped center.
+- New `tst_readingview_hover_signal` locks the two-arg signal shape
+  + empty-href leave semantics.
+
+Scope narrowed during execution: **LinkRenderer forwarding for
+regular-URL hover** (original spec §2.1 widen) dropped after T3
+implementer discovered `Markoff::Reading::LinkRenderer` is orphaned
+(constructed nowhere in production). The real gap is a URL-span
+hit-test equivalent to `wikiLinkTargetAt` or LinkRenderer
+integration into the section pipeline; both belong under C3/C4, not
+a signal-unification work-unit. Captured in commit `4b95f3d`. Reading
+mode still has no regular-URL hover — same coverage as before C5 —
+but Reading mode also has no hover popover wired at all today, so
+no user-visible regression.
+
+`codeBlockProcessorRegistry` routing remains deferred per the
+earlier C5 spec revision (`d445345`).
+
+Standalone `ctest` green: 64/64 (`markoff|reading` suite in the
+Corbomite-tree build).
+
+Next: Corbomite submodule bump to `v0.4.0` + HoverPopover rewire
+(consuming the two-arg signal; also wiring ReadingView::linkHovered
+→ HoverPopover for the first time — Reading-mode hover popover is
+new behavior) + Cluster V Phase 4 closeout.
 
 ### 2026-04-20 — C5 spec drafted
 
