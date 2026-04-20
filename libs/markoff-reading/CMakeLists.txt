@@ -90,9 +90,14 @@ if(MARKOFF_READING_USE_REAL_COREDEPS)
     # empirically: EmbedRenderer.cpp directly includes
     # `<corbomite/storage/CachedMetadata.h>`, so Storage is live. The
     # stubs/corbomite/storage/ tree stays for standalone Markoff builds.)
+    # Corbomite::Core is PUBLIC because markoff/reading/VaultResourceProvider.h
+    # (a public header) forwards to `corbomite/core/VaultResourceProvider.h`;
+    # consumers and tests must resolve that include transitively, matching
+    # the standalone-mode stubs dir which is also PUBLIC.
     target_link_libraries(markoff_reading
-        PRIVATE
+        PUBLIC
             Corbomite::Core
+        PRIVATE
             Corbomite::Storage
             mmdr
     )
