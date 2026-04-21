@@ -113,6 +113,23 @@ Editor::Editor(QWidget *parent)
     connect(m_coordinator, &SceneCoordinator::reparsed,
             this, &Editor::subscribeLinkSignalsForItems);
 
+    // Phase C6 — contextChanged debounce. Rapid bursts of cursor /
+    // selection / document-mutation signals coalesce into one
+    // contextChanged emission ~16ms after the last change, so hosts
+    // can sync toolbars without thrashing on arrow-key navigation.
+    m_contextDebounceTimer = new QTimer(this);
+    m_contextDebounceTimer->setSingleShot(true);
+    m_contextDebounceTimer->setInterval(16);
+    connect(m_contextDebounceTimer, &QTimer::timeout, this, [this] {
+        Q_EMIT contextChanged(context());
+    });
+    connect(m_coordinator, &SceneCoordinator::reparsed,
+            this, &Editor::subscribeContextSignalsForItems);
+    // Re-parse itself is a consumer-spec §3.2 trigger — kick the debounce
+    // so the post-reparse snapshot gets published.
+    connect(m_coordinator, &SceneCoordinator::reparsed,
+            this, &Editor::scheduleContextRefresh);
+
     // SearchBar is a child of the Editor (not the viewport), so it
     // stays pinned to the bottom of the visible area rather than
     // scrolling with the scene contents.
@@ -1091,6 +1108,11 @@ bool Editor::setReadOnly(bool readOnly)
         if (auto *a = m_actions.value(id))
             a->setEnabled(!readOnly);
     }
+
+    // Phase C6 — read-only state is part of the EditorContext snapshot,
+    // so publish a fresh context after the mode flips. The debounce
+    // coalesces rapid toggles into a single emission.
+    scheduleContextRefresh();
     return true;
 }
 
@@ -2255,6 +2277,36 @@ void Editor::subscribeLinkSignalsForItems()
                 this, &Editor::onCursorMoved,
                 Qt::UniqueConnection);
     }
+}
+
+void Editor::subscribeContextSignalsForItems()
+{
+    // Phase C6 — subscribe each text item's TextControl to the three
+    // §3.2 triggers (cursor moved, selection changed, document edited).
+    // Each fires scheduleContextRefresh() which kicks the 16ms debounce.
+    // Qt::UniqueConnection keeps re-subscription across reparses idempotent.
+    for (auto *item : m_coordinator->items()) {
+        if (!item->isTextItem()) continue;
+        auto *textItem = static_cast<MarkdownTextItem *>(item->asGraphicsItem());
+        auto *tc = textItem->textControl();
+        if (!tc) continue;
+        connect(tc, &TextControl::cursorPositionChanged,
+                this, &Editor::scheduleContextRefresh,
+                Qt::UniqueConnection);
+        connect(tc, &TextControl::selectionChanged,
+                this, &Editor::scheduleContextRefresh,
+                Qt::UniqueConnection);
+        if (auto *doc = tc->document()) {
+            connect(doc, &QTextDocument::contentsChanged,
+                    this, &Editor::scheduleContextRefresh,
+                    Qt::UniqueConnection);
+        }
+    }
+}
+
+void Editor::scheduleContextRefresh()
+{
+    if (m_contextDebounceTimer) m_contextDebounceTimer->start();
 }
 
 void Editor::onCursorMoved()

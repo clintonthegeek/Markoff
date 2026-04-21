@@ -393,6 +393,11 @@ private:
     void subscribeLinkSignalsForItems();
     void onCursorMoved();
 
+    // Phase C6 — contextChanged emission (16ms debounce).
+    void scheduleContextRefresh();
+    void subscribeContextSignalsForItems();
+    QTimer *m_contextDebounceTimer = nullptr;
+
     // MarkdownView bridge
     MarkoffDocument *m_markoffDoc = nullptr;
     std::unique_ptr<LiveSearchAdapter> m_searchAdapter;

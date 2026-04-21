@@ -12,6 +12,11 @@ namespace Markoff::Internal {
 /// Custom QTextCharFormat property key used by MarkdownHighlighter to tag
 /// inline-code runs so EditorContext classification can detect them
 /// without guessing from font family. See MarkdownHighlighter.cpp.
+///
+/// QTextFormat::UserProperty + 100 — intentional gap above the existing
+/// MathTextObject (+1..+3), CheckboxTextObject (+4), and ReadingMathObject
+/// (+10..+11) allocations. Leaves +5..+99 reserved for future text-object
+/// properties without forcing renumbering here.
 constexpr int kInlineCodeProperty = QTextFormat::UserProperty + 100;
 
 /// Classify the block at the given cursor position. Populates
