@@ -34,8 +34,66 @@ SourceEditor::SourceEditor(QWidget *parent)
 
 SourceEditor::~SourceEditor() = default;
 
-void SourceEditor::setDocument(Markoff::MarkoffDocument *doc) { m_markoffDoc = doc; }
+void SourceEditor::setDocument(Markoff::MarkoffDocument *doc)
+{
+    if (m_markoffDoc == doc) return;
+
+    // Disconnect from the old document before replacing the pointer.
+    if (m_markoffDoc) {
+        disconnect(m_markoffDoc, nullptr, this, nullptr);
+    }
+    m_markoffDoc = doc;
+
+    if (!doc) {
+        // Disconnected — leave buffer content in place (frozen display).
+        return;
+    }
+
+    // Disable Qutepart's own QTextDocument undo; canonical's QUndoStack is
+    // the authoritative stack.
+    m_qutepart->document()->setUndoRedoEnabled(false);
+
+    // Load canonical text into Qutepart's buffer.
+    m_applyingCanonicalDelta = true;
+    m_qutepart->document()->setPlainText(doc->toMarkdown());
+    m_applyingCanonicalDelta = false;
+
+    // Subscribe to canonical events.
+    connect(doc, &Markoff::MarkoffDocument::contentsChanged,
+            this, &SourceEditor::onCanonicalContentsChanged);
+    connect(doc, &Markoff::MarkoffDocument::documentReloaded,
+            this, &SourceEditor::onCanonicalReloaded);
+    // parseUpdated is not subscribed — Source renders text verbatim, not AST.
+}
+
 Markoff::MarkoffDocument *SourceEditor::document() const { return m_markoffDoc; }
+
+QString SourceEditor::toPlainText() const
+{
+    return m_qutepart ? m_qutepart->toPlainText() : QString();
+}
+
+void SourceEditor::onCanonicalContentsChanged(qsizetype offset, qsizetype removed, qsizetype inserted)
+{
+    if (m_applyingCanonicalDelta) return;
+    if (!m_markoffDoc) return;
+
+    m_applyingCanonicalDelta = true;
+    QTextCursor c(m_qutepart->document());
+    c.setPosition(int(offset));
+    c.setPosition(int(offset + removed), QTextCursor::KeepAnchor);
+    const QString insertedText = m_markoffDoc->substring(offset, inserted);
+    c.insertText(insertedText);
+    m_applyingCanonicalDelta = false;
+}
+
+void SourceEditor::onCanonicalReloaded()
+{
+    if (!m_markoffDoc) return;
+    m_applyingCanonicalDelta = true;
+    m_qutepart->document()->setPlainText(m_markoffDoc->toMarkdown());
+    m_applyingCanonicalDelta = false;
+}
 
 void SourceEditor::setViewTheme(const Markoff::Theme &) {}
 void SourceEditor::setViewResourceProvider(Markoff::ResourceProvider *) {}

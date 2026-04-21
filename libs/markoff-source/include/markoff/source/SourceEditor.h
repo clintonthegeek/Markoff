@@ -50,14 +50,23 @@ public:
     QVector<Markoff::FoldSpec> foldedHeadings() const override;
     void setFoldedHeadings(const QVector<Markoff::FoldSpec> &) override;
 
-    // Internal hooks exposed for SourceSearchAdapter
+    // Internal hooks exposed for SourceSearchAdapter and tests
     Qutepart::Qutepart *qutepart() { return m_qutepart; }
+
+    /// Convenience: plain text content of Qutepart's internal buffer.
+    /// Mirrors QPlainTextEdit::toPlainText() for test/host access without
+    /// exposing Qutepart directly.
+    QString toPlainText() const;
 
 private:
     Qutepart::Qutepart *m_qutepart = nullptr;
     Markoff::MarkoffDocument *m_markoffDoc = nullptr;
     std::unique_ptr<SourceSearchAdapter> m_searchAdapter;
     int m_baseFontPt = 0;  // captured on construction for resetZoom
+    bool m_applyingCanonicalDelta = false;
+
+    void onCanonicalContentsChanged(qsizetype offset, qsizetype removed, qsizetype inserted);
+    void onCanonicalReloaded();
 };
 
 }  // namespace Markoff::Source

@@ -35,3 +35,16 @@ add_test(NAME tst_markoff_source_markdown_view COMMAND tst_markoff_source_markdo
 set_tests_properties(tst_markoff_source_markdown_view PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
 )
+
+# Phase C3 Task 10: SourceEditor canonical attach / inbound delta / reload.
+qt_add_executable(tst_source_canonical_attach tst_source_canonical_attach.cpp)
+target_link_libraries(tst_source_canonical_attach
+    PRIVATE
+        Qt6::Test
+        Qt6::Widgets
+        markoff_source
+)
+add_test(NAME tst_source_canonical_attach COMMAND tst_source_canonical_attach)
+set_tests_properties(tst_source_canonical_attach PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+)
