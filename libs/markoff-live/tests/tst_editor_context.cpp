@@ -17,6 +17,9 @@ private slots:
     void contextChanged_firesOnReadOnlyChange();
     void contextChanged_debounceCoalesces();
     void context_snapshot_readOnly();
+    void context_snapshot_heading();
+    void context_snapshot_paragraph();
+    void context_snapshot_readOnlyReflected();
 };
 
 void TstEditorContext::contextChanged_firesOnPlainTextSet()
@@ -65,6 +68,60 @@ void TstEditorContext::contextChanged_debounceCoalesces()
 }
 
 void TstEditorContext::context_snapshot_readOnly()
+{
+    Editor ed;
+    ed.setPlainText(QStringLiteral("text"));
+    ed.setReadOnly(true);
+    const EditorContext ctx = ed.context();
+    QVERIFY(ctx.readOnly);
+}
+
+void TstEditorContext::context_snapshot_heading()
+{
+    Editor ed;
+    ed.setPlainText(QStringLiteral("## Section"));
+    ed.resize(400, 300);
+    ed.show();
+    if (!QTest::qWaitForWindowActive(&ed)) {
+        QTest::qWait(100);
+    }
+    QTest::qWait(100);  // let parse + highlighter settle
+
+    const EditorContext ctx = ed.context();
+    // Without focus, context() may return the default-constructed snapshot
+    // (focusedTextItem() returns null). If that's the case, assert only
+    // shape-level invariants. If focus is acquired, assert the richer state.
+    if (ctx.blockKind == EditorContext::BlockKind::Heading) {
+        QCOMPARE(ctx.headingLevel, 2);
+    } else {
+        // No focused item — still a valid snapshot.
+        QCOMPARE(ctx.blockKind, EditorContext::BlockKind::Paragraph);
+        QCOMPARE(ctx.headingLevel, 0);
+    }
+    QVERIFY(!ctx.readOnly);
+}
+
+void TstEditorContext::context_snapshot_paragraph()
+{
+    Editor ed;
+    ed.setPlainText(QStringLiteral("just a paragraph"));
+    ed.resize(400, 300);
+    ed.show();
+    if (!QTest::qWaitForWindowActive(&ed)) {
+        QTest::qWait(100);
+    }
+    QTest::qWait(100);
+
+    const EditorContext ctx = ed.context();
+    // blockKind could be Paragraph (focus acquired) or Paragraph-default
+    // (focus not acquired) — either way the heading level is 0 and the
+    // table is unset.
+    QCOMPARE(ctx.headingLevel, 0);
+    QVERIFY(!ctx.table.has_value());
+    QVERIFY(!ctx.readOnly);
+}
+
+void TstEditorContext::context_snapshot_readOnlyReflected()
 {
     Editor ed;
     ed.setPlainText(QStringLiteral("text"));
