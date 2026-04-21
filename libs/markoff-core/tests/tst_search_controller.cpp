@@ -1,9 +1,4 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// PhaseC3: Whole file pending rewrite against Phase-C3 API in Task 8.
-// Current API uses Phase-A setPlainText/plainText removed in Task 6.
-// Rewrite mappings:
-//   setPlainText(text) → resetContent(text, Origin::FirstOpen) (or TestFixture)
-//   plainText() → toMarkdown()
 #include <QTest>
 #include <QSignalSpy>
 
@@ -32,16 +27,17 @@ class TstSearchController : public QObject {
 private Q_SLOTS:
     void findsAllLiteralMatches() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("ab ab AB"));
+        doc.resetContent(QStringLiteral("ab ab AB"), Origin::FirstOpen);
         StubAdapter adapter;
         SearchController c(&doc, &adapter);
         c.setQuery(QStringLiteral("ab"));
-        QCOMPARE(c.matchCount(), 2);  // case-insensitive off by default? test below
+        // caseSensitive defaults to true → matches "ab" only, not "AB"
+        QCOMPARE(c.matchCount(), 2);
     }
 
     void caseSensitiveFlag() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("ab ab AB"));
+        doc.resetContent(QStringLiteral("ab ab AB"), Origin::FirstOpen);
         StubAdapter adapter;
         SearchController c(&doc, &adapter);
         SearchController::Flags f;
@@ -56,7 +52,7 @@ private Q_SLOTS:
 
     void nextPrevWraps() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("x y x y x"));
+        doc.resetContent(QStringLiteral("x y x y x"), Origin::FirstOpen);
         StubAdapter adapter;
         SearchController c(&doc, &adapter);
         c.setQuery(QStringLiteral("x"));
@@ -74,7 +70,7 @@ private Q_SLOTS:
 
     void highlightsMatchesOnQueryChange() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("a bb a"));
+        doc.resetContent(QStringLiteral("a bb a"), Origin::FirstOpen);
         StubAdapter adapter;
         SearchController c(&doc, &adapter);
         c.setQuery(QStringLiteral("a"));
@@ -83,7 +79,7 @@ private Q_SLOTS:
 
     void clearsOnEmptyQuery() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("a"));
+        doc.resetContent(QStringLiteral("a"), Origin::FirstOpen);
         StubAdapter adapter;
         SearchController c(&doc, &adapter);
         c.setQuery(QStringLiteral("a"));
@@ -94,7 +90,7 @@ private Q_SLOTS:
 
     void wholeWordFlag() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("cat catalog category"));
+        doc.resetContent(QStringLiteral("cat catalog category"), Origin::FirstOpen);
         StubAdapter adapter;
         SearchController c(&doc, &adapter);
         SearchController::Flags f;
@@ -106,7 +102,7 @@ private Q_SLOTS:
 
     void regexFlag() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("foo123 bar456"));
+        doc.resetContent(QStringLiteral("foo123 bar456"), Origin::FirstOpen);
         StubAdapter adapter;
         SearchController c(&doc, &adapter);
         SearchController::Flags f;
@@ -118,7 +114,7 @@ private Q_SLOTS:
 
     void nextStartsFromCursor() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("xxxxx"));
+        doc.resetContent(QStringLiteral("xxxxx"), Origin::FirstOpen);
         StubAdapter adapter;
         adapter.cursor = 3;
         SearchController c(&doc, &adapter);

@@ -1,99 +1,105 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 #include <QSignalSpy>
-#include <QTextDocument>
 
 #include <markoff/MarkoffDocument.h>
+#include <markoff/MarkdownDelta.h>
 
 using namespace Markoff;
 
 class TstMarkoffDocument : public QObject {
     Q_OBJECT
 private Q_SLOTS:
-    void setPlainTextEmitsContentsChanged() {
-        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); plainText() → toMarkdown()
+    void resetContentFirstOpenEmitsContentsChanged() {
         MarkoffDocument doc;
         QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
-        doc.setPlainText(QStringLiteral("hello"));
-        QCOMPARE(doc.plainText(), QStringLiteral("hello"));
+        doc.resetContent(QStringLiteral("hello"), Origin::FirstOpen);
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("hello"));
         QVERIFY(spy.count() >= 1);
     }
 
     void replaceMutatesTextAndEmits() {
-        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); replace() → undoStack()->push(new MarkdownDelta(...)); plainText() → toMarkdown()
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("hello world"));
+        doc.resetContent(QStringLiteral("hello world"), Origin::FirstOpen);
         QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
-        doc.replace(6, 5, QStringLiteral("there"));
-        QCOMPARE(doc.plainText(), QStringLiteral("hello there"));
+        doc.undoStack()->push(new MarkdownDelta(&doc, 6, 5, QStringLiteral("there")));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("hello there"));
         QVERIFY(spy.count() >= 1);
     }
 
     void insertAndRemove() {
-        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); insert() → undoStack()->push(new MarkdownDelta(&doc, offset, 0, str)); remove() → undoStack()->push(new MarkdownDelta(&doc, offset, len, QString())); plainText() → toMarkdown()
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("ac"));
-        doc.insert(1, QStringLiteral("b"));
-        QCOMPARE(doc.plainText(), QStringLiteral("abc"));
-        doc.remove(0, 1);
-        QCOMPARE(doc.plainText(), QStringLiteral("bc"));
+        doc.resetContent(QStringLiteral("ac"), Origin::FirstOpen);
+        doc.undoStack()->push(new MarkdownDelta(&doc, 1, 0, QStringLiteral("b")));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("abc"));
+        doc.undoStack()->push(new MarkdownDelta(&doc, 0, 1, QString()));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("bc"));
     }
 
     void transactionBoundaryCoalescesUndo() {
-        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); textDocument() removed; use undoStack()->beginMacro()/endMacro(); plainText() → toMarkdown()
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("hello"));
-        QTextDocument *td = doc.textDocument();
-        const QString beforeTxn = doc.plainText();
+        doc.resetContent(QStringLiteral("hello"), Origin::FirstOpen);
+        const QString beforeTxn = doc.toMarkdown();
 
-        doc.beginTransaction();
-        doc.insert(5, QStringLiteral(" a"));
-        doc.insert(doc.plainText().size(), QStringLiteral(" b"));
-        doc.endTransaction();
+        doc.undoStack()->beginMacro(QStringLiteral("two-inserts"));
+        doc.undoStack()->push(new MarkdownDelta(&doc, 5, 0, QStringLiteral(" a")));
+        doc.undoStack()->push(
+            new MarkdownDelta(&doc, doc.toMarkdown().size(), 0, QStringLiteral(" b")));
+        doc.undoStack()->endMacro();
 
-        QCOMPARE(doc.plainText(), QStringLiteral("hello a b"));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("hello a b"));
 
-        // One undo should revert the entire transaction.
-        td->undo();
-        QCOMPARE(doc.plainText(), beforeTxn);
+        // One undo should revert the entire macro.
+        doc.undoStack()->undo();
+        QCOMPARE(doc.toMarkdown(), beforeTxn);
     }
 
     void untransactedEditsAreIndividuallyUndoable() {
-        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); textDocument() removed; insert() → undoStack()->push(new MarkdownDelta(...)); plainText() → toMarkdown()
+        // Use replace-style deltas (non-pure-insert) so mergeWith never coalesces them.
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("a"));
-        QTextDocument *td = doc.textDocument();
+        doc.resetContent(QStringLiteral("_b_"), Origin::FirstOpen);
 
-        doc.insert(1, QStringLiteral("b"));
-        doc.insert(2, QStringLiteral("c"));
-        QCOMPARE(doc.plainText(), QStringLiteral("abc"));
+        // Replace '_' at offset 0 with 'a'.
+        doc.undoStack()->push(new MarkdownDelta(&doc, 0, 1, QStringLiteral("a")));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("ab_"));
+        // Replace '_' at offset 2 with 'c'.
+        doc.undoStack()->push(new MarkdownDelta(&doc, 2, 1, QStringLiteral("c")));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("abc"));
 
-        td->undo();
-        QCOMPARE(doc.plainText(), QStringLiteral("ab"));
-        td->undo();
-        QCOMPARE(doc.plainText(), QStringLiteral("a"));
+        doc.undoStack()->undo();
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("ab_"));
+        doc.undoStack()->undo();
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("_b_"));
     }
 
-    void parseIsSyncForSmallDocs() {
-        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); parsed() → parsedDocument()
+    void parseCompletesAsyncForSmallDocs() {
+        // Parsing is async via ParsePool debounce. After resetContent the parse
+        // is scheduled; spy.wait() pumps the event loop until parseUpdated fires.
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("# Heading\n\nbody\n"));
+        doc.setCoalescingIdleMs(0);  // minimize debounce for tests
+        QSignalSpy spy(&doc, &MarkoffDocument::parseUpdated);
+        doc.resetContent(QStringLiteral("# Heading\n\nbody\n"), Origin::FirstOpen);
+        QVERIFY(spy.wait(2000));
         QVERIFY(!doc.parseIsPending());
-        QVERIFY(doc.parsed() != nullptr);
+        QVERIFY(doc.parsedDocument() != nullptr);
     }
 
-    void parseIsInvalidatedOnEdit() {
-        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); insert() → undoStack()->push(new MarkdownDelta(...)); plainText() → toMarkdown(); parsed() → parsedDocument()
+    void parseIsRescheduledOnEdit() {
+        // After an edit the parse is invalidated (pending) and a new parseUpdated
+        // fires once the pool completes the new job.
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("# h\n"));
-        const auto *first = doc.parsed();
-        QVERIFY(first != nullptr);
-        doc.insert(doc.plainText().size(), QStringLiteral("\nmore\n"));
-        if (doc.parseIsPending()) {
-            QVERIFY(doc.parsed() == nullptr);
-        } else {
-            QVERIFY(doc.parsed() != nullptr);
-        }
+        doc.setCoalescingIdleMs(0);
+        QSignalSpy spy(&doc, &MarkoffDocument::parseUpdated);
+        doc.resetContent(QStringLiteral("# h\n"), Origin::FirstOpen);
+        QVERIFY(spy.wait(2000));  // first parse settles
+
+        spy.clear();
+        doc.undoStack()->push(
+            new MarkdownDelta(&doc, doc.toMarkdown().size(), 0, QStringLiteral("\nmore\n")));
+        // After the delta, a new parse should be scheduled and eventually complete.
+        QVERIFY(spy.wait(2000));
+        QVERIFY(!doc.parseIsPending());
+        QVERIFY(doc.parsedDocument() != nullptr);
     }
 };
 

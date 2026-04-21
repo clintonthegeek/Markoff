@@ -1,12 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// PhaseC3: Whole file pending rewrite against Phase-C3 API in Task 8.
-// Current API uses Phase-A setPlainText/plainText removed in Task 6.
-// Rewrite mappings:
-//   setPlainText(text) → resetContent(text, Origin::FirstOpen) (or TestFixture)
-//   plainText() → toMarkdown()
-//   textDocument() → removed; use toMarkdown() / parsedDocument()
 #include <QTest>
-#include <QTextDocument>
+#include <QUndoStack>
 
 #include <markoff/MarkoffDocument.h>
 #include <markoff/ReplaceController.h>
@@ -33,50 +27,50 @@ class TstReplaceController : public QObject {
 private Q_SLOTS:
     void replaceCurrentMutates() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("foo bar foo"));
+        doc.resetContent(QStringLiteral("foo bar foo"), Origin::FirstOpen);
         StubAdapter adapter;
         ReplaceController c(&doc, &adapter);
         c.setQuery(QStringLiteral("foo"));
         QCOMPARE(c.matchCount(), 2);
         c.replaceCurrent(QStringLiteral("baz"));
-        QCOMPARE(doc.plainText(), QStringLiteral("baz bar foo"));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("baz bar foo"));
     }
 
     void replaceAllIsAtomic() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("a a a"));
+        doc.resetContent(QStringLiteral("a a a"), Origin::FirstOpen);
         StubAdapter adapter;
         ReplaceController c(&doc, &adapter);
         c.setQuery(QStringLiteral("a"));
         QCOMPARE(c.replaceAll(QStringLiteral("zz")), 3);
-        QCOMPARE(doc.plainText(), QStringLiteral("zz zz zz"));
-        // One undo reverts all three.
-        doc.textDocument()->undo();
-        QCOMPARE(doc.plainText(), QStringLiteral("a a a"));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("zz zz zz"));
+        // One undo reverts all three (replaceAll wraps in a beginMacro/endMacro).
+        doc.undoStack()->undo();
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("a a a"));
     }
 
     void refusesWhenAdapterRejects() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("a"));
+        doc.resetContent(QStringLiteral("a"), Origin::FirstOpen);
         StubAdapter adapter;
         adapter.replace = false;
         ReplaceController c(&doc, &adapter);
         c.setQuery(QStringLiteral("a"));
-        const QString before = doc.plainText();
+        const QString before = doc.toMarkdown();
         c.replaceCurrent(QStringLiteral("b"));
-        QCOMPARE(doc.plainText(), before);
+        QCOMPARE(doc.toMarkdown(), before);
         QCOMPARE(c.replaceAll(QStringLiteral("b")), 0);
-        QCOMPARE(doc.plainText(), before);
+        QCOMPARE(doc.toMarkdown(), before);
     }
 
     void replaceAllHandlesOverlappingGrowth() {
         MarkoffDocument doc;
-        doc.setPlainText(QStringLiteral("a a"));
+        doc.resetContent(QStringLiteral("a a"), Origin::FirstOpen);
         StubAdapter adapter;
         ReplaceController c(&doc, &adapter);
         c.setQuery(QStringLiteral("a"));
         QCOMPARE(c.replaceAll(QStringLiteral("aa")), 2);
-        QCOMPARE(doc.plainText(), QStringLiteral("aa aa"));
+        QCOMPARE(doc.toMarkdown(), QStringLiteral("aa aa"));
     }
 };
 
