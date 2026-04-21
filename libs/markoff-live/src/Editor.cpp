@@ -2580,6 +2580,14 @@ void Editor::setDocument(MarkoffDocument *doc)
     connect(doc, &MarkoffDocument::documentReloaded,
             this, &Editor::onCanonicalDocumentReloaded);
 
+    // Phase C3 Task 16 — subscribe to inbound canonical deltas and forward
+    // them into the coordinator for live per-item splicing.
+    connect(doc, &MarkoffDocument::contentsChanged,
+            this, [this](qsizetype offset, qsizetype removed, qsizetype inserted) {
+        if (m_coordinator)
+            m_coordinator->applyCanonicalDelta(offset, removed, inserted);
+    });
+
     // If a parse result is already available, build the scene immediately
     // (sync path — ensures test determinism when doc is pre-parsed).
     if (const Markoff::Document *parsed = doc->parsedDocument())

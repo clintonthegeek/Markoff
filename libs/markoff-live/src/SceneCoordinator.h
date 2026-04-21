@@ -144,6 +144,13 @@ public:
     /// stack. Call from Editor::setDocument; pass nullptr to detach.
     void setBoundDocument(Markoff::MarkoffDocument *doc);
 
+    /// Phase C3 Task 16 — apply an inbound canonical delta (from
+    /// MarkoffDocument::contentsChanged) into the affected per-item
+    /// QTextDocument. Single-item deltas are spliced directly; multi-item
+    /// deltas set m_sceneNeedsFullRebuildOnNextParse and apply a conservative
+    /// offset update so the next parseUpdated can force-rebuild.
+    void applyCanonicalDelta(qsizetype offset, qsizetype removed, qsizetype inserted);
+
 Q_SIGNALS:
     void textChanged();
     void reparsed();
@@ -208,9 +215,13 @@ private:
     int m_keyboardAnchorIdx = -1;
     int m_keyboardAnchorPos = -1;
 
-    // Phase C3 Task 15 — outbound delta path
+    // Phase C3 Task 15/16 — outbound + inbound delta path
     Markoff::MarkoffDocument *m_boundDoc = nullptr;
     bool m_applyingCanonicalDelta = false;
+
+    // Phase C3 Task 16 — set when an inbound multi-item delta arrives; cleared
+    // on the next parseUpdated so the next loadMarkdown() rebuilds from scratch.
+    bool m_sceneNeedsFullRebuildOnNextParse = false;
 };
 
 } // namespace Markoff

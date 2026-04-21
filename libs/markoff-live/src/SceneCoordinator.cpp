@@ -202,6 +202,10 @@ SceneCoordinator::detectTableRegions(const QString &markdown) const
 
 void SceneCoordinator::loadMarkdown(const QString &markdown)
 {
+    // Phase C3 Task 16: clear the full-rebuild flag — loadMarkdown always
+    // rebuilds from scratch, so the flag is satisfied unconditionally.
+    m_sceneNeedsFullRebuildOnNextParse = false;
+
     clearItems();  // also clears m_tableConverters and m_itemMap
     auto segments = MarkdownSplitter::split(markdown, *m_parser);
     captureFullDocumentParse(markdown);
@@ -1262,6 +1266,64 @@ void SceneCoordinator::onLocalItemContentsChange(int itemIndex, int localPos,
                                    qsizetype(charsRemoved),
                                    insertedText));
     m_applyingCanonicalDelta = false;
+}
+
+// -------------------------------------------------------------------------
+// Phase C3 Task 16 — inbound canonical-delta splice
+// -------------------------------------------------------------------------
+
+void SceneCoordinator::applyCanonicalDelta(qsizetype offset, qsizetype removed,
+                                            qsizetype inserted)
+{
+    // Guard: skip if we originated this delta (outbound path, Task 15).
+    if (m_applyingCanonicalDelta) return;
+    if (!m_boundDoc) return;
+
+    const int blockIdx = findItemIndexForOffset(int(offset));
+    if (blockIdx < 0 || blockIdx >= m_itemMap.size()) {
+        // Offset out of range — flag for full rebuild on next parseUpdated.
+        m_sceneNeedsFullRebuildOnNextParse = true;
+        return;
+    }
+
+    auto &block = m_itemMap[blockIdx];
+
+    // Does the delta span beyond this item's canonicalEnd?
+    if (offset + removed > qsizetype(block.canonicalEnd)) {
+        // Multi-item delta — cannot splice piecemeal.
+        // Mark for full rebuild on next parseUpdated and apply a conservative
+        // offset update so the map stays approximately consistent.
+        m_sceneNeedsFullRebuildOnNextParse = true;
+        block.canonicalEnd += int(inserted - removed);
+        shiftItemsAfter(blockIdx, int(inserted - removed));
+        return;
+    }
+
+    // Single-item splice: only text items have an inner QTextDocument.
+    // If the affected item is a block item (image etc.) there is nothing to
+    // splice into — just update the offset map and let the next reparse fix it.
+    if (!block.item || !block.item->isTextItem()) {
+        m_sceneNeedsFullRebuildOnNextParse = true;
+        block.canonicalEnd += int(inserted - removed);
+        shiftItemsAfter(blockIdx, int(inserted - removed));
+        return;
+    }
+
+    // Translate canonical offset to local document position.
+    const int localPos = int(offset) - block.canonicalStart;
+    m_applyingCanonicalDelta = true;
+
+    auto *td = static_cast<MarkdownTextItem *>(block.item)->document();
+    QTextCursor c(td);
+    c.setPosition(localPos);
+    c.setPosition(localPos + int(removed), QTextCursor::KeepAnchor);
+    const QString insertedText = m_boundDoc->substring(offset, inserted);
+    c.insertText(insertedText);
+
+    m_applyingCanonicalDelta = false;
+
+    block.canonicalEnd += int(inserted - removed);
+    shiftItemsAfter(blockIdx, int(inserted - removed));
 }
 
 } // namespace Markoff

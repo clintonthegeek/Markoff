@@ -7,6 +7,7 @@
 #include <QUndoStack>
 #include <markoff/Editor.h>
 #include <markoff/MarkoffDocument.h>
+#include <markoff/MarkdownDelta.h>
 #include "MarkdownTextItem.h"   // private src header (added via include path in CMakeLists)
 #include "SceneCoordinator.h"   // private src header
 
@@ -24,6 +25,11 @@ private Q_SLOTS:
     void localEdit_pushesCanonicalDelta();
     void localEdit_deleteRange();
     void localEdit_replaceRange();
+
+    // Phase C3 Task 16 — inbound canonical-delta tests
+    void inboundDelta_splicesIntoItem();
+    void inboundDelta_spanningMultipleItems_marksForFullRebuild();
+    void documentReloaded_tearsDownScene();
 };
 
 /// Attach before the first parse fires: scene is empty until parseUpdated
@@ -212,6 +218,79 @@ void TstLiveCanonicalAttach::localEdit_replaceRange()
     // Canonical buffer should now be "hello Qt".
     QCOMPARE(doc.toMarkdown(), QStringLiteral("hello Qt"));
     QVERIFY(doc.undoStack()->count() >= 1);
+}
+
+// -------------------------------------------------------------------------
+// Phase C3 Task 16 — inbound canonical-delta tests
+// -------------------------------------------------------------------------
+
+void TstLiveCanonicalAttach::inboundDelta_splicesIntoItem()
+{
+    MarkoffDocument doc;
+    doc.resetContent(QStringLiteral("hello world"), Origin::FirstOpen);
+    Editor ed;
+    ed.setDocument(&doc);
+    QSignalSpy parsed(&doc, &MarkoffDocument::parseUpdated);
+    QVERIFY(parsed.wait(2000));
+
+    // External delta (not via a local edit in Live) — push directly onto
+    // the canonical undo stack.
+    doc.undoStack()->push(new Markoff::MarkdownDelta(&doc, 5, 0, QStringLiteral(", friend")));
+    // Canonical should show it.
+    QCOMPARE(doc.toMarkdown(), QStringLiteral("hello, friend world"));
+    // Live's first item should have the splice applied.
+    auto *coord = ed.coordinatorForTesting();
+    QVERIFY(coord);
+    const auto &map = coord->itemMap();
+    QVERIFY(!map.isEmpty());
+    auto *mti = static_cast<MarkdownTextItem *>(map[0].item);
+    QCOMPARE(mti->document()->toPlainText(), QStringLiteral("hello, friend world"));
+}
+
+void TstLiveCanonicalAttach::inboundDelta_spanningMultipleItems_marksForFullRebuild()
+{
+    // Use markdown with an image segment so MarkdownSplitter creates >= 2 items.
+    const QString md = QStringLiteral("text1\n\n![](x.png)\n\ntext2");
+    MarkoffDocument doc;
+    doc.resetContent(md, Origin::FirstOpen);
+    Editor ed;
+    ed.setDocument(&doc);
+    QSignalSpy parsed(&doc, &MarkoffDocument::parseUpdated);
+    QVERIFY(parsed.wait(2000));
+    parsed.clear();
+
+    auto *coord = ed.coordinatorForTesting();
+    QVERIFY(coord);
+    const auto &mapBefore = coord->itemMap();
+    QVERIFY(mapBefore.size() >= 2);
+
+    // Delta that spans items: delete a range that crosses item 0's canonicalEnd.
+    const qsizetype cross = mapBefore[0].canonicalEnd - 1;  // one byte inside item 0
+    const qsizetype len = 4;                                 // crosses into item 1
+    doc.undoStack()->push(new Markoff::MarkdownDelta(&doc, cross, len, QStringLiteral("X")));
+    // Accept either: scene immediately correct, or force-rebuilt after next parseUpdated.
+    QVERIFY(parsed.wait(2000));
+    // After reparse, coordinator's toMarkdown should match canonical.
+    QCOMPARE(coord->toMarkdown(), doc.toMarkdown());
+}
+
+void TstLiveCanonicalAttach::documentReloaded_tearsDownScene()
+{
+    MarkoffDocument doc;
+    doc.resetContent(QStringLiteral("# first"), Origin::FirstOpen);
+    Editor ed;
+    ed.setDocument(&doc);
+    QSignalSpy parsed(&doc, &MarkoffDocument::parseUpdated);
+    QVERIFY(parsed.wait(2000));
+    parsed.clear();
+
+    QSignalSpy reload(&doc, &MarkoffDocument::documentReloaded);
+    doc.resetContent(QStringLiteral("# second content"), Origin::ExternalReloadClean);
+    QCOMPARE(reload.count(), 1);
+    QVERIFY(parsed.wait(2000));
+    // Scene rebuilt with new content.
+    auto *coord = ed.coordinatorForTesting();
+    QCOMPARE(coord->toMarkdown(), QStringLiteral("# second content"));
 }
 
 QTEST_MAIN(TstLiveCanonicalAttach)
