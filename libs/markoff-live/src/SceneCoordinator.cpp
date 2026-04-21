@@ -21,8 +21,11 @@
 #include <QGuiApplication>
 #include <QUndoStack>
 #include <QPointer>
+#include <QLoggingCategory>
 
 namespace Markoff {
+
+Q_LOGGING_CATEGORY(lcSceneRebuild, "markoff.live.scene.rebuild")
 
 namespace {
 /// Count newlines in `utf8` up to and including byte offset `byteOffset`.
@@ -1283,6 +1286,10 @@ void SceneCoordinator::applyCanonicalDelta(qsizetype offset, qsizetype removed,
     if (blockIdx < 0 || blockIdx >= m_itemMap.size()) {
         // Offset out of range — flag for full rebuild on next parseUpdated.
         m_sceneNeedsFullRebuildOnNextParse = true;
+        qCDebug(lcSceneRebuild) << "full rebuild: out-of-range offset"
+                                << "offset=" << offset
+                                << "removed=" << removed
+                                << "inserted=" << inserted;
         return;
     }
 
@@ -1294,6 +1301,12 @@ void SceneCoordinator::applyCanonicalDelta(qsizetype offset, qsizetype removed,
         // Mark for full rebuild on next parseUpdated and apply a conservative
         // offset update so the map stays approximately consistent.
         m_sceneNeedsFullRebuildOnNextParse = true;
+        qCDebug(lcSceneRebuild) << "full rebuild: multi-item span"
+                                << "offset=" << offset
+                                << "removed=" << removed
+                                << "inserted=" << inserted
+                                << "blockEnd=" << block.canonicalEnd
+                                << "itemIdx=" << blockIdx;
         block.canonicalEnd += int(inserted - removed);
         shiftItemsAfter(blockIdx, int(inserted - removed));
         return;
@@ -1304,6 +1317,11 @@ void SceneCoordinator::applyCanonicalDelta(qsizetype offset, qsizetype removed,
     // splice into — just update the offset map and let the next reparse fix it.
     if (!block.item || !block.item->isTextItem()) {
         m_sceneNeedsFullRebuildOnNextParse = true;
+        qCDebug(lcSceneRebuild) << "full rebuild: non-text item"
+                                << "offset=" << offset
+                                << "removed=" << removed
+                                << "inserted=" << inserted
+                                << "itemIdx=" << blockIdx;
         block.canonicalEnd += int(inserted - removed);
         shiftItemsAfter(blockIdx, int(inserted - removed));
         return;
@@ -1321,6 +1339,12 @@ void SceneCoordinator::applyCanonicalDelta(qsizetype offset, qsizetype removed,
     c.insertText(insertedText);
 
     m_applyingCanonicalDelta = false;
+
+    qCDebug(lcSceneRebuild) << "splice:"
+                            << "offset=" << offset
+                            << "removed=" << removed
+                            << "inserted=" << inserted
+                            << "itemIdx=" << blockIdx;
 
     block.canonicalEnd += int(inserted - removed);
     shiftItemsAfter(blockIdx, int(inserted - removed));
