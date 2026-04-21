@@ -46,10 +46,11 @@ void classifyBlockAtCursor(const QTextCursor &cursor, EditorContext &ctx)
     const QTextBlock block = cursor.block();
     const QString line = block.text();
 
-    ctx.atBlockStart = cursor.positionInBlock() == 0;
-    // length() includes the trailing block separator; cursor at the end
-    // of the actual text is at length()-1. An empty block has length 1.
-    ctx.atBlockEnd = cursor.positionInBlock() == qMax(0, block.length() - 1);
+    // Use Qt's own helpers — they handle the terminal-block case
+    // (no trailing block separator) correctly, unlike a
+    // positionInBlock() vs length()-1 comparison.
+    ctx.atBlockStart = cursor.atBlockStart();
+    ctx.atBlockEnd = cursor.atBlockEnd();
 
     // Table — check first; tables own their own QTextBlock tree so
     // heading/list heuristics on block text don't apply.
@@ -94,8 +95,47 @@ void classifyBlockAtCursor(const QTextCursor &cursor, EditorContext &ctx)
 
 void classifyInlineAtCursor(const QTextCursor &cursor, EditorContext &ctx)
 {
-    // Commit B stub — real body lands in Commit C.
     ctx.hasSelection = cursor.hasSelection();
+    if (cursor.isNull()) return;
+
+    const QTextCharFormat fmtStart = cursor.charFormat();
+
+    auto isBoldFmt = [](const QTextCharFormat &f) {
+        return f.fontWeight() >= QFont::Bold;
+    };
+    auto isItalicFmt = [](const QTextCharFormat &f) {
+        return f.fontItalic();
+    };
+    auto isStrikeFmt = [](const QTextCharFormat &f) {
+        return f.fontStrikeOut();
+    };
+    // Inline-code storage mechanism: MarkdownHighlighter tags inline-code
+    // runs with a custom QTextCharFormat property (kInlineCodeProperty).
+    // Reading font family or fontFixedPitch() is unreliable because the
+    // theme's InlineCode format uses setFont(codeFont, FontPropertiesSpecifiedOnly)
+    // which doesn't guarantee the fixed-pitch flag is carried through, and
+    // other elements (CodeBlock, Math) share the same monospace family.
+    auto isInlineCodeFmt = [](const QTextCharFormat &f) {
+        return f.boolProperty(kInlineCodeProperty);
+    };
+
+    if (ctx.hasSelection) {
+        // Selection-wide: matching-span iff the flag holds at both
+        // start and end of the selection. Matches Qt's own
+        // QTextEdit::fontBold()-style semantics.
+        QTextCursor endCur(cursor);
+        endCur.setPosition(cursor.selectionEnd());
+        const QTextCharFormat fmtEnd = endCur.charFormat();
+        ctx.inBold          = isBoldFmt(fmtStart)    && isBoldFmt(fmtEnd);
+        ctx.inItalic        = isItalicFmt(fmtStart)  && isItalicFmt(fmtEnd);
+        ctx.inStrikethrough = isStrikeFmt(fmtStart)  && isStrikeFmt(fmtEnd);
+        ctx.inInlineCode    = isInlineCodeFmt(fmtStart) && isInlineCodeFmt(fmtEnd);
+    } else {
+        ctx.inBold          = isBoldFmt(fmtStart);
+        ctx.inItalic        = isItalicFmt(fmtStart);
+        ctx.inStrikethrough = isStrikeFmt(fmtStart);
+        ctx.inInlineCode    = isInlineCodeFmt(fmtStart);
+    }
 }
 
 } // namespace Markoff::Internal

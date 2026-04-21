@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "MarkdownHighlighter.h"
+#include "EditorContextClassifier.h"
 
 #include <QFont>
 #include <QTextDocument>
@@ -113,7 +114,11 @@ void MarkdownHighlighter::applySpanFormat(const SourceSpan &span,
                 setFormat(localStart, localLen,
                           m_theme.formats.value(headingElements[span.headingLevel - 1]));
             } else if (span.code) {
-                setFormat(localStart, localLen, m_theme.formats.value(Element::InlineCode));
+                QTextCharFormat codeFmt = m_theme.formats.value(Element::InlineCode);
+                // Tag the run so EditorContextClassifier can detect inline-code
+                // context without guessing from font family.
+                codeFmt.setProperty(Markoff::Internal::kInlineCodeProperty, true);
+                setFormat(localStart, localLen, codeFmt);
             } else if (span.bold && span.italic) {
                 QTextCharFormat fmt;
                 fmt.setFontWeight(700);
@@ -185,8 +190,12 @@ void MarkdownHighlighter::applySpanFormat(const SourceSpan &span,
             fmt.setFontItalic(true);
         if (span.strikethrough)
             fmt.setFontStrikeOut(true);
-        if (span.code)
+        if (span.code) {
             fmt.merge(m_theme.formats.value(Element::InlineCode));
+            // Tag the run so EditorContextClassifier can detect inline-code
+            // context without guessing from font family.
+            fmt.setProperty(Markoff::Internal::kInlineCodeProperty, true);
+        }
         if (span.math || span.mathDisplay)
             fmt.setForeground(m_theme.formats.value(Element::Math).foreground());
         if (span.highlight)

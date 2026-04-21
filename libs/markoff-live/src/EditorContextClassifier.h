@@ -5,8 +5,14 @@
 #include <markoff/EditorContext.h>
 
 #include <QTextCursor>
+#include <QTextFormat>
 
 namespace Markoff::Internal {
+
+/// Custom QTextCharFormat property key used by MarkdownHighlighter to tag
+/// inline-code runs so EditorContext classification can detect them
+/// without guessing from font family. See MarkdownHighlighter.cpp.
+constexpr int kInlineCodeProperty = QTextFormat::UserProperty + 100;
 
 /// Classify the block at the given cursor position. Populates
 /// `ctx.blockKind`, `ctx.headingLevel`, `ctx.table`, `ctx.atBlockStart`,
@@ -17,8 +23,6 @@ void classifyBlockAtCursor(const QTextCursor &cursor, EditorContext &ctx);
 /// selection if non-empty). Populates `ctx.inBold`, `ctx.inItalic`,
 /// `ctx.inStrikethrough`, `ctx.inInlineCode`, `ctx.hasSelection`.
 /// Other fields untouched.
-///
-/// Stub in Commit B — real body lands in Commit C.
 void classifyInlineAtCursor(const QTextCursor &cursor, EditorContext &ctx);
 
 } // namespace Markoff::Internal
