@@ -14,7 +14,9 @@ SearchController::SearchController(MarkoffDocument *doc,
     : QObject(parent), m_doc(doc), m_adapter(adapter)
 {
     connect(m_doc, &MarkoffDocument::contentsChanged,
-            this, &SearchController::recomputeMatches);
+            this, [this](qsizetype, qsizetype, qsizetype) {
+                recomputeMatches();
+            });
 }
 
 SearchController::~SearchController() = default;
@@ -50,7 +52,7 @@ void SearchController::recomputeMatches()
         return;
     }
 
-    const QString text = m_doc->plainText();
+    const QString text = m_doc->toMarkdown();
 
     if (m_flags.regex) {
         QRegularExpression::PatternOptions opts =

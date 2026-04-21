@@ -1,147 +1,130 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/MarkoffDocument.h>
+#include <markoff/CanonicalBuffer.h>
+#include <markoff/CursorPosition.h>
+#include <markoff/ParsePool.h>
+#include <markoff/MarkdownDelta.h>
 
-#include <QTextCursor>
-#include <QTextDocument>
+// Bring in InMemoryCanonicalBuffer for default construction.
+#include "InMemoryCanonicalBuffer.h"
 
+// Full definition of markoff-parser Document required for unique_ptr<Document> in Private.
 #include <markoff-parser/Document.h>
+
+#include <QUndoStack>
 
 namespace Markoff {
 
 struct MarkoffDocument::Private {
-    QTextDocument *textDoc = nullptr;
-    int coalescingIdleMs = 500;
-    bool parseDirty = true;
-    std::unique_ptr<Document> cachedParse;
-    int transactionDepth = 0;
+    std::unique_ptr<CanonicalBuffer> buffer;
+    std::unique_ptr<Document>        parsedDoc;   // markoff-parser — fwd-declared above
+    std::unique_ptr<QUndoStack>      undoStack;
+    ParsePool *pool = nullptr;
+    bool       ownsPool = false;   // Task 7: set to true when default pool is constructed
+    int        coalescingIdleMs = 150;
+    bool       m_parsePending = false;
+    // Task 7: poolDebounce QTimer lives here.
 };
 
 MarkoffDocument::MarkoffDocument(QObject *parent)
-    : QObject(parent), d(std::make_unique<Private>())
-{
-    d->textDoc = new QTextDocument(this);
-    connect(d->textDoc, &QTextDocument::contentsChanged,
-            this, [this] {
-                d->parseDirty = true;
-                d->cachedParse.reset();
-                Q_EMIT contentsChanged();
-            });
+    : MarkoffDocument(std::make_unique<InMemoryCanonicalBuffer>(), nullptr, parent) {
 }
 
-MarkoffDocument::~MarkoffDocument() = default;
-
-QString MarkoffDocument::plainText() const
-{
-    return d->textDoc->toPlainText();
-}
-
-void MarkoffDocument::setPlainText(const QString &text)
-{
-    d->textDoc->setPlainText(text);
-    // setPlainText emits contentsChanged, which invalidates the cache.
-}
-
-QTextDocument *MarkoffDocument::textDocument() const
-{
-    return d->textDoc;
-}
-
-void MarkoffDocument::replace(int sourceOffset, int removeLen,
-                              const QString &insert)
-{
-    QTextCursor c(d->textDoc);
-    // Wrap in edit block when outside a transaction so Qt does not
-    // auto-merge this with adjacent edits into a single undo step.
-    const bool standalone = (d->transactionDepth == 0);
-    if (standalone) c.beginEditBlock();
-    c.setPosition(sourceOffset);
-    if (removeLen > 0) {
-        c.setPosition(sourceOffset + removeLen, QTextCursor::KeepAnchor);
-        c.removeSelectedText();
+MarkoffDocument::MarkoffDocument(std::unique_ptr<CanonicalBuffer> buffer,
+                                 ParsePool *pool,
+                                 QObject *parent)
+    : QObject(parent), d(std::make_unique<Private>()) {
+    d->buffer = std::move(buffer);
+    if (!d->buffer) {
+        d->buffer = std::make_unique<InMemoryCanonicalBuffer>();
     }
-    if (!insert.isEmpty()) {
-        c.insertText(insert);
+    d->pool = pool;        // Task 7: if null, construct a DefaultParsePool here and set ownsPool = true
+    d->undoStack = std::make_unique<QUndoStack>(this);
+}
+
+MarkoffDocument::~MarkoffDocument() {
+    // Invariant per Phase C3 spec §4.7: cancel any in-flight parse for this doc
+    // before the ParsePool's queued lambdas can fire with a dangling sender.
+    if (d->pool) {
+        d->pool->cancelJobsFor(this);
     }
-    if (standalone) c.endEditBlock();
+    // d->undoStack dies first (unique_ptr order in the struct), then d->buffer,
+    // then d->parsedDoc. QObject base dtor disconnects all connections targeting
+    // this — safe against any concurrent jobCompleted emissions.
 }
 
-void MarkoffDocument::insert(int sourceOffset, const QString &text)
-{
-    if (text.isEmpty()) return;
-    QTextCursor c(d->textDoc);
-    // Wrap in edit block when outside a transaction so Qt does not
-    // auto-merge this with adjacent edits into a single undo step.
-    const bool standalone = (d->transactionDepth == 0);
-    if (standalone) c.beginEditBlock();
-    c.setPosition(sourceOffset);
-    c.insertText(text);
-    if (standalone) c.endEditBlock();
+// ---- Reads ----
+const QString &MarkoffDocument::toMarkdown() const {
+    return d->buffer->toMarkdown();
 }
 
-void MarkoffDocument::remove(int sourceOffset, int len)
-{
-    if (len <= 0) return;
-    QTextCursor c(d->textDoc);
-    // Wrap in edit block when outside a transaction so Qt does not
-    // auto-merge this with adjacent edits into a single undo step.
-    const bool standalone = (d->transactionDepth == 0);
-    if (standalone) c.beginEditBlock();
-    c.setPosition(sourceOffset);
-    c.setPosition(sourceOffset + len, QTextCursor::KeepAnchor);
-    c.removeSelectedText();
-    if (standalone) c.endEditBlock();
+qsizetype MarkoffDocument::length() const {
+    return d->buffer->length();
 }
 
-void MarkoffDocument::beginTransaction()
-{
-    if (d->transactionDepth++ == 0) {
-        QTextCursor c(d->textDoc);
-        c.beginEditBlock();
-        // The cursor goes out of scope here; endEditBlock() pairs
-        // through the document's own tracking. We use a separate
-        // cursor at endTransaction() to close the same block —
-        // QTextDocument nests editBlock calls on any cursor tied to it.
+QString MarkoffDocument::substring(qsizetype offset, qsizetype len) const {
+    return d->buffer->substring(offset, len);
+}
+
+const Document *MarkoffDocument::parsedDocument() const {
+    return d->parsedDoc.get();
+}
+
+bool MarkoffDocument::parseIsPending() const {
+    return d->m_parsePending;
+}
+
+// ---- Writes ----
+QUndoStack *MarkoffDocument::undoStack() const {
+    return d->undoStack.get();
+}
+
+void MarkoffDocument::resetContent(const QString &newContent, Origin origin) {
+    // Task 7 fills in the full Origin-branch logic.
+    // For Task 6, a minimal impl lets the tests pass for FirstOpen:
+    d->buffer->reset(newContent);
+    if (origin == Origin::FirstOpen) {
+        emit contentsChanged(0, 0, newContent.size());
+    } else {
+        d->undoStack->clear();
+        emit documentReloaded();
     }
+    // Task 7: schedulePoolPost() here.
 }
 
-void MarkoffDocument::endTransaction()
-{
-    if (--d->transactionDepth == 0) {
-        QTextCursor c(d->textDoc);
-        c.endEditBlock();
-    }
+// ---- Anchors ----
+CursorPosition MarkoffDocument::trackCursor(qsizetype offset, CursorBias bias) {
+    const quint64 h = d->buffer->createAnchor(offset, bias);
+    return CursorPosition(this, h);
 }
 
-void MarkoffDocument::setCoalescingIdleMs(int ms)
-{
-    d->coalescingIdleMs = ms;
+qsizetype MarkoffDocument::resolveCursor(const CursorPosition &cp) const {
+    if (!cp.isValid()) return -1;
+    // CursorPosition is an opaque handle; we reach into it via friendship.
+    // MarkoffDocument is declared as friend in CursorPosition, so m_handle is accessible.
+    return d->buffer->resolveAnchor(cp.m_handle);
 }
 
-int MarkoffDocument::coalescingIdleMs() const
-{
-    return d->coalescingIdleMs;
+// ---- Coalescing ----
+void MarkoffDocument::setCoalescingIdleMs(int ms) { d->coalescingIdleMs = ms; }
+int  MarkoffDocument::coalescingIdleMs() const    { return d->coalescingIdleMs; }
+
+// ---- Package-private helpers ----
+QString MarkoffDocument::canonicalSubstring(qsizetype offset, qsizetype len) const {
+    return d->buffer->substring(offset, len);
 }
 
-const Document *MarkoffDocument::parsed() const
-{
-    if (!d->parseDirty && d->cachedParse) {
-        return d->cachedParse.get();
-    }
-    // Sync parse for Phase A. Async worker arrives in Phase C.
-    d->cachedParse = Document::fromMarkdown(d->textDoc->toPlainText());
-    d->parseDirty = false;
-    // Emit while the caller is inside parsed() — OK, Qt signals are
-    // direct by default for same-thread receivers.
-    Q_EMIT const_cast<MarkoffDocument *>(this)->parseUpdated(
-        d->cachedParse.get());
-    return d->cachedParse.get();
+void MarkoffDocument::applyCanonicalDelta(qsizetype offset, qsizetype removedLength,
+                                          const QString &inserted) {
+    // Task 7 fills in: buffer->applyDelta + emit contentsChanged + schedulePoolPost.
+    // For Task 6, a minimal impl lets MarkdownDelta::redo/undo be testable at Task 7.
+    d->buffer->applyDelta(offset, removedLength, inserted);
+    emit contentsChanged(offset, removedLength, inserted.size());
+    // Task 7: schedulePoolPost()
 }
 
-bool MarkoffDocument::parseIsPending() const
-{
-    // Sync parse only in Phase A — never pending.
-    Q_UNUSED(d);
-    return false;
+void MarkoffDocument::releaseAnchorHandle(quint64 handle) {
+    d->buffer->releaseAnchor(handle);
 }
 
-}  // namespace Markoff
+} // namespace Markoff

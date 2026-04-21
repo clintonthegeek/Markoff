@@ -35,12 +35,9 @@ bool CursorPosition::isValid() const {
 }
 
 void CursorPosition::release() {
-    // Phase C3 Task 6 fills in the release path once
-    // MarkoffDocument::releaseAnchorHandle exists:
-    //     if (isValid()) m_doc->releaseAnchorHandle(m_handle);
-    // Until then, the m_doc == nullptr guard prevents a null-deref
-    // and the handle leak is bounded by the life of the MarkoffDocument
-    // (which owns the CanonicalBuffer that owns the anchor).
+    if (isValid()) {
+        m_doc->releaseAnchorHandle(m_handle);
+    }
     m_doc = nullptr;
     m_handle = 0;
 }

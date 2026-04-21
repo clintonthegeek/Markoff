@@ -4,57 +4,71 @@
 #include <QObject>
 #include <QString>
 #include <memory>
+#include <markoff/CanonicalBuffer.h>   // for CursorBias enum — leaves CursorPosition fwd-decl'd
+#include <markoff/MarkoffCoreExport.h>
 
-class QTextDocument;
+class QUndoStack;
 
 namespace Markoff {
 
-class Document;                          // markoff-parser
+class CanonicalBuffer;
+class CursorPosition;
+class ParsePool;
+class Document;  // markoff-parser
 
-/// Canonical markdown source + undo + cached parse. Views attach via
-/// MarkdownView::setDocument(). In Phase A the leaf widgets still
-/// own their own content; attaching a MarkoffDocument stores the
-/// pointer but doesn't yet bind text. Phase C flips that.
-class MarkoffDocument : public QObject {
+enum class Origin {
+    FirstOpen,              // empty stack, no command pushed
+    ExternalReloadClean,    // stack cleared
+    ExternalReloadResolved, // stack cleared (post-merge-modal, any outcome)
+    UserRevertToSaved,      // pushes one mega MarkdownDelta
+    TestFixture,            // stack cleared
+};
+
+class MARKOFF_CORE_EXPORT MarkoffDocument : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(MarkoffDocument)
 public:
     explicit MarkoffDocument(QObject *parent = nullptr);
+    MarkoffDocument(std::unique_ptr<CanonicalBuffer> buffer,
+                    ParsePool *pool = nullptr,
+                    QObject *parent = nullptr);
     ~MarkoffDocument() override;
 
-    QString plainText() const;
-    void setPlainText(const QString &text);
+    // Reads
+    const QString  &toMarkdown() const;
+    qsizetype       length() const;
+    QString         substring(qsizetype offset, qsizetype len) const;
+    const Document *parsedDocument() const;
+    bool            parseIsPending() const;
 
-    QTextDocument *textDocument() const;
+    // Writes — undo-stack only
+    QUndoStack *undoStack() const;
+    void        resetContent(const QString &newContent, Origin origin);
 
-    void replace(int sourceOffset, int removeLen, const QString &insert);
-    void insert(int sourceOffset, const QString &text);
-    void remove(int sourceOffset, int len);
+    // Anchors
+    CursorPosition trackCursor(qsizetype offset, CursorBias bias);
+    qsizetype      resolveCursor(const CursorPosition &) const;
 
-    void beginTransaction();
-    void endTransaction();
-
+    // Coalescing
     void setCoalescingIdleMs(int ms);
-    int coalescingIdleMs() const;
+    int  coalescingIdleMs() const;
 
-    /// Synchronous parse cache. Async worker lands in Phase C.
-    const Document *parsed() const;
-    bool parseIsPending() const;
-
-    // --- Phase C3 write-side API (Task 6+7) ---
-    // Declared here so MarkdownDelta.cpp compiles; implementations land in Task 7.
-    QString   canonicalSubstring(qsizetype offset, qsizetype length) const;
-    void      applyCanonicalDelta(qsizetype offset,
-                                  qsizetype removedLength,
-                                  const QString &inserted);
+    // Package-private helpers (friend-used by MarkdownDelta + CursorPosition).
+    // Kept public for simplicity; a later pass can tighten via friend decls.
+    QString canonicalSubstring(qsizetype offset, qsizetype len) const;
+    void    applyCanonicalDelta(qsizetype offset,
+                                qsizetype removedLength,
+                                const QString &inserted);
+    void    releaseAnchorHandle(quint64 handle);
 
 Q_SIGNALS:
-    void contentsChanged();
-    void parseUpdated(const Document *);
+    void contentsChanged(qsizetype offset, qsizetype removed, qsizetype inserted);
+    void parseUpdated(const Markoff::Document *parsed);
+    void documentReloaded();
 
 private:
     struct Private;
     std::unique_ptr<Private> d;
 };
 
-}  // namespace Markoff
+} // namespace Markoff

@@ -2,8 +2,10 @@
 #include <markoff/ReplaceController.h>
 
 #include <QLoggingCategory>
+#include <QUndoStack>
 
 #include <markoff/MarkoffDocument.h>
+#include <markoff/MarkdownDelta.h>
 #include <markoff/SearchAdapter.h>
 
 namespace {
@@ -26,7 +28,8 @@ void ReplaceController::replaceCurrent(const QString &with)
     }
     if (m_current < 0 || m_current >= m_matches.size()) return;
     const TextSpan s = m_matches[m_current];
-    m_doc->replace(s.offset, s.length, with);
+    m_doc->undoStack()->push(
+        new MarkdownDelta(m_doc, s.offset, s.length, with));
 }
 
 int ReplaceController::replaceAll(const QString &with)
@@ -40,12 +43,13 @@ int ReplaceController::replaceAll(const QString &with)
     QVector<TextSpan> spans = m_matches;
     const int count = spans.size();
 
-    m_doc->beginTransaction();
+    m_doc->undoStack()->beginMacro(QStringLiteral("Replace All"));
     for (int i = count - 1; i >= 0; --i) {
         const TextSpan s = spans[i];
-        m_doc->replace(s.offset, s.length, with);
+        m_doc->undoStack()->push(
+            new MarkdownDelta(m_doc, s.offset, s.length, with));
     }
-    m_doc->endTransaction();
+    m_doc->undoStack()->endMacro();
     return count;
 }
 
