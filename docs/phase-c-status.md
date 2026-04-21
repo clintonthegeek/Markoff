@@ -68,7 +68,7 @@ during C1–C7.
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
 | C6   | done | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | Corbomite `a893c88d` | `v0.5.0`  |
-| C3   | markoff ready (v0.6.0) | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | `master`             | —                    | `v0.6.0`  |
+| C3   | done | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | `master`             | Corbomite `c6c4f446`..`23bc5094` | `v0.6.0`  |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C4   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,79 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-21 — C3 done (Corbomite-side adaptation shipped)
+
+Tasks 20-23 Corbomite-side adaptation landed. Total C3 commit
+count:
+- Markoff side: ~19 commits on master across v0.6.0-alpha.1
+  (Task 9) and v0.6.0 (Task 19) tag lines; core primitives +
+  MarkoffDocument rewrite + three leaves bound + tri-view
+  interop + cross-mode undo tests.
+- Corbomite side: ~5 commits (20-23 adaptation + pin bumps).
+
+Key Corbomite-side deliverables:
+
+- Task 20 (NoteDocument wrapper): NoteDocument owns
+  Markoff::MarkoffDocument via pimpl. markdown() / setMarkdown()
+  delegate to toMarkdown() / resetContent(TestFixture).
+  markoff() accessor exposes the MarkoffDocument for leaves to
+  bind via setDocument(note->markoff()). contentsChanged /
+  documentReloaded relay to textChanged + modified=true.
+
+- Task 21 (Vault ParsePool + raw-byte saveDocument):
+  Vault owns one Markoff::ParsePool for its lifetime.
+  openDocument hydrates via resetContent(FirstOpen) + explicit
+  setModified(false). saveDocument writes canonical bytes via
+  raw QFile::write (no QTextDocumentWriter coercion). Byte-
+  equality defense-in-depth in onExternalModified suppresses
+  reloads when disk bytes equal canonical.
+
+- Task 22 (External-reload Origin dispatch):
+  onExternalModified dispatches to Origin::ExternalReloadClean
+  (auto-apply, clear stack) or emits externalReloadConflict
+  signal (dirty case). resolveExternalReload applies
+  Origin::ExternalReloadResolved after UI merge-modal outcome.
+
+- Task 23 (NoteEditorWidget flush/restore retired): four pre-C3
+  call sites deleted. Mode swap: outgoing leaf
+  setDocument(nullptr), stacked-page switch, incoming leaf
+  setDocument(m_doc->markoff()) + ephemeralState restore.
+  Canonical content never round-trips through leaves during
+  swap. Replaced Corbomite::SourceEditor (Phase A adapter) with
+  Markoff::Source::SourceEditor throughout the editor stack.
+
+Test state (Corbomite build at Task 24 validation):
+- Markoff-core tests: all C3 tests (tst_canonical_buffer,
+  tst_cursor_position, tst_markdown_delta, tst_parse_pool,
+  tst_origin_reset, tst_cursor_anchor, tst_markoff_document,
+  tst_markoff_search_controller, tst_markoff_replace_controller)
+  pass.
+- Markoff-leaf tests: tst_source_canonical_attach,
+  tst_reading_canonical_attach, tst_live_canonical_attach,
+  tst_scene_offset_map all pass.
+- Top-level markoff: tst_canonical_interop, tst_cross_mode_undo
+  both pass. tst_tri_view_smoke + C6-era markoff editor tests
+  continue green.
+- Corbomite adaptation: tst_notedocument, tst_vault_save_reload,
+  tst_note_editor_widget_ephemeral,
+  tst_note_editor_widget_mode_transition all pass.
+- Full Corbomite ctest: 260/264 pass. 4 pre-existing failures:
+  tst_markoff_undo_grouping, tst_markoff_table_operations
+  (documented pre-C3), tst_completion_popup (Wayland-teardown
+  SEGFAULT, environmental), tst_benchmark_layout (documented
+  timeout).
+
+Follow-ups tracked (per spec §9):
+- HoverPopover live-binding (post-C3 Corbomite follow-up).
+- Sync-chattiness undo-clear mitigation (Phase-E motivator).
+- libs/markoff-live/CLAUDE.md rename (cosmetic).
+- Four MARKOFF_READING_USE_REAL_COREDEPS-gated-then-retired
+  tests from C1b become revivable (C3 makes injection concrete).
+
+C3 work-unit complete. Next work-unit in Markoff Phase C
+sequence: C7 (Source feature completion — find/replace +
+fold-gutter).
 
 ### 2026-04-21 — C3 landed at v0.6.0
 
