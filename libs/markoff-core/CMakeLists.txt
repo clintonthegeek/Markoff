@@ -11,11 +11,13 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 
 add_library(markoff_core STATIC
     src/EphemeralState.cpp
+    src/InMemoryCanonicalBuffer.cpp
     src/MarkdownRenderChild.cpp
     src/MarkoffDocument.cpp
     src/ReplaceController.cpp
     src/SearchController.cpp
     src/SearchBar.cpp
+    include/markoff/CanonicalBuffer.h
     include/markoff/CursorPos.h
     include/markoff/TextSpan.h
     include/markoff/FoldSpec.h

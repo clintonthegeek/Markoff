@@ -61,3 +61,8 @@ add_executable(tst_markoff_default_vault_provider tst_markoff_default_vault_prov
 add_test(NAME tst_markoff_default_vault_provider COMMAND tst_markoff_default_vault_provider)
 target_link_libraries(tst_markoff_default_vault_provider PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_markoff_default_vault_provider PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_canonical_buffer tst_canonical_buffer.cpp)
+add_test(NAME tst_canonical_buffer COMMAND tst_canonical_buffer)
+target_link_libraries(tst_canonical_buffer PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_canonical_buffer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
