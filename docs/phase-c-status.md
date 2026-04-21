@@ -69,7 +69,7 @@ during C1–C7.
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
 | C6   | done | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | Corbomite `a893c88d` | `v0.5.0`  |
 | C3   | **in soak** — `v0.6.0` tagged premature per 2026-04-21 C3 landing review; re-tagged `v0.6.0-alpha.2` at same SHA pending dogfood week. Fix commits tag `v0.6.0-alpha.3/.4/...`; stability re-tags as `v0.6.1`. | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | `master`             | Corbomite `c6c4f446`..`23bc5094` | `v0.6.0` + `v0.6.0-alpha.2` |
-| C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
+| C7   | **BLOCKED** — editor key-dispatch architectural flaw must be resolved first ([spec](specs/2026-04-21-editor-key-dispatch-architecture.md)). See activity log 2026-04-21. Design inputs ready but implementation deferred: [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C4   | not started  | —                                      | —                                      | —                    | —                    | —         |
 
@@ -229,6 +229,31 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-21 — Soak-week fix series alpha.3 → alpha.8; C7 BLOCKED on architectural spec
+
+Six consecutive typing-triggered SEGVs during user dogfooding surfaced a mix of C3-integration bugs and one pre-existing `Markoff::Editor` architectural flaw. Six fix tags pushed; the final one (alpha.8) is explicitly a **bandage** and the architectural issue **blocks C7 until resolved**.
+
+**Soak crashes + fixes:**
+
+| Tag | Crash trigger | Root cause | Fix |
+|---|---|---|---|
+| `v0.6.0-alpha.3` | Typing right after opening a note | Scene had no focusItem; key events bubbled from m_view back to Editor in infinite recursion | Focus-loop at tail of `onCanonicalParseUpdated` |
+| `v0.6.0-alpha.4` | Cursor crash after typing a short while | `onCanonicalParseUpdated` called `loadMarkdown` unconditionally on every debounced parseUpdated, tearing down TextControl state mid-typing | Gate rebuild on `consumeRebuildFlag()` or scene-out-of-sync |
+| `v0.6.0-alpha.5` | Cursor crash (same symptom, different path) | `SceneCoordinator`'s internal 150ms reparse timer ran strip/refresh Inline Substitutions under `doc->blockSignals(true)`, desync'ing TextControl's internal tracking | Skip internal reparse when canonical-bound |
+| `v0.6.0-alpha.6` | Same cursor-drift symptom | Root still un-localized; pre-emptive defense | Defensive clamp in `rectForPosition` + qCWarning on drift |
+| `v0.6.0-alpha.7` | Crash before typing a single character | Race: `Vault::openDocument` schedules async parse; `Editor::setDocument` only built scene when `parsedDocument()` was non-null. Between setDocument and first parseUpdated (~150ms), no focus target → bubble-recursion | Build scene synchronously in `setDocument` from `doc->toMarkdown()`; don't wait for parseUpdated |
+| `v0.6.0-alpha.8` | Bare Shift press mid-typing (thousands of recursive keyPressEvent lines) | **Architectural flaw in `Markoff::Editor`** (pre-existing, masked by pre-C3 tests). `setFocusProxy(m_view)` + manual `sendEvent(m_view, e)` in `keyPressEvent` contradict each other; Qt's natural unaccepted-event bubbling from m_view's QWidget parent (= Editor) completes the loop | **Bandage**: re-entrance guard in `Editor::keyPressEvent`. Real fix deferred to dedicated spec |
+
+**Architectural followup spec:** [`docs/specs/2026-04-21-editor-key-dispatch-architecture.md`](specs/2026-04-21-editor-key-dispatch-architecture.md) — details the flaw, three fix options (A: drop manual sendEvent + rely on focus proxy; B: reparent m_view; C: drop focus proxy), recommends Option A, and enumerates the stakeholders (every key-driven Live feature: Tab, Ctrl+Home, PageUp/Down, character input, IME, selection, shortcuts, context menu, CJK autocorrect, read-only mode, event filtering).
+
+**C7 is BLOCKED** on this spec's resolution. C7 (Source find/replace + fold-gutter) adds many new key bindings — each one would have to navigate the re-entrance guard, and every new "unaccepted bubbles back" edge case would be silently swallowed (quiet regression) rather than crashing (loud regression). Fixing the architecture before C7 means the test pass is smaller and the behavioral contract is coherent.
+
+**Current soak state:** User dogfooding v0.6.0-alpha.8; further crashes funnel into new alpha tags. `v0.6.1` will NOT be tagged while the bandage is in place — promoting the bandage to a milestone release would cement the architectural debt.
+
+**Not proposed for this PR or tagging:** immediate Option A implementation. The architectural fix touches every key-driven Live feature; it deserves spec + reviewer + test-pass scope, not a rushed soak-week commit.
+
+
 
 ### 2026-04-21 — C3 landing review received; 5 asks actioned; v0.6.0 re-tagged alpha.2 pending soak week
 
