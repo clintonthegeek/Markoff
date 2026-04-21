@@ -123,6 +123,102 @@ Any change to the key-dispatch structure affects all of these. That's why this i
 5. Remove the bandage (`m_inKeyPressEvent` + the guard block in `Editor::keyPressEvent`).
 6. Re-tag as `v0.6.1` once the dogfood week closes.
 
+## Dogfood-surfaced test-pass criteria
+
+The `v0.6.0-alpha.8` bandage was shipped with instrumentation logging (`Q_LOGGING_CATEGORY` `markoff.live.dogfood`) and observed live during user dogfooding. Beyond the known `key=0x1000020` (Shift) recursion-guard firing on every modifier press — expected under the bandage — the instrumentation surfaced three behaviours that the architectural fix MUST verify absent. Each one is a symptom downstream of the same flaw; the Option A refactor should eliminate all three, and the test pass should include explicit checks.
+
+### D1. No focus loss mid-typing
+
+Observed pattern in the dogfood log:
+
+```
+keyPressEvent fwd: key=0x1000020 text= ... focusItem=0x5555577f0910   ← valid focus
+  (a few events later, after Enter press)
+keyPressEvent fwd: key=0x48 text=H ... focusItem=0x0                  ← focus lost
+recursion guard fired: key=0x48 — event bubbled back, accepting to break.
+keyPressEvent fwd: key=0x4d text=m ... focusItem=0x0
+recursion guard fired: key=0x4d ...
+  (5 more character keystrokes all eaten by the guard with focusItem=0x0)
+```
+
+**Problem:** with `focusItem=0x0`, the bandage cheerfully accepts every keystroke and returns — including plain character keys (`H`, `m`, `j`, etc.) that the user was actively typing. The bandage prevents SEGV but silently drops user input in this window. The user observed this as "I pressed keys and they didn't appear."
+
+**Trigger signal in log:** followed an Enter press, which likely caused a transient scene mutation (new paragraph boundary, MarkdownSplitter re-segmentation, or similar) that destroyed or blurred the focused item. Focus was never restored automatically; it came back only when the user later clicked or selected.
+
+**Test-pass requirement:** after Option A lands, paragraph-boundary-creating keys (Enter, backspace-at-block-start, triple-click-select-all-paragraph-then-type, paste-with-newlines) MUST leave the scene with a valid `focusItem` that accepts the next character key. Manual test: type a paragraph, Enter, type more — every character must appear. Automated test: simulate key sequence `"hello\n\nworld"` via `QTest::keyClicks`, assert `scene->focusItem() != nullptr` at every step AND `coord->toMarkdown().contains("hello\n\nworld")` at the end.
+
+### D2. No cursor-position drift warnings
+
+Observed in the dogfood log:
+
+```
+QTextCursor::setPosition: Position '407' out of range
+QTextCursor::setPosition: Position '474' out of range
+QTextCursor::setPosition: Position '127' out of range
+QTextCursor::setPosition: Position '194' out of range
+```
+
+**Problem:** pre-`alpha.6` these conditions crashed inside `QTextEngine::justify` via `TextControlPrivate::rectForPosition`. The `alpha.6` defensive clamp (in `TextControl.cpp::rectForPosition`) prevents the crash by clamping out-of-range positions to end-of-doc, but the warnings still fire — the underlying `TextControlPrivate::cursor` position is going out of sync with its bound `QTextDocument`. The clamp masks the symptom without addressing the root cause.
+
+**Correlation observed:** drift warnings cluster around the same moments as focus-loss events (D1). Something racing between user input, per-item `QTextDocument` modification, and TextControl's cursor-tracking.
+
+**Prime suspect:** `MarkdownTextItem::applyCjkBracketAutocorrect` (at `MarkdownTextItem.cpp:801`) uses a LOCAL `QTextCursor` with `beginEditBlock` + `removeSelectedText` + `insertText` on the focused item's document. It runs on every non-empty-text key press. If autocorrect mutates the doc content near `TextControlPrivate::cursor`'s position via a local cursor, the `TextControlPrivate::cursor`'s cached tracking can diverge from the post-mutation document. CJK autocorrect isn't part of the key-dispatch refactor per se, but the bug has the same class (cursor ownership confusion between multiple QTextCursor instances attached to the same doc).
+
+**Test-pass requirement:** after Option A lands, typing sequences that trigger CJK autocorrect candidates (and sequences that don't) MUST produce zero `QTextCursor::setPosition: Position 'N' out of range` warnings across a 10-minute typing session. The alpha.6 clamp's `qCWarning` log line `rectForPosition: position N out of range [0, M] — clamping` MUST fire zero times under Option A. If any remain, investigate the remaining drift path (likely CJK autocorrect's local cursor ops) and fix BEFORE removing the clamp.
+
+### D3. No `QFont::setPointSizeF: Point size <= 0` warnings
+
+Observed four-in-a-row during a `setDocument` re-attach in the dogfood log:
+
+```
+Editor::setDocument(doc=0x... , canonicalLen=125)
+Editor::setDocument sync-build: canonicalLen=125 sceneItemsBefore=1
+QFont::setPointSizeF: Point size <= 0 (0.000000), must be greater than 0
+QFont::setPointSizeF: Point size <= 0 (0.000000), must be greater than 0
+QFont::setPointSizeF: Point size <= 0 (0.000000), must be greater than 0
+QFont::setPointSizeF: Point size <= 0 (0.000000), must be greater than 0
+Editor::setDocument post-build: ...
+```
+
+**Problem:** `m_fontSize = 0` when `setDocument`'s sync-build calls `font.setPointSize(m_fontSize)` after `m_coordinator->setItemWidth(width)`. The path at the time of the warnings:
+
+```cpp
+// In Editor::setDocument sync-build:
+if (m_fontSize > 0) {
+    QFont font = this->font();
+    font.setPointSize(m_fontSize);
+    m_coordinator->setFont(font);
+}
+```
+
+The `if (m_fontSize > 0)` guard should prevent the warning... unless `m_coordinator->setFont(font)` internally rebuilds per-item fonts via some path that itself calls `setPointSize(0)` on a stale member font. OR it's a different code path entirely — possibly `applyEffectiveFont()` or theme init running concurrently with scene reconstruction, picking up `m_fontSize == 0` from a partially-constructed state.
+
+**User-visible impact:** if a note opens before the theme has applied, text may render at the default font size instead of the configured one. Cosmetic but persistent.
+
+**Test-pass requirement:** after Option A lands, and with a vault loaded under normal conditions (theme applied before note open), opening a note MUST produce zero `QFont::setPointSizeF: Point size <= 0` warnings. If the warning is a theme-initialization-ordering issue orthogonal to Option A, file as a separate cosmetic follow-up and close with a comment in the relevant init path; do NOT ship Option A with it unexplained.
+
+### Test-pass summary
+
+The Option A test pass (per the Recommendation above) must confirm all of:
+
+| Behaviour | Verification |
+|---|---|
+| Tab smart-indent still works | Manual + existing `tst_markoff_live` tab slots |
+| Ctrl+Home / Ctrl+End / PageUp / PageDown | Manual + add regression slot |
+| Character input | New regression slot: `QTest::keyClicks` with full English text |
+| IME commit path | Manual test with fcitx or ibus |
+| Bare modifier press produces no crash AND no swallowed-input | New regression slot with `QTest::keyClick(Qt::Key_Shift)` |
+| Bound QShortcut / QAction | Manual test of Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+Z, Ctrl+Y |
+| Context-menu key (Menu key) | Manual |
+| Arrow keys and selection extension | Manual + existing `tst_markoff_live` |
+| **D1: focus survives Enter + paragraph boundary** | New regression slot per above |
+| **D2: zero `setPosition out of range` warnings across 10-min typing** | Manual (or long-running instrumented test) |
+| **D3: zero `QFont::setPointSizeF <= 0` warnings on fresh note open** | Manual verification with clean dev-build profile |
+
+Alpha.6's `rectForPosition` clamp and `alpha.8`'s `m_inKeyPressEvent` guard both get REMOVED as part of Option A landing. Running the test pass with both safety nets gone is the acceptance gate. If any of D1/D2/D3 still reproduce after Option A, the bandages stay until a follow-up fix; `v0.6.1` still does not tag until all three clear.
+
+---
+
 ## The bandage (`v0.6.0-alpha.8`)
 
 Committed as-is at `b58b96d` on the Markoff submodule master. The guard:
