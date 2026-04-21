@@ -11,6 +11,7 @@ class TstMarkoffDocument : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void setPlainTextEmitsContentsChanged() {
+        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); plainText() → toMarkdown()
         MarkoffDocument doc;
         QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
         doc.setPlainText(QStringLiteral("hello"));
@@ -19,6 +20,7 @@ private Q_SLOTS:
     }
 
     void replaceMutatesTextAndEmits() {
+        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); replace() → undoStack()->push(new MarkdownDelta(...)); plainText() → toMarkdown()
         MarkoffDocument doc;
         doc.setPlainText(QStringLiteral("hello world"));
         QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
@@ -28,6 +30,7 @@ private Q_SLOTS:
     }
 
     void insertAndRemove() {
+        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); insert() → undoStack()->push(new MarkdownDelta(&doc, offset, 0, str)); remove() → undoStack()->push(new MarkdownDelta(&doc, offset, len, QString())); plainText() → toMarkdown()
         MarkoffDocument doc;
         doc.setPlainText(QStringLiteral("ac"));
         doc.insert(1, QStringLiteral("b"));
@@ -37,6 +40,7 @@ private Q_SLOTS:
     }
 
     void transactionBoundaryCoalescesUndo() {
+        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); textDocument() removed; use undoStack()->beginMacro()/endMacro(); plainText() → toMarkdown()
         MarkoffDocument doc;
         doc.setPlainText(QStringLiteral("hello"));
         QTextDocument *td = doc.textDocument();
@@ -55,6 +59,7 @@ private Q_SLOTS:
     }
 
     void untransactedEditsAreIndividuallyUndoable() {
+        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); textDocument() removed; insert() → undoStack()->push(new MarkdownDelta(...)); plainText() → toMarkdown()
         MarkoffDocument doc;
         doc.setPlainText(QStringLiteral("a"));
         QTextDocument *td = doc.textDocument();
@@ -70,6 +75,7 @@ private Q_SLOTS:
     }
 
     void parseIsSyncForSmallDocs() {
+        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); parsed() → parsedDocument()
         MarkoffDocument doc;
         doc.setPlainText(QStringLiteral("# Heading\n\nbody\n"));
         QVERIFY(!doc.parseIsPending());
@@ -77,6 +83,7 @@ private Q_SLOTS:
     }
 
     void parseIsInvalidatedOnEdit() {
+        // PhaseC3: rewrite in Task 8 — setPlainText() → resetContent(text, Origin::FirstOpen); insert() → undoStack()->push(new MarkdownDelta(...)); plainText() → toMarkdown(); parsed() → parsedDocument()
         MarkoffDocument doc;
         doc.setPlainText(QStringLiteral("# h\n"));
         const auto *first = doc.parsed();
