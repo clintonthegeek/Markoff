@@ -10,6 +10,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(KF6SyntaxHighlighting REQUIRED)
 
 add_library(markoff_core STATIC
+    src/CursorPosition.cpp
     src/EphemeralState.cpp
     src/InMemoryCanonicalBuffer.cpp
     src/MarkdownRenderChild.cpp
@@ -18,6 +19,7 @@ add_library(markoff_core STATIC
     src/SearchController.cpp
     src/SearchBar.cpp
     include/markoff/CanonicalBuffer.h
+    include/markoff/CursorPosition.h
     include/markoff/CursorPos.h
     include/markoff/TextSpan.h
     include/markoff/FoldSpec.h
