@@ -2562,10 +2562,15 @@ void Editor::setDocument(MarkoffDocument *doc)
     m_markoffDoc = doc;
 
     if (!doc) {
-        // Detach: clear the scene; next setDocument will rebuild.
+        // Detach: clear the scene and disconnect the outbound delta path.
+        m_coordinator->setBoundDocument(nullptr);
         m_coordinator->loadMarkdown(QString());
         return;
     }
+
+    // Inform the coordinator of the bound document so per-item contentsChange
+    // can push MarkdownDeltas onto its undo stack (Phase C3 Task 15).
+    m_coordinator->setBoundDocument(doc);
 
     // Subscribe to canonical signals.
     connect(doc, &MarkoffDocument::parseUpdated,

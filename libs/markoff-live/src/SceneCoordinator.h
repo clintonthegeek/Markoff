@@ -3,6 +3,7 @@
 #define MARKOFF_SCENECOORDINATOR_H
 
 #include <markoff/Theme.h>
+#include <markoff/MarkoffDocument.h>
 #include "TableConverter.h"
 #include <markoff-parser/Document.h>
 #include <QObject>
@@ -138,6 +139,11 @@ public:
     /// PUBLIC — used by Editor (Task 8) for find auto-unfold.
     QStringList enclosingHeadingPathAtBlock(int itemIndex, int blockNumber) const;
 
+    /// Phase C3 Task 15 — inform the coordinator of the bound MarkoffDocument
+    /// so that per-item contentsChange can push MarkdownDeltas onto its undo
+    /// stack. Call from Editor::setDocument; pass nullptr to detach.
+    void setBoundDocument(Markoff::MarkoffDocument *doc);
+
 Q_SIGNALS:
     void textChanged();
     void reparsed();
@@ -151,6 +157,11 @@ private:
     void repositionItems();
     void onItemTextChanged();
     void reparse();
+
+    /// Phase C3 Task 15 — translates a per-item local contentsChange into a
+    /// canonical MarkdownDelta and pushes it onto m_boundDoc->undoStack().
+    void onLocalItemContentsChange(int itemIndex, int localPos,
+                                   int charsRemoved, int charsAdded);
 
     FoldingModel *m_foldingModel = nullptr;
     void applyFoldVisibility();
@@ -196,6 +207,10 @@ private:
     int m_keyboardCurrentIdx = -1;
     int m_keyboardAnchorIdx = -1;
     int m_keyboardAnchorPos = -1;
+
+    // Phase C3 Task 15 — outbound delta path
+    Markoff::MarkoffDocument *m_boundDoc = nullptr;
+    bool m_applyingCanonicalDelta = false;
 };
 
 } // namespace Markoff

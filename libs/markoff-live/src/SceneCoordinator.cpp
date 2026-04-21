@@ -12,12 +12,15 @@
 #include <markoff-parser/TableHandler.h>
 #include "MarkdownHighlighter.h"
 #include <markoff-parser/TreeSitterParser.h>
+#include <markoff/MarkdownDelta.h>
 
 #include <QTimer>
 #include <QTextDocument>
 #include <QTextTable>
 #include <QTextFrame>
 #include <QGuiApplication>
+#include <QUndoStack>
+#include <QPointer>
 
 namespace Markoff {
 
@@ -98,6 +101,29 @@ MarkdownTextItem *SceneCoordinator::createTextItem(const QString &text)
     // undo source; allowing QTextDocument to accumulate its own history
     // would cause double-undo and state divergence.
     item->document()->setUndoRedoEnabled(false);
+
+    // Phase C3 Task 15 — outbound delta: connect each item's QTextDocument
+    // contentsChange to a lambda that translates (localPos, removed, added) →
+    // canonical offset via the item map and pushes a MarkdownDelta.
+    //
+    // Capture via QPointer<MarkdownTextItem> (QObject subtype) so the lambda
+    // stays safe across scene rebuilds where the item is replaced. At dispatch
+    // time we look up the item's current index in m_itemMap rather than
+    // capturing a stale index.
+    {
+        QPointer<MarkdownTextItem> itemRef(item);
+        connect(item->document(), &QTextDocument::contentsChange,
+                this, [this, itemRef](int pos, int removed, int added) {
+            if (!itemRef) return;
+            // Find current index of itemRef in m_itemMap at dispatch time.
+            int idx = -1;
+            for (int i = 0; i < m_itemMap.size(); ++i) {
+                if (m_itemMap[i].item == itemRef.data()) { idx = i; break; }
+            }
+            if (idx < 0) return;
+            this->onLocalItemContentsChange(idx, pos, removed, added);
+        });
+    }
 
     connect(item, &MarkdownTextItem::textChanged,
             this, &SceneCoordinator::onItemTextChanged);
@@ -1188,6 +1214,54 @@ qreal SceneCoordinator::headingSceneY(int headingIndex) const
         }
     }
     return -1.0;
+}
+
+// -------------------------------------------------------------------------
+// Phase C3 Task 15 — outbound delta: setBoundDocument + onLocalItemContentsChange
+// -------------------------------------------------------------------------
+
+void SceneCoordinator::setBoundDocument(Markoff::MarkoffDocument *doc)
+{
+    m_boundDoc = doc;
+}
+
+void SceneCoordinator::onLocalItemContentsChange(int itemIndex, int localPos,
+                                                  int charsRemoved, int charsAdded)
+{
+    // Guard: skip if we are currently applying an inbound canonical delta
+    // (Task 16) or if no document is bound.
+    if (m_applyingCanonicalDelta) return;
+    if (!m_boundDoc) return;
+    if (itemIndex < 0 || itemIndex >= m_itemMap.size()) return;
+
+    const auto &entry = m_itemMap[itemIndex];
+    const qsizetype canonicalOffset = entry.canonicalStart + qsizetype(localPos);
+
+    // Extract the inserted text from the local document before pushing the
+    // delta (the delta's first redo() will capture the removed text from the
+    // canonical buffer, so we only need to provide the insertion here).
+    QString insertedText;
+    if (charsAdded > 0) {
+        if (entry.item && entry.item->isTextItem()) {
+            auto *mti = static_cast<MarkdownTextItem *>(entry.item);
+            QTextDocument *td = mti->document();
+            QTextCursor c(td);
+            c.setPosition(localPos);
+            c.setPosition(localPos + charsAdded, QTextCursor::KeepAnchor);
+            insertedText = c.selectedText();
+            // Qt uses U+2029 (ParagraphSeparator) for paragraph breaks inside
+            // a QTextDocument; normalize to '\n' for the canonical buffer.
+            insertedText.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+        }
+    }
+
+    m_applyingCanonicalDelta = true;
+    m_boundDoc->undoStack()->push(
+        new Markoff::MarkdownDelta(m_boundDoc,
+                                   canonicalOffset,
+                                   qsizetype(charsRemoved),
+                                   insertedText));
+    m_applyingCanonicalDelta = false;
 }
 
 } // namespace Markoff
