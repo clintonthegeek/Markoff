@@ -41,6 +41,13 @@ public:
     const Document *parsed() const;
     bool parseIsPending() const;
 
+    // --- Phase C3 write-side API (Task 6+7) ---
+    // Declared here so MarkdownDelta.cpp compiles; implementations land in Task 7.
+    QString   canonicalSubstring(qsizetype offset, qsizetype length) const;
+    void      applyCanonicalDelta(qsizetype offset,
+                                  qsizetype removedLength,
+                                  const QString &inserted);
+
 Q_SIGNALS:
     void contentsChanged();
     void parseUpdated(const Document *);

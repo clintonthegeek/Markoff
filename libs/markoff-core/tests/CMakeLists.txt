@@ -66,3 +66,14 @@ add_executable(tst_canonical_buffer tst_canonical_buffer.cpp)
 add_test(NAME tst_canonical_buffer COMMAND tst_canonical_buffer)
 target_link_libraries(tst_canonical_buffer PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_canonical_buffer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# TODO Task 7: tst_markdown_delta will fail to link until MarkoffDocument gains
+# resetContent(Origin), toMarkdown(), undoStack(), applyCanonicalDelta(),
+# canonicalSubstring(), and setCoalescingIdleMs() (write-side API, Task 6+7).
+# Registered here so the target exists; link failure is expected and documented.
+if(FALSE)
+add_executable(tst_markdown_delta tst_markdown_delta.cpp)
+add_test(NAME tst_markdown_delta COMMAND tst_markdown_delta)
+target_link_libraries(tst_markdown_delta PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markdown_delta PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif() # TODO Task 7: enable once MarkoffDocument write API lands

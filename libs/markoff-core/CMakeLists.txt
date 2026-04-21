@@ -13,6 +13,7 @@ add_library(markoff_core STATIC
     src/CursorPosition.cpp
     src/EphemeralState.cpp
     src/InMemoryCanonicalBuffer.cpp
+    src/MarkdownDelta.cpp
     src/MarkdownRenderChild.cpp
     src/MarkoffDocument.cpp
     src/ReplaceController.cpp
@@ -20,6 +21,7 @@ add_library(markoff_core STATIC
     src/SearchBar.cpp
     include/markoff/CanonicalBuffer.h
     include/markoff/CursorPosition.h
+    include/markoff/MarkdownDelta.h
     include/markoff/CursorPos.h
     include/markoff/TextSpan.h
     include/markoff/FoldSpec.h
