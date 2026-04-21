@@ -68,7 +68,7 @@ during C1–C7.
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
 | C6   | done | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | Corbomite `a893c88d` | `v0.5.0`  |
-| C3   | done | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | `master`             | Corbomite `c6c4f446`..`23bc5094` | `v0.6.0`  |
+| C3   | **in soak** — `v0.6.0` tagged premature per 2026-04-21 C3 landing review; re-tagged `v0.6.0-alpha.2` at same SHA pending dogfood week. Fix commits tag `v0.6.0-alpha.3/.4/...`; stability re-tags as `v0.6.1`. | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | `master`             | Corbomite `c6c4f446`..`23bc5094` | `v0.6.0` + `v0.6.0-alpha.2` |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C4   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,40 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-21 — C3 landing review received; 5 asks actioned; v0.6.0 re-tagged alpha.2 pending soak week
+
+Markoff dev team posted a pre-C7 review at `/home/clinton/dev/Markoff/2026-04-21-c3-landing-review.md` (~150 lines). Summary: "the design direction is right; the build is not yet earned." Five concerns named:
+
+1. **`m_sceneNeedsFullRebuildOnNextParse` is an escape hatch at the critical seam** — fires on multi-paragraph paste, multi-line delete across heading, edit touching image block. Each full rebuild costs focus loss, scroll jump, ephemeral-state reset. The original A-vs-B pushback explicitly called out this as "the hardest engineering problem in C3" warranting several iteration alphas.
+
+2. **Two test quarantines without rewrite plan** — `1c33098` + `1205a38` during Task 5/7. On inspection Task 8 at `3682de0` rewrote + un-quarantined all three (`tst_markoff_document`, `tst_markoff_search_controller`, `tst_markoff_replace_controller` — all three registered + passing). Reviewer was reading chronologically.
+
+3. **Anchor-math bug fixed 7min after interface** — right-bias-at-pure-insert (Task 1 code quality review caught it). Concern: the bug family — right-bias at SOT/EOT, left-bias under collapse-vs-span delete, bias under replace (one-delta vs two), macro-grouped edits, undo→redo stability, reset invariance — may have uncovered edge cases.
+
+4. **Velocity vs. soak** — 2h37m spec-to-tag; alpha.1 existed for 34 minutes; zero dogfooding. Original expected cadence was "several iteration commits between alpha.1 and stable" per the Task 2 A-vs-B response; actual was "zero iteration commits."
+
+5. **Two clones diverged** — 45 commits + 4 tags ahead of canonical `~/dev/Markoff/` (at `v0.3.0-alpha.2`). Library state depends on which checkout you read.
+
+User approved all five asks + committed to personal dogfooding. Actions (all landed this session):
+
+- **Ask 1 (push to canonical):** 4 tags pushed + canonical `master` fast-forwarded to `55f4807` via `git pull --ff-only` from the canonical side (direct push rejected because canonical has `master` checked out). Library state now consistent.
+
+- **Ask 3a (un-quarantine verify):** verified all three previously-quarantined tests currently registered + passing — nothing to do, Task 8 already handled.
+
+- **Ask 3b (anchor edge-case pass):** commit `a75424b`. 11 new test slots across `tst_canonical_buffer.cpp` + `tst_cursor_anchor.cpp` covering right/left bias at SOT + EOT, anchor at deleteStart (unaffected both biases), anchor at deleteEnd (non-straddle follow), replace with mismatched removed/inserted lengths, macro-grouped multi-delta edits, and undo→redo stability. **All pass, no bugs exposed** — the implementation holds up under expanded coverage.
+
+- **Concern 1 soak instrumentation:** commit `c661bf1`. `Q_LOGGING_CATEGORY("markoff.live.scene.rebuild")` in `SceneCoordinator.cpp` logs both the single-item splice happy-path (offset/removed/inserted/itemIdx) and every `m_sceneNeedsFullRebuildOnNextParse = true` site (multi-item span, non-text item, out-of-range) with reason + context. Off by default; enable at runtime with `QT_LOGGING_RULES="markoff.live.scene.rebuild=true"`. Dogfooding can measure fallback-fire rate.
+
+- **Ask 4 (re-tag):** `v0.6.0-alpha.2` created at commit `cf37d0e` (same SHA as `v0.6.0`; append-only — `v0.6.0` stays in place). Honesty-level annotation: the original `v0.6.0` landed too fast for the A-vs-B cadence the lock-in response promised.
+
+- **Ask 2 (soak state annotation):** work-unit status table C3 row updated from `done` to `in soak`. Fix commits during the week tag as `v0.6.0-alpha.3/.4/...`; genuine stability after dogfooding re-tags as `v0.6.1`.
+
+**Soak week starts now.** User dogfoods `v0.6.0` in CorbomiteApp with realistic docs + cross-mode editing + the scene-rebuild logging enabled. Any fallback-fire patterns that emerge drive either (a) extending the single-item splice to cover the case, or (b) accepting full-rebuild as the model and optimising it. **C7 does not start until the week closes.** Corbomite-side polish or C7 spec-drafting (non-library work) are valid uses of the interim.
+
+How to apply for future multi-task plans with multi-repo reach: build an explicit dogfooding checkpoint between alpha.N and release tag; don't treat passing tests as the sole release gate.
+
+
 
 ### 2026-04-21 — C3 done (Corbomite-side adaptation shipped)
 
