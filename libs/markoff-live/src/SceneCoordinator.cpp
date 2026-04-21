@@ -736,7 +736,30 @@ void SceneCoordinator::onItemTextChanged()
 {
     if (m_inReparse)
         return;
-    m_reparseTimer->start(); // restart 150ms countdown
+
+    // v0.6.0-alpha.5: when a MarkoffDocument is bound (C3 canonical mode),
+    // the internal 150ms reparse() is redundant and actively harmful —
+    // MarkoffDocument's ParsePool is the authoritative parse source, and
+    // reparse()'s stripInlineSubstitutions + refreshInlineSubstitutions
+    // mutate doc text while doc->blockSignals(true) is held. That blocks
+    // TextControl::_q_contentsChanged notifications, so TextControlPrivate
+    // gets no chance to update internal tracking tied to contentsChange,
+    // and over successive edits TextControlPrivate::cursor drifts
+    // out-of-sync with the actual doc length — eventually causing
+    // "QTextCursor::setPosition 'N' out of range" → crash in
+    // QTextEngine::justify during repaintSelection (2026-04-21 dogfood).
+    //
+    // Skip the internal reparse in canonical mode. Still emit textChanged
+    // so any consumers observing scene-level text state are notified.
+    //
+    // Consequence: syntax-highlighting refresh between edits is deferred
+    // until the next canonical-parse-driven rebuild (which alpha.4 gates
+    // on consumeRebuildFlag or scene-out-of-sync). Highlighting staleness
+    // is the known soak-week limitation; avoiding crashes is the priority.
+    if (!m_boundDoc) {
+        m_reparseTimer->start(); // Phase-A path: restart 150ms countdown
+    }
+
     emit textChanged();
 }
 
