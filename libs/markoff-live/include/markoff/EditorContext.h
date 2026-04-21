@@ -3,7 +3,7 @@
 #pragma once
 
 #include <QString>
-#include <Qt>
+#include <QtCore/Qt>
 
 #include <optional>
 

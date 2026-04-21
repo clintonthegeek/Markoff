@@ -13,6 +13,7 @@
 #include "FoldGutter.h"
 #include "GutterColumn.h"
 #include "CheckboxTextObject.h"
+#include "EditorContextClassifier.h"
 #include "MathTextObject.h"
 
 #include <markoff/MarkoffDocument.h>
@@ -1413,10 +1414,15 @@ int Editor::currentHeadingLevel() const
 
 EditorContext Editor::context() const
 {
-    // Phase C6 stub — later tasks (T2 block classifier, T3 inline
-    // classifier) wire the real population.
     EditorContext ctx;
     ctx.readOnly = isReadOnly();
+
+    auto *ti = focusedTextItem();
+    if (!ti) return ctx;
+
+    const QTextCursor cursor = ti->textControl()->textCursor();
+    Internal::classifyBlockAtCursor(cursor, ctx);
+    Internal::classifyInlineAtCursor(cursor, ctx);
     return ctx;
 }
 

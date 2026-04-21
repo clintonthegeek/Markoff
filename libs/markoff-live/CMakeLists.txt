@@ -37,6 +37,8 @@ add_library(markoff_live STATIC
     src/MathTextObject.cpp
     src/CheckboxTextObject.h
     src/CheckboxTextObject.cpp
+    src/EditorContextClassifier.h
+    src/EditorContextClassifier.cpp
     src/SelectionManager.h
     src/SelectionManager.cpp
     src/SelectionScene.h
