@@ -16,6 +16,8 @@ add_library(markoff_core STATIC
     src/MarkdownDelta.cpp
     src/MarkdownRenderChild.cpp
     src/MarkoffDocument.cpp
+    src/ParsePool.cpp
+    src/ParsePoolWorker.cpp
     src/ReplaceController.cpp
     src/SearchController.cpp
     src/SearchBar.cpp
@@ -28,6 +30,7 @@ add_library(markoff_core STATIC
     include/markoff/EphemeralState.h
     include/markoff/MarkoffCoreExport.h
     include/markoff/MarkoffDocument.h
+    include/markoff/ParsePool.h
     include/markoff/ReplaceController.h
     include/markoff/SearchAdapter.h
     include/markoff/SearchController.h
@@ -48,6 +51,7 @@ add_library(markoff_core STATIC
     include/markoff/vault/DefaultMetadataCache.h
     include/markoff/vault/DefaultMetadataParser.h
     include/markoff/vault/DefaultResourceProvider.h
+    src/ParsePoolWorker.h
 )
 
 target_include_directories(markoff_core
