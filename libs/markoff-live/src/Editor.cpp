@@ -2551,8 +2551,67 @@ QPoint Editor::mapFromScene(const QPointF &p) const { return m_view->mapFromScen
 // MarkdownView overrides (Phase A forwarding)
 // =========================================================================
 
-void Editor::setDocument(MarkoffDocument *doc) { m_markoffDoc = doc; }
+void Editor::setDocument(MarkoffDocument *doc)
+{
+    if (m_markoffDoc == doc)
+        return;
+
+    if (m_markoffDoc)
+        disconnect(m_markoffDoc, nullptr, this, nullptr);
+
+    m_markoffDoc = doc;
+
+    if (!doc) {
+        // Detach: clear the scene; next setDocument will rebuild.
+        m_coordinator->loadMarkdown(QString());
+        return;
+    }
+
+    // Subscribe to canonical signals.
+    connect(doc, &MarkoffDocument::parseUpdated,
+            this, [this](const Markoff::Document *parsed) {
+        onCanonicalParseUpdated(parsed);
+    });
+    connect(doc, &MarkoffDocument::documentReloaded,
+            this, &Editor::onCanonicalDocumentReloaded);
+
+    // If a parse result is already available, build the scene immediately
+    // (sync path — ensures test determinism when doc is pre-parsed).
+    if (const Markoff::Document *parsed = doc->parsedDocument())
+        onCanonicalParseUpdated(parsed);
+}
+
 MarkoffDocument *Editor::document() const { return m_markoffDoc; }
+
+int Editor::blockCount() const
+{
+    return m_coordinator ? static_cast<int>(m_coordinator->items().size()) : 0;
+}
+
+void Editor::onCanonicalParseUpdated(const Markoff::Document *parsed)
+{
+    if (!parsed || !m_markoffDoc)
+        return;
+    m_sourceText = m_markoffDoc->toMarkdown();
+    m_coordinator->loadMarkdown(m_sourceText);
+
+    qreal width = m_view->viewport()->width() - 32;
+    if (width > 100)
+        m_coordinator->setItemWidth(width);
+    if (m_fontSize > 0) {
+        QFont font = this->font();
+        font.setPointSize(m_fontSize);
+        m_coordinator->setFont(font);
+    }
+    subscribeLinkSignalsForItems();
+    subscribeContextSignalsForItems();
+}
+
+void Editor::onCanonicalDocumentReloaded()
+{
+    // Clear the scene; the next parseUpdated signal will rebuild it.
+    m_coordinator->loadMarkdown(QString());
+}
 
 void Editor::setViewTheme(const Theme &) {}
 void Editor::setViewResourceProvider(ResourceProvider *) {}

@@ -101,9 +101,13 @@ public:
     bool setReadOnly(bool readOnly) override;
     bool isReadOnly() const override;
 
-    // --- MarkdownView overrides (Phase A forwarding) ---
+    // --- MarkdownView overrides (Phase C3 canonical binding) ---
     void setDocument(MarkoffDocument *doc) override;
     MarkoffDocument *document() const override;
+
+    /// Returns the number of scene blocks currently rendered.
+    /// Public for testing; reflects the live scene state.
+    int blockCount() const;
     void setViewTheme(const Theme &theme) override;
     void setViewResourceProvider(ResourceProvider *rp) override;
     void setViewLinkResolver(LinkResolver *lr) override;
@@ -398,9 +402,12 @@ private:
     void subscribeContextSignalsForItems();
     QTimer *m_contextDebounceTimer = nullptr;
 
-    // MarkdownView bridge
+    // MarkdownView bridge (Phase C3 canonical binding)
     MarkoffDocument *m_markoffDoc = nullptr;
     std::unique_ptr<LiveSearchAdapter> m_searchAdapter;
+
+    void onCanonicalParseUpdated(const Markoff::Document *parsed);
+    void onCanonicalDocumentReloaded();
 };
 
 } // namespace Markoff

@@ -93,6 +93,12 @@ MarkdownTextItem *SceneCoordinator::createTextItem(const QString &text)
     m_scene->addItem(item);
     m_items.append(item);
 
+    // Phase C3: disable Qt's built-in per-block undo history.
+    // The canonical QUndoStack (MarkoffDocument) is the sole authoritative
+    // undo source; allowing QTextDocument to accumulate its own history
+    // would cause double-undo and state divergence.
+    item->document()->setUndoRedoEnabled(false);
+
     connect(item, &MarkdownTextItem::textChanged,
             this, &SceneCoordinator::onItemTextChanged);
     connect(item, &MarkdownTextItem::cursorAtBoundary,

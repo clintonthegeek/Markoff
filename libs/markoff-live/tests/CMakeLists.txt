@@ -246,3 +246,9 @@ add_test(NAME tst_markoff_editor_markdown_view COMMAND tst_markoff_editor_markdo
 target_link_libraries(tst_markoff_editor_markdown_view PRIVATE Qt6::Test Qt6::Widgets markoff_live)
 target_include_directories(tst_markoff_editor_markdown_view PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 set_tests_properties(tst_markoff_editor_markdown_view PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_live_canonical_attach tst_live_canonical_attach.cpp)
+add_test(NAME tst_live_canonical_attach COMMAND tst_live_canonical_attach)
+target_link_libraries(tst_live_canonical_attach PRIVATE Qt6::Test Qt6::Widgets markoff_live)
+target_include_directories(tst_live_canonical_attach PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+set_tests_properties(tst_live_canonical_attach PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
