@@ -67,7 +67,7 @@ during C1–C7.
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
-| C6   | spec drafted | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | —                                      | —                    | —                    | —         |
+| C6   | markoff ready (v0.5.0) | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | —                    | `v0.5.0`  |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,48 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C6 landed at `v0.5.0`
+
+6 commits on `master` (`19f41c7` → `9f500e1` + this test-extension
+commit). Deliverables:
+
+- `Markoff::EditorContext` struct shipped as public API surface in
+  `<markoff/EditorContext.h>` — full shape (BlockKind/ListMarker/
+  TaskState enums + TableContext/LinkContext/TagContext/FootnoteContext
+  nested structs) stable; initial classifier populates the Option-C
+  field set (blockKind, headingLevel, table, inBold/Italic/
+  Strikethrough/InlineCode, hasSelection, atBlockStart, atBlockEnd,
+  readOnly).
+- `Markoff::Editor::context() const` pull accessor.
+- `Markoff::Editor::contextChanged(const EditorContext &)` signal
+  with 16ms QTimer::singleShot debounce; kicks on per-item TextControl
+  cursorPositionChanged + selectionChanged + QTextDocument
+  contentsChanged + SceneCoordinator::reparsed + setReadOnly.
+- `Markoff::Editor::aboutToShowContextMenu(QMenu *, const EditorContext &, const QPoint &)`
+  signal fired in both branches of contextMenuEvent (table + general)
+  after built-ins, before menu.exec(). Read-only editors emit nothing
+  (early-return preserved).
+- Internal classifier at `src/EditorContextClassifier.{h,cpp}` in
+  `Markoff::Internal::` namespace — not public API.
+- `kInlineCodeProperty = QTextFormat::UserProperty + 100` on the
+  highlighter's inline-code runs; classifier reads via
+  `QTextCharFormat::boolProperty`. Bold/italic/strike read standard
+  Qt flags (fontWeight/fontItalic/fontStrikeOut).
+
+~15 `EditorContext` fields (callout/blockquote/code-block sub-context,
+link/tag/footnote context, math/highlight inline, task-state detail,
+list-marker detail, column-alignment) stay default-valued; struct
+shape stable so consumer code is forward-compatible. Fill in future
+C-phases when a consumer materializes.
+
+Test coverage: 17 classifier unit tests + 4 contextChanged tests + 3
+context-menu signal tests + 3 end-to-end snapshot tests = 27 new
+test slots. Full markoff ctest green.
+
+Next: Corbomite submodule bump to `v0.5.0` + `MainWindow` consumer
+wiring (onEditorContextChanged + onAboutToShowContextMenu via
+MenuSectionHelper) + Cluster V debt cleanup.
 
 ### 2026-04-20 — C6 spec drafted
 
