@@ -12,6 +12,7 @@
 #include <markoff-parser/Document.h>
 
 #include <QUndoStack>
+#include <QTimer>
 
 namespace Markoff {
 
@@ -20,10 +21,10 @@ struct MarkoffDocument::Private {
     std::unique_ptr<Document>        parsedDoc;   // markoff-parser — fwd-declared above
     std::unique_ptr<QUndoStack>      undoStack;
     ParsePool *pool = nullptr;
-    bool       ownsPool = false;   // Task 7: set to true when default pool is constructed
+    bool       ownsPool = false;
     int        coalescingIdleMs = 150;
     bool       m_parsePending = false;
-    // Task 7: poolDebounce QTimer lives here.
+    QTimer    *poolDebounce = nullptr;
 };
 
 MarkoffDocument::MarkoffDocument(QObject *parent)
@@ -38,8 +39,37 @@ MarkoffDocument::MarkoffDocument(std::unique_ptr<CanonicalBuffer> buffer,
     if (!d->buffer) {
         d->buffer = std::make_unique<InMemoryCanonicalBuffer>();
     }
-    d->pool = pool;        // Task 7: if null, construct a DefaultParsePool here and set ownsPool = true
-    d->undoStack = std::make_unique<QUndoStack>(this);
+
+    // Pool fallback: if none provided, construct an owned default.
+    if (pool) {
+        d->pool = pool;
+        d->ownsPool = false;
+    } else {
+        d->pool = new ParsePool(this);
+        d->ownsPool = true;
+    }
+
+    // No Qt parent on undoStack: unique_ptr has sole ownership.
+    d->undoStack = std::make_unique<QUndoStack>();
+
+    // Wire jobCompleted → parseUpdated.
+    connect(d->pool, &ParsePool::jobCompleted, this,
+            [this](MarkoffDocument *sender, Document *parsed) {
+        if (sender != this) return;
+        d->parsedDoc.reset(parsed);
+        d->m_parsePending = false;
+        emit parseUpdated(d->parsedDoc.get());
+    });
+
+    // Pool debounce timer: QObject child of this, so destroyed with us.
+    d->poolDebounce = new QTimer(this);
+    d->poolDebounce->setSingleShot(true);
+    d->poolDebounce->setInterval(d->coalescingIdleMs);
+    connect(d->poolDebounce, &QTimer::timeout, this, [this]() {
+        if (!d->pool) return;
+        d->m_parsePending = true;
+        d->pool->postJob(this, d->buffer->toMarkdown());
+    });
 }
 
 MarkoffDocument::~MarkoffDocument() {
@@ -48,8 +78,8 @@ MarkoffDocument::~MarkoffDocument() {
     if (d->pool) {
         d->pool->cancelJobsFor(this);
     }
-    // d->undoStack dies first (unique_ptr order in the struct), then d->buffer,
-    // then d->parsedDoc. QObject base dtor disconnects all connections targeting
+    // d->undoStack dies first (unique_ptr order in the struct), then d->parsedDoc,
+    // then d->buffer. QObject base dtor disconnects all connections targeting
     // this — safe against any concurrent jobCompleted emissions.
 }
 
@@ -80,16 +110,34 @@ QUndoStack *MarkoffDocument::undoStack() const {
 }
 
 void MarkoffDocument::resetContent(const QString &newContent, Origin origin) {
-    // Task 7 fills in the full Origin-branch logic.
-    // For Task 6, a minimal impl lets the tests pass for FirstOpen:
-    d->buffer->reset(newContent);
-    if (origin == Origin::FirstOpen) {
-        emit contentsChanged(0, 0, newContent.size());
-    } else {
+    const qsizetype oldLen = d->buffer->length();
+
+    switch (origin) {
+    case Origin::FirstOpen:
+        // Stack is already empty (fresh document). Just reset the buffer and
+        // signal a ranged replacement (not a pure insertion).
+        d->buffer->reset(newContent);
+        emit contentsChanged(0, oldLen, newContent.size());
+        break;
+
+    case Origin::ExternalReloadClean:
+    case Origin::ExternalReloadResolved:
+    case Origin::TestFixture:
+        d->buffer->reset(newContent);
         d->undoStack->clear();
         emit documentReloaded();
+        break;
+
+    case Origin::UserRevertToSaved:
+        // Push a MarkdownDelta so the user can Ctrl+Z to reverse the revert.
+        // The command's redo() calls applyCanonicalDelta which does the actual
+        // buffer mutation + emits contentsChanged + schedules the pool post.
+        d->undoStack->push(new MarkdownDelta(this, 0, oldLen, newContent));
+        // NOTE: no direct buffer->reset here; applyCanonicalDelta handles it.
+        return; // schedulePoolPost() called inside applyCanonicalDelta
     }
-    // Task 7: schedulePoolPost() here.
+
+    schedulePoolPost();
 }
 
 // ---- Anchors ----
@@ -106,7 +154,13 @@ qsizetype MarkoffDocument::resolveCursor(const CursorPosition &cp) const {
 }
 
 // ---- Coalescing ----
-void MarkoffDocument::setCoalescingIdleMs(int ms) { d->coalescingIdleMs = ms; }
+void MarkoffDocument::setCoalescingIdleMs(int ms) {
+    d->coalescingIdleMs = ms;
+    if (d->poolDebounce) {
+        d->poolDebounce->setInterval(ms);
+    }
+}
+
 int  MarkoffDocument::coalescingIdleMs() const    { return d->coalescingIdleMs; }
 
 // ---- Package-private helpers ----
@@ -116,15 +170,19 @@ QString MarkoffDocument::canonicalSubstring(qsizetype offset, qsizetype len) con
 
 void MarkoffDocument::applyCanonicalDelta(qsizetype offset, qsizetype removedLength,
                                           const QString &inserted) {
-    // Task 7 fills in: buffer->applyDelta + emit contentsChanged + schedulePoolPost.
-    // For Task 6, a minimal impl lets MarkdownDelta::redo/undo be testable at Task 7.
     d->buffer->applyDelta(offset, removedLength, inserted);
     emit contentsChanged(offset, removedLength, inserted.size());
-    // Task 7: schedulePoolPost()
+    schedulePoolPost();
 }
 
 void MarkoffDocument::releaseAnchorHandle(quint64 handle) {
     d->buffer->releaseAnchor(handle);
+}
+
+// ---- Private helpers ----
+void MarkoffDocument::schedulePoolPost() {
+    if (!d->poolDebounce) return;
+    d->poolDebounce->start();  // restart timer; coalesces bursts
 }
 
 } // namespace Markoff

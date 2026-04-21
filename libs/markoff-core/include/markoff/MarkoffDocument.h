@@ -8,6 +8,7 @@
 #include <markoff/MarkoffCoreExport.h>
 
 class QUndoStack;
+class QTimer;
 
 namespace Markoff {
 
@@ -67,6 +68,8 @@ Q_SIGNALS:
     void documentReloaded();
 
 private:
+    void schedulePoolPost();
+
     struct Private;
     std::unique_ptr<Private> d;
 };
