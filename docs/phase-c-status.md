@@ -68,7 +68,7 @@ during C1–C7.
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
 | C6   | done | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | Corbomite `a893c88d` | `v0.5.0`  |
-| C3   | plan drafted | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | —                    | —                    | —         |
+| C3   | markoff implementing (alpha.1) | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | `master`             | —                    | —         |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C4   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,57 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-21 — C3 alpha.1: core primitives + MarkoffDocument rewrite
+
+Tasks 1-8 of the Phase C3 plan landed on `master` across commits
+`aaaf57d` → `3682de0`. Markoff-core now has:
+
+- `CanonicalBuffer` pure-virtual interface + `InMemoryCanonicalBuffer`
+  concrete (QString + anchor table with bias semantics).
+- `CursorPosition` move-only RAII handle over anchor handles.
+- `MarkdownDelta` QUndoCommand — single command type with
+  mergeWith coalescing for adjacent pure-insert / pure-delete
+  sequences.
+- `ParsePool` + `ParsePoolWorker` — single-worker-thread async
+  parse queue with per-sender generation counter; auto-constructed
+  if caller passes `nullptr`.
+- `MarkoffDocument` public API per spec §4.4: toMarkdown / length /
+  substring / parsedDocument / parseIsPending / undoStack /
+  resetContent(Origin) / trackCursor / resolveCursor + 3-arg
+  contentsChanged + parseUpdated + documentReloaded signals. All
+  5 Origin enum values implemented; UserRevertToSaved pushes a
+  MarkdownDelta so Ctrl+Z reverses the revert.
+- Pool debounce via per-doc QTimer; jobCompleted lambda routes
+  parsed Document back to parseUpdated on the main thread with
+  sender filtering.
+
+Test coverage (9 test targets, all green):
+
+- tst_canonical_buffer (11 slots — includes pure-insert-at-anchor
+  bias behaviors and reset-clears-anchors assertion after a
+  code-review-caught gap)
+- tst_cursor_position (3 slots — move semantics)
+- tst_markdown_delta (5 slots — redo/undo/merge/reject non-adjacent/
+  reject cross-type)
+- tst_parse_pool (3 slots — produces, coalesces burst, cancels on
+  destroy)
+- tst_origin_reset (5 slots — one per Origin enum value)
+- tst_cursor_anchor (4 slots — preceding/following/left-straddle/
+  right-straddle bias)
+- tst_markoff_document (7 slots, all rewritten from Phase-A API)
+- tst_markoff_search_controller (rewritten against resetContent)
+- tst_markoff_replace_controller (rewritten against resetContent +
+  MarkdownDelta undoStack)
+
+Leaves (Markoff::Source / Markoff::Editor Live / Markoff::Reading)
+still hold their Phase-A text independence; symmetric-B leaf
+adaptation begins at Task 10 (Source), then Task 12 (Reading),
+then Tasks 13-16 (Live). v0.6.0 proper lands at Task 19 after
+the leaves bind + tri-view interop + cross-mode undo tests.
+
+Next: Task 10 (Source::SourceEditor binds canonical via
+setDocument).
 
 ### 2026-04-20 — C3 plan drafted
 
