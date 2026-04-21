@@ -17,6 +17,16 @@ private slots:
     void anchor_released_staysResolvable_asInvalid();
     void anchor_rightBias_atInsertPoint();
     void anchor_leftBias_atInsertPoint();
+    // Edge-case pass — C3 landing review §3
+    void anchor_rightBias_atOffsetZero_pureInsert_advances();
+    void anchor_leftBias_atOffsetZero_pureInsert_staysAtZero();
+    void anchor_rightBias_atEndOfText_pureInsert_advances();
+    void anchor_leftBias_atEndOfText_pureInsert_staysAtEnd();
+    void anchor_leftBias_atDeleteEnd_followsAsNonStraddle();
+    void anchor_rightBias_atDeleteStart_unaffected();
+    void anchor_leftBias_atDeleteStart_unaffected();
+    void anchor_rightBias_onReplace_clampsToInsertEnd();
+    void anchor_leftBias_onReplace_clampsToDeleteStart();
 };
 
 void TstCanonicalBuffer::applyDelta_insert() {
@@ -109,6 +119,109 @@ void TstCanonicalBuffer::anchor_leftBias_atInsertPoint() {
     const auto h = buf.createAnchor(3, Markoff::CursorBias::Left);
     buf.applyDelta(3, 0, QStringLiteral("XX"));   // pure insert AT the anchor
     QCOMPARE(buf.resolveAnchor(h), qsizetype(3)); // left-bias stays before inserted text
+    buf.releaseAnchor(h);
+}
+
+// --- Edge-case pass (C3 landing review §3) ---
+
+void TstCanonicalBuffer::anchor_rightBias_atOffsetZero_pureInsert_advances() {
+    // Right-bias anchor at offset 0; insert 2 chars at offset 0 — should
+    // advance past the inserted text to offset 2.
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("hello"));
+    const auto h = buf.createAnchor(0, Markoff::CursorBias::Right);
+    buf.applyDelta(0, 0, QStringLiteral("XX"));
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(2));
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_leftBias_atOffsetZero_pureInsert_staysAtZero() {
+    // Left-bias anchor at offset 0; insert 2 chars at offset 0 — should stay
+    // at 0 (precedes the inserted text).
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("hello"));
+    const auto h = buf.createAnchor(0, Markoff::CursorBias::Left);
+    buf.applyDelta(0, 0, QStringLiteral("XX"));
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(0));
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_rightBias_atEndOfText_pureInsert_advances() {
+    // Right-bias anchor at end-of-text (offset 5 in "hello"); appending "!"
+    // — should advance to offset 6.
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("hello"));
+    const auto h = buf.createAnchor(5, Markoff::CursorBias::Right);
+    buf.applyDelta(5, 0, QStringLiteral("!"));
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(6));
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_leftBias_atEndOfText_pureInsert_staysAtEnd() {
+    // Left-bias anchor at end-of-text (offset 5 in "hello"); appending "!"
+    // — should stay at 5.
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("hello"));
+    const auto h = buf.createAnchor(5, Markoff::CursorBias::Left);
+    buf.applyDelta(5, 0, QStringLiteral("!"));
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(5));
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_leftBias_atDeleteEnd_followsAsNonStraddle() {
+    // Buffer "abcdef", anchor at 4 (deleteEnd), delete chars 2..4 ("cd").
+    // a.offset(4) >= deleteEnd(4) — treated as "follows the edit", not a straddle.
+    // Shifts by delta -2 → offset 2.
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("abcdef"));
+    const auto h = buf.createAnchor(4, Markoff::CursorBias::Left);
+    buf.applyDelta(2, 2, QString());
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(2));
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_rightBias_atDeleteStart_unaffected() {
+    // Buffer "abcdef", anchor at 2 (deleteStart), delete chars 2..4 ("cd").
+    // a.offset(2) <= deleteStart(2) — precedes-or-equals, unaffected → stays at 2.
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("abcdef"));
+    const auto h = buf.createAnchor(2, Markoff::CursorBias::Right);
+    buf.applyDelta(2, 2, QString());
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(2));
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_leftBias_atDeleteStart_unaffected() {
+    // Buffer "abcdef", anchor at 2 (deleteStart), delete chars 2..4 ("cd").
+    // a.offset(2) <= deleteStart(2) — precedes-or-equals, unaffected → stays at 2.
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("abcdef"));
+    const auto h = buf.createAnchor(2, Markoff::CursorBias::Left);
+    buf.applyDelta(2, 2, QString());
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(2));
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_rightBias_onReplace_clampsToInsertEnd() {
+    // Buffer "abcdef", anchor at 3, replace offset=2 removedLength=3 ("cde") with "X".
+    // deleteStart=2, deleteEnd=5, insertEnd=3.
+    // Anchor(3) not pure-insert; 3 > deleteStart(2) and 3 < deleteEnd(5) → straddle.
+    // Right-bias → clamps to insertEnd = 3.
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("abcdef"));
+    const auto h = buf.createAnchor(3, Markoff::CursorBias::Right);
+    buf.applyDelta(2, 3, QStringLiteral("X"));
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(3));
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_leftBias_onReplace_clampsToDeleteStart() {
+    // Same setup as above; left-bias → clamps to deleteStart = 2.
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("abcdef"));
+    const auto h = buf.createAnchor(3, Markoff::CursorBias::Left);
+    buf.applyDelta(2, 3, QStringLiteral("X"));
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(2));
     buf.releaseAnchor(h);
 }
 
