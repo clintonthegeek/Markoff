@@ -68,7 +68,7 @@ during C1–C7.
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
 | C6   | done | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | Corbomite `a893c88d` | `v0.5.0`  |
-| C3   | spec drafted | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | —                                      | —                    | —                    | —         |
+| C3   | plan drafted | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | —                    | —                    | —         |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C4   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,29 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C3 plan drafted
+
+`docs/plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md` — 3240-line 25-task plan. §0 orientation covers build commands, invariants, submodule pin protocol, commit conventions, SPDX header, and five troubleshooting entries. Tasks cleave into 12 phases:
+
+- §A Tasks 1–5: markoff-core primitives (`CanonicalBuffer` + `InMemoryCanonicalBuffer`, `CursorPosition`, `MarkdownDelta`, `ParsePool` + `DefaultParsePool`, test quarantine of legacy `tst_markoff_document` slots).
+- §B Tasks 6–8: `MarkoffDocument` rewrite (header replacement, reads + anchor-handle API, writes + `contentsChanged` emission + `resetContent(Origin)` branch behavior, `Origin` + anchor tests + tst_markoff_document rewrite).
+- §C Task 9: interim tag `v0.6.0-alpha.1`.
+- §D Tasks 10–11: `Source::SourceEditor` attach/detach + inbound splicing + outbound local-edit → `MarkdownDelta` + IME macro.
+- §E Task 12: `Reading::ReadingView` attach/detach + `parseUpdated` + `documentReloaded`.
+- §F Tasks 13–16: Live (`Markoff::Editor`) attach + `SceneCoordinator` per-block offset map + outbound local-edit translation + inbound splicing + multi-block-delta full-rebuild flag.
+- §G Tasks 17–18: tri-view `tst_canonical_interop` + `tst_cross_mode_undo`.
+- §H Task 19: tag `v0.6.0`.
+- §I Task 20: Corbomite `NoteDocument` wrapper rewrite (delegates `markdown()/setMarkdown` to owned `MarkoffDocument`; new `markoff()` accessor).
+- §J Tasks 21–22: Corbomite `Vault` ownership of `ParsePool` + raw-byte `saveDocument` + byte-equality echo suppression + external-reload `Origin` dispatch (clean vs. merge-modal resolved).
+- §K Task 23: `NoteEditorWidget` four flush/restore call sites delete; mode-swap becomes `setDocument(nullptr)` / `setDocument(markoff)` + ephemeralState preservation.
+- §L Tasks 24–25: submodule pin bump to `v0.6.0`, full Corbomite ctest, manual `./build/Corbomite` smoke per spec §7.2 #16, closeout updates to `phase-c-status` + Corbomite `PROJECT-STATE` + `decisions-archive`.
+
+§M self-review maps every spec section to its covering task(s) — no gaps. Cross-task type-consistency cleared: `applyCanonicalDelta`/`canonicalSubstring`/`releaseAnchorHandle` (pkg-private helpers in Task 6 called from Tasks 3/6/2 respectively), `m_applyingCanonicalDelta` guard convention across all three leaves, `simulateBlockEdit` test helper defined in Task 15 and reused in 17/18. Task 9 interim tag `v0.6.0-alpha.1` is the first bisect-friendly checkpoint after markoff-core primitives land but before leaves are adapted — catches core-vs-leaf regressions cheaply. Per-leaf commits are test-first: every leaf task's Step 1 writes a failing test naming the slot(s), Step 2+ implements, Step N runs + commits.
+
+Ritual 5 compliance: all Markoff-side commits use `<library>: <description>` subjects (no cluster footer). Corbomite-side adapter commits use `feat(markoff): Phase C3 adaptation — …` conventional shape. `Co-Authored-By: Claude Opus 4.7 (1M context) …` trailer both sides.
+
+User pre-approved plan; next: Task 1 in a fresh execution session (or this one — work authorized to proceed autonomously unless unexpected problems emerge).
 
 ### 2026-04-20 — C3 spec drafted
 
