@@ -56,6 +56,12 @@ target_link_libraries(tst_markoff_editor_context PRIVATE Qt6::Test Qt6::Widgets 
 target_include_directories(tst_markoff_editor_context PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 set_tests_properties(tst_markoff_editor_context PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_markoff_editor_context_menu tst_editor_context_menu.cpp)
+add_test(NAME tst_markoff_editor_context_menu COMMAND tst_markoff_editor_context_menu)
+target_link_libraries(tst_markoff_editor_context_menu PRIVATE Qt6::Test Qt6::Widgets markoff_live)
+target_include_directories(tst_markoff_editor_context_menu PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+set_tests_properties(tst_markoff_editor_context_menu PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_markoff_undo_grouping tst_undo_grouping.cpp)
 add_test(NAME tst_markoff_undo_grouping COMMAND tst_markoff_undo_grouping)
 target_link_libraries(tst_markoff_undo_grouping PRIVATE Qt6::Test Qt6::Widgets markoff_live)

@@ -747,6 +747,7 @@ void Editor::contextMenuEvent(QContextMenuEvent *e)
             menu.addSeparator();
             menu.addAction(tr("Select Row"), this, &Editor::tableSelectRow);
             menu.addAction(tr("Select Column"), this, &Editor::tableSelectColumn);
+            Q_EMIT aboutToShowContextMenu(&menu, context(), e->globalPos());
             menu.exec(e->globalPos());
             e->accept();
             return;
@@ -789,7 +790,9 @@ void Editor::contextMenuEvent(QContextMenuEvent *e)
     pasteAction->setEnabled(QApplication::clipboard()->mimeData()
                             && QApplication::clipboard()->mimeData()->hasText());
 
+    Q_EMIT aboutToShowContextMenu(&menu, context(), e->globalPos());
     menu.exec(e->globalPos());
+    e->accept();
 }
 
 // =========================================================================
