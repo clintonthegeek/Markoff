@@ -107,6 +107,10 @@ public:
     /// virtual-scroll controller. Exposed for tests.
     int mountedCount() const;
 
+    /// Phase C3 accessor — total number of sections built from the last
+    /// parse. Exposed for tests.
+    int sectionCount() const;
+
     /// Cluster J phase 5 — built-in code-block processor registry.
     Markoff::CodeBlockProcessorRegistry *codeBlockProcessorRegistry();
     const Markoff::CodeBlockProcessorRegistry *
@@ -181,6 +185,10 @@ private:
     qreal visualLineSpacing() const;
     QString wikiLinkTargetAt(const QPoint &viewportPos) const;
     int sectionIndexAt(const QPoint &viewportPos) const;
+
+    // Phase C3 — canonical document binding slots.
+    void onCanonicalParseUpdated();
+    void onCanonicalDocumentReloaded();
 
     // Phase 6 — fold + geometry machinery.
     void recomputeFoldVisibility();

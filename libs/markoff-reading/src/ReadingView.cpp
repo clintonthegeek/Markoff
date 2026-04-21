@@ -14,6 +14,7 @@
 #include "markoff/reading/VirtualScrollController.h"
 #include "markoff/reading/styling/StyleManager.h"
 
+#include <markoff/MarkoffDocument.h>
 #include <markoff/DefaultMermaidRenderer.h>
 #include <markoff/vault/DefaultLinkResolver.h>
 #include <markoff/vault/DefaultMetadataCache.h>
@@ -306,6 +307,11 @@ VaultResourceProvider *ReadingView::vaultResourceProvider() const
 int ReadingView::mountedCount() const
 {
     return m_controller ? m_controller->mountedCount() : 0;
+}
+
+int ReadingView::sectionCount() const
+{
+    return static_cast<int>(m_sections.size());
 }
 
 void ReadingView::resizeEvent(QResizeEvent *event)
@@ -858,12 +864,60 @@ void ReadingView::resetZoom()
 
 void ReadingView::setDocument(Markoff::MarkoffDocument *doc)
 {
+    if (m_markoffDoc == doc) return;
+
+    if (m_markoffDoc) {
+        disconnect(m_markoffDoc, nullptr, this, nullptr);
+    }
+
     m_markoffDoc = doc;
+
+    if (!doc) {
+        // Detached — clear the section layout so stale sections don't
+        // persist after the document is gone.
+        m_markdown.clear();
+        m_lastMarkdown.clear();
+        m_layout = std::make_unique<SectionLayout>();
+        m_sections.clear();
+        if (m_controller) m_controller->setSections(m_sections);
+        return;
+    }
+
+    connect(doc, &Markoff::MarkoffDocument::parseUpdated,
+            this, [this](const Markoff::Document *) { onCanonicalParseUpdated(); });
+    connect(doc, &Markoff::MarkoffDocument::documentReloaded,
+            this, &ReadingView::onCanonicalDocumentReloaded);
+
+    // If a parse result is already available, build the section layout now.
+    // Otherwise, wait for the first parseUpdated signal.
+    if (!doc->parseIsPending() && doc->parsedDocument()) {
+        m_markdown = doc->toMarkdown();
+        rebuild();
+    }
 }
 
 Markoff::MarkoffDocument *ReadingView::document() const
 {
     return m_markoffDoc;
+}
+
+void ReadingView::onCanonicalParseUpdated()
+{
+    if (!m_markoffDoc) return;
+    // Use the canonical text — ReadingView's internal worker re-parses it
+    // to produce ReadingSection objects for the section-layout pipeline.
+    m_markdown = m_markoffDoc->toMarkdown();
+    rebuild();
+}
+
+void ReadingView::onCanonicalDocumentReloaded()
+{
+    // Tear down the current section layout; the next parseUpdated will
+    // rebuild from the new canonical text.
+    m_lastMarkdown.clear();
+    m_layout = std::make_unique<SectionLayout>();
+    m_sections.clear();
+    if (m_controller) m_controller->setSections(m_sections);
 }
 
 void ReadingView::setViewTheme(const Markoff::Theme &) {}
