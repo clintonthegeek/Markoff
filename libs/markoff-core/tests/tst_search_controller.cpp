@@ -1,4 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// PhaseC3: Whole file pending rewrite against Phase-C3 API in Task 8.
+// Current API uses Phase-A setPlainText/plainText removed in Task 6.
+// Rewrite mappings:
+//   setPlainText(text) → resetContent(text, Origin::FirstOpen) (or TestFixture)
+//   plainText() → toMarkdown()
 #include <QTest>
 #include <QSignalSpy>
 
