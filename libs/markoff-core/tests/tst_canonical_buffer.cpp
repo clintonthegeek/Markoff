@@ -15,6 +15,8 @@ private slots:
     void anchor_leftBias_onStraddle();
     void anchor_rightBias_onStraddle();
     void anchor_released_staysResolvable_asInvalid();
+    void anchor_rightBias_atInsertPoint();
+    void anchor_leftBias_atInsertPoint();
 };
 
 void TstCanonicalBuffer::applyDelta_insert() {
@@ -41,9 +43,11 @@ void TstCanonicalBuffer::applyDelta_replace() {
 void TstCanonicalBuffer::reset_clearsAll() {
     Markoff::InMemoryCanonicalBuffer buf;
     buf.reset(QStringLiteral("first"));
+    const auto h = buf.createAnchor(3, Markoff::CursorBias::Left);
     buf.reset(QStringLiteral("second"));
     QCOMPARE(buf.toMarkdown(), QStringLiteral("second"));
     QCOMPARE(buf.length(), qsizetype(6));
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(-1));  // anchor invalidated by reset
 }
 
 void TstCanonicalBuffer::anchor_survivesPrecedingInsert() {
@@ -88,6 +92,24 @@ void TstCanonicalBuffer::anchor_released_staysResolvable_asInvalid() {
     const auto h = buf.createAnchor(3, Markoff::CursorBias::Left);
     buf.releaseAnchor(h);
     QCOMPARE(buf.resolveAnchor(h), qsizetype(-1));
+}
+
+void TstCanonicalBuffer::anchor_rightBias_atInsertPoint() {
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("hello"));
+    const auto h = buf.createAnchor(3, Markoff::CursorBias::Right);
+    buf.applyDelta(3, 0, QStringLiteral("XX"));   // pure insert AT the anchor
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(5)); // right-bias advances past inserted text
+    buf.releaseAnchor(h);
+}
+
+void TstCanonicalBuffer::anchor_leftBias_atInsertPoint() {
+    Markoff::InMemoryCanonicalBuffer buf;
+    buf.reset(QStringLiteral("hello"));
+    const auto h = buf.createAnchor(3, Markoff::CursorBias::Left);
+    buf.applyDelta(3, 0, QStringLiteral("XX"));   // pure insert AT the anchor
+    QCOMPARE(buf.resolveAnchor(h), qsizetype(3)); // left-bias stays before inserted text
+    buf.releaseAnchor(h);
 }
 
 QTEST_GUILESS_MAIN(TstCanonicalBuffer)

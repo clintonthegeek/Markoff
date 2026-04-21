@@ -25,8 +25,15 @@ void InMemoryCanonicalBuffer::applyDelta(qsizetype offset,
 
     for (auto it = m_anchors.begin(); it != m_anchors.end(); ++it) {
         Anchor &a = it.value();
-        if (a.offset <= deleteStart) {
-            // Anchor precedes (or sits at) the start of the edit — unaffected.
+        if (removedLength == 0 && a.offset == offset) {
+            // Pure insert at the anchor point — bias decides which side.
+            // Left-bias: anchor stays put (still precedes the inserted text).
+            // Right-bias: anchor advances past the inserted text.
+            if (a.bias == CursorBias::Right) {
+                a.offset = insertEnd;
+            }
+        } else if (a.offset <= deleteStart) {
+            // Anchor precedes the edit — unaffected.
         } else if (a.offset >= deleteEnd) {
             // Anchor follows the edit — shift by net delta.
             a.offset += delta;
