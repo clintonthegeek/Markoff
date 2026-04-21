@@ -176,13 +176,29 @@ SceneCoordinator::detectTableRegions(const QString &markdown) const
 
 void SceneCoordinator::loadMarkdown(const QString &markdown)
 {
-    clearItems();
-    m_tableConverters.clear();
-
+    clearItems();  // also clears m_tableConverters and m_itemMap
     auto segments = MarkdownSplitter::split(markdown, *m_parser);
     captureFullDocumentParse(markdown);
 
-    for (const auto &seg : segments) {
+    // Build the canonical offset map alongside item creation.
+    // `toMarkdown()` reconstructs the buffer as:
+    //   items[0].toMarkdown() + '\n' + items[1].toMarkdown() + '\n' + ...
+    // The inter-item '\n' separator occupies one char in the canonical buffer.
+    // To keep the map contiguous (each item's canonicalEnd == next item's
+    // canonicalStart), each non-last item absorbs the trailing separator into
+    // its range. The last item's canonicalEnd == toMarkdown().length().
+    // We compute canonicalStart correctly on the fly; canonicalEnd is fixed up
+    // in a second pass after all items are created.
+    int runningOffset = 0;
+
+    for (int segIdx = 0; segIdx < segments.size(); ++segIdx) {
+        const auto &seg = segments[segIdx];
+        if (segIdx > 0)
+            runningOffset += 1; // the '\n' join separator from toMarkdown()
+
+        const int itemStart = runningOffset;
+        const int itemEnd   = runningOffset + seg.text.length();
+
         if (seg.type == MarkdownSegment::Text) {
             auto *item = createTextItem(seg.text);
 
@@ -230,13 +246,24 @@ void SceneCoordinator::loadMarkdown(const QString &markdown)
                     if (hl) hl->rehighlight();
                 }
             }
+
+            m_itemMap.append({itemStart, itemEnd, item});
         } else if (seg.type == MarkdownSegment::Image) {
             auto *item = new ImageBlockItem(seg.text, m_itemWidth, m_resourceProvider);
             m_scene->addItem(item);
             m_items.append(item);
+            m_itemMap.append({itemStart, itemEnd, item});
         }
         // No more TableBlockItem creation — tables now live inside text items
+
+        runningOffset = itemEnd;
     }
+
+    // Second pass: make the map contiguous. Each non-last item absorbs the
+    // trailing '\n' separator into its canonicalEnd so that
+    // m_itemMap[i].canonicalEnd == m_itemMap[i+1].canonicalStart.
+    for (int i = 0; i + 1 < m_itemMap.size(); ++i)
+        m_itemMap[i].canonicalEnd = m_itemMap[i + 1].canonicalStart;
 
     repositionItems();
     m_scene->setSelectableItems(m_items);
@@ -413,6 +440,37 @@ QString SceneCoordinator::toMarkdown() const
         result += m_items[i]->toMarkdown();
     }
     return result;
+}
+
+int SceneCoordinator::findItemIndexForOffset(int offset) const
+{
+    // Items are sorted by canonicalStart (linear splitter traversal guarantees
+    // monotone order). Binary search for the item whose half-open range
+    // [canonicalStart, canonicalEnd) contains offset.
+    int lo = 0, hi = m_itemMap.size() - 1;
+    while (lo <= hi) {
+        const int mid = lo + (hi - lo) / 2;
+        const auto &e = m_itemMap[mid];
+        if (offset < e.canonicalStart)
+            hi = mid - 1;
+        else if (offset >= e.canonicalEnd)
+            lo = mid + 1;
+        else
+            return mid;
+    }
+    // End-of-buffer sentinel: offset == back().canonicalEnd maps to last item.
+    if (!m_itemMap.isEmpty() && offset == m_itemMap.back().canonicalEnd)
+        return m_itemMap.size() - 1;
+    return -1;
+}
+
+void SceneCoordinator::shiftItemsAfter(int itemIndex, int delta)
+{
+    // Shift all items STRICTLY after itemIndex (not including itemIndex itself).
+    for (int i = itemIndex + 1; i < m_itemMap.size(); ++i) {
+        m_itemMap[i].canonicalStart += delta;
+        m_itemMap[i].canonicalEnd   += delta;
+    }
 }
 
 void SceneCoordinator::setItemWidth(qreal width)
@@ -619,6 +677,7 @@ void SceneCoordinator::clearItems()
     }
     m_items.clear();
     m_tableConverters.clear();
+    m_itemMap.clear();
 }
 
 void SceneCoordinator::repositionItems()
@@ -668,12 +727,20 @@ void SceneCoordinator::reparse()
     }
 
     if (structureChanged) {
-        clearItems();
-        m_tableConverters.clear();
-        for (const auto &seg : newSegments) {
+        clearItems();  // also clears m_tableConverters and m_itemMap
+
+        int runningOffset = 0;
+        for (int segIdx = 0; segIdx < newSegments.size(); ++segIdx) {
+            const auto &seg = newSegments[segIdx];
+            if (segIdx > 0)
+                runningOffset += 1; // '\n' join separator from toMarkdown()
+
+            const int itemStart = runningOffset;
+            const int itemEnd   = runningOffset + seg.text.length();
+
             if (seg.type == MarkdownSegment::Text) {
                 auto *item = createTextItem(seg.text);
-    
+
                 // Detect and convert pipe tables (same logic as loadMarkdown)
                 if (m_parser->parse(seg.text)) {
                     auto regions = detectTableRegions(seg.text);
@@ -701,13 +768,24 @@ void SceneCoordinator::reparse()
                         if (hl) hl->rehighlight();
                     }
                 }
+
+                m_itemMap.append({itemStart, itemEnd, item});
             } else if (seg.type == MarkdownSegment::Image) {
                 auto *item = new ImageBlockItem(seg.text, m_itemWidth, m_resourceProvider);
-                    m_scene->addItem(item);
+                m_scene->addItem(item);
                 m_items.append(item);
+                m_itemMap.append({itemStart, itemEnd, item});
             }
             // No more TableBlockItem creation — tables live inside text items
+
+            runningOffset = itemEnd;
         }
+
+        // Make map contiguous: each non-last item absorbs the trailing '\n'
+        // separator so m_itemMap[i].canonicalEnd == m_itemMap[i+1].canonicalStart.
+        for (int i = 0; i + 1 < m_itemMap.size(); ++i)
+            m_itemMap[i].canonicalEnd = m_itemMap[i + 1].canonicalStart;
+
         repositionItems();
         m_scene->setSelectableItems(m_items);
     } else {

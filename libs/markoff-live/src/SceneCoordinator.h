@@ -7,6 +7,7 @@
 #include <markoff-parser/Document.h>
 #include <QObject>
 #include <QList>
+#include <QVector>
 #include <QFont>
 #include <QHash>
 #include <QPair>
@@ -42,6 +43,15 @@ public:
         int localBlockNumber = 0;
     };
 
+    /// Per-item canonical offset record. `canonicalStart` and `canonicalEnd`
+    /// are QString char-index offsets into the canonical markdown buffer
+    /// that this item renders. `canonicalEnd` is exclusive.
+    struct ItemEntry {
+        int canonicalStart = 0;
+        int canonicalEnd = 0;   ///< exclusive
+        SelectableItem *item = nullptr;
+    };
+
     GlobalPosition globalPositionOf(const MarkdownTextItem *item,
                                      int localBlockNumber,
                                      int columnInBlock) const;
@@ -73,6 +83,22 @@ public:
 
     /// Get ordered items (for external use).
     const QList<SelectableItem *> &items() const { return m_items; }
+
+    /// Returns the item-offset map (one entry per scene item, ordered by
+    /// canonicalStart). Populated during loadMarkdown / reparse.
+    const QVector<ItemEntry> &itemMap() const { return m_itemMap; }
+
+    /// Binary search: returns the index of the item whose
+    /// [canonicalStart, canonicalEnd) range contains `offset`, or -1 if
+    /// `offset` is not covered. If `offset == back().canonicalEnd` the
+    /// last item index is returned (end-of-buffer sentinel).
+    int findItemIndexForOffset(int offset) const;
+
+    /// Shift all items strictly after `itemIndex` by `delta` chars.
+    /// Leaves item at `itemIndex` and all items before it unchanged.
+    /// Used by Task 16 inbound-splice to keep the map consistent after
+    /// a partial-document replacement.
+    void shiftItemsAfter(int itemIndex, int delta);
 
     /// Transfer focus to an adjacent item. Returns true if successful.
     bool moveFocusTo(MarkdownTextItem *from, Qt::Edge edge);
@@ -149,6 +175,10 @@ private:
     void captureFullDocumentParse(const QString &markdown);
 
     QList<TableConverter::TableRegion> detectTableRegions(const QString &markdown) const;
+
+    /// Canonical offset map: one entry per scene item, ordered by
+    /// canonicalStart. Populated during loadMarkdown / reparse.
+    QVector<ItemEntry> m_itemMap;
 
     SelectionScene *m_scene = nullptr;
     QList<SelectableItem *> m_items;
