@@ -5,6 +5,7 @@
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QUndoStack>
+#include <QGraphicsScene>
 #include <markoff/Editor.h>
 #include <markoff/MarkoffDocument.h>
 #include <markoff/MarkdownDelta.h>
@@ -30,6 +31,11 @@ private Q_SLOTS:
     void inboundDelta_splicesIntoItem();
     void inboundDelta_spanningMultipleItems_marksForFullRebuild();
     void documentReloaded_tearsDownScene();
+
+    // v0.6.0-alpha.3 — regression: post-setDocument focus must be on the
+    // first text item, or key events bubble from m_view back up to Editor
+    // and recurse infinitely (2026-04-21 dogfood SEGV).
+    void postSetDocument_firstTextItemHasFocus();
 };
 
 /// Attach before the first parse fires: scene is empty until parseUpdated
@@ -291,6 +297,42 @@ void TstLiveCanonicalAttach::documentReloaded_tearsDownScene()
     // Scene rebuilt with new content.
     auto *coord = ed.coordinatorForTesting();
     QCOMPARE(coord->toMarkdown(), QStringLiteral("# second content"));
+}
+
+/// v0.6.0-alpha.3 regression: when Editor::setDocument completes and the
+/// scene is built, the first text item MUST have focus. Otherwise a typed
+/// key event delivered to Editor bubbles through m_view (whose parent is
+/// Editor), finds no accepting focus item in the scene, bubbles back to
+/// Editor::event → keyPressEvent → QApplication::sendEvent(m_view, ...) →
+/// infinite recursion → stack overflow SEGV. The focus-assignment loop
+/// that Phase-A's rebuildScene() had at its tail was lost when Task 13
+/// copied the width/font/subscribe logic into onCanonicalParseUpdated
+/// without the focus block. Surfaced 2026-04-21 during v0.6.0 dogfood.
+void TstLiveCanonicalAttach::postSetDocument_firstTextItemHasFocus()
+{
+    MarkoffDocument doc;
+    doc.resetContent(QStringLiteral("hello world\n\npara2"), Origin::FirstOpen);
+    Editor ed;
+    ed.setDocument(&doc);
+    QSignalSpy parsed(&doc, &MarkoffDocument::parseUpdated);
+    if (parsed.count() == 0)
+        QVERIFY(parsed.wait(2000));
+
+    auto *coord = ed.coordinatorForTesting();
+    QVERIFY(coord);
+    const auto &items = coord->items();
+    QVERIFY(!items.isEmpty());
+
+    // Find the first text item; it must be the scene's focusItem after
+    // setDocument, or key events bubble back up to Editor infinitely.
+    SelectableItem *firstTextItem = nullptr;
+    for (auto *it : items) {
+        if (it->isTextItem()) { firstTextItem = it; break; }
+    }
+    QVERIFY(firstTextItem);
+    auto *scene = firstTextItem->asGraphicsItem()->scene();
+    QVERIFY(scene);
+    QCOMPARE(scene->focusItem(), firstTextItem->asGraphicsItem());
 }
 
 QTEST_MAIN(TstLiveCanonicalAttach)

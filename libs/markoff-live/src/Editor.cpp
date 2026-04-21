@@ -2616,8 +2616,20 @@ void Editor::onCanonicalParseUpdated(const Markoff::Document *parsed)
         font.setPointSize(m_fontSize);
         m_coordinator->setFont(font);
     }
-    subscribeLinkSignalsForItems();
-    subscribeContextSignalsForItems();
+
+    // Focus the first text item so typed keys reach it instead of bubbling
+    // back up from m_view (whose parent is *this*, Editor) into
+    // Editor::keyPressEvent → QApplication::sendEvent(m_view, ...) → ... →
+    // infinite recursion. rebuildScene() (the Phase-A path) does the same
+    // thing; Task 13's canonical path missed it because the focus-loop was
+    // tail-of-rebuildScene and the inline rewrite only copied the
+    // width/font/subscribe bits. Surfaced 2026-04-21 during v0.6.0 dogfood.
+    for (auto *item : m_coordinator->items()) {
+        if (item->isTextItem()) {
+            item->asGraphicsItem()->setFocus();
+            break;
+        }
+    }
 }
 
 void Editor::onCanonicalDocumentReloaded()
