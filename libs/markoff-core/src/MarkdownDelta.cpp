@@ -43,6 +43,7 @@ int MarkdownDelta::id() const {
 }
 
 bool MarkdownDelta::mergeWith(const QUndoCommand *other) {
+    if (other->id() != id()) return false;
     const auto *next = static_cast<const MarkdownDelta *>(other);
     if (next->m_doc != m_doc) return false;
 

@@ -23,7 +23,7 @@ public:
     bool mergeWith(const QUndoCommand *other) override;
 
     qsizetype      offset() const          { return m_offset; }
-    qsizetype      removedLength() const   { return m_removed.size(); }
+    qsizetype      removedLength() const   { return m_firstRedo ? m_removedLengthHint : m_removed.size(); }
     const QString &removedText() const     { return m_removed; }
     const QString &insertedText() const    { return m_inserted; }
 
