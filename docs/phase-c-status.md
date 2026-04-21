@@ -69,7 +69,7 @@ during C1–C7.
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
 | C6   | done | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | Corbomite `a893c88d` | `v0.5.0`  |
 | C3   | **in soak** — `v0.6.0` tagged premature per 2026-04-21 C3 landing review; re-tagged `v0.6.0-alpha.2` at same SHA pending dogfood week. Fix commits tag `v0.6.0-alpha.3/.4/...`; stability re-tags as `v0.6.1`. | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | [C3 plan](plans/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | `master`             | Corbomite `c6c4f446`..`23bc5094` | `v0.6.0` + `v0.6.0-alpha.2` |
-| C7   | **BLOCKED** — editor key-dispatch architectural flaw must be resolved first ([spec](specs/2026-04-21-editor-key-dispatch-architecture.md)). See activity log 2026-04-21. Design inputs ready but implementation deferred: [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
+| C7   | **BLOCKED** — editor key-dispatch architectural flaw must be resolved first ([spec](specs/2026-04-21-editor-key-dispatch-architecture.md)) ⟵ **fresh-context agents: start with [session brief](specs/2026-04-21-editor-key-dispatch-SESSION-BRIEF.md) ⟵** . See activity log 2026-04-21. Design inputs ready but implementation deferred: [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C4   | not started  | —                                      | —                                      | —                    | —                    | —         |
 
@@ -229,6 +229,12 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-21 — Dogfood paused; fresh-context session brief for architectural fix
+
+User has paused dogfooding. Next work unit is the architectural fix for `Markoff::Editor` key-dispatch. Fresh-context agents picking this up MUST start with the **[session brief](specs/2026-04-21-editor-key-dispatch-SESSION-BRIEF.md)** — it lists the full reading path, cross-repo stakeholder enumeration, required investigation, brainstorm topics, deliverables, and hard warnings. The user's explicit ask: "go deep on analysis and find solutions which please *all* stakeholders in corbomite and markoff."
+
+The brief contains a hard-warning block: do NOT rush to Option A (the main architectural spec's recommended choice) without evaluating all options, hybrids, and stakeholder vetoes. Do NOT skip brainstorming. Do NOT tag `v0.6.1` with bandages in place. Do NOT treat Corbomite ctest as sufficient — manual dogfood required for key-dispatch behaviours.
 
 ### 2026-04-21 — Soak-week fix series alpha.3 → alpha.8; C7 BLOCKED on architectural spec
 
