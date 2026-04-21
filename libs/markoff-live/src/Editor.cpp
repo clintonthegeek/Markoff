@@ -802,6 +802,26 @@ void Editor::contextMenuEvent(QContextMenuEvent *e)
 
 void Editor::keyPressEvent(QKeyEvent *e)
 {
+    // v0.6.0-alpha.8: re-entrance guard. If we're already forwarding to
+    // m_view for this event, the event has bubbled back up (Qt propagates
+    // unaccepted key events from m_view to its QWidget parent = Editor).
+    // Accept and return to break the recursion. Without this guard, bare
+    // modifier keys (Shift), unbound shortcut keys, etc. produce infinite
+    // recursion → stack overflow SEGV.
+    if (m_inKeyPressEvent) {
+        static QLoggingCategory lcDog("markoff.live.dogfood");
+        qCWarning(lcDog, "keyPressEvent recursion guard fired: key=0x%x — "
+                         "event bubbled back from m_view, accepting to break.",
+                  e->key());
+        e->accept();
+        return;
+    }
+    struct GuardRAII {
+        bool &g;
+        GuardRAII(bool &b) : g(b) { g = true; }
+        ~GuardRAII() { g = false; }
+    } guard(m_inKeyPressEvent);
+
     // Tab smart-indent (handled here because it's context-dependent:
     // inside a table TextControl handles cell navigation; outside,
     // Editor handles indent/dedent).

@@ -363,6 +363,14 @@ private:
     void handleWheelOnViewport(QWheelEvent *e);
 
     QGraphicsView *m_view = nullptr;
+    // v0.6.0-alpha.8: re-entrance guard for keyPressEvent. Qt bubbles
+    // key events from m_view back up to its QWidget parent (which is
+    // Editor) when no child widget accepts them — e.g. bare Shift,
+    // unbound shortcuts. Without this guard, Editor::keyPressEvent runs,
+    // sendEvents to m_view, the unaccepted event bubbles back to
+    // Editor::event → keyPressEvent → sendEvent(m_view) → … infinite
+    // recursion → stack overflow SEGV (2026-04-21 dogfood, three variants).
+    bool m_inKeyPressEvent = false;
     QHash<ActionId, QAction*> m_actions;
 
     SelectionScene *m_scene = nullptr;
