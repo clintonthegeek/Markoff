@@ -2606,6 +2606,30 @@ void Editor::onCanonicalParseUpdated(const Markoff::Document *parsed)
     if (!parsed || !m_markoffDoc)
         return;
     m_sourceText = m_markoffDoc->toMarkdown();
+
+    // v0.6.0-alpha.4 fix: only do a full loadMarkdown rebuild when needed.
+    // Needed = coordinator flagged a multi-item / non-text / out-of-range
+    // delta, OR the scene is empty (first-attach, documentReloaded, or
+    // caller explicitly cleared it). For the common single-item splice
+    // path, outbound (Task 15) and inbound (Task 16) already kept the
+    // scene in sync — calling loadMarkdown here would destroy + recreate
+    // items, stealing cursor / focus state from the block the user is
+    // typing in and producing stale cursor positions that crash
+    // QTextEngine::justify on next key (2026-04-21 dogfood SEGV).
+    //
+    // Consequence: syntax highlighting / AST-dependent rendering may be
+    // slightly stale between edits and the next forced rebuild. That's a
+    // known soak-week limitation; tracked for a follow-up that refreshes
+    // highlighting in place without tearing items down.
+    const bool rebuildFlag = m_coordinator->consumeRebuildFlag();
+    // Scene out-of-sync with canonical is another rebuild trigger — catches
+    // first-attach (items empty) and documentReloaded (items reset to an
+    // empty placeholder). Comparing reconstructed markdown against canonical
+    // is more robust than checking items.isEmpty() alone.
+    const bool sceneOutOfSync = m_coordinator->toMarkdown() != m_sourceText;
+    if (!rebuildFlag && !sceneOutOfSync)
+        return;
+
     m_coordinator->loadMarkdown(m_sourceText);
 
     qreal width = m_view->viewport()->width() - 32;
@@ -2617,19 +2641,18 @@ void Editor::onCanonicalParseUpdated(const Markoff::Document *parsed)
         m_coordinator->setFont(font);
     }
 
-    // Focus the first text item so typed keys reach it instead of bubbling
-    // back up from m_view (whose parent is *this*, Editor) into
-    // Editor::keyPressEvent → QApplication::sendEvent(m_view, ...) → ... →
-    // infinite recursion. rebuildScene() (the Phase-A path) does the same
-    // thing; Task 13's canonical path missed it because the focus-loop was
-    // tail-of-rebuildScene and the inline rewrite only copied the
-    // width/font/subscribe bits. Surfaced 2026-04-21 during v0.6.0 dogfood.
+    // Focus the first text item on rebuild (pre-alpha.3 fix: without this,
+    // the rebuilt scene has no focus item, and typed keys bubble from m_view
+    // back up into Editor::keyPressEvent infinitely).
     for (auto *item : m_coordinator->items()) {
         if (item->isTextItem()) {
             item->asGraphicsItem()->setFocus();
             break;
         }
     }
+
+    subscribeLinkSignalsForItems();
+    subscribeContextSignalsForItems();
 }
 
 void Editor::onCanonicalDocumentReloaded()

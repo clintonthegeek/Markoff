@@ -151,6 +151,15 @@ public:
     /// offset update so the next parseUpdated can force-rebuild.
     void applyCanonicalDelta(qsizetype offset, qsizetype removed, qsizetype inserted);
 
+    /// Phase C3 v0.6.0-alpha.4 — read-and-clear accessor for the
+    /// scene-needs-full-rebuild flag. Returns true (and clears the flag) if a
+    /// multi-item / non-text / out-of-range delta was queued since the last
+    /// call; the caller must force a full loadMarkdown in that case. Returns
+    /// false for the common single-item splice path — onCanonicalParseUpdated
+    /// must SKIP loadMarkdown in that case, or the rebuild steals cursor /
+    /// focus state from the block the user is typing in.
+    bool consumeRebuildFlag();
+
 Q_SIGNALS:
     void textChanged();
     void reparsed();

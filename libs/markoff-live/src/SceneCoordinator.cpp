@@ -203,6 +203,13 @@ SceneCoordinator::detectTableRegions(const QString &markdown) const
     return regions;
 }
 
+bool SceneCoordinator::consumeRebuildFlag()
+{
+    const bool flag = m_sceneNeedsFullRebuildOnNextParse;
+    m_sceneNeedsFullRebuildOnNextParse = false;
+    return flag;
+}
+
 void SceneCoordinator::loadMarkdown(const QString &markdown)
 {
     // Phase C3 Task 16: clear the full-rebuild flag — loadMarkdown always
