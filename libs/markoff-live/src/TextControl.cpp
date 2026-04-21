@@ -1694,6 +1694,7 @@ QRectF TextControlPrivate::rectForPosition(int position) const
     // a SEGV that loses their work.
     if (!doc) return QRectF();
     const int docEnd = doc->characterCount() - 1;  // characterCount includes trailing \0
+    if (docEnd < 0) return QRectF();  // empty doc — nothing to render; avoids UB in clamp
     if (position > docEnd || position < 0) {
         static QLoggingCategory lcCursorDrift("markoff.live.text_control.cursor_drift");
         qCWarning(lcCursorDrift,

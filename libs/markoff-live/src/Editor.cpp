@@ -2,6 +2,7 @@
 #include "markoff/Editor.h"
 #include "markoff/LinkRenderer.h"
 #include "markoff/SearchBar.h"
+#include <QLoggingCategory>
 #include "LiveSearchAdapter.h"
 #include "SelectionScene.h"
 #include "SelectionManager.h"
@@ -830,6 +831,20 @@ void Editor::keyPressEvent(QKeyEvent *e)
         return;
     }
 
+    // v0.6.0-alpha.7 soak instrumentation — log pre-dispatch focus state.
+    // If focusItem() is null here, the key event will find no accepting
+    // item in the scene, bubble back from m_view to Editor, and recurse.
+    {
+        static QLoggingCategory lcDog("markoff.live.dogfood");
+        auto *fi = m_scene ? m_scene->focusItem() : nullptr;
+        qCWarning(lcDog,
+                  "keyPressEvent fwd: key=0x%x text=%s "
+                  "scene=%p focusItem=%p items=%d bound=%p",
+                  e->key(), qUtf8Printable(e->text()),
+                  (void*)m_scene, (void*)fi,
+                  m_coordinator ? int(m_coordinator->items().size()) : -1,
+                  (void*)m_markoffDoc);
+    }
     // Forward to the composed QGraphicsView so its default key handling
     // (scene -> focus item) runs unchanged. Using sendEvent (not
     // postEvent) so it runs synchronously before we check e->text() etc.
@@ -2553,6 +2568,13 @@ QPoint Editor::mapFromScene(const QPointF &p) const { return m_view->mapFromScen
 
 void Editor::setDocument(MarkoffDocument *doc)
 {
+    static QLoggingCategory lcDog("markoff.live.dogfood");
+    qCWarning(lcDog, "Editor::setDocument(this=%p, doc=%p, currentDoc=%p, "
+                     "docParsedPtr=%p, canonicalLen=%lld)",
+              (void*)this, (void*)doc, (void*)m_markoffDoc,
+              (void*)(doc ? doc->parsedDocument() : nullptr),
+              (long long)(doc ? doc->length() : -1));
+
     if (m_markoffDoc == doc)
         return;
 
@@ -2562,6 +2584,7 @@ void Editor::setDocument(MarkoffDocument *doc)
     m_markoffDoc = doc;
 
     if (!doc) {
+        qCWarning(lcDog, "Editor::setDocument detaching (doc=nullptr)");
         // Detach: clear the scene and disconnect the outbound delta path.
         m_coordinator->setBoundDocument(nullptr);
         m_coordinator->loadMarkdown(QString());
@@ -2588,8 +2611,62 @@ void Editor::setDocument(MarkoffDocument *doc)
             m_coordinator->applyCanonicalDelta(offset, removed, inserted);
     });
 
-    // If a parse result is already available, build the scene immediately
-    // (sync path — ensures test determinism when doc is pre-parsed).
+    // v0.6.0-alpha.7: build the scene synchronously from canonical text,
+    // regardless of whether the async parse has completed. Otherwise there's
+    // a 150ms-or-so window between setDocument and the first parseUpdated
+    // during which the scene is empty, nothing has focus, and any key event
+    // bubbles from m_view back up to Editor → keyPressEvent → sendEvent
+    // → ... infinite recursion → stack overflow SEGV.
+    //
+    // Pre-C3 (Phase A) setPlainText did this synchronously; canonical mode's
+    // gating on parseUpdated introduced the race. Tests didn't catch it
+    // because they QSignalSpy::wait on parseUpdated before exercising keys.
+    //
+    // Highlighting / AST-dependent rendering is stale until the subsequent
+    // parseUpdated arrives — same known soak limitation as alpha.4/.5.
+    m_sourceText = doc->toMarkdown();
+    qCWarning(lcDog, "Editor::setDocument sync-build: canonicalLen=%lld "
+                     "sceneItemsBefore=%d",
+              (long long)m_sourceText.size(),
+              int(m_coordinator->items().size()));
+    if (!m_sourceText.isEmpty() || !m_coordinator->items().isEmpty()) {
+        m_coordinator->loadMarkdown(m_sourceText);
+
+        qreal width = m_view->viewport()->width() - 32;
+        if (width > 100)
+            m_coordinator->setItemWidth(width);
+        if (m_fontSize > 0) {
+            QFont font = this->font();
+            font.setPointSize(m_fontSize);
+            m_coordinator->setFont(font);
+        }
+
+        // Focus the first text item so typed keys reach it rather than
+        // bubbling back up into Editor::keyPressEvent.
+        SelectableItem *focused = nullptr;
+        for (auto *item : m_coordinator->items()) {
+            if (item->isTextItem()) {
+                item->asGraphicsItem()->setFocus();
+                focused = item;
+                break;
+            }
+        }
+        qCWarning(lcDog, "Editor::setDocument post-build: items=%d "
+                         "focusedFirstTextItem=%p sceneFocusItem=%p",
+                  int(m_coordinator->items().size()),
+                  (void*)focused,
+                  m_scene ? (void*)m_scene->focusItem() : nullptr);
+
+        subscribeLinkSignalsForItems();
+        subscribeContextSignalsForItems();
+    } else {
+        qCWarning(lcDog, "Editor::setDocument: empty canonical + empty scene, "
+                         "no sync-build");
+    }
+
+    // If a parse result is already available (sync path — test determinism
+    // when doc is pre-parsed), call onCanonicalParseUpdated too. It'll see
+    // the scene is in sync and skip the rebuild — no-op for AST refresh.
     if (const Markoff::Document *parsed = doc->parsedDocument())
         onCanonicalParseUpdated(parsed);
 }
@@ -2603,6 +2680,9 @@ int Editor::blockCount() const
 
 void Editor::onCanonicalParseUpdated(const Markoff::Document *parsed)
 {
+    static QLoggingCategory lcDog("markoff.live.dogfood");
+    qCWarning(lcDog, "onCanonicalParseUpdated: parsed=%p bound=%p",
+              (void*)parsed, (void*)m_markoffDoc);
     if (!parsed || !m_markoffDoc)
         return;
     m_sourceText = m_markoffDoc->toMarkdown();
@@ -2627,6 +2707,11 @@ void Editor::onCanonicalParseUpdated(const Markoff::Document *parsed)
     // empty placeholder). Comparing reconstructed markdown against canonical
     // is more robust than checking items.isEmpty() alone.
     const bool sceneOutOfSync = m_coordinator->toMarkdown() != m_sourceText;
+    qCWarning(lcDog, "onCanonicalParseUpdated: rebuildFlag=%d sceneOutOfSync=%d "
+                     "items=%d srcLen=%lld",
+              (int)rebuildFlag, (int)sceneOutOfSync,
+              int(m_coordinator->items().size()),
+              (long long)m_sourceText.size());
     if (!rebuildFlag && !sceneOutOfSync)
         return;
 
