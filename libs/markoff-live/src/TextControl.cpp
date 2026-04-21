@@ -24,6 +24,8 @@
 #include <qtextformat.h>
 #include <qdatetime.h>
 #include <qbuffer.h>
+#include <QLoggingCategory>
+#include <algorithm>
 #include <limits.h>
 #include <qtexttable.h>
 #include <qvariant.h>
@@ -1680,6 +1682,27 @@ void TextControl::insertFromMimeData(const QMimeData *source)
 
 QRectF TextControlPrivate::rectForPosition(int position) const
 {
+    // v0.6.0-alpha.6: defensive clamp against cursor drift. Three soak-week
+    // crashes have hit "QTextCursor::setPosition: Position 'N' out of range"
+    // inside QTextEngine::justify via rectForPosition when the cursor's
+    // cached position exceeds doc->characterCount() - 1. Root cause still
+    // being tracked (see the qCWarning instrumentation just below); while
+    // that investigation proceeds, preventing the crash here keeps typing
+    // usable. Behavior when drift hits: position clamps to end-of-doc and
+    // the cursor-rect is computed at that position — visible to the user
+    // as the caret painted slightly wrong for one frame, far better than
+    // a SEGV that loses their work.
+    if (!doc) return QRectF();
+    const int docEnd = doc->characterCount() - 1;  // characterCount includes trailing \0
+    if (position > docEnd || position < 0) {
+        static QLoggingCategory lcCursorDrift("markoff.live.text_control.cursor_drift");
+        qCWarning(lcCursorDrift,
+                  "rectForPosition: position %d out of range [0, %d] — clamping. "
+                  "Indicates TextControlPrivate::cursor drifted relative to doc "
+                  "length; caller stack should reveal which edit path desyncd it.",
+                  position, docEnd);
+        position = std::clamp(position, 0, docEnd);
+    }
     const QTextBlock block = doc->findBlock(position);
     if (!block.isValid())
         return QRectF();
