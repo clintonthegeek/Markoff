@@ -58,3 +58,16 @@ target_link_libraries(tst_canonical_interop PRIVATE
 target_include_directories(tst_canonical_interop PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/markoff-live/src)
 set_tests_properties(tst_canonical_interop PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Task 18 — Cross-mode undo test. Edit-in-Source → swap-to-Live → edit-in-Live
+# → Ctrl+Z reverses LIFO; the canonical QUndoStack is the single history
+# regardless of which leaf was active at edit time.
+add_executable(tst_cross_mode_undo tst_cross_mode_undo.cpp)
+add_test(NAME tst_cross_mode_undo COMMAND tst_cross_mode_undo)
+target_link_libraries(tst_cross_mode_undo PRIVATE
+    Qt6::Test Qt6::Widgets
+    markoff_core
+    markoff_live
+    markoff_source
+)
+set_tests_properties(tst_cross_mode_undo PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
