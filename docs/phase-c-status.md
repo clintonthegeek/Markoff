@@ -67,7 +67,7 @@ during C1–C7.
 | ---- | ------------ | -------------------------------------- | -------------------------------------- | -------------------- | -------------------- | --------- |
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
-| C6   | markoff ready (v0.5.0) | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | —                    | `v0.5.0`  |
+| C6   | done | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | Corbomite `a893c88d` | `v0.5.0`  |
 | C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,46 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C6 corbomite-shipped; done
+
+Corbomite submodule bumped to `v0.5.0-1-ga9cbc9a` (one commit past
+the tag — the phase-c-status update). Corbomite adapter commit
+`a893c88d`:
+
+- `MainWindow::connectEditorContext` + `onEditorContextChanged`
+  (public Q_SLOT for test dispatch) drives Format toolbar
+  check-state, Heading radio, Table delete-row/col gating (refined
+  via the new `EditorContext::table` row/col fields), and
+  `toggle_fold` enable-state. `refreshEditorActions` remains as the
+  initial-state primer for non-context-driven actions.
+- `MainWindow::connectEditorContextMenu` + `onAboutToShowContextMenu`
+  (public Q_SLOT) wire the new `aboutToShowContextMenu` signal to
+  `MenuSectionHelper`-driven contributions: Format / Heading / Insert
+  / Table entries land in the `"action"` section of the right-click
+  editor menu via `addToSection(QAction *, QString)` + `finalize()`
+  (plan had assumed `addItem` + `flush` — real API confirmed during
+  adaptation).
+- Latent UX fix surfaced during adapter wiring: `format_bold`,
+  `format_italic`, `format_strikethrough`, `format_inline_code`
+  actions were not previously `setCheckable(true)`; `QAction::setChecked`
+  was silently no-oping on them. Adding `setCheckable(true)` in
+  `MainWindow::setupActions` is why the Format toolbar now shows
+  correct visual check state.
+- `tst_mainwindow_action_wiring` extended with a slot-dispatch test
+  that calls `onEditorContextChanged` with a synthetic
+  `EditorContext` and asserts the `format_bold` action's
+  `isChecked()` flips.
+
+A stale-vault artifact briefly looked like a `tst_e2e_gui` regression
+during execution (global-search returned 0 hits + SEGV in
+teardown) — verified on the pre-C6 parent commit with a clean vault
+state: both issues were pre-existing state-dependent flakes, not
+caused by C6. Full Corbomite ctest green modulo the two documented
+flakes (`tst_benchmark_layout` timeout, `tst_editorsuggest` bounds
+bug). Cluster V.2 remains open.
+
+Next: C3 (`MarkoffDocument` content-authoritative).
 
 ### 2026-04-20 — C6 landed at `v0.5.0`
 
