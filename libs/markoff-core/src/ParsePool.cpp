@@ -50,9 +50,11 @@ ParsePool::~ParsePool()
 {
     d->thread->quit();
     d->thread->wait();
-    // Worker is deleteLater'd on thread::finished (connected above).
-    // unique_ptr<Private> tears down the QThread object (and mutex/map)
-    // after the thread has been fully joined — safe.
+    // Worker is deleteLater'd on thread::finished (see constructor connect).
+    // Any QueuedConnection-delivered lambdas from worker::parsed still in the
+    // main-thread event queue are safe: ~QObject (runs after this destructor body)
+    // disconnects all incoming queued connections before the next event-loop
+    // iteration can deliver them.
 }
 
 void ParsePool::postJob(MarkoffDocument *sender, QString snapshot)
@@ -62,10 +64,12 @@ void ParsePool::postJob(MarkoffDocument *sender, QString snapshot)
         QMutexLocker lk(&d->mutex);
         gen = ++d->generations[sender];
     }
-    QMetaObject::invokeMethod(d->worker, "parseSnapshot", Qt::QueuedConnection,
-                              Q_ARG(Markoff::MarkoffDocument *, sender),
-                              Q_ARG(QString, std::move(snapshot)),
-                              Q_ARG(quint64, gen));
+    ParsePoolWorker *worker = d->worker;
+    QMetaObject::invokeMethod(worker,
+        [worker, sender, snap = std::move(snapshot), gen]() mutable {
+            worker->parseSnapshot(sender, std::move(snap), gen);
+        },
+        Qt::QueuedConnection);
 }
 
 void ParsePool::cancelJobsFor(MarkoffDocument *sender)
