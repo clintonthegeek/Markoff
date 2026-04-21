@@ -68,7 +68,7 @@ during C1–C7.
 | C1   | markoff ready (v0.3.0) — corbomite adapter shipped; Phase B bridge retired | [C1 DI seam](docs/specs/2026-04-20-phase-c1-di-seam.md) | [C1 plan](docs/plans/2026-04-20-phase-c1-di-seam.md) | `master`             | Corbomite `59ecd5cb` | `v0.3.0`  |
 | C5   | markoff ready (v0.4.0) | [C5 spec](specs/2026-04-20-phase-c5-reading-interaction-parity.md) | [C5 plan](plans/2026-04-20-phase-c5-reading-interaction-parity.md) | `master`             | —                    | `v0.4.0`  |
 | C6   | done | [C6 wrapper spec](specs/2026-04-20-phase-c6-editor-state-context-menu.md) + [consumer-spec §1-8 + §9](libs/markoff-live/docs/specs/2026-04-20-consumer-editor-state-surface.md) | [C6 plan](plans/2026-04-20-phase-c6-editor-state-context-menu.md) | `master`             | Corbomite `a893c88d` | `v0.5.0`  |
-| C3   | not started  | —                                      | —                                      | —                    | —                    | —         |
+| C3   | spec drafted | [C3 spec](specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md) | —                                      | —                    | —                    | —         |
 | C7   | requirements — see inputs | [find/replace design](libs/markoff-live/docs/specs/2026-04-14-find-replace-design.md) + [code-folding Kate harvest](libs/markoff-live/docs/specs/2026-04-14-code-folding-kate-harvest.md) + [find/replace Kate harvest](libs/markoff-live/docs/specs/2026-04-14-find-replace-kate-harvest.md) | —                                      | —                    | —                    | —         |
 | C2   | not started  | —                                      | —                                      | —                    | —                    | —         |
 | C4   | not started  | —                                      | —                                      | —                    | —                    | —         |
@@ -229,6 +229,27 @@ on the local ahead-master for three weeks).
 ## Activity log
 
 Append in reverse-chronological order (newest first).
+
+### 2026-04-20 — C3 spec drafted
+
+`docs/specs/2026-04-20-phase-c3-markoff-document-content-authoritative.md` — 574-line spec for the largest Phase C work-unit. Delivers content-authoritative `MarkoffDocument` as the symmetric-B design: canonical = markdown bytes (`QString` behind `CanonicalBuffer` interface); one `QUndoStack` on `MarkoffDocument`; all three leaves subscribe to bytewise deltas (`contentsChanged`) + AST (`parseUpdated`) + wholesale-reload (`documentReloaded`); every edit routes through `MarkdownDelta` commands; native Qt per-leaf undo disabled everywhere.
+
+Key calls recorded in §10 (Decisions recorded), eight total:
+
+1. Wrapper (1:1), not pool — Vault's existing NoteDocument cache is the de-facto pool.
+2. Symmetric-B undo — rejected A (Live scene-graph rewrite on single `QTextEdit`) as a separately-scoped future phase; Qt-cliff cost on A was prohibitive.
+3. Shared single-worker `ParsePool` — Cluster I `MetadataWorker` precedent.
+4. No internal `QTextDocument` on `MarkoffDocument` — footgun by type-leak; removal in C3 is the fix.
+5. `Origin` enum on `resetContent` covers FirstOpen / ExternalReloadClean / ExternalReloadResolved / UserRevertToSaved / TestFixture with differing stack semantics.
+6. `documentReloaded` signal distinct from `contentsChanged`.
+7. Byte-equality defense-in-depth in echo suppression (enabled by raw-byte save path).
+8. HoverPopover live-binding deferred as post-C3 Corbomite follow-up.
+
+Phase-E hedge (§11): `CanonicalBuffer` interface + `CursorPosition` opaque handle ship in C3 at small real cost; keep a future CRDT swap (`~/dev/collabtext/`) as a clean internal refactor, not a re-architecture. Scouting doc landing on the Corbomite side at `docs/superpowers/plans/2026-04-20-phase-e-crdt-canonical-SCOUTING.md`.
+
+Scope explicitly excludes: Live scene-graph rewrite (future phase), renderer unification (C4), Theme/ResourceProvider/LinkResolver consolidation (C2), find/replace API (C7), fold-gutter coordinator (C7), plugin-visible `MarkoffDocument`. 14 acceptance criteria (7 Markoff-side, 7 Corbomite-side) + 12-file signatures-at-a-glance manifest + 7-item breaking-changes list for the removed `textDocument()` / `setPlainText` / `plainText` / `replace` / `insert` / `remove` / `beginTransaction` / `endTransaction` / `parsed()` API.
+
+**Not self-approved** — design had substantive pushback from the Markoff agent during brainstorm (correctly caught a `QTextCursor`-as-view framing error and a B-as-dual-stacks strawman in the A/B options writeup). Post-iteration the user explicitly pre-approved the final direction, so spec is approved on that basis. Next: plan file.
 
 ### 2026-04-20 — C6 corbomite-shipped; done
 
