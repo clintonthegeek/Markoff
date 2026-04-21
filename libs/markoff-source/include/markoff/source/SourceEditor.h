@@ -3,6 +3,8 @@
 
 #include <memory>
 
+#include <QTextDocument>
+
 #include <markoff/MarkdownView.h>
 
 namespace Qutepart { class Qutepart; }
@@ -53,6 +55,11 @@ public:
     // Internal hooks exposed for SourceSearchAdapter and tests
     Qutepart::Qutepart *qutepart() { return m_qutepart; }
 
+    /// Returns Qutepart's inner QTextDocument. Exposed for tests that need
+    /// to drive edits via QTextCursor without pulling in the full Qutepart
+    /// header — preferred over qutepart()->document() in test code.
+    QTextDocument *innerDocument() const;
+
     /// Convenience: plain text content of Qutepart's internal buffer.
     /// Mirrors QPlainTextEdit::toPlainText() for test/host access without
     /// exposing Qutepart directly.
@@ -67,6 +74,7 @@ private:
 
     void onCanonicalContentsChanged(qsizetype offset, qsizetype removed, qsizetype inserted);
     void onCanonicalReloaded();
+    void onLocalContentsChange(int position, int charsRemoved, int charsAdded);
 };
 
 }  // namespace Markoff::Source

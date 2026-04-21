@@ -12,8 +12,11 @@
 
 #include <qutepart/qutepart.h>
 
+#include <QUndoStack>
+
 #include <markoff/CursorPos.h>
 #include <markoff/FoldSpec.h>
+#include <markoff/MarkdownDelta.h>
 #include <markoff/MarkoffDocument.h>
 
 #include "SourceSearchAdapter.h"
@@ -42,6 +45,13 @@ void SourceEditor::setDocument(Markoff::MarkoffDocument *doc)
     if (m_markoffDoc) {
         disconnect(m_markoffDoc, nullptr, this, nullptr);
     }
+
+    // Disconnect Qutepart's inner QTextDocument from the outbound slot.
+    if (m_qutepart) {
+        disconnect(m_qutepart->document(), &QTextDocument::contentsChange,
+                   this, &SourceEditor::onLocalContentsChange);
+    }
+
     m_markoffDoc = doc;
 
     if (!doc) {
@@ -64,9 +74,18 @@ void SourceEditor::setDocument(Markoff::MarkoffDocument *doc)
     connect(doc, &Markoff::MarkoffDocument::documentReloaded,
             this, &SourceEditor::onCanonicalReloaded);
     // parseUpdated is not subscribed — Source renders text verbatim, not AST.
+
+    // Subscribe to Qutepart's inner QTextDocument to capture local edits.
+    connect(m_qutepart->document(), &QTextDocument::contentsChange,
+            this, &SourceEditor::onLocalContentsChange);
 }
 
 Markoff::MarkoffDocument *SourceEditor::document() const { return m_markoffDoc; }
+
+QTextDocument *SourceEditor::innerDocument() const
+{
+    return m_qutepart ? m_qutepart->document() : nullptr;
+}
 
 QString SourceEditor::toPlainText() const
 {
@@ -92,6 +111,26 @@ void SourceEditor::onCanonicalReloaded()
     if (!m_markoffDoc) return;
     m_applyingCanonicalDelta = true;
     m_qutepart->document()->setPlainText(m_markoffDoc->toMarkdown());
+    m_applyingCanonicalDelta = false;
+}
+
+void SourceEditor::onLocalContentsChange(int position, int charsRemoved, int charsAdded)
+{
+    if (m_applyingCanonicalDelta) return;
+    if (!m_markoffDoc) return;
+
+    QString insertedText;
+    if (charsAdded > 0) {
+        QTextCursor c(m_qutepart->document());
+        c.setPosition(position);
+        c.setPosition(position + charsAdded, QTextCursor::KeepAnchor);
+        insertedText = c.selectedText();
+        insertedText.replace(QChar::ParagraphSeparator, QLatin1Char('\n'));
+    }
+
+    m_applyingCanonicalDelta = true;
+    m_markoffDoc->undoStack()->push(
+        new Markoff::MarkdownDelta(m_markoffDoc, position, charsRemoved, insertedText));
     m_applyingCanonicalDelta = false;
 }
 
