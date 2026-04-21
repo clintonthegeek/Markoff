@@ -40,3 +40,21 @@ target_link_libraries(tst_tri_view_smoke PRIVATE
     markoff_reading
 )
 set_tests_properties(tst_tri_view_smoke PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Task 17 — Top-level tri-view canonical interop test. All three leaves bound
+# to one MarkoffDocument: cross-leaf edit propagation + parseUpdated burst
+# coalescing.
+add_executable(tst_canonical_interop tst_canonical_interop.cpp)
+add_test(NAME tst_canonical_interop COMMAND tst_canonical_interop)
+target_link_libraries(tst_canonical_interop PRIVATE
+    Qt6::Test Qt6::Widgets
+    markoff_core
+    markoff_live
+    markoff_source
+    markoff_reading
+)
+# SceneCoordinator.h is an internal markoff-live header; expose it for the
+# coordinatorForTesting() call the same way tst_live_canonical_attach does.
+target_include_directories(tst_canonical_interop PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../../libs/markoff-live/src)
+set_tests_properties(tst_canonical_interop PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
