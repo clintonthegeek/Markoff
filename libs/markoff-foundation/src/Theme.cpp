@@ -15,15 +15,27 @@ QColor Theme::color(Slot s) const
 
 void Theme::setColor(Slot s, QColor c) { m_colors[static_cast<int>(s)] = std::move(c); }
 
-// Stubs — filled in subsequent tasks.
-QFont Theme::font(FontRole) const { return {}; }
-void  Theme::setFont(FontRole, QFont) {}
-bool  Theme::isBold(Slot) const { return false; }
-void  Theme::setBold(Slot, bool) {}
-bool  Theme::isItalic(Slot) const { return false; }
-void  Theme::setItalic(Slot, bool) {}
-qreal Theme::fontSizeMultiplier(Slot) const { return 1.0; }
-void  Theme::setFontSizeMultiplier(Slot, qreal) {}
+QFont Theme::font(FontRole r) const
+{
+    const auto it = m_fonts.constFind(static_cast<int>(r));
+    return it != m_fonts.constEnd() ? it.value() : QFont{};
+}
+void Theme::setFont(FontRole r, QFont f) { m_fonts[static_cast<int>(r)] = std::move(f); }
+
+bool Theme::isBold(Slot s) const { return m_bolds.value(static_cast<int>(s), false); }
+void Theme::setBold(Slot s, bool b) { m_bolds[static_cast<int>(s)] = b; }
+
+bool Theme::isItalic(Slot s) const { return m_italics.value(static_cast<int>(s), false); }
+void Theme::setItalic(Slot s, bool b) { m_italics[static_cast<int>(s)] = b; }
+
+qreal Theme::fontSizeMultiplier(Slot s) const
+{
+    return m_sizeMul.value(static_cast<int>(s), 1.0);
+}
+void Theme::setFontSizeMultiplier(Slot s, qreal m)
+{
+    m_sizeMul[static_cast<int>(s)] = m;
+}
 
 QColor Theme::colorForCodeToken(CodeTokenKind) const { return color(Slot::CodeBlock); }
 

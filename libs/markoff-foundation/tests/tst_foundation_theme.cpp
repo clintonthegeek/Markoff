@@ -22,6 +22,26 @@ private Q_SLOTS:
         // rather than an invalid QColor. View code can rely on this.
         QVERIFY(t.color(Theme::Slot::Heading6).isValid());
     }
+
+    void font_set_round_trips() {
+        Theme t;
+        QFont f("Monaco", 14);
+        t.setFont(Theme::FontRole::Monospace, f);
+        QCOMPARE(t.font(Theme::FontRole::Monospace).family(), QStringLiteral("Monaco"));
+    }
+
+    void bold_italic_size_round_trip() {
+        Theme t;
+        t.setBold(Theme::Slot::Heading1, true);
+        t.setItalic(Theme::Slot::Quote, true);
+        t.setFontSizeMultiplier(Theme::Slot::Heading1, 2.0);
+        QVERIFY(t.isBold(Theme::Slot::Heading1));
+        QVERIFY(t.isItalic(Theme::Slot::Quote));
+        QCOMPARE(t.fontSizeMultiplier(Theme::Slot::Heading1), 2.0);
+        // Defaults.
+        QVERIFY(!t.isBold(Theme::Slot::TextDefault));
+        QCOMPARE(t.fontSizeMultiplier(Theme::Slot::TextDefault), 1.0);
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationTheme)
