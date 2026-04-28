@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Session.h>
 
 #include "MarkoffDocumentPrivate.h"
 
@@ -228,12 +229,31 @@ quint32 MarkoffDocument::resolveAnchor(const CollabText::Crdt::Anchor &a) const
     return d->buffer.resolve_anchor(a);
 }
 
-// Sessions - filled in Task 23.
-Session *MarkoffDocument::createSession(const SessionParams &) { return nullptr; }
-void MarkoffDocument::destroySession(Session *) {}
-QList<Session *> MarkoffDocument::sessions() const { return {}; }
-Session *MarkoffDocument::sessionForParticipant(const QString &) const
+Session *MarkoffDocument::createSession(const SessionParams &params)
 {
+    auto *s = new Session(this, params);
+    d->sessions.append(s);
+    Q_EMIT sessionCreated(s);
+    return s;
+}
+
+void MarkoffDocument::destroySession(Session *s)
+{
+    if (!s) return;
+    if (!d->sessions.removeOne(s)) return;
+    Q_EMIT sessionDestroyed(s);
+    s->deleteLater();
+}
+
+QList<Session *> MarkoffDocument::sessions() const
+{
+    return d->sessions;
+}
+
+Session *MarkoffDocument::sessionForParticipant(const QString &participantId) const
+{
+    for (Session *s : d->sessions)
+        if (s->participantId() == participantId) return s;
     return nullptr;
 }
 

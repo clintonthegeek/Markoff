@@ -4,6 +4,8 @@
 #include <QSignalSpy>
 
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Session.h>
+#include <markoff-foundation/SessionParams.h>
 
 using namespace Markoff;
 
@@ -369,6 +371,35 @@ private Q_SLOTS:
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abce"));
         // Right-bias anchor moves past the inserted text.
         QCOMPARE(doc.resolveAnchor(a), quint32(2));
+    }
+
+    void create_session_returns_owned_session() {
+        MarkoffDocument doc(1);
+        QSignalSpy spy(&doc, &MarkoffDocument::sessionCreated);
+        Session *s = doc.createSession();
+        QVERIFY(s != nullptr);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(doc.sessions().size(), 1);
+    }
+
+    void create_two_sessions_with_distinct_participants() {
+        MarkoffDocument doc(1);
+        SessionParams pa; pa.participantId = QStringLiteral("alice");
+        SessionParams pb; pb.participantId = QStringLiteral("bob");
+        Session *a = doc.createSession(pa);
+        Session *b = doc.createSession(pb);
+        QCOMPARE(doc.sessions().size(), 2);
+        QCOMPARE(doc.sessionForParticipant("alice"), a);
+        QCOMPARE(doc.sessionForParticipant("bob"),   b);
+    }
+
+    void destroy_session_removes_from_list() {
+        MarkoffDocument doc(1);
+        Session *s = doc.createSession();
+        QSignalSpy spy(&doc, &MarkoffDocument::sessionDestroyed);
+        doc.destroySession(s);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(doc.sessions().size(), 0);
     }
 };
 
