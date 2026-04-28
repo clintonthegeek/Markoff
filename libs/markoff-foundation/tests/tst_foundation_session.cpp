@@ -117,6 +117,48 @@ private Q_SLOTS:
             QVERIFY(x.kind != Selection::Kind::SearchMatch);
         delete s;
     }
+
+    void set_top_visible_emits_scroll_changed() {
+        MarkoffDocument doc(1);
+        Session *s = new Session(&doc, SessionParams{});
+        QSignalSpy spy(s, &Session::scrollChanged);
+        const auto a = CollabText::Crdt::Anchor(1, 100, CollabText::Crdt::Bias::Left);
+        s->setTopVisible(a, 0.25);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(s->topVisibleAnchor().char_value, quint32(100));
+        QCOMPARE(s->topVisibleFraction(), 0.25);
+        delete s;
+    }
+
+    void set_folded_regions_replaces_list() {
+        MarkoffDocument doc(1);
+        Session *s = new Session(&doc, SessionParams{});
+        FoldRef f; f.kind = FoldRef::Kind::Heading;
+        f.start = CollabText::Crdt::Anchor(1, 50, CollabText::Crdt::Bias::Left);
+        f.headingPath << QStringLiteral("Intro");
+        f.headingLevel = 1;
+
+        QSignalSpy spy(s, &Session::foldedRegionsChanged);
+        s->setFoldedRegions({ f });
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(s->foldedRegions().size(), 1);
+        delete s;
+    }
+
+    void toggle_fold_adds_then_removes() {
+        MarkoffDocument doc(1);
+        Session *s = new Session(&doc, SessionParams{});
+        FoldRef f; f.kind = FoldRef::Kind::Heading;
+        f.start = CollabText::Crdt::Anchor(1, 50, CollabText::Crdt::Bias::Left);
+        f.headingPath << QStringLiteral("Intro");
+        f.headingLevel = 1;
+
+        s->toggleFold(f);
+        QCOMPARE(s->foldedRegions().size(), 1);
+        s->toggleFold(f);
+        QCOMPARE(s->foldedRegions().size(), 0);
+        delete s;
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationSession)

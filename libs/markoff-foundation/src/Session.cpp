@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff-foundation/Session.h>
 
+#include <algorithm>
+
 #include <QUuid>
 
 #include <markoff-foundation/MarkoffDocument.h>
@@ -73,11 +75,39 @@ void Session::clearSecondarySelectionsOfKind(Selection::Kind kind)
 
 CollabText::Crdt::Anchor Session::topVisibleAnchor() const { return d->topAnchor; }
 qreal                    Session::topVisibleFraction() const { return d->topFraction; }
-void Session::setTopVisible(CollabText::Crdt::Anchor, qreal) {}
+
+void Session::setTopVisible(CollabText::Crdt::Anchor a, qreal fraction)
+{
+    d->topAnchor   = a;
+    d->topFraction = fraction;
+    Q_EMIT scrollChanged(a, fraction);
+}
 
 const QList<FoldRef> &Session::foldedRegions() const { return d->folds; }
-void Session::setFoldedRegions(QList<FoldRef>) {}
-void Session::toggleFold(const FoldRef &) {}
+
+void Session::setFoldedRegions(QList<FoldRef> folds)
+{
+    d->folds = std::move(folds);
+    Q_EMIT foldedRegionsChanged();
+}
+
+void Session::toggleFold(const FoldRef &f)
+{
+    // Match by start anchor identity (replica + char_value) — ignores
+    // ephemeral heading-path drift across parses.
+    const auto matches = [&](const FoldRef &x) {
+        return x.start.replica_id == f.start.replica_id
+            && x.start.char_value == f.start.char_value
+            && x.kind             == f.kind;
+    };
+    const auto it = std::find_if(d->folds.begin(), d->folds.end(), matches);
+    if (it == d->folds.end()) {
+        d->folds.append(f);
+    } else {
+        d->folds.erase(it);
+    }
+    Q_EMIT foldedRegionsChanged();
+}
 
 void Session::copyStateFrom(const Session &) {}
 QJsonObject Session::toJson() const { return {}; }
