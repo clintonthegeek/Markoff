@@ -40,22 +40,30 @@ public:
     QList<CodeSpan> spans;
     quint32         lineByteBase = 0;
 
-    KSyntaxHighlighting::State highlight(QStringView text,
+    KSyntaxHighlighting::State highlight(const QString &line,
                                          const KSyntaxHighlighting::State &state)
     {
-        return highlightLine(text, state);
+        m_currentLine = line;
+        return highlightLine(line, state);
     }
 
 protected:
     void applyFormat(int offset, int length,
                      const KSyntaxHighlighting::Format &fmt) override
     {
+        const quint32 byteOffset = static_cast<quint32>(
+            m_currentLine.left(offset).toUtf8().size());
+        const quint32 byteLength = static_cast<quint32>(
+            m_currentLine.mid(offset, length).toUtf8().size());
         CodeSpan sp;
-        sp.offset = lineByteBase + static_cast<quint32>(offset);
-        sp.length = static_cast<quint32>(length);
+        sp.offset = lineByteBase + byteOffset;
+        sp.length = byteLength;
         sp.kind   = mapStyle(fmt.textStyle());
         spans << sp;
     }
+
+private:
+    QString m_currentLine;
 };
 }
 

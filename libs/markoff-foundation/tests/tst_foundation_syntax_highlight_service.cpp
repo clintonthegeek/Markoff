@@ -31,6 +31,20 @@ private Q_SLOTS:
             QByteArray("int main() { return 0; }"));
         QVERIFY(!spans.isEmpty());
     }
+
+    void highlight_offsets_are_utf8_bytes_for_non_ascii() {
+        Kf6SyntaxHighlightService s;
+        const QString lang = s.supportsLanguage("c++") ? "c++" : "cpp";
+        // "// é\n" = 2+1+2+1 = 6 UTF-8 bytes; second line starts at byte offset 6.
+        // "int" on the second line must produce a span with offset >= 6.
+        const QByteArray src = QString::fromUtf8("// é\nint main() { return 0; }").toUtf8();
+        const auto spans = s.highlight(lang, src);
+        QVERIFY(!spans.isEmpty());
+        bool found_second_line = false;
+        for (const auto &sp : spans)
+            if (sp.offset >= 6) { found_second_line = true; break; }
+        QVERIFY(found_second_line);
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationSyntaxHighlightService)
