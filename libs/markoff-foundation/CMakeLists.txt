@@ -26,6 +26,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/LinkActivation.h
     include/markoff-foundation/LinkService.h
     include/markoff-foundation/DefaultLinkService.h
+    include/markoff-foundation/CommandFacade.h
     # --- Cmd/ (public) ---
     # Cmd aggregate
     include/markoff-foundation/Cmd.h
@@ -48,6 +49,7 @@ add_library(markoff_foundation STATIC
     src/Theme.cpp
     src/LinkService.cpp
     src/DefaultLinkService.cpp
+    src/CommandFacade.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h
