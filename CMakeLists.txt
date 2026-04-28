@@ -37,6 +37,17 @@ set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "" FORCE)
 
 add_subdirectory(libs/rapidyaml)
 add_subdirectory(libs/markoff-parser)
+
+# collabtext — CRDT engine, sibling library symlinked from /home/clinton/dev/collabtext.
+# Defensive guard against double-add by parent projects.
+if(NOT TARGET collabtext)
+    add_subdirectory(libs/collabtext)
+endif()
+
+# markoff-foundation — new foundation library replacing markoff-core's role.
+# Lives alongside the existing markoff-core, which remains master-maintained.
+add_subdirectory(libs/markoff-foundation)
+
 add_subdirectory(libs/markoff-core)
 add_subdirectory(libs/markoff-source)
 add_subdirectory(libs/markoff-live)
