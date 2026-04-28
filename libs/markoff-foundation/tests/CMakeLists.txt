@@ -27,3 +27,8 @@ add_executable(tst_selection tst_selection.cpp)
 add_test(NAME tst_selection COMMAND tst_selection)
 target_link_libraries(tst_selection PRIVATE Qt6::Test markoff_foundation)
 set_tests_properties(tst_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_fold_ref tst_fold_ref.cpp)
+add_test(NAME tst_fold_ref COMMAND tst_fold_ref)
+target_link_libraries(tst_fold_ref PRIVATE Qt6::Test markoff_foundation)
+set_tests_properties(tst_fold_ref PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

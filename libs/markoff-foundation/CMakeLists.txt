@@ -17,9 +17,11 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/MarkoffEdit.h
     include/markoff-foundation/AnchorJson.h
     include/markoff-foundation/Selection.h
+    include/markoff-foundation/FoldRef.h
     src/MarkoffEdit.cpp
     src/AnchorJson.cpp
     src/Selection.cpp
+    src/FoldRef.cpp
 )
 
 target_include_directories(markoff_foundation
