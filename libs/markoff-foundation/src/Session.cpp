@@ -47,9 +47,29 @@ void Session::setPrimarySelection(const Selection &sel)
 }
 
 const QList<Selection> &Session::secondarySelections() const { return d->secondaries; }
-void Session::setSecondarySelections(QList<Selection>) {}
-void Session::addSecondarySelection(Selection) {}
-void Session::clearSecondarySelectionsOfKind(Selection::Kind) {}
+void Session::setSecondarySelections(QList<Selection> sels)
+{
+    d->secondaries = std::move(sels);
+    Q_EMIT secondarySelectionsChanged();
+}
+
+void Session::addSecondarySelection(Selection sel)
+{
+    d->secondaries.append(std::move(sel));
+    Q_EMIT secondarySelectionsChanged();
+}
+
+void Session::clearSecondarySelectionsOfKind(Selection::Kind kind)
+{
+    QList<Selection> kept;
+    kept.reserve(d->secondaries.size());
+    for (const Selection &s : d->secondaries) {
+        if (s.kind != kind) kept << s;
+    }
+    if (kept.size() == d->secondaries.size()) return;
+    d->secondaries = std::move(kept);
+    Q_EMIT secondarySelectionsChanged();
+}
 
 CollabText::Crdt::Anchor Session::topVisibleAnchor() const { return d->topAnchor; }
 qreal                    Session::topVisibleFraction() const { return d->topFraction; }

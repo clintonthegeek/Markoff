@@ -69,6 +69,54 @@ private Q_SLOTS:
         QCOMPARE(spy.count(), 0);
         delete s;
     }
+
+    void set_secondary_selections_replaces_list() {
+        MarkoffDocument doc(1);
+        Session *s = new Session(&doc, SessionParams{});
+        Selection a; a.kind = Selection::Kind::Secondary;
+        a.anchor = CollabText::Crdt::Anchor(1, 10, CollabText::Crdt::Bias::Left);
+        a.active = CollabText::Crdt::Anchor(1, 11, CollabText::Crdt::Bias::Right);
+        Selection b; b.kind = Selection::Kind::SearchMatch;
+        b.anchor = CollabText::Crdt::Anchor(1, 20, CollabText::Crdt::Bias::Left);
+        b.active = CollabText::Crdt::Anchor(1, 23, CollabText::Crdt::Bias::Right);
+
+        QSignalSpy spy(s, &Session::secondarySelectionsChanged);
+        s->setSecondarySelections({ a, b });
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(s->secondarySelections().size(), 2);
+        delete s;
+    }
+
+    void add_secondary_selection_appends() {
+        MarkoffDocument doc(1);
+        Session *s = new Session(&doc, SessionParams{});
+        Selection a; a.kind = Selection::Kind::Secondary;
+        a.anchor = CollabText::Crdt::Anchor(1, 10, CollabText::Crdt::Bias::Left);
+        a.active = CollabText::Crdt::Anchor(1, 11, CollabText::Crdt::Bias::Right);
+        s->addSecondarySelection(a);
+        QCOMPARE(s->secondarySelections().size(), 1);
+        s->addSecondarySelection(a);
+        QCOMPARE(s->secondarySelections().size(), 2);
+        delete s;
+    }
+
+    void clear_of_kind_preserves_other_kinds() {
+        MarkoffDocument doc(1);
+        Session *s = new Session(&doc, SessionParams{});
+        Selection sec; sec.kind = Selection::Kind::Secondary;
+        sec.anchor = CollabText::Crdt::Anchor(1, 1, CollabText::Crdt::Bias::Left);
+        Selection sm;  sm.kind  = Selection::Kind::SearchMatch;
+        sm.anchor  = CollabText::Crdt::Anchor(1, 5, CollabText::Crdt::Bias::Left);
+        Selection pres; pres.kind = Selection::Kind::Presence;
+        pres.anchor = CollabText::Crdt::Anchor(1, 9, CollabText::Crdt::Bias::Left);
+        s->setSecondarySelections({ sec, sm, pres });
+
+        s->clearSecondarySelectionsOfKind(Selection::Kind::SearchMatch);
+        QCOMPARE(s->secondarySelections().size(), 2);
+        for (const Selection &x : s->secondarySelections())
+            QVERIFY(x.kind != Selection::Kind::SearchMatch);
+        delete s;
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationSession)
