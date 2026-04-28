@@ -13,6 +13,7 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 # the export header so the target builds.
 add_library(markoff_foundation STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
+    include/markoff-foundation/Origin.h
     src/foundation_anchor.cpp
 )
 
