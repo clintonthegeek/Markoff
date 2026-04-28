@@ -54,6 +54,29 @@ private Q_SLOTS:
         const auto edits = Cmd::editsForToggleBold(doc, sel);
         QVERIFY(edits.isEmpty());
     }
+
+    void toggle_italic_wraps() {
+        MarkoffDocument doc(1);
+        seed(doc, "abc");
+        Cmd::toggleItalic(doc, rangeSel(doc, 0, 3));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("*abc*"));
+    }
+
+    void toggle_strikethrough_wraps() {
+        MarkoffDocument doc(1);
+        seed(doc, "abc");
+        Cmd::toggleStrikethrough(doc, rangeSel(doc, 0, 3));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("~~abc~~"));
+    }
+
+    void toggle_inline_code_wraps_and_unwraps() {
+        MarkoffDocument doc(1);
+        seed(doc, "abc");
+        Cmd::toggleInlineCode(doc, rangeSel(doc, 0, 3));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("`abc`"));
+        Cmd::toggleInlineCode(doc, rangeSel(doc, 1, 4));  // inside backticks
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abc"));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationCmdInlineFormat)
