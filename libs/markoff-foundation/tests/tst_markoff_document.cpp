@@ -115,6 +115,35 @@ private Q_SLOTS:
         // The first received edit should describe the insertion at oldStart=1.
         QCOMPARE(received.first().oldStart, quint32(1));
     }
+
+    void apply_local_edit_batch() {
+        MarkoffDocument doc(1);
+        {
+            QList<MarkoffEdit> seed;
+            MarkoffEdit i;
+            i.oldStart = 0;
+            i.oldEnd = 0;
+            i.newText = "aaaa bbbb cccc";
+            seed << i;
+            doc.applyLocalEdit(seed);
+        }
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("aaaa bbbb cccc"));
+
+        // Two non-overlapping replacements in one batch.
+        QList<MarkoffEdit> edits;
+        MarkoffEdit r1;
+        r1.oldStart = 0;
+        r1.oldEnd = 4;
+        r1.newText = "AAAA";
+        edits << r1;
+        MarkoffEdit r2;
+        r2.oldStart = 10;
+        r2.oldEnd = 14;
+        r2.newText = "CCCC";
+        edits << r2;
+        doc.applyLocalEdit(edits);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("AAAA bbbb CCCC"));
+    }
 };
 
 int main(int argc, char *argv[]) {
