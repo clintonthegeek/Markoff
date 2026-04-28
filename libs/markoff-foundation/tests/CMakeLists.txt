@@ -17,3 +17,8 @@ add_executable(tst_markoff_edit tst_markoff_edit.cpp)
 add_test(NAME tst_markoff_edit COMMAND tst_markoff_edit)
 target_link_libraries(tst_markoff_edit PRIVATE Qt6::Test markoff_foundation)
 set_tests_properties(tst_markoff_edit PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_anchor_json tst_anchor_json.cpp)
+add_test(NAME tst_anchor_json COMMAND tst_anchor_json)
+target_link_libraries(tst_anchor_json PRIVATE Qt6::Test markoff_foundation)
+set_tests_properties(tst_anchor_json PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
