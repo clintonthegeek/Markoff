@@ -23,12 +23,16 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/Session.h
     src/MarkoffDocumentPrivate.h
     src/SessionPrivate.h
+    src/ParsePool.h
+    src/ParsePoolWorker.h
     src/MarkoffEdit.cpp
     src/AnchorJson.cpp
     src/Selection.cpp
     src/FoldRef.cpp
     src/MarkoffDocument.cpp
     src/Session.cpp
+    src/ParsePool.cpp
+    src/ParsePoolWorker.cpp
 )
 
 target_include_directories(markoff_foundation

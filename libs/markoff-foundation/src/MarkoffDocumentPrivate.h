@@ -9,6 +9,8 @@
 
 #include <crdt/Buffer.h>
 
+#include "ParsePool.h"
+
 namespace Markoff {
 
 class Session;
@@ -19,10 +21,12 @@ struct MarkoffDocument::Private {
         , replicaId(replicaId)
     {}
 
-    CollabText::Crdt::Buffer buffer;
-    quint16                  replicaId;
-    int                      coalescingIdleMs = 250;
-    QList<Session *>         sessions;  // filled by Task 23
+    CollabText::Crdt::Buffer                  buffer;
+    quint16                                   replicaId;
+    int                                       coalescingIdleMs = 250;
+    QList<Session *>                          sessions;  // filled by Task 23
+    Markoff::Foundation::ParsePool            parsePool;
+    std::unique_ptr<const Markoff::Document>  latestParse;
 };
 
 }  // namespace Markoff

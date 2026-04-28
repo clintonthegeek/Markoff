@@ -2,6 +2,8 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Session.h>
 
+#include <markoff-parser/Document.h>
+
 #include "MarkoffDocumentPrivate.h"
 
 namespace Markoff {
@@ -10,6 +12,11 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>(replicaId))
 {
+    QObject::connect(&d->parsePool, &Markoff::Foundation::ParsePool::parseReady,
+                     this, [this](const Markoff::Document *p) {
+                         d->latestParse.reset(p);
+                         Q_EMIT parseUpdated(p);
+                     });
 }
 
 MarkoffDocument::~MarkoffDocument() = default;
@@ -32,14 +39,12 @@ quint32 MarkoffDocument::visibleLength() const
 
 const Markoff::Document *MarkoffDocument::parsedDocument() const
 {
-    // Filled in Task 19 (ParsePool integration).
-    return nullptr;
+    return d->latestParse.get();
 }
 
 bool MarkoffDocument::parseIsPending() const
 {
-    // Filled in Task 19.
-    return false;
+    return d->parsePool.isPending();
 }
 
 quint16 MarkoffDocument::replicaId() const
@@ -89,8 +94,10 @@ MarkoffDocument::applyLocalEdit(const QList<MarkoffEdit> &edits)
         resultingEdits << me;
     }
 
-    if (!resultingEdits.isEmpty())
+    if (!resultingEdits.isEmpty()) {
         Q_EMIT contentsChanged(resultingEdits);
+        d->parsePool.schedule(toMarkdownUtf8());
+    }
 
     return op;
 }
@@ -113,8 +120,10 @@ std::optional<CollabText::Crdt::Operation> MarkoffDocument::undo()
                                 static_cast<int>(te.new_text.size()));
         resultingEdits << me;
     }
-    if (!resultingEdits.isEmpty())
+    if (!resultingEdits.isEmpty()) {
         Q_EMIT contentsChanged(resultingEdits);
+        d->parsePool.schedule(toMarkdownUtf8());
+    }
 
     return op;
 }
@@ -137,8 +146,10 @@ std::optional<CollabText::Crdt::Operation> MarkoffDocument::redo()
                                 static_cast<int>(te.new_text.size()));
         resultingEdits << me;
     }
-    if (!resultingEdits.isEmpty())
+    if (!resultingEdits.isEmpty()) {
         Q_EMIT contentsChanged(resultingEdits);
+        d->parsePool.schedule(toMarkdownUtf8());
+    }
 
     return op;
 }
@@ -174,8 +185,10 @@ void MarkoffDocument::applyRemoteOps(
         resultingEdits << me;
     }
 
-    if (!resultingEdits.isEmpty())
+    if (!resultingEdits.isEmpty()) {
         Q_EMIT contentsChanged(resultingEdits);
+        d->parsePool.schedule(toMarkdownUtf8());
+    }
 }
 
 void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
@@ -215,6 +228,7 @@ void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
         break;
     }
     }
+    d->parsePool.schedule(toMarkdownUtf8());
     Q_EMIT documentReloaded();
 }
 
