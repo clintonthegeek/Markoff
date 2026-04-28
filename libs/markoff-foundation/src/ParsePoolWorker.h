@@ -6,7 +6,7 @@
 
 namespace Markoff { class Document; }  // markoff-parser
 
-namespace Markoff::Foundation {
+namespace Markoff::Parse::Detail {
 
 /// Private worker object that lives on ParsePool's worker thread. Receives
 /// parseSnapshot() invocations via QueuedConnection from ParsePool and emits
@@ -23,4 +23,4 @@ Q_SIGNALS:
     void parsed(Markoff::Document *result, quint64 generation);
 };
 
-}  // namespace Markoff::Foundation
+}  // namespace Markoff::Parse::Detail

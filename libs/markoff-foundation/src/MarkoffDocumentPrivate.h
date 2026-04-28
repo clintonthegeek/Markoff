@@ -25,7 +25,7 @@ struct MarkoffDocument::Private {
     quint16                                   replicaId;
     int                                       coalescingIdleMs = 250;
     QList<Session *>                          sessions;  // filled by Task 23
-    Markoff::Foundation::ParsePool            parsePool;
+    Markoff::Parse::Detail::ParsePool         parsePool;
     std::unique_ptr<const Markoff::Document>  latestParse;
 };
 

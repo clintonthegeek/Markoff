@@ -5,7 +5,7 @@
 
 #include <memory>
 
-namespace Markoff::Foundation {
+namespace Markoff::Parse::Detail {
 
 void ParsePoolWorker::parseSnapshot(QByteArray utf8, quint64 generation)
 {
@@ -18,4 +18,4 @@ void ParsePoolWorker::parseSnapshot(QByteArray utf8, quint64 generation)
     Q_EMIT parsed(doc.release(), generation);
 }
 
-}  // namespace Markoff::Foundation
+}  // namespace Markoff::Parse::Detail

@@ -12,7 +12,7 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>(replicaId))
 {
-    QObject::connect(&d->parsePool, &Markoff::Foundation::ParsePool::parseReady,
+    QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p) {
                          d->latestParse.reset(p);
                          Q_EMIT parseUpdated(p);

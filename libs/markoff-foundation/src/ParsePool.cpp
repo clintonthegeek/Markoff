@@ -12,7 +12,7 @@
 
 #include <utility>
 
-namespace Markoff::Foundation {
+namespace Markoff::Parse::Detail {
 
 struct ParsePool::Private {
     QThread          *thread = nullptr;
@@ -93,4 +93,4 @@ bool ParsePool::isPending() const
     return d->inFlight > 0 && d->inFlight == d->generation;
 }
 
-}  // namespace Markoff::Foundation
+}  // namespace Markoff::Parse::Detail

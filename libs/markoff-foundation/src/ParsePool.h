@@ -8,7 +8,7 @@
 
 namespace Markoff { class Document; }  // markoff-parser
 
-namespace Markoff::Foundation {
+namespace Markoff::Parse::Detail {
 
 /// Background Markdown parser, single-owner: each MarkoffDocument holds one
 /// ParsePool by value. Snapshots are scheduled via schedule(); the worker
@@ -37,4 +37,4 @@ private:
     std::unique_ptr<Private> d;
 };
 
-}  // namespace Markoff::Foundation
+}  // namespace Markoff::Parse::Detail
