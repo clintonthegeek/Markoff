@@ -28,7 +28,23 @@ QColor  Session::presenceColor() const    { return d->presenceColor; }
 
 // Selection / scroll / fold getters return defaults until Tasks 19-22.
 Selection Session::primarySelection() const { return d->primary; }
-void Session::setPrimarySelection(const Selection &) {}
+
+void Session::setPrimarySelection(const Selection &sel)
+{
+    const Selection &cur = d->primary;
+    if (cur.anchor.replica_id == sel.anchor.replica_id
+        && cur.anchor.char_value == sel.anchor.char_value
+        && cur.anchor.bias       == sel.anchor.bias
+        && cur.active.replica_id == sel.active.replica_id
+        && cur.active.char_value == sel.active.char_value
+        && cur.active.bias       == sel.active.bias
+        && cur.kind              == sel.kind)
+    {
+        return;
+    }
+    d->primary = sel;
+    Q_EMIT primarySelectionChanged(d->primary);
+}
 
 const QList<Selection> &Session::secondarySelections() const { return d->secondaries; }
 void Session::setSecondarySelections(QList<Selection>) {}
