@@ -327,6 +327,49 @@ private Q_SLOTS:
         doc.undo();
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("draft"));
     }
+
+    void anchor_at_resolves_to_offset() {
+        MarkoffDocument doc(1);
+        QList<MarkoffEdit> ed;
+        MarkoffEdit i;
+        i.oldStart = 0;
+        i.oldEnd = 0;
+        i.newText = "abcdef";
+        ed << i;
+        doc.applyLocalEdit(ed);
+
+        const auto a = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        QCOMPARE(doc.resolveAnchor(a), quint32(3));
+    }
+
+    void anchor_survives_left_insert() {
+        MarkoffDocument doc(1);
+        {
+            QList<MarkoffEdit> ed;
+            MarkoffEdit i;
+            i.oldStart = 0;
+            i.oldEnd = 0;
+            i.newText = "ace";
+            ed << i;
+            doc.applyLocalEdit(ed);
+        }
+        // Anchor at offset 1 (between 'a' and 'c'), right-bias.
+        const auto a = doc.anchorAt(1, CollabText::Crdt::Bias::Right);
+
+        // Insert "b" at offset 1.
+        {
+            QList<MarkoffEdit> ed;
+            MarkoffEdit i;
+            i.oldStart = 1;
+            i.oldEnd = 1;
+            i.newText = "b";
+            ed << i;
+            doc.applyLocalEdit(ed);
+        }
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abce"));
+        // Right-bias anchor moves past the inserted text.
+        QCOMPARE(doc.resolveAnchor(a), quint32(2));
+    }
 };
 
 int main(int argc, char *argv[]) {
