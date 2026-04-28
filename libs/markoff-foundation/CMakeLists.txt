@@ -22,6 +22,8 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/SessionParams.h
     include/markoff-foundation/Session.h
     include/markoff-foundation/Theme.h
+    include/markoff-foundation/CodeTokenKind.h
+    include/markoff-foundation/CodeSpan.h
     include/markoff-foundation/LinkKind.h
     include/markoff-foundation/LinkActivation.h
     include/markoff-foundation/LinkService.h
