@@ -14,7 +14,8 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 add_library(markoff_foundation STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
-    src/foundation_anchor.cpp
+    include/markoff-foundation/MarkoffEdit.h
+    src/MarkoffEdit.cpp
 )
 
 target_include_directories(markoff_foundation
