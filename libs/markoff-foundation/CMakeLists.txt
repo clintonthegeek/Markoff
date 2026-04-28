@@ -29,6 +29,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/LinkService.h
     include/markoff-foundation/DefaultLinkService.h
     include/markoff-foundation/SyntaxHighlightService.h
+    include/markoff-foundation/Kf6SyntaxHighlightService.h
     include/markoff-foundation/CommandFacade.h
     include/markoff-foundation/SearchEngine.h
     include/markoff-foundation/ReplaceController.h
@@ -55,6 +56,7 @@ add_library(markoff_foundation STATIC
     src/LinkService.cpp
     src/DefaultLinkService.cpp
     src/SyntaxHighlightService.cpp
+    src/Kf6SyntaxHighlightService.cpp
     src/CommandFacade.cpp
     src/SearchEngine.cpp
     src/ReplaceController.cpp
