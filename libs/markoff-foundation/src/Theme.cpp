@@ -39,10 +39,110 @@ void Theme::setFontSizeMultiplier(Slot s, qreal m)
 
 QColor Theme::colorForCodeToken(CodeTokenKind) const { return color(Slot::CodeBlock); }
 
-Theme Theme::defaultLight() { return Theme{}; }
-Theme Theme::defaultDark()  { return Theme{}; }
+Theme Theme::defaultLight()
+{
+    Theme t;
+    t.setColor(Slot::EditorBackground, QColor("#ffffff"));
+    t.setColor(Slot::TextDefault,      QColor("#222222"));
+    t.setColor(Slot::Heading1,         QColor("#1a1a1a"));
+    t.setColor(Slot::Heading2,         QColor("#1f1f1f"));
+    t.setColor(Slot::Heading3,         QColor("#262626"));
+    t.setColor(Slot::Heading4,         QColor("#333333"));
+    t.setColor(Slot::Heading5,         QColor("#404040"));
+    t.setColor(Slot::Heading6,         QColor("#4d4d4d"));
+    t.setColor(Slot::Link,             QColor("#0066cc"));
+    t.setColor(Slot::WikiLink,         QColor("#5050cc"));
+    t.setColor(Slot::Tag,              QColor("#a04080"));
+    t.setColor(Slot::Quote,            QColor("#666666"));
+    t.setColor(Slot::InlineCode,       QColor("#882020"));
+    t.setColor(Slot::CodeBlock,        QColor("#222222"));
+    t.setColor(Slot::CodeBlockBackground, QColor("#f4f4f4"));
+    t.setColor(Slot::SelectionBackground, QColor("#b0d0ff"));
+    t.setColor(Slot::SearchMatchBackground, QColor("#ffe080"));
+    t.setColor(Slot::SearchActiveMatchBackground, QColor("#ffb050"));
+    t.setBold(Slot::Heading1, true);
+    t.setBold(Slot::Heading2, true);
+    t.setBold(Slot::BoldEmphasis, true);
+    t.setItalic(Slot::ItalicEmphasis, true);
+    t.setFontSizeMultiplier(Slot::Heading1, 1.8);
+    t.setFontSizeMultiplier(Slot::Heading2, 1.5);
+    t.setFontSizeMultiplier(Slot::Heading3, 1.3);
+    t.setFont(FontRole::Body, QFont("sans-serif", 11));
+    t.setFont(FontRole::Monospace, QFont("monospace", 11));
+    t.setFont(FontRole::Heading, QFont("sans-serif", 11));
+    return t;
+}
 
-QJsonObject Theme::toJson() const { return {}; }
-Theme Theme::fromJson(const QJsonObject &) { return Theme{}; }
+Theme Theme::defaultDark()
+{
+    Theme t = defaultLight();
+    t.setColor(Slot::EditorBackground, QColor("#1e1e1e"));
+    t.setColor(Slot::TextDefault,      QColor("#e0e0e0"));
+    t.setColor(Slot::Heading1,         QColor("#ffffff"));
+    t.setColor(Slot::Heading2,         QColor("#f0f0f0"));
+    t.setColor(Slot::Heading3,         QColor("#dcdcdc"));
+    t.setColor(Slot::Quote,            QColor("#aaaaaa"));
+    t.setColor(Slot::CodeBlockBackground, QColor("#2d2d2d"));
+    t.setColor(Slot::SelectionBackground, QColor("#264070"));
+    return t;
+}
+
+QJsonObject Theme::toJson() const
+{
+    QJsonObject obj;
+    QJsonObject colors;
+    for (auto it = m_colors.constBegin(); it != m_colors.constEnd(); ++it)
+        colors.insert(QString::number(it.key()), it.value().name(QColor::HexArgb));
+    obj.insert("colors", colors);
+
+    QJsonObject bolds;
+    for (auto it = m_bolds.constBegin(); it != m_bolds.constEnd(); ++it)
+        bolds.insert(QString::number(it.key()), it.value());
+    obj.insert("bolds", bolds);
+
+    QJsonObject italics;
+    for (auto it = m_italics.constBegin(); it != m_italics.constEnd(); ++it)
+        italics.insert(QString::number(it.key()), it.value());
+    obj.insert("italics", italics);
+
+    QJsonObject sizes;
+    for (auto it = m_sizeMul.constBegin(); it != m_sizeMul.constEnd(); ++it)
+        sizes.insert(QString::number(it.key()), it.value());
+    obj.insert("sizeMul", sizes);
+
+    QJsonObject fonts;
+    for (auto it = m_fonts.constBegin(); it != m_fonts.constEnd(); ++it)
+        fonts.insert(QString::number(it.key()), it.value().toString());
+    obj.insert("fonts", fonts);
+
+    return obj;
+}
+
+Theme Theme::fromJson(const QJsonObject &obj)
+{
+    Theme t;
+    const QJsonObject colors = obj.value("colors").toObject();
+    for (auto it = colors.begin(); it != colors.end(); ++it)
+        t.m_colors[it.key().toInt()] = QColor(it.value().toString());
+
+    const QJsonObject bolds = obj.value("bolds").toObject();
+    for (auto it = bolds.begin(); it != bolds.end(); ++it)
+        t.m_bolds[it.key().toInt()] = it.value().toBool();
+
+    const QJsonObject italics = obj.value("italics").toObject();
+    for (auto it = italics.begin(); it != italics.end(); ++it)
+        t.m_italics[it.key().toInt()] = it.value().toBool();
+
+    const QJsonObject sizes = obj.value("sizeMul").toObject();
+    for (auto it = sizes.begin(); it != sizes.end(); ++it)
+        t.m_sizeMul[it.key().toInt()] = it.value().toDouble();
+
+    const QJsonObject fonts = obj.value("fonts").toObject();
+    for (auto it = fonts.begin(); it != fonts.end(); ++it) {
+        QFont f; f.fromString(it.value().toString());
+        t.m_fonts[it.key().toInt()] = f;
+    }
+    return t;
+}
 
 }  // namespace Markoff

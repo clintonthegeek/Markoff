@@ -42,6 +42,34 @@ private Q_SLOTS:
         QVERIFY(!t.isBold(Theme::Slot::TextDefault));
         QCOMPARE(t.fontSizeMultiplier(Theme::Slot::TextDefault), 1.0);
     }
+
+    void default_light_has_dark_text_on_light_background() {
+        const Theme t = Theme::defaultLight();
+        const QColor bg = t.color(Theme::Slot::EditorBackground);
+        const QColor fg = t.color(Theme::Slot::TextDefault);
+        QVERIFY(bg.lightness() > fg.lightness());
+    }
+
+    void default_dark_has_light_text_on_dark_background() {
+        const Theme t = Theme::defaultDark();
+        const QColor bg = t.color(Theme::Slot::EditorBackground);
+        const QColor fg = t.color(Theme::Slot::TextDefault);
+        QVERIFY(bg.lightness() < fg.lightness());
+    }
+
+    void theme_json_roundtrip() {
+        Theme a = Theme::defaultLight();
+        a.setColor(Theme::Slot::Heading1, QColor(0xff, 0x00, 0x00));
+        a.setBold(Theme::Slot::Heading1, true);
+        a.setFontSizeMultiplier(Theme::Slot::Heading1, 1.5);
+
+        const QJsonObject json = a.toJson();
+        const Theme b = Theme::fromJson(json);
+        QCOMPARE(b.color(Theme::Slot::Heading1).name(),
+                 a.color(Theme::Slot::Heading1).name());
+        QVERIFY(b.isBold(Theme::Slot::Heading1));
+        QCOMPARE(b.fontSizeMultiplier(Theme::Slot::Heading1), 1.5);
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationTheme)
