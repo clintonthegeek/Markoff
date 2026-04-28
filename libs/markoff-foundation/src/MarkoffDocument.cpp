@@ -177,9 +177,44 @@ void MarkoffDocument::applyRemoteOps(
         Q_EMIT contentsChanged(resultingEdits);
 }
 
-void MarkoffDocument::resetContent(const QByteArray &, Origin)
+void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
 {
-    // Filled in Task 16.
+    switch (origin) {
+    case Origin::FirstOpen:
+    case Origin::ExternalReloadClean:
+    case Origin::ExternalReloadResolved:
+    case Origin::TestFixture: {
+        d->buffer = CollabText::Crdt::Buffer(d->replicaId);
+        if (!newContent.isEmpty()) {
+            std::vector<std::pair<uint32_t, uint32_t>> ranges{ {0, 0} };
+            std::vector<std::string> texts{
+                std::string(newContent.constData(),
+                            static_cast<size_t>(newContent.size())) };
+            d->buffer.apply_local_edit(ranges, texts);
+            // Clear the undo stack so this seed is not undoable.
+            // Buffer doesn't expose a clear-undo API directly, but
+            // set_max_undo_depth(0) trims the stack on shrink.  Reset
+            // back to the default afterwards so subsequent local edits
+            // can still be undone.
+            const auto savedDepth = d->buffer.max_undo_depth();
+            d->buffer.set_max_undo_depth(0);
+            d->buffer.set_max_undo_depth(savedDepth);
+        }
+        break;
+    }
+    case Origin::UserRevertToSaved: {
+        // Push one mega-edit that replaces the entire buffer with newContent.
+        // Undo reverses the revert.
+        const auto curLen = d->buffer.visible_length();
+        std::vector<std::pair<uint32_t, uint32_t>> ranges{ {0u, curLen} };
+        std::vector<std::string> texts{
+            std::string(newContent.constData(),
+                        static_cast<size_t>(newContent.size())) };
+        d->buffer.apply_local_edit(ranges, texts);
+        break;
+    }
+    }
+    Q_EMIT documentReloaded();
 }
 
 CollabText::Crdt::Anchor

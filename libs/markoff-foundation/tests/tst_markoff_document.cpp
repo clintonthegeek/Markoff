@@ -283,6 +283,50 @@ private Q_SLOTS:
         doc.undo();
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
     }
+
+    void reset_content_first_open_clears_undo() {
+        MarkoffDocument doc(1);
+        QList<MarkoffEdit> ed;
+        MarkoffEdit i;
+        i.oldStart = 0;
+        i.oldEnd = 0;
+        i.newText = "old";
+        ed << i;
+        doc.applyLocalEdit(ed);
+        QVERIFY(doc.undoDepth() > 0);
+
+        doc.resetContent(QByteArray("new content"), Origin::FirstOpen);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("new content"));
+        QCOMPARE(doc.undoDepth(), 0);
+    }
+
+    void reset_content_emits_document_reloaded() {
+        MarkoffDocument doc(1);
+        QSignalSpy spy(&doc, &MarkoffDocument::documentReloaded);
+        doc.resetContent(QByteArray("hello"), Origin::FirstOpen);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void reset_content_user_revert_pushes_undo_entry() {
+        MarkoffDocument doc(1);
+        {
+            QList<MarkoffEdit> ed;
+            MarkoffEdit i;
+            i.oldStart = 0;
+            i.oldEnd = 0;
+            i.newText = "draft";
+            ed << i;
+            doc.applyLocalEdit(ed);
+        }
+        const int beforeDepth = doc.undoDepth();
+
+        doc.resetContent(QByteArray("saved"), Origin::UserRevertToSaved);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("saved"));
+        // UserRevertToSaved pushes one mega-edit so undo reverses the revert.
+        QVERIFY(doc.undoDepth() > beforeDepth);
+        doc.undo();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("draft"));
+    }
 };
 
 int main(int argc, char *argv[]) {
