@@ -15,7 +15,7 @@ private Q_SLOTS:
         MarkoffEdit i; i.oldStart = 0; i.oldEnd = 0; i.newText = "ab";
         ed << i;
         doc.applyLocalEdit(ed);
-        Cmd::undo(&doc);
+        Cmd::undo(doc);
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
     }
 
@@ -25,8 +25,8 @@ private Q_SLOTS:
         MarkoffEdit i; i.oldStart = 0; i.oldEnd = 0; i.newText = "ab";
         ed << i;
         doc.applyLocalEdit(ed);
-        Cmd::undo(&doc);
-        Cmd::redo(&doc);
+        Cmd::undo(doc);
+        Cmd::redo(doc);
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("ab"));
     }
 };
