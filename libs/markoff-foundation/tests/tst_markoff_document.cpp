@@ -251,6 +251,38 @@ private Q_SLOTS:
         doc.undo();
         QVERIFY(spy.count() >= 1);
     }
+
+    void coalesce_last_undo_groups_two_edits() {
+        MarkoffDocument doc(1);
+        {
+            QList<MarkoffEdit> seed;
+            MarkoffEdit i;
+            i.oldStart = 0;
+            i.oldEnd = 0;
+            i.newText = "ab";
+            seed << i;
+            doc.applyLocalEdit(seed);
+        }
+        {
+            QList<MarkoffEdit> ed;
+            MarkoffEdit i;
+            i.oldStart = 2;
+            i.oldEnd = 2;
+            i.newText = "c";
+            ed << i;
+            doc.applyLocalEdit(ed);
+        }
+        // Two edits → undoDepth == 2.
+        QCOMPARE(doc.undoDepth(), 2);
+
+        // Coalesce the last two into one undo step.
+        QVERIFY(doc.coalesceLastUndo());
+        QCOMPARE(doc.undoDepth(), 1);
+
+        // One undo should now revert both edits.
+        doc.undo();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
+    }
 };
 
 int main(int argc, char *argv[]) {
