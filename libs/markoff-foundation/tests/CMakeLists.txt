@@ -49,3 +49,8 @@ add_executable(tst_foundation_parse_pool tst_foundation_parse_pool.cpp)
 add_test(NAME tst_foundation_parse_pool COMMAND tst_foundation_parse_pool)
 target_link_libraries(tst_foundation_parse_pool PRIVATE Qt6::Test markoff_foundation)
 set_tests_properties(tst_foundation_parse_pool PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_foundation_theme tst_foundation_theme.cpp)
+add_test(NAME tst_foundation_theme COMMAND tst_foundation_theme)
+target_link_libraries(tst_foundation_theme PRIVATE Qt6::Test markoff_foundation)
+set_tests_properties(tst_foundation_theme PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
