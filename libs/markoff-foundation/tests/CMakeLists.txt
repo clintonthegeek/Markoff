@@ -32,3 +32,10 @@ add_executable(tst_fold_ref tst_fold_ref.cpp)
 add_test(NAME tst_fold_ref COMMAND tst_fold_ref)
 target_link_libraries(tst_fold_ref PRIVATE Qt6::Test markoff_foundation)
 set_tests_properties(tst_fold_ref PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Note: target name differentiated from markoff-core's tst_markoff_document
+# (CMake target names must be globally unique within a single build tree).
+add_executable(tst_foundation_markoff_document tst_markoff_document.cpp)
+add_test(NAME tst_foundation_markoff_document COMMAND tst_foundation_markoff_document)
+target_link_libraries(tst_foundation_markoff_document PRIVATE Qt6::Test markoff_foundation)
+set_tests_properties(tst_foundation_markoff_document PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
