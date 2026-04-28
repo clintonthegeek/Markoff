@@ -93,7 +93,7 @@ bool SearchEngine::findNext(MarkoffDocument *doc, Session *sess)
     if (ms.isEmpty()) return false;
     const quint32 cur = doc->resolveAnchor(sess->primarySelection().active);
     for (const Selection &x : ms) {
-        if (doc->resolveAnchor(x.anchor) > cur) {
+        if (doc->resolveAnchor(x.anchor) >= cur) {
             Selection p = x; p.kind = Selection::Kind::Primary;
             sess->setPrimarySelection(p);
             return true;
