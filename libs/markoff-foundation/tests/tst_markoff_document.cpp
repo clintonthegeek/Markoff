@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
+#include <QApplication>
+#include <QSignalSpy>
 
 #include <markoff-foundation/MarkoffDocument.h>
 
 using namespace Markoff;
+
+Q_DECLARE_METATYPE(QList<Markoff::MarkoffEdit>)
 
 class TstMarkoffDocument : public QObject {
     Q_OBJECT
@@ -81,7 +85,42 @@ private Q_SLOTS:
         doc.applyLocalEdit(del);
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abef"));
     }
+
+    void apply_local_edit_emits_contents_changed() {
+        MarkoffDocument doc(1);
+        // Seed.
+        {
+            QList<MarkoffEdit> seed;
+            MarkoffEdit i;
+            i.oldStart = 0;
+            i.oldEnd = 0;
+            i.newText = "abc";
+            seed << i;
+            doc.applyLocalEdit(seed);
+        }
+
+        QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
+        QList<MarkoffEdit> edits;
+        MarkoffEdit ins;
+        ins.oldStart = 1;
+        ins.oldEnd = 1;
+        ins.newText = "X";
+        edits << ins;
+        doc.applyLocalEdit(edits);
+
+        QCOMPARE(spy.count(), 1);
+        const QList<MarkoffEdit> received =
+            spy.takeFirst().at(0).value<QList<MarkoffEdit>>();
+        QVERIFY(!received.isEmpty());
+        // The first received edit should describe the insertion at oldStart=1.
+        QCOMPARE(received.first().oldStart, quint32(1));
+    }
 };
 
-QTEST_MAIN(TstMarkoffDocument)
+int main(int argc, char *argv[]) {
+    qRegisterMetaType<QList<Markoff::MarkoffEdit>>("QList<Markoff::MarkoffEdit>");
+    QApplication app(argc, argv);
+    TstMarkoffDocument tc;
+    return QTest::qExec(&tc, argc, argv);
+}
 #include "tst_markoff_document.moc"
