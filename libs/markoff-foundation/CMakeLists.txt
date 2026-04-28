@@ -27,6 +27,8 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/LinkService.h
     include/markoff-foundation/DefaultLinkService.h
     # --- Cmd/ (public) ---
+    # Cmd aggregate
+    include/markoff-foundation/Cmd.h
     include/markoff-foundation/Cmd/Edit.h
     include/markoff-foundation/Cmd/InlineFormat.h
     include/markoff-foundation/Cmd/Block.h
