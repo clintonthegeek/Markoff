@@ -39,3 +39,8 @@ add_executable(tst_foundation_markoff_document tst_markoff_document.cpp)
 add_test(NAME tst_foundation_markoff_document COMMAND tst_foundation_markoff_document)
 target_link_libraries(tst_foundation_markoff_document PRIVATE Qt6::Test markoff_foundation)
 set_tests_properties(tst_foundation_markoff_document PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_foundation_session tst_foundation_session.cpp)
+add_test(NAME tst_foundation_session COMMAND tst_foundation_session)
+target_link_libraries(tst_foundation_session PRIVATE Qt6::Test markoff_foundation)
+set_tests_properties(tst_foundation_session PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

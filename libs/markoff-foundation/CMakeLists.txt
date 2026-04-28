@@ -19,12 +19,16 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/Selection.h
     include/markoff-foundation/FoldRef.h
     include/markoff-foundation/MarkoffDocument.h
+    include/markoff-foundation/SessionParams.h
+    include/markoff-foundation/Session.h
     src/MarkoffDocumentPrivate.h
+    src/SessionPrivate.h
     src/MarkoffEdit.cpp
     src/AnchorJson.cpp
     src/Selection.cpp
     src/FoldRef.cpp
     src/MarkoffDocument.cpp
+    src/Session.cpp
 )
 
 target_include_directories(markoff_foundation

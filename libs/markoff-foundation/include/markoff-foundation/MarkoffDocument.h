@@ -18,12 +18,12 @@
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff-foundation/SessionParams.h>
 
 namespace Markoff {
 
 class Document;       // markoff-parser
 class Session;        // forward; defined in Session.h after this task
-struct SessionParams; // forward
 
 /// Canonical text + AST + sessions. Owns a CollabText::Crdt::Buffer
 /// internally; views are subscribers to this object's signals.
@@ -79,10 +79,7 @@ public:
     quint32 resolveAnchor(const CollabText::Crdt::Anchor &) const;
 
     // ===== Sessions (filled in Task 23) =====
-    // NOTE: default-arg `= {}` removed for now; SessionParams is forward-
-    // declared (incomplete type) until Task 23 lands its definition. The
-    // default will be restored once the type is fully visible.
-    Session *createSession(const SessionParams &params);
+    Session *createSession(const SessionParams &params = {});
     void     destroySession(Session *);
     QList<Session *> sessions() const;
     Session *sessionForParticipant(const QString &participantId) const;
