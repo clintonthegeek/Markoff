@@ -28,6 +28,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/DefaultLinkService.h
     include/markoff-foundation/CommandFacade.h
     include/markoff-foundation/SearchEngine.h
+    include/markoff-foundation/ReplaceController.h
     # --- Cmd/ (public) ---
     # Cmd aggregate
     include/markoff-foundation/Cmd.h
@@ -52,6 +53,7 @@ add_library(markoff_foundation STATIC
     src/DefaultLinkService.cpp
     src/CommandFacade.cpp
     src/SearchEngine.cpp
+    src/ReplaceController.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h

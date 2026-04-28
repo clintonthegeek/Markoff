@@ -94,3 +94,8 @@ add_executable(tst_foundation_search_engine tst_foundation_search_engine.cpp)
 add_test(NAME tst_foundation_search_engine COMMAND tst_foundation_search_engine)
 target_link_libraries(tst_foundation_search_engine PRIVATE Qt6::Test markoff_foundation)
 set_tests_properties(tst_foundation_search_engine PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_foundation_replace_controller tst_foundation_replace_controller.cpp)
+add_test(NAME tst_foundation_replace_controller COMMAND tst_foundation_replace_controller)
+target_link_libraries(tst_foundation_replace_controller PRIVATE Qt6::Test markoff_foundation)
+set_tests_properties(tst_foundation_replace_controller PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
