@@ -96,16 +96,61 @@ MarkoffDocument::applyLocalEdit(const QList<MarkoffEdit> &edits)
 
 std::optional<CollabText::Crdt::Operation> MarkoffDocument::undo()
 {
-    return std::nullopt;
+    const CollabText::Crdt::Global oldVersion = d->buffer.version();
+    auto op = d->buffer.undo();
+    if (!op.has_value())
+        return std::nullopt;
+
+    const auto textEdits = d->buffer.edits_since(oldVersion);
+    QList<MarkoffEdit> resultingEdits;
+    resultingEdits.reserve(static_cast<int>(textEdits.size()));
+    for (const auto &te : textEdits) {
+        MarkoffEdit me;
+        me.oldStart = te.old_start;
+        me.oldEnd = te.old_end;
+        me.newText = QByteArray(te.new_text.data(),
+                                static_cast<int>(te.new_text.size()));
+        resultingEdits << me;
+    }
+    if (!resultingEdits.isEmpty())
+        Q_EMIT contentsChanged(resultingEdits);
+
+    return op;
 }
 
 std::optional<CollabText::Crdt::Operation> MarkoffDocument::redo()
 {
-    return std::nullopt;
+    const CollabText::Crdt::Global oldVersion = d->buffer.version();
+    auto op = d->buffer.redo();
+    if (!op.has_value())
+        return std::nullopt;
+
+    const auto textEdits = d->buffer.edits_since(oldVersion);
+    QList<MarkoffEdit> resultingEdits;
+    resultingEdits.reserve(static_cast<int>(textEdits.size()));
+    for (const auto &te : textEdits) {
+        MarkoffEdit me;
+        me.oldStart = te.old_start;
+        me.oldEnd = te.old_end;
+        me.newText = QByteArray(te.new_text.data(),
+                                static_cast<int>(te.new_text.size()));
+        resultingEdits << me;
+    }
+    if (!resultingEdits.isEmpty())
+        Q_EMIT contentsChanged(resultingEdits);
+
+    return op;
 }
 
-int MarkoffDocument::undoDepth() const { return 0; }
-bool MarkoffDocument::coalesceLastUndo() { return false; }
+int MarkoffDocument::undoDepth() const
+{
+    return static_cast<int>(d->buffer.undo_depth());
+}
+
+bool MarkoffDocument::coalesceLastUndo()
+{
+    return d->buffer.coalesce_last_undo();
+}
 
 void MarkoffDocument::applyRemoteOps(
     const std::vector<CollabText::Crdt::Operation> &ops)

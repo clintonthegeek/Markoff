@@ -179,6 +179,78 @@ private Q_SLOTS:
         bob.applyRemoteOps({ op });
         QCOMPARE(spy.count(), 1);
     }
+
+    void undo_reverses_last_local_edit() {
+        MarkoffDocument doc(1);
+        {
+            QList<MarkoffEdit> seed;
+            MarkoffEdit i;
+            i.oldStart = 0;
+            i.oldEnd = 0;
+            i.newText = "ab";
+            seed << i;
+            doc.applyLocalEdit(seed);
+        }
+        {
+            QList<MarkoffEdit> ed;
+            MarkoffEdit i;
+            i.oldStart = 2;
+            i.oldEnd = 2;
+            i.newText = "c";
+            ed << i;
+            doc.applyLocalEdit(ed);
+        }
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abc"));
+        QVERIFY(doc.undo().has_value());
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("ab"));
+    }
+
+    void redo_reapplies_undone_edit() {
+        MarkoffDocument doc(1);
+        {
+            QList<MarkoffEdit> seed;
+            MarkoffEdit i;
+            i.oldStart = 0;
+            i.oldEnd = 0;
+            i.newText = "ab";
+            seed << i;
+            doc.applyLocalEdit(seed);
+        }
+        {
+            QList<MarkoffEdit> ed;
+            MarkoffEdit i;
+            i.oldStart = 2;
+            i.oldEnd = 2;
+            i.newText = "c";
+            ed << i;
+            doc.applyLocalEdit(ed);
+        }
+        doc.undo();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("ab"));
+        QVERIFY(doc.redo().has_value());
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abc"));
+    }
+
+    void undo_with_no_history_returns_nullopt() {
+        MarkoffDocument doc(1);
+        QVERIFY(!doc.undo().has_value());
+    }
+
+    void undo_emits_contents_changed() {
+        MarkoffDocument doc(1);
+        {
+            QList<MarkoffEdit> seed;
+            MarkoffEdit i;
+            i.oldStart = 0;
+            i.oldEnd = 0;
+            i.newText = "abc";
+            seed << i;
+            doc.applyLocalEdit(seed);
+        }
+        QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
+        doc.undo();
+        QVERIFY(spy.count() >= 1);
+    }
 };
 
 int main(int argc, char *argv[]) {
