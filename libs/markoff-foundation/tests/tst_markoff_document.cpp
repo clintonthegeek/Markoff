@@ -26,6 +26,61 @@ private Q_SLOTS:
         QCOMPARE(a.replicaId(), quint16(7));
         QCOMPARE(b.replicaId(), quint16(13));
     }
+
+    void apply_local_edit_inserts_text() {
+        MarkoffDocument doc(1);
+        // Seed via direct buffer init through a single insert at offset 0.
+        QList<MarkoffEdit> seed;
+        MarkoffEdit ins;
+        ins.oldStart = 0;
+        ins.oldEnd = 0;
+        ins.newText = "hello";
+        seed << ins;
+        doc.applyLocalEdit(seed);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+        QCOMPARE(doc.visibleLength(), quint32(5));
+    }
+
+    void apply_local_edit_replaces_range() {
+        MarkoffDocument doc(1);
+
+        QList<MarkoffEdit> seed;
+        MarkoffEdit ins;
+        ins.oldStart = 0;
+        ins.oldEnd = 0;
+        ins.newText = "hello world";
+        seed << ins;
+        doc.applyLocalEdit(seed);
+
+        QList<MarkoffEdit> edits;
+        MarkoffEdit replace;
+        replace.oldStart = 6;
+        replace.oldEnd = 11;
+        replace.newText = "there";
+        edits << replace;
+        doc.applyLocalEdit(edits);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello there"));
+    }
+
+    void apply_local_edit_deletes_range() {
+        MarkoffDocument doc(1);
+        QList<MarkoffEdit> seed;
+        MarkoffEdit ins;
+        ins.oldStart = 0;
+        ins.oldEnd = 0;
+        ins.newText = "abcdef";
+        seed << ins;
+        doc.applyLocalEdit(seed);
+
+        QList<MarkoffEdit> del;
+        MarkoffEdit d;
+        d.oldStart = 2;
+        d.oldEnd = 4;
+        d.newText.clear();
+        del << d;
+        doc.applyLocalEdit(del);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abef"));
+    }
 };
 
 QTEST_MAIN(TstMarkoffDocument)

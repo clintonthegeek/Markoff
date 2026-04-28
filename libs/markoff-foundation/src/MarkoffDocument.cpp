@@ -56,10 +56,42 @@ CollabText::Crdt::Global MarkoffDocument::version() const
 // are filled in subsequent tasks (10-23).
 
 CollabText::Crdt::Operation
-MarkoffDocument::applyLocalEdit(const QList<MarkoffEdit> &)
+MarkoffDocument::applyLocalEdit(const QList<MarkoffEdit> &edits)
 {
-    // Stub - filled in Task 10.
-    return CollabText::Crdt::EditOperation{};
+    // Snapshot version so we can compute the resulting TextEdits afterwards.
+    const CollabText::Crdt::Global oldVersion = d->buffer.version();
+
+    // Translate QList<MarkoffEdit> to the std::vector<pair> + std::vector<string>
+    // pair shape that Buffer::apply_local_edit expects.
+    std::vector<std::pair<uint32_t, uint32_t>> ranges;
+    std::vector<std::string> newTexts;
+    ranges.reserve(static_cast<size_t>(edits.size()));
+    newTexts.reserve(static_cast<size_t>(edits.size()));
+    for (const MarkoffEdit &e : edits) {
+        ranges.emplace_back(e.oldStart, e.oldEnd);
+        newTexts.emplace_back(e.newText.constData(),
+                              static_cast<size_t>(e.newText.size()));
+    }
+
+    const CollabText::Crdt::Operation op = d->buffer.apply_local_edit(ranges, newTexts);
+
+    // Compute resulting visible-text edits from the buffer's diff API.
+    const auto textEdits = d->buffer.edits_since(oldVersion);
+    QList<MarkoffEdit> resultingEdits;
+    resultingEdits.reserve(static_cast<int>(textEdits.size()));
+    for (const auto &te : textEdits) {
+        MarkoffEdit me;
+        me.oldStart = te.old_start;
+        me.oldEnd = te.old_end;
+        me.newText = QByteArray(te.new_text.data(),
+                                static_cast<int>(te.new_text.size()));
+        resultingEdits << me;
+    }
+
+    if (!resultingEdits.isEmpty())
+        Q_EMIT contentsChanged(resultingEdits);
+
+    return op;
 }
 
 std::optional<CollabText::Crdt::Operation> MarkoffDocument::undo()
