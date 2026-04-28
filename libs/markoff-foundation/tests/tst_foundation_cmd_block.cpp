@@ -46,6 +46,34 @@ private Q_SLOTS:
         Cmd::setHeading(doc, rangeSel(doc, 5, 10), 0);
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("title\n"));
     }
+
+    void toggle_checkbox_unchecked_to_checked() {
+        MarkoffDocument doc(1);
+        seed(doc, "- [ ] task\n");
+        Cmd::toggleCheckbox(doc, doc.anchorAt(7, Bias::Left));   // inside "task"
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("- [x] task\n"));
+    }
+
+    void toggle_checkbox_checked_to_none() {
+        MarkoffDocument doc(1);
+        seed(doc, "- [x] task\n");
+        Cmd::toggleCheckbox(doc, doc.anchorAt(7, Bias::Left));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("- task\n"));
+    }
+
+    void block_quote_wraps_each_line() {
+        MarkoffDocument doc(1);
+        seed(doc, "one\ntwo\n");
+        Cmd::blockQuote(doc, rangeSel(doc, 0, 7));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("> one\n> two\n"));
+    }
+
+    void block_quote_unwraps_when_all_lines_quoted() {
+        MarkoffDocument doc(1);
+        seed(doc, "> one\n> two\n");
+        Cmd::blockQuote(doc, rangeSel(doc, 0, 11));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("one\ntwo\n"));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationCmdBlock)

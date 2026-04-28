@@ -60,15 +60,91 @@ QList<MarkoffEdit> editsForSetHeading(const MarkoffDocument &doc,
 CollabText::Crdt::Operation setHeading(MarkoffDocument &d, const Selection &s, int level)
 { return d.applyLocalEdit(editsForSetHeading(d, s, level)); }
 
-// toggleCheckbox / blockQuote — stubs filled in Task 35.
-QList<MarkoffEdit> editsForToggleCheckbox(const MarkoffDocument &,
-                                           const CollabText::Crdt::Anchor &)
-{ return {}; }
+QList<MarkoffEdit> editsForToggleCheckbox(const MarkoffDocument &doc,
+                                           const CollabText::Crdt::Anchor &a)
+{
+    const QByteArray buf = doc.toMarkdownUtf8();
+    const quint32 byte = doc.resolveAnchor(a);
+    const quint32 ls = lineStart(buf, byte);
+
+    // Look for "- [ ] " or "- [x] " or "- " prefix.
+    int b = static_cast<int>(ls);
+    if (b + 1 >= buf.size()) return {};
+    // Step over leading "- " or "* " or "+ " bullet.
+    if (buf.at(b) != '-' && buf.at(b) != '*' && buf.at(b) != '+') return {};
+    if (b + 1 >= buf.size() || buf.at(b + 1) != ' ') return {};
+    int after = b + 2;
+
+    if (after + 3 < buf.size() && buf.at(after) == '[' && buf.at(after + 2) == ']'
+        && buf.at(after + 3) == ' ')
+    {
+        const char inside = buf.at(after + 1);
+        MarkoffEdit r; r.oldStart = static_cast<quint32>(after);
+        if (inside == ' ') {
+            // [ ] -> [x]
+            r.oldEnd = static_cast<quint32>(after + 4);
+            r.newText = "[x] ";
+        } else {
+            // [x] -> none (strip "[x] ")
+            r.oldEnd = static_cast<quint32>(after + 4);
+            r.newText.clear();
+        }
+        return { r };
+    }
+    // No checkbox -> add "[ ] "
+    MarkoffEdit r;
+    r.oldStart = static_cast<quint32>(after);
+    r.oldEnd   = static_cast<quint32>(after);
+    r.newText  = "[ ] ";
+    return { r };
+}
+
 CollabText::Crdt::Operation toggleCheckbox(MarkoffDocument &d,
                                             const CollabText::Crdt::Anchor &a)
 { return d.applyLocalEdit(editsForToggleCheckbox(d, a)); }
-QList<MarkoffEdit> editsForBlockQuote(const MarkoffDocument &, const Selection &)
-{ return {}; }
+
+QList<MarkoffEdit> editsForBlockQuote(const MarkoffDocument &doc, const Selection &sel)
+{
+    const auto [start, end] = Detail::selectionByteRange(doc, sel);
+    const QByteArray buf = doc.toMarkdownUtf8();
+
+    // Collect line starts in [start, end].
+    QList<quint32> lineStarts;
+    quint32 ls = lineStart(buf, start);
+    while (ls < end || (ls == end && lineStarts.isEmpty())) {
+        lineStarts << ls;
+        int next = static_cast<int>(ls);
+        while (next < buf.size() && buf.at(next) != '\n') ++next;
+        if (next >= buf.size()) break;
+        ls = static_cast<quint32>(next + 1);
+    }
+
+    bool allQuoted = !lineStarts.isEmpty();
+    for (quint32 l : lineStarts) {
+        if (l + 1 >= static_cast<quint32>(buf.size())
+            || buf.at(static_cast<int>(l)) != '>'
+            || buf.at(static_cast<int>(l) + 1) != ' ')
+        { allQuoted = false; break; }
+    }
+
+    QList<MarkoffEdit> out;
+    out.reserve(lineStarts.size());
+    if (allQuoted) {
+        for (quint32 l : lineStarts) {
+            MarkoffEdit r;
+            r.oldStart = l; r.oldEnd = l + 2; r.newText.clear();
+            out << r;
+        }
+    } else {
+        for (quint32 l : lineStarts) {
+            MarkoffEdit r;
+            r.oldStart = l; r.oldEnd = l; r.newText = "> ";
+            out << r;
+        }
+    }
+    return out;
+}
+
 CollabText::Crdt::Operation blockQuote(MarkoffDocument &d, const Selection &s)
 { return d.applyLocalEdit(editsForBlockQuote(d, s)); }
 
