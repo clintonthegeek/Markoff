@@ -22,6 +22,9 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/SessionParams.h
     include/markoff-foundation/Session.h
     include/markoff-foundation/Theme.h
+    include/markoff-foundation/LinkKind.h
+    include/markoff-foundation/LinkActivation.h
+    include/markoff-foundation/LinkService.h
     src/MarkoffDocumentPrivate.h
     src/SessionPrivate.h
     src/ParsePool.h
@@ -35,6 +38,7 @@ add_library(markoff_foundation STATIC
     src/ParsePool.cpp
     src/ParsePoolWorker.cpp
     src/Theme.cpp
+    src/LinkService.cpp
 )
 
 target_include_directories(markoff_foundation
