@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 #include <QColor>
+#include <QJsonObject>
 #include <QSignalSpy>
 #include <QString>
 
@@ -158,6 +159,49 @@ private Q_SLOTS:
         s->toggleFold(f);
         QCOMPARE(s->foldedRegions().size(), 0);
         delete s;
+    }
+
+    void copy_state_from_transfers_ephemeral_state() {
+        MarkoffDocument doc(1);
+        Session *src = new Session(&doc, SessionParams{
+            .participantId = QStringLiteral("alice")});
+        Selection p;
+        p.anchor = CollabText::Crdt::Anchor(1, 5, CollabText::Crdt::Bias::Left);
+        p.active = CollabText::Crdt::Anchor(1, 8, CollabText::Crdt::Bias::Right);
+        src->setPrimarySelection(p);
+        src->setTopVisible(CollabText::Crdt::Anchor(1, 100,
+                           CollabText::Crdt::Bias::Left), 0.5);
+
+        Session *dst = new Session(&doc, SessionParams{
+            .participantId = QStringLiteral("bob")});
+        dst->copyStateFrom(*src);
+
+        QCOMPARE(dst->primarySelection().anchor.char_value, quint32(5));
+        QCOMPARE(dst->topVisibleAnchor().char_value,        quint32(100));
+        QCOMPARE(dst->topVisibleFraction(),                 0.5);
+        // Identity is NOT copied.
+        QCOMPARE(dst->participantId(), QStringLiteral("bob"));
+        QVERIFY(dst->id() != src->id());
+        delete src; delete dst;
+    }
+
+    void session_json_roundtrip() {
+        MarkoffDocument doc(1);
+        Session *s = new Session(&doc, SessionParams{
+            .participantId    = QStringLiteral("alice"),
+            .participantLabel = QStringLiteral("Alice"),
+            .presenceColor    = QColor(Qt::cyan)});
+        Selection p;
+        p.anchor = CollabText::Crdt::Anchor(1, 5, CollabText::Crdt::Bias::Left);
+        p.active = CollabText::Crdt::Anchor(1, 8, CollabText::Crdt::Bias::Right);
+        s->setPrimarySelection(p);
+
+        const QJsonObject json = s->toJson();
+        Session *t = new Session(&doc, SessionParams{});
+        t->fromJson(json);
+        QCOMPARE(t->primarySelection().anchor.char_value, quint32(5));
+        QCOMPARE(t->participantId(), QStringLiteral("alice"));
+        delete s; delete t;
     }
 };
 

@@ -3,8 +3,10 @@
 
 #include <algorithm>
 
+#include <QJsonArray>
 #include <QUuid>
 
+#include <markoff-foundation/AnchorJson.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include "SessionPrivate.h"
 
@@ -109,8 +111,64 @@ void Session::toggleFold(const FoldRef &f)
     Q_EMIT foldedRegionsChanged();
 }
 
-void Session::copyStateFrom(const Session &) {}
-QJsonObject Session::toJson() const { return {}; }
-void        Session::fromJson(const QJsonObject &) {}
+void Session::copyStateFrom(const Session &other)
+{
+    d->primary     = other.d->primary;
+    d->secondaries = other.d->secondaries;
+    d->topAnchor   = other.d->topAnchor;
+    d->topFraction = other.d->topFraction;
+    d->folds       = other.d->folds;
+    Q_EMIT primarySelectionChanged(d->primary);
+    Q_EMIT secondarySelectionsChanged();
+    Q_EMIT scrollChanged(d->topAnchor, d->topFraction);
+    Q_EMIT foldedRegionsChanged();
+}
+
+QJsonObject Session::toJson() const
+{
+    QJsonObject obj;
+    obj.insert("id",               d->id);
+    obj.insert("participantId",    d->participantId);
+    obj.insert("participantLabel", d->participantLabel);
+    obj.insert("presenceColor",    d->presenceColor.name(QColor::HexArgb));
+    obj.insert("primary",          d->primary.toJson());
+
+    QJsonArray sec;
+    for (const Selection &s : d->secondaries) sec.append(s.toJson());
+    obj.insert("secondaries", sec);
+
+    obj.insert("topAnchor",   anchorToJson(d->topAnchor));
+    obj.insert("topFraction", d->topFraction);
+
+    QJsonArray folds;
+    for (const FoldRef &f : d->folds) folds.append(f.toJson());
+    obj.insert("folds", folds);
+    return obj;
+}
+
+void Session::fromJson(const QJsonObject &obj)
+{
+    d->id               = obj.value("id").toString();
+    d->participantId    = obj.value("participantId").toString();
+    d->participantLabel = obj.value("participantLabel").toString();
+    d->presenceColor    = QColor(obj.value("presenceColor").toString());
+    d->primary          = Selection::fromJson(obj.value("primary").toObject());
+
+    d->secondaries.clear();
+    for (const QJsonValue &v : obj.value("secondaries").toArray())
+        d->secondaries << Selection::fromJson(v.toObject());
+
+    d->topAnchor   = anchorFromJson(obj.value("topAnchor").toObject());
+    d->topFraction = obj.value("topFraction").toDouble();
+
+    d->folds.clear();
+    for (const QJsonValue &v : obj.value("folds").toArray())
+        d->folds << FoldRef::fromJson(v.toObject());
+
+    Q_EMIT primarySelectionChanged(d->primary);
+    Q_EMIT secondarySelectionsChanged();
+    Q_EMIT scrollChanged(d->topAnchor, d->topFraction);
+    Q_EMIT foldedRegionsChanged();
+}
 
 }  // namespace Markoff
