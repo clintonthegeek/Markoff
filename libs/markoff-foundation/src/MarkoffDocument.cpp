@@ -108,9 +108,28 @@ int MarkoffDocument::undoDepth() const { return 0; }
 bool MarkoffDocument::coalesceLastUndo() { return false; }
 
 void MarkoffDocument::applyRemoteOps(
-    const std::vector<CollabText::Crdt::Operation> &)
+    const std::vector<CollabText::Crdt::Operation> &ops)
 {
-    // Filled in Task 13.
+    if (ops.empty())
+        return;
+
+    const CollabText::Crdt::Global oldVersion = d->buffer.version();
+    d->buffer.apply_ops(ops);
+
+    const auto textEdits = d->buffer.edits_since(oldVersion);
+    QList<MarkoffEdit> resultingEdits;
+    resultingEdits.reserve(static_cast<int>(textEdits.size()));
+    for (const auto &te : textEdits) {
+        MarkoffEdit me;
+        me.oldStart = te.old_start;
+        me.oldEnd = te.old_end;
+        me.newText = QByteArray(te.new_text.data(),
+                                static_cast<int>(te.new_text.size()));
+        resultingEdits << me;
+    }
+
+    if (!resultingEdits.isEmpty())
+        Q_EMIT contentsChanged(resultingEdits);
 }
 
 void MarkoffDocument::resetContent(const QByteArray &, Origin)

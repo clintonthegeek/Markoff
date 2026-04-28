@@ -144,6 +144,41 @@ private Q_SLOTS:
         doc.applyLocalEdit(edits);
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("AAAA bbbb CCCC"));
     }
+
+    void apply_remote_ops_replicates() {
+        MarkoffDocument alice(1);
+        MarkoffDocument bob(2);
+
+        // Alice types.
+        QList<MarkoffEdit> ed;
+        MarkoffEdit ins;
+        ins.oldStart = 0;
+        ins.oldEnd = 0;
+        ins.newText = "hello";
+        ed << ins;
+        const auto op = alice.applyLocalEdit(ed);
+
+        // Bob applies Alice's op.
+        bob.applyRemoteOps({ op });
+        QCOMPARE(bob.toMarkdownUtf8(), QByteArray("hello"));
+    }
+
+    void apply_remote_ops_emits_contents_changed() {
+        MarkoffDocument alice(1);
+        MarkoffDocument bob(2);
+
+        QList<MarkoffEdit> ed;
+        MarkoffEdit ins;
+        ins.oldStart = 0;
+        ins.oldEnd = 0;
+        ins.newText = "x";
+        ed << ins;
+        const auto op = alice.applyLocalEdit(ed);
+
+        QSignalSpy spy(&bob, &MarkoffDocument::contentsChanged);
+        bob.applyRemoteOps({ op });
+        QCOMPARE(spy.count(), 1);
+    }
 };
 
 int main(int argc, char *argv[]) {
