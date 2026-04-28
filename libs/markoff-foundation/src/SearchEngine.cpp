@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff-foundation/SearchEngine.h>
 
+#include <algorithm>
+
 #include <QRegularExpression>
 
 #include <markoff-foundation/MarkoffDocument.h>
@@ -10,6 +12,19 @@
 #include <crdt/Anchor.h>
 
 namespace Markoff {
+
+namespace {
+QList<Selection> matchesInOrder(Session *sess, const MarkoffDocument *doc) {
+    QList<Selection> ms;
+    for (const Selection &x : sess->secondarySelections())
+        if (x.kind == Selection::Kind::SearchMatch) ms << x;
+    std::sort(ms.begin(), ms.end(),
+              [doc](const Selection &a, const Selection &b) {
+                  return doc->resolveAnchor(a.anchor) < doc->resolveAnchor(b.anchor);
+              });
+    return ms;
+}
+}
 
 SearchEngine::SearchEngine(QObject *parent) : QObject(parent) {}
 SearchEngine::~SearchEngine() = default;
@@ -71,8 +86,41 @@ int SearchEngine::findAll(MarkoffDocument *doc, Session *sess,
     return matches.size();
 }
 
-bool SearchEngine::findNext(MarkoffDocument *, Session *) { return false; }
-bool SearchEngine::findPrevious(MarkoffDocument *, Session *) { return false; }
+bool SearchEngine::findNext(MarkoffDocument *doc, Session *sess)
+{
+    if (!doc || !sess) return false;
+    const auto ms = matchesInOrder(sess, doc);
+    if (ms.isEmpty()) return false;
+    const quint32 cur = doc->resolveAnchor(sess->primarySelection().active);
+    for (const Selection &x : ms) {
+        if (doc->resolveAnchor(x.anchor) > cur) {
+            Selection p = x; p.kind = Selection::Kind::Primary;
+            sess->setPrimarySelection(p);
+            return true;
+        }
+    }
+    Selection p = ms.first(); p.kind = Selection::Kind::Primary;
+    sess->setPrimarySelection(p);
+    return true;
+}
+
+bool SearchEngine::findPrevious(MarkoffDocument *doc, Session *sess)
+{
+    if (!doc || !sess) return false;
+    const auto ms = matchesInOrder(sess, doc);
+    if (ms.isEmpty()) return false;
+    const quint32 cur = doc->resolveAnchor(sess->primarySelection().anchor);
+    for (auto it = ms.crbegin(); it != ms.crend(); ++it) {
+        if (doc->resolveAnchor(it->active) < cur) {
+            Selection p = *it; p.kind = Selection::Kind::Primary;
+            sess->setPrimarySelection(p);
+            return true;
+        }
+    }
+    Selection p = ms.last(); p.kind = Selection::Kind::Primary;
+    sess->setPrimarySelection(p);
+    return true;
+}
 void SearchEngine::clearMatches(Session *sess)
 {
     if (sess) sess->clearSecondarySelectionsOfKind(Selection::Kind::SearchMatch);

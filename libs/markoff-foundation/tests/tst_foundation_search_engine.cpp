@@ -55,6 +55,36 @@ private Q_SLOTS:
         QCOMPARE(s.findAll(&doc, sess, "foo",
                            SearchEngine::FindFlag::CaseSensitive), 1);
     }
+
+    void find_next_advances_primary_selection() {
+        MarkoffDocument doc(1);
+        QList<MarkoffEdit> ed;
+        MarkoffEdit i; i.oldStart = 0; i.oldEnd = 0; i.newText = "ab cd ef";
+        ed << i;
+        doc.applyLocalEdit(ed);
+
+        Session *sess = doc.createSession();
+        SearchEngine s;
+        s.findAll(&doc, sess, "cd", {});
+        QVERIFY(s.findNext(&doc, sess));
+        const auto p = sess->primarySelection();
+        QCOMPARE(doc.resolveAnchor(p.anchor), quint32(3));
+    }
+
+    void clear_matches_removes_search_kind() {
+        MarkoffDocument doc(1);
+        QList<MarkoffEdit> ed;
+        MarkoffEdit i; i.oldStart = 0; i.oldEnd = 0; i.newText = "abc";
+        ed << i;
+        doc.applyLocalEdit(ed);
+
+        Session *sess = doc.createSession();
+        SearchEngine s;
+        s.findAll(&doc, sess, "a", {});
+        s.clearMatches(sess);
+        for (const Selection &x : sess->secondarySelections())
+            QVERIFY(x.kind != Selection::Kind::SearchMatch);
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationSearchEngine)
