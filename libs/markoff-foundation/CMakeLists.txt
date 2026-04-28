@@ -28,6 +28,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/DefaultLinkService.h
     # --- Cmd/ (public) ---
     include/markoff-foundation/Cmd/Edit.h
+    include/markoff-foundation/Cmd/InlineFormat.h
     src/MarkoffDocumentPrivate.h
     src/SessionPrivate.h
     src/ParsePool.h
@@ -47,6 +48,7 @@ add_library(markoff_foundation STATIC
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h
     src/Cmd/Helpers.cpp
+    src/Cmd/InlineFormat.cpp
 )
 
 target_include_directories(markoff_foundation
