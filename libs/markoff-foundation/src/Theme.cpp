@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff-foundation/Theme.h>
+#include <markoff-foundation/CodeTokenKind.h>
 
 namespace Markoff {
 
@@ -37,7 +38,30 @@ void Theme::setFontSizeMultiplier(Slot s, qreal m)
     m_sizeMul[static_cast<int>(s)] = m;
 }
 
-QColor Theme::colorForCodeToken(CodeTokenKind) const { return color(Slot::CodeBlock); }
+QColor Theme::colorForCodeToken(CodeTokenKind k) const
+{
+    using K = CodeTokenKind;
+    switch (k) {
+    case K::Keyword:        return color(Slot::CodeKeyword);
+    case K::ControlFlow:    return color(Slot::CodeControlFlow);
+    case K::Builtin:        return color(Slot::CodeBuiltin);
+    case K::Type:           return color(Slot::CodeType);
+    case K::Function:       return color(Slot::CodeFunction);
+    case K::Variable:       return color(Slot::CodeVariable);
+    case K::Constant:       return color(Slot::CodeConstant);
+    case K::Operator:       return color(Slot::CodeOperator);
+    case K::Punctuation:    return color(Slot::CodePunctuation);
+    case K::String:         return color(Slot::CodeString);
+    case K::Number:         return color(Slot::CodeNumber);
+    case K::Boolean:        return color(Slot::CodeBoolean);
+    case K::Comment:        return color(Slot::CodeComment);
+    case K::Documentation:  return color(Slot::CodeDocumentation);
+    case K::Preprocessor:   return color(Slot::CodePreprocessor);
+    case K::Annotation:     return color(Slot::CodeAnnotation);
+    case K::Default:        break;
+    }
+    return color(Slot::CodeBlock);
+}
 
 Theme Theme::defaultLight()
 {

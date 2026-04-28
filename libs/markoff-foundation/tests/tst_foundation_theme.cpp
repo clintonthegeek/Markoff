@@ -3,6 +3,7 @@
 #include <QColor>
 
 #include <markoff-foundation/Theme.h>
+#include <markoff-foundation/CodeTokenKind.h>
 
 using namespace Markoff;
 
@@ -55,6 +56,16 @@ private Q_SLOTS:
         const QColor bg = t.color(Theme::Slot::EditorBackground);
         const QColor fg = t.color(Theme::Slot::TextDefault);
         QVERIFY(bg.lightness() < fg.lightness());
+    }
+
+    void colorForCodeToken_maps_to_code_slots() {
+        Theme t;
+        t.setColor(Theme::Slot::CodeKeyword, QColor("#ff0000"));
+        t.setColor(Theme::Slot::CodeString,  QColor("#00ff00"));
+        QCOMPARE(t.colorForCodeToken(CodeTokenKind::Keyword).name(),
+                 QColor("#ff0000").name());
+        QCOMPARE(t.colorForCodeToken(CodeTokenKind::String).name(),
+                 QColor("#00ff00").name());
     }
 
     void theme_json_roundtrip() {
