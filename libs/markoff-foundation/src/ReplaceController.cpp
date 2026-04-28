@@ -35,9 +35,32 @@ ReplaceController::replaceCurrent(MarkoffDocument *doc, Session *sess,
 }
 
 ReplaceController::ReplaceAllResult
-ReplaceController::replaceAll(MarkoffDocument *, Session *, const QString &)
+ReplaceController::replaceAll(MarkoffDocument *doc, Session *sess,
+                               const QString &replacement)
 {
-    return {};   // filled in Task 42
+    ReplaceAllResult res;
+    if (!doc || !sess) return res;
+
+    QList<MarkoffEdit> edits;
+    for (const Selection &x : sess->secondarySelections()) {
+        if (x.kind != Selection::Kind::SearchMatch) continue;
+        const quint32 a = doc->resolveAnchor(x.anchor);
+        const quint32 b = doc->resolveAnchor(x.active);
+        MarkoffEdit r;
+        r.oldStart = std::min(a, b);
+        r.oldEnd   = std::max(a, b);
+        r.newText  = replacement.toUtf8();
+        edits << r;
+    }
+    if (edits.isEmpty()) return res;
+    std::sort(edits.begin(), edits.end(),
+              [](const MarkoffEdit &a, const MarkoffEdit &b) {
+                  return a.oldStart < b.oldStart;
+              });
+    res.op = doc->applyLocalEdit(edits);
+    res.count = edits.size();
+    SearchEngine().clearMatches(sess);
+    return res;
 }
 
 }  // namespace Markoff

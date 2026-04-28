@@ -27,6 +27,23 @@ private Q_SLOTS:
         QVERIFY(rc.replaceCurrent(&doc, sess, "bar").has_value());
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("bar foo"));
     }
+
+    void replace_all_replaces_every_match() {
+        MarkoffDocument doc(1);
+        QList<MarkoffEdit> ed;
+        MarkoffEdit i; i.oldStart = 0; i.oldEnd = 0;
+        i.newText = "foo bar foo baz foo";
+        ed << i;
+        doc.applyLocalEdit(ed);
+
+        Session *sess = doc.createSession();
+        SearchEngine().findAll(&doc, sess, "foo", {});
+
+        ReplaceController rc;
+        const auto r = rc.replaceAll(&doc, sess, "X");
+        QCOMPARE(r.count, 3);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("X bar X baz X"));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationReplaceController)
