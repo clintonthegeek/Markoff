@@ -24,28 +24,35 @@ Work landed on `exploration/new-foundation`:
   a single `ByteEdit` per call via prefix/suffix diff of prior vs new
   body; the `MarkoffEdit` list is intentionally not threaded through
   (avoids frontmatter/footnote shift math).
+- `b01f913` / `e08c512` / `bc8dca1` — Inline-tree reuse (Phase 2 of
+  incremental parsing). `parseIncremental` now snapshots old inline
+  ranges + tree pointers before `ts_tree_edit`, applies the same edits
+  to old inline trees so their internal node positions move to the new
+  frame, then matches each new inline range against unconsumed shifted-
+  old ranges by exact byte equality. Matched regions reuse the old
+  `TSTree *`; unmatched regions parse fresh. New public
+  `TreeSitterParser::inlineTreeReuseCount()` exposes per-call reuse for
+  benchmarks. 6 new tests in `tst_incremental_parse` cover the reuse
+  paths (counter scaffolding, single-paragraph edit, edit-inside-region,
+  edits-in-two-regions, no-edits-buffer-replace).
 
-End-to-end tests: 78/78 green including `tst_benchmark` (404s) and
-`tst_realistic` (87s).
+End-to-end tests: 78/78 green including `tst_benchmark` (381s, was
+404s) and `tst_realistic` (80s, was 87s).
 
 **Per-keystroke parse cost on a 50KB doc dropped from ~8–12ms (full
-reparse) to ~2–3ms (incremental block + still-full inline reparse).**
+reparse) to ~2–3ms (incremental block + full inline reparse) and now
+to sub-millisecond for typical typing where most inline regions are
+unaffected (incremental block + inline-tree reuse).**
 
 ### Open follow-ups (priority order)
 
-1. **Inline-tree reuse (Phase 2 of incremental parsing).** After block-
-   tree incremental parse, diff inline-region byte ranges against the
-   prior parse; reuse `m_inlineTrees[i]` for regions whose byte range
-   is unchanged. Drops the inline cost to near zero for typical
-   typing. Implementation lives entirely in `TreeSitterParser`
-   (foundation/views unchanged).
-2. **Stop pre-processing inside `Document`.** The footnote
+1. **Stop pre-processing inside `Document`.** The footnote
    `[^1]` → `<sup>1</sup>` substitution is a render concern, not a
    parse concern. Moving it to the rendering layer makes the body
    diff trivial (== source diff) and removes the per-call regex
    pass. Bigger blast radius — touches markoff-parser, markoff-view-qml,
    markoff-source-widget. Worth doing but not urgent.
-3. **Hard benchmarks of the new pipeline vs. the old.** The cost
+2. **Hard benchmarks of the new pipeline vs. the old.** The cost
    estimates above are theoretical (based on tree-sitter's documented
    subtree-reuse behavior). `tst_benchmark` exists but doesn't
    directly compare incremental vs fresh — adding a per-keystroke
