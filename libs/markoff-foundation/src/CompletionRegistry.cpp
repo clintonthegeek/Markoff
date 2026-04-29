@@ -16,6 +16,8 @@ void CompletionRegistry::registerProvider(std::shared_ptr<CompletionProvider> p)
 
 void CompletionRegistry::unregisterProvider(CompletionProvider *raw)
 {
+    if (!raw) return;
+    QObject::disconnect(raw, nullptr, this, nullptr);
     for (auto it = m_providers.begin(); it != m_providers.end(); ++it) {
         if (it->get() == raw) { m_providers.erase(it); break; }
     }
