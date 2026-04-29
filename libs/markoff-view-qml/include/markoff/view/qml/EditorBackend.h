@@ -4,7 +4,10 @@
 #include <QObject>
 #include <QtQmlIntegration>
 
+#include <crdt/Anchor.h>
+
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
 #include <markoff-foundation/Theme.h>
 
@@ -24,6 +27,10 @@ class EditorBackend : public QObject {
                READ theme
                WRITE setTheme
                NOTIFY themeChanged)
+    Q_PROPERTY(CollabText::Crdt::Anchor cursorAnchor
+               READ cursorAnchor
+               WRITE setCursorAnchor
+               NOTIFY cursorAnchorChanged)
 public:
     explicit EditorBackend(QObject *parent = nullptr);
     ~EditorBackend() override;
@@ -36,15 +43,26 @@ public:
     Markoff::Theme theme() const;
     void           setTheme(const Markoff::Theme &);
 
+    CollabText::Crdt::Anchor cursorAnchor() const;
+    void setCursorAnchor(const CollabText::Crdt::Anchor &);
+
 Q_SIGNALS:
     void documentChanged();
     void sessionChanged();
     void themeChanged();
+    void cursorAnchorChanged();
+
+private Q_SLOTS:
+    void onSessionPrimarySelectionChanged(const Markoff::Selection &);
 
 private:
     Markoff::MarkoffDocument *m_document = nullptr;
     Markoff::Session         *m_session  = nullptr;
     Markoff::Theme            m_theme    = Markoff::Theme::defaultLight();
+    CollabText::Crdt::Anchor  m_cursorAnchor;
+    bool                      m_applyingSessionSelection = false;
 };
 
 }  // namespace Markoff::View::Qml
+
+Q_DECLARE_METATYPE(CollabText::Crdt::Anchor)

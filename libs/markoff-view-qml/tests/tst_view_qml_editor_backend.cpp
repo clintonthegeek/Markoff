@@ -3,6 +3,10 @@
 #include <QSignalSpy>
 #include <QTest>
 
+#include <crdt/Anchor.h>
+
+#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
 #include <markoff-foundation/Theme.h>
 #include <markoff/view/qml/EditorBackend.h>
@@ -106,6 +110,54 @@ private Q_SLOTS:
         QCOMPARE(spy.count(), 1);
         QCOMPARE(backend.theme().color(Markoff::Theme::Slot::TextDefault).name(),
                  QColor("#ff0000").name());
+    }
+
+    void cursor_anchor_default_is_zero() {
+        EditorBackend backend;
+        QCOMPARE(backend.cursorAnchor(), CollabText::Crdt::Anchor{});
+    }
+
+    void set_cursor_anchor_lifts_to_session_primary_selection() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        backend.setDocument(&doc);
+
+        // Seed text so anchorAt makes sense.
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
+        doc.applyLocalEdit({ ed });
+
+        // Build an anchor at byte offset 5.
+        const CollabText::Crdt::Anchor a = doc.anchorAt(5, CollabText::Crdt::Bias::Left);
+        backend.setCursorAnchor(a);
+
+        // Session's primary selection should now be a degenerate selection at 'a'.
+        Markoff::Session *sess = backend.session();
+        QVERIFY(sess != nullptr);
+        const Markoff::Selection sel = sess->primarySelection();
+        QCOMPARE(sel.anchor, a);
+        QCOMPARE(sel.active, a);
+        QCOMPARE(sel.kind, Markoff::Selection::Kind::Primary);
+    }
+
+    void session_primary_selection_change_updates_cursor_anchor() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        backend.setDocument(&doc);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
+        doc.applyLocalEdit({ ed });
+
+        const CollabText::Crdt::Anchor a = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        Markoff::Selection sel;
+        sel.anchor = a; sel.active = a; sel.kind = Markoff::Selection::Kind::Primary;
+
+        QSignalSpy spy(&backend, &EditorBackend::cursorAnchorChanged);
+        backend.session()->setPrimarySelection(sel);
+
+        QVERIFY(spy.count() >= 1);
+        QCOMPARE(backend.cursorAnchor(), a);
     }
 };
 

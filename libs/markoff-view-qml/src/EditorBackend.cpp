@@ -25,6 +25,8 @@ void EditorBackend::setDocument(Markoff::MarkoffDocument *doc)
     // Create session for new document.
     if (m_document) {
         m_session = m_document->createSession();
+        connect(m_session, &Markoff::Session::primarySelectionChanged,
+                this, &EditorBackend::onSessionPrimarySelectionChanged);
         Q_EMIT sessionChanged();
     }
 }
@@ -38,6 +40,37 @@ void EditorBackend::setTheme(const Markoff::Theme &t)
     // Theme::operator== is not defined; emit unconditionally on every setTheme call.
     m_theme = t;
     Q_EMIT themeChanged();
+}
+
+CollabText::Crdt::Anchor EditorBackend::cursorAnchor() const { return m_cursorAnchor; }
+
+void EditorBackend::setCursorAnchor(const CollabText::Crdt::Anchor &a)
+{
+    if (m_cursorAnchor == a) return;
+    m_cursorAnchor = a;
+
+    // Lift to Session as a degenerate (cursor) selection.
+    if (m_session && !m_applyingSessionSelection) {
+        Markoff::Selection sel;
+        sel.anchor = a;
+        sel.active = a;
+        sel.kind   = Markoff::Selection::Kind::Primary;
+        m_session->setPrimarySelection(sel);
+    }
+    Q_EMIT cursorAnchorChanged();
+}
+
+void EditorBackend::onSessionPrimarySelectionChanged(const Markoff::Selection &sel)
+{
+    // Only update cursorAnchor when selection is degenerate (anchor == active).
+    // Non-degenerate selections (T6) are reported via selectionAnchor/selectionActive.
+    if (sel.anchor != sel.active) return;
+
+    if (m_cursorAnchor == sel.anchor) return;
+    m_cursorAnchor = sel.anchor;
+    m_applyingSessionSelection = true;
+    Q_EMIT cursorAnchorChanged();
+    m_applyingSessionSelection = false;
 }
 
 }  // namespace Markoff::View::Qml
