@@ -37,6 +37,13 @@ struct FootnoteInfo {
     QString content;
 };
 
+struct FootnoteRefInfo {
+    QString label;        // e.g. "1", "bignote"
+    int     number;       // 1-based, assigned by first-reference order;
+                          // 0 if the label has no matching definition.
+    int     sourceOffset; // QString char offset of '[' in body.
+};
+
 /// @deprecated Use YamlValue-based parsedFrontmatter() instead.
 struct FrontmatterProperty {
     QString key;
@@ -49,24 +56,29 @@ struct DocumentQueryResult;
 
 /// Frontmatter-aware extraction output. After this call:
 ///   - `frontmatter` holds the YAML body between the --- delimiters
-///     (without the delimiters or the surrounding newlines).
-///   - `body` is the source verbatim with the frontmatter block removed
+///     (without delimiters or the surrounding newline).
+///   - `body` is the source verbatim, with the frontmatter block removed
 ///     (== source.mid(frontmatterBlockEnd) when frontmatter is present,
 ///     == source otherwise). Footnote references and definition lines
-///     remain in `body` exactly as written.
+///     remain in `body` exactly as written; the parser sees them in
+///     their original textual form.
 ///   - `footnotes` is the canonical definition list (label → content,
 ///     numbered by first-reference order).
+///   - `refs` records every `[^label]` reference occurrence in `body`,
+///     in order of appearance, with the same numbering scheme. Refs
+///     whose label has no definition carry number 0.
 ///
 /// Used by long-lived parsers (e.g., foundation's IncrementalParseSession)
 /// that want to share Document::extract()'s logic without going through the
 /// fromMarkdown() one-shot path.
 struct ExtractedSource {
-    QString             body;
-    QString             frontmatter;
-    int                 frontmatterBlockStart = -1;
-    int                 frontmatterBlockEnd = -1;
-    bool                frontmatterEofClose = false;
-    QList<FootnoteInfo> footnotes;  // numbered, in reference order
+    QString                  body;
+    QString                  frontmatter;
+    int                      frontmatterBlockStart = -1;
+    int                      frontmatterBlockEnd   = -1;
+    bool                     frontmatterEofClose   = false;
+    QList<FootnoteInfo>      footnotes;  // numbered, in reference order
+    QList<FootnoteRefInfo>   refs;       // ordered by sourceOffset (== first-occurrence order)
 };
 
 class Document
@@ -144,6 +156,11 @@ public:
     QList<LinkInfo> wikiLinks() const;
     QList<TagInfo> tags() const;
     QList<FootnoteInfo> footnotes() const;
+    /// Footnote references in `body`, in order of occurrence. Each entry
+    /// carries the label, the number assigned by first-reference order,
+    /// and the QString char offset of the opening `[` in body coordinates.
+    /// Refs whose label has no matching definition carry number 0.
+    QList<FootnoteRefInfo> footnoteRefs() const;
     int wordCount() const;
     int characterCount() const;
 

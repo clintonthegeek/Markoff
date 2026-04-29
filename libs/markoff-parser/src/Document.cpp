@@ -15,6 +15,7 @@ struct Document::Private {
     int frontmatterBlockEnd = -1;     // byte offset past closing --- line (or EOF)
     bool eofClose = false;            // closing --- is at EOF with no trailing newline
     QList<FootnoteInfo> footnotes;
+    QList<FootnoteRefInfo> refs;
 
     // Baked at construction by walking the parsed tree once.  Document
     // does not retain the TreeSitterParser instance; callers that need
@@ -74,9 +75,9 @@ ExtractedSource Document::extract(const QString &source)
         QRegularExpression::MultilineOption);
 
     QHash<QString, FootnoteInfo> footnoteMap;
-    auto it = footnoteDef.globalMatch(markdown);
-    while (it.hasNext()) {
-        auto match = it.next();
+    auto defIt = footnoteDef.globalMatch(markdown);
+    while (defIt.hasNext()) {
+        auto match = defIt.next();
         FootnoteInfo fn;
         fn.label = match.captured(1);
         fn.content = match.captured(2);
@@ -84,15 +85,40 @@ ExtractedSource Document::extract(const QString &source)
         footnoteMap.insert(fn.label, fn);
     }
 
-    // Number footnotes in order of first reference.
+    // Single-pass scan over `[^label]` occurrences. Skip definition prefixes
+    // (a `[^label]` immediately followed by `:`). Number on first sighting,
+    // record every occurrence into `out.refs`.
     int nextNum = 1;
     static const QRegularExpression footnoteRef(QStringLiteral(R"(\[\^([^\]]+)\])"));
     auto refIt = footnoteRef.globalMatch(markdown);
     while (refIt.hasNext()) {
         auto match = refIt.next();
+        const int afterClose = match.capturedEnd();
+        // Skip definition prefixes: `]` followed (after optional whitespace
+        // that is not a newline) by `:`.
+        int p = afterClose;
+        while (p < markdown.size()) {
+            const QChar c = markdown[p];
+            if (c == QLatin1Char(' ') || c == QLatin1Char('\t')) {
+                ++p;
+                continue;
+            }
+            break;
+        }
+        if (p < markdown.size() && markdown[p] == QLatin1Char(':'))
+            continue;
+
         const QString label = match.captured(1);
-        if (footnoteMap.contains(label) && footnoteMap[label].number == 0)
-            footnoteMap[label].number = nextNum++;
+        FootnoteRefInfo ref;
+        ref.label = label;
+        ref.sourceOffset = match.capturedStart();
+        ref.number = 0;
+        if (footnoteMap.contains(label)) {
+            if (footnoteMap[label].number == 0)
+                footnoteMap[label].number = nextNum++;
+            ref.number = footnoteMap[label].number;
+        }
+        out.refs.append(ref);
     }
 
     // Sort referenced footnotes by assigned number.
@@ -121,6 +147,7 @@ std::unique_ptr<Document> Document::fromComponents(
     doc->d->frontmatterBlockEnd   = extracted.frontmatterBlockEnd;
     doc->d->eofClose              = extracted.frontmatterEofClose;
     doc->d->footnotes             = std::move(extracted.footnotes);
+    doc->d->refs                  = std::move(extracted.refs);
     doc->d->queries               = queries;
     return doc;
 }
@@ -228,6 +255,11 @@ QList<TagInfo> Document::tags() const
 QList<FootnoteInfo> Document::footnotes() const
 {
     return d->footnotes;
+}
+
+QList<FootnoteRefInfo> Document::footnoteRefs() const
+{
+    return d->refs;
 }
 
 int Document::wordCount() const
