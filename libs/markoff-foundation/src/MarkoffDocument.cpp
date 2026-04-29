@@ -15,7 +15,7 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p) {
                          d->latestParse.reset(p);
-                         Q_EMIT parseUpdated(p);
+                         Q_EMIT parseUpdated(p, version());
                      });
 }
 
