@@ -191,6 +191,11 @@ void SourceTextDocumentBinding::rebindMarkoffDocumentSubscription()
         QObject::connect(m_subscribedDoc, &Markoff::MarkoffDocument::contentsChanged,
                          this, &SourceTextDocumentBinding::onMarkoffContentsChanged);
     }
+
+    // If both doc and qtDoc are captured, seed the qtDoc with the doc's
+    // current content. This handles the case where MarkoffDocument was
+    // populated (e.g. via resetContent) BEFORE the binding subscribed.
+    syncQtDocumentFromMarkoff();
 }
 
 QQuickTextDocument *SourceTextDocumentBinding::qtQuickDocument() const
@@ -229,6 +234,20 @@ void SourceTextDocumentBinding::tryCaptureQtDocument()
         QObject::connect(m_qtDoc, &QTextDocument::contentsChange,
                          this, &SourceTextDocumentBinding::onQtContentsChange);
     }
+
+    // Seed the qtDoc from the foundation's current content (if both are now ready).
+    syncQtDocumentFromMarkoff();
+}
+
+void SourceTextDocumentBinding::syncQtDocumentFromMarkoff()
+{
+    if (!m_subscribedDoc || !m_qtDoc) return;
+    const QByteArray utf8 = m_subscribedDoc->toMarkdownUtf8();
+    const QString text = QString::fromUtf8(utf8);
+    if (m_qtDoc->toPlainText() == text) return;  // already in sync
+    m_applyingRemoteEdit = true;
+    m_qtDoc->setPlainText(text);
+    m_applyingRemoteEdit = false;
 }
 
 void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, int charsAdded)

@@ -7,6 +7,7 @@ Q_IMPORT_PLUGIN(org_markoff_view_qmlPlugin)
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickStyle>
 #include <QRandomGenerator>
 #include <QVariant>
 
@@ -25,6 +26,12 @@ Q_IMPORT_PLUGIN(org_markoff_view_qmlPlugin)
 
 int main(int argc, char *argv[])
 {
+    // Pin the Qt Quick Controls style. Bypasses Plasma's Breeze override
+    // (which has a known TextArea.qml warning that's noisy but harmless)
+    // and gives us predictable cross-platform behavior. Must be called
+    // BEFORE QGuiApplication construction.
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
+
     QGuiApplication app(argc, argv);
 
     if (argc < 2) {

@@ -87,6 +87,11 @@ private:
     /// T14: sync selectionStart/selectionEnd from backend's selectionAnchor/selectionActive.
     void syncFromBackendSelection();
 
+    /// Seed m_qtDoc with the current content of m_subscribedDoc.
+    /// Called whenever both pointers become available to handle the case where
+    /// MarkoffDocument was populated (e.g. via resetContent) before the binding subscribed.
+    void syncQtDocumentFromMarkoff();
+
     EditorBackend      *m_editorBackend = nullptr;
     QQuickTextDocument *m_qtQuickDoc    = nullptr;
     QTextDocument      *m_qtDoc         = nullptr;  ///< the captured QTextDocument
