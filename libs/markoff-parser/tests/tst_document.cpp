@@ -13,6 +13,9 @@ private Q_SLOTS:
     void testExtractSubpathBlockId();
     void testExtractSubpathNotFound();
     void extract_doesNotInsertSupHtml();
+    void extract_bodyEqualsSourceWhenNoFrontmatter();
+    void extract_bodyEqualsPostFrontmatterSliceWithFrontmatter();
+    void extract_keepsFootnoteDefinitionLinesInBody();
 };
 
 void TestDocument::testEmptyDocument()
@@ -105,6 +108,34 @@ void TestDocument::extract_doesNotInsertSupHtml()
     const auto extracted = Markoff::Document::extract(src);
     QVERIFY2(!extracted.body.contains(QStringLiteral("<sup>")),
              qPrintable(QStringLiteral("body still contains <sup>: ")
+                        + extracted.body));
+}
+
+void TestDocument::extract_bodyEqualsSourceWhenNoFrontmatter()
+{
+    const QString src = QStringLiteral(
+        "Plain text[^a].\n\n[^a]: definition lives here.\nMore text.\n");
+    const auto extracted = Markoff::Document::extract(src);
+    QCOMPARE(extracted.body, src);
+}
+
+void TestDocument::extract_bodyEqualsPostFrontmatterSliceWithFrontmatter()
+{
+    const QString src = QStringLiteral(
+        "---\nkey: value\n---\nbody[^1] line.\n\n[^1]: defn.\n");
+    const auto extracted = Markoff::Document::extract(src);
+    QVERIFY(extracted.frontmatterBlockEnd > 0);
+    QCOMPARE(extracted.body, src.mid(extracted.frontmatterBlockEnd));
+}
+
+void TestDocument::extract_keepsFootnoteDefinitionLinesInBody()
+{
+    const QString src = QStringLiteral(
+        "ref[^1].\n\n[^1]: This is the definition content.\n");
+    const auto extracted = Markoff::Document::extract(src);
+    QVERIFY2(extracted.body.contains(
+                 QStringLiteral("[^1]: This is the definition content.")),
+             qPrintable(QStringLiteral("definition line missing from body: ")
                         + extracted.body));
 }
 

@@ -84,10 +84,6 @@ ExtractedSource Document::extract(const QString &source)
         footnoteMap.insert(fn.label, fn);
     }
 
-    // Remove footnote definition lines from the body.
-    if (!footnoteMap.isEmpty())
-        markdown.remove(footnoteDef);
-
     // Number footnotes in order of first reference.
     int nextNum = 1;
     static const QRegularExpression footnoteRef(QStringLiteral(R"(\[\^([^\]]+)\])"));
