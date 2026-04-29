@@ -40,12 +40,13 @@ Popup {
         keyNavigationWraps: true
 
         delegate: ItemDelegate {
-            required property string display
+            // `display` is a FINAL property on ItemDelegate in Qt 6; don't re-declare it.
+            // Model roles are accessible via `model.*` in delegates.
             required property string insertion
             required property int index
 
             width: ListView.view.width
-            text: display
+            text: model.display
             highlighted: ListView.isCurrentItem
             onClicked: {
                 listView.currentIndex = index
