@@ -32,6 +32,11 @@ target_link_libraries(tst_view_qml_integration PRIVATE Qt6::Test Qt6::Qml Qt6::Q
 qt6_import_qml_plugins(tst_view_qml_integration)
 set_tests_properties(tst_view_qml_integration PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_view_qml_block_walker tst_view_qml_block_walker.cpp)
+add_test(NAME tst_view_qml_block_walker COMMAND tst_view_qml_block_walker)
+target_link_libraries(tst_view_qml_block_walker PRIVATE Qt6::Test markoff_view_qml)
+set_tests_properties(tst_view_qml_block_walker PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_view_qml_app_smoke tst_view_qml_app_smoke.cpp)
 add_test(NAME tst_view_qml_app_smoke COMMAND tst_view_qml_app_smoke)
 target_link_libraries(tst_view_qml_app_smoke PRIVATE Qt6::Test Qt6::Core)

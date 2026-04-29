@@ -25,6 +25,8 @@ qt_add_qml_module(markoff_view_qml
         src/BlockKind.cpp
         include/markoff/view/qml/BlockKind.h
         include/markoff/view/qml/BlockRecord.h
+        src/BlockWalker.cpp
+        src/BlockWalker.h
     QML_FILES
         qml/SourceEditor.qml
         qml/SearchBar.qml
