@@ -6,5 +6,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(tst_source_widget_editor tst_source_widget_editor.cpp)
 add_test(NAME tst_source_widget_editor COMMAND tst_source_widget_editor)
-target_link_libraries(tst_source_widget_editor PRIVATE Qt6::Test markoff_source_widget)
+target_link_libraries(tst_source_widget_editor PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_foundation)
 set_tests_properties(tst_source_widget_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_source_widget_binding_roundtrip tst_source_widget_binding_roundtrip.cpp)
+add_test(NAME tst_source_widget_binding_roundtrip COMMAND tst_source_widget_binding_roundtrip)
+target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_foundation)
+set_tests_properties(tst_source_widget_binding_roundtrip PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

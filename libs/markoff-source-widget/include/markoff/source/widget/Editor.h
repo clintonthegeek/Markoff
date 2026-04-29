@@ -2,10 +2,12 @@
 #pragma once
 
 #include <QPlainTextEdit>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Theme.h>
 
-namespace Markoff { class SourceTextDocumentBinding; }
+#include <KSyntaxHighlighting/SyntaxHighlighter>
+
+#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/SourceTextDocumentBinding.h>
+#include <markoff-foundation/Theme.h>
 
 namespace Markoff::Source::Widget {
 
@@ -31,11 +33,16 @@ Q_SIGNALS:
     void documentChanged();
     void themeChanged();
 
+protected:
+    void keyPressEvent(QKeyEvent *e) override;
+
 private:
-    Markoff::MarkoffDocument          *m_document = nullptr;
-    Markoff::SourceTextDocumentBinding *m_binding = nullptr;
-    Gutter                             *m_gutter  = nullptr;
-    Markoff::Theme                      m_theme;
+    Markoff::MarkoffDocument               *m_document     = nullptr;
+    Markoff::Session                       *m_session      = nullptr;
+    Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
+    KSyntaxHighlighting::SyntaxHighlighter *m_highlighter  = nullptr;
+    Gutter                                 *m_gutter       = nullptr;
+    Markoff::Theme                          m_theme;
 };
 
 } // namespace Markoff::Source::Widget
