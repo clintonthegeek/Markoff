@@ -11,10 +11,11 @@ Rectangle {
     property string codeLanguage: ""
     property string codeText: ""
     property var    selectionModel: null
+    property var    theme: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
-    color: "#1e1e1e"
+    color: root.theme ? root.theme.codeBlockBackground : "#1e1e1e"
     radius: 4
     implicitHeight: textEdit.implicitHeight + 16
 
@@ -32,7 +33,7 @@ Rectangle {
         wrapMode: TextEdit.NoWrap
         font.family: "monospace"
         font.pixelSize: 13
-        color: "#dcdcdc"
+        color: root.theme ? root.theme.codeBlock : "#dcdcdc"
 
         Connections {
             target: root.selectionModel

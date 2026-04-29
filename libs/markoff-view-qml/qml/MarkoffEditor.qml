@@ -49,6 +49,7 @@ Item {
         anchors.fill: parent
         anchors.bottomMargin: searchBar.visible ? searchBar.implicitHeight : 0
         editorBackend: sourceEditor.editorBackend
+        theme: root.theme
         visible: root.mode === "live"
         enabled: root.mode === "live"
     }

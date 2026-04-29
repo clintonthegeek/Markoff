@@ -16,6 +16,7 @@ Item {
     id: root
 
     property var editorBackend  // EditorBackend *
+    property var theme   // Markoff::Theme value type; null → delegates fall back to hex defaults
 
     LiveListModelBinding {
         id: binding
@@ -55,6 +56,7 @@ Item {
                     blockIndex: index
                     blockText: model.text
                     selectionModel: binding.selectionModel
+                    theme: root.theme
                 }
             }
             DelegateChoice {
@@ -64,12 +66,15 @@ Item {
                     blockText: model.text
                     headingLevel: model.headingLevel
                     selectionModel: binding.selectionModel
+                    theme: root.theme
                 }
             }
             DelegateChoice {
                 roleValue: "hr"
                 HorizontalRuleDelegate {
                     blockIndex: index
+                    selectionModel: binding.selectionModel
+                    theme: root.theme
                 }
             }
             DelegateChoice {
@@ -79,6 +84,8 @@ Item {
                     imageSrc: model.imageSrc
                     imageAlt: model.imageAlt
                     imageTitle: model.imageTitle
+                    selectionModel: binding.selectionModel
+                    theme: root.theme
                 }
             }
             DelegateChoice {
@@ -88,6 +95,7 @@ Item {
                     codeLanguage: model.codeLanguage
                     codeText: model.codeText
                     selectionModel: binding.selectionModel
+                    theme: root.theme
                 }
             }
         }

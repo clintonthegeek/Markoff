@@ -9,6 +9,7 @@ Item {
     property string blockText: ""
     property int    headingLevel: 0
     property var    selectionModel: null
+    property var    theme: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12

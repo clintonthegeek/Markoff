@@ -8,6 +8,8 @@ Item {
     property string imageSrc: ""
     property string imageAlt: ""
     property string imageTitle: ""
+    property var    selectionModel: null
+    property var    theme: null
 
     /// Image has no text content; positionAt returns 0 (start-of-block).
     function positionAt(x, y) { return 0 }
@@ -29,9 +31,10 @@ Item {
 
     Rectangle {
         id: altLabel
+        objectName: "altFallback"
         visible: image.status !== Image.Ready
         anchors.fill: parent
-        color: "#222"
+        color: root.theme ? root.theme.codeBlockBackground : "#222"
         Text {
             anchors.centerIn: parent
             color: "#ccc"
@@ -39,6 +42,26 @@ Item {
                 ? "[image: " + root.imageAlt + "]"
                 : "[image: " + root.imageSrc + "]"
             font.italic: true
+        }
+    }
+
+    Rectangle {
+        id: selectionOverlay
+        objectName: "selectionOverlay"
+        anchors.fill: parent
+        color: root.theme ? root.theme.selectionBackground : "#406080"
+        opacity: 0.35
+        // Q_INVOKABLE rangeForBlock() isn't tracked by QML's binding system,
+        // so we drive `selected` via Connections on the model's signal.
+        property bool selected: false
+        visible: selected
+    }
+
+    Connections {
+        target: root.selectionModel
+        function onSelectionChanged() {
+            selectionOverlay.selected =
+                root.selectionModel.rangeForBlock(root.blockIndex).x !== -1
         }
     }
 }

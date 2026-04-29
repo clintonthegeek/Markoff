@@ -5,6 +5,8 @@ Item {
     id: root
 
     property int blockIndex: -1
+    property var selectionModel: null
+    property var theme: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
@@ -20,5 +22,25 @@ Item {
         anchors.right: parent.right
         height: 1
         color: "#888"
+    }
+
+    Rectangle {
+        id: selectionOverlay
+        objectName: "selectionOverlay"
+        anchors.fill: parent
+        color: root.theme ? root.theme.selectionBackground : "#406080"
+        opacity: 0.35
+        // Q_INVOKABLE rangeForBlock() isn't tracked by QML's binding system,
+        // so we drive `selected` via Connections on the model's signal.
+        property bool selected: false
+        visible: selected
+    }
+
+    Connections {
+        target: root.selectionModel
+        function onSelectionChanged() {
+            selectionOverlay.selected =
+                root.selectionModel.rangeForBlock(root.blockIndex).x !== -1
+        }
     }
 }
