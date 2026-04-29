@@ -9,6 +9,24 @@ namespace {
 bool isIdentChar(QChar c) {
     return c.isLetterOrNumber() || c == '_' || c == '-';
 }
+
+bool insideFencedCodeBlock(const QString &text, int u16cur) {
+    int fences = 0;
+    int i = 0;
+    while (i + 2 < u16cur) {
+        if (text.at(i) == '`' && text.at(i + 1) == '`' && text.at(i + 2) == '`'
+            && (i == 0 || text.at(i - 1) == '\n'))
+            ++fences;
+        ++i;
+    }
+    return fences % 2 == 1;
+}
+
+bool isEscaped(const QString &text, int idx) {
+    int n = 0;
+    for (int j = idx - 1; j >= 0 && text.at(j) == '\\'; --j) ++n;
+    return n % 2 == 1;
+}
 }
 
 CompletionContext
@@ -20,12 +38,11 @@ CompletionDetector::detect(const MarkoffDocument *doc,
     if (!doc) return ctx;
 
     const QString text = doc->toMarkdown();
-    const quint32 byteOff = doc->resolveAnchor(cursor);
-    // Convert byte offset to UTF-16 index.
-    const QByteArray prefixBytes = doc->toMarkdownUtf8().left(byteOff);
+    const QByteArray prefixBytes = doc->toMarkdownUtf8().left(doc->resolveAnchor(cursor));
     const int u16cur = QString::fromUtf8(prefixBytes).size();
 
-    // Scan back from u16cur to a trigger char or whitespace.
+    if (insideFencedCodeBlock(text, u16cur)) return ctx;
+
     int i = u16cur;
     while (i > 0 && isIdentChar(text.at(i - 1))) --i;
     const QString prefix = text.mid(i, u16cur - i);
@@ -35,12 +52,18 @@ CompletionDetector::detect(const MarkoffDocument *doc,
     if (trig == ':') {
         ctx.trigger = CompletionTrigger::Emoji;
         ctx.prefix  = prefix;
-    } else if (trig == '[' && i >= 2 && text.at(i - 2) == '[') {
+    } else if (trig == '[' && i >= 2 && text.at(i - 2) == '['
+               && !isEscaped(text, i - 2))
+    {
         ctx.trigger = CompletionTrigger::WikiLink;
         ctx.prefix  = prefix;
+    } else if (trig == '^' && i >= 2 && text.at(i - 2) == '['
+               && !isEscaped(text, i - 2))
+    {
+        ctx.trigger = CompletionTrigger::Footnote;
+        ctx.prefix  = prefix;
     } else if (trig == '#') {
-        // Heading marker if at line start; tag otherwise.
-        bool atLineStart = (i - 1 == 0) || text.at(i - 2) == '\n';
+        const bool atLineStart = (i - 1 == 0) || text.at(i - 2) == '\n';
         if (!atLineStart) {
             ctx.trigger = CompletionTrigger::Tag;
             ctx.prefix  = prefix;

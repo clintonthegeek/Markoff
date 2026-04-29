@@ -45,6 +45,39 @@ private Q_SLOTS:
         QCOMPARE(ctx.trigger, CompletionTrigger::Tag);
         QCOMPARE(ctx.prefix, QStringLiteral("ta"));
     }
+
+    void heading_marker_not_a_tag() {
+        MarkoffDocument doc(1);
+        seed(doc, "#h");
+        const auto ctx = CompletionDetector::detect(&doc,
+            doc.anchorAt(2, Bias::Left));
+        QCOMPARE(ctx.trigger, CompletionTrigger::None);
+    }
+
+    void inside_fenced_code_block_suppresses_triggers() {
+        MarkoffDocument doc(1);
+        seed(doc, "```\n[[no");
+        const auto ctx = CompletionDetector::detect(&doc,
+            doc.anchorAt(8, Bias::Left));
+        QCOMPARE(ctx.trigger, CompletionTrigger::None);
+    }
+
+    void escaped_double_bracket_not_a_wikilink() {
+        MarkoffDocument doc(1);
+        seed(doc, "see \\[[no");
+        const auto ctx = CompletionDetector::detect(&doc,
+            doc.anchorAt(9, Bias::Left));
+        QCOMPARE(ctx.trigger, CompletionTrigger::None);
+    }
+
+    void footnote_marker_recognized() {
+        MarkoffDocument doc(1);
+        seed(doc, "see [^fn");
+        const auto ctx = CompletionDetector::detect(&doc,
+            doc.anchorAt(8, Bias::Left));
+        QCOMPARE(ctx.trigger, CompletionTrigger::Footnote);
+        QCOMPARE(ctx.prefix, QStringLiteral("fn"));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationCompletionDetector)
