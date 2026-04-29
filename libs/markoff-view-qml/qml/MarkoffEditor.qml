@@ -24,11 +24,16 @@ Item {
     property var theme
     property var completionModel: null
 
+    /// Either "source" or "live". Default: "source" (unchanged from Phase 1).
+    property string mode: "source"
+
     /// Exposes the inner EditorBackend so the host (e.g. AstInspectorPane) can
     /// subscribe to parseUpdatedAt without going through the document directly.
     readonly property alias editorBackend: sourceEditor.editorBackend
 
-    // The single Phase-1 source editor. Phase-2 may toggle to a LiveEditor here.
+    // PHASE-2 SEAM: SourceEditor and LiveView are siblings; `mode` toggles which
+    // is visible/enabled. Both share the same EditorBackend (LiveView consumes
+    // sourceEditor.editorBackend).
     SourceEditor {
         id: sourceEditor
         anchors.fill: parent
@@ -36,6 +41,16 @@ Item {
         document: root.document
         theme: root.theme
         focus: true
+        visible: root.mode === "source"
+        enabled: root.mode === "source"
+    }
+    LiveView {
+        id: liveView
+        anchors.fill: parent
+        anchors.bottomMargin: searchBar.visible ? searchBar.implicitHeight : 0
+        editorBackend: sourceEditor.editorBackend
+        visible: root.mode === "live"
+        enabled: root.mode === "live"
     }
 
     // Internal SearchBackend wired to the source editor's EditorBackend.
@@ -83,10 +98,4 @@ Item {
         }
     }
 
-    // Phase-2 placeholder:
-    //   To add LiveEditor as a sibling, create a LiveEditor.qml that consumes
-    //   the same EditorBackend (sourceEditor.editorBackend.document, .session),
-    //   then introduce a `mode` property here that StackLayout-toggles between
-    //   sourceEditor and liveEditor. The seam is intentional — no other file
-    //   needs to change.
 }
