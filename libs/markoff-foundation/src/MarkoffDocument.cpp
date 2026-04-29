@@ -228,7 +228,7 @@ void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
         break;
     }
     }
-    d->parsePool.schedule(toMarkdownUtf8());
+    d->parsePool.scheduleReset(toMarkdownUtf8());
     Q_EMIT documentReloaded();
 }
 

@@ -43,12 +43,54 @@ struct FrontmatterProperty {
     QVariant value;
 };
 
+/// Result of walking a parsed tree to extract structured queries. Defined
+/// in <markoff-parser/TreeSitterParser.h>.
+struct DocumentQueryResult;
+
+/// Frontmatter + footnote-pre-processing output extracted from a raw markdown
+/// source. The `body` is the post-extraction text fed to the parser (with the
+/// frontmatter block stripped, footnote definition lines removed, and footnote
+/// references like `[^1]` replaced with `<sup>1</sup>`).
+///
+/// Used by long-lived parsers (e.g., foundation's IncrementalParseSession)
+/// that want to share Document::extract()'s logic without going through the
+/// fromMarkdown() one-shot path.
+struct ExtractedSource {
+    QString             body;
+    QString             frontmatter;
+    int                 frontmatterBlockStart = -1;
+    int                 frontmatterBlockEnd = -1;
+    bool                frontmatterEofClose = false;
+    QList<FootnoteInfo> footnotes;  // numbered, in reference order
+};
+
 class Document
 {
 public:
     ~Document();
 
+    /// One-shot parse: extracts metadata, runs a fresh TreeSitterParser,
+    /// bakes a snapshot. Convenience for callers that don't need a
+    /// long-lived parser.
     static std::unique_ptr<Document> fromMarkdown(const QString &source);
+
+    /// Extract frontmatter + footnote pre-processing from a raw markdown
+    /// source. Pure function over `source`; no tree-sitter involved. The
+    /// returned `body` is what callers should feed to TreeSitterParser
+    /// (whether for a one-shot parse() or an incremental parseIncremental()).
+    static ExtractedSource extract(const QString &source);
+
+    /// Bake a Document from pre-computed components — used by long-lived
+    /// parsers (foundation's IncrementalParseSession) so that a single
+    /// TreeSitterParser instance can persist across calls and feed
+    /// successive Document snapshots without re-parsing.
+    ///
+    /// `queries` should be the result of buildDocumentQueries() called on
+    /// the parser whose tree was built against `extracted.body`.
+    static std::unique_ptr<Document> fromComponents(
+        QString source,
+        ExtractedSource extracted,
+        const DocumentQueryResult &queries);
 
     QString sourceText() const;
     bool isEmpty() const;

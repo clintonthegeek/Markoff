@@ -57,6 +57,7 @@ add_library(markoff_foundation STATIC
     src/SessionPrivate.h
     src/ParsePool.h
     src/ParsePoolWorker.h
+    src/IncrementalParseSession.h
     src/MarkoffEdit.cpp
     src/AnchorJson.cpp
     src/Selection.cpp
@@ -65,6 +66,7 @@ add_library(markoff_foundation STATIC
     src/Session.cpp
     src/ParsePool.cpp
     src/ParsePoolWorker.cpp
+    src/IncrementalParseSession.cpp
     src/Theme.cpp
     src/LinkService.cpp
     src/DefaultLinkService.cpp

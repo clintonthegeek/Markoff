@@ -5,6 +5,7 @@
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-parser/Document.h>
 
 #include "../src/ParsePool.h"
 
@@ -30,6 +31,56 @@ private Q_SLOTS:
 
         QVERIFY(spy.wait(2000));
         QVERIFY(doc.parsedDocument() != nullptr);
+    }
+
+    void scheduleReset_drives_a_fresh_parse() {
+        using namespace Markoff::Parse::Detail;
+        ParsePool pool;
+        QSignalSpy spy(&pool, &ParsePool::parseReady);
+
+        pool.scheduleReset(QByteArrayLiteral("# Initial\n\nbody"));
+        QVERIFY(spy.wait(2000));
+        QCOMPARE(spy.count(), 1);
+
+        // Drain the captured Document; the parser owns its memory.
+        const auto args = spy.takeFirst();
+        const auto *parsed = qvariant_cast<const Markoff::Document *>(args.at(0));
+        QVERIFY(parsed != nullptr);
+        QCOMPARE(parsed->sourceText(), QStringLiteral("# Initial\n\nbody"));
+        delete parsed;
+    }
+
+    void schedule_after_scheduleReset_uses_new_session() {
+        using namespace Markoff::Parse::Detail;
+        ParsePool pool;
+        QSignalSpy spy(&pool, &ParsePool::parseReady);
+
+        // Reset to one body, then incrementally update — both deliveries
+        // should reflect the right source.
+        pool.scheduleReset(QByteArrayLiteral("first"));
+        QVERIFY(spy.wait(2000));
+        while (spy.wait(50)) { /* drain */ }
+
+        // Free Documents from the reset wave.
+        for (auto &args : std::as_const(spy)) {
+            delete qvariant_cast<const Markoff::Document *>(args.at(0));
+        }
+        spy.clear();
+
+        pool.schedule(QByteArrayLiteral("first second"));
+        QVERIFY(spy.wait(2000));
+        while (spy.wait(50)) { /* drain */ }
+
+        QVERIFY(spy.count() >= 1);
+        const auto args = spy.takeLast();
+        const auto *parsed = qvariant_cast<const Markoff::Document *>(args.at(0));
+        QVERIFY(parsed != nullptr);
+        QCOMPARE(parsed->sourceText(), QStringLiteral("first second"));
+        delete parsed;
+        // Free any prior deliveries.
+        for (auto &a : std::as_const(spy)) {
+            delete qvariant_cast<const Markoff::Document *>(a.at(0));
+        }
     }
 
     void schedule_coalesces_in_flight_requests() {
