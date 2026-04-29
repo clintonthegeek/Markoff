@@ -246,6 +246,37 @@ private Q_SLOTS:
         QVERIFY(spy.wait(2000));
         QCOMPARE(spy.count(), 1);
     }
+
+    void undo_reverts_local_edit() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        backend.setDocument(&doc);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello");
+        doc.applyLocalEdit({ ed });
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+
+        backend.undo();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
+    }
+
+    void redo_replays_undone_edit() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        backend.setDocument(&doc);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello");
+        doc.applyLocalEdit({ ed });
+        backend.undo();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
+
+        backend.redo();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+    }
 };
 
 QTEST_MAIN(TstViewQmlEditorBackend)

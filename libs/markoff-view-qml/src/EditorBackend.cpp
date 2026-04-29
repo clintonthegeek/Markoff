@@ -106,6 +106,16 @@ void EditorBackend::pushSelectionToSession()
     m_session->setPrimarySelection(sel);
 }
 
+void EditorBackend::undo()
+{
+    if (m_document) m_document->undo();
+}
+
+void EditorBackend::redo()
+{
+    if (m_document) m_document->redo();
+}
+
 void EditorBackend::onSessionPrimarySelectionChanged(const Markoff::Selection &sel)
 {
     m_applyingSessionSelection = true;

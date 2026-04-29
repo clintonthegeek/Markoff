@@ -60,6 +60,9 @@ public:
     CollabText::Crdt::Anchor selectionActive() const;
     void setSelectionActive(const CollabText::Crdt::Anchor &);
 
+    Q_INVOKABLE void undo();
+    Q_INVOKABLE void redo();
+
 Q_SIGNALS:
     void documentChanged();
     void sessionChanged();
