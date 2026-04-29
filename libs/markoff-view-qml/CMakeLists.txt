@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Test)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick QuickControls2 Test)
 
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -40,6 +40,7 @@ target_include_directories(markoff_view_qml
 target_link_libraries(markoff_view_qml PUBLIC
     Qt6::Core
     Qt6::Gui
+    Qt6::Widgets
     Qt6::Quick
     Qt6::QuickControls2
     markoff_foundation

@@ -3,8 +3,8 @@
 
 Q_IMPORT_PLUGIN(org_markoff_view_qmlPlugin)
 
+#include <QApplication>
 #include <QFile>
-#include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
@@ -29,10 +29,10 @@ int main(int argc, char *argv[])
     // Pin the Qt Quick Controls style. Bypasses Plasma's Breeze override
     // (which has a known TextArea.qml warning that's noisy but harmless)
     // and gives us predictable cross-platform behavior. Must be called
-    // BEFORE QGuiApplication construction.
+    // BEFORE QApplication construction.
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
-    QGuiApplication app(argc, argv);
+    QApplication app(argc, argv);
 
     if (argc < 2) {
         qWarning("Usage: %s <markdown-file>", argv[0]);

@@ -11,7 +11,7 @@ qt_add_qml_module(markoff-view-qml-app
 )
 
 target_link_libraries(markoff-view-qml-app PRIVATE
-    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+    Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2 Qt6::Qml
     markoff_view_qml
     markoff_view_qmlplugin
     markoff_foundation
