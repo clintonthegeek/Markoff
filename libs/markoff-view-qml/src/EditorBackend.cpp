@@ -49,7 +49,12 @@ void EditorBackend::setCursorAnchor(const CollabText::Crdt::Anchor &a)
     if (m_cursorAnchor == a) return;
     m_cursorAnchor = a;
 
-    // Lift to Session as a degenerate (cursor) selection.
+    // Cursor set => collapse selection to degenerate (anchor = active = a).
+    bool selectionAnchorMoved = (m_selectionAnchor != a);
+    bool selectionActiveMoved = (m_selectionActive != a);
+    m_selectionAnchor = a;
+    m_selectionActive = a;
+
     if (m_session && !m_applyingSessionSelection) {
         Markoff::Selection sel;
         sel.anchor = a;
@@ -57,19 +62,63 @@ void EditorBackend::setCursorAnchor(const CollabText::Crdt::Anchor &a)
         sel.kind   = Markoff::Selection::Kind::Primary;
         m_session->setPrimarySelection(sel);
     }
+
     Q_EMIT cursorAnchorChanged();
+    if (selectionAnchorMoved) Q_EMIT selectionAnchorChanged();
+    if (selectionActiveMoved) Q_EMIT selectionActiveChanged();
+}
+
+CollabText::Crdt::Anchor EditorBackend::selectionAnchor() const { return m_selectionAnchor; }
+
+void EditorBackend::setSelectionAnchor(const CollabText::Crdt::Anchor &a)
+{
+    if (m_selectionAnchor == a) return;
+    m_selectionAnchor = a;
+    pushSelectionToSession();
+    Q_EMIT selectionAnchorChanged();
+}
+
+CollabText::Crdt::Anchor EditorBackend::selectionActive() const { return m_selectionActive; }
+
+void EditorBackend::setSelectionActive(const CollabText::Crdt::Anchor &a)
+{
+    if (m_selectionActive == a) return;
+    m_selectionActive = a;
+    pushSelectionToSession();
+    Q_EMIT selectionActiveChanged();
+}
+
+void EditorBackend::pushSelectionToSession()
+{
+    if (!m_session || m_applyingSessionSelection) return;
+    Markoff::Selection sel;
+    sel.anchor = m_selectionAnchor;
+    sel.active = m_selectionActive;
+    sel.kind   = Markoff::Selection::Kind::Primary;
+    m_session->setPrimarySelection(sel);
 }
 
 void EditorBackend::onSessionPrimarySelectionChanged(const Markoff::Selection &sel)
 {
-    // Only update cursorAnchor when selection is degenerate (anchor == active).
-    // Non-degenerate selections (T6) are reported via selectionAnchor/selectionActive.
-    if (sel.anchor != sel.active) return;
-
-    if (m_cursorAnchor == sel.anchor) return;
-    m_cursorAnchor = sel.anchor;
     m_applyingSessionSelection = true;
-    Q_EMIT cursorAnchorChanged();
+
+    // selectionAnchor + selectionActive always reflect the session selection's two ends.
+    if (m_selectionAnchor != sel.anchor) {
+        m_selectionAnchor = sel.anchor;
+        Q_EMIT selectionAnchorChanged();
+    }
+    if (m_selectionActive != sel.active) {
+        m_selectionActive = sel.active;
+        Q_EMIT selectionActiveChanged();
+    }
+
+    // cursorAnchor is the "active" end (where the cursor is). For a degenerate
+    // selection (anchor == active), it's just the cursor position.
+    if (m_cursorAnchor != sel.active) {
+        m_cursorAnchor = sel.active;
+        Q_EMIT cursorAnchorChanged();
+    }
+
     m_applyingSessionSelection = false;
 }
 

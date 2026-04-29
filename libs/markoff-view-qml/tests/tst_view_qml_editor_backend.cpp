@@ -159,6 +159,76 @@ private Q_SLOTS:
         QVERIFY(spy.count() >= 1);
         QCOMPARE(backend.cursorAnchor(), a);
     }
+
+    void selection_anchor_and_active_default_to_zero() {
+        EditorBackend backend;
+        QCOMPARE(backend.selectionAnchor(), CollabText::Crdt::Anchor{});
+        QCOMPARE(backend.selectionActive(), CollabText::Crdt::Anchor{});
+    }
+
+    void set_selection_anchor_and_active_lifts_range_to_session() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        backend.setDocument(&doc);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
+        doc.applyLocalEdit({ ed });
+
+        const auto a3 = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        const auto a8 = doc.anchorAt(8, CollabText::Crdt::Bias::Right);
+        backend.setSelectionAnchor(a3);
+        backend.setSelectionActive(a8);
+
+        const Markoff::Selection sel = backend.session()->primarySelection();
+        QCOMPARE(sel.anchor, a3);
+        QCOMPARE(sel.active, a8);
+    }
+
+    void selection_can_be_reversed_active_before_anchor() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        backend.setDocument(&doc);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
+        doc.applyLocalEdit({ ed });
+
+        const auto a8 = doc.anchorAt(8, CollabText::Crdt::Bias::Left);
+        const auto a3 = doc.anchorAt(3, CollabText::Crdt::Bias::Right);
+        backend.setSelectionAnchor(a8);
+        backend.setSelectionActive(a3);
+
+        const Markoff::Selection sel = backend.session()->primarySelection();
+        QCOMPARE(sel.anchor, a8);
+        QCOMPARE(sel.active, a3);
+        QVERIFY(sel.isReversed());
+    }
+
+    void session_range_selection_updates_both_anchor_and_active() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        backend.setDocument(&doc);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
+        doc.applyLocalEdit({ ed });
+
+        const auto a2 = doc.anchorAt(2, CollabText::Crdt::Bias::Left);
+        const auto a7 = doc.anchorAt(7, CollabText::Crdt::Bias::Right);
+        Markoff::Selection sel;
+        sel.anchor = a2; sel.active = a7; sel.kind = Markoff::Selection::Kind::Primary;
+
+        QSignalSpy spyAnchor(&backend, &EditorBackend::selectionAnchorChanged);
+        QSignalSpy spyActive(&backend, &EditorBackend::selectionActiveChanged);
+        QSignalSpy spyCursor(&backend, &EditorBackend::cursorAnchorChanged);
+
+        backend.session()->setPrimarySelection(sel);
+
+        QVERIFY(spyAnchor.count() >= 1);
+        QVERIFY(spyActive.count() >= 1);
+        QVERIFY(spyCursor.count() >= 1);
+        QCOMPARE(backend.selectionAnchor(), a2);
+        QCOMPARE(backend.selectionActive(), a7);
+        QCOMPARE(backend.cursorAnchor(), a7);  // cursor follows active end
+    }
 };
 
 QTEST_APPLESS_MAIN(TstViewQmlEditorBackend)

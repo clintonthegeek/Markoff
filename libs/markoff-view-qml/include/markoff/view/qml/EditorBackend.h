@@ -31,6 +31,14 @@ class EditorBackend : public QObject {
                READ cursorAnchor
                WRITE setCursorAnchor
                NOTIFY cursorAnchorChanged)
+    Q_PROPERTY(CollabText::Crdt::Anchor selectionAnchor
+               READ selectionAnchor
+               WRITE setSelectionAnchor
+               NOTIFY selectionAnchorChanged)
+    Q_PROPERTY(CollabText::Crdt::Anchor selectionActive
+               READ selectionActive
+               WRITE setSelectionActive
+               NOTIFY selectionActiveChanged)
 public:
     explicit EditorBackend(QObject *parent = nullptr);
     ~EditorBackend() override;
@@ -46,20 +54,32 @@ public:
     CollabText::Crdt::Anchor cursorAnchor() const;
     void setCursorAnchor(const CollabText::Crdt::Anchor &);
 
+    CollabText::Crdt::Anchor selectionAnchor() const;
+    void setSelectionAnchor(const CollabText::Crdt::Anchor &);
+
+    CollabText::Crdt::Anchor selectionActive() const;
+    void setSelectionActive(const CollabText::Crdt::Anchor &);
+
 Q_SIGNALS:
     void documentChanged();
     void sessionChanged();
     void themeChanged();
     void cursorAnchorChanged();
+    void selectionAnchorChanged();
+    void selectionActiveChanged();
 
 private Q_SLOTS:
     void onSessionPrimarySelectionChanged(const Markoff::Selection &);
 
 private:
+    void pushSelectionToSession();
+
     Markoff::MarkoffDocument *m_document = nullptr;
     Markoff::Session         *m_session  = nullptr;
     Markoff::Theme            m_theme    = Markoff::Theme::defaultLight();
     CollabText::Crdt::Anchor  m_cursorAnchor;
+    CollabText::Crdt::Anchor  m_selectionAnchor;
+    CollabText::Crdt::Anchor  m_selectionActive;
     bool                      m_applyingSessionSelection = false;
 };
 
