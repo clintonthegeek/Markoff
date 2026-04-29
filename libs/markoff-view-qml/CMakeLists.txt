@@ -24,6 +24,8 @@ qt_add_qml_module(markoff_view_qml
         include/markoff/view/qml/CompletionPopupModel.h
         src/LiveSelectionModel.cpp
         include/markoff/view/qml/LiveSelectionModel.h
+        src/LiveBlockModel.cpp
+        include/markoff/view/qml/LiveBlockModel.h
         src/BlockKind.cpp
         include/markoff/view/qml/BlockKind.h
         include/markoff/view/qml/BlockRecord.h
