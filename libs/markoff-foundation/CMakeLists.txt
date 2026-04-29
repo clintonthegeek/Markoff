@@ -44,6 +44,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/CommandFacade.h
     include/markoff-foundation/SearchEngine.h
     include/markoff-foundation/ReplaceController.h
+    include/markoff-foundation/MarkoffServices.h
     # --- Cmd/ (public) ---
     # Cmd aggregate
     include/markoff-foundation/Cmd.h
