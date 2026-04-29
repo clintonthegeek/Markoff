@@ -56,6 +56,7 @@ private Q_SLOTS:
     void crossBlockEdit_matchesFreshParse();
     void freshParse_resetsReuseCountToZero();
     void parseIncremental_noPriorTree_reportsZeroReuse();
+    void singleParagraphEdit_reusesUnchangedInlineRegions();
 };
 
 // ---------------------------------------------------------------------------
@@ -249,6 +250,35 @@ void TstIncrementalParse::parseIncremental_noPriorTree_reportsZeroReuse()
     TreeSitterParser p;
     QVERIFY(p.parseIncremental({}, QByteArrayLiteral("# Heading\n\npara")));
     QCOMPARE(p.inlineTreeReuseCount(), 0);
+}
+
+void TstIncrementalParse::singleParagraphEdit_reusesUnchangedInlineRegions()
+{
+    // Three paragraphs. Edit only the middle one. Expect the two outer
+    // inline regions to be reused.
+    QByteArray oldSrc = QByteArrayLiteral(
+        "para alpha here.\n\npara beta here.\n\npara gamma here.");
+    QByteArray newSrc = QByteArrayLiteral(
+        "para alpha here.\n\npara **beta** here.\n\npara gamma here.");
+
+    TreeSitterParser p;
+    QVERIFY(p.parse(QString::fromUtf8(oldSrc)));
+
+    const int at = oldSrc.indexOf(QByteArrayLiteral("beta"));
+    QVERIFY(at >= 0);
+    // Replace "beta" (4 bytes) with "**beta**" (8 bytes).
+    ByteEdit e{ static_cast<quint32>(at),
+                static_cast<quint32>(at + 4),
+                8u };
+    QVERIFY(p.parseIncremental({e}, newSrc));
+
+    QCOMPARE(p.inlineTreeReuseCount(), 2);
+
+    // Span output must still match a fresh parse exactly.
+    TreeSitterParser ref;
+    QVERIFY(ref.parse(QString::fromUtf8(newSrc)));
+    QCOMPARE(fingerprintAll(p.buildSpanMap()),
+             fingerprintAll(ref.buildSpanMap()));
 }
 
 QTEST_APPLESS_MAIN(TstIncrementalParse)

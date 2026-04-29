@@ -229,11 +229,21 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
         return parse(QString::fromUtf8(newUtf8));
     }
 
-    // No edits but caller still asked for incremental: nothing to do for
-    // the block tree (it's already valid). But the buffer-of-record may
-    // have been replaced by an identical-looking newUtf8; refresh it and
-    // rebuild inline trees so caller sees consistent state.
+    // Snapshot inline state from the OLD block tree before any edit, so we
+    // can reuse trees whose post-edit byte range is unchanged.
+    std::vector<TSRange> oldInlineRanges;
+    collectInlineRanges(ts_tree_root_node(m_blockTree), oldInlineRanges);
+    QList<TSTree *> oldInlineTrees = m_inlineTrees;
+    m_inlineTrees.clear();
+
+    QList<ByteEdit> sortedEdits;
+
     if (edits.isEmpty()) {
+        // No edits but caller still asked for incremental: nothing to do
+        // for the block tree (it's already valid). Refresh the buffer-of-
+        // record (caller may have replaced it with an identical-looking
+        // newUtf8) and fall through to the inline reuse pass — every
+        // inline region's range will match exactly, so all trees reuse.
         m_utf8       = newUtf8;
         m_byteToChar = buildByteToCharMap(m_utf8);
     } else {
@@ -242,13 +252,13 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
         // editing right-to-left, each edit's old-frame offsets remain valid
         // against the tree's then-current state (because we haven't touched
         // anything to the right yet).
-        QList<ByteEdit> sorted = edits;
-        std::sort(sorted.begin(), sorted.end(),
+        sortedEdits = edits;
+        std::sort(sortedEdits.begin(), sortedEdits.end(),
                   [](const ByteEdit &a, const ByteEdit &b) {
                       return a.oldStart < b.oldStart;
                   });
 
-        for (auto it = sorted.rbegin(); it != sorted.rend(); ++it) {
+        for (auto it = sortedEdits.rbegin(); it != sortedEdits.rend(); ++it) {
             const ByteEdit &e = *it;
             TSInputEdit ed{};
             ed.start_byte    = e.oldStart;
@@ -259,6 +269,11 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
             // decisions but byte offsets dominate; this is the documented
             // safe shortcut for byte-only consumers.
             ts_tree_edit(m_blockTree, &ed);
+            // Apply the same edit to all old inline trees so that their
+            // node byte positions are updated to the new frame. Trees that
+            // are later reused will then emit spans with correct offsets.
+            for (TSTree *inlineTree : oldInlineTrees)
+                ts_tree_edit(inlineTree, &ed);
         }
 
         // Now reparse the block tree against the new buffer, supplying the
@@ -269,29 +284,90 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
         TSTree *newTree = ts_parser_parse_string(m_blockParser, m_blockTree,
                                                   m_utf8.constData(),
                                                   static_cast<uint32_t>(m_utf8.size()));
-        if (!newTree)
+        if (!newTree) {
+            // Block reparse failed. Restore the old inline-tree handles so
+            // the parser stays in a valid state, and report failure.
+            m_inlineTrees = oldInlineTrees;
             return false;
+        }
         ts_tree_delete(m_blockTree);
         m_blockTree = newTree;
     }
 
-    // Phase 1: full reparse of inline regions. Phase 2 will reuse trees
-    // for regions whose byte ranges are unchanged from the prior parse.
-    for (TSTree *t : m_inlineTrees) ts_tree_delete(t);
-    m_inlineTrees.clear();
-
+    // Phase 2: reuse inline trees for regions whose post-edit byte range
+    // is unchanged. For each old range, shift through the sorted edits
+    // to derive its post-edit byte range, or mark it invalid if any edit
+    // overlaps. Then match new ranges against unconsumed shifted-old
+    // ranges by exact byte equality; reuse on match, fresh-parse on miss.
     TSNode root = ts_tree_root_node(m_blockTree);
-    std::vector<TSRange> inlineRanges;
-    collectInlineRanges(root, inlineRanges);
+    std::vector<TSRange> newInlineRanges;
+    collectInlineRanges(root, newInlineRanges);
 
-    for (const TSRange &range : inlineRanges) {
-        ts_parser_set_included_ranges(m_inlineParser, &range, 1);
-        TSTree *tree = ts_parser_parse_string(m_inlineParser, nullptr,
-                                               m_utf8.constData(),
-                                               static_cast<uint32_t>(m_utf8.size()));
-        if (tree)
-            m_inlineTrees.append(tree);
-        ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
+    m_lastInlineReuseCount = 0;
+
+    struct ShiftedRange {
+        quint32 start;
+        quint32 end;
+        int oldIdx;
+        bool valid;
+    };
+    std::vector<ShiftedRange> shifted;
+    shifted.reserve(oldInlineRanges.size());
+    for (size_t i = 0; i < oldInlineRanges.size(); ++i) {
+        const quint32 s = oldInlineRanges[i].start_byte;
+        const quint32 e = oldInlineRanges[i].end_byte;
+        bool valid = true;
+        qint64 delta = 0;
+        for (const ByteEdit &ed : sortedEdits) {
+            if (ed.oldEnd <= s) {
+                delta += static_cast<qint64>(ed.newLength)
+                       - static_cast<qint64>(ed.oldEnd - ed.oldStart);
+            } else if (ed.oldStart >= e) {
+                // edit lies entirely past this range — no impact.
+            } else {
+                valid = false;
+                break;
+            }
+        }
+        ShiftedRange sr{};
+        sr.oldIdx = static_cast<int>(i);
+        sr.valid = valid;
+        if (valid) {
+            sr.start = static_cast<quint32>(static_cast<qint64>(s) + delta);
+            sr.end   = static_cast<quint32>(static_cast<qint64>(e) + delta);
+        }
+        shifted.push_back(sr);
+    }
+
+    std::vector<bool> consumed(oldInlineTrees.size(), false);
+    for (const TSRange &nr : newInlineRanges) {
+        int reuseIdx = -1;
+        for (const ShiftedRange &sr : shifted) {
+            if (!sr.valid || consumed[sr.oldIdx])
+                continue;
+            if (sr.start == nr.start_byte && sr.end == nr.end_byte) {
+                reuseIdx = sr.oldIdx;
+                break;
+            }
+        }
+        if (reuseIdx >= 0) {
+            m_inlineTrees.append(oldInlineTrees[reuseIdx]);
+            consumed[reuseIdx] = true;
+            ++m_lastInlineReuseCount;
+        } else {
+            ts_parser_set_included_ranges(m_inlineParser, &nr, 1);
+            TSTree *tree = ts_parser_parse_string(m_inlineParser, nullptr,
+                                                   m_utf8.constData(),
+                                                   static_cast<uint32_t>(m_utf8.size()));
+            if (tree)
+                m_inlineTrees.append(tree);
+            ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
+        }
+    }
+
+    for (size_t i = 0; i < oldInlineTrees.size(); ++i) {
+        if (!consumed[i])
+            ts_tree_delete(oldInlineTrees[i]);
     }
 
     return true;
