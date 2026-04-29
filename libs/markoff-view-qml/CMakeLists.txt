@@ -42,6 +42,11 @@ qt_add_qml_module(markoff_view_qml
         qml/SearchBar.qml
         qml/CompletionPopup.qml
         qml/MarkoffEditor.qml
+        qml/delegates/ParagraphDelegate.qml
+        qml/delegates/HeadingDelegate.qml
+        qml/delegates/HorizontalRuleDelegate.qml
+        qml/delegates/ImageDelegate.qml
+        qml/delegates/CodeBlockDelegate.qml
 )
 
 target_include_directories(markoff_view_qml
