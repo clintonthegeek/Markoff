@@ -10,7 +10,7 @@ namespace Markoff::Source::Widget {
 
 Gutter::Gutter(Editor *editor) : QWidget(editor), m_editor(editor) {}
 
-QSize Gutter::sizeHint() const { return QSize(40, 0); }
+QSize Gutter::sizeHint() const { return QSize(m_editor->gutterWidth(), 0); }
 
 void Gutter::paintEvent(QPaintEvent *event) {
     QPainter p(this);

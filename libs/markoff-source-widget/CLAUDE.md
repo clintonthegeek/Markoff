@@ -7,7 +7,7 @@ Fully-owned QtWidgets Source view on `markoff-foundation`. Replaces the Qutepart
 - `Markoff::Source::Widget::FindBar` — standalone find UI.
 
 ## Internal
-- `Markoff::Source::Widget::Gutter` — line-number gutter, child of editor's viewport. Single-column at v0; polymorphic-column shape (per legacy `markoff-live::FoldGutter`) when fold arrows arrive.
+- `Markoff::Source::Widget::Gutter` — line-number gutter, child of the editor. Single-column at v0; polymorphic-column shape (per legacy `markoff-live::FoldGutter`) when fold arrows arrive.
 
 ## Dependencies
 - Qt6 Core / Gui / Widgets
