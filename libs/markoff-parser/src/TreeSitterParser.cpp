@@ -219,6 +219,83 @@ bool TreeSitterParser::parse(const QString &text)
     return true;
 }
 
+bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
+                                        const QByteArray &newUtf8)
+{
+    // No prior tree → full parse of the new buffer. Callers don't need
+    // a first-parse branch.
+    if (!m_blockTree) {
+        return parse(QString::fromUtf8(newUtf8));
+    }
+
+    // No edits but caller still asked for incremental: nothing to do for
+    // the block tree (it's already valid). But the buffer-of-record may
+    // have been replaced by an identical-looking newUtf8; refresh it and
+    // rebuild inline trees so caller sees consistent state.
+    if (edits.isEmpty()) {
+        m_utf8       = newUtf8;
+        m_byteToChar = buildByteToCharMap(m_utf8);
+    } else {
+        // Sort by ascending oldStart, then apply ts_tree_edit in DESCENDING
+        // order. Each ts_tree_edit shifts node positions to a new frame; by
+        // editing right-to-left, each edit's old-frame offsets remain valid
+        // against the tree's then-current state (because we haven't touched
+        // anything to the right yet).
+        QList<ByteEdit> sorted = edits;
+        std::sort(sorted.begin(), sorted.end(),
+                  [](const ByteEdit &a, const ByteEdit &b) {
+                      return a.oldStart < b.oldStart;
+                  });
+
+        for (auto it = sorted.rbegin(); it != sorted.rend(); ++it) {
+            const ByteEdit &e = *it;
+            TSInputEdit ed{};
+            ed.start_byte    = e.oldStart;
+            ed.old_end_byte  = e.oldEnd;
+            ed.new_end_byte  = e.oldStart + e.newLength;
+            // Points are unused downstream (we read trees by byte only),
+            // so leave them zero. tree-sitter uses points for some
+            // decisions but byte offsets dominate; this is the documented
+            // safe shortcut for byte-only consumers.
+            ts_tree_edit(m_blockTree, &ed);
+        }
+
+        // Now reparse the block tree against the new buffer, supplying the
+        // edited prior tree. tree-sitter reuses unchanged subtrees.
+        m_utf8       = newUtf8;
+        m_byteToChar = buildByteToCharMap(m_utf8);
+
+        TSTree *newTree = ts_parser_parse_string(m_blockParser, m_blockTree,
+                                                  m_utf8.constData(),
+                                                  static_cast<uint32_t>(m_utf8.size()));
+        if (!newTree)
+            return false;
+        ts_tree_delete(m_blockTree);
+        m_blockTree = newTree;
+    }
+
+    // Phase 1: full reparse of inline regions. Phase 2 will reuse trees
+    // for regions whose byte ranges are unchanged from the prior parse.
+    for (TSTree *t : m_inlineTrees) ts_tree_delete(t);
+    m_inlineTrees.clear();
+
+    TSNode root = ts_tree_root_node(m_blockTree);
+    std::vector<TSRange> inlineRanges;
+    collectInlineRanges(root, inlineRanges);
+
+    for (const TSRange &range : inlineRanges) {
+        ts_parser_set_included_ranges(m_inlineParser, &range, 1);
+        TSTree *tree = ts_parser_parse_string(m_inlineParser, nullptr,
+                                               m_utf8.constData(),
+                                               static_cast<uint32_t>(m_utf8.size()));
+        if (tree)
+            m_inlineTrees.append(tree);
+        ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
+    }
+
+    return true;
+}
+
 int TreeSitterParser::utf8ToCharOffset(int byteOffset) const
 {
     if (byteOffset < 0) return 0;

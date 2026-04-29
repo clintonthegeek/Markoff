@@ -13,6 +13,19 @@ typedef struct TSNode TSNode;
 
 namespace Markoff {
 
+/// A surgical edit in old-text UTF-8 byte coordinates. Independent of
+/// markoff-foundation's MarkoffEdit (which carries the new-text bytes too);
+/// for tree-sitter incremental parsing we only need ranges + new lengths
+/// since the post-edit buffer is supplied separately.
+///
+/// `oldEnd >= oldStart`. `newLength` is bytes inserted in the slice's place
+/// (zero for pure deletion).
+struct ByteEdit {
+    quint32 oldStart = 0;
+    quint32 oldEnd = 0;
+    quint32 newLength = 0;
+};
+
 struct HeadingInfo;
 struct LinkInfo;
 struct TagInfo;
@@ -34,9 +47,25 @@ public:
     TreeSitterParser();
     ~TreeSitterParser();
 
-    /// Parse markdown text. Returns true on success.
-    /// After parsing, use buildSpanMap() to get formatting spans.
+    /// Parse markdown text from scratch. Returns true on success.
+    /// Discards any prior tree state. After parsing, use buildSpanMap()
+    /// to get formatting spans.
     bool parse(const QString &text);
+
+    /// Incrementally re-parse after a set of byte-range edits.
+    ///
+    /// `edits` describe the transformation from the previously-parsed
+    /// buffer (m_utf8) to `newUtf8`, in old-buffer byte coordinates.
+    /// Edits may be in any order; this function sorts and applies them
+    /// internally. `newUtf8` is the full post-edit buffer.
+    ///
+    /// If no prior tree exists (first parse, or parse() never succeeded),
+    /// this falls through to a full parse of `newUtf8` — callers do not
+    /// need a "first parse" branch.
+    ///
+    /// Returns true on success.
+    bool parseIncremental(const QList<ByteEdit> &edits,
+                          const QByteArray &newUtf8);
 
     /// Build a flat span map from the CST. Each span has byte offsets
     /// (converted to QString char offsets) and formatting/delimiter flags.
