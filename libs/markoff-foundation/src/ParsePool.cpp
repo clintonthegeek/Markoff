@@ -18,8 +18,10 @@ struct ParsePool::Private {
     QThread          *thread = nullptr;
     ParsePoolWorker  *worker = nullptr;
     mutable QMutex    mutex;
-    quint64           generation = 0;  // bumped on each schedule()
-    quint64           inFlight   = 0;  // last-scheduled gen; 0 == resolved
+    quint64           generation = 0;     // bumped on each schedule()
+    bool              workerBusy = false; // a parse is currently running on the worker
+    QByteArray        pending;            // snapshot waiting to be dispatched after current parse
+    quint64           pendingGen = 0;     // generation tag for pending snapshot
 };
 
 ParsePool::ParsePool(QObject *parent)
@@ -44,17 +46,36 @@ ParsePool::ParsePool(QObject *parent)
     // Results come back via QueuedConnection so the lambda runs on our thread.
     connect(d->worker, &ParsePoolWorker::parsed,
             this, [this](Markoff::Document *parsed, quint64 gen) {
+        QByteArray nextSnapshot;
+        quint64    nextGen = 0;
         {
             QMutexLocker lk(&d->mutex);
             if (gen != d->generation) {
-                // Superseded — drop the result.
+                // This result is for a snapshot that has been superseded by
+                // a newer pending one. Drop the result and dispatch the pending.
                 delete parsed;
-                return;
+                parsed = nullptr;
             }
-            // Most-recent generation has now resolved.
-            d->inFlight = 0;
+            // Drain pending if any.
+            if (!d->pending.isEmpty() || d->pendingGen != 0) {
+                nextSnapshot = std::move(d->pending);
+                nextGen      = d->pendingGen;
+                d->pending.clear();
+                d->pendingGen = 0;
+                // worker stays busy
+            } else {
+                d->workerBusy = false;
+            }
         }
-        Q_EMIT parseReady(static_cast<const Markoff::Document *>(parsed));
+        if (parsed) Q_EMIT parseReady(static_cast<const Markoff::Document *>(parsed));
+        if (nextGen != 0) {
+            ParsePoolWorker *worker = d->worker;
+            QMetaObject::invokeMethod(worker,
+                [worker, b = std::move(nextSnapshot), nextGen]() mutable {
+                    worker->parseSnapshot(std::move(b), nextGen);
+                },
+                Qt::QueuedConnection);
+        }
     }, Qt::QueuedConnection);
 
     d->thread->start();
@@ -74,23 +95,34 @@ ParsePool::~ParsePool()
 void ParsePool::schedule(QByteArray utf8)
 {
     quint64 gen;
+    bool    dispatchNow = false;
     {
         QMutexLocker lk(&d->mutex);
         gen = ++d->generation;
-        d->inFlight = gen;
+        if (d->workerBusy) {
+            // A parse is already in flight. Replace pending with this newer
+            // snapshot (drops any prior pending — that's the coalesce).
+            d->pending    = std::move(utf8);
+            d->pendingGen = gen;
+        } else {
+            d->workerBusy = true;
+            dispatchNow   = true;
+        }
     }
-    ParsePoolWorker *worker = d->worker;
-    QMetaObject::invokeMethod(worker,
-        [worker, b = std::move(utf8), gen]() mutable {
-            worker->parseSnapshot(std::move(b), gen);
-        },
-        Qt::QueuedConnection);
+    if (dispatchNow) {
+        ParsePoolWorker *worker = d->worker;
+        QMetaObject::invokeMethod(worker,
+            [worker, b = std::move(utf8), gen]() mutable {
+                worker->parseSnapshot(std::move(b), gen);
+            },
+            Qt::QueuedConnection);
+    }
 }
 
 bool ParsePool::isPending() const
 {
     QMutexLocker lk(&d->mutex);
-    return d->inFlight > 0 && d->inFlight == d->generation;
+    return d->workerBusy || !d->pending.isEmpty();
 }
 
 }  // namespace Markoff::Parse::Detail

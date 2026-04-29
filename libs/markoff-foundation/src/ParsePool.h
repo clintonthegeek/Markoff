@@ -16,9 +16,11 @@ namespace Markoff::Parse::Detail {
 /// receiver of parseReady() takes ownership of the parsed Document and is
 /// responsible for deleting it.
 ///
-/// Coalescing: only the most-recently-scheduled snapshot's result is
-/// surfaced. Earlier results that complete after a newer schedule() call
-/// are silently dropped (deleted) inside the pool.
+/// Coalescing: requests are coalesced at the queue. At most one parse runs
+/// on the worker at a time; subsequent schedule() calls during an in-flight
+/// parse only update the "pending" snapshot, which is dispatched when the
+/// current parse finishes. Stale results (whose generation has been
+/// superseded by a pending snapshot) are dropped silently inside the pool.
 class ParsePool : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(ParsePool)

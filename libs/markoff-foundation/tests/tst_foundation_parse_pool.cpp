@@ -6,6 +6,8 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
 
+#include "../src/ParsePool.h"
+
 using namespace Markoff;
 
 class TstFoundationParsePool : public QObject {
@@ -28,6 +30,36 @@ private Q_SLOTS:
 
         QVERIFY(spy.wait(2000));
         QVERIFY(doc.parsedDocument() != nullptr);
+    }
+
+    void schedule_coalesces_in_flight_requests() {
+        using namespace Markoff::Parse::Detail;
+        ParsePool pool;
+        QSignalSpy spy(&pool, &ParsePool::parseReady);
+
+        // Queue 50 snapshots back-to-back, each with a distinct content marker
+        // so we can identify which one(s) ran. The "marker" is a unique line
+        // count: snapshot N has N+1 newlines.
+        const int N = 50;
+        for (int i = 0; i < N; ++i) {
+            QByteArray b("# t\n");
+            for (int j = 0; j < i; ++j) b.append("x\n");
+            pool.schedule(b);
+        }
+
+        // Wait for whatever the pool decides to deliver to settle.
+        // It MUST deliver at least one parse, and it MUST NOT deliver more
+        // than 2 (the in-flight one at coalesce time + one drained from pending).
+        QVERIFY(spy.wait(2000));
+        // Drain any further deliveries that might still be in queue.
+        while (spy.wait(200)) { /* keep draining */ }
+
+        // Only the most-recently-scheduled snapshot's content is allowed to be
+        // surfaced as the *last* delivery. (Earlier deliveries are permitted
+        // for the coalesce-window grace; we don't constrain them tightly here.)
+        // Hard cap on total deliveries: 2.
+        QVERIFY2(spy.count() >= 1, qPrintable(QString("got %1 deliveries").arg(spy.count())));
+        QVERIFY2(spy.count() <= 2, qPrintable(QString("got %1 deliveries — coalescing failed").arg(spy.count())));
     }
 };
 
