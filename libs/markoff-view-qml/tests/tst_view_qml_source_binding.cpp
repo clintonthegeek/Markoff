@@ -4,6 +4,7 @@
 #include <QQuickTextDocument>
 #include <QSignalSpy>
 #include <QTest>
+#include <QTextCursor>
 
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/SourceTextDocumentBinding.h>
@@ -150,6 +151,117 @@ private Q_SLOTS:
             if (qtPos < text.size() && text.at(qtPos).isLowSurrogate()) continue;
             QCOMPARE(qtPosBack, qtPos);
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Forward edit path: QTextDocument → MarkoffDocument (T12)
+    // -----------------------------------------------------------------------
+
+    // Helper: load a QML TextArea, return its QQuickTextDocument.
+    // Returns nullptr if the QML engine fails (offscreen unavailable).
+    static QQuickTextDocument *seedQQuickTextDocument(QQmlApplicationEngine &engine)
+    {
+        engine.loadData(
+            R"qml(
+                import QtQuick
+                import QtQuick.Controls
+                ApplicationWindow {
+                    visible: false
+                    TextArea { id: ta; objectName: "ta" }
+                }
+            )qml"
+        );
+        QObject *root = engine.rootObjects().value(0);
+        if (!root) return nullptr;
+        QObject *ta = root->findChild<QObject *>("ta");
+        if (!ta) return nullptr;
+        return qvariant_cast<QQuickTextDocument *>(ta->property("textDocument"));
+    }
+
+    void typing_into_qtextdocument_propagates_to_markoffdocument() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello"));
+
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+    }
+
+    void deleting_text_in_qtextdocument_propagates_to_markoffdocument() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello world"));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello world"));
+
+        // Select " world" and delete.
+        cursor.setPosition(5);
+        cursor.setPosition(11, QTextCursor::KeepAnchor);
+        cursor.removeSelectedText();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+    }
+
+    void replacing_text_in_qtextdocument_propagates_to_markoffdocument() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello world"));
+
+        // Replace "world" with "there".
+        cursor.setPosition(6);
+        cursor.setPosition(11, QTextCursor::KeepAnchor);
+        cursor.insertText(QStringLiteral("there"));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello there"));
+    }
+
+    void typing_non_ascii_propagates_correctly() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        // Type "héllo" — 'é' is U+00E9, 1 UTF-16 unit, 2 UTF-8 bytes.
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("héllo"));
+
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("h\xC3\xA9llo"));
     }
 };
 
