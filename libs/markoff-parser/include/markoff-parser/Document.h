@@ -47,10 +47,15 @@ struct FrontmatterProperty {
 /// in <markoff-parser/TreeSitterParser.h>.
 struct DocumentQueryResult;
 
-/// Frontmatter + footnote-pre-processing output extracted from a raw markdown
-/// source. The `body` is the post-extraction text fed to the parser (with the
-/// frontmatter block stripped, footnote definition lines removed, and footnote
-/// references like `[^1]` replaced with `<sup>1</sup>`).
+/// Frontmatter-aware extraction output. After this call:
+///   - `frontmatter` holds the YAML body between the --- delimiters
+///     (without the delimiters or the surrounding newlines).
+///   - `body` is the source verbatim with the frontmatter block removed
+///     (== source.mid(frontmatterBlockEnd) when frontmatter is present,
+///     == source otherwise). Footnote references and definition lines
+///     remain in `body` exactly as written.
+///   - `footnotes` is the canonical definition list (label → content,
+///     numbered by first-reference order).
 ///
 /// Used by long-lived parsers (e.g., foundation's IncrementalParseSession)
 /// that want to share Document::extract()'s logic without going through the
