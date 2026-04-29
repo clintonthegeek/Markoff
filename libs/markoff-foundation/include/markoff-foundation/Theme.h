@@ -44,6 +44,16 @@ public:
     enum class FontRole { Body, Monospace, Heading };
     Q_ENUM(FontRole)
 
+    // QML-facing color views over the most-used slots. New delegates that
+    // need additional slot views add their own here in lowerCamelCase.
+    Q_PROPERTY(QColor codeBlockBackground READ codeBlockBackground)
+    Q_PROPERTY(QColor codeBlock           READ codeBlockColor)
+    Q_PROPERTY(QColor selectionBackground READ selectionBackground)
+
+    QColor codeBlockBackground() const { return color(Slot::CodeBlockBackground); }
+    QColor codeBlockColor()      const { return color(Slot::CodeBlock); }
+    QColor selectionBackground() const { return color(Slot::SelectionBackground); }
+
     QColor color(Slot) const;
     void   setColor(Slot, QColor);
 
