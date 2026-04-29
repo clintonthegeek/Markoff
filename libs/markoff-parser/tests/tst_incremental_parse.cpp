@@ -54,6 +54,8 @@ private Q_SLOTS:
     void multipleEdits_matchesFreshParse();
     void heavyTypingBurst_matchesFreshParse();
     void crossBlockEdit_matchesFreshParse();
+    void freshParse_resetsReuseCountToZero();
+    void parseIncremental_noPriorTree_reportsZeroReuse();
 };
 
 // ---------------------------------------------------------------------------
@@ -233,6 +235,20 @@ void TstIncrementalParse::crossBlockEdit_matchesFreshParse()
     QVERIFY(ref.parse(QString::fromUtf8(newSrc)));
     QCOMPARE(fingerprintAll(p.buildSpanMap()),
              fingerprintAll(ref.buildSpanMap()));
+}
+
+void TstIncrementalParse::freshParse_resetsReuseCountToZero()
+{
+    TreeSitterParser p;
+    QVERIFY(p.parse(QStringLiteral("# Heading\n\npara")));
+    QCOMPARE(p.inlineTreeReuseCount(), 0);
+}
+
+void TstIncrementalParse::parseIncremental_noPriorTree_reportsZeroReuse()
+{
+    TreeSitterParser p;
+    QVERIFY(p.parseIncremental({}, QByteArrayLiteral("# Heading\n\npara")));
+    QCOMPARE(p.inlineTreeReuseCount(), 0);
 }
 
 QTEST_APPLESS_MAIN(TstIncrementalParse)

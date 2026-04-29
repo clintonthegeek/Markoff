@@ -183,6 +183,7 @@ TreeSitterParser::~TreeSitterParser()
 
 bool TreeSitterParser::parse(const QString &text)
 {
+    m_lastInlineReuseCount = 0;
     m_utf8 = text.toUtf8();
     m_byteToChar = buildByteToCharMap(m_utf8);
 

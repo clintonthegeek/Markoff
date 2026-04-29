@@ -77,6 +77,11 @@ public:
     /// Check if a tree exists (parse was successful)
     bool hasTree() const { return m_blockTree != nullptr; }
 
+    /// Number of inline regions whose tree was reused (not reparsed) on
+    /// the most recent `parseIncremental()` call. Reset to 0 on `parse()`.
+    /// Primarily an observability hook for tests/benchmarks.
+    int inlineTreeReuseCount() const { return m_lastInlineReuseCount; }
+
     /// A non-text block boundary found by the parser.
     struct BlockBoundary {
         enum Type { Table, FencedCodeBlock, Image };
@@ -106,6 +111,7 @@ private:
     QList<TSTree *> m_inlineTrees;  // one per inline region
     QByteArray m_utf8;
     QList<int> m_byteToChar;  // UTF-8 byte offset → QString char offset
+    int m_lastInlineReuseCount = 0;
 };
 
 } // namespace Markoff
