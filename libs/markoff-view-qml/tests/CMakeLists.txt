@@ -15,3 +15,8 @@ add_executable(tst_view_qml_source_binding tst_view_qml_source_binding.cpp)
 add_test(NAME tst_view_qml_source_binding COMMAND tst_view_qml_source_binding)
 target_link_libraries(tst_view_qml_source_binding PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml)
 set_tests_properties(tst_view_qml_source_binding PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_view_qml_search_backend tst_view_qml_search_backend.cpp)
+add_test(NAME tst_view_qml_search_backend COMMAND tst_view_qml_search_backend)
+target_link_libraries(tst_view_qml_search_backend PRIVATE Qt6::Test markoff_view_qml)
+set_tests_properties(tst_view_qml_search_backend PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
