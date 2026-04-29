@@ -7,6 +7,8 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Quick QuickControls2 Test)
 
+qt_standard_project_setup(REQUIRES 6.5)
+
 qt_add_qml_module(markoff_view_qml
     URI org.markoff.view.qml
     VERSION 1.0
