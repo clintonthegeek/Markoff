@@ -36,14 +36,20 @@ Q_SIGNALS:
 
 protected:
     void keyPressEvent(QKeyEvent *e) override;
+    void resizeEvent(QResizeEvent *e) override;
 
 private:
+    void recomputeGutterWidth();
+    int  gutterWidth() const;
+
     QPointer<Markoff::MarkoffDocument>      m_document;
     QPointer<Markoff::Session>              m_session;
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
     KSyntaxHighlighting::SyntaxHighlighter *m_highlighter  = nullptr;
     Gutter                                 *m_gutter       = nullptr;
     Markoff::Theme                          m_theme;
+
+    friend class Gutter;
 };
 
 } // namespace Markoff::Source::Widget

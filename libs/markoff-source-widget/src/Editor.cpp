@@ -11,6 +11,7 @@
 #include <markoff-foundation/SourceTextDocumentBinding.h>
 
 #include <QKeyEvent>
+#include <QResizeEvent>
 
 namespace Markoff::Source::Widget {
 
@@ -40,6 +41,19 @@ Editor::Editor(QWidget *parent)
     m_highlighter->setTheme(repo().defaultTheme(KSyntaxHighlighting::Repository::LightTheme));
 
     setLineWrapMode(QPlainTextEdit::WidgetWidth);
+
+    m_gutter = new Gutter(this);
+    connect(this, &QPlainTextEdit::blockCountChanged,
+            this, [this]() { recomputeGutterWidth(); });
+    connect(this, &QPlainTextEdit::updateRequest,
+            this, [this](const QRect &rect, int dy) {
+        if (dy) m_gutter->scroll(0, dy);
+        else m_gutter->update(0, rect.y(), m_gutter->width(), rect.height());
+        if (rect.contains(viewport()->rect())) recomputeGutterWidth();
+    });
+    connect(this, &QPlainTextEdit::cursorPositionChanged,
+            this, [this]() { if (m_gutter) m_gutter->update(); });
+    recomputeGutterWidth();
 }
 
 Editor::~Editor() = default;
@@ -93,6 +107,23 @@ void Editor::keyPressEvent(QKeyEvent *e) {
         }
     }
     QPlainTextEdit::keyPressEvent(e);
+}
+
+void Editor::resizeEvent(QResizeEvent *e) {
+    QPlainTextEdit::resizeEvent(e);
+    QRect cr = contentsRect();
+    m_gutter->setGeometry(QRect(cr.left(), cr.top(), gutterWidth(), cr.height()));
+}
+
+int Editor::gutterWidth() const {
+    int digits = 1;
+    int max = qMax(1, blockCount());
+    while (max >= 10) { max /= 10; ++digits; }
+    return 3 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits + 6;
+}
+
+void Editor::recomputeGutterWidth() {
+    setViewportMargins(gutterWidth(), 0, 0, 0);
 }
 
 } // namespace
