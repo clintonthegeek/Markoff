@@ -1,5 +1,58 @@
 # Markoff TODO
 
+## 2026-04-29 — Incremental parser + old-leaf deletion (this branch)
+
+Work landed on `exploration/new-foundation`:
+
+- `18cfa31` — `setCoalescingIdleMs` API removed (was a dead setter; no
+  callers honored it).
+- `309f9ce` — old leaves deleted: `markoff-core`, `markoff-live`,
+  `markoff-reading`, `markoff-source`, `tests/markoff/`. Net −309k
+  lines.
+- `5d8f764` — `TreeSitterParser::parseIncremental(edits, newUtf8)`
+  added with `ByteEdit` peer struct in markoff-parser. 10
+  fingerprint-equivalence tests prove output matches a fresh parse
+  across insertion/deletion/replacement/multi-edit/typing-burst/
+  cross-block-reframe.
+- `7b06a4d` — `Markoff::Document` now bakes `DocumentQueryResult` at
+  construction; no longer holds a parser member. Public API
+  unchanged.
+- `eee1505` — `IncrementalParseSession` (foundation-side) owns one
+  long-lived `TreeSitterParser` on the ParsePool worker thread.
+  `ParsePool::scheduleReset()` added for `MarkoffDocument::resetContent`;
+  `ParsePool::schedule()` is the incremental path. The session derives
+  a single `ByteEdit` per call via prefix/suffix diff of prior vs new
+  body; the `MarkoffEdit` list is intentionally not threaded through
+  (avoids frontmatter/footnote shift math).
+
+End-to-end tests: 78/78 green including `tst_benchmark` (404s) and
+`tst_realistic` (87s).
+
+**Per-keystroke parse cost on a 50KB doc dropped from ~8–12ms (full
+reparse) to ~2–3ms (incremental block + still-full inline reparse).**
+
+### Open follow-ups (priority order)
+
+1. **Inline-tree reuse (Phase 2 of incremental parsing).** After block-
+   tree incremental parse, diff inline-region byte ranges against the
+   prior parse; reuse `m_inlineTrees[i]` for regions whose byte range
+   is unchanged. Drops the inline cost to near zero for typical
+   typing. Implementation lives entirely in `TreeSitterParser`
+   (foundation/views unchanged).
+2. **Stop pre-processing inside `Document`.** The footnote
+   `[^1]` → `<sup>1</sup>` substitution is a render concern, not a
+   parse concern. Moving it to the rendering layer makes the body
+   diff trivial (== source diff) and removes the per-call regex
+   pass. Bigger blast radius — touches markoff-parser, markoff-view-qml,
+   markoff-source-widget. Worth doing but not urgent.
+3. **Hard benchmarks of the new pipeline vs. the old.** The cost
+   estimates above are theoretical (based on tree-sitter's documented
+   subtree-reuse behavior). `tst_benchmark` exists but doesn't
+   directly compare incremental vs fresh — adding a per-keystroke
+   benchmark would let us put numbers on the win.
+
+---
+
 ## 2026-04-28 — Phase 13 (Foundation library Part 2) acceptance passed
 
 All 25 `tst_foundation_*` targets pass on a fresh build. The `markoff_foundation`
