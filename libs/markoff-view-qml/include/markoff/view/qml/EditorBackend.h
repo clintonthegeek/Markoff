@@ -67,6 +67,7 @@ Q_SIGNALS:
     void cursorAnchorChanged();
     void selectionAnchorChanged();
     void selectionActiveChanged();
+    void parseUpdatedAt(const Markoff::Document *parsed, CollabText::Crdt::Global atVersion);
 
 private Q_SLOTS:
     void onSessionPrimarySelectionChanged(const Markoff::Selection &);
@@ -86,3 +87,4 @@ private:
 }  // namespace Markoff::View::Qml
 
 Q_DECLARE_METATYPE(CollabText::Crdt::Anchor)
+Q_DECLARE_OPAQUE_POINTER(const Markoff::Document *)

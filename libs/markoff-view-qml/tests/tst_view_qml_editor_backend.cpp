@@ -229,7 +229,24 @@ private Q_SLOTS:
         QCOMPARE(backend.selectionActive(), a7);
         QCOMPARE(backend.cursorAnchor(), a7);  // cursor follows active end
     }
+
+    void parse_updated_at_relays_from_foundation_with_version() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        backend.setDocument(&doc);
+
+        QSignalSpy spy(&backend, &EditorBackend::parseUpdatedAt);
+
+        // Drive an edit to trigger a parse.
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("# Hello");
+        doc.applyLocalEdit({ ed });
+
+        // ParsePool is async; wait for the signal.
+        QVERIFY(spy.wait(2000));
+        QCOMPARE(spy.count(), 1);
+    }
 };
 
-QTEST_APPLESS_MAIN(TstViewQmlEditorBackend)
+QTEST_MAIN(TstViewQmlEditorBackend)
 #include "tst_view_qml_editor_backend.moc"

@@ -12,6 +12,12 @@ void EditorBackend::setDocument(Markoff::MarkoffDocument *doc)
 {
     if (m_document == doc) return;
 
+    // Disconnect parseUpdated relay from old document before replacing.
+    if (m_document) {
+        QObject::disconnect(m_document, &Markoff::MarkoffDocument::parseUpdated,
+                            this, nullptr);
+    }
+
     // Clean up existing session before swapping document pointer.
     if (m_session && m_document) {
         m_document->destroySession(m_session);
@@ -22,8 +28,10 @@ void EditorBackend::setDocument(Markoff::MarkoffDocument *doc)
     m_document = doc;
     Q_EMIT documentChanged();
 
-    // Create session for new document.
+    // Create session for new document and connect relay signals.
     if (m_document) {
+        QObject::connect(m_document, &Markoff::MarkoffDocument::parseUpdated,
+                         this, &EditorBackend::parseUpdatedAt);
         m_session = m_document->createSession();
         connect(m_session, &Markoff::Session::primarySelectionChanged,
                 this, &EditorBackend::onSessionPrimarySelectionChanged);
