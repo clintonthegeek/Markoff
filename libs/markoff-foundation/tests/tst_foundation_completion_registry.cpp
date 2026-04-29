@@ -5,6 +5,7 @@
 #include <markoff-foundation/CompletionContext.h>
 #include <markoff-foundation/CompletionProvider.h>
 #include <markoff-foundation/CompletionRegistry.h>
+#include <markoff-foundation/EmojiCompletionProvider.h>
 
 using namespace Markoff;
 
@@ -50,6 +51,21 @@ private Q_SLOTS:
         ctx.trigger = CompletionTrigger::Tag;
         ctx.prefix  = "x";
         QCOMPARE(r.gather(ctx, 1).size(), 0);
+    }
+
+    void emoji_provider_returns_smile_for_smi_prefix() {
+        CompletionRegistry r;
+        r.registerProvider(std::make_shared<EmojiCompletionProvider>());
+        CompletionContext ctx;
+        ctx.trigger = CompletionTrigger::Emoji;
+        ctx.prefix  = "smi";
+        const auto cands = r.gather(ctx, 1);
+        bool foundSmile = false;
+        for (const auto &c : cands)
+            if (c.display.contains("smile", Qt::CaseInsensitive)) {
+                foundSmile = true; break;
+            }
+        QVERIFY(foundSmile);
     }
 };
 
