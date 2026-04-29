@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QColor>
 #include <QSignalSpy>
 #include <QTest>
 
 #include <markoff-foundation/Session.h>
+#include <markoff-foundation/Theme.h>
 #include <markoff/view/qml/EditorBackend.h>
 
 using namespace Markoff::View::Qml;
@@ -84,6 +86,26 @@ private Q_SLOTS:
         backend.setDocument(nullptr);
         QVERIFY(spy.count() >= 1);
         QCOMPARE(backend.session(), nullptr);
+    }
+
+    void default_theme_is_light() {
+        EditorBackend backend;
+        Markoff::Theme defaultLight = Markoff::Theme::defaultLight();
+        QCOMPARE(backend.theme().color(Markoff::Theme::Slot::TextDefault).name(),
+                 defaultLight.color(Markoff::Theme::Slot::TextDefault).name());
+    }
+
+    void set_theme_emits_change_signal() {
+        EditorBackend backend;
+        QSignalSpy spy(&backend, &EditorBackend::themeChanged);
+
+        Markoff::Theme custom = Markoff::Theme::defaultLight();
+        custom.setColor(Markoff::Theme::Slot::TextDefault, QColor("#ff0000"));
+        backend.setTheme(custom);
+
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(backend.theme().color(Markoff::Theme::Slot::TextDefault).name(),
+                 QColor("#ff0000").name());
     }
 };
 

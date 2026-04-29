@@ -31,4 +31,13 @@ void EditorBackend::setDocument(Markoff::MarkoffDocument *doc)
 
 Markoff::Session *EditorBackend::session() const { return m_session; }
 
+Markoff::Theme EditorBackend::theme() const { return m_theme; }
+
+void EditorBackend::setTheme(const Markoff::Theme &t)
+{
+    // Theme::operator== is not defined; emit unconditionally on every setTheme call.
+    m_theme = t;
+    Q_EMIT themeChanged();
+}
+
 }  // namespace Markoff::View::Qml
