@@ -99,27 +99,6 @@ ExtractedSource Document::extract(const QString &source)
             footnoteMap[label].number = nextNum++;
     }
 
-    // Replace [^label] references with superscript numbers.
-    if (!footnoteMap.isEmpty()) {
-        QString processed;
-        int pos = 0;
-        auto refIt2 = footnoteRef.globalMatch(markdown);
-        while (refIt2.hasNext()) {
-            auto match = refIt2.next();
-            processed += markdown.mid(pos, match.capturedStart() - pos);
-            const QString label = match.captured(1);
-            if (footnoteMap.contains(label)) {
-                int num = footnoteMap[label].number;
-                processed += QStringLiteral("<sup>%1</sup>").arg(num);
-            } else {
-                processed += match.captured(0);  // unresolved → leave as-is
-            }
-            pos = match.capturedEnd();
-        }
-        processed += markdown.mid(pos);
-        markdown = processed;
-    }
-
     // Sort referenced footnotes by assigned number.
     for (auto &fn : footnoteMap) {
         if (fn.number > 0)

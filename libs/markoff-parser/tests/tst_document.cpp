@@ -12,6 +12,7 @@ private Q_SLOTS:
     void testExtractSubpathHeading();
     void testExtractSubpathBlockId();
     void testExtractSubpathNotFound();
+    void extract_doesNotInsertSupHtml();
 };
 
 void TestDocument::testEmptyDocument()
@@ -95,6 +96,16 @@ void TestDocument::testExtractSubpathNotFound()
 
     const QString result = doc->extractSubpath(QStringLiteral("#NonExistentHeading"));
     QVERIFY(result.isEmpty());
+}
+
+void TestDocument::extract_doesNotInsertSupHtml()
+{
+    const QString src =
+        QStringLiteral("Text with[^1] a reference.\n\n[^1]: defn.\n");
+    const auto extracted = Markoff::Document::extract(src);
+    QVERIFY2(!extracted.body.contains(QStringLiteral("<sup>")),
+             qPrintable(QStringLiteral("body still contains <sup>: ")
+                        + extracted.body));
 }
 
 QTEST_MAIN(TestDocument)
