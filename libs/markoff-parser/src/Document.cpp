@@ -20,8 +20,14 @@ struct Document::Private {
     int frontmatterBlockStart = -1;   // byte offset of first char of opening ---
     int frontmatterBlockEnd = -1;     // byte offset past closing --- line (or EOF)
     bool eofClose = false;            // closing --- is at EOF with no trailing newline
-    TreeSitterParser parser;
     QList<Footnote> footnotes;
+
+    // Baked at construction by walking the parsed tree once.  Document
+    // does not retain the TreeSitterParser instance; callers that need
+    // a long-lived parser (e.g., ParsePool worker for incremental reparse)
+    // own it externally and bake a Document via the same path
+    // fromMarkdown() uses internally.
+    DocumentQueryResult queries;
 
     // Lazy-parsed
     mutable YamlValue cachedParsed;
@@ -138,8 +144,12 @@ std::unique_ptr<Document> Document::fromMarkdown(const QString &source)
               [](const Footnote &a, const Footnote &b) { return a.number < b.number; });
     doc->d->footnotes = sorted;
 
-    // Parse with tree-sitter
-    doc->d->parser.parse(markdown);
+    // Parse with tree-sitter and bake queries into Document.  The parser
+    // itself is local to this call; Document carries forward only the
+    // baked results.
+    TreeSitterParser parser;
+    parser.parse(markdown);
+    doc->d->queries = parser.buildDocumentQueries();
 
     return doc;
 }
@@ -207,24 +217,23 @@ QString Document::footnoteContent(int number) const
 }
 
 // ---------------------------------------------------------------------------
-// Query API — delegates to TreeSitterParser::buildDocumentQueries()
+// Query API — reads baked results from d->queries, populated at construction.
 // ---------------------------------------------------------------------------
 
 QList<HeadingInfo> Document::headings() const
 {
-    return d->parser.buildDocumentQueries().headings;
+    return d->queries.headings;
 }
 
 QList<LinkInfo> Document::links() const
 {
-    return d->parser.buildDocumentQueries().links;
+    return d->queries.links;
 }
 
 QList<LinkInfo> Document::wikiLinks() const
 {
-    QList<LinkInfo> all = links();
     QList<LinkInfo> result;
-    for (const auto &l : all) {
+    for (const auto &l : d->queries.links) {
         if (l.type == LinkInfo::Wiki || l.type == LinkInfo::Embed)
             result.append(l);
     }
@@ -233,7 +242,7 @@ QList<LinkInfo> Document::wikiLinks() const
 
 QList<TagInfo> Document::tags() const
 {
-    return d->parser.buildDocumentQueries().tags;
+    return d->queries.tags;
 }
 
 QList<FootnoteInfo> Document::footnotes() const
