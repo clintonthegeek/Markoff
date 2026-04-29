@@ -15,3 +15,5 @@ target_link_libraries(markoff-view-qml-app PRIVATE
     markoff_view_qml
     markoff_foundation
 )
+
+qt_import_qml_plugins(markoff-view-qml-app)
