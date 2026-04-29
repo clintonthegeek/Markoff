@@ -37,6 +37,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/CompletionTrigger.h
     include/markoff-foundation/CompletionContext.h
     include/markoff-foundation/CompletionCandidate.h
+    include/markoff-foundation/CompletionDetector.h
     include/markoff-foundation/CommandFacade.h
     include/markoff-foundation/SearchEngine.h
     include/markoff-foundation/ReplaceController.h
@@ -68,6 +69,7 @@ add_library(markoff_foundation STATIC
     src/SearchEngine.cpp
     src/ReplaceController.cpp
     src/CodeBlockProcessorRegistry.cpp
+    src/CompletionDetector.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h
