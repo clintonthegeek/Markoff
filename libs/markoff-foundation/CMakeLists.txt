@@ -33,6 +33,10 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/RenderedBlock.h
     include/markoff-foundation/CodeBlockProcessor.h
     include/markoff-foundation/CodeBlockProcessorRegistry.h
+    # --- Completion/ (public) ---
+    include/markoff-foundation/CompletionTrigger.h
+    include/markoff-foundation/CompletionContext.h
+    include/markoff-foundation/CompletionCandidate.h
     include/markoff-foundation/CommandFacade.h
     include/markoff-foundation/SearchEngine.h
     include/markoff-foundation/ReplaceController.h
