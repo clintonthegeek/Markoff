@@ -1,4 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QtPlugin>
+
+Q_IMPORT_PLUGIN(org_markoff_view_qmlPlugin)
+
 #include <QFile>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
