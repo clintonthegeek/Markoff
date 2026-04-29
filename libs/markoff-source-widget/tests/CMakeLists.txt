@@ -1,0 +1,10 @@
+cmake_minimum_required(VERSION 3.19)
+find_package(Qt6 REQUIRED COMPONENTS Test Widgets)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+add_executable(tst_source_widget_editor tst_source_widget_editor.cpp)
+add_test(NAME tst_source_widget_editor COMMAND tst_source_widget_editor)
+target_link_libraries(tst_source_widget_editor PRIVATE Qt6::Test markoff_source_widget)
+set_tests_properties(tst_source_widget_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

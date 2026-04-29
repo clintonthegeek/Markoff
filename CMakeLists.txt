@@ -50,6 +50,7 @@ add_subdirectory(libs/markoff-foundation)
 
 # POC QML view library — Phase 1 source-mode editor; Phase 2 will add live-preview.
 add_subdirectory(libs/markoff-view-qml)
+add_subdirectory(libs/markoff-source-widget)
 
 add_subdirectory(libs/markoff-core)
 add_subdirectory(libs/markoff-source)
