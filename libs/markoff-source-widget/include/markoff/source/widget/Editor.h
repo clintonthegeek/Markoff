@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QPlainTextEdit>
+#include <QPointer>
 
 #include <KSyntaxHighlighting/SyntaxHighlighter>
 
@@ -37,8 +38,8 @@ protected:
     void keyPressEvent(QKeyEvent *e) override;
 
 private:
-    Markoff::MarkoffDocument               *m_document     = nullptr;
-    Markoff::Session                       *m_session      = nullptr;
+    QPointer<Markoff::MarkoffDocument>      m_document;
+    QPointer<Markoff::Session>              m_session;
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
     KSyntaxHighlighting::SyntaxHighlighter *m_highlighter  = nullptr;
     Gutter                                 *m_gutter       = nullptr;

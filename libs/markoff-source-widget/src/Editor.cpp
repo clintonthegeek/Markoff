@@ -24,7 +24,7 @@ KSyntaxHighlighting::Repository &repo() {
 Editor::Editor(QWidget *parent)
     : QPlainTextEdit(parent),
       m_binding(new Markoff::SourceTextDocumentBinding(this)),
-      m_highlighter(new KSyntaxHighlighting::SyntaxHighlighter(QPlainTextEdit::document())),
+      m_highlighter(new KSyntaxHighlighting::SyntaxHighlighter(this)),
       m_theme(Markoff::Theme::defaultLight())
 {
     // The binding talks to the QPlainTextEdit's underlying QTextDocument.
@@ -32,6 +32,10 @@ Editor::Editor(QWidget *parent)
     // MarkoffDocument is canonical (see SourceTextDocumentBinding::rewireQtDocument).
     m_binding->setTextDocument(QPlainTextEdit::document());
 
+    // Parent the highlighter to the Editor (not to the QTextDocument) so its
+    // lifetime is tied to the Editor regardless of any later setDocument() on
+    // the underlying QPlainTextEdit.
+    m_highlighter->setDocument(QPlainTextEdit::document());
     m_highlighter->setDefinition(repo().definitionForName(QStringLiteral("Markdown")));
     m_highlighter->setTheme(repo().defaultTheme(KSyntaxHighlighting::Repository::LightTheme));
 
@@ -40,15 +44,16 @@ Editor::Editor(QWidget *parent)
 
 Editor::~Editor() = default;
 
-Markoff::MarkoffDocument *Editor::document() const { return m_document; }
+Markoff::MarkoffDocument *Editor::document() const { return m_document.data(); }
 
 void Editor::setDocument(Markoff::MarkoffDocument *doc) {
-    if (m_document == doc) return;
+    if (m_document.data() == doc) return;
 
-    // Tear down the previous session, if any.
+    // Tear down the previous session, if any. QPointer auto-nulls when the
+    // watched object dies, so we only act if both are still alive.
     if (m_document && m_session) {
         m_binding->setSession(nullptr);
-        m_document->destroySession(m_session);
+        m_document->destroySession(m_session.data());
         m_session = nullptr;
     }
 
@@ -56,19 +61,8 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
 
     if (m_document) {
         m_session = m_document->createSession();
-        m_binding->setMarkoffDocument(m_document);
-        m_binding->setSession(m_session);
-
-        // If the document outlives or is destroyed before the editor, null our
-        // pointers so destruction is safe and a subsequent setDocument(nullptr)
-        // doesn't dereference a dead object.
-        connect(m_document, &QObject::destroyed, this, [this]() {
-            m_document = nullptr;
-            m_session  = nullptr;
-        });
-        connect(m_session, &QObject::destroyed, this, [this]() {
-            m_session = nullptr;
-        });
+        m_binding->setMarkoffDocument(m_document.data());
+        m_binding->setSession(m_session.data());
     } else {
         m_binding->setMarkoffDocument(nullptr);
     }
