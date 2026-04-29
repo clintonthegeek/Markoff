@@ -17,17 +17,72 @@ SourceTextDocumentBinding::~SourceTextDocumentBinding() = default;
 quint32 SourceTextDocumentBinding::qtPosToByteOffset(const QString &text, int qtOffset)
 {
     if (qtOffset <= 0) return 0;
-    if (qtOffset >= text.size()) return static_cast<quint32>(text.toUtf8().size());
-    return static_cast<quint32>(text.left(qtOffset).toUtf8().size());
+    const int n = std::min(qtOffset, static_cast<int>(text.size()));
+
+    // Walk UTF-16 code units in `text`, counting their UTF-8 byte widths.
+    // No allocation; constant memory; O(qtOffset) time.
+    quint32 bytes = 0;
+    int i = 0;
+    while (i < n) {
+        const ushort u = text.at(i).unicode();
+        if (u < 0x80) {
+            bytes += 1;
+            ++i;
+        } else if (u < 0x800) {
+            bytes += 2;
+            ++i;
+        } else if (u >= 0xD800 && u <= 0xDBFF) {
+            // High surrogate. UTF-8 encoding of the surrogate pair is 4 bytes;
+            // it consumes 2 UTF-16 code units. Only count the pair if both
+            // code units are within `n` — if a high surrogate is at position
+            // n-1 and we're stopping there, count it as 0 bytes (not yet
+            // emitted; matches the original allocating impl which would
+            // truncate before emitting).
+            if (i + 1 < n) {
+                bytes += 4;
+                i += 2;
+            } else {
+                // Trailing lone high surrogate at the boundary; count as 0
+                // and stop.
+                break;
+            }
+        } else {
+            // BMP non-ASCII (U+0800..U+FFFF excluding surrogates).
+            bytes += 3;
+            ++i;
+        }
+    }
+
+    return bytes;
 }
 
 int SourceTextDocumentBinding::byteOffsetToQtPos(const QByteArray &utf8, quint32 byteOffset)
 {
     if (byteOffset == 0) return 0;
-    if (byteOffset >= static_cast<quint32>(utf8.size())) {
-        return QString::fromUtf8(utf8).size();
+
+    // Walk UTF-8 bytes counting UTF-16 code units. No allocation.
+    int qtPos = 0;
+    quint32 currentByte = 0;
+    int i = 0;
+    const int sz = utf8.size();
+    while (i < sz && currentByte < byteOffset) {
+        const uchar b = static_cast<uchar>(utf8.at(i));
+        int byteCount;
+        int codeUnits;
+        if ((b & 0x80) == 0)         { byteCount = 1; codeUnits = 1; }   // ASCII
+        else if ((b & 0xE0) == 0xC0) { byteCount = 2; codeUnits = 1; }   // 2-byte UTF-8 → 1 UTF-16
+        else if ((b & 0xF0) == 0xE0) { byteCount = 3; codeUnits = 1; }   // 3-byte UTF-8 → 1 UTF-16
+        else if ((b & 0xF8) == 0xF0) { byteCount = 4; codeUnits = 2; }   // 4-byte UTF-8 → surrogate pair
+        else                         { byteCount = 1; codeUnits = 1; }   // invalid; resync
+
+        // If consuming this character would overshoot byteOffset, stop here
+        // — we've reached the qt position just before the byte boundary.
+        if (currentByte + static_cast<quint32>(byteCount) > byteOffset) break;
+        currentByte += static_cast<quint32>(byteCount);
+        qtPos       += codeUnits;
+        i           += byteCount;
     }
-    return QString::fromUtf8(utf8.left(static_cast<int>(byteOffset))).size();
+    return qtPos;
 }
 
 EditorBackend *SourceTextDocumentBinding::editorBackend() const
