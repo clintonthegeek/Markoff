@@ -42,6 +42,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/CompletionRegistry.h
     include/markoff-foundation/EmojiCompletionProvider.h
     include/markoff-foundation/CommandFacade.h
+    include/markoff-foundation/SourceTextDocumentBinding.h
     include/markoff-foundation/SearchEngine.h
     include/markoff-foundation/ReplaceController.h
     include/markoff-foundation/MarkoffServices.h
@@ -70,6 +71,7 @@ add_library(markoff_foundation STATIC
     src/SyntaxHighlightService.cpp
     src/Kf6SyntaxHighlightService.cpp
     src/CommandFacade.cpp
+    src/SourceTextDocumentBinding.cpp
     src/SearchEngine.cpp
     src/ReplaceController.cpp
     src/CodeBlockProcessorRegistry.cpp

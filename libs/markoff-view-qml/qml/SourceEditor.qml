@@ -33,8 +33,13 @@ Item {
 
     SourceTextDocumentBinding {
         id: binding
-        editorBackend: backend
-        qtQuickDocument: textArea.textDocument
+        markoffDocument: backend.document
+        session: backend.session
+        // textArea.textDocument is a QQuickTextDocument; the underlying
+        // QTextDocument is exposed via the QML extension's invokable setter
+        // (the binding's own textDocument property is QTextDocument *, which
+        // QML can't extract from QQuickTextDocument without a helper).
+        Component.onCompleted: setQtQuickDocument(textArea.textDocument)
     }
 
     // KSyntaxHighlighting attached to the TextArea (sibling, not child).

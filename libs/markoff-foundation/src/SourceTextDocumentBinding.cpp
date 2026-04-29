@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/view/qml/SourceTextDocumentBinding.h>
+#include <markoff-foundation/SourceTextDocumentBinding.h>
 
 #include <algorithm>
 
 #include <QTextCursor>
+#include <QTextDocument>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/Selection.h>
+#include <markoff-foundation/Session.h>
 
-namespace Markoff::View::Qml {
+namespace Markoff {
 
 SourceTextDocumentBinding::SourceTextDocumentBinding(QObject *parent)
     : QObject(parent) {}
@@ -85,47 +88,39 @@ int SourceTextDocumentBinding::byteOffsetToQtPos(const QByteArray &utf8, quint32
     return qtPos;
 }
 
-EditorBackend *SourceTextDocumentBinding::editorBackend() const
+// ---------------------------------------------------------------------------
+// MarkoffDocument property
+// ---------------------------------------------------------------------------
+
+Markoff::MarkoffDocument *SourceTextDocumentBinding::markoffDocument() const
 {
-    return m_editorBackend;
+    return m_markoffDocument;
 }
 
-void SourceTextDocumentBinding::setEditorBackend(EditorBackend *eb)
+void SourceTextDocumentBinding::setMarkoffDocument(Markoff::MarkoffDocument *doc)
 {
-    if (m_editorBackend == eb) return;
-
-    if (m_editorBackend) {
-        QObject::disconnect(m_editorBackend, &EditorBackend::documentChanged,
-                            this, &SourceTextDocumentBinding::onEditorBackendDocumentChanged);
-        QObject::disconnect(m_editorBackend, &EditorBackend::cursorAnchorChanged,
-                            this, nullptr);
-        QObject::disconnect(m_editorBackend, &EditorBackend::selectionAnchorChanged,
-                            this, nullptr);
-        QObject::disconnect(m_editorBackend, &EditorBackend::selectionActiveChanged,
-                            this, nullptr);
-    }
-
-    m_editorBackend = eb;
-
-    if (m_editorBackend) {
-        QObject::connect(m_editorBackend, &EditorBackend::documentChanged,
-                         this, &SourceTextDocumentBinding::onEditorBackendDocumentChanged);
-        QObject::connect(m_editorBackend, &EditorBackend::cursorAnchorChanged,
-                         this, [this]() { syncFromBackendCursor(); });
-        QObject::connect(m_editorBackend, &EditorBackend::selectionAnchorChanged,
-                         this, [this]() { syncFromBackendSelection(); });
-        QObject::connect(m_editorBackend, &EditorBackend::selectionActiveChanged,
-                         this, [this]() { syncFromBackendSelection(); });
-    }
-
-    Q_EMIT editorBackendChanged();
+    if (m_markoffDocument == doc) return;
+    m_markoffDocument = doc;
+    Q_EMIT markoffDocumentChanged();
     rebindMarkoffDocumentSubscription();
-    tryCaptureQtDocument();
+    rewireQtDocument();
 }
 
-void SourceTextDocumentBinding::onEditorBackendDocumentChanged()
+// ---------------------------------------------------------------------------
+// Session property
+// ---------------------------------------------------------------------------
+
+Markoff::Session *SourceTextDocumentBinding::session() const
 {
-    rebindMarkoffDocumentSubscription();
+    return m_session;
+}
+
+void SourceTextDocumentBinding::setSession(Markoff::Session *s)
+{
+    if (m_session == s) return;
+    m_session = s;
+    Q_EMIT sessionChanged();
+    rebindSessionSubscription();
 }
 
 // ---------------------------------------------------------------------------
@@ -141,14 +136,16 @@ void SourceTextDocumentBinding::setCursorPosition(int pos)
     if (m_cursorPosition == pos) return;
     m_cursorPosition = pos;
 
-    if (!m_applyingBackendCursor && m_editorBackend && m_qtDoc) {
-        Markoff::MarkoffDocument *doc = m_editorBackend->document();
-        if (doc) {
-            const QString text = m_qtDoc->toPlainText();
-            const quint32 byteOff = qtPosToByteOffset(text, pos);
-            const auto anchor = doc->anchorAt(byteOff, CollabText::Crdt::Bias::Left);
-            m_editorBackend->setCursorAnchor(anchor);
-        }
+    if (!m_applyingBackendCursor && m_session && m_markoffDocument && m_textDocument) {
+        const QString text = m_textDocument->toPlainText();
+        const quint32 byteOff = qtPosToByteOffset(text, pos);
+        const auto anchor = m_markoffDocument->anchorAt(byteOff, CollabText::Crdt::Bias::Left);
+        // Cursor move => collapse selection.
+        Markoff::Selection sel;
+        sel.anchor = anchor;
+        sel.active = anchor;
+        sel.kind   = Markoff::Selection::Kind::Primary;
+        m_session->setPrimarySelection(sel);
     }
     Q_EMIT cursorPositionChanged();
 }
@@ -158,14 +155,8 @@ void SourceTextDocumentBinding::setSelectionStart(int pos)
     if (m_selectionStart == pos) return;
     m_selectionStart = pos;
 
-    if (!m_applyingBackendCursor && m_editorBackend && m_qtDoc) {
-        Markoff::MarkoffDocument *doc = m_editorBackend->document();
-        if (doc) {
-            const QString text = m_qtDoc->toPlainText();
-            const quint32 byteOff = qtPosToByteOffset(text, pos);
-            const auto anchor = doc->anchorAt(byteOff, CollabText::Crdt::Bias::Left);
-            m_editorBackend->setSelectionAnchor(anchor);
-        }
+    if (!m_applyingBackendCursor) {
+        pushSelectionToSession();
     }
     Q_EMIT selectionStartChanged();
 }
@@ -175,48 +166,48 @@ void SourceTextDocumentBinding::setSelectionEnd(int pos)
     if (m_selectionEnd == pos) return;
     m_selectionEnd = pos;
 
-    if (!m_applyingBackendCursor && m_editorBackend && m_qtDoc) {
-        Markoff::MarkoffDocument *doc = m_editorBackend->document();
-        if (doc) {
-            const QString text = m_qtDoc->toPlainText();
-            const quint32 byteOff = qtPosToByteOffset(text, pos);
-            const auto anchor = doc->anchorAt(byteOff, CollabText::Crdt::Bias::Right);
-            m_editorBackend->setSelectionActive(anchor);
-        }
+    if (!m_applyingBackendCursor) {
+        pushSelectionToSession();
     }
     Q_EMIT selectionEndChanged();
 }
 
-void SourceTextDocumentBinding::syncFromBackendCursor()
+void SourceTextDocumentBinding::pushSelectionToSession()
 {
-    if (!m_editorBackend || !m_qtDoc) return;
-    Markoff::MarkoffDocument *doc = m_editorBackend->document();
-    if (!doc) return;
-
-    const quint32 byteOff = doc->resolveAnchor(m_editorBackend->cursorAnchor());
-    const QByteArray utf8 = doc->toMarkdownUtf8();
-    const int qtPos = byteOffsetToQtPos(utf8, byteOff);
-
-    if (m_cursorPosition == qtPos) return;
-    m_cursorPosition = qtPos;
-    m_applyingBackendCursor = true;
-    Q_EMIT cursorPositionChanged();
-    m_applyingBackendCursor = false;
+    if (!m_session || !m_markoffDocument || !m_textDocument) return;
+    const QString text = m_textDocument->toPlainText();
+    const quint32 startByte = qtPosToByteOffset(text, m_selectionStart);
+    const quint32 endByte   = qtPosToByteOffset(text, m_selectionEnd);
+    const auto anchorA = m_markoffDocument->anchorAt(startByte, CollabText::Crdt::Bias::Left);
+    const auto anchorB = m_markoffDocument->anchorAt(endByte,   CollabText::Crdt::Bias::Right);
+    Markoff::Selection sel;
+    sel.anchor = anchorA;
+    sel.active = anchorB;
+    sel.kind   = Markoff::Selection::Kind::Primary;
+    m_session->setPrimarySelection(sel);
 }
 
-void SourceTextDocumentBinding::syncFromBackendSelection()
+void SourceTextDocumentBinding::onSessionPrimarySelectionChanged(const Markoff::Selection &)
 {
-    if (!m_editorBackend || !m_qtDoc) return;
-    Markoff::MarkoffDocument *doc = m_editorBackend->document();
-    if (!doc) return;
+    syncFromSession();
+}
 
-    const quint32 anchorByte = doc->resolveAnchor(m_editorBackend->selectionAnchor());
-    const quint32 activeByte = doc->resolveAnchor(m_editorBackend->selectionActive());
-    const QByteArray utf8 = doc->toMarkdownUtf8();
+void SourceTextDocumentBinding::syncFromSession()
+{
+    if (!m_session || !m_markoffDocument || !m_textDocument) return;
+
+    const Markoff::Selection sel = m_session->primarySelection();
+    const quint32 anchorByte = m_markoffDocument->resolveAnchor(sel.anchor);
+    const quint32 activeByte = m_markoffDocument->resolveAnchor(sel.active);
+    const QByteArray utf8 = m_markoffDocument->toMarkdownUtf8();
     const int newStart = byteOffsetToQtPos(utf8, anchorByte);
     const int newEnd   = byteOffsetToQtPos(utf8, activeByte);
 
     m_applyingBackendCursor = true;
+    if (m_cursorPosition != newEnd) {
+        m_cursorPosition = newEnd;
+        Q_EMIT cursorPositionChanged();
+    }
     if (m_selectionStart != newStart) {
         m_selectionStart = newStart;
         Q_EMIT selectionStartChanged();
@@ -230,8 +221,7 @@ void SourceTextDocumentBinding::syncFromBackendSelection()
 
 void SourceTextDocumentBinding::rebindMarkoffDocumentSubscription()
 {
-    Markoff::MarkoffDocument *newDoc =
-        m_editorBackend ? m_editorBackend->document() : nullptr;
+    Markoff::MarkoffDocument *newDoc = m_markoffDocument;
 
     if (newDoc == m_subscribedDoc) return;
 
@@ -253,41 +243,54 @@ void SourceTextDocumentBinding::rebindMarkoffDocumentSubscription()
     syncQtDocumentFromMarkoff();
 }
 
-QQuickTextDocument *SourceTextDocumentBinding::qtQuickDocument() const
+void SourceTextDocumentBinding::rebindSessionSubscription()
 {
-    return m_qtQuickDoc;
-}
+    if (m_session == m_subscribedSession) return;
 
-void SourceTextDocumentBinding::setQtQuickDocument(QQuickTextDocument *q)
-{
-    if (m_qtQuickDoc == q) return;
-    m_qtQuickDoc = q;
-    Q_EMIT qtQuickDocumentChanged();
-    tryCaptureQtDocument();
-}
-
-void SourceTextDocumentBinding::tryCaptureQtDocument()
-{
-    if (!m_qtQuickDoc || !m_editorBackend) {
-        m_qtDoc = nullptr;
-        return;
+    if (m_subscribedSession) {
+        QObject::disconnect(m_subscribedSession, &Markoff::Session::primarySelectionChanged,
+                            this, &SourceTextDocumentBinding::onSessionPrimarySelectionChanged);
     }
-    QTextDocument *newQtDoc = m_qtQuickDoc->textDocument();
-    if (m_qtDoc == newQtDoc) return;
 
-    if (m_qtDoc) {
+    m_subscribedSession = m_session;
+
+    if (m_subscribedSession) {
+        QObject::connect(m_subscribedSession, &Markoff::Session::primarySelectionChanged,
+                         this, &SourceTextDocumentBinding::onSessionPrimarySelectionChanged);
+    }
+}
+
+QTextDocument *SourceTextDocumentBinding::textDocument() const
+{
+    return m_textDocument;
+}
+
+void SourceTextDocumentBinding::setTextDocument(QTextDocument *td)
+{
+    if (m_textDocument == td) return;
+
+    if (m_textDocument) {
         // Detach from old QTextDocument before switching.
-        QObject::disconnect(m_qtDoc, &QTextDocument::contentsChange,
+        QObject::disconnect(m_textDocument, &QTextDocument::contentsChange,
                             this, &SourceTextDocumentBinding::onQtContentsChange);
     }
 
-    m_qtDoc = newQtDoc;
-    if (m_qtDoc) {
-        // Foundation's CRDT undo (via EditorBackend.undo/redo) is canonical.
+    m_textDocument = td;
+    Q_EMIT textDocumentChanged();
+    rewireQtDocument();
+}
+
+void SourceTextDocumentBinding::rewireQtDocument()
+{
+    if (m_textDocument) {
+        // Foundation's CRDT undo (via MarkoffDocument::undo/redo) is canonical.
         // Disable QTextDocument's own undo stack to prevent double-undo behavior.
-        m_qtDoc->setUndoRedoEnabled(false);
-        QObject::connect(m_qtDoc, &QTextDocument::contentsChange,
-                         this, &SourceTextDocumentBinding::onQtContentsChange);
+        m_textDocument->setUndoRedoEnabled(false);
+        // Reconnect (Qt::UniqueConnection prevents double-subscription if
+        // rewireQtDocument is called multiple times for the same doc).
+        QObject::connect(m_textDocument, &QTextDocument::contentsChange,
+                         this, &SourceTextDocumentBinding::onQtContentsChange,
+                         Qt::UniqueConnection);
     }
 
     // Seed the qtDoc from the foundation's current content (if both are now ready).
@@ -296,12 +299,12 @@ void SourceTextDocumentBinding::tryCaptureQtDocument()
 
 void SourceTextDocumentBinding::syncQtDocumentFromMarkoff()
 {
-    if (!m_subscribedDoc || !m_qtDoc) return;
+    if (!m_subscribedDoc || !m_textDocument) return;
     const QByteArray utf8 = m_subscribedDoc->toMarkdownUtf8();
     const QString text = QString::fromUtf8(utf8);
-    if (m_qtDoc->toPlainText() == text) return;  // already in sync
+    if (m_textDocument->toPlainText() == text) return;  // already in sync
     m_applyingRemoteEdit = true;
-    m_qtDoc->setPlainText(text);
+    m_textDocument->setPlainText(text);
     m_applyingRemoteEdit = false;
 }
 
@@ -309,10 +312,10 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
 {
     // Cycle guard: when T13's reverse path is mid-application, don't loop back.
     if (m_applyingRemoteEdit) return;
-    if (!m_editorBackend) return;
-    Markoff::MarkoffDocument *doc = m_editorBackend->document();
-    if (!doc) return;
-    if (!m_qtDoc) return;
+    if (!m_markoffDocument) return;
+    if (!m_textDocument) return;
+
+    Markoff::MarkoffDocument *doc = m_markoffDocument;
 
     // Compute byte offsets against the PRE-CHANGE document state.
     // doc->toMarkdownUtf8() still holds the pre-change bytes because we haven't
@@ -323,7 +326,7 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
     const quint32 oldEnd   = qtPosToByteOffset(preText, qtPos + charsRemoved);
 
     // Extract the inserted text from the POST-CHANGE QTextDocument.
-    const QString postPlain = m_qtDoc->toPlainText();
+    const QString postPlain = m_textDocument->toPlainText();
     const QString insertedText = postPlain.mid(qtPos, charsAdded);
     const QByteArray newText = insertedText.toUtf8();
 
@@ -342,16 +345,16 @@ void SourceTextDocumentBinding::onMarkoffContentsChanged(const QList<Markoff::Ma
     // Cycle guard: if WE just called applyLocalEdit (T12 forward path), this is
     // the echo of our own change — don't re-apply.
     if (m_applyingLocalEdit) return;
-    if (!m_qtDoc) return;
+    if (!m_textDocument) return;
     if (!m_subscribedDoc) return;
 
     // Capture the pre-change plain text from QTextDocument (it hasn't been
     // touched yet) for byte→Qt-pos conversion.
-    const QString preText = m_qtDoc->toPlainText();
+    const QString preText = m_textDocument->toPlainText();
     const QByteArray preBytes = preText.toUtf8();
 
     m_applyingRemoteEdit = true;
-    QTextCursor cursor(m_qtDoc);
+    QTextCursor cursor(m_textDocument);
 
     // Walk edits in reverse byte-offset order so that earlier edits' positions
     // are not invalidated by the mutations we apply to later (higher-offset) regions.
@@ -378,4 +381,4 @@ void SourceTextDocumentBinding::onMarkoffContentsChanged(const QList<Markoff::Ma
     m_applyingRemoteEdit = false;
 }
 
-}  // namespace Markoff::View::Qml
+}  // namespace Markoff

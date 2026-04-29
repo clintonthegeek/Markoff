@@ -7,32 +7,34 @@
 #include <QTextCursor>
 
 #include <markoff/view/qml/EditorBackend.h>
-#include <markoff/view/qml/SourceTextDocumentBinding.h>
+#include <markoff-foundation/SourceTextDocumentBinding.h>
 
-using namespace Markoff::View::Qml;
+using Markoff::SourceTextDocumentBinding;
+using Markoff::View::Qml::EditorBackend;
 
 class TstViewQmlSourceBinding : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void default_constructed_has_null_pointers() {
         SourceTextDocumentBinding b;
-        QCOMPARE(b.editorBackend(), nullptr);
-        QCOMPARE(b.qtQuickDocument(), nullptr);
+        QCOMPARE(b.markoffDocument(), nullptr);
+        QCOMPARE(b.session(), nullptr);
+        QCOMPARE(b.textDocument(), nullptr);
     }
 
-    void setting_editor_backend_emits_signal() {
+    void setting_markoff_document_emits_signal() {
         SourceTextDocumentBinding b;
-        EditorBackend backend;
-        QSignalSpy spy(&b, &SourceTextDocumentBinding::editorBackendChanged);
-        b.setEditorBackend(&backend);
+        Markoff::MarkoffDocument doc(1);
+        QSignalSpy spy(&b, &SourceTextDocumentBinding::markoffDocumentChanged);
+        b.setMarkoffDocument(&doc);
         QCOMPARE(spy.count(), 1);
-        QCOMPARE(b.editorBackend(), &backend);
+        QCOMPARE(b.markoffDocument(), &doc);
     }
 
     // QQuickTextDocument requires a real QQuickItem parent. The cleanest way
     // to test capture is to construct a TextArea via QML and grab its
     // textDocument. We do that with a one-line QML doc string.
-    void setting_qt_quick_document_disables_undo_redo_when_paired_with_backend() {
+    void setting_text_document_disables_undo_redo() {
         QQmlApplicationEngine engine;
         engine.loadData(
             R"qml(
@@ -56,9 +58,7 @@ private Q_SLOTS:
         QVERIFY(qqtd);
 
         SourceTextDocumentBinding b;
-        EditorBackend backend;
-        b.setEditorBackend(&backend);
-        b.setQtQuickDocument(qqtd);
+        b.setTextDocument(qqtd->textDocument());
 
         QVERIFY(qqtd->textDocument()->isUndoRedoEnabled() == false);
     }
@@ -188,8 +188,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello"));
@@ -207,8 +208,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello world"));
@@ -231,8 +233,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello world"));
@@ -254,8 +257,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         // Type "héllo" — 'é' is U+00E9, 1 UTF-16 unit, 2 UTF-8 bytes.
         QTextCursor cursor(qqtd->textDocument());
@@ -277,8 +281,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         // Type into TextArea, propagating to MarkoffDocument.
         QTextCursor cursor(qqtd->textDocument());
@@ -302,8 +307,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         // Apply edit directly via the foundation, NOT via TextArea.
         // T13 reverse path should apply it to QTextDocument.
@@ -327,8 +333,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello"));
@@ -349,8 +356,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello"));
@@ -379,8 +387,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello world"));
@@ -401,8 +410,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello world"));
@@ -423,8 +433,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello world"));
@@ -457,8 +468,9 @@ private Q_SLOTS:
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
-        binding.setEditorBackend(&backend);
-        binding.setQtQuickDocument(qqtd);
+        binding.setMarkoffDocument(&doc);
+        binding.setSession(backend.session());
+        binding.setTextDocument(qqtd->textDocument());
 
         // "héllo" — 'é' is 1 UTF-16 unit, 2 UTF-8 bytes.
         QTextCursor cursor(qqtd->textDocument());
