@@ -24,6 +24,10 @@ Item {
     property var theme
     property var completionModel: null
 
+    /// Exposes the inner EditorBackend so the host (e.g. AstInspectorPane) can
+    /// subscribe to parseUpdatedAt without going through the document directly.
+    readonly property alias editorBackend: sourceEditor.editorBackend
+
     // The single Phase-1 source editor. Phase-2 may toggle to a LiveEditor here.
     SourceEditor {
         id: sourceEditor

@@ -43,6 +43,8 @@ target_link_libraries(markoff_view_qml PUBLIC
     markoff_foundation
 )
 
+add_subdirectory(app)
+
 # Tests.
 if(NOT DEFINED MARKOFF_VIEW_QML_BUILD_TESTS)
     set(MARKOFF_VIEW_QML_BUILD_TESTS ON)
