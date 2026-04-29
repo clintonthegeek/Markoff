@@ -42,6 +42,7 @@ qt_add_qml_module(markoff_view_qml
         qml/SearchBar.qml
         qml/CompletionPopup.qml
         qml/MarkoffEditor.qml
+        qml/LiveView.qml
         qml/delegates/ParagraphDelegate.qml
         qml/delegates/HeadingDelegate.qml
         qml/delegates/HorizontalRuleDelegate.qml
