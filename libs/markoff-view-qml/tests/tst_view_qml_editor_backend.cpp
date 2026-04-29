@@ -277,6 +277,59 @@ private Q_SLOTS:
         backend.redo();
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
     }
+
+    void copy_selection_as_markdown_returns_substring() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        backend.setDocument(&doc);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
+        doc.applyLocalEdit({ ed });
+
+        const auto a6 = doc.anchorAt(6, CollabText::Crdt::Bias::Left);
+        const auto a11 = doc.anchorAt(11, CollabText::Crdt::Bias::Right);
+        backend.setSelectionAnchor(a6);
+        backend.setSelectionActive(a11);
+
+        QCOMPARE(backend.copySelectionAsMarkdown(), QStringLiteral("world"));
+    }
+
+    void copy_selection_as_markdown_handles_reversed_selection() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        backend.setDocument(&doc);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
+        doc.applyLocalEdit({ ed });
+
+        const auto a11 = doc.anchorAt(11, CollabText::Crdt::Bias::Left);
+        const auto a6  = doc.anchorAt(6, CollabText::Crdt::Bias::Right);
+        backend.setSelectionAnchor(a11);
+        backend.setSelectionActive(a6);
+
+        // Anchor>active should still return the substring in document order.
+        QCOMPARE(backend.copySelectionAsMarkdown(), QStringLiteral("world"));
+    }
+
+    void copy_selection_returns_empty_when_degenerate() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        backend.setDocument(&doc);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello");
+        doc.applyLocalEdit({ ed });
+
+        const auto a3 = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        backend.setCursorAnchor(a3);
+
+        QCOMPARE(backend.copySelectionAsMarkdown(), QString());
+    }
 };
 
 QTEST_MAIN(TstViewQmlEditorBackend)

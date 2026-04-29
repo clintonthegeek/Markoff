@@ -62,6 +62,7 @@ public:
 
     Q_INVOKABLE void undo();
     Q_INVOKABLE void redo();
+    Q_INVOKABLE QString copySelectionAsMarkdown() const;
 
 Q_SIGNALS:
     void documentChanged();

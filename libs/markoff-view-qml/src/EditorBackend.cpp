@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <algorithm>
 #include <markoff/view/qml/EditorBackend.h>
 
 namespace Markoff::View::Qml {
@@ -114,6 +115,22 @@ void EditorBackend::undo()
 void EditorBackend::redo()
 {
     if (m_document) m_document->redo();
+}
+
+QString EditorBackend::copySelectionAsMarkdown() const
+{
+    if (!m_document) return QString();
+
+    const quint32 anchorOff = m_document->resolveAnchor(m_selectionAnchor);
+    const quint32 activeOff = m_document->resolveAnchor(m_selectionActive);
+    const quint32 lo = std::min(anchorOff, activeOff);
+    const quint32 hi = std::max(anchorOff, activeOff);
+
+    if (lo == hi) return QString();  // empty / degenerate selection
+
+    const QByteArray src = m_document->toMarkdownUtf8();
+    return QString::fromUtf8(src.mid(static_cast<int>(lo),
+                                     static_cast<int>(hi - lo)));
 }
 
 void EditorBackend::onSessionPrimarySelectionChanged(const Markoff::Selection &sel)
