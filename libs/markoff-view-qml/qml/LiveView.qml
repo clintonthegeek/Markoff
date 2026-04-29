@@ -51,7 +51,7 @@ Item {
             DelegateChoice {
                 roleValue: "paragraph"
                 ParagraphDelegate {
-                    blockIndex: model.index
+                    blockIndex: index
                     blockText: model.text
                     selectionModel: binding.selectionModel
                 }
@@ -59,7 +59,7 @@ Item {
             DelegateChoice {
                 roleValue: "heading"
                 HeadingDelegate {
-                    blockIndex: model.index
+                    blockIndex: index
                     blockText: model.text
                     headingLevel: model.headingLevel
                     selectionModel: binding.selectionModel
@@ -67,11 +67,14 @@ Item {
             }
             DelegateChoice {
                 roleValue: "hr"
-                HorizontalRuleDelegate {}
+                HorizontalRuleDelegate {
+                    blockIndex: index
+                }
             }
             DelegateChoice {
                 roleValue: "image"
                 ImageDelegate {
+                    blockIndex: index
                     imageSrc: model.imageSrc
                     imageAlt: model.imageAlt
                     imageTitle: model.imageTitle
@@ -80,7 +83,7 @@ Item {
             DelegateChoice {
                 roleValue: "code_block"
                 CodeBlockDelegate {
-                    blockIndex: model.index
+                    blockIndex: index
                     codeLanguage: model.codeLanguage
                     codeText: model.codeText
                     selectionModel: binding.selectionModel
@@ -122,7 +125,7 @@ Item {
                     const probe = listView.itemAt(probeX, listView.contentHeight - 1)
                     if (probe) {
                         const localY = Math.max(0, probe.height - 1)
-                        return { block: probe.index ?? lastIdx,
+                        return { block: (probe.blockIndex !== undefined ? probe.blockIndex : lastIdx),
                                  offset: probe.positionAt
                                      ? probe.positionAt(clampedLocalX(probe, cx), localY)
                                      : blockTextOf(lastIdx).length }
@@ -139,7 +142,7 @@ Item {
                     const offset = item.positionAt
                         ? item.positionAt(clampedLocalX(item, cx), localY)
                         : 0
-                    return { block: item.index ?? 0, offset: offset }
+                    return { block: (item.blockIndex !== undefined ? item.blockIndex : 0), offset: offset }
                 }
 
                 let aboveItem = null, aboveDy = 0
@@ -160,13 +163,13 @@ Item {
                     const offset = aboveItem.positionAt
                         ? aboveItem.positionAt(clampedLocalX(aboveItem, cx), localY)
                         : blockTextOf(aboveItem.index).length
-                    return { block: aboveItem.index ?? 0, offset: offset }
+                    return { block: (aboveItem.blockIndex !== undefined ? aboveItem.blockIndex : 0), offset: offset }
                 }
                 if (belowItem) {
                     const offset = belowItem.positionAt
                         ? belowItem.positionAt(clampedLocalX(belowItem, cx), 0)
                         : 0
-                    return { block: belowItem.index ?? 0, offset: offset }
+                    return { block: (belowItem.blockIndex !== undefined ? belowItem.blockIndex : 0), offset: offset }
                 }
                 return null
             }

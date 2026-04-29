@@ -7,16 +7,19 @@ import org.kde.syntaxhighlighting
 Rectangle {
     id: root
 
-    required property int    blockIndex
-    required property string codeLanguage
-    required property string codeText
-    required property var    selectionModel
+    property int    blockIndex: -1
+    property string codeLanguage: ""
+    property string codeText: ""
+    property var    selectionModel: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
     color: "#1e1e1e"
     radius: 4
     implicitHeight: textEdit.implicitHeight + 16
+
+    function positionAt(x, y) { return textEdit.positionAt(x, y) }
+    readonly property int textLength: textEdit.length
 
     TextEdit {
         id: textEdit

@@ -2,39 +2,48 @@
 import QtQuick
 import QtQuick.Controls
 
-TextEdit {
-    id: textEdit
+Item {
+    id: root
 
-    required property int    blockIndex
-    required property string blockText
-    required property int    headingLevel
-    required property var    selectionModel
+    property int    blockIndex: -1
+    property string blockText: ""
+    property int    headingLevel: 0
+    property var    selectionModel: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
+    implicitHeight: textEdit.implicitHeight
 
-    text: textEdit.blockText
-    textFormat: TextEdit.PlainText
-    readOnly: true
-    selectByMouse: false
-    wrapMode: TextEdit.Wrap
-    font.pixelSize: {
-        switch (textEdit.headingLevel) {
-            case 1: return 28
-            case 2: return 24
-            case 3: return 20
-            case 4: return 18
-            case 5: return 16
-            case 6: return 14
-            default: return 16
+    function positionAt(x, y) { return textEdit.positionAt(x, y) }
+    readonly property int textLength: textEdit.length
+
+    TextEdit {
+        id: textEdit
+        anchors.left: parent.left
+        anchors.right: parent.right
+        text: root.blockText
+        textFormat: TextEdit.PlainText
+        readOnly: true
+        selectByMouse: false
+        wrapMode: TextEdit.Wrap
+        font.pixelSize: {
+            switch (root.headingLevel) {
+                case 1: return 28
+                case 2: return 24
+                case 3: return 20
+                case 4: return 18
+                case 5: return 16
+                case 6: return 14
+                default: return 16
+            }
         }
+        font.bold: true
     }
-    font.bold: true
 
     Connections {
-        target: textEdit.selectionModel
+        target: root.selectionModel
         function onSelectionChanged() {
-            const r = textEdit.selectionModel.rangeForBlock(textEdit.blockIndex)
+            const r = root.selectionModel.rangeForBlock(root.blockIndex)
             if (r.x === -1) {
                 textEdit.deselect()
             } else {

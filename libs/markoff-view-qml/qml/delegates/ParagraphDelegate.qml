@@ -2,27 +2,41 @@
 import QtQuick
 import QtQuick.Controls
 
-TextEdit {
-    id: textEdit
+Item {
+    id: root
 
-    required property int    blockIndex
-    required property string blockText
-    required property var    selectionModel  // LiveSelectionModel *
+    property int    blockIndex: -1
+    property string blockText: ""
+    property var    selectionModel: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
+    implicitHeight: textEdit.implicitHeight
 
-    text: textEdit.blockText
-    textFormat: TextEdit.MarkdownText
-    readOnly: true
-    selectByMouse: false
-    wrapMode: TextEdit.Wrap
-    font.pixelSize: 16
+    /// Proxy positionAt to the inner TextEdit. The hit-test layer in
+    /// LiveView.qml calls this on the delegate; without the proxy it would
+    /// be undefined (Item has no positionAt) and offsets would collapse to 0.
+    function positionAt(x, y) { return textEdit.positionAt(x, y) }
+
+    /// Proxy length so LiveView.qml can clamp INT32_MAX sentinel when needed.
+    readonly property int textLength: textEdit.length
+
+    TextEdit {
+        id: textEdit
+        anchors.left: parent.left
+        anchors.right: parent.right
+        text: root.blockText
+        textFormat: TextEdit.MarkdownText
+        readOnly: true
+        selectByMouse: false
+        wrapMode: TextEdit.Wrap
+        font.pixelSize: 16
+    }
 
     Connections {
-        target: textEdit.selectionModel
+        target: root.selectionModel
         function onSelectionChanged() {
-            const r = textEdit.selectionModel.rangeForBlock(textEdit.blockIndex)
+            const r = root.selectionModel.rangeForBlock(root.blockIndex)
             if (r.x === -1) {
                 textEdit.deselect()
             } else {

@@ -4,9 +4,14 @@ import QtQuick
 Item {
     id: root
 
-    required property string imageSrc
-    required property string imageAlt
-    required property string imageTitle
+    property int    blockIndex: -1
+    property string imageSrc: ""
+    property string imageAlt: ""
+    property string imageTitle: ""
+
+    /// Image has no text content; positionAt returns 0 (start-of-block).
+    function positionAt(x, y) { return 0 }
+    readonly property int textLength: 0
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
