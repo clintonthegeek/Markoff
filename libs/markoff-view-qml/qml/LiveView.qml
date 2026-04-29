@@ -39,6 +39,7 @@ Item {
 
     ListView {
         id: listView
+        objectName: "listView"
         anchors.fill: parent
         clip: true
         spacing: 12
