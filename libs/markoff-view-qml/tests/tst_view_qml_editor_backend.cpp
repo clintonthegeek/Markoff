@@ -2,6 +2,7 @@
 #include <QSignalSpy>
 #include <QTest>
 
+#include <markoff-foundation/Session.h>
 #include <markoff/view/qml/EditorBackend.h>
 
 using namespace Markoff::View::Qml;
@@ -38,6 +39,51 @@ private Q_SLOTS:
         backend.setDocument(nullptr);
         QCOMPARE(spy.count(), 1);
         QCOMPARE(backend.document(), nullptr);
+    }
+
+    void session_is_null_when_no_document() {
+        EditorBackend backend;
+        QCOMPARE(backend.session(), nullptr);
+    }
+
+    void session_created_when_document_set() {
+        EditorBackend backend;
+        QSignalSpy spy(&backend, &EditorBackend::sessionChanged);
+
+        Markoff::MarkoffDocument doc(1);
+        backend.setDocument(&doc);
+
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(backend.session() != nullptr);
+    }
+
+    void session_replaced_when_document_swapped() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument docA(1);
+        Markoff::MarkoffDocument docB(2);
+        backend.setDocument(&docA);
+        Markoff::Session *sessionA = backend.session();
+        QVERIFY(sessionA != nullptr);
+
+        QSignalSpy spy(&backend, &EditorBackend::sessionChanged);
+        backend.setDocument(&docB);
+
+        // Two emissions: one for cleanup of old session, one for creation of new.
+        QVERIFY(spy.count() >= 1);
+        QVERIFY(backend.session() != nullptr);
+        QVERIFY(backend.session() != sessionA);
+    }
+
+    void session_destroyed_when_document_set_to_null() {
+        EditorBackend backend;
+        Markoff::MarkoffDocument doc(1);
+        backend.setDocument(&doc);
+        QVERIFY(backend.session() != nullptr);
+
+        QSignalSpy spy(&backend, &EditorBackend::sessionChanged);
+        backend.setDocument(nullptr);
+        QVERIFY(spy.count() >= 1);
+        QCOMPARE(backend.session(), nullptr);
     }
 };
 

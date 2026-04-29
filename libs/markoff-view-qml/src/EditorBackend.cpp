@@ -11,8 +11,24 @@ Markoff::MarkoffDocument *EditorBackend::document() const { return m_document; }
 void EditorBackend::setDocument(Markoff::MarkoffDocument *doc)
 {
     if (m_document == doc) return;
+
+    // Clean up existing session before swapping document pointer.
+    if (m_session && m_document) {
+        m_document->destroySession(m_session);
+        m_session = nullptr;
+        Q_EMIT sessionChanged();
+    }
+
     m_document = doc;
     Q_EMIT documentChanged();
+
+    // Create session for new document.
+    if (m_document) {
+        m_session = m_document->createSession();
+        Q_EMIT sessionChanged();
+    }
 }
+
+Markoff::Session *EditorBackend::session() const { return m_session; }
 
 }  // namespace Markoff::View::Qml
