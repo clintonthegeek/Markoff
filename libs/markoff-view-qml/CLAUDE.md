@@ -162,6 +162,30 @@ All tests use `QTEST_MAIN` (not `QTEST_APPLESS_MAIN`) — the QML engine and `QS
 - AST inspector pane shows parse-count and parse-version only; full AST tree rendering is Phase 2.
 - `Theme::operator==` not implemented; theme setters emit `themeChanged` unconditionally (verified harmless in tests).
 
+## Performance
+
+The POC has a known, **substantial** typing-latency problem on long documents. Reproducer: open `docs/specs/2026-04-28-foundation-design.md` (~16 KB), place cursor near the end, type rapidly. The CPU pegs at 100% on one core and the UI freezes for tens of seconds while the keyboard buffer drains.
+
+### Suspected cost centres (unprofiled — top suspects only)
+
+1. **`SourceTextDocumentBinding::onQtContentsChange` does 3× full-document copies per keystroke**: `doc->toMarkdownUtf8()` → `QString::fromUtf8(preBytes)` → `m_qtDoc->toPlainText()`. For a 16 KB doc that's ~80 KB of allocation per keystroke, before the foundation does any work. The pure-insertion case (`charsRemoved == 0`, the typing case) can be fast-pathed to skip the pre-state fetch — the prefix up to `qtPos` is unchanged in the post-state. Not yet implemented.
+
+2. **Foundation's `ParsePool` parses the whole document on every change**. No incremental tree-sitter parsing yet (`ts_tree_edit()`). Documented as deferred in the foundation design (`docs/specs/2026-04-28-foundation-design.md`).
+
+3. **KSyntaxHighlighter re-highlight scope**. KF6's QML `SyntaxHighlighter` may rehighlight affected blocks only, or may scan further. Unverified; needs measurement.
+
+4. **AST inspector pane updates a Label on every `parseUpdatedAt`**. Individually cheap but contributes during sustained typing.
+
+### Done so far
+
+- Commit `5b116be` made `qtPosToByteOffset` / `byteOffsetToQtPos` allocation-free (in-place UTF-16↔UTF-8 walks). Did NOT eliminate the freeze, so this isn't the dominant cost.
+
+### Investigation owed before further fixes
+
+Before piling on more speculative "fixes", profile under `perf record` while typing into a long document. Compare CPU breakdown with a tiny document (100 lines) to determine whether the cost is per-character constant or scales with document size. Then apply targeted fixes; don't optimize blindly.
+
+A separate plan should be written for the perf phase before implementation begins. See `docs/handoff/2026-04-28-post-poc-perf-SESSION-BRIEF.md`.
+
 ## Plan reference
 
 The plan that produced this POC: `~/.claude/plans/nah-a-is-fine-fuzzy-backus.md`. The branch covers T0–T23; review with:
