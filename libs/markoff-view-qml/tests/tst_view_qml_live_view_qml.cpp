@@ -113,6 +113,128 @@ private Q_SLOTS:
         QCOMPARE(delegates.value(4)->property("codeText").toString(),
                  QStringLiteral("x = 1\n"));
     }
+
+    void mouse_drag_selects_across_block_kinds() {
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "theme", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: theme\n"
+            "    mode: \"live\"\n"
+            "}\n",
+            QUrl());
+        if (component.isError()) qWarning() << component.errors();
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral(
+            "# Heading\n\n"
+            "Para text.\n\n"
+            "---\n\n"
+            "![alt](http://example.com/img.png)\n\n"
+            "```python\nx = 1\n```\n");
+        doc.applyLocalEdit({ ed });
+        QVERIFY(parseSpy.wait(2000));
+
+        QQuickItem *listView = root->findChild<QQuickItem *>(
+            QStringLiteral("listView"));
+        QVERIFY(listView);
+        QTRY_COMPARE(listView->property("count").toInt(), 5);
+
+        QMetaObject::invokeMethod(listView, "forceLayout");
+        view.grabWindow();
+
+        auto *contentItem = qvariant_cast<QQuickItem *>(
+            listView->property("contentItem"));
+        QVERIFY(contentItem);
+
+        auto collectDelegates = [contentItem]() {
+            QHash<int, QQuickItem *> out;
+            for (QQuickItem *child : contentItem->childItems()) {
+                QVariant bi = child->property("blockIndex");
+                if (bi.isValid() && bi.toInt() >= 0) {
+                    out.insert(bi.toInt(), child);
+                }
+            }
+            return out;
+        };
+
+        QHash<int, QQuickItem *> delegates;
+        QTRY_VERIFY((delegates = collectDelegates()).size() == 5);
+
+        // Translate row 1 (paragraph) and row 3 (image) centres into window
+        // coordinates. Mid-x avoids the leading 12-px margin set by delegates.
+        auto *para = delegates.value(1);
+        auto *img  = delegates.value(3);
+        QVERIFY(para);
+        QVERIFY(img);
+
+        const QPointF paraScene =
+            para->mapToScene(QPointF(para->width() / 2, para->height() / 2));
+        const QPointF imgScene =
+            img->mapToScene(QPointF(img->width() / 2, img->height() / 2));
+        const QPoint paraPos = paraScene.toPoint();
+        const QPoint imgPos = imgScene.toPoint();
+
+        // Synthesise a press at the paragraph centre, drag through the HR
+        // (row 2) into the image centre (row 3).
+        QTest::mousePress(&view, Qt::LeftButton, Qt::NoModifier, paraPos);
+        QTest::qWait(20);
+
+        const int steps = 4;
+        for (int i = 1; i <= steps; ++i) {
+            QPoint mid(paraPos.x() + (imgPos.x() - paraPos.x()) * i / steps,
+                       paraPos.y() + (imgPos.y() - paraPos.y()) * i / steps);
+            QTest::mouseMove(&view, mid);
+            QTest::qWait(20);
+        }
+        QTest::mouseRelease(&view, Qt::LeftButton, Qt::NoModifier, imgPos);
+        QTest::qWait(20);
+
+        // Locate the LiveListModelBinding (id: binding inside LiveView.qml)
+        // by walking the live-view subtree for the first object whose class
+        // name ends with "LiveListModelBinding".
+        QObject *binding = nullptr;
+        for (QObject *child : root->findChildren<QObject *>()) {
+            if (QString::fromLatin1(child->metaObject()->className())
+                    .endsWith(QLatin1String("LiveListModelBinding"))) {
+                binding = child;
+                break;
+            }
+        }
+        QVERIFY(binding);
+
+        QObject *selModel = qvariant_cast<QObject *>(
+            binding->property("selectionModel"));
+        QVERIFY(selModel);
+
+        QCOMPARE(selModel->property("anchorBlock").toInt(), 1);
+        QCOMPARE(selModel->property("activeBlock").toInt(), 3);
+        QVERIFY(selModel->property("anchorOffset").toInt() > 0);
+    }
 };
 
 QTEST_MAIN(TstLiveViewQml)
