@@ -263,6 +263,107 @@ private Q_SLOTS:
 
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("h\xC3\xA9llo"));
     }
+    // -----------------------------------------------------------------------
+    // Reverse edit path: MarkoffDocument → QTextDocument (T13)
+    // -----------------------------------------------------------------------
+
+    void undo_propagates_back_to_qtextdocument() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        // Type into TextArea, propagating to MarkoffDocument.
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello"));
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+        QCOMPARE(qqtd->textDocument()->toPlainText(), QStringLiteral("hello"));
+
+        // Undo via foundation; T13's reverse path applies the change to QTextDocument.
+        backend.undo();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
+        QCOMPARE(qqtd->textDocument()->toPlainText(), QString());
+    }
+
+    void direct_markoff_edit_propagates_to_qtextdocument() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        // Apply edit directly via the foundation, NOT via TextArea.
+        // T13 reverse path should apply it to QTextDocument.
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
+        doc.applyLocalEdit({ ed });
+
+        QCOMPARE(qqtd->textDocument()->toPlainText(), QStringLiteral("hello world"));
+    }
+
+    void local_edit_does_not_double_apply() {
+        // The most paranoid test: a TextArea edit echoes back via contentsChanged.
+        // The forward path cycle guard (m_applyingLocalEdit) must suppress the
+        // reverse path; the reverse path's removed-text re-apply must NOT happen.
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello"));
+
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+        QCOMPARE(qqtd->textDocument()->toPlainText(), QStringLiteral("hello"));
+        // Crucially, after the local edit + echo, BOTH sides hold "hello",
+        // not "hellohello" (which would happen if the cycle guard was missing).
+    }
+
+    void undo_then_redo_round_trips_via_both_paths() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello"));
+
+        backend.undo();
+        QCOMPARE(qqtd->textDocument()->toPlainText(), QString());
+
+        backend.redo();
+        QCOMPARE(qqtd->textDocument()->toPlainText(), QStringLiteral("hello"));
+
+        backend.undo();
+        QCOMPARE(qqtd->textDocument()->toPlainText(), QString());
+    }
 };
 
 QTEST_MAIN(TstViewQmlSourceBinding)

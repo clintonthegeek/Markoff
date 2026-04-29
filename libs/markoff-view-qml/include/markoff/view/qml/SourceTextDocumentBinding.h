@@ -46,15 +46,22 @@ Q_SIGNALS:
 
 private Q_SLOTS:
     void onQtContentsChange(int qtPos, int charsRemoved, int charsAdded);
+    void onMarkoffContentsChanged(const QList<Markoff::MarkoffEdit> &edits);
+    void onEditorBackendDocumentChanged();
 
 private:
     /// Called whenever both pointers are non-null and either changed.
     /// Captures m_qtDoc and disables QTextDocument's own undo stack.
     void tryCaptureQtDocument();
 
+    /// Rewire the contentsChanged subscription to the backend's current document.
+    void rebindMarkoffDocumentSubscription();
+
     EditorBackend      *m_editorBackend = nullptr;
     QQuickTextDocument *m_qtQuickDoc    = nullptr;
     QTextDocument      *m_qtDoc         = nullptr;  ///< the captured QTextDocument
+
+    Markoff::MarkoffDocument *m_subscribedDoc = nullptr;  ///< what we're currently subscribed to
 
     bool m_applyingLocalEdit  = false;  ///< T12: set during applyLocalEdit ingestion
     bool m_applyingRemoteEdit = false;  ///< T13: set during reverse edit application

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/view/qml/SourceTextDocumentBinding.h>
 
+#include <algorithm>
+
+#include <QTextCursor>
+
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
 
@@ -34,9 +38,47 @@ EditorBackend *SourceTextDocumentBinding::editorBackend() const
 void SourceTextDocumentBinding::setEditorBackend(EditorBackend *eb)
 {
     if (m_editorBackend == eb) return;
+
+    if (m_editorBackend) {
+        QObject::disconnect(m_editorBackend, &EditorBackend::documentChanged,
+                            this, &SourceTextDocumentBinding::onEditorBackendDocumentChanged);
+    }
+
     m_editorBackend = eb;
+
+    if (m_editorBackend) {
+        QObject::connect(m_editorBackend, &EditorBackend::documentChanged,
+                         this, &SourceTextDocumentBinding::onEditorBackendDocumentChanged);
+    }
+
     Q_EMIT editorBackendChanged();
+    rebindMarkoffDocumentSubscription();
     tryCaptureQtDocument();
+}
+
+void SourceTextDocumentBinding::onEditorBackendDocumentChanged()
+{
+    rebindMarkoffDocumentSubscription();
+}
+
+void SourceTextDocumentBinding::rebindMarkoffDocumentSubscription()
+{
+    Markoff::MarkoffDocument *newDoc =
+        m_editorBackend ? m_editorBackend->document() : nullptr;
+
+    if (newDoc == m_subscribedDoc) return;
+
+    if (m_subscribedDoc) {
+        QObject::disconnect(m_subscribedDoc, &Markoff::MarkoffDocument::contentsChanged,
+                            this, &SourceTextDocumentBinding::onMarkoffContentsChanged);
+    }
+
+    m_subscribedDoc = newDoc;
+
+    if (m_subscribedDoc) {
+        QObject::connect(m_subscribedDoc, &Markoff::MarkoffDocument::contentsChanged,
+                         this, &SourceTextDocumentBinding::onMarkoffContentsChanged);
+    }
 }
 
 QQuickTextDocument *SourceTextDocumentBinding::qtQuickDocument() const
@@ -107,6 +149,47 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
     m_applyingLocalEdit = true;
     doc->applyLocalEdit({ ed });
     m_applyingLocalEdit = false;
+}
+
+void SourceTextDocumentBinding::onMarkoffContentsChanged(const QList<Markoff::MarkoffEdit> &edits)
+{
+    // Cycle guard: if WE just called applyLocalEdit (T12 forward path), this is
+    // the echo of our own change — don't re-apply.
+    if (m_applyingLocalEdit) return;
+    if (!m_qtDoc) return;
+    if (!m_subscribedDoc) return;
+
+    // Capture the pre-change plain text from QTextDocument (it hasn't been
+    // touched yet) for byte→Qt-pos conversion.
+    const QString preText = m_qtDoc->toPlainText();
+    const QByteArray preBytes = preText.toUtf8();
+
+    m_applyingRemoteEdit = true;
+    QTextCursor cursor(m_qtDoc);
+
+    // Walk edits in reverse byte-offset order so that earlier edits' positions
+    // are not invalidated by the mutations we apply to later (higher-offset) regions.
+    // All offsets in the list are OLD-text coordinates (pre-batch state), so
+    // reverse application keeps them valid throughout the loop.
+    QList<Markoff::MarkoffEdit> sorted = edits;
+    std::sort(sorted.begin(), sorted.end(),
+              [](const Markoff::MarkoffEdit &a, const Markoff::MarkoffEdit &b) {
+                  return a.oldStart > b.oldStart;
+              });
+
+    for (const Markoff::MarkoffEdit &ed : sorted) {
+        const int qtStart = byteOffsetToQtPos(preBytes, ed.oldStart);
+        const int qtEnd   = byteOffsetToQtPos(preBytes, ed.oldEnd);
+
+        cursor.setPosition(qtStart);
+        cursor.setPosition(qtEnd, QTextCursor::KeepAnchor);
+        cursor.removeSelectedText();
+        if (!ed.newText.isEmpty()) {
+            cursor.insertText(QString::fromUtf8(ed.newText));
+        }
+    }
+
+    m_applyingRemoteEdit = false;
 }
 
 }  // namespace Markoff::View::Qml
