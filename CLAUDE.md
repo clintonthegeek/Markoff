@@ -59,15 +59,24 @@ the slow tail; everything else completes in <10 seconds. Use
 For each keystroke the foundation runs:
 
 1. `MarkoffDocument::applyLocalEdit` → `ParsePool::schedule(utf8)`.
-2. Worker: `Document::extract(raw)` does frontmatter+footnote pre-
-   processing.
+2. Worker: `Document::extract(raw)` strips frontmatter and harvests
+   footnote metadata (definitions and per-reference numbering). It
+   does NOT mutate the body — `extracted.body == raw.mid(frontmatter
+   BlockEnd)` byte-for-byte. Footnote refs are surfaced via
+   `Document::footnoteRefs()` for renderers.
 3. `IncrementalParseSession` diffs prior body vs new body via prefix/
-   suffix scan to derive a single `ByteEdit`.
+   suffix scan to derive a single `ByteEdit`. Since body equals post-
+   frontmatter source, body diff equals source diff modulo the
+   frontmatter offset.
 4. `TreeSitterParser::parseIncremental({edit}, newBody)`:
    - Block tree: `ts_tree_edit` + `ts_parser_parse(prevTree, …)`,
      reusing unchanged subtrees.
-   - Inline trees: still full reparse per region (Phase 2 work
-     pending; see `docs/TODO.md`).
+   - Inline trees: snapshot old ranges before the edit, shift each
+     through `sortedEdits` to derive its post-edit range, and reuse
+     `m_inlineTrees[i]` for any region whose byte range is unchanged.
+     Overlap-with-edit invalidates a region; unmatched new ranges
+     parse fresh. Reuse count exposed via
+     `TreeSitterParser::inlineTreeReuseCount()` for benchmarks.
 5. `parser.buildDocumentQueries()` walks the tree to bake
    `DocumentQueryResult`.
 6. `Document::fromComponents()` snapshots a value-shaped Document.
