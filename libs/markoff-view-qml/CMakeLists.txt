@@ -22,6 +22,7 @@ qt_add_qml_module(markoff_view_qml
         include/markoff/view/qml/CompletionPopupModel.h
     QML_FILES
         qml/SourceEditor.qml
+        qml/SearchBar.qml
 )
 
 target_include_directories(markoff_view_qml
