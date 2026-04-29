@@ -7,6 +7,22 @@ SourceTextDocumentBinding::SourceTextDocumentBinding(QObject *parent)
     : QObject(parent) {}
 SourceTextDocumentBinding::~SourceTextDocumentBinding() = default;
 
+quint32 SourceTextDocumentBinding::qtPosToByteOffset(const QString &text, int qtOffset)
+{
+    if (qtOffset <= 0) return 0;
+    if (qtOffset >= text.size()) return static_cast<quint32>(text.toUtf8().size());
+    return static_cast<quint32>(text.left(qtOffset).toUtf8().size());
+}
+
+int SourceTextDocumentBinding::byteOffsetToQtPos(const QByteArray &utf8, quint32 byteOffset)
+{
+    if (byteOffset == 0) return 0;
+    if (byteOffset >= static_cast<quint32>(utf8.size())) {
+        return QString::fromUtf8(utf8).size();
+    }
+    return QString::fromUtf8(utf8.left(static_cast<int>(byteOffset))).size();
+}
+
 EditorBackend *SourceTextDocumentBinding::editorBackend() const
 {
     return m_editorBackend;

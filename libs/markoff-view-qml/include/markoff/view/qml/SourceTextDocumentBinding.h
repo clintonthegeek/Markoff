@@ -25,6 +25,15 @@ public:
     explicit SourceTextDocumentBinding(QObject *parent = nullptr);
     ~SourceTextDocumentBinding() override;
 
+    /// Convert a UTF-16 code-unit offset within `text` to a UTF-8 byte offset.
+    /// Returns the byte offset such that `text.left(qtOffset).toUtf8().size() == byteOffset`.
+    static quint32 qtPosToByteOffset(const QString &text, int qtOffset);
+
+    /// Convert a UTF-8 byte offset within `utf8` to a UTF-16 code-unit offset.
+    /// Returns the code-unit position such that the byte at `byteOffset` lies
+    /// at or just before that code unit.
+    static int byteOffsetToQtPos(const QByteArray &utf8, quint32 byteOffset);
+
     EditorBackend     *editorBackend() const;
     void               setEditorBackend(EditorBackend *);
 

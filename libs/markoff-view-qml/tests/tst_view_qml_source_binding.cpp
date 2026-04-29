@@ -61,6 +61,96 @@ private Q_SLOTS:
 
         QVERIFY(qqtd->textDocument()->isUndoRedoEnabled() == false);
     }
+
+    // -----------------------------------------------------------------------
+    // UTF-8 / UTF-16 conversion helpers (T11)
+    // -----------------------------------------------------------------------
+
+    void qt_pos_to_byte_offset_data() {
+        QTest::addColumn<QString>("text");
+        QTest::addColumn<int>("qtOffset");
+        QTest::addColumn<quint32>("expected");
+
+        QTest::newRow("ascii at start") << QStringLiteral("hello") << 0 << quint32(0);
+        QTest::newRow("ascii at end")   << QStringLiteral("hello") << 5 << quint32(5);
+        QTest::newRow("ascii mid")      << QStringLiteral("hello") << 3 << quint32(3);
+
+        // 'é' is U+00E9 — 1 UTF-16 code unit, 2 UTF-8 bytes.
+        QTest::newRow("e-accent before") << QStringLiteral("éhello") << 1 << quint32(2);
+        QTest::newRow("e-accent at end") << QStringLiteral("éhello") << 6 << quint32(7);
+
+        // 'カ' is U+30AB (Katakana KA) — 1 UTF-16 code unit, 3 UTF-8 bytes.
+        QTest::newRow("katakana before") << QStringLiteral("カhello") << 1 << quint32(3);
+        QTest::newRow("katakana at end") << QStringLiteral("カhello") << 6 << quint32(8);
+
+        // '🎉' is U+1F389 (party popper) — 2 UTF-16 code units (surrogate pair),
+        // 4 UTF-8 bytes.
+        QTest::newRow("emoji before") << QStringLiteral("🎉hello") << 2 << quint32(4);
+        QTest::newRow("emoji at end") << QStringLiteral("🎉hello") << 7 << quint32(9);
+
+        // Out-of-bounds clamps.
+        QTest::newRow("negative qtOffset clamps to 0")
+            << QStringLiteral("hello") << -5 << quint32(0);
+        QTest::newRow("over-end qtOffset clamps to text byte size")
+            << QStringLiteral("hello") << 999 << quint32(5);
+    }
+
+    void qt_pos_to_byte_offset() {
+        QFETCH(QString, text);
+        QFETCH(int, qtOffset);
+        QFETCH(quint32, expected);
+        QCOMPARE(SourceTextDocumentBinding::qtPosToByteOffset(text, qtOffset), expected);
+    }
+
+    void byte_offset_to_qt_pos_data() {
+        QTest::addColumn<QByteArray>("utf8");
+        QTest::addColumn<quint32>("byteOffset");
+        QTest::addColumn<int>("expected");
+
+        QTest::newRow("ascii at start") << QByteArray("hello") << quint32(0) << 0;
+        QTest::newRow("ascii at end")   << QByteArray("hello") << quint32(5) << 5;
+        QTest::newRow("ascii mid")      << QByteArray("hello") << quint32(3) << 3;
+
+        // "éhello" = 0xC3 0xA9 + "hello" = 7 bytes. byte 2 → after é → qtPos 1.
+        QTest::newRow("after e-accent")
+            << QByteArray("\xC3\xA9hello") << quint32(2) << 1;
+        QTest::newRow("after e-accent then h")
+            << QByteArray("\xC3\xA9hello") << quint32(3) << 2;
+
+        // "カhello" = 0xE3 0x82 0xAB + "hello" = 8 bytes. byte 3 → after カ → qtPos 1.
+        QTest::newRow("after katakana")
+            << QByteArray("\xE3\x82\xABhello") << quint32(3) << 1;
+
+        // "🎉hello" = 0xF0 0x9F 0x8E 0x89 + "hello" = 9 bytes. byte 4 → after emoji → qtPos 2.
+        QTest::newRow("after emoji")
+            << QByteArray("\xF0\x9F\x8E\x89hello") << quint32(4) << 2;
+
+        QTest::newRow("byte 0") << QByteArray("hello") << quint32(0) << 0;
+        QTest::newRow("over-end clamps to total qt size")
+            << QByteArray("hello") << quint32(999) << 5;
+    }
+
+    void byte_offset_to_qt_pos() {
+        QFETCH(QByteArray, utf8);
+        QFETCH(quint32, byteOffset);
+        QFETCH(int, expected);
+        QCOMPARE(SourceTextDocumentBinding::byteOffsetToQtPos(utf8, byteOffset), expected);
+    }
+
+    void roundtrip_qt_to_byte_to_qt_for_mixed_content() {
+        const QString text = QStringLiteral("hello é world カ test 🎉 end");
+        const QByteArray utf8 = text.toUtf8();
+        for (int qtPos = 0; qtPos <= text.size(); ++qtPos) {
+            const quint32 byteOff = SourceTextDocumentBinding::qtPosToByteOffset(text, qtPos);
+            const int qtPosBack = SourceTextDocumentBinding::byteOffsetToQtPos(utf8, byteOff);
+            // Note: positions inside a surrogate pair won't roundtrip exactly.
+            // We test only positions on UTF-16 code-unit boundaries that are also
+            // UTF-8 character boundaries — every position OUTSIDE the surrogate pair.
+            // The emoji '🎉' occupies qtPos 21..22; skip qtPos 22 specifically.
+            if (qtPos < text.size() && text.at(qtPos).isLowSurrogate()) continue;
+            QCOMPARE(qtPosBack, qtPos);
+        }
+    }
 };
 
 QTEST_MAIN(TstViewQmlSourceBinding)
