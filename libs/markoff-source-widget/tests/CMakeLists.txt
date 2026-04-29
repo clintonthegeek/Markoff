@@ -13,3 +13,8 @@ add_executable(tst_source_widget_binding_roundtrip tst_source_widget_binding_rou
 add_test(NAME tst_source_widget_binding_roundtrip COMMAND tst_source_widget_binding_roundtrip)
 target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_foundation)
 set_tests_properties(tst_source_widget_binding_roundtrip PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_source_widget_findbar tst_source_widget_findbar.cpp)
+add_test(NAME tst_source_widget_findbar COMMAND tst_source_widget_findbar)
+target_link_libraries(tst_source_widget_findbar PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_foundation)
+set_tests_properties(tst_source_widget_findbar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
