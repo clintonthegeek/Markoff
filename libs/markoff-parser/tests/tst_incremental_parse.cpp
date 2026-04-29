@@ -57,6 +57,9 @@ private Q_SLOTS:
     void freshParse_resetsReuseCountToZero();
     void parseIncremental_noPriorTree_reportsZeroReuse();
     void singleParagraphEdit_reusesUnchangedInlineRegions();
+    void editInsideRegion_invalidatesOnlyThatRegion();
+    void editsInTwoRegions_reusesTheRegionBetween();
+    void noEdits_reusesAllInlineRegions();
 };
 
 // ---------------------------------------------------------------------------
@@ -277,6 +280,88 @@ void TstIncrementalParse::singleParagraphEdit_reusesUnchangedInlineRegions()
     // Span output must still match a fresh parse exactly.
     TreeSitterParser ref;
     QVERIFY(ref.parse(QString::fromUtf8(newSrc)));
+    QCOMPARE(fingerprintAll(p.buildSpanMap()),
+             fingerprintAll(ref.buildSpanMap()));
+}
+
+void TstIncrementalParse::editInsideRegion_invalidatesOnlyThatRegion()
+{
+    QByteArray oldSrc = QByteArrayLiteral(
+        "first paragraph.\n\nsecond paragraph here.\n\nthird paragraph.");
+    // Insert "**" pair inside "second" — this edit overlaps the second
+    // paragraph's inline region, so only that one must rebuild; first and
+    // third are reused.
+    QByteArray newSrc = QByteArrayLiteral(
+        "first paragraph.\n\nsecond **paragraph** here.\n\nthird paragraph.");
+
+    TreeSitterParser p;
+    QVERIFY(p.parse(QString::fromUtf8(oldSrc)));
+
+    const int at = oldSrc.indexOf(QByteArrayLiteral("paragraph here"));
+    QVERIFY(at >= 0);
+    ByteEdit e{ static_cast<quint32>(at),
+                static_cast<quint32>(at + 9),  // length of "paragraph"
+                13u };  // length of "**paragraph**"
+    QVERIFY(p.parseIncremental({e}, newSrc));
+
+    QCOMPARE(p.inlineTreeReuseCount(), 2);
+
+    TreeSitterParser ref;
+    QVERIFY(ref.parse(QString::fromUtf8(newSrc)));
+    QCOMPARE(fingerprintAll(p.buildSpanMap()),
+             fingerprintAll(ref.buildSpanMap()));
+}
+
+void TstIncrementalParse::editsInTwoRegions_reusesTheRegionBetween()
+{
+    QByteArray oldSrc = QByteArrayLiteral(
+        "alpha line.\n\nbeta line.\n\ngamma line.");
+    // Bold "alpha" and "gamma" (in old-frame coords, out of order to
+    // exercise the sort path). beta line is untouched, must reuse.
+    const int alphaAt = oldSrc.indexOf(QByteArrayLiteral("alpha"));
+    const int gammaAt = oldSrc.indexOf(QByteArrayLiteral("gamma"));
+    QVERIFY(alphaAt >= 0 && gammaAt >= 0);
+
+    QByteArray newSrc = oldSrc;
+    newSrc.replace(gammaAt, 5, QByteArrayLiteral("**gamma**"));
+    newSrc.replace(alphaAt, 5, QByteArrayLiteral("**alpha**"));
+
+    TreeSitterParser p;
+    QVERIFY(p.parse(QString::fromUtf8(oldSrc)));
+
+    QList<ByteEdit> edits = {
+        ByteEdit{ static_cast<quint32>(gammaAt),
+                  static_cast<quint32>(gammaAt + 5),
+                  9u },
+        ByteEdit{ static_cast<quint32>(alphaAt),
+                  static_cast<quint32>(alphaAt + 5),
+                  9u },
+    };
+    QVERIFY(p.parseIncremental(edits, newSrc));
+
+    QCOMPARE(p.inlineTreeReuseCount(), 1);  // beta line reused
+
+    TreeSitterParser ref;
+    QVERIFY(ref.parse(QString::fromUtf8(newSrc)));
+    QCOMPARE(fingerprintAll(p.buildSpanMap()),
+             fingerprintAll(ref.buildSpanMap()));
+}
+
+void TstIncrementalParse::noEdits_reusesAllInlineRegions()
+{
+    QByteArray src = QByteArrayLiteral(
+        "# Heading\n\nfirst paragraph.\n\nsecond paragraph.");
+
+    TreeSitterParser p;
+    QVERIFY(p.parse(QString::fromUtf8(src)));
+
+    QVERIFY(p.parseIncremental({}, src));
+
+    // 3 inline regions: heading text, paragraph 1, paragraph 2.
+    QCOMPARE(p.inlineTreeReuseCount(), 3);
+
+    TreeSitterParser ref;
+    QVERIFY(ref.parse(QString::fromUtf8(src)));
     QCOMPARE(fingerprintAll(p.buildSpanMap()),
              fingerprintAll(ref.buildSpanMap()));
 }
