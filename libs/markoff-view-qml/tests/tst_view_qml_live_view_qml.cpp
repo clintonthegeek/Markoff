@@ -29,7 +29,6 @@ private Q_SLOTS:
 
     void delegates_render_model_text() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
 
         QQuickView view;
         view.engine()->rootContext()->setContextProperty("doc", &doc);
@@ -116,7 +115,6 @@ private Q_SLOTS:
 
     void mouse_drag_selects_across_block_kinds() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
 
         QQuickView view;
         view.engine()->rootContext()->setContextProperty("doc", &doc);
@@ -238,7 +236,6 @@ private Q_SLOTS:
 
     void delegates_consume_theme_colors() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
 
         // Build a custom theme with sentinel colours.
         Markoff::Theme theme = Markoff::Theme::defaultLight();
@@ -342,7 +339,6 @@ private Q_SLOTS:
 
     void selection_highlight_appears_on_hr_and_image() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
 
         QQuickView view;
         view.engine()->rootContext()->setContextProperty("doc", &doc);

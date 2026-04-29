@@ -88,10 +88,6 @@ public:
     qsizetype collectGarbage();
     qsizetype compact(const CollabText::Crdt::Global &watermark);
 
-    // ===== Coalescing =====
-    void setCoalescingIdleMs(int ms);
-    int  coalescingIdleMs() const;
-
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
     void parseUpdated(const Markoff::Document *parsed, CollabText::Crdt::Global atVersion);

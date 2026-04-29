@@ -281,7 +281,4 @@ qsizetype MarkoffDocument::compact(const CollabText::Crdt::Global &watermark)
     return static_cast<qsizetype>(d->buffer.compact(watermark));
 }
 
-void MarkoffDocument::setCoalescingIdleMs(int ms) { d->coalescingIdleMs = ms; }
-int  MarkoffDocument::coalescingIdleMs() const { return d->coalescingIdleMs; }
-
 }  // namespace Markoff

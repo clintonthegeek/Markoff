@@ -13,7 +13,6 @@ class TstSourceWidgetFindBar : public QObject {
 private:
     Markoff::MarkoffDocument *makeDoc(const QByteArray &seed) {
         auto *d = new Markoff::MarkoffDocument(1);
-        d->setCoalescingIdleMs(0);
         Markoff::MarkoffEdit ed;
         ed.oldStart = 0;
         ed.oldEnd = 0;

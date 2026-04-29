@@ -23,7 +23,6 @@ struct MarkoffDocument::Private {
 
     CollabText::Crdt::Buffer                  buffer;
     quint16                                   replicaId;
-    int                                       coalescingIdleMs = 250;
     QList<Session *>                          sessions;  // filled by Task 23
     Markoff::Parse::Detail::ParsePool         parsePool;
     std::unique_ptr<const Markoff::Document>  latestParse;

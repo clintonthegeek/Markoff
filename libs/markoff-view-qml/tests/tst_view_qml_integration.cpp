@@ -31,7 +31,6 @@ private Q_SLOTS:
     void markoff_editor_qml_loads_and_binds_to_document() {
         // Build a doc with seed content.
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         doc.resetContent(QByteArray("hello world"), Markoff::Origin::FirstOpen);
 
         // Set up a QML engine with the doc + theme as context properties.
@@ -78,7 +77,6 @@ private Q_SLOTS:
 
     void editing_via_markoff_document_propagates_to_qml() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         doc.resetContent(QByteArray("seed"), Markoff::Origin::FirstOpen);
 
         QQmlEngine engine;

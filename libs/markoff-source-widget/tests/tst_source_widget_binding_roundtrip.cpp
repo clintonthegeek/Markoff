@@ -15,7 +15,6 @@ private Q_SLOTS:
     void typing_propagates_to_markoff_document() {
         Markoff::Source::Widget::Editor e;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         e.setDocument(&doc);
         e.show();
         QTest::keyClicks(&e, QStringLiteral("abc"));
@@ -25,7 +24,6 @@ private Q_SLOTS:
     void external_doc_edit_propagates_to_editor() {
         Markoff::Source::Widget::Editor e;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         e.setDocument(&doc);
 
         Markoff::MarkoffEdit ed;
@@ -39,14 +37,12 @@ private Q_SLOTS:
         // QPlainTextEdit's QTextDocument undo stack (which is disabled by
         // SourceTextDocumentBinding::rewireQtDocument).
         //
-        // Each keystroke produces one applyLocalEdit -> one undo entry; the
-        // foundation's coalescingIdleMs is presently unconsumed (see
-        // MarkoffDocumentPrivate::coalescingIdleMs) so three keystrokes need
-        // three Ctrl+Z presses to fully revert. Auto-coalescing is a
-        // foundation feature, not a widget concern.
+        // Each keystroke produces one applyLocalEdit -> one undo entry, so
+        // three keystrokes need three Ctrl+Z presses to fully revert.
+        // Auto-coalescing of adjacent inserts is a foundation concern (not
+        // yet implemented), not a widget concern.
         Markoff::Source::Widget::Editor e;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         e.setDocument(&doc);
         e.show();
         QTest::keyClicks(&e, QStringLiteral("abc"));

@@ -250,7 +250,6 @@ private Q_SLOTS:
     void undo_reverts_local_edit() {
         EditorBackend backend;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         backend.setDocument(&doc);
 
         Markoff::MarkoffEdit ed;
@@ -265,7 +264,6 @@ private Q_SLOTS:
     void redo_replays_undone_edit() {
         EditorBackend backend;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         backend.setDocument(&doc);
 
         Markoff::MarkoffEdit ed;
@@ -281,7 +279,6 @@ private Q_SLOTS:
     void copy_selection_as_markdown_returns_substring() {
         EditorBackend backend;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         backend.setDocument(&doc);
 
         Markoff::MarkoffEdit ed;
@@ -299,7 +296,6 @@ private Q_SLOTS:
     void copy_selection_as_markdown_handles_reversed_selection() {
         EditorBackend backend;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         backend.setDocument(&doc);
 
         Markoff::MarkoffEdit ed;
@@ -318,7 +314,6 @@ private Q_SLOTS:
     void copy_selection_returns_empty_when_degenerate() {
         EditorBackend backend;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         backend.setDocument(&doc);
 
         Markoff::MarkoffEdit ed;

@@ -28,7 +28,6 @@ private Q_SLOTS:
 
     void find_all_returns_match_count() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         Markoff::MarkoffEdit ed;
         ed.oldStart = 0; ed.oldEnd = 0;
         ed.newText = QByteArray("the quick brown fox jumps over the lazy fox");
@@ -49,7 +48,6 @@ private Q_SLOTS:
 
     void find_next_advances_and_find_prev_retreats() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         Markoff::MarkoffEdit ed;
         ed.oldStart = 0; ed.oldEnd = 0;
         ed.newText = QByteArray("the quick brown fox jumps over the lazy fox");
@@ -69,7 +67,6 @@ private Q_SLOTS:
 
     void clear_resets_match_count() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         Markoff::MarkoffEdit ed;
         ed.oldStart = 0; ed.oldEnd = 0;
         ed.newText = QByteArray("foo bar foo");
@@ -89,7 +86,6 @@ private Q_SLOTS:
 
     void case_sensitive_flag_changes_results() {
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         Markoff::MarkoffEdit ed;
         ed.oldStart = 0; ed.oldEnd = 0;
         ed.newText = QByteArray("Foo foo FOO");

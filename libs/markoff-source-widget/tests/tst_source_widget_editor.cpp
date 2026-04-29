@@ -19,7 +19,6 @@ private Q_SLOTS:
     void setDocument_attaches_and_seed_text_appears() {
         Markoff::Source::Widget::Editor e;
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         doc.resetContent(QByteArray("hello world"), Markoff::Origin::FirstOpen);
         e.setDocument(&doc);
         QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);

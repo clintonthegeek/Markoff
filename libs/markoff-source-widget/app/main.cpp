@@ -16,7 +16,6 @@ int main(int argc, char **argv) {
     QApplication app(argc, argv);
 
     Markoff::MarkoffDocument doc(1);
-    doc.setCoalescingIdleMs(80);
 
     QByteArray seed;
     if (argc > 1) {

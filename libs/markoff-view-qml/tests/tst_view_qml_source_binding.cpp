@@ -184,7 +184,6 @@ private Q_SLOTS:
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -204,7 +203,6 @@ private Q_SLOTS:
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -229,7 +227,6 @@ private Q_SLOTS:
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -253,7 +250,6 @@ private Q_SLOTS:
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -277,7 +273,6 @@ private Q_SLOTS:
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -303,7 +298,6 @@ private Q_SLOTS:
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -329,7 +323,6 @@ private Q_SLOTS:
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -352,7 +345,6 @@ private Q_SLOTS:
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -383,7 +375,6 @@ private Q_SLOTS:
         QVERIFY(qqtd);
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -406,7 +397,6 @@ private Q_SLOTS:
         QVERIFY(qqtd);
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -429,7 +419,6 @@ private Q_SLOTS:
         QVERIFY(qqtd);
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
@@ -464,7 +453,6 @@ private Q_SLOTS:
         QVERIFY(qqtd);
 
         Markoff::MarkoffDocument doc(1);
-        doc.setCoalescingIdleMs(0);
         EditorBackend backend;
         backend.setDocument(&doc);
         SourceTextDocumentBinding binding;
