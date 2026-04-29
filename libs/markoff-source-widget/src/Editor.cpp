@@ -11,6 +11,7 @@
 #include <markoff-foundation/SourceTextDocumentBinding.h>
 
 #include <QKeyEvent>
+#include <QPalette>
 #include <QResizeEvent>
 
 namespace Markoff::Source::Widget {
@@ -88,6 +89,20 @@ Markoff::Theme Editor::theme() const { return m_theme; }
 
 void Editor::setTheme(const Markoff::Theme &t) {
     m_theme = t;
+    QPalette p = palette();
+    p.setColor(QPalette::Base,            t.color(Markoff::Theme::Slot::EditorBackground));
+    p.setColor(QPalette::Text,            t.color(Markoff::Theme::Slot::TextDefault));
+    p.setColor(QPalette::Highlight,       t.color(Markoff::Theme::Slot::SelectionBackground));
+    p.setColor(QPalette::HighlightedText, t.color(Markoff::Theme::Slot::TextDefault));
+    setPalette(p);
+
+    const bool darkUi = t.color(Markoff::Theme::Slot::EditorBackground).lightnessF() < 0.5;
+    if (m_highlighter) {
+        m_highlighter->setTheme(repo().defaultTheme(
+            darkUi ? KSyntaxHighlighting::Repository::DarkTheme
+                   : KSyntaxHighlighting::Repository::LightTheme));
+        m_highlighter->rehighlight();
+    }
     if (m_gutter) m_gutter->update();
     emit themeChanged();
 }

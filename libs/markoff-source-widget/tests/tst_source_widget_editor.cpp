@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QPalette>
 #include <QSignalSpy>
 #include <QTest>
 
 #include <markoff/source/widget/Editor.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Origin.h>
+#include <markoff-foundation/Theme.h>
 
 class TstSourceWidgetEditor : public QObject {
     Q_OBJECT
@@ -25,6 +27,15 @@ private Q_SLOTS:
         QTest::qWait(50);
         QCOMPARE(e.toPlainText(), QStringLiteral("hello world"));
         QCOMPARE(e.document(), &doc);
+    }
+
+    void setTheme_updates_palette_base_color() {
+        Markoff::Source::Widget::Editor e;
+        Markoff::Theme t = Markoff::Theme::defaultLight();
+        const QColor sentinel("#abcdef");
+        t.setColor(Markoff::Theme::Slot::EditorBackground, sentinel);
+        e.setTheme(t);
+        QCOMPARE(e.palette().color(QPalette::Base), sentinel);
     }
 };
 
