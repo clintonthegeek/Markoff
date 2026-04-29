@@ -25,6 +25,7 @@ ApplicationWindow {
             document: ctxDocument
             theme: ctxTheme
             completionModel: ctxCompletionModel
+            mode: typeof startInLiveMode !== "undefined" && startInLiveMode ? "live" : "source"
             focus: true
         }
 

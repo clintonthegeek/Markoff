@@ -34,16 +34,27 @@ int main(int argc, char *argv[])
 
     QApplication app(argc, argv);
 
-    if (argc < 2) {
-        qWarning("Usage: %s <markdown-file>", argv[0]);
+    const QStringList cliArgs = QCoreApplication::arguments();
+    const bool startInLiveMode = cliArgs.contains(QStringLiteral("--live"));
+
+    // Find the first non-flag argument as the file path.
+    QString filePath;
+    for (int i = 1; i < cliArgs.size(); ++i) {
+        const QString &a = cliArgs.at(i);
+        if (a.startsWith(QStringLiteral("--"))) continue;
+        filePath = a;
+        break;
+    }
+    if (filePath.isEmpty()) {
+        qWarning("Usage: %s [--live] <markdown-file>", argv[0]);
         return 1;
     }
 
     // Read the file.
-    QFile in(QString::fromLocal8Bit(argv[1]));
+    QFile in(filePath);
     if (!in.open(QIODevice::ReadOnly)) {
         qWarning("Failed to open %s: %s",
-                 argv[1], qUtf8Printable(in.errorString()));
+                 qUtf8Printable(filePath), qUtf8Printable(in.errorString()));
         return 1;
     }
     const QByteArray content = in.readAll();
@@ -71,6 +82,8 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(
         "ctxTheme", QVariant::fromValue(Markoff::Theme::defaultLight()));
     engine.rootContext()->setContextProperty("ctxCompletionModel", popupModel.get());
+    engine.rootContext()->setContextProperty(QStringLiteral("startInLiveMode"),
+                                             QVariant(startInLiveMode));
 
     engine.loadFromModule("org.markoff.view.qml.app", "Main");
     if (engine.rootObjects().isEmpty()) return 2;
