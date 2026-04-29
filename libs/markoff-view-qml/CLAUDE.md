@@ -16,14 +16,70 @@ This library lives on branch `exploration/new-foundation` and is not yet part of
 - Emoji completion popup via `CompletionPopupModel` + `EmojiCompletionProvider`.
 - Test app at `app/main.cpp` with an AST inspector pane (parse count + parse version).
 
-## Phase-2 plan (not in this code — architecture is positioned for it)
+## Phase-2 v0 walking skeleton (in code)
 
-- `LiveEditor.qml` will be a sibling of `SourceEditor.qml` inside `MarkoffEditor.qml`. The explicit growth seam is the `// PHASE-2 SEAM` comment in `qml/MarkoffEditor.qml`.
-- `LiveListModelBinding` will be a sibling of `SourceTextDocumentBinding`, owning a `ListView` + `DelegateChooser` over an AST model fed by `parseUpdatedAt`.
-- All 16 content types from the legacy `markoff-live` editor must eventually render: headings, bold/italic/strikethrough, inline code, fenced code blocks, inline math, display math, pipe tables (editable), images, wikilinks, external links, callouts, task checkboxes, horizontal rules, YAML frontmatter, blockquotes, tags. Plus 2 missing in legacy: embedded notes (`![[note]]`), mermaid blocks.
-- `EditorBackend`, `Session`, and the CRDT undo stack all stay the same in Phase 2 — only the binding + view layer changes.
+The Phase-2 read-only walking skeleton landed on `exploration/new-foundation` (plan: `docs/plans/2026-04-29-live-render-walking-skeleton.md`, design: `docs/specs/2026-04-29-live-render-design.md`). `LiveView.qml` is now a sibling of `SourceEditor.qml` inside `MarkoffEditor.qml` and slots into the `// PHASE-2 SEAM`. `EditorBackend`, `Session`, the CRDT undo stack, and `ParsePool` are unchanged — only the new binding + view layer was added.
 
-## Architectural invariants (do not violate)
+**v0 block kinds rendered (read-only):**
+
+- `paragraph` (TextEdit with `textFormat: TextEdit.MarkdownText`)
+- `heading` (level-driven font sizing via `Theme`)
+- `hr` (themed divider)
+- `image` (async `Image` with alt-text fallback)
+- `code-block` (TextEdit + `org.kde.syntaxhighlighting` keyed by `codeLanguage`; consults `CodeBlockProcessorRegistry` first)
+
+**C++ exports (Tasks 2-8 of the plan):**
+
+- `BlockKind` — string-keyed kind constants (open set; no closed enum so plugin-registered kinds don't recompile the library).
+- `BlockRecord` / `BlockKey` — value types. `BlockKey = (kind, content-hash)` is the diff identity unit.
+- `BlockWalker` — top-level AST → `BlockRecord` walker.
+- `AstBlockDiff` — pure C++ Myers/LCS diff over `QList<BlockKey>`. Output: edit script (`Equal | Insert | Delete | Move`).
+- `LiveSelectionModel` — `(anchorBlock, anchorOffset, activeBlock, activeOffset)` state. `Q_INVOKABLE` `begin/extend/clear/rangeForBlock/collectSelectedText/copySelectionToClipboard`. Structurally identical to the spike at `.spike/cross-block-selection/SelectionModel.{h,cpp}`.
+- `LiveBlockModel` — `QAbstractListModel`. Roles: `kind`, `text`, plus kind-specific (`headingLevel`, `imageSrc`/`imageAlt`/`imageTitle`, `codeLanguage`, `codeText`).
+- `LiveListModelBinding` — `QObject` exposed to QML. Subscribes to `EditorBackend::parseUpdatedAt`, owns the `LiveBlockModel`, drives `AstBlockDiff` to emit minimal Qt model signals, clears `LiveSelectionModel` if a touched block is removed.
+- `LiveContextMenuHandler` — KDAB Widget bridge. Owns `std::unique_ptr<QMenu>`. v0 actions: Copy, Select All. The library + test app now link `Qt6::Widgets`; `main.cpp` uses `QApplication`.
+
+**QML files added:**
+
+- `qml/LiveView.qml` — top-level. `ListView` + `DelegateChooser` (from `Qt.labs.qmlmodels`) + a top-level `MouseArea` driving `LiveSelectionModel`. The `hit(mouseX, mouseY)` JS function from the spike findings is the load-bearing piece.
+- `qml/delegates/ParagraphDelegate.qml`
+- `qml/delegates/HeadingDelegate.qml`
+- `qml/delegates/HorizontalRuleDelegate.qml`
+- `qml/delegates/ImageDelegate.qml`
+- `qml/delegates/CodeBlockDelegate.qml`
+
+`MarkoffEditor.qml` now exposes a `mode` property (`"source"` or `"live"`) and swaps the visible child accordingly. The test app's `--live` flag sets `mode: "live"` at startup; default is still `"source"` for v0.
+
+The legacy `markoff-live` editor's 16 content types are still the eventual target (math, mermaid, tables, lists, blockquotes, callouts, links/wikilinks, embedded notes, frontmatter, tags, etc.). v0 ships the five above; everything else is deferred per the design's `## 8. Out of scope`.
+
+**Cross-references:**
+
+- Design doc: `docs/specs/2026-04-29-live-render-design.md` (load-bearing — read this before touching anything Live-side).
+- Spike findings: `docs/specs/2026-04-29-cross-block-selection-spike-findings.md` (the `hit()` function's edge cases + the `INT32_MAX`-clamp lesson).
+- Spike code (runnable reference): `.spike/cross-block-selection/`.
+- Implementation plan: `docs/plans/2026-04-29-live-render-walking-skeleton.md`.
+
+### Architectural invariants (Phase-2 v0)
+
+These are the eight invariants from the design spec (`docs/specs/2026-04-29-live-render-design.md` §4) — must hold for every commit touching `LiveView`:
+
+1. **Single source of truth: `MarkoffDocument` only.** No per-delegate independent state for content. Delegates are followers of the model; never writers (until editing-spec).
+
+2. **Selection is canonical in `LiveSelectionModel`.** Each TextEdit's `selectionStart`/`selectionEnd` is a derived shadow of the model. `TextEdit.selectByMouse` is `false` everywhere; the top-level `MouseArea` is the sole input owner.
+
+3. **AST-driven model identity is preserved across parses** via `AstBlockDiff` (Myers/LCS over `BlockKey`s).
+
+4. **No `setFocusProxy`, no `QApplication::sendEvent`, no inline `QTextObject` text-objects.** Block-level rendering = separate delegates.
+
+5. **Native windows for native concerns** (KDAB Widget bridge for menus / popups / dialogs). QML `Menu`/`Popup` is the exception.
+
+6. **Parse-pool coalescing applies** (Phase-1's perf fix carries forward).
+
+7. **`MarkoffDocument` black-boxes the CRDT.** Live render uses **no** `CollabText::Crdt::*` types. Selection is `(blockIndex, offsetInBlockText)`, not CRDT anchors. Future non-CRDT-bypass codepath has zero cost to the view layer.
+
+8. **`rangeForBlock`'s `INT32_MAX` sentinel must be clamped by QML consumers.** `TextEdit.select(start, end)` silently no-ops if `end > text.length`. Every `Connections` handler clamps via `Math.min(r.y, textEdit.length)`.
+
+## Architectural invariants (cross-cutting — do not violate)
 
 These are load-bearing. Breaking them re-introduces the legacy `markoff-live` failure modes documented in the audit (§2.5 of the POC plan).
 
@@ -73,10 +129,11 @@ cmake --build build-dev --target markoff-view-qml-app -j
 Run the test app:
 
 ```bash
-./build-dev/bin/markoff-view-qml-app /path/to/file.md
+./build-dev/bin/markoff-view-qml-app /path/to/file.md          # Source mode (default)
+./build-dev/bin/markoff-view-qml-app --live /path/to/file.md   # Live mode (Phase-2 v0)
 ```
 
-The AST inspector pane in the app shows parse count and parse version — useful for verifying the `parseUpdatedAt` relay.
+The AST inspector pane in the app shows parse count and parse version — useful for verifying the `parseUpdatedAt` relay. The `--live` flag boots `MarkoffEditor` with `mode: "live"`, exercising the new `LiveView.qml` walking skeleton.
 
 ## Testing
 
@@ -138,7 +195,9 @@ All tests use `QTEST_MAIN` (not `QTEST_APPLESS_MAIN`) — the QML engine and `QS
 - `qml/SourceEditor.qml` — `TextArea` + `KSyntaxHighlighter` attachment + `SourceTextDocumentBinding` bindings.
 - `qml/SearchBar.qml` — find UI; calls `SearchBackend` invokables.
 - `qml/CompletionPopup.qml` — emoji completion popup. **Important:** the delegate uses `model.display` access (the qualified form), not `required property string display`. Qt6 `ItemDelegate` has a FINAL `display` property that conflicts with a `required` property of the same name — the `required` declaration wins the name but breaks `ItemDelegate`'s own text binding. Found during T22; use `model.display` everywhere.
-- `qml/MarkoffEditor.qml` — outer shell. Exposes `editorBackend` via alias so sibling components (search bar, completion popup, AST inspector) can bind to it. The `// PHASE-2 SEAM` comment marks where `LiveEditor.qml` plugs in.
+- `qml/MarkoffEditor.qml` — outer shell. Exposes `editorBackend` via alias so sibling components (search bar, completion popup, AST inspector) can bind to it. Has a `mode` property (`"source"` / `"live"`) that swaps the visible child between `SourceEditor.qml` and `LiveView.qml` (the former `// PHASE-2 SEAM` is now wired).
+- `qml/LiveView.qml` — Phase-2 v0 read-only live render. `ListView` + `DelegateChooser` + top-level `MouseArea` driving `LiveSelectionModel`. See "Phase-2 v0 walking skeleton" above.
+- `qml/delegates/{Paragraph,Heading,HorizontalRule,Image,CodeBlock}Delegate.qml` — the five v0 block delegates.
 
 ## Conventions
 
@@ -152,7 +211,7 @@ All tests use `QTEST_MAIN` (not `QTEST_APPLESS_MAIN`) — the QML engine and `QS
 ## Known limitations / deferred
 
 - No `EditorHighlighter` (spec §9.5's second `QSyntaxHighlighter` for code-block content overlay). Attaching two highlighters to the same `QTextDocument` is risky; deferred indefinitely.
-- No live-preview formatting — Phase 2.
+- Live-preview renders **read-only** for paragraph / heading / hr / image / code-block only at v0. Editing in Live mode + the other ~14 block kinds (math, mermaid, tables, lists, blockquotes, callouts, links/wikilinks, embedded notes, frontmatter, tags, etc.) are deferred to subsequent specs (editing-spec + per-delegate specs).
 - No file save / save-as / file picker — POC takes one file from `argv`.
 - No multi-cursor / secondary selection UI — foundation supports it, POC doesn't expose it.
 - No replace UI — `ReplaceController` exists in the foundation but no QML wrapper.
