@@ -14,6 +14,8 @@ qt_add_qml_module(markoff_view_qml
     SOURCES
         src/EditorBackend.cpp
         include/markoff/view/qml/EditorBackend.h
+        src/SourceTextDocumentBinding.cpp
+        include/markoff/view/qml/SourceTextDocumentBinding.h
 )
 
 target_include_directories(markoff_view_qml
