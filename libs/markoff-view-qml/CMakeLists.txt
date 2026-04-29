@@ -33,6 +33,8 @@ qt_add_qml_module(markoff_view_qml
         src/BlockWalker.h
         src/AstBlockDiff.cpp
         src/AstBlockDiff.h
+        src/LiveListModelBinding.cpp
+        include/markoff/view/qml/LiveListModelBinding.h
     QML_FILES
         qml/SourceEditor.qml
         qml/SearchBar.qml

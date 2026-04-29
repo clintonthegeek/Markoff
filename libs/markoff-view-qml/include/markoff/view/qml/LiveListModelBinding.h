@@ -1,0 +1,49 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
+
+#include <QObject>
+#include <memory>
+#include <qqmlintegration.h>
+
+#include <crdt/Anchor.h>
+#include <markoff/view/qml/EditorBackend.h>
+#include <markoff/view/qml/LiveBlockModel.h>
+#include <markoff/view/qml/LiveSelectionModel.h>
+
+namespace Markoff { class Document; }
+
+namespace Markoff::View::Qml {
+
+/// Wires `EditorBackend::parseUpdatedAt` → `BlockWalker` → `AstBlockDiff` →
+/// `LiveBlockModel`. Also clears `LiveSelectionModel` if any block touched by
+/// the edit (i.e. anchor or active block disappears in the diff) is removed.
+class LiveListModelBinding : public QObject {
+    Q_OBJECT
+    QML_ELEMENT
+    Q_PROPERTY(EditorBackend *editorBackend
+               READ editorBackend WRITE setEditorBackend NOTIFY editorBackendChanged)
+    Q_PROPERTY(LiveBlockModel *model READ model CONSTANT)
+    Q_PROPERTY(LiveSelectionModel *selectionModel READ selectionModel CONSTANT)
+
+public:
+    explicit LiveListModelBinding(QObject *parent = nullptr);
+    ~LiveListModelBinding() override;
+
+    EditorBackend *editorBackend() const;
+    void setEditorBackend(EditorBackend *eb);
+
+    LiveBlockModel *model() const;
+    LiveSelectionModel *selectionModel() const;
+
+Q_SIGNALS:
+    void editorBackendChanged();
+
+private:
+    void onParseUpdatedAt(const Markoff::Document *parsed,
+                          CollabText::Crdt::Global atVersion);
+
+    struct Private;
+    std::unique_ptr<Private> d;
+};
+
+}  // namespace Markoff::View::Qml

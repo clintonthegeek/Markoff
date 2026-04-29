@@ -52,6 +52,11 @@ add_test(NAME tst_view_qml_live_block_model COMMAND tst_view_qml_live_block_mode
 target_link_libraries(tst_view_qml_live_block_model PRIVATE Qt6::Test markoff_view_qml)
 set_tests_properties(tst_view_qml_live_block_model PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_view_qml_live_list_model_binding tst_view_qml_live_list_model_binding.cpp)
+add_test(NAME tst_view_qml_live_list_model_binding COMMAND tst_view_qml_live_list_model_binding)
+target_link_libraries(tst_view_qml_live_list_model_binding PRIVATE Qt6::Test markoff_view_qml markoff_foundation)
+set_tests_properties(tst_view_qml_live_list_model_binding PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_view_qml_app_smoke tst_view_qml_app_smoke.cpp)
 add_test(NAME tst_view_qml_app_smoke COMMAND tst_view_qml_app_smoke)
 target_link_libraries(tst_view_qml_app_smoke PRIVATE Qt6::Test Qt6::Core)
