@@ -37,6 +37,11 @@ add_test(NAME tst_view_qml_block_walker COMMAND tst_view_qml_block_walker)
 target_link_libraries(tst_view_qml_block_walker PRIVATE Qt6::Test markoff_view_qml)
 set_tests_properties(tst_view_qml_block_walker PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_view_qml_ast_block_diff tst_view_qml_ast_block_diff.cpp)
+add_test(NAME tst_view_qml_ast_block_diff COMMAND tst_view_qml_ast_block_diff)
+target_link_libraries(tst_view_qml_ast_block_diff PRIVATE Qt6::Test markoff_view_qml)
+set_tests_properties(tst_view_qml_ast_block_diff PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_view_qml_app_smoke tst_view_qml_app_smoke.cpp)
 add_test(NAME tst_view_qml_app_smoke COMMAND tst_view_qml_app_smoke)
 target_link_libraries(tst_view_qml_app_smoke PRIVATE Qt6::Test Qt6::Core)
