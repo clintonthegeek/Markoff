@@ -364,6 +364,111 @@ private Q_SLOTS:
         backend.undo();
         QCOMPARE(qqtd->textDocument()->toPlainText(), QString());
     }
+
+    // -----------------------------------------------------------------------
+    // T14: cursor/selection int↔anchor bridge
+    // -----------------------------------------------------------------------
+
+    void setting_cursor_position_lifts_to_backend_anchor() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        QVERIFY(qqtd);
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello world"));
+
+        binding.setCursorPosition(6);
+
+        const auto a = backend.cursorAnchor();
+        QCOMPARE(doc.resolveAnchor(a), quint32(6));
+    }
+
+    void backend_cursor_anchor_change_propagates_to_int_position() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        QVERIFY(qqtd);
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello world"));
+
+        const auto a4 = doc.anchorAt(4, CollabText::Crdt::Bias::Left);
+        backend.setCursorAnchor(a4);
+
+        QCOMPARE(binding.cursorPosition(), 4);
+    }
+
+    void selection_int_props_round_trip_via_backend() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        QVERIFY(qqtd);
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("hello world"));
+
+        binding.setSelectionStart(2);
+        binding.setSelectionEnd(7);
+
+        const Markoff::Selection sel = backend.session()->primarySelection();
+        QCOMPARE(doc.resolveAnchor(sel.anchor), quint32(2));
+        QCOMPARE(doc.resolveAnchor(sel.active), quint32(7));
+
+        // Reverse: change session, observe binding ints update.
+        const auto a3 = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        const auto a8 = doc.anchorAt(8, CollabText::Crdt::Bias::Right);
+        Markoff::Selection sel2;
+        sel2.anchor = a3; sel2.active = a8; sel2.kind = Markoff::Selection::Kind::Primary;
+        backend.session()->setPrimarySelection(sel2);
+
+        QCOMPARE(binding.selectionStart(), 3);
+        QCOMPARE(binding.selectionEnd(), 8);
+    }
+
+    void cursor_position_handles_non_ascii() {
+        QQmlApplicationEngine engine;
+        QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
+        QVERIFY(qqtd);
+
+        Markoff::MarkoffDocument doc(1);
+        doc.setCoalescingIdleMs(0);
+        EditorBackend backend;
+        backend.setDocument(&doc);
+        SourceTextDocumentBinding binding;
+        binding.setEditorBackend(&backend);
+        binding.setQtQuickDocument(qqtd);
+
+        // "héllo" — 'é' is 1 UTF-16 unit, 2 UTF-8 bytes.
+        QTextCursor cursor(qqtd->textDocument());
+        cursor.insertText(QStringLiteral("héllo"));
+
+        // qtPos 2 (after 'h' + 'é') corresponds to byte 3 (after 'h' + 2 bytes for é).
+        binding.setCursorPosition(2);
+        const quint32 byteOff = doc.resolveAnchor(backend.cursorAnchor());
+        QCOMPARE(byteOff, quint32(3));
+    }
 };
 
 QTEST_MAIN(TstViewQmlSourceBinding)

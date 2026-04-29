@@ -21,6 +21,18 @@ class SourceTextDocumentBinding : public QObject {
                READ qtQuickDocument
                WRITE setQtQuickDocument
                NOTIFY qtQuickDocumentChanged)
+    Q_PROPERTY(int cursorPosition
+               READ cursorPosition
+               WRITE setCursorPosition
+               NOTIFY cursorPositionChanged)
+    Q_PROPERTY(int selectionStart
+               READ selectionStart
+               WRITE setSelectionStart
+               NOTIFY selectionStartChanged)
+    Q_PROPERTY(int selectionEnd
+               READ selectionEnd
+               WRITE setSelectionEnd
+               NOTIFY selectionEndChanged)
 public:
     explicit SourceTextDocumentBinding(QObject *parent = nullptr);
     ~SourceTextDocumentBinding() override;
@@ -40,9 +52,21 @@ public:
     QQuickTextDocument *qtQuickDocument() const;
     void                setQtQuickDocument(QQuickTextDocument *);
 
+    int  cursorPosition() const;
+    void setCursorPosition(int pos);
+
+    int  selectionStart() const;
+    void setSelectionStart(int pos);
+
+    int  selectionEnd() const;
+    void setSelectionEnd(int pos);
+
 Q_SIGNALS:
     void editorBackendChanged();
     void qtQuickDocumentChanged();
+    void cursorPositionChanged();
+    void selectionStartChanged();
+    void selectionEndChanged();
 
 private Q_SLOTS:
     void onQtContentsChange(int qtPos, int charsRemoved, int charsAdded);
@@ -57,14 +81,25 @@ private:
     /// Rewire the contentsChanged subscription to the backend's current document.
     void rebindMarkoffDocumentSubscription();
 
+    /// T14: sync cursorPosition from backend's cursorAnchor.
+    void syncFromBackendCursor();
+
+    /// T14: sync selectionStart/selectionEnd from backend's selectionAnchor/selectionActive.
+    void syncFromBackendSelection();
+
     EditorBackend      *m_editorBackend = nullptr;
     QQuickTextDocument *m_qtQuickDoc    = nullptr;
     QTextDocument      *m_qtDoc         = nullptr;  ///< the captured QTextDocument
 
     Markoff::MarkoffDocument *m_subscribedDoc = nullptr;  ///< what we're currently subscribed to
 
-    bool m_applyingLocalEdit  = false;  ///< T12: set during applyLocalEdit ingestion
-    bool m_applyingRemoteEdit = false;  ///< T13: set during reverse edit application
+    bool m_applyingLocalEdit      = false;  ///< T12: set during applyLocalEdit ingestion
+    bool m_applyingRemoteEdit     = false;  ///< T13: set during reverse edit application
+    bool m_applyingBackendCursor  = false;  ///< T14: cycle guard for int↔anchor sync
+
+    int m_cursorPosition = 0;   ///< T14: mirrors TextArea.cursorPosition
+    int m_selectionStart = 0;   ///< T14: mirrors TextArea.selectionStart
+    int m_selectionEnd   = 0;   ///< T14: mirrors TextArea.selectionEnd
 };
 
 }  // namespace Markoff::View::Qml
