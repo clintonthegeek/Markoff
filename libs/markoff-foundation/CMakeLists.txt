@@ -32,6 +32,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/Kf6SyntaxHighlightService.h
     include/markoff-foundation/RenderedBlock.h
     include/markoff-foundation/CodeBlockProcessor.h
+    include/markoff-foundation/CodeBlockProcessorRegistry.h
     include/markoff-foundation/CommandFacade.h
     include/markoff-foundation/SearchEngine.h
     include/markoff-foundation/ReplaceController.h
@@ -62,6 +63,7 @@ add_library(markoff_foundation STATIC
     src/CommandFacade.cpp
     src/SearchEngine.cpp
     src/ReplaceController.cpp
+    src/CodeBlockProcessorRegistry.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h
