@@ -1,0 +1,344 @@
+Test project /home/clinton/dev/Markoff/.worktrees/foundation-exploration/build-dev
+        Start   1: tst_markoff_parser_document
+        Start   2: tst_markoff_parser_document_queries
+        Start   3: tst_markoff_parser_splitter
+        Start   4: tst_markoff_parser_table
+        Start   5: tst_markoff_parser_linktext
+        Start   6: tst_markoff_parser_frontmatter
+        Start   7: tst_markoff_parser_splitter_table_passthrough
+        Start   8: tst_clock
+        Start   9: tst_locator
+        Start  10: tst_buffer
+        Start  11: tst_convergence
+        Start  12: tst_sumtree
+        Start  13: tst_anchor
+        Start  14: tst_opqueue
+        Start  15: tst_utf8
+        Start  16: tst_rope
+  1/147 Test   #1: tst_markoff_parser_document .....................   Passed    0.02 sec
+  2/147 Test   #2: tst_markoff_parser_document_queries .............   Passed    0.02 sec
+  3/147 Test   #5: tst_markoff_parser_linktext .....................   Passed    0.02 sec
+  4/147 Test   #7: tst_markoff_parser_splitter_table_passthrough ...   Passed    0.01 sec
+        Start  17: tst_fuzz
+        Start  18: tst_rope_integration
+        Start  19: tst_undomap
+        Start  20: tst_benchmark
+  5/147 Test   #3: tst_markoff_parser_splitter .....................   Passed    0.02 sec
+  6/147 Test   #4: tst_markoff_parser_table ........................   Passed    0.02 sec
+  7/147 Test   #6: tst_markoff_parser_frontmatter ..................   Passed    0.02 sec
+        Start  21: tst_gc
+        Start  22: tst_serialization
+        Start  23: tst_edits_since
+  8/147 Test   #8: tst_clock .......................................   Passed    1.00 sec
+        Start  24: tst_filesync
+  9/147 Test  #16: tst_rope ........................................   Passed    1.00 sec
+        Start  25: tst_multicursor
+ 10/147 Test  #12: tst_sumtree .....................................   Passed    1.01 sec
+        Start  26: tst_realistic
+ 11/147 Test   #9: tst_locator .....................................   Passed    1.05 sec
+        Start  27: tst_identity_json
+ 12/147 Test  #13: tst_anchor ......................................   Passed    1.05 sec
+ 13/147 Test  #15: tst_utf8 ........................................   Passed    1.05 sec
+        Start  28: tst_identity_store
+        Start  29: tst_identity_projector
+ 14/147 Test  #10: tst_buffer ......................................   Passed    1.06 sec
+        Start  30: tst_presence_manager
+ 15/147 Test  #14: tst_opqueue .....................................   Passed    1.06 sec
+        Start  31: tst_identity_widgets
+ 16/147 Test  #18: tst_rope_integration ............................   Passed    1.08 sec
+ 17/147 Test  #22: tst_serialization ...............................   Passed    1.07 sec
+ 18/147 Test  #23: tst_edits_since .................................   Passed    1.07 sec
+        Start  32: tst_collab_plain_text_edit
+        Start  33: tst_scroll_stability
+        Start  34: tst_stream_sync
+ 19/147 Test  #19: tst_undomap .....................................   Passed    1.08 sec
+        Start  35: tst_chat_message
+ 20/147 Test  #35: tst_chat_message ................................   Passed    0.01 sec
+        Start  36: tst_comment
+ 21/147 Test  #36: tst_comment .....................................   Passed    0.01 sec
+        Start  37: tst_markoff_edit
+ 22/147 Test  #37: tst_markoff_edit ................................   Passed    0.04 sec
+        Start  38: tst_anchor_json
+ 23/147 Test  #38: tst_anchor_json .................................   Passed    0.03 sec
+        Start  39: tst_selection
+ 24/147 Test  #39: tst_selection ...................................   Passed    0.03 sec
+        Start  40: tst_fold_ref
+ 25/147 Test  #21: tst_gc ..........................................   Passed    1.21 sec
+        Start  41: tst_foundation_markoff_document
+ 26/147 Test  #40: tst_fold_ref ....................................   Passed    0.03 sec
+        Start  42: tst_foundation_session
+ 27/147 Test  #41: tst_foundation_markoff_document .................   Passed    0.03 sec
+        Start  43: tst_foundation_parse_pool
+ 28/147 Test  #42: tst_foundation_session ..........................   Passed    0.02 sec
+        Start  44: tst_foundation_theme
+ 29/147 Test  #44: tst_foundation_theme ............................   Passed    0.02 sec
+        Start  45: tst_foundation_link_service
+ 30/147 Test  #43: tst_foundation_parse_pool .......................   Passed    0.03 sec
+        Start  46: tst_foundation_cmd_edit
+ 31/147 Test  #45: tst_foundation_link_service .....................   Passed    0.02 sec
+        Start  47: tst_foundation_cmd_inline_format
+ 32/147 Test  #46: tst_foundation_cmd_edit .........................   Passed    0.02 sec
+        Start  48: tst_foundation_cmd_block
+ 33/147 Test  #47: tst_foundation_cmd_inline_format ................   Passed    0.02 sec
+        Start  49: tst_foundation_cmd_insert
+ 34/147 Test  #48: tst_foundation_cmd_block ........................   Passed    0.02 sec
+        Start  50: tst_foundation_cmd_multi
+ 35/147 Test  #49: tst_foundation_cmd_insert .......................   Passed    0.02 sec
+        Start  51: tst_foundation_command_facade
+ 36/147 Test  #50: tst_foundation_cmd_multi ........................   Passed    0.02 sec
+        Start  52: tst_foundation_search_engine
+ 37/147 Test  #51: tst_foundation_command_facade ...................   Passed    0.02 sec
+        Start  53: tst_foundation_replace_controller
+ 38/147 Test  #52: tst_foundation_search_engine ....................   Passed    0.02 sec
+        Start  54: tst_foundation_code_token
+ 39/147 Test  #53: tst_foundation_replace_controller ...............   Passed    0.02 sec
+        Start  55: tst_foundation_syntax_highlight_service
+ 40/147 Test  #54: tst_foundation_code_token .......................   Passed    0.01 sec
+        Start  56: tst_foundation_code_block_processor_registry
+ 41/147 Test  #56: tst_foundation_code_block_processor_registry ....   Passed    0.02 sec
+        Start  57: tst_foundation_completion_types
+ 42/147 Test  #57: tst_foundation_completion_types .................   Passed    0.02 sec
+        Start  58: tst_foundation_completion_detector
+ 43/147 Test  #58: tst_foundation_completion_detector ..............   Passed    0.02 sec
+        Start  59: tst_foundation_completion_registry
+ 44/147 Test  #59: tst_foundation_completion_registry ..............   Passed    0.02 sec
+        Start  60: tst_foundation_services_bundle
+ 45/147 Test  #60: tst_foundation_services_bundle ..................   Passed    0.03 sec
+        Start  61: tst_foundation_markoff_document_property
+ 46/147 Test  #55: tst_foundation_syntax_highlight_service .........   Passed    0.15 sec
+        Start  62: tst_markoff_value_types
+ 47/147 Test  #62: tst_markoff_value_types .........................   Passed    0.03 sec
+        Start  63: tst_markoff_ephemeral_state
+ 48/147 Test  #63: tst_markoff_ephemeral_state .....................   Passed    0.02 sec
+        Start  64: tst_markoff_document
+ 49/147 Test  #64: tst_markoff_document ............................   Passed    0.03 sec
+        Start  65: tst_cursor_position
+ 50/147 Test  #65: tst_cursor_position .............................   Passed    0.01 sec
+        Start  66: tst_markoff_search_controller
+ 51/147 Test  #66: tst_markoff_search_controller ...................   Passed    0.02 sec
+        Start  67: tst_markoff_replace_controller
+ 52/147 Test  #25: tst_multicursor .................................   Passed    0.65 sec
+        Start  68: tst_markoff_search_bar
+ 53/147 Test  #67: tst_markoff_replace_controller ..................   Passed    0.03 sec
+        Start  69: tst_markoff_markdown_view
+ 54/147 Test  #24: tst_filesync ....................................   Passed    0.68 sec
+        Start  70: tst_markoff_embed_registry
+ 55/147 Test  #69: tst_markoff_markdown_view .......................   Passed    0.03 sec
+        Start  71: tst_markoff_codeblock_registry
+ 56/147 Test  #70: tst_markoff_embed_registry ......................   Passed    0.03 sec
+        Start  72: tst_markoff_embed_depth_guard
+ 57/147 Test  #71: tst_markoff_codeblock_registry ..................   Passed    0.03 sec
+        Start  73: tst_markoff_default_vault_provider
+ 58/147 Test  #72: tst_markoff_embed_depth_guard ...................   Passed    0.03 sec
+        Start  74: tst_canonical_buffer
+ 59/147 Test  #68: tst_markoff_search_bar ..........................   Passed    0.10 sec
+        Start  75: tst_markdown_delta
+ 60/147 Test  #29: tst_identity_projector ..........................   Passed    0.71 sec
+        Start  76: tst_parse_pool
+ 61/147 Test  #74: tst_canonical_buffer ............................   Passed    0.02 sec
+        Start  77: tst_origin_reset
+ 62/147 Test  #28: tst_identity_store ..............................   Passed    0.71 sec
+        Start  78: tst_cursor_anchor
+ 63/147 Test  #73: tst_markoff_default_vault_provider ..............   Passed    0.04 sec
+        Start  79: tst_qutepart_smoke
+ 64/147 Test  #30: tst_presence_manager ............................   Passed    0.71 sec
+        Start  80: tst_markoff_source_markdown_view
+ 65/147 Test  #34: tst_stream_sync .................................   Passed    0.69 sec
+        Start  81: tst_source_canonical_attach
+ 66/147 Test  #27: tst_identity_json ...............................   Passed    0.74 sec
+ 67/147 Test  #77: tst_origin_reset ................................   Passed    0.02 sec
+        Start  82: tst_markoff_selection
+        Start  83: tst_markoff_theme
+ 68/147 Test  #75: tst_markdown_delta ..............................   Passed    0.04 sec
+        Start  84: tst_markoff_resourceprovider
+ 69/147 Test  #78: tst_cursor_anchor ...............................   Passed    0.04 sec
+        Start  85: tst_markoff_inline_math
+ 70/147 Test  #80: tst_markoff_source_markdown_view ................   Passed    0.09 sec
+        Start  86: tst_markoff_editor_formatting
+ 71/147 Test  #33: tst_scroll_stability ............................   Passed    0.77 sec
+        Start  87: tst_markoff_set_heading_actions
+ 72/147 Test  #84: tst_markoff_resourceprovider ....................   Passed    0.07 sec
+        Start  88: tst_markoff_editor_cursor_in_table
+ 73/147 Test  #79: tst_qutepart_smoke ..............................   Passed    0.11 sec
+ 74/147 Test  #81: tst_source_canonical_attach .....................   Passed    0.10 sec
+        Start  89: tst_markoff_editor_context_classifier
+        Start  90: tst_markoff_editor_context
+ 75/147 Test  #31: tst_identity_widgets ............................   Passed    0.82 sec
+        Start  91: tst_markoff_editor_context_menu
+ 76/147 Test  #89: tst_markoff_editor_context_classifier ...........   Passed    0.02 sec
+        Start  92: tst_markoff_undo_grouping
+ 77/147 Test  #82: tst_markoff_selection ...........................   Passed    0.12 sec
+        Start  93: tst_markoff_folding_model
+ 78/147 Test  #93: tst_markoff_folding_model .......................   Passed    0.03 sec
+        Start  94: tst_markoff_fold_persistence
+ 79/147 Test  #61: tst_foundation_markoff_document_property ........   Passed    0.50 sec
+        Start  95: tst_markoff_folding_reconcile
+ 80/147 Test  #32: tst_collab_plain_text_edit ......................   Passed    0.91 sec
+        Start  96: tst_markoff_folding_integration
+ 81/147 Test  #92: tst_markoff_undo_grouping .......................***Failed    0.10 sec
+********* Start testing of TestUndoGrouping *********
+Config: Using QtTest library 6.11.0, Qt 6.11.0 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 15.2.1 20260209), manjaro unknown
+PASS   : TestUndoGrouping::initTestCase()
+FAIL!  : TestUndoGrouping::headingToggleOnMultipleLinesIsAtomicUndo() Compared values are not the same
+   Actual   (undone)                                          : "# Line one\n# Line two\n# Line three"
+   Expected (QStringLiteral("Line one\nLine two\nLine three")): "Line one\nLine two\nLine three"
+   Loc: [/home/clinton/dev/Markoff/.worktrees/foundation-exploration/libs/markoff-live/tests/tst_undo_grouping.cpp(34)]
+PASS   : TestUndoGrouping::cleanupTestCase()
+Totals: 2 passed, 1 failed, 0 skipped, 0 blacklisted, 74ms
+********* Finished testing of TestUndoGrouping *********
+
+        Start  97: tst_markoff_folding_tables
+ 82/147 Test  #94: tst_markoff_fold_persistence ....................   Passed    0.08 sec
+        Start  98: tst_markoff_fold_gutter
+ 83/147 Test  #98: tst_markoff_fold_gutter .........................   Passed    0.03 sec
+        Start  99: tst_markoff_scroll_position
+ 84/147 Test  #88: tst_markoff_editor_cursor_in_table ..............   Passed    0.20 sec
+        Start 100: tst_markoff_global_coordinates
+ 85/147 Test  #95: tst_markoff_folding_reconcile ...................   Passed    0.10 sec
+        Start 101: tst_markoff_table_serializer
+ 86/147 Test  #86: tst_markoff_editor_formatting ...................   Passed    0.23 sec
+        Start 102: tst_markoff_table_converter
+ 87/147 Test #101: tst_markoff_table_serializer ....................   Passed    0.04 sec
+        Start 103: tst_markoff_table_navigation
+ 88/147 Test  #83: tst_markoff_theme ...............................   Passed    0.34 sec
+        Start 104: tst_markoff_table_diagnostics
+ 89/147 Test #102: tst_markoff_table_converter .....................   Passed    0.05 sec
+        Start 105: tst_markoff_table_bugs
+ 90/147 Test  #87: tst_markoff_set_heading_actions .................   Passed    0.28 sec
+        Start 106: tst_markoff_table_integration
+ 91/147 Test  #85: tst_markoff_inline_math .........................   Passed    0.36 sec
+        Start 107: tst_markoff_table_operations
+ 92/147 Test #103: tst_markoff_table_navigation ....................   Passed    0.07 sec
+        Start 108: tst_markoff_checkbox_toggle
+ 93/147 Test  #91: tst_markoff_editor_context_menu .................   Passed    0.32 sec
+        Start 109: tst_markoff_checkbox_text_object
+ 94/147 Test #109: tst_markoff_checkbox_text_object ................   Passed    0.03 sec
+        Start 110: tst_markoff_completion_triggers
+ 95/147 Test  #76: tst_parse_pool ..................................   Passed    0.49 sec
+        Start 111: tst_markoff_scene_coordinator
+ 96/147 Test #106: tst_markoff_table_integration ...................   Passed    0.18 sec
+        Start 112: tst_markoff_textcontrol_cursor
+ 97/147 Test #108: tst_markoff_checkbox_toggle .....................   Passed    0.18 sec
+        Start 113: tst_markoff_textcontrol_selection
+ 98/147 Test #112: tst_markoff_textcontrol_cursor ..................   Passed    0.06 sec
+        Start 114: tst_markoff_textcontrol_editing
+ 99/147 Test #107: tst_markoff_table_operations ....................***Failed    0.28 sec
+********* Start testing of TestTableOperations *********
+Config: Using QtTest library 6.11.0, Qt 6.11.0 (x86_64-little_endian-lp64 shared (dynamic) release build; by GCC 15.2.1 20260209), manjaro unknown
+PASS   : TestTableOperations::initTestCase()
+PASS   : TestTableOperations::tableEnteredSignalExists()
+QWARN  : TestTableOperations::insertRowBelow() This plugin does not support propagateSizeHints()
+PASS   : TestTableOperations::insertRowBelow()
+QWARN  : TestTableOperations::insertRowAbove() This plugin does not support propagateSizeHints()
+PASS   : TestTableOperations::insertRowAbove()
+QWARN  : TestTableOperations::insertColumnRight() This plugin does not support propagateSizeHints()
+PASS   : TestTableOperations::insertColumnRight()
+QWARN  : TestTableOperations::insertColumnLeft() This plugin does not support propagateSizeHints()
+PASS   : TestTableOperations::insertColumnLeft()
+QWARN  : TestTableOperations::deleteRow() This plugin does not support propagateSizeHints()
+PASS   : TestTableOperations::deleteRow()
+QWARN  : TestTableOperations::deleteColumn() This plugin does not support propagateSizeHints()
+PASS   : TestTableOperations::deleteColumn()
+QWARN  : TestTableOperations::cannotDeleteLastRow() This plugin does not support propagateSizeHints()
+PASS   : TestTableOperations::cannotDeleteLastRow()
+QWARN  : TestTableOperations::cannotDeleteLastColumn() This plugin does not support propagateSizeHints()
+PASS   : TestTableOperations::cannotDeleteLastColumn()
+QWARN  : TestTableOperations::undoGroupsStructuralOp() This plugin does not support propagateSizeHints()
+FAIL!  : TestTableOperations::undoGroupsStructuralOp() Compared values are not the same
+   Actual   (rowsAfterUndo): 4
+   Expected (rowsBefore)   : 3
+   Loc: [/home/clinton/dev/Markoff/.worktrees/foundation-exploration/libs/markoff-live/tests/tst_table_operations.cpp(334)]
+PASS   : TestTableOperations::cleanupTestCase()
+Totals: 11 passed, 1 failed, 0 skipped, 0 blacklisted, 244ms
+********* Finished testing of TestTableOperations *********
+
+        Start 115: tst_markoff_textcontrol_input
+100/147 Test #114: tst_markoff_textcontrol_editing .................   Passed    0.06 sec
+        Start 116: tst_markoff_textcontrol_links
+101/147 Test #113: tst_markoff_textcontrol_selection ...............   Passed    0.08 sec
+        Start 117: tst_markoff_textcontrol_integration
+102/147 Test  #99: tst_markoff_scroll_position .....................   Passed    0.48 sec
+        Start 118: tst_markoff_editor_markdown_view
+103/147 Test #116: tst_markoff_textcontrol_links ...................   Passed    0.08 sec
+        Start 119: tst_live_canonical_attach
+104/147 Test #100: tst_markoff_global_coordinates ..................   Passed    0.46 sec
+        Start 120: tst_scene_offset_map
+105/147 Test #115: tst_markoff_textcontrol_input ...................   Passed    0.11 sec
+        Start 121: tst_readingview_bootstrap
+106/147 Test #118: tst_markoff_editor_markdown_view ................   Passed    0.08 sec
+        Start 122: tst_readingpipeline_section_split
+107/147 Test #121: tst_readingview_bootstrap .......................   Passed    0.06 sec
+        Start 123: tst_sectionlayout_basic
+108/147 Test #122: tst_readingpipeline_section_split ...............   Passed    0.03 sec
+        Start 124: tst_readingview_end_to_end
+109/147 Test  #90: tst_markoff_editor_context ......................   Passed    0.83 sec
+        Start 125: tst_sectionlayout_tables
+110/147 Test #123: tst_sectionlayout_basic .........................   Passed    0.13 sec
+        Start 126: tst_sectionlayout_images
+111/147 Test #125: tst_sectionlayout_tables ........................   Passed    0.07 sec
+        Start 127: tst_sectionlayout_wiki_links
+112/147 Test #104: tst_markoff_table_diagnostics ...................   Passed    0.70 sec
+        Start 128: tst_sectionlayout_math
+113/147 Test #126: tst_sectionlayout_images ........................   Passed    0.12 sec
+        Start 129: tst_section_recycle
+114/147 Test #128: tst_sectionlayout_math ..........................   Passed    0.09 sec
+        Start 130: tst_async_parse
+115/147 Test #127: tst_sectionlayout_wiki_links ....................   Passed    0.13 sec
+        Start 131: tst_frame_budget_constants
+116/147 Test #131: tst_frame_budget_constants ......................   Passed    0.02 sec
+        Start 132: tst_virtual_scroll
+117/147 Test #129: tst_section_recycle .............................   Passed    0.10 sec
+        Start 133: tst_heading_fold
+118/147 Test #110: tst_markoff_completion_triggers .................   Passed    0.73 sec
+        Start 134: tst_readingview_click_to_fold
+119/147 Test #133: tst_heading_fold ................................   Passed    0.08 sec
+        Start 135: tst_readingview_linkrenderer
+120/147 Test #134: tst_readingview_click_to_fold ...................   Passed    0.08 sec
+        Start 136: tst_readingview_hover_signal
+121/147 Test #135: tst_readingview_linkrenderer ....................   Passed    0.02 sec
+        Start 137: tst_readingview_math_registered
+122/147 Test #136: tst_readingview_hover_signal ....................   Passed    0.03 sec
+        Start 138: tst_readingview_syntax_registered
+123/147 Test #138: tst_readingview_syntax_registered ...............   Passed    0.04 sec
+        Start 139: tst_readingview_embed_image_shim
+124/147 Test #137: tst_readingview_math_registered .................   Passed    0.07 sec
+        Start 140: tst_readingview_embed_media_stubs
+125/147 Test #120: tst_scene_offset_map ............................   Passed    0.60 sec
+        Start 141: tst_reading_markdown_view
+126/147 Test #139: tst_readingview_embed_image_shim ................   Passed    0.02 sec
+        Start 142: tst_reading_canonical_attach
+127/147 Test #140: tst_readingview_embed_media_stubs ...............   Passed    0.02 sec
+        Start 143: tst_markoff_link_source_honesty
+128/147 Test #143: tst_markoff_link_source_honesty .................   Passed    0.01 sec
+        Start 144: tst_markoff_wikilink_clickable
+129/147 Test #141: tst_reading_markdown_view .......................   Passed    0.03 sec
+        Start 145: tst_tri_view_smoke
+130/147 Test #111: tst_markoff_scene_coordinator ...................   Passed    0.92 sec
+        Start 146: tst_canonical_interop
+131/147 Test #124: tst_readingview_end_to_end ......................   Passed    0.55 sec
+        Start 147: tst_cross_mode_undo
+132/147 Test #145: tst_tri_view_smoke ..............................   Passed    0.07 sec
+133/147 Test #144: tst_markoff_wikilink_clickable ..................   Passed    0.11 sec
+134/147 Test #105: tst_markoff_table_bugs ..........................   Passed    1.18 sec
+135/147 Test #147: tst_cross_mode_undo .............................   Passed    0.21 sec
+136/147 Test #142: tst_reading_canonical_attach ....................   Passed    0.52 sec
+137/147 Test #146: tst_canonical_interop ...........................   Passed    0.85 sec
+138/147 Test #132: tst_virtual_scroll ..............................   Passed    1.58 sec
+139/147 Test  #11: tst_convergence .................................   Passed    4.70 sec
+140/147 Test  #17: tst_fuzz ........................................   Passed    4.69 sec
+141/147 Test #117: tst_markoff_textcontrol_integration .............   Passed    2.33 sec
+142/147 Test #119: tst_live_canonical_attach .......................   Passed    2.27 sec
+143/147 Test  #97: tst_markoff_folding_tables ......................   Passed    3.16 sec
+144/147 Test  #96: tst_markoff_folding_integration .................   Passed    6.05 sec
+145/147 Test #130: tst_async_parse .................................   Passed    5.65 sec
+146/147 Test  #26: tst_realistic ...................................   Passed   81.32 sec
+147/147 Test  #20: tst_benchmark ...................................   Passed  434.35 sec
+
+99% tests passed, 2 tests failed out of 147
+
+Total Test time (real) = 434.38 sec
+
+The following tests FAILED:
+	 92 - tst_markoff_undo_grouping (Failed)
+	107 - tst_markoff_table_operations (Failed)
+Errors while running CTest
