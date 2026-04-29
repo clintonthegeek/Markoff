@@ -60,10 +60,10 @@ int main(int argc, char *argv[])
     popupModel->registerProvider(std::make_shared<Markoff::EmojiCompletionProvider>());
 
     QQmlApplicationEngine engine;
-    engine.rootContext()->setContextProperty("doc", doc.get());
+    engine.rootContext()->setContextProperty("ctxDocument", doc.get());
     engine.rootContext()->setContextProperty(
-        "theme", QVariant::fromValue(Markoff::Theme::defaultLight()));
-    engine.rootContext()->setContextProperty("completionModel", popupModel.get());
+        "ctxTheme", QVariant::fromValue(Markoff::Theme::defaultLight()));
+    engine.rootContext()->setContextProperty("ctxCompletionModel", popupModel.get());
 
     engine.loadFromModule("org.markoff.view.qml.app", "Main");
     if (engine.rootObjects().isEmpty()) return 2;

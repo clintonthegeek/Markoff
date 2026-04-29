@@ -37,6 +37,38 @@ Item {
         qtQuickDocument: textArea.textDocument
     }
 
+    // KSyntaxHighlighting attached to the TextArea (sibling, not child).
+    // Kept outside the TextArea body so that Breeze's TextArea.qml doesn't
+    // try to slot it in as a TextInput child.
+    SyntaxHighlighter {
+        textEdit: textArea
+        definition: "Markdown"
+    }
+
+    // Reverse direction: when the binding notifies (because Session changed
+    // externally, e.g. SearchEngine moved selection to a match), update the
+    // TextArea programmatically. Sibling of the TextArea (not a child) so
+    // that Breeze's TextArea.qml doesn't try to slot it in as a TextInput.
+    Connections {
+        target: binding
+        function onCursorPositionChanged() {
+            if (textArea.cursorPosition !== binding.cursorPosition) {
+                textArea.cursorPosition = binding.cursorPosition
+            }
+        }
+        function onSelectionStartChanged() {
+            if (textArea.selectionStart !== binding.selectionStart) {
+                // Use select() to set both ends atomically.
+                textArea.select(binding.selectionStart, binding.selectionEnd)
+            }
+        }
+        function onSelectionEndChanged() {
+            if (textArea.selectionEnd !== binding.selectionEnd) {
+                textArea.select(binding.selectionStart, binding.selectionEnd)
+            }
+        }
+    }
+
     ScrollView {
         id: scroll
         anchors.fill: parent
@@ -58,35 +90,6 @@ Item {
             onCursorPositionChanged: binding.cursorPosition = cursorPosition
             onSelectionStartChanged: binding.selectionStart = selectionStart
             onSelectionEndChanged:   binding.selectionEnd   = selectionEnd
-
-            // Reverse direction: when binding notifies (because Session changed externally,
-            // e.g. SearchEngine moved selection to a match), update the TextArea programmatically.
-            // Use a Connections{} so we can ignore self-emitted echoes.
-            Connections {
-                target: binding
-                function onCursorPositionChanged() {
-                    if (textArea.cursorPosition !== binding.cursorPosition) {
-                        textArea.cursorPosition = binding.cursorPosition
-                    }
-                }
-                function onSelectionStartChanged() {
-                    if (textArea.selectionStart !== binding.selectionStart) {
-                        // Use select() to set both ends atomically.
-                        textArea.select(binding.selectionStart, binding.selectionEnd)
-                    }
-                }
-                function onSelectionEndChanged() {
-                    if (textArea.selectionEnd !== binding.selectionEnd) {
-                        textArea.select(binding.selectionStart, binding.selectionEnd)
-                    }
-                }
-            }
-
-            // KSyntaxHighlighting attached to the TextArea.
-            SyntaxHighlighter {
-                textEdit: textArea
-                definition: "Markdown"
-            }
 
             // Standard text-editor key bindings handled here (full set will accrete later;
             // Phase-1 covers the must-haves: undo/redo via the foundation's CRDT stack).

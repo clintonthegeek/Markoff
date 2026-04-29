@@ -22,9 +22,9 @@ ApplicationWindow {
             id: editor
             SplitView.fillWidth: true
             SplitView.minimumWidth: 300
-            document: doc
-            theme: theme
-            completionModel: completionModel
+            document: ctxDocument
+            theme: ctxTheme
+            completionModel: ctxCompletionModel
             focus: true
         }
 
