@@ -35,24 +35,34 @@ Work landed on `exploration/new-foundation`:
   benchmarks. 6 new tests in `tst_incremental_parse` cover the reuse
   paths (counter scaffolding, single-paragraph edit, edit-inside-region,
   edits-in-two-regions, no-edits-buffer-replace).
+- `9bf92fe` / `955e935` / `bd9d69a` / `92e57f1` — Footnote cleanup
+  (Option A of `docs/specs/2026-04-29-footnote-cleanup-design.md`).
+  `Document::extract` no longer rewrites the body: the dead
+  `[^N]` → `<sup>N</sup>` substitution and the definition-line strip
+  are gone, so `body == source.mid(frontmatterBlockEnd)` byte-for-byte.
+  New `Document::footnoteRefs()` exposes per-reference label + number +
+  source offset for the future live preview. The reference scan and
+  numbering pass became a single sweep with a definition-prefix skip
+  rule. `Document::footnotes()` unchanged. Body diff in
+  `IncrementalParseSession` now equals the source diff modulo a
+  constant frontmatter offset — perf win on every footnote-related
+  edit. Option B (custom tree-sitter grammar with native
+  footnote_reference / footnote_definition / inline_footnote nodes,
+  Obsidian inline `^[content]`, multi-paragraph defs) is captured as a
+  deferred epic in the spec.
 
-End-to-end tests: 78/78 green including `tst_benchmark` (381s, was
-404s) and `tst_realistic` (80s, was 87s).
+End-to-end tests: 78/78 green including `tst_benchmark` (~400s) and
+`tst_realistic` (~85s).
 
 **Per-keystroke parse cost on a 50KB doc dropped from ~8–12ms (full
 reparse) to ~2–3ms (incremental block + full inline reparse) and now
 to sub-millisecond for typical typing where most inline regions are
-unaffected (incremental block + inline-tree reuse).**
+unaffected (incremental block + inline-tree reuse).** `Document::extract`
+no longer regex-rewrites body on every keystroke.
 
 ### Open follow-ups (priority order)
 
-1. **Stop pre-processing inside `Document`.** The footnote
-   `[^1]` → `<sup>1</sup>` substitution is a render concern, not a
-   parse concern. Moving it to the rendering layer makes the body
-   diff trivial (== source diff) and removes the per-call regex
-   pass. Bigger blast radius — touches markoff-parser, markoff-view-qml,
-   markoff-source-widget. Worth doing but not urgent.
-2. **Hard benchmarks of the new pipeline vs. the old.** The cost
+1. **Hard benchmarks of the new pipeline vs. the old.** The cost
    estimates above are theoretical (based on tree-sitter's documented
    subtree-reuse behavior). `tst_benchmark` exists but doesn't
    directly compare incremental vs fresh — adding a per-keystroke
