@@ -59,6 +59,7 @@ add_library(markoff_foundation STATIC
     src/ParsePool.h
     src/ParsePoolWorker.h
     src/IncrementalParseSession.h
+    src/AnchorConversion.cpp
     src/MarkoffEdit.cpp
     src/AnchorJson.cpp
     src/Selection.cpp

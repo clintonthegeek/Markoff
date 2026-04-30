@@ -148,4 +148,6 @@ set_tests_properties(tst_foundation_markoff_document_property PROPERTIES ENVIRON
 add_executable(tst_foundation_text_anchor tst_foundation_text_anchor.cpp)
 add_test(NAME tst_foundation_text_anchor COMMAND tst_foundation_text_anchor)
 target_link_libraries(tst_foundation_text_anchor PRIVATE Qt6::Test markoff_foundation)
+target_include_directories(tst_foundation_text_anchor PRIVATE
+    ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src)
 set_tests_properties(tst_foundation_text_anchor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
