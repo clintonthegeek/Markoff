@@ -62,6 +62,13 @@ public:
     /// decision 8.
     quint64 editSequence() const noexcept;
 
+    /// Locally-monotonic parse-sequence number for the most recent parse
+    /// delivered via parseUpdated. View-layer code uses this for parse-
+    /// ordering ("is this a newer parse than what I rendered?") without
+    /// holding a Crdt::Global. Decoupled from the CRDT version vector.
+    /// See spec §10 decision 3.
+    quint64 parseSequence() const noexcept;
+
     // ===== Local writes =====
     /// Apply a list of local edits as a single batched local edit. Edits are
     /// in OLD-text byte coordinates; ranges must be non-overlapping; if

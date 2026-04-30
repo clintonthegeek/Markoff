@@ -15,6 +15,10 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p) {
                          d->latestParse.reset(p);
+                         ++d->parseSequence;
+                         // Signal-shape change (parseSequence + QList<BlockAnchor>)
+                         // lands in Task 7; for now keep the legacy emit and only
+                         // bump parseSequence here.
                          Q_EMIT parseUpdated(p, version());
                      });
 }
@@ -60,6 +64,11 @@ CollabText::Crdt::Global MarkoffDocument::version() const
 quint64 MarkoffDocument::editSequence() const noexcept
 {
     return d->editSequence;
+}
+
+quint64 MarkoffDocument::parseSequence() const noexcept
+{
+    return d->parseSequence;
 }
 
 // applyLocalEdit, undo/redo, applyRemoteOps, resetContent, anchorAt,
