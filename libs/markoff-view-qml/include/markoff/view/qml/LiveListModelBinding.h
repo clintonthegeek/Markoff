@@ -17,6 +17,12 @@ namespace Markoff::View::Qml {
 /// Wires `EditorBackend::parseUpdatedAt` → `BlockWalker` → `AstBlockDiff` →
 /// `LiveBlockModel`. Also clears `LiveSelectionModel` if any block touched by
 /// the edit (i.e. anchor or active block disappears in the diff) is removed.
+///
+/// `BlockWalker::walk` is dispatched to `QThreadPool::globalInstance()` and
+/// posted back to the binding's thread for the LCS-diff + model apply step.
+/// See `docs/specs/2026-04-30-blockwalker-threading-decision.md` for the
+/// rationale (option 1A) and the trigger conditions for promoting to a
+/// foundation-side shared decomposition (option 1C).
 class LiveListModelBinding : public QObject {
     Q_OBJECT
     QML_ELEMENT

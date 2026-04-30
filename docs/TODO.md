@@ -1,5 +1,26 @@
 # Markoff TODO
 
+## 2026-04-30 — Revert bench small-replicaId workaround (collabtext side fixed)
+
+`apps/bench/markoff-bench-render.cpp` (≈line 252) and
+`libs/markoff-bench/src/ScenarioRunner.cpp` use a small monotonic
+`replicaId` to sidestep collabtext bug 0008577 (SBO heap-promotion
+crash on first heap-bound `Global::observe`). Documented in
+`docs/handoff/2026-04-30-collabtext-sbo-regression-repro.md`.
+
+Collabtext has fixed the bug. The small-replicaId workaround is now
+safe to revert: switch back to a random `quint16` (or whatever the
+pre-workaround code used) and re-run the render bench matrix to
+confirm nothing regresses.
+
+When reverting:
+- update `docs/handoff/2026-04-30-collabtext-sbo-regression-repro.md`
+  to mark the upstream as fixed (or move the file to `docs/archive/`).
+- delete the inline `// We use a small monotonic replicaId rather
+  than a random uint16…` comment block(s) at the workaround sites.
+- re-run `markoff-bench-render --mode live` across the full corpus
+  and confirm no crashes.
+
 ## 2026-04-29 — Incremental parser + old-leaf deletion (this branch)
 
 Work landed on `exploration/new-foundation`:

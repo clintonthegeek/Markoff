@@ -30,11 +30,10 @@ private Q_SLOTS:
             "```python\nx = 1\n```\n");
         doc.applyLocalEdit({ ed });
 
-        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
-        QVERIFY(parseSpy.wait(2000));
-
+        // BlockWalker runs off-thread; spin the event loop until the model
+        // converges. See docs/specs/2026-04-30-blockwalker-threading-decision.md.
         LiveBlockModel *model = binding.model();
-        QCOMPARE(model->rowCount(), 5);
+        QTRY_COMPARE(model->rowCount(), 5);
 
         QStringList kinds;
         for (int i = 0; i < model->rowCount(); ++i) {

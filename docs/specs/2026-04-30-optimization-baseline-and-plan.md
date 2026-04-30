@@ -479,3 +479,92 @@ disambiguate.
 Stage 1.3 (skip `extract` when the edit window misses
 frontmatter/footnote bytes) remains demoted: `phase_extract` is still
 0.8-2.0 % of total and the conditional adds complexity for little win.
+
+## Stage 2 candidate #1 outcome — phantom (not pursued)
+
+The 2026-04-30 render-optimization SESSION-BRIEF (`docs/handoff/2026-04-30-render-optimization-SESSION-BRIEF.md`)
+flagged candidate #1 as: *"live-mode `phase_apply_edit` is 14× source-mode
+(~5.15 ms vs 0.36 ms gap on mid_prose / type_end)"*. Verification against
+the cited baseline JSON found this premise didn't survive contact with
+the data:
+
+| profile          | apply_edit p50 LIVE (baseline) | apply_edit p50 SOURCE (fresh run) |
+|------------------|-------------------------------:|----------------------------------:|
+| mid_prose        | 347.5 µs                       | 371.3 µs                          |
+| big_prose        | 1 159 µs                       | 1 205 µs                          |
+| big_code_heavy   | 1 316 µs                       | 1 376 µs                          |
+| huge             | 5 353 µs                       | 5 376 µs                          |
+
+Live and source `apply_edit` are within 4-6 % of each other on every
+profile — within run-to-run noise. The brief's "5.15 ms" figure was a
+profile mix-up: it's the `huge` profile's apply_edit p50 (5.35 ms),
+not mid_prose's. There is no live-vs-source apply_edit gap to chase.
+Candidate dropped without code change.
+
+## Stage 2 candidate #2 — `phase_render_frame` re-investigation → BlockWalker move (DONE)
+
+**Brief's hypothesis:** "ListView with no virtualization tuning; every
+paragraph allocates a TextEdit; for 100 KB / ~1000 paragraphs that's a
+lot of scenegraph nodes per frame."
+
+**What the data actually showed.** Setting `ListView.reuseItems: true`
+produced no measurable change anywhere (mid_prose +0.2 %, big_prose
+−0.8 %, huge +1.3 %, pathological +3.1 % — all noise). Reverted.
+
+Direct timing inside `LiveListModelBinding::onParseUpdatedAt`
+(instrumented run; instrumentation reverted before commit) found the
+real cost is **`BlockWalker::walk`**, which scales O(doc_size) and
+runs synchronously on the main thread:
+
+| profile      | walk per call |
+|--------------|--------------:|
+| mid_prose    |        85 µs  |
+| big_prose    |       614 µs  |
+| huge         |     3 487 µs  |
+| pathological |    16 242 µs  |
+
+This is the dominant remaining main-thread cost on the live keystroke→
+frame path for documents ≥ 100 KB. The bench's `phase_model_update`
+hides it on heavy profiles because parse-pool coalescing means
+`onParseUpdatedAt` fires only once per scenario while the bench tap
+attributes phantom small samples to all 180 iters (the brief acknowledged
+this dynamic for `parse_work` ↔ `render_frame` but not for
+`model_update`). The `phase_render_frame` framing in the brief
+("scenegraph rebuild for visible delegates") didn't fit the data —
+on heavy profiles `phase_render_frame` is mostly parse_work bleed +
+frame-cadence wait, not real scenegraph cost.
+
+**Fix:** dispatch `BlockWalker::walk` to a private QThreadPool inside
+`LiveListModelBinding`, post the result back via queued
+`QMetaObject::invokeMethod`, drop stale results via a monotonic
+generation cookie. LCS-diff + `LiveBlockModel::applyOps` stay on the
+main thread (sub-100 µs).
+
+**Architectural decision:** view-side QThreadPool dispatch (option 1A)
+rather than a foundation-side canonical block stream (option 1C). The
+1A → 1C migration is additive, not a rewrite; promote only when a
+second block-walking view exists or a split-view UI ships paying
+duplicate walks. See `docs/specs/2026-04-30-blockwalker-threading-decision.md`.
+
+**Bench delta (this commit, vs baseline `f7acaab`):**
+
+- `mid_prose / type_end` — `phase_model_update` p50 −94.2 % (135 → 8 µs); `total_ns` p50 −3.9 %.
+- `mid_mixed / type_end` — `phase_model_update` p50 −95.5 % (185 → 8 µs); `total_ns` p50 −0.8 %.
+- `mid_mixed / paste_4kb` — `total_ns` p50 −5.0 %.
+- `huge / paste_4kb` — `total_ns` p50 −3.7 %.
+- `pathological / type_end` — `total_ns` p50 −2.1 % (−11 ms).
+- `pathological / paste_4kb` — `total_ns` p50 −3.1 % (−20 ms).
+
+The `model_update` win is muted on heavy profiles (`big_prose`+) only
+because the bench's tap was already underreporting model_update there
+(phantom samples from coalescing). Direct in-slot timing (above)
+confirms the equivalent off-thread move on those profiles.
+
+Total wall-time is roughly flat across heavy profiles, as expected:
+we're moving work off the main thread, not eliminating it. The
+user-visible benefit (main thread freed for keystroke processing
+during parse update) doesn't surface in the bench's existing taps;
+that's a tier-2 instrumentation follow-up, not a perf claim for this
+commit.
+
+Baseline JSON: `docs/bench-baselines/2026-04-30-render-cc63eed-1A-blockwalker-async.json`.

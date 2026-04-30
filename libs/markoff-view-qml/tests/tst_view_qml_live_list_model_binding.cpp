@@ -26,12 +26,11 @@ private Q_SLOTS:
         ed.newText = QByteArrayLiteral("# Title\n\nFirst paragraph.\n");
         doc.applyLocalEdit({ ed });
 
-        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
-        QVERIFY(parseSpy.wait(2000));
-
+        // BlockWalker runs off-thread under 1A; spin the event loop until the
+        // model has been populated (queued post-back from the worker thread).
         LiveBlockModel *model = binding.model();
         QVERIFY(model != nullptr);
-        QCOMPARE(model->rowCount(), 2);
+        QTRY_COMPARE(model->rowCount(), 2);
         QCOMPARE(model->data(model->index(0, 0), model->roleForName("kind")).toString(),
                  QStringLiteral("heading"));
         QCOMPARE(model->data(model->index(1, 0), model->roleForName("kind")).toString(),
@@ -49,10 +48,10 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0;
         ed.newText = QByteArrayLiteral("# Title\n\npara\n");
         doc.applyLocalEdit({ ed });
-        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
-        QVERIFY(parseSpy.wait(2000));
 
         LiveBlockModel *model = binding.model();
+        QTRY_COMPARE(model->rowCount(), 2);
+
         QSignalSpy ins(model, &QAbstractItemModel::rowsInserted);
         QSignalSpy rem(model, &QAbstractItemModel::rowsRemoved);
         QSignalSpy chg(model, &QAbstractItemModel::dataChanged);
@@ -65,10 +64,10 @@ private Q_SLOTS:
         edit.oldEnd   = 13;
         edit.newText  = QByteArrayLiteral("!");
         doc.applyLocalEdit({ edit });
-        parseSpy.wait(2000);
 
-        // Diff should produce 1-2 model touches (depends on whether the diff
-        // outputs Equal+Delete+Insert+Equal or just dataChanged on row 1).
+        // Wait for the post-walk model apply (any of the model touch signals
+        // is sufficient). Then assert touch-count + final size.
+        QTRY_VERIFY(chg.count() + ins.count() + rem.count() >= 1);
         const int touched = chg.count() + ins.count() + rem.count();
         QVERIFY2(touched >= 1 && touched <= 2,
                  qPrintable(QString("expected 1-2 model touches, got %1").arg(touched)));
@@ -86,8 +85,8 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0;
         ed.newText = QByteArrayLiteral("a\n\nb\n\nc\n");
         doc.applyLocalEdit({ ed });
-        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
-        QVERIFY(parseSpy.wait(2000));
+        LiveBlockModel *model = binding.model();
+        QTRY_COMPARE(model->rowCount(), 3);
 
         LiveSelectionModel *sel = binding.selectionModel();
         QVERIFY(sel != nullptr);
@@ -103,9 +102,8 @@ private Q_SLOTS:
         edit.oldEnd   = 6;
         edit.newText  = QByteArray();
         doc.applyLocalEdit({ edit });
-        parseSpy.wait(2000);
 
-        QVERIFY(!sel->hasSelection());
+        QTRY_VERIFY(!sel->hasSelection());
     }
 
     void selection_persists_when_unrelated_block_changes() {
@@ -119,8 +117,8 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0;
         ed.newText = QByteArrayLiteral("a\n\nb\n\nc\n");
         doc.applyLocalEdit({ ed });
-        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
-        QVERIFY(parseSpy.wait(2000));
+        LiveBlockModel *model = binding.model();
+        QTRY_COMPARE(model->rowCount(), 3);
 
         LiveSelectionModel *sel = binding.selectionModel();
         sel->begin(2, 0);
@@ -132,9 +130,51 @@ private Q_SLOTS:
         edit.oldEnd   = 1;
         edit.newText  = QByteArrayLiteral("!");
         doc.applyLocalEdit({ edit });
-        parseSpy.wait(2000);
 
+        // Wait for the model to reflect the edit, then verify selection
+        // survived. The first paragraph's text should now be "a!".
+        QTRY_COMPARE(model->data(model->index(0, 0), model->roleForName("text")).toString(),
+                     QStringLiteral("a!"));
         QVERIFY(sel->hasSelection());
+    }
+
+    /// 1A: rapid back-to-back edits — the final model state must match the
+    /// final document state, regardless of how parses + walks coalesce.
+    /// Without the m_walkGeneration cookie an out-of-order walk completion
+    /// could clobber the model with a stale snapshot.
+    void rapid_edits_converge_to_final_state() {
+        Markoff::MarkoffDocument doc(1);
+        EditorBackend be;
+        be.setDocument(&doc);
+        LiveListModelBinding binding;
+        binding.setEditorBackend(&be);
+
+        // Initial state.
+        Markoff::MarkoffEdit init;
+        init.oldStart = 0; init.oldEnd = 0;
+        init.newText = QByteArrayLiteral("alpha\n\nbeta\n");
+        doc.applyLocalEdit({ init });
+        LiveBlockModel *model = binding.model();
+        QTRY_COMPARE(model->rowCount(), 2);
+
+        // Issue several edits in rapid succession with no intervening
+        // event-loop pumps. Most will coalesce inside the parse pool;
+        // the last one is what the model must converge to.
+        // Source after init: "alpha\n\nbeta\n" (12 bytes total).
+        // Append "!" at byte 11 (just before final \n) three times in a row.
+        for (int i = 0; i < 3; ++i) {
+            Markoff::MarkoffEdit e;
+            e.oldStart = static_cast<quint32>(11 + i);
+            e.oldEnd   = static_cast<quint32>(11 + i);
+            e.newText  = QByteArrayLiteral("!");
+            doc.applyLocalEdit({ e });
+        }
+
+        // Final paragraph should read "beta!!!".
+        QTRY_COMPARE(
+            model->data(model->index(1, 0), model->roleForName("text")).toString(),
+            QStringLiteral("beta!!!"));
+        QCOMPARE(model->rowCount(), 2);
     }
 };
 
