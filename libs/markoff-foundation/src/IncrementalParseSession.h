@@ -36,6 +36,11 @@ public:
 
     std::unique_ptr<Markoff::Document> snapshot() const;
 
+    /// Read-only access to the underlying TreeSitterParser. Used by the
+    /// in-tree benchmark to read inline-tree-reuse and block-changed-bytes
+    /// counters. Not part of the public foundation API.
+    const Markoff::TreeSitterParser &parser() const { return m_parser; }
+
 private:
     Markoff::TreeSitterParser    m_parser;
     Markoff::ExtractedSource     m_extracted;

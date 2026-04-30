@@ -113,10 +113,10 @@ RunResult runDirectParse(const QByteArray &corpus, ScenarioKind scenario, quint6
                 for (int p = 0; p < kPhaseCount; ++p) phaseSamples[p].push_back(iter.phases[p]);
                 allocBytes.push_back(iter.alloc.bytes);
                 allocCount.push_back(iter.alloc.count);
-                // blockChangedBytes / inlineReuseCount: emit zeros for now;
-                // wired in Task 11.
-                blockChangedBytes.push_back(0);
-                inlineReuse.push_back(0);
+                const int changed = session.parser().blockChangedByteCount();
+                const int inlineR = session.parser().inlineTreeReuseCount();
+                blockChangedBytes.push_back(changed < 0 ? 0u : static_cast<quint64>(changed));
+                inlineReuse.push_back(static_cast<quint64>(inlineR));
             }
         }
     }

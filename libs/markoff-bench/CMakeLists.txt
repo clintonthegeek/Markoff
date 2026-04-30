@@ -18,6 +18,7 @@ add_library(markoff_bench STATIC
     src/FixtureLoader.cpp
     src/Scenario.cpp
     src/ScenarioRunner.cpp
+    src/JsonReporter.cpp
 )
 
 target_include_directories(markoff_bench
