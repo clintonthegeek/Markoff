@@ -39,3 +39,11 @@ add_executable(tst_bench_scenario tst_bench_scenario.cpp)
 add_test(NAME tst_bench_scenario COMMAND tst_bench_scenario)
 target_link_libraries(tst_bench_scenario PRIVATE Qt6::Test markoff_bench)
 set_tests_properties(tst_bench_scenario PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_bench_smoke tst_bench_smoke.cpp)
+add_test(NAME tst_bench_smoke COMMAND tst_bench_smoke)
+target_link_libraries(tst_bench_smoke PRIVATE Qt6::Test markoff_bench)
+set_tests_properties(tst_bench_smoke PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "bench"
+    TIMEOUT 30)
