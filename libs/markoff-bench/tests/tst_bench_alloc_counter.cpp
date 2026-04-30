@@ -26,20 +26,13 @@ void TstBenchAllocCounter::disabled_by_default()
     QCOMPARE(before.count, after.count);
 }
 
-// Prevent GCC from eliding operator new calls at -O2.
-// The function pointer indirection prevents the compiler from proving
-// no side-effects (it cannot see through the pointer at compile time).
-static void *(*s_newFn)(std::size_t) = ::operator new;
-
 void TstBenchAllocCounter::counts_when_enabled()
 {
     {
         AllocCounterScope scope;     // enables + zeros TLS counters
-        // Call operator new through a function pointer so the compiler
-        // cannot elide the allocation even at -O2.
-        void *buf = s_newFn(sizeof(int) * 1024);
+        std::vector<int> v;
+        v.reserve(1024);             // ≥ one heap allocation
         AllocSnapshot snap = currentAllocSnapshot();
-        ::operator delete(buf, sizeof(int) * 1024);
         QVERIFY2(snap.count >= 1, "expected at least one allocation");
         QVERIFY2(snap.bytes >= sizeof(int) * 1024, "expected ≥4096 bytes counted");
     }
@@ -53,9 +46,9 @@ void TstBenchAllocCounter::scope_guard_resets()
 {
     {
         AllocCounterScope scope;
-        void *p = s_newFn(sizeof(int) * 64);
+        auto *p = new int[64];
+        delete[] p;
         AllocSnapshot s1 = currentAllocSnapshot();
-        ::operator delete(p, sizeof(int) * 64);
         QVERIFY(s1.count >= 1);
     }
     {

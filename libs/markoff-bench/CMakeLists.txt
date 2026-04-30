@@ -40,6 +40,27 @@ target_compile_definitions(markoff_bench
 
 add_library(Markoff::Bench ALIAS markoff_bench)
 
+# Export operator new/delete from consuming binaries so libstdc++.so's
+# internal allocation calls resolve to our replacement (not its own).
+# Only meaningful on ELF/Linux; harmless elsewhere because the linker
+# silently ignores unrecognized -rdynamic on platforms that lack it.
+if(UNIX AND NOT APPLE)
+    target_link_options(markoff_bench INTERFACE -rdynamic)
+endif()
+
+# Prevent GCC's allocation-DCE pass from eliding new/delete pairs at
+# call sites in bench consumers.  Without this flag, GCC -O2 proves
+# that a local std::vector::reserve() or new[]/delete[] whose result
+# does not escape has no observable effect and removes the call
+# entirely — making the AllocShim never fire.  -fno-allocation-dce
+# restores the call so our operator new replacement is actually reached.
+# The flag is GCC-specific; Clang and MSVC don't need it (they don't
+# perform this optimisation) and silently ignore unknown -f flags, so
+# the guard is only on the compiler family.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(markoff_bench INTERFACE -fno-allocation-dce)
+endif()
+
 # Tests.
 if(NOT DEFINED MARKOFF_BENCH_BUILD_TESTS)
     set(MARKOFF_BENCH_BUILD_TESTS ON)
