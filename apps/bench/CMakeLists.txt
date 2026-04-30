@@ -13,4 +13,18 @@ target_link_libraries(markoff-bench-parse PRIVATE
     markoff_bench
 )
 
-# Tier 2 binary added in Task 14.
+find_package(Qt6 6.8 REQUIRED COMPONENTS Gui Quick Widgets QuickControls2)
+
+add_executable(markoff-bench-render markoff-bench-render.cpp)
+target_link_libraries(markoff-bench-render PRIVATE
+    Qt6::Core
+    Qt6::Gui
+    Qt6::Widgets
+    Qt6::Quick
+    Qt6::QuickControls2
+    markoff_bench
+    markoff_view_qml
+    markoff_view_qmlplugin
+    markoff_foundation
+)
+qt6_import_qml_plugins(markoff-bench-render)
