@@ -48,6 +48,11 @@ add_subdirectory(libs/markoff-view-qml)
 add_subdirectory(libs/markoff-source-widget)
 add_subdirectory(libs/markoff-bench)
 
+option(MARKOFF_BUILD_BENCH_APPS "Build standalone bench CLIs" ON)
+if(MARKOFF_BUILD_BENCH_APPS)
+    add_subdirectory(apps/bench)
+endif()
+
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
 if(MARKOFF_BUILD_TESTS)
     enable_testing()
