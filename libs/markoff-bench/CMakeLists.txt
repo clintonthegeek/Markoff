@@ -15,6 +15,7 @@ add_library(markoff_bench STATIC
     src/AllocCounter.cpp
     src/AllocShim.cpp
     src/CorpusGen.cpp
+    src/FixtureLoader.cpp
 )
 
 target_include_directories(markoff_bench

@@ -29,3 +29,8 @@ target_link_libraries(tst_bench_corpus_gen PRIVATE Qt6::Test markoff_bench)
 set_tests_properties(tst_bench_corpus_gen PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     TIMEOUT 60)
+
+add_executable(tst_bench_fixture_loader tst_bench_fixture_loader.cpp)
+add_test(NAME tst_bench_fixture_loader COMMAND tst_bench_fixture_loader)
+target_link_libraries(tst_bench_fixture_loader PRIVATE Qt6::Test markoff_bench)
+set_tests_properties(tst_bench_fixture_loader PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
