@@ -2,10 +2,12 @@
 
 **Date:** 2026-04-30
 **Branch:** `exploration/new-foundation`
-**Status:** Stage 0 complete (commit `6040dd2`). Stage 1 candidates re-prioritised against phased data — see "Phased baseline outcome" below.
+**Status:** Stages 0 / 1.1 / 1.2 complete (commits `6040dd2`, `96bb42c`, `5568c93`). Stage 1.3 demoted; Stage 2 unchanged.
 **Bench corpus baselines:**
 - Pre-phase: `docs/bench-baselines/2026-04-30-parse-9bf4fad.json` (commit `9bf4fad`, parse-tier bucketed wholly into `parse_block`).
-- Phased: `docs/bench-baselines/2026-04-30-parse-9bf4fad-stage0-phased.json` (commit `9bf4fad+stage0`, post-Stage-0).
+- Stage 0 (phased): `docs/bench-baselines/2026-04-30-parse-9bf4fad-stage0-phased.json` (commit `9bf4fad+stage0`).
+- Stage 1.1 (incremental queries): `docs/bench-baselines/2026-04-30-parse-5f6ef77-stage1-1-queries.json` (commit `5f6ef77+stage1.1`).
+- Stage 1.2 (inline matcher hash-map): `docs/bench-baselines/2026-04-30-parse-96bb42c-stage1-2-matcher.json` (commit `96bb42c+stage1.2`).
 - Render: `docs/bench-baselines/2026-04-30-render-*.json` (commit `9bf4fad`).
 
 All on RelWithDebInfo, x86_64 / Linux 6.12 / Qt 6.11.0.
@@ -221,29 +223,49 @@ Each is a one-commit `perf:` change with a before/after JSON diff cited
 in the body. Do them in order, re-run the bench between each, and stop
 early if the phase that motivated the change isn't actually moving.
 
-- **Task 1.1: Incremental `buildDocumentQueries`.** When `parseIncremental`
-  runs, `ts_tree_get_changed_ranges(prevTree, newTree)` already gives us
-  exact changed byte ranges. The query layer should keep the prior
-  `DocumentQueryResult` and only re-walk subtrees overlapping those
-  ranges. Implementation skeleton: a "range-filtered" walk that takes
-  prior queries + changed ranges and produces a new result by replacing
-  only the entries whose source offset lies in a changed range. **Bench
-  target:** drive `phase_queries` on `big_prose` / `huge` / `pathological`
-  to <2 % of total (current 6.9 / 10.9 / 15.7 %). If it doesn't, the
-  walk isn't actually `O(tree size)` and a second look at `collectHeadings*`
-  / `collectInlineQueries` is needed.
+- **Task 1.1: Incremental `buildDocumentQueries` — DONE (commit `96bb42c`).**
+  Implementation: `TreeSitterParser` now stores `m_lastChangedRanges`
+  (the union of `ts_tree_get_changed_ranges` and edits-derived ranges
+  in the new frame — both are needed because tree-sitter's block-tree
+  changed-ranges report nothing for inline-only edits). New
+  `buildDocumentQueries(prior, edits)` overload carries over each prior
+  entry whose full byte range doesn't overlap any changed range (with
+  shifted offset), and walks only the subtrees of the new tree that do
+  overlap. `HeadingInfo`/`LinkInfo`/`TagInfo` gained a `sourceLength`
+  field so the carry-over check can use the full entry range, not just
+  the start byte (TDD caught the heading-text-changed bug this protects
+  against).
 
-- **Task 1.2: Investigate the inline-reuse drop on paste/replace.** Read
-  `inline_reuse_count` p50 / p95 across `paste_4kb` and `replace_1kb` rows
-  in the phased JSON. For each profile: how many inline trees did we have
-  pre-paste, how many got reused, what percentage? If the answer is <50 %
-  on prose docs, the reuse mechanism is over-invalidating. The hypothesis
-  to test: the matcher in `parseIncremental` requires *exact* shifted-old
-  range equality with new ranges, but `ts_tree_get_changed_ranges` may
-  report ranges adjacent to the edit as "changed" even when the inline
-  content is byte-identical post-shift. If true, expand the matcher to
-  accept content-equivalent ranges. **Bench target:** `phase_parse_inline`
-  on `paste_4kb / mid_prose` from 14.6 % to <5 %.
+  **Phase delta:** `phase_queries` p50 dropped 14-18× across the matrix:
+  - `mid_prose`: 103 → 10 µs
+  - `big_prose`: 1 082 → 74 µs
+  - `huge`: 7 832 → 547 µs (−6 % total wall time)
+  - `pathological`: 45 804 → 2 500 µs (−11 % total wall time)
+
+- **Task 1.2: Inline-tree matcher hash-map + cached old ranges — DONE
+  (commit `5568c93`).** The original hypothesis ("matcher over-invalidates
+  on paste/replace") turned out to be wrong. Reading `inline_reuse_count`
+  on the phased JSON showed reuse was already perfect on big-region
+  profiles (`big_code_heavy` 92/92, `huge` 734/734, `pathological`
+  2193/2193 every iteration). The cost was in the matcher *machinery*,
+  not in cache misses. Two fixes landed:
+  1. Replaced the O(N²) nested-loop matcher with a packed
+     `(start_byte << 32 | end_byte)` hash map. O(N) lookups; old ranges
+     are pairwise disjoint and shifts are monotonic, so keys are unique.
+  2. Cached `m_inlineRanges` on the parser parallel to `m_inlineTrees`,
+     populated by `parse()` and `parseIncremental()`. Eliminates one of
+     the two `collectInlineRanges` tree walks per call (the old-tree
+     walk became a vector copy).
+
+  **Phase delta:** `phase_parse_inline` p50 dropped 36-50 % across every
+  big-region profile and every scenario. Net total wall-time gains
+  surfaced where the savings were big enough:
+  - `pathological / type_end`: −21.8 ms (−8 %)
+  - `pathological / paste_4kb`: −17.7 ms (−7 %)
+  - `pathological / replace_1kb`: −19.6 ms (−7 %)
+  - `pathological / block_boundary`: −17.3 ms (−7 %)
+  - `huge / replace_1kb`: −3.7 ms (−6 %)
+  - `huge / paste_4kb`: −2.9 ms (−4 %)
 
 - **Task 1.3 (demoted, deferred): Skip `extract` when the edit window misses
   frontmatter and footnote bytes.** Phase ceiling is ~2 % across the
@@ -312,23 +334,46 @@ It does not catch:
 This bound is fine. The bench is the source of truth for the parse
 pipeline; perf-record stays the source of truth for everything else.
 
+## Cumulative outcome through Stage 1.2
+
+`pathological / type_end` p50 went from **292 466 µs** (Stage 0
+baseline) to **238 523 µs** (Stage 1.2). That's −18 % per keystroke
+on a 2 MB doc. `huge / type_end` went from 71 727 µs to 64 996 µs
+(−9 %). On smaller profiles the savings are real per-phase but get
+buried under run-to-run variance in `phase_parse_block` (which is
+tree-sitter internal and not affected by these changes).
+
+`phase_parse_block` is now the only meaningful cost left on the parse
+tier — 79-89 % of total across the corpus, all internal to tree-sitter.
+That's Stage 2 territory and requires a different approach (parser
+configuration, larger edit-window hints, or upstream changes); not
+going to fall to a 100-line patch.
+
 ## Recommended next move
 
-Stage 0 done. The phased baseline above answers "which phase" across
-the matrix.
+The cheap parse-tier wins are exhausted. Three reasonable directions:
 
-The recommended Stage-1 entry point is **Task 1.1 (incremental
-`buildDocumentQueries`)**. It targets the single largest *eliminable*
-cost (queries grows from 4 % to 16 % with doc size; on `huge` it's 7.8 ms
-per keystroke, on `pathological` 46 ms). The implementation is bounded:
-read `ts_tree_get_changed_ranges`, filter the prior `DocumentQueryResult`
-by source offset against the changed-range list, re-walk only the
-subtrees that overlap. Existing per-call wall time gives a clean
-before/after.
+1. **Stage 2.2: Render-tier paste cost.** `paste_4kb` render p50 is
+   still 110-215 ms. The render bench currently has one bucket;
+   instrumenting `pool_queue` / `signal_hop` / `model_update` / `frame`
+   would tell us where the time actually goes. Worth a separate spec.
 
-If 1.1 lands and 1.2 (inline-reuse-drop investigation) confirms a real
-regression on paste/replace scenarios, that's the second move. After
-those two, the plan is mostly out of cheap wins inside the parse tier;
-further wins live in tree-sitter parameters, the render tier, or the
-deferred non-CRDT codepath — all of which require a fresh
-`docs/specs/...-design.md` cycle and are out of scope here.
+2. **Re-baseline with perf-record.** The 04-28 perf data is stale:
+   the profile shape after Stages 0 / 1.1 / 1.2 is meaningfully
+   different (queries and inline matcher are both order-of-magnitude
+   smaller now). A fresh `perf record` against `markoff-view-qml-app`
+   would show whether the highlighter / scenegraph / glyph cache is
+   the next dominant cost on the UI path, and whether Stage 2.3
+   (KSyntaxHighlighter rehighlight scope, deferred from 04-28) is
+   still warranted.
+
+3. **Drop the parse work and look at the user-visible UI path.** The
+   bench measures the parse pipeline; the user feels the *render*
+   pipeline. Even after these wins, the dominant per-keystroke cost
+   on a real long doc is likely the Qt Quick scenegraph rebuild —
+   not parsing. Direction 2 (perf-record re-baseline) decides whether
+   this is true.
+
+Stage 1.3 (skip `extract` when the edit window misses
+frontmatter/footnote bytes) remains demoted: `phase_extract` is still
+0.8-2.0 % of total and the conditional adds complexity for little win.
