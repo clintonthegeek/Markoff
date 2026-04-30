@@ -2,7 +2,7 @@
 #include <markoff-bench/PercentileReducer.h>
 
 #include <algorithm>
-#include <numeric>
+#include <cmath>
 
 namespace Markoff::Bench {
 
@@ -11,7 +11,7 @@ quint64 nearestRank(std::vector<quint64> &scratch, double pct) {
     // 1-indexed rank, then clamp to [0, n-1] for 0-indexed access.
     const auto n = scratch.size();
     if (n == 0) return 0;
-    auto rank = static_cast<size_t>((pct * static_cast<double>(n)) + 0.5);
+    auto rank = static_cast<size_t>(std::ceil(pct * static_cast<double>(n)));
     if (rank == 0) rank = 1;
     if (rank > n) rank = n;
     const size_t idx = rank - 1;

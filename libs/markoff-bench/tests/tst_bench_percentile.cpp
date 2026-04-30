@@ -12,6 +12,7 @@ private slots:
     void single_value();
     void monotonic_sequence();
     void unsorted_does_not_mutate();
+    void fractional_rank_uses_ceil();
 };
 
 using namespace Markoff::Bench;
@@ -62,6 +63,20 @@ void TstBenchPercentile::unsorted_does_not_mutate()
     QCOMPARE(v, copy);                        // input unchanged
     QCOMPARE(d.min, 1ull);
     QCOMPARE(d.max, 9ull);
+}
+
+void TstBenchPercentile::fractional_rank_uses_ceil()
+{
+    // n=180 makes 0.99*n = 178.2 — a fractional rank.
+    // Nearest-rank/ceil → rank 179 → element 179 (1-indexed) → value 179.
+    // Round-half-up would give rank 178 → value 178 (regression we just fixed).
+    std::vector<quint64> v(180);
+    std::iota(v.begin(), v.end(), 1);   // 1..180
+    Distribution d = reducePercentiles(v);
+    QCOMPARE(d.count, 180u);
+    QCOMPARE(d.min, 1ull);
+    QCOMPARE(d.max, 180ull);
+    QCOMPARE(d.p99, 179ull);   // ceil(0.99 * 180) = 179, NOT 178
 }
 
 QTEST_GUILESS_MAIN(TstBenchPercentile)
