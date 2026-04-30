@@ -45,6 +45,7 @@ endif()
 add_subdirectory(libs/markoff-foundation)
 add_subdirectory(libs/markoff-view-qml)
 add_subdirectory(libs/markoff-source-widget)
+add_subdirectory(libs/markoff-bench)
 
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
 if(MARKOFF_BUILD_TESTS)
