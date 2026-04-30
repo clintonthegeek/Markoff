@@ -12,6 +12,8 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 add_library(markoff_bench STATIC
     src/PhaseTimer.cpp
     src/PercentileReducer.cpp
+    src/AllocCounter.cpp
+    src/AllocShim.cpp
 )
 
 target_include_directories(markoff_bench
