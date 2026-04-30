@@ -38,7 +38,10 @@ const char *phaseJsonKey(int p) {
     case Phase::Snapshot:    return "phase_snapshot";
     case Phase::PoolQueue:   return "phase_pool_queue";
     case Phase::SignalHop:   return "phase_signal_hop";
+    case Phase::ModelUpdate: return "phase_model_update";
     case Phase::RenderFrame: return "phase_render_frame";
+    case Phase::ApplyEdit:   return "phase_apply_edit";
+    case Phase::ParseWork:   return "phase_parse_work";
     case Phase::Count:       return "_count";
     }
     return "phase_unknown";

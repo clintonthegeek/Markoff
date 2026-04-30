@@ -47,3 +47,15 @@ set_tests_properties(tst_bench_smoke PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
     LABELS "bench"
     TIMEOUT 30)
+
+# Tier-2 (render) smoke. Shells out to markoff-bench-render and asserts the
+# six render-tier phases populate. Slower than Tier-1 (offscreen QPA + QML
+# engine), so it's gated under the `bench` label and bumps the timeout.
+add_executable(tst_bench_render_smoke tst_bench_render_smoke.cpp)
+add_test(NAME tst_bench_render_smoke COMMAND tst_bench_render_smoke)
+add_dependencies(tst_bench_render_smoke markoff-bench-render)
+target_link_libraries(tst_bench_render_smoke PRIVATE Qt6::Test markoff_bench)
+set_tests_properties(tst_bench_render_smoke PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "bench"
+    TIMEOUT 90)

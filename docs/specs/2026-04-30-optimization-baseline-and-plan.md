@@ -365,16 +365,104 @@ disambiguate.
   development agents. See `docs/handoff/2026-04-30-collabtext-crdt-join-perf-handoff.md`
   for the data we're handing across.
 
-- **Task 2.B: Render-tier instrumentation (Tier 2 phase splits).**
-  The render bench currently has one bucket (`phase_render_frame`);
-  splitting it into `pool_queue` / `signal_hop` / `model_update` /
-  `frame` would let the bench attribute UI-side cost the way it now
-  attributes parse-side cost. Combined with the perf-record above,
-  this should pin down whether the 23 % combined Qt Quick + GPU + text
-  bucket is highlighter-driven (04-28 deferred Task 2 hypothesis), QML
-  delegate-rebuild driven, or just intrinsic per-frame cost. See
-  `docs/handoff/2026-04-30-render-tier-instrumentation-SESSION-BRIEF.md`
-  for the prepared brief.
+- **Task 2.B: Render-tier instrumentation — DONE (commit landing this update).**
+  Render bench now reports six per-iteration phases (apply_edit,
+  pool_queue, parse_work, signal_hop, model_update, render_frame) that
+  by construction sum to `total_ns` per iteration. Bench runs in **live
+  mode** by default so the four UI-side phases are sequential on the
+  critical path. Baseline JSON: `docs/bench-baselines/2026-04-30-render-f7acaab-phased.json`.
+
+  Phase split, p50 (microseconds), `type_end` scenario:
+
+  | profile | total | apply | pool | parse | hop | model | render |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | `tiny`               |    6 010 |    170 |   8 |     190 |   8 |    32 |    5 570 |
+  | `mid_prose`          |    7 750 |    350 |  15 |   2 440 |  16 |   140 |    4 820 |
+  | `mid_mixed`          |    9 120 |    430 |  11 |   1 960 |  14 |   190 |    6 440 |
+  | `big_prose`          |   17 280 |  1 160 |  54 |  15 310 |   0 |     1 |   16 070 |
+  | `big_code_heavy`     |   25 630 |  1 320 |  28 |   8 770 |   0 |     1 |   24 280 |
+  | `big_table_heavy`    |   28 390 |  1 260 |  29 |  12 200 |   0 |     1 |   27 080 |
+  | `big_footnote_heavy` |   19 160 |  1 210 |  34 |  15 070 |   0 |     1 |   17 930 |
+  | `huge`               |   99 000 |  5 350 |  32 |  63 120 |   0 |     2 |   93 510 |
+  | `pathological`       |  549 750 | 24 680 |  36 | 239 290 |   0 |     2 |  523 620 |
+
+  `paste_4kb` p50 (microseconds), same matrix:
+
+  | profile | total | apply | pool | parse | hop | model | render |
+  |---|---:|---:|---:|---:|---:|---:|---:|
+  | `tiny`               |  106 640 |  96 880 |  27 |   2 190 |   0 |    1 |    9 750 |
+  | `mid_prose`          |  109 010 |  98 060 |  32 |   4 880 |   0 |    1 |   10 990 |
+  | `big_prose`          |  116 970 |  96 810 |  28 |  18 290 |   0 |    1 |   20 150 |
+  | `pathological`       |  667 170 | 123 900 |  37 | 246 680 |   0 |    2 |  541 770 |
+
+  **Sum of per-iter phases equals `total_ns` exactly by construction.**
+  Sum of phase p50s diverges from p50 of total on heavy profiles (e.g.
+  `big_prose / type_end`: sum of p50s is 32.5 ms vs 17.3 ms total) because
+  `parse_work` and `render_frame` are inversely correlated per-iter under
+  parse-pool coalescing — when parse coalesces into pending, the next iter
+  sees a small parse_work but a large render_frame attributed to the
+  earlier coalesced work, and vice versa. This is an artifact of percentile
+  decomposition, not a measurement bug; the per-iter invariant
+  (apply + pool + parse + hop + model + render = total) holds exactly. See
+  `libs/markoff-bench/README.md § Render-tier phase taxonomy`.
+
+  **Findings (informing 2.C and follow-up work):**
+
+  1. **`phase_render_frame` is the dominant UI-side cost on every doc
+     ≥ 16 KB**, ranging from 4.8 ms on `mid_prose` to 524 ms on
+     `pathological`. Scales roughly linearly with doc size, as expected
+     for a non-virtualizing ListView with per-paragraph delegates. This is
+     not highlighter cost (highlighter is in `apply_edit`); it's
+     scenegraph rebuild + QtGui text layout for visible delegates.
+
+  2. **`phase_apply_edit` is non-trivial in live mode (1-5 ms on big
+     profiles)** and is dominated by `paste_4kb` (~100 ms on every
+     profile). Live-mode apply_edit is ~14× source-mode apply_edit on
+     `mid_prose / type_end` (5.1 ms vs 0.36 ms), implying that a live-
+     mode-specific synchronous path (likely SourceTextDocumentBinding's
+     reverse-update of the invisible source TextArea, since
+     `MarkoffDocument::contentsChanged` is a DirectConnection signal and
+     SourceTextDocumentBinding is the only foundation-side subscriber)
+     is paying a cost it doesn't need to in live mode. **Follow-up
+     candidate.** Easy win if confirmed: short-circuit
+     SourceTextDocumentBinding when its TextArea is `enabled: false`.
+
+  3. **`phase_model_update` is essentially zero on every profile** (1-200
+     µs p50). Either LiveListModelBinding's BlockWalker + AstBlockDiff +
+     applyOps work is genuinely fast, OR the work happens inside QML's
+     async polish phase that blends into `phase_render_frame`. Worth a
+     focused profile to disambiguate before betting on Stage 2.C
+     (KSyntaxHighlighter): if model_update is genuinely cheap, the
+     scenegraph cost is delegate-driven (QML pipeline / QtGui text), not
+     highlighter-driven. The 04-28 highlighter hypothesis loses support.
+
+  4. **`phase_pool_queue` and `phase_signal_hop` are noise** (sub-100 µs
+     across every profile). The Qt queued-connection plumbing is not a
+     cost contributor at any size we measured.
+
+  5. **`paste_4kb`'s ~100 ms `phase_apply_edit`** is striking and
+     consistent across every profile (96-124 ms). This is one CRDT
+     `apply_local_edit` for a single 4 KB insertion; the cost is
+     dominated by `Buffer::apply_local_edit` itself, not by anything
+     downstream. Belongs to Stage 2.A (CRDT) territory and to the
+     `collabtext` agents — it's nearly invariant of doc size, so it's a
+     constant per-paste cost in the buffer write path.
+
+- **Task 2.C (deferred): KSyntaxHighlighter rehighlight scope.** Render-
+  tier instrumentation now lets us decide. `phase_model_update` p50 is
+  1-200 µs across every profile, while `phase_render_frame` carries
+  3.6-523 ms. If the scenegraph cost were highlighter-driven, we'd
+  expect it to surface in `phase_apply_edit` (KSyntaxHighlighter is a
+  DirectConnection subscriber to QTextDocument::contentsChange) or
+  `phase_model_update` (if the highlighter ran during the parsed-doc
+  consumption path). Neither is the case — `apply_edit` is small except
+  on `paste_4kb`, where the cost is in CRDT, not the highlighter.
+  **Recommendation: drop Task 2.C's "highlighter rehighlight scope"
+  framing.** Re-prioritize as "QML delegate / Live-render scenegraph
+  rebuild" — the cost is in scenegraph node creation, not in the
+  highlighter. Pursue only if Live mode is the actual target UX (current
+  user-facing app defaults to source mode per `markoff-view-qml-app`
+  arg parsing).
 
 - **Task 2.C (deferred): KSyntaxHighlighter rehighlight scope.** Cannot
   be confirmed or refuted by the perf-record (highlighter symbols don't

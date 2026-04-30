@@ -54,6 +54,40 @@ ctest --test-dir build-dev -j 8 -LE bench -E "tst_realistic|tst_benchmark" \
     --output-on-failure
 ```
 
+## Render-tier phase taxonomy
+
+`markoff-bench-render` reports six per-iteration phases that together sum to
+`total_ns` (within ±5 % steady_clock-capture noise) on every measured scenario:
+
+| Phase | Boundary | Thread |
+|---|---|---|
+| `phase_apply_edit` | `t0` → `applyLocalEdit()` return | main |
+| `phase_pool_queue` | `applyLocalEdit` return → `ParsePoolWorker::parseSnapshot` body start | queued (cross-thread) |
+| `phase_parse_work` | worker entry → `Q_EMIT parsed` | parse-pool worker |
+| `phase_signal_hop` | worker emit → `ParsePool::parseReady` lambda body start on the document thread | queued (cross-thread) |
+| `phase_model_update` | parseReady lambda start → all `DirectConnection` slots returned (incl. `LiveListModelBinding::onParseUpdatedAt`) | main |
+| `phase_render_frame` | model-done → next `QQuickWindow::frameSwapped` | main + GPU |
+
+The four UI-side phases (`pool_queue`, `signal_hop`, `model_update`,
+`render_frame`) are the ones the SESSION-BRIEF for Task 2.B asked for. The
+extra `apply_edit` and `parse_work` slots are required for the per-iteration
+sum to equal `total_ns`: `apply_edit` covers the synchronous CRDT +
+`SourceTextDocumentBinding` + KSyntaxHighlighter rehighlight cost paid
+inside `applyLocalEdit`, and `parse_work` covers the worker-thread parse
+itself (split per-phase at Tier 1 — see `phase_extract..phase_snapshot`; at
+Tier 2 it's reported as a single bucket because the existing
+`ParsePhaseTable` plumbing isn't currently forwarded through the pool).
+
+The render bench defaults to **live mode** (`MarkoffEditor.mode === "live"`).
+That keeps the four UI phases sequential on the critical path: the next
+frame can't swap until `LiveListModelBinding` has consumed the new parse.
+Pass `--mode source` to bench against the source-mode QML pipeline; in
+source mode `phase_render_frame` may be ≪ `phase_signal_hop` because the
+QTextDocument-side render runs in parallel with the parse, and the next
+frame can swap before the model-update phase ends. The CLI clamps any
+negative deltas to 0 in that case; the mode caveat is documented in the
+binary's source comments.
+
 ## Output schema (v1)
 
 ```json
@@ -79,7 +113,10 @@ ctest --test-dir build-dev -j 8 -LE bench -E "tst_realistic|tst_benchmark" \
         "phase_snapshot":      {"…"},
         "phase_pool_queue":    {"…"},
         "phase_signal_hop":    {"…"},
+        "phase_model_update":  {"…"},
         "phase_render_frame":  {"…"},
+        "phase_apply_edit":    {"…"},
+        "phase_parse_work":    {"…"},
         "block_changed_bytes": {"…"},
         "inline_reuse_count":  {"…"},
         "alloc_bytes":         {"…"},
@@ -96,11 +133,15 @@ emit zeros for those fields.
 
 ## Caveats
 
-1. **Phase splits are coarse.** Tier 1 currently buckets the entire
-   per-iter parse cost into `phase_parse_block`. Finer splits require
-   instrumenting `IncrementalParseSession::applyEdit` with PhaseTimer
-   guards inside the foundation source — a follow-up task once a
-   profile motivates it.
+1. **Tier-1 phase splits are fine; Tier-2 lumps parse into one bucket.**
+   `IncrementalParseSession::applyEdit` is fully split into `phase_extract`,
+   `phase_diff`, `phase_parse_block`, `phase_parse_inline`, `phase_queries`,
+   `phase_snapshot` at Tier 1. Tier 2 reports `phase_parse_work` as a single
+   bucket because the existing `ParsePhaseTable` plumbing is not currently
+   forwarded through the parse pool from the bench frontend. If a render-tier
+   profile shows parse_work as the dominant cost on a given scenario, drill
+   in by running the same `(profile, scenario)` at Tier 1 to see the per-
+   parse-phase split.
 2. **Allocation counter is approximate.** The shim sees `operator new`
    from C++ code in markoff_bench-linked binaries. Calls that bypass
    the global operator (mmap, jemalloc, etc.) are not counted. The

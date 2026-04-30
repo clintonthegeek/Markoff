@@ -14,10 +14,20 @@ enum class Phase : int {
     ParseInline = 3,
     Queries     = 4,
     Snapshot    = 5,
-    PoolQueue   = 6,   // Tier 1b: applyLocalEdit return → worker pickup
-    SignalHop   = 7,   // Tier 1b: worker emit → main-thread receipt
-    RenderFrame = 8,   // Tier 2 only
-    Count       = 9,   // sentinel — keep last
+    PoolQueue   = 6,   // Tier 1b/2: applyLocalEdit return → worker pickup
+    SignalHop   = 7,   // Tier 1b/2: worker parsed-emit → main-thread receipt
+    ModelUpdate = 8,   // Tier 2: parseUpdated emit start → all DirectConnection
+                       // slots returned (e.g. LiveListModelBinding finished)
+    RenderFrame = 9,   // Tier 2: model done → next frameSwapped
+    ApplyEdit   = 10,  // Tier 2: applyLocalEdit() synchronous wall time
+                       // (CRDT + SourceTextDocumentBinding QTextDoc rebuild +
+                       // KSyntaxHighlighter rehighlight + parsePool.schedule)
+    ParseWork   = 11,  // Tier 2: gross parse-worker time (worker entry → emit).
+                       // At Tier 1 this lives in Extract..Snapshot; at Tier 2
+                       // we keep it as a single lump so the six Tier-2 phases
+                       // (apply_edit + pool_queue + parse_work + signal_hop +
+                       // model_update + render_frame) sum to total_ns.
+    Count       = 12,  // sentinel — keep last
 };
 
 constexpr int kPhaseCount = static_cast<int>(Phase::Count);
