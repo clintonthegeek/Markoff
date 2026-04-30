@@ -6,7 +6,7 @@
 
 **Goal:** Turn the read-only `LiveView` walking skeleton into a structurally-complete editor per `docs/specs/2026-04-30-live-editing-design.md`. Type into delegates, cross-block structural edits, clipboard, undo, IME, cross-mode selection, app-layer save with dirty tracking. Retire three pieces of walking-skeleton tech debt along the way: `TextEdit.MarkdownText`, content-hash `BlockKey`, and standalone `LiveSelectionModel`.
 
-**Architecture:** `TextEdit.PlainText` everywhere with markoff-parser-AST-driven `QTextCharFormat` highlighter; per-delegate cycle-guarded write path mirroring `SourceTextDocumentBinding`'s pattern; γ-CRDT-anchor identity via `(kind, BlockAnchor)`; `Session::primarySelection` as cross-mode source of truth; shared `MarkoffDocument` undo stack; two narrow speculative paths (inline open delimiters at the highlighter, code-block fence at the editor); source-faithful gap model.
+**Architecture:** `TextEdit.PlainText` everywhere with markoff-parser-AST-driven `QTextCharFormat` highlighter; per-delegate cycle-guarded write path mirroring `SourceTextDocumentBinding`'s pattern; CRDT-anchor identity via `(kind, BlockAnchor)`; `Session::primarySelection` as cross-mode source of truth; shared `MarkoffDocument` undo stack; two narrow speculative paths (inline open delimiters at the highlighter, code-block fence at the editor); source-faithful gap model.
 
 **Tech Stack:** C++20, Qt 6.8+ (Quick, QuickControls2, Qml, Widgets), KF6::SyntaxHighlighting, CMake 3.19+. Test framework Qt Test for C++ + QML smoke. Build with `-j 8` (no bare `-j`, which freezes the user's machine).
 
@@ -100,8 +100,8 @@ Before any editing work begins, verify the BlockAnchor + TextAnchor foundation A
 - [ ] **Step 1.1: Confirm foundation symbols exist**
 
 ```bash
-grep -E "BlockAnchor|TextAnchor" libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
-grep -E "blockAt|offsetInBlock|anchorAt.*BlockAnchor" libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
+grep -E "BlockAnchor|TextAnchor|parseSequence|editSequence" libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
+grep -E "blockAt|offsetInBlock|textAnchorAt.*BlockAnchor" libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
 ```
 
 Expected: at least one match for each. If missing, STOP — the foundation work is not yet landed.
@@ -141,7 +141,7 @@ Where `BlockKey` is defined (currently `AstBlockDiff.h` per spec; verify with `g
 
 - [ ] **Step 2.2: Update `LiveListModelBinding::onParseUpdated`**
 
-The function that walks the parsed AST and builds the BlockKey list now reads `BlockAnchor` from each top-level block (foundation provides this on the parsed `Document`). Replace the content-hash computation with the anchor read.
+The new `parseUpdated` signal ships a parallel `QList<BlockAnchor>` alongside the parsed `Document`, plus a `quint64 parseSequence` replacing the prior `Crdt::Global atVersion` (per the BlockAnchor foundation spec §2). Update the slot signature accordingly. For each top-level block in the Document, read its BlockAnchor from the parallel list at the same index. Replace the content-hash computation with this anchor read. Record the `parseSequence` for any subsequent ordering checks the binding needs.
 
 - [ ] **Step 2.3: Update `AstBlockDiff` equality**
 
@@ -631,9 +631,9 @@ App-layer save in `markoff-view-qml/app/main.cpp`.
 **Files:**
 - Modify: `libs/markoff-view-qml/app/main.cpp`
 
-- [ ] **Step 14.1: Track lastSavedVersion + dirty**
+- [ ] **Step 14.1: Track lastSavedSequence + dirty**
 
-After `resetContent` on file open, record `lastSavedVersion = doc.version()`. Subscribe to `contentsChanged`; recompute dirty as `version() != lastSavedVersion`.
+After `resetContent` on file open, record `lastSavedSequence = doc.editSequence()`. Subscribe to `contentsChanged`; recompute dirty as `doc.editSequence() != lastSavedSequence`. (Do not call `doc.version()` from app-layer code — that returns `Crdt::Global` and is foundation-internal per the BlockAnchor spec §2.)
 
 - [ ] **Step 14.2: Window title `[modified]` indicator**
 
@@ -641,7 +641,7 @@ Update title on dirty change.
 
 - [ ] **Step 14.3: Ctrl+S handler**
 
-On Ctrl+S, write `doc.toMarkdownUtf8()` to the file path (or open Save-As if no path); update `lastSavedVersion`.
+On Ctrl+S, write `doc.toMarkdownUtf8()` to the file path (or open Save-As if no path); update `lastSavedSequence` to `doc.editSequence()`.
 
 - [ ] **Step 14.4: Close-prompt on dirty**
 

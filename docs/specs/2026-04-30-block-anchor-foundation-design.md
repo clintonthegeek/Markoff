@@ -104,6 +104,20 @@ Existing methods unchanged. Add these:
 /// holding a Crdt::Global. Decoupled from the CRDT version vector.
 quint64 parseSequence() const noexcept;
 
+// ===== Edit sequence =====
+/// Locally-monotonic edit-sequence number that increments on every
+/// state-change operation (applyLocalEdit, undo, redo, resetContent).
+/// Public-boundary consumers use this for dirty-tracking ("has the
+/// doc changed since the last save?") without holding a Crdt::Global.
+///
+/// Note the monotonic semantics: a doc that was edited and then
+/// undone to a byte-equivalent of its saved state still reports a
+/// different editSequence than at save time. This matches the prior
+/// `version() != savedVersion` behaviour; if a future consumer wants
+/// byte-equivalence dirty-tracking, that's a separate concern (e.g. a
+/// content fingerprint).
+quint64 editSequence() const noexcept;
+
 // ===== Anchors (extended) =====
 /// Returns a TextAnchor at the given byte offset with the given bias.
 /// Companion to existing anchorAt(quint32, Crdt::Bias) — same semantics
@@ -196,7 +210,7 @@ foundation-internal callers; nothing on the public boundary holds
 - `applyLocalEdit(const QList<MarkoffEdit> &) → Crdt::Operation` — local writes.
 - `undo()` / `redo()` / `undoDepth()` / `coalesceLastUndo()` — undo stack.
 - `toMarkdownUtf8() → QByteArray` — read source bytes.
-- `version() → Crdt::Global` — version (foundation-internal). View-layer code uses the new `parseSequence() → quint64` accessor.
+- `version() → Crdt::Global` — version (foundation-internal). Public-boundary consumers use `parseSequence() → quint64` for parse-ordering, and `editSequence() → quint64` for "has the doc changed since save?" — neither leaks `Global`.
 - `anchorAt(quint32, Crdt::Bias)` / `resolveAnchor(...)` — byte ↔ anchor (CRDT-typed; foundation-internal).
 - `contentsChanged(QList<MarkoffEdit>)` — change signal.
 - `parsedDocument() → const Document *` — current parsed AST.
@@ -468,6 +482,19 @@ here for traceability.
    a future consumer wants always-Some clamping semantics, add a
    separate `nearestBlockAt(TextAnchor)` then; do not preemptively
    split the API.
+
+8. **`editSequence() → quint64` for dirty-tracking** (added during
+   the cross-check against `docs/plans/2026-04-30-live-editing.md`).
+   The test app's "[modified] in window title" flow records
+   `lastSavedSequence = doc.editSequence()` on save and recomputes
+   dirty as `doc.editSequence() != lastSavedSequence`. Distinct from
+   `parseSequence()` (parse-ordering) and from `version()` (CRDT
+   version vector, foundation-internal). Increments on every
+   state-change op — applyLocalEdit, undo, redo, resetContent — so
+   the semantics match the prior `version() !=` behaviour. Resolves
+   the otherwise-conflict between decision 3 ("view layer never holds
+   `Global`") and the live-editing plan's task 14 (which reached for
+   `doc.version()` to drive dirty-tracking).
 
 ---
 
