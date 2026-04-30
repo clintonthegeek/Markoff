@@ -57,6 +57,11 @@ CollabText::Crdt::Global MarkoffDocument::version() const
     return d->buffer.version();
 }
 
+quint64 MarkoffDocument::editSequence() const noexcept
+{
+    return d->editSequence;
+}
+
 // applyLocalEdit, undo/redo, applyRemoteOps, resetContent, anchorAt,
 // resolveAnchor, sessions, collectGarbage, compact, coalescing setters
 // are filled in subsequent tasks (10-23).
@@ -64,6 +69,8 @@ CollabText::Crdt::Global MarkoffDocument::version() const
 CollabText::Crdt::Operation
 MarkoffDocument::applyLocalEdit(const QList<MarkoffEdit> &edits)
 {
+    ++d->editSequence;
+
     // Snapshot version so we can compute the resulting TextEdits afterwards.
     const CollabText::Crdt::Global oldVersion = d->buffer.version();
 
@@ -109,6 +116,8 @@ std::optional<CollabText::Crdt::Operation> MarkoffDocument::undo()
     if (!op.has_value())
         return std::nullopt;
 
+    ++d->editSequence;
+
     const auto textEdits = d->buffer.edits_since(oldVersion);
     QList<MarkoffEdit> resultingEdits;
     resultingEdits.reserve(static_cast<int>(textEdits.size()));
@@ -134,6 +143,8 @@ std::optional<CollabText::Crdt::Operation> MarkoffDocument::redo()
     auto op = d->buffer.redo();
     if (!op.has_value())
         return std::nullopt;
+
+    ++d->editSequence;
 
     const auto textEdits = d->buffer.edits_since(oldVersion);
     QList<MarkoffEdit> resultingEdits;
@@ -170,6 +181,8 @@ void MarkoffDocument::applyRemoteOps(
     if (ops.empty())
         return;
 
+    ++d->editSequence;
+
     const CollabText::Crdt::Global oldVersion = d->buffer.version();
     d->buffer.apply_ops(ops);
 
@@ -193,6 +206,8 @@ void MarkoffDocument::applyRemoteOps(
 
 void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
 {
+    ++d->editSequence;
+
     switch (origin) {
     case Origin::FirstOpen:
     case Origin::ExternalReloadClean:

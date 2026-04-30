@@ -54,6 +54,14 @@ public:
     quint16 replicaId() const;
     CollabText::Crdt::Global version() const;
 
+    // ===== Sequence accessors (CRDT-free, public-boundary friendly) =====
+    /// Locally-monotonic edit-sequence number that increments on every
+    /// state-change operation (applyLocalEdit, undo, redo, applyRemoteOps,
+    /// resetContent). Used for dirty-tracking ("has the doc changed since
+    /// the last save?") without holding a Crdt::Global. See spec §10
+    /// decision 8.
+    quint64 editSequence() const noexcept;
+
     // ===== Local writes =====
     /// Apply a list of local edits as a single batched local edit. Edits are
     /// in OLD-text byte coordinates; ranges must be non-overlapping; if
