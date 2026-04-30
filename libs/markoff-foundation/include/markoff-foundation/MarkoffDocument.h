@@ -17,6 +17,7 @@
 
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
+#include <markoff-foundation/TextAnchor.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
 #include <markoff-foundation/RenderPhases.h>
 #include <markoff-foundation/SessionParams.h>
@@ -93,6 +94,15 @@ public:
     CollabText::Crdt::Anchor
         anchorAt(quint32 byteOffset, CollabText::Crdt::Bias bias) const;
     quint32 resolveAnchor(const CollabText::Crdt::Anchor &) const;
+
+    /// TextAnchor-typed companion to anchorAt(quint32, Crdt::Bias). Same
+    /// semantics; view-layer-friendly because it doesn't require including
+    /// <crdt/Anchor.h>.
+    TextAnchor textAnchorAt(quint32 byteOffset, bool rightBias) const;
+
+    /// Resolve a TextAnchor to its current byte offset. Companion to
+    /// resolveAnchor(const Crdt::Anchor &).
+    quint32 resolveTextAnchor(const TextAnchor &) const;
 
     // ===== Sessions (filled in Task 23) =====
     Session *createSession(const SessionParams &params = {});

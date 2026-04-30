@@ -5,6 +5,7 @@
 #include <markoff-parser/Document.h>
 
 #include "MarkoffDocumentPrivate.h"
+#include "AnchorConversion.h"
 
 namespace Markoff {
 
@@ -265,6 +266,18 @@ MarkoffDocument::anchorAt(quint32 byteOffset, CollabText::Crdt::Bias bias) const
 quint32 MarkoffDocument::resolveAnchor(const CollabText::Crdt::Anchor &a) const
 {
     return d->buffer.resolve_anchor(a);
+}
+
+TextAnchor MarkoffDocument::textAnchorAt(quint32 byteOffset, bool rightBias) const
+{
+    using CollabText::Crdt::Bias;
+    return Detail::toTextAnchor(
+        anchorAt(byteOffset, rightBias ? Bias::Right : Bias::Left));
+}
+
+quint32 MarkoffDocument::resolveTextAnchor(const TextAnchor &t) const
+{
+    return resolveAnchor(Detail::toCrdtAnchor(t));
 }
 
 Session *MarkoffDocument::createSession(const SessionParams &params)

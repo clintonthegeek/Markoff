@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
+#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/Origin.h>
 #include <markoff-foundation/TextAnchor.h>
 #include <crdt/Anchor.h>
 #include "AnchorConversion.h"  // tests reach into foundation src/ for internals
@@ -72,6 +75,30 @@ private Q_SLOTS:
         const TextAnchor t = Markoff::Detail::toTextAnchor(a);
         const auto back = Markoff::Detail::toCrdtAnchor(t);
         QVERIFY(back.is_max());
+    }
+
+    void document_textAnchorAt_resolves_back_to_same_byte_with_left_bias() {
+        MarkoffDocument doc{1};
+        doc.resetContent("hello world", Origin::TestFixture);
+        const TextAnchor t = doc.textAnchorAt(6, /*rightBias*/ false);
+        QCOMPARE(doc.resolveTextAnchor(t), quint32{6});
+    }
+
+    void document_textAnchorAt_resolves_back_to_same_byte_with_right_bias() {
+        MarkoffDocument doc{1};
+        doc.resetContent("hello world", Origin::TestFixture);
+        const TextAnchor t = doc.textAnchorAt(6, /*rightBias*/ true);
+        QCOMPARE(doc.resolveTextAnchor(t), quint32{6});
+    }
+
+    void document_textAnchorAt_left_bias_survives_insert_before() {
+        MarkoffDocument doc{1};
+        doc.resetContent("hello world", Origin::TestFixture);
+        const TextAnchor t = doc.textAnchorAt(6, /*rightBias*/ false);
+        // Insert "X" at position 0 — anchor at byte 6 should now resolve to 7.
+        MarkoffEdit e; e.oldStart = 0; e.oldEnd = 0; e.newText = "X";
+        doc.applyLocalEdit({e});
+        QCOMPARE(doc.resolveTextAnchor(t), quint32{7});
     }
 };
 
