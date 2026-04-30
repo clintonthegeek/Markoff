@@ -315,6 +315,7 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
     collectInlineRanges(root, newInlineRanges);
 
     m_lastInlineReuseCount = 0;
+    m_lastBlockChangedBytes = 0;
 
     struct ShiftedRange {
         quint32 start;

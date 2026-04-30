@@ -61,6 +61,7 @@ private Q_SLOTS:
     void editsInTwoRegions_reusesTheRegionBetween();
     void noEdits_reusesAllInlineRegions();
     void blockChangedByteCount_initialAndIncremental();
+    void blockChangedByteCount_resetOnEmptyEdits();
 };
 
 // ---------------------------------------------------------------------------
@@ -374,10 +375,10 @@ void TstIncrementalParse::blockChangedByteCount_initialAndIncremental()
     // After a fresh parse there is no previous tree to compare against.
     QCOMPARE(parser.blockChangedByteCount(), -1);
 
-    // Insert a single character at the end of the paragraph.
+    // Insert a single character before the final '.' in "A paragraph.".
     Markoff::ByteEdit edit;
-    edit.oldStart = 23;          // before final '\n'
-    edit.oldEnd   = 23;
+    edit.oldStart = 22;          // position of the final '.' in "A paragraph."
+    edit.oldEnd   = 22;
     edit.newLength = 1;
     QByteArray newBuf = QByteArrayLiteral("# Heading\n\nA paragraph!.\n");
     QVERIFY(parser.parseIncremental({edit}, newBuf));
@@ -385,6 +386,26 @@ void TstIncrementalParse::blockChangedByteCount_initialAndIncremental()
     const int changed = parser.blockChangedByteCount();
     QVERIFY2(changed >= 0, "after parseIncremental the counter must be set");
     QVERIFY2(changed <= 64, "a one-char edit on a tiny doc must produce a small changed-bytes total");
+}
+
+void TstIncrementalParse::blockChangedByteCount_resetOnEmptyEdits()
+{
+    Markoff::TreeSitterParser parser;
+    QVERIFY(parser.parse(QStringLiteral("# Heading\n\nA paragraph.\n")));
+    QCOMPARE(parser.blockChangedByteCount(), -1);
+
+    // First incremental parse with an edit — counter should become >= 0.
+    Markoff::ByteEdit edit;
+    edit.oldStart  = 22;
+    edit.oldEnd    = 22;
+    edit.newLength = 1;
+    QVERIFY(parser.parseIncremental({edit}, QByteArrayLiteral("# Heading\n\nA paragraph!.\n")));
+    QVERIFY(parser.blockChangedByteCount() >= 0);
+
+    // Now an empty-edits incremental parse — counter should reset to 0
+    // (no edits = no block-tree changes), NOT carry the stale value over.
+    QVERIFY(parser.parseIncremental({}, QByteArrayLiteral("# Heading\n\nA paragraph!.\n")));
+    QCOMPARE(parser.blockChangedByteCount(), 0);
 }
 
 QTEST_APPLESS_MAIN(TstIncrementalParse)
