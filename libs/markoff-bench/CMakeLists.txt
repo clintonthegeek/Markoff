@@ -17,6 +17,7 @@ add_library(markoff_bench STATIC
     src/CorpusGen.cpp
     src/FixtureLoader.cpp
     src/Scenario.cpp
+    src/ScenarioRunner.cpp
 )
 
 target_include_directories(markoff_bench
