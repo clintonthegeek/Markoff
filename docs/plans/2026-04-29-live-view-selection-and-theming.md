@@ -1,3 +1,5 @@
+> **Status: completed.** Landed via `bd75ecf` (Theme Q_PROPERTYs) + `78b8f22` (overlay + theme threading). All four tests in `tst_view_qml_live_view_qml.cpp` pass. Do not execute.
+
 # Live-view selection highlight + delegate theming — implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

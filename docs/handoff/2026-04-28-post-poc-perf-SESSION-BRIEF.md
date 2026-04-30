@@ -1,3 +1,5 @@
+> **Status: superseded.** Initial perf investigation landed (`6cdf0f2`); the broader perf arc has moved to `docs/specs/2026-04-30-optimization-baseline-and-plan.md` + `docs/handoff/2026-04-30-post-blockwalker-SESSION-BRIEF.md`. Do not execute.
+
 # Post-POC perf investigation — fresh-context SESSION BRIEF
 
 **Read this first.** This document is a self-contained briefing for a fresh-context Claude session picking up the markoff-view-qml POC's typing-perf problem.

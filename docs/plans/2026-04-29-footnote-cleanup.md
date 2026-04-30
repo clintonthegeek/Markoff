@@ -1,3 +1,5 @@
+> **Status: completed.** Landed via `9bf92fe` / `955e935` / `bd9d69a` / `92e57f1`. Tasks below are kept for historical reference; do not execute.
+
 # Footnote Cleanup Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

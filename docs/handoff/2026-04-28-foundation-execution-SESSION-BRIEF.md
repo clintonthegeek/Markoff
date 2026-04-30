@@ -1,3 +1,5 @@
+> **Status: superseded.** All 55 foundation tasks landed; foundation library is feature-complete. Kept for arc context only; do not execute.
+
 # Foundation execution — fresh-context SESSION BRIEF
 
 **Read this first.** This document is a self-contained briefing for a fresh-context Claude session picking up the Markoff-foundation implementation. It encodes the prior session's decisions, recommendations, and hard warnings so you don't repeat the brainstorming work or violate constraints.

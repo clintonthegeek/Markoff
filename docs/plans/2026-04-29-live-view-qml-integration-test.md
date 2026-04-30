@@ -1,3 +1,5 @@
+> **Status: completed.** Landed via `a64f722` / `89b8931` / `1406a64` / `7d8e244`. `tst_view_qml_live_view_qml.cpp` exists with all four test methods passing. Do not execute.
+
 # Live View QML integration test — implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

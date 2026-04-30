@@ -1,3 +1,5 @@
+> **Status: completed.** `libs/markoff-source-widget/` and `SourceTextDocumentBinding` foundation relocation are in tree (commit range `89bc241`…`5915520`). Do not execute.
+
 # `markoff-source-widget` — implementation plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development. Steps use checkbox (`- [ ]`) syntax for tracking.

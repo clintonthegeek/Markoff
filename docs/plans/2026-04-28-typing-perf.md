@@ -1,3 +1,5 @@
+> **Status: paused (intentional).** Tasks 2–5 deferred; subsequent perf work has moved to `docs/specs/2026-04-30-optimization-baseline-and-plan.md` + the post-blockwalker arc. Do not execute as-is.
+
 # Typing-perf fixes — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

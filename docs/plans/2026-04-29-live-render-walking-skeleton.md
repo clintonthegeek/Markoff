@@ -1,3 +1,5 @@
+> **Status: completed.** Walking skeleton landed in 13 commits ending `f172095` + dogfood-fix `b03b0d0`. All five v0 block delegates + LiveListModelBinding + LiveSelectionModel are in tree. Do not execute.
+
 # Live Render walking skeleton — Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

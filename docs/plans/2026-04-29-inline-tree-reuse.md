@@ -1,3 +1,5 @@
+> **Status: completed.** Landed via `b01f913` / `e08c512` / `bc8dca1`. `TreeSitterParser::inlineTreeReuseCount()` is wired and tested. Do not execute.
+
 # Inline-Tree Reuse Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

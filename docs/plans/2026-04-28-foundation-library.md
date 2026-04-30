@@ -1,3 +1,5 @@
+> **Status: completed.** All 25 `tst_foundation_*` tests pass; `markoff_foundation` is feature-complete per spec §12. See TODO.md "Phase 13 acceptance passed" entry for confirmation. Do not execute.
+
 # Markoff Foundation Library Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.

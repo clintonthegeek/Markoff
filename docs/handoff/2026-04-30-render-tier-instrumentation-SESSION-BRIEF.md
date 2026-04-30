@@ -1,3 +1,5 @@
+> **Status: superseded.** Per-phase taps landed via `91719e7` + `80074b7`. Do not execute.
+
 # Render-tier instrumentation — fresh-context SESSION BRIEF
 
 **Read this first.** Self-contained briefing for a fresh-context Claude session picking up render-tier (Tier 2) bench instrumentation on the `exploration/new-foundation` branch.

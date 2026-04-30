@@ -1,3 +1,5 @@
+> **Status: superseded.** This brief's quantitative claims were retired by `f3bbdf6` (BlockWalker off main thread). Successor brief: `docs/handoff/2026-04-30-post-blockwalker-SESSION-BRIEF.md`. Do not execute.
+
 # Markoff render/CRDT optimization — fresh-context SESSION BRIEF
 
 Branch: exploration/new-foundation

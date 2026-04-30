@@ -1,3 +1,5 @@
+> **Status: superseded.** Foundation Phase 4+ tasks all shipped. Do not execute.
+
 # Foundation execution Phase 4+ — fresh-context SESSION BRIEF
 
 **Read this first.** This document is a self-contained briefing for a fresh-context Claude session picking up the Markoff-foundation implementation. Tasks 1–18 are landed; you are continuing from Task 19.

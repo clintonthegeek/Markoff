@@ -1,3 +1,5 @@
+> **Status: superseded.** All three follow-ups (selection overlay, theming, QML integration test) shipped via `78b8f22` + `bd75ecf` + the `tst_view_qml_live_view_qml` series. Do not execute.
+
 # Live Render walking skeleton — fresh-context follow-up SESSION BRIEF
 
 **Read this first.** This document is a self-contained briefing for a fresh-context Claude session picking up the markoff-view-qml Phase-2 v0 walking skeleton after dogfood landed it.
