@@ -139,6 +139,10 @@ private:
     TSParser *m_inlineParser = nullptr;
     TSTree *m_blockTree = nullptr;
     QList<TSTree *> m_inlineTrees;  // one per inline region
+    // Byte ranges of m_inlineTrees in the current frame, parallel to
+    // m_inlineTrees. Cached so the next parseIncremental() can skip a
+    // collectInlineRanges() walk over the prior block tree.
+    std::vector<ByteRange> m_inlineRanges;
     QByteArray m_utf8;
     QList<int> m_byteToChar;  // UTF-8 byte offset → QString char offset
     int m_lastInlineReuseCount = 0;
