@@ -60,6 +60,7 @@ private Q_SLOTS:
     void editInsideRegion_invalidatesOnlyThatRegion();
     void editsInTwoRegions_reusesTheRegionBetween();
     void noEdits_reusesAllInlineRegions();
+    void blockChangedByteCount_initialAndIncremental();
 };
 
 // ---------------------------------------------------------------------------
@@ -364,6 +365,26 @@ void TstIncrementalParse::noEdits_reusesAllInlineRegions()
     QVERIFY(ref.parse(QString::fromUtf8(src)));
     QCOMPARE(fingerprintAll(p.buildSpanMap()),
              fingerprintAll(ref.buildSpanMap()));
+}
+
+void TstIncrementalParse::blockChangedByteCount_initialAndIncremental()
+{
+    Markoff::TreeSitterParser parser;
+    QVERIFY(parser.parse(QStringLiteral("# Heading\n\nA paragraph.\n")));
+    // After a fresh parse there is no previous tree to compare against.
+    QCOMPARE(parser.blockChangedByteCount(), -1);
+
+    // Insert a single character at the end of the paragraph.
+    Markoff::ByteEdit edit;
+    edit.oldStart = 23;          // before final '\n'
+    edit.oldEnd   = 23;
+    edit.newLength = 1;
+    QByteArray newBuf = QByteArrayLiteral("# Heading\n\nA paragraph!.\n");
+    QVERIFY(parser.parseIncremental({edit}, newBuf));
+
+    const int changed = parser.blockChangedByteCount();
+    QVERIFY2(changed >= 0, "after parseIncremental the counter must be set");
+    QVERIFY2(changed <= 64, "a one-char edit on a tiny doc must produce a small changed-bytes total");
 }
 
 QTEST_APPLESS_MAIN(TstIncrementalParse)

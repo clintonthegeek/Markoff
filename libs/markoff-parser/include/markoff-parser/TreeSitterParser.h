@@ -82,6 +82,11 @@ public:
     /// Primarily an observability hook for tests/benchmarks.
     int inlineTreeReuseCount() const { return m_lastInlineReuseCount; }
 
+    /// Total bytes covered by ts_tree_get_changed_ranges(prevTree, newTree)
+    /// on the most recent parseIncremental() call. Returns -1 after a fresh
+    /// parse() (no previous tree to compare). Observability hook for benches.
+    int blockChangedByteCount() const { return m_lastBlockChangedBytes; }
+
     /// A non-text block boundary found by the parser.
     struct BlockBoundary {
         enum Type { Table, FencedCodeBlock, Image };
@@ -112,6 +117,7 @@ private:
     QByteArray m_utf8;
     QList<int> m_byteToChar;  // UTF-8 byte offset → QString char offset
     int m_lastInlineReuseCount = 0;
+    int m_lastBlockChangedBytes = -1;
 };
 
 } // namespace Markoff

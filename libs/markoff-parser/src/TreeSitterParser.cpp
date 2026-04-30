@@ -184,6 +184,7 @@ TreeSitterParser::~TreeSitterParser()
 bool TreeSitterParser::parse(const QString &text)
 {
     m_lastInlineReuseCount = 0;
+    m_lastBlockChangedBytes = -1;
     m_utf8 = text.toUtf8();
     m_byteToChar = buildByteToCharMap(m_utf8);
 
@@ -289,6 +290,16 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
             // the parser stays in a valid state, and report failure.
             m_inlineTrees = oldInlineTrees;
             return false;
+        }
+        {
+            uint32_t nRanges = 0;
+            TSRange *ranges = ts_tree_get_changed_ranges(m_blockTree, newTree, &nRanges);
+            quint64 totalBytes = 0;
+            for (uint32_t i = 0; i < nRanges; ++i) {
+                totalBytes += static_cast<quint64>(ranges[i].end_byte) - ranges[i].start_byte;
+            }
+            if (ranges) free(ranges);
+            m_lastBlockChangedBytes = static_cast<int>(qMin<quint64>(totalBytes, INT_MAX));
         }
         ts_tree_delete(m_blockTree);
         m_blockTree = newTree;
