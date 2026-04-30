@@ -65,6 +65,22 @@ private Q_SLOTS:
             prev = cur;
         }
     }
+
+    void undo_on_empty_stack_does_not_increment() {
+        MarkoffDocument d{1};
+        const auto seq0 = d.editSequence();
+        const auto op = d.undo();
+        QVERIFY(!op.has_value());
+        QCOMPARE(d.editSequence(), seq0);
+    }
+
+    void redo_on_empty_stack_does_not_increment() {
+        MarkoffDocument d{1};
+        const auto seq0 = d.editSequence();
+        const auto op = d.redo();
+        QVERIFY(!op.has_value());
+        QCOMPARE(d.editSequence(), seq0);
+    }
 };
 
 QTEST_MAIN(TstFoundationEditSequence)
