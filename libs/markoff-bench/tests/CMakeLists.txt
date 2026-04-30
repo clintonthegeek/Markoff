@@ -34,3 +34,8 @@ add_executable(tst_bench_fixture_loader tst_bench_fixture_loader.cpp)
 add_test(NAME tst_bench_fixture_loader COMMAND tst_bench_fixture_loader)
 target_link_libraries(tst_bench_fixture_loader PRIVATE Qt6::Test markoff_bench)
 set_tests_properties(tst_bench_fixture_loader PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_bench_scenario tst_bench_scenario.cpp)
+add_test(NAME tst_bench_scenario COMMAND tst_bench_scenario)
+target_link_libraries(tst_bench_scenario PRIVATE Qt6::Test markoff_bench)
+set_tests_properties(tst_bench_scenario PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
