@@ -12,3 +12,8 @@ add_executable(tst_bench_phase_timer tst_bench_phase_timer.cpp)
 add_test(NAME tst_bench_phase_timer COMMAND tst_bench_phase_timer)
 target_link_libraries(tst_bench_phase_timer PRIVATE Qt6::Test markoff_bench)
 set_tests_properties(tst_bench_phase_timer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_bench_percentile tst_bench_percentile.cpp)
+add_test(NAME tst_bench_percentile COMMAND tst_bench_percentile)
+target_link_libraries(tst_bench_percentile PRIVATE Qt6::Test markoff_bench)
+set_tests_properties(tst_bench_percentile PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

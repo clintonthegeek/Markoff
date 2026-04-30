@@ -11,6 +11,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 # tests. It is not installed and is not part of the public Markoff API.
 add_library(markoff_bench STATIC
     src/PhaseTimer.cpp
+    src/PercentileReducer.cpp
 )
 
 target_include_directories(markoff_bench
