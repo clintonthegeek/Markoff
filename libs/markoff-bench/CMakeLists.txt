@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Test)
 
 # Bench is a STATIC library used only by the in-tree bench frontends and
 # tests. It is not installed and is not part of the public Markoff API.
@@ -32,6 +32,7 @@ target_link_libraries(markoff_bench
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
+        Qt6::Test
         markoff_foundation
         MarkoffParser::MarkoffParser
 )

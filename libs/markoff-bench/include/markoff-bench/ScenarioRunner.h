@@ -55,4 +55,12 @@ RunResult runDirectParse(const QByteArray &corpus,
                          ScenarioKind scenario,
                          quint64 seed);
 
+/// Run a scenario at Tier 1b (MarkoffDocument + ParsePool + signal hop).
+/// Each iteration: applyLocalEdit, then run the event loop until
+/// parseUpdated fires (or 5s deadline). Captures the same metrics as
+/// runDirectParse plus PoolQueue + SignalHop phase splits.
+RunResult runPoolParse(const QByteArray &corpus,
+                       ScenarioKind scenario,
+                       quint64 seed);
+
 }  // namespace Markoff::Bench

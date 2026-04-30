@@ -8,6 +8,14 @@
 // include access into libs/markoff-foundation/src/.
 #include <IncrementalParseSession.h>
 
+#include <QCoreApplication>
+#include <QEventLoop>
+#include <QSignalSpy>
+
+#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/Origin.h>
+
 #include <chrono>
 
 namespace Markoff::Bench {
@@ -126,6 +134,90 @@ RunResult runDirectParse(const QByteArray &corpus, ScenarioKind scenario, quint6
     r.inlineReuseCount   = reducePercentiles(inlineReuse);
     r.allocBytes         = reducePercentiles(allocBytes);
     r.allocCount         = reducePercentiles(allocCount);
+    return r;
+}
+
+namespace {
+quint64 waitForParseUpdated(Markoff::MarkoffDocument *doc, int timeoutMs) {
+    QSignalSpy spy(doc, &Markoff::MarkoffDocument::parseUpdated);
+    const auto t0 = std::chrono::steady_clock::now();
+    if (!spy.wait(timeoutMs)) {
+        qWarning("bench: parseUpdated did not fire within %d ms", timeoutMs);
+        return 0;
+    }
+    const auto t1 = std::chrono::steady_clock::now();
+    return static_cast<quint64>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
+}
+}  // namespace
+
+RunResult runPoolParse(const QByteArray &corpus, ScenarioKind scenario, quint64 seed) {
+    const ScenarioMeta meta = scenarioMeta(scenario);
+
+    // Caller is responsible for ensuring a QCoreApplication exists (the
+    // CLI frontend constructs one).
+    Q_ASSERT(QCoreApplication::instance() != nullptr);
+
+    Markoff::MarkoffDocument doc(/*replicaId*/ 1);
+    doc.resetContent(corpus, Markoff::Origin::TestFixture);
+    waitForParseUpdated(&doc, 30'000);   // initial parse can be slow on huge corpora
+
+    QByteArray currentDoc = corpus;
+    std::vector<quint64> totalNs;
+    std::vector<quint64> waitNs;             // PoolQueue + SignalHop combined
+    std::vector<quint64> allocBytes;
+    std::vector<quint64> allocCount;
+
+    const int totalIters = meta.warmupIters + meta.measuredIters;
+
+    if (scenario == ScenarioKind::ColdParse) {
+        // For ColdParse at Tier 1b: rebuild the doc and wait for parseUpdated.
+        Markoff::MarkoffDocument fresh(/*replicaId*/ 2);
+        AllocCounterScope allocScope;
+        const auto t0 = std::chrono::steady_clock::now();
+        fresh.resetContent(corpus, Markoff::Origin::TestFixture);
+        const quint64 wait = waitForParseUpdated(&fresh, 30'000);
+        const auto t1 = std::chrono::steady_clock::now();
+        const auto ns = static_cast<quint64>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
+        totalNs.push_back(ns);
+        waitNs.push_back(wait);
+        const auto alloc = currentAllocSnapshot();
+        allocBytes.push_back(alloc.bytes);
+        allocCount.push_back(alloc.count);
+    } else {
+        for (int i = 0; i < totalIters; ++i) {
+            const Markoff::MarkoffEdit edit = nextStep(scenario, currentDoc, i, seed);
+            currentDoc = applyEditToBuffer(currentDoc, edit);
+
+            AllocCounterScope allocScope;
+            const auto t0 = std::chrono::steady_clock::now();
+            doc.applyLocalEdit({edit});
+            const quint64 wait = waitForParseUpdated(&doc, 5'000);
+            const auto t1 = std::chrono::steady_clock::now();
+
+            if (i >= meta.warmupIters) {
+                totalNs.push_back(static_cast<quint64>(
+                    std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count()));
+                waitNs.push_back(wait);
+                const auto alloc = currentAllocSnapshot();
+                allocBytes.push_back(alloc.bytes);
+                allocCount.push_back(alloc.count);
+            }
+        }
+    }
+
+    RunResult r;
+    r.scenarioName = meta.name;
+    r.tier         = Tier::PoolParse;
+    r.iterations   = static_cast<int>(totalNs.size());
+    r.warmupIters  = (scenario == ScenarioKind::ColdParse) ? 0 : meta.warmupIters;
+    r.totalNs      = reducePercentiles(totalNs);
+    // Lump PoolQueue + SignalHop into the SignalHop slot; finer-grained
+    // split would require instrumentation in MarkoffDocument itself.
+    r.phases[static_cast<int>(Phase::SignalHop)] = reducePercentiles(waitNs);
+    r.allocBytes   = reducePercentiles(allocBytes);
+    r.allocCount   = reducePercentiles(allocCount);
     return r;
 }
 
