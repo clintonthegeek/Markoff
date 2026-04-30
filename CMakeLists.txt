@@ -8,6 +8,7 @@ project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 #   - libs/markoff-foundation (Markoff::Foundation — MarkoffDocument + ParsePool + Sessions)
 #   - libs/markoff-view-qml   (QML view library)
 #   - libs/markoff-source-widget (QPlainTextEdit-based source widget)
+#   - libs/markoff-bench         (in-tree benchmark harness; STATIC, internal)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project.
 # Qt6 / KF6 are discovered via find_package — parent projects that already find

@@ -17,7 +17,7 @@ target_include_directories(markoff_bench
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE
-        ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src
+        ${CMAKE_CURRENT_SOURCE_DIR}/../markoff-foundation/src
 )
 
 target_link_libraries(markoff_bench
