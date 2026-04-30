@@ -14,6 +14,7 @@ add_library(markoff_bench STATIC
     src/PercentileReducer.cpp
     src/AllocCounter.cpp
     src/AllocShim.cpp
+    src/CorpusGen.cpp
 )
 
 target_include_directories(markoff_bench

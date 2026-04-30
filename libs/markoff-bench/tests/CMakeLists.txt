@@ -22,3 +22,10 @@ add_executable(tst_bench_alloc_counter tst_bench_alloc_counter.cpp)
 add_test(NAME tst_bench_alloc_counter COMMAND tst_bench_alloc_counter)
 target_link_libraries(tst_bench_alloc_counter PRIVATE Qt6::Test markoff_bench)
 set_tests_properties(tst_bench_alloc_counter PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_bench_corpus_gen tst_bench_corpus_gen.cpp)
+add_test(NAME tst_bench_corpus_gen COMMAND tst_bench_corpus_gen)
+target_link_libraries(tst_bench_corpus_gen PRIVATE Qt6::Test markoff_bench)
+set_tests_properties(tst_bench_corpus_gen PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    TIMEOUT 60)
