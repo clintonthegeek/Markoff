@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Hard precondition:** This plan does NOT start until the foundation `BlockAnchor` + `TextAnchor` work has landed. See `docs/plans/<TBD>-block-anchor-foundation.md` (to be written from `docs/specs/2026-04-30-block-anchor-foundation-design.md`). The first task assumes the foundation API is callable; do not begin without it.
+> **Hard precondition:** This plan does NOT start until the foundation `BlockAnchor` + `TextAnchor` work has landed. See [`docs/plans/2026-04-30-block-anchor-foundation.md`](2026-04-30-block-anchor-foundation.md). The first task assumes the foundation API is callable; do not begin without it.
 
 **Goal:** Turn the read-only `LiveView` walking skeleton into a structurally-complete editor per `docs/specs/2026-04-30-live-editing-design.md`. Type into delegates, cross-block structural edits, clipboard, undo, IME, cross-mode selection, app-layer save with dirty tracking. Retire three pieces of walking-skeleton tech debt along the way: `TextEdit.MarkdownText`, content-hash `BlockKey`, and standalone `LiveSelectionModel`.
 
