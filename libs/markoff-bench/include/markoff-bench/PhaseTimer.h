@@ -17,10 +17,10 @@ enum class Phase : int {
     PoolQueue   = 6,   // Tier 1b: applyLocalEdit return → worker pickup
     SignalHop   = 7,   // Tier 1b: worker emit → main-thread receipt
     RenderFrame = 8,   // Tier 2 only
-    _Count      = 9,
+    Count       = 9,   // sentinel — keep last
 };
 
-constexpr int kPhaseCount = static_cast<int>(Phase::_Count);
+constexpr int kPhaseCount = static_cast<int>(Phase::Count);
 
 /// Per-iteration phase totals in nanoseconds, indexed by Phase.
 using PhaseTable = std::array<quint64, kPhaseCount>;
