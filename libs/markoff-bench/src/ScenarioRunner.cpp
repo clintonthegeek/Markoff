@@ -7,6 +7,7 @@
 // Foundation-internal — accessible because markoff_bench has PRIVATE
 // include access into libs/markoff-foundation/src/.
 #include <IncrementalParseSession.h>
+#include <ParsePhases.h>
 
 #include <QCoreApplication>
 #include <QEventLoop>
@@ -46,24 +47,34 @@ PerIter timeOneIter(Markoff::Parse::Detail::IncrementalParseSession &session,
 
     AllocCounterScope allocScope;
 
+    // Foundation accumulates phase nanoseconds into this table; we reset it
+    // per-iter and copy out into the bench PhaseTable below. Foundation
+    // ParsePhase indices 0..5 align with bench Phase indices 0..5 by
+    // construction (Extract / Diff / ParseBlock / ParseInline / Queries /
+    // Snapshot) — kept in sync intentionally.
+    Markoff::Parse::Detail::ParsePhaseTable foundationPhases{};
+    session.setPhaseTable(&foundationPhases);
+
     const auto t0 = std::chrono::steady_clock::now();
-
-    // For Phase-0 of this plan, total parse cost is bucketed into ParseBlock.
-    // Per-phase splits land in a follow-up if profile data motivates them.
-    {
-        PhaseTimer guard(iter.phases, Phase::ParseBlock);
-        session.applyEdit(QString::fromUtf8(newDoc));
-    }
-
+    session.applyEdit(QString::fromUtf8(newDoc));
+    auto snap = session.snapshot();
     const auto t1 = std::chrono::steady_clock::now();
+
+    Q_UNUSED(snap);
+
     iter.totalNs = static_cast<quint64>(
         std::chrono::duration_cast<std::chrono::nanoseconds>(t1 - t0).count());
 
-    // Reuse counters are wired in Task 11 once IncrementalParseSession
-    // exposes its TreeSitterParser. For now, emit zeros so the JSON
-    // schema stays consistent.
-    auto snap = session.snapshot();
-    Q_UNUSED(snap);
+    // Copy parse-side phase totals into the bench PhaseTable. Bench phases
+    // 6..8 (PoolQueue / SignalHop / RenderFrame) stay 0 on Tier 1.
+    static_assert(static_cast<int>(Markoff::Parse::Detail::ParsePhase::Count)
+                      <= kPhaseCount,
+                  "bench PhaseTable must hold every foundation parse phase");
+    for (int i = 0; i < Markoff::Parse::Detail::kParsePhaseCount; ++i) {
+        iter.phases[i] = foundationPhases[i];
+    }
+
+    session.setPhaseTable(nullptr);
 
     iter.alloc = currentAllocSnapshot();
     return iter;

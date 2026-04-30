@@ -9,6 +9,7 @@
 
 #include <QStringList>
 #include <QPair>
+#include <chrono>
 #include <vector>
 #include <algorithm>
 
@@ -185,6 +186,8 @@ bool TreeSitterParser::parse(const QString &text)
 {
     m_lastInlineReuseCount = 0;
     m_lastBlockChangedBytes = -1;
+    m_lastParseBlockNs  = 0;
+    m_lastParseInlineNs = 0;
     m_utf8 = text.toUtf8();
     m_byteToChar = buildByteToCharMap(m_utf8);
 
@@ -224,11 +227,21 @@ bool TreeSitterParser::parse(const QString &text)
 bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
                                         const QByteArray &newUtf8)
 {
+    m_lastParseBlockNs  = 0;
+    m_lastParseInlineNs = 0;
+
     // No prior tree → full parse of the new buffer. Callers don't need
     // a first-parse branch.
     if (!m_blockTree) {
         return parse(QString::fromUtf8(newUtf8));
     }
+
+    using Clock = std::chrono::steady_clock;
+    auto toNs = [](Clock::duration d) {
+        return static_cast<quint64>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(d).count());
+    };
+    const auto tStart = Clock::now();
 
     // Snapshot inline state from the OLD block tree before any edit, so we
     // can reuse trees whose post-edit byte range is unchanged.
@@ -236,6 +249,7 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
     collectInlineRanges(ts_tree_root_node(m_blockTree), oldInlineRanges);
     QList<TSTree *> oldInlineTrees = m_inlineTrees;
     m_inlineTrees.clear();
+    const auto tInlinePrepDone = Clock::now();
 
     QList<ByteEdit> sortedEdits;
 
@@ -305,6 +319,8 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
         ts_tree_delete(m_blockTree);
         m_blockTree = newTree;
     }
+
+    const auto tBlockEnd = Clock::now();
 
     // Phase 2: reuse inline trees for regions whose post-edit byte range
     // is unchanged. For each old range, shift through the sorted edits
@@ -381,6 +397,10 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
         if (!consumed[i])
             ts_tree_delete(oldInlineTrees[i]);
     }
+
+    const auto tEnd = Clock::now();
+    m_lastParseBlockNs  = toNs(tBlockEnd - tInlinePrepDone);
+    m_lastParseInlineNs = toNs(tInlinePrepDone - tStart) + toNs(tEnd - tBlockEnd);
 
     return true;
 }

@@ -46,10 +46,19 @@ IncrementalParseSession::~IncrementalParseSession() = default;
 
 void IncrementalParseSession::reset(const QString &raw)
 {
-    m_source     = raw;
-    m_extracted  = Markoff::Document::extract(raw);
-    m_parser.parse(m_extracted.body);
-    m_queries        = m_parser.buildDocumentQueries();
+    m_source = raw;
+    {
+        ParsePhaseGuard g(m_phaseTable, ParsePhase::Extract);
+        m_extracted = Markoff::Document::extract(raw);
+    }
+    {
+        ParsePhaseGuard g(m_phaseTable, ParsePhase::ParseBlock);
+        m_parser.parse(m_extracted.body);
+    }
+    {
+        ParsePhaseGuard g(m_phaseTable, ParsePhase::Queries);
+        m_queries = m_parser.buildDocumentQueries();
+    }
     m_havePriorParse = true;
 }
 
@@ -60,11 +69,27 @@ void IncrementalParseSession::applyEdit(const QString &newRaw)
         return;
     }
 
-    Markoff::ExtractedSource newExtracted = Markoff::Document::extract(newRaw);
-    const QByteArray priorBodyUtf8 = m_extracted.body.toUtf8();
-    const QByteArray newBodyUtf8   = newExtracted.body.toUtf8();
+    Markoff::ExtractedSource newExtracted;
+    {
+        ParsePhaseGuard g(m_phaseTable, ParsePhase::Extract);
+        newExtracted = Markoff::Document::extract(newRaw);
+    }
 
-    if (priorBodyUtf8 == newBodyUtf8) {
+    QByteArray priorBodyUtf8;
+    QByteArray newBodyUtf8;
+    Markoff::ByteEdit edit;
+    bool bodyChanged = false;
+    {
+        ParsePhaseGuard g(m_phaseTable, ParsePhase::Diff);
+        priorBodyUtf8 = m_extracted.body.toUtf8();
+        newBodyUtf8   = newExtracted.body.toUtf8();
+        bodyChanged   = (priorBodyUtf8 != newBodyUtf8);
+        if (bodyChanged) {
+            edit = diffBodyBytes(priorBodyUtf8, newBodyUtf8);
+        }
+    }
+
+    if (!bodyChanged) {
         // Body unchanged (edit was entirely in frontmatter, or was a
         // no-op after pre-processing). Refresh source/extracted bookkeeping
         // but skip the parser invocation entirely.
@@ -73,17 +98,27 @@ void IncrementalParseSession::applyEdit(const QString &newRaw)
         return;
     }
 
-    const Markoff::ByteEdit edit = diffBodyBytes(priorBodyUtf8, newBodyUtf8);
+    // Drive the parser. parseIncremental internally splits its wall time
+    // into block and inline; we read it back via the parser's getters and
+    // attribute it to the corresponding phase buckets.
     m_parser.parseIncremental({edit}, newBodyUtf8);
+    if (m_phaseTable) {
+        (*m_phaseTable)[static_cast<int>(ParsePhase::ParseBlock)]  += m_parser.lastParseBlockNs();
+        (*m_phaseTable)[static_cast<int>(ParsePhase::ParseInline)] += m_parser.lastParseInlineNs();
+    }
 
     m_source    = newRaw;
     m_extracted = std::move(newExtracted);
-    m_queries   = m_parser.buildDocumentQueries();
+    {
+        ParsePhaseGuard g(m_phaseTable, ParsePhase::Queries);
+        m_queries = m_parser.buildDocumentQueries();
+    }
 }
 
 std::unique_ptr<Markoff::Document>
 IncrementalParseSession::snapshot() const
 {
+    ParsePhaseGuard g(m_phaseTable, ParsePhase::Snapshot);
     return Markoff::Document::fromComponents(m_source, m_extracted, m_queries);
 }
 

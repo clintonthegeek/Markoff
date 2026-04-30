@@ -87,6 +87,16 @@ public:
     /// parse() (no previous tree to compare). Observability hook for benches.
     int blockChangedByteCount() const { return m_lastBlockChangedBytes; }
 
+    /// Wall-clock nanoseconds spent in the block-tree edit + parse phase of
+    /// the most recent parseIncremental() (or parse() — full block parse).
+    /// Reset to 0 if the call returns false. Observability hook for benches.
+    quint64 lastParseBlockNs() const { return m_lastParseBlockNs; }
+
+    /// Wall-clock nanoseconds spent in the inline-tree reuse/reparse phase
+    /// of the most recent parseIncremental() (or parse() — full inline pass).
+    /// Reset to 0 if the call returns false. Observability hook for benches.
+    quint64 lastParseInlineNs() const { return m_lastParseInlineNs; }
+
     /// A non-text block boundary found by the parser.
     struct BlockBoundary {
         enum Type { Table, FencedCodeBlock, Image };
@@ -118,6 +128,8 @@ private:
     QList<int> m_byteToChar;  // UTF-8 byte offset → QString char offset
     int m_lastInlineReuseCount = 0;
     int m_lastBlockChangedBytes = -1;
+    quint64 m_lastParseBlockNs  = 0;
+    quint64 m_lastParseInlineNs = 0;
 };
 
 } // namespace Markoff

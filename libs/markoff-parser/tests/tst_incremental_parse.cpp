@@ -62,6 +62,7 @@ private Q_SLOTS:
     void noEdits_reusesAllInlineRegions();
     void blockChangedByteCount_initialAndIncremental();
     void blockChangedByteCount_resetOnEmptyEdits();
+    void parseIncremental_reportsBlockAndInlineTimingNs();
 };
 
 // ---------------------------------------------------------------------------
@@ -406,6 +407,35 @@ void TstIncrementalParse::blockChangedByteCount_resetOnEmptyEdits()
     // (no edits = no block-tree changes), NOT carry the stale value over.
     QVERIFY(parser.parseIncremental({}, QByteArrayLiteral("# Heading\n\nA paragraph!.\n")));
     QCOMPARE(parser.blockChangedByteCount(), 0);
+}
+
+void TstIncrementalParse::parseIncremental_reportsBlockAndInlineTimingNs()
+{
+    // After a parseIncremental call the parser must report the wall time it
+    // spent in the block-tree edit/parse phase and in the inline-tree
+    // reuse/reparse phase, in nanoseconds. The bench harness depends on
+    // these to populate phase_parse_block / phase_parse_inline.
+    Markoff::TreeSitterParser p;
+    const QString seed = QStringLiteral(
+        "# Heading\n\n"
+        "A paragraph with **bold** and *italic* and a [link](https://x).\n\n"
+        "Another paragraph.\n");
+    QVERIFY(p.parse(seed));
+
+    // Single-byte append in the second paragraph.
+    QByteArray after = seed.toUtf8();
+    after.insert(after.size() - 1, '!');
+
+    Markoff::ByteEdit e;
+    e.oldStart  = static_cast<quint32>(after.size() - 2);
+    e.oldEnd    = static_cast<quint32>(after.size() - 2);
+    e.newLength = 1;
+    QVERIFY(p.parseIncremental({e}, after));
+
+    QVERIFY2(p.lastParseBlockNs() > 0,
+             qPrintable(QString("lastParseBlockNs=%1 (expected > 0)").arg(p.lastParseBlockNs())));
+    QVERIFY2(p.lastParseInlineNs() > 0,
+             qPrintable(QString("lastParseInlineNs=%1 (expected > 0)").arg(p.lastParseInlineNs())));
 }
 
 QTEST_APPLESS_MAIN(TstIncrementalParse)
