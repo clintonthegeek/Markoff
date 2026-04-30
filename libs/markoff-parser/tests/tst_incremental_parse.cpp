@@ -384,7 +384,7 @@ void TstIncrementalParse::blockChangedByteCount_initialAndIncremental()
     QVERIFY(parser.parseIncremental({edit}, newBuf));
 
     const int changed = parser.blockChangedByteCount();
-    QVERIFY2(changed >= 0, "after parseIncremental the counter must be set");
+    QVERIFY2(changed > 0, "after parseIncremental on a real edit the counter must be positive");
     QVERIFY2(changed <= 64, "a one-char edit on a tiny doc must produce a small changed-bytes total");
 }
 

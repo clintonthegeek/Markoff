@@ -245,6 +245,7 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
         // record (caller may have replaced it with an identical-looking
         // newUtf8) and fall through to the inline reuse pass — every
         // inline region's range will match exactly, so all trees reuse.
+        m_lastBlockChangedBytes = 0;
         m_utf8       = newUtf8;
         m_byteToChar = buildByteToCharMap(m_utf8);
     } else {
@@ -315,7 +316,6 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
     collectInlineRanges(root, newInlineRanges);
 
     m_lastInlineReuseCount = 0;
-    m_lastBlockChangedBytes = 0;
 
     struct ShiftedRange {
         quint32 start;
