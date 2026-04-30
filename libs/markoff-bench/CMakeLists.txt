@@ -10,7 +10,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 # Bench is a STATIC library used only by the in-tree bench frontends and
 # tests. It is not installed and is not part of the public Markoff API.
 add_library(markoff_bench STATIC
-    # Sources are added incrementally as tasks land.
+    src/PhaseTimer.cpp
 )
 
 target_include_directories(markoff_bench
