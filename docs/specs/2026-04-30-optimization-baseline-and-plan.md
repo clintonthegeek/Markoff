@@ -2,13 +2,15 @@
 
 **Date:** 2026-04-30
 **Branch:** `exploration/new-foundation`
-**Status:** Stages 0 / 1.1 / 1.2 complete (commits `6040dd2`, `96bb42c`, `5568c93`). Stage 1.3 demoted; Stage 2 unchanged.
+**Status:** Stages 0 / 1.1 / 1.2 complete (commits `6040dd2`, `96bb42c`, `5568c93`). Post-Stage-1.2 perf-record captured; parse-pipeline is no longer the bottleneck on the long-doc reproducer. Stage 1.3 demoted. Stage 2 candidates re-prioritised against the post-Stage-1.2 perf — see "Post-Stage-1.2 perf-record outcome" below.
+
 **Bench corpus baselines:**
 - Pre-phase: `docs/bench-baselines/2026-04-30-parse-9bf4fad.json` (commit `9bf4fad`, parse-tier bucketed wholly into `parse_block`).
 - Stage 0 (phased): `docs/bench-baselines/2026-04-30-parse-9bf4fad-stage0-phased.json` (commit `9bf4fad+stage0`).
 - Stage 1.1 (incremental queries): `docs/bench-baselines/2026-04-30-parse-5f6ef77-stage1-1-queries.json` (commit `5f6ef77+stage1.1`).
 - Stage 1.2 (inline matcher hash-map): `docs/bench-baselines/2026-04-30-parse-96bb42c-stage1-2-matcher.json` (commit `96bb42c+stage1.2`).
 - Render: `docs/bench-baselines/2026-04-30-render-*.json` (commit `9bf4fad`).
+- Post-Stage-1.2 perf-record (live UI, 30 s typing into 72 KB doc): `docs/bench-baselines/2026-04-30-perf-typing-stage1-2-after.data`.
 
 All on RelWithDebInfo, x86_64 / Linux 6.12 / Qt 6.11.0.
 
@@ -278,42 +280,6 @@ early if the phase that motivated the change isn't actually moving.
 - **Task 1.1 (old): cache `priorBodyUtf8`.** Diff phase is 0.3-1.0 %. Not worth the cache invariant.
 - **Task 2.1 (old): shared_ptr queries through `Document`.** Snapshot phase is ~0 %. The move-only path through `fromComponents` is already free.
 
-### Stage 2 — Bigger-ticket items (gated on Stage 1 + a re-profile)
-
-These are work-units, not one-commit fixes. Do not start any of these
-until Stage 1's exit criterion is met *and* a perf-record on the long
-doc (per the 04-28 methodology) shows the cost actually sits where the
-bench claims.
-
-- **Task 2.1: Reuse `DocumentQueryResult` across the snapshot boundary.**
-  Today every `Document::fromComponents` copies the full `queries` value.
-  The Document is immutable; the snapshot can hold a `shared_ptr` to
-  the queries. The change is small but touches public-ish API. Bench
-  target: `Phase::Snapshot` p50 on `big_prose`.
-
-- **Task 2.2: Render-tier paste cost.** `paste_4kb` render p50 is
-  110-215 ms — the worst single-keystroke cost in the corpus. The
-  render bench currently has a single bucket (`phase_render_frame`).
-  Splitting that into `pool_queue` / `signal_hop` / `parse_total` /
-  `model_update` / `frame` would let us localise the cost. The render
-  bench is more invasive to instrument than the parse bench — likely
-  needs a worker-thread side timestamp + a main-thread receipt
-  timestamp, both in the QML view module. Treat as a separate plan if
-  it survives prioritisation.
-
-- **Task 2.3 (deferred from 04-28): KSyntaxHighlighter rehighlight scope.**
-  04-28 plan Task 2 stopped here. The render-tier numbers above
-  suggest the highlighter is contributing to the per-keystroke cost
-  on prose docs (`mid_prose` 16 ms render p50 is dominated by glyph /
-  scenegraph work, per the 04-28 perf-record). The bench doesn't help
-  identify this directly — perf-record does. Pair the bench output
-  with a fresh perf-record run *after* Stage 1 lands and decide.
-
-- **Task 2.4 (memory-resident, future): Lightweight non-CRDT codepath.**
-  Tier 1b - Tier 1 = 35 % overhead on `tiny`. On real docs it's
-  invisible. Worth it eventually, but only after the dominant per-doc-
-  size costs are addressed.
-
 ## What the bench will and won't catch
 
 It catches:
@@ -349,30 +315,78 @@ That's Stage 2 territory and requires a different approach (parser
 configuration, larger edit-window hints, or upstream changes); not
 going to fall to a 100-line patch.
 
-## Recommended next move
+## Post-Stage-1.2 perf-record outcome
 
-The cheap parse-tier wins are exhausted. Three reasonable directions:
+A 30-second perf-record session against `markoff-view-qml-app` typing
+into the 72 KB long-doc reproducer (`docs/specs/2026-04-28-foundation-design.md`)
+captures the new profile shape post-Stage-1.2. Methodology matches
+04-28: `perf record -F 99 -g`, ~100 wpm steady typing, same reproducer.
 
-1. **Stage 2.2: Render-tier paste cost.** `paste_4kb` render p50 is
-   still 110-215 ms. The render bench currently has one bucket;
-   instrumenting `pool_queue` / `signal_hop` / `model_update` / `frame`
-   would tell us where the time actually goes. Worth a separate spec.
+**Per-thread CPU split:**
 
-2. **Re-baseline with perf-record.** The 04-28 perf data is stale:
-   the profile shape after Stages 0 / 1.1 / 1.2 is meaningfully
-   different (queries and inline matcher are both order-of-magnitude
-   smaller now). A fresh `perf record` against `markoff-view-qml-app`
-   would show whether the highlighter / scenegraph / glyph cache is
-   the next dominant cost on the UI path, and whether Stage 2.3
-   (KSyntaxHighlighter rehighlight scope, deferred from 04-28) is
-   still warranted.
+| Thread | 04-28 baseline | Stage 1.2 after |
+|---|---|---|
+| Main (`markoff-view-qm`) | 67.3 % | 97.2 % |
+| Parse worker (`QThread`) | 32.5 % | **2.6 %** |
 
-3. **Drop the parse work and look at the user-visible UI path.** The
-   bench measures the parse pipeline; the user feels the *render*
-   pipeline. Even after these wins, the dominant per-keystroke cost
-   on a real long doc is likely the Qt Quick scenegraph rebuild —
-   not parsing. Direction 2 (perf-record re-baseline) decides whether
-   this is true.
+**The parse pipeline is no longer the bottleneck.** The parse-worker
+share dropped 12×. Tree-sitter symbols are absent from the top 30; the
+only entry left is `ts_node_child` at 0.98 %.
+
+**Main-thread cost categorisation** (post-Stage-1.2):
+
+| Bucket | Share | Notes |
+|---|---|---|
+| libc / allocator | **26.31 %** | The 14.81 % at `libc:0x16d107` is the malloc inner loop. Reached primarily through Qt Quick scenegraph + glyph cache; some unknown share from per-keystroke QString work. |
+| CRDT (`Global::join`) | **20.87 %** | Pure compute; sub-tree dominated by inlined `max<unsigned int>`. **No allocation** — version-vector merge per `applyLocalEdit`. |
+| Qt Quick scenegraph | 15.39 % | `prepareAlphaBatches`, `nodeChanged`, `unmap`, `uploadMergedElement`, `markDirty`. |
+| QtGui text layout | 7.69 % | `QGlyphRun`, `QTextBlock`, `QTextLine`. |
+| GPU driver | 2.30 % | `nvidia-eglcore` command submission. |
+| Tree-sitter | 1.21 % | Down from 32.5 % at 04-28. |
+| Markoff app code | 0.70 % | Our own code. |
+
+The long-doc profile now resembles 04-28's *small-doc* profile shape
+(allocator + CRDT dominant). Parsing has been compressed enough that
+its share collapsed; the constant-per-keystroke costs (CRDT, allocator,
+render) are now the visible cost.
+
+**KSyntaxHighlighting symbols are not in the top 30.** Either the
+highlighter isn't the cause of the scenegraph cost (contradicts 04-28
+hypothesis), or its work is inlined into the scenegraph call paths and
+doesn't surface as its own line. Render-tier instrumentation will
+disambiguate.
+
+## Stage 2 — Re-prioritised against the perf-record data
+
+- **Task 2.A (out of mandate, handed off): CRDT `Global::join`
+  optimisation.** 20.87 % of total CPU on a single function — the
+  largest single eliminable cost. Out of this repo's scope: the
+  `collabtext` library has its own bench harness and dedicated
+  development agents. See `docs/handoff/2026-04-30-collabtext-crdt-join-perf-handoff.md`
+  for the data we're handing across.
+
+- **Task 2.B: Render-tier instrumentation (Tier 2 phase splits).**
+  The render bench currently has one bucket (`phase_render_frame`);
+  splitting it into `pool_queue` / `signal_hop` / `model_update` /
+  `frame` would let the bench attribute UI-side cost the way it now
+  attributes parse-side cost. Combined with the perf-record above,
+  this should pin down whether the 23 % combined Qt Quick + GPU + text
+  bucket is highlighter-driven (04-28 deferred Task 2 hypothesis), QML
+  delegate-rebuild driven, or just intrinsic per-frame cost. See
+  `docs/handoff/2026-04-30-render-tier-instrumentation-SESSION-BRIEF.md`
+  for the prepared brief.
+
+- **Task 2.C (deferred): KSyntaxHighlighter rehighlight scope.** Cannot
+  be confirmed or refuted by the perf-record (highlighter symbols don't
+  surface in the top 30). Render-tier instrumentation (Task 2.B) is
+  the prerequisite; until we localise the scenegraph cost to a phase,
+  guessing at the highlighter is premature.
+
+- **Task 2.D (deferred): Allocator reduction.** 26 % of CPU but no
+  single hot site — diffuse target. The allocator share will likely
+  drop as a side-effect of either CRDT (Task 2.A) or render (Task 2.B)
+  wins, since both reach the allocator from many paths. Standalone
+  attack only if the diffuse share remains after 2.A and 2.B.
 
 Stage 1.3 (skip `extract` when the edit window misses
 frontmatter/footnote bytes) remains demoted: `phase_extract` is still
