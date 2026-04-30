@@ -27,6 +27,7 @@ struct ParsePool::Private {
     QByteArray        pending;            // latest snapshot waiting to be dispatched
     quint64           pendingGen = 0;     // generation tag for pending snapshot
     ParseKind         pendingKind = ParseKind::Incremental;
+    Markoff::Render::RenderPhaseTaps *taps = nullptr;  // bench-only opt-in
 };
 
 namespace {
@@ -71,6 +72,13 @@ ParsePool::ParsePool(QObject *parent)
     // Results come back via QueuedConnection so the lambda runs on our thread.
     connect(d->worker, &ParsePoolWorker::parsed,
             this, [this](Markoff::Document *parsed, quint64 gen) {
+        // Bench-tap: main-thread receipt of a worker `parsed` signal. This
+        // is the earliest point at which the parsed Document is observable
+        // on the document's thread.
+        Markoff::Render::RenderPhaseTaps *taps = d->taps;
+        if (taps) taps->tMainSlotEntryNs.store(Markoff::Render::nowNs(),
+                                               std::memory_order_release);
+
         QByteArray nextSnapshot;
         quint64    nextGen = 0;
         ParseKind  nextKind = ParseKind::Incremental;
@@ -94,6 +102,13 @@ ParsePool::ParsePool(QObject *parent)
             }
         }
         if (parsed) Q_EMIT parseReady(static_cast<const Markoff::Document *>(parsed));
+        // Bench-tap: parseReady has returned, meaning every DirectConnection
+        // slot (MarkoffDocument's lambda → parseUpdated → LiveListModelBinding's
+        // model rebuild) has finished synchronously. The view is ready to
+        // render; the next `frameSwapped` is what `phase_render_frame` measures.
+        if (taps) taps->tModelDoneNs.store(Markoff::Render::nowNs(),
+                                           std::memory_order_release);
+
         if (nextGen != 0)
             dispatch(d->worker, std::move(nextSnapshot), nextGen, nextKind);
     }, Qt::QueuedConnection);
@@ -165,6 +180,15 @@ bool ParsePool::isPending() const
 {
     QMutexLocker lk(&d->mutex);
     return d->workerBusy || !d->pending.isEmpty();
+}
+
+void ParsePool::setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept
+{
+    // Owner-thread side: just stash the pointer. The main-thread parseReady
+    // lambda reads d->taps directly (already on this thread).
+    d->taps = taps;
+    // Worker-thread side: forward to the worker's atomic.
+    d->worker->setRenderPhaseTaps(taps);
 }
 
 }  // namespace Markoff::Parse::Detail

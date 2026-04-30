@@ -19,6 +19,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/Selection.h
     include/markoff-foundation/FoldRef.h
     include/markoff-foundation/MarkoffDocument.h
+    include/markoff-foundation/RenderPhases.h
     include/markoff-foundation/SessionParams.h
     include/markoff-foundation/Session.h
     include/markoff-foundation/Theme.h

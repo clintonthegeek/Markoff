@@ -6,6 +6,8 @@
 
 #include <memory>
 
+#include <markoff-foundation/RenderPhases.h>
+
 namespace Markoff { class Document; }  // markoff-parser
 
 namespace Markoff::Parse::Detail {
@@ -45,6 +47,14 @@ public:
     void scheduleReset(QByteArray utf8);
 
     bool isPending() const;
+
+    /// Bench-only opt-in tap installation. When `taps` is non-null, the worker
+    /// writes T_workerEntry / T_workerEmit on each parse, and the main-thread
+    /// receiver lambda writes T_mainSlotEntry / T_modelDone. Production
+    /// callers leave this null and pay zero. Caller owns the taps and is
+    /// responsible for thread-safe lifetime (must outlive any parse that
+    /// completes while installed).
+    void setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept;
 
 Q_SIGNALS:
     void parseReady(const Markoff::Document *parsed);

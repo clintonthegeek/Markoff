@@ -281,4 +281,9 @@ qsizetype MarkoffDocument::compact(const CollabText::Crdt::Global &watermark)
     return static_cast<qsizetype>(d->buffer.compact(watermark));
 }
 
+void MarkoffDocument::setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept
+{
+    d->parsePool.setRenderPhaseTaps(taps);
+}
+
 }  // namespace Markoff

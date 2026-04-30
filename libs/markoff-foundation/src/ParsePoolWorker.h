@@ -4,6 +4,10 @@
 #include <QByteArray>
 #include <QObject>
 
+#include <atomic>
+
+#include <markoff-foundation/RenderPhases.h>
+
 #include "IncrementalParseSession.h"
 
 namespace Markoff { class Document; }  // markoff-parser
@@ -32,8 +36,17 @@ public Q_SLOTS:
 Q_SIGNALS:
     void parsed(Markoff::Document *result, quint64 generation);
 
+public:
+    /// Bench-only opt-in tap. Set on the owner thread; read on the worker.
+    /// Atomic pointer so the worker observes the latest value without a
+    /// per-parse mutex. Null for production.
+    void setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept {
+        m_taps.store(taps, std::memory_order_release);
+    }
+
 private:
-    IncrementalParseSession m_session;
+    IncrementalParseSession                            m_session;
+    std::atomic<Markoff::Render::RenderPhaseTaps *>    m_taps{nullptr};
 };
 
 }  // namespace Markoff::Parse::Detail

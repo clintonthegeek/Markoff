@@ -18,6 +18,7 @@
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff-foundation/RenderPhases.h>
 #include <markoff-foundation/SessionParams.h>
 
 namespace Markoff {
@@ -87,6 +88,15 @@ public:
     // ===== Garbage collection =====
     qsizetype collectGarbage();
     qsizetype compact(const CollabText::Crdt::Global &watermark);
+
+    // ===== Bench-only opt-in instrumentation =====
+    /// Wire an external render-tier timestamp tap for benchmarking. The
+    /// document writes worker-thread and main-thread timestamps into the
+    /// passed `RenderPhaseTaps` for every parse iteration that completes
+    /// while the pointer is installed. Pass nullptr (the default) to disable.
+    /// Caller owns the taps and resets them between iterations.
+    /// Production callers leave this null and pay zero overhead.
+    void setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept;
 
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
