@@ -3,8 +3,8 @@
 **Date:** 2026-04-30
 **Branch:** `exploration/new-foundation`
 **Phase:** Foundation API extension; precondition for `docs/specs/2026-04-30-live-editing-design.md`
-**Status:** ready for the next agent to plan + implement
-**Authoring context:** This spec was written in a single sitting against the editing-spec brainstorm transcript; it has not been brainstormed Q-by-Q with the user. The implementing agent should run a quick brainstorming pass with the user to confirm the open decisions called out in §10 before writing the implementation plan.
+**Status:** decisions resolved 2026-04-30; ready for plan-writing
+**Authoring context:** Initial spec written 2026-04-30 against the editing-spec brainstorm transcript. The §10 open decisions were resolved with the user the same day; §10 now records those decisions and §2 / §3 / §5 reflect them.
 
 ## 0. TL;DR
 
@@ -97,6 +97,13 @@ Existing methods unchanged. Add these:
 ```cpp
 // in MarkoffDocument.h, in the public section
 
+// ===== Parse sequence =====
+/// Locally-monotonic parse-sequence number for the most recent parse
+/// delivered via parseUpdated. View-layer code uses this for parse-
+/// ordering ("is this a newer parse than what I rendered?") without
+/// holding a Crdt::Global. Decoupled from the CRDT version vector.
+quint64 parseSequence() const noexcept;
+
 // ===== Anchors (extended) =====
 /// Returns a TextAnchor at the given byte offset with the given bias.
 /// Companion to existing anchorAt(quint32, Crdt::Bias) — same semantics
@@ -151,62 +158,111 @@ The current signal is:
 void parseUpdated(const Markoff::Document *parsed, CollabText::Crdt::Global atVersion);
 ```
 
-This signal is consumed by view-layer code that includes `<crdt/Clock.h>` for `Global`. To keep the view-layer header-free of CRDT, the spec adds:
-
-**Option A — additional argument:** the signal payload includes a parallel `QList<BlockAnchor>` whose i-th element is the BlockAnchor for the i-th top-level block of `*parsed`.
+The new shape ships a parallel `QList<BlockAnchor>` and replaces the
+CRDT version with a *parse sequence* — a locally-monotonic `quint64`
+managed by the foundation, semantically distinct from the CRDT version
+vector and not derived from it:
 
 ```cpp
 void parseUpdated(
     const Markoff::Document *parsed,
-    quint64 atVersion,            ///< replaces Crdt::Global with a stable opaque id
+    quint64 parseSequence,        ///< local-monotonic; foundation-managed
     QList<BlockAnchor> blockAnchors);
 ```
 
-Note the secondary change to drop `Crdt::Global` from the signal — replace with a `quint64` (or another opaque type) so the signal header is CRDT-free. View-layer code uses `atVersion` only for ordering (compare against `MarkoffDocument::version()` which would also need a non-CRDT companion accessor).
+The parse sequence is *not* a flatten of `Crdt::Global`. It's a
+view-layer-ordering primitive: "this is the i-th parse to return on
+this MarkoffDocument instance." It supports the only ordering question
+the view layer naturally asks ("is this parse newer than the last one
+I rendered") without exposing or copying CRDT version-vector state on
+the public boundary. This dovetails with the 2026-04-30 collabtext
+join-perf handoff: every avoided `Global` copy on a public boundary
+is one fewer call site that may need to fan out into a hot
+`Global::join`.
 
-**Option B — separate accessor:** keep `parseUpdated`'s shape; add `MarkoffDocument::blockAnchorsForCurrentParse() → QList<BlockAnchor>` that consumers call after receiving the signal.
+CRDT-aware questions — e.g. "did this parse include the edit I just
+submitted?" — are answered by foundation-internal helpers on
+`MarkoffDocument` rather than by exposing `Global` to view-layer
+consumers. v0 of this spec does not specify those helpers; they're
+introduced when the editing spec or a downstream consumer demands
+them.
 
-**Recommendation: A.** It saves consumers a round-trip; it makes the parse output self-contained. The view-layer header-free goal is also better served because consumers don't need to call back to MarkoffDocument for anchors.
-
-The version typing question (`Crdt::Global` vs `quint64`) needs a separate small decision — `Crdt::Global` is currently exposed; replacing it across the API is broader scope. The implementing agent should brainstorm with the user on whether to do that here or defer it.
+`MarkoffDocument::version()` continues to return `Crdt::Global` for
+foundation-internal callers; nothing on the public boundary holds
+`Global`.
 
 ### Already-existing `MarkoffDocument` APIs that consumers reuse
 
 - `applyLocalEdit(const QList<MarkoffEdit> &) → Crdt::Operation` — local writes.
 - `undo()` / `redo()` / `undoDepth()` / `coalesceLastUndo()` — undo stack.
 - `toMarkdownUtf8() → QByteArray` — read source bytes.
-- `version() → Crdt::Global` — version (needs a non-CRDT companion if the version typing question is resolved per Option A).
+- `version() → Crdt::Global` — version (foundation-internal). View-layer code uses the new `parseSequence() → quint64` accessor.
 - `anchorAt(quint32, Crdt::Bias)` / `resolveAnchor(...)` — byte ↔ anchor (CRDT-typed; foundation-internal).
 - `contentsChanged(QList<MarkoffEdit>)` — change signal.
 - `parsedDocument() → const Document *` — current parsed AST.
 
-### `Selection` companion accessors
+### `Selection` field type change
 
-`Markoff::Selection` currently holds `CollabText::Crdt::Anchor anchor + active`. View-layer consumption needs TextAnchor companions:
+`Markoff::Selection` currently holds `CollabText::Crdt::Anchor anchor +
+active`. The fields change to `TextAnchor`:
 
 ```cpp
-// In Selection.h
+// In Selection.h — drops #include <crdt/Anchor.h>.
 struct Selection {
-    // ... existing fields stay
-    CollabText::Crdt::Anchor anchor;
-    CollabText::Crdt::Anchor active;
-    // ...
-
-    /// Companion accessors for view-layer code that can't include <crdt/Anchor.h>.
-    TextAnchor anchorAsText() const;
-    TextAnchor activeAsText() const;
+    TextAnchor anchor;
+    TextAnchor active;
+    // ... other fields unchanged ...
 };
 ```
 
-Or — preferably — make `Selection`'s public fields TextAnchor-typed and translate internally where needed. The implementing agent should choose; the public API change has slightly more reach. If the latter is chosen, callers that currently take `Crdt::Anchor` from `Selection` need updating.
+Foundation-internal call sites that today pass `sel.anchor` /
+`sel.active` to `MarkoffDocument::resolveAnchor(Crdt::Anchor)` switch
+to the `TextAnchor`-typed `resolveTextAnchor` overload. The ~10–15
+affected call sites are in `CommandFacade.cpp`, `SearchEngine.cpp`,
+`SourceTextDocumentBinding.cpp`, `Cmd/Helpers.cpp`, `Session.cpp`,
+`EditorBackend.cpp`, and the qml editor-backend tests — each is a
+one-line typedef-style change.
+
+The header change (`Selection.h` no longer includes `<crdt/Anchor.h>`)
+removes another transitive include of the CRDT clock/anchor surface
+from view-layer compilation units.
 
 ---
 
 ## 3. Computation
 
-**Where BlockAnchors are computed:** in the foundation, on the worker thread, as part of the parse pipeline (`IncrementalParseSession` or `ParsePoolWorker`). For each top-level block of the freshly-parsed `Markoff::Document`, take the block's first byte (parser-reported byte range start), call the equivalent of `anchorAt(blockStartByte, Bias::Left)` to get a `Crdt::Anchor`, wrap as `TextAnchor` then `BlockAnchor`, append to the parallel `QList<BlockAnchor>`. The list is shipped with the `parseUpdated` signal.
+**Where BlockAnchors are computed:** in `MarkoffDocument`, on the
+main thread, in the lambda that relays the worker's `parsed(Document
+*, generation)` signal to the public `parseUpdated`. The CRDT buffer
+is held by `MarkoffDocument` and is most easily accessed from there;
+giving the worker thread CRDT access would require either a
+thread-safe buffer snapshot or per-byte Lamport plumbing across the
+parse boundary, neither of which earns its weight at v0.
 
-**Caveat — parse staleness:** the parse computes against a snapshot of the source as of `atVersion`. If the source has mutated since (typing during parse), the BlockAnchors are still correct — they identify the blocks in the parse's snapshot. The view layer treats `parseUpdated` as ground truth as-of `atVersion`; reconciliation with later local edits is a view-layer concern (the editing spec discusses it).
+For each top-level block of the freshly-parsed `Markoff::Document`,
+take the block's first byte (parser-reported byte range start), call
+`anchorAt(blockStartByte, Bias::Left)` against the current CRDT
+buffer to get a `Crdt::Anchor`, wrap as `TextAnchor` then
+`BlockAnchor`, append to the parallel `QList<BlockAnchor>`.
+
+**Caveat — one-cycle staleness window:** the parse arrives carrying
+block byte ranges that were correct as-of the version the parse was
+*scheduled* against. If the CRDT buffer has advanced between
+parse-schedule and parse-return (one or more keystrokes during the
+parse-in-flight window), the freshly-computed BlockAnchor for each
+block identifies the *current* character at that block's first byte
+rather than the parse-snapshot's character. For blocks whose first
+byte was not edited during the window, this is identical. For a block
+whose first byte *was* edited, the BlockAnchor for one parse cycle
+identifies a slightly different character than the "ideal" anchor;
+the next parse cycle delivers a corrected anchor.
+
+This is acceptable because BlockAnchor identity is robust: the next
+parse re-issues a corrected list, and the AstBlockDiff sees one row
+identity-flip rather than a churn cascade. If profiling later shows
+the staleness window matters in practice, the alternative is to ship
+a per-byte Lamport snapshot (or a thread-safe CRDT buffer reference)
+to the worker — that's a future refactor, not a v0 concern.
 
 **Cost:** one CRDT anchor lookup per top-level block. The existing CRDT data structures support `O(log n)` byte-to-anchor translation, so a 1000-block doc adds ~10 ms of anchor computation in the worst case (in practice much less). For a 50KB typical doc with ~100 top-level blocks this is sub-millisecond and well below the parse cost.
 
@@ -259,17 +315,37 @@ libs/markoff-foundation/
 ```
 libs/markoff-foundation/
   include/markoff-foundation/
-    MarkoffDocument.h         new public APIs per §2
-    Selection.h               new TextAnchor accessors (or field type change)
+    MarkoffDocument.h         new public APIs per §2 (parseSequence,
+                              textAnchorAt overloads, blockAt,
+                              offsetInBlock, blockAnchorAt,
+                              blockByteRange); parseUpdated signal
+                              shape change
+    Selection.h               field type change: anchor/active → TextAnchor
+                              (drops #include <crdt/Anchor.h>)
   src/
-    MarkoffDocument.cpp       implement new APIs
-    IncrementalParseSession.cpp OR ParsePoolWorker.cpp  compute BlockAnchors per parse
-    ParsePool.cpp             pass BlockAnchor list through
-    Selection.cpp             implement TextAnchor accessors
+    MarkoffDocument.cpp       implement new APIs; compute BlockAnchors in
+                              the parsed→parseUpdated relay lambda;
+                              maintain parseSequence counter
+    Selection.cpp             update for TextAnchor field types
+    CommandFacade.cpp         resolveAnchor → resolveTextAnchor at ~5 sites
+    SearchEngine.cpp          resolveAnchor → resolveTextAnchor at ~2 sites
+    SourceTextDocumentBinding.cpp  same shape, ~3 sites
+    Cmd/Helpers.cpp           same shape, ~2 sites
+    Session.cpp               selection-equality compares TextAnchor fields
+                              instead of Crdt::Anchor fields
   CMakeLists.txt              new sources/tests
+
+libs/markoff-view-qml/src/
+    EditorBackend.cpp         m_selectionAnchor / m_cursorAnchor become
+                              TextAnchor (drops <crdt/Anchor.h>)
+
+libs/markoff-view-qml/tests/
+    tst_view_qml_editor_backend.cpp  update to compare TextAnchor
 ```
 
-The implementing agent picks whether `IncrementalParseSession` or `ParsePoolWorker` is the right home for `BlockAnchorComputation` invocation; both are on the worker thread.
+`BlockAnchorComputation` is a small internal helper in
+`markoff-foundation/src/`. It's invoked from the `parsed→parseUpdated`
+lambda inside `MarkoffDocument` (per §3), not from the parse worker.
 
 ---
 
@@ -303,7 +379,8 @@ Add to existing `tst_realistic` or `tst_benchmark`:
 
 ## 7. Future evolution
 
-- **Multi-cursor / secondary selections:** `Session::secondarySelections` already uses CRDT anchors. Same TextAnchor wrapping pattern applies; same translation APIs. No new work.
+- **Multi-cursor / secondary selections:** `Session::secondarySelections` is a `QList<Selection>` and inherits the TextAnchor field-type change automatically. Multi-cursor projection through `blockAt`/`offsetInBlock` falls out of the same APIs.
+- **Worker-thread BlockAnchor compute (alternative path).** §3 keeps anchor compute on the main thread for v0. If profiling later shows the one-cycle staleness window or the per-parse main-thread cost matters, the alternative is to ship a thread-safe CRDT-buffer reference (or a per-byte Lamport snapshot) into the parse worker so it can compute anchors against the version the parse saw. Strictly a future refactor; flagged so the v0 design isn't taken as final.
 - **Collaborative editing:** the CRDT foundation already supports it; BlockAnchors are stable across collaborators by the Lamport-equality identity. The view layer's `AstBlockDiff` would see the same identities for the same blocks regardless of which collaborator made the edit.
 - **Inline anchors (mid-block stable refs):** the same TextAnchor type works for any byte position. If a future spec needs stable anchors on inline tokens (e.g. for mid-paragraph cursor preservation across reflows), no new types are needed — just new translation methods.
 - **Inline-tree node identity:** if a future spec wants stable identity for inline AST nodes (e.g. each `**bold**` span gets a stable handle), the same pattern can apply at finer granularity. Not in scope for v0; flagged so the design doesn't preclude it.
@@ -312,7 +389,7 @@ Add to existing `tst_realistic` or `tst_benchmark`:
 
 ## 8. Out of scope
 
-- Performance optimisation of the BlockAnchor computation beyond the obvious "compute once per parse on the worker thread". If profiling reveals hotspots, future spec.
+- Performance optimisation of the BlockAnchor computation beyond the obvious "compute once per parse, in the main-thread relay lambda" (per §3). If profiling reveals hotspots — including the staleness window or main-thread budget pressure — future spec.
 - API for *all* views to consume; this spec targets view-layer consumption (`markoff-view-qml`). The Source widget already uses `Crdt::Anchor` directly via `SourceTextDocumentBinding` and may continue to; if it later wants TextAnchor, that's an opportunistic touch.
 - Save / load of BlockAnchors. They're ephemeral (tied to a specific CRDT replica state); they shouldn't be persisted. The `Selection` JSON serialisation already handles persistence of `Crdt::Anchor` for cursor position; no analogue is needed for `BlockAnchor`.
 - Documentation for plugin authors. The view-layer spec covers it where relevant; no foundation-side public-doc work in v0.
@@ -329,26 +406,71 @@ Add to existing `tst_realistic` or `tst_benchmark`:
 
 ---
 
-## 10. Open decisions for the implementing agent
+## 10. Decisions resolved (2026-04-30)
 
-These are decisions I made tentatively but where the user should weigh in via a short brainstorm before locking. The implementing agent should run a clarifying-questions pass on each before writing the implementation plan:
+The seven open decisions the original draft left for the user were
+resolved during a brainstorming pass on 2026-04-30. The §2/§3/§5
+prose has been updated to reflect them; the resolutions are recorded
+here for traceability.
 
-1. **Strong-typedef vs trivial wrapper for `BlockAnchor`.** I picked a trivial wrapper struct (one field: `firstByte: TextAnchor`) for type safety. Alternative: `using BlockAnchor = TextAnchor;` for zero-cost simplicity at the cost of not catching mix-ups at compile time. Recommend trivial wrapper unless the user prefers minimal API surface.
+1. **`BlockAnchor`: trivial wrapper struct, not alias.**
+   `struct BlockAnchor { TextAnchor firstByte; };`. Type-distinct from
+   `TextAnchor` so signatures self-document and mix-ups become compile
+   errors. Cost is negligible (same layout, trivially copyable).
 
-2. **`parseUpdated` signal change scope (Option A vs B in §2).** I recommended A (additive arg + drop CRDT type from signal). B is more conservative (additive accessor only, signal unchanged). User should weigh: header-cleanliness vs signal-stability for any current consumers.
+2. **`parseUpdated` signal: ship BlockAnchors and replace
+   `Crdt::Global` (Option A).** The signal argument list grows by a
+   `QList<BlockAnchor>`; the version argument changes from
+   `Crdt::Global atVersion` to `quint64 parseSequence` (see §2). No
+   existing production consumers of `parseUpdated` on this branch, so
+   the API change is cheap.
 
-3. **`Crdt::Global` vs `quint64` for `version`.** Tied to the above. If we keep `Global`, the view-layer header issue forces a companion accessor. If we replace with `quint64` (or another stable opaque type), we touch every consumer of `version()` and `parseUpdated`. Recommend the opaque-id replacement *if* the user wants strict view-layer header purity; otherwise keep `Global`.
+3. **Version typing: locally-monotonic parse sequence (`quint64`),
+   not a flatten of `Crdt::Global`.** The signal's version argument
+   is a foundation-managed sequence number — "this is the i-th parse
+   on this MarkoffDocument instance" — semantically decoupled from
+   the CRDT version vector. CRDT-aware questions ("did this parse
+   include the edit I just submitted?") are answered by foundation-
+   internal helpers on `MarkoffDocument`; the view layer never holds
+   a `Global`. This dovetails with the 2026-04-30 collabtext
+   join-perf handoff: fewer `Global` copies on hot public boundaries.
 
-4. **`Selection` field type vs accessor methods.** I leaned toward accessor methods (TextAnchor companions) to avoid breaking existing `Selection` consumers. Alternative: change the public field types to `TextAnchor` and translate internally. Bigger blast radius; cleaner API afterwards. User decision.
+4. **`Selection`: change public field types to `TextAnchor`** (not
+   accessor companions). `Selection.h` drops `#include
+   <crdt/Anchor.h>`. Foundation-internal call sites switch to
+   `resolveTextAnchor`; ~10–15 sites total, each a one-line
+   typedef-style change. View-layer call sites in `EditorBackend.cpp`
+   and the qml tests update with them.
 
-5. **Where in the parse pipeline does BlockAnchor computation live?** `IncrementalParseSession` knows the parsed `Document`; `ParsePoolWorker` is the wider container. Either is plausible; pick whichever has cleaner access to both the parser's block iterator and the CRDT buffer's anchor lookup.
+5. **Compute BlockAnchors on the main thread**, in `MarkoffDocument`'s
+   `parsed → parseUpdated` relay, not on the parse worker. The CRDT
+   buffer is held by `MarkoffDocument`; routing it to the worker
+   would need a thread-safe snapshot or per-byte Lamport plumbing
+   that does not earn its weight at v0. The trade is a one-cycle
+   staleness window for blocks whose first byte was edited during a
+   parse-in-flight window (see §3); the next parse cycle issues a
+   corrected anchor. Revisit if profiling shows it matters.
 
-6. **Should `blockAt(TextAnchor)` use the parsed doc as-of the most recent parse, or as-of a passed-in version?** The spec says "most recent parse". For most uses that's right. If a consumer holds a stale parse and asks `blockAt`, we'd return a BlockAnchor from a newer parse — fine for identity but possibly off-by-one for byte ranges. The implementing agent should think about whether to expose a versioned variant for race-sensitive consumers; for v0 the simple form is probably enough.
+6. **`blockAt(TextAnchor)` resolves against the most-recent-parse**,
+   no versioned variant in v0. Qt's main-thread event loop sequences
+   parse delivery and slot handlers, so within a single slot-handler
+   stack frame, "most recent parse" is well-defined. Multi-user CRDT
+   collaboration does not change this — BlockAnchor identity is
+   Lamport-stable across replicas, which is the cross-replica
+   invariant that matters; per-replica `blockAt` semantics are a
+   local concern. Revisit if a future consumer holds a parse
+   out-of-band (e.g. background analysis).
 
-7. **Handling of orphaned BlockAnchors.** When a block's first-byte char is deleted (a tombstone case), the anchor still resolves but to an unhelpful position. The view-layer diff naturally drops the row (no block in the new tree starts there), but a clarifying question for the user: should `blockAt(orphanedAnchor)` return `std::nullopt` (current spec text) or return the *next* block whose byte range follows? Either is defensible; nullopt is simpler.
+7. **Orphaned `blockAt` returns `std::nullopt`.** When the resolved
+   byte falls outside any top-level block (past last block, in
+   between-block whitespace, or before the first block), `blockAt`
+   returns `nullopt`. Callers handle "no block here" explicitly. If
+   a future consumer wants always-Some clamping semantics, add a
+   separate `nearestBlockAt(TextAnchor)` then; do not preemptively
+   split the API.
 
 ---
 
 ## 11. The bet, restated
 
-`BlockAnchor = TextAnchor at the block's first byte` is the simplest possible answer that gets us γ-CRDT-anchor identity for the editing spec and unblocks the entire Live editing work. It's mostly type-safety scaffolding; the hard CRDT primitive already exists. The view layer gets a header-clean way to consume CRDT-stable identities; the foundation gets one new opaque type to maintain. This unlocks not just live editing but every future view that wants stable per-block handles — and it's the right architectural shape for collaborative editing when that lands.
+`BlockAnchor = TextAnchor at the block's first byte` is the simplest possible answer that gets us CRDT-anchor identity for the editing spec and unblocks the entire Live editing work. It's mostly type-safety scaffolding; the hard CRDT primitive already exists. The view layer gets a header-clean way to consume CRDT-stable identities; the foundation gets one new opaque type to maintain. This unlocks not just live editing but every future view that wants stable per-block handles — and it's the right architectural shape for collaborative editing when that lands.
