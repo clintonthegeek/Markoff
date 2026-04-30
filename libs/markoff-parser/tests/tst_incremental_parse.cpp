@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
+#include <markoff-parser/Document.h>
 #include <markoff-parser/SourceSpan.h>
 #include <markoff-parser/TreeSitterParser.h>
 
@@ -41,6 +42,24 @@ QString fingerprintAll(const QList<SourceSpan> &spans)
     return out.join(QLatin1Char('\n'));
 }
 
+QString fingerprintQueries(const DocumentQueryResult &q)
+{
+    QStringList out;
+    out.reserve(q.headings.size() + q.links.size() + q.tags.size());
+    for (const auto &h : q.headings) {
+        out << QStringLiteral("H lv=%1 off=%2 t=%3")
+                   .arg(h.level).arg(h.sourceOffset).arg(h.text);
+    }
+    for (const auto &l : q.links) {
+        out << QStringLiteral("L ty=%1 off=%2 tgt=%3 dsp=%4")
+                   .arg(int(l.type)).arg(l.sourceOffset).arg(l.target).arg(l.displayText);
+    }
+    for (const auto &t : q.tags) {
+        out << QStringLiteral("T off=%1 n=%2").arg(t.sourceOffset).arg(t.name);
+    }
+    return out.join(QLatin1Char('\n'));
+}
+
 }  // namespace
 
 class TstIncrementalParse : public QObject {
@@ -63,6 +82,9 @@ private Q_SLOTS:
     void blockChangedByteCount_initialAndIncremental();
     void blockChangedByteCount_resetOnEmptyEdits();
     void parseIncremental_reportsBlockAndInlineTimingNs();
+    void incrementalQueries_matchesFreshWalk_typingBurst();
+    void incrementalQueries_matchesFreshWalk_addAndRemoveHeading();
+    void incrementalQueries_matchesFreshWalk_replacementWithLinkChurn();
 };
 
 // ---------------------------------------------------------------------------
@@ -436,6 +458,166 @@ void TstIncrementalParse::parseIncremental_reportsBlockAndInlineTimingNs()
              qPrintable(QString("lastParseBlockNs=%1 (expected > 0)").arg(p.lastParseBlockNs())));
     QVERIFY2(p.lastParseInlineNs() > 0,
              qPrintable(QString("lastParseInlineNs=%1 (expected > 0)").arg(p.lastParseInlineNs())));
+}
+
+// ---------------------------------------------------------------------------
+// Incremental queries: assert that buildDocumentQueries(prior, edits) — the
+// incremental overload — produces the same DocumentQueryResult as a fresh
+// walk of the new tree (the no-arg overload, called on a freshly-parsed
+// reference parser). This is the contract: incremental output must match
+// fresh output entry-for-entry, modulo internal ordering. Fingerprint
+// equality is the proof.
+// ---------------------------------------------------------------------------
+
+namespace {
+
+QByteArray applyEditAtBytes(const QByteArray &doc, int oldStart, int oldEnd,
+                            const QByteArray &replacement)
+{
+    QByteArray out;
+    out.reserve(doc.size() - (oldEnd - oldStart) + replacement.size());
+    out.append(doc.constData(), oldStart);
+    out.append(replacement);
+    out.append(doc.constData() + oldEnd, doc.size() - oldEnd);
+    return out;
+}
+
+}  // namespace
+
+void TstIncrementalParse::incrementalQueries_matchesFreshWalk_typingBurst()
+{
+    // A doc with at least one heading, one inline link, one wiki-link, one tag.
+    QByteArray src = QByteArrayLiteral(
+        "# First heading\n\n"
+        "Para with a [link](https://x.example) and a [[Note]] and a #tag-here.\n\n"
+        "## Second heading\n\n"
+        "Para two with #other and [more](https://y.example).\n");
+
+    TreeSitterParser p;
+    QVERIFY(p.parse(QString::fromUtf8(src)));
+    DocumentQueryResult prior = p.buildDocumentQueries();
+
+    // Five small typing edits, each at a different byte position. After each,
+    // the incremental queries must equal a fresh-parse reference.
+    QByteArray cur = src;
+    const QList<int> insertOffsets = {
+        int(cur.indexOf("First heading") + QByteArrayLiteral("First").size()),
+        int(cur.indexOf("Para with") + QByteArrayLiteral("Para").size()),
+        int(cur.indexOf("https://x.example") + QByteArrayLiteral("https://x").size()),
+        int(cur.indexOf("#tag-here") + QByteArrayLiteral("#tag").size()),
+        int(cur.size() - 1),
+    };
+
+    for (int insertAt : insertOffsets) {
+        const QByteArray ins = QByteArrayLiteral("X");
+        ByteEdit e{ static_cast<quint32>(insertAt),
+                    static_cast<quint32>(insertAt),
+                    static_cast<quint32>(ins.size()) };
+        const QByteArray nw = applyEditAtBytes(cur, insertAt, insertAt, ins);
+        QVERIFY(p.parseIncremental({e}, nw));
+
+        DocumentQueryResult inc = p.buildDocumentQueries(prior, {e});
+
+        TreeSitterParser ref;
+        QVERIFY(ref.parse(QString::fromUtf8(nw)));
+        DocumentQueryResult fresh = ref.buildDocumentQueries();
+
+        QCOMPARE(fingerprintQueries(inc), fingerprintQueries(fresh));
+
+        prior = std::move(inc);
+        cur   = nw;
+    }
+}
+
+void TstIncrementalParse::incrementalQueries_matchesFreshWalk_addAndRemoveHeading()
+{
+    QByteArray src = QByteArrayLiteral(
+        "# Top\n\nA paragraph here.\n\n"
+        "More text and a [[wiki]] link.\n");
+
+    TreeSitterParser p;
+    QVERIFY(p.parse(QString::fromUtf8(src)));
+    DocumentQueryResult prior = p.buildDocumentQueries();
+
+    // 1) Insert a new "## New section\n\n" between the first paragraph and
+    //    "More text".
+    const int afterFirstPara = src.indexOf("More text");
+    QVERIFY(afterFirstPara >= 0);
+    const QByteArray insertedHeading = QByteArrayLiteral("## New section\n\n");
+
+    {
+        ByteEdit e{ static_cast<quint32>(afterFirstPara),
+                    static_cast<quint32>(afterFirstPara),
+                    static_cast<quint32>(insertedHeading.size()) };
+        const QByteArray nw = applyEditAtBytes(src, afterFirstPara, afterFirstPara,
+                                                insertedHeading);
+        QVERIFY(p.parseIncremental({e}, nw));
+
+        DocumentQueryResult inc = p.buildDocumentQueries(prior, {e});
+
+        TreeSitterParser ref;
+        QVERIFY(ref.parse(QString::fromUtf8(nw)));
+        DocumentQueryResult fresh = ref.buildDocumentQueries();
+        QCOMPARE(fingerprintQueries(inc), fingerprintQueries(fresh));
+
+        prior = std::move(inc);
+        src   = nw;
+    }
+
+    // 2) Remove the new heading we just added.
+    {
+        const int delAt = src.indexOf("## New section\n\n");
+        QVERIFY(delAt >= 0);
+        ByteEdit e{ static_cast<quint32>(delAt),
+                    static_cast<quint32>(delAt + insertedHeading.size()),
+                    0u };
+        const QByteArray nw = applyEditAtBytes(src, delAt,
+                                                delAt + int(insertedHeading.size()),
+                                                QByteArray());
+        QVERIFY(p.parseIncremental({e}, nw));
+
+        DocumentQueryResult inc = p.buildDocumentQueries(prior, {e});
+
+        TreeSitterParser ref;
+        QVERIFY(ref.parse(QString::fromUtf8(nw)));
+        DocumentQueryResult fresh = ref.buildDocumentQueries();
+        QCOMPARE(fingerprintQueries(inc), fingerprintQueries(fresh));
+    }
+}
+
+void TstIncrementalParse::incrementalQueries_matchesFreshWalk_replacementWithLinkChurn()
+{
+    // A 1-KB-ish replacement that overwrites a region containing a link
+    // and a tag with new content that has different links/tags. Mimics
+    // what `replace_1kb` does at the bench level.
+    QByteArray src = QByteArrayLiteral(
+        "# Header\n\n"
+        "Lead paragraph with [old-link](https://old.example) and #old-tag.\n\n"
+        "Tail paragraph with [tail](https://tail.example).\n");
+
+    TreeSitterParser p;
+    QVERIFY(p.parse(QString::fromUtf8(src)));
+    DocumentQueryResult prior = p.buildDocumentQueries();
+
+    const int rStart = src.indexOf("Lead paragraph");
+    const int rEnd   = src.indexOf("Tail paragraph");
+    QVERIFY(rStart >= 0 && rEnd > rStart);
+
+    const QByteArray replacement = QByteArrayLiteral(
+        "Replacement para with [new-link](https://new.example) "
+        "and [[NewWiki]] and #new-tag.\n\n");
+    ByteEdit e{ static_cast<quint32>(rStart),
+                static_cast<quint32>(rEnd),
+                static_cast<quint32>(replacement.size()) };
+    const QByteArray nw = applyEditAtBytes(src, rStart, rEnd, replacement);
+    QVERIFY(p.parseIncremental({e}, nw));
+
+    DocumentQueryResult inc = p.buildDocumentQueries(prior, {e});
+
+    TreeSitterParser ref;
+    QVERIFY(ref.parse(QString::fromUtf8(nw)));
+    DocumentQueryResult fresh = ref.buildDocumentQueries();
+    QCOMPARE(fingerprintQueries(inc), fingerprintQueries(fresh));
 }
 
 QTEST_APPLESS_MAIN(TstIncrementalParse)

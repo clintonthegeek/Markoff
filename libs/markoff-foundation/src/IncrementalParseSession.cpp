@@ -111,7 +111,9 @@ void IncrementalParseSession::applyEdit(const QString &newRaw)
     m_extracted = std::move(newExtracted);
     {
         ParsePhaseGuard g(m_phaseTable, ParsePhase::Queries);
-        m_queries = m_parser.buildDocumentQueries();
+        // Incremental queries: re-walk only subtrees that overlap a changed
+        // range (block tree's structural changes ∪ edits-derived ranges).
+        m_queries = m_parser.buildDocumentQueries(m_queries, {edit});
     }
 }
 

@@ -6,6 +6,8 @@
 #include <QByteArray>
 #include <QList>
 
+#include <vector>
+
 // Forward declare tree-sitter C types
 typedef struct TSParser TSParser;
 typedef struct TSTree TSTree;
@@ -74,6 +76,15 @@ public:
     /// Walk the CST and extract headings, links, and tags as structured data.
     DocumentQueryResult buildDocumentQueries() const;
 
+    /// Incremental overload: re-derive the DocumentQueryResult from a prior
+    /// result + the same `edits` list passed to the most recent
+    /// parseIncremental(). Internally consults the changed-range info
+    /// captured during that parseIncremental() call to skip subtrees
+    /// untouched by the edits. Output is required to fingerprint-equal a
+    /// fresh-walk result on the post-edit tree.
+    DocumentQueryResult buildDocumentQueries(const DocumentQueryResult &prior,
+                                             const QList<ByteEdit> &edits) const;
+
     /// Check if a tree exists (parse was successful)
     bool hasTree() const { return m_blockTree != nullptr; }
 
@@ -117,6 +128,10 @@ public:
     /// Convert a UTF-8 byte offset to a QString char offset.
     int utf8ToCharOffset(int byteOffset) const;
 
+    /// A half-open byte range [startByte, endByte). Used by the incremental
+    /// queries overload to communicate changed-range info.
+    struct ByteRange { quint32 startByte; quint32 endByte; };
+
 private:
     void walkNode(TSNode node, QList<SourceSpan> &spans) const;
 
@@ -130,6 +145,12 @@ private:
     int m_lastBlockChangedBytes = -1;
     quint64 m_lastParseBlockNs  = 0;
     quint64 m_lastParseInlineNs = 0;
+    // New-frame byte ranges reported as changed by the most recent
+    // parseIncremental() call. Used by buildDocumentQueries(prior, edits)
+    // to prune the walk to subtrees that overlap a change. Empty after
+    // parse() (no incremental info) and after parseIncremental({}, …)
+    // when nothing changed.
+    std::vector<ByteRange> m_lastChangedRanges;
 };
 
 } // namespace Markoff

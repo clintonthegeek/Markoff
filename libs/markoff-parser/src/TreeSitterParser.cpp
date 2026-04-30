@@ -10,6 +10,7 @@
 #include <QStringList>
 #include <QPair>
 #include <chrono>
+#include <optional>
 #include <vector>
 #include <algorithm>
 
@@ -188,6 +189,7 @@ bool TreeSitterParser::parse(const QString &text)
     m_lastBlockChangedBytes = -1;
     m_lastParseBlockNs  = 0;
     m_lastParseInlineNs = 0;
+    m_lastChangedRanges.clear();
     m_utf8 = text.toUtf8();
     m_byteToChar = buildByteToCharMap(m_utf8);
 
@@ -229,6 +231,7 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
 {
     m_lastParseBlockNs  = 0;
     m_lastParseInlineNs = 0;
+    m_lastChangedRanges.clear();
 
     // No prior tree → full parse of the new buffer. Callers don't need
     // a first-parse branch.
@@ -310,11 +313,29 @@ bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
             uint32_t nRanges = 0;
             TSRange *ranges = ts_tree_get_changed_ranges(m_blockTree, newTree, &nRanges);
             quint64 totalBytes = 0;
+            m_lastChangedRanges.reserve(nRanges + sortedEdits.size());
             for (uint32_t i = 0; i < nRanges; ++i) {
                 totalBytes += static_cast<quint64>(ranges[i].end_byte) - ranges[i].start_byte;
+                m_lastChangedRanges.push_back(
+                    ByteRange{ ranges[i].start_byte, ranges[i].end_byte });
             }
             if (ranges) free(ranges);
             m_lastBlockChangedBytes = static_cast<int>(qMin<quint64>(totalBytes, INT_MAX));
+
+            // Tree-sitter reports STRUCTURAL changes on the block tree only:
+            // an inline-only edit (typing inside a heading or paragraph)
+            // often produces no block-tree changed-range. The edits
+            // themselves are the authoritative lower bound on changed
+            // bytes; project each edit into the new frame and union it
+            // into m_lastChangedRanges so the queries layer sees inline
+            // edits too.
+            qint64 delta = 0;
+            for (const ByteEdit &e : sortedEdits) {
+                const quint32 newStart = static_cast<quint32>(qint64(e.oldStart) + delta);
+                const quint32 newEnd   = newStart + e.newLength;
+                m_lastChangedRanges.push_back(ByteRange{ newStart, newEnd });
+                delta += qint64(e.newLength) - qint64(e.oldEnd - e.oldStart);
+            }
         }
         ts_tree_delete(m_blockTree);
         m_blockTree = newTree;
@@ -924,157 +945,214 @@ QList<TreeSitterParser::BlockBoundary> TreeSitterParser::findBlockBoundaries() c
 
 namespace {
 
-/// Recursively walk block tree for atx_heading nodes
-void collectHeadingsForQuery(TSNode node, const QByteArray &utf8,
-                             QList<HeadingInfo> &headings)
+using ByteRange = TreeSitterParser::ByteRange;
+
+bool rangesOverlap(quint32 aStart, quint32 aEnd,
+                   const std::vector<ByteRange> &ranges)
+{
+    for (const auto &r : ranges) {
+        if (r.startByte < aEnd && r.endByte > aStart) return true;
+    }
+    return false;
+}
+
+// Pure node-to-Info extractors. Return true if the node matched the expected
+// shape. Used by both the full walk and the pruned-by-changed-ranges walk.
+
+bool extractHeadingFromNode(TSNode node, const QByteArray &utf8, HeadingInfo &out)
+{
+    if (strcmp(ts_node_type(node), "atx_heading") != 0) return false;
+    out.level = 1;
+    const int sb = static_cast<int>(ts_node_start_byte(node));
+    const int eb = static_cast<int>(ts_node_end_byte(node));
+    out.sourceOffset = sb;
+    out.sourceLength = eb - sb;
+    QString text;
+    uint32_t count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < count; ++i) {
+        TSNode child = ts_node_child(node, i);
+        const char *ct = ts_node_type(child);
+        if (strncmp(ct, "atx_h", 5) == 0 && strstr(ct, "_marker")) {
+            out.level = ct[5] - '0';
+        } else if (strcmp(ct, "inline") == 0) {
+            int csb = static_cast<int>(ts_node_start_byte(child));
+            int ceb = static_cast<int>(ts_node_end_byte(child));
+            text = QString::fromUtf8(utf8.mid(csb, ceb - csb));
+        }
+    }
+    out.text = text.trimmed();
+    return true;
+}
+
+bool extractLinkFromNode(TSNode node, const QByteArray &utf8, LinkInfo &out)
 {
     const char *type = ts_node_type(node);
-
-    if (strcmp(type, "atx_heading") == 0) {
-        HeadingInfo h;
-        h.level = 1;
-        h.sourceOffset = static_cast<int>(ts_node_start_byte(node));
-        QString text;
-
+    if (strcmp(type, "wiki_link") == 0) {
+        int sb = static_cast<int>(ts_node_start_byte(node));
+        int eb = static_cast<int>(ts_node_end_byte(node));
+        QString raw = QString::fromUtf8(utf8.mid(sb, eb - sb));
+        out.sourceOffset = sb;
+        out.sourceLength = eb - sb;
+        const bool isEmbed = raw.startsWith(QStringLiteral("![["));
+        out.type = isEmbed ? LinkInfo::Embed : LinkInfo::Wiki;
+        QString inner = isEmbed ? raw.mid(3, raw.size() - 5)
+                                : raw.mid(2, raw.size() - 4);
+        const int pipeIdx = inner.indexOf(QLatin1Char('|'));
+        if (pipeIdx >= 0) {
+            out.target = inner.left(pipeIdx);
+            out.displayText = inner.mid(pipeIdx + 1);
+        } else {
+            out.target = inner;
+            out.displayText = inner;
+        }
+        return true;
+    }
+    if (strcmp(type, "inline_link") == 0 ||
+        strcmp(type, "shortcut_link") == 0 ||
+        strcmp(type, "full_reference_link") == 0 ||
+        strcmp(type, "collapsed_reference_link") == 0) {
+        out.type = LinkInfo::Standard;
+        out.sourceOffset = static_cast<int>(ts_node_start_byte(node));
+        out.sourceLength = static_cast<int>(ts_node_end_byte(node)) - out.sourceOffset;
+        out.target.clear();
+        out.displayText.clear();
         uint32_t count = ts_node_child_count(node);
         for (uint32_t i = 0; i < count; ++i) {
             TSNode child = ts_node_child(node, i);
             const char *ct = ts_node_type(child);
-
-            if (strncmp(ct, "atx_h", 5) == 0 && strstr(ct, "_marker")) {
-                h.level = ct[5] - '0';
-            } else if (strcmp(ct, "inline") == 0) {
-                int startByte = static_cast<int>(ts_node_start_byte(child));
-                int endByte = static_cast<int>(ts_node_end_byte(child));
-                text = QString::fromUtf8(utf8.mid(startByte, endByte - startByte));
+            int cs = static_cast<int>(ts_node_start_byte(child));
+            int ce = static_cast<int>(ts_node_end_byte(child));
+            if (strcmp(ct, "link_text") == 0) {
+                QString raw = QString::fromUtf8(utf8.mid(cs, ce - cs));
+                if (raw.startsWith(QLatin1Char('[')) && raw.endsWith(QLatin1Char(']')))
+                    raw = raw.mid(1, raw.size() - 2);
+                out.displayText = raw;
+            } else if (strcmp(ct, "link_destination") == 0) {
+                out.target = QString::fromUtf8(utf8.mid(cs, ce - cs));
             }
         }
-
-        h.text = text.trimmed();
-        headings.append(h);
-        return; // don't recurse into children of atx_heading
+        if (out.target.isEmpty() && !out.displayText.isEmpty())
+            out.target = out.displayText;
+        return true;
     }
+    if (strcmp(type, "image") == 0) {
+        out.type = LinkInfo::Image;
+        out.sourceOffset = static_cast<int>(ts_node_start_byte(node));
+        out.sourceLength = static_cast<int>(ts_node_end_byte(node)) - out.sourceOffset;
+        out.target.clear();
+        out.displayText.clear();
+        uint32_t count = ts_node_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_child(node, i);
+            const char *ct = ts_node_type(child);
+            int cs = static_cast<int>(ts_node_start_byte(child));
+            int ce = static_cast<int>(ts_node_end_byte(child));
+            if (strcmp(ct, "image_description") == 0 || strcmp(ct, "link_text") == 0) {
+                out.displayText = QString::fromUtf8(utf8.mid(cs, ce - cs));
+            } else if (strcmp(ct, "link_destination") == 0) {
+                out.target = QString::fromUtf8(utf8.mid(cs, ce - cs));
+            }
+        }
+        return true;
+    }
+    return false;
+}
 
+bool extractTagFromNode(TSNode node, const QByteArray &utf8, TagInfo &out)
+{
+    if (strcmp(ts_node_type(node), "tag") != 0) return false;
+    int sb = static_cast<int>(ts_node_start_byte(node));
+    int eb = static_cast<int>(ts_node_end_byte(node));
+    QString raw = QString::fromUtf8(utf8.mid(sb, eb - sb));
+    out.sourceOffset = sb;
+    out.sourceLength = eb - sb;
+    out.name = raw.startsWith(QLatin1Char('#')) ? raw.mid(1) : raw;
+    return true;
+}
+
+// ---------- full walks (used by buildDocumentQueries() no-arg) -------------
+
+void collectHeadingsForQuery(TSNode node, const QByteArray &utf8,
+                             QList<HeadingInfo> &headings)
+{
+    HeadingInfo h;
+    if (extractHeadingFromNode(node, utf8, h)) {
+        headings.append(h);
+        return;  // don't recurse into atx_heading children
+    }
     uint32_t count = ts_node_child_count(node);
     for (uint32_t i = 0; i < count; ++i)
         collectHeadingsForQuery(ts_node_child(node, i), utf8, headings);
 }
 
-/// Recursively walk an inline tree for links, wikilinks, images, and tags
 void collectInlineQueries(TSNode node, const QByteArray &utf8,
                           QList<LinkInfo> &links, QList<TagInfo> &tags)
 {
-    const char *type = ts_node_type(node);
-
-    if (strcmp(type, "wiki_link") == 0) {
-        // Wiki link: [[target]] or [[target|display]] or ![[embed]]
-        int startByte = static_cast<int>(ts_node_start_byte(node));
-        int endByte = static_cast<int>(ts_node_end_byte(node));
-        QString raw = QString::fromUtf8(utf8.mid(startByte, endByte - startByte));
-
-        LinkInfo li;
-        li.sourceOffset = startByte;
-
-        // Check for embed prefix
-        bool isEmbed = raw.startsWith(QStringLiteral("![["));
-        li.type = isEmbed ? LinkInfo::Embed : LinkInfo::Wiki;
-
-        // Strip delimiters: ![[...]] or [[...]]
-        QString inner;
-        if (isEmbed)
-            inner = raw.mid(3, raw.size() - 5); // strip "![[" and "]]"
-        else
-            inner = raw.mid(2, raw.size() - 4); // strip "[[" and "]]"
-
-        // Split on | for display text
-        int pipeIdx = inner.indexOf(QLatin1Char('|'));
-        if (pipeIdx >= 0) {
-            li.target = inner.left(pipeIdx);
-            li.displayText = inner.mid(pipeIdx + 1);
-        } else {
-            li.target = inner;
-            li.displayText = inner;
-        }
-
-        links.append(li);
-        return; // don't recurse into wiki_link children
-    }
-
-    if (strcmp(type, "inline_link") == 0 ||
-        strcmp(type, "shortcut_link") == 0 ||
-        strcmp(type, "full_reference_link") == 0 ||
-        strcmp(type, "collapsed_reference_link") == 0) {
-
-        LinkInfo li;
-        li.type = LinkInfo::Standard;
-        li.sourceOffset = static_cast<int>(ts_node_start_byte(node));
-
-        uint32_t count = ts_node_child_count(node);
-        for (uint32_t i = 0; i < count; ++i) {
-            TSNode child = ts_node_child(node, i);
-            const char *ct = ts_node_type(child);
-            int cStart = static_cast<int>(ts_node_start_byte(child));
-            int cEnd = static_cast<int>(ts_node_end_byte(child));
-
-            if (strcmp(ct, "link_text") == 0) {
-                // link_text includes brackets, so strip them
-                QString raw = QString::fromUtf8(utf8.mid(cStart, cEnd - cStart));
-                if (raw.startsWith(QLatin1Char('[')) && raw.endsWith(QLatin1Char(']')))
-                    raw = raw.mid(1, raw.size() - 2);
-                li.displayText = raw;
-            } else if (strcmp(ct, "link_destination") == 0) {
-                li.target = QString::fromUtf8(utf8.mid(cStart, cEnd - cStart));
-            }
-        }
-
-        // For shortcut_link: target = displayText (no separate destination)
-        if (li.target.isEmpty() && !li.displayText.isEmpty())
-            li.target = li.displayText;
-
+    LinkInfo li;
+    if (extractLinkFromNode(node, utf8, li)) {
         links.append(li);
         return;
     }
-
-    if (strcmp(type, "image") == 0) {
-        LinkInfo li;
-        li.type = LinkInfo::Image;
-        li.sourceOffset = static_cast<int>(ts_node_start_byte(node));
-
-        uint32_t count = ts_node_child_count(node);
-        for (uint32_t i = 0; i < count; ++i) {
-            TSNode child = ts_node_child(node, i);
-            const char *ct = ts_node_type(child);
-            int cStart = static_cast<int>(ts_node_start_byte(child));
-            int cEnd = static_cast<int>(ts_node_end_byte(child));
-
-            if (strcmp(ct, "image_description") == 0 || strcmp(ct, "link_text") == 0) {
-                li.displayText = QString::fromUtf8(utf8.mid(cStart, cEnd - cStart));
-            } else if (strcmp(ct, "link_destination") == 0) {
-                li.target = QString::fromUtf8(utf8.mid(cStart, cEnd - cStart));
-            }
-        }
-
-        links.append(li);
-        return;
-    }
-
-    if (strcmp(type, "tag") == 0) {
-        int startByte = static_cast<int>(ts_node_start_byte(node));
-        int endByte = static_cast<int>(ts_node_end_byte(node));
-        QString raw = QString::fromUtf8(utf8.mid(startByte, endByte - startByte));
-
-        TagInfo ti;
-        ti.sourceOffset = startByte;
-        // Strip leading #
-        ti.name = raw.startsWith(QLatin1Char('#')) ? raw.mid(1) : raw;
+    TagInfo ti;
+    if (extractTagFromNode(node, utf8, ti)) {
         tags.append(ti);
         return;
     }
-
-    // Recurse into children
     uint32_t count = ts_node_child_count(node);
     for (uint32_t i = 0; i < count; ++i)
         collectInlineQueries(ts_node_child(node, i), utf8, links, tags);
+}
+
+// ---------- pruned walks (used by buildDocumentQueries(prior, edits)) ------
+
+// Emit gate: an entry is emitted by the pruned walk when its full byte
+// range overlaps any changed range. This is the inverse of the carry-over
+// keep gate (which keeps entries whose range does NOT overlap), so for
+// any individual entry exactly one of carry-over and pruned-walk emits it.
+
+void collectHeadingsForQueryInRanges(TSNode node, const QByteArray &utf8,
+                                     const std::vector<ByteRange> &ranges,
+                                     QList<HeadingInfo> &headings)
+{
+    const quint32 ns = ts_node_start_byte(node);
+    const quint32 ne = ts_node_end_byte(node);
+    if (!rangesOverlap(ns, ne, ranges)) return;
+    HeadingInfo h;
+    if (extractHeadingFromNode(node, utf8, h)) {
+        if (rangesOverlap(quint32(h.sourceOffset),
+                          quint32(h.sourceOffset + h.sourceLength), ranges))
+            headings.append(h);
+        return;
+    }
+    uint32_t count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < count; ++i)
+        collectHeadingsForQueryInRanges(ts_node_child(node, i), utf8, ranges, headings);
+}
+
+void collectInlineQueriesInRanges(TSNode node, const QByteArray &utf8,
+                                  const std::vector<ByteRange> &ranges,
+                                  QList<LinkInfo> &links, QList<TagInfo> &tags)
+{
+    const quint32 ns = ts_node_start_byte(node);
+    const quint32 ne = ts_node_end_byte(node);
+    if (!rangesOverlap(ns, ne, ranges)) return;
+    LinkInfo li;
+    if (extractLinkFromNode(node, utf8, li)) {
+        if (rangesOverlap(quint32(li.sourceOffset),
+                          quint32(li.sourceOffset + li.sourceLength), ranges))
+            links.append(li);
+        return;
+    }
+    TagInfo ti;
+    if (extractTagFromNode(node, utf8, ti)) {
+        if (rangesOverlap(quint32(ti.sourceOffset),
+                          quint32(ti.sourceOffset + ti.sourceLength), ranges))
+            tags.append(ti);
+        return;
+    }
+    uint32_t count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < count; ++i)
+        collectInlineQueriesInRanges(ts_node_child(node, i), utf8, ranges, links, tags);
 }
 
 } // anonymous namespace
@@ -1095,6 +1173,94 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
         TSNode inlineRoot = ts_tree_root_node(tree);
         collectInlineQueries(inlineRoot, m_utf8, result.links, result.tags);
     }
+
+    return result;
+}
+
+DocumentQueryResult TreeSitterParser::buildDocumentQueries(
+    const DocumentQueryResult &prior,
+    const QList<ByteEdit> &edits) const
+{
+    if (!m_blockTree)
+        return {};
+
+    // Sort edits by oldStart so we can apply shift math left-to-right per
+    // entry. (parseIncremental does its own sort internally; we must match
+    // the shape of edits the caller used.)
+    QList<ByteEdit> sortedEdits = edits;
+    std::sort(sortedEdits.begin(), sortedEdits.end(),
+              [](const ByteEdit &a, const ByteEdit &b) {
+                  return a.oldStart < b.oldStart;
+              });
+
+    // Map an old-frame byte offset to the new-frame. Returns std::nullopt
+    // if the offset falls strictly inside an edit's old range (entry was
+    // overwritten and must be re-discovered, not carried over).
+    auto shiftOldOffset = [&sortedEdits](int oldOff) -> std::optional<int> {
+        qint64 cur = oldOff;
+        for (const ByteEdit &e : sortedEdits) {
+            if (qint64(e.oldStart) > cur) break;            // edit lies past us
+            if (qint64(e.oldEnd) <= cur) {                  // edit lies entirely before us
+                cur += qint64(e.newLength) - qint64(e.oldEnd - e.oldStart);
+            } else {                                        // cur is inside [oldStart, oldEnd)
+                return std::nullopt;
+            }
+        }
+        return int(cur);
+    };
+
+    DocumentQueryResult result;
+
+    // 1. Carry over prior entries whose byte range did not intersect any
+    //    changed range. The entry's full range — [sourceOffset, sourceOffset
+    //    + sourceLength) in old-frame coords — must shift cleanly (start byte
+    //    survives; we conservatively require the start to shift) AND must
+    //    not overlap any changed range in the new frame.
+    auto carry = [&](auto &outList, const auto &priorList) {
+        for (const auto &item : priorList) {
+            const std::optional<int> nf = shiftOldOffset(item.sourceOffset);
+            if (!nf) continue;
+            const int len = item.sourceLength > 0 ? item.sourceLength : 1;
+            if (rangesOverlap(quint32(*nf), quint32(*nf + len), m_lastChangedRanges))
+                continue;
+            auto shifted = item;
+            shifted.sourceOffset = *nf;
+            outList.append(shifted);
+        }
+    };
+    carry(result.headings, prior.headings);
+    carry(result.links,    prior.links);
+    carry(result.tags,     prior.tags);
+
+    // 2. Walk only the subtrees of the new tree that overlap a changed
+    //    range, emitting entries whose start byte sits in a changed range.
+    //    If there are no changed ranges (e.g. parseIncremental({}, sameBuf))
+    //    this is a no-op and the carry-over above is the entire result.
+    if (!m_lastChangedRanges.empty()) {
+        TSNode blockRoot = ts_tree_root_node(m_blockTree);
+        collectHeadingsForQueryInRanges(blockRoot, m_utf8, m_lastChangedRanges,
+                                         result.headings);
+        for (TSTree *tree : m_inlineTrees) {
+            TSNode inlineRoot = ts_tree_root_node(tree);
+            collectInlineQueriesInRanges(inlineRoot, m_utf8, m_lastChangedRanges,
+                                          result.links, result.tags);
+        }
+    }
+
+    // 3. Sort by source offset for stable order and equality with the
+    //    fresh-walk reference.
+    std::sort(result.headings.begin(), result.headings.end(),
+              [](const HeadingInfo &a, const HeadingInfo &b) {
+                  return a.sourceOffset < b.sourceOffset;
+              });
+    std::sort(result.links.begin(), result.links.end(),
+              [](const LinkInfo &a, const LinkInfo &b) {
+                  return a.sourceOffset < b.sourceOffset;
+              });
+    std::sort(result.tags.begin(), result.tags.end(),
+              [](const TagInfo &a, const TagInfo &b) {
+                  return a.sourceOffset < b.sourceOffset;
+              });
 
     return result;
 }

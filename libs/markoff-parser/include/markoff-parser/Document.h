@@ -16,6 +16,7 @@ struct HeadingInfo {
     int level;
     QString text;
     int sourceOffset;
+    int sourceLength = 0;  ///< UTF-8 bytes covered by the atx_heading node.
 };
 
 struct LinkInfo {
@@ -24,11 +25,13 @@ struct LinkInfo {
     QString target;
     QString displayText;
     int sourceOffset;
+    int sourceLength = 0;  ///< UTF-8 bytes covered by the link node.
 };
 
 struct TagInfo {
     QString name;
     int sourceOffset;
+    int sourceLength = 0;  ///< UTF-8 bytes covered by the tag node.
 };
 
 struct FootnoteInfo {
