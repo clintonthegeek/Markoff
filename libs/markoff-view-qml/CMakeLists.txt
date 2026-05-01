@@ -44,6 +44,9 @@ qt_add_qml_module(markoff_view_qml
         include/markoff/view/qml/LiveStructuralKeyHandler.h
         src/LiveSpeculativeFenceController.cpp
         include/markoff/view/qml/LiveSpeculativeFenceController.h
+        src/LiveProjectionLayer.cpp
+        include/markoff/view/qml/LiveProjectionLayer.h
+        include/markoff/view/qml/ProjectionItem.h
         src/LiveClipboardController.cpp
         include/markoff/view/qml/LiveClipboardController.h
     QML_FILES
