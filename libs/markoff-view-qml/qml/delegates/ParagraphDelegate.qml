@@ -79,7 +79,7 @@ Item {
                     root.blockIndex,
                     textEdit.cursorPosition,
                     textEdit.selectedText.length === 0,
-                    root.blockText
+                    textEdit.getText(0, textEdit.length)
                 )
                 if (handled) event.accepted = true
             }

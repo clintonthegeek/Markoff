@@ -4,7 +4,6 @@
 #include <Qt>
 
 #include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/SourceTextDocumentBinding.h>
 
 #include <markoff/view/qml/LiveBlockModel.h>
 
@@ -47,33 +46,40 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
 {
     if (!m_document || !m_model) return false;
 
-    const auto rangeOpt = m_document->blockByteRange(rowAnchor);
-    if (!rangeOpt) return false;
+    // Sanity-check: block exists in the most-recent parse.
+    if (!m_document->blockByteRange(rowAnchor)) return false;
 
-    const quint32 blockStart = rangeOpt->first;
-    const quint32 blockEnd   = rangeOpt->second;  // exclusive of content; \n\n separator follows
+    // CRDT-current block start byte. resolveTextAnchor tracks the character
+    // through edits, so this is accurate even when blockByteRange is stale
+    // (i.e. when the user has typed since the last parse completed).
+    const quint32 currentBlockStart = m_document->resolveTextAnchor(rowAnchor.firstByte);
+    // Current block end = start + UTF-8 byte count of the TextEdit's current text.
+    // blockText is passed from QML as textEdit.getText(0, textEdit.length), i.e.
+    // the live TextEdit content rather than the stale model role.
+    const quint32 currentBlockEnd = currentBlockStart
+                                    + static_cast<quint32>(blockText.toUtf8().size());
 
     const int rowCount = m_model->rowCount();
 
     if (key == Qt::Key_Backspace && selectionEmpty && qtPos == 0) {
-        // Merge with previous block by deleting the newline separator before blockStart.
-        if (blockIndex <= 0 || blockStart == 0) return false;
+        // Merge with previous block by deleting the newline separator before block start.
+        if (blockIndex <= 0 || currentBlockStart == 0) return false;
         Markoff::MarkoffEdit ed;
-        ed.oldStart = blockStart - 1;
-        ed.oldEnd   = blockStart;
+        ed.oldStart = currentBlockStart - 1;
+        ed.oldEnd   = currentBlockStart;
         ed.newText  = QByteArray();
         m_document->applyLocalEdit({ ed });
         return true;
     }
 
     if (key == Qt::Key_Delete && selectionEmpty && qtPos == blockText.length()) {
-        // Merge with next block by deleting the newline separator after blockEnd.
+        // Merge with next block by deleting the newline separator after block end.
         if (blockIndex >= rowCount - 1) return false;
         const quint32 docLength = m_document->visibleLength();
-        if (blockEnd >= docLength) return false;
+        if (currentBlockEnd >= docLength) return false;
         Markoff::MarkoffEdit ed;
-        ed.oldStart = blockEnd;
-        ed.oldEnd   = blockEnd + 1;
+        ed.oldStart = currentBlockEnd;
+        ed.oldEnd   = currentBlockEnd + 1;
         ed.newText  = QByteArray();
         m_document->applyLocalEdit({ ed });
         return true;
@@ -91,23 +97,19 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
         if (qtPos == blockText.length()) {
             // At the end of a non-code block: insert paragraph break after block.
             Markoff::MarkoffEdit ed;
-            ed.oldStart = blockEnd;
-            ed.oldEnd   = blockEnd;
+            ed.oldStart = currentBlockEnd;
+            ed.oldEnd   = currentBlockEnd;
             ed.newText  = QByteArrayLiteral("\n\n");
             m_document->applyLocalEdit({ ed });
             return true;
         }
 
         if (qtPos > 0) {
-            // Mid-block: split by inserting paragraph break at cursor byte offset.
-            // Convert block-local qtPos to a document-global byte offset.
-            const QByteArray docBytes   = m_document->toMarkdownUtf8();
-            const QString    docText    = QString::fromUtf8(docBytes);
-            const int blockStartQtPos   =
-                Markoff::SourceTextDocumentBinding::byteOffsetToQtPos(docBytes, blockStart);
-            const quint32 byteOffset    =
-                Markoff::SourceTextDocumentBinding::qtPosToByteOffset(
-                    docText, blockStartQtPos + qtPos);
+            // Mid-block split: cursor byte offset = block start + UTF-8 bytes
+            // in the block up to qtPos (UTF-16 code units).
+            const quint32 prefixBytes =
+                static_cast<quint32>(blockText.left(qtPos).toUtf8().size());
+            const quint32 byteOffset = currentBlockStart + prefixBytes;
 
             Markoff::MarkoffEdit ed;
             ed.oldStart = byteOffset;
@@ -119,8 +121,8 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
 
         // qtPos == 0: insert paragraph break before block start.
         Markoff::MarkoffEdit ed;
-        ed.oldStart = blockStart;
-        ed.oldEnd   = blockStart;
+        ed.oldStart = currentBlockStart;
+        ed.oldEnd   = currentBlockStart;
         ed.newText  = QByteArrayLiteral("\n\n");
         m_document->applyLocalEdit({ ed });
         return true;
