@@ -447,6 +447,163 @@ private Q_SLOTS:
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("\n\nFINAL"));
     }
 
+    // -----------------------------------------------------------------------
+    // Bug-fix tests: holeCreated, detach/reattach round-trip, applyOps with
+    // hole detached, anchor-row-deleted abandon path.
+    // -----------------------------------------------------------------------
+
+    void v1_create_block_hole_emits_hole_created_with_view_row()
+    {
+        LiveProjectionLayer layer;
+        LiveBlockModel model;
+        layer.setBlockModel(&model);
+
+        QSignalSpy createdSpy(&layer, &LiveProjectionLayer::holeCreated);
+
+        BlockHole h;
+        h.kind = QStringLiteral("paragraph");
+        h.afterParsedRow = -1;
+        layer.createBlockHole(h);
+
+        QCOMPARE(createdSpy.count(), 1);
+        QCOMPARE(createdSpy.first().first().toInt(), 0);
+
+        // afterParsedRow=2 → viewRow=3.
+        BlockHole h2;
+        h2.kind = QStringLiteral("paragraph");
+        h2.afterParsedRow = 2;
+        // Need underlying records so the second hole can sit at viewRow=3.
+        // The test is just about the emitted viewRow, so we don't need real
+        // records — set up a fresh layer/model.
+        LiveProjectionLayer layer2;
+        LiveBlockModel model2;
+        layer2.setBlockModel(&model2);
+        // Insert a few parsed rows.
+        BlockRecord r;
+        r.kind = QStringLiteral("paragraph");
+        AstBlockDiff::Op op;
+        op.kind = AstBlockDiff::OpKind::Insert;
+        op.nextIndex = 0;
+        model2.applyOps({ op, op, op }, { r, r, r });
+
+        QSignalSpy createdSpy2(&layer2, &LiveProjectionLayer::holeCreated);
+        layer2.createBlockHole(h2);
+        QCOMPARE(createdSpy2.count(), 1);
+        QCOMPARE(createdSpy2.first().first().toInt(), 3);
+    }
+
+    void v1_detach_reattach_round_trip_preserves_hole()
+    {
+        LiveProjectionLayer layer;
+        LiveBlockModel model;
+        layer.setBlockModel(&model);
+
+        BlockHole h;
+        h.kind = QStringLiteral("paragraph");
+        h.reifyOffset = 42;
+        h.afterParsedRow = -1;
+        const quint64 id = layer.createBlockHole(h);
+        layer.setBlockHoleBuffer(id, QStringLiteral("buf"));
+
+        QCOMPARE(model.rowCount(), 1);
+        QVERIFY(layer.hasPendingBlockHole());
+
+        const auto snap = layer.detachPendingHoleForReparse();
+        QVERIFY(snap.has_value());
+        QCOMPARE(snap->id, id);
+        QCOMPARE(snap->kind, QStringLiteral("paragraph"));
+        QCOMPARE(snap->bufferText, QStringLiteral("buf"));
+        QCOMPARE(snap->afterParsedRow, -1);
+        QCOMPARE(snap->reifyOffset, quint32(42));
+
+        QVERIFY(!layer.hasPendingBlockHole());
+        QCOMPARE(model.rowCount(), 0);
+
+        layer.reattachHoleAfterReparse(*snap);
+        QVERIFY(layer.hasPendingBlockHole());
+        QCOMPARE(layer.pendingBlockHoleId(), id);
+        QCOMPARE(layer.pendingBlockHoleBuffer(), QStringLiteral("buf"));
+        QCOMPARE(model.rowCount(), 1);
+    }
+
+    void v1_apply_ops_while_hole_detached_does_not_assert()
+    {
+        LiveProjectionLayer layer;
+        LiveBlockModel model;
+        layer.setBlockModel(&model);
+
+        // Set up: 1 parsed paragraph + 1 hole behind it.
+        BlockRecord r;
+        r.kind = QStringLiteral("paragraph");
+        r.text = QStringLiteral("first");
+        AstBlockDiff::Op insertOp;
+        insertOp.kind = AstBlockDiff::OpKind::Insert;
+        insertOp.nextIndex = 0;
+        model.applyOps({ insertOp }, { r });
+
+        BlockHole h;
+        h.kind = QStringLiteral("paragraph");
+        h.afterParsedRow = 0;  // sit below the existing paragraph
+        const quint64 id = layer.createBlockHole(h);
+        layer.setBlockHoleBuffer(id, QStringLiteral("hole-buf"));
+        QCOMPARE(model.rowCount(), 2);  // 1 parsed + 1 hole
+
+        // Detach, apply equal-op (no-op semantically), reattach.
+        const auto snap = layer.detachPendingHoleForReparse();
+        QVERIFY(snap.has_value());
+        QCOMPARE(model.rowCount(), 1);
+
+        AstBlockDiff::Op eqOp;
+        eqOp.kind = AstBlockDiff::OpKind::Equal;
+        eqOp.nextIndex = 0;
+        model.applyOps({ eqOp }, { r });  // must not assert
+
+        layer.reattachHoleAfterReparse(*snap);
+        QCOMPARE(model.rowCount(), 2);
+        QVERIFY(layer.hasPendingBlockHole());
+        QCOMPARE(layer.pendingBlockHoleBuffer(), QStringLiteral("hole-buf"));
+    }
+
+    void v1_anchor_row_deleted_abandon_emits_hole_dropped()
+    {
+        LiveProjectionLayer layer;
+        LiveBlockModel model;
+        layer.setBlockModel(&model);
+
+        // Set up 1 paragraph + hole anchored at row 0.
+        BlockRecord r;
+        r.kind = QStringLiteral("paragraph");
+        AstBlockDiff::Op insertOp;
+        insertOp.kind = AstBlockDiff::OpKind::Insert;
+        insertOp.nextIndex = 0;
+        model.applyOps({ insertOp }, { r });
+
+        BlockHole h;
+        h.kind = QStringLiteral("paragraph");
+        h.afterParsedRow = 0;
+        layer.createBlockHole(h);
+        QCOMPARE(model.rowCount(), 2);
+
+        QSignalSpy droppedSpy(&layer, &LiveProjectionLayer::holeDropped);
+
+        const auto snap = layer.detachPendingHoleForReparse();
+        QVERIFY(snap.has_value());
+
+        // Apply a Delete that removes the anchor row.
+        AstBlockDiff::Op delOp;
+        delOp.kind = AstBlockDiff::OpKind::Delete;
+        delOp.prevIndex = 0;
+        model.applyOps({ delOp }, {});
+        QCOMPARE(model.rowCount(), 0);
+
+        // Anchor row gone (snap->afterParsedRow=0 not in [0, 0)) → abandon.
+        layer.reattachHoleAfterReparseAbandon(*snap);
+
+        QVERIFY(!layer.hasPendingBlockHole());
+        QCOMPARE(droppedSpy.count(), 1);
+        QCOMPARE(droppedSpy.first().first().toInt(), 1);
+    }
+
     void setters_store_pointers()
     {
         LiveProjectionLayer layer;

@@ -70,6 +70,34 @@ Item {
                 })
             }
         }
+        function onHoleCreated(viewRow) {
+            // Two reasons we MUST defer + verify here:
+            //   (1) onHoleCreated runs synchronously inside the keyPressEvent
+            //       that triggered the hole; ListView has not yet incubated
+            //       the new delegate, so itemAtIndex(viewRow) returns the
+            //       previously-incubated delegate at that visual position
+            //       (the paragraph that was at viewRow before the insert).
+            //       Calling focusAtStart on that wrong delegate lands the
+            //       user's next keystroke at the start of the WRONG row.
+            //       (Dogfood-surfaced: "t at start of next paragraph".)
+            //   (2) After callLater fires, verify item.isHole === true so
+            //       a stale item from before the insert never receives
+            //       focus.
+            // Mirrors the empty-doc m_firstInsertPending pattern's two
+            // levels of Qt.callLater.
+            let attempts = 0
+            function tryFocus() {
+                attempts++
+                const item = listView.itemAtIndex(viewRow)
+                if (item && item.isHole === true
+                    && typeof item.focusAtStart === "function") {
+                    item.focusAtStart()
+                    return
+                }
+                if (attempts < 10) Qt.callLater(tryFocus)
+            }
+            Qt.callLater(function() { Qt.callLater(tryFocus) })
+        }
         function onHoleDropped(prevViewRow) {
             const targetRow = prevViewRow - 1
             if (targetRow < 0) return

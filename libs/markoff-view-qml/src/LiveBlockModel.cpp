@@ -203,14 +203,12 @@ void LiveBlockModel::setComposingRow(int row, bool composing)
 void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                               const QList<BlockRecord> &nextRecords)
 {
-    // Contract: parse-driven ops must not interleave with a pending hole.
-    // The projection layer is responsible for committing or dropping the
-    // hole BEFORE allowing parse ops to land. `commitBlockHole` removes the
-    // hole synchronously before issuing `applyLocalEdit`; `dropBlockHole`
-    // removes it without any source mutation.
-    Q_ASSERT_X(!m_hole.has_value(), "LiveBlockModel::applyOps",
-               "applyOps called while a hole row is present");
-
+    // The hole is a pure view-state row; parse-driven ops operate on the
+    // parsed-rows underlay only. `LiveListModelBinding` is responsible for
+    // detaching any pending hole via the projection layer before calling
+    // applyOps and re-attaching (or abandoning) it afterwards. By the time
+    // we get here, no hole row should be present.
+    //
     // Parse arrived — clear all speculative state; parser result is authoritative.
     m_speculativeOriginals.clear();
 

@@ -206,8 +206,30 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
                     }
                 }
 
+                // Hole-aware applyOps: detach any pending hole so the diff
+                // ops land on the parsed-rows underlay only, then reattach
+                // (if anchor row still valid) or abandon.
+                std::optional<BlockHole> heldHole;
+                if (d->projection && d->projection->hasPendingBlockHole()) {
+                    heldHole = d->projection->detachPendingHoleForReparse();
+                }
+
                 d->model->applyOps(ops, records);
                 d->lastKeys = std::move(nextKeys);
+
+                if (heldHole.has_value()) {
+                    if (heldHole->afterParsedRow >= 0
+                            && heldHole->afterParsedRow < records.size()) {
+                        d->projection->reattachHoleAfterReparse(*heldHole);
+                    } else if (heldHole->afterParsedRow == -1
+                               && records.isEmpty()) {
+                        // Empty-document case: hole anchors at row 0, no
+                        // parsed rows. Still valid.
+                        d->projection->reattachHoleAfterReparse(*heldHole);
+                    } else {
+                        d->projection->reattachHoleAfterReparseAbandon(*heldHole);
+                    }
+                }
             },
             Qt::QueuedConnection);
     });

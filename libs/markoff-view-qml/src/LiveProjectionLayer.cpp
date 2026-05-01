@@ -67,7 +67,40 @@ quint64 LiveProjectionLayer::createBlockHole(BlockHole hole)
     if (m_model) {
         m_model->insertHoleRow(hole.id, hole.kind, hole.bufferText, hole.afterParsedRow);
     }
+    // Notify QML so it can route focus into the new delegate. viewRow == 0
+    // when afterParsedRow == -1 (empty-document case).
+    Q_EMIT holeCreated(hole.afterParsedRow + 1);
     return hole.id;
+}
+
+std::optional<BlockHole> LiveProjectionLayer::detachPendingHoleForReparse()
+{
+    if (!m_pendingHole.has_value()) return std::nullopt;
+    const BlockHole snapshot = *m_pendingHole;
+    m_pendingHole.reset();
+    if (m_model) {
+        m_model->removeHoleRow();
+    }
+    return snapshot;
+}
+
+void LiveProjectionLayer::reattachHoleAfterReparse(const BlockHole &snapshot)
+{
+    Q_ASSERT_X(!m_pendingHole.has_value(),
+               "LiveProjectionLayer::reattachHoleAfterReparse",
+               "reattach called while a hole is already pending");
+    m_pendingHole = snapshot;
+    if (m_model) {
+        m_model->insertHoleRow(snapshot.id, snapshot.kind,
+                               snapshot.bufferText, snapshot.afterParsedRow);
+    }
+}
+
+void LiveProjectionLayer::reattachHoleAfterReparseAbandon(const BlockHole &snapshot)
+{
+    // The model row was already removed by `detachPendingHoleForReparse`;
+    // we just emit the dropped notification so the view can route focus.
+    Q_EMIT holeDropped(snapshot.afterParsedRow + 1);
 }
 
 void LiveProjectionLayer::setBlockHoleBuffer(quint64 holeId, const QString &bufferText)

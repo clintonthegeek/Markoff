@@ -156,6 +156,14 @@ Item {
 
         // Buffer mirror: hole-row text changes flow back into the layer's
         // pending buffer. Cycle-guarded against model→delegate replays.
+        // No idle-commit: every commit destroys this delegate and incubates
+        // a new one (the now-real paragraph). If a commit fires mid-burst
+        // (idle 250ms is easy to hit between bursts of fast typing) the
+        // user's next keystroke arrives during the destroy/incubate window
+        // and lands on the wrong delegate — the v0 scramble race. v1
+        // commits ONLY on explicit user signals: focus-out, save, Esc,
+        // explicit Enter. A pause in typing keeps the buffer pending; save
+        // (T23) flushes it.
         onTextChanged: {
             if (!root.isHole || !root.projectionLayer) return
             if (root.m_applyingModelBuffer) return
@@ -163,8 +171,6 @@ Item {
                 root.holeId,
                 textEdit.getText(0, textEdit.length)
             )
-            // Restart idle-commit timer on every keystroke.
-            idleCommitTimer.restart()
         }
 
         InlineFormatHighlighter {
@@ -174,19 +180,6 @@ Item {
             blockIndex: root.blockIndex
         }
 
-    }
-
-    // Idle-commit timer for hole rows: 250ms after the last keystroke,
-    // commit the buffer to source.
-    Timer {
-        id: idleCommitTimer
-        interval: 250
-        repeat: false
-        onTriggered: {
-            if (!root.isHole || !root.projectionLayer) return
-            const buf = textEdit.getText(0, textEdit.length)
-            if (buf.length > 0) root.projectionLayer.commitBlockHole(root.holeId)
-        }
     }
 
     // IME finalization: when the layer is about to commit our hole, force
