@@ -10,12 +10,10 @@
 #include <markoff/view/qml/LiveListModelBinding.h>
 #include <markoff/view/qml/LiveSelectionView.h>
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 
 using namespace Markoff::View::Qml;
 using Markoff::MarkoffDocument;
-using Markoff::MarkoffEdit;
 
 namespace {
 
