@@ -40,7 +40,7 @@ Item {
         anchors.bottomMargin: searchBar.visible ? searchBar.implicitHeight : 0
         document: root.document
         theme: root.theme
-        focus: true
+        focus: root.mode === "source"
         visible: root.mode === "source"
         enabled: root.mode === "source"
     }
@@ -50,6 +50,7 @@ Item {
         anchors.bottomMargin: searchBar.visible ? searchBar.implicitHeight : 0
         editorBackend: sourceEditor.editorBackend
         theme: root.theme
+        focus: root.mode === "live"
         visible: root.mode === "live"
         enabled: root.mode === "live"
     }

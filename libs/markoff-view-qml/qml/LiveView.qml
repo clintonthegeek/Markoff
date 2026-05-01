@@ -183,6 +183,7 @@ Item {
         // docs/specs/2026-04-29-cross-block-selection-spike-findings.md §3.
         MouseArea {
             anchors.fill: parent
+            z: -1               // delegates sit above; they receive clicks first
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.IBeamCursor
             hoverEnabled: false
