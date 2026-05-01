@@ -891,18 +891,11 @@ private Q_SLOTS:
         QTRY_COMPARE(listView->property("count").toInt(), 1);
         QMetaObject::invokeMethod(listView, "forceLayout");
 
-        QQuickItem *para = listView->findChild<QQuickItem *>(
-            QString(), Qt::FindDirectChildrenOnly);
-        if (!para) QSKIP("Delegate not materialised");
-
-        QQuickItem *te = para->findChild<QQuickItem *>(QStringLiteral("textEdit"));
-        if (!te) {
-            // Walk all descendants
-            for (QQuickItem *c : para->findChildren<QQuickItem *>()) {
-                if (c->objectName() == QLatin1String("textEdit")) { te = c; break; }
-            }
+        QQuickItem *te = nullptr;
+        for (QQuickItem *c : root->findChildren<QQuickItem *>()) {
+            if (c->objectName() == QLatin1String("textEdit")) { te = c; break; }
         }
-        if (!te) QSKIP("textEdit not found in delegate");
+        if (!te) QSKIP("textEdit not found in delegate.");
 
         te->forceActiveFocus();
         QMetaObject::invokeMethod(te, "selectAll");
@@ -985,8 +978,7 @@ private Q_SLOTS:
         QTest::keyClick(&view, Qt::Key_Z, Qt::ControlModifier);
         QVERIFY(parseSpy.wait(2000));
         const QByteArray afterUndo = doc.toMarkdownUtf8();
-        QVERIFY2(!afterUndo.contains("xyz") || afterUndo == original,
-                 "Undo did not revert the edit");
+        QCOMPARE(afterUndo, original);
     }
 
     void mode_toggle_source_to_live_preserves_content() {
@@ -1031,11 +1023,13 @@ private Q_SLOTS:
 
         // Switch to live mode.
         root->setProperty("mode", QStringLiteral("live"));
-        QTest::qWait(100);
 
         // Live view should now show one paragraph block.
-        QQuickItem *listView = root->findChild<QQuickItem *>(QStringLiteral("listView"));
-        if (!listView) QSKIP("listView not found after mode toggle");
+        // Wait for listView to materialise, then for count to reach 1.
+        QQuickItem *listView = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((listView = root->findChild<QQuickItem *>(
+                                      QStringLiteral("listView"))) != nullptr, 2000);
+        if (!listView) QSKIP("listView not found after mode toggle.");
         QTRY_COMPARE_WITH_TIMEOUT(listView->property("count").toInt(), 1, 2000);
 
         // Content must still be there.
