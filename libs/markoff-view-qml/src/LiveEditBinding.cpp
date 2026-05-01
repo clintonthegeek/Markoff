@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/view/qml/LiveEditBinding.h>
 
-#include <algorithm>
-
 #include <QTextDocument>
 
 #include <markoff-foundation/MarkoffEdit.h>

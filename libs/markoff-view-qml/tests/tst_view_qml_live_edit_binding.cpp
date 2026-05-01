@@ -14,10 +14,8 @@
 #include <markoff-foundation/Origin.h>
 
 using Markoff::MarkoffDocument;
-using Markoff::MarkoffEdit;
 using Markoff::BlockAnchor;
 using Markoff::View::Qml::LiveEditBinding;
-using Markoff::View::Qml::EditorBackend;
 
 class TstViewQmlLiveEditBinding : public QObject {
     Q_OBJECT
