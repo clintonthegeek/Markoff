@@ -4,6 +4,8 @@
 
 #include <markoff-parser/Document.h>
 
+#include <algorithm>
+
 #include "MarkoffDocumentPrivate.h"
 #include "AnchorConversion.h"
 #include "BlockAnchorComputation.h"
@@ -294,6 +296,58 @@ TextAnchor MarkoffDocument::textAnchorAt(quint32 byteOffset, bool rightBias) con
 quint32 MarkoffDocument::resolveTextAnchor(const TextAnchor &t) const
 {
     return resolveAnchor(Detail::toCrdtAnchor(t));
+}
+
+std::optional<BlockAnchor> MarkoffDocument::blockAnchorAt(int blockIndex) const
+{
+    if (blockIndex < 0) return std::nullopt;
+    if (blockIndex >= d->latestBlockAnchors.size()) return std::nullopt;
+    return d->latestBlockAnchors.at(blockIndex);
+}
+
+std::optional<std::pair<quint32, quint32>>
+MarkoffDocument::blockByteRange(const BlockAnchor &b) const
+{
+    for (int i = 0; i < d->latestBlockAnchors.size(); ++i) {
+        if (d->latestBlockAnchors[i] == b) {
+            const auto &r = d->latestBlockRanges[i];
+            return std::make_pair(r.startByte, r.endByte);
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<BlockAnchor> MarkoffDocument::blockAt(const TextAnchor &t) const
+{
+    const quint32 byte = resolveTextAnchor(t);
+    for (int i = 0; i < d->latestBlockRanges.size(); ++i) {
+        const auto &r = d->latestBlockRanges[i];
+        if (byte >= r.startByte && byte < r.endByte) {
+            return d->latestBlockAnchors[i];
+        }
+    }
+    return std::nullopt;
+}
+
+int MarkoffDocument::offsetInBlock(const BlockAnchor &b, const TextAnchor &t) const
+{
+    const auto rng = blockByteRange(b);
+    if (!rng.has_value()) return 0;
+    const quint32 byte = resolveTextAnchor(t);
+    if (byte <= rng->first)  return 0;
+    if (byte >= rng->second) return static_cast<int>(rng->second - rng->first);
+    return static_cast<int>(byte - rng->first);
+}
+
+TextAnchor MarkoffDocument::textAnchorAt(const BlockAnchor &b,
+                                         int offset,
+                                         bool rightBias) const
+{
+    const auto rng = blockByteRange(b);
+    if (!rng.has_value()) return TextAnchor{};
+    const int clamped = std::max(0, std::min(offset,
+        static_cast<int>(rng->second - rng->first)));
+    return textAnchorAt(rng->first + static_cast<quint32>(clamped), rightBias);
 }
 
 Session *MarkoffDocument::createSession(const SessionParams &params)

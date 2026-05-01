@@ -9,6 +9,7 @@
 
 #include <memory>
 #include <optional>
+#include <utility>
 #include <vector>
 
 #include <crdt/Anchor.h>
@@ -104,6 +105,35 @@ public:
     /// Resolve a TextAnchor to its current byte offset. Companion to
     /// resolveAnchor(const Crdt::Anchor &).
     quint32 resolveTextAnchor(const TextAnchor &) const;
+
+    // ===== Block-aware queries =====
+    /// Returns the BlockAnchor for the top-level block at index `i` in
+    /// the most-recent parse. Out-of-range returns std::nullopt.
+    std::optional<BlockAnchor> blockAnchorAt(int blockIndex) const;
+
+    /// Returns the byte range [start, end) of the BlockAnchor's block in
+    /// the current parse. End is exclusive of any structural separator
+    /// to the next block (parser/scanner-reported AST node range).
+    std::optional<std::pair<quint32, quint32>>
+        blockByteRange(const BlockAnchor &) const;
+
+    /// Returns the BlockAnchor for the top-level block containing the
+    /// given TextAnchor's resolved byte position. Returns std::nullopt
+    /// if the resolved byte falls outside any top-level block (e.g.
+    /// inside an inter-block separator, before the first block, or
+    /// past the last block).
+    std::optional<BlockAnchor> blockAt(const TextAnchor &) const;
+
+    /// Returns the offset (in UTF-8 bytes) of the given TextAnchor's
+    /// resolved byte relative to the BlockAnchor's first byte. Clamps:
+    /// resolved-byte below block-start returns 0; resolved-byte past
+    /// block-end returns block byte length.
+    int offsetInBlock(const BlockAnchor &, const TextAnchor &) const;
+
+    /// Returns a TextAnchor at `offset` UTF-8 bytes from the
+    /// BlockAnchor's first-byte position. Block-local companion to
+    /// textAnchorAt(quint32, bool).
+    TextAnchor textAnchorAt(const BlockAnchor &, int offset, bool rightBias) const;
 
     // ===== Sessions (filled in Task 23) =====
     Session *createSession(const SessionParams &params = {});
