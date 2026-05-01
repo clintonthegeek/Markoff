@@ -117,6 +117,12 @@ target_link_libraries(tst_view_qml_live_projection_layer
     PRIVATE Qt6::Test markoff_view_qml)
 set_tests_properties(tst_view_qml_live_projection_layer PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_view_qml_live_paragraph_hole tst_view_qml_live_paragraph_hole.cpp)
+add_test(NAME tst_view_qml_live_paragraph_hole COMMAND tst_view_qml_live_paragraph_hole)
+target_link_libraries(tst_view_qml_live_paragraph_hole
+    PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml markoff_foundation)
+set_tests_properties(tst_view_qml_live_paragraph_hole PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_view_qml_live_ime tst_view_qml_live_ime.cpp)
 add_test(NAME tst_view_qml_live_ime COMMAND tst_view_qml_live_ime)
 target_link_libraries(tst_view_qml_live_ime

@@ -29,6 +29,10 @@ Item {
     // Used to position the cursor correctly after the delegate materialises.
     property int m_firstInsertLength: 0
 
+    // Stage 4 / T19: view row of a hole row that just received focus and
+    // is awaiting delegate materialisation.
+    property int m_pendingHoleFocusViewRow: -1
+
     Keys.onPressed: (event) => {
         if (listView.count !== 0) { event.accepted = false; return }
         const text = event.text
@@ -44,6 +48,25 @@ Item {
         id: structuralKeys
         document: root.editorBackend ? root.editorBackend.document : null
         model: binding.model
+        projectionLayer: binding.projectionLayer
+
+        onBlockHoleCreated: (holeId, viewRow) => {
+            // T19: route focus into the freshly-inserted hole row at qtPos 0.
+            // Mirror the empty-doc m_firstInsertPending pattern: defer twice
+            // so the delegate has time to materialise.
+            root.m_pendingHoleFocusViewRow = viewRow
+            Qt.callLater(function() {
+                Qt.callLater(function() {
+                    const item = listView.itemAtIndex(root.m_pendingHoleFocusViewRow)
+                    if (!item) return
+                    if (typeof item.focusAtPos === "function")
+                        item.focusAtPos(0)
+                    else if (typeof item.focusAtStart === "function")
+                        item.focusAtStart()
+                    root.m_pendingHoleFocusViewRow = -1
+                })
+            })
+        }
     }
 
     LiveSpeculativeFenceController {
@@ -124,6 +147,8 @@ Item {
                     structuralKeyHandler: structuralKeys
                     modelBinding: binding
                     fenceController: fenceCtrl
+                    isHole: model.isHole !== undefined ? model.isHole : false
+                    holeId: model.holeId !== undefined ? model.holeId : 0
                 }
             }
             DelegateChoice {
@@ -324,5 +349,17 @@ Item {
     Shortcut {
         sequence: StandardKey.Paste
         onActivated: clipboard.paste()
+    }
+
+    // Ctrl+Z: spec §6 case 1 — drop unreified holes first, then run CRDT undo.
+    Shortcut {
+        sequence: StandardKey.Undo
+        onActivated: {
+            if (binding.projectionLayer) {
+                binding.projectionLayer.undoWithHoles()
+            } else if (root.editorBackend) {
+                root.editorBackend.undo()
+            }
+        }
     }
 }

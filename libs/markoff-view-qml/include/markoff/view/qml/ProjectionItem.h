@@ -25,14 +25,37 @@ namespace Markoff::View::Qml {
 /// user reifies it (printable char), abandons it (focus-out, undo, idle), or
 /// a remote edit invalidates the anchor.
 struct BlockHole {
+    /// Stable id assigned by the layer at creation time. Producers may leave
+    /// this 0 — the layer rewrites it to a monotonic value.
+    quint64 id = 0;
+
     /// Where in source this hole projects from. Synthetic until reified —
     /// foundation translation APIs must refuse to translate synthetic
-    /// projection anchors (spec §5 invariant 13).
+    /// projection anchors (spec §5 invariant 13). For the v0 empty-paragraph
+    /// hole, `origin` is a default-constructed (zero-valued) BlockAnchor; the
+    /// `synthetic` flag below distinguishes it from any real anchor.
     Markoff::BlockAnchor origin;
+
+    /// True when `origin` is not yet bound to a real CRDT position. v0 holes
+    /// are always synthetic; reification produces a real edit that the next
+    /// parse turns into a confirmed block (no need to retroactively rebind
+    /// the hole — the hole is dropped at reify time).
+    bool synthetic = true;
 
     /// Semantic block kind this hole stands in for ("paragraph", "list_item",
     /// "heading", ...).
     QString kind;
+
+    /// Index of the parsed model row this hole follows. The interleaved view
+    /// row index is `afterParsedRow + 1` plus any earlier holes following the
+    /// same row. -1 means "before the first parsed row" (not used in v0).
+    int afterParsedRow = -1;
+
+    /// Source-byte offset where the paired edit (e.g. `\n\n`) lives. Used by
+    /// the reification path to position the inserted text correctly: the
+    /// reify edit lands at `reifyByteOffset`. Stored explicitly so the layer
+    /// does not need to re-resolve `origin` (which is synthetic).
+    quint32 reifyByteOffset = 0;
 
     /// If the hole was created paired with a real CRDT edit (e.g. the `\n\n`
     /// insert that paired with the empty-paragraph hole), this is the byte
