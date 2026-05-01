@@ -201,8 +201,7 @@ int LiveBlockModel::insertHole(quint64 holeId, int afterParsedRow, const QString
     // to the same parsed row (so newest holes appear last among siblings).
     int viewRow = afterParsedRow + 1;
     for (const HoleRow &existing : m_holes) {
-        if (existing.afterParsedRow < afterParsedRow) ++viewRow;
-        else if (existing.afterParsedRow == afterParsedRow) ++viewRow;
+        if (existing.afterParsedRow <= afterParsedRow) ++viewRow;
     }
 
     beginInsertRows(QModelIndex(), viewRow, viewRow);

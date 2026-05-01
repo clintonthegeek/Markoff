@@ -42,6 +42,32 @@ Item {
     property int m_pendingReifyFocusQtPos: 0
     property int m_reifyFocusExpectedCount: -1
 
+    /// Route focus to the delegate at `viewRow`, calling `focusAtPos(qtPos)`
+    /// when available (else `focusAtEnd` / `focusAtStart` per `useStart`).
+    /// Polls via Qt.callLater up to 10 times because under QQuickView (and
+    /// especially the offscreen platform) ListView's incubator can take
+    /// several event-loop ticks to materialise a freshly-inserted delegate;
+    /// `itemAtIndex` returns null until then. Bounded; silently gives up
+    /// if the delegate never appears (e.g. user scrolled it out of view).
+    function _routeFocusToRow(viewRow, qtPos, useStart) {
+        const tryRoute = function(attemptsLeft) {
+            const item = listView.itemAtIndex(viewRow)
+            if (item) {
+                if (typeof item.focusAtPos === "function")
+                    item.focusAtPos(qtPos)
+                else if (useStart && typeof item.focusAtStart === "function")
+                    item.focusAtStart()
+                else if (typeof item.focusAtEnd === "function")
+                    item.focusAtEnd()
+                return
+            }
+            if (attemptsLeft > 0) {
+                Qt.callLater(function() { tryRoute(attemptsLeft - 1) })
+            }
+        }
+        Qt.callLater(function() { tryRoute(10) })
+    }
+
     Keys.onPressed: (event) => {
         if (listView.count !== 0) { event.accepted = false; return }
         const text = event.text
@@ -61,26 +87,7 @@ Item {
 
         onBlockHoleCreated: (holeId, viewRow) => {
             // T19: route focus into the freshly-inserted hole row at qtPos 0.
-            // The delegate may not be materialised yet — schedule a retry loop
-            // via callLater that polls until itemAtIndex returns non-null.
-            // (Two-callLater pattern was insufficient under QQuickView in
-            // offscreen testing — the delegate sometimes materialises later.)
-            root.m_pendingHoleFocusViewRow = viewRow
-            const tryRoute = function(attemptsLeft) {
-                const item = listView.itemAtIndex(root.m_pendingHoleFocusViewRow)
-                if (item) {
-                    if (typeof item.focusAtPos === "function")
-                        item.focusAtPos(0)
-                    else if (typeof item.focusAtStart === "function")
-                        item.focusAtStart()
-                    root.m_pendingHoleFocusViewRow = -1
-                    return
-                }
-                if (attemptsLeft > 0) {
-                    Qt.callLater(function() { tryRoute(attemptsLeft - 1) })
-                }
-            }
-            Qt.callLater(function() { tryRoute(10) })
+            root._routeFocusToRow(viewRow, 0, /*useStart=*/true)
         }
     }
 
@@ -149,20 +156,7 @@ Item {
                 root.m_pendingReifyFocusViewRow = -1
                 root.m_pendingReifyFocusQtPos = 0
                 root.m_reifyFocusExpectedCount = -1
-                const tryRoute = function(attemptsLeft) {
-                    const item = listView.itemAtIndex(targetRow)
-                    if (item) {
-                        if (typeof item.focusAtPos === "function")
-                            item.focusAtPos(targetPos)
-                        else if (typeof item.focusAtEnd === "function")
-                            item.focusAtEnd()
-                        return
-                    }
-                    if (attemptsLeft > 0) {
-                        Qt.callLater(function() { tryRoute(attemptsLeft - 1) })
-                    }
-                }
-                Qt.callLater(function() { tryRoute(10) })
+                root._routeFocusToRow(targetRow, targetPos, /*useStart=*/false)
             }
             if (listView.count >= 1 && root.m_firstInsertPending) {
                 root.m_firstInsertPending = false

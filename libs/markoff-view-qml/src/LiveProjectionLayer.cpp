@@ -159,14 +159,10 @@ void LiveProjectionLayer::undoWithHoles()
 {
     // Spec §6 case 1: drop unreified holes first, then run the CRDT undo
     // (which rolls back the paired `\n\n` insert). One user-visible step.
-    const bool hadHole = !m_blockHoles.isEmpty();
     while (!m_blockHoles.isEmpty()) {
         dropBlockHole(m_blockHoles.first().id);
     }
-    if (hadHole && m_observedDocument) {
-        m_observedDocument->undo();
-    } else if (m_observedDocument) {
-        // No holes — normal undo.
+    if (m_observedDocument) {
         m_observedDocument->undo();
     }
 }
