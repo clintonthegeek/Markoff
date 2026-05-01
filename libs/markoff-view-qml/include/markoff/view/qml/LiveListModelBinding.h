@@ -5,7 +5,6 @@
 #include <memory>
 #include <qqmlintegration.h>
 
-#include <crdt/Anchor.h>
 #include <markoff-foundation/BlockAnchor.h>
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveBlockModel.h>

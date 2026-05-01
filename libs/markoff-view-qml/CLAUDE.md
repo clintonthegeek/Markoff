@@ -10,7 +10,7 @@ This library lives on branch `exploration/new-foundation` and is not yet part of
 - Markdown syntax highlighting via `KSyntaxHighlighting` (`KSyntaxHighlighter` attached to `TextArea.textDocument`).
 - CRDT-backed undo/redo (no QTextDocument-side undo stack — disabled by `SourceTextDocumentBinding`).
 - Cursor + selection lifted to `Session::primarySelection()` always. `EditorBackend.cursorAnchor` / `selectionAnchor` / `selectionActive` round-trip through the Session; they are never stored only as TextArea ints.
-- `parseUpdatedAt(parsed, atVersion)` signal relay for AST consumers. `atVersion` is the `MarkoffDocument::version()` at parse time so stale parses can be discarded.
+- `parseUpdatedAt(parsed, parseSequence, blockAnchors)` signal relay for AST consumers. `parseSequence` is a `quint64` local-monotonic counter from `MarkoffDocument::parseSequence()` so stale parses can be discarded; `blockAnchors` is a `QList<Markoff::BlockAnchor>` aligned to the parse's top-level blocks.
 - `copySelectionAsMarkdown()` Q_INVOKABLE (raw-markdown contract, not HTML).
 - In-place find bar via `SearchBackend` wrapping `SearchEngine`.
 - Emoji completion popup via `CompletionPopupModel` + `EmojiCompletionProvider`.
@@ -95,7 +95,7 @@ These are load-bearing. Breaking them re-introduces the legacy `markoff-live` fa
 
 6. **Bidirectional cycle guards on every cross-domain seam.** `m_applyingLocalEdit` (forward) + `m_applyingRemoteEdit` (reverse) on the QTextDocument bridge. `m_applyingSessionSelection` on the EditorBackend selection. `m_applyingBackendCursor` on the int↔anchor bridge. Setters check the flag before acting; receivers set/clear it around their own emits.
 
-7. **`parseUpdatedAt` is version-tagged.** Phase-2 consumers must compare the parse's `atVersion` against `MarkoffDocument::version()` before rendering. Stale parses must be discarded. `EditorBackend::parseUpdatedAt(parsed, atVersion)` carries the version; T0 in the POC plan added this tag to `MarkoffDocument::parseUpdated`.
+7. **`parseUpdatedAt` is parse-sequence-tagged.** Phase-2 consumers must compare the parse's `parseSequence` against `MarkoffDocument::parseSequence()` before rendering. Stale parses must be discarded. `EditorBackend::parseUpdatedAt(parsed, parseSequence, blockAnchors)` carries the local-monotonic counter and the per-top-level-block `QList<Markoff::BlockAnchor>`; the original tag was added in the POC plan and reshaped by the block-anchor-foundation work to drop `Crdt::Global` from the public surface and emit `BlockAnchor`s directly.
 
 ## Layer map
 
@@ -173,7 +173,7 @@ All tests use `QTEST_MAIN` (not `QTEST_APPLESS_MAIN`) — the QML engine and `QS
 
 - Properties: `document` (read/write), `session` (read-only, derived), `theme`, `cursorAnchor`, `selectionAnchor`, `selectionActive`.
 - Q_INVOKABLEs: `undo()`, `redo()`, `copySelectionAsMarkdown()`.
-- Signal: `parseUpdatedAt(QVariant parsed, quint64 atVersion)`.
+- Signal: `parseUpdatedAt(QVariant parsed, quint64 parseSequence, QList<Markoff::BlockAnchor> blockAnchors)`.
 
 **`SourceTextDocumentBinding`** — bridges QTextDocument to MarkoffDocument.
 
@@ -205,7 +205,7 @@ All tests use `QTEST_MAIN` (not `QTEST_APPLESS_MAIN`) — the QML engine and `QS
 - `// SPDX-License-Identifier: GPL-3.0-or-later` on every file.
 - C++ namespace: `Markoff::View::Qml` for types in this library.
 - Test prefix `tst_view_qml_*`.
-- `Q_DECLARE_METATYPE(CollabText::Crdt::Anchor)` is at file scope in `EditorBackend.h` — first place the metatype was needed; do not duplicate it.
+- `Q_DECLARE_METATYPE(Markoff::TextAnchor)` is at file scope in `EditorBackend.h` — first place the metatype was needed; do not duplicate it. (Retyped from `CollabText::Crdt::Anchor` in the block-anchor-foundation work — view-layer surfaces no longer mention `Crdt::*`.) `Q_DECLARE_METATYPE(QList<Markoff::BlockAnchor>)` is also at file scope in `EditorBackend.h` (added so the new `parseUpdatedAt` 3-arg signal can ship `blockAnchors` through `QSignalSpy` / `QMetaObject::invokeMethod`).
 - Commit subjects are bare (no `Co-Authored-By` trailer) — matches the style of the foundation work on this branch.
 
 ## Known limitations / deferred
