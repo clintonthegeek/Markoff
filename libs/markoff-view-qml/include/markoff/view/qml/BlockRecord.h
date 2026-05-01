@@ -24,11 +24,19 @@ struct BlockRecord {
     QString codeLanguage;       ///< Fence info-string if kind==CodeBlock
     QString codeText;           ///< Body without fences if kind==CodeBlock
 
+    /// CRDT-stable identity for the block's first byte. Populated by
+    /// LiveListModelBinding after BlockWalker::walk so LiveEditBinding can
+    /// translate block-relative TextEdit positions to document-global byte
+    /// offsets without a separate lookup. Default-constructed anchor is
+    /// sentinel (invalid) and LiveEditBinding bails if it resolves to nothing.
+    Markoff::BlockAnchor blockAnchor;
+
     bool operator==(const BlockRecord &o) const noexcept {
         return kind == o.kind && source == o.source && text == o.text
             && headingLevel == o.headingLevel
             && imageSrc == o.imageSrc && imageAlt == o.imageAlt && imageTitle == o.imageTitle
-            && codeLanguage == o.codeLanguage && codeText == o.codeText;
+            && codeLanguage == o.codeLanguage && codeText == o.codeText
+            && blockAnchor == o.blockAnchor;
     }
     bool operator!=(const BlockRecord &o) const noexcept { return !(*this == o); }
 };

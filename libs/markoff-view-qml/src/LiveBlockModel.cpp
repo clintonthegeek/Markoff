@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/view/qml/LiveBlockModel.h>
 
+#include <markoff-foundation/BlockAnchor.h>
+
 namespace Markoff::View::Qml {
 
 LiveBlockModel::LiveBlockModel(QObject *parent) : QAbstractListModel(parent) {}
@@ -23,6 +25,7 @@ QHash<int, QByteArray> LiveBlockModel::roleNames() const
         { ImageTitleRole,   "imageTitle" },
         { CodeLanguageRole, "codeLanguage" },
         { CodeTextRole,     "codeText" },
+        { BlockAnchorRole,  "blockAnchor" },
     };
 }
 
@@ -49,6 +52,7 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
         case ImageTitleRole:   return r.imageTitle;
         case CodeLanguageRole: return r.codeLanguage;
         case CodeTextRole:     return r.codeText;
+        case BlockAnchorRole:  return QVariant::fromValue(r.blockAnchor);
         default:               return {};
     }
 }

@@ -10,6 +10,8 @@ Item {
     property int    blockIndex: -1
     property string blockText: ""
     property int    headingLevel: 0
+    property var    blockAnchor   // Markoff::BlockAnchor
+    property var    document: null  // Markoff::MarkoffDocument *
     property var    selectionModel: null
     property var    theme: null
 
@@ -20,13 +22,19 @@ Item {
     function positionAt(x, y) { return textEdit.positionAt(x, y) }
     readonly property int textLength: textEdit.length
 
+    LiveEditBinding {
+        id: editBinding
+        document: root.document
+        blockAnchor: root.blockAnchor !== undefined ? root.blockAnchor : editBinding.blockAnchor
+        textDocument: textEdit.textDocument
+    }
+
     TextEdit {
         id: textEdit
         anchors.left: parent.left
         anchors.right: parent.right
-        text: root.blockText
         textFormat: TextEdit.PlainText
-        readOnly: true
+        readOnly: false
         selectByMouse: false
         wrapMode: TextEdit.Wrap
         font.pixelSize: {
@@ -46,6 +54,14 @@ Item {
             document: textEdit.textDocument
             source: root.blockText
         }
+    }
+
+    // Model-driven text updates go through the cycle guard so that
+    // contentsChange fired by the text assignment is suppressed.
+    onBlockTextChanged: {
+        editBinding.beginModelUpdate()
+        textEdit.text = root.blockText
+        editBinding.endModelUpdate()
     }
 
     Connections {

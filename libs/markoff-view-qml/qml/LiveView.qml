@@ -55,6 +55,8 @@ Item {
                 ParagraphDelegate {
                     blockIndex: index
                     blockText: model.text
+                    blockAnchor: model.blockAnchor
+                    document: root.editorBackend ? root.editorBackend.document : null
                     selectionModel: binding.selectionModel
                     theme: root.theme
                 }
@@ -65,6 +67,8 @@ Item {
                     blockIndex: index
                     blockText: model.text
                     headingLevel: model.headingLevel
+                    blockAnchor: model.blockAnchor
+                    document: root.editorBackend ? root.editorBackend.document : null
                     selectionModel: binding.selectionModel
                     theme: root.theme
                 }
@@ -94,6 +98,8 @@ Item {
                     blockIndex: index
                     codeLanguage: model.codeLanguage
                     codeText: model.codeText
+                    blockAnchor: model.blockAnchor
+                    document: root.editorBackend ? root.editorBackend.document : null
                     selectionModel: binding.selectionModel
                     theme: root.theme
                 }

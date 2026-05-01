@@ -80,3 +80,9 @@ add_executable(tst_view_qml_inline_format_highlighter tst_view_qml_inline_format
 add_test(NAME tst_view_qml_inline_format_highlighter COMMAND tst_view_qml_inline_format_highlighter)
 target_link_libraries(tst_view_qml_inline_format_highlighter PRIVATE Qt6::Test markoff_view_qml)
 set_tests_properties(tst_view_qml_inline_format_highlighter PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_view_qml_live_edit_binding tst_view_qml_live_edit_binding.cpp)
+add_test(NAME tst_view_qml_live_edit_binding COMMAND tst_view_qml_live_edit_binding)
+target_link_libraries(tst_view_qml_live_edit_binding
+    PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml markoff_foundation)
+set_tests_properties(tst_view_qml_live_edit_binding PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

@@ -26,7 +26,8 @@ public:
         ImageAltRole,
         ImageTitleRole,
         CodeLanguageRole,
-        CodeTextRole
+        CodeTextRole,
+        BlockAnchorRole
     };
 
     explicit LiveBlockModel(QObject *parent = nullptr);

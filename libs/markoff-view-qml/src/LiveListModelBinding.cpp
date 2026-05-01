@@ -127,6 +127,7 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
                 for (qsizetype i = 0; i < records.size(); ++i) {
                     const Markoff::BlockAnchor anchor =
                         (i < anchors.size()) ? anchors[i] : Markoff::BlockAnchor{};
+                    records[i].blockAnchor = anchor;
                     nextKeys.append(BlockKey { records[i].kind, anchor });
                 }
 
