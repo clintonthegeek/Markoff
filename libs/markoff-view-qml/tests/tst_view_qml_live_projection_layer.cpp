@@ -37,8 +37,8 @@ private Q_SLOTS:
 
         InlinePrediction p;
         p.row = 3;
-        p.byteStart = 0;
-        p.byteEnd = 4;
+        p.charStart = 0;
+        p.charEnd = 4;
         QTextCharFormat fmt;
         fmt.setFontWeight(QFont::Bold);
         p.format = fmt;
@@ -48,8 +48,8 @@ private Q_SLOTS:
         const auto out = layer.predictionsForRow(3);
         QCOMPARE(out.size(), 1);
         QCOMPARE(out.first().row, 3);
-        QCOMPARE(out.first().byteStart, 0);
-        QCOMPARE(out.first().byteEnd, 4);
+        QCOMPARE(out.first().charStart, 0);
+        QCOMPARE(out.first().charEnd, 4);
         QCOMPARE(out.first().format.fontWeight(), int(QFont::Bold));
 
         // Other rows return empty.
@@ -58,8 +58,8 @@ private Q_SLOTS:
 
         // Multiple predictions on the same row accumulate.
         InlinePrediction q = p;
-        q.byteStart = 6;
-        q.byteEnd = 10;
+        q.charStart = 6;
+        q.charEnd = 10;
         layer.createInlinePrediction(q);
         QCOMPARE(layer.predictionsForRow(3).size(), 2);
         QCOMPARE(layer.inlinePredictionCount(), 2);
@@ -139,8 +139,8 @@ private Q_SLOTS:
         // return.
         InlinePrediction p;
         p.row = 0;
-        p.byteStart = 0;
-        p.byteEnd = 1;
+        p.charStart = 0;
+        p.charEnd = 1;
         layer.createInlinePrediction(p);
 
         BlockHole hole;

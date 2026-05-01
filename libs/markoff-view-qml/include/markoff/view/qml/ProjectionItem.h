@@ -61,11 +61,9 @@ struct InlinePrediction {
     int row = -1;
 
     /// Range inside the row's text (UTF-16 character offsets, [start, end)).
-    /// These match `QSyntaxHighlighter::setFormat` arguments directly. The
-    /// field name "byte" is historical; v0 consumers (the inline highlighter)
-    /// work in UTF-16 because that is the unit `QTextDocument` exposes.
-    int byteStart = 0;
-    int byteEnd = 0;
+    /// These match `QSyntaxHighlighter::setFormat` arguments directly.
+    int charStart = 0;
+    int charEnd = 0;
 
     /// Format to apply. Highlighter consumers paint this on top of plain
     /// text in `formatBlock`.

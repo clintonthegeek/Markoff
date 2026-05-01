@@ -180,8 +180,8 @@ void InlineFormatHighlighter::publishInlinePredictions(const QString &source)
 
         InlinePrediction pred;
         pred.row       = m_blockIndex;
-        pred.byteStart = contentStart;
-        pred.byteEnd   = len;
+        pred.charStart = contentStart;
+        pred.charEnd   = len;
         pred.format    = fmt;
 
         m_fallbackPredictions.append(pred);
@@ -211,8 +211,8 @@ void InlineFormatHighlighter::highlightBlock(const QString &text)
     // uses the internal `m_fallbackPredictions` list — same data, same
     // shape.
     for (const InlinePrediction &p : currentPredictions()) {
-        const int start  = p.byteStart;
-        const int length = p.byteEnd - p.byteStart;
+        const int start  = p.charStart;
+        const int length = p.charEnd - p.charStart;
         if (length > 0) setFormat(start, length, p.format);
     }
 
