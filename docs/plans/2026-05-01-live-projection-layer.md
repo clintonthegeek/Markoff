@@ -2,9 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **Order matters: refactor first, extend second.** Stages 1–3 are pure restructure with no behavior change — every existing test must remain green. Only after the layer's shape has soaked does Stage 4 add the empty-paragraph hole. Resist the temptation to land the hole alongside the refactor; the design pressure of restructuring will reshape the layer's API and you want to absorb that before introducing a new concept.
+> **Status (2026-05-01).** Stages 1-3 + the prep rename **shipped** at branch tip (`b07b07c`). Stages 4 v0 + 5 were attempted, the empty-paragraph hole failed dogfood with five distinct failure modes (spec §3.6), and the work was reverted at `cfbc30f`. Stage 4 v1 (IME-preedit redesign) and v1 of Stage 5 are below, **deferred to a fresh session**. Read the handoff brief at `docs/handoff/2026-05-01-projection-layer-stage4-redesign-SESSION-BRIEF.md` before starting.
 
-**Goal:** Land the `LiveProjectionLayer` per `docs/specs/2026-05-01-live-projection-layer.md`. Two existing speculations (`InlineFormatHighlighter`, `LiveSpeculativeFenceController`) move behind it without behavior change. One new citizen — the empty-paragraph hole — fixes the user-reported "Enter does nothing at end of paragraph" bug.
+> **Order matters: refactor first, extend second.** Stages 1–3 are pure restructure with no behavior change. Stage 4 v1 introduces the first hole, only after the layer's shape has soaked. Resist the temptation to ship Stage 4 v1 alongside any other refactor; treat it as its own focused change.
+
+**Goal:** Land the `LiveProjectionLayer` per `docs/specs/2026-05-01-live-projection-layer.md`. Two existing speculations (`InlineFormatHighlighter`, `LiveSpeculativeFenceController`) move behind it without behavior change (Stages 1-3, **done**). One new citizen — the empty-paragraph hole — fixes the user-reported "Enter does nothing at end of paragraph" bug (Stage 4 v1, **deferred**).
 
 **Architecture:** A single C++ class (`LiveProjectionLayer`) sits between `EditorBackend`/`MarkoffDocument` (authority) and `LiveBlockModel` (view-binding). It owns two item kinds (Predictions, Holes) under a shared reconciliation protocol. Public API of `LiveBlockModel`, `EditorBackend`, `Session`, and all QML components is unchanged. Inline-prediction painting and block-kind speculation continue to work; the empty-paragraph hole is added as the layer's first hole consumer.
 
@@ -95,32 +97,62 @@ Same shape as Stage 2 but for inline predictions.
 - [ ] **T15** Run `tst_view_qml_inline_format_highlighter`. **Verification gate:** all assertions pass unchanged.
 - [ ] **T16** Run full ctest. **Verification gate:** 78/78 (or current count) green. The layer now owns both prediction kinds with no behavior change.
 
-## Stage 4 — Empty-paragraph hole (the new behavior)
+## Stage 4 (v0) — REVERTED
 
-Now the additive work. With the layer's shape settled, holes are mostly bookkeeping.
+The original Stage 4 (T17-T25) implemented a "reify-on-first-keystroke" pattern that wrote `\n\n` to source at hole-creation time and reified each hole on first printable keystroke via a separate `applyLocalEdit`. Five failure modes surfaced during dogfood (spec §3.6). Reverted at commit `cfbc30f`.
 
-- [ ] **T17** Add `LiveBlockModel::interleaveHoles` (or analogous mechanism): the model accepts a list of hole rows from the layer and emits them interleaved with parsed blocks. Anchor sort keeps order stable. Hole rows expose the same roles (`kind`, `text`, `blockAnchor`) — `text` is empty, `blockAnchor` is the synthetic-anchor sentinel.
-- [ ] **T18** Add a hole-creation hook to `LiveStructuralKeyHandler::tryHandle`: when Enter at `qtPos == blockText.length()` AND the block is the last in the document (or the block following has zero parser visibility), insert `\n\n` as today AND call `layer->createBlockHole(BlockHole{kind="paragraph", origin=currentBlockEnd+2})`.
-- [ ] **T19** Wire focus routing for newly-created holes: after the next parse arrives, `LiveListModelBinding` (or `LiveView.qml`) detects the new hole row and routes focus into its delegate at `cursorPosition: 0`. Mirror the existing `m_firstInsertPending` / `Qt.callLater` chain in `LiveView.qml`.
-- [ ] **T20** Reification path: `ParagraphDelegate` (or `LiveEditBinding`) detects "first printable character into a hole-backed row" and routes the keystroke through `LiveProjectionLayer::reify(holeId, text)`. The layer builds the canonical `MarkoffEdit`, calls `applyLocalEdit`, and drops the hole. Next parse produces the real block at the same model index.
-- [ ] **T21** Abandonment: layer subscribes to focus changes. Focus leaves a hole-row delegate → drop the hole. Idle timer (30s, hard-coded for v0) → drop the hole.
-- [ ] **T22** Backspace inside an empty hole at qtPos 0: drop the hole, route focus back to the previous row's end. No CRDT edit.
-- [ ] **T23** Undo coalescing: when a hole is created paired with a real CRDT edit (`\n\n` insert), register the pairing on the hole. Ctrl+Z while the hole is unreified drops the hole AND triggers the CRDT undo for the paired edit, in one user-visible step.
-- [ ] **T24** Create `tests/tst_view_qml_live_paragraph_hole.cpp`:
-    - End-of-doc Enter creates a hole; `listView.count` becomes 2; focus lands in the new row at cursor 0.
-    - First printable character reifies; `listView.count` stays 2 (hole replaced by real block at same index); doc source contains the typed character.
-    - Focus-out abandons; `listView.count` returns to 1; doc source contains trailing `\n\n` only.
-    - Backspace inside empty hole at qtPos 0 drops the hole and routes focus to previous row.
-    - Ctrl+Z inside unreified hole drops the hole and the paired `\n\n` edit; doc source returns to pre-Enter state.
-    - Mid-block Enter still works (regression check on the existing path).
-- [ ] **T25** Run full ctest. **Verification gate:** all prior tests green; new paragraph-hole tests green.
+**Do not re-attempt the v0 pattern.** The v1 plan below replaces it.
 
-## Stage 5 — Dogfood and documentation
+## Stage 4 (v1) — Empty-paragraph hole (IME-preedit pattern, deferred)
 
-- [ ] **T26** Manual-test the demo app: `cmake --build build-dev --target markoff-view-qml-app -j 8` and exercise Enter at end of file, Enter on blank line, Enter then immediately Ctrl+Z, Enter then click elsewhere, Enter twice in a row. Verify each matches spec §3.3 / §6 / §9.
-- [ ] **T27** Update `libs/markoff-view-qml/CLAUDE.md`: add a "Projection layer" section noting (a) the layer exists, (b) new speculations and holes go through it, (c) invariants 11–16 from the spec.
-- [ ] **T28** Mention in the spec frontmatter: status flips from `draft` to `implemented (v0)`. Cross-reference this plan from the spec.
-- [ ] **T29** Run the slow tail: `tst_realistic` and `tst_benchmark` once to confirm no perf regressions from the extra layer.
+Per spec §3.2-§3.5. The hole's delegate is a real local-typing surface; commits are debounced and atomic; navigation is non-destructive.
+
+- [ ] **T17** `BlockHole` value type: `{ id: quint64, kind: QString, reifyOffset: quint32, bufferText: QString, afterParsedRow: int }`. Drop `pairedSourceEditByteCount` (no paired source edit in v1). Drop `synthetic` flag (the bufferText / reifyOffset distinction is enough).
+- [ ] **T18** `LiveBlockModel::interleaveHoles`: accept a list of hole rows from the layer and interleave with parsed blocks. Hole rows expose `kind = "paragraph"`, `text = bufferText` (live, mutates as user types), `IsHoleRole = true`, `HoleIdRole = id`. The `text` role is the buffer's current contents — the delegate's TextEdit binds to this and stays in sync via the binding's contentsChange path.
+- [ ] **T19** `LiveProjectionLayer` v1 API:
+    - `createBlockHole(hole)` returns id; pure view-state add, **no source edit**.
+    - `setBlockHoleBuffer(holeId, text)` updates buffer; emits `bufferChanged(holeId)` for the model row to update.
+    - `commitBlockHole(holeId)` builds `MarkoffEdit("\n\n" + bufferText)` at `reifyOffset`, calls `applyLocalEdit`, drops the hole, schedules `holeReified(viewRow, qtPos)` to fire on the next `parseUpdated`.
+    - `dropBlockHole(holeId)` abandons; no source mutation; emits `holeDropped(viewRow)` so the view can route focus to the nearest neighbor.
+    - `commitAllPendingHoles()` for the save path.
+- [ ] **T20** `LiveStructuralKeyHandler::tryHandle` for Enter at EOB: only `createBlockHole(...)`, no `applyLocalEdit`. Stacked-Enter coalesce: if a hole already exists at this `afterParsedRow`, no-op (hole stays, second Enter does nothing because there's nothing to commit).
+- [ ] **T21** `ParagraphDelegate.qml` hole-row binding:
+    - `isHole === true`: TextEdit accepts keys normally (no special routing on first keystroke).
+    - `onTextChanged` (or via binding) calls `layer.setBlockHoleBuffer(holeId, currentText)`.
+    - Idle commit: a `Timer` with `interval: 250`, `repeat: false`, restarted on each text change; on triggered, calls `layer.commitBlockHole(holeId)` if buffer non-empty.
+    - Focus-out commit: `onActiveFocusChanged: if (!activeFocus && bufferText.length > 0) layer.commitBlockHole(holeId)`.
+    - Focus-out abandon: `if (!activeFocus && bufferText.length === 0) layer.dropBlockHole(holeId)`.
+    - Esc key abandons regardless.
+    - Backspace at qtPos 0 with empty buffer: `layer.dropBlockHole(holeId)` and route focus to previous block's end.
+    - Arrow keys at edges: let TextEdit's default behavior fire (focus may move to neighbor delegate via QML focus chain); the `onActiveFocusChanged` handler picks up commit/abandon.
+- [ ] **T22** `LiveView.qml` focus routing on commit:
+    - Connect to `layer.holeReified(viewRow, qtPos)`, queued on next `parseUpdated`.
+    - When fired, `_routeFocusToRow(viewRow, qtPos, useStart=false)` — but the bounded retry loop is now justified for "wait for delegate to materialise after parse" only, not "wait for delegate that's racing with focus loss."
+    - Confirm: this single focus-routing is the only user-visible delegate destruction during the typing flow. Stress-typing into the hole no longer crosses a destroy boundary because the hole's delegate stays alive throughout typing.
+- [ ] **T23** Save flush: in `app/main.cpp` (or wherever Ctrl+S is handled), call `binding.projectionLayer.commitAllPendingHoles()` before invoking the document save. Add a test that creates a hole, types into it, Ctrl+S, exits the app, reopens — verify the file contains the typed text.
+- [ ] **T24** Tests:
+    - `tst_view_qml_live_paragraph_hole.cpp` (unit, direct surfaces):
+      - End-of-doc Enter creates a hole; doc source unchanged; row count goes 1 → 2; buffer empty.
+      - `setBlockHoleBuffer(id, "abc")` updates buffer; doc source still unchanged.
+      - `commitBlockHole(id)` performs one `applyLocalEdit("\n\nabc")`; row count drops then climbs as parse arrives; final source is `Hello\n\nabc`.
+      - `dropBlockHole(id)` with empty buffer: row count goes 2 → 1; doc source unchanged.
+      - `dropBlockHole(id)` with non-empty buffer (abandon path): doc source unchanged; user's typed text is lost (acceptable; documented behavior — the abandon path is for empty buffers).
+      - Stacked Enter on existing hole: no-op (hole stays, no second hole created, doc source still unchanged).
+    - `tst_view_qml_live_paragraph_hole_integration.cpp` (QQuickView integration, slow):
+      - **Stress-typing test** (load-bearing for v1): seed `"Hello"`, drive `Key_End` then `Key_Return`, then a sequence of `keyClick(Key_T)`, `keyClick(Key_H)`, `keyClick(Key_I)`, ..., with `QTest::qWait(20)` between each (approximating real keystroke timing). Drive `processEvents()` between each pair. Wait for idle commit (qWait 300+). Assert final source equals `"Hello\n\nthis is interesting"` exactly — character order preserved.
+      - Arrow-key navigation test: create hole, type "abc", press Down arrow. Buffer commits; focus moves to wherever Down goes; doc source includes "abc".
+      - Backspace-in-empty-hole test: create hole, immediately Backspace. Hole drops; focus returns to previous block's end; doc source unchanged.
+      - Save-while-pending test: create hole, type "X", trigger save (programmatic), verify file contains `"Hello\n\nX"`.
+      - Esc abandons test: create hole, type "X", press Esc. Hole drops; doc source unchanged. (User loses preedit; acceptable abandonment.)
+      - Mid-block Enter regression: existing behavior unchanged.
+- [ ] **T25** Run full ctest. **Verification gate:** all prior tests green; new paragraph-hole tests green; specifically the stress-typing test must produce in-order source bytes.
+
+## Stage 5 (v1) — Dogfood and documentation
+
+- [ ] **T26** Manual-test the demo app on the v1 implementation: exercise Enter at end of file, type fast, navigate with arrow keys, save, click elsewhere, Esc, double-Enter. Confirm none of the v0 failure modes recur. Verify against spec §3.3 / §3.6 / §6 / §9.
+- [ ] **T27** Update `libs/markoff-view-qml/CLAUDE.md`'s "Projection layer" section: add the v1 hole semantics (preedit buffer, commit triggers, abandon triggers); flip the old hole description if it remains.
+- [ ] **T28** Spec frontmatter: flip status from "Stage 4 deferred" to "Stage 4 v1 implemented." Update landing-commits list. Mark spec §9 open questions resolved-or-deferred per dogfood findings.
+- [ ] **T29** Run the slow tail: `tst_realistic` and `tst_benchmark` once to confirm no perf regressions.
 
 ---
 
@@ -138,19 +170,25 @@ Final gate: full `ctest --test-dir build-dev -j 8 -E 'tst_realistic|tst_benchmar
 
 ---
 
-## Risks and mitigations
+## Risks and mitigations (v1)
 
-- **Risk:** The refactor (Stages 2–3) changes `InlineFormatHighlighter` painting timing in ways tests don't cover, manifesting as visible flicker only.
-  **Mitigation:** After Stage 3, manually scroll a long file in the demo app and watch for inline-formatting flicker on speculative bold/italic. If present, profile the layer's reconcile path and tighten its synchronous-call discipline (invariant 15).
+- **Risk:** The 250ms idle-debounce is wrong (too short → distracting parse round-trips, jittery delegate swap during a typing burst; too long → user saves and loses content).
+  **Mitigation:** Save path commits unconditionally first (T23) so save can never lose content. Adjust 250ms based on dogfood feedback in §9.
 
-- **Risk:** Hole reification races the next parse, producing a duplicate row briefly.
-  **Mitigation:** The reification path drops the hole *before* `applyLocalEdit` returns; the next parse arrives later. Confirm in T24 with a `QTRY_COMPARE` on `listView.count` immediately post-reification — must be 2, not 3.
+- **Risk:** The buffer-mirror path (TextEdit text → `setBlockHoleBuffer`) introduces a feedback loop if the model's `text` role push-back drives further `onTextChanged` events.
+  **Mitigation:** Cycle-guard mirroring `LiveEditBinding`'s `m_applyingModelUpdate` pattern. The hole's binding flags model-driven updates so `onTextChanged` ignores them.
 
-- **Risk:** Undo of an Enter that created a hole leaves orphan view state if the pairing isn't tracked.
-  **Mitigation:** T23 explicitly tests this path; the pairing field on `BlockHole` is the mechanism.
+- **Risk:** Commit-on-focus-out fires before the user's `onActiveFocusChanged` handler runs (Qt focus order quirk), causing the buffer to be lost during normal navigation.
+  **Mitigation:** Test T24's "arrow-key navigation test" asserts final source contains the typed buffer; if it fails, switch to a `Connections` on the parent ListView's focus item changes, which fire before the delegate's `activeFocus` flips.
 
-- **Risk:** The 30s idle-abandonment threshold is wrong (too short → user thinks it's flaky; too long → save-with-stale-hole confusion).
-  **Mitigation:** v0 hard-codes 30s and we revisit after a week of dogfooding (spec §9). If needed, the threshold can become per-hole-kind in a follow-on spec.
+- **Risk:** Qt's `QQuickTextDocument` synchronously emits `contentsChange` for the very first keystroke into a freshly-bound TextEdit, before the binding has a chance to install its cycle guard. The buffer ends up double-applied.
+  **Mitigation:** The hole's binding initializes with `bufferText` already set in the model role; the first user keystroke produces a `contentsChange(0, 0, 1)` that the binding interprets as a normal append, not as a model-driven full-replace. Verify in T24 unit tests.
+
+- **Risk:** The stress-typing test passes locally but real users still see scrambled letters.
+  **Mitigation:** The stress test uses `qWait(20)` per keystroke + `processEvents()` between, mimicking real keyboard timing. v0's failure was that `keyClick` events landed within a single event-loop spin, masking the race. If v1's stress test still doesn't reproduce a real user's experience, the test isn't strict enough; iterate.
+
+- **Risk:** Commit-on-focus-out leaves a brief visual flicker when the new delegate replaces the hole (delegate destroyed → parse round-trip → new delegate materialises).
+  **Mitigation:** The hole's delegate visually displays the buffered text already; the new real delegate displays the same text from source. Visually identical content; the swap is cosmetically silent unless layout differs (e.g. the real paragraph adopts a different style). Acceptable for v1; refine in v2 if dogfood objects.
 
 - **Risk:** Anchor invalidation under collaborative edits drops a hole the user is actively typing into.
   **Mitigation:** Out of scope for v0; collab-edit hole-invalidation lands in a follow-on. v0 single-user dogfood doesn't exercise this.

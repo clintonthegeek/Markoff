@@ -3,16 +3,20 @@
 **Date:** 2026-05-01
 **Branch:** `exploration/new-foundation`
 **Phase:** Phase-2 follow-on inside `markoff-view-qml`. Builds on the live-editing design (`docs/specs/2026-04-30-live-editing-design.md`) and the walking skeleton (`docs/specs/2026-04-29-live-render-design.md`).
-**Status:** implemented (v0). Plan: [`docs/plans/2026-05-01-live-projection-layer.md`](../plans/2026-05-01-live-projection-layer.md). Landed in commits `19094bb` (skeleton) → `ef62f57` (fence refactor) → `3e1c437` (inline highlighter refactor) → `b07b07c` + `a463bca` + `ef0433b` (empty-paragraph hole) → `030d581` (cleanup).
+**Status:** **partially shipped — Stages 1-3 (the layer infrastructure + refactors) implemented; Stage 4 (empty-paragraph hole) reverted, redesigned, and deferred to a fresh session.** Plan: [`docs/plans/2026-05-01-live-projection-layer.md`](../plans/2026-05-01-live-projection-layer.md). Handoff brief: [`docs/handoff/2026-05-01-projection-layer-stage4-redesign-SESSION-BRIEF.md`](../handoff/2026-05-01-projection-layer-stage4-redesign-SESSION-BRIEF.md). Stages 1-3 landed in commits `19094bb` (skeleton) → `ef62f57` (fence refactor) → `3e1c437` (inline highlighter refactor) → `b07b07c` (`InlinePrediction` `byte→char` rename). Stage 4 v0 (`a463bca` + `ef0433b` + `030d581`) was reverted at `cfbc30f` after dogfood surfaced five distinct failure modes (see §3.6 below).
 **Depends on:** `markoff-foundation` BlockAnchor/TextAnchor APIs (already shipped); `LiveBlockModel`, `LiveListModelBinding`, `InlineFormatHighlighter`, `LiveSpeculativeFenceController` (already shipped).
 
 ## 0. TL;DR
 
 The editing model is a *superset* of the source model. The projection downward to source is *lossy by design*. Today that gap is filled by two ad-hoc speculations (`InlineFormatHighlighter` for open inline delimiters, `LiveSpeculativeFenceController` for unclosed fences) plus a *missing third citizen* — **holes** — for user intent that the markdown source language cannot represent yet.
 
-This spec promotes "view-state ahead of source" to a first-class architectural layer: the `LiveProjectionLayer`. It absorbs the two existing speculations and introduces holes as siblings under one shared protocol. Holes solve the user-visible bug where pressing Enter at end of a paragraph appears to do nothing — the resulting `\n\n` lands in the source rope but the parser produces no second block, so the view shrugs and the user's intent evaporates.
+This spec promotes "view-state ahead of source" to a first-class architectural layer: the `LiveProjectionLayer`. It absorbs the two existing speculations (Stages 1-3, **shipped**) and proposes holes as siblings under one shared protocol (Stage 4, **deferred** after a failed v0 attempt; see §3.6). The motivating user bug — pressing Enter at end of a paragraph appears to do nothing in the live editor — remains open at the tip of this branch.
 
-**v0 scope:** the projection layer abstraction, the refactor of `InlineFormatHighlighter` and `LiveSpeculativeFenceController` behind it (no behavior change), and a single new hole — *empty paragraph after Enter*. **Explicitly out:** the rest of the hole inventory (list items, checklists, code-fence interior, blockquote, callout, table cells, links, wikilinks, footnotes, math); collaborative-edit hole invalidation beyond the simple "anchor deleted → drop" case; configurable abandonment timeouts.
+**Shipped scope (Stages 1-3):** the projection-layer abstraction; the refactors of `InlineFormatHighlighter` and `LiveSpeculativeFenceController` behind it with no behavior change. The architecture is named, and predictions cohabit cleanly.
+
+**Deferred scope (Stage 4 v1):** the empty-paragraph hole, redesigned around an IME-preedit pattern after the v0 reify-on-first-keystroke design failed dogfood (§3.6). The redesign is in §3.1-§3.5.
+
+**Explicitly out (all versions):** the rest of the hole inventory (list items, checklists, code-fence interior, blockquote, callout, table cells, links, wikilinks, footnotes, math); collaborative-edit hole invalidation beyond the simple "anchor deleted → drop" case; configurable abandonment timeouts.
 
 ---
 
@@ -112,42 +116,82 @@ The layer consumes parser output *and* user-input intent signals; it emits a uni
 
 When the user presses Enter at end of `Hello`, they want to be in a new paragraph. Source becomes `Hello\n\n`. Parser reports one block. View shows one row. Without holes, the user's cursor remains in `Hello` and the next keystroke extends `Hello`. With holes, the layer inserts a transient empty-paragraph row after `Hello`'s row, focus is routed into it, and the next keystroke reifies it into a real block.
 
-### 3.2. Hole lifecycle
+### 3.2. Hole lifecycle (v1 — IME-preedit pattern)
+
+The v1 design treats a hole as a **preedit buffer** — a real local-typing surface that does not write to source until commit. This mirrors how IMEs handle multi-keystroke input that doesn't yet have a committed representation in the document.
 
 ```
    user input intent (e.g. Enter at EOB)
               │
               ▼
    ┌──── layer creates BlockHole ────┐
-   │   anchor = end-of-source        │
-   │   kind   = "paragraph"          │
-   │   reify  = printable char       │
-   │   abandon = focus-out, undo,    │
-   │             idle 30s            │
+   │   kind         = "paragraph"    │
+   │   reifyOffset  = currentBlockEnd│  (NO source edit yet)
+   │   bufferText   = ""             │
    └──────────────┬──────────────────┘
                   │
    ┌──────────────┴──────────────────┐
-   │ next event                      │
-   │   reify-trigger fires? ─── yes ─┼─► build canonical MarkoffEdit
-   │                                 │     for kind+content; drop hole;
-   │                                 │     applyLocalEdit
-   │   abandon-trigger fires? ── yes ┼─► drop hole; route focus
-   │                                 │
-   │   parse arrives without         │
-   │     reifying input?       ───── ┼─► hole persists (intent is still
-   │                                 │     valid; no source change)
+   │ keystroke into hole's delegate  │
+   │   - TextEdit accepts locally    │
+   │   - bufferText updated          │  (still no source edit)
+   │   - idle timer restarts (250ms) │
+   └──────────────┬──────────────────┘
+                  │
+   ┌──────────────┴──────────────────┐
+   │ commit triggers (any of):       │
+   │   - idle 250ms after keystroke  │
+   │   - focus leaves delegate AND   │
+   │     bufferText is non-empty     │
+   │   - explicit Enter / Tab / Esc  │  (decided by spec; see §3.3)
+   │   - save (Ctrl+S) flushes       │
+   │ → applyLocalEdit("\n\n" + buf)  │
+   │   at reifyOffset                │
+   │ → drop hole                     │
+   │ → focus routes to new block at  │
+   │   end-of-buffer offset          │
+   └─────────────────────────────────┘
+                  │
+   ┌──────────────┴──────────────────┐
+   │ abandon triggers (any of):      │
+   │   - focus leaves AND buffer is  │
+   │     empty                       │
+   │   - Esc                         │
+   │   - Backspace at qtPos 0 with   │
+   │     empty buffer                │
+   │ → drop hole                     │
+   │ → no source mutation            │
+   │ → focus routes to nearest live  │
+   │   neighbor (previous block end) │
    └─────────────────────────────────┘
 ```
 
-### 3.3. The v0 hole: empty paragraph after Enter
+The defining property of v1: **source is never written to until commit.** The hole is invisible to the parser, the dirty flag, and save. Navigation away from an *empty* hole leaves no trace.
 
-**Trigger.** `LiveStructuralKeyHandler` detects Enter at `qtPos == blockText.length()` *and* the resulting source would have no parser-visible block past `currentBlockEnd`. Source-byte edit (`\n\n` insert) still happens, *and* the layer creates a `BlockHole(kind="paragraph", origin=currentBlockEnd+2)`.
+### 3.3. The v1 hole: empty paragraph after Enter (deferred implementation)
 
-**Reification.** First printable character (or paste, or IME commit) into the hole's delegate triggers reification: the layer builds a `MarkoffEdit` inserting that text at `origin`, drops the hole, calls `applyLocalEdit`. Next parse produces the real paragraph; the row swap is invisible because the hole was at the same model index.
+**Trigger.** `LiveStructuralKeyHandler` detects Enter at `qtPos == blockText.length()` AND the resulting block-after position would have no parser-visible content. Layer creates `BlockHole(kind="paragraph", reifyOffset=currentBlockEnd, bufferText="")`. **No source edit is performed.** The trailing whitespace problem from v0 is gone — source remains exactly as it was before Enter was pressed.
 
-**Abandonment.** Focus leaves the hole's delegate, the layer drops the hole. Undo (Ctrl+Z) before reification: drop the hole; no CRDT rollback needed because the `\n\n` insert was already a real source edit and is undone separately by the CRDT undo stack. Idle 30 seconds without reification: drop the hole.
+**Local typing.** The hole's delegate is a regular `ParagraphDelegate` with `isHole === true`. Its `TextEdit` accepts keystrokes through Qt's normal text-input path. Each keystroke updates `bufferText` in the layer (the binding mirrors the QTextDocument's contents into the hole's buffer). The TextEdit shows the buffer locally; visually identical to typing into a real paragraph.
 
-**Edge case — backspace inside an empty hole.** Backspace at qtPos 0 in an empty hole drops the hole and routes focus back to the end of the previous block. No CRDT edit; the trailing `\n\n` from the original Enter remains in source until the user takes another action that touches it.
+**Commit triggers** (when the hole has non-empty `bufferText`):
+
+- **Idle debounce:** 250ms after the most recent keystroke. Default v1 trigger; ensures the source is at most 250ms behind the user's typing without forcing a per-keystroke parse round-trip.
+- **Focus-out with content:** the user clicks elsewhere, presses arrow keys to navigate, etc. Commit before yielding focus.
+- **Save (Ctrl+S):** flush the buffer first, then save. Guarantees the saved file contains what the user typed.
+- **Explicit Enter** while the buffer is non-empty: opens a *new* hole below the just-committed paragraph. (User reaction: "Enter twice creates two new paragraphs to type in" — natural.)
+
+**Commit semantics.** One `MarkoffEdit` inserts `"\n\n" + bufferText` at `reifyOffset` in a single CRDT operation. The layer drops the hole synchronously (model-row count drops by one). `applyLocalEdit` returns synchronously; the parse runs async; the parse's `applyOps` reports an Insert at the correct row, and the new real delegate materialises with the typed text already in it. **Critical for stress-typing:** the user has been typing into a stable delegate the whole time; the destroy-and-recreate happens *once*, at commit, not per keystroke.
+
+**Abandon triggers** (when `bufferText` is empty):
+
+- **Esc:** drop the hole, route focus to the previous block's end.
+- **Focus-out with empty buffer:** drop the hole, no source mutation. Equivalent to the user changing their mind.
+- **Backspace at qtPos 0:** drop the hole, route focus to the previous block's end.
+- **Arrow keys at edges:** v0 made arrow-keys destroy the hole. **v1 reverses this**: arrow keys are normal navigation; if they would leave the delegate (e.g. Up at qtPos 0 of an empty hole), commit-or-abandon based on `bufferText` non-empty/empty.
+
+**Focus routing on commit.** The layer emits `holeReified(viewRow, qtPos)` *after* `applyLocalEdit` returns AND the next `parseUpdated` lands. The view binds focus only when the real delegate is materialised, not via async polling. This requires either (a) the binding subscribes to `parseUpdated` to detect when the new row is ready and emits a delayed signal, or (b) the layer queues `holeReified` on a `parseUpdated`-once connection. v0's bug — focus race during async delegate materialisation — is structurally impossible in v1 because we don't try to route focus until the new delegate exists.
+
+**Edge case — Enter on an already-pending hole.** User presses Enter, types nothing, presses Enter again. v1: idle commits "" (no-op — nothing to insert), and the second Enter creates… well, this case is degenerate. Spec proposal: second Enter in an empty hole is a no-op (the hole stays). Validate during dogfood.
 
 ### 3.4. The full hole inventory (deferred)
 
@@ -164,7 +208,53 @@ For Obsidian-flavored markdown, the eventual hole catalog is:
 9. Empty footnote definition.
 10. Empty math block (`$$ $$`).
 
-These all share the same archetype-shape (trigger keystroke → kind → reification rule → abandonment rule). v0 ships only #1; the rest land in follow-on plans once the abstraction has soaked.
+These all share the same archetype-shape (trigger keystroke → kind → preedit/local-typing → commit/abandon rules). The v1 hole #1 ships first; the rest land in follow-on plans once the abstraction has soaked.
+
+### 3.5. Architectural changes required for v1 (vs. v0)
+
+Stages 1-3 (the layer infrastructure for predictions) need no changes. The Stage 4 v1 work needs:
+
+1. **`BlockHole` value type:** add `QString bufferText` (the local preedit buffer). Drop `pairedSourceEditByteCount` (no paired source edit anymore).
+2. **`LiveProjectionLayer`:**
+   - `createBlockHole(...)` no longer pairs with a source edit — pure view-state addition.
+   - New `appendToBlockHoleBuffer(holeId, text)` and `setBlockHoleBuffer(holeId, text)` for the binding to mirror local TextEdit changes into the buffer.
+   - New `commitBlockHole(holeId)` — builds `MarkoffEdit("\n\n" + bufferText)`, calls `applyLocalEdit`, schedules `holeReified` to fire on the next `parseUpdated`.
+   - `dropBlockHole` is unchanged for the abandon path.
+3. **`LiveBlockModel` row interleaving:** unchanged — still serves a hole row at `viewRow = afterParsedRow + 1`.
+4. **`ParagraphDelegate.qml`:**
+   - Reify-on-first-keystroke logic removed. Hole rows are normal editable delegates.
+   - Add an `onTextChanged` (or `onContentsChange` from the binding) that mirrors the TextEdit's text into `layer.setBlockHoleBuffer`.
+   - Add commit triggers: `onActiveFocusChanged` with non-empty buffer → commit; idle timer (250ms restart on edit) → commit; explicit `Esc` → abandon.
+   - Arrow-key navigation does NOT trigger drop. If navigation would naturally leave the TextEdit (Qt default), the commit/abandon decision happens *before* the focus actually leaves.
+5. **`LiveView.qml`:**
+   - The `_routeFocusToRow` retry loop stays for hole-creation focus (to land the user in the new hole row when it materialises).
+   - The reify-focus path is replaced by a `parseUpdated`-once subscription that fires after commit. No more polling for delegate materialisation under the racy condition.
+6. **`LiveStructuralKeyHandler`:**
+   - Enter at EOB no longer emits a `\n\n` source edit. Only creates the hole.
+   - The "stacked Enter" case (user presses Enter twice fast, second hits the empty hole) is handled by ParagraphDelegate's `Enter`-in-empty-hole rule (no-op, hole stays).
+7. **Save path:** the binding (or wherever Ctrl+S is handled) calls `layer.commitAllPendingHoles()` before invoking the document save. Guarantees the saved file matches what the user sees on screen.
+8. **Tests:** the v1 implementation MUST include a stress-typing test that mirrors the user's manual reproduction — fast successive `keyClick` events into a freshly-created hole, asserting the resulting source is in-order and matches the typed sequence. `tst_view_qml_live_paragraph_hole_integration.cpp` was deleted along with the v0 revert; the v1 version replaces it with this stress test as the load-bearing assertion.
+
+### 3.6. Lessons from the v0 attempt (reverted at `cfbc30f`)
+
+The v0 design (preserved in §3.3 of an earlier draft of this spec, reachable via `git log` for educational value) used a "reify-on-first-keystroke" pattern: insert `\n\n` at hole-creation, create the hole, reify on first keypress by issuing one more `applyLocalEdit` and dropping the hole. Dogfooding under a real `QQuickView` (not the offscreen test harness) surfaced five distinct failure modes:
+
+1. **Visual double-spacing.** The `\n\n` inserted at hole-creation belonged to the previous block's byte range (per the live-editing-design "delegate owns trailing whitespace" invariant). It rendered as a blank line below the previous paragraph. Stacked with the hole row's own visual line, the user perceived two paragraph breaks for one Enter press.
+2. **Character scramble during fast typing.** Between hole-drop (synchronous) and new-delegate-materialisation-after-parse (asynchronous, 30-100ms typical), focus is in transit. Every keystroke during that window landed on the wrong delegate, producing scrambled source. User reproduction: "this is interesting" → "t is inhteresg. tinis". The 10-attempt `Qt.callLater` retry loop the code-quality reviewer accepted as defensible only ensured focus *eventually* arrived; it did nothing about intermediate keystrokes. **No automated test at any granularity caught this** — `QTest::keyClick` calls land synchronously between event-loop ticks, masking the race.
+3. **Arrow keys destroyed the hole.** v0's abandonment fired on any focus-out, including Up/Down/Left/Right navigation. Normal navigation should not be a hole-killing event.
+4. **Focus went nowhere after abandonment.** Drop-on-focus-out left the user with no caret and no recovery path other than clicking. The "route focus to nearest live neighbor" requirement was mentioned in invariant #16 (collab-edit case) but never wired for the local-abandonment path.
+5. **Source-state leak.** The `\n\n` we wrote at Enter-time stayed in the file even after silent abandonment. Files accumulated trailing newlines that were invisible to the user. Save → quit → reopen would reveal the damage.
+
+**Root cause analysis.** The v0 design had two compounding mistakes:
+
+- **The spec said "insert `\n\n` AND create the hole"** (§3.3 in the original draft). This was an attempt to keep the parser ahead of the user — by writing the paragraph break to source eagerly, the parser would already know about the new block by the time reification fired. But this conflated *visual paragraph break* (which the user wants to see) with *source paragraph break* (which is what the parser sees). A faithful preedit doesn't put anything in source until commit; the visual paragraph break should come entirely from the hole row, not from `\n\n` rendered as trailing whitespace by the previous block.
+- **Reify-on-first-keystroke** assumed the `applyLocalEdit` → parse → new-delegate cycle was fast enough that focus could chase. It is, on a small synthetic test. It isn't on a real document with a real parse pool and real ListView delegate incubation timing. The async hop is mandatory; the fix is not to require it (preedit lets the user keep typing into a stable delegate that *becomes* the real one on commit).
+
+**Process lessons:**
+
+- The unit test (`tst_view_qml_live_paragraph_hole.cpp`) drove the C++ surfaces directly. It passed cleanly while the user-facing demo was completely broken. Driving directly past the QML keyboard path is fast and reliable but cannot catch bugs in async UI behavior.
+- The integration test (`tst_view_qml_live_paragraph_hole_integration.cpp`) used `QQuickView` + `QTest::keyClick` and asserted post-typing focus position and source bytes. It also passed. `QTest::keyClick` synchronously delivers events between event-loop spins, which masks the very timing race that fails on real keyboard input where keystrokes arrive on real-time intervals an event loop can drain in between.
+- Future stress-typing tests for v1 must either (a) inject keystrokes via `QCoreApplication::sendEvent` with deliberate `QTest::qWait(N)` gaps that mimic real keystroke spacing, or (b) involve a real keyboard hardware harness, or (c) at minimum, repeatedly call `QCoreApplication::processEvents()` between keystrokes to give the binding's async paths a chance to misbehave. Without one of these, stress tests will continue to pass while real users see scrambled letters.
 
 ---
 
@@ -203,17 +293,17 @@ These add to (do not replace) the ten invariants in `docs/specs/2026-04-30-live-
 
 ---
 
-## 6. Save and undo semantics
+## 6. Save and undo semantics (v1)
 
-**Save (Ctrl+S).** Source rope is what hits disk. Projections — predictions and holes — are not flushed. If the user has a pending hole when they save, the saved file does not contain it. This is the correct behavior: the user has not committed the intent yet (no character typed into the hole), so there is nothing to persist. After save, the hole persists in view-state because `editSequence` (the dirty-tracking source) only counts real CRDT edits; an in-flight hole does not mark the document dirty by itself.
+**Save (Ctrl+S).** v1 reverses v0's "save flushes only the rope, hole persists" rule. Instead: **save flushes the preedit buffer first, then writes the rope.** If the user has a pending hole with non-empty `bufferText` when they hit Ctrl+S, the layer commits it (one `applyLocalEdit("\n\n" + bufferText)`) and then the document save proceeds normally. If the buffer is empty, save proceeds without committing — there's nothing to write. This makes the saved file always equal to what the user sees on screen.
 
 **Undo (Ctrl+Z).** Three cases:
 
-1. *Hole exists, not yet reified.* Ctrl+Z drops the hole. If the hole's creation was paired with a real CRDT edit (e.g. the `\n\n` insert that paired with the empty-paragraph hole), the CRDT undo runs and undoes that edit too, in the same Ctrl+Z. The pairing is the layer's job to register at hole-creation time.
-2. *Hole was reified by a printable character.* Ctrl+Z runs normal CRDT undo on the reification edit. The hole does not re-appear; the previous block regains focus naturally because the CRDT state matches pre-reification.
+1. *Hole exists, not yet committed (buffer empty or non-empty).* Ctrl+Z drops the hole. **No CRDT undo is needed** because v1 doesn't write to source at hole creation. Predictions and the buffer evaporate. (v0's undo had to undo the paired `\n\n` edit — that complexity is gone.)
+2. *Hole was committed by idle/focus-out/Enter.* Ctrl+Z runs normal CRDT undo on the commit edit (which removed `"\n\n" + bufferText` in one step). The hole does not re-appear; focus restores to the previous block's end via the CRDT undo's normal flow.
 3. *Predictions.* Predictions don't enter the undo stack at all — they are a function of source state, so undoing source automatically reconciles them.
 
-**Redo (Ctrl+Y).** Symmetric to undo. A redo of an Enter-empty-paragraph step replays the `\n\n` CRDT edit; the layer observes the edit and re-creates the hole as a fresh projection. (This is *not* re-creating the same hole from saved view state — it is a new hole produced by the same trigger, identical for user purposes.)
+**Redo (Ctrl+Y).** Symmetric to undo. A redo of a committed empty-paragraph step replays the `applyLocalEdit("\n\n" + bufferText)` edit. The hole is *not* re-created — the redo lands the real block directly, mirroring the normal "did → undid → did again" cycle.
 
 ---
 
@@ -232,10 +322,17 @@ public:
     void setEditorBackend(EditorBackend *backend);
     void setBlockModel(LiveBlockModel *model);
 
-    // Hole creation hooks (called by structural-key handler, list-item-key
-    // handler, etc.).
-    void createBlockHole(BlockHole hole);
-    void createInlineHole(InlineHole hole);
+    // Hole creation + buffer mutation hooks (called by structural-key handler,
+    // delegate's binding, etc.). v1 preedit-pattern: createBlockHole does NOT
+    // write to source; setBlockHoleBuffer mirrors local TextEdit content into
+    // the layer's buffer; commitBlockHole flushes the buffer to source via
+    // applyLocalEdit and drops the hole.
+    quint64 createBlockHole(BlockHole hole);
+    void    setBlockHoleBuffer(quint64 holeId, const QString &text);
+    void    commitBlockHole(quint64 holeId);
+    void    dropBlockHole(quint64 holeId);  // abandon path — no source mutation
+    void    commitAllPendingHoles();         // called by save path
+    void    createInlineHole(InlineHole hole);
 
     // Prediction creation hooks (called by InlineFormatHighlighter,
     // LiveSpeculativeFenceController).
@@ -292,14 +389,16 @@ struct BlockKindPrediction { /* row + kinds + confirm-rule */ };
 
 ---
 
-## 9. Open questions
+## 9. Open questions (v1)
 
-These do not block implementation but should be resolved before the layer leaves draft.
+These do not block v1 implementation but should be resolved during dogfooding.
 
-- **Idle-abandonment threshold.** 30 seconds is a guess. The right number probably comes from dogfooding. v0 hard-codes; revisit after a week of use.
-- **Multiple stacked Enter presses.** Pressing Enter twice in succession at EOB: does the second Enter create a *second* empty-paragraph hole, or does it merge / no-op? Proposal: second Enter is a no-op (the hole is already there and empty; nothing to split). Validate with users.
-- **Backspace traversal across a hole.** Backspace from inside an empty hole drops the hole. Backspace from the *start of a real block following a hole row*: does it drop the hole, or does it merge across the trailing `\n\n` in source? Proposal: drop the hole first, leave source untouched; second Backspace does the source-level merge. Two-step, predictable.
-- **Save-while-hole-exists.** Spec says save flushes only the rope, hole persists. But the dirty indicator behavior — does the hole alone make the doc "dirty"? Proposal: no, only CRDT edits make it dirty. The Enter that created the hole already did, via its `\n\n` source edit.
+- **Idle-debounce threshold.** Proposed 250ms (v1). Trade-off: shorter = more parse round-trips and earlier commits (less risk of unsaved work); longer = fewer commits but longer windows where what-you-see ≠ what-you-save. 250ms is a guess based on typical typing-burst pause durations; revisit.
+- **Multiple stacked Enter presses on an empty hole.** Proposal: no-op (the hole stays). User pressed Enter once, got an empty paragraph to type in; pressing Enter again with no content typed shouldn't create *another* empty paragraph below.
+- **Multiple stacked Enter presses on a non-empty hole.** Proposal: commit current buffer, then create a new hole below for the next paragraph. Mimics "I typed a paragraph and pressed Enter to start the next one."
+- **Backspace traversal across a (real) committed paragraph break.** Backspace at qtPos 0 of a real block that follows a `\n\n`: does it merge the two paragraphs? This is base markdown-editor behavior, not hole-specific; current implementation (Stage 3 tip) likely already handles it correctly via `LiveStructuralKeyHandler::Key_Backspace`. Verify during v1 dogfood.
+- **Save-while-hole-exists.** v1 commits the buffer first, then saves. Does the dirty indicator update correctly during the brief commit→save window? Proposal: yes, since the commit itself is a CRDT edit and `editSequence` increments naturally.
+- **Concurrent collab edits during preedit.** A remote peer edits the document while the user is typing into a hole. The hole's `reifyOffset` may or may not still be valid. Proposal: on remote edit, if `reifyOffset` is still valid (no remote mutation in `[reifyOffset-2, reifyOffset+2]`), keep the hole; otherwise drop it (with the buffer's contents — user loses their preedit). This is acceptable v0 behavior for collab; v1 of v1 might preserve the buffer by re-targeting `reifyOffset` to the nearest stable anchor.
 
 ---
 
