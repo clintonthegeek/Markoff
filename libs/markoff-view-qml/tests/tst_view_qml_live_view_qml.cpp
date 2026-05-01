@@ -846,6 +846,202 @@ private Q_SLOTS:
         QVERIFY(imgOverlay);
         QVERIFY(imgOverlay->isVisible());
     }
+    void type_into_paragraph_mutates_document() {
+        Markoff::MarkoffDocument doc(1);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "themeCtx", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: themeCtx\n"
+            "    mode: \"live\"\n"
+            "}\n",
+            QUrl());
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        // Seed the document with one paragraph.
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("Hello");
+        doc.applyLocalEdit({ ed });
+        QVERIFY(parseSpy.wait(2000));
+
+        // Find the paragraph TextEdit and focus it.
+        QQuickItem *listView = root->findChild<QQuickItem *>(QStringLiteral("listView"));
+        QVERIFY(listView);
+        QTRY_COMPARE(listView->property("count").toInt(), 1);
+        QMetaObject::invokeMethod(listView, "forceLayout");
+
+        QQuickItem *para = listView->findChild<QQuickItem *>(
+            QString(), Qt::FindDirectChildrenOnly);
+        if (!para) QSKIP("Delegate not materialised");
+
+        QQuickItem *te = para->findChild<QQuickItem *>(QStringLiteral("textEdit"));
+        if (!te) {
+            // Walk all descendants
+            for (QQuickItem *c : para->findChildren<QQuickItem *>()) {
+                if (c->objectName() == QLatin1String("textEdit")) { te = c; break; }
+            }
+        }
+        if (!te) QSKIP("textEdit not found in delegate");
+
+        te->forceActiveFocus();
+        QMetaObject::invokeMethod(te, "selectAll");
+
+        // Type ' World' (6 chars appended conceptually — just type 3 extra chars).
+        const QByteArray before = doc.toMarkdownUtf8();
+        QTest::keyClick(&view, Qt::Key_End);
+        QTest::keyClick(&view, Qt::Key_Exclam);
+        QTest::keyClick(&view, Qt::Key_Exclam);
+        QTest::keyClick(&view, Qt::Key_Exclam);
+        // Wait for a parse to confirm the edit landed.
+        QVERIFY(parseSpy.wait(2000));
+
+        const QByteArray after = doc.toMarkdownUtf8();
+        QVERIFY2(after.contains("!!!"), "Typed characters did not reach MarkoffDocument");
+        QVERIFY2(after != before, "Document unchanged after typing");
+    }
+
+    void ctrl_z_undoes_edit() {
+        Markoff::MarkoffDocument doc(1);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "themeCtx", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: themeCtx\n"
+            "    mode: \"live\"\n"
+            "}\n",
+            QUrl());
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        // Seed document.
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("Original");
+        doc.applyLocalEdit({ ed });
+        QVERIFY(parseSpy.wait(2000));
+        const QByteArray original = doc.toMarkdownUtf8();
+
+        // Find the text edit and type something.
+        QQuickItem *listView = root->findChild<QQuickItem *>(QStringLiteral("listView"));
+        QVERIFY(listView);
+        QTRY_COMPARE(listView->property("count").toInt(), 1);
+        QMetaObject::invokeMethod(listView, "forceLayout");
+
+        QQuickItem *te = nullptr;
+        for (QQuickItem *c : root->findChildren<QQuickItem *>()) {
+            if (c->objectName() == QLatin1String("textEdit")) { te = c; break; }
+        }
+        if (!te) QSKIP("textEdit not found");
+
+        te->forceActiveFocus();
+        QTest::keyClick(&view, Qt::Key_End);
+        QTest::keyClick(&view, Qt::Key_X);
+        QTest::keyClick(&view, Qt::Key_Y);
+        QTest::keyClick(&view, Qt::Key_Z);
+        QVERIFY(parseSpy.wait(2000));
+        QVERIFY(doc.toMarkdownUtf8().contains("xyz"));
+
+        // Ctrl+Z: undo.
+        QTest::keyClick(&view, Qt::Key_Z, Qt::ControlModifier);
+        QVERIFY(parseSpy.wait(2000));
+        const QByteArray afterUndo = doc.toMarkdownUtf8();
+        QVERIFY2(!afterUndo.contains("xyz") || afterUndo == original,
+                 "Undo did not revert the edit");
+    }
+
+    void mode_toggle_source_to_live_preserves_content() {
+        Markoff::MarkoffDocument doc(1);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "themeCtx", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    id: editor\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: themeCtx\n"
+            "    mode: \"source\"\n"
+            "}\n",
+            QUrl());
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        // Seed document from the doc side (simulates load from file).
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("Source content");
+        doc.applyLocalEdit({ ed });
+        QVERIFY(parseSpy.wait(2000));
+
+        // Switch to live mode.
+        root->setProperty("mode", QStringLiteral("live"));
+        QTest::qWait(100);
+
+        // Live view should now show one paragraph block.
+        QQuickItem *listView = root->findChild<QQuickItem *>(QStringLiteral("listView"));
+        if (!listView) QSKIP("listView not found after mode toggle");
+        QTRY_COMPARE_WITH_TIMEOUT(listView->property("count").toInt(), 1, 2000);
+
+        // Content must still be there.
+        QVERIFY2(doc.toMarkdownUtf8().contains("Source content"),
+                 "Document content lost after mode toggle");
+    }
 };
 
 QTEST_MAIN(TstLiveViewQml)

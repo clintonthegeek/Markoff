@@ -59,31 +59,35 @@ The legacy `markoff-live` editor's 16 content types are still the eventual targe
 - Spike code (runnable reference): `.spike/cross-block-selection/`.
 - Implementation plan: `docs/plans/2026-04-29-live-render-walking-skeleton.md`.
 
-### Architectural invariants (Phase-2 v0)
+### Architectural invariants (editing — must hold for every commit touching `LiveView`)
 
-These are the eight invariants from the design spec (`docs/specs/2026-04-29-live-render-design.md` §4) — must hold for every commit touching `LiveView`:
+These ten invariants are from `docs/specs/2026-04-30-live-editing-design.md` §4. They supersede the read-only walking-skeleton invariants from the v0 design doc.
 
-1. **Single source of truth: `MarkoffDocument` only.** No per-delegate independent state for content. Delegates are followers of the model; never writers (until editing-spec).
+1. **Source-faithful text representation.** Each text-bearing delegate's QTextDocument text equals the canonical UTF-8 source bytes for its block range (modulo UTF-16 conversion). qtPos in the delegate translates to canonical byte offset by simple arithmetic, never by reverse-mapping rendered text to source.
 
-2. **Selection is canonical in `LiveSelectionModel`.** Each TextEdit's `selectionStart`/`selectionEnd` is a derived shadow of the model. `TextEdit.selectByMouse` is `false` everywhere; the top-level `MouseArea` is the sole input owner.
+2. **Single source of truth: `MarkoffDocument` only.** No per-delegate independent state for content. The cycle-guarded `LiveEditBinding` writes go through `applyLocalEdit`; reads go through the model's `text` role. Speculative kind changes are model-layer state reconciled with parser truth on every parse return; speculation is never authoritative.
 
-3. **AST-driven model identity is preserved across parses** via `AstBlockDiff` (Myers/LCS over `BlockKey`s).
+3. **`Session::primarySelection` is the single canonical selection across modes.** View projections to per-delegate ranges are derived, never authoritative. (Walking-skeleton `LiveSelectionModel` is superseded by `LiveSelectionView`, which projects Session state into block/offset pairs for delegate use.)
 
-4. **No `setFocusProxy`, no `QApplication::sendEvent`, no inline `QTextObject` text-objects.** Block-level rendering = separate delegates.
+4. **No `TextEdit.MarkdownText`.** Every text-bearing delegate uses `TextEdit.PlainText`. Inline rendering goes through `InlineFormatHighlighter` driven by markoff-parser.
 
-5. **Native windows for native concerns** (KDAB Widget bridge for menus / popups / dialogs). QML `Menu`/`Popup` is the exception.
+5. **BlockAnchor byte ranges are stable up to the next parse.** Between parses, a delegate's block start is adjusted by the local edit's delta so qtPos translation continues to work during the parse round-trip. The view consumes `BlockAnchor` as opaque.
 
-6. **Parse-pool coalescing applies** (Phase-1's perf fix carries forward).
+6. **CRDT types are opaque to the view layer.** `markoff-view-qml` headers must not `#include <crdt/...>`. `Markoff::TextAnchor` is the only CRDT-typed value visible at the view layer, and it is never inspected, constructed, or compared — only passed back to `MarkoffDocument` translation APIs.
 
-7. **`MarkoffDocument` black-boxes the CRDT.** Live render uses **no** `CollabText::Crdt::*` types. Selection is `(blockIndex, offsetInBlockText)`, not CRDT anchors. Future non-CRDT-bypass codepath has zero cost to the view layer.
+7. **No focus-proxy, no `QApplication::sendEvent`, no QML focus chain workarounds.** Structural keys are intercepted by `LiveStructuralKeyHandler` via QML `Keys.onPressed`. No re-dispatch hacks.
 
-8. **`rangeForBlock`'s `INT32_MAX` sentinel must be clamped by QML consumers.** `TextEdit.select(start, end)` silently no-ops if `end > text.length`. Every `Connections` handler clamps via `Math.min(r.y, textEdit.length)`.
+8. **Cycle-guard is per-delegate.** Each `LiveEditBinding` owns its own reentrancy guard (`m_applyingModelUpdate`). Writes from `MarkoffDocument` to a delegate's TextEdit are flagged and ignored by the binding's `contentsChange` slot. Mirrors `SourceTextDocumentBinding`'s pattern.
+
+9. **IME composition is held off.** No `applyLocalEdit` fires while a delegate's TextEdit is in active composition. Parse-driven text updates for that row are deferred until composition ends.
+
+10. **Undo entries are coalesced per a deterministic policy.** View-side policy: consecutive printables in same focus context coalesce; broken by non-printables, movement, mode switch, paste, structural change, or idle threshold (1 second). No user-configurable settings in v0.
 
 ## Architectural invariants (cross-cutting — do not violate)
 
 These are load-bearing. Breaking them re-introduces the legacy `markoff-live` failure modes documented in the audit (§2.5 of the POC plan).
 
-1. **Single source of truth: `MarkoffDocument` only.** No per-block QTextDocuments. No forked Qt private TextControl.
+1. **Single source of truth: `MarkoffDocument` only.** No per-block QTextDocuments. No forked Qt private TextControl. Delegates are followers of the model; never writers.
 
 2. **Document-level CRDT undo only.** `MarkoffDocument::undo()` / `redo()`. The QTextDocument's own undo stack is disabled (`setUndoRedoEnabled(false)`) inside `SourceTextDocumentBinding`. Never re-enable it.
 
