@@ -64,9 +64,43 @@ void LiveBlockModel::setRecords(const QList<BlockRecord> &records)
     endResetModel();
 }
 
+void LiveBlockModel::speculativelyChangeKind(int row, const QString &newKind)
+{
+    if (row < 0 || row >= m_rows.size()) return;
+    if (!m_speculativeOriginals.contains(row))
+        m_speculativeOriginals[row] = m_rows[row].kind;
+    m_rows[row].kind = newKind;
+    const QModelIndex idx = index(row, 0);
+    Q_EMIT dataChanged(idx, idx, { KindRole });
+}
+
+void LiveBlockModel::revertSpeculativeKind(int row)
+{
+    if (!m_speculativeOriginals.contains(row)) return;
+    m_rows[row].kind = m_speculativeOriginals.take(row);
+    const QModelIndex idx = index(row, 0);
+    Q_EMIT dataChanged(idx, idx, { KindRole });
+}
+
+bool LiveBlockModel::isSpeculative(int row) const
+{
+    return m_speculativeOriginals.contains(row);
+}
+
+QString LiveBlockModel::confirmedKindAt(int row) const
+{
+    if (m_speculativeOriginals.contains(row))
+        return m_speculativeOriginals.value(row);
+    if (row < 0 || row >= m_rows.size()) return {};
+    return m_rows[row].kind;
+}
+
 void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                               const QList<BlockRecord> &nextRecords)
 {
+    // Parse arrived — clear all speculative state; parser result is authoritative.
+    m_speculativeOriginals.clear();
+
     int row = 0;
     for (const auto &op : ops) {
         switch (op.kind) {

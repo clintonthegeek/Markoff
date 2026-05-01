@@ -42,6 +42,8 @@ qt_add_qml_module(markoff_view_qml
         include/markoff/view/qml/LiveEditBinding.h
         src/LiveStructuralKeyHandler.cpp
         include/markoff/view/qml/LiveStructuralKeyHandler.h
+        src/LiveSpeculativeFenceController.cpp
+        include/markoff/view/qml/LiveSpeculativeFenceController.h
     QML_FILES
         qml/SourceEditor.qml
         qml/SearchBar.qml

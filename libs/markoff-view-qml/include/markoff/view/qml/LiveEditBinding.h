@@ -73,6 +73,10 @@ Q_SIGNALS:
     void blockAnchorChanged();
     void textDocumentChanged();
 
+    /// Emitted after an edit is applied to the CRDT document.
+    /// `postText` is the block's current text from the QTextDocument (post-edit).
+    void editApplied(const Markoff::BlockAnchor &blockAnchor, const QString &postText);
+
 private Q_SLOTS:
     void onContentsChange(int qtPos, int charsRemoved, int charsAdded);
 

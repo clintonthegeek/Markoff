@@ -49,8 +49,24 @@ public:
 
     const BlockRecord &recordAt(int row) const { return m_rows.at(row); }
 
+    /// Speculatively override this row's kind in the view layer (before the
+    /// parser confirms). Saves the current kind for later revert. If the row
+    /// already has a speculative kind, the saved "original" is not overwritten.
+    void speculativelyChangeKind(int row, const QString &newKind);
+
+    /// Revert a speculative kind override back to the last confirmed kind.
+    void revertSpeculativeKind(int row);
+
+    /// Returns true if the row currently has a speculative kind.
+    bool isSpeculative(int row) const;
+
+    /// Returns the original (pre-speculative) kind for a row, or the current
+    /// kind if there is no speculative override.
+    QString confirmedKindAt(int row) const;
+
 private:
     QList<BlockRecord> m_rows;
+    QHash<int, QString> m_speculativeOriginals;  // row → original kind
 };
 
 }  // namespace Markoff::View::Qml

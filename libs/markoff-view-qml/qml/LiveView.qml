@@ -24,6 +24,11 @@ Item {
         model: binding.model
     }
 
+    LiveSpeculativeFenceController {
+        id: fenceCtrl
+        model: binding.model
+    }
+
     LiveListModelBinding {
         id: binding
         editorBackend: root.editorBackend
@@ -67,6 +72,7 @@ Item {
                     theme: root.theme
                     structuralKeyHandler: structuralKeys
                     modelBinding: binding
+                    fenceController: fenceCtrl
                 }
             }
             DelegateChoice {
@@ -81,6 +87,7 @@ Item {
                     theme: root.theme
                     structuralKeyHandler: structuralKeys
                     modelBinding: binding
+                    fenceController: fenceCtrl
                 }
             }
             DelegateChoice {
@@ -114,6 +121,7 @@ Item {
                     theme: root.theme
                     structuralKeyHandler: structuralKeys
                     modelBinding: binding
+                    fenceController: fenceCtrl
                 }
             }
         }

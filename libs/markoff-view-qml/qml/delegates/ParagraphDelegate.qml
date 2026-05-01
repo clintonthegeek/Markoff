@@ -15,6 +15,7 @@ Item {
     property var    theme: null
     property var    structuralKeyHandler: null
     property var    modelBinding: null
+    property var    fenceController: null  // LiveSpeculativeFenceController*
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
@@ -113,6 +114,15 @@ Item {
             if (root.modelBinding && root.modelBinding.isFocusRestoreTarget(root.blockAnchor)) {
                 textEdit.forceActiveFocus()
                 textEdit.cursorPosition = Math.min(qtPos, textEdit.length)
+            }
+        }
+    }
+
+    Connections {
+        target: editBinding
+        function onEditApplied(anchor, postText) {
+            if (root.fenceController) {
+                root.fenceController.onEditApplied(anchor, root.blockIndex, postText)
             }
         }
     }

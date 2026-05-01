@@ -175,6 +175,7 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     ed.newText  = newText;
 
     m_document->applyLocalEdit({ ed });
+    Q_EMIT editApplied(m_blockAnchor, m_textDoc->toPlainText());
 }
 
 }  // namespace Markoff::View::Qml

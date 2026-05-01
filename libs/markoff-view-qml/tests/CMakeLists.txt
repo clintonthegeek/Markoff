@@ -92,3 +92,9 @@ add_test(NAME tst_view_qml_live_structural_keys COMMAND tst_view_qml_live_struct
 target_link_libraries(tst_view_qml_live_structural_keys
     PRIVATE Qt6::Test markoff_view_qml markoff_foundation)
 set_tests_properties(tst_view_qml_live_structural_keys PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_view_qml_live_speculative_fence tst_view_qml_live_speculative_fence.cpp)
+add_test(NAME tst_view_qml_live_speculative_fence COMMAND tst_view_qml_live_speculative_fence)
+target_link_libraries(tst_view_qml_live_speculative_fence
+    PRIVATE Qt6::Test markoff_view_qml)
+set_tests_properties(tst_view_qml_live_speculative_fence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
