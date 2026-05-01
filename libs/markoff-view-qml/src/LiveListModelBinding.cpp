@@ -151,33 +151,41 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
                 }
 
                 // Detect kind-change at the focused block: a Delete of the
-                // focused block's anchor followed by an Insert at the same
-                // model row position (nextIndex matching the model row the
-                // Delete leaves behind) means the block changed kind.
+                // focused block's anchor paired with an Insert at the same
+                // model row position (nextIndex == deletedRow) means the block
+                // changed kind in-place rather than being reshuffled.
                 // NOTE: the BlockAnchor changes on prepend (e.g. "# " →
                 // heading) because it is the CRDT anchor at the first byte.
-                // We therefore match by prevIndex (the focused block's row)
-                // and nextIndex equal to that same row — indicating an in-place
-                // kind swap rather than a block-list reshuffle.
+                // Two-pass approach: first find the Delete for the focused
+                // anchor, then separately scan for an Insert at that exact row.
+                // This prevents an unrelated Insert that happens to be the last
+                // one in the diff from matching against an earlier Delete.
                 if (d->focusedAnchor.has_value()) {
                     const auto fa = d->focusedAnchor.value();
                     int deletedRow = -1;
-                    int insertedRow = -1;
                     for (const auto &op : ops) {
                         if (op.kind == AstBlockDiff::OpKind::Delete
                                 && op.prevIndex >= 0
                                 && op.prevIndex < d->lastKeys.size()
-                                && d->lastKeys[op.prevIndex].anchor == fa)
+                                && d->lastKeys[op.prevIndex].anchor == fa) {
                             deletedRow = op.prevIndex;
-                        if (op.kind == AstBlockDiff::OpKind::Insert
-                                && op.nextIndex >= 0
-                                && op.nextIndex < nextKeys.size())
-                            insertedRow = op.nextIndex;
+                            break;
+                        }
                     }
-                    // Same row deleted and inserted at same position → kind-change.
-                    if (deletedRow >= 0 && insertedRow == deletedRow) {
+                    bool insertedAtSameRow = false;
+                    if (deletedRow >= 0) {
+                        for (const auto &op : ops) {
+                            if (op.kind == AstBlockDiff::OpKind::Insert
+                                    && op.nextIndex == deletedRow) {
+                                insertedAtSameRow = true;
+                                break;
+                            }
+                        }
+                    }
+                    // Same row deleted and re-inserted at that position → kind-change.
+                    if (deletedRow >= 0 && insertedAtSameRow) {
                         const int savedPos = d->focusedCursorPosition;
-                        const Markoff::BlockAnchor newAnchor = nextKeys[insertedRow].anchor;
+                        const Markoff::BlockAnchor newAnchor = nextKeys[deletedRow].anchor;
                         // Update focused anchor to the new anchor so
                         // isFocusRestoreTarget works in delegates.
                         d->focusedAnchor = newAnchor;
