@@ -10,6 +10,7 @@ Item {
     property string imageTitle: ""
     property var    selectionModel: null
     property var    theme: null
+    property var    routeFocusToNeighbour: null
 
     /// Image has no text content; positionAt returns 0 (start-of-block).
     function positionAt(x, y) { return 0 }
@@ -62,6 +63,14 @@ Item {
         function onSelectionChanged() {
             selectionOverlay.selected =
                 root.selectionModel.rangeForBlock(root.blockIndex).x !== -1
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        onClicked: {
+            if (root.routeFocusToNeighbour)
+                root.routeFocusToNeighbour(root.blockIndex)
         }
     }
 }

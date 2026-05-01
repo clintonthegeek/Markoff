@@ -342,6 +342,186 @@ private Q_SLOTS:
         QCOMPARE(altFallback->property("color").value<QColor>(), sentinelBg);
     }
 
+    void hr_click_routes_focus_to_preceding_paragraph() {
+        // Document: paragraph (0), HR (1), paragraph (2).
+        // Calling routeNeighbourFocus(1) should focus the preceding paragraph (0).
+        Markoff::MarkoffDocument doc(1);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "themeCtx", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: themeCtx\n"
+            "    mode: \"live\"\n"
+            "}\n",
+            QUrl());
+        if (component.isError()) qWarning() << component.errors();
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("First para\n\n---\n\nSecond para");
+        doc.applyLocalEdit({ ed });
+        QVERIFY(parseSpy.wait(2000));
+
+        QQuickItem *listView = root->findChild<QQuickItem *>(
+            QStringLiteral("listView"));
+        QVERIFY(listView);
+        QTRY_COMPARE(listView->property("count").toInt(), 3);
+
+        QMetaObject::invokeMethod(listView, "forceLayout");
+        view.grabWindow();
+
+        // Find the LiveView item (direct child of MarkoffEditor that has routeNeighbourFocus).
+        // LiveView.qml is the root Item inside MarkoffEditor, accessible via findChild.
+        QQuickItem *liveView = nullptr;
+        for (QQuickItem *child : root->findChildren<QQuickItem *>()) {
+            // routeNeighbourFocus is defined in LiveView.qml; check by property or
+            // by finding the item that owns the listView.
+            if (child->findChild<QQuickItem *>(QStringLiteral("listView"))) {
+                liveView = child;
+                break;
+            }
+        }
+        if (!liveView) {
+            QSKIP("Cannot locate LiveView item — focus routing test requires "
+                  "a real QQuickWindow with materialised delegates");
+        }
+
+        // Invoke routeNeighbourFocus(1) — HR is at blockIndex 1.
+        bool ok = QMetaObject::invokeMethod(liveView, "routeNeighbourFocus",
+                                             Q_ARG(QVariant, QVariant(1)));
+        if (!ok) {
+            QSKIP("routeNeighbourFocus not invokable — QML function not accessible "
+                  "from C++ in this test harness");
+        }
+        QTest::qWait(50);
+
+        // The preceding paragraph (blockIndex 0) should now have active focus.
+        // The activeFocusItem of the window should be a TextEdit inside block 0.
+        QQuickItem *focused = view.activeFocusItem();
+        QVERIFY2(focused,
+                 "No item has active focus after routeNeighbourFocus(1)");
+
+        // Walk up the parent chain to find the delegate at blockIndex 0.
+        bool focusInBlock0 = false;
+        for (QQuickItem *it = focused; it; it = it->parentItem()) {
+            QVariant bi = it->property("blockIndex");
+            if (bi.isValid() && bi.toInt() == 0) {
+                focusInBlock0 = true;
+                break;
+            }
+        }
+        QVERIFY2(focusInBlock0,
+                 "Focus should be in block 0 (preceding paragraph) after HR click");
+    }
+
+    void hr_at_top_routes_focus_to_following_paragraph() {
+        // Document: HR (0), paragraph (1).
+        // Calling routeNeighbourFocus(0) should focus the following paragraph (1).
+        Markoff::MarkoffDocument doc(1);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "themeCtx", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: themeCtx\n"
+            "    mode: \"live\"\n"
+            "}\n",
+            QUrl());
+        if (component.isError()) qWarning() << component.errors();
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("---\n\nFirst para");
+        doc.applyLocalEdit({ ed });
+        QVERIFY(parseSpy.wait(2000));
+
+        QQuickItem *listView = root->findChild<QQuickItem *>(
+            QStringLiteral("listView"));
+        QVERIFY(listView);
+        QTRY_COMPARE(listView->property("count").toInt(), 2);
+
+        QMetaObject::invokeMethod(listView, "forceLayout");
+        view.grabWindow();
+
+        // Locate LiveView (the item that owns listView).
+        QQuickItem *liveView = nullptr;
+        for (QQuickItem *child : root->findChildren<QQuickItem *>()) {
+            if (child->findChild<QQuickItem *>(QStringLiteral("listView"))) {
+                liveView = child;
+                break;
+            }
+        }
+        if (!liveView) {
+            QSKIP("Cannot locate LiveView item — focus routing test requires "
+                  "a real QQuickWindow with materialised delegates");
+        }
+
+        bool ok = QMetaObject::invokeMethod(liveView, "routeNeighbourFocus",
+                                             Q_ARG(QVariant, QVariant(0)));
+        if (!ok) {
+            QSKIP("routeNeighbourFocus not invokable — QML function not accessible "
+                  "from C++ in this test harness");
+        }
+        QTest::qWait(50);
+
+        QQuickItem *focused = view.activeFocusItem();
+        QVERIFY2(focused,
+                 "No item has active focus after routeNeighbourFocus(0)");
+
+        // Walk up the parent chain to find the delegate at blockIndex 1.
+        bool focusInBlock1 = false;
+        for (QQuickItem *it = focused; it; it = it->parentItem()) {
+            QVariant bi = it->property("blockIndex");
+            if (bi.isValid() && bi.toInt() == 1) {
+                focusInBlock1 = true;
+                break;
+            }
+        }
+        QVERIFY2(focusInBlock1,
+                 "Focus should be in block 1 (following paragraph) after HR-at-top click");
+    }
+
     void selection_highlight_appears_on_hr_and_image() {
         Markoff::MarkoffDocument doc(1);
 

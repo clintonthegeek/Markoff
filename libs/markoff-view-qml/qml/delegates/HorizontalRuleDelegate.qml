@@ -7,6 +7,7 @@ Item {
     property int blockIndex: -1
     property var selectionModel: null
     property var theme: null
+    property var routeFocusToNeighbour: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
@@ -41,6 +42,14 @@ Item {
         function onSelectionChanged() {
             selectionOverlay.selected =
                 root.selectionModel.rangeForBlock(root.blockIndex).x !== -1
+        }
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        onClicked: {
+            if (root.routeFocusToNeighbour)
+                root.routeFocusToNeighbour(root.blockIndex)
         }
     }
 }

@@ -103,6 +103,7 @@ Item {
                     blockIndex: index
                     selectionModel: binding.selectionModel
                     theme: root.theme
+                    routeFocusToNeighbour: root.routeNeighbourFocus
                 }
             }
             DelegateChoice {
@@ -114,6 +115,7 @@ Item {
                     imageTitle: model.imageTitle
                     selectionModel: binding.selectionModel
                     theme: root.theme
+                    routeFocusToNeighbour: root.routeNeighbourFocus
                 }
             }
             DelegateChoice {
@@ -233,6 +235,30 @@ Item {
                 if (!pressed || (m.buttons & Qt.LeftButton) === 0) return
                 const h = hit(m.x, m.y)
                 if (h) binding.selectionModel.extend(h.block, h.offset)
+            }
+        }
+    }
+
+    /// Route keyboard focus from a non-text delegate (HR, image) to the nearest
+    /// text delegate. Searches backward first (preceding block), then forward
+    /// (following block). Text delegates are identified by having `focusAtEnd`.
+    /// `fromIndex` is the block index of the non-text delegate that was clicked.
+    function routeNeighbourFocus(fromIndex) {
+        const total = binding.model ? binding.model.rowCount() : 0
+        // Preceding text delegate.
+        for (let i = fromIndex - 1; i >= 0; --i) {
+            const item = listView.itemAtIndex(i)
+            if (item && typeof item.focusAtEnd === "function") {
+                item.focusAtEnd()
+                return
+            }
+        }
+        // No preceding text — try following.
+        for (let i = fromIndex + 1; i < total; ++i) {
+            const item = listView.itemAtIndex(i)
+            if (item && typeof item.focusAtStart === "function") {
+                item.focusAtStart()
+                return
             }
         }
     }

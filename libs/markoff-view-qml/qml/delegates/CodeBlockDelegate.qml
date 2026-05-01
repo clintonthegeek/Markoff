@@ -32,6 +32,9 @@ Rectangle {
     readonly property int cursorPosition: textEdit.cursorPosition
     readonly property string selectedText: textEdit.selectedText
 
+    function focusAtEnd()   { textEdit.forceActiveFocus(); textEdit.cursorPosition = textEdit.length }
+    function focusAtStart() { textEdit.forceActiveFocus(); textEdit.cursorPosition = 0 }
+
     LiveEditBinding {
         id: editBinding
         document: root.document
