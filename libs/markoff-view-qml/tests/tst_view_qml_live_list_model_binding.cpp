@@ -132,8 +132,11 @@ private Q_SLOTS:
         doc.applyLocalEdit({ edit });
 
         // Wait for the model to reflect the edit, then verify selection
-        // survived. The first paragraph's text should now be "a!".
-        QTRY_COMPARE(model->data(model->index(0, 0), model->roleForName("text")).toString(),
+        // survived. The first paragraph's text should now be "a!" (Stage
+        // C-2/C-3: source-faithful text includes the trailing newline
+        // that's part of the paragraph block's byte range).
+        QTRY_COMPARE(model->data(model->index(0, 0), model->roleForName("text"))
+                         .toString().trimmed(),
                      QStringLiteral("a!"));
         QVERIFY(sel->hasSelection());
     }
@@ -282,9 +285,11 @@ private Q_SLOTS:
             doc.applyLocalEdit({ e });
         }
 
-        // Final paragraph should read "beta!!!".
+        // Final paragraph should read "beta!!!" (source-faithful text
+        // includes the trailing newline; trim before comparing).
         QTRY_COMPARE(
-            model->data(model->index(1, 0), model->roleForName("text")).toString(),
+            model->data(model->index(1, 0), model->roleForName("text"))
+                  .toString().trimmed(),
             QStringLiteral("beta!!!"));
         QCOMPARE(model->rowCount(), 2);
     }

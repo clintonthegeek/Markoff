@@ -11,10 +11,7 @@
 
 #include <QList>
 #include <QMetaObject>
-#include <QRunnable>
-#include <QThreadPool>
 
-#include <atomic>
 #include <optional>
 
 namespace Markoff::View::Qml {
@@ -29,20 +26,8 @@ struct LiveListModelBinding::Private {
     std::optional<Markoff::BlockAnchor> focusedAnchor;
     int focusedCursorPosition = 0;
 
-    /// Monotonic counter incremented on every dispatched walk. Worker threads
-    /// capture the value at dispatch time and the main-thread post-back drops
-    /// stale results when a newer walk has been dispatched in the meantime.
-    /// std::atomic because the worker thread reads it during the post-back.
-    std::atomic<quint64> walkGeneration{0};
-
     /// The parse sequence number from the last accepted parse result.
     quint64 lastParseSequence{0};
-
-    /// Private thread pool dedicated to BlockWalker dispatch. Owning it
-    /// (rather than borrowing the global pool) lets the destructor block on
-    /// `waitForDone()` so no worker is mid-`invokeMethod(this, ...)` when
-    /// `*this` is being torn down. Race avoidance, not throughput.
-    QThreadPool walkPool;
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
@@ -55,18 +40,9 @@ LiveListModelBinding::LiveListModelBinding(QObject *parent)
     // owned by the binding, lifetime equals the binding's.
     d->projection = new LiveProjectionLayer(this);
     d->projection->setBlockModel(d->model);
-    // One worker is enough — stale-walk drop happens via walkGeneration; we
-    // don't benefit from running multiple walks in parallel against the same
-    // model.
-    d->walkPool.setMaxThreadCount(1);
 }
 
-LiveListModelBinding::~LiveListModelBinding()
-{
-    // Drain in-flight walkers before the QObject base destructor runs;
-    // otherwise a worker mid-invokeMethod against `this` races the teardown.
-    d->walkPool.waitForDone();
-}
+LiveListModelBinding::~LiveListModelBinding() = default;
 
 EditorBackend *LiveListModelBinding::editorBackend() const { return d->editorBackend; }
 LiveBlockModel *LiveListModelBinding::model() const { return d->model; }
@@ -108,131 +84,111 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
 {
     if (!parsed) return;
 
-    // Capture before crossing the thread boundary. `sourceText()` returns a
-    // QString (implicitly shared); the worker walks a private view of it.
-    // We never deref `parsed` off-thread — its lifetime is owned by
-    // MarkoffDocument's `latestParse` and may be replaced when the next parse
-    // arrives.
-    const QString source = parsed->sourceText();
-    // blockAnchors is a QList (implicitly shared) — copy to own a named value for the lambda capture.
-    const QList<Markoff::BlockAnchor> anchors = blockAnchors;
-    const quint64 myGen  = d->walkGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
+    // Stage C-2: walk the foundation-baked top-level blocks synchronously
+    // on the main thread. This is a fast O(blocks) traversal of an already-
+    // parsed snapshot; no off-thread dispatch is needed. The previous
+    // worker-pool path existed because BlockWalker was a regex-based
+    // re-parse — that's gone now.
+    QList<BlockRecord> records = BlockWalker::walk(parsed);
 
-    d->walkPool.start([this, source, anchors, myGen, parseSequence]() {
-        QList<BlockRecord> records = BlockWalker::walk(source);
+    d->lastParseSequence = parseSequence;
 
-        // Post the result back to the binding's thread. If `this` is
-        // destroyed before delivery, Qt drops the pending event during
-        // QObject's destructor.
-        QMetaObject::invokeMethod(this,
-            [this, records = std::move(records), anchors, myGen, parseSequence]() mutable {
-                // Drop stale results: a newer walk has been dispatched since.
-                if (myGen != d->walkGeneration.load(std::memory_order_acquire)) return;
+    // Build keys from (kind, BlockAnchor) pairs. The anchors list from
+    // the foundation is aligned 1:1 with the foundation's
+    // `topLevelBlocks()` (and therefore with our records, since `walk`
+    // emits one record per top-level block in order). If the lengths
+    // diverge that's a real bug in the foundation; default-construct a
+    // sentinel anchor so we don't crash, but the diff/edit path won't
+    // resolve cleanly for the unaligned tail.
+    QList<BlockKey> nextKeys;
+    nextKeys.reserve(records.size());
+    for (qsizetype i = 0; i < records.size(); ++i) {
+        const Markoff::BlockAnchor anchor =
+            (i < blockAnchors.size()) ? blockAnchors[i] : Markoff::BlockAnchor{};
+        records[i].blockAnchor = anchor;
+        nextKeys.append(BlockKey { records[i].kind, anchor });
+    }
 
-                d->lastParseSequence = parseSequence;
+    const QList<AstBlockDiff::Op> ops =
+        AstBlockDiff::diff(d->lastKeys, nextKeys);
 
-                // Build keys from (kind, BlockAnchor) pairs. The anchors list
-                // is aligned to the top-level block order from the parse; if
-                // the walker produced more records than we have anchors (e.g.
-                // BlockWalker adds synthetic sub-blocks), we fall back to a
-                // default-constructed BlockAnchor so the list lengths stay in
-                // sync with records.
-                QList<BlockKey> nextKeys;
-                nextKeys.reserve(records.size());
-                for (qsizetype i = 0; i < records.size(); ++i) {
-                    const Markoff::BlockAnchor anchor =
-                        (i < anchors.size()) ? anchors[i] : Markoff::BlockAnchor{};
-                    records[i].blockAnchor = anchor;
-                    nextKeys.append(BlockKey { records[i].kind, anchor });
+    if (d->selection->hasSelection()) {
+        QList<Markoff::BlockAnchor> deletedBlockAnchors;
+        for (const auto &op : ops) {
+            if (op.kind == AstBlockDiff::OpKind::Delete &&
+                op.prevIndex >= 0 && op.prevIndex < d->lastKeys.size()) {
+                deletedBlockAnchors.append(d->lastKeys[op.prevIndex].anchor);
+            }
+        }
+        if (!deletedBlockAnchors.isEmpty())
+            d->selection->notifyBlocksRemoved(deletedBlockAnchors);
+    }
+
+    // Detect kind-change at the focused block: a Delete of the focused
+    // block's anchor paired with an Insert at the same model row position
+    // (nextIndex == deletedRow) means the block changed kind in-place
+    // rather than being reshuffled. NOTE: the BlockAnchor changes on
+    // prepend (e.g. "# " → heading) because it is the CRDT anchor at the
+    // first byte. Two-pass approach prevents an unrelated Insert from
+    // matching against an earlier Delete.
+    if (d->focusedAnchor.has_value()) {
+        const auto fa = d->focusedAnchor.value();
+        int deletedRow = -1;
+        for (const auto &op : ops) {
+            if (op.kind == AstBlockDiff::OpKind::Delete
+                    && op.prevIndex >= 0
+                    && op.prevIndex < d->lastKeys.size()
+                    && d->lastKeys[op.prevIndex].anchor == fa) {
+                deletedRow = op.prevIndex;
+                break;
+            }
+        }
+        bool insertedAtSameRow = false;
+        if (deletedRow >= 0) {
+            for (const auto &op : ops) {
+                if (op.kind == AstBlockDiff::OpKind::Insert
+                        && op.nextIndex == deletedRow) {
+                    insertedAtSameRow = true;
+                    break;
                 }
+            }
+        }
+        // Same row deleted and re-inserted at that position → kind-change.
+        if (deletedRow >= 0 && insertedAtSameRow) {
+            const int savedPos = d->focusedCursorPosition;
+            const Markoff::BlockAnchor newAnchor = nextKeys[deletedRow].anchor;
+            // Update focused anchor to the new anchor so
+            // isFocusRestoreTarget works in delegates.
+            d->focusedAnchor = newAnchor;
+            QMetaObject::invokeMethod(this, [this, newAnchor, savedPos]() {
+                Q_EMIT focusRestoreRequested(newAnchor, savedPos);
+            }, Qt::QueuedConnection);
+        }
+    }
 
-                const QList<AstBlockDiff::Op> ops =
-                    AstBlockDiff::diff(d->lastKeys, nextKeys);
+    // Hole-aware applyOps: detach any pending hole so the diff ops land
+    // on the parsed-rows underlay only, then reattach (if anchor row
+    // still valid) or abandon.
+    std::optional<BlockHole> heldHole;
+    if (d->projection && d->projection->hasPendingBlockHole()) {
+        heldHole = d->projection->detachPendingHoleForReparse();
+    }
 
-                if (d->selection->hasSelection()) {
-                    QList<Markoff::BlockAnchor> deletedBlockAnchors;
-                    for (const auto &op : ops) {
-                        if (op.kind == AstBlockDiff::OpKind::Delete &&
-                            op.prevIndex >= 0 && op.prevIndex < d->lastKeys.size()) {
-                            deletedBlockAnchors.append(d->lastKeys[op.prevIndex].anchor);
-                        }
-                    }
-                    if (!deletedBlockAnchors.isEmpty())
-                        d->selection->notifyBlocksRemoved(deletedBlockAnchors);
-                }
+    d->model->applyOps(ops, records);
+    d->lastKeys = std::move(nextKeys);
 
-                // Detect kind-change at the focused block: a Delete of the
-                // focused block's anchor paired with an Insert at the same
-                // model row position (nextIndex == deletedRow) means the block
-                // changed kind in-place rather than being reshuffled.
-                // NOTE: the BlockAnchor changes on prepend (e.g. "# " →
-                // heading) because it is the CRDT anchor at the first byte.
-                // Two-pass approach: first find the Delete for the focused
-                // anchor, then separately scan for an Insert at that exact row.
-                // This prevents an unrelated Insert that happens to be the last
-                // one in the diff from matching against an earlier Delete.
-                if (d->focusedAnchor.has_value()) {
-                    const auto fa = d->focusedAnchor.value();
-                    int deletedRow = -1;
-                    for (const auto &op : ops) {
-                        if (op.kind == AstBlockDiff::OpKind::Delete
-                                && op.prevIndex >= 0
-                                && op.prevIndex < d->lastKeys.size()
-                                && d->lastKeys[op.prevIndex].anchor == fa) {
-                            deletedRow = op.prevIndex;
-                            break;
-                        }
-                    }
-                    bool insertedAtSameRow = false;
-                    if (deletedRow >= 0) {
-                        for (const auto &op : ops) {
-                            if (op.kind == AstBlockDiff::OpKind::Insert
-                                    && op.nextIndex == deletedRow) {
-                                insertedAtSameRow = true;
-                                break;
-                            }
-                        }
-                    }
-                    // Same row deleted and re-inserted at that position → kind-change.
-                    if (deletedRow >= 0 && insertedAtSameRow) {
-                        const int savedPos = d->focusedCursorPosition;
-                        const Markoff::BlockAnchor newAnchor = nextKeys[deletedRow].anchor;
-                        // Update focused anchor to the new anchor so
-                        // isFocusRestoreTarget works in delegates.
-                        d->focusedAnchor = newAnchor;
-                        QMetaObject::invokeMethod(this, [this, newAnchor, savedPos]() {
-                            Q_EMIT focusRestoreRequested(newAnchor, savedPos);
-                        }, Qt::QueuedConnection);
-                    }
-                }
-
-                // Hole-aware applyOps: detach any pending hole so the diff
-                // ops land on the parsed-rows underlay only, then reattach
-                // (if anchor row still valid) or abandon.
-                std::optional<BlockHole> heldHole;
-                if (d->projection && d->projection->hasPendingBlockHole()) {
-                    heldHole = d->projection->detachPendingHoleForReparse();
-                }
-
-                d->model->applyOps(ops, records);
-                d->lastKeys = std::move(nextKeys);
-
-                if (heldHole.has_value()) {
-                    if (heldHole->afterParsedRow >= 0
-                            && heldHole->afterParsedRow < records.size()) {
-                        d->projection->reattachHoleAfterReparse(*heldHole);
-                    } else if (heldHole->afterParsedRow == -1
-                               && records.isEmpty()) {
-                        // Empty-document case: hole anchors at row 0, no
-                        // parsed rows. Still valid.
-                        d->projection->reattachHoleAfterReparse(*heldHole);
-                    } else {
-                        d->projection->reattachHoleAfterReparseAbandon(*heldHole);
-                    }
-                }
-            },
-            Qt::QueuedConnection);
-    });
+    if (heldHole.has_value()) {
+        if (heldHole->afterParsedRow >= 0
+                && heldHole->afterParsedRow < records.size()) {
+            d->projection->reattachHoleAfterReparse(*heldHole);
+        } else if (heldHole->afterParsedRow == -1
+                   && records.isEmpty()) {
+            // Empty-document case: hole anchors at row 0, no parsed rows.
+            d->projection->reattachHoleAfterReparse(*heldHole);
+        } else {
+            d->projection->reattachHoleAfterReparseAbandon(*heldHole);
+        }
+    }
 }
 
 void LiveListModelBinding::notifyFocused(const Markoff::BlockAnchor &anchor, int cursorPos)

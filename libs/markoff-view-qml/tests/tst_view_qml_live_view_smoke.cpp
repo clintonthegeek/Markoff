@@ -13,7 +13,7 @@ using namespace Markoff::View::Qml;
 class TstLiveViewSmoke : public QObject {
     Q_OBJECT
 private Q_SLOTS:
-    void live_view_renders_five_block_kinds() {
+    void live_view_renders_block_kinds_from_foundation() {
         Markoff::MarkoffDocument doc(1);
         EditorBackend be;
         be.setDocument(&doc);
@@ -30,8 +30,13 @@ private Q_SLOTS:
             "```python\nx = 1\n```\n");
         doc.applyLocalEdit({ ed });
 
-        // BlockWalker runs off-thread; spin the event loop until the model
-        // converges. See docs/specs/2026-04-30-blockwalker-threading-decision.md.
+        // Stage C-2: BlockWalker now consumes the foundation's
+        // topLevelBlocks() snapshot synchronously inside the
+        // parseUpdatedAt slot. The image-only paragraph is no longer
+        // recognized as a special Image kind (the foundation does not
+        // surface that distinction); it renders as a paragraph with
+        // source-faithful text containing the image markdown. Inline
+        // image rendering is a future enhancement.
         LiveBlockModel *model = binding.model();
         QTRY_COMPARE(model->rowCount(), 5);
 
@@ -44,7 +49,7 @@ private Q_SLOTS:
             QStringLiteral("heading"),
             QStringLiteral("paragraph"),
             QStringLiteral("hr"),
-            QStringLiteral("image"),
+            QStringLiteral("paragraph"),  // was "image" before C-2
             QStringLiteral("code_block")
         }));
     }

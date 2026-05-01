@@ -6,15 +6,28 @@
 
 #include <markoff/view/qml/BlockRecord.h>
 
+namespace Markoff { class Document; }
+
 namespace Markoff::View::Qml {
 
-/// Walks a markdown source string and returns a list of top-level block
-/// records. Pure function; no Qt-app or QML dependencies. The classification
-/// is intentionally simple (line-based + fence-state); edge cases that
-/// require full tree-sitter analysis are deferred to a later phase.
+/// Convert a parsed `Markoff::Document` into a flat list of `BlockRecord`s
+/// in document order. Pure function over the tree-sitter AST snapshot
+/// exposed by `Markoff::Document::topLevelBlocks()`. No regex, no
+/// re-parsing — the foundation has already done that work.
+///
+/// Records carry source-faithful `text` / `source` (raw markdown for the
+/// block's byte range), plus kind-specific metadata (heading level,
+/// code language, etc.) where the foundation surfaces it.
+///
+/// Replaces the legacy regex-based line walker. See Stage C-2 in the
+/// new-foundation refactor plan.
 class BlockWalker {
 public:
-    static QList<BlockRecord> walk(const QString &source);
+    /// Walk the document's top-level blocks and emit records. The
+    /// `BlockAnchor` field on each record is left default-constructed —
+    /// LiveListModelBinding fills those in from the parse-aligned
+    /// anchors list it receives via `parseUpdatedAt`.
+    static QList<BlockRecord> walk(const Markoff::Document *parsed);
 };
 
 }  // namespace Markoff::View::Qml

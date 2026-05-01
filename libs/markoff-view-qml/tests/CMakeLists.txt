@@ -34,7 +34,7 @@ set_tests_properties(tst_view_qml_integration PROPERTIES ENVIRONMENT "QT_QPA_PLA
 
 add_executable(tst_view_qml_block_walker tst_view_qml_block_walker.cpp)
 add_test(NAME tst_view_qml_block_walker COMMAND tst_view_qml_block_walker)
-target_link_libraries(tst_view_qml_block_walker PRIVATE Qt6::Test markoff_view_qml)
+target_link_libraries(tst_view_qml_block_walker PRIVATE Qt6::Test markoff_view_qml MarkoffParser::MarkoffParser)
 set_tests_properties(tst_view_qml_block_walker PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_view_qml_ast_block_diff tst_view_qml_ast_block_diff.cpp)

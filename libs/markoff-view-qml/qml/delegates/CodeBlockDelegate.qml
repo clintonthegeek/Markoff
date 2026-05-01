@@ -10,7 +10,10 @@ Rectangle {
 
     property int    blockIndex: -1
     property string codeLanguage: ""
-    property string codeText: ""
+    /// Source-faithful raw markdown for this block (includes the fence
+    /// markers). As of Stage C-2/C-3 this is the canonical text; the
+    /// legacy `codeText` (body without fences) is no longer used.
+    property string blockText: ""
     property var    blockAnchor   // Markoff::BlockAnchor
     property var    document: null  // Markoff::MarkoffDocument *
     property var    selectionModel: null
@@ -108,16 +111,16 @@ Rectangle {
 
     // Model-driven text updates: use setModelText so the cycle guard is held
     // synchronously while the QTextDocument update fires contentsChange.
-    onCodeTextChanged: {
-        editBinding.setModelText(root.codeText)
+    onBlockTextChanged: {
+        editBinding.setModelText(root.blockText)
     }
 
     // QML change handlers do not fire for the initial property value at
     // component construction. Without this, the code block appears empty
     // on first incubation. Mirrors ParagraphDelegate's Component.onCompleted.
     Component.onCompleted: {
-        if (root.codeText.length > 0)
-            editBinding.setModelText(root.codeText)
+        if (root.blockText.length > 0)
+            editBinding.setModelText(root.blockText)
     }
 
     SyntaxHighlighter {

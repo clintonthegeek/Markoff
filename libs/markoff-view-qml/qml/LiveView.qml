@@ -231,7 +231,10 @@ Item {
                 CodeBlockDelegate {
                     blockIndex: index
                     codeLanguage: model.codeLanguage
-                    codeText: model.codeText
+                    // Source-faithful text (Stage C-2/C-3): includes the
+                    // surrounding fences. The TextEdit shows fences inline
+                    // so the user can see and edit them directly.
+                    blockText: model.text
                     blockAnchor: model.blockAnchor
                     document: root.editorBackend ? root.editorBackend.document : null
                     selectionModel: binding.selectionModel

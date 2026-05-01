@@ -101,16 +101,25 @@ private Q_SLOTS:
         QHash<int, QQuickItem *> delegates;
         QTRY_VERIFY((delegates = collectDelegates()).size() == 5);
 
-        QCOMPARE(delegates.value(0)->property("blockText").toString(),
-                 QStringLiteral("Heading"));
-        QCOMPARE(delegates.value(1)->property("blockText").toString(),
+        // Stage C-2/C-3: blockText is source-faithful — heading retains
+        // the "# " marker, paragraphs retain trailing whitespace.
+        QVERIFY2(delegates.value(0)->property("blockText").toString()
+                     .trimmed().endsWith(QStringLiteral("# Heading")),
+                 qPrintable(delegates.value(0)->property("blockText").toString()));
+        QCOMPARE(delegates.value(1)->property("blockText").toString().trimmed(),
                  QStringLiteral("Para text."));
-        QCOMPARE(delegates.value(3)->property("imageSrc").toString(),
-                 QStringLiteral("http://example.com/img.png"));
-        QCOMPARE(delegates.value(3)->property("imageAlt").toString(),
-                 QStringLiteral("alt"));
-        QCOMPARE(delegates.value(4)->property("codeText").toString(),
-                 QStringLiteral("x = 1\n"));
+        // Image-only paragraph is now kind="paragraph" (the foundation does
+        // not surface this as a special Image kind), so row 3 has blockText
+        // containing the raw image markdown rather than imageSrc/imageAlt.
+        QVERIFY2(delegates.value(3)->property("blockText").toString()
+                     .contains(QStringLiteral("http://example.com/img.png")),
+                 qPrintable(delegates.value(3)->property("blockText").toString()));
+        // Code block: blockText is source-faithful and includes the fences.
+        QVERIFY2(delegates.value(4)->property("blockText").toString()
+                     .contains(QStringLiteral("x = 1")),
+                 qPrintable(delegates.value(4)->property("blockText").toString()));
+        QVERIFY(delegates.value(4)->property("blockText").toString()
+                     .contains(QStringLiteral("```")));
     }
 
     void mouse_drag_selects_across_block_kinds() {
