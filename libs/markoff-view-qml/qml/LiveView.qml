@@ -33,6 +33,15 @@ Item {
     // is awaiting delegate materialisation.
     property int m_pendingHoleFocusViewRow: -1
 
+    // Stage 4 follow-up: state for reify-focus routing. When a hole is
+    // reified, the layer drops the synthetic row synchronously (count: 2→1),
+    // applyLocalEdit fires async, parse round-trip adds the real row back
+    // (count: 1→2). We watch onCountChanged for the restoration and route
+    // focus to the (now-real) view row at the typed-character offset.
+    property int m_pendingReifyFocusViewRow: -1
+    property int m_pendingReifyFocusQtPos: 0
+    property int m_reifyFocusExpectedCount: -1
+
     Keys.onPressed: (event) => {
         if (listView.count !== 0) { event.accepted = false; return }
         const text = event.text
@@ -52,20 +61,26 @@ Item {
 
         onBlockHoleCreated: (holeId, viewRow) => {
             // T19: route focus into the freshly-inserted hole row at qtPos 0.
-            // Mirror the empty-doc m_firstInsertPending pattern: defer twice
-            // so the delegate has time to materialise.
+            // The delegate may not be materialised yet — schedule a retry loop
+            // via callLater that polls until itemAtIndex returns non-null.
+            // (Two-callLater pattern was insufficient under QQuickView in
+            // offscreen testing — the delegate sometimes materialises later.)
             root.m_pendingHoleFocusViewRow = viewRow
-            Qt.callLater(function() {
-                Qt.callLater(function() {
-                    const item = listView.itemAtIndex(root.m_pendingHoleFocusViewRow)
-                    if (!item) return
+            const tryRoute = function(attemptsLeft) {
+                const item = listView.itemAtIndex(root.m_pendingHoleFocusViewRow)
+                if (item) {
                     if (typeof item.focusAtPos === "function")
                         item.focusAtPos(0)
                     else if (typeof item.focusAtStart === "function")
                         item.focusAtStart()
                     root.m_pendingHoleFocusViewRow = -1
-                })
-            })
+                    return
+                }
+                if (attemptsLeft > 0) {
+                    Qt.callLater(function() { tryRoute(attemptsLeft - 1) })
+                }
+            }
+            Qt.callLater(function() { tryRoute(10) })
         }
     }
 
@@ -78,6 +93,18 @@ Item {
     LiveListModelBinding {
         id: binding
         editorBackend: root.editorBackend
+    }
+
+    Connections {
+        target: binding.projectionLayer
+        function onHoleReified(viewRow, qtPos) {
+            // The layer has just dropped the synthetic row; expect listView.count
+            // to drop by one and then climb back as the parse round-trip lands.
+            // Watch onCountChanged for the restoration.
+            root.m_pendingReifyFocusViewRow = viewRow
+            root.m_pendingReifyFocusQtPos = qtPos
+            root.m_reifyFocusExpectedCount = listView.count + 1
+        }
     }
 
     LiveClipboardController {
@@ -112,6 +139,31 @@ Item {
         model: binding.model
 
         onCountChanged: {
+            // Stage 4 follow-up: reify-focus routing. Once the parse round-trip
+            // restores the row count, route focus into the now-real block at
+            // the typed-character offset.
+            if (root.m_pendingReifyFocusViewRow >= 0 &&
+                listView.count >= root.m_reifyFocusExpectedCount) {
+                const targetRow = root.m_pendingReifyFocusViewRow
+                const targetPos = root.m_pendingReifyFocusQtPos
+                root.m_pendingReifyFocusViewRow = -1
+                root.m_pendingReifyFocusQtPos = 0
+                root.m_reifyFocusExpectedCount = -1
+                const tryRoute = function(attemptsLeft) {
+                    const item = listView.itemAtIndex(targetRow)
+                    if (item) {
+                        if (typeof item.focusAtPos === "function")
+                            item.focusAtPos(targetPos)
+                        else if (typeof item.focusAtEnd === "function")
+                            item.focusAtEnd()
+                        return
+                    }
+                    if (attemptsLeft > 0) {
+                        Qt.callLater(function() { tryRoute(attemptsLeft - 1) })
+                    }
+                }
+                Qt.callLater(function() { tryRoute(10) })
+            }
             if (listView.count >= 1 && root.m_firstInsertPending) {
                 root.m_firstInsertPending = false
                 const targetPos = root.m_firstInsertLength

@@ -128,6 +128,11 @@ bool LiveProjectionLayer::reifyBlockHole(quint64 holeId, const QString &text)
     if (idx < 0) return false;
     const BlockHole hole = m_blockHoles[idx];
 
+    // Capture the hole's view-row BEFORE dropping it, so we can tell the view
+    // where to route focus once the parse round-trip materialises the real
+    // block.
+    const int reifiedViewRow = viewRowForBlockHoleId(holeId);
+
     // SYNCHRONOUSLY drop the hole BEFORE applyLocalEdit, so the next parse
     // arrives to a model without the synthetic row and produces the real
     // block at the same view index (spec §3.3 reification semantics).
@@ -139,6 +144,13 @@ bool LiveProjectionLayer::reifyBlockHole(quint64 holeId, const QString &text)
         ed.oldEnd   = hole.reifyByteOffset;
         ed.newText  = text.toUtf8();
         m_observedDocument->applyLocalEdit({ ed });
+    }
+
+    // Stage 4 follow-up: surface the reify to the view so it can route focus
+    // into the now-real block once parse arrives. The view tracks pending
+    // reify-focus state and applies on the next listView.count restoration.
+    if (reifiedViewRow >= 0) {
+        Q_EMIT holeReified(reifiedViewRow, static_cast<int>(text.length()));
     }
     return true;
 }

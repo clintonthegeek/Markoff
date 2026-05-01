@@ -117,9 +117,15 @@ Q_SIGNALS:
     /// should reflect. Stage-1 is a no-op; later stages emit on reconcile.
     void rowsChanged(int firstRow, int lastRow);
 
-    /// A hole has been reified into a real CRDT edit at `newAnchor`. The
-    /// listening view uses this to route focus into the now-real block.
-    void holeReified(Markoff::BlockAnchor newAnchor);
+    /// A hole has been reified into a real CRDT edit. The listening view uses
+    /// this to route focus into the now-real block once the parse round-trip
+    /// produces it. `viewRow` is the model row the hole occupied (which is
+    /// also the view row at which the new real block will materialise — spec
+    /// §3.3 reification semantics: dropping the hole synchronously before
+    /// applyLocalEdit means the new real block lands at the same view index).
+    /// `qtPos` is where the cursor should land in the new block (== UTF-16
+    /// length of the typed character that triggered reification).
+    void holeReified(int viewRow, int qtPos);
 
 public Q_SLOTS:
     /// Reconcile predictions and holes against the latest parser output.

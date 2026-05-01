@@ -127,6 +127,19 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
             // visible row to type into. The byte-level edit is what the source
             // can express; the hole carries the user's intent (a new paragraph)
             // until it is reified by the next character.
+            //
+            // Spec §9 stacked-Enter coalesce: if a hole already exists for this
+            // parsed row, the second Enter is a no-op — the hole is already
+            // there and empty, nothing to split. Skip the source edit so we
+            // don't accumulate `\n\n` bytes per press.
+            if (m_layer) {
+                const int parsedRow =
+                    m_model->parsedRowForViewRow(blockIndex);
+                if (parsedRow >= 0 &&
+                    m_layer->hasBlockHoleAfterParsedRow(parsedRow)) {
+                    return true;  // event consumed; no source edit, no new hole
+                }
+            }
             Markoff::MarkoffEdit ed;
             ed.oldStart = currentBlockEnd;
             ed.oldEnd   = currentBlockEnd;

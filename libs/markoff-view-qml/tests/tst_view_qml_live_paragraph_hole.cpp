@@ -342,14 +342,19 @@ private Q_SLOTS:
                                   0, blockText.length(), true, blockText));
         QCOMPARE(layer->blockHoleCount(), 1);
         QCOMPARE(model->rowCount(), 2);
+        // First Enter appends exactly one `\n\n`.
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("Hello\n\n"));
 
-        // Second Enter at EOB — the structural-key handler creates a second
-        // \n\n edit, but the layer's `createBlockHole` coalesces (no second
-        // hole row added).
+        // Second Enter at EOB — the structural-key handler now detects that a
+        // hole already exists for this parsed row and short-circuits without
+        // issuing a duplicate `\n\n` source edit (spec §9: "second Enter is a
+        // no-op; the hole is already there and empty").
         QVERIFY(handler.tryHandle(Qt::Key_Return, Qt::NoModifier, anchor0,
                                   0, blockText.length(), true, blockText));
         QCOMPARE(layer->blockHoleCount(), 1);
         QCOMPARE(model->rowCount(), 2);
+        // Source bytes did NOT accumulate.
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("Hello\n\n"));
     }
 };
 
