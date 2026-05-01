@@ -7,6 +7,7 @@
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveBlockModel.h>
 #include <markoff/view/qml/LiveListModelBinding.h>
+#include <markoff/view/qml/LiveProjectionLayer.h>
 #include <markoff/view/qml/LiveStructuralKeyHandler.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
@@ -185,6 +186,13 @@ private Q_SLOTS:
 
     void enter_at_end_inserts_paragraph_break()
     {
+        // Shape change (T20 of the live-projection-layer plan): Enter at
+        // end-of-block no longer mutates source directly. It opens a
+        // transient projection-layer hole; commit happens later (idle
+        // timer / explicit Enter / focus-out). Source bytes are NOT
+        // touched until commit.
+        using Markoff::View::Qml::LiveProjectionLayer;
+
         MarkoffDocument doc(1);
         EditorBackend be;
         be.setDocument(&doc);
@@ -196,23 +204,37 @@ private Q_SLOTS:
         LiveBlockModel *model = binding.model();
         const BlockAnchor anchor0 = anchorForRow(doc, 0);
 
+        // Without a layer, Enter-at-EOB is now a no-op (returns false).
         LiveStructuralKeyHandler handler;
         handler.setDocument(&doc);
         handler.setModel(model);
 
         const QString blockText = QStringLiteral("hello world");
+        const bool handledNoLayer = handler.tryHandle(
+            Qt::Key_Return, Qt::NoModifier,
+            anchor0, 0,
+            blockText.length(),
+            true,
+            blockText
+        );
+        QVERIFY(!handledNoLayer);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello world"));
+
+        // With a layer wired, Enter-at-EOB creates a pending hole.
+        // Source remains untouched; the hole's reify offset is the end
+        // of the current block.
+        handler.setProjectionLayer(binding.projectionLayer());
         const bool handled = handler.tryHandle(
             Qt::Key_Return, Qt::NoModifier,
             anchor0, 0,
-            blockText.length(),  // cursor at end
+            blockText.length(),
             true,
             blockText
         );
         QVERIFY(handled);
-
-        const QByteArray result = doc.toMarkdownUtf8();
-        QVERIFY(result.contains("\n\n"));
-        QVERIFY(result.startsWith("hello world"));
+        QVERIFY(binding.projectionLayer()->hasPendingBlockHole());
+        // Source bytes unchanged at this point.
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello world"));
     }
 
     // -----------------------------------------------------------------------

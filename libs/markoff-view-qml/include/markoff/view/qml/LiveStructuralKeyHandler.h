@@ -11,6 +11,7 @@
 namespace Markoff::View::Qml {
 
 class LiveBlockModel;
+class LiveProjectionLayer;
 
 /// Handles structural key events that cross block boundaries.
 ///
@@ -30,6 +31,10 @@ class LiveStructuralKeyHandler : public QObject {
                READ model
                WRITE setModel
                NOTIFY modelChanged)
+    Q_PROPERTY(Markoff::View::Qml::LiveProjectionLayer *projectionLayer
+               READ projectionLayer
+               WRITE setProjectionLayer
+               NOTIFY projectionLayerChanged)
 
 public:
     explicit LiveStructuralKeyHandler(QObject *parent = nullptr);
@@ -39,6 +44,9 @@ public:
 
     LiveBlockModel *model() const;
     void setModel(LiveBlockModel *m);
+
+    LiveProjectionLayer *projectionLayer() const;
+    void setProjectionLayer(LiveProjectionLayer *layer);
 
     /// Try to handle a structural key event.
     ///
@@ -66,10 +74,12 @@ public:
 Q_SIGNALS:
     void documentChanged();
     void modelChanged();
+    void projectionLayerChanged();
 
 private:
     Markoff::MarkoffDocument *m_document = nullptr;
     LiveBlockModel           *m_model    = nullptr;
+    LiveProjectionLayer      *m_layer    = nullptr;
 };
 
 }  // namespace Markoff::View::Qml

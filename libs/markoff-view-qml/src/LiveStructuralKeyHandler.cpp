@@ -6,6 +6,8 @@
 #include <markoff-foundation/MarkoffEdit.h>
 
 #include <markoff/view/qml/LiveBlockModel.h>
+#include <markoff/view/qml/LiveProjectionLayer.h>
+#include <markoff/view/qml/ProjectionItem.h>
 
 namespace Markoff::View::Qml {
 
@@ -35,6 +37,18 @@ void LiveStructuralKeyHandler::setModel(LiveBlockModel *m)
     if (m_model == m) return;
     m_model = m;
     Q_EMIT modelChanged();
+}
+
+LiveProjectionLayer *LiveStructuralKeyHandler::projectionLayer() const
+{
+    return m_layer;
+}
+
+void LiveStructuralKeyHandler::setProjectionLayer(LiveProjectionLayer *layer)
+{
+    if (m_layer == layer) return;
+    m_layer = layer;
+    Q_EMIT projectionLayerChanged();
 }
 
 bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
@@ -95,12 +109,17 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
         if (kind == QStringLiteral("code_block")) return false;
 
         if (qtPos == blockText.length()) {
-            // At the end of a non-code block: insert paragraph break after block.
-            Markoff::MarkoffEdit ed;
-            ed.oldStart = currentBlockEnd;
-            ed.oldEnd   = currentBlockEnd;
-            ed.newText  = QByteArrayLiteral("\n\n");
-            m_document->applyLocalEdit({ ed });
+            // End-of-block Enter: open a transient projection-layer hole
+            // (preedit pattern). The layer auto-displaces any prior pending
+            // hole (commit if non-empty, drop if empty) before creating the
+            // new one, giving "Enter starts the next paragraph" semantics.
+            if (!m_layer) return false;
+            Markoff::View::Qml::BlockHole h;
+            h.kind = QStringLiteral("paragraph");
+            h.reifyOffset = currentBlockEnd;
+            h.afterParsedRow = blockIndex;
+            // bufferText starts empty.
+            m_layer->createBlockHole(h);
             return true;
         }
 

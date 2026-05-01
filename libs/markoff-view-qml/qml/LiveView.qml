@@ -44,6 +44,38 @@ Item {
         id: structuralKeys
         document: root.editorBackend ? root.editorBackend.document : null
         model: binding.model
+        projectionLayer: binding.projectionLayer
+    }
+
+    // Hole reification / drop → focus routing. The layer fires holeReified
+    // once `applyLocalEdit` produces the new real row, and holeDropped when
+    // a pending hole is abandoned without source mutation.
+    //
+    // NOTE: the spec's "Enter on non-empty hole opens a new hole below the
+    // just-committed paragraph" chain is not implemented here. After a
+    // commit the user lands at end of the new real paragraph; pressing
+    // Enter again triggers the standard EOB path which opens a fresh hole.
+    // The two-keystroke path is correct; the one-keystroke chain is a
+    // follow-up nicety.
+    Connections {
+        target: binding.projectionLayer
+        function onHoleReified(viewRow, qtPos) {
+            const item = listView.itemAtIndex(viewRow)
+            if (item && typeof item.focusAtPos === "function") {
+                item.focusAtPos(qtPos)
+            } else {
+                Qt.callLater(function() {
+                    const it = listView.itemAtIndex(viewRow)
+                    if (it && typeof it.focusAtPos === "function") it.focusAtPos(qtPos)
+                })
+            }
+        }
+        function onHoleDropped(prevViewRow) {
+            const targetRow = prevViewRow - 1
+            if (targetRow < 0) return
+            const item = listView.itemAtIndex(targetRow)
+            if (item && typeof item.focusAtEnd === "function") item.focusAtEnd()
+        }
     }
 
     LiveSpeculativeFenceController {
@@ -124,6 +156,10 @@ Item {
                     structuralKeyHandler: structuralKeys
                     modelBinding: binding
                     fenceController: fenceCtrl
+
+                    isHole: model.isHole === true
+                    holeId: model.holeId
+                    projectionLayer: binding.projectionLayer
                 }
             }
             DelegateChoice {

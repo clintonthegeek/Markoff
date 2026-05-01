@@ -17,6 +17,19 @@ Item {
     property var    modelBinding: null
     property var    fenceController: null  // LiveSpeculativeFenceController*
 
+    // ---- Projection-layer "hole" support (T21). ----
+    // When isHole === true, this delegate is a transient projection row
+    // backing an unparsed user-intent paragraph (preedit pattern). The
+    // delegate writes go to the layer's bufferText; source is NOT touched
+    // until commitBlockHole.
+    property bool isHole: false
+    property var  holeId: 0
+    property var  projectionLayer: null
+
+    // Cycle guard: when applying model.text → editBinding.setModelText we
+    // must NOT mirror that change back to the layer's buffer.
+    property bool m_applyingModelBuffer: false
+
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
     implicitHeight: textEdit.implicitHeight
@@ -53,7 +66,11 @@ Item {
         id: editBinding
         document: root.document
         blockAnchor: root.blockAnchor !== undefined ? root.blockAnchor : editBinding.blockAnchor
-        textDocument: textEdit.textDocument
+        // On hole rows the binding must NOT call applyLocalEdit; we sever
+        // its textDocument hookup so contentsChange is never observed.
+        // Option A from the brief: setTextDocument(nullptr) cleanly
+        // disconnects (verified in LiveEditBinding.cpp::rewireTextDocument).
+        textDocument: root.isHole ? null : textEdit.textDocument
     }
 
     TextEdit {
@@ -68,6 +85,34 @@ Item {
 
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
+            // ---- Hole-row key intercepts (run before structural handler). ----
+            if (root.isHole && root.projectionLayer) {
+                if (event.key === Qt.Key_Escape) {
+                    root.projectionLayer.dropBlockHole(root.holeId)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Backspace
+                    && textEdit.cursorPosition === 0
+                    && textEdit.length === 0) {
+                    root.projectionLayer.dropBlockHole(root.holeId)
+                    event.accepted = true
+                    return
+                }
+                if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+                    const buf = textEdit.getText(0, textEdit.length)
+                    if (buf.length > 0) {
+                        // Commit current hole; user re-presses Enter at end
+                        // of the now-real paragraph to open the next hole.
+                        // (One-keystroke chain is deferred — see LiveView.)
+                        root.projectionLayer.commitBlockHole(root.holeId)
+                    }
+                    // empty buffer: consume Enter, keep hole open.
+                    event.accepted = true
+                    return
+                }
+            }
+
             if (!root.structuralKeyHandler) return
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter ||
                 event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete ||
@@ -89,6 +134,14 @@ Item {
             if (activeFocus && root.modelBinding) {
                 root.modelBinding.notifyFocused(root.blockAnchor, textEdit.cursorPosition)
             }
+            // Hole focus-out: commit if non-empty, drop if empty.
+            if (root.isHole && root.projectionLayer && !activeFocus) {
+                const buf = textEdit.getText(0, textEdit.length)
+                if (buf.length > 0)
+                    root.projectionLayer.commitBlockHole(root.holeId)
+                else
+                    root.projectionLayer.dropBlockHole(root.holeId)
+            }
         }
         onCursorPositionChanged: {
             if (activeFocus && root.modelBinding) {
@@ -101,6 +154,19 @@ Item {
                 root.modelBinding.setRowComposing(root.blockIndex, inputMethodComposing)
         }
 
+        // Buffer mirror: hole-row text changes flow back into the layer's
+        // pending buffer. Cycle-guarded against model→delegate replays.
+        onTextChanged: {
+            if (!root.isHole || !root.projectionLayer) return
+            if (root.m_applyingModelBuffer) return
+            root.projectionLayer.setBlockHoleBuffer(
+                root.holeId,
+                textEdit.getText(0, textEdit.length)
+            )
+            // Restart idle-commit timer on every keystroke.
+            idleCommitTimer.restart()
+        }
+
         InlineFormatHighlighter {
             document: textEdit.textDocument
             source: root.blockText
@@ -110,20 +176,54 @@ Item {
 
     }
 
+    // Idle-commit timer for hole rows: 250ms after the last keystroke,
+    // commit the buffer to source.
+    Timer {
+        id: idleCommitTimer
+        interval: 250
+        repeat: false
+        onTriggered: {
+            if (!root.isHole || !root.projectionLayer) return
+            const buf = textEdit.getText(0, textEdit.length)
+            if (buf.length > 0) root.projectionLayer.commitBlockHole(root.holeId)
+        }
+    }
+
+    // IME finalization: when the layer is about to commit our hole, force
+    // any pending Qt input-method composition to deliver as a final
+    // committed inputMethodEvent before the layer reads bufferText.
+    Connections {
+        target: root.projectionLayer
+        enabled: root.isHole
+        function onAboutToCommit(id) {
+            if (id !== root.holeId) return
+            if (Qt.inputMethod && typeof Qt.inputMethod.commit === "function") {
+                Qt.inputMethod.commit()
+            }
+        }
+    }
+
     // Model-driven text updates: use setModelText so the cycle guard is held
     // synchronously while the QTextDocument update fires contentsChange.
     // The QML begin/end pattern doesn't work because Qt Quick defers
     // TextEdit text updates past the guard window.
     onBlockTextChanged: {
+        // Hold the buffer-mirror guard while the model-driven text update
+        // propagates through QTextDocument::setPlainText → onTextChanged.
+        root.m_applyingModelBuffer = true
         editBinding.setModelText(root.blockText)
+        root.m_applyingModelBuffer = false
     }
 
     // On fresh delegate creation the textDocument binding may not have been
     // resolved when onBlockTextChanged first fires, leaving the TextEdit empty.
     // Re-apply the text after the component is fully initialised.
     Component.onCompleted: {
-        if (root.blockText.length > 0)
+        if (root.blockText.length > 0) {
+            root.m_applyingModelBuffer = true
             editBinding.setModelText(root.blockText)
+            root.m_applyingModelBuffer = false
+        }
     }
 
     Connections {
