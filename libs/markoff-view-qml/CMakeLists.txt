@@ -36,6 +36,8 @@ qt_add_qml_module(markoff_view_qml
         src/AstBlockDiff.h
         src/LiveListModelBinding.cpp
         include/markoff/view/qml/LiveListModelBinding.h
+        src/InlineFormatHighlighter.cpp
+        include/markoff/view/qml/InlineFormatHighlighter.h
     QML_FILES
         qml/SourceEditor.qml
         qml/SearchBar.qml

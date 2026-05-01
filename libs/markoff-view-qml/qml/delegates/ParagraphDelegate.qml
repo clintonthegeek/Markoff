@@ -2,6 +2,8 @@
 import QtQuick
 import QtQuick.Controls
 
+import org.markoff.view.qml
+
 Item {
     id: root
 
@@ -27,11 +29,16 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         text: root.blockText
-        textFormat: TextEdit.MarkdownText
+        textFormat: TextEdit.PlainText
         readOnly: true
         selectByMouse: false
         wrapMode: TextEdit.Wrap
         font.pixelSize: 16
+
+        InlineFormatHighlighter {
+            document: textEdit.textDocument
+            source: root.blockText
+        }
     }
 
     Connections {

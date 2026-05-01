@@ -2,6 +2,8 @@
 import QtQuick
 import QtQuick.Controls
 
+import org.markoff.view.qml
+
 Item {
     id: root
 
@@ -39,6 +41,11 @@ Item {
             }
         }
         font.bold: true
+
+        InlineFormatHighlighter {
+            document: textEdit.textDocument
+            source: root.blockText
+        }
     }
 
     Connections {
