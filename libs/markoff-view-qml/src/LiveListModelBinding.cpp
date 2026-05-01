@@ -29,6 +29,9 @@ struct LiveListModelBinding::Private {
     /// std::atomic because the worker thread reads it during the post-back.
     std::atomic<quint64> walkGeneration{0};
 
+    /// The parse sequence number from the last accepted parse result.
+    quint64 lastParseSequence{0};
+
     /// Private thread pool dedicated to BlockWalker dispatch. Owning it
     /// (rather than borrowing the global pool) lets the destructor block on
     /// `waitForDone()` so no worker is mid-`invokeMethod(this, ...)` when
@@ -74,7 +77,7 @@ void LiveListModelBinding::setEditorBackend(EditorBackend *eb)
 }
 
 void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
-                                            quint64 /*parseSequence*/,
+                                            quint64 parseSequence,
                                             const QList<Markoff::BlockAnchor> &blockAnchors)
 {
     if (!parsed) return;
@@ -89,16 +92,18 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
     const QList<Markoff::BlockAnchor> anchors = blockAnchors;
     const quint64 myGen  = d->walkGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
 
-    d->walkPool.start([this, source, anchors, myGen]() {
+    d->walkPool.start([this, source, anchors, myGen, parseSequence]() {
         QList<BlockRecord> records = BlockWalker::walk(source);
 
         // Post the result back to the binding's thread. If `this` is
         // destroyed before delivery, Qt drops the pending event during
         // QObject's destructor.
         QMetaObject::invokeMethod(this,
-            [this, records = std::move(records), anchors, myGen]() mutable {
+            [this, records = std::move(records), anchors, myGen, parseSequence]() mutable {
                 // Drop stale results: a newer walk has been dispatched since.
                 if (myGen != d->walkGeneration.load(std::memory_order_acquire)) return;
+
+                d->lastParseSequence = parseSequence;
 
                 // Build keys from (kind, BlockAnchor) pairs. The anchors list
                 // is aligned to the top-level block order from the parse; if
