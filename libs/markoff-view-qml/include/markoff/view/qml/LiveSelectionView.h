@@ -43,6 +43,14 @@ public:
 
     bool hasSelection() const;
 
+    /// Returns the document (non-owning). May be nullptr before setDocument().
+    Markoff::MarkoffDocument *document() const { return m_document; }
+
+    /// Returns the canonical selection byte range [min, max) in UTF-8 document bytes.
+    /// If selection is degenerate (cursor), min == max == cursor position.
+    /// Returns {0, 0} if no document is set.
+    QPair<quint32, quint32> selectionByteRange() const;
+
     /// Returns the selection range (in UTF-16 QChar units) for the given block.
     /// Returns QPoint(-1,-1) if the block is not in the selection.
     /// The y component may be INT32_MAX as a "to end of block" sentinel.

@@ -51,6 +51,14 @@ bool LiveSelectionView::hasSelection() const
     return anchorByte != activeByte;
 }
 
+QPair<quint32, quint32> LiveSelectionView::selectionByteRange() const
+{
+    if (!m_document) return {0, 0};
+    const quint32 anchorByte = m_document->resolveTextAnchor(m_selection.anchor);
+    const quint32 activeByte = m_document->resolveTextAnchor(m_selection.active);
+    return { qMin(anchorByte, activeByte), qMax(anchorByte, activeByte) };
+}
+
 QPoint LiveSelectionView::rangeForBlock(int blockIndex) const
 {
     if (!m_document) return QPoint(-1, -1);

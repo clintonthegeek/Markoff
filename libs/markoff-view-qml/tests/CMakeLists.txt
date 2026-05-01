@@ -98,3 +98,9 @@ add_test(NAME tst_view_qml_live_speculative_fence COMMAND tst_view_qml_live_spec
 target_link_libraries(tst_view_qml_live_speculative_fence
     PRIVATE Qt6::Test markoff_view_qml)
 set_tests_properties(tst_view_qml_live_speculative_fence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_view_qml_live_clipboard tst_view_qml_live_clipboard.cpp)
+add_test(NAME tst_view_qml_live_clipboard COMMAND tst_view_qml_live_clipboard)
+target_link_libraries(tst_view_qml_live_clipboard
+    PRIVATE Qt6::Test markoff_view_qml markoff_foundation)
+set_tests_properties(tst_view_qml_live_clipboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

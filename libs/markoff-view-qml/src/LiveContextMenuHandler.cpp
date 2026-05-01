@@ -24,6 +24,16 @@ LiveContextMenuHandler::LiveContextMenuHandler(QObject *parent)
             ? m_blockTexts.at(lastIdx).size() : 0;
         m_selection->extend(lastIdx, lastLen);
     });
+
+    QAction *cutAction = m_menu->addAction(tr("Cut"));
+    QObject::connect(cutAction, &QAction::triggered, this, [this]() {
+        if (m_clipboard) m_clipboard->cut();
+    });
+
+    QAction *pasteAction = m_menu->addAction(tr("Paste"));
+    QObject::connect(pasteAction, &QAction::triggered, this, [this]() {
+        if (m_clipboard) m_clipboard->paste();
+    });
 }
 
 LiveContextMenuHandler::~LiveContextMenuHandler() = default;
@@ -47,6 +57,13 @@ void LiveContextMenuHandler::setBlockCount(int n)
     if (m_blockCount == n) return;
     m_blockCount = n;
     Q_EMIT blockCountChanged();
+}
+
+void LiveContextMenuHandler::setClipboardController(LiveClipboardController *c)
+{
+    if (m_clipboard == c) return;
+    m_clipboard = c;
+    Q_EMIT clipboardControllerChanged();
 }
 
 void LiveContextMenuHandler::popup(QPoint globalPos)

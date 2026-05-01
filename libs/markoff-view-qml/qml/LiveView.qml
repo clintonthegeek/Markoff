@@ -34,9 +34,16 @@ Item {
         editorBackend: root.editorBackend
     }
 
+    LiveClipboardController {
+        id: clipboard
+        selectionModel: binding.selectionModel
+        blockModel: binding.model
+    }
+
     LiveContextMenuHandler {
         id: ctxMenu
         selectionModel: binding.selectionModel
+        clipboardController: clipboard
         blockTexts: {
             const out = []
             const count = binding.model ? binding.model.rowCount() : 0
@@ -233,15 +240,18 @@ Item {
     // Ctrl+C copies the current selection.
     Shortcut {
         sequence: StandardKey.Copy
-        onActivated: {
-            if (!binding.selectionModel.hasSelection) return
-            const out = []
-            const count = binding.model.rowCount()
-            for (let i = 0; i < count; ++i) {
-                const idx = binding.model.index(i, 0)
-                out.push(binding.model.data(idx, binding.model.roleForName("text")))
-            }
-            binding.selectionModel.copySelectionToClipboard(out)
-        }
+        onActivated: clipboard.copy()
+    }
+
+    // Ctrl+X cuts the current selection.
+    Shortcut {
+        sequence: StandardKey.Cut
+        onActivated: clipboard.cut()
+    }
+
+    // Ctrl+V pastes clipboard text at the cursor / over the selection.
+    Shortcut {
+        sequence: StandardKey.Paste
+        onActivated: clipboard.paste()
     }
 }
