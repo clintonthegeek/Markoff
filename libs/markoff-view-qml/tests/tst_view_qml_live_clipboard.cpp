@@ -243,6 +243,79 @@ private Q_SLOTS:
 
         QCOMPARE(doc.toMarkdown(), before);
     }
+
+    // 7. copy() spanning two blocks puts text from both blocks on the clipboard,
+    //    with a structural newline separator between them.
+    void cross_block_copy()
+    {
+        MarkoffDocument doc(1);
+        EditorBackend be;
+        be.setDocument(&doc);
+        LiveListModelBinding binding;
+        binding.setEditorBackend(&be);
+
+        // "Hello world\n\nSecond para" → 2 blocks
+        seedAndWait(doc, be, binding, "Hello world\n\nSecond para", 2);
+
+        LiveSelectionView *sel = binding.selectionModel();
+        QVERIFY(sel);
+        if (doc.blockAnchorAt(0) == std::nullopt) {
+            QSignalSpy p(&doc, &MarkoffDocument::parseUpdated);
+            p.wait(2000);
+        }
+
+        // Select from offset 5 in block 0 ("Hello|") to offset 6 in block 1 ("Second|").
+        sel->begin(0, 5);
+        sel->extend(1, 6);
+        QVERIFY(sel->hasSelection());
+
+        LiveClipboardController ctrl;
+        ctrl.setSelectionModel(sel);
+        ctrl.setBlockModel(binding.model());
+        ctrl.copy();
+
+        const QString clip = QGuiApplication::clipboard()->text();
+        QVERIFY(clip.contains(QStringLiteral("world")));
+        QVERIFY(clip.contains(QStringLiteral("Second")));
+        QVERIFY(clip.contains(QStringLiteral("\n")));
+    }
+
+    // 8. paste() with multi-line markdown causes the model to have more than one
+    //    block after the next parse arrives.
+    void paste_multiline_decomposes_on_reparse()
+    {
+        MarkoffDocument doc(1);
+        EditorBackend be;
+        be.setDocument(&doc);
+        LiveListModelBinding binding;
+        binding.setEditorBackend(&be);
+
+        // Start with a single-paragraph document.
+        seedAndWait(doc, be, binding, "Hello", 1);
+
+        LiveSelectionView *sel = binding.selectionModel();
+        QVERIFY(sel);
+        if (doc.blockAnchorAt(0) == std::nullopt) {
+            QSignalSpy p(&doc, &MarkoffDocument::parseUpdated);
+            p.wait(2000);
+        }
+
+        // Set clipboard to two-paragraph markdown.
+        QGuiApplication::clipboard()->setText(QStringLiteral("foo\n\nbar"));
+
+        // Degenerate cursor at position 0 — no selection.
+        sel->begin(0, 0);
+        QVERIFY(!sel->hasSelection());
+
+        LiveClipboardController ctrl;
+        ctrl.setSelectionModel(sel);
+        ctrl.setBlockModel(binding.model());
+        ctrl.paste();
+
+        // After paste, "foo\n\nbar" is prepended before "Hello" → "foo\n\nbarHello"
+        // which the parser splits into 2 blocks.
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+    }
 };
 
 QTEST_MAIN(TstLiveClipboard)
