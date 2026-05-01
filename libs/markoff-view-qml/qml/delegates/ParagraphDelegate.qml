@@ -131,6 +131,24 @@ Item {
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter ||
                 event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete ||
                 event.key === Qt.Key_Tab) {
+                // Detect mid-block Enter BEFORE delegating: the structural
+                // handler will insert \n\n at the cursor's source byte
+                // offset (splitting the block), but it does NOT touch this
+                // TextEdit. With the parse-back skip-on-activeFocus rule
+                // (see onBlockTextChanged), nothing else will truncate
+                // this TextEdit either — leading to visible duplication
+                // (this row keeps the full pre-Enter text while a new
+                // delegate appears below with the post-cursor half).
+                // Locally truncate to the prefix BEFORE applyLocalEdit so
+                // the parse-back is a no-op on this delegate.
+                const isMidBlockEnter =
+                    (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                    && textEdit.cursorPosition > 0
+                    && textEdit.cursorPosition < textEdit.length
+                const prefixForSplit = isMidBlockEnter
+                    ? textEdit.getText(0, textEdit.cursorPosition)
+                    : ""
+
                 const handled = root.structuralKeyHandler.tryHandle(
                     event.key,
                     event.modifiers,
@@ -140,7 +158,20 @@ Item {
                     textEdit.selectedText.length === 0,
                     textEdit.getText(0, textEdit.length)
                 )
-                if (handled) event.accepted = true
+                if (handled) {
+                    if (isMidBlockEnter) {
+                        // setModelText holds the cycle guard while
+                        // setPlainText runs, so the resulting
+                        // contentsChange does not loop back into
+                        // applyLocalEdit. Cursor lands at end of the
+                        // truncated prefix (close to the user's pre-Enter
+                        // position; the new "World" row will appear
+                        // below — focus routing to it is a follow-up).
+                        editBinding.setModelText(prefixForSplit)
+                        textEdit.cursorPosition = prefixForSplit.length
+                    }
+                    event.accepted = true
+                }
             }
         }
 
