@@ -25,11 +25,15 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
                          d->latestParse.reset(p);
                          ++d->parseSequence;
 
-                         // Compute BlockAnchors against the CURRENT CRDT buffer.
-                         // One-cycle staleness is acceptable per spec §3.
+                         // Compute BlockAnchors against the CURRENT CRDT buffer (main-thread,
+                         // synchronous). The parse itself reflects the buffer at parse-schedule
+                         // time; if intervening edits moved a block's first-byte char, that
+                         // block's BlockAnchor for one parse cycle identifies a slightly
+                         // different character — the next parse cycle delivers a corrected
+                         // anchor. See spec §3.
                          const QByteArray body = toMarkdownUtf8();
                          auto bundle = Markoff::Detail::computeBlockAnchors(*this, body);
-                         d->latestBlockAnchors = bundle.anchors;
+                         d->latestBlockAnchors = std::move(bundle.anchors);
                          d->latestBlockRanges  = std::move(bundle.ranges);
 
                          Q_EMIT parseUpdated(p, d->parseSequence, d->latestBlockAnchors);

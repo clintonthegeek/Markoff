@@ -94,4 +94,5 @@ private:
 }  // namespace Markoff::View::Qml
 
 Q_DECLARE_METATYPE(CollabText::Crdt::Anchor)
+Q_DECLARE_METATYPE(QList<Markoff::BlockAnchor>)
 Q_DECLARE_OPAQUE_POINTER(const Markoff::Document *)
