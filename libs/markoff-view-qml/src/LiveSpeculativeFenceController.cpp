@@ -34,6 +34,11 @@ void LiveSpeculativeFenceController::onEditApplied(const Markoff::BlockAnchor &/
         return;
     }
 
+    // TODO: The spec (step 8.2) also requires "no prior unclosed fence in the doc"
+    // before speculating. This guard is not implemented: we check only the block's own
+    // text. False positives (paragraph inside an already-open fence) are always
+    // corrected when the next parse arrives via LiveBlockModel::applyOps clearing all
+    // speculative state. The transient visual artifact is minor and deferred.
     if (isFenceOpener(postText)) {
         if (!m_model->isSpeculative(row))
             m_model->speculativelyChangeKind(row, QStringLiteral("code_block"));

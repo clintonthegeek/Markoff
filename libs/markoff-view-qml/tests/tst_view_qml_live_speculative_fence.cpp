@@ -164,5 +164,5 @@ private Q_SLOTS:
     }
 };
 
-QTEST_APPLESS_MAIN(TstLiveSpeculativeFence)
+QTEST_MAIN(TstLiveSpeculativeFence)
 #include "tst_view_qml_live_speculative_fence.moc"
