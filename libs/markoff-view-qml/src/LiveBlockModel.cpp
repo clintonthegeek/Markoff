@@ -98,13 +98,22 @@ QString LiveBlockModel::confirmedKindAt(int row) const
 void LiveBlockModel::setComposingRow(int row, bool composing)
 {
     if (composing) {
-        m_composingRows.insert(row);
+        m_composingAnchor = (row >= 0 && row < m_rows.size())
+            ? std::optional<Markoff::BlockAnchor>(m_rows[row].blockAnchor)
+            : std::nullopt;
+        m_hasDeferredDataChanged = false;
     } else {
-        m_composingRows.remove(row);
-        if (m_deferredDataChanged.remove(row)) {
-            const QModelIndex idx = index(row, 0);
-            Q_EMIT dataChanged(idx, idx);
+        if (m_composingAnchor.has_value() && m_hasDeferredDataChanged) {
+            // Find the current row for this anchor (may have shifted via ops).
+            for (int i = 0; i < m_rows.size(); ++i) {
+                if (m_rows[i].blockAnchor == m_composingAnchor.value()) {
+                    Q_EMIT dataChanged(index(i, 0), index(i, 0));
+                    break;
+                }
+            }
         }
+        m_composingAnchor = std::nullopt;
+        m_hasDeferredDataChanged = false;
     }
 }
 
@@ -122,8 +131,11 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                     if (m_rows[row] != nextRecords[op.nextIndex]) {
                         m_rows[row] = nextRecords[op.nextIndex];
                         const QModelIndex idx = index(row, 0);
-                        if (m_composingRows.contains(row)) {
-                            m_deferredDataChanged.insert(row);   // flush when composing ends
+                        // Defer the notification if this row is currently composing
+                        // (identified by anchor, not row number, for Insert/Delete safety).
+                        if (m_composingAnchor.has_value()
+                                && m_rows[row].blockAnchor == m_composingAnchor.value()) {
+                            m_hasDeferredDataChanged = true;
                         } else {
                             Q_EMIT dataChanged(idx, idx);
                         }
@@ -140,8 +152,13 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                 break;
             }
             case AstBlockDiff::OpKind::Delete: {
-                m_composingRows.remove(row);
-                m_deferredDataChanged.remove(row);
+                // If the composing block is being deleted, clear composing state.
+                if (m_composingAnchor.has_value()
+                        && row < m_rows.size()
+                        && m_rows[row].blockAnchor == m_composingAnchor.value()) {
+                    m_composingAnchor = std::nullopt;
+                    m_hasDeferredDataChanged = false;
+                }
                 beginRemoveRows(QModelIndex(), row, row);
                 m_rows.removeAt(row);
                 endRemoveRows();

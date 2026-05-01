@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <optional>
+
 #include <QAbstractListModel>
 #include <QHash>
 #include <QList>
-#include <QSet>
 #include <qqmlintegration.h>
 
+#include <markoff-foundation/BlockAnchor.h>
 #include <markoff/view/qml/BlockRecord.h>
 #include "../../../../src/AstBlockDiff.h"
 
@@ -74,8 +76,12 @@ public:
 private:
     QList<BlockRecord> m_rows;
     QHash<int, QString> m_speculativeOriginals;  // row → original kind
-    QSet<int> m_composingRows;          // rows currently mid-composition
-    QSet<int> m_deferredDataChanged;    // rows with a deferred dataChanged pending
+
+    // Composing-row deferral: tracked by BlockAnchor (CRDT-stable) so the row
+    // number can shift via Insert/Delete ops without losing the reference.
+    // At most one block is composing at a time (single focused TextEdit).
+    std::optional<Markoff::BlockAnchor> m_composingAnchor;
+    bool m_hasDeferredDataChanged = false;
 };
 
 }  // namespace Markoff::View::Qml
