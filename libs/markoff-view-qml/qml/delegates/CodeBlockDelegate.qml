@@ -25,6 +25,10 @@ Rectangle {
     function positionAt(x, y) { return textEdit.positionAt(x, y) }
     readonly property int textLength: textEdit.length
 
+    // Expose cursor/selection state for LiveView.qml's Keys handler.
+    readonly property int cursorPosition: textEdit.cursorPosition
+    readonly property string selectedText: textEdit.selectedText
+
     LiveEditBinding {
         id: editBinding
         document: root.document
@@ -45,6 +49,13 @@ Rectangle {
         color: root.theme ? root.theme.codeBlock : "#dcdcdc"
         // Tab inserts a literal tab (Qt TextEdit default when readOnly: false).
         // Enter inserts \n (TextEdit default). Neither is intercepted here.
+
+        onActiveFocusChanged: {
+            if (activeFocus) {
+                const lv = root.ListView.view
+                if (lv) lv.parent.focusedDelegate = root
+            }
+        }
 
         Connections {
             target: root.selectionModel

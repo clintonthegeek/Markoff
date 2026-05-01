@@ -22,6 +22,10 @@ Item {
     function positionAt(x, y) { return textEdit.positionAt(x, y) }
     readonly property int textLength: textEdit.length
 
+    // Expose cursor/selection state for LiveView.qml's Keys handler.
+    readonly property int cursorPosition: textEdit.cursorPosition
+    readonly property string selectedText: textEdit.selectedText
+
     LiveEditBinding {
         id: editBinding
         document: root.document
@@ -53,6 +57,13 @@ Item {
         InlineFormatHighlighter {
             document: textEdit.textDocument
             source: root.blockText
+        }
+
+        onActiveFocusChanged: {
+            if (activeFocus) {
+                const lv = root.ListView.view
+                if (lv) lv.parent.focusedDelegate = root
+            }
         }
     }
 

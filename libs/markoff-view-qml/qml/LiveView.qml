@@ -18,6 +18,31 @@ Item {
     property var editorBackend  // EditorBackend *
     property var theme   // Markoff::Theme value type; null → delegates fall back to hex defaults
 
+    // Focused delegate reference — updated by each delegate on activeFocusChanged.
+    // Provides cursor state to the Keys handler without needing to walk the item tree.
+    property var focusedDelegate: null
+
+    LiveStructuralKeyHandler {
+        id: structuralKeys
+        document: root.editorBackend ? root.editorBackend.document : null
+        model: binding.model
+    }
+
+    Keys.onPressed: (event) => {
+        if (!root.focusedDelegate) return
+        const d = root.focusedDelegate
+        const handled = structuralKeys.tryHandle(
+            event.key,
+            event.modifiers,
+            d.blockAnchor,
+            d.blockIndex,
+            d.cursorPosition !== undefined ? d.cursorPosition : 0,
+            d.selectedText !== undefined ? (d.selectedText.length === 0) : true,
+            d.blockText !== undefined ? d.blockText : ""
+        )
+        if (handled) event.accepted = true
+    }
+
     LiveListModelBinding {
         id: binding
         editorBackend: root.editorBackend

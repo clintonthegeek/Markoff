@@ -86,3 +86,9 @@ add_test(NAME tst_view_qml_live_edit_binding COMMAND tst_view_qml_live_edit_bind
 target_link_libraries(tst_view_qml_live_edit_binding
     PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml markoff_foundation)
 set_tests_properties(tst_view_qml_live_edit_binding PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_view_qml_live_structural_keys tst_view_qml_live_structural_keys.cpp)
+add_test(NAME tst_view_qml_live_structural_keys COMMAND tst_view_qml_live_structural_keys)
+target_link_libraries(tst_view_qml_live_structural_keys
+    PRIVATE Qt6::Test markoff_view_qml markoff_foundation)
+set_tests_properties(tst_view_qml_live_structural_keys PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

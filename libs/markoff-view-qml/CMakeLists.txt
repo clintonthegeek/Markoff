@@ -40,6 +40,8 @@ qt_add_qml_module(markoff_view_qml
         include/markoff/view/qml/InlineFormatHighlighter.h
         src/LiveEditBinding.cpp
         include/markoff/view/qml/LiveEditBinding.h
+        src/LiveStructuralKeyHandler.cpp
+        include/markoff/view/qml/LiveStructuralKeyHandler.h
     QML_FILES
         qml/SourceEditor.qml
         qml/SearchBar.qml
