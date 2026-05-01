@@ -59,6 +59,7 @@ protected:
 
 private:
     void rebuildSpans();
+    void applySpeculativeFormats(const QString &source);
 
     QQuickTextDocument *m_quickDoc = nullptr;
     QString             m_source;

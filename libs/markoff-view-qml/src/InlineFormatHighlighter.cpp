@@ -3,6 +3,8 @@
 
 #include <markoff-parser/TreeSitterParser.h>
 
+#include <QBitArray>
+#include <QFont>
 #include <QQuickTextDocument>
 #include <QTextCharFormat>
 
@@ -56,9 +58,73 @@ void InlineFormatHighlighter::rebuildSpans()
     m_spans = parser.buildSpanMap();
 }
 
+void InlineFormatHighlighter::applySpeculativeFormats(const QString &source)
+{
+    if (source.isEmpty()) return;
+
+    // Collect confirmed code-span ranges to avoid speculating inside code.
+    QList<QPair<int,int>> codeRanges;
+    for (const SourceSpan &s : m_spans) {
+        if (s.code && !s.isDelimiter && s.charLength > 0)
+            codeRanges.append({s.charOffset, s.charOffset + s.charLength});
+    }
+    auto inCodeRange = [&](int pos) {
+        for (const auto &r : codeRanges)
+            if (pos >= r.first && pos < r.second) return true;
+        return false;
+    };
+
+    // Process delimiters longest-first. Track consumed positions.
+    const int len = source.length();
+    QBitArray consumed(len, false);
+
+    struct DelimSpec { QString d; bool bold, italic, code, strike, highlight; };
+    const DelimSpec specs[] = {
+        { QStringLiteral("**"), true,  false, false, false, false },
+        { QStringLiteral("__"), true,  false, false, false, false },
+        { QStringLiteral("~~"), false, false, false, true,  false },
+        { QStringLiteral("=="), false, false, false, false, true  },
+        { QStringLiteral("*"),  false, true,  false, false, false },
+        { QStringLiteral("_"),  false, true,  false, false, false },
+        { QStringLiteral("`"),  false, false, true,  false, false },
+    };
+
+    for (const DelimSpec &spec : specs) {
+        const int dlen = spec.d.length();
+        // Find all non-consumed, non-code-range occurrences.
+        QList<int> positions;
+        for (int i = 0; i <= len - dlen; ++i) {
+            if (consumed[i]) continue;
+            if (inCodeRange(i)) continue;
+            if (QStringView(source).mid(i, dlen) == spec.d) {
+                // Mark as consumed.
+                for (int j = 0; j < dlen; ++j) consumed[i + j] = true;
+                positions.append(i);
+            }
+        }
+        if (positions.isEmpty() || positions.size() % 2 == 0) continue;
+        // Odd count → unclosed opener. The last position is the unclosed one.
+        const int openerStart = positions.last();
+        const int contentStart = openerStart + dlen;
+        if (contentStart >= len) continue;  // opener at very end, nothing to style
+
+        QTextCharFormat fmt;
+        if (spec.bold)      fmt.setFontWeight(QFont::Bold);
+        if (spec.italic)    fmt.setFontItalic(true);
+        if (spec.code)    { fmt.setFontFamilies({ QStringLiteral("Monospace") });
+                            fmt.setBackground(QColor(0xf0, 0xf0, 0xf0)); }
+        if (spec.strike)    fmt.setFontStrikeOut(true);
+        if (spec.highlight) fmt.setBackground(QColor(0xff, 0xff, 0x00));
+
+        setFormat(contentStart, len - contentStart, fmt);
+    }
+}
+
 void InlineFormatHighlighter::highlightBlock(const QString &text)
 {
-    Q_UNUSED(text)
+    // Apply speculative formats first so confirmed spans can overwrite them.
+    applySpeculativeFormats(text);
+
     if (m_spans.isEmpty()) return;
 
     // QSyntaxHighlighter is called once per QTextBlock. For single-block

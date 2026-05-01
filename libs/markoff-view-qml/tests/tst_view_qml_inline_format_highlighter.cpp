@@ -175,6 +175,70 @@ private Q_SLOTS:
         QVERIFY(h.anyBold(2, 15));
         QVERIFY(h.anyItalic(8, 14));
     }
+
+    // --- Speculative open-delimiter tests ---
+
+    void speculative_bold_open_delimiter() {
+        // "**hello" — unclosed ** → "hello" (chars 2..7) is speculatively bold.
+        Helper h;
+        h.load(QStringLiteral("**hello"));
+        QVERIFY(h.anyBold(2, 7));
+    }
+
+    void speculative_closes_when_parser_confirms() {
+        // "**hello**" — parser confirms bold; chars 2..7 must be bold.
+        Helper h;
+        h.load(QStringLiteral("**hello**"));
+        QVERIFY(h.anyBold(2, 7));
+    }
+
+    void speculative_italic_open_delimiter() {
+        // "*world" — unclosed * → "world" (chars 1..6) is speculatively italic.
+        Helper h;
+        h.load(QStringLiteral("*world"));
+        QVERIFY(h.anyItalic(1, 6));
+    }
+
+    void speculative_code_open_delimiter() {
+        // "`code" — unclosed ` → "code" (chars 1..5) is speculatively code-styled.
+        Helper h;
+        h.load(QStringLiteral("`code"));
+        QVERIFY(h.anyCode(1, 5));
+    }
+
+    void speculative_strikethrough_open_delimiter() {
+        // "~~strike" — unclosed ~~ → "strike" (chars 2..8) is speculatively strikethrough.
+        Helper h;
+        h.load(QStringLiteral("~~strike"));
+        QVERIFY(h.anyStrikethrough(2, 8));
+    }
+
+    void speculative_highlight_open_delimiter() {
+        // "==bright" — unclosed == → "bright" (chars 2..8) is speculatively highlighted.
+        Helper h;
+        h.load(QStringLiteral("==bright"));
+        QVERIFY(h.anyHighlight(2, 8));
+    }
+
+    void speculative_double_underscore_bold() {
+        // "__text" — unclosed __ → "text" (chars 2..6) is speculatively bold.
+        Helper h;
+        h.load(QStringLiteral("__text"));
+        QVERIFY(h.anyBold(2, 6));
+    }
+
+    void speculative_code_does_not_format_nested() {
+        // "**before** `inside` **after" — "inside" is confirmed code (monospace),
+        // "after" is speculatively bold from the unclosed final **.
+        // Key check: "inside" is NOT bold (it's inside code), "after" IS bold.
+        Helper h;
+        h.load(QStringLiteral("**before** `inside` **after"));
+        // "after" starts at index 22 ("**after" → ** at 20, content at 22)
+        QVERIFY(h.anyBold(22, 27));
+        // "inside" is at chars 12..18 — should be code-styled, not bold
+        QVERIFY(h.anyCode(12, 18));
+        QVERIFY(!h.anyBold(12, 18));
+    }
 };
 
 QTEST_MAIN(TstInlineFormatHighlighter)
