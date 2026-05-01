@@ -2,6 +2,7 @@
 #include <markoff/view/qml/LiveEditBinding.h>
 
 #include <QTextDocument>
+#include <QThread>
 
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/SourceTextDocumentBinding.h>
@@ -121,6 +122,7 @@ void LiveEditBinding::endModelUpdate()
 
 void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdded)
 {
+    Q_ASSERT(QThread::currentThread() == thread());
     // Suppress changes that come from our own model-driven text assignment.
     if (m_applyingModelUpdate) return;
     if (!m_document || !m_textDoc) return;
