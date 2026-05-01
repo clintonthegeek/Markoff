@@ -188,3 +188,10 @@ add_executable(tst_foundation_block_anchor_stability tst_foundation_block_anchor
 add_test(NAME tst_foundation_block_anchor_stability COMMAND tst_foundation_block_anchor_stability)
 target_link_libraries(tst_foundation_block_anchor_stability PRIVATE Qt6::Test markoff_foundation)
 set_tests_properties(tst_foundation_block_anchor_stability PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_foundation_block_anchor_perf tst_foundation_block_anchor_perf.cpp)
+add_test(NAME tst_foundation_block_anchor_perf COMMAND tst_foundation_block_anchor_perf)
+target_link_libraries(tst_foundation_block_anchor_perf PRIVATE Qt6::Test markoff_foundation)
+target_include_directories(tst_foundation_block_anchor_perf PRIVATE
+    ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src)
+set_tests_properties(tst_foundation_block_anchor_perf PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
