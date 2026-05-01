@@ -25,7 +25,7 @@ void LiveSpeculativeFenceController::onEditApplied(const Markoff::BlockAnchor &/
 
     const QString currentKind = m_model->data(
         m_model->index(row, 0),
-        m_model->roleForName("kind")).toString();
+        LiveBlockModel::KindRole).toString();
 
     if (currentKind != QStringLiteral("paragraph")) {
         // Not a paragraph — revert any stale speculation on this row.
