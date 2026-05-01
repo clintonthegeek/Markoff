@@ -111,6 +111,20 @@ Item {
                     event.accepted = true
                     return
                 }
+                // Up/Down at the edges of the hole's TextEdit would yield
+                // focus to ListView's focus chain, which here just causes
+                // the view to scroll while the caret vanishes. Convert
+                // these into explicit commit-or-abandon + neighbour focus
+                // routing so up/down navigates as the user expects.
+                if (event.key === Qt.Key_Up || event.key === Qt.Key_Down) {
+                    const buf = textEdit.getText(0, textEdit.length)
+                    if (buf.length > 0)
+                        root.projectionLayer.commitBlockHole(root.holeId)
+                    else
+                        root.projectionLayer.dropBlockHole(root.holeId)
+                    event.accepted = true
+                    return
+                }
             }
 
             if (!root.structuralKeyHandler) return
@@ -201,8 +215,20 @@ Item {
     // The QML begin/end pattern doesn't work because Qt Quick defers
     // TextEdit text updates past the guard window.
     onBlockTextChanged: {
-        // Hold the buffer-mirror guard while the model-driven text update
-        // propagates through QTextDocument::setPlainText → onTextChanged.
+        // CRITICAL: skip the model→delegate text replay when this delegate
+        // currently has user focus. The cycle guard in setModelText handles
+        // the immediate echo of OUR last applyLocalEdit, but it does not
+        // handle the user typing faster than the parse round-trip: by the
+        // time parseUpdatedAt fires, the QTextDocument already contains
+        // user keystrokes that postdate the parse's input snapshot.
+        // setPlainText would clobber those in-flight characters and reset
+        // the cursor, producing the visible scramble the dogfood surfaced.
+        // While the user has focus here, the TextEdit content is the
+        // canonical view; the CRDT already has the keystrokes via
+        // applyLocalEdit. Let the parse-back update propagate to the model
+        // (kind changes, sibling rows) but skip overwriting THIS delegate's
+        // text. When focus leaves, any drift is reconciled on next entry.
+        if (textEdit.activeFocus) return
         root.m_applyingModelBuffer = true
         editBinding.setModelText(root.blockText)
         root.m_applyingModelBuffer = false
