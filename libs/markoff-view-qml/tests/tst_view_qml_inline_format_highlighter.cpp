@@ -83,6 +83,16 @@ struct Helper {
         }
         return false;
     }
+
+    bool anyHighlight(int start, int end) const {
+        for (int i = start; i < end; ++i) {
+            const QTextCharFormat fmt = mergedFormatAt(i);
+            const QColor bgColor = fmt.background().color();
+            if (bgColor.isValid() && bgColor == QColor(0xff, 0xff, 0x00))
+                return true;
+        }
+        return false;
+    }
 };
 
 }  // namespace
@@ -110,6 +120,13 @@ private Q_SLOTS:
         Helper h;
         h.load(QStringLiteral("`code`"));
         QVERIFY(h.anyCode(1, 5));
+    }
+
+    void highlight_applied() {
+        // "==highlighted==" — "highlighted" (chars 2..13) should have yellow background.
+        Helper h;
+        h.load(QStringLiteral("==highlighted=="));
+        QVERIFY(h.anyHighlight(2, 13));
     }
 
     void strikethrough_applied() {
