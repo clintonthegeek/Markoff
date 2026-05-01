@@ -18,6 +18,28 @@ Item {
     property var editorBackend  // EditorBackend *
     property var theme   // Markoff::Theme value type; null → delegates fall back to hex defaults
 
+    // Grab focus when the document is empty so the first keystroke is received here.
+    focus: listView.count === 0
+
+    // Set to true when insertFirstCharacter has been called; cleared once we
+    // redirect focus into the freshly-created delegate.
+    property bool m_firstInsertPending: false
+
+    // Length (in UTF-16 code units) of the text inserted via insertFirstCharacter.
+    // Used to position the cursor correctly after the delegate materialises.
+    property int m_firstInsertLength: 0
+
+    Keys.onPressed: (event) => {
+        if (listView.count !== 0) { event.accepted = false; return }
+        const text = event.text
+        if (text.length === 0 || text.charCodeAt(0) < 32) { event.accepted = false; return }
+        if (!root.editorBackend) { event.accepted = false; return }
+        structuralKeys.insertFirstCharacter(text)
+        root.m_firstInsertPending = true
+        root.m_firstInsertLength = text.length
+        event.accepted = true
+    }
+
     LiveStructuralKeyHandler {
         id: structuralKeys
         document: root.editorBackend ? root.editorBackend.document : null
@@ -64,6 +86,27 @@ Item {
         spacing: 12
 
         model: binding.model
+
+        onCountChanged: {
+            if (listView.count >= 1 && root.m_firstInsertPending) {
+                root.m_firstInsertPending = false
+                const targetPos = root.m_firstInsertLength
+                root.m_firstInsertLength = 0
+                // Two Qt.callLater levels: first to let the delegate
+                // materialise, second to let blockText sync to the TextEdit
+                // before we position the cursor.
+                Qt.callLater(function() {
+                    Qt.callLater(function() {
+                        const item = listView.itemAtIndex(0)
+                        if (!item) return
+                        if (typeof item.focusAtPos === "function")
+                            item.focusAtPos(targetPos)
+                        else if (typeof item.focusAtEnd === "function")
+                            item.focusAtEnd()
+                    })
+                })
+            }
+        }
 
         delegate: DelegateChooser {
             role: "kind"

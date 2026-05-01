@@ -139,4 +139,14 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
     return false;
 }
 
+void LiveStructuralKeyHandler::insertFirstCharacter(const QString &text)
+{
+    if (!m_document || text.isEmpty()) return;
+    Markoff::MarkoffEdit ed;
+    ed.oldStart = 0;
+    ed.oldEnd   = 0;
+    ed.newText  = text.toUtf8();
+    m_document->applyLocalEdit({ ed });
+}
+
 }  // namespace Markoff::View::Qml

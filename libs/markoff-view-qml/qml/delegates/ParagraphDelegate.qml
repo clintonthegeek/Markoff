@@ -33,8 +33,21 @@ Item {
     readonly property int cursorPosition: textEdit.cursorPosition
     readonly property string selectedText: textEdit.selectedText
 
-    function focusAtEnd()   { textEdit.forceActiveFocus(); textEdit.cursorPosition = textEdit.length }
-    function focusAtStart() { textEdit.forceActiveFocus(); textEdit.cursorPosition = 0 }
+    function focusAtEnd()      { textEdit.forceActiveFocus(); textEdit.cursorPosition = textEdit.length }
+    function focusAtStart()    { textEdit.forceActiveFocus(); textEdit.cursorPosition = 0 }
+    // Place cursor at pos; if the TextEdit text hasn't populated yet, schedule
+    // a retry so the position sticks once content arrives.
+    function focusAtPos(pos) {
+        textEdit.forceActiveFocus()
+        if (textEdit.length >= pos) {
+            textEdit.cursorPosition = pos
+        } else {
+            // Text not yet synced — retry once more after the next event cycle.
+            Qt.callLater(function() {
+                textEdit.cursorPosition = Math.min(pos, textEdit.length)
+            })
+        }
+    }
 
     LiveEditBinding {
         id: editBinding
@@ -101,6 +114,14 @@ Item {
     // TextEdit text updates past the guard window.
     onBlockTextChanged: {
         editBinding.setModelText(root.blockText)
+    }
+
+    // On fresh delegate creation the textDocument binding may not have been
+    // resolved when onBlockTextChanged first fires, leaving the TextEdit empty.
+    // Re-apply the text after the component is fully initialised.
+    Component.onCompleted: {
+        if (root.blockText.length > 0)
+            editBinding.setModelText(root.blockText)
     }
 
     Connections {

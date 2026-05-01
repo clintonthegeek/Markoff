@@ -666,6 +666,76 @@ private Q_SLOTS:
                  "Focus should be in block 1 (following paragraph) after image-at-top click");
     }
 
+    void empty_doc_first_keystroke_materialises_paragraph() {
+        // Empty document — type 'a' — one paragraph row appears, focus lands
+        // in it with cursor at offset 1.
+        Markoff::MarkoffDocument doc(1);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "themeCtx", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: themeCtx\n"
+            "    mode: \"live\"\n"
+            "}\n",
+            QUrl());
+        if (component.isError()) qWarning() << component.errors();
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        // Find the LiveView
+        QQuickItem *liveView = nullptr;
+        for (QQuickItem *child : root->findChildren<QQuickItem *>()) {
+            if (child->findChild<QQuickItem *>(QStringLiteral("listView"))) {
+                liveView = child; break;
+            }
+        }
+        if (!liveView) QSKIP("Cannot locate LiveView");
+
+        // LiveView should have active focus (doc is empty, count == 0)
+        liveView->forceActiveFocus();
+
+        // Type 'a'
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        QTest::keyClick(&view, Qt::Key_A);
+        QVERIFY(parseSpy.wait(2000));
+
+        // One paragraph row should materialise
+        QQuickItem *listViewItem = root->findChild<QQuickItem *>(QStringLiteral("listView"));
+        QVERIFY(listViewItem);
+        QTRY_COMPARE(listViewItem->property("count").toInt(), 1);
+
+        // Focus should be in the new delegate with cursor at 1.
+        // Allow up to 500 ms for the deferred Qt.callLater focus-at-pos chain
+        // to complete (two callLater levels + one potential retry).
+        QQuickItem *focused = nullptr;
+        QTRY_VERIFY_WITH_TIMEOUT((focused = view.activeFocusItem()) != nullptr, 500);
+        QVERIFY2(focused, "No active focus after materialisation");
+
+        // The cursor should be at offset 1
+        QVariant cursorPos = focused->property("cursorPosition");
+        if (cursorPos.isValid())
+            QTRY_COMPARE_WITH_TIMEOUT(
+                view.activeFocusItem()->property("cursorPosition").toInt(), 1, 500);
+    }
+
     void selection_highlight_appears_on_hr_and_image() {
         Markoff::MarkoffDocument doc(1);
 

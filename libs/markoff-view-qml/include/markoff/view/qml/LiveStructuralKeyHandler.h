@@ -57,6 +57,12 @@ public:
                                bool selectionEmpty,
                                const QString &blockText);
 
+    /// Insert the very first character into an empty document.
+    ///
+    /// Called by LiveView.qml when the document has 0 rows and the user presses
+    /// a printable key. Creates a paragraph block containing \a text.
+    Q_INVOKABLE void insertFirstCharacter(const QString &text);
+
 Q_SIGNALS:
     void documentChanged();
     void modelChanged();
