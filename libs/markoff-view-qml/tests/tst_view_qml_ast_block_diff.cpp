@@ -151,9 +151,11 @@ private Q_SLOTS:
         QList<BlockKey> next { k(BlockKind::Heading,   1) };
         const auto ops = AstBlockDiff::diff(prev, next);
         QCOMPARE(ops.size(), 2);
-        const bool first_is_delete = ops[0].kind == AstBlockDiff::OpKind::Delete;
-        const bool first_is_insert = ops[0].kind == AstBlockDiff::OpKind::Insert;
-        QVERIFY2(first_is_delete || first_is_insert, qPrintable(opsToString(ops)));
+        const bool hasDelete = ops[0].kind == AstBlockDiff::OpKind::Delete ||
+                               ops[1].kind == AstBlockDiff::OpKind::Delete;
+        const bool hasInsert = ops[0].kind == AstBlockDiff::OpKind::Insert ||
+                               ops[1].kind == AstBlockDiff::OpKind::Insert;
+        QVERIFY2(hasDelete && hasInsert, qPrintable(opsToString(ops)));
     }
 
     void large_identical_short_circuits_to_all_equals() {

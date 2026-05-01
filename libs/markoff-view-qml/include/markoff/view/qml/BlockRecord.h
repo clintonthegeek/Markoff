@@ -14,7 +14,7 @@ namespace Markoff::View::Qml {
 /// source, or strip frontmatter markers, etc., per kind).
 struct BlockRecord {
     QString kind;          ///< One of BlockKind::*
-    QString source;        ///< Raw markdown source for this block (identity)
+    QString source;        ///< Raw markdown source for this block (rendering only; identity is carried by BlockKey)
     QString text;          ///< Renderable text (used by paragraph/heading delegates)
 
     int     headingLevel = 0;   ///< 1..6 if kind==Heading; else 0

@@ -88,7 +88,7 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
     // MarkoffDocument's `latestParse` and may be replaced when the next parse
     // arrives.
     const QString source = parsed->sourceText();
-    // blockAnchors is a QList (implicitly shared) — safe to capture by value.
+    // blockAnchors is a QList (implicitly shared) — copy to own a named value for the lambda capture.
     const QList<Markoff::BlockAnchor> anchors = blockAnchors;
     const quint64 myGen  = d->walkGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
 
@@ -113,7 +113,7 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
                 // sync with records.
                 QList<BlockKey> nextKeys;
                 nextKeys.reserve(records.size());
-                for (int i = 0; i < records.size(); ++i) {
+                for (qsizetype i = 0; i < records.size(); ++i) {
                     const Markoff::BlockAnchor anchor =
                         (i < anchors.size()) ? anchors[i] : Markoff::BlockAnchor{};
                     nextKeys.append(BlockKey { records[i].kind, anchor });
