@@ -41,8 +41,13 @@ public:
     LiveBlockModel *model() const;
     LiveSelectionView *selectionModel() const;
 
+    Q_INVOKABLE void notifyFocused(const Markoff::BlockAnchor &anchor, int cursorPos);
+    Q_INVOKABLE void notifyFocusedCursorMoved(int cursorPos);
+    Q_INVOKABLE bool isFocusRestoreTarget(const Markoff::BlockAnchor &anchor) const;
+
 Q_SIGNALS:
     void editorBackendChanged();
+    void focusRestoreRequested(const Markoff::BlockAnchor &anchor, int qtPos);
 
 private:
     void onParseUpdatedAt(const Markoff::Document *parsed,

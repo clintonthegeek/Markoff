@@ -14,6 +14,7 @@ Item {
     property var    selectionModel: null
     property var    theme: null
     property var    structuralKeyHandler: null
+    property var    modelBinding: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
@@ -67,6 +68,17 @@ Item {
             }
         }
 
+        onActiveFocusChanged: {
+            if (activeFocus && root.modelBinding) {
+                root.modelBinding.notifyFocused(root.blockAnchor, textEdit.cursorPosition)
+            }
+        }
+        onCursorPositionChanged: {
+            if (activeFocus && root.modelBinding) {
+                root.modelBinding.notifyFocusedCursorMoved(textEdit.cursorPosition)
+            }
+        }
+
         InlineFormatHighlighter {
             document: textEdit.textDocument
             source: root.blockText
@@ -91,6 +103,16 @@ Item {
             } else {
                 const end = Math.min(r.y, textEdit.length)
                 textEdit.select(r.x, end)
+            }
+        }
+    }
+
+    Connections {
+        target: root.modelBinding
+        function onFocusRestoreRequested(anchor, qtPos) {
+            if (root.modelBinding && root.modelBinding.isFocusRestoreTarget(root.blockAnchor)) {
+                textEdit.forceActiveFocus()
+                textEdit.cursorPosition = Math.min(qtPos, textEdit.length)
             }
         }
     }

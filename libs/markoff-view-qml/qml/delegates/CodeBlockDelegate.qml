@@ -16,6 +16,7 @@ Rectangle {
     property var    selectionModel: null
     property var    theme: null
     property var    structuralKeyHandler: null
+    property var    modelBinding: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
@@ -71,6 +72,17 @@ Rectangle {
             }
         }
 
+        onActiveFocusChanged: {
+            if (activeFocus && root.modelBinding) {
+                root.modelBinding.notifyFocused(root.blockAnchor, textEdit.cursorPosition)
+            }
+        }
+        onCursorPositionChanged: {
+            if (activeFocus && root.modelBinding) {
+                root.modelBinding.notifyFocusedCursorMoved(textEdit.cursorPosition)
+            }
+        }
+
         Connections {
             target: root.selectionModel
             function onSelectionChanged() {
@@ -94,5 +106,15 @@ Rectangle {
     SyntaxHighlighter {
         textEdit: textEdit
         definition: root.codeLanguage.length > 0 ? root.codeLanguage : "Markdown"
+    }
+
+    Connections {
+        target: root.modelBinding
+        function onFocusRestoreRequested(anchor, qtPos) {
+            if (root.modelBinding && root.modelBinding.isFocusRestoreTarget(root.blockAnchor)) {
+                textEdit.forceActiveFocus()
+                textEdit.cursorPosition = Math.min(qtPos, textEdit.length)
+            }
+        }
     }
 }

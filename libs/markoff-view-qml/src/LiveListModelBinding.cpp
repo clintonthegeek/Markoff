@@ -14,6 +14,7 @@
 #include <QThreadPool>
 
 #include <atomic>
+#include <optional>
 
 namespace Markoff::View::Qml {
 
@@ -22,6 +23,9 @@ struct LiveListModelBinding::Private {
     LiveBlockModel     *model         = nullptr;
     LiveSelectionView  *selection     = nullptr;
     QList<BlockKey>     lastKeys;
+
+    std::optional<Markoff::BlockAnchor> focusedAnchor;
+    int focusedCursorPosition = 0;
 
     /// Monotonic counter incremented on every dispatched walk. Worker threads
     /// capture the value at dispatch time and the main-thread post-back drops
@@ -146,11 +150,64 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
                         d->selection->notifyBlocksRemoved(deletedBlockAnchors);
                 }
 
+                // Detect kind-change at the focused block: a Delete of the
+                // focused block's anchor followed by an Insert at the same
+                // model row position (nextIndex matching the model row the
+                // Delete leaves behind) means the block changed kind.
+                // NOTE: the BlockAnchor changes on prepend (e.g. "# " →
+                // heading) because it is the CRDT anchor at the first byte.
+                // We therefore match by prevIndex (the focused block's row)
+                // and nextIndex equal to that same row — indicating an in-place
+                // kind swap rather than a block-list reshuffle.
+                if (d->focusedAnchor.has_value()) {
+                    const auto fa = d->focusedAnchor.value();
+                    int deletedRow = -1;
+                    int insertedRow = -1;
+                    for (const auto &op : ops) {
+                        if (op.kind == AstBlockDiff::OpKind::Delete
+                                && op.prevIndex >= 0
+                                && op.prevIndex < d->lastKeys.size()
+                                && d->lastKeys[op.prevIndex].anchor == fa)
+                            deletedRow = op.prevIndex;
+                        if (op.kind == AstBlockDiff::OpKind::Insert
+                                && op.nextIndex >= 0
+                                && op.nextIndex < nextKeys.size())
+                            insertedRow = op.nextIndex;
+                    }
+                    // Same row deleted and inserted at same position → kind-change.
+                    if (deletedRow >= 0 && insertedRow == deletedRow) {
+                        const int savedPos = d->focusedCursorPosition;
+                        const Markoff::BlockAnchor newAnchor = nextKeys[insertedRow].anchor;
+                        // Update focused anchor to the new anchor so
+                        // isFocusRestoreTarget works in delegates.
+                        d->focusedAnchor = newAnchor;
+                        QMetaObject::invokeMethod(this, [this, newAnchor, savedPos]() {
+                            Q_EMIT focusRestoreRequested(newAnchor, savedPos);
+                        }, Qt::QueuedConnection);
+                    }
+                }
+
                 d->model->applyOps(ops, records);
                 d->lastKeys = std::move(nextKeys);
             },
             Qt::QueuedConnection);
     });
+}
+
+void LiveListModelBinding::notifyFocused(const Markoff::BlockAnchor &anchor, int cursorPos)
+{
+    d->focusedAnchor = anchor;
+    d->focusedCursorPosition = cursorPos;
+}
+
+void LiveListModelBinding::notifyFocusedCursorMoved(int cursorPos)
+{
+    d->focusedCursorPosition = cursorPos;
+}
+
+bool LiveListModelBinding::isFocusRestoreTarget(const Markoff::BlockAnchor &anchor) const
+{
+    return d->focusedAnchor.has_value() && d->focusedAnchor.value() == anchor;
 }
 
 }  // namespace Markoff::View::Qml

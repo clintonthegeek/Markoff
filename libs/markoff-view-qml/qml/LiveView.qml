@@ -66,6 +66,7 @@ Item {
                     selectionModel: binding.selectionModel
                     theme: root.theme
                     structuralKeyHandler: structuralKeys
+                    modelBinding: binding
                 }
             }
             DelegateChoice {
@@ -79,6 +80,7 @@ Item {
                     selectionModel: binding.selectionModel
                     theme: root.theme
                     structuralKeyHandler: structuralKeys
+                    modelBinding: binding
                 }
             }
             DelegateChoice {
@@ -111,6 +113,7 @@ Item {
                     selectionModel: binding.selectionModel
                     theme: root.theme
                     structuralKeyHandler: structuralKeys
+                    modelBinding: binding
                 }
             }
         }

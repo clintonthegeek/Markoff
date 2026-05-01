@@ -138,6 +138,118 @@ private Q_SLOTS:
         QVERIFY(sel->hasSelection());
     }
 
+    /// Task 7: typing "# " at the start of a paragraph causes a kind-change
+    /// (paragraph → heading). The binding must emit focusRestoreRequested with
+    /// the new block's anchor and the saved cursor position so the new
+    /// HeadingDelegate can restore focus.
+    void focus_restore_requested_on_kind_change() {
+        Markoff::MarkoffDocument doc(1);
+        EditorBackend be;
+        be.setDocument(&doc);
+        LiveListModelBinding binding;
+        binding.setEditorBackend(&be);
+
+        // Seed: one paragraph "hello world"
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("hello world\n");
+        doc.applyLocalEdit({ ed });
+
+        LiveBlockModel *model = binding.model();
+        QTRY_COMPARE(model->rowCount(), 1);
+        QCOMPARE(model->data(model->index(0, 0), model->roleForName("kind")).toString(),
+                 QStringLiteral("paragraph"));
+
+        // Capture the paragraph's BlockAnchor from the model role.
+        const QVariant anchorVar =
+            model->data(model->index(0, 0), model->roleForName("blockAnchor"));
+        QVERIFY(anchorVar.isValid());
+        const Markoff::BlockAnchor para_anchor =
+            anchorVar.value<Markoff::BlockAnchor>();
+
+        // Simulate the delegate notifying focus at cursor position 3.
+        binding.notifyFocused(para_anchor, 3);
+        QVERIFY(binding.isFocusRestoreTarget(para_anchor));
+
+        // Spy on the focusRestoreRequested signal.
+        QSignalSpy restoreSpy(&binding, &LiveListModelBinding::focusRestoreRequested);
+
+        // Apply the kind-changing edit: prepend "# " → "# hello world\n"
+        Markoff::MarkoffEdit kindEdit;
+        kindEdit.oldStart = 0;
+        kindEdit.oldEnd = 0;
+        kindEdit.newText = QByteArrayLiteral("# ");
+        doc.applyLocalEdit({ kindEdit });
+
+        // Wait for the model to reflect the heading kind.
+        QTRY_COMPARE(model->data(model->index(0, 0), model->roleForName("kind")).toString(),
+                     QStringLiteral("heading"));
+
+        // The focusRestoreRequested signal must have fired.
+        // It is queued so we need to pump the event loop.
+        QTRY_VERIFY(restoreSpy.count() >= 1);
+
+        // The signal carries the new block's anchor (the heading anchor —
+        // BlockAnchor changes on prepend since it's the first-byte CRDT anchor)
+        // and the saved cursor position.
+        const auto args = restoreSpy.first();
+        // The emitted anchor must match the heading block's anchor in the model.
+        const Markoff::BlockAnchor heading_anchor =
+            model->data(model->index(0, 0), model->roleForName("blockAnchor"))
+                  .value<Markoff::BlockAnchor>();
+        QCOMPARE(args[0].value<Markoff::BlockAnchor>(), heading_anchor);
+        QCOMPARE(args[1].toInt(), 3);
+        // isFocusRestoreTarget must now return true for the heading anchor.
+        QVERIFY(binding.isFocusRestoreTarget(heading_anchor));
+    }
+
+    /// isFocusRestoreTarget returns false when no anchor is focused.
+    void is_focus_restore_target_false_by_default() {
+        LiveListModelBinding binding;
+        Markoff::BlockAnchor dummy{};
+        QVERIFY(!binding.isFocusRestoreTarget(dummy));
+    }
+
+    /// notifyFocusedCursorMoved updates the saved cursor position.
+    void notify_focused_cursor_moved_updates_position() {
+        Markoff::MarkoffDocument doc(1);
+        EditorBackend be;
+        be.setDocument(&doc);
+        LiveListModelBinding binding;
+        binding.setEditorBackend(&be);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("hello world\n");
+        doc.applyLocalEdit({ ed });
+
+        LiveBlockModel *model = binding.model();
+        QTRY_COMPARE(model->rowCount(), 1);
+
+        const QVariant anchorVar =
+            model->data(model->index(0, 0), model->roleForName("blockAnchor"));
+        const Markoff::BlockAnchor anchor = anchorVar.value<Markoff::BlockAnchor>();
+
+        binding.notifyFocused(anchor, 0);
+        binding.notifyFocusedCursorMoved(7);
+
+        // Spy to capture the emitted position after a kind-change.
+        QSignalSpy restoreSpy(&binding, &LiveListModelBinding::focusRestoreRequested);
+
+        Markoff::MarkoffEdit kindEdit;
+        kindEdit.oldStart = 0; kindEdit.oldEnd = 0;
+        kindEdit.newText = QByteArrayLiteral("# ");
+        doc.applyLocalEdit({ kindEdit });
+
+        QTRY_COMPARE(model->data(model->index(0, 0), model->roleForName("kind")).toString(),
+                     QStringLiteral("heading"));
+        QTRY_VERIFY(restoreSpy.count() >= 1);
+
+        // Position should be the value set by notifyFocusedCursorMoved (7).
+        const auto args = restoreSpy.first();
+        QCOMPARE(args[1].toInt(), 7);
+    }
+
     /// 1A: rapid back-to-back edits — the final model state must match the
     /// final document state, regardless of how parses + walks coalesce.
     /// Without the m_walkGeneration cookie an out-of-order walk completion
