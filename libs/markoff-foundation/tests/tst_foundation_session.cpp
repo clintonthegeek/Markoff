@@ -9,8 +9,19 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Session.h>
 #include <markoff-foundation/SessionParams.h>
+#include <markoff-foundation/TextAnchor.h>
 
 using namespace Markoff;
+
+namespace {
+/// Build a TextAnchor with the same wire identity as a CRDT anchor.
+/// The Selection field type changed to TextAnchor in T10/T11; tests
+/// retain CRDT construction for clarity at the seed and convert here.
+TextAnchor ta(quint16 r, quint32 cv, CollabText::Crdt::Bias bias)
+{
+    return TextAnchor{r, cv, bias == CollabText::Crdt::Bias::Right ? quint8(1) : quint8(0)};
+}
+}  // namespace
 
 class TstFoundationSession : public QObject {
     Q_OBJECT
@@ -44,16 +55,16 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         Session *s = new Session(&doc, SessionParams{});
         Selection sel;
-        sel.anchor = CollabText::Crdt::Anchor(1, 10, CollabText::Crdt::Bias::Left);
-        sel.active = CollabText::Crdt::Anchor(1, 12, CollabText::Crdt::Bias::Right);
+        sel.anchor = ta(1, 10, CollabText::Crdt::Bias::Left);
+        sel.active = ta(1, 12, CollabText::Crdt::Bias::Right);
         sel.kind   = Selection::Kind::Primary;
 
         QSignalSpy spy(s, &Session::primarySelectionChanged);
         s->setPrimarySelection(sel);
 
         QCOMPARE(spy.count(), 1);
-        QCOMPARE(s->primarySelection().anchor.char_value, sel.anchor.char_value);
-        QCOMPARE(s->primarySelection().active.char_value, sel.active.char_value);
+        QCOMPARE(s->primarySelection().anchor.charValue, sel.anchor.charValue);
+        QCOMPARE(s->primarySelection().active.charValue, sel.active.charValue);
         delete s;
     }
 
@@ -61,8 +72,8 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         Session *s = new Session(&doc, SessionParams{});
         Selection sel;
-        sel.anchor = CollabText::Crdt::Anchor(1, 10, CollabText::Crdt::Bias::Left);
-        sel.active = CollabText::Crdt::Anchor(1, 10, CollabText::Crdt::Bias::Left);
+        sel.anchor = ta(1, 10, CollabText::Crdt::Bias::Left);
+        sel.active = ta(1, 10, CollabText::Crdt::Bias::Left);
         s->setPrimarySelection(sel);
 
         QSignalSpy spy(s, &Session::primarySelectionChanged);
@@ -75,11 +86,11 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         Session *s = new Session(&doc, SessionParams{});
         Selection a; a.kind = Selection::Kind::Secondary;
-        a.anchor = CollabText::Crdt::Anchor(1, 10, CollabText::Crdt::Bias::Left);
-        a.active = CollabText::Crdt::Anchor(1, 11, CollabText::Crdt::Bias::Right);
+        a.anchor = ta(1, 10, CollabText::Crdt::Bias::Left);
+        a.active = ta(1, 11, CollabText::Crdt::Bias::Right);
         Selection b; b.kind = Selection::Kind::SearchMatch;
-        b.anchor = CollabText::Crdt::Anchor(1, 20, CollabText::Crdt::Bias::Left);
-        b.active = CollabText::Crdt::Anchor(1, 23, CollabText::Crdt::Bias::Right);
+        b.anchor = ta(1, 20, CollabText::Crdt::Bias::Left);
+        b.active = ta(1, 23, CollabText::Crdt::Bias::Right);
 
         QSignalSpy spy(s, &Session::secondarySelectionsChanged);
         s->setSecondarySelections({ a, b });
@@ -92,8 +103,8 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         Session *s = new Session(&doc, SessionParams{});
         Selection a; a.kind = Selection::Kind::Secondary;
-        a.anchor = CollabText::Crdt::Anchor(1, 10, CollabText::Crdt::Bias::Left);
-        a.active = CollabText::Crdt::Anchor(1, 11, CollabText::Crdt::Bias::Right);
+        a.anchor = ta(1, 10, CollabText::Crdt::Bias::Left);
+        a.active = ta(1, 11, CollabText::Crdt::Bias::Right);
         s->addSecondarySelection(a);
         QCOMPARE(s->secondarySelections().size(), 1);
         s->addSecondarySelection(a);
@@ -105,11 +116,11 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         Session *s = new Session(&doc, SessionParams{});
         Selection sec; sec.kind = Selection::Kind::Secondary;
-        sec.anchor = CollabText::Crdt::Anchor(1, 1, CollabText::Crdt::Bias::Left);
+        sec.anchor = ta(1, 1, CollabText::Crdt::Bias::Left);
         Selection sm;  sm.kind  = Selection::Kind::SearchMatch;
-        sm.anchor  = CollabText::Crdt::Anchor(1, 5, CollabText::Crdt::Bias::Left);
+        sm.anchor  = ta(1, 5, CollabText::Crdt::Bias::Left);
         Selection pres; pres.kind = Selection::Kind::Presence;
-        pres.anchor = CollabText::Crdt::Anchor(1, 9, CollabText::Crdt::Bias::Left);
+        pres.anchor = ta(1, 9, CollabText::Crdt::Bias::Left);
         s->setSecondarySelections({ sec, sm, pres });
 
         s->clearSecondarySelectionsOfKind(Selection::Kind::SearchMatch);
@@ -166,8 +177,8 @@ private Q_SLOTS:
         Session *src = new Session(&doc, SessionParams{
             .participantId = QStringLiteral("alice")});
         Selection p;
-        p.anchor = CollabText::Crdt::Anchor(1, 5, CollabText::Crdt::Bias::Left);
-        p.active = CollabText::Crdt::Anchor(1, 8, CollabText::Crdt::Bias::Right);
+        p.anchor = ta(1, 5, CollabText::Crdt::Bias::Left);
+        p.active = ta(1, 8, CollabText::Crdt::Bias::Right);
         src->setPrimarySelection(p);
         src->setTopVisible(CollabText::Crdt::Anchor(1, 100,
                            CollabText::Crdt::Bias::Left), 0.5);
@@ -176,7 +187,7 @@ private Q_SLOTS:
             .participantId = QStringLiteral("bob")});
         dst->copyStateFrom(*src);
 
-        QCOMPARE(dst->primarySelection().anchor.char_value, quint32(5));
+        QCOMPARE(dst->primarySelection().anchor.charValue, quint32(5));
         QCOMPARE(dst->topVisibleAnchor().char_value,        quint32(100));
         QCOMPARE(dst->topVisibleFraction(),                 0.5);
         // Identity is NOT copied.
@@ -192,14 +203,14 @@ private Q_SLOTS:
             .participantLabel = QStringLiteral("Alice"),
             .presenceColor    = QColor(Qt::cyan)});
         Selection p;
-        p.anchor = CollabText::Crdt::Anchor(1, 5, CollabText::Crdt::Bias::Left);
-        p.active = CollabText::Crdt::Anchor(1, 8, CollabText::Crdt::Bias::Right);
+        p.anchor = ta(1, 5, CollabText::Crdt::Bias::Left);
+        p.active = ta(1, 8, CollabText::Crdt::Bias::Right);
         s->setPrimarySelection(p);
 
         const QJsonObject json = s->toJson();
         Session *t = new Session(&doc, SessionParams{});
         t->fromJson(json);
-        QCOMPARE(t->primarySelection().anchor.char_value, quint32(5));
+        QCOMPARE(t->primarySelection().anchor.charValue, quint32(5));
         QCOMPARE(t->participantId(), QStringLiteral("alice"));
         delete s; delete t;
     }

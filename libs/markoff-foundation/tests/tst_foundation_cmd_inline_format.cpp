@@ -6,13 +6,12 @@
 #include <markoff-foundation/Selection.h>
 
 using namespace Markoff;
-using CollabText::Crdt::Bias;
 
 namespace {
 Selection rangeSel(const MarkoffDocument &doc, quint32 start, quint32 end) {
     Selection s;
-    s.anchor = doc.anchorAt(start, Bias::Left);
-    s.active = doc.anchorAt(end,   Bias::Right);
+    s.anchor = doc.textAnchorAt(start, /*rightBias*/ false);
+    s.active = doc.textAnchorAt(end,   /*rightBias*/ true);
     s.kind = Selection::Kind::Primary;
     return s;
 }

@@ -3,25 +3,25 @@
 
 #include <markoff-foundation/AnchorJson.h>
 
+#include "AnchorConversion.h"
+
 namespace Markoff {
 
 bool Selection::isEmpty() const
 {
-    return anchor.replica_id == active.replica_id
-        && anchor.char_value == active.char_value
-        && anchor.bias == active.bias;
+    return anchor == active;
 }
 
 bool Selection::isReversed() const
 {
     // Without a Buffer to resolve to byte offsets, we can't deterministically
     // order anchors. This returns whether the cursor head sits "before" the
-    // anchor in lexicographic (char_value, replica_id) order — a coarse
+    // anchor in lexicographic (charValue, replicaId) order — a coarse
     // proxy. Callers that need byte-offset semantics should resolve via the
     // Buffer and compare byte offsets directly.
-    if (active.char_value != anchor.char_value)
-        return active.char_value < anchor.char_value;
-    return active.replica_id < anchor.replica_id;
+    if (active.charValue != anchor.charValue)
+        return active.charValue < anchor.charValue;
+    return active.replicaId < anchor.replicaId;
 }
 
 namespace {
@@ -48,8 +48,8 @@ Selection::Kind kindFromString(const QString &s)
 QJsonObject Selection::toJson() const
 {
     QJsonObject obj;
-    obj.insert("anchor", anchorToJson(anchor));
-    obj.insert("active", anchorToJson(active));
+    obj.insert("anchor", anchorToJson(Detail::toCrdtAnchor(anchor)));
+    obj.insert("active", anchorToJson(Detail::toCrdtAnchor(active)));
     obj.insert("kind", QString::fromLatin1(kindToString(kind)));
     if (kind == Kind::Presence) {
         obj.insert("participantId", participantId);
@@ -63,8 +63,8 @@ QJsonObject Selection::toJson() const
 Selection Selection::fromJson(const QJsonObject &obj)
 {
     Selection s;
-    s.anchor = anchorFromJson(obj.value("anchor").toObject());
-    s.active = anchorFromJson(obj.value("active").toObject());
+    s.anchor = Detail::toTextAnchor(anchorFromJson(obj.value("anchor").toObject()));
+    s.active = Detail::toTextAnchor(anchorFromJson(obj.value("active").toObject()));
     s.kind = kindFromString(obj.value("kind").toString());
     if (s.kind == Kind::Presence) {
         s.participantId = obj.value("participantId").toString();

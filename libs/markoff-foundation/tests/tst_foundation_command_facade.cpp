@@ -7,7 +7,6 @@
 #include <markoff-foundation/Session.h>
 
 using namespace Markoff;
-using CollabText::Crdt::Bias;
 
 class TstFoundationCommandFacade : public QObject {
     Q_OBJECT
@@ -20,8 +19,8 @@ private Q_SLOTS:
         doc.applyLocalEdit(ed);
 
         Session *sess = doc.createSession();
-        Selection p; p.anchor = doc.anchorAt(0, Bias::Left);
-        p.active = doc.anchorAt(5, Bias::Right);
+        Selection p; p.anchor = doc.textAnchorAt(0, /*rightBias*/ false);
+        p.active = doc.textAnchorAt(5, /*rightBias*/ true);
         sess->setPrimarySelection(p);
 
         CommandFacade facade;

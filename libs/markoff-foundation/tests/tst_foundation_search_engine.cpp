@@ -68,7 +68,7 @@ private Q_SLOTS:
         s.findAll(&doc, sess, "cd", {});
         QVERIFY(s.findNext(&doc, sess));
         const auto p = sess->primarySelection();
-        QCOMPARE(doc.resolveAnchor(p.anchor), quint32(3));
+        QCOMPARE(doc.resolveTextAnchor(p.anchor), quint32(3));
     }
 
     void clear_matches_removes_search_kind() {

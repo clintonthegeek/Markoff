@@ -13,8 +13,8 @@ namespace Markoff::Cmd::Detail {
 std::pair<quint32, quint32>
 selectionByteRange(const MarkoffDocument &doc, const Selection &sel)
 {
-    const auto a = doc.resolveAnchor(sel.anchor);
-    const auto b = doc.resolveAnchor(sel.active);
+    const auto a = doc.resolveTextAnchor(sel.anchor);
+    const auto b = doc.resolveTextAnchor(sel.active);
     return a <= b ? std::pair{a, b} : std::pair{b, a};
 }
 

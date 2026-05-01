@@ -139,7 +139,7 @@ void SourceTextDocumentBinding::setCursorPosition(int pos)
     if (!m_applyingBackendCursor && m_session && m_markoffDocument && m_textDocument) {
         const QString text = m_textDocument->toPlainText();
         const quint32 byteOff = qtPosToByteOffset(text, pos);
-        const auto anchor = m_markoffDocument->anchorAt(byteOff, CollabText::Crdt::Bias::Left);
+        const auto anchor = m_markoffDocument->textAnchorAt(byteOff, /*rightBias*/ false);
         // Cursor move => collapse selection.
         Markoff::Selection sel;
         sel.anchor = anchor;
@@ -178,8 +178,8 @@ void SourceTextDocumentBinding::pushSelectionToSession()
     const QString text = m_textDocument->toPlainText();
     const quint32 startByte = qtPosToByteOffset(text, m_selectionStart);
     const quint32 endByte   = qtPosToByteOffset(text, m_selectionEnd);
-    const auto anchorA = m_markoffDocument->anchorAt(startByte, CollabText::Crdt::Bias::Left);
-    const auto anchorB = m_markoffDocument->anchorAt(endByte,   CollabText::Crdt::Bias::Right);
+    const auto anchorA = m_markoffDocument->textAnchorAt(startByte, /*rightBias*/ false);
+    const auto anchorB = m_markoffDocument->textAnchorAt(endByte,   /*rightBias*/ true);
     Markoff::Selection sel;
     sel.anchor = anchorA;
     sel.active = anchorB;
@@ -197,8 +197,8 @@ void SourceTextDocumentBinding::syncFromSession()
     if (!m_session || !m_markoffDocument || !m_textDocument) return;
 
     const Markoff::Selection sel = m_session->primarySelection();
-    const quint32 anchorByte = m_markoffDocument->resolveAnchor(sel.anchor);
-    const quint32 activeByte = m_markoffDocument->resolveAnchor(sel.active);
+    const quint32 anchorByte = m_markoffDocument->resolveTextAnchor(sel.anchor);
+    const quint32 activeByte = m_markoffDocument->resolveTextAnchor(sel.active);
     const QByteArray utf8 = m_markoffDocument->toMarkdownUtf8();
     const int newStart = byteOffsetToQtPos(utf8, anchorByte);
     const int newEnd   = byteOffsetToQtPos(utf8, activeByte);

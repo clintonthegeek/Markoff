@@ -20,8 +20,8 @@ ReplaceController::replaceCurrent(MarkoffDocument *doc, Session *sess,
 {
     if (!doc || !sess) return std::nullopt;
     const Selection p = sess->primarySelection();
-    const quint32 a = doc->resolveAnchor(p.anchor);
-    const quint32 b = doc->resolveAnchor(p.active);
+    const quint32 a = doc->resolveTextAnchor(p.anchor);
+    const quint32 b = doc->resolveTextAnchor(p.active);
     if (a == b) return std::nullopt;
 
     MarkoffEdit r;
@@ -44,8 +44,8 @@ ReplaceController::replaceAll(MarkoffDocument *doc, Session *sess,
     QList<MarkoffEdit> edits;
     for (const Selection &x : sess->secondarySelections()) {
         if (x.kind != Selection::Kind::SearchMatch) continue;
-        const quint32 a = doc->resolveAnchor(x.anchor);
-        const quint32 b = doc->resolveAnchor(x.active);
+        const quint32 a = doc->resolveTextAnchor(x.anchor);
+        const quint32 b = doc->resolveTextAnchor(x.active);
         MarkoffEdit r;
         r.oldStart = std::min(a, b);
         r.oldEnd   = std::max(a, b);

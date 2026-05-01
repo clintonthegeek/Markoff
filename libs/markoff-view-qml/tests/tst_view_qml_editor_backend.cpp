@@ -8,10 +8,23 @@
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
+#include <markoff-foundation/TextAnchor.h>
 #include <markoff-foundation/Theme.h>
 #include <markoff/view/qml/EditorBackend.h>
 
 using namespace Markoff::View::Qml;
+
+namespace {
+/// Crdt::Anchor → TextAnchor with same wire identity (T10/T11 cascade
+/// boundary; tests still seed via doc.anchorAt which yields Crdt::Anchor).
+Markoff::TextAnchor toTA(const CollabText::Crdt::Anchor &a)
+{
+    return Markoff::TextAnchor{
+        a.replica_id, a.char_value,
+        (a.bias == CollabText::Crdt::Bias::Right) ? quint8(1) : quint8(0)
+    };
+}
+}  // namespace
 
 class TstViewQmlEditorBackend : public QObject {
     Q_OBJECT
@@ -135,8 +148,8 @@ private Q_SLOTS:
         Markoff::Session *sess = backend.session();
         QVERIFY(sess != nullptr);
         const Markoff::Selection sel = sess->primarySelection();
-        QCOMPARE(sel.anchor, a);
-        QCOMPARE(sel.active, a);
+        QCOMPARE(sel.anchor, toTA(a));
+        QCOMPARE(sel.active, toTA(a));
         QCOMPARE(sel.kind, Markoff::Selection::Kind::Primary);
     }
 
@@ -151,7 +164,7 @@ private Q_SLOTS:
 
         const CollabText::Crdt::Anchor a = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
         Markoff::Selection sel;
-        sel.anchor = a; sel.active = a; sel.kind = Markoff::Selection::Kind::Primary;
+        sel.anchor = toTA(a); sel.active = toTA(a); sel.kind = Markoff::Selection::Kind::Primary;
 
         QSignalSpy spy(&backend, &EditorBackend::cursorAnchorChanged);
         backend.session()->setPrimarySelection(sel);
@@ -180,8 +193,8 @@ private Q_SLOTS:
         backend.setSelectionActive(a8);
 
         const Markoff::Selection sel = backend.session()->primarySelection();
-        QCOMPARE(sel.anchor, a3);
-        QCOMPARE(sel.active, a8);
+        QCOMPARE(sel.anchor, toTA(a3));
+        QCOMPARE(sel.active, toTA(a8));
     }
 
     void selection_can_be_reversed_active_before_anchor() {
@@ -198,8 +211,8 @@ private Q_SLOTS:
         backend.setSelectionActive(a3);
 
         const Markoff::Selection sel = backend.session()->primarySelection();
-        QCOMPARE(sel.anchor, a8);
-        QCOMPARE(sel.active, a3);
+        QCOMPARE(sel.anchor, toTA(a8));
+        QCOMPARE(sel.active, toTA(a3));
         QVERIFY(sel.isReversed());
     }
 
@@ -214,7 +227,7 @@ private Q_SLOTS:
         const auto a2 = doc.anchorAt(2, CollabText::Crdt::Bias::Left);
         const auto a7 = doc.anchorAt(7, CollabText::Crdt::Bias::Right);
         Markoff::Selection sel;
-        sel.anchor = a2; sel.active = a7; sel.kind = Markoff::Selection::Kind::Primary;
+        sel.anchor = toTA(a2); sel.active = toTA(a7); sel.kind = Markoff::Selection::Kind::Primary;
 
         QSignalSpy spyAnchor(&backend, &EditorBackend::selectionAnchorChanged);
         QSignalSpy spyActive(&backend, &EditorBackend::selectionActiveChanged);

@@ -9,8 +9,6 @@
 #include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
 
-#include <crdt/Anchor.h>
-
 namespace Markoff {
 
 namespace {
@@ -20,7 +18,8 @@ QList<Selection> matchesInOrder(Session *sess, const MarkoffDocument *doc) {
         if (x.kind == Selection::Kind::SearchMatch) ms << x;
     std::sort(ms.begin(), ms.end(),
               [doc](const Selection &a, const Selection &b) {
-                  return doc->resolveAnchor(a.anchor) < doc->resolveAnchor(b.anchor);
+                  return doc->resolveTextAnchor(a.anchor)
+                       < doc->resolveTextAnchor(b.anchor);
               });
     return ms;
 }
@@ -59,8 +58,8 @@ int SearchEngine::findAll(MarkoffDocument *doc, Session *sess,
                 hay.left(u16end).toUtf8().size());
             Selection x;
             x.kind = Selection::Kind::SearchMatch;
-            x.anchor = doc->anchorAt(bs, CollabText::Crdt::Bias::Left);
-            x.active = doc->anchorAt(be, CollabText::Crdt::Bias::Right);
+            x.anchor = doc->textAnchorAt(bs, /*rightBias*/ false);
+            x.active = doc->textAnchorAt(be, /*rightBias*/ true);
             matches << x;
         }
     } else {
@@ -75,8 +74,8 @@ int SearchEngine::findAll(MarkoffDocument *doc, Session *sess,
                 hay.left(u16end).toUtf8().size());
             Selection x;
             x.kind = Selection::Kind::SearchMatch;
-            x.anchor = doc->anchorAt(bs, CollabText::Crdt::Bias::Left);
-            x.active = doc->anchorAt(be, CollabText::Crdt::Bias::Right);
+            x.anchor = doc->textAnchorAt(bs, /*rightBias*/ false);
+            x.active = doc->textAnchorAt(be, /*rightBias*/ true);
             matches << x;
             from = u16end;
             if (needle.isEmpty()) ++from;
@@ -91,9 +90,9 @@ bool SearchEngine::findNext(MarkoffDocument *doc, Session *sess)
     if (!doc || !sess) return false;
     const auto ms = matchesInOrder(sess, doc);
     if (ms.isEmpty()) return false;
-    const quint32 cur = doc->resolveAnchor(sess->primarySelection().active);
+    const quint32 cur = doc->resolveTextAnchor(sess->primarySelection().active);
     for (const Selection &x : ms) {
-        if (doc->resolveAnchor(x.anchor) >= cur) {
+        if (doc->resolveTextAnchor(x.anchor) >= cur) {
             Selection p = x; p.kind = Selection::Kind::Primary;
             sess->setPrimarySelection(p);
             return true;
@@ -109,9 +108,9 @@ bool SearchEngine::findPrevious(MarkoffDocument *doc, Session *sess)
     if (!doc || !sess) return false;
     const auto ms = matchesInOrder(sess, doc);
     if (ms.isEmpty()) return false;
-    const quint32 cur = doc->resolveAnchor(sess->primarySelection().anchor);
+    const quint32 cur = doc->resolveTextAnchor(sess->primarySelection().anchor);
     for (auto it = ms.crbegin(); it != ms.crend(); ++it) {
-        if (doc->resolveAnchor(it->active) < cur) {
+        if (doc->resolveTextAnchor(it->active) < cur) {
             Selection p = *it; p.kind = Selection::Kind::Primary;
             sess->setPrimarySelection(p);
             return true;

@@ -6,7 +6,21 @@
 #include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
 
+#include "AnchorConversion.h"
+
 namespace Markoff {
+
+namespace {
+/// Cmd:: anchor-taking receivers (toggleCheckbox, insertTable, ...) take
+/// CollabText::Crdt::Anchor and have callers in foundation tests that pass
+/// raw doc.anchorAt(...) results. We keep their signatures unchanged and
+/// convert at the Selection boundary here.
+inline CollabText::Crdt::Anchor crdt(const TextAnchor &t) noexcept
+{
+    return Detail::toCrdtAnchor(t);
+}
+}  // namespace
+
 
 CommandFacade::CommandFacade(QObject *parent) : QObject(parent) {}
 CommandFacade::~CommandFacade() = default;
@@ -30,19 +44,19 @@ void CommandFacade::toggleInlineCode()
 void CommandFacade::setHeading(int level)
 { if (m_doc && m_sess) Cmd::setHeading(*m_doc, m_sess->primarySelection(), level); }
 void CommandFacade::toggleCheckbox()
-{ if (m_doc && m_sess) Cmd::toggleCheckbox(*m_doc, m_sess->primarySelection().active); }
+{ if (m_doc && m_sess) Cmd::toggleCheckbox(*m_doc, crdt(m_sess->primarySelection().active)); }
 void CommandFacade::blockQuote()
 { if (m_doc && m_sess) Cmd::blockQuote(*m_doc, m_sess->primarySelection()); }
 void CommandFacade::insertTable(int rows, int cols, bool hasHeader)
-{ if (m_doc && m_sess) Cmd::insertTable(*m_doc, m_sess->primarySelection().active,
+{ if (m_doc && m_sess) Cmd::insertTable(*m_doc, crdt(m_sess->primarySelection().active),
                                           rows, cols, hasHeader); }
 void CommandFacade::insertLink(const QString &t, const QString &u)
-{ if (m_doc && m_sess) Cmd::insertLink(*m_doc, m_sess->primarySelection().active, t, u); }
+{ if (m_doc && m_sess) Cmd::insertLink(*m_doc, crdt(m_sess->primarySelection().active), t, u); }
 void CommandFacade::insertImage(const QString &a, const QString &u)
-{ if (m_doc && m_sess) Cmd::insertImage(*m_doc, m_sess->primarySelection().active, a, u); }
+{ if (m_doc && m_sess) Cmd::insertImage(*m_doc, crdt(m_sess->primarySelection().active), a, u); }
 void CommandFacade::insertHorizontalRule()
 { if (m_doc && m_sess) Cmd::insertHorizontalRule(*m_doc,
-                                                   m_sess->primarySelection().active); }
+                                                   crdt(m_sess->primarySelection().active)); }
 void CommandFacade::undo() { if (m_doc) Cmd::undo(*m_doc); }
 void CommandFacade::redo() { if (m_doc) Cmd::redo(*m_doc); }
 

@@ -7,7 +7,6 @@
 #include <markoff-foundation/Selection.h>
 
 using namespace Markoff;
-using CollabText::Crdt::Bias;
 
 class TstFoundationCmdMulti : public QObject {
     Q_OBJECT
@@ -20,12 +19,12 @@ private Q_SLOTS:
         doc.applyLocalEdit(ed);
 
         Session *sess = doc.createSession();
-        Selection p; p.anchor = doc.anchorAt(0, Bias::Left);
-        p.active = doc.anchorAt(3, Bias::Right); p.kind = Selection::Kind::Primary;
+        Selection p; p.anchor = doc.textAnchorAt(0, /*rightBias*/ false);
+        p.active = doc.textAnchorAt(3, /*rightBias*/ true); p.kind = Selection::Kind::Primary;
         sess->setPrimarySelection(p);
 
-        Selection s2; s2.anchor = doc.anchorAt(8, Bias::Left);
-        s2.active = doc.anchorAt(11, Bias::Right); s2.kind = Selection::Kind::Secondary;
+        Selection s2; s2.anchor = doc.textAnchorAt(8, /*rightBias*/ false);
+        s2.active = doc.textAnchorAt(11, /*rightBias*/ true); s2.kind = Selection::Kind::Secondary;
         sess->addSecondarySelection(s2);
 
         Cmd::applyToAllPrimaryAndSecondaries(doc, *sess, &Cmd::editsForToggleBold);

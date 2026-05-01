@@ -2,7 +2,35 @@
 #include <algorithm>
 #include <markoff/view/qml/EditorBackend.h>
 
+#include <markoff-foundation/TextAnchor.h>
+
 namespace Markoff::View::Qml {
+
+namespace {
+/// Inline conversion at the EditorBackend↔Selection seam. T10/T11 changed
+/// Selection.anchor / .active to TextAnchor; EditorBackend's m_selectionAnchor
+/// and m_cursorAnchor remain Crdt::Anchor until T12 retypes them. These
+/// helpers bridge the two without leaking the foundation-internal
+/// AnchorConversion.h into view-qml.
+inline Markoff::TextAnchor toTextAnchor(const CollabText::Crdt::Anchor &a) noexcept
+{
+    return Markoff::TextAnchor{
+        a.replica_id,
+        a.char_value,
+        (a.bias == CollabText::Crdt::Bias::Right) ? quint8(1) : quint8(0)
+    };
+}
+
+inline CollabText::Crdt::Anchor toCrdtAnchor(const Markoff::TextAnchor &t) noexcept
+{
+    using CollabText::Crdt::Bias;
+    return CollabText::Crdt::Anchor{
+        t.replicaId,
+        t.charValue,
+        t.bias == 1 ? Bias::Right : Bias::Left
+    };
+}
+}  // namespace
 
 EditorBackend::EditorBackend(QObject *parent) : QObject(parent) {}
 EditorBackend::~EditorBackend() = default;
@@ -66,8 +94,8 @@ void EditorBackend::setCursorAnchor(const CollabText::Crdt::Anchor &a)
 
     if (m_session && !m_applyingSessionSelection) {
         Markoff::Selection sel;
-        sel.anchor = a;
-        sel.active = a;
+        sel.anchor = toTextAnchor(a);
+        sel.active = toTextAnchor(a);
         sel.kind   = Markoff::Selection::Kind::Primary;
         m_session->setPrimarySelection(sel);
     }
@@ -101,8 +129,8 @@ void EditorBackend::pushSelectionToSession()
 {
     if (!m_session || m_applyingSessionSelection) return;
     Markoff::Selection sel;
-    sel.anchor = m_selectionAnchor;
-    sel.active = m_selectionActive;
+    sel.anchor = toTextAnchor(m_selectionAnchor);
+    sel.active = toTextAnchor(m_selectionActive);
     sel.kind   = Markoff::Selection::Kind::Primary;
     m_session->setPrimarySelection(sel);
 }
@@ -138,19 +166,21 @@ void EditorBackend::onSessionPrimarySelectionChanged(const Markoff::Selection &s
     m_applyingSessionSelection = true;
 
     // selectionAnchor + selectionActive always reflect the session selection's two ends.
-    if (m_selectionAnchor != sel.anchor) {
-        m_selectionAnchor = sel.anchor;
+    const CollabText::Crdt::Anchor selAnchor = toCrdtAnchor(sel.anchor);
+    const CollabText::Crdt::Anchor selActive = toCrdtAnchor(sel.active);
+    if (m_selectionAnchor != selAnchor) {
+        m_selectionAnchor = selAnchor;
         Q_EMIT selectionAnchorChanged();
     }
-    if (m_selectionActive != sel.active) {
-        m_selectionActive = sel.active;
+    if (m_selectionActive != selActive) {
+        m_selectionActive = selActive;
         Q_EMIT selectionActiveChanged();
     }
 
     // cursorAnchor is the "active" end (where the cursor is). For a degenerate
     // selection (anchor == active), it's just the cursor position.
-    if (m_cursorAnchor != sel.active) {
-        m_cursorAnchor = sel.active;
+    if (m_cursorAnchor != selActive) {
+        m_cursorAnchor = selActive;
         Q_EMIT cursorAnchorChanged();
     }
 

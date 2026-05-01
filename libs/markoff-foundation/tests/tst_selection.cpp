@@ -3,26 +3,24 @@
 #include <QColor>
 
 #include <markoff-foundation/Selection.h>
-#include <crdt/Anchor.h>
+#include <markoff-foundation/TextAnchor.h>
 
 using namespace Markoff;
-using CollabText::Crdt::Anchor;
-using CollabText::Crdt::Bias;
 
 class TstSelection : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void empty_when_anchor_equals_active() {
         Selection s;
-        s.anchor = Anchor(1, 10, Bias::Left);
-        s.active = Anchor(1, 10, Bias::Left);
+        s.anchor = TextAnchor{1, 10, 0};
+        s.active = TextAnchor{1, 10, 0};
         QVERIFY(s.isEmpty());
     }
 
     void not_empty_when_different() {
         Selection s;
-        s.anchor = Anchor(1, 10, Bias::Left);
-        s.active = Anchor(1, 12, Bias::Right);
+        s.anchor = TextAnchor{1, 10, 0};
+        s.active = TextAnchor{1, 12, 1};
         QVERIFY(!s.isEmpty());
     }
 
@@ -45,22 +43,22 @@ private Q_SLOTS:
 
     void json_roundtrip_primary() {
         Selection s;
-        s.anchor = Anchor(2, 100, Bias::Left);
-        s.active = Anchor(2, 105, Bias::Right);
+        s.anchor = TextAnchor{2, 100, 0};
+        s.active = TextAnchor{2, 105, 1};
         s.kind = Selection::Kind::Primary;
         const QJsonObject json = s.toJson();
         const Selection r = Selection::fromJson(json);
-        QCOMPARE(r.anchor.replica_id, s.anchor.replica_id);
-        QCOMPARE(r.anchor.char_value, s.anchor.char_value);
-        QCOMPARE(r.active.replica_id, s.active.replica_id);
-        QCOMPARE(r.active.char_value, s.active.char_value);
+        QCOMPARE(r.anchor.replicaId, s.anchor.replicaId);
+        QCOMPARE(r.anchor.charValue, s.anchor.charValue);
+        QCOMPARE(r.active.replicaId, s.active.replicaId);
+        QCOMPARE(r.active.charValue, s.active.charValue);
         QCOMPARE(r.kind, s.kind);
     }
 
     void json_roundtrip_presence() {
         Selection s;
-        s.anchor = Anchor(7, 50, Bias::Left);
-        s.active = Anchor(7, 50, Bias::Left);
+        s.anchor = TextAnchor{7, 50, 0};
+        s.active = TextAnchor{7, 50, 0};
         s.kind = Selection::Kind::Presence;
         s.participantId = QStringLiteral("bob");
         s.participantLabel = QStringLiteral("Bob");

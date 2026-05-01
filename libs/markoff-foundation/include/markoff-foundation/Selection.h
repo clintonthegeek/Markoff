@@ -6,9 +6,8 @@
 #include <QString>
 #include <QtGlobal>
 
-#include <crdt/Anchor.h>
-
 #include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff-foundation/TextAnchor.h>
 
 namespace Markoff {
 
@@ -16,7 +15,10 @@ namespace Markoff {
 /// more on each Session: one Primary, plus any number of Secondary,
 /// SearchMatch, or Presence selections.
 ///
-/// Anchor + active are CRDT anchors; they survive concurrent edits.
+/// `anchor` and `active` are TextAnchors — opaque view-layer-safe
+/// wrappers around CRDT byte anchors. They survive concurrent edits
+/// (the underlying CRDT identity is preserved); translation back to
+/// byte offsets goes through MarkoffDocument::resolveTextAnchor.
 struct MARKOFF_FOUNDATION_EXPORT Selection {
     enum class Kind {
         Primary,        ///< editable, the typing one (one per session)
@@ -25,9 +27,9 @@ struct MARKOFF_FOUNDATION_EXPORT Selection {
         Presence,       ///< not editable, remote-session indicator
     };
 
-    CollabText::Crdt::Anchor anchor;
-    CollabText::Crdt::Anchor active;
-    Kind                     kind = Kind::Primary;
+    TextAnchor anchor;
+    TextAnchor active;
+    Kind       kind = Kind::Primary;
 
     // Only meaningful for Kind::Presence
     QString participantId;

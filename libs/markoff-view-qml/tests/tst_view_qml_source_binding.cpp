@@ -433,12 +433,12 @@ private Q_SLOTS:
         binding.setSelectionEnd(7);
 
         const Markoff::Selection sel = backend.session()->primarySelection();
-        QCOMPARE(doc.resolveAnchor(sel.anchor), quint32(2));
-        QCOMPARE(doc.resolveAnchor(sel.active), quint32(7));
+        QCOMPARE(doc.resolveTextAnchor(sel.anchor), quint32(2));
+        QCOMPARE(doc.resolveTextAnchor(sel.active), quint32(7));
 
         // Reverse: change session, observe binding ints update.
-        const auto a3 = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
-        const auto a8 = doc.anchorAt(8, CollabText::Crdt::Bias::Right);
+        const auto a3 = doc.textAnchorAt(3, /*rightBias*/ false);
+        const auto a8 = doc.textAnchorAt(8, /*rightBias*/ true);
         Markoff::Selection sel2;
         sel2.anchor = a3; sel2.active = a8; sel2.kind = Markoff::Selection::Kind::Primary;
         backend.session()->setPrimarySelection(sel2);

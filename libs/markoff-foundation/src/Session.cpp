@@ -36,13 +36,9 @@ Selection Session::primarySelection() const { return d->primary; }
 void Session::setPrimarySelection(const Selection &sel)
 {
     const Selection &cur = d->primary;
-    if (cur.anchor.replica_id == sel.anchor.replica_id
-        && cur.anchor.char_value == sel.anchor.char_value
-        && cur.anchor.bias       == sel.anchor.bias
-        && cur.active.replica_id == sel.active.replica_id
-        && cur.active.char_value == sel.active.char_value
-        && cur.active.bias       == sel.active.bias
-        && cur.kind              == sel.kind)
+    if (cur.anchor == sel.anchor
+        && cur.active == sel.active
+        && cur.kind   == sel.kind)
     {
         return;
     }

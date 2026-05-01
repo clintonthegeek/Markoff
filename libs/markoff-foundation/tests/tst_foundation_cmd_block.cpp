@@ -11,8 +11,8 @@ using CollabText::Crdt::Bias;
 namespace {
 Selection rangeSel(const MarkoffDocument &doc, quint32 start, quint32 end) {
     Selection s;
-    s.anchor = doc.anchorAt(start, Bias::Left);
-    s.active = doc.anchorAt(end,   Bias::Right);
+    s.anchor = doc.textAnchorAt(start, /*rightBias*/ false);
+    s.active = doc.textAnchorAt(end,   /*rightBias*/ true);
     return s;
 }
 void seed(MarkoffDocument &doc, const QByteArray &text) {
