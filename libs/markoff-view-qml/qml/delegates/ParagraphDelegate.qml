@@ -79,6 +79,11 @@ Item {
                 root.modelBinding.notifyFocusedCursorMoved(textEdit.cursorPosition)
             }
         }
+        onInputMethodComposingChanged: {
+            editBinding.composing = inputMethodComposing
+            if (root.modelBinding)
+                root.modelBinding.setRowComposing(root.blockIndex, inputMethodComposing)
+        }
 
         InlineFormatHighlighter {
             document: textEdit.textDocument

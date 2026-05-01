@@ -49,6 +49,49 @@ void LiveEditBinding::setBlockAnchor(const Markoff::BlockAnchor &anchor)
 }
 
 // ---------------------------------------------------------------------------
+// composing property
+// ---------------------------------------------------------------------------
+
+bool LiveEditBinding::composing() const { return m_composing; }
+
+void LiveEditBinding::setComposing(bool composing)
+{
+    if (m_composing == composing) return;
+    m_composing = composing;
+    if (!composing && m_document && m_textDoc) {
+        applyFullBlockReplacement();
+        // Re-anchor the QTextDocument under the cycle guard so any pending
+        // composition contentsChange (which may fire before or after this call
+        // depending on platform) does not produce a double-apply.
+        setModelText(m_textDoc->toPlainText());
+    }
+    Q_EMIT composingChanged();
+}
+
+void LiveEditBinding::applyFullBlockReplacement()
+{
+    if (!m_document || !m_textDoc) return;
+    const auto rangeOpt = m_document->blockByteRange(m_blockAnchor);
+    if (!rangeOpt) return;
+    const QString qtText = m_textDoc->toPlainText();
+    const QByteArray newBytes = qtText.toUtf8();
+    // Slice the CRDT block bytes and compare — skip if identical (e.g. cancel).
+    const QByteArray docBytes = m_document->toMarkdownUtf8();
+    const QByteArray oldBytes = docBytes.mid(rangeOpt->first,
+                                              rangeOpt->second - rangeOpt->first);
+    if (oldBytes == newBytes) return;
+    Markoff::MarkoffEdit ed;
+    ed.oldStart = rangeOpt->first;
+    ed.oldEnd   = rangeOpt->second;
+    ed.newText  = newBytes;
+    m_document->applyLocalEdit({ ed });
+    // Composition commit always breaks the coalesce chain.
+    m_lastEditWasPrintable = false;
+    m_lastEditTimer.restart();
+    Q_EMIT editApplied(m_blockAnchor, qtText);
+}
+
+// ---------------------------------------------------------------------------
 // textDocument property
 // ---------------------------------------------------------------------------
 
@@ -125,6 +168,8 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     Q_ASSERT(QThread::currentThread() == thread());
     // Suppress changes that come from our own model-driven text assignment.
     if (m_applyingModelUpdate) return;
+    // Suppress preedit-driven changes; commit handled in setComposing(false).
+    if (m_composing) return;
     if (!m_document || !m_textDoc) return;
 
     // Resolve the block's byte range in the pre-change document state.

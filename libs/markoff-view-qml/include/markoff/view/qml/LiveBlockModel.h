@@ -4,6 +4,7 @@
 #include <QAbstractListModel>
 #include <QHash>
 #include <QList>
+#include <QSet>
 #include <qqmlintegration.h>
 
 #include <markoff/view/qml/BlockRecord.h>
@@ -64,9 +65,17 @@ public:
     /// kind if there is no speculative override.
     QString confirmedKindAt(int row) const;
 
+    /// Mark/unmark a model row as composing. While composing, dataChanged for
+    /// that row is deferred. On clearing composing, any deferred notification
+    /// is flushed. Highlight-format updates are not affected (they don't
+    /// involve TextRole text replacement).
+    void setComposingRow(int row, bool composing);
+
 private:
     QList<BlockRecord> m_rows;
     QHash<int, QString> m_speculativeOriginals;  // row → original kind
+    QSet<int> m_composingRows;          // rows currently mid-composition
+    QSet<int> m_deferredDataChanged;    // rows with a deferred dataChanged pending
 };
 
 }  // namespace Markoff::View::Qml

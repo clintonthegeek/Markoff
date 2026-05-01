@@ -44,6 +44,7 @@ public:
     Q_INVOKABLE void notifyFocused(const Markoff::BlockAnchor &anchor, int cursorPos);
     Q_INVOKABLE void notifyFocusedCursorMoved(int cursorPos);
     Q_INVOKABLE bool isFocusRestoreTarget(const Markoff::BlockAnchor &anchor) const;
+    Q_INVOKABLE void setRowComposing(int row, bool composing);
 
 Q_SIGNALS:
     void editorBackendChanged();

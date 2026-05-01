@@ -95,6 +95,19 @@ QString LiveBlockModel::confirmedKindAt(int row) const
     return m_rows[row].kind;
 }
 
+void LiveBlockModel::setComposingRow(int row, bool composing)
+{
+    if (composing) {
+        m_composingRows.insert(row);
+    } else {
+        m_composingRows.remove(row);
+        if (m_deferredDataChanged.remove(row)) {
+            const QModelIndex idx = index(row, 0);
+            Q_EMIT dataChanged(idx, idx);
+        }
+    }
+}
+
 void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                               const QList<BlockRecord> &nextRecords)
 {
@@ -109,7 +122,11 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                     if (m_rows[row] != nextRecords[op.nextIndex]) {
                         m_rows[row] = nextRecords[op.nextIndex];
                         const QModelIndex idx = index(row, 0);
-                        Q_EMIT dataChanged(idx, idx);
+                        if (m_composingRows.contains(row)) {
+                            m_deferredDataChanged.insert(row);   // flush when composing ends
+                        } else {
+                            Q_EMIT dataChanged(idx, idx);
+                        }
                     }
                 }
                 ++row;
@@ -123,6 +140,8 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                 break;
             }
             case AstBlockDiff::OpKind::Delete: {
+                m_composingRows.remove(row);
+                m_deferredDataChanged.remove(row);
                 beginRemoveRows(QModelIndex(), row, row);
                 m_rows.removeAt(row);
                 endRemoveRows();

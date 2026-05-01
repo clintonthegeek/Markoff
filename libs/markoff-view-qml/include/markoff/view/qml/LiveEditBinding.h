@@ -39,6 +39,10 @@ class LiveEditBinding : public QObject {
                READ textDocument
                WRITE setTextDocument
                NOTIFY textDocumentChanged)
+    Q_PROPERTY(bool composing
+               READ composing
+               WRITE setComposing
+               NOTIFY composingChanged)
 
 public:
     explicit LiveEditBinding(QObject *parent = nullptr);
@@ -52,6 +56,9 @@ public:
 
     QQuickTextDocument *textDocument() const;
     void setTextDocument(QQuickTextDocument *qtd);
+
+    bool composing() const;
+    void setComposing(bool composing);
 
     /// Atomically set the TextEdit's plain text while holding the cycle guard.
     /// This is the preferred path for model-driven text updates: the underlying
@@ -73,6 +80,7 @@ Q_SIGNALS:
     void documentChanged();
     void blockAnchorChanged();
     void textDocumentChanged();
+    void composingChanged();
 
     /// Emitted after an edit is applied to the CRDT document.
     /// `postText` is the block's current text from the QTextDocument (post-edit).
@@ -83,6 +91,7 @@ private Q_SLOTS:
 
 private:
     void rewireTextDocument();
+    void applyFullBlockReplacement();
 
     Markoff::MarkoffDocument *m_document    = nullptr;
     Markoff::BlockAnchor      m_blockAnchor = {};
@@ -90,6 +99,7 @@ private:
     QTextDocument            *m_textDoc     = nullptr;
 
     bool m_applyingModelUpdate = false;
+    bool m_composing           = false;
 
     // Coalesce state
     QElapsedTimer     m_lastEditTimer;

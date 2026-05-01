@@ -218,4 +218,9 @@ bool LiveListModelBinding::isFocusRestoreTarget(const Markoff::BlockAnchor &anch
     return d->focusedAnchor.has_value() && d->focusedAnchor.value() == anchor;
 }
 
+void LiveListModelBinding::setRowComposing(int row, bool composing)
+{
+    d->model->setComposingRow(row, composing);
+}
+
 }  // namespace Markoff::View::Qml
