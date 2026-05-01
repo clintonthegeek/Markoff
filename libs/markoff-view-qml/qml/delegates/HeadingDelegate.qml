@@ -110,6 +110,15 @@ Item {
         editBinding.setModelText(root.blockText)
     }
 
+    // QML change handlers do not fire for the initial property value at
+    // component construction — only on subsequent changes. Without this,
+    // the TextEdit stays empty on first incubation and the heading appears
+    // invisible. Mirrors ParagraphDelegate's Component.onCompleted.
+    Component.onCompleted: {
+        if (root.blockText.length > 0)
+            editBinding.setModelText(root.blockText)
+    }
+
     Connections {
         target: root.selectionModel
         function onSelectionChanged() {

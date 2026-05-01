@@ -112,6 +112,14 @@ Rectangle {
         editBinding.setModelText(root.codeText)
     }
 
+    // QML change handlers do not fire for the initial property value at
+    // component construction. Without this, the code block appears empty
+    // on first incubation. Mirrors ParagraphDelegate's Component.onCompleted.
+    Component.onCompleted: {
+        if (root.codeText.length > 0)
+            editBinding.setModelText(root.codeText)
+    }
+
     SyntaxHighlighter {
         textEdit: textEdit
         definition: root.codeLanguage.length > 0 ? root.codeLanguage : "Markdown"
