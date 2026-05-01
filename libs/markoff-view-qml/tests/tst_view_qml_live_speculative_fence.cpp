@@ -3,6 +3,7 @@
 #include <QTest>
 
 #include <markoff/view/qml/LiveBlockModel.h>
+#include <markoff/view/qml/LiveProjectionLayer.h>
 #include <markoff/view/qml/LiveSpeculativeFenceController.h>
 #include <markoff/view/qml/BlockKind.h>
 
@@ -35,8 +36,12 @@ private Q_SLOTS:
         LiveBlockModel model;
         model.setRecords({ makeBlock(BlockKind::Paragraph) });
 
+        LiveProjectionLayer layer;
+        layer.setBlockModel(&model);
+
         LiveSpeculativeFenceController ctrl;
         ctrl.setModel(&model);
+        ctrl.setProjectionLayer(&layer);
 
         BlockAnchor anchor;
         ctrl.onEditApplied(anchor, 0, QStringLiteral("```cpp"));
@@ -54,8 +59,12 @@ private Q_SLOTS:
         LiveBlockModel model;
         model.setRecords({ makeBlock(BlockKind::Paragraph) });
 
+        LiveProjectionLayer layer;
+        layer.setBlockModel(&model);
+
         LiveSpeculativeFenceController ctrl;
         ctrl.setModel(&model);
+        ctrl.setProjectionLayer(&layer);
 
         BlockAnchor anchor;
         // First, speculatively apply
@@ -77,8 +86,12 @@ private Q_SLOTS:
         LiveBlockModel model;
         model.setRecords({ makeBlock(BlockKind::Paragraph) });
 
+        LiveProjectionLayer layer;
+        layer.setBlockModel(&model);
+
         LiveSpeculativeFenceController ctrl;
         ctrl.setModel(&model);
+        ctrl.setProjectionLayer(&layer);
 
         BlockAnchor anchor;
         ctrl.onEditApplied(anchor, 0, QStringLiteral("```cpp"));
@@ -104,8 +117,12 @@ private Q_SLOTS:
         LiveBlockModel model;
         model.setRecords({ makeBlock(BlockKind::Paragraph) });
 
+        LiveProjectionLayer layer;
+        layer.setBlockModel(&model);
+
         LiveSpeculativeFenceController ctrl;
         ctrl.setModel(&model);
+        ctrl.setProjectionLayer(&layer);
 
         BlockAnchor anchor;
         // Speculatively set to code_block
@@ -131,8 +148,12 @@ private Q_SLOTS:
         LiveBlockModel model;
         model.setRecords({ makeBlock(BlockKind::CodeBlock) });
 
+        LiveProjectionLayer layer;
+        layer.setBlockModel(&model);
+
         LiveSpeculativeFenceController ctrl;
         ctrl.setModel(&model);
+        ctrl.setProjectionLayer(&layer);
 
         BlockAnchor anchor;
         // Feed fence text to a block that's already a code_block
@@ -152,8 +173,12 @@ private Q_SLOTS:
         LiveBlockModel model;
         model.setRecords({ makeBlock(BlockKind::Paragraph) });
 
+        LiveProjectionLayer layer;
+        layer.setBlockModel(&model);
+
         LiveSpeculativeFenceController ctrl;
         ctrl.setModel(&model);
+        ctrl.setProjectionLayer(&layer);
 
         BlockAnchor anchor;
         ctrl.onEditApplied(anchor, 0, QStringLiteral("~~~python"));

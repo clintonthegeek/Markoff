@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/view/qml/LiveSpeculativeFenceController.h>
 
+#include <markoff/view/qml/BlockKind.h>
+#include <markoff/view/qml/LiveProjectionLayer.h>
+#include <markoff/view/qml/ProjectionItem.h>
+
 namespace Markoff::View::Qml {
 
 LiveSpeculativeFenceController::LiveSpeculativeFenceController(QObject *parent)
@@ -16,10 +20,23 @@ void LiveSpeculativeFenceController::setModel(LiveBlockModel *m)
     Q_EMIT modelChanged();
 }
 
+LiveProjectionLayer *LiveSpeculativeFenceController::projectionLayer() const { return m_layer; }
+
+void LiveSpeculativeFenceController::setProjectionLayer(LiveProjectionLayer *layer)
+{
+    if (m_layer == layer) return;
+    m_layer = layer;
+    Q_EMIT projectionLayerChanged();
+}
+
 void LiveSpeculativeFenceController::onEditApplied(const Markoff::BlockAnchor &/*anchor*/,
                                                    int row,
                                                    const QString &postText)
 {
+    // Stage-2 contract: this controller is a *producer*. All kind mutations on
+    // the model flow through `LiveProjectionLayer`. Without a layer we have
+    // nowhere to register the prediction, so we no-op rather than dual-route.
+    if (!m_layer) return;
     if (!m_model) return;
     if (row < 0 || row >= m_model->rowCount()) return;
 
@@ -28,9 +45,10 @@ void LiveSpeculativeFenceController::onEditApplied(const Markoff::BlockAnchor &/
         LiveBlockModel::KindRole).toString();
 
     if (currentKind != QStringLiteral("paragraph")) {
-        // Not a paragraph — revert any stale speculation on this row.
+        // Not a paragraph — drop any stale prediction on this row. The layer
+        // is the single owner of the kind-revert mutation.
         if (m_model->isSpeculative(row))
-            m_model->revertSpeculativeKind(row);
+            m_layer->dropBlockKindPrediction(row);
         return;
     }
 
@@ -40,12 +58,17 @@ void LiveSpeculativeFenceController::onEditApplied(const Markoff::BlockAnchor &/
     // corrected when the next parse arrives via LiveBlockModel::applyOps clearing all
     // speculative state. The transient visual artifact is minor and deferred.
     if (isFenceOpener(postText)) {
-        if (!m_model->isSpeculative(row))
-            m_model->speculativelyChangeKind(row, QStringLiteral("code_block"));
+        if (!m_model->isSpeculative(row)) {
+            BlockKindPrediction p;
+            p.row             = row;
+            p.originalKind    = currentKind;
+            p.speculativeKind = BlockKind::CodeBlock;
+            m_layer->createBlockKindPrediction(p);
+        }
     } else {
-        // Fence no longer present — revert.
+        // Fence no longer present — drop the prediction.
         if (m_model->isSpeculative(row))
-            m_model->revertSpeculativeKind(row);
+            m_layer->dropBlockKindPrediction(row);
     }
 }
 

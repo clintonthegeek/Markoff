@@ -46,6 +46,12 @@ public:
     void createInlinePrediction(const InlinePrediction &prediction);
     void createBlockKindPrediction(const BlockKindPrediction &prediction);
 
+    /// Drop a previously-registered block-kind prediction for `row`. Reverts
+    /// the model's speculative kind back to the parser-confirmed kind in the
+    /// same call. Used by `LiveSpeculativeFenceController` when the trigger
+    /// pattern (fence opener) is erased before parser confirmation arrives.
+    void dropBlockKindPrediction(int row);
+
     // Lookups for consumers.
     QList<InlinePrediction> predictionsForRow(int row) const;
     /// Returns nullptr if no kind-prediction is registered for `row`. The

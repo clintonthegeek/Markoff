@@ -2,6 +2,7 @@
 #include <markoff/view/qml/LiveListModelBinding.h>
 
 #include <markoff/view/qml/LiveBlockModel.h>
+#include <markoff/view/qml/LiveProjectionLayer.h>
 #include <markoff/view/qml/LiveSelectionView.h>
 #include "BlockWalker.h"
 #include "AstBlockDiff.h"
@@ -19,10 +20,11 @@
 namespace Markoff::View::Qml {
 
 struct LiveListModelBinding::Private {
-    EditorBackend      *editorBackend = nullptr;
-    LiveBlockModel     *model         = nullptr;
-    LiveSelectionView  *selection     = nullptr;
-    QList<BlockKey>     lastKeys;
+    EditorBackend       *editorBackend = nullptr;
+    LiveBlockModel      *model         = nullptr;
+    LiveSelectionView   *selection     = nullptr;
+    LiveProjectionLayer *projection    = nullptr;
+    QList<BlockKey>      lastKeys;
 
     std::optional<Markoff::BlockAnchor> focusedAnchor;
     int focusedCursorPosition = 0;
@@ -49,6 +51,10 @@ LiveListModelBinding::LiveListModelBinding(QObject *parent)
 {
     d->model = new LiveBlockModel(this);
     d->selection = new LiveSelectionView(this);
+    // Spec §5 invariant 14: one projection-layer instance per binding,
+    // owned by the binding, lifetime equals the binding's.
+    d->projection = new LiveProjectionLayer(this);
+    d->projection->setBlockModel(d->model);
     // One worker is enough — stale-walk drop happens via walkGeneration; we
     // don't benefit from running multiple walks in parallel against the same
     // model.
@@ -65,6 +71,7 @@ LiveListModelBinding::~LiveListModelBinding()
 EditorBackend *LiveListModelBinding::editorBackend() const { return d->editorBackend; }
 LiveBlockModel *LiveListModelBinding::model() const { return d->model; }
 LiveSelectionView *LiveListModelBinding::selectionModel() const { return d->selection; }
+LiveProjectionLayer *LiveListModelBinding::projectionLayer() const { return d->projection; }
 
 void LiveListModelBinding::setEditorBackend(EditorBackend *eb)
 {
@@ -73,6 +80,10 @@ void LiveListModelBinding::setEditorBackend(EditorBackend *eb)
         QObject::disconnect(d->editorBackend, nullptr, this, nullptr);
     }
     d->editorBackend = eb;
+    // Forward the backend to the projection layer so it can subscribe to
+    // `parseUpdatedAt` itself — the layer owns its own reconciliation
+    // connection (single subscriber per signal; spec §5 invariant 15).
+    d->projection->setEditorBackend(eb);
     if (d->editorBackend) {
         QObject::connect(d->editorBackend, &EditorBackend::parseUpdatedAt,
                          this, &LiveListModelBinding::onParseUpdatedAt);

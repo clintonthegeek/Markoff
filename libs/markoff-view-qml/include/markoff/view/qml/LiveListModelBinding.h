@@ -8,6 +8,7 @@
 #include <markoff-foundation/BlockAnchor.h>
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveBlockModel.h>
+#include <markoff/view/qml/LiveProjectionLayer.h>
 #include <markoff/view/qml/LiveSelectionView.h>
 
 namespace Markoff { class Document; }
@@ -30,6 +31,7 @@ class LiveListModelBinding : public QObject {
                READ editorBackend WRITE setEditorBackend NOTIFY editorBackendChanged)
     Q_PROPERTY(LiveBlockModel *model READ model CONSTANT)
     Q_PROPERTY(LiveSelectionView *selectionModel READ selectionModel CONSTANT)
+    Q_PROPERTY(LiveProjectionLayer *projectionLayer READ projectionLayer CONSTANT)
 
 public:
     explicit LiveListModelBinding(QObject *parent = nullptr);
@@ -40,6 +42,7 @@ public:
 
     LiveBlockModel *model() const;
     LiveSelectionView *selectionModel() const;
+    LiveProjectionLayer *projectionLayer() const;
 
     Q_INVOKABLE void notifyFocused(const Markoff::BlockAnchor &anchor, int cursorPos);
     Q_INVOKABLE void notifyFocusedCursorMoved(int cursorPos);

@@ -49,6 +49,7 @@ Item {
     LiveSpeculativeFenceController {
         id: fenceCtrl
         model: binding.model
+        projectionLayer: binding.projectionLayer
     }
 
     LiveListModelBinding {

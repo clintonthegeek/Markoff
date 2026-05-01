@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/view/qml/LiveProjectionLayer.h>
 
+#include <markoff/view/qml/EditorBackend.h>
+#include <markoff/view/qml/LiveBlockModel.h>
+
 namespace Markoff::View::Qml {
 
 LiveProjectionLayer::LiveProjectionLayer(QObject *parent)
@@ -11,7 +14,25 @@ LiveProjectionLayer::~LiveProjectionLayer() = default;
 
 void LiveProjectionLayer::setEditorBackend(EditorBackend *backend)
 {
+    if (m_backend == backend) return;
+    if (m_backend) {
+        QObject::disconnect(m_backend, &EditorBackend::parseUpdatedAt,
+                            this, nullptr);
+    }
     m_backend = backend;
+    if (m_backend) {
+        // Reconciliation runs synchronously on parse arrival (spec §5
+        // invariant 15). The 3-arg signal is reduced to a no-op connection
+        // here — Stage 2 reconciliation only needs to drop registered
+        // predictions; Stage 4 will widen this to anchor-invalidation for
+        // holes.
+        QObject::connect(m_backend, &EditorBackend::parseUpdatedAt,
+                         this, [this](const Markoff::Document *,
+                                      quint64,
+                                      const QList<Markoff::BlockAnchor> &) {
+                             onParseUpdated();
+                         });
+    }
 }
 
 void LiveProjectionLayer::setBlockModel(LiveBlockModel *model)
@@ -47,6 +68,20 @@ void LiveProjectionLayer::createInlinePrediction(const InlinePrediction &predict
 void LiveProjectionLayer::createBlockKindPrediction(const BlockKindPrediction &prediction)
 {
     m_blockKindPredictions.insert(prediction.row, prediction);
+    // Apply the kind change to the model on the producer's behalf. The model
+    // owns the speculative-state map (cleared by `applyOps` when parse truth
+    // arrives); the layer owns the prediction-set bookkeeping.
+    if (m_model) {
+        m_model->speculativelyChangeKind(prediction.row, prediction.speculativeKind);
+    }
+}
+
+void LiveProjectionLayer::dropBlockKindPrediction(int row)
+{
+    m_blockKindPredictions.remove(row);
+    if (m_model) {
+        m_model->revertSpeculativeKind(row);
+    }
 }
 
 QList<InlinePrediction> LiveProjectionLayer::predictionsForRow(int row) const
@@ -100,12 +135,20 @@ int LiveProjectionLayer::blockKindPredictionCount() const
 
 void LiveProjectionLayer::onParseUpdated()
 {
-    // Stage-1: no-op seam. Stage 2/3 fill in:
-    //   - drop inline predictions whose ranges the parser now confirms
-    //   - drop block-kind predictions whose kind the parser now matches
-    //   - snap contradicted predictions away (model emits dataChanged via the
-    //     blockModel/binding path)
-    //   - drop holes whose origin anchor has been invalidated
+    // Stage-2: reconciliation for block-kind predictions on parse return.
+    //
+    // The model's own speculative-state map (`m_speculativeOriginals`) is
+    // cleared by `LiveBlockModel::applyOps` when parse results are applied —
+    // parser truth is authoritative there. The layer's prediction-set
+    // bookkeeping mirrors that lifecycle: every registered block-kind
+    // prediction is dropped on parse arrival. If the parser confirmed the
+    // speculative kind, the model row already reflects the confirmed kind;
+    // if it contradicted, `applyOps` snapped the row back. Either way, the
+    // prediction has run its course.
+    m_blockKindPredictions.clear();
+
+    // Stage 3 fills in inline prediction reconciliation; Stage 4 fills in
+    // hole anchor-invalidation.
 }
 
 void LiveProjectionLayer::onLocalEditApplied()
