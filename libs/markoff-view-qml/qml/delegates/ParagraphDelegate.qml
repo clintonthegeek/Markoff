@@ -49,12 +49,12 @@ Item {
         }
     }
 
-    // Model-driven text updates go through the cycle guard so that
-    // contentsChange fired by the text assignment is suppressed.
+    // Model-driven text updates: use setModelText so the cycle guard is held
+    // synchronously while the QTextDocument update fires contentsChange.
+    // The QML begin/end pattern doesn't work because Qt Quick defers
+    // TextEdit text updates past the guard window.
     onBlockTextChanged: {
-        editBinding.beginModelUpdate()
-        textEdit.text = root.blockText
-        editBinding.endModelUpdate()
+        editBinding.setModelText(root.blockText)
     }
 
     Connections {

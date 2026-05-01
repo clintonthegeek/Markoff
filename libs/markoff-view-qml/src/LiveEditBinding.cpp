@@ -89,6 +89,18 @@ void LiveEditBinding::rewireTextDocument()
 // Cycle-guard invokables
 // ---------------------------------------------------------------------------
 
+void LiveEditBinding::setModelText(const QString &text)
+{
+    // Call QTextDocument::setPlainText directly so contentsChange fires
+    // synchronously, while the guard is held. The QML path
+    // (textEdit.text = x; endModelUpdate()) does NOT work reliably because
+    // Qt Quick defers the TextEdit text update past the endModelUpdate() call.
+    if (!m_textDoc) return;
+    m_applyingModelUpdate = true;
+    m_textDoc->setPlainText(text);
+    m_applyingModelUpdate = false;
+}
+
 void LiveEditBinding::beginModelUpdate()
 {
     m_applyingModelUpdate = true;

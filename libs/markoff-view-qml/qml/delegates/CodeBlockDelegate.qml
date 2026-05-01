@@ -60,12 +60,10 @@ Rectangle {
         }
     }
 
-    // Model-driven text updates go through the cycle guard so that
-    // contentsChange fired by the text assignment is suppressed.
+    // Model-driven text updates: use setModelText so the cycle guard is held
+    // synchronously while the QTextDocument update fires contentsChange.
     onCodeTextChanged: {
-        editBinding.beginModelUpdate()
-        textEdit.text = root.codeText
-        editBinding.endModelUpdate()
+        editBinding.setModelText(root.codeText)
     }
 
     SyntaxHighlighter {

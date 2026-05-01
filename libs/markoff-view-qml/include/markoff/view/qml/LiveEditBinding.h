@@ -52,8 +52,17 @@ public:
     QQuickTextDocument *textDocument() const;
     void setTextDocument(QQuickTextDocument *qtd);
 
+    /// Atomically set the TextEdit's plain text while holding the cycle guard.
+    /// This is the preferred path for model-driven text updates: the underlying
+    /// QTextDocument::setPlainText() fires contentsChange synchronously, so
+    /// the guard is active for the entire duration. Calling beginModelUpdate /
+    /// textEdit.text = x / endModelUpdate from QML does NOT work reliably
+    /// because Qt Quick defers the TextEdit text update past the guard window.
+    Q_INVOKABLE void setModelText(const QString &text);
+
     /// Set before assigning model-driven text to the TextEdit; prevents
     /// the resulting contentsChange from being forwarded to MarkoffDocument.
+    /// Prefer setModelText() over begin/end when possible.
     Q_INVOKABLE void beginModelUpdate();
 
     /// Clear after the model-driven text assignment is complete.
