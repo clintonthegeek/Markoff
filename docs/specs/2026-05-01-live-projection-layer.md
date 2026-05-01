@@ -3,7 +3,7 @@
 **Date:** 2026-05-01
 **Branch:** `exploration/new-foundation`
 **Phase:** Phase-2 follow-on inside `markoff-view-qml`. Builds on the live-editing design (`docs/specs/2026-04-30-live-editing-design.md`) and the walking skeleton (`docs/specs/2026-04-29-live-render-design.md`).
-**Status:** draft (pending user spec review)
+**Status:** implemented (v0). Plan: [`docs/plans/2026-05-01-live-projection-layer.md`](../plans/2026-05-01-live-projection-layer.md). Landed in commits `19094bb` (skeleton) → `ef62f57` (fence refactor) → `3e1c437` (inline highlighter refactor) → `b07b07c` + `a463bca` + `ef0433b` (empty-paragraph hole) → `030d581` (cleanup).
 **Depends on:** `markoff-foundation` BlockAnchor/TextAnchor APIs (already shipped); `LiveBlockModel`, `LiveListModelBinding`, `InlineFormatHighlighter`, `LiveSpeculativeFenceController` (already shipped).
 
 ## 0. TL;DR

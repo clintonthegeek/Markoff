@@ -101,6 +101,32 @@ These are load-bearing. Breaking them re-introduces the legacy `markoff-live` fa
 
 7. **`parseUpdatedAt` is parse-sequence-tagged.** Phase-2 consumers must compare the parse's `parseSequence` against `MarkoffDocument::parseSequence()` before rendering. Stale parses must be discarded. `EditorBackend::parseUpdatedAt(parsed, parseSequence, blockAnchors)` carries the local-monotonic counter and the per-top-level-block `QList<Markoff::BlockAnchor>`; the original tag was added in the POC plan and reshaped by the block-anchor-foundation work to drop `Crdt::Global` from the public surface and emit `BlockAnchor`s directly.
 
+## Projection layer
+
+`LiveProjectionLayer` owns all view-side state that is *not* present in the source rope. The defining sentence (from `docs/specs/2026-05-01-live-projection-layer.md`): **the editing model is a superset of the source model; the projection downward is lossy by design; the layer owns the difference.**
+
+Two item kinds:
+
+- **Predictions** (latency-bridging). View runs ahead of parser on bytes that *are* already in source: open `**`/`*`/`` ` ``/`~~`/`==` rendered as bold/italic/etc. before the parser confirms (`InlineFormatHighlighter`); ```` ``` ```` flips a paragraph row's kind to `code_block` before the close fence arrives (`LiveSpeculativeFenceController`). Reconcile against parser truth — confirm or drop.
+- **Holes** (intent-holding). View holds intent that source cannot represent yet: empty paragraph after Enter at end-of-block (`BlockHole{kind="paragraph"}` produced by `LiveStructuralKeyHandler`). Reify on first printable character (build canonical `MarkoffEdit`, drop hole, `applyLocalEdit`); abandon on focus-out / 30s idle / Ctrl+Z / Backspace-at-empty. The full hole catalog (list items, checklists, code-fence interior, blockquote, callout, table cells, links, wikilinks, footnotes, math) is enumerated in spec §3.4 and lands one at a time in follow-on plans.
+
+Architectural invariants the layer enforces (numbered 11-16; extend the seven cross-cutting invariants above):
+
+11. **Source rope is canonical.** Projections never write to the rope except through `applyLocalEdit` at reification time. Save serializes only the rope; a pending hole is not flushed to disk.
+12. **Projections are not in the CRDT undo stack.** Holes that have not reified are pure view state; their drop is not an undo entry. Reification produces a normal CRDT edit which enters the stack normally. `LiveProjectionLayer::undoWithHoles()` is the QML Ctrl+Z entry point: drops any pending hole AND runs `MarkoffDocument::undo()` in one user-visible step.
+13. **Anchor opacity holds for projection anchors too.** A projection's `origin` is a `BlockAnchor` value; delegates pass it through opaquely. Synthetic projection anchors (those that don't yet correspond to any real CRDT position) are flagged via `BlockHole::synthetic` so foundation translation APIs are never called on them.
+14. **One layer instance per `LiveListModelBinding`.** No globals. The layer's lifetime equals the binding's. The binding owns the layer; controllers (`LiveSpeculativeFenceController`, `InlineFormatHighlighter`) and the model (`LiveBlockModel`) take a non-owning pointer.
+15. **Reconciliation runs synchronously on its trigger.** Parse return → reconcile predictions before emitting model signals. User keystroke at hole → reify synchronously (drop hole *before* `applyLocalEdit` returns). No deferred-reconciliation queues.
+16. **Collab safety.** When a remote peer's edit invalidates a projection's `origin`, drop the projection and route focus to the nearest live neighbor. Same shape as the existing "selection-touched-block-removed" handling.
+
+Producer / consumer split:
+
+- Producers call `layer->createXxx(...)` / `layer->dropXxx(...)`. They do not subscribe to `parseUpdatedAt`; the layer does.
+- The model (`LiveBlockModel`) interleaves hole rows with parsed rows. View rows = parsed blocks ⊕ holes, sorted by `afterParsedRow`. Roles `kind`/`text`/`blockAnchor` plus `IsHoleRole`/`HoleIdRole`. `parsedRowForViewRow` / `viewRowForParsedRow` translate between the two indexings; `applyOps` (the diff-and-apply path from the binding) translates parsed-row indices → view-row indices when emitting model signals so existing diff code stays naïve about hole rows.
+- Hole-row delegates are regular `ParagraphDelegate`s with `isHole === true` and a `holeId`; on first printable keystroke they call `layer.reifyBlockHole(holeId, event.text)`. `LiveView.qml` listens for `holeReified(viewRow, qtPos)` and routes focus into the now-real row via the bounded retry helper `_routeFocusToRow`.
+
+Spec: `docs/specs/2026-05-01-live-projection-layer.md`. Plan: `docs/plans/2026-05-01-live-projection-layer.md`.
+
 ## Layer map
 
 ```
