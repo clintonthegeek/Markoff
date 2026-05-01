@@ -13,6 +13,7 @@ Item {
     property var    document: null  // Markoff::MarkoffDocument *
     property var    selectionModel: null
     property var    theme: null
+    property var    structuralKeyHandler: null
 
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
@@ -26,7 +27,7 @@ Item {
     /// Proxy length so LiveView.qml can clamp INT32_MAX sentinel when needed.
     readonly property int textLength: textEdit.length
 
-    // Expose cursor/selection state for LiveView.qml's Keys handler.
+    // Expose cursor/selection state (used by hit-test layer and external consumers).
     readonly property int cursorPosition: textEdit.cursorPosition
     readonly property string selectedText: textEdit.selectedText
 
@@ -47,17 +48,30 @@ Item {
         wrapMode: TextEdit.Wrap
         font.pixelSize: 16
 
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: (event) => {
+            if (!root.structuralKeyHandler) return
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter ||
+                event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete ||
+                event.key === Qt.Key_Tab) {
+                const handled = root.structuralKeyHandler.tryHandle(
+                    event.key,
+                    event.modifiers,
+                    root.blockAnchor,
+                    root.blockIndex,
+                    textEdit.cursorPosition,
+                    textEdit.selectedText.length === 0,
+                    root.blockText
+                )
+                if (handled) event.accepted = true
+            }
+        }
+
         InlineFormatHighlighter {
             document: textEdit.textDocument
             source: root.blockText
         }
 
-        onActiveFocusChanged: {
-            if (activeFocus) {
-                const lv = root.ListView.view
-                if (lv) lv.parent.focusedDelegate = root
-            }
-        }
     }
 
     // Model-driven text updates: use setModelText so the cycle guard is held
