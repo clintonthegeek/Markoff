@@ -12,6 +12,9 @@ LiveSelectionView::LiveSelectionView(QObject *parent) : QObject(parent) {}
 
 void LiveSelectionView::setDocument(Markoff::MarkoffDocument *doc)
 {
+    // NOTE: setSession must also be called for selection to work — both must be
+    // set together. A document without a session (or vice versa) leaves the
+    // selection non-functional.
     m_document = doc;
 }
 
@@ -74,37 +77,26 @@ QPoint LiveSelectionView::rangeForBlock(int blockIndex) const
     // always returns 0 and the active anchor sits at the block's start byte.
     if (selEnd < blockStart || selStart >= blockEnd) return QPoint(-1, -1);
 
-    const QByteArray docUtf8 = m_document->toMarkdownUtf8();
+    const QByteArray docUtf8   = m_document->toMarkdownUtf8();
+    const QByteArray blockUtf8 = docUtf8.mid(static_cast<int>(blockStart),
+                                              static_cast<int>(blockEnd - blockStart));
 
     // within-block start QChar position
-    int startQChar;
-    if (selStart <= blockStart) {
-        startQChar = 0;
-    } else {
-        const quint32 byteInBlock = selStart - blockStart;
-        const QByteArray blockUtf8 = docUtf8.mid(static_cast<int>(blockStart),
-                                                  static_cast<int>(blockEnd - blockStart));
-        startQChar = Markoff::SourceTextDocumentBinding::byteOffsetToQtPos(blockUtf8, byteInBlock);
-    }
+    const int startQChar = (selStart <= blockStart)
+        ? 0
+        : Markoff::SourceTextDocumentBinding::byteOffsetToQtPos(blockUtf8, selStart - blockStart);
 
     // within-block end QChar position (INT32_MAX = "to end of block")
-    int endQChar;
-    if (selEnd >= blockEnd) {
-        endQChar = INT32_MAX;
-    } else {
-        const quint32 byteInBlock = selEnd - blockStart;
-        const QByteArray blockUtf8 = docUtf8.mid(static_cast<int>(blockStart),
-                                                  static_cast<int>(blockEnd - blockStart));
-        endQChar = Markoff::SourceTextDocumentBinding::byteOffsetToQtPos(blockUtf8, byteInBlock);
-    }
+    const int endQChar = (selEnd >= blockEnd)
+        ? INT32_MAX
+        : Markoff::SourceTextDocumentBinding::byteOffsetToQtPos(blockUtf8, selEnd - blockStart);
 
     return QPoint(startQChar, endQChar);
 }
 
 void LiveSelectionView::copySelectionToClipboard(const QStringList &blockTexts) const
 {
-    if (!hasSelection()) return;
-    if (!m_document) return;
+    if (!hasSelection()) return;  // also returns false when m_document is null
 
     const quint32 anchorByte = m_document->resolveTextAnchor(m_selection.anchor);
     const quint32 activeByte = m_document->resolveTextAnchor(m_selection.active);
@@ -155,8 +147,8 @@ void LiveSelectionView::copySelectionToClipboard(const QStringList &blockTexts) 
 
 void LiveSelectionView::begin(int blockIndex, int qtOffset)
 {
+    if (!m_session || !m_document) return;
     const Markoff::TextAnchor ta = anchorForBlockOffset(blockIndex, qtOffset, false);
-    if (!m_session) return;
 
     m_applyingSessionSelection = true;
     Markoff::Selection sel;
