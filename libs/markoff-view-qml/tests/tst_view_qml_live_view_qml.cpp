@@ -522,6 +522,150 @@ private Q_SLOTS:
                  "Focus should be in block 1 (following paragraph) after HR-at-top click");
     }
 
+    void image_click_routes_focus_to_preceding_paragraph() {
+        // Document: paragraph (0), image (1), paragraph (2).
+        // Calling routeNeighbourFocus(1) should focus the preceding paragraph (0).
+        Markoff::MarkoffDocument doc(1);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "themeCtx", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: themeCtx\n"
+            "    mode: \"live\"\n"
+            "}\n",
+            QUrl());
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("First para\n\n![alt](img.png)\n\nSecond para");
+        doc.applyLocalEdit({ ed });
+        QVERIFY(parseSpy.wait(2000));
+
+        QQuickItem *listView = root->findChild<QQuickItem *>(QStringLiteral("listView"));
+        QVERIFY(listView);
+        QTRY_COMPARE(listView->property("count").toInt(), 3);
+        QMetaObject::invokeMethod(listView, "forceLayout");
+        view.grabWindow();
+
+        QQuickItem *liveView = nullptr;
+        for (QQuickItem *child : root->findChildren<QQuickItem *>()) {
+            if (child->findChild<QQuickItem *>(QStringLiteral("listView"))) {
+                liveView = child; break;
+            }
+        }
+        if (!liveView)
+            QSKIP("Cannot locate LiveView item");
+
+        bool ok = QMetaObject::invokeMethod(liveView, "routeNeighbourFocus",
+                                             Q_ARG(QVariant, QVariant(1)));
+        if (!ok) QSKIP("routeNeighbourFocus not invokable");
+        QTest::qWait(50);
+
+        QQuickItem *focused = view.activeFocusItem();
+        QVERIFY2(focused, "No item has active focus after image routeNeighbourFocus(1)");
+
+        bool focusInBlock0 = false;
+        for (QQuickItem *it = focused; it; it = it->parentItem()) {
+            QVariant bi = it->property("blockIndex");
+            if (bi.isValid() && bi.toInt() == 0) { focusInBlock0 = true; break; }
+        }
+        QVERIFY2(focusInBlock0,
+                 "Focus should be in block 0 (preceding paragraph) after image click");
+    }
+
+    void image_at_top_routes_focus_to_following_paragraph() {
+        // Document: image (0), paragraph (1).
+        // Calling routeNeighbourFocus(0) should focus the following paragraph (1).
+        Markoff::MarkoffDocument doc(1);
+
+        QQuickView view;
+        view.engine()->rootContext()->setContextProperty("doc", &doc);
+        view.engine()->rootContext()->setContextProperty(
+            "themeCtx", QVariant::fromValue(Markoff::Theme::defaultLight()));
+        view.setResizeMode(QQuickView::SizeRootObjectToView);
+        view.resize(600, 800);
+
+        QQmlComponent component(view.engine());
+        component.setData(
+            "import QtQuick\n"
+            "import QtQuick.Controls\n"
+            "import org.markoff.view.qml\n"
+            "MarkoffEditor {\n"
+            "    width: 600; height: 800\n"
+            "    document: doc\n"
+            "    theme: themeCtx\n"
+            "    mode: \"live\"\n"
+            "}\n",
+            QUrl());
+        QVERIFY(!component.isError());
+
+        auto *root = qobject_cast<QQuickItem *>(component.create());
+        QVERIFY(root);
+        root->setParentItem(view.contentItem());
+        root->setParent(view.contentItem());
+        view.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("![alt](img.png)\n\nFirst para");
+        doc.applyLocalEdit({ ed });
+        QVERIFY(parseSpy.wait(2000));
+
+        QQuickItem *listView = root->findChild<QQuickItem *>(QStringLiteral("listView"));
+        QVERIFY(listView);
+        QTRY_COMPARE(listView->property("count").toInt(), 2);
+        QMetaObject::invokeMethod(listView, "forceLayout");
+        view.grabWindow();
+
+        QQuickItem *liveView = nullptr;
+        for (QQuickItem *child : root->findChildren<QQuickItem *>()) {
+            if (child->findChild<QQuickItem *>(QStringLiteral("listView"))) {
+                liveView = child; break;
+            }
+        }
+        if (!liveView)
+            QSKIP("Cannot locate LiveView item");
+
+        bool ok = QMetaObject::invokeMethod(liveView, "routeNeighbourFocus",
+                                             Q_ARG(QVariant, QVariant(0)));
+        if (!ok) QSKIP("routeNeighbourFocus not invokable");
+        QTest::qWait(50);
+
+        QQuickItem *focused = view.activeFocusItem();
+        QVERIFY2(focused, "No item has active focus after image-at-top routeNeighbourFocus(0)");
+
+        bool focusInBlock1 = false;
+        for (QQuickItem *it = focused; it; it = it->parentItem()) {
+            QVariant bi = it->property("blockIndex");
+            if (bi.isValid() && bi.toInt() == 1) { focusInBlock1 = true; break; }
+        }
+        QVERIFY2(focusInBlock1,
+                 "Focus should be in block 1 (following paragraph) after image-at-top click");
+    }
+
     void selection_highlight_appears_on_hr_and_image() {
         Markoff::MarkoffDocument doc(1);
 

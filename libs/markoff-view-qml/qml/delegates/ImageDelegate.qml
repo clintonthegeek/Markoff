@@ -68,6 +68,7 @@ Item {
 
     MouseArea {
         anchors.fill: parent
+        acceptedButtons: Qt.LeftButton
         onClicked: {
             if (root.routeFocusToNeighbour)
                 root.routeFocusToNeighbour(root.blockIndex)
