@@ -388,7 +388,7 @@ private Q_SLOTS:
         binding.setCursorPosition(6);
 
         const auto a = backend.cursorAnchor();
-        QCOMPARE(doc.resolveAnchor(a), quint32(6));
+        QCOMPARE(doc.resolveTextAnchor(a), quint32(6));
     }
 
     void backend_cursor_anchor_change_propagates_to_int_position() {
@@ -407,7 +407,7 @@ private Q_SLOTS:
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello world"));
 
-        const auto a4 = doc.anchorAt(4, CollabText::Crdt::Bias::Left);
+        const auto a4 = doc.textAnchorAt(4, /*rightBias*/ false);
         backend.setCursorAnchor(a4);
 
         QCOMPARE(binding.cursorPosition(), 4);
@@ -466,7 +466,7 @@ private Q_SLOTS:
 
         // qtPos 2 (after 'h' + 'é') corresponds to byte 3 (after 'h' + 2 bytes for é).
         binding.setCursorPosition(2);
-        const quint32 byteOff = doc.resolveAnchor(backend.cursorAnchor());
+        const quint32 byteOff = doc.resolveTextAnchor(backend.cursorAnchor());
         QCOMPARE(byteOff, quint32(3));
     }
 };

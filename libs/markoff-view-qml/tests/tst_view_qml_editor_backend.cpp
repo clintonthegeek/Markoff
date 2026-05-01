@@ -3,8 +3,6 @@
 #include <QSignalSpy>
 #include <QTest>
 
-#include <crdt/Anchor.h>
-
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
@@ -13,18 +11,6 @@
 #include <markoff/view/qml/EditorBackend.h>
 
 using namespace Markoff::View::Qml;
-
-namespace {
-/// Crdt::Anchor → TextAnchor with same wire identity (T10/T11 cascade
-/// boundary; tests still seed via doc.anchorAt which yields Crdt::Anchor).
-Markoff::TextAnchor toTA(const CollabText::Crdt::Anchor &a)
-{
-    return Markoff::TextAnchor{
-        a.replica_id, a.char_value,
-        (a.bias == CollabText::Crdt::Bias::Right) ? quint8(1) : quint8(0)
-    };
-}
-}  // namespace
 
 class TstViewQmlEditorBackend : public QObject {
     Q_OBJECT
@@ -127,7 +113,7 @@ private Q_SLOTS:
 
     void cursor_anchor_default_is_zero() {
         EditorBackend backend;
-        QCOMPARE(backend.cursorAnchor(), CollabText::Crdt::Anchor{});
+        QCOMPARE(backend.cursorAnchor(), Markoff::TextAnchor{});
     }
 
     void set_cursor_anchor_lifts_to_session_primary_selection() {
@@ -135,21 +121,21 @@ private Q_SLOTS:
         Markoff::MarkoffDocument doc(1);
         backend.setDocument(&doc);
 
-        // Seed text so anchorAt makes sense.
+        // Seed text so textAnchorAt makes sense.
         Markoff::MarkoffEdit ed;
         ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
         doc.applyLocalEdit({ ed });
 
         // Build an anchor at byte offset 5.
-        const CollabText::Crdt::Anchor a = doc.anchorAt(5, CollabText::Crdt::Bias::Left);
+        const Markoff::TextAnchor a = doc.textAnchorAt(5, /*rightBias*/ false);
         backend.setCursorAnchor(a);
 
         // Session's primary selection should now be a degenerate selection at 'a'.
         Markoff::Session *sess = backend.session();
         QVERIFY(sess != nullptr);
         const Markoff::Selection sel = sess->primarySelection();
-        QCOMPARE(sel.anchor, toTA(a));
-        QCOMPARE(sel.active, toTA(a));
+        QCOMPARE(sel.anchor, a);
+        QCOMPARE(sel.active, a);
         QCOMPARE(sel.kind, Markoff::Selection::Kind::Primary);
     }
 
@@ -162,9 +148,9 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
         doc.applyLocalEdit({ ed });
 
-        const CollabText::Crdt::Anchor a = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        const Markoff::TextAnchor a = doc.textAnchorAt(3, /*rightBias*/ false);
         Markoff::Selection sel;
-        sel.anchor = toTA(a); sel.active = toTA(a); sel.kind = Markoff::Selection::Kind::Primary;
+        sel.anchor = a; sel.active = a; sel.kind = Markoff::Selection::Kind::Primary;
 
         QSignalSpy spy(&backend, &EditorBackend::cursorAnchorChanged);
         backend.session()->setPrimarySelection(sel);
@@ -175,8 +161,8 @@ private Q_SLOTS:
 
     void selection_anchor_and_active_default_to_zero() {
         EditorBackend backend;
-        QCOMPARE(backend.selectionAnchor(), CollabText::Crdt::Anchor{});
-        QCOMPARE(backend.selectionActive(), CollabText::Crdt::Anchor{});
+        QCOMPARE(backend.selectionAnchor(), Markoff::TextAnchor{});
+        QCOMPARE(backend.selectionActive(), Markoff::TextAnchor{});
     }
 
     void set_selection_anchor_and_active_lifts_range_to_session() {
@@ -187,14 +173,14 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
         doc.applyLocalEdit({ ed });
 
-        const auto a3 = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
-        const auto a8 = doc.anchorAt(8, CollabText::Crdt::Bias::Right);
+        const auto a3 = doc.textAnchorAt(3, /*rightBias*/ false);
+        const auto a8 = doc.textAnchorAt(8, /*rightBias*/ true);
         backend.setSelectionAnchor(a3);
         backend.setSelectionActive(a8);
 
         const Markoff::Selection sel = backend.session()->primarySelection();
-        QCOMPARE(sel.anchor, toTA(a3));
-        QCOMPARE(sel.active, toTA(a8));
+        QCOMPARE(sel.anchor, a3);
+        QCOMPARE(sel.active, a8);
     }
 
     void selection_can_be_reversed_active_before_anchor() {
@@ -205,14 +191,14 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
         doc.applyLocalEdit({ ed });
 
-        const auto a8 = doc.anchorAt(8, CollabText::Crdt::Bias::Left);
-        const auto a3 = doc.anchorAt(3, CollabText::Crdt::Bias::Right);
+        const auto a8 = doc.textAnchorAt(8, /*rightBias*/ false);
+        const auto a3 = doc.textAnchorAt(3, /*rightBias*/ true);
         backend.setSelectionAnchor(a8);
         backend.setSelectionActive(a3);
 
         const Markoff::Selection sel = backend.session()->primarySelection();
-        QCOMPARE(sel.anchor, toTA(a8));
-        QCOMPARE(sel.active, toTA(a3));
+        QCOMPARE(sel.anchor, a8);
+        QCOMPARE(sel.active, a3);
         QVERIFY(sel.isReversed());
     }
 
@@ -224,10 +210,10 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
         doc.applyLocalEdit({ ed });
 
-        const auto a2 = doc.anchorAt(2, CollabText::Crdt::Bias::Left);
-        const auto a7 = doc.anchorAt(7, CollabText::Crdt::Bias::Right);
+        const auto a2 = doc.textAnchorAt(2, /*rightBias*/ false);
+        const auto a7 = doc.textAnchorAt(7, /*rightBias*/ true);
         Markoff::Selection sel;
-        sel.anchor = toTA(a2); sel.active = toTA(a7); sel.kind = Markoff::Selection::Kind::Primary;
+        sel.anchor = a2; sel.active = a7; sel.kind = Markoff::Selection::Kind::Primary;
 
         QSignalSpy spyAnchor(&backend, &EditorBackend::selectionAnchorChanged);
         QSignalSpy spyActive(&backend, &EditorBackend::selectionActiveChanged);
@@ -298,8 +284,8 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
         doc.applyLocalEdit({ ed });
 
-        const auto a6 = doc.anchorAt(6, CollabText::Crdt::Bias::Left);
-        const auto a11 = doc.anchorAt(11, CollabText::Crdt::Bias::Right);
+        const auto a6 = doc.textAnchorAt(6, /*rightBias*/ false);
+        const auto a11 = doc.textAnchorAt(11, /*rightBias*/ true);
         backend.setSelectionAnchor(a6);
         backend.setSelectionActive(a11);
 
@@ -315,8 +301,8 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
         doc.applyLocalEdit({ ed });
 
-        const auto a11 = doc.anchorAt(11, CollabText::Crdt::Bias::Left);
-        const auto a6  = doc.anchorAt(6, CollabText::Crdt::Bias::Right);
+        const auto a11 = doc.textAnchorAt(11, /*rightBias*/ false);
+        const auto a6  = doc.textAnchorAt(6, /*rightBias*/ true);
         backend.setSelectionAnchor(a11);
         backend.setSelectionActive(a6);
 
@@ -333,7 +319,7 @@ private Q_SLOTS:
         ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello");
         doc.applyLocalEdit({ ed });
 
-        const auto a3 = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        const auto a3 = doc.textAnchorAt(3, /*rightBias*/ false);
         backend.setCursorAnchor(a3);
 
         QCOMPARE(backend.copySelectionAsMarkdown(), QString());
