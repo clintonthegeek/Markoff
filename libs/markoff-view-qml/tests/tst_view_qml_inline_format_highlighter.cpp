@@ -199,6 +199,13 @@ private Q_SLOTS:
         QVERIFY(h.anyItalic(1, 6));
     }
 
+    void speculative_underscore_italic_open_delimiter() {
+        // "_italic" — unclosed _ → "italic" (chars 1..7) is speculatively italic.
+        Helper h;
+        h.load(QStringLiteral("_italic"));
+        QVERIFY(h.anyItalic(1, 7));
+    }
+
     void speculative_code_open_delimiter() {
         // "`code" — unclosed ` → "code" (chars 1..5) is speculatively code-styled.
         Helper h;

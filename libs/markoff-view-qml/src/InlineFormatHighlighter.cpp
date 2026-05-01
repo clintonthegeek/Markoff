@@ -4,6 +4,7 @@
 #include <markoff-parser/TreeSitterParser.h>
 
 #include <QBitArray>
+#include <QColor>
 #include <QFont>
 #include <QQuickTextDocument>
 #include <QTextCharFormat>
