@@ -262,6 +262,11 @@ QList<FootnoteRefInfo> Document::footnoteRefs() const
     return d->refs;
 }
 
+QList<TopLevelBlock> Document::topLevelBlocks() const
+{
+    return d->queries.topLevelBlocks;
+}
+
 int Document::wordCount() const
 {
     const QString content = markdownContent().trimmed();

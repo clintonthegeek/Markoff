@@ -53,6 +53,80 @@ struct FrontmatterProperty {
     QVariant value;
 };
 
+/// A single top-level block in the parsed Markdown body, with its
+/// kind, byte range, and a few kind-specific extras (heading level,
+/// fenced-code language/body, etc.).
+///
+/// This is a snapshot of the tree-sitter Markdown grammar's
+/// block-level children. The parser wraps document content in a
+/// `document` → `section` → block hierarchy; this API flattens that
+/// hierarchy back to a linear sequence of blocks in document order
+/// (sections themselves are not emitted — their child heading +
+/// blocks are).
+///
+/// Byte ranges (`byteStart`, `byteEnd`) are half-open
+/// `[byteStart, byteEnd)` and are in the *body* (post-frontmatter)
+/// buffer's UTF-8 byte coordinates. Frontmatter is already stripped
+/// by the parse pipeline before tree-sitter sees the text. To
+/// translate to full-source bytes when frontmatter is present, add
+/// `frontmatterSpan()->second` to byte offsets.
+///
+/// `Kind` is open: `Other` is the catch-all for any block kind not
+/// yet recognised by this snapshot (future grammar additions).
+struct TopLevelBlock {
+    enum class Kind {
+        Paragraph,
+        AtxHeading,                 // # / ## / ### / ... headings
+        SetextHeading,              // ==== / ---- underline headings
+        FencedCodeBlock,
+        IndentedCodeBlock,
+        BlockQuote,
+        ListTight,                  // top-level list (tight, default)
+        ListLoose,                  // top-level list (loose)
+        ThematicBreak,              // <hr> / horizontal rule
+        HtmlBlock,
+        LinkReferenceDefinition,
+        Table,                      // pipe_table extension
+        Other                       // any unrecognized top-level node type
+    };
+
+    Kind kind = Kind::Other;
+
+    /// UTF-8 byte range in the (post-frontmatter) body that this block
+    /// occupies. Half-open: [byteStart, byteEnd).
+    int byteStart = 0;
+    int byteEnd = 0;
+
+    /// Heading level (1-6). Valid for kind == AtxHeading or
+    /// SetextHeading; 0 otherwise.
+    int headingLevel = 0;
+
+    /// For FencedCodeBlock: the language info string (the trimmed
+    /// `language` child of the opening fence's info_string). Empty
+    /// if absent. Empty for IndentedCodeBlock and other kinds.
+    QString codeLanguage;
+
+    /// For FencedCodeBlock: the body of the code block (concatenated
+    /// `code_fence_content` text, fences excluded). For
+    /// IndentedCodeBlock: the raw block source as-is (consumers
+    /// de-indent if needed; this is a v1 simplification). Empty for
+    /// other kinds.
+    QString codeText;
+
+    /// For HtmlBlock with a single recognized image syntax (raw
+    /// `<img>`): src/alt/title. v1 leaves these empty; consumers
+    /// should detect images inside paragraphs via the link API.
+    QString imageSrc;
+    QString imageAlt;
+    QString imageTitle;
+
+    /// True if the block's source has any nested children that the
+    /// consumer might care about (e.g. inline code, formatting).
+    /// v1 leaves this false; consumers re-walk via buildSpanMap()
+    /// for fine-grained inline info.
+    bool hasInlineContent = false;
+};
+
 /// Result of walking a parsed tree to extract structured queries. Defined
 /// in <markoff-parser/TreeSitterParser.h>.
 struct DocumentQueryResult;
@@ -164,6 +238,13 @@ public:
     /// and the QString char offset of the opening `[` in body coordinates.
     /// Refs whose label has no matching definition carry number 0.
     QList<FootnoteRefInfo> footnoteRefs() const;
+
+    /// Iterate the parsed tree's top-level blocks in document order.
+    /// Each returned block carries its kind, source byte range
+    /// (half-open, in body coordinates), and kind-specific extras.
+    /// See `TopLevelBlock` for coordinate-space details.
+    QList<TopLevelBlock> topLevelBlocks() const;
+
     int wordCount() const;
     int characterCount() const;
 

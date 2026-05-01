@@ -31,11 +31,13 @@ struct ByteEdit {
 struct HeadingInfo;
 struct LinkInfo;
 struct TagInfo;
+struct TopLevelBlock;
 
 struct DocumentQueryResult {
     QList<HeadingInfo> headings;
     QList<LinkInfo> links;
     QList<TagInfo> tags;
+    QList<TopLevelBlock> topLevelBlocks;
 };
 
 struct SourceSpan;

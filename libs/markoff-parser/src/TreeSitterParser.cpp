@@ -1158,6 +1158,130 @@ void collectInlineQueriesInRanges(TSNode node, const QByteArray &utf8,
         collectInlineQueriesInRanges(ts_node_child(node, i), utf8, ranges, links, tags);
 }
 
+// ---------- top-level block walker (used by buildDocumentQueries) ----------
+
+static int setextHeadingLevelFromNode(TSNode node)
+{
+    uint32_t count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < count; ++i) {
+        TSNode child = ts_node_child(node, i);
+        const char *type = ts_node_type(child);
+        if (strcmp(type, "setext_h1_underline") == 0) return 1;
+        if (strcmp(type, "setext_h2_underline") == 0) return 2;
+    }
+    return 1;
+}
+
+static void fillFencedCodeFields(TSNode node, const QByteArray &utf8,
+                                 TopLevelBlock &b)
+{
+    uint32_t count = ts_node_child_count(node);
+    QByteArray collectedBody;
+    bool firstContent = true;
+    for (uint32_t i = 0; i < count; ++i) {
+        TSNode child = ts_node_child(node, i);
+        const char *ct = ts_node_type(child);
+        if (strcmp(ct, "info_string") == 0) {
+            // Prefer the `language` named child of info_string. If
+            // not present, fall back to the trimmed info_string text.
+            uint32_t ic = ts_node_child_count(child);
+            QString lang;
+            for (uint32_t j = 0; j < ic; ++j) {
+                TSNode ic_child = ts_node_child(child, j);
+                if (strcmp(ts_node_type(ic_child), "language") == 0) {
+                    int s = static_cast<int>(ts_node_start_byte(ic_child));
+                    int e = static_cast<int>(ts_node_end_byte(ic_child));
+                    lang = QString::fromUtf8(utf8.mid(s, e - s));
+                    break;
+                }
+            }
+            if (lang.isEmpty()) {
+                int s = static_cast<int>(ts_node_start_byte(child));
+                int e = static_cast<int>(ts_node_end_byte(child));
+                lang = QString::fromUtf8(utf8.mid(s, e - s)).trimmed();
+            }
+            b.codeLanguage = lang;
+        } else if (strcmp(ct, "code_fence_content") == 0) {
+            int s = static_cast<int>(ts_node_start_byte(child));
+            int e = static_cast<int>(ts_node_end_byte(child));
+            if (!firstContent) collectedBody.append('\n');
+            collectedBody.append(utf8.mid(s, e - s));
+            firstContent = false;
+        }
+    }
+    b.codeText = QString::fromUtf8(collectedBody);
+}
+
+static TopLevelBlock::Kind classifyTopLevelKind(const char *type)
+{
+    if (strcmp(type, "paragraph") == 0)                 return TopLevelBlock::Kind::Paragraph;
+    if (strcmp(type, "atx_heading") == 0)               return TopLevelBlock::Kind::AtxHeading;
+    if (strcmp(type, "setext_heading") == 0)            return TopLevelBlock::Kind::SetextHeading;
+    if (strcmp(type, "fenced_code_block") == 0)         return TopLevelBlock::Kind::FencedCodeBlock;
+    if (strcmp(type, "indented_code_block") == 0)       return TopLevelBlock::Kind::IndentedCodeBlock;
+    if (strcmp(type, "block_quote") == 0)               return TopLevelBlock::Kind::BlockQuote;
+    if (strcmp(type, "list") == 0)                      return TopLevelBlock::Kind::ListTight;
+    if (strcmp(type, "thematic_break") == 0)            return TopLevelBlock::Kind::ThematicBreak;
+    if (strcmp(type, "html_block") == 0)                return TopLevelBlock::Kind::HtmlBlock;
+    if (strcmp(type, "link_reference_definition") == 0) return TopLevelBlock::Kind::LinkReferenceDefinition;
+    if (strcmp(type, "pipe_table") == 0)                return TopLevelBlock::Kind::Table;
+    return TopLevelBlock::Kind::Other;
+}
+
+// Walk container nodes (`document`, `section`) recursively, emitting a
+// TopLevelBlock for every block-level child. Sections themselves are
+// containers — their child heading and following blocks are flattened
+// into the linear output sequence.
+static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
+                                  QList<TopLevelBlock> &out)
+{
+    const char *type = ts_node_type(node);
+
+    // Containers: descend into named children, do not emit.
+    if (strcmp(type, "document") == 0 || strcmp(type, "section") == 0) {
+        uint32_t count = ts_node_named_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_named_child(node, i);
+            collectTopLevelBlocks(child, utf8, out);
+        }
+        return;
+    }
+
+    // Skip frontmatter metadata blocks if they ever appear (the parse
+    // pipeline strips frontmatter before tree-sitter sees the body, so
+    // this is defensive).
+    if (strcmp(type, "minus_metadata") == 0 ||
+        strcmp(type, "plus_metadata") == 0) {
+        return;
+    }
+
+    // Block-level node — emit one TopLevelBlock.
+    TopLevelBlock b;
+    b.kind      = classifyTopLevelKind(type);
+    b.byteStart = static_cast<int>(ts_node_start_byte(node));
+    b.byteEnd   = static_cast<int>(ts_node_end_byte(node));
+
+    switch (b.kind) {
+    case TopLevelBlock::Kind::AtxHeading:
+        b.headingLevel = headingLevelFromNode(node);
+        break;
+    case TopLevelBlock::Kind::SetextHeading:
+        b.headingLevel = setextHeadingLevelFromNode(node);
+        break;
+    case TopLevelBlock::Kind::FencedCodeBlock:
+        fillFencedCodeFields(node, utf8, b);
+        break;
+    case TopLevelBlock::Kind::IndentedCodeBlock:
+        // v1: surface raw block source. Consumers de-indent if needed.
+        b.codeText = QString::fromUtf8(utf8.mid(b.byteStart, b.byteEnd - b.byteStart));
+        break;
+    default:
+        break;
+    }
+
+    out.append(b);
+}
+
 } // anonymous namespace
 
 DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
@@ -1170,6 +1294,9 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
     // Walk block tree for headings
     TSNode blockRoot = ts_tree_root_node(m_blockTree);
     collectHeadingsForQuery(blockRoot, m_utf8, result.headings);
+
+    // Walk block tree for top-level blocks (linearised, in document order)
+    collectTopLevelBlocks(blockRoot, m_utf8, result.topLevelBlocks);
 
     // Walk inline trees for links and tags
     for (TSTree *tree : m_inlineTrees) {
@@ -1264,6 +1391,15 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries(
               [](const TagInfo &a, const TagInfo &b) {
                   return a.sourceOffset < b.sourceOffset;
               });
+
+    // Top-level blocks: inherently order-dependent (consumers expect a
+    // linear document-order sequence) and there are typically far fewer
+    // of them than headings/links/tags. A fresh full walk is simpler
+    // and correct; revisit if profiling shows it as a hot spot.
+    {
+        TSNode blockRoot = ts_tree_root_node(m_blockTree);
+        collectTopLevelBlocks(blockRoot, m_utf8, result.topLevelBlocks);
+    }
 
     return result;
 }
