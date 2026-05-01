@@ -107,27 +107,34 @@ The original Stage 4 (T17-T25) implemented a "reify-on-first-keystroke" pattern 
 
 Per spec §3.2-§3.5. The hole's delegate is a real local-typing surface; commits are debounced and atomic; navigation is non-destructive.
 
-- [ ] **T17** `BlockHole` value type: `{ id: quint64, kind: QString, reifyOffset: quint32, bufferText: QString, afterParsedRow: int }`. Drop `pairedSourceEditByteCount` (no paired source edit in v1). Drop `synthetic` flag (the bufferText / reifyOffset distinction is enough).
+- [ ] **T17** `BlockHole` value type: `{ id: quint64, kind: QString, reifyOffset: quint32, bufferText: QString, afterParsedRow: int }`. Drop `pairedSourceEditByteCount` (no paired source edit in v1). Drop `synthetic` flag (the bufferText / reifyOffset distinction is enough). **v1 invariant: at most one block hole pending at a time** — the layer enforces this (see T19).
 - [ ] **T18** `LiveBlockModel::interleaveHoles`: accept a list of hole rows from the layer and interleave with parsed blocks. Hole rows expose `kind = "paragraph"`, `text = bufferText` (live, mutates as user types), `IsHoleRole = true`, `HoleIdRole = id`. The `text` role is the buffer's current contents — the delegate's TextEdit binds to this and stays in sync via the binding's contentsChange path.
 - [ ] **T19** `LiveProjectionLayer` v1 API:
-    - `createBlockHole(hole)` returns id; pure view-state add, **no source edit**.
+    - `createBlockHole(hole)` returns id; pure view-state add, **no source edit**. **If a hole is already pending, the layer first commits-or-abandons it (commit if its bufferText is non-empty; abandon otherwise), then creates the new one.** Multi-hole concurrency is explicitly out of v1.
     - `setBlockHoleBuffer(holeId, text)` updates buffer; emits `bufferChanged(holeId)` for the model row to update.
-    - `commitBlockHole(holeId)` builds `MarkoffEdit("\n\n" + bufferText)` at `reifyOffset`, calls `applyLocalEdit`, drops the hole, schedules `holeReified(viewRow, qtPos)` to fire on the next `parseUpdated`.
+    - `commitBlockHole(holeId)`:
+      1. Tells the active hole-row delegate (if any) to **finalize any pending Qt IME preedit** before reading the buffer — otherwise the in-flight composition is silently lost. Implementation: emit `aboutToCommit(holeId)` synchronously; the delegate's binding calls `QInputMethod::commit()` or equivalent on its TextEdit.
+      2. Builds `MarkoffEdit("\n\n" + bufferText)` at `reifyOffset`, calls `applyLocalEdit`.
+      3. Drops the hole.
+      4. Schedules `holeReified(viewRow, qtPos)` to fire **deterministically when the new row appears** (see T22 — connected to `LiveBlockModel::rowsInserted`, NOT a polling/retry loop).
     - `dropBlockHole(holeId)` abandons; no source mutation; emits `holeDropped(viewRow)` so the view can route focus to the nearest neighbor.
-    - `commitAllPendingHoles()` for the save path.
-- [ ] **T20** `LiveStructuralKeyHandler::tryHandle` for Enter at EOB: only `createBlockHole(...)`, no `applyLocalEdit`. Stacked-Enter coalesce: if a hole already exists at this `afterParsedRow`, no-op (hole stays, second Enter does nothing because there's nothing to commit).
+    - `commitAllPendingHoles()` for the save path. With the one-hole invariant this commits at most one.
+- [ ] **T20** `LiveStructuralKeyHandler::tryHandle` for Enter at EOB: only `createBlockHole(...)`, no `applyLocalEdit`. Stacked-Enter behavior:
+    - Enter on an **empty** existing hole at this row: no-op (hole stays).
+    - Enter on a **non-empty** existing hole: commit current buffer (T19's createBlockHole-flushes-prior path handles this naturally, since creating a new hole when one is pending commits the prior one), then create a new hole below the just-committed paragraph. Equivalent to "I typed a paragraph, Enter starts the next one."
 - [ ] **T21** `ParagraphDelegate.qml` hole-row binding:
     - `isHole === true`: TextEdit accepts keys normally (no special routing on first keystroke).
-    - `onTextChanged` (or via binding) calls `layer.setBlockHoleBuffer(holeId, currentText)`.
+    - `onTextChanged` (or via binding) calls `layer.setBlockHoleBuffer(holeId, currentText)`. **Cycle guard:** mirror `LiveEditBinding::m_applyingModelUpdate` exactly — flag set when the model's `text` role drives a TextEdit update, checked in `onTextChanged` to suppress mirror-back. Do not invent a new pattern.
     - Idle commit: a `Timer` with `interval: 250`, `repeat: false`, restarted on each text change; on triggered, calls `layer.commitBlockHole(holeId)` if buffer non-empty.
     - Focus-out commit: `onActiveFocusChanged: if (!activeFocus && bufferText.length > 0) layer.commitBlockHole(holeId)`.
     - Focus-out abandon: `if (!activeFocus && bufferText.length === 0) layer.dropBlockHole(holeId)`.
     - Esc key abandons regardless.
     - Backspace at qtPos 0 with empty buffer: `layer.dropBlockHole(holeId)` and route focus to previous block's end.
     - Arrow keys at edges: let TextEdit's default behavior fire (focus may move to neighbor delegate via QML focus chain); the `onActiveFocusChanged` handler picks up commit/abandon.
-- [ ] **T22** `LiveView.qml` focus routing on commit:
-    - Connect to `layer.holeReified(viewRow, qtPos)`, queued on next `parseUpdated`.
-    - When fired, `_routeFocusToRow(viewRow, qtPos, useStart=false)` — but the bounded retry loop is now justified for "wait for delegate to materialise after parse" only, not "wait for delegate that's racing with focus loss."
+- [ ] **T22** `LiveView.qml` focus routing on commit — **deterministic, no polling**:
+    - On `commitBlockHole`, the layer records `pendingFocusRow` and `pendingFocusQtPos`, then connects (one-shot) to `LiveBlockModel::rowsInserted`.
+    - When `rowsInserted(parent, first, last)` fires and the new row matches the recorded post-commit row, the layer disconnects and emits `holeReified(viewRow, qtPos)`.
+    - `LiveView.qml` connects `holeReified` → `_routeFocusToRow(viewRow, qtPos, useStart=false)` directly. **Delete the bounded retry loop on this path** — the model tells us exactly when the delegate is creatable; no retries. (Retain it only if the existing hole-creation focus path in T18/T22 still needs it for ListView delegate incubation; if not, remove that too.)
     - Confirm: this single focus-routing is the only user-visible delegate destruction during the typing flow. Stress-typing into the hole no longer crosses a destroy boundary because the hole's delegate stays alive throughout typing.
 - [ ] **T23** Save flush: in `app/main.cpp` (or wherever Ctrl+S is handled), call `binding.projectionLayer.commitAllPendingHoles()` before invoking the document save. Add a test that creates a hole, types into it, Ctrl+S, exits the app, reopens — verify the file contains the typed text.
 - [ ] **T24** Tests:
@@ -163,10 +170,10 @@ Per spec §3.2-§3.5. The hole's delegate is a real local-typing surface; commit
 | 1 | Skeleton compiles, no behavior change | `ctest --test-dir build-dev -R '^tst_view_qml_' -j 8` |
 | 2 | Fence speculation unchanged behavior | `ctest --test-dir build-dev -R live_speculative_fence` |
 | 3 | Inline prediction unchanged behavior | `ctest --test-dir build-dev -R inline_format_highlighter` |
-| 4 | Empty-paragraph hole works | `ctest --test-dir build-dev -R 'live_paragraph_hole|live_view_qml'` |
-| 5 | Manual dogfood + perf neutral | (manual) + `ctest --test-dir build-dev -R 'tst_realistic|tst_benchmark'` |
+| 4 | Empty-paragraph hole works (regression floor) | `ctest --test-dir build-dev -R 'live_paragraph_hole|live_view_qml'` |
+| 5 | **Manual dogfood pass (load-bearing) + perf neutral** | (manual on `markoff-view-qml-app --live`) + `ctest --test-dir build-dev -R 'tst_realistic|tst_benchmark'` |
 
-Final gate: full `ctest --test-dir build-dev -j 8 -E 'tst_realistic|tst_benchmark'` green; manual demo-app pass on Enter / focus-out / undo / mid-block-split.
+**Final gate:** full `ctest --test-dir build-dev -j 8 -E 'tst_realistic|tst_benchmark'` green AND **manual demo-app dogfood pass** on Enter / fast-typing / focus-out / arrow-key navigation / Esc / undo / mid-block-split / save-while-pending. **Stage 4 does not land on automated-green alone** — the v0 lesson is that QQuickView + `QTest::keyClick` masks async UI races. T24's stress test is a regression floor; T26 dogfood is the truth.
 
 ---
 
