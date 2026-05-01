@@ -164,9 +164,11 @@ Item {
                         // setPlainText runs, so the resulting
                         // contentsChange does not loop back into
                         // applyLocalEdit. Cursor lands at end of the
-                        // truncated prefix (close to the user's pre-Enter
-                        // position; the new "World" row will appear
-                        // below — focus routing to it is a follow-up).
+                        // truncated prefix here, but focus is then
+                        // routed to qtPos 0 of the new "second half"
+                        // row by LiveView.qml's Connections block on
+                        // LiveStructuralKeyHandler::focusAfterStructuralEdit
+                        // once the parse-back inserts that row.
                         editBinding.setModelText(prefixForSplit)
                         textEdit.cursorPosition = prefixForSplit.length
                     }

@@ -106,6 +106,28 @@ Item {
         }
     }
 
+    // Mid-block Enter focus routing. The structural-key handler emits this
+    // signal after applying the "\n\n" split edit; the new "second half"
+    // row appears at `viewRow` once the parse returns. Mirrors the
+    // holeReified pattern (two Qt.callLater + bounded retry) since the
+    // delegate may not be incubated yet when the signal fires.
+    Connections {
+        target: structuralKeys
+        function onFocusAfterStructuralEdit(viewRow, qtPos) {
+            let attempts = 0
+            function tryFocus() {
+                attempts++
+                const item = listView.itemAtIndex(viewRow)
+                if (item && typeof item.focusAtPos === "function") {
+                    item.focusAtPos(qtPos)
+                    return
+                }
+                if (attempts < 10) Qt.callLater(tryFocus)
+            }
+            Qt.callLater(function() { Qt.callLater(tryFocus) })
+        }
+    }
+
     LiveSpeculativeFenceController {
         id: fenceCtrl
         model: binding.model

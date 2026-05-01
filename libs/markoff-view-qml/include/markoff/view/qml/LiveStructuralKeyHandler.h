@@ -76,6 +76,14 @@ Q_SIGNALS:
     void modelChanged();
     void projectionLayerChanged();
 
+    /// Emitted after a structural edit that creates a new row at
+    /// `expectedRow` where the caret should land at `qtPos`. Examples:
+    /// mid-block Enter split (caret goes to start of the new "second
+    /// half" row). Consumers (LiveListModelBinding) install a one-shot
+    /// listener on the model's rowsInserted signal and call
+    /// `routeFocusToRow(viewRow, qtPos)` when the new row appears.
+    void focusAfterStructuralEdit(int expectedRow, int qtPos);
+
 private:
     Markoff::MarkoffDocument *m_document = nullptr;
     LiveBlockModel           *m_model    = nullptr;

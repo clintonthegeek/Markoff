@@ -135,6 +135,12 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
             ed.oldEnd   = byteOffset;
             ed.newText  = QByteArrayLiteral("\n\n");
             m_document->applyLocalEdit({ ed });
+            // After the parse-back, the original block stays at `blockIndex`
+            // with its text truncated to the prefix and a new "second half"
+            // row is inserted at `blockIndex + 1`. The caret should land at
+            // qtPos 0 in that new row (start of the next paragraph).
+            const int expectedRow = blockIndex + 1;
+            Q_EMIT focusAfterStructuralEdit(expectedRow, /*qtPos=*/0);
             return true;
         }
 
