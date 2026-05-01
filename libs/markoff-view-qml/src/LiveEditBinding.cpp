@@ -79,6 +79,11 @@ void LiveEditBinding::rewireTextDocument()
             QObject::connect(m_textDoc, &QTextDocument::contentsChange,
                              this, &LiveEditBinding::onContentsChange,
                              Qt::UniqueConnection);
+            // Guard against external destruction of the QTextDocument.
+            connect(m_textDoc, &QObject::destroyed, this, [this]() {
+                m_textDoc = nullptr;
+                m_quickDoc = nullptr;
+            });
         }
     }
 }
@@ -122,15 +127,17 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     // Resolve the block's byte range in the pre-change document state.
     // blockByteRange uses the most-recently-parsed AST; the block anchor is
     // a stable CRDT identity so it remains valid as long as the block exists.
+    // DEFERRED: blockByteRange resolves against the last-parsed AST, which may lag
+    // by one edit during rapid typing. The CRDT generally handles approximate
+    // positions gracefully. A proper fix requires CRDT-native block resolution.
     const auto rangeOpt = m_document->blockByteRange(m_blockAnchor);
     if (!rangeOpt) return;  // block no longer in the parse (rare during structural edits)
 
     const quint32 blockStart = rangeOpt->first;
 
-    // The pre-change block text is the QTextDocument's current plain text
-    // BEFORE we've applied any edit — which is exactly what QTextDocument
-    // holds at the point contentsChange fires (Qt fires before the cursor
-    // is moved, but the document already has the new content).
+    // Qt fires contentsChange AFTER the document is modified.
+    // m_document->toMarkdownUtf8() is still PRE-change because we haven't
+    // called applyLocalEdit yet — same invariant as SourceTextDocumentBinding.
     //
     // We need the PRE-change text to convert (qtPos, charsRemoved) to byte
     // offsets. We cannot read it from m_textDoc (already post-change).
