@@ -16,6 +16,7 @@ Q_IMPORT_PLUGIN(org_markoff_view_qmlPlugin)
 #include <QShortcut>
 #include <QVariant>
 
+#include <functional>
 #include <memory>
 
 #include <markoff-foundation/CodeBlockProcessorRegistry.h>
@@ -28,6 +29,8 @@ Q_IMPORT_PLUGIN(org_markoff_view_qmlPlugin)
 #include <markoff-foundation/Theme.h>
 
 #include <markoff/view/qml/CompletionPopupModel.h>
+#include <markoff/view/qml/LiveListModelBinding.h>
+#include <markoff/view/qml/LiveProjectionLayer.h>
 
 // ---------------------------------------------------------------------------
 // CloseGuard — event filter that intercepts QEvent::Close on the root window
@@ -42,6 +45,7 @@ public:
                const QString &filePath,
                bool *dirtyFlag,
                quint64 *lastSavedSeq,
+               std::function<void()> flushPendingHoles,
                QObject *parent = nullptr)
         : QObject(parent)
         , m_window(window)
@@ -49,10 +53,12 @@ public:
         , m_filePath(filePath)
         , m_dirty(dirtyFlag)
         , m_lastSavedSeq(lastSavedSeq)
+        , m_flushPendingHoles(std::move(flushPendingHoles))
     {}
 
     bool save()
     {
+        if (m_flushPendingHoles) m_flushPendingHoles();
         QFile out(m_filePath);
         if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             QMessageBox::critical(nullptr,
@@ -102,6 +108,7 @@ private:
     QString                   m_filePath;
     bool                     *m_dirty;
     quint64                  *m_lastSavedSeq;
+    std::function<void()>     m_flushPendingHoles;
 };
 
 #include "main.moc"
@@ -208,9 +215,23 @@ int main(int argc, char *argv[])
                          updateDirty();
                      });
 
+    // Flush any pending projection-layer hole(s) before saving so the file
+    // on disk matches what the user sees on screen. v1 invariant: at most
+    // one hole pending. Walks the engine roots for the LiveListModelBinding;
+    // a no-op when running in source mode (no live binding constructed).
+    auto flushPendingHoles = [&]() {
+        for (QObject *root : engine.rootObjects()) {
+            auto *binding = root->findChild<Markoff::View::Qml::LiveListModelBinding *>();
+            if (!binding) continue;
+            if (auto *layer = binding->projectionLayer())
+                layer->commitAllPendingHoles();
+        }
+    };
+
     // T14.3 — Ctrl+S save shortcut.
     auto *saveShortcut = new QShortcut(QKeySequence::Save, window);
     QObject::connect(saveShortcut, &QShortcut::activated, window, [&]() {
+        flushPendingHoles();
         QFile out(filePath);
         if (!out.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
             qWarning("Save failed: %s", qUtf8Printable(out.errorString()));
@@ -224,7 +245,7 @@ int main(int argc, char *argv[])
 
     // T14.4 — close-prompt event filter.
     auto *guard = new CloseGuard(window, doc.get(), filePath, &dirty,
-                                 &lastSavedSequence, window);
+                                 &lastSavedSequence, flushPendingHoles, window);
     window->installEventFilter(guard);
 
     return app.exec();
