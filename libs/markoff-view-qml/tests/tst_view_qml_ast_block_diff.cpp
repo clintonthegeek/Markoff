@@ -2,13 +2,21 @@
 #include <QTest>
 #include "../src/AstBlockDiff.h"
 #include <markoff/view/qml/BlockKind.h>
+#include <markoff-foundation/BlockAnchor.h>
+#include <markoff-foundation/TextAnchor.h>
 
 using namespace Markoff::View::Qml;
 
 namespace {
 
-BlockKey k(const QString &kind, const QString &source) {
-    return BlockKey { kind, source };
+/// Construct a BlockAnchor with a unique integer ID (charValue).
+/// replicaId=1, bias=0 (Left) for all test fixtures.
+Markoff::BlockAnchor anchor(quint32 id) {
+    return Markoff::BlockAnchor{ Markoff::TextAnchor{ 1, id, 0 } };
+}
+
+BlockKey k(const QString &kind, quint32 anchorId) {
+    return BlockKey { kind, anchor(anchorId) };
 }
 
 QString opName(AstBlockDiff::OpKind k) {
@@ -41,7 +49,7 @@ private Q_SLOTS:
     }
 
     void empty_to_one_block_emits_one_insert() {
-        QList<BlockKey> next { k(BlockKind::Paragraph, QStringLiteral("hi")) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 1) };
         const auto ops = AstBlockDiff::diff({}, next);
         QCOMPARE(ops.size(), 1);
         QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Insert);
@@ -49,7 +57,7 @@ private Q_SLOTS:
     }
 
     void one_block_to_empty_emits_one_delete() {
-        QList<BlockKey> prev { k(BlockKind::Paragraph, QStringLiteral("hi")) };
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1) };
         const auto ops = AstBlockDiff::diff(prev, {});
         QCOMPARE(ops.size(), 1);
         QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Delete);
@@ -58,9 +66,9 @@ private Q_SLOTS:
 
     void identity_three_blocks_three_equals() {
         QList<BlockKey> seq {
-            k(BlockKind::Paragraph, QStringLiteral("a")),
-            k(BlockKind::Paragraph, QStringLiteral("b")),
-            k(BlockKind::Paragraph, QStringLiteral("c"))
+            k(BlockKind::Paragraph, 1),
+            k(BlockKind::Paragraph, 2),
+            k(BlockKind::Paragraph, 3)
         };
         const auto ops = AstBlockDiff::diff(seq, seq);
         QCOMPARE(ops.size(), 3);
@@ -72,11 +80,12 @@ private Q_SLOTS:
     }
 
     void single_insert_at_start() {
-        QList<BlockKey> prev { k(BlockKind::Paragraph, QStringLiteral("b")),
-                               k(BlockKind::Paragraph, QStringLiteral("c")) };
-        QList<BlockKey> next { k(BlockKind::Paragraph, QStringLiteral("a")),
-                               k(BlockKind::Paragraph, QStringLiteral("b")),
-                               k(BlockKind::Paragraph, QStringLiteral("c")) };
+        // prev: blocks 2, 3  →  next: blocks 1(new), 2, 3
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 2),
+                               k(BlockKind::Paragraph, 3) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 2),
+                               k(BlockKind::Paragraph, 3) };
         const auto ops = AstBlockDiff::diff(prev, next);
         QCOMPARE(ops.size(), 3);
         QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Insert);
@@ -86,9 +95,10 @@ private Q_SLOTS:
     }
 
     void single_insert_at_end() {
-        QList<BlockKey> prev { k(BlockKind::Paragraph, QStringLiteral("a")) };
-        QList<BlockKey> next { k(BlockKind::Paragraph, QStringLiteral("a")),
-                               k(BlockKind::Paragraph, QStringLiteral("b")) };
+        // prev: block 1  →  next: blocks 1, 2(new)
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 2) };
         const auto ops = AstBlockDiff::diff(prev, next);
         QCOMPARE(ops.size(), 2);
         QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Equal);
@@ -97,11 +107,12 @@ private Q_SLOTS:
     }
 
     void single_insert_middle() {
-        QList<BlockKey> prev { k(BlockKind::Paragraph, QStringLiteral("a")),
-                               k(BlockKind::Paragraph, QStringLiteral("c")) };
-        QList<BlockKey> next { k(BlockKind::Paragraph, QStringLiteral("a")),
-                               k(BlockKind::Paragraph, QStringLiteral("b")),
-                               k(BlockKind::Paragraph, QStringLiteral("c")) };
+        // prev: blocks 1, 3  →  next: blocks 1, 2(new), 3
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 3) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 2),
+                               k(BlockKind::Paragraph, 3) };
         const auto ops = AstBlockDiff::diff(prev, next);
         QCOMPARE(ops.size(), 3);
         QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Equal);
@@ -111,9 +122,10 @@ private Q_SLOTS:
     }
 
     void single_delete_at_start() {
-        QList<BlockKey> prev { k(BlockKind::Paragraph, QStringLiteral("a")),
-                               k(BlockKind::Paragraph, QStringLiteral("b")) };
-        QList<BlockKey> next { k(BlockKind::Paragraph, QStringLiteral("b")) };
+        // prev: blocks 1, 2  →  next: block 2 only
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 2) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 2) };
         const auto ops = AstBlockDiff::diff(prev, next);
         QCOMPARE(ops.size(), 2);
         QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Delete);
@@ -122,9 +134,10 @@ private Q_SLOTS:
     }
 
     void single_delete_at_end() {
-        QList<BlockKey> prev { k(BlockKind::Paragraph, QStringLiteral("a")),
-                               k(BlockKind::Paragraph, QStringLiteral("b")) };
-        QList<BlockKey> next { k(BlockKind::Paragraph, QStringLiteral("a")) };
+        // prev: blocks 1, 2  →  next: block 1 only
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 2) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 1) };
         const auto ops = AstBlockDiff::diff(prev, next);
         QCOMPARE(ops.size(), 2);
         QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Equal);
@@ -133,8 +146,9 @@ private Q_SLOTS:
     }
 
     void replace_kind_change_emits_delete_then_insert() {
-        QList<BlockKey> prev { k(BlockKind::Paragraph, QStringLiteral("a")) };
-        QList<BlockKey> next { k(BlockKind::Heading,   QStringLiteral("a")) };
+        // Same anchor, different kind → Delete + Insert (anchor+kind pair differs).
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1) };
+        QList<BlockKey> next { k(BlockKind::Heading,   1) };
         const auto ops = AstBlockDiff::diff(prev, next);
         QCOMPARE(ops.size(), 2);
         const bool first_is_delete = ops[0].kind == AstBlockDiff::OpKind::Delete;
@@ -142,27 +156,70 @@ private Q_SLOTS:
         QVERIFY2(first_is_delete || first_is_insert, qPrintable(opsToString(ops)));
     }
 
-    void content_edit_in_middle_of_three_blocks() {
-        QList<BlockKey> prev { k(BlockKind::Paragraph, QStringLiteral("a")),
-                               k(BlockKind::Paragraph, QStringLiteral("b")),
-                               k(BlockKind::Paragraph, QStringLiteral("c")) };
-        QList<BlockKey> next { k(BlockKind::Paragraph, QStringLiteral("a")),
-                               k(BlockKind::Paragraph, QStringLiteral("B!")),
-                               k(BlockKind::Paragraph, QStringLiteral("c")) };
-        const auto ops = AstBlockDiff::diff(prev, next);
-        QCOMPARE(ops.size(), 4);
-        QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Equal);
-        QCOMPARE(ops[3].kind, AstBlockDiff::OpKind::Equal);
-    }
-
     void large_identical_short_circuits_to_all_equals() {
         QList<BlockKey> seq;
         for (int i = 0; i < 50; ++i)
-            seq.append(k(BlockKind::Paragraph, QString::number(i)));
+            seq.append(k(BlockKind::Paragraph, static_cast<quint32>(i + 1)));
         const auto ops = AstBlockDiff::diff(seq, seq);
         QCOMPARE(ops.size(), 50);
         for (const auto &op : ops) {
             QCOMPARE(op.kind, AstBlockDiff::OpKind::Equal);
+        }
+    }
+
+    /// Content edit on a block (same anchor, same kind) must produce a single
+    /// Equal op — not a Delete+Insert. This is the key property that anchor-
+    /// based identity provides: a block whose text was modified in-place keeps
+    /// its delegate alive rather than being torn down and recreated.
+    void content_edit_preserves_block_identity() {
+        // Block 2 has the same anchor (id=2) in prev and next; only the content
+        // (stored in BlockRecord, not in BlockKey) changed. The diff must see
+        // these as Equal.
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 2),
+                               k(BlockKind::Paragraph, 3) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 2),   // same anchor → Equal
+                               k(BlockKind::Paragraph, 3) };
+        const auto ops = AstBlockDiff::diff(prev, next);
+        QCOMPARE(ops.size(), 3);
+        QCOMPARE(ops[0].kind, AstBlockDiff::OpKind::Equal);
+        QCOMPARE(ops[1].kind, AstBlockDiff::OpKind::Equal);
+        QCOMPARE(ops[2].kind, AstBlockDiff::OpKind::Equal);
+    }
+
+    /// A paragraph split produces a Delete for the old block and two Inserts
+    /// for the resulting blocks (they carry fresh anchors unknown to prev).
+    void paragraph_split_produces_delete_and_two_inserts() {
+        // prev has one block (anchor 1); after split, next has two new blocks
+        // (anchors 10 and 11). The split = Delete anchor-1 + Insert anchor-10 +
+        // Insert anchor-11.
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 10),
+                               k(BlockKind::Paragraph, 11) };
+        const auto ops = AstBlockDiff::diff(prev, next);
+        // Exactly 3 ops: 1 Delete + 2 Inserts (order depends on LCS backtrack,
+        // but none may be Equal since no anchor is shared).
+        QCOMPARE(ops.size(), 3);
+        for (const auto &op : ops) {
+            QVERIFY2(op.kind == AstBlockDiff::OpKind::Delete ||
+                     op.kind == AstBlockDiff::OpKind::Insert,
+                     qPrintable(opsToString(ops)));
+        }
+    }
+
+    /// Two blocks merged: prev has two blocks; next has one block with a new
+    /// anchor. Both prev blocks are deleted; the merged block is inserted.
+    void paragraph_merge_produces_two_deletes_and_one_insert() {
+        QList<BlockKey> prev { k(BlockKind::Paragraph, 1),
+                               k(BlockKind::Paragraph, 2) };
+        QList<BlockKey> next { k(BlockKind::Paragraph, 10) };  // merged, new anchor
+        const auto ops = AstBlockDiff::diff(prev, next);
+        QCOMPARE(ops.size(), 3);
+        for (const auto &op : ops) {
+            QVERIFY2(op.kind == AstBlockDiff::OpKind::Delete ||
+                     op.kind == AstBlockDiff::OpKind::Insert,
+                     qPrintable(opsToString(ops)));
         }
     }
 };

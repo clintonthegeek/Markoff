@@ -3,6 +3,8 @@
 
 #include <QString>
 
+#include <markoff-foundation/BlockAnchor.h>
+
 namespace Markoff::View::Qml {
 
 /// Kind-tagged record for a single AST block, carrying both identity-bearing
@@ -32,12 +34,15 @@ struct BlockRecord {
 };
 
 /// Minimal identity key used by AstBlockDiff. Two blocks with the same kind
-/// and source bytes are "the same block" from the diff's perspective.
+/// and BlockAnchor are "the same block" from the diff's perspective.
+/// BlockAnchor equality is CRDT-identity based (Lamport clock), so a block
+/// that has been content-edited but not split/merged will still compare Equal
+/// across parses — preventing spurious delegate destruction.
 struct BlockKey {
-    QString kind;
-    QString source;
+    QString              kind;
+    Markoff::BlockAnchor anchor;
     bool operator==(const BlockKey &o) const noexcept {
-        return kind == o.kind && source == o.source;
+        return kind == o.kind && anchor == o.anchor;
     }
     bool operator!=(const BlockKey &o) const noexcept { return !(*this == o); }
 };

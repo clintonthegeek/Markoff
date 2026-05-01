@@ -75,7 +75,7 @@ void LiveListModelBinding::setEditorBackend(EditorBackend *eb)
 
 void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
                                             quint64 /*parseSequence*/,
-                                            const QList<Markoff::BlockAnchor> & /*blockAnchors*/)
+                                            const QList<Markoff::BlockAnchor> &blockAnchors)
 {
     if (!parsed) return;
 
@@ -85,23 +85,33 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
     // MarkoffDocument's `latestParse` and may be replaced when the next parse
     // arrives.
     const QString source = parsed->sourceText();
+    // blockAnchors is a QList (implicitly shared) — safe to capture by value.
+    const QList<Markoff::BlockAnchor> anchors = blockAnchors;
     const quint64 myGen  = d->walkGeneration.fetch_add(1, std::memory_order_acq_rel) + 1;
 
-    d->walkPool.start([this, source, myGen]() {
+    d->walkPool.start([this, source, anchors, myGen]() {
         QList<BlockRecord> records = BlockWalker::walk(source);
 
         // Post the result back to the binding's thread. If `this` is
         // destroyed before delivery, Qt drops the pending event during
         // QObject's destructor.
         QMetaObject::invokeMethod(this,
-            [this, records = std::move(records), myGen]() mutable {
+            [this, records = std::move(records), anchors, myGen]() mutable {
                 // Drop stale results: a newer walk has been dispatched since.
                 if (myGen != d->walkGeneration.load(std::memory_order_acquire)) return;
 
+                // Build keys from (kind, BlockAnchor) pairs. The anchors list
+                // is aligned to the top-level block order from the parse; if
+                // the walker produced more records than we have anchors (e.g.
+                // BlockWalker adds synthetic sub-blocks), we fall back to a
+                // default-constructed BlockAnchor so the list lengths stay in
+                // sync with records.
                 QList<BlockKey> nextKeys;
                 nextKeys.reserve(records.size());
-                for (const auto &r : records) {
-                    nextKeys.append(BlockKey { r.kind, r.source });
+                for (int i = 0; i < records.size(); ++i) {
+                    const Markoff::BlockAnchor anchor =
+                        (i < anchors.size()) ? anchors[i] : Markoff::BlockAnchor{};
+                    nextKeys.append(BlockKey { records[i].kind, anchor });
                 }
 
                 const QList<AstBlockDiff::Op> ops =
