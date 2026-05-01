@@ -1,5 +1,47 @@
 # Markoff TODO
 
+## 2026-04-30 — BlockAnchor foundation complete; two perf follow-ups
+
+The 14-task BlockAnchor foundation plan
+(`docs/plans/2026-04-30-block-anchor-foundation.md`) landed as commits
+`7f0bcad..5bb4491` on `exploration/new-foundation`. 96/96 tests pass.
+The plan's hard-precondition for the live-editing plan
+(`docs/plans/2026-04-30-live-editing.md`) is satisfied — that plan can
+now begin.
+
+Two perf gaps the work surfaced are deferred to follow-up specs:
+
+1. **`computeBlockAnchors` per-parse cost is ~32ms** on a 100-block /
+   50KB doc, dominated by per-block CRDT anchor lookups (the foundation-
+   side scanner alone meets the < 1ms budget). The compute test
+   `tst_foundation_block_anchor_perf::anchor_compute_per_parse_regression_guardrail_50KB_doc`
+   ships as a 50ms regression guardrail rather than a strict budget.
+   Root cause is the same as the `Global::join` hot spot tracked in
+   `docs/handoff/2026-04-30-collabtext-crdt-join-perf-handoff.md`. A
+   follow-up spec should either tighten via batch-anchor-lookup or
+   address the underlying CRDT structure.
+
+2. **`toMarkdownUtf8()` per-parse copy in the relay lambda.** The
+   parse-relay in `MarkoffDocument`'s constructor calls
+   `toMarkdownUtf8()` once per parse to feed `computeBlockAnchors` —
+   ≈50KB of QByteArray construction per keystroke on a 50KB doc. No
+   regression guardrail yet. Possible mitigations: have
+   `ParsePool::parseReady` carry the UTF-8 it parsed (so the relay
+   reuses it), or expose the parsed `Document`'s source bytes via a
+   `sourceUtf8()` companion accessor.
+
+Optional follow-up cleanups (none blocking):
+- Add `qHash(const Markoff::BlockAnchor &)` so `QHash<BlockAnchor, …>`
+  works out-of-box for downstream consumers (e.g. AstBlockDiff move
+  detection).
+- Index `latestBlockAnchors` / `latestBlockRanges` via a `QHash` so the
+  block-aware queries on `MarkoffDocument` (`blockByteRange`,
+  `blockAt`, `offsetInBlock`, block-local `textAnchorAt`) are O(1)
+  rather than O(n) linear scans.
+- Sweep the remaining `Crdt::Anchor` exposures on
+  `Session::topVisibleAnchor`/`scrollChanged` and `FoldRef` —
+  pre-existing public-boundary surfaces this work didn't touch.
+
 ## 2026-04-30 — Revert bench small-replicaId workaround (collabtext side fixed)
 
 `apps/bench/markoff-bench-render.cpp` (≈line 252) and
