@@ -10,7 +10,7 @@ LiveBlockModel::LiveBlockModel(QObject *parent) : QAbstractListModel(parent) {}
 int LiveBlockModel::rowCount(const QModelIndex &parent) const
 {
     Q_UNUSED(parent);
-    return m_rows.size();
+    return m_rows.size() + (m_hole.has_value() ? 1 : 0);
 }
 
 QHash<int, QByteArray> LiveBlockModel::roleNames() const
@@ -26,6 +26,8 @@ QHash<int, QByteArray> LiveBlockModel::roleNames() const
         { CodeLanguageRole, "codeLanguage" },
         { CodeTextRole,     "codeText" },
         { BlockAnchorRole,  "blockAnchor" },
+        { IsHoleRole,       "isHole" },
+        { HoleIdRole,       "holeId" },
     };
 }
 
@@ -40,8 +42,38 @@ int LiveBlockModel::roleForName(const QByteArray &name) const
 
 QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
 {
-    if (!index.isValid() || index.row() < 0 || index.row() >= m_rows.size()) return {};
-    const BlockRecord &r = m_rows[index.row()];
+    if (!index.isValid()) return {};
+    const int row = index.row();
+    const int total = rowCount();
+    if (row < 0 || row >= total) return {};
+
+    // Hole row first (it sits at viewRow = afterParsedRow + 1).
+    if (m_hole.has_value() && row == holeViewRowFor(*m_hole)) {
+        switch (role) {
+            case KindRole:         return m_hole->kind;
+            case TextRole:         return m_hole->bufferText;
+            case SourceRole:       return QString();
+            case BlockAnchorRole:  return QVariant::fromValue(Markoff::BlockAnchor{});
+            case IsHoleRole:       return true;
+            case HoleIdRole:       return QVariant::fromValue(m_hole->id);
+            case HeadingLevelRole: return 0;
+            case ImageSrcRole:
+            case ImageAltRole:
+            case ImageTitleRole:
+            case CodeLanguageRole:
+            case CodeTextRole:     return QString();
+            default:               return {};
+        }
+    }
+
+    // Translate viewRow → records index, accounting for the hole inserted
+    // before this row (if any).
+    int recIdx = row;
+    if (m_hole.has_value() && holeViewRowFor(*m_hole) < row) {
+        recIdx = row - 1;
+    }
+    if (recIdx < 0 || recIdx >= m_rows.size()) return {};
+    const BlockRecord &r = m_rows[recIdx];
     switch (role) {
         case KindRole:         return r.kind;
         case TextRole:         return r.text;
@@ -53,6 +85,8 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
         case CodeLanguageRole: return r.codeLanguage;
         case CodeTextRole:     return r.codeText;
         case BlockAnchorRole:  return QVariant::fromValue(r.blockAnchor);
+        case IsHoleRole:       return false;
+        case HoleIdRole:       return QVariant::fromValue<quint64>(0);
         default:               return {};
     }
 }
@@ -61,7 +95,56 @@ void LiveBlockModel::setRecords(const QList<BlockRecord> &records)
 {
     beginResetModel();
     m_rows = records;
+    // Resetting wipes any pending hole — `setRecords` is only used at
+    // initialization / wholesale rebuild paths.
+    m_hole.reset();
     endResetModel();
+}
+
+void LiveBlockModel::insertHoleRow(quint64 holeId, const QString &kind,
+                                   const QString &bufferText, int afterParsedRow)
+{
+    Q_ASSERT_X(!m_hole.has_value(), "LiveBlockModel::insertHoleRow",
+               "v1 invariant violation: hole row already present");
+    HoleRow h;
+    h.id = holeId;
+    h.kind = kind;
+    h.bufferText = bufferText;
+    h.afterParsedRow = afterParsedRow;
+    const int viewRow = holeViewRowFor(h);
+    beginInsertRows(QModelIndex(), viewRow, viewRow);
+    m_hole = h;
+    endInsertRows();
+}
+
+void LiveBlockModel::setHoleBufferText(const QString &bufferText)
+{
+    if (!m_hole.has_value()) return;
+    if (m_hole->bufferText == bufferText) return;
+    m_hole->bufferText = bufferText;
+    const int viewRow = holeViewRowFor(*m_hole);
+    const QModelIndex idx = index(viewRow, 0);
+    Q_EMIT dataChanged(idx, idx, { TextRole });
+}
+
+void LiveBlockModel::removeHoleRow()
+{
+    if (!m_hole.has_value()) return;
+    const int viewRow = holeViewRowFor(*m_hole);
+    beginRemoveRows(QModelIndex(), viewRow, viewRow);
+    m_hole.reset();
+    endRemoveRows();
+}
+
+int LiveBlockModel::holeViewRow() const
+{
+    if (!m_hole.has_value()) return -1;
+    return holeViewRowFor(*m_hole);
+}
+
+quint64 LiveBlockModel::holeId() const
+{
+    return m_hole.has_value() ? m_hole->id : 0;
 }
 
 void LiveBlockModel::speculativelyChangeKind(int row, const QString &newKind)
@@ -120,6 +203,14 @@ void LiveBlockModel::setComposingRow(int row, bool composing)
 void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                               const QList<BlockRecord> &nextRecords)
 {
+    // Contract: parse-driven ops must not interleave with a pending hole.
+    // The projection layer is responsible for committing or dropping the
+    // hole BEFORE allowing parse ops to land. `commitBlockHole` removes the
+    // hole synchronously before issuing `applyLocalEdit`; `dropBlockHole`
+    // removes it without any source mutation.
+    Q_ASSERT_X(!m_hole.has_value(), "LiveBlockModel::applyOps",
+               "applyOps called while a hole row is present");
+
     // Parse arrived — clear all speculative state; parser result is authoritative.
     m_speculativeOriginals.clear();
 

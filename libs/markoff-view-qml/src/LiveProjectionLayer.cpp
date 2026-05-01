@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/view/qml/LiveProjectionLayer.h>
 
+#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/MarkoffEdit.h>
+
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveBlockModel.h>
 
@@ -50,9 +53,127 @@ LiveBlockModel *LiveProjectionLayer::blockModel() const
     return m_model;
 }
 
-void LiveProjectionLayer::createBlockHole(const BlockHole &hole)
+quint64 LiveProjectionLayer::createBlockHole(BlockHole hole)
 {
-    m_blockHoles.append(hole);
+    // v1 invariant: at most one block hole pending. Displace any prior hole
+    // first (commit if it has buffered text, drop if not).
+    if (m_pendingHole.has_value()) {
+        commitAllPendingHoles();
+    }
+
+    hole.id = m_nextHoleId++;
+    m_pendingHole = hole;
+
+    if (m_model) {
+        m_model->insertHoleRow(hole.id, hole.kind, hole.bufferText, hole.afterParsedRow);
+    }
+    return hole.id;
+}
+
+void LiveProjectionLayer::setBlockHoleBuffer(quint64 holeId, const QString &bufferText)
+{
+    if (!m_pendingHole.has_value() || m_pendingHole->id != holeId) return;
+    if (m_pendingHole->bufferText == bufferText) return;
+    m_pendingHole->bufferText = bufferText;
+    if (m_model) {
+        m_model->setHoleBufferText(bufferText);
+    }
+    Q_EMIT bufferChanged(holeId);
+}
+
+void LiveProjectionLayer::commitBlockHole(quint64 holeId)
+{
+    if (!m_pendingHole.has_value() || m_pendingHole->id != holeId) return;
+
+    // (1) Synchronously notify the active delegate so it can finalize any
+    // in-flight Qt IME preedit. The delegate's slot may call
+    // `setBlockHoleBuffer` re-entrantly; that's intentional.
+    Q_EMIT aboutToCommit(holeId);
+
+    // (2) Snapshot AFTER aboutToCommit so a final IME commit lands.
+    if (!m_pendingHole.has_value() || m_pendingHole->id != holeId) {
+        // Slot dropped/replaced the hole synchronously. Nothing to do.
+        return;
+    }
+    const BlockHole snapshot = *m_pendingHole;
+    const int expectedRow = snapshot.afterParsedRow + 1;
+    const int qtPos = snapshot.bufferText.length();  // UTF-16 code units
+
+    // (3) Remove the hole row BEFORE applying the local edit so the parse
+    // round-trip's resulting `applyOps` sees a hole-free model (the model's
+    // applyOps assert fires otherwise).
+    m_pendingHole.reset();
+    if (m_model) {
+        m_model->removeHoleRow();
+    }
+
+    // (4) Apply the single CRDT edit that materializes the buffered text.
+    if (m_backend && m_backend->document()) {
+        Markoff::MarkoffEdit edit;
+        edit.oldStart = snapshot.reifyOffset;
+        edit.oldEnd   = snapshot.reifyOffset;
+        QByteArray bytes;
+        bytes.append("\n\n", 2);
+        bytes.append(snapshot.bufferText.toUtf8());
+        edit.newText = bytes;
+        m_backend->document()->applyLocalEdit({ edit });
+    }
+
+    // (5) One-shot listener on the model's `rowsInserted`. Emit
+    // `holeReified` once a parse-driven Insert lands a row that contains
+    // (or is) the expected post-commit viewRow. The parser may insert
+    // multiple rows in a single round-trip; we treat the first range that
+    // covers `expectedRow` as the match (see fallback note in T19 plan).
+    if (m_model) {
+        // Disconnect any stale prior connection before installing a new one.
+        if (m_pendingHoleReifiedConnection) {
+            QObject::disconnect(m_pendingHoleReifiedConnection);
+            m_pendingHoleReifiedConnection = {};
+        }
+        m_pendingHoleReifiedConnection = QObject::connect(
+            m_model, &QAbstractItemModel::rowsInserted, this,
+            [this, expectedRow, qtPos](const QModelIndex &, int first, int last) {
+                if (first <= expectedRow && expectedRow <= last) {
+                    Q_EMIT holeReified(expectedRow, qtPos);
+                    if (m_pendingHoleReifiedConnection) {
+                        QObject::disconnect(m_pendingHoleReifiedConnection);
+                        m_pendingHoleReifiedConnection = {};
+                    }
+                }
+            });
+    }
+}
+
+void LiveProjectionLayer::dropBlockHole(quint64 holeId)
+{
+    if (!m_pendingHole.has_value() || m_pendingHole->id != holeId) return;
+    const int viewRow = m_pendingHole->afterParsedRow + 1;
+    m_pendingHole.reset();
+    if (m_model) {
+        m_model->removeHoleRow();
+    }
+    Q_EMIT holeDropped(viewRow);
+}
+
+void LiveProjectionLayer::commitAllPendingHoles()
+{
+    if (!m_pendingHole.has_value()) return;
+    const quint64 id = m_pendingHole->id;
+    if (m_pendingHole->bufferText.isEmpty()) {
+        dropBlockHole(id);
+    } else {
+        commitBlockHole(id);
+    }
+}
+
+quint64 LiveProjectionLayer::pendingBlockHoleId() const
+{
+    return m_pendingHole.has_value() ? m_pendingHole->id : 0;
+}
+
+QString LiveProjectionLayer::pendingBlockHoleBuffer() const
+{
+    return m_pendingHole.has_value() ? m_pendingHole->bufferText : QString();
 }
 
 void LiveProjectionLayer::createInlineHole(const InlineHole &hole)
@@ -103,20 +224,20 @@ const BlockKindPrediction *LiveProjectionLayer::blockKindPredictionFor(int row) 
     return &it.value();
 }
 
-bool LiveProjectionLayer::rowIsHole(int /*row*/) const
+bool LiveProjectionLayer::rowIsHole(int row) const
 {
-    // Stage-1: no row↔hole mapping is established yet (the model doesn't
-    // interleave holes until Stage 4 / T17). When holes carry no row, the
-    // answer is trivially "no real row corresponds to a hole." Any test
-    // exercising `rowIsHole` for a registered hole row depends on Stage 4
-    // wiring; for Stage 1, surfacing whether *any* block hole is registered
-    // is enough to validate the storage path.
-    return !m_blockHoles.isEmpty();
+    if (!m_pendingHole.has_value()) return false;
+    if (m_model && m_model->hasHoleRow()) {
+        return row == m_model->holeViewRow();
+    }
+    // No model wired yet (test convenience): treat any row as "is hole" if
+    // a hole exists, mirroring the prior Stage-1 stub behavior.
+    return true;
 }
 
 int LiveProjectionLayer::blockHoleCount() const
 {
-    return m_blockHoles.size();
+    return m_pendingHole.has_value() ? 1 : 0;
 }
 
 int LiveProjectionLayer::inlineHoleCount() const

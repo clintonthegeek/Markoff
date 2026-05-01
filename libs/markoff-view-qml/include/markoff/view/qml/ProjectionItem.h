@@ -20,26 +20,46 @@ namespace Markoff::View::Qml {
 /// (InlineFormatHighlighter, LiveSpeculativeFenceController, the future
 /// empty-paragraph hole creator) attach later in Stages 2-4 of the plan.
 
-/// Block-level hole: source has bytes (e.g. trailing `\n\n`) but the parser
-/// produces no block past them. The layer carries a synthetic row until the
-/// user reifies it (printable char), abandons it (focus-out, undo, idle), or
-/// a remote edit invalidates the anchor.
+/// Block-level hole: a transient projection-layer row holding the user's
+/// intent ("I'm now in a new paragraph") for which the source rope cannot
+/// yet produce a block (e.g. an empty paragraph after Enter at end-of-block).
+///
+/// v1 semantics: the hole behaves like an IME preedit buffer. Source is NOT
+/// written when the hole is created — `bufferText` accumulates locally as
+/// the user types, and only on commit does the layer emit a single
+/// `applyLocalEdit("\n\n" + bufferText)` at `reifyOffset`. Until commit, the
+/// delegate stays alive and editable; abandon (focus-out, escape) is purely
+/// non-destructive view-state cleanup. There is no `origin` BlockAnchor (the
+/// hole has no real position in source) and no paired source edit.
+///
+/// v1 invariant: at most one block hole is pending at a time. The layer
+/// enforces this — calling `createBlockHole` while one is pending first
+/// commits-or-abandons the prior hole.
 struct BlockHole {
-    /// Where in source this hole projects from. Synthetic until reified —
-    /// foundation translation APIs must refuse to translate synthetic
-    /// projection anchors (spec §5 invariant 13).
-    Markoff::BlockAnchor origin;
+    /// Monotonic id, assigned by the layer when the hole is created. Callers
+    /// pass `id == 0` to mean "unassigned". The id is the handle used for
+    /// `setBlockHoleBuffer` / `commitBlockHole` / `dropBlockHole` so that
+    /// late callbacks against a long-gone hole can be safely no-op'd.
+    quint64 id = 0;
 
-    /// Semantic block kind this hole stands in for ("paragraph", "list_item",
-    /// "heading", ...).
+    /// Semantic block kind this hole stands in for. v1 only uses
+    /// "paragraph"; future kinds (e.g. "list_item", "code_block") are
+    /// reserved.
     QString kind;
 
-    /// If the hole was created paired with a real CRDT edit (e.g. the `\n\n`
-    /// insert that paired with the empty-paragraph hole), this is the byte
-    /// count of that edit. Used by undo coalescing (spec §6) so Ctrl+Z while
-    /// the hole is unreified drops the hole AND triggers the CRDT undo for
-    /// the paired edit, in one user-visible step.
-    quint32 pairedSourceEditByteCount = 0;
+    /// Byte index in source where commit will land. The committed edit is
+    /// `applyLocalEdit({ oldStart=reifyOffset, oldEnd=reifyOffset,
+    /// newText="\n\n"+bufferText })`. Stable: source is not mutated while
+    /// the hole is pending, so `reifyOffset` does not need updating.
+    quint32 reifyOffset = 0;
+
+    /// Local preedit content; empty until the user types into the hole.
+    /// The model's `TextRole` for the hole row mirrors this string.
+    QString bufferText;
+
+    /// The hole occupies `viewRow = afterParsedRow + 1` in the model. A
+    /// value of `-1` places the hole at row 0 (the empty-document case).
+    int afterParsedRow = -1;
 };
 
 /// Inline-level hole: a placeholder slot inside a row whose source can't yet

@@ -30,7 +30,9 @@ public:
         ImageTitleRole,
         CodeLanguageRole,
         CodeTextRole,
-        BlockAnchorRole
+        BlockAnchorRole,
+        IsHoleRole,   ///< true iff this row is the transient projection hole
+        HoleIdRole    ///< quint64 hole id (valid only when IsHoleRole == true)
     };
 
     explicit LiveBlockModel(QObject *parent = nullptr);
@@ -67,6 +69,28 @@ public:
     /// kind if there is no speculative override.
     QString confirmedKindAt(int row) const;
 
+    /// Insert the (one) transient hole row at viewRow = afterParsedRow + 1.
+    /// Must not be called while a hole row is already present (the layer
+    /// enforces the v1 one-hole invariant). Emits the standard
+    /// `beginInsertRows` / `endInsertRows` pair so QML's ListView animates.
+    void insertHoleRow(quint64 holeId, const QString &kind,
+                       const QString &bufferText, int afterParsedRow);
+
+    /// Update the pending hole's buffer text. Emits `dataChanged` on the
+    /// hole's view row for the `TextRole`. No-op if no hole is present.
+    void setHoleBufferText(const QString &bufferText);
+
+    /// Drop the hole row if any. Emits `beginRemoveRows` / `endRemoveRows`.
+    void removeHoleRow();
+
+    bool hasHoleRow() const { return m_hole.has_value(); }
+
+    /// Returns the hole's current view row, or -1 if no hole is present.
+    int holeViewRow() const;
+
+    /// Returns the pending hole's id, or 0 if no hole is present.
+    quint64 holeId() const;
+
     /// Mark/unmark a model row as composing. While composing, dataChanged for
     /// that row is deferred. On clearing composing, any deferred notification
     /// is flushed. Highlight-format updates are not affected (they don't
@@ -74,7 +98,22 @@ public:
     void setComposingRow(int row, bool composing);
 
 private:
+    /// Transient hole-row state. v1 invariant: at most one hole at a time
+    /// (enforced by `LiveProjectionLayer`). `applyOps` must NOT be called
+    /// while a hole is present — the layer is responsible for committing or
+    /// dropping the hole before any parse-driven ops land. Asserted in
+    /// `applyOps`.
+    struct HoleRow {
+        quint64 id = 0;
+        QString kind;
+        QString bufferText;
+        int afterParsedRow = -1;  // viewRow == afterParsedRow + 1
+    };
+
+    int holeViewRowFor(const HoleRow &h) const { return h.afterParsedRow + 1; }
+
     QList<BlockRecord> m_rows;
+    std::optional<HoleRow> m_hole;
     QHash<int, QString> m_speculativeOriginals;  // row → original kind
 
     // Composing-row deferral: tracked by BlockAnchor (CRDT-stable) so the row

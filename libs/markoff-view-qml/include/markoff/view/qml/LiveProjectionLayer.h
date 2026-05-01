@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <optional>
+
 #include <QHash>
 #include <QList>
 #include <QObject>
@@ -37,8 +39,53 @@ public:
     EditorBackend *editorBackend() const;
     LiveBlockModel *blockModel() const;
 
-    // Hole creation hooks — called by structural-key handlers (Stage 4+).
-    void createBlockHole(const BlockHole &hole);
+    // ---- v1 block-hole API (IME-preedit pattern). -------------------------
+    //
+    // Creates the pending hole and returns its newly-assigned id. Callers
+    // pass `hole` with `id == 0`. v1 invariant: at most one block hole is
+    // pending at a time. If a hole is already pending when this is called,
+    // the layer first commits-or-abandons it (commit if non-empty
+    // `bufferText`, abandon otherwise), then creates the new one.
+    quint64 createBlockHole(BlockHole hole);
+
+    /// Update the pending hole's local buffer. `holeId` must equal the
+    /// layer's current pending hole id; otherwise a no-op (the hole was
+    /// already committed or dropped — the caller raced).
+    void setBlockHoleBuffer(quint64 holeId, const QString &bufferText);
+
+    /// Commit the pending hole identified by `holeId`. Order:
+    ///   1. Emit `aboutToCommit(holeId)` synchronously so the active
+    ///      delegate finalizes any pending Qt IME preedit before the
+    ///      buffer is read (delegate-side wiring is T21; the signal
+    ///      exists now).
+    ///   2. Snapshot `bufferText`.
+    ///   3. Tell the model to remove the hole row.
+    ///   4. Build a single `MarkoffEdit{ oldStart=reifyOffset,
+    ///      oldEnd=reifyOffset, newText="\n\n"+buffer }` and call
+    ///      `m_backend->document()->applyLocalEdit({edit})`.
+    ///   5. Install a one-shot listener on the model's `rowsInserted`
+    ///      signal so that when a new row appears at the expected
+    ///      post-commit `viewRow`, the layer emits
+    ///      `holeReified(viewRow, qtPos)` and disconnects. `qtPos` is
+    ///      the snapshotted buffer length in UTF-16 code units.
+    /// No-op if `holeId` does not match the pending hole.
+    void commitBlockHole(quint64 holeId);
+
+    /// Drop the pending hole identified by `holeId` without any source
+    /// mutation. Emits `holeDropped(viewRow)`. No-op if `holeId` does not
+    /// match.
+    void dropBlockHole(quint64 holeId);
+
+    /// At most one hole exists; commits it if `bufferText` is non-empty,
+    /// drops it otherwise. Called by the save path (T23) and by
+    /// `createBlockHole` when displacing a prior pending hole.
+    void commitAllPendingHoles();
+
+    bool hasPendingBlockHole() const { return m_pendingHole.has_value(); }
+    quint64 pendingBlockHoleId() const;
+    QString pendingBlockHoleBuffer() const;
+
+    // ---- Inline holes (unchanged Stage-1 stub). ---------------------------
     void createInlineHole(const InlineHole &hole);
 
     // Prediction creation hooks — called by InlineFormatHighlighter (Stage 3)
@@ -67,6 +114,7 @@ public:
     bool rowIsHole(int row) const;
 
     /// Total registered item counts — Stage-1 test convenience.
+    /// `blockHoleCount` returns 0 or 1 under the v1 one-hole invariant.
     int blockHoleCount() const;
     int inlineHoleCount() const;
     int inlinePredictionCount() const;
@@ -77,9 +125,27 @@ Q_SIGNALS:
     /// should reflect. Stage-1 is a no-op; later stages emit on reconcile.
     void rowsChanged(int firstRow, int lastRow);
 
-    /// A hole has been reified into a real CRDT edit at `newAnchor`. The
-    /// listening view uses this to route focus into the now-real block.
-    void holeReified(Markoff::BlockAnchor newAnchor);
+    /// A pending hole has been reified into a real parsed block. Emitted
+    /// from inside the one-shot `rowsInserted` listener installed by
+    /// `commitBlockHole`. `viewRow` is the model row of the new real block;
+    /// `qtPos` is the cursor offset (in UTF-16 code units) the focus router
+    /// should place inside that row's TextEdit.
+    void holeReified(int viewRow, int qtPos);
+
+    /// Synchronous notification fired at the start of `commitBlockHole`
+    /// before the buffer snapshot is read. T21 will wire the active
+    /// delegate to commit any pending Qt IME preedit on this signal.
+    void aboutToCommit(quint64 holeId);
+
+    /// A pending hole was abandoned without source mutation. Carries the
+    /// view row the hole occupied (for focus routing back to the prior
+    /// block).
+    void holeDropped(int previousViewRow);
+
+    /// Higher-level notification that the pending hole's buffer changed.
+    /// The model already emits `dataChanged` on `TextRole`; this is for
+    /// non-model consumers.
+    void bufferChanged(quint64 holeId);
 
 public Q_SLOTS:
     /// Reconcile predictions and holes against the latest parser output.
@@ -93,7 +159,10 @@ public Q_SLOTS:
     void onLocalEditApplied();
 
 private:
-    QList<BlockHole>                m_blockHoles;
+    std::optional<BlockHole>        m_pendingHole;
+    quint64                         m_nextHoleId = 1;
+    QMetaObject::Connection         m_pendingHoleReifiedConnection;
+
     QList<InlineHole>               m_inlineHoles;
     QHash<int, QList<InlinePrediction>> m_inlinePredictions;     // keyed by row
     QHash<int, BlockKindPrediction> m_blockKindPredictions;      // keyed by row
