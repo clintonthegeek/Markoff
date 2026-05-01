@@ -29,45 +29,6 @@ Item {
     // Used to position the cursor correctly after the delegate materialises.
     property int m_firstInsertLength: 0
 
-    // Stage 4 / T19: view row of a hole row that just received focus and
-    // is awaiting delegate materialisation.
-    property int m_pendingHoleFocusViewRow: -1
-
-    // Stage 4 follow-up: state for reify-focus routing. When a hole is
-    // reified, the layer drops the synthetic row synchronously (count: 2→1),
-    // applyLocalEdit fires async, parse round-trip adds the real row back
-    // (count: 1→2). We watch onCountChanged for the restoration and route
-    // focus to the (now-real) view row at the typed-character offset.
-    property int m_pendingReifyFocusViewRow: -1
-    property int m_pendingReifyFocusQtPos: 0
-    property int m_reifyFocusExpectedCount: -1
-
-    /// Route focus to the delegate at `viewRow`, calling `focusAtPos(qtPos)`
-    /// when available (else `focusAtEnd` / `focusAtStart` per `useStart`).
-    /// Polls via Qt.callLater up to 10 times because under QQuickView (and
-    /// especially the offscreen platform) ListView's incubator can take
-    /// several event-loop ticks to materialise a freshly-inserted delegate;
-    /// `itemAtIndex` returns null until then. Bounded; silently gives up
-    /// if the delegate never appears (e.g. user scrolled it out of view).
-    function _routeFocusToRow(viewRow, qtPos, useStart) {
-        const tryRoute = function(attemptsLeft) {
-            const item = listView.itemAtIndex(viewRow)
-            if (item) {
-                if (typeof item.focusAtPos === "function")
-                    item.focusAtPos(qtPos)
-                else if (useStart && typeof item.focusAtStart === "function")
-                    item.focusAtStart()
-                else if (typeof item.focusAtEnd === "function")
-                    item.focusAtEnd()
-                return
-            }
-            if (attemptsLeft > 0) {
-                Qt.callLater(function() { tryRoute(attemptsLeft - 1) })
-            }
-        }
-        Qt.callLater(function() { tryRoute(10) })
-    }
-
     Keys.onPressed: (event) => {
         if (listView.count !== 0) { event.accepted = false; return }
         const text = event.text
@@ -83,12 +44,6 @@ Item {
         id: structuralKeys
         document: root.editorBackend ? root.editorBackend.document : null
         model: binding.model
-        projectionLayer: binding.projectionLayer
-
-        onBlockHoleCreated: (holeId, viewRow) => {
-            // T19: route focus into the freshly-inserted hole row at qtPos 0.
-            root._routeFocusToRow(viewRow, 0, /*useStart=*/true)
-        }
     }
 
     LiveSpeculativeFenceController {
@@ -100,18 +55,6 @@ Item {
     LiveListModelBinding {
         id: binding
         editorBackend: root.editorBackend
-    }
-
-    Connections {
-        target: binding.projectionLayer
-        function onHoleReified(viewRow, qtPos) {
-            // The layer has just dropped the synthetic row; expect listView.count
-            // to drop by one and then climb back as the parse round-trip lands.
-            // Watch onCountChanged for the restoration.
-            root.m_pendingReifyFocusViewRow = viewRow
-            root.m_pendingReifyFocusQtPos = qtPos
-            root.m_reifyFocusExpectedCount = listView.count + 1
-        }
     }
 
     LiveClipboardController {
@@ -146,18 +89,6 @@ Item {
         model: binding.model
 
         onCountChanged: {
-            // Stage 4 follow-up: reify-focus routing. Once the parse round-trip
-            // restores the row count, route focus into the now-real block at
-            // the typed-character offset.
-            if (root.m_pendingReifyFocusViewRow >= 0 &&
-                listView.count >= root.m_reifyFocusExpectedCount) {
-                const targetRow = root.m_pendingReifyFocusViewRow
-                const targetPos = root.m_pendingReifyFocusQtPos
-                root.m_pendingReifyFocusViewRow = -1
-                root.m_pendingReifyFocusQtPos = 0
-                root.m_reifyFocusExpectedCount = -1
-                root._routeFocusToRow(targetRow, targetPos, /*useStart=*/false)
-            }
             if (listView.count >= 1 && root.m_firstInsertPending) {
                 root.m_firstInsertPending = false
                 const targetPos = root.m_firstInsertLength
@@ -193,8 +124,6 @@ Item {
                     structuralKeyHandler: structuralKeys
                     modelBinding: binding
                     fenceController: fenceCtrl
-                    isHole: model.isHole !== undefined ? model.isHole : false
-                    holeId: model.holeId !== undefined ? model.holeId : 0
                 }
             }
             DelegateChoice {
@@ -395,17 +324,5 @@ Item {
     Shortcut {
         sequence: StandardKey.Paste
         onActivated: clipboard.paste()
-    }
-
-    // Ctrl+Z: spec §6 case 1 — drop unreified holes first, then run CRDT undo.
-    Shortcut {
-        sequence: StandardKey.Undo
-        onActivated: {
-            if (binding.projectionLayer) {
-                binding.projectionLayer.undoWithHoles()
-            } else if (root.editorBackend) {
-                root.editorBackend.undo()
-            }
-        }
     }
 }

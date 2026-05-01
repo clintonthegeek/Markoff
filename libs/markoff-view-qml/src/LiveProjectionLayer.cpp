@@ -4,13 +4,7 @@
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveBlockModel.h>
 
-#include <markoff-foundation/MarkoffEdit.h>
-
 namespace Markoff::View::Qml {
-
-namespace {
-constexpr int kHoleIdleTimeoutMs = 30 * 1000;  // spec §3.3 / §9
-}
 
 LiveProjectionLayer::LiveProjectionLayer(QObject *parent)
     : QObject(parent)
@@ -23,8 +17,6 @@ void LiveProjectionLayer::setEditorBackend(EditorBackend *backend)
     if (m_backend == backend) return;
     if (m_backend) {
         QObject::disconnect(m_backend, &EditorBackend::parseUpdatedAt,
-                            this, nullptr);
-        QObject::disconnect(m_backend, &EditorBackend::documentChanged,
                             this, nullptr);
     }
     m_backend = backend;
@@ -40,19 +32,6 @@ void LiveProjectionLayer::setEditorBackend(EditorBackend *backend)
                                       const QList<Markoff::BlockAnchor> &) {
                              onParseUpdated();
                          });
-        // Track the document so we can resolve `m_observedDocument` when
-        // reifying. The undo-pairing path (spec §6 case 1) is invoked
-        // explicitly via `undoWithHoles()` rather than observed via
-        // `contentsChanged`, because `contentsChanged` fires for every edit
-        // (typing, undo, redo, remote ops) and disambiguating the undo case
-        // from forward typing requires extra bookkeeping that is not worth
-        // it for v0. See spec §9 — the simpler-of-two-options choice.
-        auto rewireDocument = [this]() {
-            m_observedDocument = m_backend ? m_backend->document() : nullptr;
-        };
-        rewireDocument();
-        QObject::connect(m_backend, &EditorBackend::documentChanged,
-                         this, rewireDocument);
     }
 }
 
@@ -71,152 +50,9 @@ LiveBlockModel *LiveProjectionLayer::blockModel() const
     return m_model;
 }
 
-quint64 LiveProjectionLayer::createBlockHole(BlockHole hole)
+void LiveProjectionLayer::createBlockHole(const BlockHole &hole)
 {
-    // Multiple-stacked-Enter coalesce (spec §9): if a hole already exists for
-    // the same parent parsed-row, second Enter is a no-op.
-    for (const BlockHole &existing : m_blockHoles) {
-        if (existing.afterParsedRow == hole.afterParsedRow) {
-            return existing.id;  // second Enter is a no-op; reuse existing id
-        }
-    }
-
-    if (hole.id == 0) hole.id = m_nextHoleId++;
     m_blockHoles.append(hole);
-
-    if (m_model) {
-        m_model->insertHole(hole.id, hole.afterParsedRow,
-                            hole.kind.isEmpty()
-                                ? QStringLiteral("paragraph") : hole.kind);
-    }
-
-    // Idle abandonment timer (30s, hard-coded for v0; spec §3.3 / §9).
-    auto *timer = new QTimer(this);
-    timer->setSingleShot(true);
-    timer->setInterval(kHoleIdleTimeoutMs);
-    const quint64 hid = hole.id;
-    QObject::connect(timer, &QTimer::timeout, this,
-                     [this, hid]() { onIdleTimerFired(hid); });
-    timer->start();
-    m_idleTimers.insert(hid, timer);
-
-    return hole.id;
-}
-
-void LiveProjectionLayer::dropBlockHole(quint64 holeId)
-{
-    int idx = -1;
-    for (int i = 0; i < m_blockHoles.size(); ++i) {
-        if (m_blockHoles[i].id == holeId) { idx = i; break; }
-    }
-    if (idx < 0) return;
-
-    if (auto *t = m_idleTimers.take(holeId)) {
-        t->stop();
-        t->deleteLater();
-    }
-    m_blockHoles.removeAt(idx);
-    if (m_model) m_model->removeHole(holeId);
-}
-
-bool LiveProjectionLayer::reifyBlockHole(quint64 holeId, const QString &text)
-{
-    int idx = -1;
-    for (int i = 0; i < m_blockHoles.size(); ++i) {
-        if (m_blockHoles[i].id == holeId) { idx = i; break; }
-    }
-    if (idx < 0) return false;
-    const BlockHole hole = m_blockHoles[idx];
-
-    // Capture the hole's view-row BEFORE dropping it, so we can tell the view
-    // where to route focus once the parse round-trip materialises the real
-    // block.
-    const int reifiedViewRow = viewRowForBlockHoleId(holeId);
-
-    // SYNCHRONOUSLY drop the hole BEFORE applyLocalEdit, so the next parse
-    // arrives to a model without the synthetic row and produces the real
-    // block at the same view index (spec §3.3 reification semantics).
-    dropBlockHole(holeId);
-
-    if (m_observedDocument && !text.isEmpty()) {
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = hole.reifyByteOffset;
-        ed.oldEnd   = hole.reifyByteOffset;
-        ed.newText  = text.toUtf8();
-        m_observedDocument->applyLocalEdit({ ed });
-    }
-
-    // Stage 4 follow-up: surface the reify to the view so it can route focus
-    // into the now-real block once parse arrives. The view tracks pending
-    // reify-focus state and applies on the next listView.count restoration.
-    if (reifiedViewRow >= 0) {
-        Q_EMIT holeReified(reifiedViewRow, static_cast<int>(text.length()));
-    }
-    return true;
-}
-
-void LiveProjectionLayer::undoWithHoles()
-{
-    // Spec §6 case 1: drop unreified holes first, then run the CRDT undo
-    // (which rolls back the paired `\n\n` insert). One user-visible step.
-    while (!m_blockHoles.isEmpty()) {
-        dropBlockHole(m_blockHoles.first().id);
-    }
-    if (m_observedDocument) {
-        m_observedDocument->undo();
-    }
-}
-
-void LiveProjectionLayer::restartHoleIdleTimer(quint64 holeId)
-{
-    auto it = m_idleTimers.find(holeId);
-    if (it == m_idleTimers.end()) return;
-    it.value()->start();  // restart with same interval
-}
-
-void LiveProjectionLayer::onIdleTimerFired(quint64 holeId)
-{
-    dropBlockHole(holeId);
-}
-
-bool LiveProjectionLayer::hasBlockHoleAfterParsedRow(int parsedRow) const
-{
-    for (const BlockHole &h : m_blockHoles) {
-        if (h.afterParsedRow == parsedRow) return true;
-    }
-    return false;
-}
-
-quint64 LiveProjectionLayer::blockHoleIdAt(int viewRow) const
-{
-    if (!m_model) return 0;
-    return m_model->holeIdAt(viewRow);
-}
-
-int LiveProjectionLayer::viewRowForBlockHoleId(quint64 holeId) const
-{
-    if (!m_model) return -1;
-    const int total = m_model->rowCount();
-    for (int r = 0; r < total; ++r) {
-        if (m_model->holeIdAt(r) == holeId) return r;
-    }
-    return -1;
-}
-
-quint32 LiveProjectionLayer::pairedSourceEditByteCountForHoleId(quint64 holeId) const
-{
-    for (const BlockHole &h : m_blockHoles) {
-        if (h.id == holeId) return h.pairedSourceEditByteCount;
-    }
-    return 0;
-}
-
-BlockHole LiveProjectionLayer::blockHoleById(quint64 holeId) const
-{
-    for (const BlockHole &h : m_blockHoles) {
-        if (h.id == holeId) return h;
-    }
-    return {};
 }
 
 void LiveProjectionLayer::createInlineHole(const InlineHole &hole)
@@ -267,15 +103,14 @@ const BlockKindPrediction *LiveProjectionLayer::blockKindPredictionFor(int row) 
     return &it.value();
 }
 
-bool LiveProjectionLayer::rowIsHole(int row) const
+bool LiveProjectionLayer::rowIsHole(int /*row*/) const
 {
-    // Stage 4: the model is the source of truth for the row↔hole mapping.
-    // The Stage 1 placeholder (`return !m_blockHoles.isEmpty()`) is
-    // retired here.
-    if (m_model) return m_model->isHoleRow(row);
-    // Fallback when no model is wired (e.g. unit tests that exercise the
-    // layer in isolation): treat any registered hole as if it occupied an
-    // unspecified row, so the existing skeleton tests stay green.
+    // Stage-1: no row↔hole mapping is established yet (the model doesn't
+    // interleave holes until Stage 4 / T17). When holes carry no row, the
+    // answer is trivially "no real row corresponds to a hole." Any test
+    // exercising `rowIsHole` for a registered hole row depends on Stage 4
+    // wiring; for Stage 1, surfacing whether *any* block hole is registered
+    // is enough to validate the storage path.
     return !m_blockHoles.isEmpty();
 }
 

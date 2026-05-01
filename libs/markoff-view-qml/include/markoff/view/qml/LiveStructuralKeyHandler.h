@@ -11,7 +11,6 @@
 namespace Markoff::View::Qml {
 
 class LiveBlockModel;
-class LiveProjectionLayer;
 
 /// Handles structural key events that cross block boundaries.
 ///
@@ -31,10 +30,6 @@ class LiveStructuralKeyHandler : public QObject {
                READ model
                WRITE setModel
                NOTIFY modelChanged)
-    Q_PROPERTY(Markoff::View::Qml::LiveProjectionLayer *projectionLayer
-               READ projectionLayer
-               WRITE setProjectionLayer
-               NOTIFY projectionLayerChanged)
 
 public:
     explicit LiveStructuralKeyHandler(QObject *parent = nullptr);
@@ -44,15 +39,6 @@ public:
 
     LiveBlockModel *model() const;
     void setModel(LiveBlockModel *m);
-
-    LiveProjectionLayer *projectionLayer() const;
-    void setProjectionLayer(LiveProjectionLayer *layer);
-
-    /// Backspace inside an empty hole row at qtPos 0: drop the hole, return
-    /// true. The QML layer then routes focus back to the previous row.
-    /// (Spec §3.3 backspace edge case + T22.)
-    Q_INVOKABLE bool tryHandleHoleBackspace(int viewRow, int qtPos,
-                                            const QString &blockText);
 
     /// Try to handle a structural key event.
     ///
@@ -80,15 +66,10 @@ public:
 Q_SIGNALS:
     void documentChanged();
     void modelChanged();
-    void projectionLayerChanged();
-    /// Emitted when a paragraph hole has been created. The QML layer wires
-    /// focus into the new hole row at cursorPosition 0.
-    void blockHoleCreated(quint64 holeId, int viewRow);
 
 private:
     Markoff::MarkoffDocument *m_document = nullptr;
     LiveBlockModel           *m_model    = nullptr;
-    LiveProjectionLayer      *m_layer    = nullptr;
 };
 
 }  // namespace Markoff::View::Qml

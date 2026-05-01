@@ -17,13 +17,6 @@ Item {
     property var    modelBinding: null
     property var    fenceController: null  // LiveSpeculativeFenceController*
 
-    // Stage 4 / T20: hole-row state. When `isHole` is true, the delegate is
-    // standing in for a synthetic row in the projection layer. The first
-    // printable character routes through the layer's `reifyBlockHole`
-    // instead of the normal LiveEditBinding write path.
-    property bool   isHole: false
-    property var    holeId: 0  // quint64
-
     width: ListView.view ? ListView.view.width - 24 : 600
     x: 12
     implicitHeight: textEdit.implicitHeight
@@ -75,28 +68,6 @@ Item {
 
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
-            // T22 + T20: hole-row interception runs before the structural-key
-            // path. Backspace at qtPos 0 in an empty hole drops the hole.
-            // First printable char into a hole reifies it via the projection
-            // layer.
-            if (root.isHole && root.holeId !== 0 && root.modelBinding &&
-                root.modelBinding.projectionLayer) {
-                const layer = root.modelBinding.projectionLayer
-                if (event.key === Qt.Key_Backspace &&
-                        textEdit.cursorPosition === 0 &&
-                        textEdit.length === 0) {
-                    layer.dropBlockHole(root.holeId)
-                    event.accepted = true
-                    return
-                }
-                const text = event.text
-                if (text.length > 0 && text.charCodeAt(0) >= 32) {
-                    layer.reifyBlockHole(root.holeId, text)
-                    event.accepted = true
-                    return
-                }
-            }
-
             if (!root.structuralKeyHandler) return
             if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter ||
                 event.key === Qt.Key_Backspace || event.key === Qt.Key_Delete ||
@@ -117,11 +88,6 @@ Item {
         onActiveFocusChanged: {
             if (activeFocus && root.modelBinding) {
                 root.modelBinding.notifyFocused(root.blockAnchor, textEdit.cursorPosition)
-            }
-            // T21: focus-out abandonment for hole rows.
-            if (!activeFocus && root.isHole && root.holeId !== 0 &&
-                    root.modelBinding && root.modelBinding.projectionLayer) {
-                root.modelBinding.projectionLayer.dropBlockHole(root.holeId)
             }
         }
         onCursorPositionChanged: {

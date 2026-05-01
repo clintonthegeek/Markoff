@@ -6,8 +6,6 @@
 #include <markoff-foundation/MarkoffEdit.h>
 
 #include <markoff/view/qml/LiveBlockModel.h>
-#include <markoff/view/qml/LiveProjectionLayer.h>
-#include <markoff/view/qml/ProjectionItem.h>
 
 namespace Markoff::View::Qml {
 
@@ -37,31 +35,6 @@ void LiveStructuralKeyHandler::setModel(LiveBlockModel *m)
     if (m_model == m) return;
     m_model = m;
     Q_EMIT modelChanged();
-}
-
-LiveProjectionLayer *LiveStructuralKeyHandler::projectionLayer() const
-{
-    return m_layer;
-}
-
-void LiveStructuralKeyHandler::setProjectionLayer(LiveProjectionLayer *layer)
-{
-    if (m_layer == layer) return;
-    m_layer = layer;
-    Q_EMIT projectionLayerChanged();
-}
-
-bool LiveStructuralKeyHandler::tryHandleHoleBackspace(int viewRow, int qtPos,
-                                                     const QString &blockText)
-{
-    // T22: backspace at qtPos 0 inside an empty hole row drops the hole.
-    if (qtPos != 0 || !blockText.isEmpty()) return false;
-    if (!m_model || !m_layer) return false;
-    if (!m_model->isHoleRow(viewRow)) return false;
-    const quint64 hid = m_model->holeIdAt(viewRow);
-    if (hid == 0) return false;
-    m_layer->dropBlockHole(hid);
-    return true;
 }
 
 bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
@@ -122,48 +95,12 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
         if (kind == QStringLiteral("code_block")) return false;
 
         if (qtPos == blockText.length()) {
-            // At the end of a non-code block: insert paragraph break after block,
-            // AND (Stage 4 / T18) create a paragraph hole so the user has a
-            // visible row to type into. The byte-level edit is what the source
-            // can express; the hole carries the user's intent (a new paragraph)
-            // until it is reified by the next character.
-            //
-            // Spec §9 stacked-Enter coalesce: if a hole already exists for this
-            // parsed row, the second Enter is a no-op — the hole is already
-            // there and empty, nothing to split. Skip the source edit so we
-            // don't accumulate `\n\n` bytes per press.
-            if (m_layer) {
-                const int parsedRow =
-                    m_model->parsedRowForViewRow(blockIndex);
-                if (parsedRow >= 0 &&
-                    m_layer->hasBlockHoleAfterParsedRow(parsedRow)) {
-                    return true;  // event consumed; no source edit, no new hole
-                }
-            }
+            // At the end of a non-code block: insert paragraph break after block.
             Markoff::MarkoffEdit ed;
             ed.oldStart = currentBlockEnd;
             ed.oldEnd   = currentBlockEnd;
             ed.newText  = QByteArrayLiteral("\n\n");
             m_document->applyLocalEdit({ ed });
-
-            if (m_layer) {
-                // blockIndex is the view-row index; the hole anchors to the
-                // corresponding parsed-row index so that interleaving stays
-                // stable across subsequent parse arrivals.
-                const int parsedRow =
-                    m_model->parsedRowForViewRow(blockIndex);
-                if (parsedRow >= 0) {
-                    BlockHole hole;
-                    hole.kind = QStringLiteral("paragraph");
-                    hole.afterParsedRow = parsedRow;
-                    hole.synthetic = true;
-                    hole.reifyByteOffset = currentBlockEnd + 2;  // past \n\n
-                    hole.pairedSourceEditByteCount = 2;
-                    const quint64 hid = m_layer->createBlockHole(hole);
-                    const int viewRow = m_layer->viewRowForBlockHoleId(hid);
-                    Q_EMIT blockHoleCreated(hid, viewRow);
-                }
-            }
             return true;
         }
 
