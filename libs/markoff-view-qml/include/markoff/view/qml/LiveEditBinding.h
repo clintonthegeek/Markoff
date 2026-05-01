@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QElapsedTimer>
 #include <QObject>
 #include <QQuickTextDocument>
 #include <QString>
@@ -89,6 +90,11 @@ private:
     QTextDocument            *m_textDoc     = nullptr;
 
     bool m_applyingModelUpdate = false;
+
+    // Coalesce state
+    QElapsedTimer     m_lastEditTimer;
+    bool              m_lastEditWasPrintable = false;
+    Markoff::BlockAnchor m_lastEditAnchor    = {};
 };
 
 }  // namespace Markoff::View::Qml

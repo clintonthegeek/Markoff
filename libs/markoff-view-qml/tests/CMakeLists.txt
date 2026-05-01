@@ -104,3 +104,9 @@ add_test(NAME tst_view_qml_live_clipboard COMMAND tst_view_qml_live_clipboard)
 target_link_libraries(tst_view_qml_live_clipboard
     PRIVATE Qt6::Test markoff_view_qml markoff_foundation)
 set_tests_properties(tst_view_qml_live_clipboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_view_qml_live_undo tst_view_qml_live_undo.cpp)
+add_test(NAME tst_view_qml_live_undo COMMAND tst_view_qml_live_undo)
+target_link_libraries(tst_view_qml_live_undo
+    PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml markoff_foundation)
+set_tests_properties(tst_view_qml_live_undo PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

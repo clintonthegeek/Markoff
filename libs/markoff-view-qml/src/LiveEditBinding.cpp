@@ -43,6 +43,7 @@ void LiveEditBinding::setBlockAnchor(const Markoff::BlockAnchor &anchor)
 {
     if (m_blockAnchor == anchor) return;
     m_blockAnchor = anchor;
+    m_lastEditWasPrintable = false;  // anchor change breaks coalesce chain
     Q_EMIT blockAnchorChanged();
 }
 
@@ -175,6 +176,22 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     ed.newText  = newText;
 
     m_document->applyLocalEdit({ ed });
+
+    const bool isPrintable = (charsRemoved == 0 && charsAdded == 1);
+
+    if (isPrintable
+        && m_lastEditWasPrintable
+        && m_blockAnchor == m_lastEditAnchor
+        && m_lastEditTimer.isValid()
+        && m_lastEditTimer.elapsed() < 1000)
+    {
+        m_document->coalesceLastUndo();
+    }
+
+    m_lastEditWasPrintable = isPrintable;
+    m_lastEditAnchor       = m_blockAnchor;
+    m_lastEditTimer.restart();
+
     Q_EMIT editApplied(m_blockAnchor, m_textDoc->toPlainText());
 }
 
