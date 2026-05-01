@@ -74,7 +74,8 @@ void LiveListModelBinding::setEditorBackend(EditorBackend *eb)
 }
 
 void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
-                                            CollabText::Crdt::Global /*atVersion*/)
+                                            quint64 /*parseSequence*/,
+                                            const QList<Markoff::BlockAnchor> & /*blockAnchors*/)
 {
     if (!parsed) return;
 

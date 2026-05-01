@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QMetaType>
+
 #include <markoff-foundation/TextAnchor.h>
 
 namespace Markoff {
@@ -16,3 +18,5 @@ struct MARKOFF_FOUNDATION_EXPORT BlockAnchor {
 };
 
 }  // namespace Markoff
+
+Q_DECLARE_METATYPE(Markoff::BlockAnchor)

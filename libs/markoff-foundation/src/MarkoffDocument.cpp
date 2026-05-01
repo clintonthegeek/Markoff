@@ -6,6 +6,7 @@
 
 #include "MarkoffDocumentPrivate.h"
 #include "AnchorConversion.h"
+#include "BlockAnchorComputation.h"
 
 namespace Markoff {
 
@@ -13,14 +14,25 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>(replicaId))
 {
+    // Runtime registration so QList<BlockAnchor> survives any cross-thread
+    // QueuedConnection slot. Q_DECLARE_METATYPE on its own is compile-time
+    // only; queued connections need this.
+    qRegisterMetaType<Markoff::BlockAnchor>("Markoff::BlockAnchor");
+    qRegisterMetaType<QList<Markoff::BlockAnchor>>("QList<Markoff::BlockAnchor>");
+
     QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p) {
                          d->latestParse.reset(p);
                          ++d->parseSequence;
-                         // Signal-shape change (parseSequence + QList<BlockAnchor>)
-                         // lands in Task 7; for now keep the legacy emit and only
-                         // bump parseSequence here.
-                         Q_EMIT parseUpdated(p, version());
+
+                         // Compute BlockAnchors against the CURRENT CRDT buffer.
+                         // One-cycle staleness is acceptable per spec §3.
+                         const QByteArray body = toMarkdownUtf8();
+                         auto bundle = Markoff::Detail::computeBlockAnchors(*this, body);
+                         d->latestBlockAnchors = bundle.anchors;
+                         d->latestBlockRanges  = std::move(bundle.ranges);
+
+                         Q_EMIT parseUpdated(p, d->parseSequence, d->latestBlockAnchors);
                      });
 }
 

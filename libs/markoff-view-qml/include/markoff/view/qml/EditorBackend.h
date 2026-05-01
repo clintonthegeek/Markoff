@@ -6,6 +6,7 @@
 
 #include <crdt/Anchor.h>
 
+#include <markoff-foundation/BlockAnchor.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
@@ -71,7 +72,9 @@ Q_SIGNALS:
     void cursorAnchorChanged();
     void selectionAnchorChanged();
     void selectionActiveChanged();
-    void parseUpdatedAt(const Markoff::Document *parsed, CollabText::Crdt::Global atVersion);
+    void parseUpdatedAt(const Markoff::Document *parsed,
+                        quint64 parseSequence,
+                        QList<Markoff::BlockAnchor> blockAnchors);
 
 private Q_SLOTS:
     void onSessionPrimarySelectionChanged(const Markoff::Selection &);

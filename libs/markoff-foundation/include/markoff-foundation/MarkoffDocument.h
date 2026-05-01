@@ -15,6 +15,7 @@
 #include <crdt/Clock.h>
 #include <crdt/Operations.h>
 
+#include <markoff-foundation/BlockAnchor.h>
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/TextAnchor.h>
@@ -125,7 +126,9 @@ public:
 
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
-    void parseUpdated(const Markoff::Document *parsed, CollabText::Crdt::Global atVersion);
+    void parseUpdated(const Markoff::Document *parsed,
+                      quint64 parseSequence,
+                      QList<Markoff::BlockAnchor> blockAnchors);
     void documentReloaded();
     void sessionCreated(Markoff::Session *);
     void sessionDestroyed(Markoff::Session *);

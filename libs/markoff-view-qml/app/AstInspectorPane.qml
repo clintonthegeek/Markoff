@@ -21,12 +21,14 @@ Rectangle {
 
     Connections {
         target: root.editorBackend
-        // Foundation's signal signature is (parsed, atVersion).
-        // QML doesn't auto-stringify the Global atVersion, so we just count
-        // and timestamp. The arg names are positional in QML callbacks.
-        function onParseUpdatedAt(parsed, atVersion) {
+        // Foundation's signal signature is (parsed, parseSequence, blockAnchors).
+        // We just count and surface the parse-sequence number. Arg names are
+        // positional in QML callbacks.
+        function onParseUpdatedAt(parsed, parseSequence, blockAnchors) {
             root.parseCount += 1
-            root.lastVersion = qsTr("parse #%1 received").arg(root.parseCount)
+            root.lastVersion = qsTr("parse #%1 (seq %2)")
+                                   .arg(root.parseCount)
+                                   .arg(parseSequence)
         }
     }
 

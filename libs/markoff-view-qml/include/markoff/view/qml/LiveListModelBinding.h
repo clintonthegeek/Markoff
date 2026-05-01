@@ -6,6 +6,7 @@
 #include <qqmlintegration.h>
 
 #include <crdt/Anchor.h>
+#include <markoff-foundation/BlockAnchor.h>
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveBlockModel.h>
 #include <markoff/view/qml/LiveSelectionModel.h>
@@ -46,7 +47,8 @@ Q_SIGNALS:
 
 private:
     void onParseUpdatedAt(const Markoff::Document *parsed,
-                          CollabText::Crdt::Global atVersion);
+                          quint64 parseSequence,
+                          const QList<Markoff::BlockAnchor> &blockAnchors);
 
     struct Private;
     std::unique_ptr<Private> d;
