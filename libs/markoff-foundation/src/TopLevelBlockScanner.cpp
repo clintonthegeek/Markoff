@@ -14,22 +14,37 @@ bool isBlankLine(const QByteArray &body, qsizetype lineStart, qsizetype lineEnd)
     return true;
 }
 
-/// Returns true if the line at [lineStart, lineEnd) opens or closes
-/// a fenced code block — i.e. starts with three or more backticks or
-/// tildes (after up to three leading spaces).
-bool isFenceOpenOrClose(const QByteArray &body, qsizetype lineStart, qsizetype lineEnd)
+/// True if the line at [lineStart, lineEnd) opens a fenced code block.
+/// Mirrors view-qml BlockWalker's regex `^```\s*(\S*)\s*$` — exactly
+/// 3 backticks at the start of the line (no leading spaces, no tildes),
+/// optionally followed by an info string and trailing whitespace.
+bool isFenceOpen(const QByteArray &body, qsizetype lineStart, qsizetype lineEnd)
 {
-    qsizetype i = lineStart;
-    int leadingSpaces = 0;
-    while (i < lineEnd && body[i] == ' ' && leadingSpaces < 3) {
-        ++i; ++leadingSpaces;
+    // Need at least 3 chars and they must all be backticks.
+    if (lineEnd - lineStart < 3) return false;
+    if (body[lineStart]     != '`') return false;
+    if (body[lineStart + 1] != '`') return false;
+    if (body[lineStart + 2] != '`') return false;
+    // Anything after the 3 backticks is fine — info string + trailing whitespace.
+    // (Mirrors BlockWalker's regex which captures (\S*)\s*$ after the leading ```.)
+    return true;
+}
+
+/// True if the line at [lineStart, lineEnd) closes a fenced code block.
+/// Mirrors view-qml BlockWalker's regex `^```\s*$` — exactly 3 backticks
+/// at the start of the line, followed only by whitespace.
+bool isFenceClose(const QByteArray &body, qsizetype lineStart, qsizetype lineEnd)
+{
+    if (lineEnd - lineStart < 3) return false;
+    if (body[lineStart]     != '`') return false;
+    if (body[lineStart + 1] != '`') return false;
+    if (body[lineStart + 2] != '`') return false;
+    // After the 3 backticks, every byte must be whitespace.
+    for (qsizetype i = lineStart + 3; i < lineEnd; ++i) {
+        const char c = body[i];
+        if (c != ' ' && c != '\t' && c != '\r') return false;
     }
-    if (i >= lineEnd) return false;
-    const char c = body[i];
-    if (c != '`' && c != '~') return false;
-    int run = 0;
-    while (i < lineEnd && body[i] == c) { ++i; ++run; }
-    return run >= 3;
+    return true;
 }
 
 /// Scan from `lineStart` to the start of the next line. Returns the
@@ -64,14 +79,14 @@ QList<BlockByteRange> scanTopLevelBlockRanges(const QByteArray &body)
         BlockByteRange range;
         range.startByte = static_cast<quint32>(lineStart);
 
-        if (isFenceOpenOrClose(body, lineStart, lineEnd)) {
+        if (isFenceOpen(body, lineStart, lineEnd)) {
             // Fenced code block. Read through close-fence or EOF.
             qsizetype lastIncludedEnd = lineEnd;
             while (cursor < body.size()) {
                 const qsizetype nextStart = cursor;
                 const qsizetype nextEnd   = findLineEnd(body, nextStart, cursor);
                 lastIncludedEnd = nextEnd;
-                if (isFenceOpenOrClose(body, nextStart, nextEnd)) break;
+                if (isFenceClose(body, nextStart, nextEnd)) break;
             }
             range.endByte = static_cast<quint32>(lastIncludedEnd);
             result.append(range);

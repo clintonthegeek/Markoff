@@ -17,9 +17,14 @@ struct BlockByteRange {
 ///
 /// The algorithm mirrors libs/markoff-view-qml/src/BlockWalker.cpp:
 ///   - Skip leading blank lines.
-///   - A fenced code block (line starting with ``` or ~~~ of three or
-///     more) is one block, from the opening fence through the closing
-///     fence (or to EOF if unclosed).
+///   - A fenced code block opens with a line starting with exactly
+///     three backticks (no leading spaces, no tildes — see view-qml
+///     BlockWalker's `^```\s*(\S*)\s*$`). Optional info string after
+///     the backticks. The block extends from the open-fence line
+///     through the close-fence line (or to EOF if unclosed). The
+///     close-fence is a line starting with exactly three backticks
+///     followed only by whitespace (`^```\s*$`) — a line like
+///     `` ```python `` is an open or mid-block, not a close.
 ///   - Otherwise, a block is a run of contiguous non-blank lines,
 ///     terminated by a blank line or EOF.
 ///
