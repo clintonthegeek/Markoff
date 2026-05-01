@@ -7,7 +7,7 @@
 #include <memory>
 #include <qqmlintegration.h>
 
-#include <markoff/view/qml/LiveSelectionModel.h>
+#include <markoff/view/qml/LiveSelectionView.h>
 
 class QMenu;
 
@@ -20,7 +20,7 @@ namespace Markoff::View::Qml {
 class LiveContextMenuHandler : public QObject {
     Q_OBJECT
     QML_ELEMENT
-    Q_PROPERTY(LiveSelectionModel *selectionModel
+    Q_PROPERTY(LiveSelectionView *selectionModel
                READ selectionModel WRITE setSelectionModel NOTIFY selectionModelChanged)
     Q_PROPERTY(QStringList blockTexts
                READ blockTexts WRITE setBlockTexts NOTIFY blockTextsChanged)
@@ -31,8 +31,8 @@ public:
     explicit LiveContextMenuHandler(QObject *parent = nullptr);
     ~LiveContextMenuHandler() override;
 
-    LiveSelectionModel *selectionModel() const { return m_selection; }
-    void setSelectionModel(LiveSelectionModel *m);
+    LiveSelectionView *selectionModel() const { return m_selection; }
+    void setSelectionModel(LiveSelectionView *m);
 
     QStringList blockTexts() const { return m_blockTexts; }
     void setBlockTexts(const QStringList &t);
@@ -49,7 +49,7 @@ Q_SIGNALS:
     void blockCountChanged();
 
 private:
-    LiveSelectionModel  *m_selection = nullptr;
+    LiveSelectionView   *m_selection = nullptr;
     QStringList          m_blockTexts;
     int                  m_blockCount = 0;
     std::unique_ptr<QMenu> m_menu;

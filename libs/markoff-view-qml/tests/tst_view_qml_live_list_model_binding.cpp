@@ -5,7 +5,7 @@
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveListModelBinding.h>
 #include <markoff/view/qml/LiveBlockModel.h>
-#include <markoff/view/qml/LiveSelectionModel.h>
+#include <markoff/view/qml/LiveSelectionView.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
 
@@ -88,7 +88,7 @@ private Q_SLOTS:
         LiveBlockModel *model = binding.model();
         QTRY_COMPARE(model->rowCount(), 3);
 
-        LiveSelectionModel *sel = binding.selectionModel();
+        LiveSelectionView *sel = binding.selectionModel();
         QVERIFY(sel != nullptr);
         sel->begin(1, 0);
         sel->extend(1, 1);
@@ -120,7 +120,7 @@ private Q_SLOTS:
         LiveBlockModel *model = binding.model();
         QTRY_COMPARE(model->rowCount(), 3);
 
-        LiveSelectionModel *sel = binding.selectionModel();
+        LiveSelectionView *sel = binding.selectionModel();
         sel->begin(2, 0);
         sel->extend(2, 1);
 

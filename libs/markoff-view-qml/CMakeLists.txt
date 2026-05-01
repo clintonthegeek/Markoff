@@ -21,8 +21,8 @@ qt_add_qml_module(markoff_view_qml
         include/markoff/view/qml/SearchBackend.h
         src/CompletionPopupModel.cpp
         include/markoff/view/qml/CompletionPopupModel.h
-        src/LiveSelectionModel.cpp
-        include/markoff/view/qml/LiveSelectionModel.h
+        src/LiveSelectionView.cpp
+        include/markoff/view/qml/LiveSelectionView.h
         src/LiveContextMenuHandler.cpp
         include/markoff/view/qml/LiveContextMenuHandler.h
         src/LiveBlockModel.cpp

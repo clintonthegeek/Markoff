@@ -28,7 +28,7 @@ LiveContextMenuHandler::LiveContextMenuHandler(QObject *parent)
 
 LiveContextMenuHandler::~LiveContextMenuHandler() = default;
 
-void LiveContextMenuHandler::setSelectionModel(LiveSelectionModel *m)
+void LiveContextMenuHandler::setSelectionModel(LiveSelectionView *m)
 {
     if (m_selection == m) return;
     m_selection = m;

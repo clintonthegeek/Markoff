@@ -229,9 +229,14 @@ private Q_SLOTS:
             binding->property("selectionModel"));
         QVERIFY(selModel);
 
-        QCOMPARE(selModel->property("anchorBlock").toInt(), 1);
-        QCOMPARE(selModel->property("activeBlock").toInt(), 3);
-        QVERIFY(selModel->property("anchorOffset").toInt() > 0);
+        // LiveSelectionView no longer stores integer block indices — selection
+        // is Session-canonical (TextAnchors). Verify: a non-degenerate selection
+        // exists and includes block 3 (image), the drag endpoint.
+        QVERIFY(selModel->property("hasSelection").toBool());
+        QPoint r3;
+        QMetaObject::invokeMethod(selModel, "rangeForBlock",
+            Q_RETURN_ARG(QPoint, r3), Q_ARG(int, 3));
+        QVERIFY(r3.x() != -1);   // block 3 (image) is included in the selection
     }
 
     void delegates_consume_theme_colors() {

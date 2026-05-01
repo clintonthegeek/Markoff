@@ -8,7 +8,7 @@
 #include <markoff-foundation/BlockAnchor.h>
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveBlockModel.h>
-#include <markoff/view/qml/LiveSelectionModel.h>
+#include <markoff/view/qml/LiveSelectionView.h>
 
 namespace Markoff { class Document; }
 
@@ -29,7 +29,7 @@ class LiveListModelBinding : public QObject {
     Q_PROPERTY(EditorBackend *editorBackend
                READ editorBackend WRITE setEditorBackend NOTIFY editorBackendChanged)
     Q_PROPERTY(LiveBlockModel *model READ model CONSTANT)
-    Q_PROPERTY(LiveSelectionModel *selectionModel READ selectionModel CONSTANT)
+    Q_PROPERTY(LiveSelectionView *selectionModel READ selectionModel CONSTANT)
 
 public:
     explicit LiveListModelBinding(QObject *parent = nullptr);
@@ -39,7 +39,7 @@ public:
     void setEditorBackend(EditorBackend *eb);
 
     LiveBlockModel *model() const;
-    LiveSelectionModel *selectionModel() const;
+    LiveSelectionView *selectionModel() const;
 
 Q_SIGNALS:
     void editorBackendChanged();

@@ -2,15 +2,15 @@
 #include <markoff/view/qml/LiveListModelBinding.h>
 
 #include <markoff/view/qml/LiveBlockModel.h>
-#include <markoff/view/qml/LiveSelectionModel.h>
+#include <markoff/view/qml/LiveSelectionView.h>
 #include "BlockWalker.h"
 #include "AstBlockDiff.h"
 
 #include <markoff-parser/Document.h>
 
+#include <QList>
 #include <QMetaObject>
 #include <QRunnable>
-#include <QSet>
 #include <QThreadPool>
 
 #include <atomic>
@@ -18,10 +18,10 @@
 namespace Markoff::View::Qml {
 
 struct LiveListModelBinding::Private {
-    EditorBackend       *editorBackend = nullptr;
-    LiveBlockModel      *model         = nullptr;
-    LiveSelectionModel  *selection     = nullptr;
-    QList<BlockKey>      lastKeys;
+    EditorBackend      *editorBackend = nullptr;
+    LiveBlockModel     *model         = nullptr;
+    LiveSelectionView  *selection     = nullptr;
+    QList<BlockKey>     lastKeys;
 
     /// Monotonic counter incremented on every dispatched walk. Worker threads
     /// capture the value at dispatch time and the main-thread post-back drops
@@ -44,7 +44,7 @@ LiveListModelBinding::LiveListModelBinding(QObject *parent)
     , d(std::make_unique<Private>())
 {
     d->model = new LiveBlockModel(this);
-    d->selection = new LiveSelectionModel(this);
+    d->selection = new LiveSelectionView(this);
     // One worker is enough — stale-walk drop happens via walkGeneration; we
     // don't benefit from running multiple walks in parallel against the same
     // model.
@@ -60,7 +60,7 @@ LiveListModelBinding::~LiveListModelBinding()
 
 EditorBackend *LiveListModelBinding::editorBackend() const { return d->editorBackend; }
 LiveBlockModel *LiveListModelBinding::model() const { return d->model; }
-LiveSelectionModel *LiveListModelBinding::selectionModel() const { return d->selection; }
+LiveSelectionView *LiveListModelBinding::selectionModel() const { return d->selection; }
 
 void LiveListModelBinding::setEditorBackend(EditorBackend *eb)
 {
@@ -72,6 +72,17 @@ void LiveListModelBinding::setEditorBackend(EditorBackend *eb)
     if (d->editorBackend) {
         QObject::connect(d->editorBackend, &EditorBackend::parseUpdatedAt,
                          this, &LiveListModelBinding::onParseUpdatedAt);
+        QObject::connect(d->editorBackend, &EditorBackend::sessionChanged, this, [this]() {
+            d->selection->setSession(d->editorBackend->session());
+        });
+        QObject::connect(d->editorBackend, &EditorBackend::documentChanged, this, [this]() {
+            d->selection->setDocument(d->editorBackend->document());
+        });
+        d->selection->setDocument(d->editorBackend->document());
+        d->selection->setSession(d->editorBackend->session());
+    } else {
+        d->selection->setDocument(nullptr);
+        d->selection->setSession(nullptr);
     }
     Q_EMIT editorBackendChanged();
 }
@@ -123,18 +134,15 @@ void LiveListModelBinding::onParseUpdatedAt(const Markoff::Document *parsed,
                     AstBlockDiff::diff(d->lastKeys, nextKeys);
 
                 if (d->selection->hasSelection()) {
-                    QSet<int> deletedPrevIndices;
+                    QList<Markoff::BlockAnchor> deletedBlockAnchors;
                     for (const auto &op : ops) {
-                        if (op.kind == AstBlockDiff::OpKind::Delete) {
-                            deletedPrevIndices.insert(op.prevIndex);
+                        if (op.kind == AstBlockDiff::OpKind::Delete &&
+                            op.prevIndex >= 0 && op.prevIndex < d->lastKeys.size()) {
+                            deletedBlockAnchors.append(d->lastKeys[op.prevIndex].anchor);
                         }
                     }
-                    const int aB   = d->selection->anchorBlock();
-                    const int actB = d->selection->activeBlock();
-                    if (deletedPrevIndices.contains(aB) ||
-                        deletedPrevIndices.contains(actB)) {
-                        d->selection->clear();
-                    }
+                    if (!deletedBlockAnchors.isEmpty())
+                        d->selection->notifyBlocksRemoved(deletedBlockAnchors);
                 }
 
                 d->model->applyOps(ops, records);
