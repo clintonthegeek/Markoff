@@ -22,9 +22,10 @@ void InlineFormatHighlighter::setQuickDocument(QQuickTextDocument *doc)
 {
     if (m_quickDoc == doc) return;
     m_quickDoc = doc;
-    if (m_quickDoc)
+    if (m_quickDoc) {
         setDocument(m_quickDoc->textDocument());
-    else
+        rehighlight();  // apply pre-populated spans immediately
+    } else
         setDocument(nullptr);
     Q_EMIT quickDocumentChanged();
 }
@@ -69,6 +70,7 @@ void InlineFormatHighlighter::highlightBlock(const QString &text)
     // offsets are always relative to what is displayed.
     for (const Markoff::SourceSpan &s : m_spans) {
         if (s.isDelimiter) continue;  // delimiters are hidden in live preview
+        // All format branches below can assume !isDelimiter.
         if (s.charLength <= 0) continue;
 
         QTextCharFormat fmt;
@@ -95,7 +97,7 @@ void InlineFormatHighlighter::highlightBlock(const QString &text)
             fmt.setBackground(QColor(0xff, 0xff, 0x00));
             hasFormat = true;
         }
-        if (s.isLink && !s.isDelimiter) {
+        if (s.isLink) {
             fmt.setFontUnderline(true);
             fmt.setForeground(QColor(0x00, 0x66, 0xcc));
             hasFormat = true;

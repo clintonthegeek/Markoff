@@ -173,6 +173,7 @@ private Q_SLOTS:
         Helper h;
         h.load(QStringLiteral("**bold *italic***"));
         QVERIFY(h.anyBold(2, 15));
+        QVERIFY(h.anyItalic(8, 14));
     }
 };
 

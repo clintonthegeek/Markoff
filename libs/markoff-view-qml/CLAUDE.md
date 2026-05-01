@@ -227,13 +227,15 @@ The POC has a known, **substantial** typing-latency problem on long documents. R
 
 ### Suspected cost centres (unprofiled — top suspects only)
 
-1. **`SourceTextDocumentBinding::onQtContentsChange` does 3× full-document copies per keystroke**: `doc->toMarkdownUtf8()` → `QString::fromUtf8(preBytes)` → `m_qtDoc->toPlainText()`. For a 16 KB doc that's ~80 KB of allocation per keystroke, before the foundation does any work. The pure-insertion case (`charsRemoved == 0`, the typing case) can be fast-pathed to skip the pre-state fetch — the prefix up to `qtPos` is unchanged in the post-state. Not yet implemented.
+1. **`InlineFormatHighlighter::rebuildSpans()` constructs a `TreeSitterParser` per source change**. O(delegates) full parses per model update. Each inline-format span rebuild triggers a fresh parser instantiation and full tree walk. Deferred pending profiling.
 
-2. **Foundation's `ParsePool` parses the whole document on every change**. No incremental tree-sitter parsing yet (`ts_tree_edit()`). Documented as deferred in the foundation design (`docs/specs/2026-04-28-foundation-design.md`).
+2. **`SourceTextDocumentBinding::onQtContentsChange` does 3× full-document copies per keystroke**: `doc->toMarkdownUtf8()` → `QString::fromUtf8(preBytes)` → `m_qtDoc->toPlainText()`. For a 16 KB doc that's ~80 KB of allocation per keystroke, before the foundation does any work. The pure-insertion case (`charsRemoved == 0`, the typing case) can be fast-pathed to skip the pre-state fetch — the prefix up to `qtPos` is unchanged in the post-state. Not yet implemented.
 
-3. **KSyntaxHighlighter re-highlight scope**. KF6's QML `SyntaxHighlighter` may rehighlight affected blocks only, or may scan further. Unverified; needs measurement.
+3. **Foundation's `ParsePool` parses the whole document on every change**. No incremental tree-sitter parsing yet (`ts_tree_edit()`). Documented as deferred in the foundation design (`docs/specs/2026-04-28-foundation-design.md`).
 
-4. **AST inspector pane updates a Label on every `parseUpdatedAt`**. Individually cheap but contributes during sustained typing.
+4. **KSyntaxHighlighter re-highlight scope**. KF6's QML `SyntaxHighlighter` may rehighlight affected blocks only, or may scan further. Unverified; needs measurement.
+
+5. **AST inspector pane updates a Label on every `parseUpdatedAt`**. Individually cheap but contributes during sustained typing.
 
 ### Done so far
 
