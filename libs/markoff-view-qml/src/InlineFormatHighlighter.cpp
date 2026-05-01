@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/view/qml/InlineFormatHighlighter.h>
 
+#include <markoff/view/qml/LiveProjectionLayer.h>
+#include <markoff/view/qml/ProjectionItem.h>
+
 #include <markoff-parser/TreeSitterParser.h>
 
 #include <QBitArray>
@@ -44,7 +47,53 @@ void InlineFormatHighlighter::setSource(const QString &src)
     m_source = src;
     Q_EMIT sourceChanged();
     rebuildSpans();
+    publishInlinePredictions(m_source);
     rehighlight();
+}
+
+LiveProjectionLayer *InlineFormatHighlighter::projectionLayer() const
+{
+    return m_layer;
+}
+
+void InlineFormatHighlighter::setProjectionLayer(LiveProjectionLayer *layer)
+{
+    if (m_layer == layer) return;
+    if (m_layer) {
+        m_layer->clearInlinePredictionsForRow(m_blockIndex);
+    }
+    m_layer = layer;
+    // Re-publish current predictions into the new layer so the registry
+    // matches the highlighter's view of the world.
+    if (m_layer) {
+        for (const InlinePrediction &p : m_fallbackPredictions) {
+            m_layer->createInlinePrediction(p);
+        }
+    }
+    Q_EMIT projectionLayerChanged();
+}
+
+int InlineFormatHighlighter::blockIndex() const
+{
+    return m_blockIndex;
+}
+
+void InlineFormatHighlighter::setBlockIndex(int idx)
+{
+    if (m_blockIndex == idx) return;
+    if (m_layer && m_blockIndex >= 0) {
+        m_layer->clearInlinePredictionsForRow(m_blockIndex);
+    }
+    m_blockIndex = idx;
+    // Re-publish predictions under the new row key so the layer's per-row
+    // index reflects this delegate's current model index.
+    if (m_layer) {
+        for (InlinePrediction p : m_fallbackPredictions) {
+            p.row = m_blockIndex;
+            m_layer->createInlinePrediction(p);
+        }
+    }
+    Q_EMIT blockIndexChanged();
 }
 
 void InlineFormatHighlighter::rebuildSpans()
@@ -59,8 +108,20 @@ void InlineFormatHighlighter::rebuildSpans()
     m_spans = parser.buildSpanMap();
 }
 
-void InlineFormatHighlighter::applySpeculativeFormats(const QString &source)
+void InlineFormatHighlighter::publishInlinePredictions(const QString &source)
 {
+    // Producer logic: scan for unclosed inline delimiters and turn each into
+    // an `InlinePrediction`. The layer is the registry; this method is the
+    // sole producer for inline predictions emitted by the highlighter.
+
+    // Drop any previously-registered predictions for this row before
+    // republishing — the source has just changed, so prior predictions are
+    // stale.
+    m_fallbackPredictions.clear();
+    if (m_layer) {
+        m_layer->clearInlinePredictionsForRow(m_blockIndex);
+    }
+
     if (source.isEmpty()) return;
 
     // Collect confirmed code-span ranges to avoid speculating inside code.
@@ -117,14 +178,43 @@ void InlineFormatHighlighter::applySpeculativeFormats(const QString &source)
         if (spec.strike)    fmt.setFontStrikeOut(true);
         if (spec.highlight) fmt.setBackground(QColor(0xff, 0xff, 0x00));
 
-        setFormat(contentStart, len - contentStart, fmt);
+        InlinePrediction pred;
+        pred.row       = m_blockIndex;
+        pred.byteStart = contentStart;
+        pred.byteEnd   = len;
+        pred.format    = fmt;
+
+        m_fallbackPredictions.append(pred);
+        if (m_layer) {
+            m_layer->createInlinePrediction(pred);
+        }
     }
+}
+
+QList<InlinePrediction> InlineFormatHighlighter::currentPredictions() const
+{
+    if (m_layer && m_blockIndex >= 0) {
+        const QList<InlinePrediction> fromLayer =
+            m_layer->predictionsForRow(m_blockIndex);
+        if (!fromLayer.isEmpty()) return fromLayer;
+    }
+    return m_fallbackPredictions;
 }
 
 void InlineFormatHighlighter::highlightBlock(const QString &text)
 {
+    Q_UNUSED(text);
+
     // Apply speculative formats first so confirmed spans can overwrite them.
-    applySpeculativeFormats(text);
+    // Predictions live in the projection layer (Stage 3); we consume them
+    // back rather than scanning here. The fallback path (no layer wired)
+    // uses the internal `m_fallbackPredictions` list — same data, same
+    // shape.
+    for (const InlinePrediction &p : currentPredictions()) {
+        const int start  = p.byteStart;
+        const int length = p.byteEnd - p.byteStart;
+        if (length > 0) setFormat(start, length, p.format);
+    }
 
     if (m_spans.isEmpty()) return;
 

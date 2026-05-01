@@ -98,6 +98,8 @@ Item {
         InlineFormatHighlighter {
             document: textEdit.textDocument
             source: root.blockText
+            projectionLayer: root.modelBinding ? root.modelBinding.projectionLayer : null
+            blockIndex: root.blockIndex
         }
 
     }

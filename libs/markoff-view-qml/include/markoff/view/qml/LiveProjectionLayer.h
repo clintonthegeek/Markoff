@@ -46,6 +46,12 @@ public:
     void createInlinePrediction(const InlinePrediction &prediction);
     void createBlockKindPrediction(const BlockKindPrediction &prediction);
 
+    /// Clear all inline predictions registered for `row`. Called by
+    /// `InlineFormatHighlighter` before it re-publishes a fresh prediction
+    /// set on each `setSource` (the highlighter's source-scan recomputes
+    /// from scratch each time).
+    void clearInlinePredictionsForRow(int row);
+
     /// Drop a previously-registered block-kind prediction for `row`. Reverts
     /// the model's speculative kind back to the parser-confirmed kind in the
     /// same call. Used by `LiveSpeculativeFenceController` when the trigger

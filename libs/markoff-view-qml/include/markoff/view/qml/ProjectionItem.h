@@ -60,7 +60,10 @@ struct InlinePrediction {
     /// Row in the LiveBlockModel this prediction applies to.
     int row = -1;
 
-    /// Byte range inside the row's source (UTF-8 offsets, [start, end)).
+    /// Range inside the row's text (UTF-16 character offsets, [start, end)).
+    /// These match `QSyntaxHighlighter::setFormat` arguments directly. The
+    /// field name "byte" is historical; v0 consumers (the inline highlighter)
+    /// work in UTF-16 because that is the unit `QTextDocument` exposes.
     int byteStart = 0;
     int byteEnd = 0;
 

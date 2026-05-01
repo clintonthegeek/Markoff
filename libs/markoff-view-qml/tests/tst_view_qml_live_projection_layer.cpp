@@ -133,7 +133,10 @@ private Q_SLOTS:
         layer.onParseUpdated();
         layer.onLocalEditApplied();
 
-        // With items registered, slots remain no-op (Stage-1) — items survive.
+        // Stage-3: `onParseUpdated` now clears prediction registries
+        // wholesale (inline + block-kind). Holes survive — they hold user
+        // intent and are reconciled against subsequent input, not parse
+        // return.
         InlinePrediction p;
         p.row = 0;
         p.byteStart = 0;
@@ -147,7 +150,7 @@ private Q_SLOTS:
         layer.onParseUpdated();
         layer.onLocalEditApplied();
 
-        QCOMPARE(layer.inlinePredictionCount(), 1);
+        QCOMPARE(layer.inlinePredictionCount(), 0);
         QCOMPARE(layer.blockHoleCount(), 1);
     }
 

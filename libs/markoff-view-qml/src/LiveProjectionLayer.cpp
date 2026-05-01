@@ -76,6 +76,11 @@ void LiveProjectionLayer::createBlockKindPrediction(const BlockKindPrediction &p
     }
 }
 
+void LiveProjectionLayer::clearInlinePredictionsForRow(int row)
+{
+    m_inlinePredictions.remove(row);
+}
+
 void LiveProjectionLayer::dropBlockKindPrediction(int row)
 {
     m_blockKindPredictions.remove(row);
@@ -147,8 +152,15 @@ void LiveProjectionLayer::onParseUpdated()
     // prediction has run its course.
     m_blockKindPredictions.clear();
 
-    // Stage 3 fills in inline prediction reconciliation; Stage 4 fills in
-    // hole anchor-invalidation.
+    // Stage-3: inline prediction reconciliation. Same wholesale-clear policy
+    // mirrors the producer-side `setSource` recomputation: every keystroke
+    // re-runs the highlighter's source-scan and re-publishes predictions, so
+    // dropping the registry on parse arrival is safe — the next character
+    // typed will republish anything still applicable. Per-row selective
+    // reconciliation is a follow-on optimization.
+    m_inlinePredictions.clear();
+
+    // Stage 4 fills in hole anchor-invalidation.
 }
 
 void LiveProjectionLayer::onLocalEditApplied()
