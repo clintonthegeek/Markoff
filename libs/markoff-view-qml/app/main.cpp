@@ -73,7 +73,7 @@ protected:
     {
         if (watched == m_window && event->type() == QEvent::Close && *m_dirty) {
             event->ignore();
-            QMessageBox mb(m_window->parent() ? nullptr : nullptr);
+            QMessageBox mb;
             mb.setWindowTitle(tr("Unsaved changes"));
             mb.setText(tr("The document has unsaved changes."));
             mb.setIcon(QMessageBox::Warning);
