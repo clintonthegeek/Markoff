@@ -149,7 +149,7 @@ private Q_SLOTS:
     }
 
     void equal_op_with_stale_row_preserves_model_text() {
-        // The R4 freshness rule: when a row's lastEditEditSequence is GREATER
+        // The R4 freshness rule: when a row's lastEditSequence is GREATER
         // than the incoming parse's parseInputEditSequence, the parse arrived
         // with stale input for that row. The text-role update must NOT be
         // applied — the CRDT is canonical for those bytes; the existing model

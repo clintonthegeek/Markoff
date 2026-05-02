@@ -45,10 +45,15 @@ public:
     /// Apply a diff op sequence relative to `nextRecords`, applying the
     /// R4 freshness rule (spec §4.3): for each Equal op, the row's
     /// text-role update is gated on
-    ///     row.rowEditSequence(row) <= parseInputEditSeq
+    ///     rowEditSequence(row) <= parseInputEditSeq
     /// Stale rows preserve their existing model text but still receive
     /// non-text role updates (kind / headingLevel / codeLanguage /
-    /// blockAnchor / inlineSpans). Insert / Delete ops are unconditional.
+    /// blockAnchor). Insert / Delete ops are unconditional.
+    /// Note: `inlineSpans` is not part of `BlockRecord::operator==`, so
+    /// when a stale row's only "change" would be its inline spans, the
+    /// equality short-circuit suppresses the assignment and the prior
+    /// spans are retained. This is a pre-existing limitation of the
+    /// equality-based change detection.
     ///
     /// `parseInputEditSeq` defaults to `std::numeric_limits<quint64>::max()`,
     /// which means "all rows fresh" — preserves the R2/R3 callsite shape.
