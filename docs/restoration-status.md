@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-02 (R1A complete)
+**Last updated:** 2026-05-02 (R1A + R1B complete)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,13 +11,13 @@
 
 ## TL;DR — what to do *right now*
 
-> **R1A is complete** (108/108 fast-tier tests pass; `tst_view_qml_live_view_qml` baseline preserved at 9/3/2). The next session should execute **R1B** or **R1C** — they're independent and can land in either order.
+> **R1A and R1B are complete** (109/109 fast-tier tests pass; `tst_view_qml_live_view_qml` baseline preserved at 9/3/2). The next session should execute **R1C** — the new `libs/markoff-live-render` library scaffold.
 >
-> **Recommended next:** `R1B` (`docs/plans/2026-05-02-live-render-r1b-inline-span-bake.md`) — extends the parser to pre-bake `inlineSpans` on each `TopLevelBlock`.
+> **Recommended next:** `R1C` (`docs/plans/2026-05-02-live-render-r1c-library-scaffold.md`) — creates the new side-by-side library shell that R2–R10 will build into.
 >
 > **Read first** (in this order):
 > 1. `docs/handoff/2026-05-02-restoration-session-brief.md` — the orientation / working-protocol doc (~250 lines; one-time read per agent context).
-> 2. The plan you're about to execute (R1B / R1C). The plan is the source of truth for tasks; this status doc is the source of truth for what's been done.
+> 2. `docs/plans/2026-05-02-live-render-r1c-library-scaffold.md` — the active plan.
 
 ---
 
@@ -28,7 +28,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | Phase | Plan | Status | Commits | Notes |
 |---|---|---|---|---|
 | **R1A** | [r1a-parse-edit-sequence](plans/2026-05-02-live-render-r1a-parse-edit-sequence.md) | `complete` | `466121e`, `818485b` | Foundation surface: `parseUpdated` 4th arg. |
-| **R1B** | [r1b-inline-span-bake](plans/2026-05-02-live-render-r1b-inline-span-bake.md) | `pending` | — | Parser surface: `TopLevelBlock::inlineSpans`. |
+| **R1B** | [r1b-inline-span-bake](plans/2026-05-02-live-render-r1b-inline-span-bake.md) | `complete` | `65cafdf`, `<impl>` | Parser surface: `TopLevelBlock::inlineSpans`. |
 | **R1C** | [r1c-library-scaffold](plans/2026-05-02-live-render-r1c-library-scaffold.md) | `pending` | — | New library shell: `libs/markoff-live-render`. |
 | **R2** | *not yet written* | `pending` | — | Read-only render with diff. Plan written after R1 phase acceptance. |
 | **R3** | *not yet written* | `pending` | — | Cursor (Shape 1) + selection. Plan written after R2 acceptance. |
@@ -61,6 +61,8 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 | 2026-05-02 | `a9f6d0d` | docs(plan): R1 implementation plans (R1A foundation, R1B parser, R1C scaffold) |
 | 2026-05-02 | `466121e` | test(foundation): parseUpdated carries parseInputEditSequence (failing — TDD cycle) |
 | 2026-05-02 | `818485b` | feat(foundation): parseUpdated carries parseInputEditSequence (R1A complete) |
+| 2026-05-02 | `65cafdf` | test(parser): TopLevelBlock::inlineSpans bake (failing — TDD cycle) |
+| 2026-05-02 | `<impl>` | feat(parser): bake per-block inline spans into TopLevelBlock (R1B complete) |
 
 ---
 

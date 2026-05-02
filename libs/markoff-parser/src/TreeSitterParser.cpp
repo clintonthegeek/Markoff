@@ -1282,6 +1282,57 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
     out.append(b);
 }
 
+/// Bucket spans into top-level blocks by byte-range containment, translating
+/// each span's offsets from document-absolute to block-relative.
+///
+/// Pre: spans are in document-absolute coordinates (output of buildSpanMap()).
+/// Pre: blocks[i].byteStart/byteEnd are document-absolute UTF-8 byte ranges,
+///      blocks ordered ascending.
+/// Post: each block.inlineSpans contains spans whose utf8Offset is in
+///       [block.byteStart, block.byteEnd), with offsets translated to
+///       block-relative coordinates.
+void bakeInlineSpansIntoBlocks(QList<SourceSpan> spans,
+                               QList<TopLevelBlock> &blocks,
+                               const QByteArray &utf8)
+{
+    if (blocks.isEmpty() || spans.isEmpty()) return;
+
+    const QList<int> u8ToChar = buildUtf8ToCharMap(utf8);
+
+    std::sort(spans.begin(), spans.end(),
+              [](const SourceSpan &a, const SourceSpan &b) {
+                  return a.utf8Offset < b.utf8Offset;
+              });
+
+    auto charOffsetAtByte = [&](int byte) -> int {
+        if (byte < 0) return 0;
+        if (byte >= u8ToChar.size()) return u8ToChar.isEmpty() ? 0 : u8ToChar.last();
+        return u8ToChar[byte];
+    };
+
+    qsizetype spanIdx = 0;
+    for (TopLevelBlock &block : blocks) {
+        const int blockCharStart = charOffsetAtByte(block.byteStart);
+
+        while (spanIdx < spans.size()
+               && spans[spanIdx].utf8Offset < block.byteStart) {
+            ++spanIdx;
+        }
+
+        for (qsizetype i = spanIdx; i < spans.size(); ++i) {
+            const SourceSpan &s = spans[i];
+            if (s.utf8Offset >= block.byteEnd) break;
+
+            SourceSpan rel = s;
+            rel.utf8Offset = s.utf8Offset - block.byteStart;
+            rel.charOffset = s.charOffset - blockCharStart;
+            if (s.parentCharStart >= 0) rel.parentCharStart = s.parentCharStart - blockCharStart;
+            if (s.parentCharEnd   >= 0) rel.parentCharEnd   = s.parentCharEnd   - blockCharStart;
+            block.inlineSpans.append(rel);
+        }
+    }
+}
+
 } // anonymous namespace
 
 DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
@@ -1303,6 +1354,10 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
         TSNode inlineRoot = ts_tree_root_node(tree);
         collectInlineQueries(inlineRoot, m_utf8, result.links, result.tags);
     }
+
+    // Bake per-block inline spans (R1B). buildSpanMap is O(N) over inline
+    // trees; bucketing is O(spans + blocks) on top.
+    bakeInlineSpansIntoBlocks(buildSpanMap(), result.topLevelBlocks, m_utf8);
 
     return result;
 }
@@ -1400,6 +1455,9 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries(
         TSNode blockRoot = ts_tree_root_node(m_blockTree);
         collectTopLevelBlocks(blockRoot, m_utf8, result.topLevelBlocks);
     }
+
+    // Bake per-block inline spans (R1B).
+    bakeInlineSpansIntoBlocks(buildSpanMap(), result.topLevelBlocks, m_utf8);
 
     return result;
 }
