@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import org.kde.syntaxhighlighting
+import org.markoff.live.render 1.0
 
 Rectangle {
     id: root
@@ -13,24 +14,31 @@ Rectangle {
     property int modelIndex: index
     readonly property string blockText: model.text
 
-    // ListView.view attached property only resolves on the delegate ROOT;
-    // children must access via `root.selectionView`.
+    readonly property var liveBinding:
+        ListView.view ? ListView.view.binding : null
     readonly property var selectionView:
-        ListView.view && ListView.view.binding
-            ? ListView.view.binding.selectionView : null
+        liveBinding ? liveBinding.selectionView : null
+
+    LiveEditBinding {
+        id: editBinding
+        binding: root.liveBinding
+        modelIndex: root.modelIndex
+        textDocument: edit.textDocument
+        composing: edit.inputMethodComposing
+    }
 
     TextEdit {
         id: edit
         anchors { left: parent.left; right: parent.right
                   top: parent.top; bottom: parent.bottom; margins: 8 }
-        readOnly: true
+        readOnly: false
         textFormat: TextEdit.PlainText
         text: model.text
         wrapMode: TextEdit.NoWrap
         font.family: "monospace"
         font.pixelSize: 13
         color: palette.text
-        selectByMouse: false
+        selectByMouse: true
         persistentSelection: true
 
         SyntaxHighlighter {
