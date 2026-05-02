@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls
+import org.markoff.live.render 1.0
 
-/// Read-only paragraph with selection highlight.
-/// `modelIndex` is a declared QML property (not just the context var) so
-/// BlockHitTester can read it from C++ via QObject::property("modelIndex").
-/// `blockText` exposes the raw text for Ctrl-C copy collection in LiveView.qml.
+/// Editable paragraph delegate. R3 surfaces (selection highlight, blockText)
+/// retained; R4 adds LiveEditBinding so contentsChange routes to the CRDT.
 Item {
     id: root
     width: ListView.view ? ListView.view.width : 600
@@ -14,26 +13,31 @@ Item {
     property int modelIndex: index
     readonly property string blockText: model.text
 
-    // ListView.view attached property only resolves on the delegate ROOT item;
-    // accessing it from inside child items (e.g. a Connections inside the
-    // TextEdit) yields undefined. Surface the selectionView here so children
-    // can reference it through `root.selectionView`.
+    readonly property var liveBinding:
+        ListView.view ? ListView.view.binding : null
     readonly property var selectionView:
-        ListView.view && ListView.view.binding
-            ? ListView.view.binding.selectionView : null
+        liveBinding ? liveBinding.selectionView : null
+
+    LiveEditBinding {
+        id: editBinding
+        binding: root.liveBinding
+        modelIndex: root.modelIndex
+        textDocument: edit.textDocument
+        composing: edit.inputMethodComposing
+    }
 
     TextEdit {
         id: edit
         anchors.fill: parent
         leftPadding: 8; rightPadding: 8
         topPadding: 4; bottomPadding: 4
-        readOnly: true
+        readOnly: false
         textFormat: TextEdit.PlainText
         text: model.text
         wrapMode: TextEdit.Wrap
         font.pixelSize: 14
         color: palette.text
-        selectByMouse: false
+        selectByMouse: true
         persistentSelection: true
 
         function applySelection() {
