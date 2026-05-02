@@ -8,7 +8,7 @@ ApplicationWindow {
     width: 900
     height: 700
     visible: true
-    title: ctxTitle + " — markoff-live-render (R3)"
+    title: ctxTitle + " — markoff-live-render (R4)"
 
     LiveListModelBinding {
         id: modelBinding

@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-02 (R3 complete — dogfood pass landed, three follow-up fixes)
+**Last updated:** 2026-05-02 (R4 in dogfood gate — implementation complete)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,13 +11,14 @@
 
 ## TL;DR — what to do *right now*
 
-> **R1–R3 complete** (114/114 fast-tier tests pass). R3 delivers LiveCursorState (Shape-1 cursor validation), BlockHitTester (mouse→block hit via QMetaObject), LiveSelectionView (cross-block selection + Session sync + Ctrl-C copy), scrollbar, and mouse/keyboard wiring in LiveView.qml. The next session should write and execute **R4** — paragraph editing through sequence-tagged LiveEditBinding.
+> **R4 in dogfood gate.** Implementation complete: paragraph, heading, and code-block delegates are editable via per-delegate `LiveEditBinding` translating `QTextDocument::contentsChange` into a single `MarkoffEdit` and applying it to the CRDT. The C-architecture freshness rule is wired (`LiveBlockModel::applyOps` gates Equal-op text-role updates on per-row `lastEditEditSequence` against the parse's `parseInputEditSeq`). Three surviving cycle guards in place: `applyingModelUpdate` (set across applyOps via qScopeGuard), IME `composing` deferral with single-edit flush on commit, and a defensive `applyingSessionSelection` scaffold for future read-back. `LiveEditBinding` caches `m_previousText` (CRDT-coherent before-state) so consecutive keystrokes between parse arrivals don't scramble. `TextCaret::cachedByteOffset` re-resolves after every parse arrival. 6/6 live-render fast-tier executables green; 8/8 paragraph_edit slots cover the spec's regression bug-classes.
 >
-> **Recommended next:** Write the R4 plan from spec §11 R4, then execute it.
+> **Recommended next:** Run the R4 dogfood script (spec §10.3): "Type a 200-word paragraph at 100+ wpm into a 5-page document; cursor never jumps; characters never scramble." Use `./build-dev/bin/markoff-live-render-app <a-long-markdown>`. If clean, flip R4 to `complete` and start writing R5 (structural keys + IME + undo coalescing). If anything misbehaves, paste the verbatim observation and we diagnose before R5.
 >
 > **Read first** (in this order):
-> 1. `docs/handoff/2026-05-02-restoration-session-brief.md` — the orientation / working-protocol doc (~250 lines; one-time read per agent context).
-> 2. `docs/specs/2026-05-02-live-render-restoration-design.md` §11 R4 — the next phase's spec section.
+> 1. `docs/handoff/2026-05-02-restoration-session-brief.md` — the orientation / working-protocol doc.
+> 2. `docs/plans/2026-05-02-live-render-r4-paragraph-editing.md` — the R4 implementation plan, for context on what just landed.
+> 3. `docs/specs/2026-05-02-live-render-restoration-design.md` §11 R5 — the next phase's spec section.
 
 ---
 
@@ -32,7 +33,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R1C** | [r1c-library-scaffold](plans/2026-05-02-live-render-r1c-library-scaffold.md) | `complete` | `48ba7d6` | New library shell: `libs/markoff-live-render`. |
 | **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | `5a0dae7` | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
 | **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | `3484c11`, `2225061`, `e837710`, `1f26ec8`, `18abd96` | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. Dogfood-surfaced fixes: selection-paint, scroll-then-click hit-test, HR source-faithful copy. 114/114. |
-| **R4** | *not yet written* | `pending` | — | Paragraph editing through sequence-tagged binding. |
+| **R4** | [r4-paragraph-editing](plans/2026-05-02-live-render-r4-paragraph-editing.md) | `dogfood` | `1b75d37`, `ce0494f`, `3181fe8`, `dec12e7`, `7ae29e1`, `033d7e7`, `fa8e80d`, `99c616f`, `5e12f10`, `563c1f3`, `77a84eb`, `28e1c8f`, `a24c766`, `26dc802`, `7252498`, `324de05`, `201cbd3` | Paragraph + heading + code-block writable via LiveEditBinding; freshness gate; three cycle guards; previousText cache; cachedByteOffset refresh. 6/6 fast-tier; 8/8 paragraph_edit slots. |
 | **R5** | *not yet written* | `pending` | — | Structural keys + IME + undo coalescing. |
 | **R6** | *not yet written* | `pending` | — | Other text blocks + speculation refresh. |
 | **R7** | *not yet written* | `pending` | — | Lists + blockquotes (II.a, II.b). |
@@ -55,6 +56,24 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-02 | `201cbd3` | feat(live-render): code-block delegate is editable (body-interior only) |
+| 2026-05-02 | `324de05` | feat(live-render): heading delegate is editable |
+| 2026-05-02 | `7252498` | feat(live-render): paragraph delegate is editable |
+| 2026-05-02 | `26dc802` | feat(live-render): defensive applyingSessionSelection guard |
+| 2026-05-02 | `a24c766` | feat(live-render): refresh TextCaret cachedByteOffset on parse arrival |
+| 2026-05-02 | `28e1c8f` | test(live-render): stale parse never clobbers model text |
+| 2026-05-02 | `77a84eb` | feat(live-render): IME composition deferral in LiveEditBinding |
+| 2026-05-02 | `563c1f3` | test(live-render): applyingModelUpdate is true during dataChanged |
+| 2026-05-02 | `5e12f10` | fix(live-render): cache previousText for CRDT-coherent edit translation |
+| 2026-05-02 | `99c616f` | fix(live-render): gate LiveEditBinding::setRawTextDocument as test-only |
+| 2026-05-02 | `fa8e80d` | feat(live-render): LiveEditBinding wires contentsChange to applyLocalEdit |
+| 2026-05-02 | `033d7e7` | docs(live-render): note QPointer's complete-type requirement on LiveEditBinding |
+| 2026-05-02 | `7ae29e1` | feat(live-render): scaffold LiveEditBinding (no edit logic yet) |
+| 2026-05-02 | `dec12e7` | fix(live-render): qScopeGuard around applyingModelUpdate flag |
+| 2026-05-02 | `3181fe8` | feat(live-render): pass parseInputEditSeq + applyingModelUpdate guard |
+| 2026-05-02 | `ce0494f` | docs(live-render): clarify freshness-rule comment + fix typo |
+| 2026-05-02 | `1b75d37` | feat(live-render): freshness gate on LiveBlockModel::applyOps |
+| 2026-05-02 | `49e9b5d` | docs(plan): R4 implementation plan — paragraph editing through sequence-tagged binding |
 | 2026-05-02 | `18abd96` | fix(live-render): HR delegate copies its source markdown bytes |
 | 2026-05-02 | `1f26ec8` | fix(live-render): hit-test walks outward to nearest realized delegate |
 | 2026-05-02 | `e837710` | fix(live-render): expose selectionView at delegate root so children resolve it |
