@@ -30,7 +30,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R1A** | [r1a-parse-edit-sequence](plans/2026-05-02-live-render-r1a-parse-edit-sequence.md) | `complete` | `466121e`, `818485b` | Foundation surface: `parseUpdated` 4th arg. |
 | **R1B** | [r1b-inline-span-bake](plans/2026-05-02-live-render-r1b-inline-span-bake.md) | `complete` | `65cafdf`, `d3e6384` | Parser surface: `TopLevelBlock::inlineSpans`. |
 | **R1C** | [r1c-library-scaffold](plans/2026-05-02-live-render-r1c-library-scaffold.md) | `complete` | `48ba7d6` | New library shell: `libs/markoff-live-render`. |
-| **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | see commit | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
+| **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | `5a0dae7` | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
 | **R3** | *not yet written* | `pending` | — | Cursor (Shape 1) + selection. Plan written after R2 acceptance. |
 | **R4** | *not yet written* | `pending` | — | Paragraph editing through sequence-tagged binding. |
 | **R5** | *not yet written* | `pending` | — | Structural keys + IME + undo coalescing. |
@@ -55,7 +55,7 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-02 | see commit | feat(live-render): R2 complete — read-only render with diff model |
+| 2026-05-02 | `5a0dae7` | feat(live-render): R2 complete — read-only render with diff model |
 | 2026-05-02 | `ba0db23` | docs(plan): R2 implementation plan — read-only render with diff model |
 | 2026-05-02 | `5bc9db2` | docs(status): fix R1C commit SHA in restoration-status.md |
 | 2026-05-02 | `48ba7d6` | feat(live-render): scaffold libs/markoff-live-render (R1C complete) |
