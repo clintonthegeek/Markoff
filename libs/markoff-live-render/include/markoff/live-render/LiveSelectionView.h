@@ -63,6 +63,8 @@ private:
     void normalized(int &fb, int &fo, int &lb, int &lo) const;
     void syncToSession();
 
+    bool m_applyingSessionSelection = false;
+
     int m_anchorBlock = -1, m_anchorQtPos = -1;
     int m_activeBlock = -1, m_activeQtPos = -1;
 

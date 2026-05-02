@@ -117,7 +117,9 @@ void LiveSelectionView::syncToSession()
     sel.kind   = Markoff::Selection::Kind::Primary;
     sel.anchor = makeAnchor(m_anchorBlock, m_anchorQtPos);
     sel.active = makeAnchor(m_activeBlock, m_activeQtPos);
+    m_applyingSessionSelection = true;
     m_session->setPrimarySelection(sel);
+    m_applyingSessionSelection = false;
 }
 
 }  // namespace Markoff::LiveRender
