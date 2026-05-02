@@ -9,6 +9,7 @@
 #include <markoff-parser/Document.h>
 
 #include <QList>
+#include <QScopeGuard>
 
 namespace Markoff::LiveRender {
 
@@ -99,8 +100,8 @@ void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
     const QList<AstBlockDiff::Op> ops = AstBlockDiff::diff(d->lastKeys, nextKeys);
 
     d->applyingModelUpdate = true;
+    auto _ = qScopeGuard([this]{ d->applyingModelUpdate = false; });
     d->model->applyOps(ops, records, parseInputEditSequence);
-    d->applyingModelUpdate = false;
 
     d->lastKeys = std::move(nextKeys);
 }
