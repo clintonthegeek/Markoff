@@ -9,6 +9,11 @@
 #include <markoff/live-render/BlockKindRegistry.h>
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/AstBlockDiff.h>
+#include <markoff/live-render/LiveListModelBinding.h>
+
+#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/Origin.h>
 
 using namespace Markoff::LiveRender;
 
@@ -184,7 +189,47 @@ private Q_SLOTS:
         QCOMPARE(ht.lastBlockIndex(), -1);
         QCOMPARE(ht.lastQtPos(), -1);
     }
+
+    // ---- LiveListModelBinding: cachedByteOffset refresh tests ----
+
+    void textcaret_cached_offset_refreshes_on_parse_arrival() {
+        Markoff::MarkoffDocument document(/*replicaId=*/1);
+
+        LiveListModelBinding binding;
+        binding.setDocument(&document);
+
+        QSignalSpy parseSpy(&document, &Markoff::MarkoffDocument::parseUpdated);
+        document.resetContent("hello world", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 1);
+
+        const auto blockAnchor = binding.model()->recordAt(0).blockAnchor;
+
+        // Place a caret at byte offset 3 (inside "hello", on 'l').
+        TextCaret tc;
+        tc.block = blockAnchor;
+        tc.positionAnchor = document.textAnchorAt(blockAnchor, /*offset=*/3, /*rightBias=*/true);
+        tc.cachedByteOffset = 3;
+        binding.cursorState()->request(tc);
+
+        // Prepend a paragraph above. The anchor at offset 3 should still
+        // resolve to byte 3 within the (now second) block; the absolute
+        // resolved byte changes (it's now in a later position in the doc).
+        Markoff::MarkoffEdit prepend;
+        prepend.oldStart = 0; prepend.oldEnd = 0;
+        prepend.newText = "before\n\n";
+        document.applyLocalEdit({ prepend });
+        QVERIFY(parseSpy.wait(2000));
+
+        const auto refreshed = std::get<TextCaret>(binding.cursorState()->cursor());
+        // Verify cachedByteOffset matches the resolved-relative-to-block-start.
+        const auto blockRangeOpt = document.blockByteRange(refreshed.block);
+        QVERIFY(blockRangeOpt.has_value());
+        const quint32 blockStart = blockRangeOpt->first;
+        const quint32 resolvedAbs = document.resolveTextAnchor(refreshed.positionAnchor);
+        QCOMPARE(refreshed.cachedByteOffset, resolvedAbs - blockStart);
+    }
 };
 
-QTEST_APPLESS_MAIN(TstLiveRenderCursor)
+QTEST_GUILESS_MAIN(TstLiveRenderCursor)
 #include "tst_live_render_cursor.moc"

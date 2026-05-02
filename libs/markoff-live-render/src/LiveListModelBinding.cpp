@@ -104,6 +104,27 @@ void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
     d->model->applyOps(ops, records, parseInputEditSequence);
 
     d->lastKeys = std::move(nextKeys);
+
+    // Re-resolve the cached byte offset of the active TextCaret cursor.
+    // Local edits between parse arrivals shift the resolved byte position
+    // of the cursor's TextAnchor; the cached offset is consulted by
+    // selection rendering and structural-key dispatch (R5). Spec §3.3.
+    if (d->cursorState) {
+        const Cursor cur = d->cursorState->cursor();
+        if (auto *tc = std::get_if<TextCaret>(&cur)) {
+            const auto blockRangeOpt = d->document->blockByteRange(tc->block);
+            if (blockRangeOpt) {
+                const quint32 blockStart = blockRangeOpt->first;
+                const quint32 resolvedAbs = d->document->resolveTextAnchor(tc->positionAnchor);
+                TextCaret refreshed = *tc;
+                refreshed.cachedByteOffset = (resolvedAbs >= blockStart)
+                    ? resolvedAbs - blockStart : 0;
+                if (refreshed.cachedByteOffset != tc->cachedByteOffset) {
+                    d->cursorState->request(refreshed);
+                }
+            }
+        }
+    }
 }
 
 }  // namespace Markoff::LiveRender
