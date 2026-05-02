@@ -2,25 +2,48 @@
 import QtQuick
 import QtQuick.Controls
 
-/// Read-only heading. Font size driven by headingLevel (1–6).
-TextEdit {
+Item {
+    id: root
     width: ListView.view ? ListView.view.width : 600
-    readOnly: true
-    textFormat: TextEdit.PlainText
-    text: model.text
-    wrapMode: TextEdit.Wrap
-    leftPadding: 8; rightPadding: 8
-    topPadding: 6; bottomPadding: 2
-    font.pixelSize: {
-        switch (model.headingLevel) {
-            case 1: return 28
-            case 2: return 24
-            case 3: return 20
-            case 4: return 18
-            case 5: return 16
-            default: return 14
+    implicitHeight: edit.implicitHeight
+
+    property int modelIndex: index
+    readonly property string blockText: model.text
+
+    TextEdit {
+        id: edit
+        anchors.fill: parent
+        leftPadding: 8; rightPadding: 8
+        topPadding: 6; bottomPadding: 2
+        readOnly: true
+        textFormat: TextEdit.PlainText
+        text: model.text
+        wrapMode: TextEdit.Wrap
+        font.pixelSize: {
+            switch (model.headingLevel) {
+                case 1: return 28; case 2: return 24; case 3: return 20
+                case 4: return 18; case 5: return 16; default: return 14
+            }
+        }
+        font.bold: model.headingLevel <= 3
+        color: palette.text
+        selectByMouse: false
+
+        function applySelection() {
+            const sv = ListView.view && ListView.view.binding
+                       ? ListView.view.binding.selectionView : null
+            if (!sv) { deselect(); return }
+            const r = sv.rangeForBlock(model.index)
+            if (!r || r.x < 0) { deselect(); return }
+            select(r.x, Math.min(r.y, length))
+        }
+
+        Connections {
+            target: ListView.view && ListView.view.binding
+                    ? ListView.view.binding.selectionView : null
+            function onSelectionChanged() { edit.applySelection() }
         }
     }
-    font.bold: model.headingLevel <= 3
-    color: palette.text
+
+    function positionAt(x, y) { return edit.positionAt(x - edit.leftPadding, y - edit.topPadding) }
 }

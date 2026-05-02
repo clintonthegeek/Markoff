@@ -1,6 +1,4 @@
-# R1C provides one trivial test that proves the test infrastructure is alive.
-# R2 adds tst_live_render_coords, tst_live_render_registry, tst_live_render_block_model.
-# R3+ adds tst_live_render_cursor, tst_live_render_paragraph_edit, etc.
+# R1C: skeleton. R2: coords, registry, block_model. R3: cursor.
 
 qt_add_executable(tst_live_render_skeleton
     tst_live_render_skeleton.cpp
@@ -29,3 +27,10 @@ qt_add_executable(tst_live_render_block_model
 target_link_libraries(tst_live_render_block_model PRIVATE
     Qt6::Core Qt6::Test markoff_live_render)
 add_test(NAME tst_live_render_block_model COMMAND tst_live_render_block_model)
+
+qt_add_executable(tst_live_render_cursor
+    tst_live_render_cursor.cpp
+)
+target_link_libraries(tst_live_render_cursor PRIVATE
+    Qt6::Core Qt6::Test markoff_live_render)
+add_test(NAME tst_live_render_cursor COMMAND tst_live_render_cursor)

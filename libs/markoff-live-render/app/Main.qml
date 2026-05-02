@@ -8,7 +8,7 @@ ApplicationWindow {
     width: 900
     height: 700
     visible: true
-    title: ctxTitle + " — markoff-live-render (R2)"
+    title: ctxTitle + " — markoff-live-render (R3)"
 
     LiveListModelBinding {
         id: modelBinding
@@ -18,5 +18,6 @@ ApplicationWindow {
     LiveView {
         anchors.fill: parent
         binding: modelBinding
+        focus: true
     }
 }

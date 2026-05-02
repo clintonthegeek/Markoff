@@ -5,6 +5,7 @@
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/BlockAnchor.h>
+#include <markoff-foundation/Session.h>
 #include <markoff-parser/Document.h>
 
 #include <QList>
@@ -12,18 +13,26 @@
 namespace Markoff::LiveRender {
 
 struct LiveListModelBinding::Private {
-    Markoff::MarkoffDocument *document = nullptr;
-    LiveBlockModel            *model   = nullptr;
-    BlockKindRegistry          registry;  // built-ins registered in ctor
+    Markoff::MarkoffDocument *document     = nullptr;
+    Markoff::Session         *session      = nullptr;
+    LiveBlockModel            *model       = nullptr;
+    BlockKindRegistry          registry;
+    LiveCursorState           *cursorState   = nullptr;
+    BlockHitTester            *hitTester     = nullptr;
+    LiveSelectionView         *selectionView = nullptr;
     QList<BlockKey>            lastKeys;
-    quint64 lastParseInputEditSeq = 0;   // stored for R4 freshness rule
+    quint64                    lastParseInputEditSeq = 0;
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>())
 {
-    d->model = new LiveBlockModel(this);
+    d->model         = new LiveBlockModel(this);
+    d->cursorState   = new LiveCursorState(&d->registry, d->model, this);
+    d->hitTester     = new BlockHitTester(this);
+    d->selectionView = new LiveSelectionView(this);
+    d->selectionView->setModel(d->model);
 }
 
 LiveListModelBinding::~LiveListModelBinding() = default;
@@ -36,25 +45,32 @@ Markoff::MarkoffDocument *LiveListModelBinding::document() const
 void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
 {
     if (d->document == doc) return;
-    if (d->document)
+    if (d->document) {
         QObject::disconnect(d->document, nullptr, this, nullptr);
+        if (d->session) {
+            d->document->destroySession(d->session);
+            d->session = nullptr;
+        }
+    }
     d->document = doc;
     if (d->document) {
         QObject::connect(d->document, &Markoff::MarkoffDocument::parseUpdated,
                          this, &LiveListModelBinding::onParseUpdated);
+        d->session = d->document->createSession({});
+        d->selectionView->setDocument(d->document);
+        d->selectionView->setSession(d->session);
+    } else {
+        d->selectionView->setDocument(nullptr);
+        d->selectionView->setSession(nullptr);
     }
     Q_EMIT documentChanged();
 }
 
-LiveBlockModel *LiveListModelBinding::model() const
-{
-    return d->model;
-}
-
-const BlockKindRegistry *LiveListModelBinding::registry() const
-{
-    return &d->registry;
-}
+LiveBlockModel    *LiveListModelBinding::model()         const { return d->model; }
+LiveCursorState   *LiveListModelBinding::cursorState()   const { return d->cursorState; }
+BlockHitTester    *LiveListModelBinding::hitTester()     const { return d->hitTester; }
+LiveSelectionView *LiveListModelBinding::selectionView() const { return d->selectionView; }
+const BlockKindRegistry *LiveListModelBinding::registry() const { return &d->registry; }
 
 void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
                                           quint64 /*parseSequence*/,
@@ -62,12 +78,9 @@ void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
                                           quint64 parseInputEditSequence)
 {
     if (!parsed) return;
-
     d->lastParseInputEditSeq = parseInputEditSequence;
 
     QList<BlockRecord> records = BlockWalker::walk(parsed);
-
-    // Align BlockAnchors 1:1 with topLevelBlocks() (and therefore records).
     QList<BlockKey> nextKeys;
     nextKeys.reserve(records.size());
     for (qsizetype i = 0; i < records.size(); ++i) {
@@ -77,9 +90,7 @@ void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
         nextKeys.append(BlockKey{ records[i].kind, anchor });
     }
 
-    const QList<AstBlockDiff::Op> ops =
-        AstBlockDiff::diff(d->lastKeys, nextKeys);
-
+    const QList<AstBlockDiff::Op> ops = AstBlockDiff::diff(d->lastKeys, nextKeys);
     d->model->applyOps(ops, records);
     d->lastKeys = std::move(nextKeys);
 }

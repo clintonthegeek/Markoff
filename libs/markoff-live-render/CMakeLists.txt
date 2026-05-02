@@ -35,6 +35,14 @@ qt_add_qml_module(markoff_live_render
         src/BlockWalker.cpp
         src/LiveBlockModel.cpp
         src/LiveListModelBinding.cpp
+        # R3: cursor + selection
+        include/markoff/live-render/Cursor.h
+        include/markoff/live-render/LiveCursorState.h
+        include/markoff/live-render/BlockHitTester.h
+        include/markoff/live-render/LiveSelectionView.h
+        src/LiveCursorState.cpp
+        src/BlockHitTester.cpp
+        src/LiveSelectionView.cpp
     QML_FILES
         qml/LiveView.qml
         qml/delegates/ParagraphDelegate.qml
@@ -46,9 +54,6 @@ qt_add_qml_module(markoff_live_render
 
 target_include_directories(markoff_live_render
     PUBLIC include/
-    # Bare-filename `#include <Version.h>` resolution for Qt's QML
-    # type-registration generated code, mirroring markoff-view-qml's
-    # private include directory pattern.
     PRIVATE include/markoff/live-render/
     PRIVATE src/
 )

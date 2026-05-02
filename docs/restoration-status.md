@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-02 (R2 complete)
+**Last updated:** 2026-05-02 (R3 complete)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,13 +11,13 @@
 
 ## TL;DR — what to do *right now*
 
-> **R1 and R2 are complete** (113/113 fast-tier tests pass). R2 delivers L0 (Coordinates), L1 (read-only ListView + 5 delegates), L2 (LiveBlockModel + AstBlockDiff + LiveListModelBinding). The next session should write and execute **R3** — cursor + selection (Shape 1; LiveCursorState; BlockHitTester).
+> **R1–R3 complete** (114/114 fast-tier tests pass). R3 delivers LiveCursorState (Shape-1 cursor validation), BlockHitTester (mouse→block hit via QMetaObject), LiveSelectionView (cross-block selection + Session sync + Ctrl-C copy), scrollbar, and mouse/keyboard wiring in LiveView.qml. The next session should write and execute **R4** — paragraph editing through sequence-tagged LiveEditBinding.
 >
-> **Recommended next:** Write the R3 plan from spec §11 R3, then execute it.
+> **Recommended next:** Write the R4 plan from spec §11 R4, then execute it.
 >
 > **Read first** (in this order):
 > 1. `docs/handoff/2026-05-02-restoration-session-brief.md` — the orientation / working-protocol doc (~250 lines; one-time read per agent context).
-> 2. `docs/specs/2026-05-02-live-render-restoration-design.md` §11 R3 — the next phase's spec section.
+> 2. `docs/specs/2026-05-02-live-render-restoration-design.md` §11 R4 — the next phase's spec section.
 
 ---
 
@@ -31,7 +31,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R1B** | [r1b-inline-span-bake](plans/2026-05-02-live-render-r1b-inline-span-bake.md) | `complete` | `65cafdf`, `d3e6384` | Parser surface: `TopLevelBlock::inlineSpans`. |
 | **R1C** | [r1c-library-scaffold](plans/2026-05-02-live-render-r1c-library-scaffold.md) | `complete` | `48ba7d6` | New library shell: `libs/markoff-live-render`. |
 | **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | `5a0dae7` | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
-| **R3** | *not yet written* | `pending` | — | Cursor (Shape 1) + selection. Plan written after R2 acceptance. |
+| **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | see commit | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. 114/114. |
 | **R4** | *not yet written* | `pending` | — | Paragraph editing through sequence-tagged binding. |
 | **R5** | *not yet written* | `pending` | — | Structural keys + IME + undo coalescing. |
 | **R6** | *not yet written* | `pending` | — | Other text blocks + speculation refresh. |
@@ -55,6 +55,8 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-02 | see commit | feat(live-render): R3 — cursor, selection, keyboard nav, scrollbar |
+| 2026-05-02 | `96445e3` | docs(plan): R3 implementation plan — cursor, selection, keyboard nav |
 | 2026-05-02 | `5a0dae7` | feat(live-render): R2 complete — read-only render with diff model |
 | 2026-05-02 | `ba0db23` | docs(plan): R2 implementation plan — read-only render with diff model |
 | 2026-05-02 | `5bc9db2` | docs(status): fix R1C commit SHA in restoration-status.md |

@@ -3,21 +3,20 @@ import QtQuick
 import QtQuick.Controls
 import org.kde.syntaxhighlighting
 
-/// Read-only code block. KSyntaxHighlighting colors the content;
-/// language is driven by the fence info-string (`codeLanguage` role).
 Rectangle {
+    id: root
     width: ListView.view ? ListView.view.width : 600
     implicitHeight: edit.implicitHeight + 16
     color: Qt.rgba(0, 0, 0, 0.05)
     radius: 4
 
+    property int modelIndex: index
+    readonly property string blockText: model.text
+
     TextEdit {
         id: edit
-        anchors {
-            left: parent.left; right: parent.right
-            top: parent.top; bottom: parent.bottom
-            margins: 8
-        }
+        anchors { left: parent.left; right: parent.right
+                  top: parent.top; bottom: parent.bottom; margins: 8 }
         readOnly: true
         textFormat: TextEdit.PlainText
         text: model.text
@@ -25,12 +24,28 @@ Rectangle {
         font.family: "monospace"
         font.pixelSize: 13
         color: palette.text
+        selectByMouse: false
 
-        // Only attach when a language is declared; with no language the
-        // default text color renders correctly against the tinted background.
         SyntaxHighlighter {
             textEdit: model.codeLanguage.length > 0 ? edit : null
             definition: model.codeLanguage
         }
+
+        function applySelection() {
+            const sv = ListView.view && ListView.view.binding
+                       ? ListView.view.binding.selectionView : null
+            if (!sv) { deselect(); return }
+            const r = sv.rangeForBlock(model.index)
+            if (!r || r.x < 0) { deselect(); return }
+            select(r.x, Math.min(r.y, length))
+        }
+
+        Connections {
+            target: ListView.view && ListView.view.binding
+                    ? ListView.view.binding.selectionView : null
+            function onSelectionChanged() { edit.applySelection() }
+        }
     }
+
+    function positionAt(x, y) { return edit.positionAt(x - 8, y - 8) }
 }
