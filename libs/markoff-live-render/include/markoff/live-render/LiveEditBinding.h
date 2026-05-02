@@ -56,6 +56,12 @@ public:
     QQuickTextDocument *textDocument() const;
     void setTextDocument(QQuickTextDocument *td);
 
+    /// Test-only accessor: wire directly to a QTextDocument without
+    /// going through QQuickTextDocument. Used by unit tests that cannot
+    /// instantiate a QQuickItem/QML scene. Production code uses
+    /// setTextDocument(QQuickTextDocument*) instead.
+    void setRawTextDocument(QTextDocument *td);
+
     bool composing() const;
     void setComposing(bool c);
 
