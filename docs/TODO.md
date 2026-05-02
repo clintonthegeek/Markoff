@@ -8,6 +8,20 @@
 > spec at `docs/specs/2026-05-02-live-render-restoration-design.md`
 > before resuming any work in this file. Older entries kept for reference.
 
+## 2026-05-02 — R2 dogfood: LiveView needs a scrollbar
+
+`ListView` in `LiveView.qml` has no attached `ScrollBar`. Without a mouse
+wheel or a draggable element in the viewport, keyboard-only and
+pointer-only navigation is impossible. Fix: one-liner in `LiveView.qml`:
+
+```qml
+ScrollBar.vertical: ScrollBar {}
+```
+
+Earliest natural slot: R3 (when the plan covers `LiveView.qml` anyway for
+cursor/focus routing). Can land as a standalone commit if convenient before
+that.
+
 ---
 
 ## 2026-04-30 — BlockAnchor foundation complete; two perf follow-ups
