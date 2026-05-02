@@ -1,5 +1,15 @@
 # Markoff TODO
 
+> **2026-05-02 — ACTIVE: live render restoration arc.** All entries
+> below this banner predate the restoration arc and are paused/superseded
+> by it unless explicitly carried forward. The active work tracker is
+> `docs/restoration-status.md`. Read that, the session brief at
+> `docs/handoff/2026-05-02-restoration-session-brief.md`, and the
+> spec at `docs/specs/2026-05-02-live-render-restoration-design.md`
+> before resuming any work in this file. Older entries kept for reference.
+
+---
+
 ## 2026-04-30 — BlockAnchor foundation complete; two perf follow-ups
 
 The 14-task BlockAnchor foundation plan

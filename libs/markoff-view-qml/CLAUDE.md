@@ -1,5 +1,19 @@
 # markoff-view-qml — POC QML view
 
+> **2026-05-02 — restoration-arc note.** The *live-mode* portion of
+> this library is being rebuilt as a side-by-side new library
+> `libs/markoff-live-render`. See
+> `docs/specs/2026-05-02-live-render-restoration-design.md` (decision β)
+> and `docs/restoration-status.md` for the active arc. Do not modify
+> live-mode files in this library during the restoration unless the
+> active plan in `docs/plans/2026-05-02-live-render-r*-*.md` explicitly
+> says to. Source mode (`SourceEditor.qml`, `EditorBackend`,
+> `SourceTextDocumentBinding`, the search/completion stack) is **not**
+> in restoration scope and stays here unchanged. Live-mode files are
+> retired in restoration phase R10, not earlier.
+
+---
+
 A QML-first Markdown editor library. Phase-1 delivers a solid source-mode editor: `TextArea` + `KSyntaxHighlighting`, CRDT-backed undo/redo, find bar, emoji completion, and an AST inspector test app. The architecture is the seed for an Obsidian-equivalent live editor (Phase 2) — every load-bearing decision is made with Phase 2 in mind so Phase 2 is a build-on, not a rewrite.
 
 This library lives on branch `exploration/new-foundation` and is not yet part of the v0.x release series. It depends on `markoff-foundation` (the CRDT + document layer) rather than `markoff-core`.

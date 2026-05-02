@@ -1,5 +1,28 @@
 # Markoff (exploration/new-foundation branch)
 
+> **ACTIVE WORK — LIVE RENDER RESTORATION.** This branch is in a long-term
+> restoration arc rebuilding the live render widget (the WYSIWYG-ish
+> Markdown editor surface) into a new side-by-side library
+> `libs/markoff-live-render`. **A fresh agent context picking up this
+> work must read, in order:**
+>
+> 1. `docs/restoration-status.md` — live status board (what to do *right now*)
+> 2. `docs/handoff/2026-05-02-restoration-session-brief.md` — working protocol
+> 3. The active plan referenced by the status doc's TL;DR
+>
+> The architecture is pinned in `docs/specs/2026-05-02-live-render-restoration-design.md`
+> and is binding (changes require a spec-amendment entry in the status
+> doc and explicit user approval). Do not rewrite the spec unilaterally.
+>
+> The legacy `libs/markoff-view-qml` stays in service of source mode and
+> the existing live mode (regression reference) until the very end of
+> the restoration arc (R10). Do not delete its files prematurely.
+>
+> All other content below describes the project at large; the restoration
+> arc is the active subject within that.
+
+---
+
 Qt6/C++ markdown editor family, mid-rebuild. The new-foundation branch
 has retired the original four leaves (`markoff-core`, `markoff-live`,
 `markoff-reading`, `markoff-source`) and is rebuilding around a
