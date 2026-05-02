@@ -192,6 +192,44 @@ private Q_SLOTS:
         QCOMPARE(document.toMarkdown(), QString("helloAB"));
     }
 
+    void ime_composition_defers_then_flushes_on_commit() {
+        Markoff::MarkoffDocument document(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&document);
+        document.resetContent("hello", Markoff::Origin::FirstOpen);
+        QSignalSpy parseSpy(&document, &Markoff::MarkoffDocument::parseUpdated);
+        QVERIFY(parseSpy.wait(2000));
+
+        QTextEdit editor;
+        editor.setPlainText("hello");
+        LiveEditBinding eb;
+        eb.setBinding(&binding);
+        eb.setModelIndex(0);
+        eb.setRawTextDocument(editor.document());
+
+        const quint64 seqBefore = document.editSequence();
+
+        // Simulate composition start: composing = true.
+        eb.setComposing(true);
+
+        // Simulate preedit character changes. None of these should call
+        // applyLocalEdit because the composing guard skips them.
+        QTextCursor cur(editor.document());
+        cur.setPosition(5);
+        cur.insertText("a");        // -> "helloa" (preedit-stage 1)
+        cur.insertText("b");        // -> "helloab"
+        cur.insertText("c");        // -> "helloabc"
+
+        // editSequence MUST NOT have advanced — preedit is deferred.
+        QCOMPARE(document.editSequence(), seqBefore);
+
+        // Composition commits: composing = false. One applyLocalEdit fires.
+        eb.setComposing(false);
+
+        QVERIFY(document.editSequence() > seqBefore);
+        QCOMPARE(document.toMarkdown(), QString("helloabc"));
+    }
+
     void model_update_does_not_echo_back_to_apply_local_edit() {
         // Setup: a doc with one paragraph; binding wired; user has typed
         // and the row sequence is stamped at N.

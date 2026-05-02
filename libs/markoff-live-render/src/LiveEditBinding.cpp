@@ -146,7 +146,38 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
 
 void LiveEditBinding::flushPendingComposition()
 {
-    // Body in Task 7 (IME composition deferral).
+    if (!m_compositionPendingFlush) return;
+    m_compositionPendingFlush = false;
+
+    if (!m_binding || !m_binding->model() || !m_binding->document() || !m_listenedDoc)
+        return;
+    if (m_modelIndex < 0 || m_modelIndex >= m_binding->model()->rowCount())
+        return;
+
+    auto *doc   = m_binding->document();
+    auto *model = m_binding->model();
+    const auto &record = model->recordAt(m_modelIndex);
+
+    const auto blockRangeOpt = doc->blockByteRange(record.blockAnchor);
+    if (!blockRangeOpt) return;
+    const quint32 blockStart = blockRangeOpt->first;
+    const quint32 blockEnd   = blockRangeOpt->second;
+
+    const QString postQt = m_listenedDoc->toPlainText();
+    const QByteArray postUtf8 = postQt.toUtf8();
+
+    Markoff::MarkoffEdit edit;
+    edit.oldStart = blockStart;
+    edit.oldEnd   = blockEnd;
+    edit.newText  = postUtf8;
+
+    doc->applyLocalEdit({ edit });
+    model->setRowEditSequence(m_modelIndex, doc->editSequence());
+
+    // Keep the cache in sync with the post-commit document state so the
+    // next non-composing contentsChange computes its byte range against
+    // the right pre-edit reference.
+    m_previousText = postQt;
 }
 
 }  // namespace Markoff::LiveRender
