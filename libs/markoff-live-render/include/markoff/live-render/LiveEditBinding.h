@@ -17,6 +17,9 @@
 // forward declaration is rejected by the compiler at the point the
 // member is declared, not by MOC.
 
+// Forward declaration for the test-only friend grant below.
+class TstLiveRenderParagraphEdit;
+
 namespace Markoff::LiveRender {
 
 /// Per-delegate edit binding. Translates `QTextDocument::contentsChange`
@@ -56,12 +59,6 @@ public:
     QQuickTextDocument *textDocument() const;
     void setTextDocument(QQuickTextDocument *td);
 
-    /// Test-only accessor: wire directly to a QTextDocument without
-    /// going through QQuickTextDocument. Used by unit tests that cannot
-    /// instantiate a QQuickItem/QML scene. Production code uses
-    /// setTextDocument(QQuickTextDocument*) instead.
-    void setRawTextDocument(QTextDocument *td);
-
     bool composing() const;
     void setComposing(bool c);
 
@@ -75,6 +72,19 @@ private Q_SLOTS:
     void onContentsChange(int qtPos, int charsRemoved, int charsAdded);
 
 private:
+    // Grant test-only access to setRawTextDocument. The Qt 6.11 quirk
+    // (QQuickTextDocument(nullptr) crashes; a bare QTextDocument doesn't
+    // fire the 3-arg contentsChange) means unit tests must use a
+    // QTextEdit-backed document and wire it via this seam. Production
+    // code uses setTextDocument(QQuickTextDocument*) instead.
+    friend class ::TstLiveRenderParagraphEdit;
+
+    /// Test-only seam: wire directly to a QTextDocument without going
+    /// through QQuickTextDocument. Used by unit tests that cannot
+    /// instantiate a QQuickItem/QML scene. Production code must use
+    /// setTextDocument(QQuickTextDocument*) instead.
+    void setRawTextDocument(QTextDocument *td);
+
     void rewireTextDocument(QTextDocument *newDoc);
     void flushPendingComposition();
 
