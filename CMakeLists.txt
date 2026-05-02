@@ -45,6 +45,7 @@ endif()
 
 add_subdirectory(libs/markoff-foundation)
 add_subdirectory(libs/markoff-view-qml)
+add_subdirectory(libs/markoff-live-render)
 add_subdirectory(libs/markoff-source-widget)
 add_subdirectory(libs/markoff-bench)
 
