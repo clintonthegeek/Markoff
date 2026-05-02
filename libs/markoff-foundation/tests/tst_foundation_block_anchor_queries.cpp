@@ -45,7 +45,11 @@ private Q_SLOTS:
         const auto rng = doc.blockByteRange(block0);
         QVERIFY(rng.has_value());
         QCOMPARE(rng->first,  quint32{0});
-        QCOMPARE(rng->second, quint32{5});  // "hello"
+        // Tree-sitter's paragraph node for "hello" spans through its
+        // trailing newline. Block ranges are now sourced from
+        // `Markoff::Document::topLevelBlocks()` (post-C-7), which
+        // mirrors view-qml's enumeration.
+        QCOMPARE(rng->second, quint32{6});
     }
 
     void blockAt_inside_first_block_returns_first_block() {
@@ -106,7 +110,9 @@ private Q_SLOTS:
         QVERIFY(spy.wait(2000));
         const auto block0 = doc.blockAnchorAt(0).value();
         const TextAnchor pastBlock = doc.textAnchorAt(8, /*rightBias*/ false);
-        QCOMPARE(doc.offsetInBlock(block0, pastBlock), 4);
+        // Tree-sitter's paragraph node for "aaaa" spans through its
+        // trailing newline (5 bytes), so the clamp ceiling is 5 (not 4).
+        QCOMPARE(doc.offsetInBlock(block0, pastBlock), 5);
     }
 
     void block_local_textAnchorAt_round_trips_via_offsetInBlock() {

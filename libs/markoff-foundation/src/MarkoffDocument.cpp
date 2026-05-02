@@ -28,13 +28,15 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
                          ++d->parseSequence;
 
                          // Compute BlockAnchors against the CURRENT CRDT buffer (main-thread,
-                         // synchronous). The parse itself reflects the buffer at parse-schedule
-                         // time; if intervening edits moved a block's first-byte char, that
-                         // block's BlockAnchor for one parse cycle identifies a slightly
-                         // different character — the next parse cycle delivers a corrected
-                         // anchor. See spec §3.
-                         const QByteArray body = toMarkdownUtf8();
-                         auto bundle = Markoff::Detail::computeBlockAnchors(*this, body);
+                         // synchronous). Anchors are derived from the parser's tree-sitter
+                         // top-level-block enumeration (`Markoff::Document::topLevelBlocks()`),
+                         // matching what view-qml's BlockWalker consumes — so anchors[i] and
+                         // the view's records[i] always describe the same block. The parse
+                         // itself reflects the buffer at parse-schedule time; if intervening
+                         // edits moved a block's first-byte char, that block's BlockAnchor
+                         // for one parse cycle identifies a slightly different character —
+                         // the next parse cycle delivers a corrected anchor. See spec §3.
+                         auto bundle = Markoff::Detail::computeBlockAnchors(*this, p);
                          d->latestBlockAnchors = std::move(bundle.anchors);
                          d->latestBlockRanges  = std::move(bundle.ranges);
 
