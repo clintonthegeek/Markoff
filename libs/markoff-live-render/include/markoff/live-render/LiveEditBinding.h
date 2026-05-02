@@ -8,9 +8,14 @@
 #include <QObject>
 #include <QPointer>
 #include <QQuickTextDocument>
+#include <QTextDocument>
 #include <qqmlintegration.h>
 
-class QTextDocument;
+// Note: header includes the full types for `LiveListModelBinding` and
+// `QQuickTextDocument` because `QPointer<T>` member fields require T to
+// be complete (Qt6 `QtPrivate::is_complete` static-assert). A bare
+// forward declaration is rejected by the compiler at the point the
+// member is declared, not by MOC.
 
 namespace Markoff::LiveRender {
 
@@ -72,7 +77,7 @@ private:
     QPointer<QQuickTextDocument>    m_textDocument;
     QPointer<QTextDocument>         m_listenedDoc;  // remembered so we can disconnect
     bool                            m_composing = false;
-    bool                            m_compositionTouchedDoc = false;  // see Task 7
+    bool                            m_compositionPendingFlush = false;  // see Task 7
 };
 
 }  // namespace Markoff::LiveRender
