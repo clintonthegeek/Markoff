@@ -156,9 +156,18 @@ public:
 
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
+    /// Emitted on the main thread each time a parse completes.
+    ///
+    /// `parseInputEditSequence` is the value of `editSequence()` at the
+    /// moment this parse's input bytes were captured (the applyLocalEdit /
+    /// resetContent call that triggered the parse). View consumers compare
+    /// this against per-row last-edit sequence to decide whether the parse
+    /// output for a given row is stale relative to user intent.
+    /// See restoration spec §4.
     void parseUpdated(const Markoff::Document *parsed,
                       quint64 parseSequence,
-                      QList<Markoff::BlockAnchor> blockAnchors);
+                      QList<Markoff::BlockAnchor> blockAnchors,
+                      quint64 parseInputEditSequence);
     void documentReloaded();
     void sessionCreated(Markoff::Session *);
     void sessionDestroyed(Markoff::Session *);

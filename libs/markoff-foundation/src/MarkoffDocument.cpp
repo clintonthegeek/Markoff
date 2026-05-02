@@ -23,7 +23,7 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     qRegisterMetaType<QList<Markoff::BlockAnchor>>("QList<Markoff::BlockAnchor>");
 
     QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
-                     this, [this](const Markoff::Document *p) {
+                     this, [this](const Markoff::Document *p, quint64 inputEditSeq) {
                          d->latestParse.reset(p);
                          ++d->parseSequence;
 
@@ -40,7 +40,8 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
                          d->latestBlockAnchors = std::move(bundle.anchors);
                          d->latestBlockRanges  = std::move(bundle.ranges);
 
-                         Q_EMIT parseUpdated(p, d->parseSequence, d->latestBlockAnchors);
+                         Q_EMIT parseUpdated(p, d->parseSequence, d->latestBlockAnchors,
+                                             inputEditSeq);
                      });
 }
 
@@ -133,7 +134,7 @@ MarkoffDocument::applyLocalEdit(const QList<MarkoffEdit> &edits)
 
     if (!resultingEdits.isEmpty()) {
         Q_EMIT contentsChanged(resultingEdits);
-        d->parsePool.schedule(toMarkdownUtf8());
+        d->parsePool.schedule(toMarkdownUtf8(), d->editSequence);
     }
 
     return op;
@@ -161,7 +162,7 @@ std::optional<CollabText::Crdt::Operation> MarkoffDocument::undo()
     }
     if (!resultingEdits.isEmpty()) {
         Q_EMIT contentsChanged(resultingEdits);
-        d->parsePool.schedule(toMarkdownUtf8());
+        d->parsePool.schedule(toMarkdownUtf8(), d->editSequence);
     }
 
     return op;
@@ -189,7 +190,7 @@ std::optional<CollabText::Crdt::Operation> MarkoffDocument::redo()
     }
     if (!resultingEdits.isEmpty()) {
         Q_EMIT contentsChanged(resultingEdits);
-        d->parsePool.schedule(toMarkdownUtf8());
+        d->parsePool.schedule(toMarkdownUtf8(), d->editSequence);
     }
 
     return op;
@@ -230,7 +231,7 @@ void MarkoffDocument::applyRemoteOps(
 
     if (!resultingEdits.isEmpty()) {
         Q_EMIT contentsChanged(resultingEdits);
-        d->parsePool.schedule(toMarkdownUtf8());
+        d->parsePool.schedule(toMarkdownUtf8(), d->editSequence);
     }
 }
 
@@ -273,7 +274,7 @@ void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
         break;
     }
     }
-    d->parsePool.scheduleReset(toMarkdownUtf8());
+    d->parsePool.scheduleReset(toMarkdownUtf8(), d->editSequence);
     Q_EMIT documentReloaded();
 }
 

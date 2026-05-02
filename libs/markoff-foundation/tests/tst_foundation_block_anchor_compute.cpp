@@ -18,9 +18,9 @@ private Q_SLOTS:
         doc.resetContent("a\n\nb\n\nc", Origin::TestFixture);
         QVERIFY(spy.wait(2000));
 
-        // The new signal signature is (Document*, quint64, QList<BlockAnchor>).
+        // Signal signature: (Document*, quint64 parseSeq, QList<BlockAnchor>, quint64 inputEditSeq).
         const auto &args = spy.last();
-        QCOMPARE(args.size(), 3);
+        QCOMPARE(args.size(), 4);
         const auto anchors = args.at(2).value<QList<BlockAnchor>>();
         QCOMPARE(anchors.size(), 3);
         // Each anchor's firstByte resolves to the corresponding block's

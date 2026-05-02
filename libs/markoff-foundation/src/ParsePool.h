@@ -40,11 +40,11 @@ public:
     ~ParsePool() override;
 
     /// Incremental-reparse request. Worker uses session's prior tree.
-    void schedule(QByteArray utf8);
+    void schedule(QByteArray utf8, quint64 inputEditSeq);
 
     /// Full-reset request: drops session state on the worker, then full
     /// parses `utf8`. Use for resetContent (file load, reload, revert).
-    void scheduleReset(QByteArray utf8);
+    void scheduleReset(QByteArray utf8, quint64 inputEditSeq);
 
     bool isPending() const;
 
@@ -57,7 +57,7 @@ public:
     void setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept;
 
 Q_SIGNALS:
-    void parseReady(const Markoff::Document *parsed);
+    void parseReady(const Markoff::Document *parsed, quint64 inputEditSeq);
 
 private:
     struct Private;

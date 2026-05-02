@@ -27,14 +27,14 @@ public:
 
 public Q_SLOTS:
     /// Incremental reparse against `utf8` (the new full document body).
-    void parseSnapshot(QByteArray utf8, quint64 generation);
+    void parseSnapshot(QByteArray utf8, quint64 generation, quint64 inputEditSeq);
 
     /// Drop session state and full-parse `utf8`. Used for resetContent
     /// (file load, external reload, revert-to-saved, test fixture).
-    void parseReset(QByteArray utf8, quint64 generation);
+    void parseReset(QByteArray utf8, quint64 generation, quint64 inputEditSeq);
 
 Q_SIGNALS:
-    void parsed(Markoff::Document *result, quint64 generation);
+    void parsed(Markoff::Document *result, quint64 generation, quint64 inputEditSeq);
 
 public:
     /// Bench-only opt-in tap. Set on the owner thread; read on the worker.

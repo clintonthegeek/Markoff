@@ -26,24 +26,26 @@ struct ParsePool::Private {
     bool              workerBusy = false; // a parse is currently running on the worker
     QByteArray        pending;            // latest snapshot waiting to be dispatched
     quint64           pendingGen = 0;     // generation tag for pending snapshot
+    quint64           pendingInputEditSeq = 0;  // editSequence captured at schedule time
     ParseKind         pendingKind = ParseKind::Incremental;
     Markoff::Render::RenderPhaseTaps *taps = nullptr;  // bench-only opt-in
 };
 
 namespace {
 /// Dispatch a parse to the worker, picking the slot that matches `kind`.
-void dispatch(ParsePoolWorker *worker, QByteArray utf8, quint64 gen, ParseKind kind)
+void dispatch(ParsePoolWorker *worker, QByteArray utf8, quint64 gen,
+              quint64 inputEditSeq, ParseKind kind)
 {
     if (kind == ParseKind::Reset) {
         QMetaObject::invokeMethod(worker,
-            [worker, b = std::move(utf8), gen]() mutable {
-                worker->parseReset(std::move(b), gen);
+            [worker, b = std::move(utf8), gen, inputEditSeq]() mutable {
+                worker->parseReset(std::move(b), gen, inputEditSeq);
             },
             Qt::QueuedConnection);
     } else {
         QMetaObject::invokeMethod(worker,
-            [worker, b = std::move(utf8), gen]() mutable {
-                worker->parseSnapshot(std::move(b), gen);
+            [worker, b = std::move(utf8), gen, inputEditSeq]() mutable {
+                worker->parseSnapshot(std::move(b), gen, inputEditSeq);
             },
             Qt::QueuedConnection);
     }
@@ -71,7 +73,7 @@ ParsePool::ParsePool(QObject *parent)
 
     // Results come back via QueuedConnection so the lambda runs on our thread.
     connect(d->worker, &ParsePoolWorker::parsed,
-            this, [this](Markoff::Document *parsed, quint64 gen) {
+            this, [this](Markoff::Document *parsed, quint64 gen, quint64 inputEditSeq) {
         // Bench-tap: main-thread receipt of a worker `parsed` signal. This
         // is the earliest point at which the parsed Document is observable
         // on the document's thread.
@@ -81,6 +83,7 @@ ParsePool::ParsePool(QObject *parent)
 
         QByteArray nextSnapshot;
         quint64    nextGen = 0;
+        quint64    nextInputEditSeq = 0;
         ParseKind  nextKind = ParseKind::Incremental;
         {
             QMutexLocker lk(&d->mutex);
@@ -90,18 +93,21 @@ ParsePool::ParsePool(QObject *parent)
                 parsed = nullptr;
             }
             if (!d->pending.isEmpty() || d->pendingGen != 0) {
-                nextSnapshot = std::move(d->pending);
-                nextGen      = d->pendingGen;
-                nextKind     = d->pendingKind;
+                nextSnapshot        = std::move(d->pending);
+                nextGen             = d->pendingGen;
+                nextInputEditSeq    = d->pendingInputEditSeq;
+                nextKind            = d->pendingKind;
                 d->pending.clear();
-                d->pendingGen  = 0;
-                d->pendingKind = ParseKind::Incremental;
+                d->pendingGen          = 0;
+                d->pendingInputEditSeq = 0;
+                d->pendingKind         = ParseKind::Incremental;
                 // worker stays busy
             } else {
                 d->workerBusy = false;
             }
         }
-        if (parsed) Q_EMIT parseReady(static_cast<const Markoff::Document *>(parsed));
+        if (parsed)
+            Q_EMIT parseReady(static_cast<const Markoff::Document *>(parsed), inputEditSeq);
         // Bench-tap: parseReady has returned, meaning every DirectConnection
         // slot (MarkoffDocument's lambda → parseUpdated → LiveListModelBinding's
         // model rebuild) has finished synchronously. The view is ready to
@@ -110,7 +116,7 @@ ParsePool::ParsePool(QObject *parent)
                                            std::memory_order_release);
 
         if (nextGen != 0)
-            dispatch(d->worker, std::move(nextSnapshot), nextGen, nextKind);
+            dispatch(d->worker, std::move(nextSnapshot), nextGen, nextInputEditSeq, nextKind);
     }, Qt::QueuedConnection);
 
     d->thread->start();
@@ -127,7 +133,7 @@ ParsePool::~ParsePool()
     // event-loop iteration can deliver them.
 }
 
-void ParsePool::schedule(QByteArray utf8)
+void ParsePool::schedule(QByteArray utf8, quint64 inputEditSeq)
 {
     quint64   gen;
     ParseKind kind = ParseKind::Incremental;
@@ -140,8 +146,9 @@ void ParsePool::schedule(QByteArray utf8)
             // pending — that's the coalesce). Reset kind sticks: an
             // incremental schedule does NOT downgrade a pending Reset; the
             // reset must still be honored.
-            d->pending    = std::move(utf8);
-            d->pendingGen = gen;
+            d->pending             = std::move(utf8);
+            d->pendingGen          = gen;
+            d->pendingInputEditSeq = inputEditSeq;  // overwrite-coalesce
             // pendingKind unchanged (Reset stays Reset; Incremental stays
             // Incremental).
         } else {
@@ -150,11 +157,11 @@ void ParsePool::schedule(QByteArray utf8)
         }
     }
     if (dispatchNow) {
-        dispatch(d->worker, std::move(utf8), gen, kind);
+        dispatch(d->worker, std::move(utf8), gen, inputEditSeq, kind);
     }
 }
 
-void ParsePool::scheduleReset(QByteArray utf8)
+void ParsePool::scheduleReset(QByteArray utf8, quint64 inputEditSeq)
 {
     quint64 gen;
     bool    dispatchNow = false;
@@ -163,16 +170,17 @@ void ParsePool::scheduleReset(QByteArray utf8)
         gen = ++d->generation;
         if (d->workerBusy) {
             // Reset always wins over a pending incremental update.
-            d->pending     = std::move(utf8);
-            d->pendingGen  = gen;
-            d->pendingKind = ParseKind::Reset;
+            d->pending             = std::move(utf8);
+            d->pendingGen          = gen;
+            d->pendingInputEditSeq = inputEditSeq;
+            d->pendingKind         = ParseKind::Reset;
         } else {
             d->workerBusy = true;
             dispatchNow   = true;
         }
     }
     if (dispatchNow) {
-        dispatch(d->worker, std::move(utf8), gen, ParseKind::Reset);
+        dispatch(d->worker, std::move(utf8), gen, inputEditSeq, ParseKind::Reset);
     }
 }
 

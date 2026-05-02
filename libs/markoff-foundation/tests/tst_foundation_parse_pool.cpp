@@ -38,7 +38,7 @@ private Q_SLOTS:
         ParsePool pool;
         QSignalSpy spy(&pool, &ParsePool::parseReady);
 
-        pool.scheduleReset(QByteArrayLiteral("# Initial\n\nbody"));
+        pool.scheduleReset(QByteArrayLiteral("# Initial\n\nbody"), 0);
         QVERIFY(spy.wait(2000));
         QCOMPARE(spy.count(), 1);
 
@@ -57,7 +57,7 @@ private Q_SLOTS:
 
         // Reset to one body, then incrementally update — both deliveries
         // should reflect the right source.
-        pool.scheduleReset(QByteArrayLiteral("first"));
+        pool.scheduleReset(QByteArrayLiteral("first"), 0);
         QVERIFY(spy.wait(2000));
         while (spy.wait(50)) { /* drain */ }
 
@@ -67,7 +67,7 @@ private Q_SLOTS:
         }
         spy.clear();
 
-        pool.schedule(QByteArrayLiteral("first second"));
+        pool.schedule(QByteArrayLiteral("first second"), 0);
         QVERIFY(spy.wait(2000));
         while (spy.wait(50)) { /* drain */ }
 
@@ -95,7 +95,7 @@ private Q_SLOTS:
         for (int i = 0; i < N; ++i) {
             QByteArray b("# t\n");
             for (int j = 0; j < i; ++j) b.append("x\n");
-            pool.schedule(b);
+            pool.schedule(b, 0);
         }
 
         // Wait for whatever the pool decides to deliver to settle.
