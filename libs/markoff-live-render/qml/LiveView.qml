@@ -35,6 +35,17 @@ ListView {
     // ---- Hit-test (ported from .spike/cross-block-selection/Main.qml) ----
     // Returns {blockIndex, qtPos} or null on miss.
     // blockIndex is the delegate's modelIndex; qtPos is -1 for non-text blocks.
+    //
+    // Resolution order:
+    //   1. Direct hit on a realized delegate at the click's content-Y.
+    //   2. Walk outward from cy in both directions until we find a realized
+    //      delegate, snapping to its top or bottom edge.
+    // The walk uniformly handles three cases that previously needed special
+    // branches: clicks above the first realized delegate, clicks in gaps
+    // between realized delegates (when ListView has recycled them across a
+    // tall row), and clicks below the last realized delegate (which
+    // historically returned the wrong block when ListView's contentHeight
+    // estimate omitted unrealized trailing rows — see commit history).
     function hit(mouseX, mouseY) {
         const lastIdx = root.count - 1
         if (lastIdx < 0) return null
@@ -55,25 +66,22 @@ ListView {
             return { blockIndex: item.modelIndex, qtPos: qtPos }
         }
 
-        if (cy >= root.contentHeight) {
-            const probe = root.itemAt(probeX, root.contentHeight - 1)
-            if (probe) return hitItem(probe, clampedLocalX(probe, cx), probe.height - 1)
-            return { blockIndex: lastIdx, qtPos: -1 }
-        }
-        if (cy < 0) return { blockIndex: 0, qtPos: 0 }
+        // 1. Direct hit on a realized delegate.
+        const direct = root.itemAt(probeX, cy)
+        if (direct) return hitItem(direct, clampedLocalX(direct, cx), cy - direct.y)
 
-        const item = root.itemAt(probeX, cy)
-        if (item) return hitItem(item, clampedLocalX(item, cx), cy - item.y)
-
-        // In gap between delegates: walk to find nearest border.
+        // 2. Walk outward to the nearest realized delegate. Walk radius is
+        //    generous (viewport height) so we cross trailing empty space and
+        //    multi-row delegate gaps without giving up.
+        const maxWalk = Math.max(root.height, 1024)
         let aboveItem = null, belowItem = null, aboveDy = 0, belowDy = 0
-        for (let dy = 4; dy < 64; dy += 4) {
-            if (!aboveItem) {
-                const a = root.itemAt(probeX, Math.max(0, cy - dy))
+        for (let dy = 4; dy <= maxWalk; dy += 4) {
+            if (!aboveItem && cy - dy >= 0) {
+                const a = root.itemAt(probeX, cy - dy)
                 if (a) { aboveItem = a; aboveDy = dy }
             }
-            if (!belowItem) {
-                const b = root.itemAt(probeX, Math.min(root.contentHeight - 1, cy + dy))
+            if (!belowItem && cy + dy < root.contentHeight) {
+                const b = root.itemAt(probeX, cy + dy)
                 if (b) { belowItem = b; belowDy = dy }
             }
             if (aboveItem && belowItem) break
