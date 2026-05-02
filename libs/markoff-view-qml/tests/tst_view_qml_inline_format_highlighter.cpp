@@ -234,6 +234,81 @@ private Q_SLOTS:
         QVERIFY(h.anyBold(2, 6));
     }
 
+    /// C-9: bold formatting on the first visual line of a multi-line
+    /// paragraph must NOT bleed into subsequent QTextBlocks (visual lines).
+    /// QSyntaxHighlighter::highlightBlock is invoked once per QTextBlock;
+    /// without translating predictions through currentBlock().position()
+    /// each line was getting the same setFormat(charStart, ..., fmt) call,
+    /// duplicating the styling at the same in-line offsets on every line.
+    void multiline_bold_does_not_repeat_per_visual_line() {
+        // First line has bold "**hello**" (chars 0..9 with delimiters,
+        // content 2..7). Second line is plain. The highlighter must
+        // bold chars 2..7 of LINE 1 only — chars 2..7 of LINE 2 must
+        // remain unstyled.
+        QTextDocument doc;
+        InlineFormatHighlighter h(nullptr);
+        h.setDocument(&doc);
+
+        const QString text = QStringLiteral("**hello** more\nplain second line");
+        doc.setPlainText(text);
+        h.setSource(text);
+
+        const QTextBlock first = doc.firstBlock();
+        const QTextBlock second = first.next();
+        QVERIFY(second.isValid());
+
+        // Line 1: bold expected on the inner "hello".
+        QTextCharFormat fmt0;
+        for (const auto &fr : first.layout()->formats()) {
+            if (fr.start <= 2 && 2 < fr.start + fr.length) fmt0.merge(fr.format);
+        }
+        QVERIFY(fmt0.fontWeight() >= QFont::Bold);
+
+        // Line 2: chars 2..7 must NOT be bold.
+        for (int i = 2; i < 7; ++i) {
+            QTextCharFormat fmt;
+            for (const auto &fr : second.layout()->formats()) {
+                if (fr.start <= i && i < fr.start + fr.length) fmt.merge(fr.format);
+            }
+            QVERIFY2(fmt.fontWeight() < QFont::Bold,
+                     qPrintable(QStringLiteral("line2 char %1 should not be bold").arg(i)));
+        }
+    }
+
+    /// A confirmed inline format on line 1 (parser span) must not repeat
+    /// at the same in-line offset on line 2 of the same paragraph. The
+    /// pre-fix bug: setFormat(charOffset, charLength, fmt) ran per
+    /// QTextBlock with charOffset relative to the whole-block source —
+    /// so on QTextBlock 1 (line 2) it bolded the chars at indices
+    /// [charOffset, charOffset+charLength) of LINE 2 instead of leaving
+    /// line 2 unformatted.
+    void multiline_confirmed_bold_does_not_repeat() {
+        QTextDocument doc;
+        InlineFormatHighlighter h(nullptr);
+        h.setDocument(&doc);
+
+        // Closed bold on line 1; line 2 plain. The parser confirms bold
+        // on chars 2..7 of the whole-block source. After the fix, that
+        // range only lands on line 1.
+        const QString text = QStringLiteral("**hello** rest of line one\nplain second line here");
+        doc.setPlainText(text);
+        h.setSource(text);
+
+        const QTextBlock first  = doc.firstBlock();
+        const QTextBlock second = first.next();
+        QVERIFY(second.isValid());
+
+        // Line 2 chars 2..7 must NOT be bold.
+        for (int i = 2; i < 7; ++i) {
+            QTextCharFormat fmt;
+            for (const auto &fr : second.layout()->formats()) {
+                if (fr.start <= i && i < fr.start + fr.length) fmt.merge(fr.format);
+            }
+            QVERIFY2(fmt.fontWeight() < QFont::Bold,
+                     qPrintable(QStringLiteral("line2 char %1 should not be bold").arg(i)));
+        }
+    }
+
     void speculative_code_does_not_format_nested() {
         // "**before** `inside` **after" — "inside" is confirmed code (monospace),
         // "after" is speculatively bold from the unclosed final **.

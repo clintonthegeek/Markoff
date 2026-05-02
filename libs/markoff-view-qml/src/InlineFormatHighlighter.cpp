@@ -10,7 +10,10 @@
 #include <QColor>
 #include <QFont>
 #include <QQuickTextDocument>
+#include <QTextBlock>
 #include <QTextCharFormat>
+
+#include <algorithm>
 
 namespace Markoff::View::Qml {
 
@@ -203,7 +206,25 @@ QList<InlinePrediction> InlineFormatHighlighter::currentPredictions() const
 
 void InlineFormatHighlighter::highlightBlock(const QString &text)
 {
-    Q_UNUSED(text);
+    // QSyntaxHighlighter::highlightBlock is invoked once per QTextBlock
+    // (per visual line in our multi-line paragraph delegates, since
+    // Stage C-2/C-3 made BlockRecord.text source-faithful so a paragraph
+    // with internal '\n's becomes multiple QTextBlocks). Predictions and
+    // spans are computed against whole-block source positions, so each
+    // setFormat call must be translated by the current QTextBlock's
+    // start position before the call (setFormat's `start` is relative to
+    // the QTextBlock, not the QTextDocument).
+    const int blockStart = currentBlock().position();
+    const int textLen    = static_cast<int>(text.length());
+    const int blockEnd   = blockStart + textLen;
+
+    auto applyRange = [&](int absStart, int absEnd, const QTextCharFormat &fmt) {
+        if (absEnd <= blockStart || absStart >= blockEnd) return;
+        const int localStart = std::max(0, absStart - blockStart);
+        const int localEnd   = std::min(textLen, absEnd - blockStart);
+        if (localEnd <= localStart) return;
+        setFormat(localStart, localEnd - localStart, fmt);
+    };
 
     // Apply speculative formats first so confirmed spans can overwrite them.
     // Predictions live in the projection layer (Stage 3); we consume them
@@ -211,9 +232,7 @@ void InlineFormatHighlighter::highlightBlock(const QString &text)
     // uses the internal `m_fallbackPredictions` list — same data, same
     // shape.
     for (const InlinePrediction &p : currentPredictions()) {
-        const int start  = p.charStart;
-        const int length = p.charEnd - p.charStart;
-        if (length > 0) setFormat(start, length, p.format);
+        applyRange(p.charStart, p.charEnd, p.format);
     }
 
     if (m_spans.isEmpty()) return;
@@ -261,7 +280,7 @@ void InlineFormatHighlighter::highlightBlock(const QString &text)
         }
 
         if (hasFormat)
-            setFormat(s.charOffset, s.charLength, fmt);
+            applyRange(s.charOffset, s.charOffset + s.charLength, fmt);
     }
 }
 
