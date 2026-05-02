@@ -230,6 +230,53 @@ private Q_SLOTS:
         QCOMPARE(document.toMarkdown(), QString("helloabc"));
     }
 
+    void in_flight_parse_does_not_clobber_model_text_when_stale() {
+        Markoff::MarkoffDocument document(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&document);
+        document.resetContent("hello", Markoff::Origin::FirstOpen);
+        QSignalSpy parseSpy(&document, &Markoff::MarkoffDocument::parseUpdated);
+        QVERIFY(parseSpy.wait(2000));
+
+        QTextEdit editor;
+        editor.setPlainText("hello");
+        LiveEditBinding eb;
+        eb.setBinding(&binding);
+        eb.setModelIndex(0);
+        eb.setRawTextDocument(editor.document());
+
+        // User types 'X'. Model text is "hello"; row seq stamped.
+        QTextCursor cur(editor.document());
+        cur.setPosition(5);
+        cur.insertText("X");
+        const quint64 rowSeqAfterType = binding.model()->rowEditSequence(0);
+        QVERIFY(rowSeqAfterType > 0);
+
+        // Stale parse arrives with DIFFERENT text (simulating a parser
+        // normalization the user's edit hasn't been folded into yet).
+        BlockRecord staleRec;
+        staleRec.kind        = BlockKind::Paragraph;
+        staleRec.text        = QStringLiteral("STALE-NORMALIZED-TEXT");
+        staleRec.blockAnchor = binding.model()->recordAt(0).blockAnchor;
+
+        QList<BlockKey> keys{ BlockKey{ staleRec.kind, staleRec.blockAnchor } };
+        binding.model()->applyOps(AstBlockDiff::diff(keys, keys), { staleRec },
+                                  /*parseInputEditSeq=*/rowSeqAfterType - 1);
+
+        // Stale rule: model.text PRESERVED at its pre-stale-parse value.
+        QCOMPARE(binding.model()->recordAt(0).text, QString("hello"));
+
+        // Fresh parse arrives covering the edit. Now model.text accepts.
+        BlockRecord freshRec;
+        freshRec.kind        = BlockKind::Paragraph;
+        freshRec.text        = QStringLiteral("helloX");
+        freshRec.blockAnchor = binding.model()->recordAt(0).blockAnchor;
+
+        binding.model()->applyOps(AstBlockDiff::diff(keys, keys), { freshRec },
+                                  /*parseInputEditSeq=*/rowSeqAfterType);
+        QCOMPARE(binding.model()->recordAt(0).text, QString("helloX"));
+    }
+
     void model_update_does_not_echo_back_to_apply_local_edit() {
         // Setup: a doc with one paragraph; binding wired; user has typed
         // and the row sequence is stamped at N.
