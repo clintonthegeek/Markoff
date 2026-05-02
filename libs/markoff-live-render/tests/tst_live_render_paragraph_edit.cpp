@@ -191,6 +191,49 @@ private Q_SLOTS:
         // CRDT must reflect "helloAB", not "helloBA".
         QCOMPARE(document.toMarkdown(), QString("helloAB"));
     }
+
+    void model_update_does_not_echo_back_to_apply_local_edit() {
+        // Setup: a doc with one paragraph; binding wired; user has typed
+        // and the row sequence is stamped at N.
+        Markoff::MarkoffDocument document(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&document);
+        document.resetContent("aaa", Markoff::Origin::FirstOpen);
+        QSignalSpy parseSpy(&document, &Markoff::MarkoffDocument::parseUpdated);
+        QVERIFY(parseSpy.wait(2000));
+
+        QTextEdit editor;
+        editor.setPlainText("aaa");
+        LiveEditBinding eb;
+        eb.setBinding(&binding);
+        eb.setModelIndex(0);
+        eb.setRawTextDocument(editor.document());
+
+        // Drive a real parse round-trip by causing a content change in
+        // the foundation. We need model.text TO change so dataChanged
+        // actually fires for the TextRole. Use a different content:
+        document.resetContent("bbb", Markoff::Origin::TestFixture);
+        QVERIFY(parseSpy.wait(2000));
+
+        // Now assert the principle: during dataChanged from applyOps,
+        // applyingModelUpdate is true.
+        bool flagSeenDuringUpdate = false;
+        bool dataChangedFired = false;
+        auto conn = QObject::connect(binding.model(), &QAbstractItemModel::dataChanged,
+                                      [&](){
+                                          dataChangedFired = true;
+                                          flagSeenDuringUpdate = binding.applyingModelUpdate();
+                                      });
+
+        // Force another applyOps run by changing the content again.
+        document.resetContent("ccc", Markoff::Origin::TestFixture);
+        QVERIFY(parseSpy.wait(2000));
+
+        QObject::disconnect(conn);
+        QVERIFY2(dataChangedFired, "dataChanged should have fired during applyOps");
+        QVERIFY2(flagSeenDuringUpdate,
+                 "applyingModelUpdate should be true while dataChanged fires");
+    }
 };
 
 QTEST_MAIN(TstLiveRenderParagraphEdit)
