@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls
+import org.markoff.live.render 1.0
 
 ApplicationWindow {
     id: window
-    width: 800
-    height: 600
+    width: 900
+    height: 700
     visible: true
-    title: qsTr("markoff-live-render (scaffold)")
+    title: ctxTitle + " — markoff-live-render (R2)"
 
-    Rectangle {
+    LiveListModelBinding {
+        id: modelBinding
+        document: ctxDocument
+    }
+
+    LiveView {
         anchors.fill: parent
-        color: "#fafafa"
-        Label {
-            anchors.centerIn: parent
-            text: qsTr("markoff-live-render: scaffold (R1C). Real UI lands in R2.")
-        }
+        binding: modelBinding
     }
 }

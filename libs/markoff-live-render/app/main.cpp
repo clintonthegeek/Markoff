@@ -1,14 +1,48 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QApplication>
 #include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QFile>
+#include <QFileInfo>
+#include <QRandomGenerator>
+#include <QQuickStyle>
 
-/// Test app for markoff-live-render. R1C ships a window with placeholder
-/// content. R2 onwards wires in EditorBackend, the LiveListModelBinding,
-/// and the LiveView.qml sibling of source mode.
+#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Origin.h>
+
+/// Test app for markoff-live-render R2. Loads a Markdown file and renders
+/// it read-only via LiveListModelBinding + LiveView. No editing.
+/// Usage: markoff-live-render-app <markdown-file>
 int main(int argc, char *argv[])
 {
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
     QApplication app(argc, argv);
+
+    if (argc < 2) {
+        qWarning("Usage: %s <markdown-file>", argv[0]);
+        return 1;
+    }
+
+    QFile file(argv[1]);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning("Cannot open '%s': %s", argv[1],
+                 qUtf8Printable(file.errorString()));
+        return 1;
+    }
+    const QByteArray content = file.readAll();
+
+    const quint16 replicaId =
+        static_cast<quint16>(QRandomGenerator::global()->generate() & 0xFFFF);
+    auto doc = std::make_unique<Markoff::MarkoffDocument>(replicaId);
+    doc->resetContent(content, Markoff::Origin::FirstOpen);
+
     QQmlApplicationEngine engine;
+    engine.rootContext()->setContextProperty(
+        QStringLiteral("ctxDocument"), doc.get());
+    engine.rootContext()->setContextProperty(
+        QStringLiteral("ctxTitle"),
+        QFileInfo(argv[1]).fileName());
+
     engine.loadFromModule("org.markoff.live.render.app", "Main");
     if (engine.rootObjects().isEmpty())
         return 1;

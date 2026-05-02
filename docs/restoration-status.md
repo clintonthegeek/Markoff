@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-02 (R1A + R1B complete)
+**Last updated:** 2026-05-02 (R2 complete)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,13 +11,13 @@
 
 ## TL;DR — what to do *right now*
 
-> **R1A, R1B, and R1C are complete** (110/110 fast-tier tests pass; `tst_view_qml_live_view_qml` baseline preserved at 9/3/2). R1 is done. The next session should write the **R2 plan** and begin implementation.
+> **R1 and R2 are complete** (113/113 fast-tier tests pass). R2 delivers L0 (Coordinates), L1 (read-only ListView + 5 delegates), L2 (LiveBlockModel + AstBlockDiff + LiveListModelBinding). The next session should write and execute **R3** — cursor + selection (Shape 1; LiveCursorState; BlockHitTester).
 >
-> **Recommended next:** Write the R2 plan (`docs/plans/2026-05-02-live-render-r2-*.md`) from spec §11 R2, then execute it.
+> **Recommended next:** Write the R3 plan from spec §11 R3, then execute it.
 >
 > **Read first** (in this order):
 > 1. `docs/handoff/2026-05-02-restoration-session-brief.md` — the orientation / working-protocol doc (~250 lines; one-time read per agent context).
-> 2. `docs/specs/2026-05-02-live-render-restoration-design.md` §11 R2 — the next phase's spec section.
+> 2. `docs/specs/2026-05-02-live-render-restoration-design.md` §11 R3 — the next phase's spec section.
 
 ---
 
@@ -30,7 +30,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R1A** | [r1a-parse-edit-sequence](plans/2026-05-02-live-render-r1a-parse-edit-sequence.md) | `complete` | `466121e`, `818485b` | Foundation surface: `parseUpdated` 4th arg. |
 | **R1B** | [r1b-inline-span-bake](plans/2026-05-02-live-render-r1b-inline-span-bake.md) | `complete` | `65cafdf`, `d3e6384` | Parser surface: `TopLevelBlock::inlineSpans`. |
 | **R1C** | [r1c-library-scaffold](plans/2026-05-02-live-render-r1c-library-scaffold.md) | `complete` | `48ba7d6` | New library shell: `libs/markoff-live-render`. |
-| **R2** | *not yet written* | `pending` | — | Read-only render with diff. Plan written after R1 phase acceptance. |
+| **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | see commit | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
 | **R3** | *not yet written* | `pending` | — | Cursor (Shape 1) + selection. Plan written after R2 acceptance. |
 | **R4** | *not yet written* | `pending` | — | Paragraph editing through sequence-tagged binding. |
 | **R5** | *not yet written* | `pending` | — | Structural keys + IME + undo coalescing. |
@@ -55,6 +55,9 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-02 | see commit | feat(live-render): R2 complete — read-only render with diff model |
+| 2026-05-02 | `ba0db23` | docs(plan): R2 implementation plan — read-only render with diff model |
+| 2026-05-02 | `5bc9db2` | docs(status): fix R1C commit SHA in restoration-status.md |
 | 2026-05-02 | `48ba7d6` | feat(live-render): scaffold libs/markoff-live-render (R1C complete) |
 | 2026-05-02 | `bd10576` | docs: code-only architectural audit of live render |
 | 2026-05-02 | `f6b7427` | docs(spec): live render restoration design (C-architecture, 9 layers, 10 phases) |
