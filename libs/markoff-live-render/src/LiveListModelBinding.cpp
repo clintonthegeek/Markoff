@@ -22,6 +22,7 @@ struct LiveListModelBinding::Private {
     LiveSelectionView         *selectionView = nullptr;
     QList<BlockKey>            lastKeys;
     quint64                    lastParseInputEditSeq = 0;
+    bool                       applyingModelUpdate = false;
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
@@ -72,6 +73,11 @@ BlockHitTester    *LiveListModelBinding::hitTester()     const { return d->hitTe
 LiveSelectionView *LiveListModelBinding::selectionView() const { return d->selectionView; }
 const BlockKindRegistry *LiveListModelBinding::registry() const { return &d->registry; }
 
+bool LiveListModelBinding::applyingModelUpdate() const
+{
+    return d->applyingModelUpdate;
+}
+
 void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
                                           quint64 /*parseSequence*/,
                                           const QList<Markoff::BlockAnchor> &blockAnchors,
@@ -91,7 +97,11 @@ void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
     }
 
     const QList<AstBlockDiff::Op> ops = AstBlockDiff::diff(d->lastKeys, nextKeys);
-    d->model->applyOps(ops, records);
+
+    d->applyingModelUpdate = true;
+    d->model->applyOps(ops, records, parseInputEditSequence);
+    d->applyingModelUpdate = false;
+
     d->lastKeys = std::move(nextKeys);
 }
 

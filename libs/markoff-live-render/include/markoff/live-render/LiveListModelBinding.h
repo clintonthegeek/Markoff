@@ -47,6 +47,13 @@ public:
     LiveSelectionView *selectionView() const;
     const BlockKindRegistry *registry() const;
 
+    /// True for the synchronous duration of `applyOps` while parse
+    /// arrival is mutating model rows. LiveEditBinding queries this
+    /// inside its `contentsChange` slot to suppress the synchronous
+    /// QML-binding echo. Spec §4.5 (the surviving `m_applyingModelUpdate`
+    /// guard).
+    bool applyingModelUpdate() const;
+
 Q_SIGNALS:
     void documentChanged();
 
