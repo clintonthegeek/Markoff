@@ -21,14 +21,7 @@ ListView {
     spacing: 2
     focus: true
 
-    // Scrollbar: fixes keyboard-only / pointer-only navigation gap (TODO 2026-05-02).
     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-
-    // Wire hit tester to this ListView once the component is ready.
-    Component.onCompleted: {
-        if (binding && binding.hitTester)
-            binding.hitTester.listView = root
-    }
 
     delegate: DelegateChooser {
         role: "kind"
@@ -39,13 +32,65 @@ ListView {
         DelegateChoice { roleValue: "image";      delegate: ImageDelegate      {} }
     }
 
+    // ---- Hit-test (ported from .spike/cross-block-selection/Main.qml) ----
+    // Returns {blockIndex, qtPos} or null on miss.
+    // blockIndex is the delegate's modelIndex; qtPos is -1 for non-text blocks.
+    function hit(mouseX, mouseY) {
+        const lastIdx = root.count - 1
+        if (lastIdx < 0) return null
+
+        const clampedX = Math.max(0, Math.min(mouseX, root.width - 1))
+        const clampedY = Math.max(0, Math.min(mouseY, root.height - 1))
+        const cx = clampedX + root.contentX
+        const cy = clampedY + root.contentY
+        const probeX = root.width / 2
+
+        function clampedLocalX(item, contentCx) {
+            return Math.max(0, Math.min(contentCx - item.x, item.width - 1))
+        }
+
+        function hitItem(item, localX, localY) {
+            const qtPos = (typeof item.positionAt === "function")
+                          ? item.positionAt(localX, localY) : -1
+            return { blockIndex: item.modelIndex, qtPos: qtPos }
+        }
+
+        if (cy >= root.contentHeight) {
+            const probe = root.itemAt(probeX, root.contentHeight - 1)
+            if (probe) return hitItem(probe, clampedLocalX(probe, cx), probe.height - 1)
+            return { blockIndex: lastIdx, qtPos: -1 }
+        }
+        if (cy < 0) return { blockIndex: 0, qtPos: 0 }
+
+        const item = root.itemAt(probeX, cy)
+        if (item) return hitItem(item, clampedLocalX(item, cx), cy - item.y)
+
+        // In gap between delegates: walk to find nearest border.
+        let aboveItem = null, belowItem = null, aboveDy = 0, belowDy = 0
+        for (let dy = 4; dy < 64; dy += 4) {
+            if (!aboveItem) {
+                const a = root.itemAt(probeX, Math.max(0, cy - dy))
+                if (a) { aboveItem = a; aboveDy = dy }
+            }
+            if (!belowItem) {
+                const b = root.itemAt(probeX, Math.min(root.contentHeight - 1, cy + dy))
+                if (b) { belowItem = b; belowDy = dy }
+            }
+            if (aboveItem && belowItem) break
+        }
+        if (aboveItem && (!belowItem || aboveDy <= belowDy))
+            return hitItem(aboveItem, clampedLocalX(aboveItem, cx), aboveItem.height - 1)
+        if (belowItem)
+            return hitItem(belowItem, clampedLocalX(belowItem, cx), 0)
+        return null
+    }
+
     // ---- Keyboard: Ctrl-C copy ----
     Keys.onPressed: (event) => {
         if (!binding) { event.accepted = false; return }
         if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C) {
             const sv = binding.selectionView
             if (sv && sv.hasSelection) {
-                // Collect block texts from instantiated delegates.
                 const texts = []
                 for (let i = 0; i < root.count; ++i) {
                     const it = root.itemAtIndex(i)
@@ -71,8 +116,8 @@ ListView {
 
         onPressed: (mouse) => {
             root.forceActiveFocus()
-            if (!binding || !binding.hitTester || !binding.selectionView) return
-            const r = binding.hitTester.hit(mouse.x, mouse.y, root.width)
+            if (!binding || !binding.selectionView) return
+            const r = root.hit(mouse.x, mouse.y)
             mouseArea._pressResult = r
             if (!r || r.blockIndex < 0) {
                 binding.selectionView.clear()
@@ -82,23 +127,22 @@ ListView {
         }
 
         onPositionChanged: (mouse) => {
-            if (!pressed || !binding || !binding.hitTester || !binding.selectionView) return
-            const r = binding.hitTester.hit(mouse.x, mouse.y, root.width)
+            if (!pressed || !binding || !binding.selectionView) return
+            const r = root.hit(mouse.x, mouse.y)
             if (r && r.blockIndex >= 0)
                 binding.selectionView.extend(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
         }
 
         onReleased: (mouse) => {
-            // On a click (no drag), collapse selection to caret.
             const press = mouseArea._pressResult
             mouseArea._pressResult = null
             if (!press || press.blockIndex < 0 || !binding || !binding.selectionView) return
-            const r = binding.hitTester.hit(mouse.x, mouse.y, root.width)
+            const r = root.hit(mouse.x, mouse.y)
             if (!r || r.blockIndex < 0) return
             const sameBlock = (r.blockIndex === press.blockIndex)
             const smallDrift = Math.abs((r.qtPos || 0) - (press.qtPos || 0)) <= 2
             if (sameBlock && smallDrift) {
-                // Treat as a simple click: clear selection (leave cursor via selectionView.begin).
+                // Simple click: reset to caret (no drag selection).
                 binding.selectionView.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
             }
         }

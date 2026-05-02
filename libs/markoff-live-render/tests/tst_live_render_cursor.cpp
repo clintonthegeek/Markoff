@@ -29,42 +29,8 @@ static BlockKey keyOf(const BlockRecord &r)
     return BlockKey{ r.kind, r.blockAnchor };
 }
 
-// ---- BlockHitTester mock helpers (file-scope; Q_OBJECT requires top-level) ----
-
-class MockItem : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(double x      MEMBER m_x      CONSTANT)
-    Q_PROPERTY(double y      MEMBER m_y      CONSTANT)
-    Q_PROPERTY(double width  MEMBER m_width  CONSTANT)
-    Q_PROPERTY(double height MEMBER m_height CONSTANT)
-    Q_PROPERTY(int    modelIndex MEMBER m_modelIndex CONSTANT)
-public:
-    double m_x = 0, m_y = 0, m_width = 600, m_height = 24;
-    int    m_modelIndex = 0;
-    int    m_positionAtResult = 5;
-    Q_INVOKABLE int positionAt(double, double) { return m_positionAtResult; }
-};
-
-class MockListView : public QObject {
-    Q_OBJECT
-    Q_PROPERTY(int    count         MEMBER m_count         CONSTANT)
-    Q_PROPERTY(double contentX      MEMBER m_contentX      CONSTANT)
-    Q_PROPERTY(double contentY      MEMBER m_contentY      CONSTANT)
-    Q_PROPERTY(double contentHeight MEMBER m_contentHeight CONSTANT)
-    Q_PROPERTY(double width         MEMBER m_width         CONSTANT)
-    Q_PROPERTY(double height        MEMBER m_height        CONSTANT)
-public:
-    int    m_count        = 1;
-    double m_contentX     = 0, m_contentY = 0, m_contentHeight = 24;
-    double m_width        = 600, m_height = 600;
-    MockItem *m_item      = nullptr;
-
-    Q_INVOKABLE QObject* itemAt(double /*cx*/, double cy) {
-        if (!m_item) return nullptr;
-        return (cy >= m_item->m_y && cy < m_item->m_y + m_item->m_height)
-               ? m_item : nullptr;
-    }
-};
+// No mock ListView needed — the hit-test math lives in LiveView.qml (JS),
+// so BlockHitTester is just a reportHit relay. Its tests verify that relay.
 
 // ---- Test class ----
 
@@ -199,58 +165,24 @@ private Q_SLOTS:
     }
 
     // ---- BlockHitTester tests ----
+    // The hit-test math lives in LiveView.qml (JS). BlockHitTester is a
+    // simple relay: QML calls reportHit(), C++ emits hitReported().
 
-    void hit_tester_direct_hit_returns_block_and_offset() {
-        MockItem item;
-        item.m_y = 0; item.m_height = 24;
-        item.m_modelIndex = 0;
-        item.m_positionAtResult = 7;
-
-        MockListView lv;
-        lv.m_item = &item;
-        lv.m_contentHeight = 24;
-
+    void hit_tester_report_hit_emits_signal() {
         BlockHitTester ht;
-        ht.setListView(&lv);
-
-        const QVariantMap r = ht.hit(100, 12, 600);
-        QVERIFY(r.value(QStringLiteral("blockIndex"), -1).toInt() >= 0);
-        QCOMPARE(r.value(QStringLiteral("blockIndex")).toInt(), 0);
-        QCOMPARE(r.value(QStringLiteral("qtPos")).toInt(), 7);
+        QSignalSpy spy(&ht, &BlockHitTester::hitReported);
+        ht.reportHit(3, 12);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.at(0).at(0).toInt(), 3);
+        QCOMPARE(spy.at(0).at(1).toInt(), 12);
+        QCOMPARE(ht.lastBlockIndex(), 3);
+        QCOMPARE(ht.lastQtPos(), 12);
     }
 
-    void hit_tester_below_content_snaps_to_last_block() {
-        MockItem item;
-        item.m_y = 0; item.m_height = 24;
-        item.m_modelIndex = 0;
-        item.m_positionAtResult = 3;
-
-        MockListView lv;
-        lv.m_item = &item;
-        lv.m_contentHeight = 24;
-
+    void hit_tester_starts_with_miss() {
         BlockHitTester ht;
-        ht.setListView(&lv);
-
-        const QVariantMap r = ht.hit(100, 500, 600);
-        QVERIFY(r.value(QStringLiteral("blockIndex"), -1).toInt() >= 0);
-    }
-
-    void hit_tester_no_listview_returns_miss() {
-        BlockHitTester ht;
-        const QVariantMap r = ht.hit(100, 100, 600);
-        QCOMPARE(r.value(QStringLiteral("blockIndex"), -1).toInt(), -1);
-    }
-
-    void hit_tester_empty_model_returns_miss() {
-        MockListView lv;
-        lv.m_count = 0;
-
-        BlockHitTester ht;
-        ht.setListView(&lv);
-
-        const QVariantMap r = ht.hit(100, 100, 600);
-        QCOMPARE(r.value(QStringLiteral("blockIndex"), -1).toInt(), -1);
+        QCOMPARE(ht.lastBlockIndex(), -1);
+        QCOMPARE(ht.lastQtPos(), -1);
     }
 };
 
