@@ -25,6 +25,7 @@ Rectangle {
         font.pixelSize: 13
         color: palette.text
         selectByMouse: false
+        persistentSelection: true
 
         SyntaxHighlighter {
             textEdit: model.codeLanguage.length > 0 ? edit : null

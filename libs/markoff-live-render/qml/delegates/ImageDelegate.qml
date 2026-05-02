@@ -22,6 +22,7 @@ Item {
         font.pixelSize: 13
         color: palette.placeholderText
         selectByMouse: false
+        persistentSelection: true
 
         function applySelection() {
             const sv = ListView.view && ListView.view.binding

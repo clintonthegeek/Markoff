@@ -28,6 +28,7 @@ Item {
         font.bold: model.headingLevel <= 3
         color: palette.text
         selectByMouse: false
+        persistentSelection: true
 
         function applySelection() {
             const sv = ListView.view && ListView.view.binding
