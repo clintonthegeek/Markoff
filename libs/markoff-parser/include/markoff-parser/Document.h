@@ -8,6 +8,7 @@
 #include <QString>
 #include <QList>
 #include <QVariant>
+#include <markoff-parser/SourceSpan.h>
 #include <markoff-parser/YamlValue.h>
 
 namespace Markoff {
@@ -125,6 +126,18 @@ struct TopLevelBlock {
     /// v1 leaves this false; consumers re-walk via buildSpanMap()
     /// for fine-grained inline info.
     bool hasInlineContent = false;
+
+    /// Inline structural spans (bold, italic, code, link, etc.) within
+    /// this block's source range. Offsets are *block-relative*:
+    ///   - `utf8Offset` is in [0, byteEnd - byteStart)
+    ///   - `charOffset` is in [0, block-char-length)
+    ///   - `parentCharStart` / `parentCharEnd`, when non-`-1`, are
+    ///     also block-relative.
+    /// Empty for blocks whose kind has no inline content (FencedCodeBlock,
+    /// ThematicBreak, etc.). Populated by TreeSitterParser::buildDocumentQueries.
+    /// Consumers (e.g. InlineFormatHighlighter) use these directly without
+    /// re-parsing — see restoration spec §11 R1B.
+    QList<SourceSpan> inlineSpans;
 };
 
 /// Result of walking a parsed tree to extract structured queries. Defined
