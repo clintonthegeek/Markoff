@@ -71,32 +71,13 @@ Item {
             }
         }
         function onHoleCreated(viewRow) {
-            // Two reasons we MUST defer + verify here:
-            //   (1) onHoleCreated runs synchronously inside the keyPressEvent
-            //       that triggered the hole; ListView has not yet incubated
-            //       the new delegate, so itemAtIndex(viewRow) returns the
-            //       previously-incubated delegate at that visual position
-            //       (the paragraph that was at viewRow before the insert).
-            //       Calling focusAtStart on that wrong delegate lands the
-            //       user's next keystroke at the start of the WRONG row.
-            //       (Dogfood-surfaced: "t at start of next paragraph".)
-            //   (2) After callLater fires, verify item.isHole === true so
-            //       a stale item from before the insert never receives
-            //       focus.
-            // Mirrors the empty-doc m_firstInsertPending pattern's two
-            // levels of Qt.callLater.
-            let attempts = 0
-            function tryFocus() {
-                attempts++
-                const item = listView.itemAtIndex(viewRow)
-                if (item && item.isHole === true
-                    && typeof item.focusAtStart === "function") {
-                    item.focusAtStart()
-                    return
-                }
-                if (attempts < 10) Qt.callLater(tryFocus)
-            }
-            Qt.callLater(function() { Qt.callLater(tryFocus) })
+            // Route through binding.requestFocusOnRowInserted so the model's
+            // rowsInserted signal gates focus delivery. insertHoleRow fires
+            // rowsInserted synchronously, so for the hole case the gate
+            // resolves immediately; the QML retry loop below still handles
+            // the lag between model-row existing and ListView delegate
+            // incubation.
+            binding.requestFocusOnRowInserted(viewRow, 0)
         }
         function onHoleDropped(prevViewRow) {
             const targetRow = prevViewRow - 1
@@ -108,19 +89,38 @@ Item {
 
     // Mid-block Enter focus routing. The structural-key handler emits this
     // signal after applying the "\n\n" split edit; the new "second half"
-    // row appears at `viewRow` once the parse returns. Mirrors the
-    // holeReified pattern (two Qt.callLater + bounded retry) since the
-    // delegate may not be incubated yet when the signal fires.
+    // row only appears at `viewRow` once the async parse returns and the
+    // model's applyOps fires rowsInserted. Route through binding's
+    // rowsInserted gate so we don't focus the WRONG delegate (the one
+    // that was at viewRow in the OLD model state) — that was the
+    // dogfood-surfaced off-by-one ("caret moves to start of the next
+    // paragraph instead of the new split half").
     Connections {
         target: structuralKeys
         function onFocusAfterStructuralEdit(viewRow, qtPos) {
+            binding.requestFocusOnRowInserted(viewRow, qtPos)
+        }
+    }
+
+    // Unified focus delivery: once binding confirms the row exists in the
+    // model, retry-on-callLater until ListView has incubated the delegate.
+    Connections {
+        target: binding
+        function onFocusRowReady(viewRow, qtPos) {
             let attempts = 0
             function tryFocus() {
                 attempts++
                 const item = listView.itemAtIndex(viewRow)
-                if (item && typeof item.focusAtPos === "function") {
-                    item.focusAtPos(qtPos)
-                    return
+                if (item) {
+                    if (qtPos === 0 && item.isHole === true
+                        && typeof item.focusAtStart === "function") {
+                        item.focusAtStart()
+                        return
+                    }
+                    if (typeof item.focusAtPos === "function") {
+                        item.focusAtPos(qtPos)
+                        return
+                    }
                 }
                 if (attempts < 10) Qt.callLater(tryFocus)
             }

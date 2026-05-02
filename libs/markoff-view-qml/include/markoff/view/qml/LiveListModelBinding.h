@@ -48,9 +48,20 @@ public:
     Q_INVOKABLE bool isFocusRestoreTarget(const Markoff::BlockAnchor &anchor) const;
     Q_INVOKABLE void setRowComposing(int row, bool composing);
 
+    /// Schedule focus on `viewRow` at `qtPos` once the model's row count
+    /// reaches that row via `rowsInserted`. Used by both the projection-
+    /// layer hole-creation flow and the structural-key mid-block split
+    /// flow, gating focus routing on the parse-back's model update so we
+    /// don't race ListView incubation in the OLD model state.
+    Q_INVOKABLE void requestFocusOnRowInserted(int viewRow, int qtPos);
+
 Q_SIGNALS:
     void editorBackendChanged();
     void focusRestoreRequested(const Markoff::BlockAnchor &anchor, int qtPos);
+    /// Fired once the model has incubated `viewRow`. QML side then waits
+    /// for ListView delegate incubation (a few callLater ticks) before
+    /// actually focusing.
+    void focusRowReady(int viewRow, int qtPos);
 
 private:
     void onParseUpdatedAt(const Markoff::Document *parsed,

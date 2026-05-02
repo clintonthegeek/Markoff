@@ -293,6 +293,100 @@ private Q_SLOTS:
             QStringLiteral("beta!!!"));
         QCOMPARE(model->rowCount(), 2);
     }
+
+    /// requestFocusOnRowInserted defers focusRowReady until the model has
+    /// actually inserted the requested row. This is the C-8 fix: the
+    /// previous direct-itemAtIndex path raced ListView delegates in the
+    /// OLD model state and focused the wrong row.
+    void request_focus_waits_for_rows_inserted() {
+        Markoff::MarkoffDocument doc(1);
+        EditorBackend be;
+        be.setDocument(&doc);
+        LiveListModelBinding binding;
+        binding.setEditorBackend(&be);
+
+        // Empty model initially.
+        QCOMPARE(binding.model()->rowCount(), 0);
+
+        QSignalSpy readySpy(&binding, &LiveListModelBinding::focusRowReady);
+
+        // Request focus on row 1 (does not yet exist).
+        binding.requestFocusOnRowInserted(1, 5);
+
+        // Must NOT fire yet — the row doesn't exist.
+        QCOMPARE(readySpy.count(), 0);
+
+        // Apply a doc edit that yields >=2 rows.
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("# Title\n\npara\n");
+        doc.applyLocalEdit({ ed });
+
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+        QTRY_VERIFY(readySpy.count() >= 1);
+
+        const auto args = readySpy.first();
+        QCOMPARE(args[0].toInt(), 1);
+        QCOMPARE(args[1].toInt(), 5);
+    }
+
+    /// If the requested row already exists when requestFocusOnRowInserted
+    /// is called, fire focusRowReady immediately (synchronous path).
+    void request_focus_fires_immediately_if_row_exists() {
+        Markoff::MarkoffDocument doc(1);
+        EditorBackend be;
+        be.setDocument(&doc);
+        LiveListModelBinding binding;
+        binding.setEditorBackend(&be);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("# Title\n\npara\n");
+        doc.applyLocalEdit({ ed });
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+
+        QSignalSpy readySpy(&binding, &LiveListModelBinding::focusRowReady);
+        binding.requestFocusOnRowInserted(0, 3);
+
+        QCOMPARE(readySpy.count(), 1);
+        QCOMPARE(readySpy.first()[0].toInt(), 0);
+        QCOMPARE(readySpy.first()[1].toInt(), 3);
+    }
+
+    /// A second requestFocusOnRowInserted cancels the prior pending one.
+    void request_focus_replaces_prior_pending() {
+        Markoff::MarkoffDocument doc(1);
+        EditorBackend be;
+        be.setDocument(&doc);
+        LiveListModelBinding binding;
+        binding.setEditorBackend(&be);
+
+        QSignalSpy readySpy(&binding, &LiveListModelBinding::focusRowReady);
+
+        // Both rows do not yet exist.
+        binding.requestFocusOnRowInserted(0, 1);
+        binding.requestFocusOnRowInserted(1, 9);
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 0; ed.oldEnd = 0;
+        ed.newText = QByteArrayLiteral("# Title\n\npara\n");
+        doc.applyLocalEdit({ ed });
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+
+        // Spin briefly to let any pending emissions occur.
+        QTRY_VERIFY(readySpy.count() >= 1);
+
+        // Only the latest request should have fired.
+        bool sawSecond = false;
+        for (const auto &call : readySpy) {
+            if (call[0].toInt() == 1 && call[1].toInt() == 9) sawSecond = true;
+            // The first request (row 0) should not have fired since it
+            // was cancelled by the second call before any rows existed.
+            QVERIFY2(!(call[0].toInt() == 0 && call[1].toInt() == 1),
+                     "cancelled first request should not have fired");
+        }
+        QVERIFY(sawSecond);
+    }
 };
 
 QTEST_MAIN(TstLiveListModelBinding)

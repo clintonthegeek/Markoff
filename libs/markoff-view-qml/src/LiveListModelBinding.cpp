@@ -28,6 +28,9 @@ struct LiveListModelBinding::Private {
 
     /// The parse sequence number from the last accepted parse result.
     quint64 lastParseSequence{0};
+
+    /// One-shot rowsInserted listener, used by requestFocusOnRowInserted.
+    QMetaObject::Connection pendingFocusConn;
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
@@ -210,6 +213,34 @@ bool LiveListModelBinding::isFocusRestoreTarget(const Markoff::BlockAnchor &anch
 void LiveListModelBinding::setRowComposing(int row, bool composing)
 {
     d->model->setComposingRow(row, composing);
+}
+
+void LiveListModelBinding::requestFocusOnRowInserted(int viewRow, int qtPos)
+{
+    // Cancel any prior pending request — the latest caller wins.
+    if (d->pendingFocusConn) {
+        QObject::disconnect(d->pendingFocusConn);
+        d->pendingFocusConn = QMetaObject::Connection();
+    }
+
+    if (!d->model) return;
+
+    // If the row already exists in the model (synchronous insertHoleRow
+    // path, or a stale request that arrived after the parse completed),
+    // fire immediately.
+    if (viewRow < d->model->rowCount()) {
+        Q_EMIT focusRowReady(viewRow, qtPos);
+        return;
+    }
+
+    d->pendingFocusConn = QObject::connect(
+        d->model, &QAbstractItemModel::rowsInserted, this,
+        [this, viewRow, qtPos](const QModelIndex &, int first, int last) {
+            if (viewRow < first || viewRow > last) return;
+            QObject::disconnect(d->pendingFocusConn);
+            d->pendingFocusConn = QMetaObject::Connection();
+            Q_EMIT focusRowReady(viewRow, qtPos);
+        });
 }
 
 }  // namespace Markoff::View::Qml
