@@ -10,6 +10,8 @@
 #include <QList>
 #include <qqmlintegration.h>
 
+#include <limits>
+
 namespace Markoff::LiveRender {
 
 /// `QAbstractListModel` over a list of `BlockRecord`s driven by
@@ -40,9 +42,19 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    /// Apply a diff op sequence relative to `nextRecords`.
+    /// Apply a diff op sequence relative to `nextRecords`, applying the
+    /// R4 freshness rule (spec §4.3): for each Equal op, the row's
+    /// text-role update is gated on
+    ///     row.rowEditSequence(row) <= parseInputEditSeq
+    /// Stale rows preserve their existing model text but still receive
+    /// non-text role updates (kind / headingLevel / codeLanguage /
+    /// blockAnchor / inlineSpans). Insert / Delete ops are unconditional.
+    ///
+    /// `parseInputEditSeq` defaults to `std::numeric_limits<quint64>::max()`,
+    /// which means "all rows fresh" — preserves the R2/R3 callsite shape.
     void applyOps(const QList<AstBlockDiff::Op> &ops,
-                  const QList<BlockRecord> &nextRecords);
+                  const QList<BlockRecord> &nextRecords,
+                  quint64 parseInputEditSeq = std::numeric_limits<quint64>::max());
 
     const BlockRecord &recordAt(int row) const { return m_rows.at(row); }
 

@@ -147,6 +147,86 @@ private Q_SLOTS:
         m.setRowEditSequence(0, quint64(42));
         QCOMPARE(m.rowEditSequence(0), quint64(42));
     }
+
+    void equal_op_with_stale_row_preserves_model_text() {
+        // The R4 freshness rule: when a row's lastEditEditSequence is GREATER
+        // than the incoming parse's parseInputEditSequence, the parse arrived
+        // with stale input for that row. The text-role update must NOT be
+        // applied — the CRDT is canonical for those bytes; the existing model
+        // text reflects post-edit state and must be preserved.
+        LiveBlockModel model;
+        const auto firstRecs = QList<BlockRecord>{
+            makeRecord(BlockKind::Paragraph, "hello"),
+            makeRecord(BlockKind::Paragraph, "world"),
+        };
+        QList<BlockKey> firstKeys; for (const auto &r : firstRecs) firstKeys << keyOf(r);
+        model.applyOps(AstBlockDiff::diff({}, firstKeys), firstRecs);
+        QCOMPARE(model.rowCount(), 2);
+
+        // Simulate a local edit on row 0: stamp its sequence at 5.
+        model.setRowEditSequence(0, 5);
+        // Row 1 is untouched: stays at 0.
+
+        // Now parse arrives with parseInputEditSeq=3 (i.e. captured BEFORE
+        // the row-0 edit at seq 5). Records have NEW text on row 0 (the
+        // pre-edit text) and matching text on row 1.
+        const auto secondRecs = QList<BlockRecord>{
+            makeRecord(BlockKind::Paragraph, "hello-PRE-EDIT"),  // stale
+            makeRecord(BlockKind::Paragraph, "world"),            // fresh (no local edit)
+        };
+        QList<BlockKey> secondKeys; for (const auto &r : secondRecs) secondKeys << keyOf(r);
+        // BlockKey only includes (kind, anchor); for this synthesised test
+        // anchors are default-constructed and equal across both lists -> Equal ops.
+        const auto ops = AstBlockDiff::diff(firstKeys, secondKeys);
+
+        const quint64 parseInputEditSeq = 3;
+        model.applyOps(ops, secondRecs, parseInputEditSeq);
+
+        // Stale row: original text retained.
+        QCOMPARE(model.recordAt(0).text, QString("hello"));
+        // Fresh row: text updated as normal.
+        QCOMPARE(model.recordAt(1).text, QString("world"));
+    }
+
+    void equal_op_with_stale_row_still_updates_non_text_fields() {
+        LiveBlockModel model;
+        const auto firstRecs = QList<BlockRecord>{
+            makeRecord(BlockKind::Heading, "Title", /*headingLevel=*/2),
+        };
+        QList<BlockKey> firstKeys; firstKeys << keyOf(firstRecs[0]);
+        model.applyOps(AstBlockDiff::diff({}, firstKeys), firstRecs);
+
+        model.setRowEditSequence(0, 10);
+
+        // Same kind+anchor so the diff is Equal; level changes 2 -> 3.
+        const auto secondRecs = QList<BlockRecord>{
+            makeRecord(BlockKind::Heading, "STALE TEXT", /*headingLevel=*/3),
+        };
+        QList<BlockKey> secondKeys; secondKeys << keyOf(secondRecs[0]);
+        model.applyOps(AstBlockDiff::diff(firstKeys, secondKeys), secondRecs,
+                       /*parseInputEditSeq=*/5);  // stale (5 < 10)
+
+        // Stale: text preserved.
+        QCOMPARE(model.recordAt(0).text, QString("Title"));
+        // Non-text: applied even when stale (block-shape is parser-authoritative).
+        QCOMPARE(model.recordAt(0).headingLevel, 3);
+    }
+
+    void equal_op_with_default_parse_seq_treats_all_rows_fresh() {
+        // Backwards compatibility: existing R2/R3 callsites use the 2-arg
+        // overload; default treats every row as fresh.
+        LiveBlockModel model;
+        const auto firstRecs = QList<BlockRecord>{ makeRecord(BlockKind::Paragraph, "a") };
+        QList<BlockKey> firstKeys; firstKeys << keyOf(firstRecs[0]);
+        model.applyOps(AstBlockDiff::diff({}, firstKeys), firstRecs);
+        model.setRowEditSequence(0, 999);
+
+        const auto secondRecs = QList<BlockRecord>{ makeRecord(BlockKind::Paragraph, "b") };
+        QList<BlockKey> secondKeys; secondKeys << keyOf(secondRecs[0]);
+        model.applyOps(AstBlockDiff::diff(firstKeys, secondKeys), secondRecs);
+        // No third arg -> default UINT64_MAX -> 999 <= MAX -> fresh -> "b".
+        QCOMPARE(model.recordAt(0).text, QString("b"));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstLiveRenderBlockModel)

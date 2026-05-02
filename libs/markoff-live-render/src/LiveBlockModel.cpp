@@ -44,15 +44,22 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
 }
 
 void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
-                              const QList<BlockRecord> &nextRecords)
+                              const QList<BlockRecord> &nextRecords,
+                              quint64 parseInputEditSeq)
 {
     int row = 0;
     for (const auto &op : ops) {
         switch (op.kind) {
             case AstBlockDiff::OpKind::Equal: {
                 const BlockRecord &next = nextRecords[op.nextIndex];
-                if (m_rows[row] != next) {
-                    m_rows[row] = next;
+                BlockRecord merged = next;
+                const bool fresh = (m_rowEditSequences[row] <= parseInputEditSeq);
+                if (!fresh) {
+                    // Stale: keep our text; accept everything else from parse.
+                    merged.text = m_rows[row].text;
+                }
+                if (m_rows[row] != merged) {
+                    m_rows[row] = merged;
                     Q_EMIT dataChanged(index(row), index(row));
                 }
                 ++row;
