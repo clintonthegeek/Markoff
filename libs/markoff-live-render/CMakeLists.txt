@@ -43,6 +43,9 @@ qt_add_qml_module(markoff_live_render
         src/LiveCursorState.cpp
         src/BlockHitTester.cpp
         src/LiveSelectionView.cpp
+        # R4: per-delegate edit binding
+        include/markoff/live-render/LiveEditBinding.h
+        src/LiveEditBinding.cpp
     QML_FILES
         qml/LiveView.qml
         qml/delegates/ParagraphDelegate.qml
