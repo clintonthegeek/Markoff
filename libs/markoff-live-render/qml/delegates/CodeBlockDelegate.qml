@@ -26,9 +26,11 @@ Rectangle {
         font.pixelSize: 13
         color: palette.text
 
+        // Only attach when a language is declared; with no language the
+        // default text color renders correctly against the tinted background.
         SyntaxHighlighter {
-            textEdit: edit
-            definition: model.codeLanguage.length > 0 ? model.codeLanguage : "None"
+            textEdit: model.codeLanguage.length > 0 ? edit : null
+            definition: model.codeLanguage
         }
     }
 }
