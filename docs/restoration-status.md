@@ -28,7 +28,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | Phase | Plan | Status | Commits | Notes |
 |---|---|---|---|---|
 | **R1A** | [r1a-parse-edit-sequence](plans/2026-05-02-live-render-r1a-parse-edit-sequence.md) | `complete` | `466121e`, `818485b` | Foundation surface: `parseUpdated` 4th arg. |
-| **R1B** | [r1b-inline-span-bake](plans/2026-05-02-live-render-r1b-inline-span-bake.md) | `complete` | `65cafdf`, `<impl>` | Parser surface: `TopLevelBlock::inlineSpans`. |
+| **R1B** | [r1b-inline-span-bake](plans/2026-05-02-live-render-r1b-inline-span-bake.md) | `complete` | `65cafdf`, `d3e6384` | Parser surface: `TopLevelBlock::inlineSpans`. |
 | **R1C** | [r1c-library-scaffold](plans/2026-05-02-live-render-r1c-library-scaffold.md) | `pending` | — | New library shell: `libs/markoff-live-render`. |
 | **R2** | *not yet written* | `pending` | — | Read-only render with diff. Plan written after R1 phase acceptance. |
 | **R3** | *not yet written* | `pending` | — | Cursor (Shape 1) + selection. Plan written after R2 acceptance. |
@@ -62,7 +62,7 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 | 2026-05-02 | `466121e` | test(foundation): parseUpdated carries parseInputEditSequence (failing — TDD cycle) |
 | 2026-05-02 | `818485b` | feat(foundation): parseUpdated carries parseInputEditSequence (R1A complete) |
 | 2026-05-02 | `65cafdf` | test(parser): TopLevelBlock::inlineSpans bake (failing — TDD cycle) |
-| 2026-05-02 | `<impl>` | feat(parser): bake per-block inline spans into TopLevelBlock (R1B complete) |
+| 2026-05-02 | `d3e6384` | feat(parser): bake per-block inline spans into TopLevelBlock (R1B complete) |
 
 ---
 
