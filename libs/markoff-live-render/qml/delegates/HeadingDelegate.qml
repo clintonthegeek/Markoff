@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls
+import org.markoff.live.render 1.0
 
+/// Editable heading delegate. R3 surfaces (selection highlight, blockText)
+/// retained; R4 adds LiveEditBinding so contentsChange routes to the CRDT.
 Item {
     id: root
     width: ListView.view ? ListView.view.width : 600
@@ -10,18 +13,25 @@ Item {
     property int modelIndex: index
     readonly property string blockText: model.text
 
-    // ListView.view attached property only resolves on the delegate ROOT;
-    // children must access via `root.selectionView`.
+    readonly property var liveBinding:
+        ListView.view ? ListView.view.binding : null
     readonly property var selectionView:
-        ListView.view && ListView.view.binding
-            ? ListView.view.binding.selectionView : null
+        liveBinding ? liveBinding.selectionView : null
+
+    LiveEditBinding {
+        id: editBinding
+        binding: root.liveBinding
+        modelIndex: root.modelIndex
+        textDocument: edit.textDocument
+        composing: edit.inputMethodComposing
+    }
 
     TextEdit {
         id: edit
         anchors.fill: parent
         leftPadding: 8; rightPadding: 8
         topPadding: 6; bottomPadding: 2
-        readOnly: true
+        readOnly: false
         textFormat: TextEdit.PlainText
         text: model.text
         wrapMode: TextEdit.Wrap
@@ -33,7 +43,7 @@ Item {
         }
         font.bold: model.headingLevel <= 3
         color: palette.text
-        selectByMouse: false
+        selectByMouse: true
         persistentSelection: true
 
         function applySelection() {
