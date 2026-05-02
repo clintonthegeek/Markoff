@@ -10,7 +10,10 @@ Item {
     height: 17
 
     property int modelIndex: index
-    readonly property string blockText: ""  // non-text; contributes nothing to copy
+    // Source-faithful copy: the HR's raw markdown ("---", "***", etc.) so a
+    // selection spanning paragraphs and HRs round-trips intact. Matches the
+    // spec's serializeForCopy() intent (§6) and the other block delegates.
+    readonly property string blockText: model.text
 
     // Focused when cursorKind == "BlockSelected" and block matches.
     // We compare by modelIndex since we can't inspect BlockAnchor from QML.
