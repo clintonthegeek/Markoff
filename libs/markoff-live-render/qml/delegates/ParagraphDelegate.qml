@@ -11,10 +11,16 @@ Item {
     width: ListView.view ? ListView.view.width : 600
     implicitHeight: edit.implicitHeight
 
-    // Expose index as a real Q_PROPERTY-accessible value (context var "index"
-    // is not readable from C++ via QObject::property).
     property int modelIndex: index
     readonly property string blockText: model.text
+
+    // ListView.view attached property only resolves on the delegate ROOT item;
+    // accessing it from inside child items (e.g. a Connections inside the
+    // TextEdit) yields undefined. Surface the selectionView here so children
+    // can reference it through `root.selectionView`.
+    readonly property var selectionView:
+        ListView.view && ListView.view.binding
+            ? ListView.view.binding.selectionView : null
 
     TextEdit {
         id: edit
@@ -31,8 +37,7 @@ Item {
         persistentSelection: true
 
         function applySelection() {
-            const sv = ListView.view && ListView.view.binding
-                       ? ListView.view.binding.selectionView : null
+            const sv = root.selectionView
             if (!sv) { deselect(); return }
             const r = sv.rangeForBlock(model.index)
             if (!r || r.x < 0) { deselect(); return }
@@ -40,12 +45,10 @@ Item {
         }
 
         Connections {
-            target: ListView.view && ListView.view.binding
-                    ? ListView.view.binding.selectionView : null
+            target: root.selectionView
             function onSelectionChanged() { edit.applySelection() }
         }
     }
 
-    // positionAt forwarded from root item so BlockHitTester can call it via invokeMethod.
     function positionAt(x, y) { return edit.positionAt(x - edit.leftPadding, y - edit.topPadding) }
 }

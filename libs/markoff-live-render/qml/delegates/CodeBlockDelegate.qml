@@ -13,6 +13,12 @@ Rectangle {
     property int modelIndex: index
     readonly property string blockText: model.text
 
+    // ListView.view attached property only resolves on the delegate ROOT;
+    // children must access via `root.selectionView`.
+    readonly property var selectionView:
+        ListView.view && ListView.view.binding
+            ? ListView.view.binding.selectionView : null
+
     TextEdit {
         id: edit
         anchors { left: parent.left; right: parent.right
@@ -33,8 +39,7 @@ Rectangle {
         }
 
         function applySelection() {
-            const sv = ListView.view && ListView.view.binding
-                       ? ListView.view.binding.selectionView : null
+            const sv = root.selectionView
             if (!sv) { deselect(); return }
             const r = sv.rangeForBlock(model.index)
             if (!r || r.x < 0) { deselect(); return }
@@ -42,8 +47,7 @@ Rectangle {
         }
 
         Connections {
-            target: ListView.view && ListView.view.binding
-                    ? ListView.view.binding.selectionView : null
+            target: root.selectionView
             function onSelectionChanged() { edit.applySelection() }
         }
     }
