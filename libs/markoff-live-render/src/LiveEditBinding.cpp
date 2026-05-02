@@ -8,6 +8,7 @@
 #include <markoff-foundation/MarkoffEdit.h>
 
 #include <QQuickTextDocument>
+#include <QScopeGuard>
 #include <QTextDocument>
 #include <QLoggingCategory>
 
@@ -69,6 +70,9 @@ void LiveEditBinding::rewireTextDocument(QTextDocument *newDoc)
     if (m_listenedDoc) {
         QObject::connect(m_listenedDoc.data(), &QTextDocument::contentsChange,
                          this, &LiveEditBinding::onContentsChange);
+        m_previousText = m_listenedDoc->toPlainText();
+    } else {
+        m_previousText.clear();
     }
 }
 
@@ -80,6 +84,13 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
         return;
     if (!m_listenedDoc)
         return;
+
+    // Snapshot the post-edit text and compute the delta against m_previousText
+    // (the CRDT-coherent before-state for THIS contentsChange). m_previousText
+    // is updated unconditionally at the end so the cache stays in sync with
+    // the live QTextDocument across guard skip-paths too.
+    const QString postQt = m_listenedDoc->toPlainText();
+    auto _ = qScopeGuard([&]{ m_previousText = postQt; });
 
     // Guard: model-driven update echo (spec §4.5).
     if (m_binding->applyingModelUpdate()) {
@@ -105,12 +116,11 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     }
     const quint32 blockStart = blockRangeOpt->first;
 
-    // Pre-edit text for old-coordinate translation: model record's text,
-    // which has not been updated since the LAST parse arrival.
-    const QByteArray preUtf8 = record.text.toUtf8();
-
-    // Post-edit text from the live QTextDocument.
-    const QString postQt = m_listenedDoc->toPlainText();
+    // Pre-edit text for old-coordinate translation: m_previousText (the
+    // CRDT-coherent before-state of THIS edit). Using record.text instead
+    // would lag behind by any local edits since the last parse arrival,
+    // producing scrambled bytes when the user types faster than parses.
+    const QByteArray preUtf8 = m_previousText.toUtf8();
 
     // Old block-local byte range:
     const qsizetype oldStartLocal =
@@ -118,9 +128,10 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     const qsizetype oldEndLocal =
         Coordinates::qtPosToByte(preUtf8, qtPos + charsRemoved);
 
-    // New text slice from the live document, UTF-8.
-    const QString addedQt = postQt.mid(qtPos, charsAdded);
-    const QByteArray addedUtf8 = addedQt.toUtf8();
+    // New text slice. Skip toPlainText work in pure-deletion (no chars added).
+    QByteArray addedUtf8;
+    if (charsAdded > 0)
+        addedUtf8 = postQt.mid(qtPos, charsAdded).toUtf8();
 
     Markoff::MarkoffEdit edit;
     edit.oldStart = blockStart + static_cast<quint32>(oldStartLocal);

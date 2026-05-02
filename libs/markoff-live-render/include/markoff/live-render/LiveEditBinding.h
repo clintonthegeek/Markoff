@@ -94,6 +94,7 @@ private:
     QPointer<QTextDocument>         m_listenedDoc;  // remembered so we can disconnect
     bool                            m_composing = false;
     bool                            m_compositionPendingFlush = false;  // see Task 7
+    QString                         m_previousText;  // CRDT-coherent snapshot of m_listenedDoc's text
 };
 
 }  // namespace Markoff::LiveRender

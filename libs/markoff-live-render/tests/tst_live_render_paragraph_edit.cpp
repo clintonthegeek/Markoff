@@ -158,6 +158,39 @@ private Q_SLOTS:
 
         QCOMPARE(document.toMarkdown(), QString("héXllo"));
     }
+
+    void typing_two_chars_before_parse_arrives_does_not_scramble() {
+        // Reproduces the stale-record-text race: user types 'A' then 'B'
+        // before a parse cycle delivers the post-'A' state to the model.
+        // With m_previousText caching, edits compute against the
+        // CRDT-coherent before-state and stay correct.
+        Markoff::MarkoffDocument document(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&document);
+        document.resetContent("hello", Markoff::Origin::FirstOpen);
+        QSignalSpy parseSpy(&document, &Markoff::MarkoffDocument::parseUpdated);
+        QVERIFY(parseSpy.wait(2000));
+
+        QTextEdit editor;
+        editor.setPlainText("hello");
+        LiveEditBinding eb;
+        eb.setBinding(&binding);
+        eb.setModelIndex(0);
+        eb.setRawTextDocument(editor.document());
+
+        // Type 'A' at end. Don't wait for parse.
+        QTextCursor cur(editor.document());
+        cur.setPosition(5);
+        cur.insertText("A");
+
+        // Type 'B' at end. Still no parse arrival; record.text would still
+        // be "hello", but m_previousText is now "helloA".
+        cur.setPosition(6);
+        cur.insertText("B");
+
+        // CRDT must reflect "helloAB", not "helloBA".
+        QCOMPARE(document.toMarkdown(), QString("helloAB"));
+    }
 };
 
 QTEST_MAIN(TstLiveRenderParagraphEdit)
