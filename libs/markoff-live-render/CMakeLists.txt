@@ -46,6 +46,9 @@ qt_add_qml_module(markoff_live_render
         # R4: per-delegate edit binding
         include/markoff/live-render/LiveEditBinding.h
         src/LiveEditBinding.cpp
+        # R5: structural keys + undo coalescing
+        include/markoff/live-render/UndoCoalescer.h
+        src/UndoCoalescer.cpp
     QML_FILES
         qml/LiveView.qml
         qml/delegates/ParagraphDelegate.qml

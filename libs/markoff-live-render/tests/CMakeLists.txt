@@ -41,3 +41,11 @@ qt_add_executable(tst_live_render_paragraph_edit
 target_link_libraries(tst_live_render_paragraph_edit PRIVATE
     Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_paragraph_edit COMMAND tst_live_render_paragraph_edit)
+
+qt_add_executable(tst_live_render_structural
+    tst_live_render_structural.cpp
+)
+target_link_libraries(tst_live_render_structural PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test
+    markoff_live_render markoff_foundation)
+add_test(NAME tst_live_render_structural COMMAND tst_live_render_structural)
