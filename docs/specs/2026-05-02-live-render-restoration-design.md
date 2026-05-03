@@ -36,7 +36,7 @@ These decisions were made through brainstorming and are inputs to this design, n
 | 3 | Cursor shape | **Shape 1** — discriminated union: `Cursor = TextCaret | BlockSelected | BlockInternalEdit`. Block kind declares which variants apply to it. CRDT-anchored `BlockId`; within-block position is anchor-tracked. |
 | 4 | Source-of-truth | **C** — sequence-tagged hybrid. CRDT canonical; parser asynchronous; per-row staleness computed from `editSequence`/`parseSequence`. **D** (per-block CRDT) is the long-term endpoint, separate doc. |
 | 5 | Restoration shape | **β** — side-by-side library `libs/markoff-live-render`. Old `markoff-view-qml` keeps source mode and old-live for regression reference until new library reaches dogfood-stability, then retires. |
-| 6 | Enter semantics | **N** — Notion-style: Enter creates a new block; Shift-Enter inserts a soft break (`\n`) within the current block. EOB-Enter hole feature is deleted. |
+| 6 | Enter semantics | **N** — Notion-style: Enter creates a new block; Shift-Enter inserts a soft break (`\n`) within the current block. **(Amended A1, 2026-05-03)** Paragraph EOB-Enter and start-of-paragraph-Enter create a `LiveHoleLayer` hole that reifies on idle / focus-out / save / explicit Enter, per the v2 design at `docs/specs/2026-05-03-v2-holes-design.md`. The v0 hole implementation in `markoff-view-qml` is permanently retired; v2 is structurally distinct (IME-preedit pattern + concatenating proxy model). Mid-block Enter is unchanged (parser produces both halves; cursor delivery via existing `requestTextCaretAtRow` mechanism). |
 | 7 | Performance budget | 16 ms keystroke / 50 ms structural; 4 ms main-thread per keystroke handler; 8 ms parse-arrival on docs ≤ 64 KB. CI-enforced via `tst_benchmark`. |
 
 Two operating decisions made in the design (subject to user pushback if surprising):
@@ -94,10 +94,20 @@ The cursor is the load-bearing primitive of the architecture. Every part of the 
 ```cpp
 namespace Markoff::LiveRender {
 
-/// Opaque CRDT-anchored block identity. 1:1 with Markoff::BlockAnchor.
-/// Survives remote edits inside the block; invalidates if the block is
-/// fully deleted (collapsed to nearest neighbor by §3.5).
-using BlockId = Markoff::BlockAnchor;
+/// Opaque block identity. **(Amended A1, 2026-05-03)** A
+/// discriminated union: a CRDT-anchored `Markoff::BlockAnchor`
+/// for parser blocks (1:1 with the foundation type), or a
+/// `HoleBlockId` for view-side holes that have no CRDT
+/// representation yet (per `docs/specs/2026-05-03-v2-holes-design.md`
+/// §10). Parser-block IDs survive remote edits inside the
+/// block; invalidate if the block is fully deleted (collapsed
+/// to nearest neighbor by §3.5). Hole IDs are local to the
+/// `LiveHoleLayer` and disambiguated by sequence; they do not
+/// translate through `MarkoffDocument::resolveTextAnchor`.
+struct HoleBlockId {
+    quint64 holeId;                          ///< layer-local sequence
+};
+using BlockId = std::variant<Markoff::BlockAnchor, HoleBlockId>;
 
 /// Caret inside a text-bearing block, at a CRDT-anchored position
 /// within the block's bytes. Block-local; rendered as a blinking I-beam.
@@ -223,11 +233,11 @@ Each of these cycle guards in the current architecture is replaced by an instanc
 | Existing guard | Site | C replacement |
 |---|---|---|
 | `if (textEdit.activeFocus) return` skip in `onBlockTextChanged` | `ParagraphDelegate.qml:264` | Per-row `parseFreshForRow` check; focus-independent. |
-| `commitBlockHole` rowsInserted listener leak | `LiveProjectionLayer.cpp:155-177` | Holes retired (premise 6: Notion-style Enter); listener does not exist in new library. |
+| `commitBlockHole` rowsInserted listener leak | `LiveProjectionLayer.cpp:155-177` | **(Amended A1, 2026-05-03)** v2 holes return per design doc; the leak is structurally absent because `LiveHoleLayer::commitBlockHole` emits `holeReified` synchronously and `LiveCursorState::requestTextCaretAtRow` resolves on `LiveProxyBlockModel::rowsInserted` for the parse-back's new row — one deterministic event chain, no listener lifecycle. |
 | Mid-block-Enter local TextEdit truncation hack | `ParagraphDelegate.qml:144-174` | Structural-key handler emits the edit; parse-back updates both halves; freshness rule means each row updates as soon as its own parse is fresh. No truncation. |
 | Speculative-kind registry duplication (model + layer) | `LiveBlockModel::m_speculativeOriginals` + `LiveProjectionLayer::m_blockKindPredictions` | Single home: model only. Each prediction tagged with its source-snapshot `editSequence`; cleared when a parse with `parseInputEditSequence >= prediction.editSequence` arrives. |
 | Inline-prediction wholesale-clear on every parse | `LiveProjectionLayer::onParseUpdated` | Per-prediction sequence-tag; cleared selectively. |
-| Detach/reattach hole around `applyOps` | `LiveListModelBinding.cpp:175-194` | Holes retired. |
+| Detach/reattach hole around `applyOps` | `LiveListModelBinding.cpp:175-194` | **(Amended A1, 2026-05-03)** v2 holes return per design doc; the dance is structurally absent because `applyOps` runs against the parser-pure inner `LiveBlockModel` (which knows nothing of holes); the proxy `LiveProxyBlockModel` composes parser rows + hole rows for the QML ListView. The audit's L9 prescription. |
 
 ### 4.5 Cycle guards that **survive** C (and why)
 
@@ -347,6 +357,8 @@ QSet<int> consumedStructuralKeys;       // {Qt::Key_Return, Qt::Key_Tab, ...}
 
 This admits list-item's Tab/Shift-Tab indent/outdent, blockquote's nesting Enter, code-block's literal Tab insertion, math's F2-toggles-edit-mode, etc. — each block kind owns its own structural-key behaviour, the dispatcher is content-free.
 
+**(Amended A1, 2026-05-03)** Paragraph EOB-Enter and start-of-paragraph-Enter create a hole via `LiveHoleLayer::createBlockHole`, not `applyLocalEdit("\n\n")`. Mid-block Enter is unchanged (parser produces both halves; cursor delivery via `requestTextCaretAtRow` on the new parser row's arrival). Hole-row dispatch (when the focused proxy row is a hole) is a separate path within the same handler — see the v2 holes design `docs/specs/2026-05-03-v2-holes-design.md` §6.1 for the hole-row key table.
+
 ---
 
 ## 6. Components
@@ -380,10 +392,12 @@ The new library's principal C++ classes and QML files. All classes are in namesp
 - `LiveStructuralKeyHandler.{h,cpp}` — dispatch by `BlockKindDescriptor::consumedStructuralKeys`. Existing class, restructured to dispatch table.
 - `UndoCoalescer.{h,cpp}` — view-side policy (consecutive printables in same focus context; broken by non-printables, movement, mode switch, paste, structural change, idle threshold). Calls `MarkoffDocument::coalesceLastUndo()` per its rules. Pure mechanism; no ad-hoc per-event checks.
 
-**L6 — predictions (the surviving half of the old projection layer)**
-- `LiveSpeculationLayer.{h,cpp}` — corresponds to the old `LiveProjectionLayer`, renamed to reflect the surviving role. Owns inline-format predictions + block-kind predictions. Each prediction tagged with source-snapshot `editSequence`. Holes API removed.
+**L6 — predictions and phantom rows (the surviving half of the old projection layer, plus the audit's L9 phantom-rows component)**
+- `LiveSpeculationLayer.{h,cpp}` — corresponds to the old `LiveProjectionLayer`, renamed to reflect the surviving role. Owns inline-format predictions + block-kind predictions. Each prediction tagged with source-snapshot `editSequence`.
 - `InlineFormatHighlighter.{h,cpp}` — per-delegate `QSyntaxHighlighter` for inline format application. **No longer constructs a fresh `TreeSitterParser` per delegate**: consumes pre-baked per-block span data from the parse output. Predictions consulted from the speculation layer.
 - `LiveSpeculativeFenceController.{h,cpp}` — paragraph→code-block kind speculation. Carries forward, sequence-tagged.
+- **(Added A1, 2026-05-03)** `LiveHoleLayer.{h,cpp}` — owns paragraph holes (view-side rows the parser cannot represent yet); IME-preedit pattern; per-hole idle timer; per-hole undo stack. Sibling to `LiveSpeculationLayer` (predictions are within-row overlays; holes add/remove rows; categorically different reconciliation). See `docs/specs/2026-05-03-v2-holes-design.md` §3.
+- **(Added A1, 2026-05-03)** `LiveProxyBlockModel.{h,cpp}` — `QAbstractListModel` composing `LiveBlockModel` (parser-pure rows) ⊕ `LiveHoleLayer` (phantom rows) by anchor. The QML ListView binds to this proxy. `applyOps` runs against the parser-pure inner; the proxy handles row-index translation. Implements the audit's L9 prescription. See `docs/specs/2026-05-03-v2-holes-design.md` §4.
 
 **L7 — structured text blocks**
 - `ListItemDelegate` (QML, see below) and supporting C++ helpers for nested list mutation.
@@ -496,6 +510,42 @@ parseUpdated arrives (round-trip):
 ```
 
 No retry loops, no truncation hack, no second-level `Qt.callLater`.
+
+**(Amended A1, 2026-05-03)** The above flow is the *mid-block* Enter case (both halves are non-empty; parser produces Insert(B_new); cursor delivery resolves). The end-of-paragraph and start-of-paragraph cases — where the parser produces zero new rows — use a different flow:
+
+```
+TextEdit Keys.onPressed (Keys.priority BeforeItem)
+  ▼
+LiveStructuralKeyHandler::dispatch (paragraph EOB-Enter / start-Enter)
+  ├─ resolve cursor's CRDT-anchored byte offset → reifyByte
+  ├─ LiveHoleLayer::createBlockHole(Paragraph, anchorAt(reifyByte))
+  │     ▼
+  │   layer emits holeInserted(holeId) ← synchronous
+  │     ▼
+  │   LiveProxyBlockModel emits rowsInserted at proxyRowForHole
+  ├─ LiveCursorState::requestTextCaretAtRow(proxyRowForHole, 0)
+  │     ▼
+  │   resolves on the just-emitted rowsInserted; routes focus into hole
+  │
+  │ User types into the hole's TextEdit:
+  │   LiveEditBinding routes contentsChange to LiveHoleLayer::setBlockHoleBuffer
+  │   — NOT to MarkoffDocument::applyLocalEdit (no source mutation)
+  │   layer emits holeBufferChanged; proxy emits dataChanged
+  │   per-hole idle timer restarts (250 ms; suspended during IME composition)
+  │
+  │ At commit trigger (idle / focus-out non-empty / save / explicit Enter):
+  │   LiveHoleLayer::commitBlockHole(holeId)
+  │     ├─ MarkoffDocument::applyLocalEdit({insert "\n\n" + bufferText at reifyByte})
+  │     ├─ drop hole synchronously; emit holeAbandoned + holeReified
+  │     └─ schedule LiveCursorState::requestTextCaretAtRow(proxyRowForReifiedAnchor, bufferText.length())
+  ▼
+parseUpdated arrives (round-trip):
+  AstBlockDiff produces: Insert(B_new) at the reified anchor
+  rowsInserted fires on B_new through the proxy
+  LiveCursorState's pending request resolves; routes focus into B_new at end-of-typed-text
+```
+
+The user-visible trace: press Enter, see new paragraph, type into it, idle, paragraph stays, keep typing. The row was view-side state for ≤ 250 ms and source-side state from then on. See `docs/specs/2026-05-03-v2-holes-design.md` for the full design.
 
 ### 7.3 Click into math block (BlockSelected → BlockInternalEdit)
 
@@ -631,7 +681,8 @@ This is what enables the new library to land in phases — each phase's tests ve
 Per the repair plan's anti-goal #2: `QTest::keyClick` does not reproduce the async parse round-trip's timing. Each phase's acceptance criterion includes a manual dogfood pass on `markoff-live-render-app` (a copy of the existing `markoff-view-qml-app` test app, repointed at the new library) by the user, with concrete scripts:
 
 - R4 (paragraph): "Type a 200-word paragraph at 100+ wpm into a 5-page document; cursor never jumps; characters never scramble."
-- R5 (structural): "Press Enter at the end of every paragraph in a 10-block doc; caret lands in the new empty paragraph each time; Backspace at the start of each merges back, restoring the original."
+- R5 (structural): "Press Enter at the end of every paragraph in a 10-block doc; caret lands in the new empty paragraph each time; Backspace at the start of each merges back, restoring the original." **(Amended A1, 2026-05-03)** End-of-paragraph and start-of-paragraph Enter require R5.5 (paragraph holes). R5 ships with these cases as documented limitations; the *mid-block* Enter case is in scope for R5. Backspace-merge cases are in scope for R5.
+- R5.5 (paragraph holes): "Press Enter at end of every paragraph in a 10-block doc; a hole row appears with caret; type 5–10 characters into each; idle 300 ms; the hole reifies into a real paragraph and the caret stays at end-of-typed-text. Press Esc on a fresh empty hole; hole disappears, caret returns to the previous paragraph's end. Type 200 words at 100+ wpm across multiple Enter-created paragraphs; no character scramble; saved file equals on-screen content."
 - R7 (lists): "Type a 5-level nested list with Tab/Shift-Tab; toggle bullet/numbered; Enter on empty outdents one level."
 - R8 (math): "Type `$$\int_0^\infty e^{-x} dx$$`, click outside to render, double-click to re-edit, Esc to deselect; selection across paragraph + math + paragraph copies cleanly."
 
@@ -699,7 +750,24 @@ Phases. Each phase has a scope, an acceptance criterion (test passes + dogfood s
 - Heading and code-block kinds: their structural-key declarations.
 - `UndoCoalescer` policy; calls `coalesceLastUndo()`.
 
-**Acceptance.** R5 dogfood script. `tst_live_render_structural`. Cursor focus on the right block after every structural edit, deterministically.
+**Acceptance.** R5 dogfood script. `tst_live_render_structural`. Cursor focus on the right block after every structural edit, deterministically. **(Amended A1, 2026-05-03)** End-of-paragraph and start-of-paragraph Enter cases are scoped out of R5 and into R5.5 (see below). R5 closes correctness-clean for mid-block split, Backspace-merge, Delete-merge, and Shift-Enter; the EOB-Enter / start-of-paragraph-Enter cases are documented limitations until R5.5 lands.
+
+### R5.5 — Paragraph holes (2–3 weeks) — *(Added A1, 2026-05-03)*
+
+**Scope.** New L6 component: `LiveHoleLayer` + `LiveProxyBlockModel` + `LiveRealisticInputHarness`. Specified at `docs/specs/2026-05-03-v2-holes-design.md`.
+
+- `LiveRealisticInputHarness` (test utility, R5.5 Task 1) — `keyClick` + `qWait` + `processEvents`; gate test against synthetic-broken-delegate stub proves harness sees v0-style F2 race.
+- `BlockHole` value type + `LiveHoleLayer` — owns paragraph holes; per-hole idle timer (250 ms; IME-suspended); per-hole undo stack.
+- `LiveProxyBlockModel` — `QAbstractListModel` composing parser-pure `LiveBlockModel` rows ⊕ `LiveHoleLayer` rows by anchor; the model the QML ListView binds to. Implements audit L9.
+- `LiveStructuralKeyHandler` extension — paragraph EOB-Enter and start-of-paragraph-Enter route through `createBlockHole`. Hole-row dispatch (Enter / Esc / Backspace at qtPos 0 with empty buffer / Delete at end with empty buffer / mid-buffer Enter splits).
+- `LiveCursorState` extension — `requestTextCaretAtRow` resolves on `LiveProxyBlockModel::rowsInserted` (pre-existing API; new model wiring).
+- `LiveEditBinding` extension — exposes IME composition state to `LiveHoleLayer`'s idle-timer pause.
+- `LiveSelectionView` operates on proxy rows (no signature change; integration verification only).
+- `UndoCoalescer` extension — host checks if focused row is a hole; routes Ctrl-Z to `LiveHoleLayer::undoBlockHole` else `MarkoffDocument::undo`.
+- Save-flush integration — `Ctrl-S` calls `LiveHoleLayer::commitAllPendingHoles()` before `MarkoffDocument::save`.
+- QML `ParagraphDelegate` — `isHole === true` plumbing; `text` binds to `bufferText` for hole rows transparently via the proxy's role passthrough.
+
+**Acceptance.** R5.5 dogfood script (above, in §10.3). All §12 unit tests + harness-driven tests in the v2-holes design pass. The harness gate test passes (synthetic broken stub → harness sees scramble → delete stub).
 
 ### R6 — Other text blocks + speculation refresh (2–3 weeks)
 
@@ -756,16 +824,16 @@ Phases. Each phase has a scope, an acceptance criterion (test passes + dogfood s
 ### Phase dependencies
 
 ```
-R1 → R2 → R3 → R4 → R5 → R6 → R7 → R10
-                              ↘
-                                R8 → R9 → R10
+R1 → R2 → R3 → R4 → R5 → R5.5 → R6 → R7 → R10
+                                   ↘
+                                     R8 → R9 → R10
 ```
 
-R7 and R8 can parallelise after R6; R9 wants R8 (math context menu actions), so it follows R8. R10 depends on all preceding.
+R5.5 (paragraph holes) sits between R5 and R6. R7 and R8 can parallelise after R6; R9 wants R8 (math context menu actions), so it follows R8. R10 depends on all preceding.
 
 ### Total budget
 
-18–30 weeks. Phase boundaries are gates with explicit acceptance criteria and dogfood pass; they are not "merge-and-move-on."
+20–33 weeks (was 18–30; R5.5 adds 2–3 weeks). Phase boundaries are gates with explicit acceptance criteria and dogfood pass; they are not "merge-and-move-on."
 
 ---
 
@@ -840,6 +908,11 @@ Things this spec deliberately does not pin precisely; the next step (writing-pla
 6. Which tests in `markoff-view-qml`'s suite migrate to the new library as behaviour contracts (vs tests that probe the old architecture's internals and are deliberately dropped).
 7. How `LiveSelectionView` projects multi-block selections containing non-text variants (for now: collapses to whole-block coverage; precise rendering rules at R8).
 8. The rename moment: when does the test app's `--live` flag default to the new library? Proposed: end of R5 (paragraph + structural keys done) for opt-in; end of R10 for default.
+9. **(Added A1, 2026-05-03)** v2 holes scope — paragraph-only initially; full hole inventory (list-items, fence interiors, blockquote, callout, table cells, links, wikilinks, footnotes, math) deferred to R7+ as follow-on plans, each inheriting the v2 design's shape (preedit pattern + concatenating proxy).
+
+**Resolved by A1 (2026-05-03):**
+
+- §3.1 BlockId type — answered: discriminated union `std::variant<Markoff::BlockAnchor, HoleBlockId>` (per `docs/specs/2026-05-03-v2-holes-design.md` §10).
 
 These do not block plan derivation; they are flagged so the plan's task list can pick them up explicitly rather than smuggle decisions in implicit code.
 

@@ -13,7 +13,7 @@
 
 > **R5 PAUSED on architectural finding (empty-paragraph gap).** R5 Tasks 1–11 are landed (commits `7c6f7f6..b8fb639`); 7/7 live-render fast-tier executables green; 21/21 structural-test slots green. **Tasks 12–18 are paused.** The R5 dogfood criterion (spec §10.3) — *"caret lands in the new empty paragraph each time"* — is structurally unachievable with the current `\n\n`-insert design because tree-sitter's CommonMark grammar emits zero block nodes for blank-only regions. Inserting `\n\n` at end of `"hello"` produces `model->rowCount() == 1`, not 2. The planned `requestTextCaretAtRow(blockIndex+1, 0)` cursor delivery has no row to resolve into. Mid-block split works; end-of-paragraph and start-of-paragraph Enter do not. The R5 spec premise 6 ("Notion-style Enter; holes deleted") retired the only mechanism that could deliver the dogfood UX. **Holes need to come back, in their v1 IME-preedit-pattern form, scoped narrowly.** The full failure analysis + redesign brief is at `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md`.
 >
-> **Recommended next:** Post-mortem (`docs/handoff/2026-05-03-r5-holes-postmortem.md`) and design doc (`docs/specs/2026-05-03-v2-holes-design.md`) are landed and user-approved. Apply spec amendments per design doc §13 to `docs/specs/2026-05-02-live-render-restoration-design.md` (premise 6, §3.1, §4.4, §5.4, §6.1 L6, §7.2, §11 R5 + new R5.5, §15). Then derive the R5.5 plan via `superpowers:writing-plans`. Then begin implementation Task 1 (the realistic-input harness gate test). User has pre-approved spec edits and plan generation; proceed autonomously.
+> **Recommended next:** Post-mortem, design doc, and C-restoration spec amendments are landed. Derive the R5.5 plan via `superpowers:writing-plans` from the design doc. Then begin implementation Task 1 (the realistic-input harness gate test). User has pre-approved plan generation and implementation; proceed autonomously.
 >
 > **Read first** (in this order):
 > 1. `docs/handoff/2026-05-03-r5-holes-postmortem.md` — post-mortem (input to the design).
@@ -58,7 +58,8 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-03 | (this commit) | docs: R5 v2-holes post-mortem + design — verifies v1 mitigations under C; adopts audit L9 phantom-rows + concatenating proxy as structural correction; specifies LiveHoleLayer + LiveProxyBlockModel + LiveRealisticInputHarness APIs |
+| 2026-05-03 | (this commit) | docs(spec): R5/R5.5 amendment — v2 holes (premise 6 amended; §3.1 BlockId becomes variant; §4.4 cycle-guard rows restored with v2 annotations; §5.4 + §6.1 L6 + §7.2 reflect LiveHoleLayer/LiveProxyBlockModel; §11 adds R5.5; §15 resolves BlockId open question) |
+| 2026-05-03 | `af902b1` | docs: R5 v2-holes post-mortem + design — verifies v1 mitigations under C; adopts audit L9 phantom-rows + concatenating proxy as structural correction; specifies LiveHoleLayer + LiveProxyBlockModel + LiveRealisticInputHarness APIs |
 | 2026-05-03 | `8dac44b` | docs(handoff): R5 empty-paragraph gap analysis + redesign brief; status-doc reflects R5 pause |
 | 2026-05-02 | `b8fb639` | feat(live-render): populate consumedStructuralKeys on built-in descriptors (R5 Task 11; also corrected 3 test assertions about parser behaviour — surfaced the empty-paragraph gap) |
 | 2026-05-02 | `21be140` | feat(live-render): code-block consumes only Backspace/Delete edges (R5 Task 10) |
