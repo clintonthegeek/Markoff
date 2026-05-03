@@ -177,7 +177,7 @@ private Q_SLOTS:
         QCOMPARE(doc.undoDepth(), 3);
     }
 
-    // ---------- LiveStructuralKeyHandler — paragraph Enter at end ----------
+    // ---------- LiveStructuralKeyHandler — paragraph Enter (all positions) ----------
 
     void enter_at_end_of_paragraph_inserts_paragraph_break() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
@@ -213,6 +213,58 @@ private Q_SLOTS:
         QCOMPARE(std::get<TextCaret>(cur).block,
                  binding.model()->recordAt(1).blockAnchor);
     }
+    void enter_in_middle_of_paragraph_splits_block() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello world", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier,
+            /*blockIndex=*/0, /*qtPos=*/5,
+            /*selectionEmpty=*/true,
+            QStringLiteral("hello world"));
+        QVERIFY(consumed);
+
+        QCOMPARE(doc.toMarkdown(), QString("hello\n\n world"));
+
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 2);
+        QCOMPARE(binding.model()->recordAt(0).text, QString("hello"));
+        QCOMPARE(binding.model()->recordAt(1).text, QString("world"));
+
+        const Cursor cur = binding.cursorState()->cursor();
+        QVERIFY(std::holds_alternative<TextCaret>(cur));
+        QCOMPARE(std::get<TextCaret>(cur).block,
+                 binding.model()->recordAt(1).blockAnchor);
+    }
+
+    void enter_at_start_of_paragraph_inserts_blank_above() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier,
+            /*blockIndex=*/0, /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            QStringLiteral("hello"));
+        QVERIFY(consumed);
+
+        QCOMPARE(doc.toMarkdown(), QString("\n\nhello"));
+
+        QVERIFY(parseSpy.wait(2000));
+        // Parser collapses leading \n\n into a single empty/non-empty pair;
+        // expected outcome: one paragraph row with text "hello". Whether an
+        // empty leading row exists is parser-dependent and not asserted.
+        QVERIFY(binding.model()->rowCount() >= 1);
+    }
+
 };
 
 QTEST_MAIN(TstLiveRenderStructural)

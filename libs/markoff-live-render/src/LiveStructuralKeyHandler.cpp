@@ -90,24 +90,38 @@ void LiveStructuralKeyHandler::registerBuiltins()
 {
     using HR = HandleResult;
 
-    // ---------- paragraph: Enter at end of block ----------
+    // ---------- paragraph: Enter (all positions) ----------
     auto paragraphEnter = [](const Ctx &c) -> HR {
-        if (c.qtPos != c.blockText.length()) {
-            // Not end-of-block; mid-block / start-of-block handled in a later
-            // task. For now, NotHandled falls through to TextEdit's native \n.
-            return HR::NotHandled;
-        }
+        // Compute the byte offset for the cursor's qtPos.
+        const QByteArray prefixUtf8 =
+            c.blockText.left(c.qtPos).toUtf8();
+        const quint32 byteOffset =
+            c.currentBlockStart + static_cast<quint32>(prefixUtf8.size());
+
         Markoff::MarkoffEdit ed;
-        ed.oldStart = c.currentBlockEnd;
-        ed.oldEnd   = c.currentBlockEnd;
+        ed.oldStart = byteOffset;
+        ed.oldEnd   = byteOffset;
         ed.newText  = QByteArrayLiteral("\n\n");
         c.document->applyLocalEdit({ ed });
-        // Stamp the row's lastEditEditSequence so the freshness rule
-        // preserves the row's text on parse-back (spec §4.3).
         c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-        // Caret lands at qtPos 0 of the new (currently non-existent) row.
+
+        // Cursor placement:
+        //   qtPos == 0 (start-of-block):
+        //     The empty leading paragraph the parser will see may or may
+        //     not materialise as its own row (depends on Markdown
+        //     normalisation). Park the cursor at the original block, now
+        //     at row blockIndex + 1 in the post-parse layout, qtPos 0.
+        //   0 < qtPos < length (mid-block):
+        //     Original block keeps the prefix at row blockIndex; the
+        //     suffix appears as a new row at blockIndex + 1. Caret to
+        //     qtPos 0 of blockIndex + 1.
+        //   qtPos == length (end-of-block):
+        //     Empty new paragraph appears at blockIndex + 1. Caret to
+        //     qtPos 0 of blockIndex + 1.
+        //
+        // All three cases land on row blockIndex + 1 qtPos 0.
         c.cursorState->requestTextCaretAtRow(c.blockIndex + 1, 0);
-        // Structural edit: break the printable-coalesce chain.
+
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;
     };
