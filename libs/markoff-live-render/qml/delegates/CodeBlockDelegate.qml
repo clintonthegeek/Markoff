@@ -61,4 +61,10 @@ Rectangle {
     }
 
     function positionAt(x, y) { return edit.positionAt(x - 8, y - 8) }
+
+    function focusEditAt(qtPos) {
+        edit.forceActiveFocus()
+        if (qtPos >= 0 && qtPos <= edit.length)
+            edit.cursorPosition = qtPos
+    }
 }

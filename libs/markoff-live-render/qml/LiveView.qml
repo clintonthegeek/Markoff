@@ -123,15 +123,24 @@ ListView {
         property var _pressResult: null
 
         onPressed: (mouse) => {
-            root.forceActiveFocus()
             if (!binding || !binding.selectionView) return
             const r = root.hit(mouse.x, mouse.y)
             mouseArea._pressResult = r
             if (!r || r.blockIndex < 0) {
+                root.forceActiveFocus()
                 binding.selectionView.clear()
                 return
             }
             binding.selectionView.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
+            // Route keyboard focus into the matched delegate's TextEdit so
+            // typing reaches it (R4). The MouseArea has preventStealing:true
+            // and consumes the press, so the TextEdit's native click-to-focus
+            // path doesn't run; we focus it explicitly.
+            const item = root.itemAtIndex(r.blockIndex)
+            if (item && item.focusEditAt)
+                item.focusEditAt(r.qtPos >= 0 ? r.qtPos : 0)
+            else
+                root.forceActiveFocus()
         }
 
         onPositionChanged: (mouse) => {
@@ -152,6 +161,12 @@ ListView {
             if (sameBlock && smallDrift) {
                 // Simple click: reset to caret (no drag selection).
                 binding.selectionView.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
+                // Re-confirm focus + caret position on the matched delegate
+                // (the press's focusEditAt may have been pre-empted by the
+                // MouseArea event chain on some platforms).
+                const item = root.itemAtIndex(r.blockIndex)
+                if (item && item.focusEditAt)
+                    item.focusEditAt(r.qtPos >= 0 ? r.qtPos : 0)
             }
         }
     }

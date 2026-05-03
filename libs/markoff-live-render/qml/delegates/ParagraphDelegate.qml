@@ -55,4 +55,15 @@ Item {
     }
 
     function positionAt(x, y) { return edit.positionAt(x - edit.leftPadding, y - edit.topPadding) }
+
+    /// Called by LiveView's MouseArea after a click resolves. Routes
+    /// keyboard focus into the TextEdit so the user can type. R4: the
+    /// LiveView MouseArea has preventStealing:true and consumes clicks
+    /// before they reach the TextEdit, so we must put focus there
+    /// programmatically.
+    function focusEditAt(qtPos) {
+        edit.forceActiveFocus()
+        if (qtPos >= 0 && qtPos <= edit.length)
+            edit.cursorPosition = qtPos
+    }
 }

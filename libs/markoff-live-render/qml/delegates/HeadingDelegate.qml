@@ -61,4 +61,10 @@ Item {
     }
 
     function positionAt(x, y) { return edit.positionAt(x - edit.leftPadding, y - edit.topPadding) }
+
+    function focusEditAt(qtPos) {
+        edit.forceActiveFocus()
+        if (qtPos >= 0 && qtPos <= edit.length)
+            edit.cursorPosition = qtPos
+    }
 }
