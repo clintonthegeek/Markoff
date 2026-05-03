@@ -49,6 +49,8 @@ qt_add_qml_module(markoff_live_render
         # R5: structural keys + undo coalescing
         include/markoff/live-render/UndoCoalescer.h
         src/UndoCoalescer.cpp
+        include/markoff/live-render/LiveStructuralKeyHandler.h
+        src/LiveStructuralKeyHandler.cpp
     QML_FILES
         qml/LiveView.qml
         qml/delegates/ParagraphDelegate.qml

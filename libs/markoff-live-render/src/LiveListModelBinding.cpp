@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live-render/LiveListModelBinding.h>
 #include <markoff/live-render/AstBlockDiff.h>
+#include <markoff/live-render/LiveStructuralKeyHandler.h>
+#include <markoff/live-render/UndoCoalescer.h>
 #include "BlockWalker.h"
 
 #include <markoff-foundation/MarkoffDocument.h>
@@ -21,6 +23,8 @@ struct LiveListModelBinding::Private {
     LiveCursorState           *cursorState   = nullptr;
     BlockHitTester            *hitTester     = nullptr;
     LiveSelectionView         *selectionView = nullptr;
+    UndoCoalescer             *undoCoalescer = nullptr;
+    LiveStructuralKeyHandler  *structuralKeys = nullptr;
     QList<BlockKey>            lastKeys;
     quint64                    lastParseInputEditSeq = 0;
     bool                       applyingModelUpdate = false;
@@ -54,6 +58,10 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
             d->session = nullptr;
         }
     }
+    // Drop old structural components before reconstructing.
+    delete d->structuralKeys; d->structuralKeys = nullptr;
+    delete d->undoCoalescer;  d->undoCoalescer  = nullptr;
+
     d->document = doc;
     if (d->document) {
         QObject::connect(d->document, &Markoff::MarkoffDocument::parseUpdated,
@@ -61,6 +69,10 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->session = d->document->createSession({});
         d->selectionView->setDocument(d->document);
         d->selectionView->setSession(d->session);
+        d->undoCoalescer  = new UndoCoalescer(d->document, this);
+        d->structuralKeys = new LiveStructuralKeyHandler(
+            d->document, d->model, d->cursorState, &d->registry,
+            d->undoCoalescer, this);
     } else {
         d->selectionView->setDocument(nullptr);
         d->selectionView->setSession(nullptr);
@@ -68,11 +80,13 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
     Q_EMIT documentChanged();
 }
 
-LiveBlockModel    *LiveListModelBinding::model()         const { return d->model; }
-LiveCursorState   *LiveListModelBinding::cursorState()   const { return d->cursorState; }
-BlockHitTester    *LiveListModelBinding::hitTester()     const { return d->hitTester; }
-LiveSelectionView *LiveListModelBinding::selectionView() const { return d->selectionView; }
-const BlockKindRegistry *LiveListModelBinding::registry() const { return &d->registry; }
+LiveBlockModel           *LiveListModelBinding::model()               const { return d->model; }
+LiveCursorState          *LiveListModelBinding::cursorState()         const { return d->cursorState; }
+BlockHitTester           *LiveListModelBinding::hitTester()           const { return d->hitTester; }
+LiveSelectionView        *LiveListModelBinding::selectionView()       const { return d->selectionView; }
+LiveStructuralKeyHandler *LiveListModelBinding::structuralKeyHandler() const { return d->structuralKeys; }
+UndoCoalescer            *LiveListModelBinding::undoCoalescer()       const { return d->undoCoalescer; }
+const BlockKindRegistry  *LiveListModelBinding::registry()            const { return &d->registry; }
 
 bool LiveListModelBinding::applyingModelUpdate() const
 {
@@ -80,7 +94,7 @@ bool LiveListModelBinding::applyingModelUpdate() const
 }
 
 void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
-                                          quint64 /*parseSequence*/,
+                                          quint64 parseSequence,
                                           const QList<Markoff::BlockAnchor> &blockAnchors,
                                           quint64 parseInputEditSequence)
 {
@@ -125,6 +139,10 @@ void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
             }
         }
     }
+
+    // R5: advance the pending-cursor drop counter (spec §8.4).
+    if (d->cursorState)
+        d->cursorState->noteParseArrived(parseSequence);
 }
 
 }  // namespace Markoff::LiveRender

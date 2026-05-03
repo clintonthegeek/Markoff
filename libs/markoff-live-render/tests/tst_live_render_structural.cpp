@@ -3,6 +3,11 @@
 #include <QSignalSpy>
 
 #include <markoff/live-render/UndoCoalescer.h>
+#include <markoff/live-render/LiveStructuralKeyHandler.h>
+#include <markoff/live-render/LiveListModelBinding.h>
+#include <markoff/live-render/LiveBlockModel.h>
+#include <markoff/live-render/LiveCursorState.h>
+#include <markoff/live-render/Cursor.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
@@ -170,6 +175,43 @@ private Q_SLOTS:
         doc.applyLocalEdit({ e2 });
         QVERIFY(!coalescer.recordPrintable(a));  // recordOther broke the chain
         QCOMPARE(doc.undoDepth(), 3);
+    }
+
+    // ---------- LiveStructuralKeyHandler — paragraph Enter at end ----------
+
+    void enter_at_end_of_paragraph_inserts_paragraph_break() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 1);
+
+        auto *handler = binding.structuralKeyHandler();
+        QVERIFY(handler);
+
+        const bool consumed = handler->tryHandle(
+            /*key=*/Qt::Key_Return,
+            /*modifiers=*/Qt::NoModifier,
+            /*blockIndex=*/0,
+            /*qtPos=*/5,                  // end of "hello"
+            /*selectionEmpty=*/true,
+            /*blockText=*/QStringLiteral("hello"));
+        QVERIFY(consumed);
+
+        // CRDT now has "hello\n\n" — paragraph break at end.
+        QCOMPARE(doc.toMarkdown(), QString("hello\n\n"));
+
+        // After parse-back, two rows; the second is empty.
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 2);
+
+        // Cursor parked at row 1 qtPos 0.
+        const Cursor cur = binding.cursorState()->cursor();
+        QVERIFY(std::holds_alternative<TextCaret>(cur));
+        QCOMPARE(std::get<TextCaret>(cur).block,
+                 binding.model()->recordAt(1).blockAnchor);
     }
 };
 

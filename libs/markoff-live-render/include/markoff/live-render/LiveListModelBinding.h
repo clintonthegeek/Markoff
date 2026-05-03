@@ -7,6 +7,8 @@
 #include <markoff/live-render/LiveCursorState.h>
 #include <markoff/live-render/BlockHitTester.h>
 #include <markoff/live-render/LiveSelectionView.h>
+#include <markoff/live-render/LiveStructuralKeyHandler.h>
+#include <markoff/live-render/UndoCoalescer.h>
 
 #include <QObject>
 #include <memory>
@@ -33,6 +35,10 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveListModelBinding : public QObject {
                READ hitTester CONSTANT)
     Q_PROPERTY(Markoff::LiveRender::LiveSelectionView *selectionView
                READ selectionView CONSTANT)
+    Q_PROPERTY(Markoff::LiveRender::LiveStructuralKeyHandler *structuralKeyHandler
+               READ structuralKeyHandler CONSTANT)
+    Q_PROPERTY(Markoff::LiveRender::UndoCoalescer *undoCoalescer
+               READ undoCoalescer CONSTANT)
 
 public:
     explicit LiveListModelBinding(QObject *parent = nullptr);
@@ -41,11 +47,13 @@ public:
     Markoff::MarkoffDocument *document() const;
     void setDocument(Markoff::MarkoffDocument *doc);
 
-    LiveBlockModel    *model()         const;
-    LiveCursorState   *cursorState()   const;
-    BlockHitTester    *hitTester()     const;
-    LiveSelectionView *selectionView() const;
-    const BlockKindRegistry *registry() const;
+    LiveBlockModel           *model()               const;
+    LiveCursorState          *cursorState()         const;
+    BlockHitTester           *hitTester()           const;
+    LiveSelectionView        *selectionView()       const;
+    LiveStructuralKeyHandler *structuralKeyHandler() const;
+    UndoCoalescer            *undoCoalescer()       const;
+    const BlockKindRegistry  *registry()            const;
 
     /// True for the synchronous duration of `applyOps` while parse
     /// arrival is mutating model rows. LiveEditBinding queries this
