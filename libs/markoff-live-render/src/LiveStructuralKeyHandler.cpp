@@ -127,6 +127,31 @@ void LiveStructuralKeyHandler::registerBuiltins()
     };
     m_handlers[BlockKind::Paragraph][Qt::Key_Return] = paragraphEnter;
     m_handlers[BlockKind::Paragraph][Qt::Key_Enter]  = paragraphEnter;
+
+    auto paragraphBackspace = [](const Ctx &c) -> HR {
+        if (c.qtPos != 0) return HR::NotHandled;     // not at row-start
+        if (c.blockIndex == 0) return HR::NotHandled; // first block
+        if (c.currentBlockStart == 0) return HR::NotHandled;
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = c.currentBlockStart - 1;
+        ed.oldEnd   = c.currentBlockStart;
+        ed.newText  = QByteArray();
+        c.document->applyLocalEdit({ ed });
+        c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
+        c.model->setRowEditSequence(c.blockIndex - 1, c.document->editSequence());
+
+        // After parse-back: blockIndex - 1 contains the merged content;
+        // blockIndex is gone. Cursor lands at qtPos = previous block's
+        // text length (the merge point). Compute the qtPos at edit time
+        // since the previous block's text is still current in the model.
+        const int prevQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
+        c.cursorState->requestTextCaretAtRow(c.blockIndex - 1, prevQtPos);
+
+        if (c.undoCoalescer) c.undoCoalescer->recordStructural();
+        return HR::Handled;
+    };
+    m_handlers[BlockKind::Paragraph][Qt::Key_Backspace] = paragraphBackspace;
 }
 
 }  // namespace Markoff::LiveRender

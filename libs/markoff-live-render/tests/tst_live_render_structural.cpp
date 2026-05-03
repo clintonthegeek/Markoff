@@ -265,6 +265,51 @@ private Q_SLOTS:
         QVERIFY(binding.model()->rowCount() >= 1);
     }
 
+    // ---------- LiveStructuralKeyHandler — paragraph Backspace at row-start ----------
+
+    void backspace_at_start_of_paragraph_merges_with_previous() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("alpha\n\nbeta", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 2);
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Backspace, Qt::NoModifier,
+            /*blockIndex=*/1, /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            QStringLiteral("beta"));
+        QVERIFY(consumed);
+
+        // One byte deleted from the inter-block separator: "alpha\nbeta"
+        // (or possibly "alphabeta" depending on which separator byte got
+        // deleted; the legacy handler deletes ONE byte, leaving "alpha\nbeta",
+        // which the parser treats as a single paragraph).
+        QCOMPARE(doc.toMarkdown(), QString("alpha\nbeta"));
+
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 1);
+    }
+
+    void backspace_at_start_of_first_block_is_not_consumed() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("alpha", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Backspace, Qt::NoModifier,
+            /*blockIndex=*/0, /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            QStringLiteral("alpha"));
+        QVERIFY(!consumed);
+        QCOMPARE(doc.toMarkdown(), QString("alpha"));
+    }
+
 };
 
 QTEST_MAIN(TstLiveRenderStructural)
