@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-03 (R5 Tasks 1–11 landed; PAUSED on architectural finding — see TL;DR)
+**Last updated:** 2026-05-03 (R5 Tasks 1–11 landed; PAUSED. Post-mortem complete; design doc landed; spec amendments and R5.5 plan next.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -13,14 +13,14 @@
 
 > **R5 PAUSED on architectural finding (empty-paragraph gap).** R5 Tasks 1–11 are landed (commits `7c6f7f6..b8fb639`); 7/7 live-render fast-tier executables green; 21/21 structural-test slots green. **Tasks 12–18 are paused.** The R5 dogfood criterion (spec §10.3) — *"caret lands in the new empty paragraph each time"* — is structurally unachievable with the current `\n\n`-insert design because tree-sitter's CommonMark grammar emits zero block nodes for blank-only regions. Inserting `\n\n` at end of `"hello"` produces `model->rowCount() == 1`, not 2. The planned `requestTextCaretAtRow(blockIndex+1, 0)` cursor delivery has no row to resolve into. Mid-block split works; end-of-paragraph and start-of-paragraph Enter do not. The R5 spec premise 6 ("Notion-style Enter; holes deleted") retired the only mechanism that could deliver the dogfood UX. **Holes need to come back, in their v1 IME-preedit-pattern form, scoped narrowly.** The full failure analysis + redesign brief is at `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md`.
 >
-> **Recommended next (fresh context window):** Read `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md` in full. Conduct the post-mortem of the v0 holes implementation per that document's §7.2. Adapt the v1 IME-preedit-pattern design (specced at `docs/specs/2026-05-01-live-projection-layer.md` §3.1–§3.5 but never implemented) to the C-architecture restoration. Propose spec amendments per `docs/handoff/2026-05-02-restoration-session-brief.md` §3.6 — surface to the user with concrete edit drafts, await explicit approval, then re-derive the R5 (or R5.5) plan. Until that work happens, do not run the R5 dogfood gate (Task 18).
+> **Recommended next:** Post-mortem (`docs/handoff/2026-05-03-r5-holes-postmortem.md`) and design doc (`docs/specs/2026-05-03-v2-holes-design.md`) are landed and user-approved. Apply spec amendments per design doc §13 to `docs/specs/2026-05-02-live-render-restoration-design.md` (premise 6, §3.1, §4.4, §5.4, §6.1 L6, §7.2, §11 R5 + new R5.5, §15). Then derive the R5.5 plan via `superpowers:writing-plans`. Then begin implementation Task 1 (the realistic-input harness gate test). User has pre-approved spec edits and plan generation; proceed autonomously.
 >
 > **Read first** (in this order):
-> 1. `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md` — call-for-design + post-mortem brief (THIS is the entry point).
-> 2. `docs/handoff/2026-05-02-restoration-session-brief.md` — orientation / working-protocol doc; particularly §3.6 spec-amendment protocol.
-> 3. `docs/specs/2026-05-01-live-projection-layer.md` §3.1–§3.5 (v1 hole design) and §3.6 (v0 five failure modes) — load-bearing prior art.
-> 4. `docs/specs/2026-05-02-live-render-restoration-design.md` premise 6, §4.4, §5.3, §7.2, §11 R5/R6 — the spec to be amended.
-> 5. `docs/plans/2026-05-02-live-render-r5-structural-keys.md` — the R5 plan (Tasks 1–11 executed; 12–18 paused).
+> 1. `docs/handoff/2026-05-03-r5-holes-postmortem.md` — post-mortem (input to the design).
+> 2. `docs/specs/2026-05-03-v2-holes-design.md` — design (input to the spec amendments and plan).
+> 3. `docs/handoff/2026-05-02-restoration-session-brief.md` §3.6 — spec-amendment protocol.
+> 4. `docs/specs/2026-05-02-live-render-restoration-design.md` — the spec to be amended.
+> 5. `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md` — original call for design (archived; the post-mortem responds to it).
 
 ---
 
@@ -58,7 +58,8 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-03 | (this commit) | docs(handoff): R5 empty-paragraph gap analysis + redesign brief; status-doc reflects R5 pause |
+| 2026-05-03 | (this commit) | docs: R5 v2-holes post-mortem + design — verifies v1 mitigations under C; adopts audit L9 phantom-rows + concatenating proxy as structural correction; specifies LiveHoleLayer + LiveProxyBlockModel + LiveRealisticInputHarness APIs |
+| 2026-05-03 | `8dac44b` | docs(handoff): R5 empty-paragraph gap analysis + redesign brief; status-doc reflects R5 pause |
 | 2026-05-02 | `b8fb639` | feat(live-render): populate consumedStructuralKeys on built-in descriptors (R5 Task 11; also corrected 3 test assertions about parser behaviour — surfaced the empty-paragraph gap) |
 | 2026-05-02 | `21be140` | feat(live-render): code-block consumes only Backspace/Delete edges (R5 Task 10) |
 | 2026-05-02 | `cc64af9` | feat(live-render): heading structural keys mirror paragraph (R5 Task 9) |
@@ -191,14 +192,23 @@ User decision: [approved / declined / revised, with date and concrete next actio
 Spec edit commit: [SHA when applied]
 ```
 
-### A1 — 2026-05-03 — Re-introduce holes for end-of-paragraph Enter (proposed; awaiting design)
+### A1 — 2026-05-03 — Re-introduce holes for end-of-paragraph Enter (v2-holes design)
 
-Proposed by: agent (during R5 Task 11 spec-compliance review)
-Affects: spec premise 6, §4.4, §5.4, §6.1 L6, §7.2, §11 R5/R6 (and possibly §15 open questions).
-Reason: R5 Tasks 1–11 landed correctly per the plan, but the test corrections in commit `b8fb639` revealed that tree-sitter's CommonMark grammar emits zero block nodes for blank-only regions. The spec's §7.2 data-flow assumption — that `applyLocalEdit("\n\n")` at end-of-paragraph produces an `Insert(B_new)` op the cursor can resolve into — is structurally incorrect for end-of-paragraph and start-of-paragraph cases. The R5 dogfood criterion (§10.3 R5) cannot be satisfied without holes. Premise 6 ("Notion-style Enter; holes deleted") conflated v0 holes' five concrete failure modes (`docs/specs/2026-05-01-live-projection-layer.md` §3.6) with the broader cycle-guards / six-sources-of-truth architecture the audit retired; the v1 IME-preedit-pattern hole design (specced at the same document §3.1–§3.5 but never implemented) is structurally compatible with the C-architecture's freshness rule and pending-cursor mechanism, and the v0 failure modes are addressed by v1 design choices.
-Proposed change: scope-narrowed re-introduction of the `BlockHole` primitive (paragraph-only initially) into a new layer position in §6.1 (either widen `LiveSpeculationLayer` or add `LiveHoleLayer`); rewrite §7.2 structural-edit data flow to use hole-create → local-typing → commit-on-trigger semantics; amend premise 6 to retire only the v0 implementation, not the concept; add hole tasks to R5 (or split R5.5).
-User decision: **AWAITING DESIGN.** Fresh-context post-mortem and v1-redesign-adaptation session is the next step (driven by `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md`). The amendment proposal is the OUTPUT of that session, not its INPUT — this entry is a placeholder to track the open question. Concrete amendment drafts will be added in a follow-up entry once the receiving session has done the design work.
-Spec edit commit: pending.
+Proposed by: agent (during R5 Task 11 spec-compliance review; design refined through 2026-05-03 post-mortem + design session)
+Affects: spec premise 6, §3.1 (BlockId type), §4.4, §5.4, §6.1 L6, §7.2, §11 R5 + new R5.5, §15.
+Reason: R5 Tasks 1–11 landed correctly per the plan, but the test corrections in commit `b8fb639` revealed that tree-sitter's CommonMark grammar emits zero block nodes for blank-only regions. The spec's §7.2 data-flow assumption — that `applyLocalEdit("\n\n")` at end-of-paragraph produces an `Insert(B_new)` op the cursor can resolve into — is structurally incorrect for end-of-paragraph and start-of-paragraph cases. Premise 6 ("Notion-style Enter; holes deleted") conflated v0 holes' five concrete failure modes (`docs/specs/2026-05-01-live-projection-layer.md` §3.6) with the broader cycle-guards / six-sources-of-truth architecture the audit retired. The v1 IME-preedit-pattern hole design was specced but never implemented; the post-mortem (`docs/handoff/2026-05-03-r5-holes-postmortem.md`) verified each v1 mitigation under C and adopted the audit's L9 prescription (phantom-rows + concatenating proxy) as the structural correction relative to v1.
+Concrete amendments (per design doc §13):
+1. **Premise 6** — replace "EOB-Enter hole feature is deleted" with paragraph-EOB and start-of-paragraph Enter creating a `LiveHoleLayer` hole that reifies on idle / focus-out / save / explicit Enter; v0 implementation permanently retired; v2 is structurally distinct (IME-preedit pattern + concatenating proxy).
+2. **§3.1 BlockId type** — change from `using BlockId = Markoff::BlockAnchor` to a discriminated union `std::variant<Markoff::BlockAnchor, HoleBlockId>` to disambiguate hole identity from CRDT anchors.
+3. **§4.4 cycle-guards-retired table** — restore the `commitBlockHole rowsInserted listener leak` and `Detach/reattach hole around applyOps` rows; annotate with v2-pattern note ("applyOps runs against the parser-pure inner model below the proxy; no detach/reattach; cursor delivery via deterministic `LiveProxyBlockModel::rowsInserted`").
+4. **§5.4 structural keys** — note that paragraph EOB-Enter and start-of-paragraph-Enter create a hole via `LiveHoleLayer::createBlockHole`, not `applyLocalEdit("\n\n")`. Mid-block Enter unchanged.
+5. **§6.1 L6** — add `LiveHoleLayer` and `LiveProxyBlockModel` as L6 components alongside `LiveSpeculationLayer`. Architecture diagram updated.
+6. **§7.2 structural-edit data flow** — replace EOB-Enter flow with hole-create → local-typing → commit-on-trigger flow; mid-block split flow unchanged.
+7. **§11 R5** — caveat dogfood criterion: end-of-paragraph and start-of-paragraph Enter cases require R5.5; R5 ships with these as documented limitations.
+8. **§11 (new R5.5)** — paragraph holes phase between R5 and R6; plan at `docs/plans/2026-05-03-live-render-r5-5-holes.md`.
+9. **§15 open questions** — resolve §3.1 BlockId question; add v2-holes scope note (paragraph-only initially; full hole inventory deferred to R7+).
+User decision: **PRE-APPROVED.** User authorised autonomous execution of spec amendments + R5.5 plan + implementation start (2026-05-03 conversation transcript).
+Spec edit commit: (next commit; subject `docs(spec): R5/R5.5 amendment — v2 holes`).
 
 **The bar for amendment:** the spec is wrong about something material, OR a premise turned out to be unworkable, OR a phase boundary needs reshaping based on what the prior phase taught us. The bar is **not** "I have a different opinion" — agents implement the design as specified unless something genuinely contradicts.
 
