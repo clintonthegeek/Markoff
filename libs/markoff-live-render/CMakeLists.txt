@@ -52,6 +52,9 @@ qt_add_qml_module(markoff_live_render
         src/UndoCoalescer.cpp
         include/markoff/live-render/LiveStructuralKeyHandler.h
         src/LiveStructuralKeyHandler.cpp
+        # R5.5: holes
+        include/markoff/live-render/LiveHoleLayer.h
+        src/LiveHoleLayer.cpp
     QML_FILES
         qml/LiveView.qml
         qml/delegates/ParagraphDelegate.qml
