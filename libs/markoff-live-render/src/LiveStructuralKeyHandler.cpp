@@ -170,6 +170,13 @@ void LiveStructuralKeyHandler::registerBuiltins()
         return HR::Handled;
     };
     m_handlers[BlockKind::Paragraph][Qt::Key_Delete] = paragraphDelete;
+
+    // Heading: same handlers as paragraph. Source-faithful text means the
+    // # prefix is part of blockText, so qtPos arithmetic matches paragraph.
+    m_handlers[BlockKind::Heading][Qt::Key_Return]    = paragraphEnter;
+    m_handlers[BlockKind::Heading][Qt::Key_Enter]     = paragraphEnter;
+    m_handlers[BlockKind::Heading][Qt::Key_Backspace] = paragraphBackspace;
+    m_handlers[BlockKind::Heading][Qt::Key_Delete]    = paragraphDelete;
 }
 
 }  // namespace Markoff::LiveRender

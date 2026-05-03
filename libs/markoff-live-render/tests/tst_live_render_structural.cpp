@@ -8,6 +8,7 @@
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveCursorState.h>
 #include <markoff/live-render/Cursor.h>
+#include <markoff/live-render/BlockKind.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
@@ -370,6 +371,45 @@ private Q_SLOTS:
             QStringLiteral("alpha"));
         QVERIFY(!consumed);
         QCOMPARE(doc.toMarkdown(), QString("alpha"));
+    }
+
+    // ---------- LiveStructuralKeyHandler — heading structural keys ----------
+
+    void enter_at_end_of_heading_inserts_paragraph_break() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("# Title", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier,
+            /*blockIndex=*/0, /*qtPos=*/7,
+            /*selectionEmpty=*/true,
+            QStringLiteral("# Title"));
+        QVERIFY(consumed);
+
+        QCOMPARE(doc.toMarkdown(), QString("# Title\n\n"));
+    }
+
+    void backspace_at_start_of_heading_merges_with_previous() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("alpha\n\n# Heading", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 2);
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Backspace, Qt::NoModifier,
+            /*blockIndex=*/1, /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            QStringLiteral("# Heading"));
+        QVERIFY(consumed);
+        QCOMPARE(doc.toMarkdown(), QString("alpha\n# Heading"));
     }
 
 };
