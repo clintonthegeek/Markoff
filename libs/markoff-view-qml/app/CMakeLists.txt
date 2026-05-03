@@ -17,4 +17,4 @@ target_link_libraries(markoff-view-qml-app PRIVATE
     markoff_foundation
 )
 
-qt_import_qml_plugins(markoff-view-qml-app)
+# qt_import_qml_plugins removed — see live-render/app rationale.

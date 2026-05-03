@@ -9,10 +9,16 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick QuickControls2 T
 
 qt_standard_project_setup(REQUIRES 6.5)
 
+# QTP0004 NEW — see live-render/CMakeLists.txt rationale.
+if(QT_KNOWN_POLICY_QTP0004)
+    qt_policy(SET QTP0004 NEW)
+endif()
+
 qt_add_qml_module(markoff_view_qml
     URI org.markoff.view.qml
     VERSION 1.0
     STATIC
+    OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/org/markoff/view/qml
     SOURCES
         src/EditorBackend.cpp
         include/markoff/view/qml/EditorBackend.h

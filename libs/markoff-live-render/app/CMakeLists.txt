@@ -16,4 +16,9 @@ target_link_libraries(markoff-live-render-app PRIVATE
     markoff_foundation
 )
 
-qt_import_qml_plugins(markoff-live-render-app)
+# qt_import_qml_plugins removed: a holdover from pre-Qt-6.5 patterns.
+# qt_add_qml_module(STATIC ...) on Qt 6.5+ handles plugin importation
+# automatically; the explicit call walked transitive deps and tried
+# to resolve Qt6::<plugin> targets in this scope (where they aren't
+# imported), producing ~21 spurious "link target does not exist"
+# warnings per app build. See docs/2026-05-03-cmake-warnings-rationale.md.

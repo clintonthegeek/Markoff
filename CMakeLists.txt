@@ -35,6 +35,20 @@ endif()
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "" FORCE)
 
 add_subdirectory(libs/rapidyaml)
+
+# rapidyaml + bundled c4core are non-Qt third-party C++ libraries; they
+# inherit the project-scope CMAKE_AUTOMOC / CMAKE_AUTOUIC ON flags above
+# and emit dev warnings ("No valid Qt version found for target"). Opt
+# them out. Guarded with if(TARGET ...) so parent projects providing
+# ryml via find_package don't see clobbered properties. See
+# docs/2026-05-03-cmake-warnings-rationale.md.
+if(TARGET ryml)
+    set_target_properties(ryml PROPERTIES AUTOMOC OFF AUTOUIC OFF)
+endif()
+if(TARGET c4core)
+    set_target_properties(c4core PROPERTIES AUTOMOC OFF AUTOUIC OFF)
+endif()
+
 add_subdirectory(libs/markoff-parser)
 
 # collabtext — CRDT engine, sibling library symlinked from /home/clinton/dev/collabtext.

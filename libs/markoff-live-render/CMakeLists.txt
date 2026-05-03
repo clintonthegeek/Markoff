@@ -10,10 +10,21 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
 
 qt_standard_project_setup(REQUIRES 6.5)
 
+# QTP0004 NEW (Qt 6.8+): every directory that contributes .qml files
+# to a module is expected to carry its own qmldir. We add a minimal
+# qmldir under qml/delegates/ declaring the parent module URI so the
+# build system + qmllint + IDE tooling resolve sub-directory QML files
+# cleanly. Gated for forward compatibility with Qt < 6.8 envs.
+# See docs/2026-05-03-cmake-warnings-rationale.md.
+if(QT_KNOWN_POLICY_QTP0004)
+    qt_policy(SET QTP0004 NEW)
+endif()
+
 qt_add_qml_module(markoff_live_render
     URI org.markoff.live.render
     VERSION 1.0
     STATIC
+    OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/org/markoff/live/render
     SOURCES
         src/Version.cpp
         include/markoff/live-render/MarkoffLiveRenderExport.h
