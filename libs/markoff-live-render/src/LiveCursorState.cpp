@@ -100,7 +100,7 @@ void LiveCursorState::resolvePendingForRow(int row)
     m_pendingRow.reset();
 
     TextCaret tc;
-    tc.block            = m_model->recordAt(row).blockAnchor;
+    tc.block            = BlockId{m_model->recordAt(row).blockAnchor};
     tc.cachedByteOffset = static_cast<quint32>(qtPos);
     // positionAnchor: left default — selection projection refreshes it.
     request(tc);
@@ -110,13 +110,18 @@ bool LiveCursorState::validateVariant(const Cursor &c) const
 {
     if (std::holds_alternative<NoCursor>(c)) return true;
 
-    const Markoff::BlockAnchor *blockPtr = nullptr;
-    if (auto *tc = std::get_if<TextCaret>(&c))               blockPtr = &tc->block;
-    else if (auto *bs = std::get_if<BlockSelected>(&c))      blockPtr = &bs->block;
-    else if (auto *bi = std::get_if<BlockInternalEdit>(&c))  blockPtr = &bi->block;
-    if (!blockPtr) return false;
+    const BlockId *blockIdPtr = nullptr;
+    if (auto *tc = std::get_if<TextCaret>(&c))               blockIdPtr = &tc->block;
+    else if (auto *bs = std::get_if<BlockSelected>(&c))      blockIdPtr = &bs->block;
+    else if (auto *bi = std::get_if<BlockInternalEdit>(&c))  blockIdPtr = &bi->block;
+    if (!blockIdPtr) return false;
 
-    const int row = rowForBlock(*blockPtr);
+    // Holes don't (yet) pass through validateVariant — they bypass normal
+    // validation because LiveHoleLayer manages their lifecycle directly.
+    // Task 4: all live cursors are anchor-side; hole path is reserved for R5.5+.
+    if (isHoleBlockId(*blockIdPtr)) return true;
+
+    const int row = rowForBlock(anchorOf(*blockIdPtr));
     if (row < 0) {
         qCWarning(lcCursor) << "cursor request for unknown block";
         return false;

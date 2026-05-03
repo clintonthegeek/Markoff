@@ -49,3 +49,11 @@ target_link_libraries(tst_live_render_structural PRIVATE
     Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test
     markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_structural COMMAND tst_live_render_structural)
+
+qt_add_executable(tst_live_render_holes_layer
+    tst_live_render_holes_layer.cpp
+)
+target_link_libraries(tst_live_render_holes_layer PRIVATE
+    Qt6::Core Qt6::Test
+    markoff_live_render markoff_foundation)
+add_test(NAME tst_live_render_holes_layer COMMAND tst_live_render_holes_layer)

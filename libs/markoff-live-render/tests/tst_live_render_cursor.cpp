@@ -217,7 +217,7 @@ private Q_SLOTS:
         const Cursor cur = cs.cursor();
         QVERIFY(std::holds_alternative<TextCaret>(cur));
         QCOMPARE(std::get<TextCaret>(cur).cachedByteOffset, quint32(0));
-        QCOMPARE(std::get<TextCaret>(cur).block, recs[1].blockAnchor);
+        QCOMPARE(anchorOf(std::get<TextCaret>(cur).block), recs[1].blockAnchor);
     }
 
     void requestTextCaretAtRow_pending_resolves_on_rowsInserted() {
@@ -248,7 +248,7 @@ private Q_SLOTS:
 
         QCOMPARE(spy.count(), 1);
         QVERIFY(std::holds_alternative<TextCaret>(cs.cursor()));
-        QCOMPARE(std::get<TextCaret>(cs.cursor()).block, second[1].blockAnchor);
+        QCOMPARE(anchorOf(std::get<TextCaret>(cs.cursor()).block), second[1].blockAnchor);
     }
 
     void requestTextCaretAtRow_pending_dropped_after_two_parse_cycles() {
@@ -313,7 +313,7 @@ private Q_SLOTS:
 
         const auto refreshed = std::get<TextCaret>(binding.cursorState()->cursor());
         // Verify cachedByteOffset matches the resolved-relative-to-block-start.
-        const auto blockRangeOpt = document.blockByteRange(refreshed.block);
+        const auto blockRangeOpt = document.blockByteRange(anchorOf(refreshed.block));
         QVERIFY(blockRangeOpt.has_value());
         const quint32 blockStart = blockRangeOpt->first;
         const quint32 resolvedAbs = document.resolveTextAnchor(refreshed.positionAnchor);

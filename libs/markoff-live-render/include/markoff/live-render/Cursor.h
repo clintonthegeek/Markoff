@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live-render/BlockHole.h>
 #include <markoff-foundation/BlockAnchor.h>
 #include <markoff-foundation/TextAnchor.h>
 
@@ -11,11 +12,25 @@
 
 namespace Markoff::LiveRender {
 
+/// Opaque block identity (spec §3.1 amendment A1):
+/// either a CRDT-anchored parser block or a layer-local hole.
+using BlockId = std::variant<Markoff::BlockAnchor, HoleBlockId>;
+
+inline bool isHoleBlockId(const BlockId &id) {
+    return std::holds_alternative<HoleBlockId>(id);
+}
+inline quint64 holeIdOf(const BlockId &id) {
+    return std::get<HoleBlockId>(id).holeId;
+}
+inline const Markoff::BlockAnchor &anchorOf(const BlockId &id) {
+    return std::get<Markoff::BlockAnchor>(id);
+}
+
 /// Caret inside a text-bearing block at a CRDT-anchored byte position.
 /// Rendered as a blinking I-beam. Spec §3.1.
 struct MARKOFF_LIVE_RENDER_EXPORT TextCaret {
-    Markoff::BlockAnchor block;
-    Markoff::TextAnchor  positionAnchor;    ///< CRDT anchor; survives remote edits.
+    BlockId              block;           ///< was Markoff::BlockAnchor; widened by spec §3.1 amendment A1
+    Markoff::TextAnchor  positionAnchor;  ///< CRDT anchor; survives remote edits.
     quint32              cachedByteOffset = 0; ///< Resolved byte offset; refreshed on use.
 
     bool operator==(const TextCaret &o) const noexcept {
@@ -27,14 +42,14 @@ struct MARKOFF_LIVE_RENDER_EXPORT TextCaret {
 /// Block focused as a unit — no caret. Rendered as a focus ring.
 /// Used by non-text blocks (hr, image) in their default state. Spec §3.1.
 struct MARKOFF_LIVE_RENDER_EXPORT BlockSelected {
-    Markoff::BlockAnchor block;
+    BlockId block;                        ///< was Markoff::BlockAnchor; widened by spec §3.1 amendment A1
     bool operator==(const BlockSelected &o) const noexcept { return block == o.block; }
 };
 
 /// Block in its own internal-edit mode. Deferred to R8 (math block). Spec §3.1.
 struct MARKOFF_LIVE_RENDER_EXPORT BlockInternalEdit {
-    Markoff::BlockAnchor block;
-    QString              mode;  ///< Block-kind-defined token, e.g. "editing-latex".
+    BlockId block;                        ///< was Markoff::BlockAnchor; widened by spec §3.1 amendment A1
+    QString mode;  ///< Block-kind-defined token, e.g. "editing-latex".
     bool operator==(const BlockInternalEdit &o) const noexcept {
         return block == o.block && mode == o.mode;
     }

@@ -21,6 +21,7 @@ qt_add_qml_module(markoff_live_render
         # Block value types
         include/markoff/live-render/BlockRecord.h
         include/markoff/live-render/BlockKind.h
+        include/markoff/live-render/BlockHole.h
         include/markoff/live-render/BlockKindDescriptor.h
         include/markoff/live-render/BlockKindRegistry.h
         include/markoff/live-render/Coordinates.h
