@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-02 (R5 plan written; pending execution)
+**Last updated:** 2026-05-03 (R5 Tasks 1–11 landed; PAUSED on architectural finding — see TL;DR)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,14 +11,16 @@
 
 ## TL;DR — what to do *right now*
 
-> **R5 plan written; pending execution.** The 18-task R5 plan is in `docs/plans/2026-05-02-live-render-r5-structural-keys.md`. R4 remains `complete` (paragraph/heading/code-block editable; freshness rule + three cycle guards in place; 6/6 fast-tier green). R5 retires the R4 Enter-swallow with `LiveStructuralKeyHandler` (descriptor-driven dispatch), adds `UndoCoalescer` (printable-coalesce policy from spec §6.1 L5), and extends `LiveCursorState` with a deterministic pending-row request that resolves on `LiveBlockModel::rowsInserted` (spec §5.3 step 6). Resolves spec open questions §15.1 (handler-registration mechanism: per-(kind,key) `std::function` table inside the handler) and §15.4 (undo idle threshold pinned at 1000 ms); §15.8 (test-app `--live` flag rename) deferred to R10.
+> **R5 PAUSED on architectural finding (empty-paragraph gap).** R5 Tasks 1–11 are landed (commits `7c6f7f6..b8fb639`); 7/7 live-render fast-tier executables green; 21/21 structural-test slots green. **Tasks 12–18 are paused.** The R5 dogfood criterion (spec §10.3) — *"caret lands in the new empty paragraph each time"* — is structurally unachievable with the current `\n\n`-insert design because tree-sitter's CommonMark grammar emits zero block nodes for blank-only regions. Inserting `\n\n` at end of `"hello"` produces `model->rowCount() == 1`, not 2. The planned `requestTextCaretAtRow(blockIndex+1, 0)` cursor delivery has no row to resolve into. Mid-block split works; end-of-paragraph and start-of-paragraph Enter do not. The R5 spec premise 6 ("Notion-style Enter; holes deleted") retired the only mechanism that could deliver the dogfood UX. **Holes need to come back, in their v1 IME-preedit-pattern form, scoped narrowly.** The full failure analysis + redesign brief is at `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md`.
 >
-> **Recommended next:** Execute the R5 plan task-by-task per the working protocol. The plan is structured for the `superpowers:subagent-driven-development` skill (one subagent per task) or `superpowers:executing-plans` (in-session execution). The acceptance gate is the spec §10.3 R5 dogfood script: *"Press Enter at the end of every paragraph in a 10-block doc; caret lands in the new empty paragraph each time; Backspace at the start of each merges back, restoring the original."*
+> **Recommended next (fresh context window):** Read `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md` in full. Conduct the post-mortem of the v0 holes implementation per that document's §7.2. Adapt the v1 IME-preedit-pattern design (specced at `docs/specs/2026-05-01-live-projection-layer.md` §3.1–§3.5 but never implemented) to the C-architecture restoration. Propose spec amendments per `docs/handoff/2026-05-02-restoration-session-brief.md` §3.6 — surface to the user with concrete edit drafts, await explicit approval, then re-derive the R5 (or R5.5) plan. Until that work happens, do not run the R5 dogfood gate (Task 18).
 >
 > **Read first** (in this order):
-> 1. `docs/handoff/2026-05-02-restoration-session-brief.md` — the orientation / working-protocol doc.
-> 2. `docs/plans/2026-05-02-live-render-r5-structural-keys.md` — the R5 implementation plan (active).
-> 3. `docs/specs/2026-05-02-live-render-restoration-design.md` §5.3, §5.4, §7.2, §11 R5 — the architecture sections the plan derives from.
+> 1. `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md` — call-for-design + post-mortem brief (THIS is the entry point).
+> 2. `docs/handoff/2026-05-02-restoration-session-brief.md` — orientation / working-protocol doc; particularly §3.6 spec-amendment protocol.
+> 3. `docs/specs/2026-05-01-live-projection-layer.md` §3.1–§3.5 (v1 hole design) and §3.6 (v0 five failure modes) — load-bearing prior art.
+> 4. `docs/specs/2026-05-02-live-render-restoration-design.md` premise 6, §4.4, §5.3, §7.2, §11 R5/R6 — the spec to be amended.
+> 5. `docs/plans/2026-05-02-live-render-r5-structural-keys.md` — the R5 plan (Tasks 1–11 executed; 12–18 paused).
 
 ---
 
@@ -34,7 +36,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | `5a0dae7` | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
 | **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | `3484c11`, `2225061`, `e837710`, `1f26ec8`, `18abd96` | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. Dogfood-surfaced fixes: selection-paint, scroll-then-click hit-test, HR source-faithful copy. 114/114. |
 | **R4** | [r4-paragraph-editing](plans/2026-05-02-live-render-r4-paragraph-editing.md) | `complete` | `1b75d37`, `ce0494f`, `3181fe8`, `dec12e7`, `7ae29e1`, `033d7e7`, `fa8e80d`, `99c616f`, `5e12f10`, `563c1f3`, `77a84eb`, `28e1c8f`, `a24c766`, `26dc802`, `7252498`, `324de05`, `201cbd3`, `5662f95`, `7d49718`, `c7dca41`, `37b97bf` | Paragraph + heading + code-block writable via LiveEditBinding; freshness gate; three cycle guards; previousText cache; cachedByteOffset refresh; click-focus routing; Enter swallowed (R5). 6/6 fast-tier; 8 paragraph_edit slots. |
-| **R5** | [r5-structural-keys](plans/2026-05-02-live-render-r5-structural-keys.md) | `pending` | — | Structural keys + IME + undo coalescing. Plan written; execution pending. |
+| **R5** | [r5-structural-keys](plans/2026-05-02-live-render-r5-structural-keys.md) | `in-progress (paused)` | `7c6f7f6`, `6da5698`, `dff19de`, `9d9d157`, `abc1005`, `4901383`, `05363f2`, `9a6c9f8`, `1ab0da9`, `cc64af9`, `21be140`, `b8fb639` | Tasks 1–11 landed (12 commits). PAUSED at the empty-paragraph gap — see TL;DR + `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md`. Tasks 12–18 are paused pending spec amendment to re-introduce holes. |
 | **R6** | *not yet written* | `pending` | — | Other text blocks + speculation refresh. |
 | **R7** | *not yet written* | `pending` | — | Lists + blockquotes (II.a, II.b). |
 | **R8** | *not yet written* | `pending` | — | Math block + BlockInternalEdit (I.a, L8). |
@@ -56,6 +58,20 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-03 | (this commit) | docs(handoff): R5 empty-paragraph gap analysis + redesign brief; status-doc reflects R5 pause |
+| 2026-05-02 | `b8fb639` | feat(live-render): populate consumedStructuralKeys on built-in descriptors (R5 Task 11; also corrected 3 test assertions about parser behaviour — surfaced the empty-paragraph gap) |
+| 2026-05-02 | `21be140` | feat(live-render): code-block consumes only Backspace/Delete edges (R5 Task 10) |
+| 2026-05-02 | `cc64af9` | feat(live-render): heading structural keys mirror paragraph (R5 Task 9) |
+| 2026-05-02 | `1ab0da9` | feat(live-render): paragraph Shift-Enter — soft break (R5 Task 8) |
+| 2026-05-02 | `9a6c9f8` | feat(live-render): paragraph Delete at row-end merges with next (R5 Task 7) |
+| 2026-05-02 | `05363f2` | feat(live-render): paragraph Backspace at row-start merges with previous (R5 Task 6) |
+| 2026-05-02 | `4901383` | feat(live-render): paragraph Enter — mid-block split and start-of-block (R5 Task 5) |
+| 2026-05-02 | `abc1005` | feat(live-render): LiveStructuralKeyHandler skeleton + paragraph end-of-block Enter (R5 Task 4) |
+| 2026-05-02 | `9d9d157` | docs(live-render): note recordStructural/recordOther intentional duplication (R5 Task 3 follow-up) |
+| 2026-05-02 | `dff19de` | feat(live-render): UndoCoalescer policy (R5 Task 3) |
+| 2026-05-02 | `6da5698` | docs(live-render): clarify LiveCursorState pending-row semantics (R5 Task 2 follow-up) |
+| 2026-05-02 | `7c6f7f6` | feat(live-render): pending TextCaret request via rowsInserted (R5 Task 2) |
+| 2026-05-02 | `86cae4d` | docs(plan): R5 implementation plan — structural keys + IME completion + undo coalescing |
 | 2026-05-02 | `37b97bf` | fix(live-render): swallow Enter in R4 to prevent split-without-focus-transition |
 | 2026-05-02 | `c7dca41` | wip(live-render): trace logging for content-duplication dogfood (logging reverted by `37b97bf`) |
 | 2026-05-02 | `7d49718` | fix(live-render): route delegate text through LiveEditBinding to stop content duplication |
@@ -175,7 +191,14 @@ User decision: [approved / declined / revised, with date and concrete next actio
 Spec edit commit: [SHA when applied]
 ```
 
-*No amendments yet.*
+### A1 — 2026-05-03 — Re-introduce holes for end-of-paragraph Enter (proposed; awaiting design)
+
+Proposed by: agent (during R5 Task 11 spec-compliance review)
+Affects: spec premise 6, §4.4, §5.4, §6.1 L6, §7.2, §11 R5/R6 (and possibly §15 open questions).
+Reason: R5 Tasks 1–11 landed correctly per the plan, but the test corrections in commit `b8fb639` revealed that tree-sitter's CommonMark grammar emits zero block nodes for blank-only regions. The spec's §7.2 data-flow assumption — that `applyLocalEdit("\n\n")` at end-of-paragraph produces an `Insert(B_new)` op the cursor can resolve into — is structurally incorrect for end-of-paragraph and start-of-paragraph cases. The R5 dogfood criterion (§10.3 R5) cannot be satisfied without holes. Premise 6 ("Notion-style Enter; holes deleted") conflated v0 holes' five concrete failure modes (`docs/specs/2026-05-01-live-projection-layer.md` §3.6) with the broader cycle-guards / six-sources-of-truth architecture the audit retired; the v1 IME-preedit-pattern hole design (specced at the same document §3.1–§3.5 but never implemented) is structurally compatible with the C-architecture's freshness rule and pending-cursor mechanism, and the v0 failure modes are addressed by v1 design choices.
+Proposed change: scope-narrowed re-introduction of the `BlockHole` primitive (paragraph-only initially) into a new layer position in §6.1 (either widen `LiveSpeculationLayer` or add `LiveHoleLayer`); rewrite §7.2 structural-edit data flow to use hole-create → local-typing → commit-on-trigger semantics; amend premise 6 to retire only the v0 implementation, not the concept; add hole tasks to R5 (or split R5.5).
+User decision: **AWAITING DESIGN.** Fresh-context post-mortem and v1-redesign-adaptation session is the next step (driven by `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md`). The amendment proposal is the OUTPUT of that session, not its INPUT — this entry is a placeholder to track the open question. Concrete amendment drafts will be added in a follow-up entry once the receiving session has done the design work.
+Spec edit commit: pending.
 
 **The bar for amendment:** the spec is wrong about something material, OR a premise turned out to be unworkable, OR a phase boundary needs reshaping based on what the prior phase taught us. The bar is **not** "I have a different opinion" — agents implement the design as specified unless something genuinely contradicts.
 
