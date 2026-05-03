@@ -19,6 +19,8 @@ class LiveBlockModel;
 class LiveCursorState;
 class BlockKindRegistry;
 class UndoCoalescer;
+class LiveHoleLayer;
+class LiveProxyBlockModel;
 
 /// Single dispatcher for structural key events (Enter, Backspace-edge,
 /// Delete-edge, Shift-Enter; future Tab/Shift-Tab in R7). Looks up the
@@ -42,6 +44,8 @@ public:
         LiveBlockModel           *model;
         LiveCursorState          *cursorState;
         UndoCoalescer            *undoCoalescer;
+        LiveHoleLayer            *holeLayer;
+        LiveProxyBlockModel      *proxyModel;
 
         int                       blockIndex;
         Markoff::BlockAnchor      blockAnchor;
@@ -61,6 +65,8 @@ public:
                              LiveCursorState          *cursorState,
                              const BlockKindRegistry  *registry,
                              UndoCoalescer            *undoCoalescer,
+                             LiveHoleLayer            *holeLayer,
+                             LiveProxyBlockModel      *proxyModel,
                              QObject                  *parent = nullptr);
 
     /// Register a kind-specific handler for `key` (a `Qt::Key_*` value).
@@ -83,6 +89,8 @@ private:
     LiveCursorState                   *m_cursorState;
     const BlockKindRegistry           *m_registry;
     UndoCoalescer                     *m_undoCoalescer;
+    LiveHoleLayer                     *m_holeLayer;
+    LiveProxyBlockModel               *m_proxyModel;
 
     // Outer key: kind ("paragraph", etc.). Inner key: Qt::Key_*.
     QHash<QString, QHash<int, HandlerFn>> m_handlers;

@@ -92,7 +92,7 @@ void LiveProxyBlockModel::rebuildMapping() {
         if (holeCursor >= holeIds.size()) return false;
         const Markoff::TextAnchor a = m_layer->reifyAnchor(holeIds[holeCursor]);
         const quint32 byte = m_doc->resolveTextAnchor(a);
-        return byte < innerStartByteForRow(innerRow);
+        return byte <= innerStartByteForRow(innerRow);
     };
 
     for (int r = 0; r < m_inner->rowCount(); ++r) {
@@ -144,7 +144,7 @@ void LiveProxyBlockModel::onHoleInserted(quint64 holeId) {
             }
         } else {
             const quint32 innerByte = innerStartByteForRow(row.innerRow);
-            if (holeByte < innerByte) {
+            if (holeByte <= innerByte) {
                 targetProxyRow = i;
                 break;
             }

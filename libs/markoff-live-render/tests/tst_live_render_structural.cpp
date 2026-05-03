@@ -7,6 +7,8 @@
 #include <markoff/live-render/LiveListModelBinding.h>
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveCursorState.h>
+#include <markoff/live-render/LiveHoleLayer.h>
+#include <markoff/live-render/LiveProxyBlockModel.h>
 #include <markoff/live-render/Cursor.h>
 #include <markoff/live-render/BlockKind.h>
 #include <markoff-foundation/MarkoffDocument.h>
@@ -180,7 +182,8 @@ private Q_SLOTS:
 
     // ---------- LiveStructuralKeyHandler — paragraph Enter (all positions) ----------
 
-    void enter_at_end_of_paragraph_inserts_paragraph_break() {
+    void enter_at_end_of_paragraph_creates_hole() {
+        // R5.5 Task 11: EOB-Enter now creates a hole row instead of mutating source.
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
@@ -201,13 +204,16 @@ private Q_SLOTS:
             /*blockText=*/QStringLiteral("hello"));
         QVERIFY(consumed);
 
-        // CRDT now has "hello\n\n" — paragraph break at end.
-        QCOMPARE(doc.toMarkdown(), QString("hello\n\n"));
+        // F5: source is NOT mutated at hole creation time.
+        QCOMPARE(doc.toMarkdown(), QString("hello"));
 
-        // After parse-back: trailing \n\n is whitespace; tree-sitter does not
-        // create a second (empty) paragraph from trailing blank lines.
-        QVERIFY(parseSpy.wait(2000));
-        QCOMPARE(binding.model()->rowCount(), 1);
+        // A hole was created in the layer.
+        QCOMPARE(binding.holeLayer()->holeCount(), 1);
+
+        // Proxy has 2 rows: 1 parser block + 1 hole.
+        QCOMPARE(binding.proxyModel()->rowCount(), 2);
+        // Hole is AFTER the block (EOB-Enter).
+        QVERIFY(binding.proxyModel()->proxyRowIsHole(1));
     }
     void enter_in_middle_of_paragraph_splits_block() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
@@ -239,7 +245,9 @@ private Q_SLOTS:
                  binding.model()->recordAt(1).blockAnchor);
     }
 
-    void enter_at_start_of_paragraph_inserts_blank_above() {
+    void enter_at_start_of_paragraph_creates_hole_above() {
+        // R5.5 Task 11: start-of-block-Enter now creates a hole row instead of
+        // mutating source.
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
@@ -254,13 +262,16 @@ private Q_SLOTS:
             QStringLiteral("hello"));
         QVERIFY(consumed);
 
-        QCOMPARE(doc.toMarkdown(), QString("\n\nhello"));
+        // F5: source is NOT mutated at hole creation time.
+        QCOMPARE(doc.toMarkdown(), QString("hello"));
 
-        QVERIFY(parseSpy.wait(2000));
-        // Parser collapses leading \n\n into a single empty/non-empty pair;
-        // expected outcome: one paragraph row with text "hello". Whether an
-        // empty leading row exists is parser-dependent and not asserted.
-        QVERIFY(binding.model()->rowCount() >= 1);
+        // A hole was created in the layer.
+        QCOMPARE(binding.holeLayer()->holeCount(), 1);
+
+        // Proxy has 2 rows: 1 hole (above) + 1 parser block.
+        QCOMPARE(binding.proxyModel()->rowCount(), 2);
+        QVERIFY(binding.proxyModel()->proxyRowIsHole(0));
+        QVERIFY(!binding.proxyModel()->proxyRowIsHole(1));
     }
 
     // ---------- LiveStructuralKeyHandler — paragraph Backspace at row-start ----------
@@ -459,6 +470,87 @@ private Q_SLOTS:
             /*selectionEmpty=*/true,
             QStringLiteral("code\n"));
         QVERIFY(!consumed);
+    }
+
+    // ---------- R5.5 Task 11 — EOB-Enter + start-Enter create holes ----------
+
+    void paragraph_eob_enter_creates_hole_not_source_edit() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        LiveHoleLayer       *layer   = binding.holeLayer();
+        LiveProxyBlockModel *proxy   = binding.proxyModel();
+        LiveStructuralKeyHandler *handler = binding.structuralKeyHandler();
+        QVERIFY(layer && proxy && handler);
+
+        // Simulate caret at qtPos 5 of row 0 ("hello"), end-of-block.
+        const bool ok = handler->tryHandle(Qt::Key_Return, Qt::NoModifier,
+                                           /*blockIndex=*/0,
+                                           /*qtPos=*/5,
+                                           /*selectionEmpty=*/true,
+                                           QStringLiteral("hello"));
+        QVERIFY(ok);
+        QCOMPARE(layer->holeCount(), 1);
+        QCOMPARE(doc.toMarkdown(), QString("hello"));  // F5 — source unchanged
+        QCOMPARE(proxy->rowCount(), 2);                // 1 parser + 1 hole
+        QVERIFY(proxy->proxyRowIsHole(1));
+    }
+
+    void paragraph_start_enter_creates_hole_above() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *proxy   = binding.proxyModel();
+        auto *handler = binding.structuralKeyHandler();
+
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier,
+                                   0, /*qtPos=*/0, true,
+                                   QStringLiteral("hello")));
+        QCOMPARE(layer->holeCount(), 1);
+        QCOMPARE(doc.toMarkdown(), QString("hello"));
+        QCOMPARE(proxy->rowCount(), 2);
+        QVERIFY(proxy->proxyRowIsHole(0));
+        QVERIFY(!proxy->proxyRowIsHole(1));
+    }
+
+    void paragraph_eob_enter_routes_cursor_into_hole() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *handler = binding.structuralKeyHandler();
+        auto *cursor  = binding.cursorState();
+        auto *layer   = binding.holeLayer();
+
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier,
+                                   0, 5, true, QStringLiteral("hello")));
+
+        QCOMPARE(layer->holeCount(), 1);
+        const Cursor c = cursor->cursor();
+        const auto *tc = std::get_if<TextCaret>(&c);
+        QVERIFY(tc);
+        QVERIFY(isHoleBlockId(tc->block));
+        QCOMPARE(tc->cachedByteOffset, quint32(0));
+
+        // The hole's holeId — the only one in the layer.
+        QList<quint64> ids = layer->holesInOrder();
+        QCOMPARE(ids.size(), 1);
+        QCOMPARE(holeIdOf(tc->block), ids.first());
     }
 
 };

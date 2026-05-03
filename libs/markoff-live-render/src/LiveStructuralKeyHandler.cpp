@@ -7,6 +7,8 @@
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveCursorState.h>
 #include <markoff/live-render/UndoCoalescer.h>
+#include <markoff/live-render/LiveHoleLayer.h>
+#include <markoff/live-render/LiveProxyBlockModel.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
@@ -23,6 +25,8 @@ LiveStructuralKeyHandler::LiveStructuralKeyHandler(
     LiveCursorState          *cursorState,
     const BlockKindRegistry  *registry,
     UndoCoalescer            *undoCoalescer,
+    LiveHoleLayer            *holeLayer,
+    LiveProxyBlockModel      *proxyModel,
     QObject                  *parent)
     : QObject(parent)
     , m_document(document)
@@ -30,6 +34,8 @@ LiveStructuralKeyHandler::LiveStructuralKeyHandler(
     , m_cursorState(cursorState)
     , m_registry(registry)
     , m_undoCoalescer(undoCoalescer)
+    , m_holeLayer(holeLayer)
+    , m_proxyModel(proxyModel)
 {
     registerBuiltins();
 }
@@ -74,6 +80,8 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     ctx.model             = m_model;
     ctx.cursorState       = m_cursorState;
     ctx.undoCoalescer     = m_undoCoalescer;
+    ctx.holeLayer         = m_holeLayer;
+    ctx.proxyModel        = m_proxyModel;
     ctx.blockIndex        = blockIndex;
     ctx.blockAnchor       = rec.blockAnchor;
     ctx.currentBlockStart = m_document->resolveTextAnchor(rec.blockAnchor.firstByte);
@@ -94,27 +102,53 @@ void LiveStructuralKeyHandler::registerBuiltins()
     auto paragraphEnter = [](const Ctx &c) -> HR {
         const bool isShift = (c.modifiers & Qt::ShiftModifier) != 0;
 
-        const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
-        const quint32 byteOffset =
-            c.currentBlockStart + static_cast<quint32>(prefixUtf8.size());
-
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = byteOffset;
-        ed.oldEnd   = byteOffset;
-        ed.newText  = isShift
-            ? QByteArrayLiteral("\n")     // soft break — stays in block
-            : QByteArrayLiteral("\n\n");  // paragraph break — splits
-        c.document->applyLocalEdit({ ed });
-        c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-
         if (isShift) {
-            // Cursor stays in the same block, advanced past the newline.
+            // Soft break — insert \n, stay in block.
+            const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
+            const quint32 byteOffset =
+                c.currentBlockStart + static_cast<quint32>(prefixUtf8.size());
+            Markoff::MarkoffEdit ed;
+            ed.oldStart = byteOffset;
+            ed.oldEnd   = byteOffset;
+            ed.newText  = QByteArrayLiteral("\n");
+            c.document->applyLocalEdit({ ed });
+            c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
             c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 1);
-        } else {
-            // Block split — caret to qtPos 0 of the new (or original-shifted)
-            // row at blockIndex + 1. See Task 5 for the three-case rationale.
-            c.cursorState->requestTextCaretAtRow(c.blockIndex + 1, 0);
+            if (c.undoCoalescer) c.undoCoalescer->recordStructural();
+            return HR::Handled;
         }
+
+        const bool atStart = (c.qtPos == 0);
+        const bool atEnd   = (c.qtPos == c.blockText.length());
+
+        if (!atStart && !atEnd) {
+            // Mid-block split — unchanged from R5 Task 5.
+            const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
+            const quint32 byteOffset =
+                c.currentBlockStart + static_cast<quint32>(prefixUtf8.size());
+            Markoff::MarkoffEdit ed;
+            ed.oldStart = byteOffset;
+            ed.oldEnd   = byteOffset;
+            ed.newText  = QByteArrayLiteral("\n\n");
+            c.document->applyLocalEdit({ ed });
+            c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
+            c.cursorState->requestTextCaretAtRow(c.blockIndex + 1, 0);
+            if (c.undoCoalescer) c.undoCoalescer->recordStructural();
+            return HR::Handled;
+        }
+
+        // EOB or start-of-block: create hole instead of source edit (R5.5 F5).
+        if (!c.holeLayer || !c.proxyModel) return HR::NotHandled;
+
+        const quint32 reifyByte = atStart ? c.currentBlockStart : c.currentBlockEnd;
+        Markoff::TextAnchor anchor = c.document->textAnchorAt(reifyByte, /*rightBias=*/false);
+        const quint64 holeId = c.holeLayer->createBlockHole(HoleKind::Paragraph, anchor);
+
+        // Place caret in the hole row at byte offset 0.
+        TextCaret tc;
+        tc.block             = BlockId{HoleBlockId{holeId}};
+        tc.cachedByteOffset  = 0;
+        c.cursorState->request(Cursor{tc});
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;
