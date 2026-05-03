@@ -57,3 +57,11 @@ target_link_libraries(tst_live_render_holes_layer PRIVATE
     Qt6::Core Qt6::Test
     markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_holes_layer COMMAND tst_live_render_holes_layer)
+
+qt_add_executable(tst_live_render_proxy_model
+    tst_live_render_proxy_model.cpp
+)
+target_link_libraries(tst_live_render_proxy_model PRIVATE
+    Qt6::Core Qt6::Test
+    markoff_live_render markoff_foundation)
+add_test(NAME tst_live_render_proxy_model COMMAND tst_live_render_proxy_model)
