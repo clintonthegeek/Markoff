@@ -139,8 +139,9 @@ private slots:
 
         Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
         QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
-        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
-                                            doc.textAnchorAt(5, false));
+        // Hole created but bufferText left empty — timer must not fire.
+        (void)layer.createBlockHole(HoleKind::Paragraph,
+                                    doc.textAnchorAt(5, false));
         QTest::qWait(400);
         QCOMPARE(idleSpy.count(), 0);
     }
