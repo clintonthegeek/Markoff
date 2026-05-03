@@ -3,6 +3,7 @@
 
 #include <markoff-foundation/MarkoffDocument.h>
 
+#include <QTimer>
 #include <algorithm>
 
 namespace Markoff::LiveRender {
@@ -26,6 +27,11 @@ quint64 LiveHoleLayer::createBlockHole(HoleKind kind,
     entry.reifyAnchor = reifyAnchor;
 
     quint64 id = m_nextHoleId++;
+    auto *t = new QTimer(this);
+    t->setSingleShot(true);
+    t->setInterval(kIdleCommitMs);
+    connect(t, &QTimer::timeout, this, [this, id]() { Q_EMIT idleCommitDue(id); });
+    entry.idleTimer = t;
     m_holes.insert(id, entry);
     Q_EMIT holeInserted(id);
     return id;
@@ -37,13 +43,41 @@ void LiveHoleLayer::setBlockHoleBuffer(quint64 holeId, const QString &text) {
     if (it->bufferText == text) return;
     it->bufferText = text;
     Q_EMIT holeBufferChanged(holeId);
+    if (!it->composing && !text.isEmpty())
+        restartIdleTimer(holeId);
+    else
+        stopIdleTimer(holeId);
+}
+
+void LiveHoleLayer::setHoleComposition(quint64 holeId, bool composing) {
+    auto it = m_holes.find(holeId);
+    if (it == m_holes.end()) return;
+    if (it->composing == composing) return;
+    it->composing = composing;
+    if (composing)
+        stopIdleTimer(holeId);
+    else if (!it->bufferText.isEmpty())
+        restartIdleTimer(holeId);
 }
 
 void LiveHoleLayer::abandonBlockHole(quint64 holeId) {
     auto it = m_holes.find(holeId);
     if (it == m_holes.end()) return;
+    if (it->idleTimer) it->idleTimer->deleteLater();
     m_holes.erase(it);
     Q_EMIT holeAbandoned(holeId);
+}
+
+void LiveHoleLayer::restartIdleTimer(quint64 holeId) {
+    auto it = m_holes.find(holeId);
+    if (it == m_holes.end() || !it->idleTimer) return;
+    it->idleTimer->start();
+}
+
+void LiveHoleLayer::stopIdleTimer(quint64 holeId) {
+    auto it = m_holes.find(holeId);
+    if (it == m_holes.end() || !it->idleTimer) return;
+    it->idleTimer->stop();
 }
 
 int LiveHoleLayer::holeCount() const noexcept { return m_holes.size(); }

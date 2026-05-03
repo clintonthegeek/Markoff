@@ -80,7 +80,70 @@ private slots:
         QCOMPARE(doc.toMarkdown(), QString("hello"));
     }
 
-    // Tests filled in over Tasks 6–14.
+    void layer_idle_timer_starts_on_setBuffer() {
+        Markoff::MarkoffDocument doc(1);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+        layer.setBlockHoleBuffer(id, "x");
+
+        QVERIFY(idleSpy.wait(400));
+        QCOMPARE(idleSpy.count(), 1);
+        QCOMPARE(idleSpy.first().at(0).toULongLong(), id);
+    }
+
+    void layer_idle_timer_restarts_on_each_setBuffer() {
+        Markoff::MarkoffDocument doc(1);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+
+        layer.setBlockHoleBuffer(id, "a");
+        QTest::qWait(150);
+        QCOMPARE(idleSpy.count(), 0);
+        layer.setBlockHoleBuffer(id, "ab");
+        QTest::qWait(150);
+        QCOMPARE(idleSpy.count(), 0);
+        QVERIFY(idleSpy.wait(200));
+        QCOMPARE(idleSpy.count(), 1);
+    }
+
+    void layer_idle_timer_paused_during_composition() {
+        Markoff::MarkoffDocument doc(1);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+
+        layer.setHoleComposition(id, true);
+        layer.setBlockHoleBuffer(id, "preedit");
+        QTest::qWait(400);
+        QCOMPARE(idleSpy.count(), 0);
+
+        layer.setHoleComposition(id, false);
+        QVERIFY(idleSpy.wait(400));
+        QCOMPARE(idleSpy.count(), 1);
+    }
+
+    void layer_idle_does_not_fire_for_empty_buffer() {
+        Markoff::MarkoffDocument doc(1);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+        QTest::qWait(400);
+        QCOMPARE(idleSpy.count(), 0);
+    }
 };
 
 QTEST_MAIN(TstHolesLayer)

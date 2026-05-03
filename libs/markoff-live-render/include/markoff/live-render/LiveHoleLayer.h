@@ -8,6 +8,8 @@
 #include <QObject>
 #include <qqmlintegration.h>
 
+class QTimer;
+
 namespace Markoff {
 class MarkoffDocument;
 }
@@ -32,6 +34,7 @@ public:
     // Lifecycle (commit lands in Task 7).
     quint64 createBlockHole(HoleKind kind, Markoff::TextAnchor reifyAnchor);
     void    setBlockHoleBuffer(quint64 holeId, const QString &text);
+    void    setHoleComposition(quint64 holeId, bool composing);
     void    abandonBlockHole(quint64 holeId);
 
     // Lookups.
@@ -46,6 +49,7 @@ Q_SIGNALS:
     void holeInserted(quint64 holeId);
     void holeBufferChanged(quint64 holeId);
     void holeAbandoned(quint64 holeId);
+    void idleCommitDue(quint64 holeId);
     // Task 7 adds: void holeReified(quint64, Markoff::TextAnchor);
 
 private:
@@ -54,9 +58,14 @@ private:
         Markoff::TextAnchor reifyAnchor;
         QString bufferText;
         bool composing = false;
-        // Task 6 adds: QTimer *idleTimer; (per-hole)
+        QTimer *idleTimer = nullptr;
         // Task 15 adds: undo stack
     };
+
+    static constexpr int kIdleCommitMs = 250;
+
+    void restartIdleTimer(quint64 holeId);
+    void stopIdleTimer(quint64 holeId);
 
     QHash<quint64, HoleEntry> m_holes;
     quint64 m_nextHoleId = 1;
