@@ -25,6 +25,7 @@ Rectangle {
         modelIndex: root.modelIndex
         textDocument: edit.textDocument
         composing: edit.inputMethodComposing
+        text: model.text
     }
 
     TextEdit {
@@ -33,7 +34,6 @@ Rectangle {
                   top: parent.top; bottom: parent.bottom; margins: 8 }
         readOnly: false
         textFormat: TextEdit.PlainText
-        text: model.text
         wrapMode: TextEdit.NoWrap
         font.family: "monospace"
         font.pixelSize: 13

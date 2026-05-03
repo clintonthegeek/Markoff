@@ -24,6 +24,7 @@ Item {
         modelIndex: root.modelIndex
         textDocument: edit.textDocument
         composing: edit.inputMethodComposing
+        text: model.text
     }
 
     TextEdit {
@@ -33,7 +34,6 @@ Item {
         topPadding: 6; bottomPadding: 2
         readOnly: false
         textFormat: TextEdit.PlainText
-        text: model.text
         wrapMode: TextEdit.Wrap
         font.pixelSize: {
             switch (model.headingLevel) {

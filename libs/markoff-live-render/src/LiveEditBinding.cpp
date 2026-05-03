@@ -42,11 +42,37 @@ void LiveEditBinding::setTextDocument(QQuickTextDocument *td)
     m_textDocument = td;
     rewireTextDocument(td ? td->textDocument() : nullptr);
     Q_EMIT textDocumentChanged();
+    // The text property may have been bound before the document was
+    // available; flush any pending value into the now-wired document.
+    pushTextToDocument();
 }
 
 void LiveEditBinding::setRawTextDocument(QTextDocument *td)
 {
     rewireTextDocument(td);
+    pushTextToDocument();
+}
+
+QString LiveEditBinding::text() const { return m_text; }
+void LiveEditBinding::setText(const QString &t)
+{
+    if (m_text == t) return;
+    m_text = t;
+    Q_EMIT textChanged();
+    pushTextToDocument();
+}
+
+void LiveEditBinding::pushTextToDocument()
+{
+    if (!m_listenedDoc) return;
+    if (m_listenedDoc->toPlainText() == m_text) return;
+    // Setting the document text fires contentsChange synchronously; the
+    // applyingTextUpdate guard makes onContentsChange treat that as a
+    // model-driven update (no applyLocalEdit, no row-seq stamp).
+    m_applyingTextUpdate = true;
+    auto _ = qScopeGuard([this]{ m_applyingTextUpdate = false; });
+    m_listenedDoc->setPlainText(m_text);
+    m_previousText = m_text;
 }
 
 bool LiveEditBinding::composing() const { return m_composing; }
@@ -92,7 +118,18 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     const QString postQt = m_listenedDoc->toPlainText();
     auto _ = qScopeGuard([&]{ m_previousText = postQt; });
 
-    // Guard: model-driven update echo (spec §4.5).
+    // Guard: pushTextToDocument-driven update echo. Set when LiveEditBinding
+    // itself is calling setPlainText to mirror the bound `text` property
+    // (initial delegate load, ListView recycling, parse-arrival fresh-row
+    // updates routed through the QML text property). Without this guard
+    // those non-user document writes would be misread as user edits and
+    // pumped back into the CRDT, duplicating content on every parse cycle.
+    if (m_applyingTextUpdate) {
+        qCDebug(lcEdit) << "skip: applyingTextUpdate";
+        return;
+    }
+
+    // Guard: model-driven update echo via applyOps (spec §4.5).
     if (m_binding->applyingModelUpdate()) {
         qCDebug(lcEdit) << "skip: applyingModelUpdate";
         return;

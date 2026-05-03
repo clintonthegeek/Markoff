@@ -45,6 +45,16 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveEditBinding : public QObject {
                READ textDocument WRITE setTextDocument NOTIFY textDocumentChanged)
     Q_PROPERTY(bool composing
                READ composing WRITE setComposing NOTIFY composingChanged)
+    /// The text that should be displayed in the wired QTextDocument.
+    /// Bind this to `model.text` in QML — LiveEditBinding will push the
+    /// value into the QTextDocument under the applyingTextUpdate guard
+    /// so the resulting contentsChange echo is NOT misinterpreted as a
+    /// user edit. Replaces the older `text: model.text` direct binding
+    /// on TextEdit (which caused infinite-loop content duplication
+    /// because delegate creation/recycling fires contentsChange outside
+    /// applyingModelUpdate's window).
+    Q_PROPERTY(QString text
+               READ text WRITE setText NOTIFY textChanged)
 
 public:
     explicit LiveEditBinding(QObject *parent = nullptr);
@@ -62,11 +72,15 @@ public:
     bool composing() const;
     void setComposing(bool c);
 
+    QString text() const;
+    void    setText(const QString &t);
+
 Q_SIGNALS:
     void bindingChanged();
     void modelIndexChanged();
     void textDocumentChanged();
     void composingChanged();
+    void textChanged();
 
 private Q_SLOTS:
     void onContentsChange(int qtPos, int charsRemoved, int charsAdded);
@@ -87,6 +101,7 @@ private:
 
     void rewireTextDocument(QTextDocument *newDoc);
     void flushPendingComposition();
+    void pushTextToDocument();
 
     QPointer<LiveListModelBinding> m_binding;
     int                             m_modelIndex = -1;
@@ -94,6 +109,8 @@ private:
     QPointer<QTextDocument>         m_listenedDoc;  // remembered so we can disconnect
     bool                            m_composing = false;
     bool                            m_compositionPendingFlush = false;  // see Task 7
+    bool                            m_applyingTextUpdate = false;  // pushTextToDocument re-entrance guard
+    QString                         m_text;          // bound QML text (mirrors model.text)
     QString                         m_previousText;  // CRDT-coherent snapshot of m_listenedDoc's text
 };
 
