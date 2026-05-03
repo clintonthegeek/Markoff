@@ -31,11 +31,13 @@ public:
                            QObject           *parent = nullptr);
     ~LiveHoleLayer() override;
 
-    // Lifecycle (commit lands in Task 7).
+    // Lifecycle.
     quint64 createBlockHole(HoleKind kind, Markoff::TextAnchor reifyAnchor);
     void    setBlockHoleBuffer(quint64 holeId, const QString &text);
     void    setHoleComposition(quint64 holeId, bool composing);
     void    abandonBlockHole(quint64 holeId);
+    void    commitBlockHole(quint64 holeId);
+    void    commitAllPendingHoles();
 
     // Lookups.
     int     holeCount() const noexcept;
@@ -50,7 +52,7 @@ Q_SIGNALS:
     void holeBufferChanged(quint64 holeId);
     void holeAbandoned(quint64 holeId);
     void idleCommitDue(quint64 holeId);
-    // Task 7 adds: void holeReified(quint64, Markoff::TextAnchor);
+    void holeReified(quint64 holeId, Markoff::TextAnchor newRowAnchor);
 
 private:
     struct HoleEntry {

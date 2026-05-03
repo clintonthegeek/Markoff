@@ -2,6 +2,7 @@
 #include <markoff/live-render/LiveHoleLayer.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/MarkoffEdit.h>
 
 #include <QTimer>
 #include <algorithm>
@@ -112,6 +113,49 @@ QList<quint64> LiveHoleLayer::holesInOrder() const {
         return a < b;
     });
     return ids;
+}
+
+void LiveHoleLayer::commitBlockHole(quint64 holeId) {
+    auto it = m_holes.find(holeId);
+    if (it == m_holes.end()) return;
+
+    const QString buffer = it->bufferText;
+    const Markoff::TextAnchor reifyAnchor = it->reifyAnchor;
+
+    if (buffer.isEmpty()) {
+        // F5 mitigation: empty-buffer commit ≡ abandon.
+        if (it->idleTimer) it->idleTimer->deleteLater();
+        m_holes.erase(it);
+        Q_EMIT holeAbandoned(holeId);
+        return;
+    }
+
+    const quint32 reifyByte = m_doc->resolveTextAnchor(reifyAnchor);
+    const QByteArray insertion = (QStringLiteral("\n\n") + buffer).toUtf8();
+
+    // Drop hole BEFORE applyLocalEdit so the proxy's holeAbandoned-driven
+    // row removal happens before the parse-back arrives. Order matters
+    // for cursor delivery.
+    if (it->idleTimer) it->idleTimer->deleteLater();
+    m_holes.erase(it);
+    Q_EMIT holeAbandoned(holeId);
+
+    Markoff::MarkoffEdit edit;
+    edit.oldStart = reifyByte;
+    edit.oldEnd   = reifyByte;
+    edit.newText  = insertion;
+    m_doc->applyLocalEdit({ edit });
+
+    // The new row's anchor is at byte reifyByte + 2 (skipping the "\n\n").
+    Markoff::TextAnchor newRowAnchor = m_doc->textAnchorAt(reifyByte + 2, /*rightBias=*/false);
+    Q_EMIT holeReified(holeId, newRowAnchor);
+}
+
+void LiveHoleLayer::commitAllPendingHoles() {
+    // Commit in ascending reifyAnchor byte order. Anchors survive each
+    // edit (TextAnchor handles byte-shift through CRDT identity).
+    const QList<quint64> ids = holesInOrder();
+    for (quint64 id : ids) commitBlockHole(id);
 }
 
 }  // namespace Markoff::LiveRender

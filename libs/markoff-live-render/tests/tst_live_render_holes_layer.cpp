@@ -145,6 +145,72 @@ private slots:
         QTest::qWait(400);
         QCOMPARE(idleSpy.count(), 0);
     }
+
+    void layer_commit_applies_local_edit_and_drops_hole() {
+        Markoff::MarkoffDocument doc(1);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        QVERIFY(parseSpy.wait(2000));
+
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        QSignalSpy reifiedSpy(&layer, SIGNAL(holeReified(quint64, Markoff::TextAnchor)));
+        QSignalSpy abandonedSpy(&layer, SIGNAL(holeAbandoned(quint64)));
+
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+        layer.setBlockHoleBuffer(id, "world");
+        layer.commitBlockHole(id);
+
+        QCOMPARE(layer.holeCount(), 0);
+        QCOMPARE(doc.toMarkdown(), QString("hello\n\nworld"));
+        QCOMPARE(abandonedSpy.count(), 1);
+        QCOMPARE(reifiedSpy.count(), 1);
+    }
+
+    void layer_commit_with_empty_buffer_is_abandon() {
+        Markoff::MarkoffDocument doc(1);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        QVERIFY(parseSpy.wait(2000));
+
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        QSignalSpy reifiedSpy(&layer, SIGNAL(holeReified(quint64, Markoff::TextAnchor)));
+        QSignalSpy abandonedSpy(&layer, SIGNAL(holeAbandoned(quint64)));
+
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+        // No buffer.
+        layer.commitBlockHole(id);
+
+        QCOMPARE(layer.holeCount(), 0);
+        QCOMPARE(doc.toMarkdown(), QString("hello"));   // F5 mitigation
+        QCOMPARE(abandonedSpy.count(), 1);
+        QCOMPARE(reifiedSpy.count(), 0);
+    }
+
+    void layer_commit_all_pending_in_anchor_order() {
+        Markoff::MarkoffDocument doc(1);
+        doc.resetContent("para1\n\npara2", Markoff::Origin::FirstOpen);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        QVERIFY(parseSpy.wait(2000));
+
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+
+        quint64 idLate  = layer.createBlockHole(HoleKind::Paragraph,
+                                                 doc.textAnchorAt(13, false)); // end of para2
+        quint64 idEarly = layer.createBlockHole(HoleKind::Paragraph,
+                                                 doc.textAnchorAt(5, false));  // end of para1
+        layer.setBlockHoleBuffer(idLate,  "late");
+        layer.setBlockHoleBuffer(idEarly, "early");
+
+        layer.commitAllPendingHoles();
+
+        QCOMPARE(layer.holeCount(), 0);
+        const QString s = doc.toMarkdown();
+        QVERIFY(s.contains("early"));
+        QVERIFY(s.contains("late"));
+        QVERIFY(s.indexOf("early") < s.indexOf("late"));
+    }
 };
 
 QTEST_MAIN(TstHolesLayer)
