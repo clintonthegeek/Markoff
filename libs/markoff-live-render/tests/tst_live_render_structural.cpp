@@ -553,6 +553,123 @@ private Q_SLOTS:
         QCOMPARE(holeIdOf(tc->block), ids.first());
     }
 
+    // ---------- R5.5 Task 12 — hole-row Enter dispatch ----------
+
+    void hole_enter_at_end_of_buffer_commits_then_creates_new_hole() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *proxy   = binding.proxyModel();
+        auto *handler = binding.structuralKeyHandler();
+
+        // First Enter at EOB of "hello" (proxy row 0) — creates hole at proxy row 1.
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        QCOMPARE(layer->holeCount(), 1);
+        QCOMPARE(proxy->rowCount(), 2);
+        QVERIFY(proxy->proxyRowIsHole(1));
+
+        const quint64 firstHoleId = layer->holesInOrder().first();
+
+        // Simulate typing "first" into the hole buffer.
+        layer->setBlockHoleBuffer(firstHoleId, "first");
+
+        // Enter at end of buffer (qtPos == 5 == "first".length()) on proxy row 1.
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 1, 5, true, "first"));
+
+        // First hole committed; source now has "hello\n\nfirst".
+        QTRY_COMPARE(doc.toMarkdown(), QString("hello\n\nfirst"));
+        // Only the new hole remains.
+        QCOMPARE(layer->holeCount(), 1);
+        // Parser produces 2 blocks ("hello", "first") + 1 new hole = 3 proxy rows.
+        QTRY_COMPARE(proxy->rowCount(), 3);
+        QVERIFY(proxy->proxyRowIsHole(2));
+
+        // Cursor is in the new hole at qtPos 0.
+        const auto cur = binding.cursorState()->cursor();
+        const auto *tc = std::get_if<TextCaret>(&cur);
+        QVERIFY(tc);
+        QVERIFY(isHoleBlockId(tc->block));
+        QCOMPARE(tc->cachedByteOffset, quint32(0));
+        QCOMPARE(holeIdOf(tc->block), layer->holesInOrder().first());
+
+        // Type "second" into the new hole and trigger idle commit.
+        const quint64 newHoleId = layer->holesInOrder().first();
+        layer->setBlockHoleBuffer(newHoleId, "second");
+        QSignalSpy idleSpy(layer, SIGNAL(idleCommitDue(quint64)));
+        QVERIFY(idleSpy.wait(400));
+        layer->commitBlockHole(idleSpy.first().at(0).toULongLong());
+        QTRY_COMPARE(doc.toMarkdown(), QString("hello\n\nfirst\n\nsecond"));
+    }
+
+    void hole_enter_mid_buffer_splits_into_committed_prefix_and_new_hole_suffix() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        // Create a hole after "hello" (proxy row 1).
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        QCOMPARE(layer->holeCount(), 1);
+
+        const quint64 holeId = layer->holesInOrder().first();
+        layer->setBlockHoleBuffer(holeId, "helloworld");  // 10 chars
+
+        // Mid-buffer Enter at qtPos 5 (between "hello" and "world") on proxy row 1.
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 1, 5, true, "helloworld"));
+
+        // Prefix "hello" committed; source: "hello\n\nhello".
+        QTRY_COMPARE(doc.toMarkdown(), QString("hello\n\nhello"));
+        // New hole has suffix "world".
+        QCOMPARE(layer->holeCount(), 1);
+        const quint64 newId = layer->holesInOrder().first();
+        QCOMPARE(layer->bufferText(newId), QString("world"));
+
+        // Cursor at qtPos 0 of the new hole.
+        const auto cur = binding.cursorState()->cursor();
+        const auto *tc = std::get_if<TextCaret>(&cur);
+        QVERIFY(tc);
+        QVERIFY(isHoleBlockId(tc->block));
+        QCOMPARE(holeIdOf(tc->block), newId);
+        QCOMPARE(tc->cachedByteOffset, quint32(0));
+    }
+
+    void hole_enter_on_empty_buffer_is_noop() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        // Create a hole after "hello" with empty buffer (proxy row 1).
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        QCOMPARE(layer->holeCount(), 1);
+        const quint64 holeId = layer->holesInOrder().first();
+        // bufferText is empty by default.
+
+        // Enter on empty hole — consumed but no source change, no new hole.
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 1, 0, true, ""));
+        QCOMPARE(layer->holeCount(), 1);                      // same hole, unchanged
+        QCOMPARE(layer->holesInOrder().first(), holeId);
+        QCOMPARE(doc.toMarkdown(), QString("hello"));         // source untouched
+    }
+
 };
 
 QTEST_MAIN(TstLiveRenderStructural)

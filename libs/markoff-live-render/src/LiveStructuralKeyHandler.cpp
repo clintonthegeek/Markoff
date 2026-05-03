@@ -59,9 +59,28 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
         // contentsChange path). Documented in plan scope notes.
         return false;
     }
-    if (blockIndex < 0 || blockIndex >= m_model->rowCount()) return false;
 
-    const BlockRecord &rec = m_model->recordAt(blockIndex);
+    // Front-load hole-row dispatch before any inner-model lookup.
+    // blockIndex here is a PROXY row index (QML binds to proxyModel since
+    // Task 10). If the proxy row is a hole, delegate to handleHoleRowEnter.
+    if (m_proxyModel && m_proxyModel->proxyRowIsHole(blockIndex)) {
+        const quint64 holeId = m_proxyModel->holeAtProxyRow(blockIndex);
+        return handleHoleRowEnter(holeId, key, modifiers, qtPos) == HandleResult::Handled;
+    }
+
+    // Translate proxy row → inner row for anchor-side handlers.
+    // At zero holes, innerRowForProxy(N) == N, so behavior is unchanged.
+    // With holes present the proxy and inner indices diverge; we need the
+    // inner row to look up BlockRecord and feed requestTextCaretAtRow.
+    // NOTE: existing anchor-side handlers' requestTextCaretAtRow calls take
+    // inner-row indices — coherent at zero holes; row-space rework deferred
+    // to Task 14+ once holes coexist with inner-row edits.
+    const int innerRow = m_proxyModel
+                           ? m_proxyModel->innerRowForProxy(blockIndex)
+                           : blockIndex;
+    if (innerRow < 0 || innerRow >= m_model->rowCount()) return false;
+
+    const BlockRecord &rec = m_model->recordAt(innerRow);
     const auto *desc = m_registry->find(rec.kind);
     if (!desc) return false;
     if (!desc->consumedStructuralKeys.contains(key)) return false;
@@ -82,7 +101,9 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     ctx.undoCoalescer     = m_undoCoalescer;
     ctx.holeLayer         = m_holeLayer;
     ctx.proxyModel        = m_proxyModel;
-    ctx.blockIndex        = blockIndex;
+    // Use innerRow so requestTextCaretAtRow (which indexes the inner model)
+    // receives a valid index. At zero holes this is identical to blockIndex.
+    ctx.blockIndex        = innerRow;
     ctx.blockAnchor       = rec.blockAnchor;
     ctx.currentBlockStart = m_document->resolveTextAnchor(rec.blockAnchor.firstByte);
     ctx.currentBlockEnd   = ctx.currentBlockStart
@@ -92,6 +113,75 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     ctx.blockText         = blockText;
 
     return keyIt.value()(ctx) == HandleResult::Handled;
+}
+
+LiveStructuralKeyHandler::HandleResult
+LiveStructuralKeyHandler::handleHoleRowEnter(quint64 holeId, int key,
+                                             int modifiers, int qtPos)
+{
+    if (key != Qt::Key_Return && key != Qt::Key_Enter) return HandleResult::NotHandled;
+    if (modifiers & Qt::ShiftModifier) return HandleResult::NotHandled;  // soft break — TextEdit native
+
+    if (!m_holeLayer || !m_proxyModel) return HandleResult::NotHandled;
+    if (!m_holeLayer->exists(holeId)) return HandleResult::NotHandled;
+
+    const QString buf = m_holeLayer->bufferText(holeId);
+
+    // Empty-buffer Enter — no-op per stacked-Enter rule (spec §3.3).
+    // Consume the key so QML TextEdit doesn't insert a literal newline
+    // into the buffer, but make no source or layer change.
+    if (buf.isEmpty()) return HandleResult::Handled;
+
+    // Resolve the reify byte BEFORE commit; after commit the holeId is gone.
+    const quint32 reifyByte =
+        m_document->resolveTextAnchor(m_holeLayer->reifyAnchor(holeId));
+
+    if (qtPos >= buf.length()) {
+        // End-of-buffer: commit the whole buffer, then open a fresh hole
+        // positioned right after the just-committed paragraph.
+        m_holeLayer->commitBlockHole(holeId);
+        // After commit, source contains "\n\n" + buf inserted at reifyByte.
+        // The end of the just-committed paragraph is therefore at:
+        const quint32 newReifyByte = reifyByte
+            + 2  // for "\n\n"
+            + static_cast<quint32>(buf.toUtf8().size());
+        Markoff::TextAnchor newAnchor =
+            m_document->textAnchorAt(newReifyByte, /*rightBias=*/false);
+        const quint64 newId = m_holeLayer->createBlockHole(
+            HoleKind::Paragraph, newAnchor);
+
+        TextCaret tc;
+        tc.block            = BlockId{HoleBlockId{newId}};
+        tc.cachedByteOffset = 0;
+        m_cursorState->request(Cursor{tc});
+
+        if (m_undoCoalescer) m_undoCoalescer->recordStructural();
+        return HandleResult::Handled;
+    }
+
+    // Mid-buffer split: set prefix, commit, create new hole with suffix.
+    const QString prefix = buf.left(qtPos);
+    const QString suffix = buf.mid(qtPos);
+
+    m_holeLayer->setBlockHoleBuffer(holeId, prefix);
+    m_holeLayer->commitBlockHole(holeId);
+
+    const quint32 newReifyByte = reifyByte
+        + 2  // for "\n\n"
+        + static_cast<quint32>(prefix.toUtf8().size());
+    Markoff::TextAnchor newAnchor =
+        m_document->textAnchorAt(newReifyByte, /*rightBias=*/false);
+    const quint64 newId = m_holeLayer->createBlockHole(
+        HoleKind::Paragraph, newAnchor);
+    m_holeLayer->setBlockHoleBuffer(newId, suffix);
+
+    TextCaret tc;
+    tc.block            = BlockId{HoleBlockId{newId}};
+    tc.cachedByteOffset = 0;  // cursor at start of suffix
+    m_cursorState->request(Cursor{tc});
+
+    if (m_undoCoalescer) m_undoCoalescer->recordStructural();
+    return HandleResult::Handled;
 }
 
 void LiveStructuralKeyHandler::registerBuiltins()

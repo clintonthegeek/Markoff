@@ -84,6 +84,12 @@ public:
 private:
     void registerBuiltins();
 
+    /// Dispatch Enter on a hole row: commit+new-hole (EOB), split
+    /// (mid-buffer), or no-op (empty buffer). Called from tryHandle
+    /// when proxyRowIsHole(blockIndex) is true.
+    HandleResult handleHoleRowEnter(quint64 holeId, int key, int modifiers,
+                                    int qtPos);
+
     QPointer<Markoff::MarkoffDocument> m_document;
     LiveBlockModel                    *m_model;
     LiveCursorState                   *m_cursorState;
