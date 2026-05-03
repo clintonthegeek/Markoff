@@ -49,3 +49,21 @@ target_link_libraries(tst_live_render_structural PRIVATE
     Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test
     markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_structural COMMAND tst_live_render_structural)
+
+qt_add_executable(tst_live_render_holes_gate
+    tst_live_render_holes_gate.cpp
+)
+target_link_libraries(tst_live_render_holes_gate PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Test
+    markoff_live_render
+)
+qt_add_resources(tst_live_render_holes_gate "synthetic"
+    PREFIX "/"
+    BASE "."
+    FILES synthetic/SyntheticBrokenParagraphDelegate.qml
+)
+target_include_directories(tst_live_render_holes_gate PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(NAME tst_live_render_holes_gate
+         COMMAND tst_live_render_holes_gate)
