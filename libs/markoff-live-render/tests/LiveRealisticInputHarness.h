@@ -34,17 +34,24 @@ public:
         QCoreApplication::processEvents();
     }
 
-    /// ASCII letters and digits only. The naive `QChar → Qt::Key` cast and
-    /// "uppercase ⇒ Shift" heuristic do not generalise to punctuation,
-    /// symbols, or non-ASCII characters; for those, build a `QInputMethodEvent`
-    /// path or extend the harness with an explicit `(QChar, Qt::Key, mods)`
-    /// overload. Sufficient for R5.5 stress-typing tests.
+    /// ASCII letters, digits, and spaces only.
+    ///
+    /// Uses QTest::keyClicks(window, char) — the char overload populates the
+    /// key event's text() field from the char value (e.g. 'T' → text="T"),
+    /// which is what Qt Quick TextEdit uses for insertion. The Key+Modifier
+    /// overload may produce an empty text() on some platforms in headless-test
+    /// mode, causing the Shift modifier to be silently discarded.
     void typeChar(QChar c) {
+        if (c == QLatin1Char(' ')) {
+            // Space has no char shortcut in QTest; use the key overload.
+            keyClick(Qt::Key_Space);
+            return;
+        }
         Q_ASSERT(c.unicode() < 0x80 && c.isLetterOrNumber());
-        Qt::Key k = static_cast<Qt::Key>(c.toUpper().unicode());
-        Qt::KeyboardModifiers mods = c.isUpper() ? Qt::ShiftModifier
-                                                 : Qt::NoModifier;
-        keyClick(k, mods);
+        // Deliver via the char overload so text() is populated correctly.
+        QTest::keyClick(m_window, c.toLatin1());
+        QTest::qWait(m_defaultGapMs);
+        QCoreApplication::processEvents();
     }
 
     void typeString(const QString &text) {

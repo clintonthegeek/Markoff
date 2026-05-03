@@ -32,6 +32,15 @@ QString LiveCursorState::cursorKind() const
     return QStringLiteral("none");
 }
 
+quint64 LiveCursorState::focusedHoleId() const
+{
+    if (const auto *tc = std::get_if<TextCaret>(&m_cursor)) {
+        if (std::holds_alternative<HoleBlockId>(tc->block))
+            return std::get<HoleBlockId>(tc->block).holeId;
+    }
+    return 0;
+}
+
 void LiveCursorState::request(const Cursor &newCursor)
 {
     if (!validateVariant(newCursor)) {

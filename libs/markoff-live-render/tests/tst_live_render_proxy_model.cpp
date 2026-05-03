@@ -138,7 +138,11 @@ private slots:
         LiveProxyBlockModel proxy(&doc, inner, &layer);
         QCOMPARE(proxy.rowCount(), 2);
 
-        QSignalSpy insertedSpy(&proxy, &QAbstractItemModel::rowsInserted);
+        // onHoleInserted uses beginResetModel/endResetModel (not
+        // beginInsertRows/endInsertRows) because Qt.labs.qmlmodels
+        // DelegateChooser does not respond to rowsInserted for new delegate
+        // creation — only modelReset forces ListView to rebuild its delegates.
+        QSignalSpy resetSpy(&proxy, &QAbstractItemModel::modelReset);
 
         // Anchor at byte 5 = end of "para1"; hole should land between row 0
         // (para1) and row 1 (para2).
@@ -149,7 +153,7 @@ private slots:
         QVERIFY(proxy.proxyRowIsHole(1));
         QCOMPARE(proxy.proxyRowForHole(id), 1);
         QCOMPARE(proxy.proxyRowForInner(1), 2);   // para2 shifted to proxy row 2
-        QCOMPARE(insertedSpy.count(), 1);
+        QCOMPARE(resetSpy.count(), 1);
     }
 
     void proxy_drops_hole_row_on_abandon() {

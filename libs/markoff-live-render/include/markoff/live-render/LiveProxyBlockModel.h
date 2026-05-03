@@ -38,11 +38,11 @@ public:
     QVariant data(const QModelIndex &index, int role) const override;
     QHash<int, QByteArray> roleNames() const override;
 
-    int     innerRowForProxy(int proxyRow) const;
-    int     proxyRowForInner(int innerRow) const;
-    int     proxyRowForHole(quint64 holeId) const;
-    bool    proxyRowIsHole(int proxyRow) const noexcept;
-    quint64 holeAtProxyRow(int proxyRow) const noexcept;
+    Q_INVOKABLE int     innerRowForProxy(int proxyRow) const;
+    Q_INVOKABLE int     proxyRowForInner(int innerRow) const;
+    Q_INVOKABLE int     proxyRowForHole(quint64 holeId) const;
+    Q_INVOKABLE bool    proxyRowIsHole(int proxyRow) const noexcept;
+    Q_INVOKABLE quint64 holeAtProxyRow(int proxyRow) const noexcept;
 
 private:
     quint32 innerStartByteForRow(int r) const;

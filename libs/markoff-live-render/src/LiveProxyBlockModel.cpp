@@ -3,6 +3,7 @@
 
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveHoleLayer.h>
+#include <markoff/live-render/BlockKind.h>
 #include <markoff-foundation/MarkoffDocument.h>
 
 namespace Markoff::LiveRender {
@@ -59,6 +60,10 @@ QVariant LiveProxyBlockModel::data(const QModelIndex &index, int role) const {
             case HoleIdRole:     return QVariant::fromValue(r.holeId);
             case LiveBlockModel::TextRole:
                 return m_layer->bufferText(r.holeId);
+            case LiveBlockModel::KindRole:
+                // Hole rows are always paragraph-shaped for the DelegateChooser.
+                // ParagraphDelegate.isHole guards the difference in behaviour.
+                return BlockKind::Paragraph;
             default: return {};
         }
     }
@@ -151,9 +156,9 @@ void LiveProxyBlockModel::onHoleInserted(quint64 holeId) {
         }
     }
 
-    beginInsertRows({}, targetProxyRow, targetProxyRow);
+    beginResetModel();
     m_rows.insert(targetProxyRow, {true, -1, holeId});
-    endInsertRows();
+    endResetModel();
 }
 
 void LiveProxyBlockModel::onHoleBufferChanged(quint64 holeId) {

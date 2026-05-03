@@ -65,3 +65,16 @@ target_link_libraries(tst_live_render_proxy_model PRIVATE
     Qt6::Core Qt6::Test
     markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_proxy_model COMMAND tst_live_render_proxy_model)
+
+# R5.5 Task 17: stress-typing load-bearing gate test (QML-driven).
+qt_add_executable(tst_live_render_holes_qml
+    tst_live_render_holes_qml.cpp
+)
+target_link_libraries(tst_live_render_holes_qml PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::Test
+    markoff_live_render markoff_live_renderplugin markoff_foundation)
+target_include_directories(tst_live_render_holes_qml PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}
+)
+qt_import_qml_plugins(tst_live_render_holes_qml)
+add_test(NAME tst_live_render_holes_qml COMMAND tst_live_render_holes_qml)

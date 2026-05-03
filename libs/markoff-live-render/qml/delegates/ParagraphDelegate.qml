@@ -94,4 +94,19 @@ Item {
         if (qtPos >= 0 && qtPos <= edit.length)
             edit.cursorPosition = qtPos
     }
+
+    /// When a new hole delegate appears, check if the cursor state is already
+    /// pointing at this hole (set synchronously by the structural key handler
+    /// during Enter). If so, focus immediately — the delegate just became live.
+    Component.onCompleted: {
+        if (!root.isHole) return
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (!cs) return
+        if (cs.focusedHoleId !== 0 && cs.focusedHoleId === (model.holeId || 0)) {
+            // Defer focus to the next event loop turn so the ListView's
+            // model-reset processing (which may re-assign focus to a
+            // previously-focused delegate) completes first.
+            Qt.callLater(function() { focusEditAt(0) })
+        }
+    }
 }

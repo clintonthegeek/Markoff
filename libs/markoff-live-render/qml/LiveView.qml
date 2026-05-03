@@ -93,6 +93,31 @@ ListView {
         return null
     }
 
+    // ---- Cursor-state focus routing ----
+    // When a structural key (e.g. Enter at EOB) creates a hole and sets the
+    // cursor state to point at the hole, route keyboard focus into the new
+    // hole delegate's TextEdit so subsequent typing lands in the right place.
+    //
+    // For newly-created holes the delegate doesn't exist yet when
+    // onCursorChanged fires (ListView creates delegates lazily). The
+    // Component.onCompleted in ParagraphDelegate checks focusedHoleId and
+    // calls focusEditAt() when the delegate first appears. The Connections
+    // here handles the case where the hole delegate already exists (e.g.
+    // programmatic cursor re-assignment to an existing hole).
+    Connections {
+        target: binding ? binding.cursorState : null
+        function onCursorChanged() {
+            if (!binding || !binding.cursorState) return
+            const holeId = binding.cursorState.focusedHoleId
+            if (holeId === 0) return
+            const proxyRow = binding.proxyModel.proxyRowForHole(holeId)
+            if (proxyRow < 0) return
+            const item = root.itemAtIndex(proxyRow)
+            if (item && item.focusEditAt)
+                item.focusEditAt(0)
+        }
+    }
+
     // ---- Keyboard: Ctrl-C copy ----
     Keys.onPressed: (event) => {
         if (!binding) { event.accepted = false; return }
