@@ -152,6 +152,30 @@ void LiveStructuralKeyHandler::registerBuiltins()
         return HR::Handled;
     };
     m_handlers[BlockKind::Paragraph][Qt::Key_Backspace] = paragraphBackspace;
+
+    auto paragraphDelete = [](const Ctx &c) -> HR {
+        if (c.qtPos != c.blockText.length()) return HR::NotHandled;
+        if (c.blockIndex >= c.model->rowCount() - 1) return HR::NotHandled;
+        const quint32 docLen = c.document->visibleLength();
+        if (c.currentBlockEnd >= docLen) return HR::NotHandled;
+
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = c.currentBlockEnd;
+        ed.oldEnd   = c.currentBlockEnd + 1;
+        ed.newText  = QByteArray();
+        c.document->applyLocalEdit({ ed });
+        c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
+        c.model->setRowEditSequence(c.blockIndex + 1, c.document->editSequence());
+
+        // Cursor stays at end of the (now-merged) block — same row, same qtPos.
+        // Use requestTextCaretAtRow so it survives the parse-back's row
+        // reshuffle even if the block changes identity.
+        c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos);
+
+        if (c.undoCoalescer) c.undoCoalescer->recordStructural();
+        return HR::Handled;
+    };
+    m_handlers[BlockKind::Paragraph][Qt::Key_Delete] = paragraphDelete;
 }
 
 }  // namespace Markoff::LiveRender

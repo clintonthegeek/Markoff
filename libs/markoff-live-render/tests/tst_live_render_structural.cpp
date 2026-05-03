@@ -310,6 +310,45 @@ private Q_SLOTS:
         QCOMPARE(doc.toMarkdown(), QString("alpha"));
     }
 
+    // ---------- LiveStructuralKeyHandler — paragraph Delete at row-end ----------
+
+    void delete_at_end_of_paragraph_merges_with_next() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("alpha\n\nbeta", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Delete, Qt::NoModifier,
+            /*blockIndex=*/0, /*qtPos=*/5,
+            /*selectionEmpty=*/true,
+            QStringLiteral("alpha"));
+        QVERIFY(consumed);
+        QCOMPARE(doc.toMarkdown(), QString("alpha\nbeta"));
+
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 1);
+    }
+
+    void delete_at_end_of_last_block_is_not_consumed() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("alpha", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Delete, Qt::NoModifier,
+            /*blockIndex=*/0, /*qtPos=*/5,
+            /*selectionEmpty=*/true,
+            QStringLiteral("alpha"));
+        QVERIFY(!consumed);
+        QCOMPARE(doc.toMarkdown(), QString("alpha"));
+    }
+
 };
 
 QTEST_MAIN(TstLiveRenderStructural)
