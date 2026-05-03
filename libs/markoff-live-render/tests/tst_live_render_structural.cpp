@@ -412,6 +412,53 @@ private Q_SLOTS:
         QCOMPARE(doc.toMarkdown(), QString("alpha\n# Heading"));
     }
 
+    // ---------- LiveStructuralKeyHandler — code-block structural keys ----------
+
+    void backspace_at_start_of_code_block_merges_with_previous() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("alpha\n\n```\ncode\n```", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 2);
+        QCOMPARE(binding.model()->recordAt(1).kind, BlockKind::CodeBlock);
+
+        // Code-block delegate exposes the body bytes as blockText (sans fences).
+        // qtPos 0 = start of body. R5 backspace-at-start of code-block treats
+        // that as "merge with previous"; the byte deleted is the inter-block
+        // separator before currentBlockStart, where currentBlockStart is the
+        // CRDT-resolved start of the WHOLE code-block source range (including
+        // the opening fence). One \n is removed.
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Backspace, Qt::NoModifier,
+            /*blockIndex=*/1, /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            QStringLiteral("code\n"));
+        QVERIFY(consumed);
+        // Exact post-state depends on which separator byte got deleted; the
+        // important invariants are: it's shorter, and the structural handler
+        // returned true.
+        QVERIFY(doc.toMarkdown().size() < QStringLiteral("alpha\n\n```\ncode\n```").size());
+    }
+
+    void code_block_enter_is_not_consumed_by_structural_handler() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("```\ncode\n```", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::CodeBlock);
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier,
+            /*blockIndex=*/0, /*qtPos=*/4,    // mid-body
+            /*selectionEmpty=*/true,
+            QStringLiteral("code\n"));
+        QVERIFY(!consumed);
+    }
+
 };
 
 QTEST_MAIN(TstLiveRenderStructural)

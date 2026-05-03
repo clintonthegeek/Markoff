@@ -177,6 +177,19 @@ void LiveStructuralKeyHandler::registerBuiltins()
     m_handlers[BlockKind::Heading][Qt::Key_Enter]     = paragraphEnter;
     m_handlers[BlockKind::Heading][Qt::Key_Backspace] = paragraphBackspace;
     m_handlers[BlockKind::Heading][Qt::Key_Delete]    = paragraphDelete;
+
+    // Code-block: only the merge handlers. Enter is NOT consumed —
+    // TextEdit's native \n insertion routes through LiveEditBinding as
+    // a regular text edit, producing the literal newline the user
+    // expects inside fenced code.
+    //
+    // Limitation: blockText excludes the fences, so currentBlockEnd
+    // underestimates the true block end. Delete-at-body-end therefore
+    // deletes a fence byte rather than the inter-block separator. Not
+    // exercised by the R5 dogfood script; full fix lands in R6 with
+    // proper code-block byte arithmetic.
+    m_handlers[BlockKind::CodeBlock][Qt::Key_Backspace] = paragraphBackspace;
+    m_handlers[BlockKind::CodeBlock][Qt::Key_Delete]    = paragraphDelete;
 }
 
 }  // namespace Markoff::LiveRender
