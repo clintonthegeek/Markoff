@@ -10,12 +10,12 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
 
 qt_standard_project_setup(REQUIRES 6.5)
 
-# QTP0004 NEW (Qt 6.8+): every directory that contributes .qml files
-# to a module is expected to carry its own qmldir. We add a minimal
-# qmldir under qml/delegates/ declaring the parent module URI so the
-# build system + qmllint + IDE tooling resolve sub-directory QML files
-# cleanly. Gated for forward compatibility with Qt < 6.8 envs.
-# See docs/2026-05-03-cmake-warnings-rationale.md.
+# QTP0004 NEW (Qt 6.8+): every directory contributing .qml files to a
+# module is expected to carry its own qmldir. We add qmldir files under
+# each library's qml/delegates/ subdirectory listing each delegate by
+# logical type name. Gated on QT_KNOWN_POLICY_QTP0004 for forward
+# compatibility with Qt < 6.8 envs. See
+# docs/2026-05-03-cmake-warnings-rationale.md.
 if(QT_KNOWN_POLICY_QTP0004)
     qt_policy(SET QTP0004 NEW)
 endif()
