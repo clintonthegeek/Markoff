@@ -6,10 +6,17 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Origin.h>
 #include <QtTest/QtTest>
+#include <QApplication>
+#include <QClipboard>
 #include <QSignalSpy>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextEdit>
+#include <markoff/live-render/LiveBlockModel.h>
+#include <markoff/live-render/LiveProxyBlockModel.h>
+#include <markoff/live-render/LiveSelectionView.h>
+#include <markoff/live-render/LiveStructuralKeyHandler.h>
+#include <markoff/live-render/UndoCoalescer.h>
 
 using namespace Markoff::LiveRender;
 
@@ -447,6 +454,57 @@ private slots:
         QVERIFY(s.contains("early"));
         QVERIFY(s.contains("late"));
         QVERIFY(s.indexOf("early") < s.indexOf("late"));
+    }
+
+    void selection_across_hole_includes_buffer_text_in_copy() {
+        // H9 invariant: holes participate in cross-row selection. The
+        // proxy's TextRole on hole rows aliases to bufferText, so the
+        // existing Ctrl-C path (which builds `texts` from proxy.data(...))
+        // captures the hole's content alongside the parser rows it spans.
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("para1", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer  = binding.holeLayer();
+        auto *proxy  = binding.proxyModel();
+        auto *sv     = binding.selectionView();
+        auto *handler = binding.structuralKeyHandler();
+
+        // Open hole at end of para1; type "middle" into it.
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "para1"));
+        const quint64 holeId = layer->holesInOrder().first();
+        layer->setBlockHoleBuffer(holeId, "middle");
+
+        QCOMPARE(proxy->rowCount(), 2);
+        QVERIFY(proxy->proxyRowIsHole(1));
+
+        // Verify proxy's TextRole returns bufferText for the hole row.
+        const QString holeText = proxy->data(proxy->index(1, 0),
+                                              LiveBlockModel::TextRole).toString();
+        QCOMPARE(holeText, QString("middle"));
+
+        // Programmatically build a selection spanning row 0 (qtPos 0)
+        // through row 1 (the hole, qtPos 6). The selection-view stores
+        // proxy-row indices; copyToClipboard slices texts[fb..lb].
+        sv->begin(0, 0);
+        sv->extend(1, 6);
+        QVERIFY(sv->hasSelection());
+
+        // Build the texts list the way QML's Ctrl-C handler does.
+        QStringList texts;
+        for (int i = 0; i < proxy->rowCount(); ++i)
+            texts << proxy->data(proxy->index(i, 0),
+                                  LiveBlockModel::TextRole).toString();
+
+        QApplication::clipboard()->clear();
+        sv->copyToClipboard(texts);
+
+        const QString copied = QApplication::clipboard()->text();
+        QCOMPARE(copied, QString("para1\nmiddle"));   // hole's bufferText included
     }
 
     void flush_pending_holes_with_no_holes_is_noop() {
