@@ -90,37 +90,31 @@ void LiveStructuralKeyHandler::registerBuiltins()
 {
     using HR = HandleResult;
 
-    // ---------- paragraph: Enter (all positions) ----------
+    // ---------- paragraph: Enter (all positions, Shift-aware) ----------
     auto paragraphEnter = [](const Ctx &c) -> HR {
-        // Compute the byte offset for the cursor's qtPos.
-        const QByteArray prefixUtf8 =
-            c.blockText.left(c.qtPos).toUtf8();
+        const bool isShift = (c.modifiers & Qt::ShiftModifier) != 0;
+
+        const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
         const quint32 byteOffset =
             c.currentBlockStart + static_cast<quint32>(prefixUtf8.size());
 
         Markoff::MarkoffEdit ed;
         ed.oldStart = byteOffset;
         ed.oldEnd   = byteOffset;
-        ed.newText  = QByteArrayLiteral("\n\n");
+        ed.newText  = isShift
+            ? QByteArrayLiteral("\n")     // soft break — stays in block
+            : QByteArrayLiteral("\n\n");  // paragraph break — splits
         c.document->applyLocalEdit({ ed });
         c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
 
-        // Cursor placement:
-        //   qtPos == 0 (start-of-block):
-        //     The empty leading paragraph the parser will see may or may
-        //     not materialise as its own row (depends on Markdown
-        //     normalisation). Park the cursor at the original block, now
-        //     at row blockIndex + 1 in the post-parse layout, qtPos 0.
-        //   0 < qtPos < length (mid-block):
-        //     Original block keeps the prefix at row blockIndex; the
-        //     suffix appears as a new row at blockIndex + 1. Caret to
-        //     qtPos 0 of blockIndex + 1.
-        //   qtPos == length (end-of-block):
-        //     Empty new paragraph appears at blockIndex + 1. Caret to
-        //     qtPos 0 of blockIndex + 1.
-        //
-        // All three cases land on row blockIndex + 1 qtPos 0.
-        c.cursorState->requestTextCaretAtRow(c.blockIndex + 1, 0);
+        if (isShift) {
+            // Cursor stays in the same block, advanced past the newline.
+            c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 1);
+        } else {
+            // Block split — caret to qtPos 0 of the new (or original-shifted)
+            // row at blockIndex + 1. See Task 5 for the three-case rationale.
+            c.cursorState->requestTextCaretAtRow(c.blockIndex + 1, 0);
+        }
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;

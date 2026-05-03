@@ -310,6 +310,29 @@ private Q_SLOTS:
         QCOMPARE(doc.toMarkdown(), QString("alpha"));
     }
 
+    // ---------- LiveStructuralKeyHandler — paragraph Shift-Enter (soft break) ----------
+
+    void shift_enter_inserts_soft_break() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello world", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::ShiftModifier,
+            /*blockIndex=*/0, /*qtPos=*/5,
+            /*selectionEmpty=*/true,
+            QStringLiteral("hello world"));
+        QVERIFY(consumed);
+        QCOMPARE(doc.toMarkdown(), QString("hello\n world"));
+
+        QVERIFY(parseSpy.wait(2000));
+        // Parser keeps it as one paragraph (CommonMark soft break).
+        QCOMPARE(binding.model()->rowCount(), 1);
+    }
+
     // ---------- LiveStructuralKeyHandler — paragraph Delete at row-end ----------
 
     void delete_at_end_of_paragraph_merges_with_next() {
