@@ -17,8 +17,9 @@
 // forward declaration is rejected by the compiler at the point the
 // member is declared, not by MOC.
 
-// Forward declaration for the test-only friend grant below.
+// Forward declarations for the test-only friend grants below.
 class TstLiveRenderParagraphEdit;
+class TstHolesLayer;
 
 namespace Markoff::LiveRender {
 
@@ -55,6 +56,12 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveEditBinding : public QObject {
     /// applyingModelUpdate's window).
     Q_PROPERTY(QString text
                READ text WRITE setText NOTIFY textChanged)
+    /// When nonzero, this binding is attached to a hole row. All
+    /// contentsChange writes are routed to LiveHoleLayer::setBlockHoleBuffer
+    /// instead of MarkoffDocument::applyLocalEdit — preventing hole content
+    /// from leaking into the source CRDT before reification (F1 mitigation).
+    Q_PROPERTY(quint64 holeId
+               READ holeId WRITE setHoleId NOTIFY holeIdChanged)
 
 public:
     explicit LiveEditBinding(QObject *parent = nullptr);
@@ -75,12 +82,16 @@ public:
     QString text() const;
     void    setText(const QString &t);
 
+    quint64 holeId() const;
+    void    setHoleId(quint64 holeId);
+
 Q_SIGNALS:
     void bindingChanged();
     void modelIndexChanged();
     void textDocumentChanged();
     void composingChanged();
     void textChanged();
+    void holeIdChanged();
 
 private Q_SLOTS:
     void onContentsChange(int qtPos, int charsRemoved, int charsAdded);
@@ -92,6 +103,7 @@ private:
     // QTextEdit-backed document and wire it via this seam. Production
     // code uses setTextDocument(QQuickTextDocument*) instead.
     friend class ::TstLiveRenderParagraphEdit;
+    friend class ::TstHolesLayer;
 
     /// Test-only seam: wire directly to a QTextDocument without going
     /// through QQuickTextDocument. Used by unit tests that cannot
@@ -112,6 +124,7 @@ private:
     bool                            m_applyingTextUpdate = false;  // pushTextToDocument re-entrance guard
     QString                         m_text;          // bound QML text (mirrors model.text)
     QString                         m_previousText;  // CRDT-coherent snapshot of m_listenedDoc's text
+    quint64                         m_holeId = 0;    ///< nonzero ⇒ routes writes to LiveHoleLayer
 };
 
 }  // namespace Markoff::LiveRender

@@ -12,6 +12,7 @@ Item {
 
     property int modelIndex: index
     readonly property string blockText: model.text
+    property bool isHole: model.isHole === true
 
     readonly property var liveBinding:
         ListView.view ? ListView.view.binding : null
@@ -24,7 +25,8 @@ Item {
         modelIndex: root.modelIndex
         textDocument: edit.textDocument
         composing: edit.inputMethodComposing
-        text: model.text
+        text: root.isHole ? (model.bufferText || "") : model.text
+        holeId: model.holeId || 0
     }
 
     TextEdit {
@@ -40,15 +42,30 @@ Item {
         selectByMouse: true
         persistentSelection: true
 
-        // R4 limitation: Enter is a structural-key operation that splits a
-        // paragraph and needs focus transition to the new row. That's R5
-        // territory. For R4, swallow Enter so the user can't accidentally
-        // create a split that leaves their typing routed to the wrong row.
-        // Removed in R5 when LiveStructuralKeyHandler lands.
+        // Forward structural keys (Return / Enter / Esc / Backspace / Delete)
+        // to LiveStructuralKeyHandler. R5 + R5.5 logic dispatches based on
+        // row kind (paragraph / heading / code-block) and hole-vs-inner-row.
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                event.accepted = true
+            const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
+            if (!handler) { event.accepted = false; return }
+
+            // Only forward keys whose dispatch matters: structural keys + abandons.
+            const k = event.key
+            if (k !== Qt.Key_Return && k !== Qt.Key_Enter
+                && k !== Qt.Key_Escape && k !== Qt.Key_Backspace && k !== Qt.Key_Delete) {
+                return  // let TextEdit handle normally
+            }
+
+            const handled = handler.tryHandle(
+                k,
+                event.modifiers,
+                root.modelIndex,
+                edit.cursorPosition,
+                edit.selectionStart === edit.selectionEnd,
+                root.isHole ? (model.bufferText || "") : model.text
+            )
+            event.accepted = handled
         }
 
         function applySelection() {

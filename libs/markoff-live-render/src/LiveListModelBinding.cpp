@@ -76,6 +76,9 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->undoCoalescer  = new UndoCoalescer(d->document, this);
         d->holeLayer      = new LiveHoleLayer(d->document, d->model, d->undoCoalescer, this);
         d->proxyModel     = new LiveProxyBlockModel(d->document, d->model, d->holeLayer, this);
+        // End-to-end 250 ms quiet-commit path: idle timer → reification.
+        QObject::connect(d->holeLayer, &LiveHoleLayer::idleCommitDue,
+                         d->holeLayer, &LiveHoleLayer::commitBlockHole);
         Q_EMIT holeLayerChanged();
         Q_EMIT proxyModelChanged();
         d->structuralKeys = new LiveStructuralKeyHandler(
