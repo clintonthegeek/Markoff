@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "LiveRealisticInputHarness.h"
 
-#include <QQmlApplicationEngine>
 #include <QQuickItem>
 #include <QQuickView>
-#include <QSignalSpy>
 #include <QtTest/QtTest>
 
 using namespace Markoff::LiveRender::Test;
@@ -23,7 +21,7 @@ private slots:
 
         LiveRealisticInputHarness h(&view, /*defaultGapMs=*/30);
 
-        const QString target = QStringLiteral("this is interesting");
+        const QString target = QStringLiteral("thisisinteresting");
         h.typeString(target);
 
         h.idle(50);

@@ -57,11 +57,6 @@ target_link_libraries(tst_live_render_holes_gate PRIVATE
     Qt6::Core Qt6::Gui Qt6::Quick Qt6::Test
     markoff_live_render
 )
-qt_add_resources(tst_live_render_holes_gate "synthetic"
-    PREFIX "/"
-    BASE "."
-    FILES synthetic/SyntheticBrokenParagraphDelegate.qml
-)
 target_include_directories(tst_live_render_holes_gate PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )

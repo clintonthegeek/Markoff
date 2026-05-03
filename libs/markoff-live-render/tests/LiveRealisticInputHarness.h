@@ -34,7 +34,13 @@ public:
         QCoreApplication::processEvents();
     }
 
+    /// ASCII letters and digits only. The naive `QChar → Qt::Key` cast and
+    /// "uppercase ⇒ Shift" heuristic do not generalise to punctuation,
+    /// symbols, or non-ASCII characters; for those, build a `QInputMethodEvent`
+    /// path or extend the harness with an explicit `(QChar, Qt::Key, mods)`
+    /// overload. Sufficient for R5.5 stress-typing tests.
     void typeChar(QChar c) {
+        Q_ASSERT(c.unicode() < 0x80 && c.isLetterOrNumber());
         Qt::Key k = static_cast<Qt::Key>(c.toUpper().unicode());
         Qt::KeyboardModifiers mods = c.isUpper() ? Qt::ShiftModifier
                                                  : Qt::NoModifier;
@@ -45,6 +51,10 @@ public:
         for (QChar c : text) typeChar(c);
     }
 
+    /// Batches `chars.size()` keystrokes back-to-back with NO inter-
+    /// keystroke wait, then a single `pauseMs` settle at the end. Use
+    /// for testing batched-event paths and "fast typist" scenarios — NOT
+    /// for exposing async races; for that, use `typeString`.
     void burst(const QString &chars, int pauseMs) {
         for (QChar c : chars)
             QTest::keyClick(m_window, static_cast<Qt::Key>(c.toUpper().unicode()));
