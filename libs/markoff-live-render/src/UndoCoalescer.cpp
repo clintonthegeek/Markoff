@@ -41,6 +41,9 @@ void UndoCoalescer::recordStructural()
 
 void UndoCoalescer::recordOther()
 {
+    // Identical body to recordStructural for now; kept separate so R6+ can
+    // diverge (per-kind telemetry, IME-specific behavior) without touching
+    // call sites.
     m_haveLast         = true;
     m_lastWasPrintable = false;
     m_lastAnchor       = Markoff::BlockAnchor{};
