@@ -6,6 +6,7 @@
 
 #include <QObject>
 #include <QString>
+#include <optional>
 #include <qqmlintegration.h>
 
 namespace Markoff::LiveRender {
@@ -21,6 +22,12 @@ class LiveBlockModel;
 /// `cursorKind` Q_PROPERTY exposes the active variant as a string for QML
 /// bindings that need to react to focus type (e.g. focus ring vs. caret).
 /// Values: "none", "TextCaret", "BlockSelected", "BlockInternalEdit".
+///
+/// `requestTextCaretAtRow` is the deterministic-pending variant used by
+/// the structural-key handler in R5: when a structural edit creates a new
+/// row, the row doesn't exist in the model until the parse-back arrives.
+/// The pending request is held; `rowsInserted` resolves it. Spec §5.3
+/// step 6.
 class MARKOFF_LIVE_RENDER_EXPORT LiveCursorState : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -41,15 +48,41 @@ public:
 
     int rowForBlock(const Markoff::BlockAnchor &block) const;
 
+    /// Request a TextCaret at `qtPos` of the row at `expectedRow` once it
+    /// exists. If the row already exists, equivalent to constructing a
+    /// TextCaret from `model->recordAt(expectedRow).blockAnchor` and
+    /// calling `request()`. If the row does not yet exist (because a
+    /// structural edit was applied and the parse-back hasn't created it),
+    /// record the request and watch `model->rowsInserted` for resolution.
+    /// Pending requests linger up to two parse cycles before being
+    /// dropped (see spec §8.4). Spec §5.3 step 6.
+    Q_INVOKABLE void requestTextCaretAtRow(int expectedRow, int qtPos);
+
+    /// Called by LiveListModelBinding from onParseUpdated. Increments the
+    /// pending request's parse-cycle counter; drops the request after two
+    /// cycles without resolution. `parseSeq` is unused as a value (we
+    /// only care about the count); keep the signature so the call-site
+    /// is self-documenting.
+    void noteParseArrived(quint64 parseSeq);
+
 Q_SIGNALS:
     void cursorChanged();
 
 private:
     bool validateVariant(const Cursor &c) const;
+    void onRowsInserted(const QModelIndex &parent, int first, int last);
+    void resolvePendingForRow(int row);
 
     Cursor                   m_cursor;
     const BlockKindRegistry *m_registry;
     const LiveBlockModel    *m_model;
+
+    struct PendingRow {
+        int row;
+        int qtPos;
+        int parseCyclesSeen = 0;  // bumped on each noteParseArrived
+    };
+    std::optional<PendingRow> m_pendingRow;
 };
 
 }  // namespace Markoff::LiveRender

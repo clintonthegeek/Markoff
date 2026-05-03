@@ -3,6 +3,7 @@
 #include <markoff/live-render/BlockKindRegistry.h>
 #include <markoff/live-render/LiveBlockModel.h>
 
+#include <QAbstractItemModel>
 #include <QLoggingCategory>
 
 Q_LOGGING_CATEGORY(lcCursor, "markoff.live.cursor", QtWarningMsg)
@@ -17,6 +18,10 @@ LiveCursorState::LiveCursorState(const BlockKindRegistry *registry,
     , m_registry(registry)
     , m_model(model)
 {
+    if (m_model) {
+        QObject::connect(m_model, &QAbstractItemModel::rowsInserted,
+                         this, &LiveCursorState::onRowsInserted);
+    }
 }
 
 QString LiveCursorState::cursorKind() const
@@ -52,6 +57,50 @@ int LiveCursorState::rowForBlock(const Markoff::BlockAnchor &block) const
             return i;
     }
     return -1;
+}
+
+void LiveCursorState::requestTextCaretAtRow(int expectedRow, int qtPos)
+{
+    if (!m_model) return;
+    if (expectedRow < 0) return;
+    m_pendingRow = PendingRow{ expectedRow, qtPos, 0 };
+    if (expectedRow < m_model->rowCount())
+        resolvePendingForRow(expectedRow);
+}
+
+void LiveCursorState::noteParseArrived(quint64 /*parseSeq*/)
+{
+    if (!m_pendingRow) return;
+    ++m_pendingRow->parseCyclesSeen;
+    if (m_pendingRow->parseCyclesSeen >= 2) {
+        qCInfo(lcCursor) << "pending cursor request dropped after"
+                         << m_pendingRow->parseCyclesSeen
+                         << "parse cycles without resolution; row"
+                         << m_pendingRow->row;
+        m_pendingRow.reset();
+    }
+}
+
+void LiveCursorState::onRowsInserted(const QModelIndex &parent, int first, int last)
+{
+    if (parent.isValid()) return;  // top-level only
+    if (!m_pendingRow) return;
+    if (m_pendingRow->row < first || m_pendingRow->row > last) return;
+    resolvePendingForRow(m_pendingRow->row);
+}
+
+void LiveCursorState::resolvePendingForRow(int row)
+{
+    if (!m_model) return;
+    if (row < 0 || row >= m_model->rowCount()) return;
+    const int qtPos = m_pendingRow ? m_pendingRow->qtPos : 0;
+    m_pendingRow.reset();
+
+    TextCaret tc;
+    tc.block            = m_model->recordAt(row).blockAnchor;
+    tc.cachedByteOffset = static_cast<quint32>(qtPos);
+    // positionAnchor: left default — selection projection refreshes it.
+    request(tc);
 }
 
 bool LiveCursorState::validateVariant(const Cursor &c) const

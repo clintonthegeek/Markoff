@@ -22,10 +22,15 @@ using namespace Markoff::LiveRender;
 static BlockRecord makeRec(const QString &kind, const QString &text,
                             int headingLevel = 0)
 {
+    // Each call produces a record with a unique blockAnchor so diff keys
+    // are distinct. (Real records get anchors from the CRDT; tests use a
+    // simple counter to avoid collisions in AstBlockDiff.)
+    static quint32 s_anchorCounter = 1;
     BlockRecord r;
     r.kind = kind;
     r.text = text;
     r.headingLevel = headingLevel;
+    r.blockAnchor.firstByte.charValue = s_anchorCounter++;
     return r;
 }
 
@@ -188,6 +193,91 @@ private Q_SLOTS:
         BlockHitTester ht;
         QCOMPARE(ht.lastBlockIndex(), -1);
         QCOMPARE(ht.lastQtPos(), -1);
+    }
+
+    // ---- LiveCursorState: requestTextCaretAtRow tests ----
+
+    void requestTextCaretAtRow_already_exists_resolves_immediately() {
+        BlockKindRegistry reg;
+        LiveBlockModel model;
+        const auto recs = QList<BlockRecord>{
+            makeRec(BlockKind::Paragraph, "alpha"),
+            makeRec(BlockKind::Paragraph, "beta"),
+        };
+        QList<BlockKey> keys;
+        for (const auto &r : recs) keys << keyOf(r);
+        model.applyOps(AstBlockDiff::diff({}, keys), recs);
+
+        LiveCursorState cs(&reg, &model);
+        QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
+
+        cs.requestTextCaretAtRow(/*expectedRow=*/1, /*qtPos=*/0);
+
+        QCOMPARE(spy.count(), 1);
+        const Cursor cur = cs.cursor();
+        QVERIFY(std::holds_alternative<TextCaret>(cur));
+        QCOMPARE(std::get<TextCaret>(cur).cachedByteOffset, quint32(0));
+        QCOMPARE(std::get<TextCaret>(cur).block, recs[1].blockAnchor);
+    }
+
+    void requestTextCaretAtRow_pending_resolves_on_rowsInserted() {
+        BlockKindRegistry reg;
+        LiveBlockModel model;
+        const auto first = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "alpha") };
+        QList<BlockKey> firstKeys; firstKeys << keyOf(first[0]);
+        model.applyOps(AstBlockDiff::diff({}, firstKeys), first);
+
+        LiveCursorState cs(&reg, &model);
+        QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
+
+        // Request row 1: doesn't exist yet (rowCount == 1, valid rows are 0..0).
+        cs.requestTextCaretAtRow(/*expectedRow=*/1, /*qtPos=*/0);
+
+        // No cursorChanged yet — pending.
+        QCOMPARE(spy.count(), 0);
+        QVERIFY(std::holds_alternative<NoCursor>(cs.cursor()));
+
+        // Row 1 appears: applyOps with an Insert at row 1.
+        const auto second = QList<BlockRecord>{
+            first[0],
+            makeRec(BlockKind::Paragraph, "beta"),
+        };
+        QList<BlockKey> secondKeys;
+        for (const auto &r : second) secondKeys << keyOf(r);
+        model.applyOps(AstBlockDiff::diff(firstKeys, secondKeys), second);
+
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(std::holds_alternative<TextCaret>(cs.cursor()));
+        QCOMPARE(std::get<TextCaret>(cs.cursor()).block, second[1].blockAnchor);
+    }
+
+    void requestTextCaretAtRow_pending_dropped_after_two_parse_cycles() {
+        BlockKindRegistry reg;
+        LiveBlockModel model;
+        const auto first = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "alpha") };
+        QList<BlockKey> firstKeys; firstKeys << keyOf(first[0]);
+        model.applyOps(AstBlockDiff::diff({}, firstKeys), first);
+
+        LiveCursorState cs(&reg, &model);
+        QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
+
+        cs.requestTextCaretAtRow(/*expectedRow=*/1, /*qtPos=*/0);
+
+        // Two parse arrivals with no row insertion at the expected row:
+        // pending should be dropped, cursorChanged not fired.
+        cs.noteParseArrived(/*parseSeq=*/1);
+        cs.noteParseArrived(/*parseSeq=*/2);
+
+        // A third parse with the row inserted should NOT fire (pending dropped).
+        const auto third = QList<BlockRecord>{
+            first[0],
+            makeRec(BlockKind::Paragraph, "beta"),
+        };
+        QList<BlockKey> thirdKeys;
+        for (const auto &r : third) thirdKeys << keyOf(r);
+        model.applyOps(AstBlockDiff::diff(firstKeys, thirdKeys), third);
+
+        QCOMPARE(spy.count(), 0);
     }
 
     // ---- LiveListModelBinding: cachedByteOffset refresh tests ----
