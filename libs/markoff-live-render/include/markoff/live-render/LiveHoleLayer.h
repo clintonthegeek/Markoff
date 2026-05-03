@@ -4,8 +4,10 @@
 #include <markoff/live-render/BlockHole.h>
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
 
+#include <QDateTime>
 #include <QHash>
 #include <QObject>
+#include <QStack>
 #include <qqmlintegration.h>
 
 class QTimer;
@@ -17,7 +19,6 @@ class MarkoffDocument;
 namespace Markoff::LiveRender {
 
 class LiveBlockModel;
-class UndoCoalescer;
 
 class MARKOFF_LIVE_RENDER_EXPORT LiveHoleLayer : public QObject {
     Q_OBJECT
@@ -27,7 +28,6 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveHoleLayer : public QObject {
 public:
     explicit LiveHoleLayer(Markoff::MarkoffDocument *doc,
                            LiveBlockModel    *blockModel,
-                           UndoCoalescer     *undoCoalescer,
                            QObject           *parent = nullptr);
     ~LiveHoleLayer() override;
 
@@ -47,6 +47,23 @@ public:
     Markoff::TextAnchor reifyAnchor(quint64 holeId) const;
     QList<quint64> holesInOrder() const;
 
+    // Per-hole undo/redo (Task 15).
+
+    /// Pushes the current bufferText onto the per-hole undo stack and
+    /// clears the redo stack. Called explicitly by tests / by the
+    /// 1-second coalesce-break in setBlockHoleBuffer.
+    void recordHoleUndoPoint(quint64 holeId);
+
+    /// Pop one snapshot off the undo stack into bufferText (and push the
+    /// pre-undo buffer onto the redo stack). Returns true if a state
+    /// change occurred. Returns FALSE if both undoStack is empty AND
+    /// bufferText is empty — the caller should treat that as a signal
+    /// to drop the hole (matching v1 spec §3.3 Ctrl-Z-empty rule).
+    bool undoBlockHole(quint64 holeId);
+
+    /// Symmetric to undoBlockHole.
+    bool redoBlockHole(quint64 holeId);
+
 Q_SIGNALS:
     void holeInserted(quint64 holeId);
     void holeBufferChanged(quint64 holeId);
@@ -61,7 +78,9 @@ private:
         QString bufferText;
         bool composing = false;
         QTimer *idleTimer = nullptr;
-        // Task 15 adds: undo stack
+        QStack<QString> undoStack;
+        QStack<QString> redoStack;
+        qint64 lastEditMs = 0;
     };
 
     static constexpr int kIdleCommitMs = 250;
@@ -74,7 +93,6 @@ private:
 
     Markoff::MarkoffDocument *m_doc;
     LiveBlockModel *m_blockModel;
-    UndoCoalescer *m_undoCoalescer;
 };
 
 }  // namespace Markoff::LiveRender

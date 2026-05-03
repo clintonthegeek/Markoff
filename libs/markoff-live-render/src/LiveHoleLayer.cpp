@@ -4,6 +4,7 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
 
+#include <QDateTime>
 #include <QTimer>
 #include <algorithm>
 
@@ -11,12 +12,10 @@ namespace Markoff::LiveRender {
 
 LiveHoleLayer::LiveHoleLayer(Markoff::MarkoffDocument *doc,
                              LiveBlockModel    *blockModel,
-                             UndoCoalescer     *undoCoalescer,
                              QObject           *parent)
     : QObject(parent),
       m_doc(doc),
-      m_blockModel(blockModel),
-      m_undoCoalescer(undoCoalescer)
+      m_blockModel(blockModel)
 {}
 
 LiveHoleLayer::~LiveHoleLayer() = default;
@@ -42,8 +41,27 @@ void LiveHoleLayer::setBlockHoleBuffer(quint64 holeId, const QString &text) {
     auto it = m_holes.find(holeId);
     if (it == m_holes.end()) return;
     if (it->bufferText == text) return;
+
+    // 1-second coalesce-break for undo grouping: if more than 1000 ms
+    // since the last edit, snapshot the pre-edit buffer onto undoStack
+    // before overwriting. Consecutive edits within the threshold
+    // collapse into one undo entry (matches UndoCoalescer's printable-
+    // coalesce policy).
+    const qint64 now = QDateTime::currentMSecsSinceEpoch();
+    if (it->lastEditMs == 0) {
+        // First edit on a fresh hole — snapshot so undoing the first
+        // character returns to empty buffer rather than nothing.
+        it->undoStack.push(it->bufferText);
+        it->redoStack.clear();
+    } else if (now - it->lastEditMs > 1000) {
+        it->undoStack.push(it->bufferText);
+        it->redoStack.clear();
+    }
+    it->lastEditMs = now;
+
     it->bufferText = text;
     Q_EMIT holeBufferChanged(holeId);
+
     if (!it->composing && !text.isEmpty())
         restartIdleTimer(holeId);
     else
@@ -113,6 +131,41 @@ QList<quint64> LiveHoleLayer::holesInOrder() const {
         return a < b;
     });
     return ids;
+}
+
+void LiveHoleLayer::recordHoleUndoPoint(quint64 holeId) {
+    auto it = m_holes.find(holeId);
+    if (it == m_holes.end()) return;
+    it->undoStack.push(it->bufferText);
+    it->redoStack.clear();
+}
+
+bool LiveHoleLayer::undoBlockHole(quint64 holeId) {
+    auto it = m_holes.find(holeId);
+    if (it == m_holes.end()) return false;
+
+    if (it->undoStack.isEmpty() && it->bufferText.isEmpty())
+        return false;   // signal: drop the hole
+
+    if (it->undoStack.isEmpty()) {
+        // Current buffer is the only state; clear it and push to redo.
+        it->redoStack.push(it->bufferText);
+        it->bufferText.clear();
+    } else {
+        it->redoStack.push(it->bufferText);
+        it->bufferText = it->undoStack.pop();
+    }
+    Q_EMIT holeBufferChanged(holeId);
+    return true;
+}
+
+bool LiveHoleLayer::redoBlockHole(quint64 holeId) {
+    auto it = m_holes.find(holeId);
+    if (it == m_holes.end() || it->redoStack.isEmpty()) return false;
+    it->undoStack.push(it->bufferText);
+    it->bufferText = it->redoStack.pop();
+    Q_EMIT holeBufferChanged(holeId);
+    return true;
 }
 
 void LiveHoleLayer::commitBlockHole(quint64 holeId) {

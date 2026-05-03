@@ -12,6 +12,11 @@
 namespace Markoff { class MarkoffDocument; }
 
 namespace Markoff::LiveRender {
+class LiveCursorState;
+class LiveHoleLayer;
+}
+
+namespace Markoff::LiveRender {
 
 /// View-side undo coalescing policy (spec §6.1 L5). Tracks the most-recent
 /// edit's classification and focus context; on each subsequent edit, decides
@@ -34,6 +39,10 @@ namespace Markoff::LiveRender {
 /// `LiveStructuralKeyHandler`, the QML focus-change connection (in
 /// `LiveView.qml`) calls `notifyFocusChanged` when `cursorState.cursorChanged`
 /// arrives with a different `blockAnchor` than the prior cursor.
+///
+/// Task 15: undo() and redo() are the Ctrl-Z / Ctrl-Shift-Z entry points.
+/// They route to LiveHoleLayer when the cursor is on a hole row, and to
+/// MarkoffDocument otherwise.
 class MARKOFF_LIVE_RENDER_EXPORT UndoCoalescer : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -42,7 +51,10 @@ class MARKOFF_LIVE_RENDER_EXPORT UndoCoalescer : public QObject {
 public:
     static constexpr int kIdleThresholdMs = 1000;
 
-    explicit UndoCoalescer(Markoff::MarkoffDocument *document, QObject *parent = nullptr);
+    explicit UndoCoalescer(Markoff::MarkoffDocument *document,
+                           LiveCursorState          *cursorState = nullptr,
+                           LiveHoleLayer            *holeLayer   = nullptr,
+                           QObject                  *parent      = nullptr);
 
     bool recordPrintable(const Markoff::BlockAnchor &anchor);
     void recordStructural();
@@ -52,10 +64,20 @@ public:
     void notifyMovement();
     void notifyIdleExpired();
 
+    /// Ctrl-Z entry point. If the focused row is a hole, routes to
+    /// LiveHoleLayer::undoBlockHole; on empty-buffer-empty-stack,
+    /// abandons the hole. Otherwise routes to MarkoffDocument::undo().
+    Q_INVOKABLE void undo();
+
+    /// Ctrl-Shift-Z entry point. Symmetric to undo().
+    Q_INVOKABLE void redo();
+
 private:
     void clearLast();
 
     QPointer<Markoff::MarkoffDocument> m_document;
+    QPointer<LiveCursorState>          m_cursorState;
+    QPointer<LiveHoleLayer>            m_holeLayer;
 
     // Last-record state. m_haveLast == false means the chain is broken;
     // the next recordPrintable cannot coalesce.

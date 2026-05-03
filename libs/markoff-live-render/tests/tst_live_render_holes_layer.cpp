@@ -36,8 +36,7 @@ private slots:
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         doc.resetContent("hello", Markoff::Origin::FirstOpen);
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, /*blockModel=*/nullptr,
-                                                 /*undoCoalescer=*/nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, /*blockModel=*/nullptr);
         QSignalSpy spy(&layer, &Markoff::LiveRender::LiveHoleLayer::holeInserted);
 
         Markoff::TextAnchor anchor = doc.textAnchorAt(5, /*rightBias=*/false);
@@ -56,7 +55,7 @@ private slots:
         Markoff::MarkoffDocument doc(1);
         doc.resetContent("hello", Markoff::Origin::FirstOpen);
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
         quint64 id = layer.createBlockHole(HoleKind::Paragraph,
                                             doc.textAnchorAt(5, false));
 
@@ -70,7 +69,7 @@ private slots:
         Markoff::MarkoffDocument doc(1);
         doc.resetContent("hello", Markoff::Origin::FirstOpen);
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
         quint64 id = layer.createBlockHole(HoleKind::Paragraph,
                                             doc.textAnchorAt(5, false));
         layer.setBlockHoleBuffer(id, "buffered");
@@ -90,7 +89,7 @@ private slots:
         Markoff::MarkoffDocument doc(1);
         doc.resetContent("hello", Markoff::Origin::FirstOpen);
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
         QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
         quint64 id = layer.createBlockHole(HoleKind::Paragraph,
                                             doc.textAnchorAt(5, false));
@@ -105,7 +104,7 @@ private slots:
         Markoff::MarkoffDocument doc(1);
         doc.resetContent("hello", Markoff::Origin::FirstOpen);
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
         QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
         quint64 id = layer.createBlockHole(HoleKind::Paragraph,
                                             doc.textAnchorAt(5, false));
@@ -124,7 +123,7 @@ private slots:
         Markoff::MarkoffDocument doc(1);
         doc.resetContent("hello", Markoff::Origin::FirstOpen);
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
         QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
         quint64 id = layer.createBlockHole(HoleKind::Paragraph,
                                             doc.textAnchorAt(5, false));
@@ -143,7 +142,7 @@ private slots:
         Markoff::MarkoffDocument doc(1);
         doc.resetContent("hello", Markoff::Origin::FirstOpen);
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
         QSignalSpy idleSpy(&layer, SIGNAL(idleCommitDue(quint64)));
         // Hole created but bufferText left empty — timer must not fire.
         (void)layer.createBlockHole(HoleKind::Paragraph,
@@ -158,7 +157,7 @@ private slots:
         QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
         QVERIFY(parseSpy.wait(2000));
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
         QSignalSpy reifiedSpy(&layer, SIGNAL(holeReified(quint64, Markoff::TextAnchor)));
         QSignalSpy abandonedSpy(&layer, SIGNAL(holeAbandoned(quint64)));
 
@@ -179,7 +178,7 @@ private slots:
         QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
         QVERIFY(parseSpy.wait(2000));
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
         QSignalSpy reifiedSpy(&layer, SIGNAL(holeReified(quint64, Markoff::TextAnchor)));
         QSignalSpy abandonedSpy(&layer, SIGNAL(holeAbandoned(quint64)));
 
@@ -295,7 +294,7 @@ private slots:
         QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
         QVERIFY(parseSpy.wait(2000));
 
-        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr, nullptr);
+        Markoff::LiveRender::LiveHoleLayer layer(&doc, nullptr);
 
         quint64 idLate  = layer.createBlockHole(HoleKind::Paragraph,
                                                  doc.textAnchorAt(13, false)); // end of para2
@@ -311,6 +310,106 @@ private slots:
         QVERIFY(s.contains("early"));
         QVERIFY(s.contains("late"));
         QVERIFY(s.indexOf("early") < s.indexOf("late"));
+    }
+
+    // ---------- Task 15: per-hole undo/redo ----------
+
+    void undo_within_hole_pops_buffer_snapshot() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        const quint64 holeId = layer->holesInOrder().first();
+
+        layer->setBlockHoleBuffer(holeId, "abc");
+        layer->recordHoleUndoPoint(holeId);
+        layer->setBlockHoleBuffer(holeId, "abcdef");
+
+        QVERIFY(layer->undoBlockHole(holeId));
+        QCOMPARE(layer->bufferText(holeId), QString("abc"));
+
+        // Redo should restore.
+        QVERIFY(layer->redoBlockHole(holeId));
+        QCOMPARE(layer->bufferText(holeId), QString("abcdef"));
+    }
+
+    void undo_with_empty_buffer_returns_false_to_signal_drop() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        const quint64 holeId = layer->holesInOrder().first();
+
+        // Empty buffer + empty undo stack → undoBlockHole returns false.
+        QVERIFY(!layer->undoBlockHole(holeId));
+    }
+
+    void undo_coalescer_routes_undo_to_layer_when_focused_row_is_hole() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+        auto *coalesc = binding.undoCoalescer();
+
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        const quint64 holeId = layer->holesInOrder().first();
+        layer->setBlockHoleBuffer(holeId, "abc");
+        layer->recordHoleUndoPoint(holeId);
+        layer->setBlockHoleBuffer(holeId, "abcdef");
+
+        // CommandFacade-equivalent Ctrl-Z routes through UndoCoalescer.undo();
+        // since cursor is on the hole, layer's undoBlockHole runs.
+        coalesc->undo();
+        QCOMPARE(layer->bufferText(holeId), QString("abc"));
+
+        // Source unchanged (no CRDT undo).
+        QCOMPARE(doc.toMarkdown(), QString("hello"));
+    }
+
+    void undo_coalescer_routes_to_doc_when_focused_row_is_inner() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *coalesc = binding.undoCoalescer();
+
+        // No hole; cursor is default (NoCursor). Apply a CRDT edit, then
+        // call coalesc->undo() — should route to doc.
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 5;
+        ed.oldEnd   = 5;
+        ed.newText  = "X";
+        doc.applyLocalEdit({ ed });
+        QCOMPARE(doc.toMarkdown(), QString("helloX"));
+
+        coalesc->undo();
+        QCOMPARE(doc.toMarkdown(), QString("hello"));   // CRDT undo ran
     }
 };
 

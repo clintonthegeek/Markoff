@@ -73,8 +73,11 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->session = d->document->createSession({});
         d->selectionView->setDocument(d->document);
         d->selectionView->setSession(d->session);
-        d->undoCoalescer  = new UndoCoalescer(d->document, this);
-        d->holeLayer      = new LiveHoleLayer(d->document, d->model, d->undoCoalescer, this);
+        // Construction order: holeLayer first (undoCoalescer needs it),
+        // undoCoalescer second (wired to cursorState + holeLayer),
+        // proxyModel last (depends on doc + model + layer).
+        d->holeLayer      = new LiveHoleLayer(d->document, d->model, this);
+        d->undoCoalescer  = new UndoCoalescer(d->document, d->cursorState, d->holeLayer, this);
         d->proxyModel     = new LiveProxyBlockModel(d->document, d->model, d->holeLayer, this);
         // End-to-end 250 ms quiet-commit path: idle timer → reification.
         QObject::connect(d->holeLayer, &LiveHoleLayer::idleCommitDue,
