@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-03 (R5 Tasks 1–11 landed; PAUSED. Post-mortem complete; design doc landed; spec amendments and R5.5 plan next.)
+**Last updated:** 2026-05-03 (R5.5 implementation complete; entering dogfood gate.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,16 +11,15 @@
 
 ## TL;DR — what to do *right now*
 
-> **R5 PAUSED on architectural finding (empty-paragraph gap).** R5 Tasks 1–11 are landed (commits `7c6f7f6..b8fb639`); 7/7 live-render fast-tier executables green; 21/21 structural-test slots green. **Tasks 12–18 are paused.** The R5 dogfood criterion (spec §10.3) — *"caret lands in the new empty paragraph each time"* — is structurally unachievable with the current `\n\n`-insert design because tree-sitter's CommonMark grammar emits zero block nodes for blank-only regions. Inserting `\n\n` at end of `"hello"` produces `model->rowCount() == 1`, not 2. The planned `requestTextCaretAtRow(blockIndex+1, 0)` cursor delivery has no row to resolve into. Mid-block split works; end-of-paragraph and start-of-paragraph Enter do not. The R5 spec premise 6 ("Notion-style Enter; holes deleted") retired the only mechanism that could deliver the dogfood UX. **Holes need to come back, in their v1 IME-preedit-pattern form, scoped narrowly.** The full failure analysis + redesign brief is at `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md`.
+> **R5.5 implementation complete; dogfood gate next.** All 19 R5.5 tasks plus an R4 test-setup fix landed (commits `c641c39..4ddd146`, plus title bump). 10/10 live-render fast-tier executables green; the load-bearing stress test (`tst_live_render_holes_qml`) types 200 chars at 30 ms gap into a hole through the QML key-event chain and verifies byte-for-byte source equality. The harness's discriminating power was gated against v0-style scramble in Task 2 (synthetic stub deleted in Task 3). Per Tasks 14 + 17, four real bugs were caught by the QML stress test that pure C++ tests had missed: (i) `LiveProxyBlockModel::data()` returned an empty QVariant for `KindRole` on hole rows, causing `DelegateChooser` to silently miss; (ii) `Qt.labs.qmlmodels DelegateChooser` only rebuilds delegates on `modelReset`, not `rowsInserted` — `onHoleInserted` had to switch to `beginResetModel/endResetModel`; (iii) proxy helper methods needed `Q_INVOKABLE` for QML to reach them; (iv) `QTest::keyClick(Key, Modifier)` drops Shift in headless mode by emitting an empty `text()` field. All fixed in the Task 17 commit.
 >
-> **Recommended next:** Post-mortem, design doc, and C-restoration spec amendments are landed. Derive the R5.5 plan via `superpowers:writing-plans` from the design doc. Then begin implementation Task 1 (the realistic-input harness gate test). User has pre-approved plan generation and implementation; proceed autonomously.
+> **Recommended next:** User runs `./build-dev/bin/markoff-live-render-app <some-file.md>` and exercises the R5.5 dogfood script (spec §10.3 R5.5 entry — Enter at end of every paragraph in a 10-block doc; type 5–10 chars per hole; idle 300 ms; verify reification + caret-at-end; Esc abandon-cleanly; 200 words at 100+ wpm with no scramble; saved file equals on-screen content). Feedback goes into the Dogfood log below. On sign-off, R5.5 transitions to `complete` and R6 plan generation begins.
 >
-> **Read first** (in this order):
-> 1. `docs/handoff/2026-05-03-r5-holes-postmortem.md` — post-mortem (input to the design).
-> 2. `docs/specs/2026-05-03-v2-holes-design.md` — design (input to the spec amendments and plan).
-> 3. `docs/handoff/2026-05-02-restoration-session-brief.md` §3.6 — spec-amendment protocol.
-> 4. `docs/specs/2026-05-02-live-render-restoration-design.md` — the spec to be amended.
-> 5. `docs/handoff/2026-05-03-r5-empty-paragraph-gap.md` — original call for design (archived; the post-mortem responds to it).
+> **Read first** (in this order, only if context is needed):
+> 1. `docs/specs/2026-05-03-v2-holes-design.md` — the v2 holes design.
+> 2. `docs/handoff/2026-05-03-r5-holes-postmortem.md` — why v0/v1 didn't work.
+> 3. `docs/plans/2026-05-03-live-render-r5-5-holes.md` — implementation plan (now executed).
+> 4. `docs/handoff/2026-05-03-r4-paragraph-edit-tests-audit.md` — the R4 test-setup audit (commit `06ec6b2`).
 
 ---
 
@@ -36,8 +35,8 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | `5a0dae7` | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
 | **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | `3484c11`, `2225061`, `e837710`, `1f26ec8`, `18abd96` | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. Dogfood-surfaced fixes: selection-paint, scroll-then-click hit-test, HR source-faithful copy. 114/114. |
 | **R4** | [r4-paragraph-editing](plans/2026-05-02-live-render-r4-paragraph-editing.md) | `complete` | `1b75d37`, `ce0494f`, `3181fe8`, `dec12e7`, `7ae29e1`, `033d7e7`, `fa8e80d`, `99c616f`, `5e12f10`, `563c1f3`, `77a84eb`, `28e1c8f`, `a24c766`, `26dc802`, `7252498`, `324de05`, `201cbd3`, `5662f95`, `7d49718`, `c7dca41`, `37b97bf` | Paragraph + heading + code-block writable via LiveEditBinding; freshness gate; three cycle guards; previousText cache; cachedByteOffset refresh; click-focus routing; Enter swallowed (R5). 6/6 fast-tier; 8 paragraph_edit slots. |
-| **R5** | [r5-structural-keys](plans/2026-05-02-live-render-r5-structural-keys.md) | `in-progress (paused — Tasks 12–18 pending; close-out independent of R5.5)` | `7c6f7f6`, `6da5698`, `dff19de`, `9d9d157`, `abc1005`, `4901383`, `05363f2`, `9a6c9f8`, `1ab0da9`, `cc64af9`, `21be140`, `b8fb639` | Tasks 1–11 landed. EOB-Enter / start-Enter handled by R5.5 (holes); R5 dogfood criterion amended (spec §11 R5). Tasks 12–17 (delegate wiring + integration) may close independently of R5.5. |
-| **R5.5** | [r5-5-holes](plans/2026-05-03-live-render-r5-5-holes.md) | `pending` | — | Paragraph holes via LiveHoleLayer + LiveProxyBlockModel + LiveRealisticInputHarness. v2 IME-preedit pattern; audit L9 phantom-rows + concatenating proxy. 19 tasks. |
+| **R5** | [r5-structural-keys](plans/2026-05-02-live-render-r5-structural-keys.md) | `in-progress (paused — Tasks 12–18 pending; superseded in part by R5.5's hole dispatch)` | `7c6f7f6`, `6da5698`, `dff19de`, `9d9d157`, `abc1005`, `4901383`, `05363f2`, `9a6c9f8`, `1ab0da9`, `cc64af9`, `21be140`, `b8fb639` | Tasks 1–11 landed. EOB-Enter / start-Enter now handled by R5.5 (holes); R5 dogfood criterion amended (spec §11 R5). Tasks 12–17 (delegate wiring + integration) — most are now subsumed by R5.5 work; remaining items can close independently. |
+| **R5.5** | [r5-5-holes](plans/2026-05-03-live-render-r5-5-holes.md) | `dogfood` | `c641c39..4ddd146` (19 R5.5 tasks + R4 test-setup fix) | Paragraph holes via LiveHoleLayer + LiveProxyBlockModel + LiveRealisticInputHarness. v2 IME-preedit pattern landed. 10/10 fast-tier; 24 layer subtests; 31 structural subtests; 8 proxy subtests; 200-char QML stress test gates against v0 F2 scramble. Awaiting user dogfood pass. |
 | **R6** | *not yet written* | `pending` | — | Other text blocks + speculation refresh. |
 | **R7** | *not yet written* | `pending` | — | Lists + blockquotes (II.a, II.b). |
 | **R8** | *not yet written* | `pending` | — | Math block + BlockInternalEdit (I.a, L8). |
@@ -59,7 +58,28 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-03 | (this commit) | docs(plan): R5.5 — paragraph holes — 19 tasks, TDD with realistic-input harness gate; subagent-driven-development recommended |
+| 2026-05-03 | (this commit) | feat(live-render): R5.5 implementation complete — test-app title bumped; entering dogfood gate |
+| 2026-05-03 | `4ddd146` | test(live-render): selection across hole includes bufferText in copy (R5.5 Task 18) |
+| 2026-05-03 | `5e92a8f` | test(live-render): stress-typing into hole — load-bearing R5.5 gate (R5.5 Task 17). Surfaced and fixed four real bugs: kind-role miss on hole rows, DelegateChooser-only-rebuilds-on-reset, missing Q_INVOKABLE on proxy helpers, QTest::keyClick Shift-drop in headless |
+| 2026-05-03 | `75acb45` | feat(live-render): save-flush via LiveListModelBinding::flushPendingHoles (R5.5 Task 16) |
+| 2026-05-03 | `1127b97` | feat(live-render): per-hole undo + UndoCoalescer hole-aware routing (R5.5 Task 15) |
+| 2026-05-03 | `127c03d` | feat(live-render): hole bufferText mirror + IME guard + isHole plumbing + Enter dispatch (R5.5 Task 14) |
+| 2026-05-03 | `e297a21` | feat(live-render): hole-row abandon paths — Esc / Backspace-empty / Delete-empty (R5.5 Task 13) |
+| 2026-05-03 | `ea44780` | feat(live-render): hole-row Enter — commit / split / stacked-empty (R5.5 Task 12) |
+| 2026-05-03 | `71e4baa` | feat(live-render): paragraph EOB-Enter + start-Enter create holes (R5.5 Task 11) |
+| 2026-05-03 | `76a4632` | feat(live-render): wire LiveHoleLayer + LiveProxyBlockModel into binding (R5.5 Task 10) |
+| 2026-05-03 | `3363c89` | feat(live-render): proxy hole-row insertion + anchor mapping (R5.5 Task 9) |
+| 2026-05-03 | `162f15f` | feat(live-render): LiveProxyBlockModel passthrough skeleton (R5.5 Task 8) |
+| 2026-05-03 | `b08432e` | feat(live-render): commitBlockHole reifies hole into source (R5.5 Task 7) |
+| 2026-05-03 | `d15b1e7` | test(live-render): silence -Wunused-variable in idle-empty-buffer test (R5.5 Task 6 follow-up) |
+| 2026-05-03 | `3fd6822` | feat(live-render): per-hole 250 ms idle timer (R5.5 Task 6) |
+| 2026-05-03 | `b8fb0c7` | feat(live-render): LiveHoleLayer lifecycle skeleton (R5.5 Task 5) |
+| 2026-05-03 | `06ec6b2` | test(live-render): initialise eb.text before setRawTextDocument (R4 test-setup fix; audit at `docs/handoff/2026-05-03-r4-paragraph-edit-tests-audit.md`) |
+| 2026-05-03 | `ae4506e` | feat(live-render): BlockHole + HoleBlockId; BlockId is now a variant (R5.5 Task 4) |
+| 2026-05-03 | `078d461` | test(live-render): retire synthetic broken stub + gate test (R5.5 Task 3) |
+| 2026-05-03 | `b4e7072` | test(live-render): harness API hygiene (R5.5 Task 2 follow-up) |
+| 2026-05-03 | `c641c39` | test(live-render): LiveRealisticInputHarness + gate test (R5.5 Task 2) |
+| 2026-05-03 | `3f672eb` | docs(plan): R5.5 — paragraph holes — 19 tasks, TDD with realistic-input harness gate; subagent-driven-development recommended |
 | 2026-05-03 | `8d8ea00` | docs(spec): R5/R5.5 amendment — v2 holes (premise 6 amended; §3.1 BlockId becomes variant; §4.4 cycle-guard rows restored with v2 annotations; §5.4 + §6.1 L6 + §7.2 reflect LiveHoleLayer/LiveProxyBlockModel; §11 adds R5.5; §15 resolves BlockId open question) |
 | 2026-05-03 | `af902b1` | docs: R5 v2-holes post-mortem + design — verifies v1 mitigations under C; adopts audit L9 phantom-rows + concatenating proxy as structural correction; specifies LiveHoleLayer + LiveProxyBlockModel + LiveRealisticInputHarness APIs |
 | 2026-05-03 | `8dac44b` | docs(handoff): R5 empty-paragraph gap analysis + redesign brief; status-doc reflects R5 pause |
