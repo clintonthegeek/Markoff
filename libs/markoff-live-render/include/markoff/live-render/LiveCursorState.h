@@ -56,13 +56,15 @@ public:
     /// record the request and watch `model->rowsInserted` for resolution.
     /// Pending requests linger up to two parse cycles before being
     /// dropped (see spec §8.4). Spec §5.3 step 6.
+    ///
+    /// If a request is already pending, it is replaced (latest-request-wins).
     Q_INVOKABLE void requestTextCaretAtRow(int expectedRow, int qtPos);
 
     /// Called by LiveListModelBinding from onParseUpdated. Increments the
-    /// pending request's parse-cycle counter; drops the request after two
-    /// cycles without resolution. `parseSeq` is unused as a value (we
-    /// only care about the count); keep the signature so the call-site
-    /// is self-documenting.
+    /// pending request's parse-cycle counter; drops on the SECOND call
+    /// after the request was recorded (i.e. drops at parseCyclesSeen >= 2).
+    /// `parseSeq` is unused as a value (we only care about the count);
+    /// keep the signature so the call-site is self-documenting.
     void noteParseArrived(quint64 parseSeq);
 
 Q_SIGNALS:

@@ -94,6 +94,9 @@ void LiveCursorState::resolvePendingForRow(int row)
     if (!m_model) return;
     if (row < 0 || row >= m_model->rowCount()) return;
     const int qtPos = m_pendingRow ? m_pendingRow->qtPos : 0;
+    // Reset BEFORE request(): a cursorChanged consumer may re-enter and
+    // call requestTextCaretAtRow; reading a stale m_pendingRow during
+    // that re-entrance would produce the wrong qtPos.
     m_pendingRow.reset();
 
     TextCaret tc;
