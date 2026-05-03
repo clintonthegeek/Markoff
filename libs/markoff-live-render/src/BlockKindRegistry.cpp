@@ -17,26 +17,36 @@ void BlockKindRegistry::registerBuiltins()
         d.id = BlockKind::Paragraph;
         d.acceptsTextRoleUpdates = true;
         d.supportedCursorVariants = { QStringLiteral("TextCaret") };
+        d.consumedStructuralKeys = {
+            Qt::Key_Return, Qt::Key_Enter,
+            Qt::Key_Backspace, Qt::Key_Delete,
+        };
         d.delegateUrl = QStringLiteral(
             "qrc:/qt/qml/org/markoff/live/render/delegates/ParagraphDelegate.qml");
         m_descriptors.insert(d.id, d);
     }
-    // Heading: text-bearing, TextCaret.
+    // Heading: text-bearing, TextCaret. Same structural keys as paragraph.
     {
         BlockKindDescriptor d;
         d.id = BlockKind::Heading;
         d.acceptsTextRoleUpdates = true;
         d.supportedCursorVariants = { QStringLiteral("TextCaret") };
+        d.consumedStructuralKeys = {
+            Qt::Key_Return, Qt::Key_Enter,
+            Qt::Key_Backspace, Qt::Key_Delete,
+        };
         d.delegateUrl = QStringLiteral(
             "qrc:/qt/qml/org/markoff/live/render/delegates/HeadingDelegate.qml");
         m_descriptors.insert(d.id, d);
     }
-    // CodeBlock: text-bearing, TextCaret. Tab inserts literal tab (R5).
+    // CodeBlock: text-bearing, TextCaret. Only edge-merge keys consumed;
+    // Enter passes through to TextEdit's native \n insertion.
     {
         BlockKindDescriptor d;
         d.id = BlockKind::CodeBlock;
         d.acceptsTextRoleUpdates = true;
         d.supportedCursorVariants = { QStringLiteral("TextCaret") };
+        d.consumedStructuralKeys = { Qt::Key_Backspace, Qt::Key_Delete };
         d.delegateUrl = QStringLiteral(
             "qrc:/qt/qml/org/markoff/live/render/delegates/CodeBlockDelegate.qml");
         m_descriptors.insert(d.id, d);

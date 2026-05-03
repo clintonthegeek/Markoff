@@ -65,6 +65,42 @@ private Q_SLOTS:
         QVERIFY(kinds.contains(BlockKind::HorizontalRule));
         QVERIFY(kinds.contains(BlockKind::Image));
     }
+
+    void paragraph_descriptor_consumes_structural_keys() {
+        BlockKindRegistry r;
+        const auto *d = r.find(BlockKind::Paragraph);
+        QVERIFY(d);
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Return));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Enter));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Backspace));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Delete));
+    }
+
+    void heading_descriptor_consumes_structural_keys() {
+        BlockKindRegistry r;
+        const auto *d = r.find(BlockKind::Heading);
+        QVERIFY(d);
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Return));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Enter));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Backspace));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Delete));
+    }
+
+    void code_block_descriptor_consumes_only_edge_keys() {
+        BlockKindRegistry r;
+        const auto *d = r.find(BlockKind::CodeBlock);
+        QVERIFY(d);
+        QVERIFY(!d->consumedStructuralKeys.contains(Qt::Key_Return));
+        QVERIFY(!d->consumedStructuralKeys.contains(Qt::Key_Enter));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Backspace));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Delete));
+    }
+
+    void hr_image_descriptors_have_no_structural_keys() {
+        BlockKindRegistry r;
+        QVERIFY(r.find(BlockKind::HorizontalRule)->consumedStructuralKeys.isEmpty());
+        QVERIFY(r.find(BlockKind::Image)->consumedStructuralKeys.isEmpty());
+    }
 };
 
 QTEST_APPLESS_MAIN(TstLiveRenderRegistry)
