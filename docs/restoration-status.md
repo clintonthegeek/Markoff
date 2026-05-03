@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-02 (R4 complete — within-paragraph editing dogfooded; Enter deferred to R5; perf to R10)
+**Last updated:** 2026-05-02 (R5 plan written; pending execution)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,14 +11,14 @@
 
 ## TL;DR — what to do *right now*
 
-> **R4 complete.** Within-paragraph editing dogfooded successfully: clicks focus a TextEdit and place a caret, single keystrokes produce single non-duplicated characters at the cursor position, freshness rule prevents scrambling across in-flight parses. Three surviving cycle guards (`applyingModelUpdate`, IME `composing`, defensive `applyingSessionSelection`) in place. 6/6 live-render fast-tier executables green; 8 paragraph_edit slots cover the regression bug-classes from the audit. Scope notes: (1) Enter is **swallowed** in all three text delegates as an R4 limitation — pressing Enter mid-paragraph would split a block at `\n\n` but R4 has no focus-transition machinery to follow the user into the new row. Real Enter handling lands in R5 with `LiveStructuralKeyHandler`. (2) **Performance is unmet** at the spec §9 budget targets — within-paragraph typing chugs and pegs a CPU core in long documents (worse near the bottom). Per-keystroke parse re-runs over the full CRDT body, `BlockWalker::walk` is linear in doc size, and `applyOps` copies `BlockRecord` per Equal op even when nothing changed. All known territory; spec §11 R10 ("Hardening + perf-budget enforcement") is where this gets profiled and fixed.
+> **R5 plan written; pending execution.** The 18-task R5 plan is in `docs/plans/2026-05-02-live-render-r5-structural-keys.md`. R4 remains `complete` (paragraph/heading/code-block editable; freshness rule + three cycle guards in place; 6/6 fast-tier green). R5 retires the R4 Enter-swallow with `LiveStructuralKeyHandler` (descriptor-driven dispatch), adds `UndoCoalescer` (printable-coalesce policy from spec §6.1 L5), and extends `LiveCursorState` with a deterministic pending-row request that resolves on `LiveBlockModel::rowsInserted` (spec §5.3 step 6). Resolves spec open questions §15.1 (handler-registration mechanism: per-(kind,key) `std::function` table inside the handler) and §15.4 (undo idle threshold pinned at 1000 ms); §15.8 (test-app `--live` flag rename) deferred to R10.
 >
-> **Recommended next:** Write the R5 plan from spec §11 R5 (structural keys + IME completion + undo coalescing) and execute it. R5 owns Enter (split paragraph + transfer focus to new row), Backspace at block-start (merge into previous), Delete at block-end (merge with next), Shift-Enter (soft break), Tab/Shift-Tab where applicable, and the `UndoCoalescer` view-side policy. Once R5 lands, the user can finally type Enter without R4's swallow-fix as a workaround.
+> **Recommended next:** Execute the R5 plan task-by-task per the working protocol. The plan is structured for the `superpowers:subagent-driven-development` skill (one subagent per task) or `superpowers:executing-plans` (in-session execution). The acceptance gate is the spec §10.3 R5 dogfood script: *"Press Enter at the end of every paragraph in a 10-block doc; caret lands in the new empty paragraph each time; Backspace at the start of each merges back, restoring the original."*
 >
 > **Read first** (in this order):
 > 1. `docs/handoff/2026-05-02-restoration-session-brief.md` — the orientation / working-protocol doc.
-> 2. `docs/plans/2026-05-02-live-render-r4-paragraph-editing.md` — the R4 implementation plan, for context on what's now live.
-> 3. `docs/specs/2026-05-02-live-render-restoration-design.md` §11 R5 — the next phase's spec section.
+> 2. `docs/plans/2026-05-02-live-render-r5-structural-keys.md` — the R5 implementation plan (active).
+> 3. `docs/specs/2026-05-02-live-render-restoration-design.md` §5.3, §5.4, §7.2, §11 R5 — the architecture sections the plan derives from.
 
 ---
 
@@ -34,7 +34,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | `5a0dae7` | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
 | **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | `3484c11`, `2225061`, `e837710`, `1f26ec8`, `18abd96` | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. Dogfood-surfaced fixes: selection-paint, scroll-then-click hit-test, HR source-faithful copy. 114/114. |
 | **R4** | [r4-paragraph-editing](plans/2026-05-02-live-render-r4-paragraph-editing.md) | `complete` | `1b75d37`, `ce0494f`, `3181fe8`, `dec12e7`, `7ae29e1`, `033d7e7`, `fa8e80d`, `99c616f`, `5e12f10`, `563c1f3`, `77a84eb`, `28e1c8f`, `a24c766`, `26dc802`, `7252498`, `324de05`, `201cbd3`, `5662f95`, `7d49718`, `c7dca41`, `37b97bf` | Paragraph + heading + code-block writable via LiveEditBinding; freshness gate; three cycle guards; previousText cache; cachedByteOffset refresh; click-focus routing; Enter swallowed (R5). 6/6 fast-tier; 8 paragraph_edit slots. |
-| **R5** | *not yet written* | `pending` | — | Structural keys + IME + undo coalescing. |
+| **R5** | [r5-structural-keys](plans/2026-05-02-live-render-r5-structural-keys.md) | `pending` | — | Structural keys + IME + undo coalescing. Plan written; execution pending. |
 | **R6** | *not yet written* | `pending` | — | Other text blocks + speculation refresh. |
 | **R7** | *not yet written* | `pending` | — | Lists + blockquotes (II.a, II.b). |
 | **R8** | *not yet written* | `pending` | — | Math block + BlockInternalEdit (I.a, L8). |
@@ -196,7 +196,12 @@ Predecessor acceptance: [SHA / date of the prior phase reaching `complete`]
 Self-review notes: [anything surprising the writing-plans pass surfaced]
 ```
 
-*No phase-N+1 plans generated yet — R1 plans were generated as part of the spec-authoring session.*
+### 2026-05-02 — R5 — 2026-05-02-live-render-r5-structural-keys.md
+
+Generated from: spec §11 R5
+Generated by: fresh agent context (post-R4 dogfood sign-off; user invoked "let's start r5")
+Predecessor acceptance: R4 — `37b97bf` + dogfood log entry 2026-05-02
+Self-review notes: 18 tasks. Resolves spec open questions §15.1 (handler-registration mechanism: per-(kind, key) `std::function` table held inside `LiveStructuralKeyHandler`; `BlockKindDescriptor::consumedStructuralKeys` is the gating set) and §15.4 (undo idle threshold pinned at 1000 ms, matching legacy `markoff-view-qml::LiveEditBinding`). §15.8 (test-app `--live` flag rename) deferred — R5 doesn't touch `markoff-view-qml`. Heading + paragraph share structural handlers because `BlockWalker::walk` produces source-faithful blockText (the `#` prefix is part of the bytes), making qtPos arithmetic uniform across the two kinds. Code-block consumes only the edge-merge keys (Backspace-at-start, Delete-at-end) and lets Enter pass through to TextEdit's native `\n` insertion — the expected behaviour inside fenced code. Cross-task dependency surfaced: Tasks 4–10's tests fail until Task 11 wires `consumedStructuralKeys`; the plan documents this and recommends running cumulative ctest after Task 11. Code-block end-of-body byte arithmetic remains approximate (the closing-fence bytes aren't in `blockText`); ships as-is for R5 with the limitation documented. R5's `LiveCursorState::requestTextCaretAtRow` mechanism uses `cachedByteOffset` to stash qtPos for ASCII-correct routing — multi-byte cursor placement remains a known limitation, same as legacy.
 
 ---
 
