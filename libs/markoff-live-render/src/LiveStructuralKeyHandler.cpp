@@ -65,7 +65,7 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     // Task 10). If the proxy row is a hole, delegate to handleHoleRowEnter.
     if (m_proxyModel && m_proxyModel->proxyRowIsHole(blockIndex)) {
         const quint64 holeId = m_proxyModel->holeAtProxyRow(blockIndex);
-        return handleHoleRowEnter(holeId, key, modifiers, qtPos) == HandleResult::Handled;
+        return handleHoleRow(holeId, key, modifiers, qtPos) == HandleResult::Handled;
     }
 
     // Translate proxy row → inner row for anchor-side handlers.
@@ -116,72 +116,168 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
 }
 
 LiveStructuralKeyHandler::HandleResult
-LiveStructuralKeyHandler::handleHoleRowEnter(quint64 holeId, int key,
-                                             int modifiers, int qtPos)
+LiveStructuralKeyHandler::handleHoleRow(quint64 holeId, int key,
+                                        int modifiers, int qtPos)
 {
-    if (key != Qt::Key_Return && key != Qt::Key_Enter) return HandleResult::NotHandled;
-    if (modifiers & Qt::ShiftModifier) return HandleResult::NotHandled;  // soft break — TextEdit native
-
     if (!m_holeLayer || !m_proxyModel) return HandleResult::NotHandled;
     if (!m_holeLayer->exists(holeId)) return HandleResult::NotHandled;
 
     const QString buf = m_holeLayer->bufferText(holeId);
 
-    // Empty-buffer Enter — no-op per stacked-Enter rule (spec §3.3).
-    // Consume the key so QML TextEdit doesn't insert a literal newline
-    // into the buffer, but make no source or layer change.
-    if (buf.isEmpty()) return HandleResult::Handled;
+    // ---- Enter (Task 12 logic, unchanged) ----
+    if ((key == Qt::Key_Return || key == Qt::Key_Enter)
+        && (modifiers & Qt::ShiftModifier) == 0) {
 
-    // Resolve the reify byte BEFORE commit; after commit the holeId is gone.
-    const quint32 reifyByte =
-        m_document->resolveTextAnchor(m_holeLayer->reifyAnchor(holeId));
+        // Empty-buffer Enter — no-op per stacked-Enter rule (spec §3.3).
+        // Consume the key so QML TextEdit doesn't insert a literal newline
+        // into the buffer, but make no source or layer change.
+        if (buf.isEmpty()) return HandleResult::Handled;
 
-    if (qtPos >= buf.length()) {
-        // End-of-buffer: commit the whole buffer, then open a fresh hole
-        // positioned right after the just-committed paragraph.
+        // Resolve the reify byte BEFORE commit; after commit the holeId is gone.
+        const quint32 reifyByte =
+            m_document->resolveTextAnchor(m_holeLayer->reifyAnchor(holeId));
+
+        if (qtPos >= buf.length()) {
+            // End-of-buffer: commit the whole buffer, then open a fresh hole
+            // positioned right after the just-committed paragraph.
+            m_holeLayer->commitBlockHole(holeId);
+            // After commit, source contains "\n\n" + buf inserted at reifyByte.
+            // The end of the just-committed paragraph is therefore at:
+            const quint32 newReifyByte = reifyByte
+                + 2  // for "\n\n"
+                + static_cast<quint32>(buf.toUtf8().size());
+            Markoff::TextAnchor newAnchor =
+                m_document->textAnchorAt(newReifyByte, /*rightBias=*/false);
+            const quint64 newId = m_holeLayer->createBlockHole(
+                HoleKind::Paragraph, newAnchor);
+
+            TextCaret tc;
+            tc.block            = BlockId{HoleBlockId{newId}};
+            tc.cachedByteOffset = 0;
+            m_cursorState->request(Cursor{tc});
+
+            if (m_undoCoalescer) m_undoCoalescer->recordStructural();
+            return HandleResult::Handled;
+        }
+
+        // Mid-buffer split: set prefix, commit, create new hole with suffix.
+        const QString prefix = buf.left(qtPos);
+        const QString suffix = buf.mid(qtPos);
+
+        m_holeLayer->setBlockHoleBuffer(holeId, prefix);
         m_holeLayer->commitBlockHole(holeId);
-        // After commit, source contains "\n\n" + buf inserted at reifyByte.
-        // The end of the just-committed paragraph is therefore at:
+
         const quint32 newReifyByte = reifyByte
             + 2  // for "\n\n"
-            + static_cast<quint32>(buf.toUtf8().size());
+            + static_cast<quint32>(prefix.toUtf8().size());
         Markoff::TextAnchor newAnchor =
             m_document->textAnchorAt(newReifyByte, /*rightBias=*/false);
         const quint64 newId = m_holeLayer->createBlockHole(
             HoleKind::Paragraph, newAnchor);
+        m_holeLayer->setBlockHoleBuffer(newId, suffix);
 
         TextCaret tc;
         tc.block            = BlockId{HoleBlockId{newId}};
-        tc.cachedByteOffset = 0;
+        tc.cachedByteOffset = 0;  // cursor at start of suffix
         m_cursorState->request(Cursor{tc});
 
         if (m_undoCoalescer) m_undoCoalescer->recordStructural();
         return HandleResult::Handled;
     }
 
-    // Mid-buffer split: set prefix, commit, create new hole with suffix.
-    const QString prefix = buf.left(qtPos);
-    const QString suffix = buf.mid(qtPos);
+    // ---- Esc: abandon, focus previous neighbor ----
+    if (key == Qt::Key_Escape) {
+        const int holeProxyRow = m_proxyModel->proxyRowForHole(holeId);
+        m_holeLayer->abandonBlockHole(holeId);
+        routeFocusAfterAbandon(holeProxyRow, /*preferNext=*/false);
+        return HandleResult::Handled;
+    }
 
-    m_holeLayer->setBlockHoleBuffer(holeId, prefix);
-    m_holeLayer->commitBlockHole(holeId);
+    // ---- Backspace at qtPos 0 ----
+    if (key == Qt::Key_Backspace && qtPos == 0) {
+        if (buf.isEmpty()) {
+            const int holeProxyRow = m_proxyModel->proxyRowForHole(holeId);
+            m_holeLayer->abandonBlockHole(holeId);
+            routeFocusAfterAbandon(holeProxyRow, /*preferNext=*/false);
+            return HandleResult::Handled;
+        }
+        // Non-empty buffer at qtPos 0: passthrough (no char to delete).
+        return HandleResult::NotHandled;
+    }
 
-    const quint32 newReifyByte = reifyByte
-        + 2  // for "\n\n"
-        + static_cast<quint32>(prefix.toUtf8().size());
-    Markoff::TextAnchor newAnchor =
-        m_document->textAnchorAt(newReifyByte, /*rightBias=*/false);
-    const quint64 newId = m_holeLayer->createBlockHole(
-        HoleKind::Paragraph, newAnchor);
-    m_holeLayer->setBlockHoleBuffer(newId, suffix);
+    // ---- Delete at end of empty buffer ----
+    if (key == Qt::Key_Delete
+        && buf.isEmpty()
+        && qtPos == 0) {
+        const int holeProxyRow = m_proxyModel->proxyRowForHole(holeId);
+        m_holeLayer->abandonBlockHole(holeId);
+        routeFocusAfterAbandon(holeProxyRow, /*preferNext=*/true);
+        return HandleResult::Handled;
+    }
 
-    TextCaret tc;
-    tc.block            = BlockId{HoleBlockId{newId}};
-    tc.cachedByteOffset = 0;  // cursor at start of suffix
-    m_cursorState->request(Cursor{tc});
+    return HandleResult::NotHandled;
+}
 
-    if (m_undoCoalescer) m_undoCoalescer->recordStructural();
-    return HandleResult::Handled;
+void LiveStructuralKeyHandler::routeFocusAfterAbandon(int holeProxyRow,
+                                                      bool preferNext)
+{
+    // The hole has been abandoned; proxy row count has decreased by 1.
+    // The hole's old position is now occupied by what was after it.
+    //
+    // preferNext == false (Esc/Backspace): target the row just before the
+    //   hole's old position → holeProxyRow - 1 (end-of-row qtPos).
+    // preferNext == true (Delete): target the row that shifted up into
+    //   the hole's old slot → holeProxyRow (qtPos 0).
+
+    const int proxyCount = m_proxyModel->rowCount();
+
+    auto findInnerRow = [&](int proxyRow, int direction) -> int {
+        while (proxyRow >= 0 && proxyRow < proxyCount) {
+            if (!m_proxyModel->proxyRowIsHole(proxyRow)) return proxyRow;
+            proxyRow += direction;
+        }
+        return -1;
+    };
+
+    int targetProxy = -1;
+    int qtPos       = 0;
+
+    if (preferNext) {
+        // Try the row that stepped into the hole's old slot.
+        targetProxy = findInnerRow(holeProxyRow, +1);
+        qtPos = 0;
+        if (targetProxy < 0) {
+            // Fallback: previous neighbor, end-of-row.
+            targetProxy = findInnerRow(holeProxyRow - 1, -1);
+            if (targetProxy >= 0) {
+                const int innerRow = m_proxyModel->innerRowForProxy(targetProxy);
+                if (innerRow >= 0 && innerRow < m_model->rowCount())
+                    qtPos = m_model->recordAt(innerRow).text.length();
+            }
+        }
+    } else {
+        // Try the row just before the hole's old position.
+        targetProxy = findInnerRow(holeProxyRow - 1, -1);
+        if (targetProxy >= 0) {
+            const int innerRow = m_proxyModel->innerRowForProxy(targetProxy);
+            if (innerRow >= 0 && innerRow < m_model->rowCount())
+                qtPos = m_model->recordAt(innerRow).text.length();
+        } else {
+            // Fallback: next neighbor.
+            targetProxy = findInnerRow(holeProxyRow, +1);
+            qtPos = 0;
+        }
+    }
+
+    if (targetProxy < 0) {
+        // F4 single-hole-doc edge case: no inner rows at all.
+        m_cursorState->clear();
+        return;
+    }
+
+    const int innerRow = m_proxyModel->innerRowForProxy(targetProxy);
+    if (innerRow < 0) { m_cursorState->clear(); return; }
+    m_cursorState->requestTextCaretAtRow(innerRow, qtPos);
 }
 
 void LiveStructuralKeyHandler::registerBuiltins()

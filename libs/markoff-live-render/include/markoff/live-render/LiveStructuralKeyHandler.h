@@ -84,11 +84,19 @@ public:
 private:
     void registerBuiltins();
 
-    /// Dispatch Enter on a hole row: commit+new-hole (EOB), split
-    /// (mid-buffer), or no-op (empty buffer). Called from tryHandle
-    /// when proxyRowIsHole(blockIndex) is true.
-    HandleResult handleHoleRowEnter(quint64 holeId, int key, int modifiers,
-                                    int qtPos);
+    /// Dispatch all structural keys for a hole row: Enter
+    /// (commit+new-hole / split / empty-noop), Esc/Backspace/Delete
+    /// abandon paths. Called from tryHandle when
+    /// proxyRowIsHole(blockIndex) is true.
+    HandleResult handleHoleRow(quint64 holeId, int key, int modifiers,
+                               int qtPos);
+
+    /// After abandoning a hole at `holeProxyRow`, route focus to the
+    /// nearest live (non-hole) neighbor. `preferNext == false` →
+    /// previous neighbor (Esc / Backspace); `preferNext == true` →
+    /// next neighbor (Delete). Falls back to the other direction; sets
+    /// NoCursor only if the document has no inner rows at all.
+    void routeFocusAfterAbandon(int holeProxyRow, bool preferNext);
 
     QPointer<Markoff::MarkoffDocument> m_document;
     LiveBlockModel                    *m_model;

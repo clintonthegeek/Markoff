@@ -670,6 +670,115 @@ private Q_SLOTS:
         QCOMPARE(doc.toMarkdown(), QString("hello"));         // source untouched
     }
 
+    // ---------- R5.5 Task 13 — hole-row abandon paths ----------
+
+    void hole_esc_abandons_and_focuses_previous_neighbor() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        // Create a hole at EOB; type into it.
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        const quint64 holeId = layer->holesInOrder().first();
+        layer->setBlockHoleBuffer(holeId, "x");
+
+        // Esc — abandon, focus previous (row 0, "hello", end-of-row qtPos 5).
+        QVERIFY(handler->tryHandle(Qt::Key_Escape, Qt::NoModifier, 1, 1, true, "x"));
+        QCOMPARE(layer->holeCount(), 0);
+        QCOMPARE(doc.toMarkdown(), QString("hello"));
+
+        const auto cur = binding.cursorState()->cursor();
+        const auto *tc = std::get_if<TextCaret>(&cur);
+        QVERIFY(tc);
+        QVERIFY(!isHoleBlockId(tc->block));   // anchor-side
+        QCOMPARE(tc->cachedByteOffset, quint32(5));   // end of "hello"
+    }
+
+    void hole_backspace_at_qt_pos_0_with_empty_buffer_abandons() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        QCOMPARE(layer->holeCount(), 1);
+        // bufferText is empty (default); qtPos is 0.
+
+        QVERIFY(handler->tryHandle(Qt::Key_Backspace, Qt::NoModifier, 1, 0, true, ""));
+        QCOMPARE(layer->holeCount(), 0);
+        QCOMPARE(doc.toMarkdown(), QString("hello"));
+
+        const auto cur = binding.cursorState()->cursor();
+        const auto *tc = std::get_if<TextCaret>(&cur);
+        QVERIFY(tc);
+        QVERIFY(!isHoleBlockId(tc->block));
+        QCOMPARE(tc->cachedByteOffset, quint32(5));
+    }
+
+    void hole_delete_at_end_with_empty_buffer_abandons() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("first\n\nsecond", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        // Create a hole at EOB of "first" (between first and second).
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "first"));
+        QCOMPARE(layer->holeCount(), 1);
+
+        // Delete on empty hole — focus moves to next neighbor ("second", qtPos 0).
+        QVERIFY(handler->tryHandle(Qt::Key_Delete, Qt::NoModifier, 1, 0, true, ""));
+        QCOMPARE(layer->holeCount(), 0);
+        QCOMPARE(doc.toMarkdown(), QString("first\n\nsecond"));
+
+        const auto cur = binding.cursorState()->cursor();
+        const auto *tc = std::get_if<TextCaret>(&cur);
+        QVERIFY(tc);
+        QVERIFY(!isHoleBlockId(tc->block));
+        QCOMPARE(tc->cachedByteOffset, quint32(0));
+    }
+
+    void hole_backspace_at_qt_pos_0_with_non_empty_buffer_is_passthrough() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        auto *layer   = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "hello"));
+        const quint64 holeId = layer->holesInOrder().first();
+        layer->setBlockHoleBuffer(holeId, "abc");
+
+        // Backspace at qtPos 0 with non-empty buffer — passthrough (NotHandled),
+        // hole stays.
+        QVERIFY(!handler->tryHandle(Qt::Key_Backspace, Qt::NoModifier, 1, 0, true, "abc"));
+        QCOMPARE(layer->holeCount(), 1);
+        QCOMPARE(layer->bufferText(holeId), QString("abc"));
+    }
+
 };
 
 QTEST_MAIN(TstLiveRenderStructural)
