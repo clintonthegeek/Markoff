@@ -70,6 +70,13 @@ public:
     /// suppression cycle guard).
     bool applyingModelUpdate() const;
 
+    /// Commit all pending holes to source in ascending reifyAnchor byte
+    /// order. Hosts must call this BEFORE serializing the document
+    /// (Ctrl-S / save-to-disk path). After this returns, the layer holds
+    /// zero holes and `document.toMarkdown()` equals the on-screen content.
+    /// No-op when no doc is attached or no holes exist.
+    Q_INVOKABLE void flushPendingHoles();
+
 Q_SIGNALS:
     void documentChanged();
     void holeLayerChanged();

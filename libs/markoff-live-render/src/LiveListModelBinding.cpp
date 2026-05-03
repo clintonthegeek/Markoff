@@ -111,6 +111,12 @@ bool LiveListModelBinding::applyingModelUpdate() const
     return d->applyingModelUpdate;
 }
 
+void LiveListModelBinding::flushPendingHoles()
+{
+    if (d->holeLayer)
+        d->holeLayer->commitAllPendingHoles();
+}
+
 void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
                                           quint64 parseSequence,
                                           const QList<Markoff::BlockAnchor> &blockAnchors,

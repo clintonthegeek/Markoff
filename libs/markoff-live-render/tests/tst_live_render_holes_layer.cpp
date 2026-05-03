@@ -411,6 +411,57 @@ private slots:
         coalesc->undo();
         QCOMPARE(doc.toMarkdown(), QString("hello"));   // CRDT undo ran
     }
+
+    void flush_pending_holes_commits_all_in_anchor_order_then_source_matches() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("para1\n\npara2", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+
+        auto *layer  = binding.holeLayer();
+        auto *handler = binding.structuralKeyHandler();
+
+        // Hole at end of para2 (proxy row 2 will be the hole).
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 1, 5, true, "para2"));
+        QCOMPARE(layer->holeCount(), 1);
+        const quint64 lateId = layer->holesInOrder().first();
+        layer->setBlockHoleBuffer(lateId, "late");
+
+        // Hole at end of para1 (created second; earlier in document).
+        QVERIFY(handler->tryHandle(Qt::Key_Return, Qt::NoModifier, 0, 5, true, "para1"));
+        QCOMPARE(layer->holeCount(), 2);
+        // Find the just-created (earlier-anchor) hole — holesInOrder
+        // returns ascending byte order, so first is the para1-end hole.
+        const quint64 earlyId = layer->holesInOrder().first();
+        QVERIFY(earlyId != lateId);
+        layer->setBlockHoleBuffer(earlyId, "early");
+
+        // Save-flush: host calls binding.flushPendingHoles() before serializing.
+        binding.flushPendingHoles();
+
+        QCOMPARE(layer->holeCount(), 0);
+        const QString s = doc.toMarkdown();
+        QVERIFY(s.contains("early"));
+        QVERIFY(s.contains("late"));
+        QVERIFY(s.indexOf("early") < s.indexOf("late"));
+    }
+
+    void flush_pending_holes_with_no_holes_is_noop() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("hello", Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        binding.flushPendingHoles();   // no holes — must not crash or alter source
+        QCOMPARE(doc.toMarkdown(), QString("hello"));
+        QCOMPARE(binding.holeLayer()->holeCount(), 0);
+    }
 };
 
 QTEST_MAIN(TstHolesLayer)
