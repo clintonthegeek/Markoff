@@ -8,6 +8,10 @@
 #include <QVector>
 #include <qqmlintegration.h>
 
+namespace Markoff {
+class MarkoffDocument;
+}
+
 namespace Markoff::LiveRender {
 
 class LiveBlockModel;
@@ -25,9 +29,10 @@ public:
         HoleIdRole       = Qt::UserRole + 1002,
     };
 
-    explicit LiveProxyBlockModel(LiveBlockModel *inner,
-                                  LiveHoleLayer  *layer,
-                                  QObject        *parent = nullptr);
+    explicit LiveProxyBlockModel(Markoff::MarkoffDocument *doc,
+                                  LiveBlockModel          *inner,
+                                  LiveHoleLayer           *layer,
+                                  QObject                 *parent = nullptr);
 
     int rowCount(const QModelIndex &parent = {}) const override;
     QVariant data(const QModelIndex &index, int role) const override;
@@ -38,6 +43,9 @@ public:
     int     proxyRowForHole(quint64 holeId) const;
     bool    proxyRowIsHole(int proxyRow) const noexcept;
     quint64 holeAtProxyRow(int proxyRow) const noexcept;
+
+private:
+    quint32 innerStartByteForRow(int r) const;
 
 private Q_SLOTS:
     void onInnerRowsInserted(const QModelIndex &, int first, int last);
@@ -56,9 +64,10 @@ private:
         quint64 holeId;       // valid when isHole
     };
 
-    LiveBlockModel *m_inner;
-    LiveHoleLayer  *m_layer;
-    QVector<ProxyRow> m_rows;
+    Markoff::MarkoffDocument *m_doc;
+    LiveBlockModel           *m_inner;
+    LiveHoleLayer            *m_layer;
+    QVector<ProxyRow>         m_rows;
 
     void rebuildMapping();
 };

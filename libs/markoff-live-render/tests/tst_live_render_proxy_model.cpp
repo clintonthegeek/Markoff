@@ -4,8 +4,10 @@
 #include <markoff/live-render/BlockRecord.h>
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveHoleLayer.h>
+#include <markoff/live-render/LiveListModelBinding.h>
 #include <markoff/live-render/LiveProxyBlockModel.h>
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Origin.h>
 #include <QtTest/QtTest>
 #include <QSignalSpy>
 
@@ -27,6 +29,23 @@ static BlockRecord makeRecord(const QString &kind, const QString &text,
 static BlockKey keyOf(const BlockRecord &r)
 {
     return BlockKey{ r.kind, r.blockAnchor };
+}
+
+// Helper: reset content via binding and wait for the model to have expectedRows.
+// Returns true if the model reaches the expected row count within timeoutMs.
+static bool waitForModelRows(LiveListModelBinding &binding,
+                              Markoff::MarkoffDocument &doc,
+                              const QByteArray &content,
+                              int expectedRows,
+                              int timeoutMs = 2000)
+{
+    QSignalSpy spy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+    doc.resetContent(content, Markoff::Origin::FirstOpen);
+    if (binding.model()->rowCount() == expectedRows)
+        return true;
+    if (!spy.wait(timeoutMs))
+        return false;
+    return binding.model()->rowCount() == expectedRows;
 }
 }  // namespace
 
@@ -50,7 +69,7 @@ private slots:
         // we can supply a default-constructed doc that's never resolved.
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveHoleLayer layer(&doc, &inner, nullptr);
-        LiveProxyBlockModel proxy(&inner, &layer);
+        LiveProxyBlockModel proxy(&doc, &inner, &layer);
 
         QCOMPARE(proxy.rowCount(), inner.rowCount());
         for (int r = 0; r < inner.rowCount(); ++r) {
@@ -66,7 +85,7 @@ private slots:
         LiveBlockModel inner;
         Markoff::MarkoffDocument doc(1);
         LiveHoleLayer layer(&doc, &inner, nullptr);
-        LiveProxyBlockModel proxy(&inner, &layer);
+        LiveProxyBlockModel proxy(&doc, &inner, &layer);
 
         const auto names = proxy.roleNames();
         QVERIFY(names.contains(LiveProxyBlockModel::IsHoleRole));
@@ -87,7 +106,7 @@ private slots:
 
         Markoff::MarkoffDocument doc(1);
         LiveHoleLayer layer(&doc, &inner, nullptr);
-        LiveProxyBlockModel proxy(&inner, &layer);
+        LiveProxyBlockModel proxy(&doc, &inner, &layer);
 
         QSignalSpy proxySpy(&proxy, &QAbstractListModel::dataChanged);
 
@@ -100,6 +119,132 @@ private slots:
         inner.applyOps(AstBlockDiff::diff(keys, keys), recs2);
 
         QVERIFY(proxySpy.count() >= 1);
+    }
+
+    // ---- Task 9: anchor-ordered hole insertion tests ----
+
+    void proxy_inserts_hole_row_at_anchor_position() {
+        // Use LiveListModelBinding to populate inner with real BlockAnchors.
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        // "para1\n\npara2" → 2 top-level paragraphs.
+        QVERIFY(waitForModelRows(binding, doc, "para1\n\npara2", 2));
+
+        LiveBlockModel *inner = binding.model();
+        QCOMPARE(inner->rowCount(), 2);
+
+        LiveHoleLayer layer(&doc, inner, nullptr);
+        LiveProxyBlockModel proxy(&doc, inner, &layer);
+        QCOMPARE(proxy.rowCount(), 2);
+
+        QSignalSpy insertedSpy(&proxy, &QAbstractItemModel::rowsInserted);
+
+        // Anchor at byte 5 = end of "para1"; hole should land between row 0
+        // (para1) and row 1 (para2).
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+
+        QCOMPARE(proxy.rowCount(), 3);
+        QVERIFY(proxy.proxyRowIsHole(1));
+        QCOMPARE(proxy.proxyRowForHole(id), 1);
+        QCOMPARE(proxy.proxyRowForInner(1), 2);   // para2 shifted to proxy row 2
+        QCOMPARE(insertedSpy.count(), 1);
+    }
+
+    void proxy_drops_hole_row_on_abandon() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "para1\n\npara2", 2));
+
+        LiveBlockModel *inner = binding.model();
+        LiveHoleLayer layer(&doc, inner, nullptr);
+        LiveProxyBlockModel proxy(&doc, inner, &layer);
+
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+        QCOMPARE(proxy.rowCount(), 3);
+
+        QSignalSpy removedSpy(&proxy, &QAbstractItemModel::rowsRemoved);
+        layer.abandonBlockHole(id);
+
+        QCOMPARE(proxy.rowCount(), 2);
+        QCOMPARE(removedSpy.count(), 1);
+    }
+
+    void proxy_buffer_changed_emits_dataChanged() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "para1\n\npara2", 2));
+
+        LiveBlockModel *inner = binding.model();
+        LiveHoleLayer layer(&doc, inner, nullptr);
+        LiveProxyBlockModel proxy(&doc, inner, &layer);
+
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+        QCOMPARE(proxy.rowCount(), 3);
+
+        QSignalSpy dcSpy(&proxy, &QAbstractItemModel::dataChanged);
+        layer.setBlockHoleBuffer(id, "typing");
+
+        QCOMPARE(dcSpy.count(), 1);
+        QCOMPARE(proxy.data(proxy.index(1, 0), LiveProxyBlockModel::BufferTextRole)
+                     .toString(),
+                 QString("typing"));
+    }
+
+    void proxy_ties_break_by_holeId() {
+        // Two holes at SAME anchor byte; earlier-created id (lower value) should
+        // appear first in proxy row order.
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "para1\n\npara2", 2));
+
+        LiveBlockModel *inner = binding.model();
+        LiveHoleLayer layer(&doc, inner, nullptr);
+        LiveProxyBlockModel proxy(&doc, inner, &layer);
+
+        quint64 a = layer.createBlockHole(HoleKind::Paragraph,
+                                           doc.textAnchorAt(5, false));
+        quint64 b = layer.createBlockHole(HoleKind::Paragraph,
+                                           doc.textAnchorAt(5, false));
+
+        QVERIFY(proxy.proxyRowForHole(a) < proxy.proxyRowForHole(b));
+    }
+
+    void proxy_model_reset_drops_all_holes() {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "para1\n\npara2", 2));
+
+        LiveBlockModel *inner = binding.model();
+        LiveHoleLayer layer(&doc, inner, nullptr);
+        LiveProxyBlockModel proxy(&doc, inner, &layer);
+
+        quint64 id = layer.createBlockHole(HoleKind::Paragraph,
+                                            doc.textAnchorAt(5, false));
+        Q_UNUSED(id);
+        QCOMPARE(layer.holeCount(), 1);
+        QCOMPARE(proxy.rowCount(), 3);
+
+        // resetContent emits MarkoffDocument::documentReloaded synchronously,
+        // which the proxy wires to abandon all open holes. Then the new parse
+        // arrives asynchronously and populates the inner model.
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent("different", Markoff::Origin::FirstOpen);
+
+        // Holes are dropped synchronously on documentReloaded (no wait needed).
+        QCOMPARE(layer.holeCount(), 0);
+
+        // Wait for parse to land so the proxy reflects the new content.
+        QVERIFY(parseSpy.wait(2000));
+        // "different" is a single paragraph → 1 row.
+        QCOMPARE(proxy.rowCount(), 1);
     }
 };
 
