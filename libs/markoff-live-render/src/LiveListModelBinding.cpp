@@ -25,6 +25,8 @@ struct LiveListModelBinding::Private {
     LiveSelectionView         *selectionView = nullptr;
     UndoCoalescer             *undoCoalescer = nullptr;
     LiveStructuralKeyHandler  *structuralKeys = nullptr;
+    LiveHoleLayer             *holeLayer   = nullptr;
+    LiveProxyBlockModel       *proxyModel  = nullptr;
     QList<BlockKey>            lastKeys;
     quint64                    lastParseInputEditSeq = 0;
     bool                       applyingModelUpdate = false;
@@ -58,7 +60,9 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
             d->session = nullptr;
         }
     }
-    // Drop old structural components before reconstructing.
+    // Drop old structural components before reconstructing (reverse construction order).
+    delete d->proxyModel;     d->proxyModel     = nullptr;
+    delete d->holeLayer;      d->holeLayer      = nullptr;
     delete d->structuralKeys; d->structuralKeys = nullptr;
     delete d->undoCoalescer;  d->undoCoalescer  = nullptr;
 
@@ -70,12 +74,18 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->selectionView->setDocument(d->document);
         d->selectionView->setSession(d->session);
         d->undoCoalescer  = new UndoCoalescer(d->document, this);
+        d->holeLayer      = new LiveHoleLayer(d->document, d->model, d->undoCoalescer, this);
+        d->proxyModel     = new LiveProxyBlockModel(d->document, d->model, d->holeLayer, this);
+        Q_EMIT holeLayerChanged();
+        Q_EMIT proxyModelChanged();
         d->structuralKeys = new LiveStructuralKeyHandler(
             d->document, d->model, d->cursorState, &d->registry,
             d->undoCoalescer, this);
     } else {
         d->selectionView->setDocument(nullptr);
         d->selectionView->setSession(nullptr);
+        Q_EMIT holeLayerChanged();
+        Q_EMIT proxyModelChanged();
     }
     Q_EMIT documentChanged();
 }
@@ -87,6 +97,8 @@ LiveSelectionView        *LiveListModelBinding::selectionView()       const { re
 LiveStructuralKeyHandler *LiveListModelBinding::structuralKeyHandler() const { return d->structuralKeys; }
 UndoCoalescer            *LiveListModelBinding::undoCoalescer()       const { return d->undoCoalescer; }
 const BlockKindRegistry  *LiveListModelBinding::registry()            const { return &d->registry; }
+LiveHoleLayer            *LiveListModelBinding::holeLayer()           const { return d->holeLayer; }
+LiveProxyBlockModel      *LiveListModelBinding::proxyModel()          const { return d->proxyModel; }
 
 bool LiveListModelBinding::applyingModelUpdate() const
 {

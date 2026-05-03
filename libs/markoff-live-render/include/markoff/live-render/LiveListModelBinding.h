@@ -9,6 +9,8 @@
 #include <markoff/live-render/LiveSelectionView.h>
 #include <markoff/live-render/LiveStructuralKeyHandler.h>
 #include <markoff/live-render/UndoCoalescer.h>
+#include <markoff/live-render/LiveHoleLayer.h>
+#include <markoff/live-render/LiveProxyBlockModel.h>
 
 #include <QObject>
 #include <memory>
@@ -39,6 +41,10 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveListModelBinding : public QObject {
                READ structuralKeyHandler CONSTANT)
     Q_PROPERTY(Markoff::LiveRender::UndoCoalescer *undoCoalescer
                READ undoCoalescer CONSTANT)
+    Q_PROPERTY(Markoff::LiveRender::LiveHoleLayer *holeLayer
+               READ holeLayer NOTIFY holeLayerChanged)
+    Q_PROPERTY(Markoff::LiveRender::LiveProxyBlockModel *proxyModel
+               READ proxyModel NOTIFY proxyModelChanged)
 
 public:
     explicit LiveListModelBinding(QObject *parent = nullptr);
@@ -54,6 +60,8 @@ public:
     LiveStructuralKeyHandler *structuralKeyHandler() const;
     UndoCoalescer            *undoCoalescer()       const;
     const BlockKindRegistry  *registry()            const;
+    LiveHoleLayer            *holeLayer()           const;
+    LiveProxyBlockModel      *proxyModel()          const;
 
     /// True for the synchronous duration of `applyOps` while parse
     /// arrival is mutating model rows. LiveEditBinding queries this
@@ -64,6 +72,8 @@ public:
 
 Q_SIGNALS:
     void documentChanged();
+    void holeLayerChanged();
+    void proxyModelChanged();
 
 private:
     void onParseUpdated(const Markoff::Document *parsed,

@@ -16,7 +16,7 @@ ListView {
 
     required property var binding   // LiveListModelBinding *
 
-    model: binding ? binding.model : null
+    model: binding ? binding.proxyModel : null
     clip: true
     spacing: 2
     focus: true
