@@ -12,7 +12,7 @@
 #include <QTextDocument>
 #include <QLoggingCategory>
 
-Q_LOGGING_CATEGORY(lcEdit, "markoff.live.edit", QtDebugMsg)
+Q_LOGGING_CATEGORY(lcEdit, "markoff.live.edit", QtWarningMsg)
 
 namespace Markoff::LiveRender {
 
@@ -66,9 +66,6 @@ void LiveEditBinding::pushTextToDocument()
 {
     if (!m_listenedDoc) return;
     if (m_listenedDoc->toPlainText() == m_text) return;
-    qCDebug(lcEdit).nospace() << "pushText row=" << m_modelIndex
-        << " m_text=\"" << (m_text.size() > 30 ? m_text.left(27) + "..." : m_text) << "\""
-        << " curDoc=\"" << (m_listenedDoc->toPlainText().size() > 30 ? m_listenedDoc->toPlainText().left(27) + "..." : m_listenedDoc->toPlainText()) << "\"";
     // Setting the document text fires contentsChange synchronously; the
     // applyingTextUpdate guard makes onContentsChange treat that as a
     // model-driven update (no applyLocalEdit, no row-seq stamp).
@@ -107,14 +104,6 @@ void LiveEditBinding::rewireTextDocument(QTextDocument *newDoc)
 
 void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdded)
 {
-    qCDebug(lcEdit).nospace() << "cc row=" << m_modelIndex << " qtPos=" << qtPos
-        << " rm=" << charsRemoved << " ad=" << charsAdded
-        << " applyText=" << m_applyingTextUpdate
-        << " applyModel=" << (m_binding ? m_binding->applyingModelUpdate() : false)
-        << " composing=" << m_composing
-        << " prev=\"" << (m_previousText.size() > 30 ? m_previousText.left(27) + "..." : m_previousText) << "\""
-        << " curDoc=\"" << (m_listenedDoc ? (m_listenedDoc->toPlainText().size() > 30 ? m_listenedDoc->toPlainText().left(27) + "..." : m_listenedDoc->toPlainText()) : QString()) << "\"";
-
     if (!m_binding || !m_binding->model() || !m_binding->document())
         return;
     if (m_modelIndex < 0 || m_modelIndex >= m_binding->model()->rowCount())
@@ -185,10 +174,6 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     edit.oldStart = blockStart + static_cast<quint32>(oldStartLocal);
     edit.oldEnd   = blockStart + static_cast<quint32>(oldEndLocal);
     edit.newText  = addedUtf8;
-
-    qCDebug(lcEdit).nospace() << "  -> applyLocalEdit row=" << m_modelIndex
-        << " oldStart=" << edit.oldStart << " oldEnd=" << edit.oldEnd
-        << " blockStart=" << blockStart << " newText=\"" << edit.newText << "\"";
 
     doc->applyLocalEdit({ edit });
 

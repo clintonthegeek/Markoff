@@ -40,6 +40,17 @@ Item {
         selectByMouse: true
         persistentSelection: true
 
+        // R4 limitation: Enter is a structural-key operation that splits a
+        // paragraph and needs focus transition to the new row. That's R5
+        // territory. For R4, swallow Enter so the user can't accidentally
+        // create a split that leaves their typing routed to the wrong row.
+        // Removed in R5 when LiveStructuralKeyHandler lands.
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                event.accepted = true
+        }
+
         function applySelection() {
             const sv = root.selectionView
             if (!sv) { deselect(); return }

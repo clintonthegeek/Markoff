@@ -41,6 +41,13 @@ Rectangle {
         selectByMouse: true
         persistentSelection: true
 
+        // R4 limitation: structural Enter belongs to R5. Swallow it.
+        Keys.priority: Keys.BeforeItem
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+                event.accepted = true
+        }
+
         SyntaxHighlighter {
             textEdit: model.codeLanguage.length > 0 ? edit : null
             definition: model.codeLanguage
