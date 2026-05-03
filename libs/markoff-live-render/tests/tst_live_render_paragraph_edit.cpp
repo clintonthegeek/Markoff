@@ -65,6 +65,11 @@ private Q_SLOTS:
         LiveEditBinding eb;
         eb.setBinding(&binding);
         eb.setModelIndex(0);
+        // Mirror QML ordering: text Q_PROPERTY is bound to model.text BEFORE
+        // the document is wired. Without this, setRawTextDocument's
+        // pushTextToDocument() pass would silently overwrite the test's
+        // pre-populated QTextEdit with the empty default m_text.
+        eb.setText("hello world");
         eb.setRawTextDocument(editor.document());
 
         const quint64 seqBefore = document.editSequence();
@@ -94,10 +99,12 @@ private Q_SLOTS:
         // QTextEdit-backed document so contentsChange fires.
         QTextEdit editor;
         editor.setPlainText("second");  // mirrors row 1's text
+        // (eb.setText below mirrors QML ordering — see test 1 for rationale.)
 
         LiveEditBinding eb;
         eb.setBinding(&binding);
         eb.setModelIndex(1);
+        eb.setText("second");
         eb.setRawTextDocument(editor.document());
 
         // Insert 'X' at qtPos 0 of the SECOND block. Whole-doc byte offset
@@ -123,6 +130,7 @@ private Q_SLOTS:
         LiveEditBinding eb;
         eb.setBinding(&binding);
         eb.setModelIndex(0);
+        eb.setText("abcdef");
         eb.setRawTextDocument(editor.document());
 
         // Delete "cd": cursor selects 2..4, removeSelectedText.
@@ -149,6 +157,7 @@ private Q_SLOTS:
         LiveEditBinding eb;
         eb.setBinding(&binding);
         eb.setModelIndex(0);
+        eb.setText("héllo");
         eb.setRawTextDocument(editor.document());
 
         // Insert at qtPos 2 (after é). Should land at byte offset 3.
@@ -176,6 +185,7 @@ private Q_SLOTS:
         LiveEditBinding eb;
         eb.setBinding(&binding);
         eb.setModelIndex(0);
+        eb.setText("hello");
         eb.setRawTextDocument(editor.document());
 
         // Type 'A' at end. Don't wait for parse.
@@ -205,6 +215,7 @@ private Q_SLOTS:
         LiveEditBinding eb;
         eb.setBinding(&binding);
         eb.setModelIndex(0);
+        eb.setText("hello");
         eb.setRawTextDocument(editor.document());
 
         const quint64 seqBefore = document.editSequence();
