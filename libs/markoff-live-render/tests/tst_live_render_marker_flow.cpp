@@ -123,6 +123,11 @@ private Q_SLOTS:
     /// test asserts the host-visible end state, which here means
     /// driving the scrubber once the model is populated.
     void step5_loadTimeScrubber_removesMarkers();
+
+    /// Step 6: stacked-Enter on a marker block is a no-op (Task 7).
+    /// First Enter inserts a marker; second Enter at qtPos 0 of the
+    /// marker block must be consumed but produce no source change.
+    void step6_stackedEnter_onMarkerBlock_isNoOp();
 };
 
 // ---------- Step 1 ----------
@@ -370,6 +375,37 @@ void TstLiveRenderMarkerFlow::step5_loadTimeScrubber_removesMarkers()
     QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()),
              QStringLiteral("alpha\n\nbeta\n"));
     QVERIFY(!doc.toMarkdownUtf8().contains(kMarkerUtf8));
+}
+
+// ---------- Step 6 ----------
+
+void TstLiveRenderMarkerFlow::step6_stackedEnter_onMarkerBlock_isNoOp()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+
+    QVERIFY(waitForRows(binding, doc, QByteArrayLiteral("alpha"), 1));
+
+    // First Enter at EOB: inserts a marker paragraph.
+    QVERIFY(binding.structuralKeyHandler()->tryHandle(
+        Qt::Key_Return, Qt::NoModifier, /*blockIndex=*/0, /*qtPos=*/5,
+        /*selectionEmpty=*/true, QStringLiteral("alpha")));
+    QVERIFY(waitForRowCount(binding, 2));
+
+    const QString preStackedSrc = QString::fromUtf8(doc.toMarkdownUtf8());
+    const quint64 preStackedSeq = doc.editSequence();
+
+    // Second Enter on the marker-only block at qtPos 0. Per spec, this
+    // is consumed (returns true) but produces no edit — the marker
+    // already represents the intent and stacking it would not change
+    // user-visible behavior.
+    const bool consumed = binding.structuralKeyHandler()->tryHandle(
+        Qt::Key_Return, Qt::NoModifier, /*blockIndex=*/1, /*qtPos=*/0,
+        /*selectionEmpty=*/true, QString(kMarkerChar));
+    QVERIFY(consumed);
+    QCOMPARE(doc.editSequence(), preStackedSeq);
+    QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), preStackedSrc);
 }
 
 QTEST_MAIN(TstLiveRenderMarkerFlow)
