@@ -15,6 +15,13 @@ private slots:
     void redo_replaysFwd();
     // Task 2.3: per-block undo
     void undoForBlock_picksMostRecentEntryThatTouchesThisBlock();
+    // Task 2.4: coalescing
+    void coalescing_extendsPreviousEntry();
+    void coalescing_breaksOnFocusChange();
+    void coalescing_breaksOnIdleThreshold();
+    void coalescing_breaksOnStructuralOp();
+    // Task 2.5: compact
+    void compact_dropsEntriesAllOfWhoseOpsAreCollapsed();
 };
 
 // ---------- Task 2.1 ----------
@@ -116,6 +123,82 @@ void TstUndoLog::undoForBlock_picksMostRecentEntryThatTouchesThisBlock() {
     dispatched.clear();
     log.undoForBlock(blkC);
     QCOMPARE(dispatched, (std::vector<Markoff::OpId>{32, 31, 30}));
+}
+
+// ---------- Task 2.4 ----------
+
+void TstUndoLog::coalescing_extendsPreviousEntry() {
+    Markoff::UndoLog log;
+    auto blk = Markoff::BlockId::fromRaw(1);
+    Markoff::CoalesceContext ctx{blk, true, 0};
+    log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
+        t.registerOp(Markoff::CrdtTarget::buffer(blk), 1);
+    });
+    ctx.timestampMs = 100;
+    log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
+        t.registerOp(Markoff::CrdtTarget::buffer(blk), 2);
+    });
+    QCOMPARE(log.entryCount(), 1u);
+    QCOMPARE(log.lastEntry().targets.size(), 2u);
+}
+
+void TstUndoLog::coalescing_breaksOnFocusChange() {
+    Markoff::UndoLog log;
+    auto blk = Markoff::BlockId::fromRaw(1);
+    Markoff::CoalesceContext ctx{blk, true, 0, 0};
+    log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
+        t.registerOp(Markoff::CrdtTarget::buffer(blk), 1);
+    });
+    ctx.focusGeneration = 1;  // focus changed
+    log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
+        t.registerOp(Markoff::CrdtTarget::buffer(blk), 2);
+    });
+    QCOMPARE(log.entryCount(), 2u);
+}
+
+void TstUndoLog::coalescing_breaksOnIdleThreshold() {
+    Markoff::UndoLog log;
+    auto blk = Markoff::BlockId::fromRaw(1);
+    Markoff::CoalesceContext ctx{blk, true, 0};
+    log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
+        t.registerOp(Markoff::CrdtTarget::buffer(blk), 1);
+    });
+    ctx.timestampMs = 1500;  // >1000ms
+    log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
+        t.registerOp(Markoff::CrdtTarget::buffer(blk), 2);
+    });
+    QCOMPARE(log.entryCount(), 2u);
+}
+
+void TstUndoLog::coalescing_breaksOnStructuralOp() {
+    Markoff::UndoLog log;
+    auto blk = Markoff::BlockId::fromRaw(1);
+    Markoff::CoalesceContext ctx{blk, true, 0};
+    log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
+        t.registerOp(Markoff::CrdtTarget::buffer(blk), 1);
+    });
+    // structural op = isPrintable false
+    ctx.isPrintable = false;
+    log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
+        t.registerOp(Markoff::CrdtTarget::idList(), 2);
+    });
+    QCOMPARE(log.entryCount(), 2u);
+}
+
+// ---------- Task 2.5 ----------
+
+void TstUndoLog::compact_dropsEntriesAllOfWhoseOpsAreCollapsed() {
+    Markoff::UndoLog log;
+    auto blk = Markoff::BlockId::fromRaw(1);
+    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::CrdtTarget::buffer(blk), 10); }
+    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::CrdtTarget::buffer(blk), 20); }
+    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::CrdtTarget::buffer(blk), 30); }
+    QCOMPARE(log.entryCount(), 3u);
+
+    // Collapse ops 10 and 20 but not 30
+    log.compact([](const Markoff::CrdtTarget &, Markoff::OpId opId) { return opId <= 20; });
+    QCOMPARE(log.entryCount(), 1u);
+    QCOMPARE(log.lastEntry().targets[0].second, 30u);
 }
 
 QTEST_GUILESS_MAIN(TstUndoLog)
