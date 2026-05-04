@@ -175,8 +175,19 @@ void LiveCursorState::onRowsInserted(const QModelIndex &parent, int first, int l
     qInfo().noquote() << "[dogfood] CursorState: onRowsInserted [" << first << "," << last << "]"
                       << "pending=" << (m_pendingRow ? QString::number(m_pendingRow->row) : QStringLiteral("none"));
     if (!m_pendingRow) return;
-    if (m_pendingRow->row < first || m_pendingRow->row > last) return;
-    resolvePendingForRow(m_pendingRow->row);
+    // Resolve if the pending row is in the inserted range OR if rows were
+    // inserted before the pending row (shifting it from its old position into
+    // the current position). In the latter case, check if the row is now valid.
+    if (m_pendingRow->row >= first && m_pendingRow->row <= last) {
+        // Row is explicitly in the inserted range.
+        resolvePendingForRow(m_pendingRow->row);
+    } else if (first <= m_pendingRow->row) {
+        // Rows were inserted at or before our pending row. If our row now
+        // exists in the model (because it was shifted into place by the
+        // insertion), resolve it. This handles the start-of-block Enter case:
+        // pending row 1, rowsInserted(0, 0) means old row 0 shifted to row 1.
+        resolvePendingForRow(m_pendingRow->row);
+    }
 }
 
 void LiveCursorState::resolvePendingForRow(int row)

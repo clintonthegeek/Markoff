@@ -165,12 +165,12 @@ ed.oldEnd   = byteOffset;
 ed.newText  = QByteArrayLiteral("\xE2\x80\x8B\n\n");          // <ZWSP>\n\n
 c.document->applyLocalEdit({ ed });
 c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-c.cursorState->requestTextCaretAtNewRow(c.blockIndex, 0);
+c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
 if (c.undoCoalescer) c.undoCoalescer->recordStructural();
 return HR::Handled;
 ```
 
-The new row replaces the current row's index; the original block shifts down by one.
+Cursor delivery: `requestTextCaretAtNewRow(c.blockIndex + 1, 0)` — the cursor follows the user's content (now shifted down to row blockIndex+1), NOT the marker paragraph. The marker paragraph stays as a visual blank above the user's content; it is removed at save time by `MarkerScrubber::scrubBeforeSave`. **Dogfood correction (Task 18 Bug 2):** earlier spec text said cursor goes to row `blockIndex` (the marker); that contradicted user expectation that cursor stays with content.
 
 **(Spec correction, Task 6 finding.)** An earlier draft of §4.2 stated the start-of-paragraph payload was the same `"\n\n<ZWSP>"` as EOB. That was wrong — using EOB's byte order at the start of a paragraph splices a leading `\n\n` into the *previous* block (or, at document start, prepends two empty lines before the marker), producing the wrong block topology. The implementation in `LiveStructuralKeyHandler.cpp` got the byte order right; the spec text is corrected here to match.
 

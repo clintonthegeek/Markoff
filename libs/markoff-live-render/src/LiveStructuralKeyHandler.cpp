@@ -170,10 +170,14 @@ void LiveStructuralKeyHandler::registerBuiltins()
         c.document->applyLocalEdit({ ed });
         c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
 
-        // Cursor goes to qtPos 0 of the new (marker) row. For start-of-block
-        // the marker takes index `blockIndex` (the existing block shifts down);
-        // for EOB the marker is appended at `blockIndex + 1`.
-        const int newRow = atStart ? c.blockIndex : (c.blockIndex + 1);
+        // Cursor goes to qtPos 0 of the user's content row.
+        // - atStart: marker paragraph takes index `blockIndex`, original content
+        //   shifts down to `blockIndex + 1`. Cursor follows the user's content.
+        // - atEnd: marker paragraph is appended at `blockIndex + 1`. Cursor lands
+        //   in it so the user can type immediately into the new (visually empty)
+        //   paragraph.
+        // Both cases: newRow == blockIndex + 1.
+        const int newRow = c.blockIndex + 1;
         c.cursorState->requestTextCaretAtNewRow(newRow, /*qtPos=*/0);
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();

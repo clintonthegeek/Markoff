@@ -463,8 +463,42 @@ private Q_SLOTS:
                  QStringLiteral("%1\n\nalpha").arg(kMarkerChar));
 
         QTRY_COMPARE(binding.model()->rowCount(), 2);
-        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 0);
+        // Cursor follows the user's content (now at row 1), not the marker.
+        // Wait for the pending cursor request to resolve.
+        QTRY_COMPARE(binding.cursorState()->focusedAnchorRow(), 1);
         QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
+    }
+
+    void paragraphEnter_atStartOfBlock_cursorFollowsContent() {
+        using namespace Markoff;
+        using namespace Markoff::LiveRender;
+        // Dogfood correction (Task 18 Bug 2): pressing Enter at qtPos 0 of a
+        // paragraph must leave the cursor at qtPos 0 of the user's content
+        // (which is now shifted down to row blockIndex+1), NOT in the marker
+        // paragraph (at row blockIndex). The marker stays as a visual blank
+        // above; the user stays focused on their content to keep typing.
+        MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        auto *model   = binding.model();
+        auto *cs      = binding.cursorState();
+        auto *handler = binding.structuralKeyHandler();
+
+        doc.resetContent(QByteArrayLiteral("alpha\n"), Origin::TestFixture);
+        QTRY_COMPARE(model->rowCount(), 1);
+
+        bool handled = handler->tryHandle(Qt::Key_Return, Qt::NoModifier,
+                                          /*blockIndex=*/0,
+                                          /*qtPos=*/0,
+                                          /*selectionEmpty=*/true,
+                                          /*blockText=*/QStringLiteral("alpha"));
+        QVERIFY(handled);
+        QTRY_COMPARE(model->rowCount(), 2);
+        // Marker paragraph is at row 0 (visual blank above); user's content is at row 1.
+        // Cursor MUST land in row 1 (the user's content) so they can keep typing.
+        // Wait for the pending cursor request to resolve.
+        QTRY_COMPARE(cs->focusedAnchorRow(), 1);
+        QCOMPARE(cs->focusedQtPos(), 0);
     }
 
     void paragraphEnter_onMarkerOnlyBlock_isNoOp() {
