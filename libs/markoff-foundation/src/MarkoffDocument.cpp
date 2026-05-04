@@ -555,6 +555,7 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
         }
     }, op.payload);
 
+    ++d->structuralEditSequence;
     scheduleD2Changed();
 }
 
@@ -598,7 +599,7 @@ quint64 MarkoffDocument::blockEditSequence(BlockId id) const
 
 quint64 MarkoffDocument::d2EditSequence() const noexcept
 {
-    quint64 sum = 0;
+    quint64 sum = d->structuralEditSequence;
     for (const auto &seq : d->blockEditSequences)
         sum += seq;
     return sum;

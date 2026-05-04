@@ -19,6 +19,7 @@ private Q_SLOTS:
     void bufferProxy_firesOnApplyBlockEdit();
     void idListProxy_firesOnApplyStructural();
     void kindTagMapProxy_firesOnChangeKind();
+    void d2EditSequence_incrementsOnStructural();
 };
 
 void TstD2Signals::d2DocumentChanged_firesOnApplyBlockEdit()
@@ -93,6 +94,16 @@ void TstD2Signals::kindTagMapProxy_firesOnChangeKind()
     op.payload = StructuralOp::ChangeKind{blk, BlockKind::Heading};
     doc.applyStructural(op);
     QCOMPARE(spy.count(), 1);
+}
+
+void TstD2Signals::d2EditSequence_incrementsOnStructural()
+{
+    MarkoffDocument doc(1);
+    quint64 seq0 = doc.d2EditSequence();
+    StructuralOp op;
+    op.payload = StructuralOp::InsertEntry{BlockId{}, BlockKind::Paragraph};
+    doc.applyStructural(op);
+    QVERIFY(doc.d2EditSequence() > seq0);
 }
 
 QTEST_MAIN(TstD2Signals)  // needs event loop for QTimer::singleShot

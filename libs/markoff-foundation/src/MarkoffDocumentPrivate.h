@@ -108,6 +108,9 @@ struct MarkoffDocument::Private {
     // Per-block edit sequence counters (D2 dirty-tracking)
     QHash<BlockId, quint64> blockEditSequences;
 
+    // Structural edit sequence counter — bumps on every applyStructural call.
+    quint64 structuralEditSequence = 0;
+
     // Debounce flag for d2DocumentChanged signal
     bool d2ChangePending = false;
 
