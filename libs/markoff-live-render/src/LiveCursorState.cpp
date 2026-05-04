@@ -3,6 +3,8 @@
 #include <markoff/live-render/BlockKindRegistry.h>
 #include <markoff/live-render/LiveBlockModel.h>
 
+#include <markoff-foundation/MarkoffDocument.h>
+
 #include <QAbstractItemModel>
 #include <QLoggingCategory>
 
@@ -146,7 +148,7 @@ void LiveCursorState::requestTextCaretAtRow(int expectedRow, int qtPos)
     qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtRow row=" << expectedRow
                       << "qtPos=" << qtPos
                       << "(signalModel.rowCount=" << m_signalModel->rowCount() << ")";
-    m_pendingRow = PendingRow{ expectedRow, qtPos, 0, std::nullopt };
+    m_pendingRow = PendingRow{ expectedRow, qtPos, 0, std::nullopt, {}, std::nullopt };
     if (expectedRow < m_signalModel->rowCount())
         resolvePendingForRow(expectedRow);
 }
@@ -162,7 +164,7 @@ void LiveCursorState::requestTextCaretAtNewRow(int expectedRow, int qtPos)
     // that would land the cursor on whatever block currently sits there
     // (the block that's about to be SHIFTED by the upcoming insertion).
     // Wait for the next rowsInserted whose range covers expectedRow.
-    m_pendingRow = PendingRow{ expectedRow, qtPos, 0, std::nullopt };
+    m_pendingRow = PendingRow{ expectedRow, qtPos, 0, std::nullopt, {}, std::nullopt };
 }
 
 void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor,
@@ -176,7 +178,33 @@ void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnch
     // OLD row, which is about to be displaced by the upcoming insertion).
     // Wait for rowsInserted to fire during parse-back applyOps; at that
     // point the anchor's CURRENT row is the right cursor target.
-    m_pendingRow = PendingRow{ -1, qtPos, 0, expectedAnchor };
+    PendingRow p;
+    p.row = -1;
+    p.qtPos = qtPos;
+    p.parseCyclesSeen = 0;
+    p.anchor = expectedAnchor;
+    m_pendingRow = std::move(p);
+}
+
+void LiveCursorState::requestTextCaretAtByte(Markoff::MarkoffDocument *document,
+                                             quint32 targetByte,
+                                             int qtPos)
+{
+    if (!m_signalModel) return;
+    qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtByte byte=" << targetByte
+                      << "qtPos=" << qtPos
+                      << "(signalModel.rowCount=" << m_signalModel->rowCount() << ")";
+    // Byte-keyed pure-pending. Wait for the next rowsInserted; at that
+    // point the foundation's blockByteRange queries reflect the post-edit
+    // parse, and we can locate the row whose byte range contains the
+    // target byte. Most robust resolution path (Bug 3 v2).
+    PendingRow p;
+    p.row = -1;
+    p.qtPos = qtPos;
+    p.parseCyclesSeen = 0;
+    p.byteDocument = document;
+    p.targetByte = targetByte;
+    m_pendingRow = std::move(p);
 }
 
 void LiveCursorState::noteParseArrived(quint64 /*parseSeq*/)
@@ -197,11 +225,19 @@ void LiveCursorState::onRowsInserted(const QModelIndex &parent, int first, int l
     if (parent.isValid()) return;  // top-level only
     qInfo().noquote() << "[dogfood] CursorState: onRowsInserted [" << first << "," << last << "]"
                       << "pending=" << (m_pendingRow
-                                            ? (m_pendingRow->anchor
-                                                   ? QStringLiteral("anchor")
-                                                   : QString::number(m_pendingRow->row))
+                                            ? (m_pendingRow->targetByte
+                                                   ? QStringLiteral("byte")
+                                                   : (m_pendingRow->anchor
+                                                          ? QStringLiteral("anchor")
+                                                          : QString::number(m_pendingRow->row)))
                                             : QStringLiteral("none"));
     if (!m_pendingRow) return;
+    if (m_pendingRow->targetByte) {
+        // Byte-keyed: ask the foundation document which row contains the
+        // post-edit byte position. Most robust path (Bug 3 v2 fix).
+        resolvePendingForByte();
+        return;
+    }
     if (m_pendingRow->anchor) {
         // Anchor-keyed: re-search the model on every insert event. The
         // user's content's row index can drift across the diff, but the
@@ -218,6 +254,56 @@ void LiveCursorState::onRowsInserted(const QModelIndex &parent, int first, int l
     if (m_pendingRow->row >= first && m_pendingRow->row <= last) {
         resolvePendingForRow(m_pendingRow->row);
     }
+}
+
+void LiveCursorState::resolvePendingForByte()
+{
+    if (!m_signalModel) return;
+    if (!m_pendingRow || !m_pendingRow->targetByte) return;
+    Markoff::MarkoffDocument *doc = m_pendingRow->byteDocument.data();
+    if (!doc) {
+        // Document gone — drop the pending request.
+        m_pendingRow.reset();
+        return;
+    }
+    const quint32 target = *m_pendingRow->targetByte;
+    const int rows = m_signalModel->rowCount();
+    int matchedRow = -1;
+    for (int r = 0; r < rows; ++r) {
+        const QVariant v = m_signalModel->data(
+            m_signalModel->index(r, 0), LiveBlockModel::BlockAnchorRole);
+        if (!v.isValid() || !v.canConvert<Markoff::BlockAnchor>()) continue;
+        const auto blockAnchor = v.value<Markoff::BlockAnchor>();
+        const auto rng = doc->blockByteRange(blockAnchor);
+        if (!rng) continue;
+        if (target >= rng->first && target < rng->second) {
+            matchedRow = r;
+            break;
+        }
+        // Edge case: target byte equal to second (one past end) or last
+        // row's range ends at target — accept the last matching range
+        // before target as a fallback.
+        if (target >= rng->first && target == rng->second) {
+            matchedRow = r;
+        }
+    }
+    if (matchedRow < 0) {
+        // Foundation's block ranges don't yet include the target byte.
+        // Wait for the next event.
+        return;
+    }
+    const QVariant v = m_signalModel->data(
+        m_signalModel->index(matchedRow, 0), LiveBlockModel::BlockAnchorRole);
+    if (!v.isValid() || !v.canConvert<Markoff::BlockAnchor>()) return;
+    const Markoff::BlockAnchor matchedAnchor = v.value<Markoff::BlockAnchor>();
+    const int qtPos = m_pendingRow->qtPos;
+    qInfo().noquote() << "[dogfood] CursorState: resolvePendingForByte matched row="
+                      << matchedRow;
+    m_pendingRow.reset();
+    TextCaret tc;
+    tc.block            = matchedAnchor;
+    tc.cachedByteOffset = static_cast<quint32>(qtPos);
+    request(tc);
 }
 
 void LiveCursorState::resolvePendingForAnchor()

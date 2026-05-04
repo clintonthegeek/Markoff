@@ -582,6 +582,74 @@ private Q_SLOTS:
         QCOMPARE(cs->focusedQtPos(), 0);
     }
 
+    void paragraphEnter_atStartOfMidDocParagraph_textVerifies() {
+        using namespace Markoff;
+        using namespace Markoff::LiveRender;
+        // Dogfood Bug 3 v2 (Task 18 pass 3): the previous regression tests
+        // asserted by row index, which the broken anchor-resolution path
+        // happened to satisfy on tiny single-character paragraphs. With
+        // longer multi-line paragraphs (BlockWalker glues consecutive lines
+        // into one row), the dogfood scenario lands the cursor on the
+        // ORIGINALLY-FOLLOWING paragraph instead of the user's shifted
+        // content. Verify by TEXT CONTENT, not just by row index.
+        MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        auto *model   = binding.model();
+        auto *cs      = binding.cursorState();
+        auto *handler = binding.structuralKeyHandler();
+
+        // Three paragraphs of distinct lengths and content. The middle one
+        // ("beta") spans multiple source lines (BlockWalker glues them);
+        // the trailing one ("gamma") is intentionally longer so a wrong-
+        // row cursor lands on a row whose text is recognisably gamma.
+        const QByteArray src =
+            QByteArrayLiteral("alpha alpha alpha alpha\n\n")
+          + QByteArrayLiteral("beta line one and two and three\n")
+          + QByteArrayLiteral("beta line four continued\n\n")
+          + QByteArrayLiteral("gamma gamma gamma gamma gamma gamma gamma gamma\n");
+        doc.resetContent(src, Origin::TestFixture);
+        QSignalSpy parseSpy(&doc, &MarkoffDocument::parseUpdated);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(model->rowCount(), 3);
+        QCOMPARE(model->recordAt(0).text, QStringLiteral("alpha alpha alpha alpha"));
+        // beta is two source lines glued by BlockWalker.
+        QVERIFY(model->recordAt(1).text.startsWith(QStringLiteral("beta line one")));
+        QVERIFY(model->recordAt(2).text.startsWith(QStringLiteral("gamma")));
+
+        const QString preEditBetaText = model->recordAt(1).text;
+
+        bool handled = handler->tryHandle(Qt::Key_Return, Qt::NoModifier,
+                                          /*blockIndex=*/1,
+                                          /*qtPos=*/0,
+                                          /*selectionEmpty=*/true,
+                                          /*blockText=*/preEditBetaText);
+        QVERIFY(handled);
+        QTRY_COMPARE(model->rowCount(), 4);
+
+        // Post-edit layout:
+        //   row 0: alpha
+        //   row 1: <marker>
+        //   row 2: beta (the user's content — what the cursor MUST follow)
+        //   row 3: gamma
+        QCOMPARE(model->recordAt(0).text, QStringLiteral("alpha alpha alpha alpha"));
+        QCOMPARE(model->recordAt(1).text, QString(kMarkerChar));
+        QCOMPARE(model->recordAt(2).text, preEditBetaText);
+        QVERIFY(model->recordAt(3).text.startsWith(QStringLiteral("gamma")));
+
+        // The crucial assertion: the cursor's resolved row's TEXT must equal
+        // the user's pre-edit content (beta), NOT the originally-following
+        // gamma paragraph. Row index is a secondary check; if it disagrees
+        // with the text check, the text check is authoritative.
+        QTRY_VERIFY(cs->focusedAnchorRow() >= 0);
+        const int resolvedRow = cs->focusedAnchorRow();
+        const QString resolvedText = model->recordAt(resolvedRow).text;
+        QCOMPARE(resolvedText, preEditBetaText);
+        QVERIFY2(!resolvedText.startsWith(QStringLiteral("gamma")),
+                 "cursor landed on the originally-following paragraph");
+        QCOMPARE(cs->focusedQtPos(), 0);
+    }
+
     void paragraphEnter_onMarkerOnlyBlock_isNoOp() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;

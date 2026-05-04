@@ -165,12 +165,19 @@ ed.oldEnd   = byteOffset;
 ed.newText  = QByteArrayLiteral("\xE2\x80\x8B\n\n");          // <ZWSP>\n\n
 c.document->applyLocalEdit({ ed });
 c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
+const quint32 markerBytes      = static_cast<quint32>(ed.newText.size());
+const quint32 userContentByte  = c.currentBlockStart + markerBytes;
+c.cursorState->requestTextCaretAtByte(c.document, userContentByte, /*qtPos=*/0);
 if (c.undoCoalescer) c.undoCoalescer->recordStructural();
 return HR::Handled;
 ```
 
-Cursor delivery: `requestTextCaretAtNewRow(c.blockIndex + 1, 0)` — the cursor follows the user's content (now shifted down to row blockIndex+1), NOT the marker paragraph. The marker paragraph stays as a visual blank above the user's content; it is removed at save time by `MarkerScrubber::scrubBeforeSave`. **Dogfood correction (Task 18 Bug 2):** earlier spec text said cursor goes to row `blockIndex` (the marker); that contradicted user expectation that cursor stays with content.
+Cursor delivery: byte-position-keyed pending request — the cursor follows the user's content, whose post-edit first byte is `currentBlockStart + markerBytes`. The marker paragraph stays as a visual blank above the user's content; it is removed at save time by `MarkerScrubber::scrubBeforeSave`.
+
+**Dogfood corrections:**
+* Pass 2 (Bug 2): earlier spec text said cursor goes to row `blockIndex` (the marker); that contradicted user expectation that cursor stays with content. Replaced with row-keyed `requestTextCaretAtNewRow(blockIndex + 1, 0)`.
+* Pass 3 (Bug 3 v1, commit 3c86b76): row-keyed delivery off-by-one'd in mid-document context. Switched to anchor-keyed `requestTextCaretAtAnchor(c.blockAnchor, 0)`.
+* Pass 3 (Bug 3 v2, this commit): anchor-keyed delivery mis-resolved in some mid-document cases — the captured pre-edit `BlockAnchor` matched a row whose post-edit content was the *originally-following* paragraph, not the user's shifted content. Switched to byte-keyed `requestTextCaretAtByte(document, byte, 0)`. The byte position is unambiguous: the user's content's first byte is exactly `markerBytes` past the original block start. The resolver asks the foundation directly which row's `blockByteRange` contains that byte. This is robust to anchor renumbering, off-by-one row drift, and the AstBlockDiff Equal/Insert/Delete-collapse interactions that perturbed the anchor-keyed path.
 
 **(Spec correction, Task 6 finding.)** An earlier draft of §4.2 stated the start-of-paragraph payload was the same `"\n\n<ZWSP>"` as EOB. That was wrong — using EOB's byte order at the start of a paragraph splices a leading `\n\n` into the *previous* block (or, at document start, prepends two empty lines before the marker), producing the wrong block topology. The implementation in `LiveStructuralKeyHandler.cpp` got the byte order right; the spec text is corrected here to match.
 
@@ -301,9 +308,15 @@ The §13 "Load file with markers in source" test row reflects this two-step cont
 
 `LiveCursorState::requestTextCaretAtNewRow(row, qtPos)` is called with `qtPos = 0` for marker insertion. This places the cursor *before* the marker so that the first user keystroke inserts at byte 0 of the block — the atomic-bundled-edit then replaces the marker with the typed content cleanly (rather than producing `<marker><typed>` or `<typed><marker>`).
 
-### 7.2 Pending-row resolution (unchanged)
+### 7.2 Pending-row / -anchor / -byte resolution
 
-Uses the existing `requestTextCaretAtNewRow` semantics (R5.5 Bug-B fix): the request is purely pending; it resolves on the matching `rowsInserted` arrival from `LiveBlockModel`. No immediate-resolve gate.
+Three pending variants exist on `LiveCursorState`, each suited to a different structural shape:
+
+* `requestTextCaretAtNewRow(row, qtPos)` — used for **EOB-Enter** and **mid-block split**, where the structural edit births a brand-new row at a known index. Resolves on `rowsInserted` whose range covers `row`.
+* `requestTextCaretAtAnchor(BlockAnchor, qtPos)` — kept as a public seam (no current users at HEAD) for cases where the cursor target is identified by an existing block's CRDT-stable anchor. Resolves by scanning the model for that anchor on every `rowsInserted`.
+* `requestTextCaretAtByte(document, byte, qtPos)` — used for **start-of-paragraph Enter**, where the cursor must follow user content that has *shifted* to a known post-edit byte position. Resolves on `rowsInserted` by asking the foundation document which row's `blockByteRange` contains the target byte. Most robust path; chosen in pass 3 (Bug 3 v2) after both row-keyed and anchor-keyed paths exhibited subtle off-by-one and mis-resolution behavior in mid-document scenarios.
+
+All three follow the same purely-pending semantics: the request is held until `rowsInserted` arrives from `LiveBlockModel`. No immediate-resolve gate. Pending requests linger up to two parse cycles before being dropped (§8.4).
 
 ### 7.3 No `holeReified` event
 

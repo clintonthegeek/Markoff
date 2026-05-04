@@ -6,9 +6,14 @@
 
 #include <QAbstractItemModel>
 #include <QObject>
+#include <QPointer>
 #include <QString>
 #include <optional>
 #include <qqmlintegration.h>
+
+namespace Markoff {
+class MarkoffDocument;
+}
 
 namespace Markoff::LiveRender {
 
@@ -99,6 +104,23 @@ public:
     /// land the cursor on the user's content, not on the row after it.
     void requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor, int qtPos);
 
+    /// Byte-position-keyed pure-pending variant. Use when the structural
+    /// edit shifts an existing block to a known POST-EDIT byte position
+    /// (e.g. start-of-paragraph Enter inserts a marker before the user's
+    /// content; the user's content's first byte is now at
+    /// `currentBlockStart + markerBytes`). The pending request resolves on
+    /// every `rowsInserted` event by asking the foundation document for
+    /// each row's byte range and finding the row whose range contains
+    /// `targetByte`. Robust against:
+    ///   - anchor renumbering during AstBlockDiff collapse,
+    ///   - off-by-one row-index drift across the parse-back diff,
+    ///   - any other anchor-identity quirks the foundation may expose.
+    /// Bug 3 v2 fix (Task 18 dogfood pass 3): the previous anchor-keyed
+    /// path landed on the wrong paragraph in some mid-document cases.
+    void requestTextCaretAtByte(Markoff::MarkoffDocument *document,
+                                quint32 targetByte,
+                                int qtPos);
+
     /// Called by LiveListModelBinding from onParseUpdated. Increments the
     /// pending request's parse-cycle counter; drops on the SECOND call
     /// after the request was recorded (i.e. drops at parseCyclesSeen >= 2).
@@ -133,9 +155,17 @@ private:
         // the user's content's row index is not stable across the diff
         // but its BlockAnchor identity is.
         std::optional<Markoff::BlockAnchor> anchor;
+        // If set, treat this pending request as byte-keyed: resolve by
+        // asking the foundation document which row's byte range contains
+        // `targetByte`. This is the most robust resolution path; used by
+        // start-of-paragraph Enter after the previous anchor-keyed path
+        // mis-resolved in some mid-document cases (Bug 3 v2).
+        QPointer<Markoff::MarkoffDocument> byteDocument;
+        std::optional<quint32>             targetByte;
     };
     std::optional<PendingRow> m_pendingRow;
     void resolvePendingForAnchor();
+    void resolvePendingForByte();
 };
 
 }  // namespace Markoff::LiveRender

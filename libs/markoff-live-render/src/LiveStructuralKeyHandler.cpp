@@ -156,6 +156,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         // apply — non-destructive soft-break inside the list/quote.
         // Shift-Enter is also gated: it inserts a `\n` too, which we'd
         // otherwise duplicate; default Qt Shift-Enter does the same.
+
         if (rowIsListOrQuoteContent(c.blockText)) {
             return HR::NotHandled;
         }
@@ -233,14 +234,22 @@ void LiveStructuralKeyHandler::registerBuiltins()
         //   row (not the existing user content). requestTextCaretAtNewRow
         //   resolves on rowsInserted whose range covers blockIndex+1.
         // - atStart: the new marker block is born at `blockIndex`, and the
-        //   existing user content (whose anchor we already hold) shifts to
-        //   `blockIndex + 1`. Use the anchor-keyed pure-pending request —
-        //   the cursor MUST follow the user's content, and its row index
-        //   after the diff is unpredictable (anchor renumbering or multi-
-        //   row diffs can shift it). The anchor identity is stable.
-        //   Bug 3 fix (Task 18 dogfood pass 2).
+        //   existing user content shifts to byte
+        //   `currentBlockStart + markerBytes`. Use the byte-keyed pending
+        //   request — the cursor MUST follow the user's content, and the
+        //   only stable identifier across the parse-back diff is the
+        //   post-edit byte position of the user's content. Anchor identity
+        //   was tried in commit 3c86b76 but mis-resolved in some mid-doc
+        //   cases (dogfood pass 3 / Bug 3 v2): the resolver can match a
+        //   row whose anchor coincidentally equals the captured anchor in
+        //   a transient state, landing the cursor on the originally-
+        //   following paragraph. Byte-keyed resolution sidesteps anchor-
+        //   identity quirks entirely by asking the foundation directly:
+        //   "which row's byte range now contains target byte X?".
         if (atStart) {
-            c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, /*qtPos=*/0);
+            const quint32 markerBytes = static_cast<quint32>(ed.newText.size());
+            const quint32 userContentByte = c.currentBlockStart + markerBytes;
+            c.cursorState->requestTextCaretAtByte(c.document, userContentByte, /*qtPos=*/0);
         } else {
             const int newRow = c.blockIndex + 1;
             c.cursorState->requestTextCaretAtNewRow(newRow, /*qtPos=*/0);
