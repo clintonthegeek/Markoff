@@ -1,16 +1,15 @@
 # Markoff (exploration/new-foundation branch)
 
-> **ACTIVE WORK — D-EVOLUTION DESIGN (D2).** As of 2026-05-04 this branch
-> has cut from the C-restoration arc to the D architecture (per-block CRDT
-> + structural CRDT). The collabtext maintainers approved the supporting
-> primitive (`CollabText::Crdt::IdList`); D2 is the Markoff-side spec and
-> implementation. **A fresh agent context picking up this work must read,
-> in order:**
+> **ACTIVE WORK — D2 (foundation reshape, per-block CRDT).** As of 2026-05-04
+> this branch is on the D-evolution arc. D0 (joint design) and D1 (collabtext
+> `IdList` primitive) are done; D2 spec is approved and awaiting plan
+> derivation. **A fresh agent context picking up this work must read, in order:**
 >
-> 1. `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut, what carries forward, what doesn't
-> 2. `docs/specs/2026-05-02-d-evolution-proposal.md` — the Markoff-side proposal sent to collabtext maintainers
-> 3. `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` — the maintainer commitment + the six "won't do" lines D2 must record
-> 4. `docs/specs/2026-05-02-live-render-restoration-design.md` — superseded in part, but its lower-layer decisions (L0–L3, the discriminated cursor model, the layered library structure) carry forward to D2 as authoritative inputs
+> 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation across the whole D arc (D0 → D5)
+> 2. `docs/d-arc/d-arc-status.md` — live status board (where D2 stands right now)
+> 3. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items binding every D-arc spec
+> 4. `docs/specs/2026-05-04-d2-foundation-reshape-design.md` — the binding D2 spec
+> 5. `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut from C-restoration that opened the D arc
 >
 > The C-restoration's status board (`docs/restoration-status.md`) is now
 > historical. The marker-paragraph design and R5.5 plan are retired. R5.5
@@ -18,8 +17,8 @@
 > CRDT race window that D removes structurally.
 >
 > The legacy `libs/markoff-view-qml` continues to ship; the in-tree
-> `libs/markoff-live-render` keeps L0–L3 (carries forward) and the existing
-> R5/R5.5 work (will be rewritten or retired during D2 implementation).
+> `libs/markoff-live-render` keeps L0–L3 (carries forward to D3) and the existing
+> R5/R5.5 work (will be rewritten or retired during D3 implementation).
 > Do not delete `libs/markoff-view-qml` prematurely.
 >
 > All other content below describes the project at large; D2 is the active

@@ -1,0 +1,73 @@
+# D-arc — Status Board
+
+**This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
+
+**Last updated:** 2026-05-04 (D2 spec landed; D-arc scaffolding initialized; orientation roadmap published.)
+**Working tree:** `.worktrees/foundation-exploration/`
+**Branch:** `exploration/new-foundation`
+**Active phase:** **D2** (foundation reshape) — spec written, plan pending.
+
+---
+
+## TL;DR — what to do *right now*
+
+> **D2 spec is approved (`docs/specs/2026-05-04-d2-foundation-reshape-design.md`). The next concrete action is to invoke `superpowers:writing-plans` to derive the implementation plan from the spec.** D1 is already done (collabtext shipped `IdList` on 2026-05-04), so plan execution can begin as soon as the plan lands — no external dependency to wait on.
+>
+> **Read first** (in this order, for a fresh agent context):
+> 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation
+> 2. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items
+> 3. `docs/specs/2026-05-04-d2-foundation-reshape-design.md` — the binding D2 spec
+> 4. `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut from C-restoration
+
+---
+
+## Phase board
+
+| Phase | Status | Notes |
+|---|---|---|
+| **D0** | `complete` | Joint design — proposal + response delivered and accepted. |
+| **D1** | `complete` | `CollabText::Crdt::IdList` shipped 2026-05-04. Available for D2 consumption. |
+| **D2** | `spec-approved` | Spec at `docs/specs/2026-05-04-d2-foundation-reshape-design.md`. Plan pending. |
+| **D3** | `stubbed` | `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md`. Substantive design post-D2. |
+| **D4** | `stubbed` | `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`. Substantive design post-D2/D3. |
+| **D5** | `stubbed` | `docs/specs/2026-05-04-d5-collab-activation-STUB.md`. Substantive design post-D4. |
+
+**Phase status legend.** `pending` (not yet started) · `stubbed` (inputs + scope captured, no substantive design) · `spec-in-brainstorm` · `spec-approved` (spec written and user-approved) · `plan-approved` (writing-plans output landed) · `in-progress` (commits landing) · `dogfood` (implementation done; user is testing) · `complete` (acceptance criteria met).
+
+**D2 acceptance criterion.** All foundation tests pass against the new internals; round-trip corpus tests pass; markoff-live-render L4 / L5 migration completes (marker-paragraph machinery deleted); user signs off on a dogfood pass per the plan's dogfood script.
+
+---
+
+## Recent-changes log
+
+Append-only chronological record. Each entry: date, commit short SHA (when committed), one-sentence summary. Never edit prior entries — corrections are new entries that supersede.
+
+| Date | Commit | Summary |
+|---|---|---|
+| 2026-05-04 | (this commit) | D2 spec landed (`docs/specs/2026-05-04-d2-foundation-reshape-design.md`); D-arc roadmap + status board + scope-line doc + D3/D4/D5 stub specs published; worktree `CLAUDE.md` banner updated to point at the roadmap. |
+| 2026-05-04 | `0fa0111` | C-restoration bookend committed; spike/marker-hole worktree retired. (See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`.) |
+| 2026-05-04 | (external) | collabtext maintainers shipped `IdList` v1 (Option β); D1 complete. |
+| 2026-05-04 | (external) | collabtext maintainer response to D-evolution proposal: yes to β with six explicit "won't do" lines. (`~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md`.) |
+| 2026-05-02 | (in-tree) | D-evolution proposal authored (`docs/specs/2026-05-02-d-evolution-proposal.md`). |
+
+---
+
+## Open architectural questions across the arc
+
+These are deferred decisions noted at design time that the relevant phase will resolve. They are not blockers.
+
+| # | Question | Phase to resolve |
+|---|---|---|
+| Q1 | Inline parse cache eviction policy (never-evict / LRU / time-based) | D2 plan-time, informed by real workload |
+| Q2 | Plugin block-kind registration timing and registry interface | D3 |
+| Q3 | `tst_roundtrip` corpus license review (Obsidian excerpts) | D2 plan-time |
+| Q4 | `BlockAttrsMap` `AttrValue` variant scope | D3 (once block kinds are reviewed) |
+| Q5 | `Cmd::pasteMarkdown` parser invocation threading (synchronous vs background) | D2 plan-time |
+
+---
+
+## Spec amendment log
+
+When the D2 spec is amended (after spec approval but before retiring the arc), record the amendment here with date, section affected, and reason.
+
+*(No amendments yet.)*
