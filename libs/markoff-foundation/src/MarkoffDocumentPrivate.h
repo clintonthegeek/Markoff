@@ -2,12 +2,21 @@
 #pragma once
 
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/CausalLwwMap.h>
+#include <markoff-foundation/BlockKind.h>
+#include <markoff-foundation/UndoLog.h>
 
 #include <QList>
+#include <QHash>
+#include <QByteArray>
+#include <QString>
 
 #include <memory>
+#include <unordered_map>
+#include <variant>
 
 #include <crdt/Buffer.h>
+#include <crdt/IdList.h>
 
 #include "BlockAnchorComputation.h"
 #include "ParsePool.h"
@@ -16,21 +25,90 @@ namespace Markoff {
 
 class Session;
 
+// ============================================================================
+// Sibling map typedefs (Phase 5 will split to separate headers; stubs here)
+// ============================================================================
+
+using KindTagMap     = CausalLwwMap<BlockId, BlockKind>;
+using AttrName       = QByteArray;
+using AttrValue      = std::variant<int, QString, bool>;
+struct BlockAttrKey  {
+    BlockId block;
+    AttrName name;
+    bool operator==(const BlockAttrKey &o) const = default;
+};
+inline size_t qHash(const BlockAttrKey &k, size_t seed) noexcept {
+    return qHashMulti(seed, k.block, k.name);
+}
+using BlockAttrsMap  = CausalLwwMap<BlockAttrKey, AttrValue>;
+using FrontmatterKey = QByteArray;
+using FrontmatterValue = QByteArray;
+using FrontmatterMap = CausalLwwMap<FrontmatterKey, FrontmatterValue>;
+using LinkRefId      = QByteArray;
+struct LinkRefValue  {
+    QString url;
+    QString title;
+    bool operator==(const LinkRefValue &o) const = default;
+};
+using LinkRefMap     = CausalLwwMap<LinkRefId, LinkRefValue>;
+using FootnoteId     = QByteArray;
+using FootnoteDefMap = CausalLwwMap<FootnoteId, QByteArray>;
+
+// Stub placeholders — real implementations in their phases
+class WatermarkCoordinator { public: explicit WatermarkCoordinator() = default; };
+class InlineParseCache     { public: explicit InlineParseCache() = default; };
+
+// ============================================================================
+// MarkoffDocument::Private
+// ============================================================================
+
 struct MarkoffDocument::Private {
     explicit Private(uint16_t replicaId)
         : buffer(replicaId)
         , replicaId(replicaId)
+        , idList(replicaId)
+        , kindTagMap(replicaId)
+        , blockAttrsMap(replicaId)
+        , frontmatterMap(replicaId)
+        , linkRefMap(replicaId)
+        , footnoteDefMap(replicaId)
     {}
 
+    // ── Legacy single-buffer internals (retained until Phase 14) ──────────
     CollabText::Crdt::Buffer                  buffer;
     quint16                                   replicaId;
     quint64                                   editSequence = 0;   ///< Bumps on every state-change op.
     quint64                                   parseSequence = 0;  ///< Bumps each time parseUpdated is emitted.
     QList<Markoff::BlockAnchor>               latestBlockAnchors;
     QList<Markoff::Detail::BlockByteRange>    latestBlockRanges;
-    QList<Session *>                          sessions;  // filled by Task 23
+    QList<Session *>                          sessions;
     Markoff::Parse::Detail::ParsePool         parsePool;
     std::unique_ptr<const Markoff::Document>  latestParse;
+
+    // ── New D2 internals (Phase 4+) ──────────────────────────────────────
+    // BlockId hash for std::unordered_map
+    struct BlockIdHash {
+        std::size_t operator()(const BlockId &id) const noexcept {
+            return std::hash<uint64_t>{}(id.raw());
+        }
+    };
+
+    CollabText::Crdt::IdList                           idList;
+    std::unordered_map<BlockId, std::unique_ptr<CollabText::Crdt::Buffer>, BlockIdHash> blockBuffers;
+    KindTagMap      kindTagMap;
+    BlockAttrsMap   blockAttrsMap;
+    FrontmatterMap  frontmatterMap;
+    LinkRefMap      linkRefMap;
+    FootnoteDefMap  footnoteDefMap;
+    Markoff::UndoLog undoLog;
+    WatermarkCoordinator watermark;
+    InlineParseCache     inlineCache;
+
+    // Per-block edit sequence counters (D2 dirty-tracking)
+    QHash<BlockId, quint64> blockEditSequences;
+
+    // Debounce flag for d2DocumentChanged signal
+    bool d2ChangePending = false;
 };
 
 }  // namespace Markoff
