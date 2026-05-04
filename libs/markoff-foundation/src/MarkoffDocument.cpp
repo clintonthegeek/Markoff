@@ -782,8 +782,8 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         }
 
         // Mint a new block ID
-        uint64_t rawId = d->nextBlockId.fetch_add(1);
-        BlockId newId = BlockId::fromRaw(rawId);
+        BlockId newId = allocateD2BlockId();
+        uint64_t rawId = newId.raw();
 
         // Insert into IdList after the previous block (sequential append)
         d->idList.insert_after(lastAnchor, rawId);
@@ -812,7 +812,7 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);
         if (!content.isEmpty())
             buf->apply_local_edit({{0, 0}}, {content.toStdString()});
-        d->blockBuffers[newId] = std::move(buf);
+        d->blockBuffers.emplace(newId, std::move(buf));
         d->blockLoadTimeBytes[newId] = content;
         d->bufferProxies[newId] = new BufferProxy(newId, this);
     }
