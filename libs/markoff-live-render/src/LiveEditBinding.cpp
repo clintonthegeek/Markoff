@@ -28,6 +28,11 @@ void LiveEditBinding::setBinding(LiveListModelBinding *b)
 {
     if (m_binding == b) return;
     m_binding = b;
+    // Cache the borrowed MarkerScrubber pointer (owned by the binding).
+    // QPointer auto-clears if the binding tears it down; the QPointer
+    // null-check on use covers both "binding cleared" and "binding without
+    // a doc / scrubber".
+    m_markerScrubber = m_binding ? m_binding->markerScrubber() : nullptr;
     Q_EMIT bindingChanged();
 }
 
@@ -267,6 +272,19 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
 
     // Stamp the row for the freshness rule (spec §4.3).
     model->setRowEditSequence(m_modelIndex, doc->editSequence());
+}
+
+void LiveEditBinding::onFocusLost()
+{
+    // Marker-paragraph focus-out scrub (spec §6.4): if the model pushed
+    // a marker-only payload into this delegate and the user focused
+    // in/out without typing, drop the marker paragraph from source.
+    // The pending flag is cleared either way so re-focus doesn't double-
+    // emit.
+    if (m_pendingMarkerScrub && m_markerScrubber && m_modelIndex >= 0) {
+        m_markerScrubber->scrubOnFocusOut(m_modelIndex);
+    }
+    m_pendingMarkerScrub = false;
 }
 
 void LiveEditBinding::flushPendingComposition()

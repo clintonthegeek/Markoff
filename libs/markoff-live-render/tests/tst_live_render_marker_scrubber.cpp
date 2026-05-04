@@ -5,6 +5,7 @@
 #include <markoff/live-render/MarkerScrubber.h>
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveListModelBinding.h>
+#include <markoff/live-render/LiveStructuralKeyHandler.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Origin.h>
 
@@ -19,6 +20,7 @@ private Q_SLOTS:
     void scrubBeforeSave_runOfMarkers_collapsesAll();
     void scrubBeforeSave_noMarkers_returnsZero();
     void scrubAfterLoad_markersInLoadedSource_areRemoved();
+    void endToEnd_focusInOutWithoutTyping_scrubsMarker();
 private:
     static QString sourceOf(MarkoffDocument *doc);
 };
@@ -111,6 +113,29 @@ void TstMarkerScrubber::scrubAfterLoad_markersInLoadedSource_areRemoved() {
     int removed = scrubber.scrubAfterLoad();
     QVERIFY(removed > 0);
     QVERIFY(!sourceOf(&doc).contains(kMarkerChar));
+}
+
+void TstMarkerScrubber::endToEnd_focusInOutWithoutTyping_scrubsMarker() {
+    using namespace Markoff;
+    using namespace Markoff::LiveRender;
+    MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+
+    // Create marker paragraph via structural-key handler EOB-Enter.
+    doc.resetContent(QByteArrayLiteral("alpha\n"), Origin::TestFixture);
+    QTRY_COMPARE(binding.model()->rowCount(), 1);
+    binding.structuralKeyHandler()->tryHandle(
+        Qt::Key_Return, Qt::NoModifier, /*blockIndex=*/0, /*qtPos=*/5,
+        /*selectionEmpty=*/true, QStringLiteral("alpha"));
+    QTRY_COMPARE(binding.model()->rowCount(), 2);
+
+    // Simulate the focus-out scrub (no LiveEditBinding instance here;
+    // call the scrubber directly to verify the wiring of the marker
+    // detection and edit emission).
+    binding.markerScrubber()->scrubOnFocusOut(/*blockIndex=*/1);
+    QTRY_COMPARE(binding.model()->rowCount(), 1);
+    QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), QStringLiteral("alpha\n"));
 }
 
 QTEST_MAIN(TstMarkerScrubber)

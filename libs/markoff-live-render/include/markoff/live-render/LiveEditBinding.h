@@ -23,6 +23,8 @@ class TstHolesLayer;
 
 namespace Markoff::LiveRender {
 
+class MarkerScrubber;
+
 /// Per-delegate edit binding. Translates `QTextDocument::contentsChange`
 /// (qtPos, charsRemoved, charsAdded) into a `Markoff::MarkoffEdit` in
 /// UTF-8 byte coordinates, calls `MarkoffDocument::applyLocalEdit`, and
@@ -85,6 +87,15 @@ public:
     quint64 holeId() const;
     void    setHoleId(quint64 holeId);
 
+    /// Marker-paragraph focus-out hook (spec §6.4). QML invokes this
+    /// from the delegate's `Component.onDestruction` and from the
+    /// TextEdit's `onActiveFocusChanged: if (!activeFocus) ...`. If the
+    /// delegate's text was the model-pushed marker-only payload and the
+    /// user focused in/out without typing, this calls
+    /// `MarkerScrubber::scrubOnFocusOut(modelIndex)` to drop the marker
+    /// paragraph from source.
+    Q_INVOKABLE void onFocusLost();
+
 Q_SIGNALS:
     void bindingChanged();
     void modelIndexChanged();
@@ -116,6 +127,7 @@ private:
     void pushTextToDocument();
 
     QPointer<LiveListModelBinding> m_binding;
+    QPointer<MarkerScrubber>        m_markerScrubber;  ///< borrowed; owned by LiveListModelBinding
     int                             m_modelIndex = -1;
     QPointer<QQuickTextDocument>    m_textDocument;
     QPointer<QTextDocument>         m_listenedDoc;  // remembered so we can disconnect

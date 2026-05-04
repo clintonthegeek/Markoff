@@ -2,6 +2,7 @@
 #include <markoff/live-render/LiveListModelBinding.h>
 #include <markoff/live-render/AstBlockDiff.h>
 #include <markoff/live-render/LiveStructuralKeyHandler.h>
+#include <markoff/live-render/MarkerScrubber.h>
 #include <markoff/live-render/UndoCoalescer.h>
 #include "BlockWalker.h"
 
@@ -27,6 +28,7 @@ struct LiveListModelBinding::Private {
     LiveStructuralKeyHandler  *structuralKeys = nullptr;
     LiveHoleLayer             *holeLayer   = nullptr;
     LiveProxyBlockModel       *proxyModel  = nullptr;
+    MarkerScrubber            *markerScrubber = nullptr;
     QList<BlockKey>            lastKeys;
     quint64                    lastParseInputEditSeq = 0;
     bool                       applyingModelUpdate = false;
@@ -61,6 +63,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         }
     }
     // Drop old structural components before reconstructing (reverse construction order).
+    delete d->markerScrubber; d->markerScrubber = nullptr;
     delete d->proxyModel;     d->proxyModel     = nullptr;
     delete d->holeLayer;      d->holeLayer      = nullptr;
     delete d->structuralKeys; d->structuralKeys = nullptr;
@@ -107,7 +110,19 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->structuralKeys = new LiveStructuralKeyHandler(
             d->document, d->model, d->cursorState, &d->registry,
             d->undoCoalescer, this);
+
+        // Marker-paragraph scrubber (spec §6). Owned by `this`.
+        // Connect documentReloaded → scrubAfterLoad so any markers
+        // shipped in a freshly-loaded source are dropped from the CRDT
+        // before the user sees them. The pre-save and focus-out paths
+        // are driven by `flushPendingMarkers()` and LiveEditBinding
+        // respectively.
+        d->markerScrubber = new MarkerScrubber(d->document, d->model, this);
+        QObject::connect(d->document, &Markoff::MarkoffDocument::documentReloaded,
+                         d->markerScrubber, &MarkerScrubber::scrubAfterLoad);
+        Q_EMIT markerScrubberChanged();
     } else {
+        Q_EMIT markerScrubberChanged();
         d->selectionView->setDocument(nullptr);
         d->selectionView->setSession(nullptr);
         d->cursorState->setSignalModel(d->model);  // revert to inner default
@@ -126,6 +141,7 @@ UndoCoalescer            *LiveListModelBinding::undoCoalescer()       const { re
 const BlockKindRegistry  *LiveListModelBinding::registry()            const { return &d->registry; }
 LiveHoleLayer            *LiveListModelBinding::holeLayer()           const { return d->holeLayer; }
 LiveProxyBlockModel      *LiveListModelBinding::proxyModel()          const { return d->proxyModel; }
+MarkerScrubber           *LiveListModelBinding::markerScrubber()      const { return d->markerScrubber; }
 
 bool LiveListModelBinding::applyingModelUpdate() const
 {
@@ -136,6 +152,12 @@ void LiveListModelBinding::flushPendingHoles()
 {
     if (d->holeLayer)
         d->holeLayer->commitAllPendingHoles();
+}
+
+void LiveListModelBinding::flushPendingMarkers()
+{
+    if (d->markerScrubber)
+        d->markerScrubber->scrubBeforeSave();
 }
 
 void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
