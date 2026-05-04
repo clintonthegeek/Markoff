@@ -813,6 +813,7 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         if (!content.isEmpty())
             buf->apply_local_edit({{0, 0}}, {content.toStdString()});
         d->blockBuffers[newId] = std::move(buf);
+        d->blockLoadTimeBytes[newId] = content;
         d->bufferProxies[newId] = new BufferProxy(newId, this);
     }
 }
@@ -846,6 +847,16 @@ void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
     // 6. Notify
     Q_EMIT documentLoaded();
     scheduleD2Changed();
+}
+
+QByteArray MarkoffDocument::blockLoadTimeBytes(BlockId id) const
+{
+    return d->blockLoadTimeBytes.value(id);
+}
+
+std::optional<QByteArray> MarkoffDocument::frontmatterValue(const QByteArray &key) const
+{
+    return d->frontmatterMap.get(key);
 }
 
 }  // namespace Markoff

@@ -85,6 +85,10 @@ struct MarkoffDocument::Private {
     // Per-block edit sequence counters (D2 dirty-tracking)
     QHash<BlockId, quint64> blockEditSequences;
 
+    // Load-time bytes snapshot — set during loadFromMarkdown, used by
+    // Phase 8 touch-test to check whether block content has changed.
+    QHash<BlockId, QByteArray> blockLoadTimeBytes;
+
     // Structural edit sequence counter — bumps on every applyStructural call.
     quint64 structuralEditSequence = 0;
 

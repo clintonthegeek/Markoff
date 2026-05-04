@@ -250,6 +250,17 @@ public:
     /// BlockAttrsMap). Emits documentLoaded() on success.
     void loadFromMarkdown(const QByteArray &src);
 
+    /// Returns the raw bytes stored for `id` at load time (from
+    /// loadFromMarkdown). Returns an empty QByteArray if `id` was not
+    /// materialised from a load or has no content. Used by Phase 8
+    /// touch-test to detect whether a block has been edited since load.
+    QByteArray blockLoadTimeBytes(BlockId id) const;
+
+    /// Returns the value stored for `key` in the frontmatter map, or
+    /// std::nullopt if `key` is absent. In Phase 7 the map contains a
+    /// single "raw" entry whose value is the raw frontmatter string.
+    std::optional<QByteArray> frontmatterValue(const QByteArray &key) const;
+
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
     /// Emitted on the main thread each time a parse completes.
