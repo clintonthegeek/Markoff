@@ -97,6 +97,12 @@ private Q_SLOTS:
     /// The final source must end with the typed string in order, with
     /// no character scrambling and no marker bytes.
     void step2_eobEnter_stressType_noScramble();
+
+    /// Step 3: focus-out without typing scrubs the marker. EOB-Enter
+    /// inserts a marker; LiveEditBinding::onFocusLost() (called when
+    /// the delegate loses focus) routes through MarkerScrubber. Source
+    /// must return to "alpha\n".
+    void step3_focusOutWithoutTyping_scrubsMarker();
 };
 
 // ---------- Step 1 ----------
@@ -239,6 +245,45 @@ void TstLiveRenderMarkerFlow::step2_eobEnter_stressType_noScramble()
     QVERIFY(src.startsWith(QStringLiteral("alpha\n\n")));
     // Stronger: the full source equals exactly "alpha\n\n<payload>\n".
     QCOMPARE(src, QStringLiteral("alpha\n\n%1\n").arg(payload));
+}
+
+// ---------- Step 3 ----------
+
+void TstLiveRenderMarkerFlow::step3_focusOutWithoutTyping_scrubsMarker()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+
+    QVERIFY(waitForRows(binding, doc, QByteArrayLiteral("alpha"), 1));
+
+    // EOB-Enter inserts a marker paragraph.
+    QVERIFY(binding.structuralKeyHandler()->tryHandle(
+        Qt::Key_Return, Qt::NoModifier, /*blockIndex=*/0, /*qtPos=*/5,
+        /*selectionEmpty=*/true, QStringLiteral("alpha")));
+    QVERIFY(waitForRowCount(binding, 2));
+
+    // Wire LiveEditBinding to the marker block's text. setText with
+    // marker-only content arms `m_pendingMarkerScrub` (Task 5+8).
+    QTextEdit editor;
+    editor.setPlainText(QString(kMarkerChar));
+    LiveEditBinding eb;
+    eb.setBinding(&binding);
+    eb.setModelIndex(1);
+    eb.setText(QString(kMarkerChar));
+    eb.setRawTextDocument(editor.document());
+
+    // Sanity: source contains the marker pre-focus-out.
+    QVERIFY(QString::fromUtf8(doc.toMarkdownUtf8()).contains(kMarkerChar));
+
+    // Simulate focus moving away. In QML, the delegate's
+    // `onActiveFocusChanged: if (!activeFocus) onFocusLost()` calls
+    // this. Direct invocation here exercises the same code path.
+    eb.onFocusLost();
+
+    // Wait for the scrubber's applyLocalEdit to land in the model.
+    QVERIFY(waitForRowCount(binding, 1));
+    QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), QStringLiteral("alpha\n"));
 }
 
 QTEST_MAIN(TstLiveRenderMarkerFlow)
