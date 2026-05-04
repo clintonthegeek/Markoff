@@ -2,6 +2,7 @@
 #include <markoff-foundation/Selection.h>
 
 #include <markoff-foundation/AnchorJson.h>
+#include <markoff-foundation/BlockId.h>
 
 #include "AnchorConversion.h"
 
@@ -19,9 +20,9 @@ bool Selection::isReversed() const
     // anchor in lexicographic (charValue, replicaId) order — a coarse
     // proxy. Callers that need byte-offset semantics should resolve via the
     // Buffer and compare byte offsets directly.
-    if (active.charValue != anchor.charValue)
-        return active.charValue < anchor.charValue;
-    return active.replicaId < anchor.replicaId;
+    if (active.charValue() != anchor.charValue())
+        return active.charValue() < anchor.charValue();
+    return active.replicaId() < anchor.replicaId();
 }
 
 namespace {
@@ -63,8 +64,8 @@ QJsonObject Selection::toJson() const
 Selection Selection::fromJson(const QJsonObject &obj)
 {
     Selection s;
-    s.anchor = Detail::toTextAnchor(anchorFromJson(obj.value("anchor").toObject()));
-    s.active = Detail::toTextAnchor(anchorFromJson(obj.value("active").toObject()));
+    s.anchor = Detail::toTextAnchor(BlockId{}, anchorFromJson(obj.value("anchor").toObject()));
+    s.active = Detail::toTextAnchor(BlockId{}, anchorFromJson(obj.value("active").toObject()));
     s.kind = kindFromString(obj.value("kind").toString());
     if (s.kind == Kind::Presence) {
         s.participantId = obj.value("participantId").toString();

@@ -23,11 +23,16 @@ private Q_SLOTS:
         QCOMPARE(args.size(), 4);
         const auto anchors = args.at(2).value<QList<BlockAnchor>>();
         QCOMPARE(anchors.size(), 3);
-        // Each anchor's firstByte resolves to the corresponding block's
-        // start byte (0, 3, 6 in the body "a\n\nb\n\nc").
-        QCOMPARE(doc.resolveTextAnchor(anchors[0].firstByte), quint32{0});
-        QCOMPARE(doc.resolveTextAnchor(anchors[1].firstByte), quint32{3});
-        QCOMPARE(doc.resolveTextAnchor(anchors[2].firstByte), quint32{6});
+        // Each anchor is a BlockId; verify by resolving the block's byte range.
+        auto r0 = doc.blockByteRange(anchors[0]);
+        auto r1 = doc.blockByteRange(anchors[1]);
+        auto r2 = doc.blockByteRange(anchors[2]);
+        QVERIFY(r0.has_value());
+        QVERIFY(r1.has_value());
+        QVERIFY(r2.has_value());
+        QCOMPARE(r0->first, quint32{0});
+        QCOMPARE(r1->first, quint32{3});
+        QCOMPARE(r2->first, quint32{6});
     }
 
     void anchors_align_with_parsed_top_level_blocks_for_mixed_kinds() {
@@ -60,11 +65,12 @@ private Q_SLOTS:
         QCOMPARE(anchors.size(), blocks.size());
         QVERIFY(anchors.size() >= 6);
 
-        // Each anchor resolves to its block's start byte in source
-        // coordinates. No frontmatter here, so body bytes == source bytes.
+        // Each anchor's block byte range starts at the block's source byte.
+        // No frontmatter here, so body bytes == source bytes.
         for (qsizetype i = 0; i < blocks.size(); ++i) {
-            const quint32 resolved = doc.resolveTextAnchor(anchors[i].firstByte);
-            QCOMPARE(resolved, static_cast<quint32>(blocks[i].byteStart));
+            const auto rng = doc.blockByteRange(anchors[i]);
+            QVERIFY(rng.has_value());
+            QCOMPARE(rng->first, static_cast<quint32>(blocks[i].byteStart));
         }
     }
 

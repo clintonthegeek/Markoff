@@ -33,7 +33,7 @@ BlockAnchorBundle computeBlockAnchors(const MarkoffDocument &doc,
         bundle.ranges.append(r);
 
         const TextAnchor t = doc.textAnchorAt(r.startByte, /*rightBias*/ false);
-        bundle.anchors.append(BlockAnchor{t});
+        bundle.anchors.append(BlockId::fromRaw(t.charValue()));
     }
     return bundle;
 }

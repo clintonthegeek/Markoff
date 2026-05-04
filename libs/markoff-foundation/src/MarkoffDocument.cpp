@@ -16,9 +16,10 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>(replicaId))
 {
-    // Runtime registration so QList<BlockAnchor> survives any cross-thread
-    // QueuedConnection slot. Q_DECLARE_METATYPE on its own is compile-time
-    // only; queued connections need this.
+    // Runtime registration so QList<BlockId> (= QList<BlockAnchor>) survives
+    // any cross-thread QueuedConnection slot. Q_DECLARE_METATYPE on its own
+    // is compile-time only; queued connections need this.
+    qRegisterMetaType<Markoff::BlockId>("Markoff::BlockId");
     qRegisterMetaType<Markoff::BlockAnchor>("Markoff::BlockAnchor");
     qRegisterMetaType<QList<Markoff::BlockAnchor>>("QList<Markoff::BlockAnchor>");
 
@@ -291,9 +292,18 @@ quint32 MarkoffDocument::resolveAnchor(const CollabText::Crdt::Anchor &a) const
 
 TextAnchor MarkoffDocument::textAnchorAt(quint32 byteOffset, bool rightBias) const
 {
-    using CollabText::Crdt::Bias;
-    return Detail::toTextAnchor(
-        anchorAt(byteOffset, rightBias ? Bias::Right : Bias::Left));
+    // Find the block containing this byte offset
+    BlockId blockId;
+    for (int i = 0; i < d->latestBlockRanges.size(); ++i) {
+        const auto &r = d->latestBlockRanges[i];
+        if (byteOffset >= r.startByte && byteOffset <= r.endByte) {
+            blockId = d->latestBlockAnchors[i];
+            break;
+        }
+    }
+    const auto bias = rightBias ? CollabText::Crdt::Bias::Right : CollabText::Crdt::Bias::Left;
+    const CollabText::Crdt::Anchor a = anchorAt(byteOffset, bias);
+    return Detail::toTextAnchor(blockId, a);
 }
 
 quint32 MarkoffDocument::resolveTextAnchor(const TextAnchor &t) const

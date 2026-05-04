@@ -3,13 +3,14 @@
 
 #include <crdt/Anchor.h>
 #include <markoff-foundation/TextAnchor.h>
+#include <markoff-foundation/BlockId.h>
 
 namespace Markoff::Detail {
 
-/// CollabText::Crdt::Anchor → Markoff::TextAnchor.
-TextAnchor toTextAnchor(const CollabText::Crdt::Anchor &a) noexcept;
+/// CollabText::Crdt::Anchor + BlockId → Markoff::TextAnchor.
+TextAnchor toTextAnchor(BlockId blockId, const CollabText::Crdt::Anchor &a) noexcept;
 
-/// Markoff::TextAnchor → CollabText::Crdt::Anchor.
+/// Markoff::TextAnchor → CollabText::Crdt::Anchor (drops BlockId).
 CollabText::Crdt::Anchor toCrdtAnchor(const TextAnchor &t) noexcept;
 
 }  // namespace Markoff::Detail

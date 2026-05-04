@@ -1,24 +1,38 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-
-#include <QtGlobal>
-
+#include <markoff-foundation/BlockId.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
+#include <cstdint>
+#include <QtGlobal>
 
 namespace Markoff {
 
-/// Opaque view-layer-safe wrapper for a CRDT byte anchor. Same wire-
-/// level identity (replicaId + charValue + bias) as
-/// CollabText::Crdt::Anchor; conversion via foundation-internal
-/// helpers in AnchorConversion.h. Consumers may hold and pass; must
-/// NOT inspect, construct from raw fields, or compare except via
-/// operator==. All translations go through MarkoffDocument APIs.
-struct MARKOFF_FOUNDATION_EXPORT TextAnchor {
-    quint16 replicaId = 0;
-    quint32 charValue = 0;
-    quint8  bias      = 0;   ///< 0 = Left, 1 = Right (matches Crdt::Bias enum order)
+class MARKOFF_FOUNDATION_EXPORT TextAnchor {
+public:
+    TextAnchor() noexcept = default;
+    static TextAnchor make(BlockId b, uint16_t replicaId, uint64_t charValue, bool rightBias) noexcept {
+        TextAnchor a; a.m_block = b; a.m_replicaId = replicaId;
+        a.m_charValue = charValue; a.m_rightBias = rightBias;
+        return a;
+    }
 
-    bool operator==(const TextAnchor &) const = default;
+    bool isNull() const noexcept { return m_block.isNull() && m_charValue == 0; }
+    BlockId block() const noexcept { return m_block; }
+    uint16_t replicaId() const noexcept { return m_replicaId; }
+    uint64_t charValue() const noexcept { return m_charValue; }
+    bool rightBias() const noexcept { return m_rightBias; }
+
+    bool operator==(const TextAnchor &o) const noexcept {
+        return m_block == o.m_block && m_replicaId == o.m_replicaId
+            && m_charValue == o.m_charValue && m_rightBias == o.m_rightBias;
+    }
+    bool operator!=(const TextAnchor &o) const noexcept { return !(*this == o); }
+
+private:
+    BlockId  m_block;
+    uint16_t m_replicaId = 0;
+    uint64_t m_charValue = 0;
+    bool     m_rightBias = false;
 };
 
 }  // namespace Markoff

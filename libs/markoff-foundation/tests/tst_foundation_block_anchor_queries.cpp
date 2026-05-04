@@ -22,9 +22,10 @@ private Q_SLOTS:
         QVERIFY(a0.has_value());
         QVERIFY(a1.has_value());
         QVERIFY(a2.has_value());
-        QCOMPARE(doc.resolveTextAnchor(a0->firstByte), quint32{0});
-        QCOMPARE(doc.resolveTextAnchor(a1->firstByte), quint32{4});
-        QCOMPARE(doc.resolveTextAnchor(a2->firstByte), quint32{8});
+        // Verify each anchor's block starts at the expected byte.
+        QCOMPARE(doc.blockByteRange(*a0).value().first, quint32{0});
+        QCOMPARE(doc.blockByteRange(*a1).value().first, quint32{4});
+        QCOMPARE(doc.blockByteRange(*a2).value().first, quint32{8});
     }
 
     void blockAnchorAt_out_of_range_returns_nullopt() {

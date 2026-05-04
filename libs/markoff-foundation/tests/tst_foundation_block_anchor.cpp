@@ -2,6 +2,7 @@
 #include <QTest>
 
 #include <markoff-foundation/BlockAnchor.h>
+#include <markoff-foundation/TextAnchor.h>
 
 using namespace Markoff;
 
@@ -14,22 +15,22 @@ private Q_SLOTS:
         QVERIFY(a == b);
     }
 
-    void blocks_with_same_first_byte_are_equal() {
-        BlockAnchor a{TextAnchor{1, 42, 0}};
-        BlockAnchor b{TextAnchor{1, 42, 0}};
+    void blocks_with_same_raw_id_are_equal() {
+        BlockAnchor a = BlockId::fromRaw(42);
+        BlockAnchor b = BlockId::fromRaw(42);
         QVERIFY(a == b);
     }
 
-    void blocks_with_different_first_byte_unequal() {
-        BlockAnchor a{TextAnchor{1, 42, 0}};
-        BlockAnchor b{TextAnchor{1, 43, 0}};
+    void blocks_with_different_raw_id_unequal() {
+        BlockAnchor a = BlockId::fromRaw(42);
+        BlockAnchor b = BlockId::fromRaw(43);
         QVERIFY(!(a == b));
     }
 
     void block_is_distinct_type_from_text_anchor() {
         // Static-assert at compile time that BlockAnchor and TextAnchor
-        // are distinct types — protects against the "alias" alternative
-        // we explicitly rejected in the spec §10 decision 1.
+        // are distinct types — BlockAnchor is now a typedef for BlockId,
+        // which is a different type from TextAnchor.
         static_assert(!std::is_same_v<BlockAnchor, TextAnchor>);
     }
 };

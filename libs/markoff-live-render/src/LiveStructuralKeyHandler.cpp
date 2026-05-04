@@ -129,7 +129,7 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     ctx.undoCoalescer     = m_undoCoalescer;
     ctx.blockIndex        = blockIndex;
     ctx.blockAnchor       = rec.blockAnchor;
-    ctx.currentBlockStart = m_document->resolveTextAnchor(rec.blockAnchor.firstByte);
+    ctx.currentBlockStart = blockRangeOpt->first;
     ctx.currentBlockEnd   = ctx.currentBlockStart
                           + static_cast<quint32>(blockText.toUtf8().size());
     ctx.qtPos             = qtPos;

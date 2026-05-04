@@ -9,10 +9,9 @@ using namespace Markoff::View::Qml;
 
 namespace {
 
-/// Construct a BlockAnchor with a unique integer ID (charValue).
-/// replicaId=1, bias=0 (Left) for all test fixtures.
+/// Construct a BlockAnchor (= BlockId) with a unique integer ID.
 Markoff::BlockAnchor anchor(quint32 id) {
-    return Markoff::BlockAnchor{ Markoff::TextAnchor{ 1, id, 0 } };
+    return Markoff::BlockId::fromRaw(id);
 }
 
 BlockKey k(const QString &kind, quint32 anchorId) {

@@ -30,7 +30,7 @@ static BlockRecord makeRec(const QString &kind, const QString &text,
     r.kind = kind;
     r.text = text;
     r.headingLevel = headingLevel;
-    r.blockAnchor.firstByte.charValue = s_anchorCounter++;
+    r.blockAnchor = Markoff::BlockId::fromRaw(s_anchorCounter++);
     return r;
 }
 

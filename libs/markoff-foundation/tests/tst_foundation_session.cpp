@@ -6,6 +6,7 @@
 #include <QString>
 
 #include <crdt/Anchor.h>
+#include <markoff-foundation/BlockId.h>
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Session.h>
 #include <markoff-foundation/SessionParams.h>
@@ -19,7 +20,8 @@ namespace {
 /// retain CRDT construction for clarity at the seed and convert here.
 TextAnchor ta(quint16 r, quint32 cv, CollabText::Crdt::Bias bias)
 {
-    return TextAnchor{r, cv, bias == CollabText::Crdt::Bias::Right ? quint8(1) : quint8(0)};
+    return TextAnchor::make(BlockId{}, r, cv,
+                            bias == CollabText::Crdt::Bias::Right);
 }
 }  // namespace
 
@@ -63,8 +65,8 @@ private Q_SLOTS:
         s->setPrimarySelection(sel);
 
         QCOMPARE(spy.count(), 1);
-        QCOMPARE(s->primarySelection().anchor.charValue, sel.anchor.charValue);
-        QCOMPARE(s->primarySelection().active.charValue, sel.active.charValue);
+        QCOMPARE(s->primarySelection().anchor.charValue(), sel.anchor.charValue());
+        QCOMPARE(s->primarySelection().active.charValue(), sel.active.charValue());
         delete s;
     }
 
@@ -187,7 +189,7 @@ private Q_SLOTS:
             .participantId = QStringLiteral("bob")});
         dst->copyStateFrom(*src);
 
-        QCOMPARE(dst->primarySelection().anchor.charValue, quint32(5));
+        QCOMPARE(dst->primarySelection().anchor.charValue(), quint64(5));
         QCOMPARE(dst->topVisibleAnchor().char_value,        quint32(100));
         QCOMPARE(dst->topVisibleFraction(),                 0.5);
         // Identity is NOT copied.
@@ -210,7 +212,7 @@ private Q_SLOTS:
         const QJsonObject json = s->toJson();
         Session *t = new Session(&doc, SessionParams{});
         t->fromJson(json);
-        QCOMPARE(t->primarySelection().anchor.charValue, quint32(5));
+        QCOMPARE(t->primarySelection().anchor.charValue(), quint64(5));
         QCOMPARE(t->participantId(), QStringLiteral("alice"));
         delete s; delete t;
     }

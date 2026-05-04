@@ -63,10 +63,9 @@ bool LiveStructuralKeyHandler::tryHandle(int key, int /*modifiers*/,
     // Sanity-check: block exists in the most-recent parse.
     if (!m_document->blockByteRange(rowAnchor)) return false;
 
-    // CRDT-current block start byte. resolveTextAnchor tracks the character
-    // through edits, so this is accurate even when blockByteRange is stale
-    // (i.e. when the user has typed since the last parse completed).
-    const quint32 currentBlockStart = m_document->resolveTextAnchor(rowAnchor.firstByte);
+    // CRDT-current block start byte. blockByteRange gives the most-recent
+    // parse position; we already verified it has_value() above.
+    const quint32 currentBlockStart = m_document->blockByteRange(rowAnchor)->first;
     // Current block end = start + UTF-8 byte count of the TextEdit's current text.
     // blockText is passed from QML as textEdit.getText(0, textEdit.length), i.e.
     // the live TextEdit content rather than the stale model role.
