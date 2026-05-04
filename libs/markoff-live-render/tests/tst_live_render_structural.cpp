@@ -467,6 +467,33 @@ private Q_SLOTS:
         QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
     }
 
+    void paragraphEnter_onMarkerOnlyBlock_isNoOp() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent(QStringLiteral("alpha\n\n%1\n").arg(kMarkerChar).toUtf8(),
+                         Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+
+        auto *handler = binding.structuralKeyHandler();
+        QVERIFY(handler);
+
+        const QString preEditSrc = QString::fromUtf8(doc.toMarkdownUtf8());
+        const quint64 preEditSeq = doc.editSequence();
+
+        const bool handled = handler->tryHandle(
+            Qt::Key_Return, /*mods=*/Qt::NoModifier,
+            /*blockIndex=*/1,
+            /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            /*blockText=*/QString(kMarkerChar));
+        QVERIFY(handled);                          // keystroke consumed
+        QCOMPARE(doc.editSequence(), preEditSeq);  // no source edit
+        QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), preEditSrc);
+    }
+
 };
 
 QTEST_MAIN(TstLiveRenderStructural)

@@ -8,6 +8,7 @@
 #include <markoff/live-render/LiveCursorState.h>
 #include <markoff/live-render/UndoCoalescer.h>
 #include <markoff/live-render/Marker.h>
+#include <markoff/live-render/MarkerScrubber.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
@@ -100,6 +101,13 @@ void LiveStructuralKeyHandler::registerBuiltins()
 
     // ---------- paragraph: Enter (all positions, Shift-aware) ----------
     auto paragraphEnter = [](const Ctx &c) -> HR {
+        // Marker design §4.5: stacked Enter on a marker-only block is a
+        // no-op. CommonMark collapses consecutive blank lines anyway;
+        // visual "gap" can't survive a save/load cycle.
+        if (Markoff::LiveRender::MarkerScrubber::isMarkerOnly(c.blockText)) {
+            return HR::Handled;
+        }
+
         const bool isShift = (c.modifiers & Qt::ShiftModifier) != 0;
 
         if (isShift) {
