@@ -19,8 +19,6 @@ class LiveBlockModel;
 class LiveCursorState;
 class BlockKindRegistry;
 class UndoCoalescer;
-class LiveHoleLayer;
-class LiveProxyBlockModel;
 
 /// Single dispatcher for structural key events (Enter, Backspace-edge,
 /// Delete-edge, Shift-Enter; future Tab/Shift-Tab in R7). Looks up the
@@ -44,11 +42,8 @@ public:
         LiveBlockModel           *model;
         LiveCursorState          *cursorState;
         UndoCoalescer            *undoCoalescer;
-        LiveHoleLayer            *holeLayer;
-        LiveProxyBlockModel      *proxyModel;
 
-        int                       blockIndex;       ///< inner-model row (for byte arithmetic)
-        int                       proxyBlockIndex;  ///< proxy-model row (for cursor delivery)
+        int                       blockIndex;       ///< model row (used for both byte arithmetic and cursor delivery)
         Markoff::BlockAnchor      blockAnchor;
         quint32                   currentBlockStart;
         quint32                   currentBlockEnd;
@@ -66,8 +61,6 @@ public:
                              LiveCursorState          *cursorState,
                              const BlockKindRegistry  *registry,
                              UndoCoalescer            *undoCoalescer,
-                             LiveHoleLayer            *holeLayer,
-                             LiveProxyBlockModel      *proxyModel,
                              QObject                  *parent = nullptr);
 
     /// Register a kind-specific handler for `key` (a `Qt::Key_*` value).
@@ -85,27 +78,11 @@ public:
 private:
     void registerBuiltins();
 
-    /// Dispatch all structural keys for a hole row: Enter
-    /// (commit+new-hole / split / empty-noop), Esc/Backspace/Delete
-    /// abandon paths. Called from tryHandle when
-    /// proxyRowIsHole(blockIndex) is true.
-    HandleResult handleHoleRow(quint64 holeId, int key, int modifiers,
-                               int qtPos);
-
-    /// After abandoning a hole at `holeProxyRow`, route focus to the
-    /// nearest live (non-hole) neighbor. `preferNext == false` →
-    /// previous neighbor (Esc / Backspace); `preferNext == true` →
-    /// next neighbor (Delete). Falls back to the other direction; sets
-    /// NoCursor only if the document has no inner rows at all.
-    void routeFocusAfterAbandon(int holeProxyRow, bool preferNext);
-
     QPointer<Markoff::MarkoffDocument> m_document;
     LiveBlockModel                    *m_model;
     LiveCursorState                   *m_cursorState;
     const BlockKindRegistry           *m_registry;
     UndoCoalescer                     *m_undoCoalescer;
-    LiveHoleLayer                     *m_holeLayer;
-    LiveProxyBlockModel               *m_proxyModel;
 
     // Outer key: kind ("paragraph", etc.). Inner key: Qt::Key_*.
     QHash<QString, QHash<int, HandlerFn>> m_handlers;

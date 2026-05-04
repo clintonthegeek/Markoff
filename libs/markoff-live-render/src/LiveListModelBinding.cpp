@@ -106,7 +106,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         Q_EMIT proxyModelChanged();
         d->structuralKeys = new LiveStructuralKeyHandler(
             d->document, d->model, d->cursorState, &d->registry,
-            d->undoCoalescer, d->holeLayer, d->proxyModel, this);
+            d->undoCoalescer, this);
     } else {
         d->selectionView->setDocument(nullptr);
         d->selectionView->setSession(nullptr);

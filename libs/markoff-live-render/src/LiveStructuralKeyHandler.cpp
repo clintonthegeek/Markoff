@@ -7,8 +7,7 @@
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveCursorState.h>
 #include <markoff/live-render/UndoCoalescer.h>
-#include <markoff/live-render/LiveHoleLayer.h>
-#include <markoff/live-render/LiveProxyBlockModel.h>
+#include <markoff/live-render/Marker.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
@@ -25,8 +24,6 @@ LiveStructuralKeyHandler::LiveStructuralKeyHandler(
     LiveCursorState          *cursorState,
     const BlockKindRegistry  *registry,
     UndoCoalescer            *undoCoalescer,
-    LiveHoleLayer            *holeLayer,
-    LiveProxyBlockModel      *proxyModel,
     QObject                  *parent)
     : QObject(parent)
     , m_document(document)
@@ -34,8 +31,6 @@ LiveStructuralKeyHandler::LiveStructuralKeyHandler(
     , m_cursorState(cursorState)
     , m_registry(registry)
     , m_undoCoalescer(undoCoalescer)
-    , m_holeLayer(holeLayer)
-    , m_proxyModel(proxyModel)
 {
     registerBuiltins();
 }
@@ -54,7 +49,7 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
 {
     qInfo().noquote() << "[dogfood] StructHandler: tryHandle key=" << key
                       << "mod=" << modifiers
-                      << "proxyBlockIndex=" << blockIndex
+                      << "blockIndex=" << blockIndex
                       << "qtPos=" << qtPos
                       << "blockTextLen=" << blockText.length()
                       << "selEmpty=" << selectionEmpty;
@@ -66,27 +61,9 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
         return false;
     }
 
-    // Front-load hole-row dispatch before any inner-model lookup.
-    // blockIndex here is a PROXY row index (QML binds to proxyModel since
-    // Task 10). If the proxy row is a hole, delegate to handleHoleRowEnter.
-    if (m_proxyModel && m_proxyModel->proxyRowIsHole(blockIndex)) {
-        const quint64 holeId = m_proxyModel->holeAtProxyRow(blockIndex);
-        return handleHoleRow(holeId, key, modifiers, qtPos) == HandleResult::Handled;
-    }
+    if (blockIndex < 0 || blockIndex >= m_model->rowCount()) return false;
 
-    // Translate proxy row → inner row for anchor-side handlers.
-    // At zero holes, innerRowForProxy(N) == N, so behavior is unchanged.
-    // With holes present the proxy and inner indices diverge; we need the
-    // inner row to look up BlockRecord and feed requestTextCaretAtRow.
-    // NOTE: existing anchor-side handlers' requestTextCaretAtRow calls take
-    // inner-row indices — coherent at zero holes; row-space rework deferred
-    // to Task 14+ once holes coexist with inner-row edits.
-    const int innerRow = m_proxyModel
-                           ? m_proxyModel->innerRowForProxy(blockIndex)
-                           : blockIndex;
-    if (innerRow < 0 || innerRow >= m_model->rowCount()) return false;
-
-    const BlockRecord &rec = m_model->recordAt(innerRow);
+    const BlockRecord &rec = m_model->recordAt(blockIndex);
     const auto *desc = m_registry->find(rec.kind);
     if (!desc) return false;
     if (!desc->consumedStructuralKeys.contains(key)) return false;
@@ -105,13 +82,7 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     ctx.model             = m_model;
     ctx.cursorState       = m_cursorState;
     ctx.undoCoalescer     = m_undoCoalescer;
-    ctx.holeLayer         = m_holeLayer;
-    ctx.proxyModel        = m_proxyModel;
-    // blockIndex (inner) drives byte arithmetic against the inner model;
-    // proxyBlockIndex drives cursor delivery via LiveCursorState (which now
-    // listens on the proxy). At zero holes the two are equal.
-    ctx.blockIndex        = innerRow;
-    ctx.proxyBlockIndex   = blockIndex;
+    ctx.blockIndex        = blockIndex;
     ctx.blockAnchor       = rec.blockAnchor;
     ctx.currentBlockStart = m_document->resolveTextAnchor(rec.blockAnchor.firstByte);
     ctx.currentBlockEnd   = ctx.currentBlockStart
@@ -121,172 +92,6 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     ctx.blockText         = blockText;
 
     return keyIt.value()(ctx) == HandleResult::Handled;
-}
-
-LiveStructuralKeyHandler::HandleResult
-LiveStructuralKeyHandler::handleHoleRow(quint64 holeId, int key,
-                                        int modifiers, int qtPos)
-{
-    if (!m_holeLayer || !m_proxyModel) return HandleResult::NotHandled;
-    if (!m_holeLayer->exists(holeId)) return HandleResult::NotHandled;
-
-    const QString buf = m_holeLayer->bufferText(holeId);
-
-    // ---- Enter (Task 12 logic, unchanged) ----
-    if ((key == Qt::Key_Return || key == Qt::Key_Enter)
-        && (modifiers & Qt::ShiftModifier) == 0) {
-
-        // Empty-buffer Enter — no-op per stacked-Enter rule (spec §3.3).
-        // Consume the key so QML TextEdit doesn't insert a literal newline
-        // into the buffer, but make no source or layer change.
-        if (buf.isEmpty()) return HandleResult::Handled;
-
-        // Resolve the reify byte BEFORE commit; after commit the holeId is gone.
-        const quint32 reifyByte =
-            m_document->resolveTextAnchor(m_holeLayer->reifyAnchor(holeId));
-
-        if (qtPos >= buf.length()) {
-            // End-of-buffer: commit the whole buffer, then open a fresh hole
-            // positioned right after the just-committed paragraph.
-            m_holeLayer->commitBlockHole(holeId);
-            // After commit, source contains "\n\n" + buf inserted at reifyByte.
-            // The end of the just-committed paragraph is therefore at:
-            const quint32 newReifyByte = reifyByte
-                + 2  // for "\n\n"
-                + static_cast<quint32>(buf.toUtf8().size());
-            Markoff::TextAnchor newAnchor =
-                m_document->textAnchorAt(newReifyByte, /*rightBias=*/false);
-            const quint64 newId = m_holeLayer->createBlockHole(
-                HoleKind::Paragraph, newAnchor);
-
-            TextCaret tc;
-            tc.block            = BlockId{HoleBlockId{newId}};
-            tc.cachedByteOffset = 0;
-            m_cursorState->request(Cursor{tc});
-
-            if (m_undoCoalescer) m_undoCoalescer->recordStructural();
-            return HandleResult::Handled;
-        }
-
-        // Mid-buffer split: set prefix, commit, create new hole with suffix.
-        const QString prefix = buf.left(qtPos);
-        const QString suffix = buf.mid(qtPos);
-
-        m_holeLayer->setBlockHoleBuffer(holeId, prefix);
-        m_holeLayer->commitBlockHole(holeId);
-
-        const quint32 newReifyByte = reifyByte
-            + 2  // for "\n\n"
-            + static_cast<quint32>(prefix.toUtf8().size());
-        Markoff::TextAnchor newAnchor =
-            m_document->textAnchorAt(newReifyByte, /*rightBias=*/false);
-        const quint64 newId = m_holeLayer->createBlockHole(
-            HoleKind::Paragraph, newAnchor);
-        m_holeLayer->setBlockHoleBuffer(newId, suffix);
-
-        TextCaret tc;
-        tc.block            = BlockId{HoleBlockId{newId}};
-        tc.cachedByteOffset = 0;  // cursor at start of suffix
-        m_cursorState->request(Cursor{tc});
-
-        if (m_undoCoalescer) m_undoCoalescer->recordStructural();
-        return HandleResult::Handled;
-    }
-
-    // ---- Esc: abandon, focus previous neighbor ----
-    if (key == Qt::Key_Escape) {
-        const int holeProxyRow = m_proxyModel->proxyRowForHole(holeId);
-        m_holeLayer->abandonBlockHole(holeId);
-        routeFocusAfterAbandon(holeProxyRow, /*preferNext=*/false);
-        return HandleResult::Handled;
-    }
-
-    // ---- Backspace at qtPos 0 ----
-    if (key == Qt::Key_Backspace && qtPos == 0) {
-        if (buf.isEmpty()) {
-            const int holeProxyRow = m_proxyModel->proxyRowForHole(holeId);
-            m_holeLayer->abandonBlockHole(holeId);
-            routeFocusAfterAbandon(holeProxyRow, /*preferNext=*/false);
-            return HandleResult::Handled;
-        }
-        // Non-empty buffer at qtPos 0: passthrough (no char to delete).
-        return HandleResult::NotHandled;
-    }
-
-    // ---- Delete at end of empty buffer ----
-    if (key == Qt::Key_Delete
-        && buf.isEmpty()
-        && qtPos == 0) {
-        const int holeProxyRow = m_proxyModel->proxyRowForHole(holeId);
-        m_holeLayer->abandonBlockHole(holeId);
-        routeFocusAfterAbandon(holeProxyRow, /*preferNext=*/true);
-        return HandleResult::Handled;
-    }
-
-    return HandleResult::NotHandled;
-}
-
-void LiveStructuralKeyHandler::routeFocusAfterAbandon(int holeProxyRow,
-                                                      bool preferNext)
-{
-    // The hole has been abandoned; proxy row count has decreased by 1.
-    // The hole's old position is now occupied by what was after it.
-    //
-    // preferNext == false (Esc/Backspace): target the row just before the
-    //   hole's old position → holeProxyRow - 1 (end-of-row qtPos).
-    // preferNext == true (Delete): target the row that shifted up into
-    //   the hole's old slot → holeProxyRow (qtPos 0).
-
-    const int proxyCount = m_proxyModel->rowCount();
-
-    auto findInnerRow = [&](int proxyRow, int direction) -> int {
-        while (proxyRow >= 0 && proxyRow < proxyCount) {
-            if (!m_proxyModel->proxyRowIsHole(proxyRow)) return proxyRow;
-            proxyRow += direction;
-        }
-        return -1;
-    };
-
-    int targetProxy = -1;
-    int qtPos       = 0;
-
-    if (preferNext) {
-        // Try the row that stepped into the hole's old slot.
-        targetProxy = findInnerRow(holeProxyRow, +1);
-        qtPos = 0;
-        if (targetProxy < 0) {
-            // Fallback: previous neighbor, end-of-row.
-            targetProxy = findInnerRow(holeProxyRow - 1, -1);
-            if (targetProxy >= 0) {
-                const int innerRow = m_proxyModel->innerRowForProxy(targetProxy);
-                if (innerRow >= 0 && innerRow < m_model->rowCount())
-                    qtPos = m_model->recordAt(innerRow).text.length();
-            }
-        }
-    } else {
-        // Try the row just before the hole's old position.
-        targetProxy = findInnerRow(holeProxyRow - 1, -1);
-        if (targetProxy >= 0) {
-            const int innerRow = m_proxyModel->innerRowForProxy(targetProxy);
-            if (innerRow >= 0 && innerRow < m_model->rowCount())
-                qtPos = m_model->recordAt(innerRow).text.length();
-        } else {
-            // Fallback: next neighbor.
-            targetProxy = findInnerRow(holeProxyRow, +1);
-            qtPos = 0;
-        }
-    }
-
-    if (targetProxy < 0) {
-        // F4 single-hole-doc edge case: no inner rows at all.
-        m_cursorState->clear();
-        return;
-    }
-
-    const int innerRow = m_proxyModel->innerRowForProxy(targetProxy);
-    if (innerRow < 0) { m_cursorState->clear(); return; }
-    // requestTextCaretAtRow indexes the proxy now; pass targetProxy directly.
-    m_cursorState->requestTextCaretAtRow(targetProxy, qtPos);
 }
 
 void LiveStructuralKeyHandler::registerBuiltins()
@@ -308,7 +113,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             ed.newText  = QByteArrayLiteral("\n");
             c.document->applyLocalEdit({ ed });
             c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-            c.cursorState->requestTextCaretAtRow(c.proxyBlockIndex, c.qtPos + 1);
+            c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 1);
             if (c.undoCoalescer) c.undoCoalescer->recordStructural();
             return HR::Handled;
         }
@@ -318,8 +123,8 @@ void LiveStructuralKeyHandler::registerBuiltins()
 
         if (!atStart && !atEnd) {
             // Mid-block split — applyLocalEdit("\n\n") creates a NEW row at
-            // proxyBlockIndex+1. Use requestTextCaretAtNewRow (pure-pending)
-            // — requestTextCaretAtRow would resolve against whatever block
+            // blockIndex+1. Use requestTextCaretAtNewRow (pure-pending) —
+            // requestTextCaretAtRow would resolve against whatever block
             // currently sits at that index (the block about to be shifted
             // down by the insertion), landing the cursor on the wrong row.
             const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
@@ -331,28 +136,35 @@ void LiveStructuralKeyHandler::registerBuiltins()
             ed.newText  = QByteArrayLiteral("\n\n");
             c.document->applyLocalEdit({ ed });
             c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-            c.cursorState->requestTextCaretAtNewRow(c.proxyBlockIndex + 1, 0);
+            c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
             if (c.undoCoalescer) c.undoCoalescer->recordStructural();
             return HR::Handled;
         }
 
-        // EOB or start-of-block: create hole instead of source edit (R5.5 F5).
-        if (!c.holeLayer || !c.proxyModel) return HR::NotHandled;
+        // EOB or start-of-block: insert marker paragraph and let the
+        // existing parser-driven row pipeline deliver the new row.
+        // Spec §4.1 / §4.2 (R5.5 marker-paragraph design).
+        //
+        // Byte layout depends on which side the new (empty marker) block
+        // sits relative to the existing block:
+        //   atEnd:   "<existing>\n\n<marker>"  → newText = "\n\n" + marker
+        //   atStart: "<marker>\n\n<existing>"  → newText = marker + "\n\n"
+        const quint32 byteOffset = atStart ? c.currentBlockStart
+                                            : c.currentBlockEnd;
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = byteOffset;
+        ed.oldEnd   = byteOffset;
+        ed.newText  = atStart
+                        ? (QByteArray(kMarkerUtf8) + QByteArrayLiteral("\n\n"))
+                        : (QByteArrayLiteral("\n\n") + QByteArray(kMarkerUtf8));
+        c.document->applyLocalEdit({ ed });
+        c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
 
-        const quint32 reifyByte = atStart ? c.currentBlockStart : c.currentBlockEnd;
-        qInfo().noquote() << "[dogfood] StructHandler: paragraphEnter EOB-or-start"
-                          << "(atStart=" << atStart << "atEnd=" << atEnd
-                          << "innerRow=" << c.blockIndex
-                          << "proxyRow=" << c.proxyBlockIndex
-                          << "reifyByte=" << reifyByte << ")";
-        Markoff::TextAnchor anchor = c.document->textAnchorAt(reifyByte, /*rightBias=*/false);
-        const quint64 holeId = c.holeLayer->createBlockHole(HoleKind::Paragraph, anchor);
-
-        // Place caret in the hole row at byte offset 0.
-        TextCaret tc;
-        tc.block             = BlockId{HoleBlockId{holeId}};
-        tc.cachedByteOffset  = 0;
-        c.cursorState->request(Cursor{tc});
+        // Cursor goes to qtPos 0 of the new (marker) row. For start-of-block
+        // the marker takes index `blockIndex` (the existing block shifts down);
+        // for EOB the marker is appended at `blockIndex + 1`.
+        const int newRow = atStart ? c.blockIndex : (c.blockIndex + 1);
+        c.cursorState->requestTextCaretAtNewRow(newRow, /*qtPos=*/0);
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;
@@ -378,7 +190,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         // text length (the merge point). Compute the qtPos at edit time
         // since the previous block's text is still current in the model.
         const int prevQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
-        c.cursorState->requestTextCaretAtRow(c.proxyBlockIndex - 1, prevQtPos);
+        c.cursorState->requestTextCaretAtRow(c.blockIndex - 1, prevQtPos);
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;
@@ -402,7 +214,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         // Cursor stays at end of the (now-merged) block — same row, same qtPos.
         // Use requestTextCaretAtRow so it survives the parse-back's row
         // reshuffle even if the block changes identity.
-        c.cursorState->requestTextCaretAtRow(c.proxyBlockIndex, c.qtPos);
+        c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos);
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;
