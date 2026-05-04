@@ -17,6 +17,7 @@
 #include <crdt/Operations.h>
 
 #include <markoff-foundation/BlockAnchor.h>
+#include <markoff-foundation/BlockAttrsMap.h>
 #include <markoff-foundation/BlockEdit.h>
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/CrdtProxies.h>
@@ -27,6 +28,7 @@
 #include <markoff-foundation/MarkoffFoundationExport.h>
 #include <markoff-foundation/RenderPhases.h>
 #include <markoff-foundation/SessionParams.h>
+#include <markoff-foundation/UndoLog.h>
 
 namespace Markoff {
 
@@ -202,6 +204,32 @@ public:
     /// Test helper: insert a block with the given kind and content directly
     /// into D2 internals. Callable from test code; do not call in production.
     Markoff::BlockId testInsertBlock(Markoff::BlockKind kind, const QByteArray &content);
+
+    // ===== D2 internal helpers (Cmd layer; do not call from view code) =====
+
+    /// Returns the D2 UndoLog for transaction grouping and coalescing.
+    Markoff::UndoLog &d2UndoLog() noexcept;
+
+    /// Apply a buffer edit within an existing transaction.
+    /// Same semantics as applyBlockEdit() but uses caller's transaction.
+    void d2ApplyBufferEdit(BlockId block, uint32_t offset, uint32_t removedBytes,
+                           const QByteArray &insert, UndoLog::Transaction &t);
+
+    /// Insert a new block after `afterBlock` (null BlockId = insert at start).
+    /// Creates a Buffer for the new block; registers IdList + KindTag ops with t.
+    /// Returns the new BlockId.
+    BlockId d2InsertBlock(BlockId afterBlock, BlockKind kind, UndoLog::Transaction &t);
+
+    /// Remove `block` from the IdList and KindTagMap. Buffer retained for GC (Phase 9).
+    /// Registers IdList + KindTag ops with t.
+    void d2RemoveBlock(BlockId block, UndoLog::Transaction &t);
+
+    /// Update the kind of `block`. Registers KindTag op with t.
+    void d2SetBlockKind(BlockId block, BlockKind newKind, UndoLog::Transaction &t);
+
+    /// Set a block attribute. Registers BlockAttrs op with t.
+    void d2SetBlockAttr(BlockId block, const QByteArray &attrName,
+                        const AttrValue &value, UndoLog::Transaction &t);
 
     // ===== D2 CRDT proxies (fine-grained change notifications) =====
     /// Returns the BufferProxy for the given block, or nullptr if not found.

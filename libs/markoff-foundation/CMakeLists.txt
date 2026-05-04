@@ -54,6 +54,7 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/Cmd/InlineFormat.h
     include/markoff-foundation/Cmd/Block.h
     include/markoff-foundation/Cmd/Insert.h
+    include/markoff-foundation/Cmd/D2.h
     src/MarkoffDocumentPrivate.h
     src/SessionPrivate.h
     src/ParsePool.h
@@ -102,6 +103,7 @@ add_library(markoff_foundation STATIC
     src/Cmd/InlineFormat.cpp
     src/Cmd/Block.cpp
     src/Cmd/Insert.cpp
+    src/Cmd/D2.cpp
 )
 
 target_include_directories(markoff_foundation

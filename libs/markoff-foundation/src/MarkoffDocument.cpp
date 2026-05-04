@@ -638,6 +638,86 @@ BlockId MarkoffDocument::testInsertBlock(BlockKind kind, const QByteArray &conte
 }
 
 // ============================================================================
+// D2: internal helpers (Cmd layer)
+// ============================================================================
+
+UndoLog &MarkoffDocument::d2UndoLog() noexcept { return d->undoLog; }
+
+void MarkoffDocument::d2ApplyBufferEdit(BlockId block, uint32_t offset,
+                                         uint32_t removedBytes,
+                                         const QByteArray &insert,
+                                         UndoLog::Transaction &t)
+{
+    auto it = d->blockBuffers.find(block);
+    if (it == d->blockBuffers.end()) return;
+    auto op = it->second->apply_local_edit(
+        {{offset, offset + removedBytes}},
+        {insert.toStdString()});
+    auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
+    t.registerOp(CrdtTarget::buffer(block), lamportToOpId(ts));
+    ++d->blockEditSequences[block];
+    scheduleD2Changed();
+}
+
+BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
+                                        UndoLog::Transaction &t)
+{
+    static std::atomic<uint64_t> s_nextId{0x2000000};
+    uint64_t raw = s_nextId.fetch_add(1);
+    BlockId newId = BlockId::fromRaw(raw);
+
+    CollabText::Crdt::Anchor after = afterBlock.isNull()
+        ? CollabText::Crdt::Anchor::min()
+        : d->idList.anchor_of(afterBlock.raw(), CollabText::Crdt::Bias::Right);
+
+    auto idOp = d->idList.insert_after(after, raw);
+    auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
+    t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
+
+    d->blockBuffers.emplace(newId, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
+    d->bufferProxies.insert(newId, new BufferProxy(newId, this));
+
+    OpId kindOpId = d->kindTagMap.setWithNextStamp(newId, kind);
+    t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+
+    ++d->structuralEditSequence;
+    scheduleD2Changed();
+    return newId;
+}
+
+void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
+{
+    CollabText::Crdt::Anchor anchor = d->idList.anchor_of(block.raw(), CollabText::Crdt::Bias::Left);
+    auto idOp = d->idList.remove_at(anchor);
+    auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
+    t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
+
+    OpId kindOpId = d->kindTagMap.removeWithNextStamp(block);
+    t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+
+    ++d->structuralEditSequence;
+    scheduleD2Changed();
+}
+
+void MarkoffDocument::d2SetBlockKind(BlockId block, BlockKind newKind,
+                                      UndoLog::Transaction &t)
+{
+    OpId opId = d->kindTagMap.setWithNextStamp(block, newKind);
+    t.registerOp(CrdtTarget::kindTagMap(), opId);
+    scheduleD2Changed();
+}
+
+void MarkoffDocument::d2SetBlockAttr(BlockId block, const QByteArray &attrName,
+                                      const AttrValue &value,
+                                      UndoLog::Transaction &t)
+{
+    BlockAttrKey key{block, attrName};
+    OpId opId = d->blockAttrsMap.setWithNextStamp(key, value);
+    t.registerOp(CrdtTarget::blockAttrsMap(), opId);
+    scheduleD2Changed();
+}
+
+// ============================================================================
 // D2: CRDT proxy accessors
 // ============================================================================
 
