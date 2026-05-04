@@ -19,6 +19,7 @@
 
 // Forward declarations for the test-only friend grants below.
 class TstLiveRenderParagraphEdit;
+class TstLiveRenderMarkerFlow;
 
 namespace Markoff::LiveRender {
 
@@ -103,6 +104,7 @@ private:
     // QTextEdit-backed document and wire it via this seam. Production
     // code uses setTextDocument(QQuickTextDocument*) instead.
     friend class ::TstLiveRenderParagraphEdit;
+    friend class ::TstLiveRenderMarkerFlow;
 
     /// Test-only seam: wire directly to a QTextDocument without going
     /// through QQuickTextDocument. Used by unit tests that cannot
