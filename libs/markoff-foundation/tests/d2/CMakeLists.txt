@@ -16,3 +16,19 @@ add_test(NAME tst_block_types COMMAND tst_block_types)
 qt_add_executable(tst_undo_log tst_undo_log.cpp)
 target_link_libraries(tst_undo_log PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_undo_log COMMAND tst_undo_log)
+
+qt_add_executable(tst_d2_apply_block_edit tst_d2_apply_block_edit.cpp)
+target_link_libraries(tst_d2_apply_block_edit PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_apply_block_edit COMMAND tst_d2_apply_block_edit)
+
+qt_add_executable(tst_d2_apply_structural tst_d2_apply_structural.cpp)
+target_link_libraries(tst_d2_apply_structural PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_apply_structural COMMAND tst_d2_apply_structural)
+
+qt_add_executable(tst_d2_undo tst_d2_undo.cpp)
+target_link_libraries(tst_d2_undo PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_undo COMMAND tst_d2_undo)
+
+qt_add_executable(tst_d2_signals tst_d2_signals.cpp)
+target_link_libraries(tst_d2_signals PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_signals COMMAND tst_d2_signals)

@@ -1,14 +1,34 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Session.h>
+#include <markoff-foundation/BlockEdit.h>
+#include <markoff-foundation/BlockKind.h>
+#include <markoff-foundation/StructuralOp.h>
+#include <markoff-foundation/UndoLog.h>
 
 #include <markoff-parser/Document.h>
 
 #include <algorithm>
+#include <atomic>
+
+#include <QTimer>
+
+#include <crdt/IdList.h>
+#include <crdt/IdListOperations.h>
 
 #include "MarkoffDocumentPrivate.h"
 #include "AnchorConversion.h"
 #include "BlockAnchorComputation.h"
+
+namespace {
+
+// Convert a CollabText::Crdt::Lamport timestamp to the UndoLog OpId encoding.
+static Markoff::OpId lamportToOpId(CollabText::Crdt::Lamport ts) noexcept {
+    return (static_cast<uint64_t>(ts.replica_id) << 48)
+         | (static_cast<uint64_t>(ts.value) & 0x0000FFFFFFFFFFFFull);
+}
+
+}  // anonymous namespace
 
 namespace Markoff {
 
@@ -22,6 +42,38 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     qRegisterMetaType<Markoff::BlockId>("Markoff::BlockId");
     qRegisterMetaType<Markoff::BlockAnchor>("Markoff::BlockAnchor");
     qRegisterMetaType<QList<Markoff::BlockAnchor>>("QList<Markoff::BlockAnchor>");
+
+    // ── D2: wire UndoLog dispatcher ──────────────────────────────────────
+    d->undoLog.setDispatcher([this](const CrdtTarget &target, OpId opId, bool forward) {
+        std::visit([&](const auto &t) {
+            using T = std::decay_t<decltype(t)>;
+            if constexpr (std::is_same_v<T, CrdtTarget::BufferT>) {
+                auto it = d->blockBuffers.find(t.blockId);
+                if (it == d->blockBuffers.end()) return;
+                if (forward) it->second->redo();
+                else         it->second->undo();
+            } else if constexpr (std::is_same_v<T, CrdtTarget::IdListT>) {
+                if (forward) d->idList.redo();
+                else         d->idList.undo();
+            } else if constexpr (std::is_same_v<T, CrdtTarget::KindTagMapT>) {
+                if (forward) d->kindTagMap.redo();
+                else         d->kindTagMap.undo();
+            } else if constexpr (std::is_same_v<T, CrdtTarget::BlockAttrsMapT>) {
+                if (forward) d->blockAttrsMap.redo();
+                else         d->blockAttrsMap.undo();
+            } else if constexpr (std::is_same_v<T, CrdtTarget::FrontmatterMapT>) {
+                if (forward) d->frontmatterMap.redo();
+                else         d->frontmatterMap.undo();
+            } else if constexpr (std::is_same_v<T, CrdtTarget::LinkRefMapT>) {
+                if (forward) d->linkRefMap.redo();
+                else         d->linkRefMap.undo();
+            } else if constexpr (std::is_same_v<T, CrdtTarget::FootnoteDefMapT>) {
+                if (forward) d->footnoteDefMap.redo();
+                else         d->footnoteDefMap.undo();
+            }
+            (void)opId;  // opId used for CausalLwwMap-specific undo; IdList/Buffer use stack-based undo
+        }, target.kind);
+    });
 
     QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p, quint64 inputEditSeq) {
@@ -404,6 +456,159 @@ qsizetype MarkoffDocument::compact(const CollabText::Crdt::Global &watermark)
 void MarkoffDocument::setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept
 {
     d->parsePool.setRenderPhaseTaps(taps);
+}
+
+// ============================================================================
+// D2: scheduleD2Changed — debounced d2DocumentChanged signal
+// ============================================================================
+
+void MarkoffDocument::scheduleD2Changed()
+{
+    if (!d->d2ChangePending) {
+        d->d2ChangePending = true;
+        QTimer::singleShot(0, this, [this]() {
+            d->d2ChangePending = false;
+            Q_EMIT d2DocumentChanged();
+        });
+    }
+}
+
+// ============================================================================
+// D2: applyBlockEdit
+// ============================================================================
+
+void MarkoffDocument::applyBlockEdit(const BlockEdit &edit)
+{
+    auto it = d->blockBuffers.find(edit.blockId);
+    if (it == d->blockBuffers.end()) return;  // unknown block; defensive
+
+    UndoLog::Transaction t(d->undoLog);
+    auto op = it->second->apply_local_edit(
+        {{edit.withinBlockByteOffset, edit.withinBlockByteOffset + edit.removedBytes}},
+        {edit.insertedUtf8.toStdString()});
+    auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
+    t.registerOp(CrdtTarget::buffer(edit.blockId), lamportToOpId(ts));
+
+    ++d->blockEditSequences[edit.blockId];
+    scheduleD2Changed();
+}
+
+// ============================================================================
+// D2: applyStructural
+// ============================================================================
+
+void MarkoffDocument::applyStructural(const StructuralOp &op)
+{
+    UndoLog::Transaction t(d->undoLog);
+    std::visit([&](auto &&payload) {
+        using T = std::decay_t<decltype(payload)>;
+        if constexpr (std::is_same_v<T, StructuralOp::InsertEntry>) {
+            // Find after-anchor in IdList
+            CollabText::Crdt::Anchor after = payload.afterBlockId.isNull()
+                ? CollabText::Crdt::Anchor::min()
+                : d->idList.anchor_of(payload.afterBlockId.raw(), CollabText::Crdt::Bias::Right);
+            // Mint a new block ID
+            static std::atomic<uint64_t> s_nextStructId{0x1000000};
+            uint64_t raw = s_nextStructId.fetch_add(1);
+            CollabText::Crdt::IdListOperation idOp = d->idList.insert_after(after, raw);
+            BlockId newBlock = BlockId::fromRaw(raw);
+            auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
+            t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
+            // Create buffer
+            d->blockBuffers.emplace(newBlock, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
+            // Set kind
+            OpId kindOpId = d->kindTagMap.setWithNextStamp(newBlock, payload.kind);
+            t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+        } else if constexpr (std::is_same_v<T, StructuralOp::RemoveEntry>) {
+            CollabText::Crdt::Anchor anchor = d->idList.anchor_of(payload.blockId.raw(), CollabText::Crdt::Bias::Left);
+            CollabText::Crdt::IdListOperation idOp = d->idList.remove_at(anchor);
+            auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
+            t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
+            OpId kindOpId = d->kindTagMap.removeWithNextStamp(payload.blockId);
+            t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+            // Buffer retained for GC (Phase 9)
+        } else if constexpr (std::is_same_v<T, StructuralOp::ChangeKind>) {
+            OpId kindOpId = d->kindTagMap.setWithNextStamp(payload.blockId, payload.newKind);
+            t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+        }
+    }, op.payload);
+
+    scheduleD2Changed();
+}
+
+// ============================================================================
+// D2: undo/redo/undoForBlock
+// ============================================================================
+
+void MarkoffDocument::undoD2() { d->undoLog.undo(); }
+void MarkoffDocument::redoD2() { d->undoLog.redo(); }
+void MarkoffDocument::undoForBlock(BlockId block) { d->undoLog.undoForBlock(block); }
+
+// ============================================================================
+// D2: block accessors
+// ============================================================================
+
+std::vector<BlockId> MarkoffDocument::iterateBlocks() const
+{
+    auto rawIds = d->idList.ids();
+    std::vector<BlockId> out;
+    out.reserve(rawIds.size());
+    for (auto raw : rawIds) out.push_back(BlockId::fromRaw(raw));
+    return out;
+}
+
+BlockKind MarkoffDocument::blockKind(BlockId id) const
+{
+    return d->kindTagMap.get(id).value_or(BlockKind::Paragraph);
+}
+
+QByteArray MarkoffDocument::blockText(BlockId id) const
+{
+    auto it = d->blockBuffers.find(id);
+    if (it == d->blockBuffers.end()) return {};
+    return QByteArray::fromStdString(it->second->text());
+}
+
+quint64 MarkoffDocument::blockEditSequence(BlockId id) const
+{
+    return d->blockEditSequences.value(id, 0);
+}
+
+quint64 MarkoffDocument::d2EditSequence() const noexcept
+{
+    quint64 sum = 0;
+    for (const auto &seq : d->blockEditSequences)
+        sum += seq;
+    return sum;
+}
+
+// ============================================================================
+// D2: testInsertBlock (declared in public header under MARKOFF_TESTING guard;
+// implementation always compiled so test executables can link against the lib)
+// ============================================================================
+
+BlockId MarkoffDocument::testInsertBlock(BlockKind kind, const QByteArray &content)
+{
+    static std::atomic<uint64_t> s_nextTestId{1};
+    BlockId newId = BlockId::fromRaw(s_nextTestId.fetch_add(1));
+
+    // Insert into IdList at the end
+    CollabText::Crdt::Anchor afterAnchor = (d->idList.size() == 0)
+        ? CollabText::Crdt::Anchor::min()
+        : d->idList.anchor_of(d->idList.ids().back(), CollabText::Crdt::Bias::Right);
+    d->idList.insert_after(afterAnchor, newId.raw());
+
+    // Create a Buffer for it
+    auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);
+    if (!content.isEmpty()) {
+        buf->apply_local_edit({{0, 0}}, {content.toStdString()});
+    }
+    d->blockBuffers.emplace(newId, std::move(buf));
+
+    // Set kind
+    d->kindTagMap.setWithNextStamp(newId, kind);
+
+    return newId;
 }
 
 }  // namespace Markoff

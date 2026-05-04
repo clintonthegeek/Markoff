@@ -17,8 +17,11 @@
 #include <crdt/Operations.h>
 
 #include <markoff-foundation/BlockAnchor.h>
+#include <markoff-foundation/BlockEdit.h>
+#include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
+#include <markoff-foundation/StructuralOp.h>
 #include <markoff-foundation/TextAnchor.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
 #include <markoff-foundation/RenderPhases.h>
@@ -77,6 +80,7 @@ public:
     /// in OLD-text byte coordinates; ranges must be non-overlapping; if
     /// multiple edits, ordering must be ascending by oldStart. Returns the
     /// resulting Operation for broadcast (CRDT future). Emits contentsChanged.
+    [[deprecated("D2: use applyBlockEdit; will be removed in Phase 14")]]
     CollabText::Crdt::Operation
         applyLocalEdit(const QList<MarkoffEdit> &edits);
 
@@ -154,6 +158,50 @@ public:
     /// Production callers leave this null and pay zero overhead.
     void setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept;
 
+    // ===== D2 per-block edit API =====
+    /// Apply a local edit to a single block's CRDT buffer. The edit is
+    /// recorded in the UndoLog as a single undoable action.
+    void applyBlockEdit(const Markoff::BlockEdit &edit);
+
+    /// Apply a structural operation (insert/remove/change-kind) to the
+    /// IdList and related CRDTs. Recorded in the UndoLog.
+    void applyStructural(const Markoff::StructuralOp &op);
+
+    // ===== D2 undo/redo =====
+    /// Undo the last D2 action recorded in the UndoLog. Does NOT affect
+    /// the legacy single-buffer undo stack.
+    void undoD2();
+
+    /// Redo the last undone D2 action. Does NOT affect the legacy stack.
+    void redoD2();
+
+    /// Undo the most recent D2 action that touched the given block.
+    void undoForBlock(Markoff::BlockId block);
+
+    // ===== D2 block accessors =====
+    /// Returns the current ordered list of block IDs from the IdList CRDT.
+    std::vector<Markoff::BlockId> iterateBlocks() const;
+
+    /// Returns the BlockKind for the given block (defaults to Paragraph if
+    /// not set). Reads from the kindTagMap CRDT.
+    Markoff::BlockKind blockKind(Markoff::BlockId id) const;
+
+    /// Returns the current UTF-8 text of the given block's buffer.
+    /// Returns empty if the block is not found.
+    QByteArray blockText(Markoff::BlockId id) const;
+
+    /// Returns an edit-sequence counter for a specific block's buffer.
+    /// Increments each time applyBlockEdit touches that block.
+    quint64 blockEditSequence(Markoff::BlockId id) const;
+
+    /// D2: sum of all per-block edit sequences (rough document-level dirty
+    /// tracker for D2 internals).
+    quint64 d2EditSequence() const noexcept;
+
+    /// Test helper: insert a block with the given kind and content directly
+    /// into D2 internals. Callable from test code; do not call in production.
+    Markoff::BlockId testInsertBlock(Markoff::BlockKind kind, const QByteArray &content);
+
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
     /// Emitted on the main thread each time a parse completes.
@@ -164,6 +212,7 @@ Q_SIGNALS:
     /// this against per-row last-edit sequence to decide whether the parse
     /// output for a given row is stale relative to user intent.
     /// See restoration spec §4.
+    // D2: deprecated, migrating to d2DocumentChanged
     void parseUpdated(const Markoff::Document *parsed,
                       quint64 parseSequence,
                       QList<Markoff::BlockAnchor> blockAnchors,
@@ -172,7 +221,13 @@ Q_SIGNALS:
     void sessionCreated(Markoff::Session *);
     void sessionDestroyed(Markoff::Session *);
 
+    /// Emitted (debounced: once per event-loop spin) whenever any D2 CRDT
+    /// changes (applyBlockEdit or applyStructural).
+    void d2DocumentChanged();
+
 private:
+    void scheduleD2Changed();
+
     struct Private;
     std::unique_ptr<Private> d;
 };
