@@ -89,6 +89,12 @@ add_library(markoff_foundation STATIC
     src/UndoLog.cpp
     include/markoff-foundation/CrdtProxies.h
     src/CrdtProxies.cpp
+    # --- Sibling map public headers (Phase 5) ---
+    include/markoff-foundation/KindTagMap.h
+    include/markoff-foundation/BlockAttrsMap.h
+    include/markoff-foundation/FrontmatterMap.h
+    include/markoff-foundation/LinkRefMap.h
+    include/markoff-foundation/FootnoteDefMap.h
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h

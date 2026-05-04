@@ -6,6 +6,11 @@
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/UndoLog.h>
 #include <markoff-foundation/CrdtProxies.h>
+#include <markoff-foundation/KindTagMap.h>
+#include <markoff-foundation/BlockAttrsMap.h>
+#include <markoff-foundation/FrontmatterMap.h>
+#include <markoff-foundation/LinkRefMap.h>
+#include <markoff-foundation/FootnoteDefMap.h>
 
 #include <QList>
 #include <QHash>
@@ -25,35 +30,6 @@
 namespace Markoff {
 
 class Session;
-
-// ============================================================================
-// Sibling map typedefs (Phase 5 will split to separate headers; stubs here)
-// ============================================================================
-
-using KindTagMap     = CausalLwwMap<BlockId, BlockKind>;
-using AttrName       = QByteArray;
-using AttrValue      = std::variant<int, QString, bool>;
-struct BlockAttrKey  {
-    BlockId block;
-    AttrName name;
-    bool operator==(const BlockAttrKey &o) const = default;
-};
-inline size_t qHash(const BlockAttrKey &k, size_t seed) noexcept {
-    return qHashMulti(seed, k.block, k.name);
-}
-using BlockAttrsMap  = CausalLwwMap<BlockAttrKey, AttrValue>;
-using FrontmatterKey = QByteArray;
-using FrontmatterValue = QByteArray;
-using FrontmatterMap = CausalLwwMap<FrontmatterKey, FrontmatterValue>;
-using LinkRefId      = QByteArray;
-struct LinkRefValue  {
-    QString url;
-    QString title;
-    bool operator==(const LinkRefValue &o) const = default;
-};
-using LinkRefMap     = CausalLwwMap<LinkRefId, LinkRefValue>;
-using FootnoteId     = QByteArray;
-using FootnoteDefMap = CausalLwwMap<FootnoteId, QByteArray>;
 
 // Stub placeholders — real implementations in their phases
 class WatermarkCoordinator { public: explicit WatermarkCoordinator() = default; };

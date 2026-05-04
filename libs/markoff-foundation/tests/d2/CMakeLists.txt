@@ -32,3 +32,7 @@ add_test(NAME tst_d2_undo COMMAND tst_d2_undo)
 qt_add_executable(tst_d2_signals tst_d2_signals.cpp)
 target_link_libraries(tst_d2_signals PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_d2_signals COMMAND tst_d2_signals)
+
+qt_add_executable(tst_d2_sibling_maps tst_d2_sibling_maps.cpp)
+target_link_libraries(tst_d2_sibling_maps PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_sibling_maps COMMAND tst_d2_sibling_maps)
