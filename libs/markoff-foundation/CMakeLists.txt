@@ -87,6 +87,8 @@ add_library(markoff_foundation STATIC
     src/EmojiData.h
     include/markoff-foundation/UndoLog.h
     src/UndoLog.cpp
+    include/markoff-foundation/CrdtProxies.h
+    src/CrdtProxies.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h

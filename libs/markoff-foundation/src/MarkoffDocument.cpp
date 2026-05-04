@@ -43,6 +43,14 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     qRegisterMetaType<Markoff::BlockAnchor>("Markoff::BlockAnchor");
     qRegisterMetaType<QList<Markoff::BlockAnchor>>("QList<Markoff::BlockAnchor>");
 
+    // ── D2: initialise per-CRDT signal proxies ───────────────────────────
+    d->idListProxy          = new IdListProxy(this);
+    d->kindTagMapProxy      = new SiblingMapProxy(this);
+    d->blockAttrsMapProxy   = new SiblingMapProxy(this);
+    d->frontmatterMapProxy  = new SiblingMapProxy(this);
+    d->linkRefMapProxy      = new SiblingMapProxy(this);
+    d->footnoteDefMapProxy  = new SiblingMapProxy(this);
+
     // ── D2: wire UndoLog dispatcher ──────────────────────────────────────
     d->undoLog.setDispatcher([this](const CrdtTarget &target, OpId opId, bool forward) {
         std::visit([&](const auto &t) {
@@ -490,6 +498,12 @@ void MarkoffDocument::applyBlockEdit(const BlockEdit &edit)
     t.registerOp(CrdtTarget::buffer(edit.blockId), lamportToOpId(ts));
 
     ++d->blockEditSequences[edit.blockId];
+
+    // Notify per-block buffer proxy synchronously (before debounced d2DocumentChanged).
+    auto proxyIt = d->bufferProxies.find(edit.blockId);
+    if (proxyIt != d->bufferProxies.end() && proxyIt.value())
+        proxyIt.value()->notifyChanged();
+
     scheduleD2Changed();
 }
 
@@ -516,9 +530,14 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
             // Create buffer
             d->blockBuffers.emplace(newBlock, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
+            // Create buffer proxy for this block (parented to this; Qt owns it)
+            d->bufferProxies.insert(newBlock, new BufferProxy(newBlock, this));
             // Set kind
             OpId kindOpId = d->kindTagMap.setWithNextStamp(newBlock, payload.kind);
             t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+            // Notify structural + kind proxies
+            d->idListProxy->notifyChanged();
+            d->kindTagMapProxy->notifyChanged();
         } else if constexpr (std::is_same_v<T, StructuralOp::RemoveEntry>) {
             CollabText::Crdt::Anchor anchor = d->idList.anchor_of(payload.blockId.raw(), CollabText::Crdt::Bias::Left);
             CollabText::Crdt::IdListOperation idOp = d->idList.remove_at(anchor);
@@ -527,9 +546,12 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             OpId kindOpId = d->kindTagMap.removeWithNextStamp(payload.blockId);
             t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
             // Buffer retained for GC (Phase 9)
+            d->idListProxy->notifyChanged();
+            d->kindTagMapProxy->notifyChanged();
         } else if constexpr (std::is_same_v<T, StructuralOp::ChangeKind>) {
             OpId kindOpId = d->kindTagMap.setWithNextStamp(payload.blockId, payload.newKind);
             t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+            d->kindTagMapProxy->notifyChanged();
         }
     }, op.payload);
 
@@ -605,10 +627,27 @@ BlockId MarkoffDocument::testInsertBlock(BlockKind kind, const QByteArray &conte
     }
     d->blockBuffers.emplace(newId, std::move(buf));
 
+    // Create buffer proxy for this block (parented to this; Qt owns it)
+    d->bufferProxies.insert(newId, new BufferProxy(newId, this));
+
     // Set kind
     d->kindTagMap.setWithNextStamp(newId, kind);
 
     return newId;
 }
+
+// ============================================================================
+// D2: CRDT proxy accessors
+// ============================================================================
+
+BufferProxy *MarkoffDocument::bufferProxy(BlockId id) const
+{
+    auto it = d->bufferProxies.constFind(id);
+    return it != d->bufferProxies.constEnd() ? it.value() : nullptr;
+}
+
+IdListProxy *MarkoffDocument::idListProxy() const { return d->idListProxy; }
+
+SiblingMapProxy *MarkoffDocument::kindTagMapProxy() const { return d->kindTagMapProxy; }
 
 }  // namespace Markoff

@@ -4,6 +4,7 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/BlockEdit.h>
 #include <markoff-foundation/BlockKind.h>
+#include <markoff-foundation/CrdtProxies.h>
 #include <markoff-foundation/StructuralOp.h>
 
 using namespace Markoff;
@@ -15,6 +16,9 @@ private Q_SLOTS:
     void d2DocumentChanged_firesOnApplyStructural();
     void blockEditSequence_incrementsOnEdit();
     void d2EditSequence_sumsAcrossBlocks();
+    void bufferProxy_firesOnApplyBlockEdit();
+    void idListProxy_firesOnApplyStructural();
+    void kindTagMapProxy_firesOnChangeKind();
 };
 
 void TstD2Signals::d2DocumentChanged_firesOnApplyBlockEdit()
@@ -57,6 +61,38 @@ void TstD2Signals::d2EditSequence_sumsAcrossBlocks()
     doc.applyBlockEdit(BlockEdit{blkA, 5, 0, "!"});
     doc.applyBlockEdit(BlockEdit{blkB, 5, 0, "?"});
     QVERIFY(doc.d2EditSequence() > seq0 + 1);
+}
+
+void TstD2Signals::bufferProxy_firesOnApplyBlockEdit()
+{
+    MarkoffDocument doc(1);
+    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
+    auto *proxy = doc.bufferProxy(blk);
+    QVERIFY(proxy != nullptr);
+    QSignalSpy spy(proxy, &BufferProxy::inlineSpansChanged);
+    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
+    QCOMPARE(spy.count(), 1);
+}
+
+void TstD2Signals::idListProxy_firesOnApplyStructural()
+{
+    MarkoffDocument doc(1);
+    QSignalSpy spy(doc.idListProxy(), &IdListProxy::structureChanged);
+    StructuralOp op;
+    op.payload = StructuralOp::InsertEntry{BlockId{}, BlockKind::Paragraph};
+    doc.applyStructural(op);
+    QCOMPARE(spy.count(), 1);
+}
+
+void TstD2Signals::kindTagMapProxy_firesOnChangeKind()
+{
+    MarkoffDocument doc(1);
+    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "# hello");
+    QSignalSpy spy(doc.kindTagMapProxy(), &SiblingMapProxy::mapChanged);
+    StructuralOp op;
+    op.payload = StructuralOp::ChangeKind{blk, BlockKind::Heading};
+    doc.applyStructural(op);
+    QCOMPARE(spy.count(), 1);
 }
 
 QTEST_MAIN(TstD2Signals)  // needs event loop for QTimer::singleShot

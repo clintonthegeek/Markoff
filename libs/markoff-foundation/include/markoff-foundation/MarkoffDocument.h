@@ -19,6 +19,7 @@
 #include <markoff-foundation/BlockAnchor.h>
 #include <markoff-foundation/BlockEdit.h>
 #include <markoff-foundation/BlockKind.h>
+#include <markoff-foundation/CrdtProxies.h>
 #include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/StructuralOp.h>
@@ -201,6 +202,19 @@ public:
     /// Test helper: insert a block with the given kind and content directly
     /// into D2 internals. Callable from test code; do not call in production.
     Markoff::BlockId testInsertBlock(Markoff::BlockKind kind, const QByteArray &content);
+
+    // ===== D2 CRDT proxies (fine-grained change notifications) =====
+    /// Returns the BufferProxy for the given block, or nullptr if not found.
+    /// Views connect to its signals to detect per-block text changes.
+    Markoff::BufferProxy   *bufferProxy(Markoff::BlockId id) const;
+
+    /// Returns the IdList proxy. Views connect to structureChanged() to detect
+    /// block insertion/removal.
+    Markoff::IdListProxy   *idListProxy() const;
+
+    /// Returns the KindTagMap proxy. Views connect to mapChanged() to detect
+    /// block kind changes.
+    Markoff::SiblingMapProxy *kindTagMapProxy() const;
 
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);

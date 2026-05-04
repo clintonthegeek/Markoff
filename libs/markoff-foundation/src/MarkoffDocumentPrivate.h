@@ -5,6 +5,7 @@
 #include <markoff-foundation/CausalLwwMap.h>
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/UndoLog.h>
+#include <markoff-foundation/CrdtProxies.h>
 
 #include <QList>
 #include <QHash>
@@ -109,6 +110,17 @@ struct MarkoffDocument::Private {
 
     // Debounce flag for d2DocumentChanged signal
     bool d2ChangePending = false;
+
+    // Per-CRDT Qt signal proxies (parented to the MarkoffDocument; Qt owns lifetime).
+    // Raw pointers are safe: these are QObjects with a parent and are destroyed
+    // when the parent MarkoffDocument is destroyed.
+    QHash<BlockId, Markoff::BufferProxy *> bufferProxies;
+    Markoff::IdListProxy     *idListProxy     = nullptr;
+    Markoff::SiblingMapProxy *kindTagMapProxy = nullptr;
+    Markoff::SiblingMapProxy *blockAttrsMapProxy   = nullptr;
+    Markoff::SiblingMapProxy *frontmatterMapProxy  = nullptr;
+    Markoff::SiblingMapProxy *linkRefMapProxy      = nullptr;
+    Markoff::SiblingMapProxy *footnoteDefMapProxy  = nullptr;
 };
 
 }  // namespace Markoff
