@@ -8,6 +8,7 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
 
+#include <QDebug>
 #include <QQuickTextDocument>
 #include <QScopeGuard>
 #include <QTextDocument>
@@ -127,10 +128,16 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     if (!m_listenedDoc)
         return;
 
-    // Snapshot the post-edit text and compute the delta against m_previousText
-    // (the CRDT-coherent before-state for THIS contentsChange). m_previousText
-    // is updated unconditionally at the end so the cache stays in sync with
-    // the live QTextDocument across guard skip-paths too.
+    qInfo().noquote() << "[dogfood] EditBinding: onContentsChange"
+                      << "modelIndex=" << m_modelIndex
+                      << "holeId=" << m_holeId
+                      << "qtPos=" << qtPos
+                      << "removed=" << charsRemoved
+                      << "added=" << charsAdded
+                      << "applyingTextUpdate=" << m_applyingTextUpdate
+                      << "applyingModel=" << m_binding->applyingModelUpdate()
+                      << "composing=" << m_composing;
+
     const QString postQt = m_listenedDoc->toPlainText();
     auto _ = qScopeGuard([&]{ m_previousText = postQt; });
 

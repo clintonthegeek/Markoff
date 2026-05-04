@@ -138,11 +138,14 @@ private slots:
         LiveProxyBlockModel proxy(&doc, inner, &layer);
         QCOMPARE(proxy.rowCount(), 2);
 
-        // onHoleInserted uses beginResetModel/endResetModel (not
-        // beginInsertRows/endInsertRows) because Qt.labs.qmlmodels
-        // DelegateChooser does not respond to rowsInserted for new delegate
-        // creation — only modelReset forces ListView to rebuild its delegates.
-        QSignalSpy resetSpy(&proxy, &QAbstractItemModel::modelReset);
+        // onHoleInserted uses targeted beginInsertRows/endInsertRows so the
+        // QML ListView keeps focus and scroll position around hole creation.
+        // (Earlier R5.5 work used beginResetModel as a workaround for an
+        // empty-KindRole bug at the data() level; that data() bug was fixed,
+        // but the reset workaround stayed and broke the dogfood UX. Targeted
+        // insert is the spec-§4.3 contract.)
+        QSignalSpy resetSpy(&proxy,    &QAbstractItemModel::modelReset);
+        QSignalSpy insertSpy(&proxy,   &QAbstractItemModel::rowsInserted);
 
         // Anchor at byte 5 = end of "para1"; hole should land between row 0
         // (para1) and row 1 (para2).
@@ -153,7 +156,8 @@ private slots:
         QVERIFY(proxy.proxyRowIsHole(1));
         QCOMPARE(proxy.proxyRowForHole(id), 1);
         QCOMPARE(proxy.proxyRowForInner(1), 2);   // para2 shifted to proxy row 2
-        QCOMPARE(resetSpy.count(), 1);
+        QCOMPARE(resetSpy.count(),  0);
+        QCOMPARE(insertSpy.count(), 1);
     }
 
     void proxy_drops_hole_row_on_abandon() {

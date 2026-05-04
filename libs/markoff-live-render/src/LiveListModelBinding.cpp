@@ -79,9 +79,29 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->holeLayer      = new LiveHoleLayer(d->document, d->model, this);
         d->undoCoalescer  = new UndoCoalescer(d->document, d->cursorState, d->holeLayer, this);
         d->proxyModel     = new LiveProxyBlockModel(d->document, d->model, d->holeLayer, this);
+        // Pending-cursor resolution must fire AFTER the proxy's row state
+        // catches up with the inner model. Listening on inner would resolve
+        // before the proxy emits its rowsInserted, so QML lookups for the
+        // new delegate would race the proxy update and miss.
+        d->cursorState->setSignalModel(d->proxyModel);
         // End-to-end 250 ms quiet-commit path: idle timer → reification.
         QObject::connect(d->holeLayer, &LiveHoleLayer::idleCommitDue,
                          d->holeLayer, &LiveHoleLayer::commitBlockHole);
+
+        // Post-commit cursor delivery (spec §5.3, never previously wired).
+        // Fired BEFORE hole removal so we can still ask the proxy where the
+        // hole sits and what the buffer length is. The new paragraph from
+        // applyLocalEdit("\n\n" + buffer) lands at the hole's former proxy
+        // row once the parse arrives — schedule a pure-pending cursor
+        // request so it resolves on that exact rowsInserted.
+        QObject::connect(d->holeLayer, &LiveHoleLayer::aboutToCommit, this,
+            [this](quint64 holeId) {
+                if (!d->proxyModel || !d->cursorState || !d->holeLayer) return;
+                const int proxyRow = d->proxyModel->proxyRowForHole(holeId);
+                const int bufferLen = d->holeLayer->bufferText(holeId).length();
+                if (proxyRow < 0) return;
+                d->cursorState->requestTextCaretAtNewRow(proxyRow, bufferLen);
+            });
         Q_EMIT holeLayerChanged();
         Q_EMIT proxyModelChanged();
         d->structuralKeys = new LiveStructuralKeyHandler(
@@ -90,6 +110,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
     } else {
         d->selectionView->setDocument(nullptr);
         d->selectionView->setSession(nullptr);
+        d->cursorState->setSignalModel(d->model);  // revert to inner default
         Q_EMIT holeLayerChanged();
         Q_EMIT proxyModelChanged();
     }

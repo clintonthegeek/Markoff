@@ -47,7 +47,8 @@ public:
         LiveHoleLayer            *holeLayer;
         LiveProxyBlockModel      *proxyModel;
 
-        int                       blockIndex;
+        int                       blockIndex;       ///< inner-model row (for byte arithmetic)
+        int                       proxyBlockIndex;  ///< proxy-model row (for cursor delivery)
         Markoff::BlockAnchor      blockAnchor;
         quint32                   currentBlockStart;
         quint32                   currentBlockEnd;

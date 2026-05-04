@@ -69,6 +69,12 @@ Q_SIGNALS:
     void holeBufferChanged(quint64 holeId);
     void holeAbandoned(quint64 holeId);
     void idleCommitDue(quint64 holeId);
+    /// Emitted at the very start of `commitBlockHole`, BEFORE the hole row
+    /// is removed from the layer/proxy. Listeners can still resolve the
+    /// hole's proxy row + buffer length (which they need to schedule
+    /// post-commit cursor delivery into the new paragraph that is about to
+    /// land at the hole's former proxy position).
+    void aboutToCommit(quint64 holeId);
     void holeReified(quint64 holeId, Markoff::TextAnchor newRowAnchor);
 
 private:

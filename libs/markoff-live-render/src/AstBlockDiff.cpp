@@ -49,7 +49,40 @@ QList<AstBlockDiff::Op> AstBlockDiff::diff(const QList<BlockKey> &prev,
             --i;
         }
     }
-    return ops;
+
+    // Post-pass: collapse adjacent Delete+Insert (in either order) at the
+    // same logical position with the same kind. This is the foundation's
+    // BlockAnchor-instability case — typing at qtPos 0 of a block changes
+    // the byte-0 character's CRDT identity, so computeBlockAnchors hands
+    // out a "new" anchor for the same logical block. Without this collapse
+    // the model emits Delete+Insert per keystroke and the QML delegate is
+    // destroyed and recreated, mid-typing focus is lost. The collapsed
+    // Equal carries both prevIndex (so the model finds the existing row)
+    // and nextIndex (so the BlockRecord — including the new anchor — is
+    // picked up). LiveBlockModel emits anchorRenumbered for these so
+    // LiveCursorState updates its TextCaret in lockstep.
+    QList<Op> collapsed;
+    collapsed.reserve(ops.size());
+    for (int idx = 0; idx < ops.size(); ++idx) {
+        if (idx + 1 < ops.size()
+            && ops[idx].kind == OpKind::Delete
+            && ops[idx+1].kind == OpKind::Insert
+            && prev[ops[idx].prevIndex].kind == next[ops[idx+1].nextIndex].kind) {
+            collapsed.append(Op{ OpKind::Equal, ops[idx].prevIndex, ops[idx+1].nextIndex });
+            ++idx;
+            continue;
+        }
+        if (idx + 1 < ops.size()
+            && ops[idx].kind == OpKind::Insert
+            && ops[idx+1].kind == OpKind::Delete
+            && next[ops[idx].nextIndex].kind == prev[ops[idx+1].prevIndex].kind) {
+            collapsed.append(Op{ OpKind::Equal, ops[idx+1].prevIndex, ops[idx].nextIndex });
+            ++idx;
+            continue;
+        }
+        collapsed.append(ops[idx]);
+    }
+    return collapsed;
 }
 
 }  // namespace Markoff::LiveRender

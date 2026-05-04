@@ -58,9 +58,19 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                     // Stale: keep our text; accept everything else from parse.
                     merged.text = m_rows[row].text;
                 }
+                const Markoff::BlockAnchor oldAnchor = m_rows[row].blockAnchor;
+                const bool anchorChanged = (oldAnchor != merged.blockAnchor);
                 if (m_rows[row] != merged) {
                     m_rows[row] = merged;
                     Q_EMIT dataChanged(index(row), index(row));
+                    if (anchorChanged) {
+                        // AstBlockDiff collapsed a Delete+Insert pair into
+                        // this Equal — the foundation handed us a new anchor
+                        // for the same logical block (typing at qtPos 0
+                        // changes the block's first-byte character identity).
+                        // Notify listeners so cursor anchors survive.
+                        Q_EMIT anchorRenumbered(row, oldAnchor, merged.blockAnchor);
+                    }
                 }
                 ++row;
                 break;

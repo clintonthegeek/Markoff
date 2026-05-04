@@ -90,23 +90,50 @@ Item {
     /// before they reach the TextEdit, so we must put focus there
     /// programmatically.
     function focusEditAt(qtPos) {
+        console.log("[dogfood] ParaDelegate.focusEditAt modelIndex=" + root.modelIndex
+            + " isHole=" + root.isHole + " holeId=" + (model.holeId || 0)
+            + " qtPos=" + qtPos + " editLen=" + edit.length)
         edit.forceActiveFocus()
         if (qtPos >= 0 && qtPos <= edit.length)
             edit.cursorPosition = qtPos
     }
 
-    /// When a new hole delegate appears, check if the cursor state is already
-    /// pointing at this hole (set synchronously by the structural key handler
-    /// during Enter). If so, focus immediately — the delegate just became live.
+    /// When a new delegate appears, check if the cursor state is already
+    /// pointing at this row (set synchronously by the structural-key handler
+    /// during Enter / Backspace-merge / Delete-merge / EOB-Enter). If so,
+    /// focus immediately — the delegate just became live and the LiveView's
+    /// onCursorChanged handler couldn't reach us via itemAtIndex earlier.
     Component.onCompleted: {
-        if (!root.isHole) return
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (!cs) return
-        if (cs.focusedHoleId !== 0 && cs.focusedHoleId === (model.holeId || 0)) {
-            // Defer focus to the next event loop turn so the ListView's
-            // model-reset processing (which may re-assign focus to a
-            // previously-focused delegate) completes first.
-            Qt.callLater(function() { focusEditAt(0) })
+        if (!cs) {
+            console.log("[dogfood] ParaDelegate.onCompleted modelIndex=" + root.modelIndex
+                + " isHole=" + root.isHole + " holeId=" + (model.holeId || 0)
+                + " NO cursorState")
+            return
+        }
+        const proxy = root.liveBinding ? root.liveBinding.proxyModel : null
+
+        if (root.isHole) {
+            const match = (cs.focusedHoleId !== 0 && cs.focusedHoleId === (model.holeId || 0))
+            console.log("[dogfood] ParaDelegate.onCompleted modelIndex=" + root.modelIndex
+                + " isHole=true holeId=" + (model.holeId || 0)
+                + " focusedHoleId=" + cs.focusedHoleId
+                + " match=" + match)
+            if (match) {
+                Qt.callLater(function() { focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0) })
+            }
+            return
+        }
+
+        const focusedProxy = (proxy && cs.focusedAnchorRow >= 0)
+                                ? proxy.proxyRowForInner(cs.focusedAnchorRow) : -1
+        const match = (focusedProxy === root.modelIndex)
+        console.log("[dogfood] ParaDelegate.onCompleted modelIndex=" + root.modelIndex
+            + " isHole=false focusedAnchorRow=" + cs.focusedAnchorRow
+            + " focusedProxy=" + focusedProxy
+            + " match=" + match)
+        if (match) {
+            Qt.callLater(function() { focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0) })
         }
     }
 }

@@ -94,27 +94,49 @@ ListView {
     }
 
     // ---- Cursor-state focus routing ----
-    // When a structural key (e.g. Enter at EOB) creates a hole and sets the
-    // cursor state to point at the hole, route keyboard focus into the new
-    // hole delegate's TextEdit so subsequent typing lands in the right place.
+    // When a structural key (Enter mid-block, Backspace-merge, Delete-merge,
+    // EOB-Enter creating a hole, etc.) updates the cursor state, route
+    // keyboard focus into the target delegate's TextEdit so subsequent typing
+    // lands in the right place.
     //
-    // For newly-created holes the delegate doesn't exist yet when
-    // onCursorChanged fires (ListView creates delegates lazily). The
-    // Component.onCompleted in ParagraphDelegate checks focusedHoleId and
-    // calls focusEditAt() when the delegate first appears. The Connections
-    // here handles the case where the hole delegate already exists (e.g.
-    // programmatic cursor re-assignment to an existing hole).
+    // The cursor-state listener fires after the proxy's row state has caught
+    // up with the inner model (LiveCursorState's signal model is the proxy).
+    // If the target delegate is already realized, focusEditAt runs here; if
+    // not (newly-inserted row outside the realized window, or QML hasn't yet
+    // incubated the delegate), the delegate's Component.onCompleted does
+    // the same lookup and self-focuses when it appears.
     Connections {
         target: binding ? binding.cursorState : null
         function onCursorChanged() {
-            if (!binding || !binding.cursorState) return
-            const holeId = binding.cursorState.focusedHoleId
-            if (holeId === 0) return
-            const proxyRow = binding.proxyModel.proxyRowForHole(holeId)
+            if (!binding || !binding.cursorState || !binding.proxyModel) return
+            const cs = binding.cursorState
+
+            const holeId = cs.focusedHoleId
+            if (holeId !== 0) {
+                const proxyRow = binding.proxyModel.proxyRowForHole(holeId)
+                const item = (proxyRow >= 0) ? root.itemAtIndex(proxyRow) : null
+                console.log("[dogfood] LiveView.onCursorChanged HOLE holeId=" + holeId
+                    + " proxyRow=" + proxyRow
+                    + " itemFound=" + (item !== null)
+                    + " qtPos=" + cs.focusedQtPos)
+                if (proxyRow < 0) return
+                if (item && item.focusEditAt) item.focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0)
+                return
+            }
+
+            const innerRow = cs.focusedAnchorRow
+            if (innerRow < 0) {
+                console.log("[dogfood] LiveView.onCursorChanged NONE (no hole, no anchor)")
+                return
+            }
+            const proxyRow = binding.proxyModel.proxyRowForInner(innerRow)
+            const item = (proxyRow >= 0) ? root.itemAtIndex(proxyRow) : null
+            console.log("[dogfood] LiveView.onCursorChanged ANCHOR innerRow=" + innerRow
+                + " proxyRow=" + proxyRow
+                + " itemFound=" + (item !== null)
+                + " qtPos=" + cs.focusedQtPos)
             if (proxyRow < 0) return
-            const item = root.itemAtIndex(proxyRow)
-            if (item && item.focusEditAt)
-                item.focusEditAt(0)
+            if (item && item.focusEditAt) item.focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0)
         }
     }
 

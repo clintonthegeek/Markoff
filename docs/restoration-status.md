@@ -11,15 +11,17 @@
 
 ## TL;DR — what to do *right now*
 
-> **R5.5 implementation complete; dogfood gate next.** All 19 R5.5 tasks plus an R4 test-setup fix landed (commits `c641c39..4ddd146`, plus title bump). 10/10 live-render fast-tier executables green; the load-bearing stress test (`tst_live_render_holes_qml`) types 200 chars at 30 ms gap into a hole through the QML key-event chain and verifies byte-for-byte source equality. The harness's discriminating power was gated against v0-style scramble in Task 2 (synthetic stub deleted in Task 3). Per Tasks 14 + 17, four real bugs were caught by the QML stress test that pure C++ tests had missed: (i) `LiveProxyBlockModel::data()` returned an empty QVariant for `KindRole` on hole rows, causing `DelegateChooser` to silently miss; (ii) `Qt.labs.qmlmodels DelegateChooser` only rebuilds delegates on `modelReset`, not `rowsInserted` — `onHoleInserted` had to switch to `beginResetModel/endResetModel`; (iii) proxy helper methods needed `Q_INVOKABLE` for QML to reach them; (iv) `QTest::keyClick(Key, Modifier)` drops Shift in headless mode by emitting an empty `text()` field. All fixed in the Task 17 commit.
+> **R5.5 implementation iteration STOPPED — architectural review pending.** The R5.5 dogfood pass (2026-05-04) surfaced six architectural-level issues that one-bug-at-a-time fixes cannot resolve. The pattern is the v0 cycle-guard recurrence under new names: each fix exposed the next bug in the layer beneath it. Per the systematic-debugging skill's "3+ fixes failed → question the architecture" criterion (met three times over within one iteration), iteration is paused.
 >
-> **Recommended next:** User runs `./build-dev/bin/markoff-live-render-app <some-file.md>` and exercises the R5.5 dogfood script (spec §10.3 R5.5 entry — Enter at end of every paragraph in a 10-block doc; type 5–10 chars per hole; idle 300 ms; verify reification + caret-at-end; Esc abandon-cleanly; 200 words at 100+ wpm with no scramble; saved file equals on-screen content). Feedback goes into the Dogfood log below. On sign-off, R5.5 transitions to `complete` and R6 plan generation begins.
+> **Recommended next:** READ `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md` (the architectural-review document). It enumerates the six bugs, the cycle-guard pattern, the open architectural questions (most importantly §3.1 — what is a hole, structurally?), five candidate doc amendments, and a specific recommendation. The recommendation is to spike §3.1(c) (marker-character approach) on a throwaway branch first, then re-plan R5.5 from the answers.
 >
-> **Read first** (in this order, only if context is needed):
-> 1. `docs/specs/2026-05-03-v2-holes-design.md` — the v2 holes design.
-> 2. `docs/handoff/2026-05-03-r5-holes-postmortem.md` — why v0/v1 didn't work.
-> 3. `docs/plans/2026-05-03-live-render-r5-5-holes.md` — implementation plan (now executed).
-> 4. `docs/handoff/2026-05-03-r4-paragraph-edit-tests-audit.md` — the R4 test-setup audit (commit `06ec6b2`).
+> **DO NOT** start a new fix iteration from the current code state. The implementation passes 10/10 fast-tier tests and is "usable for slow-typing dogfood" but does not meet the spec's R5.5 acceptance criteria, and the architectural questions in the review doc must be answered before further code work.
+>
+> **Read first** (in this order):
+> 1. `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md` — the load-bearing document for the next decisions.
+> 2. `docs/handoff/2026-05-03-r5-holes-postmortem.md` — the v1/v2 design rationale; partially superseded by §4 of the review doc.
+> 3. `docs/specs/2026-05-03-v2-holes-design.md` — the v2 design as currently implemented; may be archived depending on §3.1's answer.
+> 4. `docs/plans/2026-05-03-live-render-r5-5-holes.md` — the executed plan; will be re-planned per §3.1's answer.
 
 ---
 
@@ -36,7 +38,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | `3484c11`, `2225061`, `e837710`, `1f26ec8`, `18abd96` | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. Dogfood-surfaced fixes: selection-paint, scroll-then-click hit-test, HR source-faithful copy. 114/114. |
 | **R4** | [r4-paragraph-editing](plans/2026-05-02-live-render-r4-paragraph-editing.md) | `complete` | `1b75d37`, `ce0494f`, `3181fe8`, `dec12e7`, `7ae29e1`, `033d7e7`, `fa8e80d`, `99c616f`, `5e12f10`, `563c1f3`, `77a84eb`, `28e1c8f`, `a24c766`, `26dc802`, `7252498`, `324de05`, `201cbd3`, `5662f95`, `7d49718`, `c7dca41`, `37b97bf` | Paragraph + heading + code-block writable via LiveEditBinding; freshness gate; three cycle guards; previousText cache; cachedByteOffset refresh; click-focus routing; Enter swallowed (R5). 6/6 fast-tier; 8 paragraph_edit slots. |
 | **R5** | [r5-structural-keys](plans/2026-05-02-live-render-r5-structural-keys.md) | `in-progress (paused — Tasks 12–18 pending; superseded in part by R5.5's hole dispatch)` | `7c6f7f6`, `6da5698`, `dff19de`, `9d9d157`, `abc1005`, `4901383`, `05363f2`, `9a6c9f8`, `1ab0da9`, `cc64af9`, `21be140`, `b8fb639` | Tasks 1–11 landed. EOB-Enter / start-Enter now handled by R5.5 (holes); R5 dogfood criterion amended (spec §11 R5). Tasks 12–17 (delegate wiring + integration) — most are now subsumed by R5.5 work; remaining items can close independently. |
-| **R5.5** | [r5-5-holes](plans/2026-05-03-live-render-r5-5-holes.md) | `dogfood` | `c641c39..4ddd146` (19 R5.5 tasks + R4 test-setup fix) | Paragraph holes via LiveHoleLayer + LiveProxyBlockModel + LiveRealisticInputHarness. v2 IME-preedit pattern landed. 10/10 fast-tier; 24 layer subtests; 31 structural subtests; 8 proxy subtests; 200-char QML stress test gates against v0 F2 scramble. Awaiting user dogfood pass. |
+| **R5.5** | [r5-5-holes](plans/2026-05-03-live-render-r5-5-holes.md) | `paused — architectural review` | `c641c39..4ddd146` + 2026-05-04 dogfood-iteration commits | Implementation passes 10/10 fast-tier and is usable for slow-typing dogfood, but six architectural issues surfaced in dogfood (Bug A–F per the review doc) that resist one-bug-at-a-time fixes. Iteration paused per systematic-debugging "3+ fixes → question architecture" criterion. **Next step: read `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md`, decide §3.1 (hole abstraction), re-plan from there.** |
 | **R6** | *not yet written* | `pending` | — | Other text blocks + speculation refresh. |
 | **R7** | *not yet written* | `pending` | — | Lists + blockquotes (II.a, II.b). |
 | **R8** | *not yet written* | `pending` | — | Math block + BlockInternalEdit (I.a, L8). |
@@ -58,7 +60,9 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-03 | (this commit) | feat(live-render): R5.5 implementation complete — test-app title bumped; entering dogfood gate |
+| 2026-05-04 | (this commit) | docs(handoff): R5.5 dogfood architectural review — six bugs surfaced in dogfood, cycle-guard pattern recurrence, R5.5 paused pending architectural decisions |
+| 2026-05-04 | (pending) | feat(live-render): R5.5 dogfood-iteration fixes — proxy targeted insert, requestTextCaretAtNewRow, holeReified cursor delivery, anchorRenumbered for BlockAnchor instability, BlockWalker trailing-`\n` trim. All correct in isolation; full architectural rationale in 2026-05-04 review doc. |
+| 2026-05-03 | (earlier) | feat(live-render): R5.5 implementation complete — test-app title bumped; entering dogfood gate |
 | 2026-05-03 | `4ddd146` | test(live-render): selection across hole includes bufferText in copy (R5.5 Task 18) |
 | 2026-05-03 | `5e92a8f` | test(live-render): stress-typing into hole — load-bearing R5.5 gate (R5.5 Task 17). Surfaced and fixed four real bugs: kind-role miss on hole rows, DelegateChooser-only-rebuilds-on-reset, missing Q_INVOKABLE on proxy helpers, QTest::keyClick Shift-drop in headless |
 | 2026-05-03 | `75acb45` | feat(live-render): save-flush via LiveListModelBinding::flushPendingHoles (R5.5 Task 16) |

@@ -74,6 +74,16 @@ public:
     // InlineFormatHighlighter reads pre-baked spans to avoid re-parsing.
     const QList<Markoff::SourceSpan> &spansAtRow(int row) const;
 
+Q_SIGNALS:
+    /// Emitted when an Equal-op rewrite (collapsed Delete+Insert) updates
+    /// the row's BlockAnchor in place. Listeners — primarily
+    /// LiveCursorState — translate any cursor pinned to `oldAnchor` to
+    /// `newAnchor` so the cursor survives the foundation's per-keystroke
+    /// anchor renumbering at qtPos 0 of a block.
+    void anchorRenumbered(int row,
+                          Markoff::BlockAnchor oldAnchor,
+                          Markoff::BlockAnchor newAnchor);
+
 private:
     QList<BlockRecord> m_rows;
     QList<quint64>     m_rowEditSequences;  // parallel to m_rows

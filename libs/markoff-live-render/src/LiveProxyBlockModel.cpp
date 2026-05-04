@@ -6,6 +6,8 @@
 #include <markoff/live-render/BlockKind.h>
 #include <markoff-foundation/MarkoffDocument.h>
 
+#include <QDebug>
+
 namespace Markoff::LiveRender {
 
 LiveProxyBlockModel::LiveProxyBlockModel(Markoff::MarkoffDocument *doc,
@@ -114,12 +116,64 @@ void LiveProxyBlockModel::rebuildMapping() {
     endResetModel();
 }
 
-void LiveProxyBlockModel::onInnerRowsInserted(const QModelIndex &, int, int) {
-    rebuildMapping();
+void LiveProxyBlockModel::onInnerRowsInserted(const QModelIndex &,
+                                                int first, int last) {
+    qInfo().noquote() << "[dogfood] Proxy: onInnerRowsInserted [" << first << "," << last << "]"
+                      << "(proxy.rowCount before=" << m_rows.size() << ")";
+    const int count = last - first + 1;
+    for (auto &row : m_rows) {
+        if (!row.isHole && row.innerRow >= first)
+            row.innerRow += count;
+    }
+    for (int k = first; k <= last; ++k) {
+        const quint32 newRowByte = innerStartByteForRow(k);
+        int targetProxyRow = m_rows.size();
+        for (int i = 0; i < m_rows.size(); ++i) {
+            const auto &row = m_rows[i];
+            if (row.isHole) {
+                const quint32 holeByte =
+                    m_doc->resolveTextAnchor(m_layer->reifyAnchor(row.holeId));
+                if (holeByte > newRowByte) { targetProxyRow = i; break; }
+            } else {
+                if (row.innerRow == k) continue;
+                const quint32 otherByte = innerStartByteForRow(row.innerRow);
+                if (otherByte >= newRowByte) { targetProxyRow = i; break; }
+            }
+        }
+        qInfo().noquote() << "[dogfood] Proxy: insert inner-row" << k
+                          << "at proxyRow=" << targetProxyRow
+                          << "(byte=" << newRowByte << ")";
+        beginInsertRows({}, targetProxyRow, targetProxyRow);
+        m_rows.insert(targetProxyRow, {false, k, 0});
+        endInsertRows();
+    }
 }
-void LiveProxyBlockModel::onInnerRowsAboutToBeRemoved(const QModelIndex &, int, int) {
-    rebuildMapping();
+
+void LiveProxyBlockModel::onInnerRowsAboutToBeRemoved(const QModelIndex &,
+                                                       int first, int last) {
+    qInfo().noquote() << "[dogfood] Proxy: onInnerRowsRemoved [" << first << "," << last << "]"
+                      << "(proxy.rowCount before=" << m_rows.size() << ")";
+    const int count = last - first + 1;
+    for (int k = last; k >= first; --k) {
+        int proxyRow = -1;
+        for (int i = 0; i < m_rows.size(); ++i) {
+            if (!m_rows[i].isHole && m_rows[i].innerRow == k) {
+                proxyRow = i; break;
+            }
+        }
+        if (proxyRow < 0) continue;
+        qInfo().noquote() << "[dogfood] Proxy: remove inner-row" << k
+                          << "from proxyRow=" << proxyRow;
+        beginRemoveRows({}, proxyRow, proxyRow);
+        m_rows.removeAt(proxyRow);
+        endRemoveRows();
+    }
+    for (auto &row : m_rows) {
+        if (!row.isHole && row.innerRow > last)
+            row.innerRow -= count;
+    }
 }
+
 void LiveProxyBlockModel::onInnerDataChanged(const QModelIndex &tl,
                                               const QModelIndex &br,
                                               const QVector<int> &roles) {
@@ -127,6 +181,8 @@ void LiveProxyBlockModel::onInnerDataChanged(const QModelIndex &tl,
                         index(proxyRowForInner(br.row()), 0), roles);
 }
 void LiveProxyBlockModel::onInnerModelReset() {
+    // Reserved for MarkoffDocument::resetContent (file-load path). Full
+    // reset is correct here — the entire model contents have changed.
     rebuildMapping();
 }
 
@@ -156,9 +212,13 @@ void LiveProxyBlockModel::onHoleInserted(quint64 holeId) {
         }
     }
 
-    beginResetModel();
+    qInfo().noquote() << "[dogfood] Proxy: onHoleInserted id=" << holeId
+                      << "at proxyRow=" << targetProxyRow
+                      << "(holeByte=" << holeByte
+                      << "rowCount before=" << m_rows.size() << ")";
+    beginInsertRows({}, targetProxyRow, targetProxyRow);
     m_rows.insert(targetProxyRow, {true, -1, holeId});
-    endResetModel();
+    endInsertRows();
 }
 
 void LiveProxyBlockModel::onHoleBufferChanged(quint64 holeId) {
@@ -170,6 +230,9 @@ void LiveProxyBlockModel::onHoleBufferChanged(quint64 holeId) {
 
 void LiveProxyBlockModel::onHoleAbandoned(quint64 holeId) {
     int proxyRow = proxyRowForHole(holeId);
+    qInfo().noquote() << "[dogfood] Proxy: onHoleAbandoned id=" << holeId
+                      << "proxyRow=" << proxyRow
+                      << "(rowCount before=" << m_rows.size() << ")";
     if (proxyRow < 0) return;
     beginRemoveRows({}, proxyRow, proxyRow);
     m_rows.removeAt(proxyRow);

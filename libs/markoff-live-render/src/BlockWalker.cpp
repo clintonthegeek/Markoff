@@ -87,6 +87,18 @@ QList<BlockRecord> BlockWalker::walk(const Markoff::Document *parsed)
         const int charEnd   = charCursor;
 
         rec.text = body.mid(charStart, charEnd - charStart);
+        // Tree-sitter's paragraph (and similar block) byte range includes
+        // the trailing newline of the block's last line — that newline is
+        // logically the boundary between this block and the next, NOT user-
+        // editable content. Without trimming, qtPos = text.length() lands
+        // ONE byte INSIDE the "\n\n" paragraph separator: a user typing at
+        // the end of a paragraph inserts between the two `\n`s, turning
+        // "para1\n\npara2" into "para1\nXpara2" (one paragraph with a soft
+        // break, eating the next paragraph). Trimming makes byte
+        // position blockStart + text.size() == byte position of the
+        // separator's first `\n`, which is the correct insert point.
+        if (rec.text.endsWith(QLatin1Char('\n')))
+            rec.text.chop(1);
         out.append(rec);
     }
 

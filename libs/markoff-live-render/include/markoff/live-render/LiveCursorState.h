@@ -4,6 +4,7 @@
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
 #include <markoff/live-render/Cursor.h>
 
+#include <QAbstractItemModel>
 #include <QObject>
 #include <QString>
 #include <optional>
@@ -38,6 +39,13 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveCursorState : public QObject {
     /// Exposed so QML LiveView can route keyboard focus into the hole's delegate
     /// TextEdit when the hole is created via a structural key (e.g. Enter at EOB).
     Q_PROPERTY(quint64 focusedHoleId READ focusedHoleId NOTIFY cursorChanged)
+    /// The inner-model row index for the active anchor-side TextCaret, else -1.
+    /// QML uses this (combined with `proxyModel.proxyRowForInner`) to find the
+    /// delegate that should receive keyboard focus after a structural edit
+    /// (mid-block split, Backspace-merge, Delete-merge).
+    Q_PROPERTY(int focusedAnchorRow READ focusedAnchorRow NOTIFY cursorChanged)
+    /// The qtPos of the active TextCaret (anchor-side or hole), else -1.
+    Q_PROPERTY(int focusedQtPos READ focusedQtPos NOTIFY cursorChanged)
 
 public:
     explicit LiveCursorState(const BlockKindRegistry *registry,
@@ -47,6 +55,17 @@ public:
     Cursor cursor() const { return m_cursor; }
     QString cursorKind() const;
     quint64 focusedHoleId() const;
+    int focusedAnchorRow() const;
+    int focusedQtPos() const;
+
+    /// Override the model whose `rowsInserted` resolves pending requests.
+    /// Defaults to the inner LiveBlockModel passed to the constructor; the
+    /// LiveListModelBinding switches this to the proxy once the proxy is
+    /// wired so resolution fires AFTER the proxy's row state is consistent
+    /// (otherwise QML lookups for the new row's delegate race the proxy
+    /// update). Pending-request row indices are interpreted in the new
+    /// model's coordinate space.
+    void setSignalModel(QAbstractItemModel *signalModel);
 
     void request(const Cursor &newCursor);
     void clear();
@@ -65,6 +84,15 @@ public:
     /// If a request is already pending, it is replaced (latest-request-wins).
     Q_INVOKABLE void requestTextCaretAtRow(int expectedRow, int qtPos);
 
+    /// Pure-pending variant: never resolves immediately even when
+    /// `expectedRow` already exists. Use when the structural edit will
+    /// INSERT a new row at this index (mid-block split, hole commit). The
+    /// pending request resolves on the next `rowsInserted` whose range
+    /// covers `expectedRow`. Distinguishes "row will be born here" from
+    /// "row already exists, just move the cursor" — the latter must use
+    /// requestTextCaretAtRow above.
+    Q_INVOKABLE void requestTextCaretAtNewRow(int expectedRow, int qtPos);
+
     /// Called by LiveListModelBinding from onParseUpdated. Increments the
     /// pending request's parse-cycle counter; drops on the SECOND call
     /// after the request was recorded (i.e. drops at parseCyclesSeen >= 2).
@@ -79,10 +107,14 @@ private:
     bool validateVariant(const Cursor &c) const;
     void onRowsInserted(const QModelIndex &parent, int first, int last);
     void resolvePendingForRow(int row);
+    void onAnchorRenumbered(int row,
+                            Markoff::BlockAnchor oldAnchor,
+                            Markoff::BlockAnchor newAnchor);
 
     Cursor                   m_cursor;
     const BlockKindRegistry *m_registry;
     const LiveBlockModel    *m_model;
+    QAbstractItemModel      *m_signalModel = nullptr;
 
     struct PendingRow {
         int row;

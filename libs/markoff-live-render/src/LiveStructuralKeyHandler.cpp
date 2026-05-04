@@ -52,6 +52,12 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
                                          bool selectionEmpty,
                                          const QString &blockText)
 {
+    qInfo().noquote() << "[dogfood] StructHandler: tryHandle key=" << key
+                      << "mod=" << modifiers
+                      << "proxyBlockIndex=" << blockIndex
+                      << "qtPos=" << qtPos
+                      << "blockTextLen=" << blockText.length()
+                      << "selEmpty=" << selectionEmpty;
     if (!m_document || !m_model || !m_cursorState || !m_registry) return false;
     if (!selectionEmpty) {
         // R5 limitation: non-empty selection defers to TextEdit's native
@@ -101,9 +107,11 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     ctx.undoCoalescer     = m_undoCoalescer;
     ctx.holeLayer         = m_holeLayer;
     ctx.proxyModel        = m_proxyModel;
-    // Use innerRow so requestTextCaretAtRow (which indexes the inner model)
-    // receives a valid index. At zero holes this is identical to blockIndex.
+    // blockIndex (inner) drives byte arithmetic against the inner model;
+    // proxyBlockIndex drives cursor delivery via LiveCursorState (which now
+    // listens on the proxy). At zero holes the two are equal.
     ctx.blockIndex        = innerRow;
+    ctx.proxyBlockIndex   = blockIndex;
     ctx.blockAnchor       = rec.blockAnchor;
     ctx.currentBlockStart = m_document->resolveTextAnchor(rec.blockAnchor.firstByte);
     ctx.currentBlockEnd   = ctx.currentBlockStart
@@ -277,7 +285,8 @@ void LiveStructuralKeyHandler::routeFocusAfterAbandon(int holeProxyRow,
 
     const int innerRow = m_proxyModel->innerRowForProxy(targetProxy);
     if (innerRow < 0) { m_cursorState->clear(); return; }
-    m_cursorState->requestTextCaretAtRow(innerRow, qtPos);
+    // requestTextCaretAtRow indexes the proxy now; pass targetProxy directly.
+    m_cursorState->requestTextCaretAtRow(targetProxy, qtPos);
 }
 
 void LiveStructuralKeyHandler::registerBuiltins()
@@ -299,7 +308,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             ed.newText  = QByteArrayLiteral("\n");
             c.document->applyLocalEdit({ ed });
             c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-            c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 1);
+            c.cursorState->requestTextCaretAtRow(c.proxyBlockIndex, c.qtPos + 1);
             if (c.undoCoalescer) c.undoCoalescer->recordStructural();
             return HR::Handled;
         }
@@ -308,7 +317,11 @@ void LiveStructuralKeyHandler::registerBuiltins()
         const bool atEnd   = (c.qtPos == c.blockText.length());
 
         if (!atStart && !atEnd) {
-            // Mid-block split — unchanged from R5 Task 5.
+            // Mid-block split — applyLocalEdit("\n\n") creates a NEW row at
+            // proxyBlockIndex+1. Use requestTextCaretAtNewRow (pure-pending)
+            // — requestTextCaretAtRow would resolve against whatever block
+            // currently sits at that index (the block about to be shifted
+            // down by the insertion), landing the cursor on the wrong row.
             const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
             const quint32 byteOffset =
                 c.currentBlockStart + static_cast<quint32>(prefixUtf8.size());
@@ -318,7 +331,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             ed.newText  = QByteArrayLiteral("\n\n");
             c.document->applyLocalEdit({ ed });
             c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-            c.cursorState->requestTextCaretAtRow(c.blockIndex + 1, 0);
+            c.cursorState->requestTextCaretAtNewRow(c.proxyBlockIndex + 1, 0);
             if (c.undoCoalescer) c.undoCoalescer->recordStructural();
             return HR::Handled;
         }
@@ -327,6 +340,11 @@ void LiveStructuralKeyHandler::registerBuiltins()
         if (!c.holeLayer || !c.proxyModel) return HR::NotHandled;
 
         const quint32 reifyByte = atStart ? c.currentBlockStart : c.currentBlockEnd;
+        qInfo().noquote() << "[dogfood] StructHandler: paragraphEnter EOB-or-start"
+                          << "(atStart=" << atStart << "atEnd=" << atEnd
+                          << "innerRow=" << c.blockIndex
+                          << "proxyRow=" << c.proxyBlockIndex
+                          << "reifyByte=" << reifyByte << ")";
         Markoff::TextAnchor anchor = c.document->textAnchorAt(reifyByte, /*rightBias=*/false);
         const quint64 holeId = c.holeLayer->createBlockHole(HoleKind::Paragraph, anchor);
 
@@ -360,7 +378,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         // text length (the merge point). Compute the qtPos at edit time
         // since the previous block's text is still current in the model.
         const int prevQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
-        c.cursorState->requestTextCaretAtRow(c.blockIndex - 1, prevQtPos);
+        c.cursorState->requestTextCaretAtRow(c.proxyBlockIndex - 1, prevQtPos);
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;
@@ -384,7 +402,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         // Cursor stays at end of the (now-merged) block — same row, same qtPos.
         // Use requestTextCaretAtRow so it survives the parse-back's row
         // reshuffle even if the block changes identity.
-        c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos);
+        c.cursorState->requestTextCaretAtRow(c.proxyBlockIndex, c.qtPos);
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;

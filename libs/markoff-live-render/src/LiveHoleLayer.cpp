@@ -5,6 +5,7 @@
 #include <markoff-foundation/MarkoffEdit.h>
 
 #include <QDateTime>
+#include <QDebug>
 #include <QTimer>
 #include <algorithm>
 
@@ -30,9 +31,15 @@ quint64 LiveHoleLayer::createBlockHole(HoleKind kind,
     auto *t = new QTimer(this);
     t->setSingleShot(true);
     t->setInterval(kIdleCommitMs);
-    connect(t, &QTimer::timeout, this, [this, id]() { Q_EMIT idleCommitDue(id); });
+    connect(t, &QTimer::timeout, this, [this, id]() {
+        qInfo().noquote() << "[dogfood] HoleLayer: idleCommitDue id=" << id;
+        Q_EMIT idleCommitDue(id);
+    });
     entry.idleTimer = t;
     m_holes.insert(id, entry);
+    qInfo().noquote() << "[dogfood] HoleLayer: createBlockHole id=" << id
+                      << "kind=" << int(kind)
+                      << "reifyByte=" << m_doc->resolveTextAnchor(reifyAnchor);
     Q_EMIT holeInserted(id);
     return id;
 }
@@ -60,6 +67,10 @@ void LiveHoleLayer::setBlockHoleBuffer(quint64 holeId, const QString &text) {
     it->lastEditMs = now;
 
     it->bufferText = text;
+    qInfo().noquote() << "[dogfood] HoleLayer: setBlockHoleBuffer id=" << holeId
+                      << "text=" << text.left(40)
+                      << "len=" << text.length()
+                      << "composing=" << it->composing;
     Q_EMIT holeBufferChanged(holeId);
 
     if (!it->composing && !text.isEmpty())
@@ -82,6 +93,8 @@ void LiveHoleLayer::setHoleComposition(quint64 holeId, bool composing) {
 void LiveHoleLayer::abandonBlockHole(quint64 holeId) {
     auto it = m_holes.find(holeId);
     if (it == m_holes.end()) return;
+    qInfo().noquote() << "[dogfood] HoleLayer: abandonBlockHole id=" << holeId
+                      << "buffer=" << it->bufferText.left(40);
     if (it->idleTimer) it->idleTimer->deleteLater();
     m_holes.erase(it);
     Q_EMIT holeAbandoned(holeId);
@@ -170,13 +183,18 @@ bool LiveHoleLayer::redoBlockHole(quint64 holeId) {
 
 void LiveHoleLayer::commitBlockHole(quint64 holeId) {
     auto it = m_holes.find(holeId);
-    if (it == m_holes.end()) return;
+    if (it == m_holes.end()) {
+        qInfo().noquote() << "[dogfood] HoleLayer: commitBlockHole id=" << holeId
+                          << "NO-OP (already gone)";
+        return;
+    }
 
     const QString buffer = it->bufferText;
     const Markoff::TextAnchor reifyAnchor = it->reifyAnchor;
 
     if (buffer.isEmpty()) {
-        // F5 mitigation: empty-buffer commit ≡ abandon.
+        qInfo().noquote() << "[dogfood] HoleLayer: commitBlockHole id=" << holeId
+                          << "EMPTY -> abandon";
         if (it->idleTimer) it->idleTimer->deleteLater();
         m_holes.erase(it);
         Q_EMIT holeAbandoned(holeId);
@@ -186,9 +204,15 @@ void LiveHoleLayer::commitBlockHole(quint64 holeId) {
     const quint32 reifyByte = m_doc->resolveTextAnchor(reifyAnchor);
     const QByteArray insertion = (QStringLiteral("\n\n") + buffer).toUtf8();
 
-    // Drop hole BEFORE applyLocalEdit so the proxy's holeAbandoned-driven
-    // row removal happens before the parse-back arrives. Order matters
-    // for cursor delivery.
+    qInfo().noquote() << "[dogfood] HoleLayer: commitBlockHole id=" << holeId
+                      << "buffer=" << buffer.left(40)
+                      << "reifyByte=" << reifyByte
+                      << "insertionLen=" << insertion.size();
+
+    // Fire BEFORE the hole row vanishes so listeners can capture proxy-row
+    // and bufferText.length() for post-commit cursor delivery.
+    Q_EMIT aboutToCommit(holeId);
+
     if (it->idleTimer) it->idleTimer->deleteLater();
     m_holes.erase(it);
     Q_EMIT holeAbandoned(holeId);
@@ -199,8 +223,9 @@ void LiveHoleLayer::commitBlockHole(quint64 holeId) {
     edit.newText  = insertion;
     m_doc->applyLocalEdit({ edit });
 
-    // The new row's anchor is at byte reifyByte + 2 (skipping the "\n\n").
     Markoff::TextAnchor newRowAnchor = m_doc->textAnchorAt(reifyByte + 2, /*rightBias=*/false);
+    qInfo().noquote() << "[dogfood] HoleLayer: holeReified id=" << holeId
+                      << "newRowByte=" << m_doc->resolveTextAnchor(newRowAnchor);
     Q_EMIT holeReified(holeId, newRowAnchor);
 }
 

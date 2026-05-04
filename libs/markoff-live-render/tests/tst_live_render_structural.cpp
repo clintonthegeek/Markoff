@@ -234,9 +234,11 @@ private Q_SLOTS:
 
         QVERIFY(parseSpy.wait(2000));
         QCOMPARE(binding.model()->rowCount(), 2);
-        // Parser includes the paragraph-separator \n in the first block's
-        // byte range; second block starts after the blank line.
-        QCOMPARE(binding.model()->recordAt(0).text, QString("hello\n"));
+        // BlockWalker trims the trailing \n that tree-sitter includes in
+        // each block's byte range — without that trim, qtPos at end-of-
+        // paragraph lands inside the "\n\n" separator and end-of-block
+        // typing eats the following paragraph (see BlockWalker comment).
+        QCOMPARE(binding.model()->recordAt(0).text, QString("hello"));
         QCOMPARE(binding.model()->recordAt(1).text, QString(" world"));
 
         const Cursor cur = binding.cursorState()->cursor();
