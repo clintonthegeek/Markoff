@@ -12,3 +12,7 @@ add_test(NAME tst_block_id COMMAND tst_block_id)
 qt_add_executable(tst_block_types tst_block_types.cpp)
 target_link_libraries(tst_block_types PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_block_types COMMAND tst_block_types)
+
+qt_add_executable(tst_undo_log tst_undo_log.cpp)
+target_link_libraries(tst_undo_log PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_undo_log COMMAND tst_undo_log)

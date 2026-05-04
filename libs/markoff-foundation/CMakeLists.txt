@@ -85,6 +85,8 @@ add_library(markoff_foundation STATIC
     src/CompletionRegistry.cpp
     src/EmojiCompletionProvider.cpp
     src/EmojiData.h
+    include/markoff-foundation/UndoLog.h
+    src/UndoLog.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h
