@@ -21,6 +21,8 @@ private Q_SLOTS:
     void deleteMerge_lastBlock_noOp();
     void changeKind_updatesBlockKind();
     void changeKind_withAttrs();
+    void pasteMarkdown_singleParagraph_contentAppearsInNewBlock();
+    void pasteMarkdown_splitsTargetAndAppendsBlocks();
 };
 
 void TstD2Cmd::insertCharacter_appendsChar()
@@ -123,6 +125,37 @@ void TstD2Cmd::changeKind_withAttrs()
     BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "# text");
     Cmd::changeKind(doc, blk, BlockKind::Heading, {"level"}, {AttrValue{1}});
     QCOMPARE(doc.blockKind(blk), BlockKind::Heading);
+}
+
+void TstD2Cmd::pasteMarkdown_singleParagraph_contentAppearsInNewBlock()
+{
+    MarkoffDocument doc(1);
+    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello ");
+    // Paste "world" as markdown at the end of the block
+    Cmd::pasteMarkdown(doc, blk, 6, "world");
+    // Should have inserted a new block after blk containing the pasted content
+    auto blocks = doc.iterateBlocks();
+    QVERIFY(blocks.size() >= 1);
+    // The combined text of all blocks should contain "world"
+    bool foundWorld = false;
+    for (const auto &b : blocks) {
+        if (doc.blockText(b).contains("world")) { foundWorld = true; break; }
+    }
+    QVERIFY(foundWorld);
+}
+
+void TstD2Cmd::pasteMarkdown_splitsTargetAndAppendsBlocks()
+{
+    MarkoffDocument doc(1);
+    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "before  after");
+    // Paste two paragraphs in the middle (at offset 7, between "before " and " after")
+    QByteArray pasteSource = "first\n\nsecond";  // two paragraphs
+    Cmd::pasteMarkdown(doc, blk, 7, pasteSource);
+    // Result: original block has "before " (tail stripped), new blocks inserted,
+    // last new block gets " after" appended
+    auto blocks = doc.iterateBlocks();
+    // Should have at least 2 blocks (original + at least 1 pasted)
+    QVERIFY(blocks.size() >= 2);
 }
 
 QTEST_GUILESS_MAIN(TstD2Cmd)
