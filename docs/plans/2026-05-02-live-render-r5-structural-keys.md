@@ -1,5 +1,7 @@
 # R5 — Structural Keys + IME Completion + Undo Coalescing Implementation Plan
 
+> **2026-05-04 — CANCELLED by D-evolution pivot.** Tasks 1–11 are landed in tree. Tasks 12–17 are **cancelled** — they are subsumed by D2's L4–L5 redesign on the per-block-CRDT premise. The structural-key dispatch shape (`LiveStructuralKeyHandler` + `BlockKindDescriptor::consumedStructuralKeys`) is a candidate to carry forward to D2 unchanged; that's a D2 §6 decision, not an R5 task. See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace R4's Enter-swallow workaround with real structural-key handling. Pressing Enter mid-paragraph splits the block into two and lands the caret at qtPos 0 of the new row deterministically (no `Qt.callLater` retry loops). Backspace at row-start merges with the previous block; Delete at row-end merges with the next; Shift-Enter inserts a soft break. Consecutive printable keystrokes coalesce into one undo entry per a deterministic policy; structural edits, movement, and an idle threshold break the chain.

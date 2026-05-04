@@ -1,8 +1,10 @@
 # R5.5 Bug 3 — atStart cursor delivery — unresolved (2026-05-04)
 
+> **2026-05-04 — CANCELLED by D-evolution pivot.** Bug 3 will not be investigated further. The bug lives entirely inside the parser-vs-CRDT race window that the D architecture removes by making block boundaries structural-CRDT state rather than parser-decided. Continuing to debug it inside the marker-paragraph mechanism — itself a workaround layered on top of v2 holes layered on top of v0 holes — defeats the purpose of the foundation-exploration branch. The C-restoration arc closes here. See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`. This handoff is preserved unedited below as a record of the failure mode that motivated the cut.
+
 **Branch:** `exploration/new-foundation`
 **HEAD at handover:** `dd64de5 r5.5(marker): atStart cursor delivery — properly target user content (Bug 3 v2)`
-**Status:** R5.5 dogfood gate (Task 18) blocked. Three implementation attempts at the atStart cursor-delivery code path have all reproduced the same user-visible symptom in real-document dogfood. No synthetic unit test reproduces the failure on any of the three commits.
+**Status (at time of writing, now superseded):** R5.5 dogfood gate (Task 18) blocked. Three implementation attempts at the atStart cursor-delivery code path have all reproduced the same user-visible symptom in real-document dogfood. No synthetic unit test reproduces the failure on any of the three commits.
 
 ## Symptom
 

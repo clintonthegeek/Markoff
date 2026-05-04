@@ -1,5 +1,7 @@
 # R5.5 — Marker-Paragraph Implementation Plan
 
+> **2026-05-04 — CANCELLED by D-evolution pivot.** Tasks 1–17 are landed in tree (commits `a895817..5473e81` plus four post-Task-17 fixes). Task 18 (dogfood gate) is **cancelled, not paused** — Bug 3 lives inside the parser-vs-CRDT race window that D removes; investigating it further has no value. The marker-paragraph code in tree stays for now (deletion happens during D2 implementation when the per-block-CRDT structural layer replaces L4–L5). See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the v2 paragraph-hole abstraction (`LiveHoleLayer` + `LiveProxyBlockModel`) with the marker-paragraph design (`docs/specs/2026-05-03-marker-paragraph-design.md`). EOB-Enter and start-of-paragraph Enter insert `"\n\n​"` directly into the CRDT source; the parser produces a real paragraph block; the cursor lands via the existing parser-driven row pipeline; an atomic-bundled-edit on the user's first keystroke replaces the marker; a `MarkerScrubber` service strips any marker that leaks at three event points (focus-out, pre-save, post-load).

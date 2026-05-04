@@ -1,7 +1,9 @@
 # Live Render Restoration — Architecture Specification
 
+> **2026-05-04 — SUPERSEDED IN PART by D-evolution pivot.** Forward C-restoration work (R5.5 dogfood, R6 → R10) is **cancelled**. The lower-layer architectural decisions in this spec (L0–L3, the discriminated cursor model, the layered library structure, the inline span pre-bake, the test contract per-layer) carry forward to D2 as authoritative inputs. Sections that depend on the parser-as-boundary-authority assumption (§4 source-of-truth protocol; §11 R5+ phase scope; the marker-paragraph A2 amendment to premise 6) are retired. See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`.
+
 **Date:** 2026-05-02
-**Status:** Approved for plan derivation (brainstorming complete; writing-plans is the next step)
+**Status:** Approved for plan derivation (brainstorming complete; writing-plans is the next step) — superseded in part 2026-05-04 (see banner).
 **Branch:** `exploration/new-foundation`
 **Audience:** the implementer who picks this up; the user (review gate); the `collabtext` maintainers (cross-reference for the companion D-evolution proposal).
 **Companion document:** `docs/specs/2026-05-02-d-evolution-proposal.md` *(to be written after this spec is approved)* — long-term per-block-CRDT direction the restoration leaves room for.

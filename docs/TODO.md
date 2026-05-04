@@ -1,6 +1,12 @@
 # Markoff TODO
 
-> **2026-05-02 — ACTIVE: live render restoration arc.** All entries
+> **2026-05-04 — ACTIVE: D-evolution design (D2).** The C-restoration arc is closed.
+> See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` for the cut.
+> All R-phase entries in `docs/restoration-status.md` are now historical. The new
+> active work tracker for D2 will be opened when the D2 spec is brainstormed and
+> written; until then this TODO file is dormant for new entries.
+
+> **2026-05-02 — (closed by 2026-05-04 banner above) live render restoration arc.** All entries
 > below this banner predate the restoration arc and are paused/superseded
 > by it unless explicitly carried forward. The active work tracker is
 > `docs/restoration-status.md`. Read that, the session brief at

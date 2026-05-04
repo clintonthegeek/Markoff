@@ -1,8 +1,10 @@
 # Marker-paragraph design (replaces v2 holes)
 
+> **2026-05-04 — RETIRED by D-evolution pivot.** This design is a workaround for the parser-vs-CRDT boundary race that D removes structurally. The marker-paragraph mechanism does **not** carry forward to D2; block boundaries become structural-CRDT state, so a freshly-Entered block is a first-class structural op rather than a parser-detected new paragraph that needs a marker character to exist. The Notion-style Enter *semantics* (premise 6 of the C spec) carry forward; the *mechanism* in this document does not. See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`.
+
 **Date:** 2026-05-03
 **Branch:** `exploration/new-foundation`
-**Status:** design — supersedes the v2 holes design (`docs/archive/2026-05-03-v2-holes-design.md`) and the paused R5.5 plan (`docs/archive/2026-05-03-live-render-r5-5-holes.md`).
+**Status:** design — superseded in entirety by D pivot 2026-05-04 (see banner). Previously: superseded the v2 holes design (`docs/archive/2026-05-03-v2-holes-design.md`) and the paused R5.5 plan (`docs/archive/2026-05-03-live-render-r5-5-holes.md`).
 **Predecessors (read first):**
 - `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md` — architectural review whose §3.1 chooses approach (c).
 - `docs/handoff/2026-05-03-section-3-1-spike-findings.md` — spike that verified the marker approach against the parser and enumerated leakage paths.

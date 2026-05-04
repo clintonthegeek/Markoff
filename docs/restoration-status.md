@@ -1,23 +1,31 @@
 # Live Render Restoration — Status Board
 
-**This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
+> **2026-05-04 — CLOSED.** This board is no longer live. The C-restoration arc was cut on 2026-05-04 in favour of the D-evolution architecture (per-block CRDT). The phase board, dogfood log, and recent-changes log below are preserved unedited as a historical record. **Do not update this file.** The new active subject is D2; see:
+>
+> - **The cut:** `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` — what closed, what carries forward, what is cancelled
+> - **D proposal (Markoff side):** `docs/specs/2026-05-02-d-evolution-proposal.md`
+> - **D response (collabtext maintainers):** `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md`
+> - **D2 spec (Markoff side):** *not yet written* — brainstorming + writing-plans is the next step
+> - **Carries forward to D2:** `docs/specs/2026-05-02-live-render-restoration-design.md` lower layers (L0–L3), the discriminated cursor model, the layered library structure, the inline span pre-bake. Sections that depend on the parser-as-boundary-authority assumption are retired.
 
-**Last updated:** 2026-05-04 (R5.5 marker-paragraph: 19 implementation commits + Bug 1 fix + Bug 2 fix landed; dogfood gate has surfaced an unresolved Bug 3 — see handoff doc.)
+**This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.** *(2026-05-04: this instruction is now historical; see banner above.)*
+
+**Last updated:** 2026-05-04 (C-restoration arc closed; D-evolution pivot bookend landed.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
 
 ---
 
-## TL;DR — what to do *right now*
+## TL;DR — what to do *right now* *(historical — see top banner)*
 
 > **R5.5 marker-paragraph implementation is structurally complete (the v2-holes design retired; marker design landed; tests green) but Task 18 dogfood gate has surfaced an unresolved cursor-delivery bug (Bug 3) that has resisted three different fix attempts**. Bugs 1 and 2 from dogfood are fixed; Bug 3 persists. The R5.5 phase is `dogfood-blocked` until Bug 3 is understood and addressed. See `docs/handoff/2026-05-04-bug-3-handoff.md`.
 >
 > Plan tasks 1–17 of `docs/plans/2026-05-03-live-render-r5-5-marker-paragraph.md` are landed. The harness suite (16 tests across save / load / undo / stacked-Enter / focus-out / stress / EOB-then-type) is green; v2-holes code (`LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, the discriminated `BlockId` variant) is deleted; clipboard scrubber strips ZWSP; backspace at qtPos 0 after a marker block scrubs the marker; `UndoCoalescer` is back to a single CRDT-undo regime. Three additional fixes landed on top of Tasks 1–17: `114b807` (Bug 1 list-gate, fixed), `7718c54` + `3c86b76` + `dd64de5` (Bug 2 + Bug 3 attempts; Bug 3 unresolved).
 >
-> **Next session:** read `docs/handoff/2026-05-04-bug-3-handoff.md` to pick up Bug 3 investigation.
+> ~~**Next session:** read `docs/handoff/2026-05-04-bug-3-handoff.md` to pick up Bug 3 investigation.~~ *(Cancelled 2026-05-04 by D-evolution pivot. Bug 3 will not be investigated; the bug lives inside the parser-vs-CRDT race window that D removes.)*
 >
-> **Read first** (in this order):
+> **Read first** (in this order — historical, see top banner):
 > 1. `docs/specs/2026-05-03-marker-paragraph-design.md` — the active design (replaces the archived v2-holes spec).
 > 2. `docs/plans/2026-05-03-live-render-r5-5-marker-paragraph.md` — the active plan (tasks 1–17 landed; task 18 dogfood gate pending).
 > 3. `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md` — the architectural review that retired v2 holes.

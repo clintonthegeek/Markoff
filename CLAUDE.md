@@ -1,25 +1,29 @@
 # Markoff (exploration/new-foundation branch)
 
-> **ACTIVE WORK — LIVE RENDER RESTORATION.** This branch is in a long-term
-> restoration arc rebuilding the live render widget (the WYSIWYG-ish
-> Markdown editor surface) into a new side-by-side library
-> `libs/markoff-live-render`. **A fresh agent context picking up this
-> work must read, in order:**
+> **ACTIVE WORK — D-EVOLUTION DESIGN (D2).** As of 2026-05-04 this branch
+> has cut from the C-restoration arc to the D architecture (per-block CRDT
+> + structural CRDT). The collabtext maintainers approved the supporting
+> primitive (`CollabText::Crdt::IdList`); D2 is the Markoff-side spec and
+> implementation. **A fresh agent context picking up this work must read,
+> in order:**
 >
-> 1. `docs/restoration-status.md` — live status board (what to do *right now*)
-> 2. `docs/handoff/2026-05-02-restoration-session-brief.md` — working protocol
-> 3. The active plan referenced by the status doc's TL;DR
+> 1. `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut, what carries forward, what doesn't
+> 2. `docs/specs/2026-05-02-d-evolution-proposal.md` — the Markoff-side proposal sent to collabtext maintainers
+> 3. `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` — the maintainer commitment + the six "won't do" lines D2 must record
+> 4. `docs/specs/2026-05-02-live-render-restoration-design.md` — superseded in part, but its lower-layer decisions (L0–L3, the discriminated cursor model, the layered library structure) carry forward to D2 as authoritative inputs
 >
-> The architecture is pinned in `docs/specs/2026-05-02-live-render-restoration-design.md`
-> and is binding (changes require a spec-amendment entry in the status
-> doc and explicit user approval). Do not rewrite the spec unilaterally.
+> The C-restoration's status board (`docs/restoration-status.md`) is now
+> historical. The marker-paragraph design and R5.5 plan are retired. R5.5
+> Bug 3 is **cancelled, not paused** — the bug lives inside the parser-vs-
+> CRDT race window that D removes structurally.
 >
-> The legacy `libs/markoff-view-qml` stays in service of source mode and
-> the existing live mode (regression reference) until the very end of
-> the restoration arc (R10). Do not delete its files prematurely.
+> The legacy `libs/markoff-view-qml` continues to ship; the in-tree
+> `libs/markoff-live-render` keeps L0–L3 (carries forward) and the existing
+> R5/R5.5 work (will be rewritten or retired during D2 implementation).
+> Do not delete `libs/markoff-view-qml` prematurely.
 >
-> All other content below describes the project at large; the restoration
-> arc is the active subject within that.
+> All other content below describes the project at large; D2 is the active
+> subject within that.
 
 ---
 
