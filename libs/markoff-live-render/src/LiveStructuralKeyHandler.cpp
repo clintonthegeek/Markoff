@@ -187,6 +187,32 @@ void LiveStructuralKeyHandler::registerBuiltins()
         if (c.blockIndex == 0) return HR::NotHandled; // first block
         if (c.currentBlockStart == 0) return HR::NotHandled;
 
+        // Marker design §8.3: if the previous block is a marker-only
+        // paragraph, delete it (and its leading "\n\n" separator) instead
+        // of running the regular paragraph-merge.
+        const auto &prevRec = c.model->recordAt(c.blockIndex - 1);
+        if (Markoff::LiveRender::MarkerScrubber::isMarkerOnly(prevRec.text)) {
+            const auto prevRange = c.document->blockByteRange(prevRec.blockAnchor);
+            if (prevRange) {
+                quint32 start = prevRange->first;
+                // blockByteRange already includes the block's trailing \n
+                // (Task 3 discovery), so we only need to absorb 1 byte of
+                // leading separator here.
+                const quint32 absorb = (start >= 1) ? 1 : start;
+                start -= absorb;
+                Markoff::MarkoffEdit ed;
+                ed.oldStart = start;
+                ed.oldEnd   = prevRange->second;
+                ed.newText  = QByteArray();
+                c.document->applyLocalEdit({ ed });
+                // Cursor lands at qtPos 0 of the user's row, which after the
+                // marker block is removed sits at index blockIndex - 1.
+                c.cursorState->requestTextCaretAtRow(c.blockIndex - 1, 0);
+                if (c.undoCoalescer) c.undoCoalescer->recordStructural();
+                return HR::Handled;
+            }
+        }
+
         Markoff::MarkoffEdit ed;
         ed.oldStart = c.currentBlockStart - 1;
         ed.oldEnd   = c.currentBlockStart;

@@ -494,6 +494,32 @@ private Q_SLOTS:
         QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), preEditSrc);
     }
 
+    // ---------- R5.5 Task 9 — Backspace at qtPos 0 after marker block ----------
+
+    void backspace_atQt0_afterMarkerBlock_scrubsMarker() {
+        using namespace Markoff;
+        using namespace Markoff::LiveRender;
+        MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        auto *model   = binding.model();
+        auto *handler = binding.structuralKeyHandler();
+
+        doc.resetContent(QStringLiteral("alpha\n\n%1\n\nbeta\n").arg(kMarkerChar).toUtf8(),
+                         Origin::TestFixture);
+        QTRY_COMPARE(model->rowCount(), 3);
+
+        bool handled = handler->tryHandle(Qt::Key_Backspace, Qt::NoModifier,
+                                          /*blockIndex=*/2,
+                                          /*qtPos=*/0,
+                                          /*selectionEmpty=*/true,
+                                          /*blockText=*/QStringLiteral("beta"));
+        QVERIFY(handled);
+        QTRY_COMPARE(model->rowCount(), 2);
+        QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()),
+                 QStringLiteral("alpha\n\nbeta\n"));
+    }
+
     void paragraphEnter_shiftEnterOnMarkerBlock_insertsSoftBreak() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
