@@ -52,7 +52,7 @@ public:
         auto it = m_entries.find(k);
         std::optional<Entry> oldEntry;
         if (it != m_entries.end()) {
-            if (!(stamp > it->stamp)) return false;  // stale — reject
+            if (stamp <= it->stamp) return false;  // stale — reject
             oldEntry = *it;
         }
         Entry newEntry{std::move(v), stamp, false};
@@ -66,7 +66,7 @@ public:
         auto it = m_entries.find(k);
         std::optional<Entry> oldEntry;
         if (it != m_entries.end()) {
-            if (!(stamp > it->stamp)) return false;
+            if (stamp <= it->stamp) return false;
             oldEntry = *it;
         }
         Entry newEntry{Value{}, stamp, true};

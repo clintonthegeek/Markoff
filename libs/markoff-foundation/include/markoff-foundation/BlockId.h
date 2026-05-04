@@ -17,7 +17,7 @@ private:
     uint64_t m_raw = 0;
 };
 
-inline size_t qHash(const BlockId &id, size_t seed = 0) noexcept {
+inline size_t qHash(const BlockId &id, size_t seed) noexcept {
     return ::qHash(id.raw(), seed);
 }
 
