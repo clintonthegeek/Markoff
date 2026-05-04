@@ -17,6 +17,7 @@
 #include <QByteArray>
 #include <QString>
 
+#include <atomic>
 #include <memory>
 #include <unordered_map>
 #include <variant>
@@ -89,6 +90,11 @@ struct MarkoffDocument::Private {
 
     // Debounce flag for d2DocumentChanged signal
     bool d2ChangePending = false;
+
+    // Load-time block ID counter — block IDs minted during loadFromMarkdown
+    // start here to avoid colliding with testInsertBlock (1...) and
+    // d2InsertBlock (0x2000000...) and applyStructural (0x1000000...) ranges.
+    std::atomic<uint64_t> nextBlockId{0x3000000};
 
     // Per-CRDT Qt signal proxies (parented to the MarkoffDocument; Qt owns lifetime).
     // Raw pointers are safe: these are QObjects with a parent and are destroyed

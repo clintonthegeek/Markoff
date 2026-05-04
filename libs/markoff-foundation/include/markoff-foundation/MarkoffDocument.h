@@ -244,6 +244,12 @@ public:
     /// block kind changes.
     Markoff::SiblingMapProxy *kindTagMapProxy() const;
 
+    // ===== D2 load =====
+    /// Parse `src` as UTF-8 Markdown, populate frontmatter, footnote defs,
+    /// and all D2 CRDT internals (IdList, per-block Buffers, KindTagMap,
+    /// BlockAttrsMap). Emits documentLoaded() on success.
+    void loadFromMarkdown(const QByteArray &src);
+
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
     /// Emitted on the main thread each time a parse completes.
@@ -267,8 +273,14 @@ Q_SIGNALS:
     /// changes (applyBlockEdit or applyStructural).
     void d2DocumentChanged();
 
+    /// Emitted when loadFromMarkdown() completes successfully.
+    void documentLoaded();
+
 private:
     void scheduleD2Changed();
+    void materializeBlocksFromParsedDoc(const Markoff::Document &parsed,
+                                        const QString &body);
+    BlockId allocateD2BlockId() noexcept;
 
     struct Private;
     std::unique_ptr<Private> d;

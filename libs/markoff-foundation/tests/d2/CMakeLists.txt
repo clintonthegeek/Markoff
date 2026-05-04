@@ -40,3 +40,7 @@ add_test(NAME tst_d2_sibling_maps COMMAND tst_d2_sibling_maps)
 qt_add_executable(tst_d2_cmd_decomposition tst_d2_cmd_decomposition.cpp)
 target_link_libraries(tst_d2_cmd_decomposition PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_d2_cmd_decomposition COMMAND tst_d2_cmd_decomposition)
+
+qt_add_executable(tst_d2_load tst_d2_load.cpp)
+target_link_libraries(tst_d2_load PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_load COMMAND tst_d2_load)

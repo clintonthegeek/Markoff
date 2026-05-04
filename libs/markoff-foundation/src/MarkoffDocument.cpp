@@ -731,4 +731,121 @@ IdListProxy *MarkoffDocument::idListProxy() const { return d->idListProxy; }
 
 SiblingMapProxy *MarkoffDocument::kindTagMapProxy() const { return d->kindTagMapProxy; }
 
+// ============================================================================
+// D2: loadFromMarkdown — Phase 7
+// ============================================================================
+
+static BlockKind mapTopLevelKind(TopLevelBlock::Kind k)
+{
+    using Kind = TopLevelBlock::Kind;
+    switch (k) {
+    case Kind::Paragraph:             return BlockKind::Paragraph;
+    case Kind::AtxHeading:
+    case Kind::SetextHeading:         return BlockKind::Heading;
+    case Kind::FencedCodeBlock:
+    case Kind::IndentedCodeBlock:     return BlockKind::CodeBlock;
+    case Kind::BlockQuote:            return BlockKind::BlockQuote;
+    case Kind::ThematicBreak:         return BlockKind::HorizontalRule;
+    case Kind::HtmlBlock:             return BlockKind::HtmlBlock;
+    case Kind::Table:                 return BlockKind::Table;
+    case Kind::ListTight:
+    case Kind::ListLoose:             return BlockKind::ListItem;
+    default:                          return BlockKind::Paragraph;
+    }
+}
+
+BlockId MarkoffDocument::allocateD2BlockId() noexcept
+{
+    return BlockId::fromRaw(d->nextBlockId.fetch_add(1));
+}
+
+void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &parsed,
+                                                      const QString &body)
+{
+    using TLB = Markoff::TopLevelBlock;
+    using CollabText::Crdt::Anchor;
+    using CollabText::Crdt::Bias;
+
+    // Pre-convert body to UTF-8 once so byte-range slicing is correct
+    // (byteStart/byteEnd from tree-sitter are UTF-8 byte offsets)
+    const QByteArray bodyUtf8 = body.toUtf8();
+
+    Anchor lastAnchor = Anchor::min();
+
+    for (const TLB &tb : parsed.topLevelBlocks()) {
+        // Route link-ref definitions to LinkRefMap (not IdList)
+        if (tb.kind == TLB::Kind::LinkReferenceDefinition) {
+            QByteArray rawText = bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart);
+            // Use first 40 bytes as key; Phase 8 refines with proper label extraction
+            d->linkRefMap.setWithNextStamp(rawText.left(40), LinkRefValue{"", ""});
+            continue;
+        }
+
+        // Mint a new block ID
+        uint64_t rawId = d->nextBlockId.fetch_add(1);
+        BlockId newId = BlockId::fromRaw(rawId);
+
+        // Insert into IdList after the previous block (sequential append)
+        d->idList.insert_after(lastAnchor, rawId);
+        lastAnchor = d->idList.anchor_of(rawId, Bias::Right);
+
+        // Set kind
+        BlockKind kind = mapTopLevelKind(tb.kind);
+        d->kindTagMap.setWithNextStamp(newId, kind);
+
+        // Set kind-specific attrs
+        if (kind == BlockKind::Heading && tb.headingLevel > 0) {
+            d->blockAttrsMap.setWithNextStamp(
+                BlockAttrKey{newId, "level"}, AttrValue{tb.headingLevel});
+        }
+        if (kind == BlockKind::CodeBlock && !tb.codeLanguage.isEmpty()) {
+            d->blockAttrsMap.setWithNextStamp(
+                BlockAttrKey{newId, "info"}, AttrValue{tb.codeLanguage});
+        }
+
+        // Buffer content: full source range in UTF-8 bytes
+        // For FencedCodeBlock, full source is stored (fences preserved for round-trip).
+        // For ListTight/ListLoose, full list source is stored; item-level unwrapping
+        // is deferred (the v1 parser doesn't expose item byte ranges).
+        QByteArray content = bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart);
+
+        auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);
+        if (!content.isEmpty())
+            buf->apply_local_edit({{0, 0}}, {content.toStdString()});
+        d->blockBuffers[newId] = std::move(buf);
+        d->bufferProxies[newId] = new BufferProxy(newId, this);
+    }
+}
+
+void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
+{
+    // 1. Convert and extract frontmatter / footnotes
+    const QString srcStr = QString::fromUtf8(src);
+    Markoff::ExtractedSource extracted = Markoff::Document::extract(srcStr);
+
+    // 2. Store raw frontmatter (Phase 7 simplification: one "raw" entry)
+    if (!extracted.frontmatter.isEmpty()) {
+        d->frontmatterMap.setWithNextStamp("raw", extracted.frontmatter.toUtf8());
+    }
+
+    // 3. Store footnote definitions
+    for (const Markoff::FootnoteInfo &fn : extracted.footnotes) {
+        d->footnoteDefMap.setWithNextStamp(
+            fn.label.toUtf8(), fn.content.toUtf8());
+    }
+
+    // 4. Full parse of the post-frontmatter body
+    auto parsedDoc = Markoff::Document::fromMarkdown(extracted.body);
+    if (parsedDoc)
+        materializeBlocksFromParsedDoc(*parsedDoc, extracted.body);
+
+    // 5. Reset load baseline (mark "clean" post-load state)
+    d->blockEditSequences.clear();
+    d->structuralEditSequence = 0;
+
+    // 6. Notify
+    Q_EMIT documentLoaded();
+    scheduleD2Changed();
+}
+
 }  // namespace Markoff
