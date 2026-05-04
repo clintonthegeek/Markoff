@@ -122,6 +122,7 @@ private:
     bool                            m_composing = false;
     bool                            m_compositionPendingFlush = false;  // see Task 7
     bool                            m_applyingTextUpdate = false;  // pushTextToDocument re-entrance guard
+    bool                            m_pendingMarkerScrub = false; ///< next contentsChange bundles marker scrub
     QString                         m_text;          // bound QML text (mirrors model.text)
     QString                         m_previousText;  // CRDT-coherent snapshot of m_listenedDoc's text
     quint64                         m_holeId = 0;    ///< nonzero ⇒ routes writes to LiveHoleLayer

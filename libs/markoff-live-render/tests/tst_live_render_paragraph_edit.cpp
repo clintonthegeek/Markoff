@@ -19,6 +19,8 @@
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/BlockKind.h>
 #include <markoff/live-render/Coordinates.h>
+#include <markoff/live-render/Marker.h>
+#include <markoff/live-render/MarkerScrubber.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
@@ -288,6 +290,8 @@ private Q_SLOTS:
         QCOMPARE(binding.model()->recordAt(0).text, QString("helloX"));
     }
 
+    void firstEdit_intoMarkerOnlyBlock_bundlesScrubAndInsert();
+
     void model_update_does_not_echo_back_to_apply_local_edit() {
         // Setup: a doc with one paragraph; binding wired; user has typed
         // and the row sequence is stamped at N.
@@ -331,6 +335,51 @@ private Q_SLOTS:
                  "applyingModelUpdate should be true while dataChanged fires");
     }
 };
+
+void TstLiveRenderParagraphEdit::firstEdit_intoMarkerOnlyBlock_bundlesScrubAndInsert()
+{
+    using namespace Markoff::LiveRender;
+
+    Markoff::MarkoffDocument document(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&document);
+
+    // Set up: a doc with two paragraphs: "alpha" and a marker-only paragraph.
+    // "alpha\n\n<MARKER>\n" => 2 blocks in the model.
+    const QString markerContent = QStringLiteral("alpha\n\n%1\n").arg(kMarkerChar);
+    QVERIFY(waitForModelRows(binding, document, markerContent.toUtf8(), 2));
+    QCOMPARE(binding.model()->rowCount(), 2);
+
+    // Sanity: second block's text is the marker.
+    QVERIFY(MarkerScrubber::isMarkerOnly(binding.model()->recordAt(1).text));
+
+    // QTextEdit-backed document fires contentsChange(int,int,int) correctly.
+    QTextEdit editor;
+    editor.setPlainText(QString(kMarkerChar));  // mirrors row 1's content
+
+    LiveEditBinding eb;
+    eb.setBinding(&binding);
+    eb.setModelIndex(1);
+    // Mirror QML ordering: setText before wiring the document.
+    eb.setText(QString(kMarkerChar));
+    eb.setRawTextDocument(editor.document());
+
+    // Sanity: pre-edit doc still has the marker.
+    QVERIFY(document.toMarkdown().contains(kMarkerChar));
+
+    const quint64 preEditSeq = document.editSequence();
+
+    // Simulate the user typing 'x' at qtPos 0 (before the marker).
+    QTextCursor cur(editor.document());
+    cur.setPosition(0);
+    cur.insertText(QStringLiteral("x"));
+
+    // After the bundling: source paragraph contains "x" only (no marker),
+    // and exactly ONE editSequence bump occurred (one batched edit, not two).
+    QVERIFY(!document.toMarkdown().contains(kMarkerChar));
+    QCOMPARE(document.toMarkdown(), QStringLiteral("alpha\n\nx\n"));
+    QCOMPARE(document.editSequence(), preEditSeq + 1);
+}
 
 QTEST_MAIN(TstLiveRenderParagraphEdit)
 #include "tst_live_render_paragraph_edit.moc"

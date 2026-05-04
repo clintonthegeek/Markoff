@@ -4,6 +4,8 @@
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveHoleLayer.h>
 #include <markoff/live-render/Coordinates.h>
+#include <markoff/live-render/Marker.h>
+#include <markoff/live-render/MarkerScrubber.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
@@ -62,6 +64,10 @@ void LiveEditBinding::setText(const QString &t)
     m_text = t;
     Q_EMIT textChanged();
     pushTextToDocument();
+    // Marker-aware first-edit bundling: if the model just pushed a
+    // marker-only string into this delegate, mark the next user edit
+    // as one that should atomically replace the marker content.
+    m_pendingMarkerScrub = MarkerScrubber::isMarkerOnly(t);
 }
 
 quint64 LiveEditBinding::holeId() const { return m_holeId; }
@@ -163,6 +169,49 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     if (m_composing) {
         m_compositionPendingFlush = true;
         return;
+    }
+
+    // Marker-scrub bundling (Task 5): if the previously-pushed model content
+    // was a marker-only string, bundle the marker removal and the user's
+    // typed bytes into a single applyLocalEdit. This produces one CRDT op,
+    // one parse-back, and one undo entry — no race window between insert
+    // and scrub.
+    if (m_pendingMarkerScrub) {
+        m_pendingMarkerScrub = false;
+        // Only applies to inner-model rows (not hole rows).
+        if (m_holeId == 0 && m_modelIndex < m_binding->model()->rowCount()) {
+            auto *doc   = m_binding->document();
+            auto *model = m_binding->model();
+            const auto &record = model->recordAt(m_modelIndex);
+            const auto rangeOpt = doc->blockByteRange(record.blockAnchor);
+            if (rangeOpt) {
+                // The block byte range INCLUDES the trailing '\n'. We
+                // replace the entire block range (including the trailing
+                // '\n') with the post-edit plain text stripped of any
+                // marker characters, plus the preserved trailing '\n'.
+                // This produces exactly "x\n" where the old content was
+                // "<MARKER>\n", keeping downstream block structure intact.
+                const quint32 blockStart = rangeOpt->first;
+                const quint32 blockEnd   = rangeOpt->second;
+
+                // Strip any remaining marker chars from the post-edit
+                // plain text. The QTextDocument shows "x<ZWSP>" because
+                // the user typed before the marker and onContentsChange
+                // fires before the document is further modified.
+                QString postEditText = m_listenedDoc->toPlainText();
+                postEditText.remove(kMarkerChar);
+
+                Markoff::MarkoffEdit ed;
+                ed.oldStart = blockStart;
+                ed.oldEnd   = blockEnd;
+                ed.newText  = postEditText.toUtf8() + "\n";
+
+                doc->applyLocalEdit({ ed });
+                model->setRowEditSequence(m_modelIndex, doc->editSequence());
+                return;
+            }
+        }
+        // Fall through to normal edit path if we couldn't do the bundled edit.
     }
 
     // Hole routing: if this binding is attached to a hole row, write to
