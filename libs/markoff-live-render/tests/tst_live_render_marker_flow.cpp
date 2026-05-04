@@ -128,6 +128,13 @@ private Q_SLOTS:
     /// First Enter inserts a marker; second Enter at qtPos 0 of the
     /// marker block must be consumed but produce no source change.
     void step6_stackedEnter_onMarkerBlock_isNoOp();
+
+    /// Step 7: Ctrl-Z after typing into a marker block returns first to
+    /// the marker state, then to the pre-Enter state. Two undo entries
+    /// are produced: the EOB-Enter (marker insert) and the bundled
+    /// scrub+insert. Coalescing must NOT merge these — they are
+    /// structural events.
+    void step7_undo_returnsToMarkerThenPreEnterState();
 };
 
 // ---------- Step 1 ----------
@@ -406,6 +413,55 @@ void TstLiveRenderMarkerFlow::step6_stackedEnter_onMarkerBlock_isNoOp()
     QVERIFY(consumed);
     QCOMPARE(doc.editSequence(), preStackedSeq);
     QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), preStackedSrc);
+}
+
+// ---------- Step 7 ----------
+
+void TstLiveRenderMarkerFlow::step7_undo_returnsToMarkerThenPreEnterState()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+
+    QVERIFY(waitForRows(binding, doc, QByteArrayLiteral("alpha"), 1));
+    const QString preEnterSrc = QString::fromUtf8(doc.toMarkdownUtf8());
+
+    // EOB-Enter: marker paragraph (undo entry #1).
+    QVERIFY(binding.structuralKeyHandler()->tryHandle(
+        Qt::Key_Return, Qt::NoModifier, /*blockIndex=*/0, /*qtPos=*/5,
+        /*selectionEmpty=*/true, QStringLiteral("alpha")));
+    QVERIFY(waitForRowCount(binding, 2));
+    const QString markerSrc = QString::fromUtf8(doc.toMarkdownUtf8());
+    QVERIFY(markerSrc.contains(kMarkerChar));
+
+    // Wire the edit binding to the marker block.
+    QTextEdit editor;
+    editor.setPlainText(QString(kMarkerChar));
+    LiveEditBinding eb;
+    eb.setBinding(&binding);
+    eb.setModelIndex(1);
+    eb.setText(QString(kMarkerChar));
+    eb.setRawTextDocument(editor.document());
+
+    // Type one char — triggers the bundled scrub+insert (undo entry #2).
+    QTextCursor cur(editor.document());
+    cur.setPosition(0);
+    cur.insertText(QStringLiteral("x"));
+
+    const QString postTypeSrc = QString::fromUtf8(doc.toMarkdownUtf8());
+    QVERIFY(!postTypeSrc.contains(kMarkerChar));
+    QCOMPARE(postTypeSrc, QStringLiteral("alpha\n\nx\n"));
+
+    // First Ctrl-Z: returns to marker state.
+    binding.undoCoalescer()->undo();
+    const QString afterFirstUndo = QString::fromUtf8(doc.toMarkdownUtf8());
+    QVERIFY2(afterFirstUndo.contains(kMarkerChar),
+             qPrintable(QStringLiteral("first undo did not restore marker; src=%1")
+                            .arg(afterFirstUndo)));
+
+    // Second Ctrl-Z: returns to pre-Enter state.
+    binding.undoCoalescer()->undo();
+    QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), preEnterSrc);
 }
 
 QTEST_MAIN(TstLiveRenderMarkerFlow)
