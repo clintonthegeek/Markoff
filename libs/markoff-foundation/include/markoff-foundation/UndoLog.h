@@ -6,6 +6,7 @@
 #include <variant>
 #include <vector>
 #include <QtTypes>
+#include <QtAssert>
 
 namespace Markoff {
 
@@ -82,13 +83,14 @@ public:
             && (ctx.timestampMs - m_lastCoalesceCtx->timestampMs) < 1000;
 
         if (canExtend) {
-            // Temporarily attach m_pendingEntry to the existing last entry.
-            // Setting m_pendingEntry non-null makes the next Transaction()
-            // see itself as inner (no new entry pushed, no cleanup on dtor).
+            // Extend last entry: set m_pendingEntry so the Transaction sees
+            // itself as inner (no new entry pushed, no entry popped on dtor).
+            // The body must not push new entries — asserted after.
+            const size_t sizeBefore = m_entries.size();
             m_pendingEntry = &m_entries.back();
             Transaction t(*this);  // sees m_pendingEntry != nullptr → inner
             body(t);
-            // t dtor: m_isOutermost=false → no pop, no clear of m_pendingEntry
+            Q_ASSERT(m_entries.size() == sizeBefore); // body must not push entries
             m_pendingEntry = nullptr;
         } else {
             // m_pendingEntry == nullptr → Transaction ctor pushes new entry

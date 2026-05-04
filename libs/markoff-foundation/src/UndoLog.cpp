@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff-foundation/UndoLog.h>
 #include <algorithm>
+#include <QtAssert>
 
 namespace Markoff {
 
@@ -22,14 +23,14 @@ UndoLog::Transaction::~Transaction() {
     if (m_isOutermost) {
         if (m_rolledBack || m_log.m_pendingEntry->targets.empty()) {
             m_log.m_entries.pop_back();
-            if (!m_rolledBack) --m_log.m_nextActionId;  // reclaim action id for empty tx
+            --m_log.m_nextActionId;  // reclaim action id — entry was discarded
         }
         m_log.m_pendingEntry = nullptr;
     }
 }
 
 void UndoLog::Transaction::registerOp(CrdtTarget target, OpId opId) {
-    if (!m_log.m_pendingEntry) return;
+    Q_ASSERT(m_log.m_pendingEntry && "registerOp called outside a transaction");
     m_log.m_pendingEntry->targets.emplace_back(std::move(target), opId);
 }
 
