@@ -193,3 +193,5 @@ target_link_libraries(tst_foundation_block_anchor_perf PRIVATE Qt6::Test markoff
 target_include_directories(tst_foundation_block_anchor_perf PRIVATE
     ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src)
 set_tests_properties(tst_foundation_block_anchor_perf PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_subdirectory(d2)
