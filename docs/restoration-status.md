@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-04 (R5.5 marker-paragraph implementation complete; spec amendments landed; entering dogfood gate.)
+**Last updated:** 2026-05-04 (R5.5 marker-paragraph: 19 implementation commits + Bug 1 fix + Bug 2 fix landed; dogfood gate has surfaced an unresolved Bug 3 — see handoff doc.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,11 +11,11 @@
 
 ## TL;DR — what to do *right now*
 
-> **R5.5 marker-paragraph implementation complete; dogfood gate is the final acceptance.** The v2-holes design was retired after the 2026-05-04 architectural review surfaced cycle-guard recurrence under new names. The replacement design — marker-paragraph (`docs/specs/2026-05-03-marker-paragraph-design.md`) — uses an invisible ZWSP character (U+200B) to make EOB-Enter and start-of-paragraph-Enter produce a real parser block whose content is the marker. An atomic-bundled-edit replaces the marker with the user's first keystroke as a single CRDT op (no race window). A `MarkerScrubber` service handles the three leakage paths (focus-out, pre-save, post-load).
+> **R5.5 marker-paragraph implementation is structurally complete (the v2-holes design retired; marker design landed; tests green) but Task 18 dogfood gate has surfaced an unresolved cursor-delivery bug (Bug 3) that has resisted three different fix attempts**. Bugs 1 and 2 from dogfood are fixed; Bug 3 persists. The R5.5 phase is `dogfood-blocked` until Bug 3 is understood and addressed. See `docs/handoff/2026-05-04-bug-3-handoff.md`.
 >
-> Plan tasks 1–17 of `docs/plans/2026-05-03-live-render-r5-5-marker-paragraph.md` are landed. Task 18 — manual dogfood gate — is the remaining acceptance criterion. The harness suite (16 tests across save / load / undo / stacked-Enter / focus-out / stress / EOB-then-type) is green; v2-holes code (`LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, the discriminated `BlockId` variant) is deleted; clipboard scrubber strips ZWSP; backspace at qtPos 0 after a marker block scrubs the marker; `UndoCoalescer` is back to a single CRDT-undo regime.
+> Plan tasks 1–17 of `docs/plans/2026-05-03-live-render-r5-5-marker-paragraph.md` are landed. The harness suite (16 tests across save / load / undo / stacked-Enter / focus-out / stress / EOB-then-type) is green; v2-holes code (`LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, the discriminated `BlockId` variant) is deleted; clipboard scrubber strips ZWSP; backspace at qtPos 0 after a marker block scrubs the marker; `UndoCoalescer` is back to a single CRDT-undo regime. Three additional fixes landed on top of Tasks 1–17: `114b807` (Bug 1 list-gate, fixed), `7718c54` + `3c86b76` + `dd64de5` (Bug 2 + Bug 3 attempts; Bug 3 unresolved).
 >
-> **Recommended next:** Run the §13 dogfood script on `markoff-live-render-app` (≥200 words across ≥10 paragraphs; verify no scramble, clean save, marker-free reload).
+> **Next session:** read `docs/handoff/2026-05-04-bug-3-handoff.md` to pick up Bug 3 investigation.
 >
 > **Read first** (in this order):
 > 1. `docs/specs/2026-05-03-marker-paragraph-design.md` — the active design (replaces the archived v2-holes spec).
@@ -39,7 +39,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | `3484c11`, `2225061`, `e837710`, `1f26ec8`, `18abd96` | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. Dogfood-surfaced fixes: selection-paint, scroll-then-click hit-test, HR source-faithful copy. 114/114. |
 | **R4** | [r4-paragraph-editing](plans/2026-05-02-live-render-r4-paragraph-editing.md) | `complete` | `1b75d37`, `ce0494f`, `3181fe8`, `dec12e7`, `7ae29e1`, `033d7e7`, `fa8e80d`, `99c616f`, `5e12f10`, `563c1f3`, `77a84eb`, `28e1c8f`, `a24c766`, `26dc802`, `7252498`, `324de05`, `201cbd3`, `5662f95`, `7d49718`, `c7dca41`, `37b97bf` | Paragraph + heading + code-block writable via LiveEditBinding; freshness gate; three cycle guards; previousText cache; cachedByteOffset refresh; click-focus routing; Enter swallowed (R5). 6/6 fast-tier; 8 paragraph_edit slots. |
 | **R5** | [r5-structural-keys](plans/2026-05-02-live-render-r5-structural-keys.md) | `in-progress (paused — Tasks 12–18 pending; superseded in part by R5.5's hole dispatch)` | `7c6f7f6`, `6da5698`, `dff19de`, `9d9d157`, `abc1005`, `4901383`, `05363f2`, `9a6c9f8`, `1ab0da9`, `cc64af9`, `21be140`, `b8fb639` | Tasks 1–11 landed. EOB-Enter / start-Enter now handled by R5.5 (holes); R5 dogfood criterion amended (spec §11 R5). Tasks 12–17 (delegate wiring + integration) — most are now subsumed by R5.5 work; remaining items can close independently. |
-| **R5.5** | [r5-5-marker-paragraph](plans/2026-05-03-live-render-r5-5-marker-paragraph.md) (active) — supersedes archived [r5-5-holes](archive/2026-05-03-live-render-r5-5-holes.md) | `dogfood` | `a895817..5473e81` (marker plan tasks 1–17) | Marker-paragraph design (`docs/specs/2026-05-03-marker-paragraph-design.md`) replaces v2 holes. Tasks 1–17 landed: `Marker.h` constant, `MarkerScrubber` service (predicate + scrubOnFocusOut / scrubBeforeSave / scrubAfterLoad), atomic-bundled-edit primitive in `LiveEditBinding`, EOB / start-of-paragraph Enter switched to marker insertion (with corrected start-of-paragraph byte order — Gap A), stacked-Enter no-op, focus-out / save / load wiring (with two-step contract for load — Gap B), backspace-after-marker scrub, clipboard ZWSP stripping, single-regime `UndoCoalescer`, `BlockId` reverted to `Markoff::BlockAnchor`, all v2-hole code deleted (`LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, three test executables). 16 harness tests green. **Next step: Task 18 — manual dogfood gate.** |
+| **R5.5** | [r5-5-marker-paragraph](plans/2026-05-03-live-render-r5-5-marker-paragraph.md) (active) — supersedes archived [r5-5-holes](archive/2026-05-03-live-render-r5-5-holes.md) | `dogfood-blocked` | `a895817..5473e81` (marker plan tasks 1–17) | Marker-paragraph design (`docs/specs/2026-05-03-marker-paragraph-design.md`) replaces v2 holes. Tasks 1–17 landed: `Marker.h` constant, `MarkerScrubber` service (predicate + scrubOnFocusOut / scrubBeforeSave / scrubAfterLoad), atomic-bundled-edit primitive in `LiveEditBinding`, EOB / start-of-paragraph Enter switched to marker insertion (with corrected start-of-paragraph byte order — Gap A), stacked-Enter no-op, focus-out / save / load wiring (with two-step contract for load — Gap B), backspace-after-marker scrub, clipboard ZWSP stripping, single-regime `UndoCoalescer`, `BlockId` reverted to `Markoff::BlockAnchor`, all v2-hole code deleted (`LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, three test executables). 16 harness tests green. Dogfood (Task 18) surfaced 3 bugs: Bug 1 (`114b807`) and Bug 2 (`7718c54`) fixed; Bug 3 (`3c86b76`, `dd64de5`) persists across two additional implementation attempts. See handoff doc. |
 | **R6** | *not yet written* | `pending` | — | Other text blocks + speculation refresh. |
 | **R7** | *not yet written* | `pending` | — | Lists + blockquotes (II.a, II.b). |
 | **R8** | *not yet written* | `pending` | — | Math block + BlockInternalEdit (I.a, L8). |
@@ -173,6 +173,33 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 ## Dogfood log
 
 The user does manual dogfood testing between phases. Their feedback lives here verbatim. **Treat this section as the highest-priority signal of restoration health** — test passes don't substitute for dogfood feedback.
+
+### 2026-05-04 — R5.5 (marker-paragraph) — pass 3
+
+User script: dogfood the live render in `markoff-live-render-app` on `docs/phase-c-status.md`, repeating the §13 marker-paragraph dogfood script after the Bug 3 v2 (byte-keyed cursor delivery) fix landed in `dd64de5`.
+
+User result: Bug 3 reproduced again. Cursor lands one row past the user's content (on the originally-following paragraph) when pressing Enter at qtPos 0 of a regular paragraph mid-document. The byte-keyed delivery did not address it. User stopped iterating.
+
+Action: docs-only commit (this commit) — captures honest state of the bug, retracts the spec's "byte-keyed delivery is robust" claim, transitions R5.5 to `dogfood-blocked`, and lands `docs/handoff/2026-05-04-bug-3-handoff.md` for the next agent. No further code attempts in this session.
+
+### 2026-05-04 — R5.5 (marker-paragraph) — pass 2
+
+User script: dogfood the live render in `markoff-live-render-app` on `docs/phase-c-status.md`, repeating the §13 marker-paragraph dogfood script after the Bug 3 v1 (anchor-keyed cursor delivery) fix landed in `3c86b76`.
+
+User result: Bug 3 reproduced. Cursor consistently lands on the originally-following paragraph instead of the user's shifted content. Reproduced 3 times in a row. Log captured at `/tmp/dogfood2.txt` (529 lines).
+
+Action: Bug 3 v2 attempt landed (`dd64de5`) — switched cursor delivery from anchor-keyed to byte-keyed `requestTextCaretAtByte`. See pass-3 entry above for outcome.
+
+### 2026-05-04 — R5.5 (marker-paragraph) — pass 1
+
+User script: dogfood the live render in `markoff-live-render-app` per the §13 marker-paragraph dogfood script (≥200 words across ≥10 paragraphs; verify no scramble, clean save, marker-free reload).
+
+User result: two bugs surfaced.
+
+- Bug 1: pressing Enter inside a list item mangled the list (the marker-insertion path fired on a list-item block, which is not a top-level paragraph).
+- Bug 2: pressing Enter at the start of a paragraph left the cursor in the marker paragraph above the user's content, not in the user's content.
+
+Action: Bug 1 fixed in `114b807` (list-gate predicate `rowIsListOrQuoteContent` short-circuits the marker dispatch for non-paragraph block kinds). Bug 2 fix attempted in `7718c54` (row-keyed `requestTextCaretAtNewRow(blockIndex+1)` with relaxed `rowsInserted` bound check). Bug 2 single-paragraph test passed; multi-paragraph dogfood reproduced what is now tracked as Bug 3 — see pass-2 entry above.
 
 ### 2026-05-02 — R4 (paragraph editing through sequence-tagged binding)
 
