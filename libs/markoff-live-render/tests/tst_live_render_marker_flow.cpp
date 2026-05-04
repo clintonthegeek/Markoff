@@ -103,6 +103,12 @@ private Q_SLOTS:
     /// the delegate loses focus) routes through MarkerScrubber. Source
     /// must return to "alpha\n".
     void step3_focusOutWithoutTyping_scrubsMarker();
+
+    /// Step 4: save-while-marker-present produces clean bytes. After
+    /// EOB-Enter (marker present), calling
+    /// LiveListModelBinding::flushPendingMarkers() — the host's
+    /// pre-save hook — must remove the marker from source.
+    void step4_savePath_flushPendingMarkers_cleansSource();
 };
 
 // ---------- Step 1 ----------
@@ -284,6 +290,36 @@ void TstLiveRenderMarkerFlow::step3_focusOutWithoutTyping_scrubsMarker()
     // Wait for the scrubber's applyLocalEdit to land in the model.
     QVERIFY(waitForRowCount(binding, 1));
     QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), QStringLiteral("alpha\n"));
+}
+
+// ---------- Step 4 ----------
+
+void TstLiveRenderMarkerFlow::step4_savePath_flushPendingMarkers_cleansSource()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+
+    QVERIFY(waitForRows(binding, doc, QByteArrayLiteral("alpha"), 1));
+
+    // EOB-Enter: marker paragraph in source; user has not typed.
+    QVERIFY(binding.structuralKeyHandler()->tryHandle(
+        Qt::Key_Return, Qt::NoModifier, /*blockIndex=*/0, /*qtPos=*/5,
+        /*selectionEmpty=*/true, QStringLiteral("alpha")));
+    QVERIFY(waitForRowCount(binding, 2));
+    QVERIFY(QString::fromUtf8(doc.toMarkdownUtf8()).contains(kMarkerChar));
+
+    // Host's pre-save hook (spec §6.4): scrubs all marker-only
+    // paragraphs from the doc.
+    binding.flushPendingMarkers();
+
+    // After flush, model should drop the marker row and source must
+    // contain no marker bytes.
+    QVERIFY(waitForRowCount(binding, 1));
+    const QByteArray bytes = doc.toMarkdownUtf8();
+    QVERIFY2(!bytes.contains(kMarkerUtf8),
+             "marker bytes leaked into save output");
+    QCOMPARE(QString::fromUtf8(bytes), QStringLiteral("alpha\n"));
 }
 
 QTEST_MAIN(TstLiveRenderMarkerFlow)
