@@ -96,6 +96,9 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/FrontmatterMap.h
     include/markoff-foundation/LinkRefMap.h
     include/markoff-foundation/FootnoteDefMap.h
+    # --- Save (Phase 8) ---
+    include/markoff-foundation/BlockSerializer.h
+    src/BlockSerializers.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h
