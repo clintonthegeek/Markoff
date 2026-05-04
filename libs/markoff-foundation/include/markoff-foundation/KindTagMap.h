@@ -6,4 +6,4 @@
 
 namespace Markoff {
 using KindTagMap = CausalLwwMap<BlockId, BlockKind>;
-}
+}  // namespace Markoff
