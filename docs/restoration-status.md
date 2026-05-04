@@ -2,7 +2,7 @@
 
 **This is the live status of the live-render restoration arc. Update after every commit, every dogfood pass, every spec amendment, every plan written.**
 
-**Last updated:** 2026-05-03 (R5.5 implementation complete; entering dogfood gate.)
+**Last updated:** 2026-05-04 (R5.5 marker-paragraph implementation complete; spec amendments landed; entering dogfood gate.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Branch tip when this entry was written:** see recent-changes log
@@ -11,17 +11,18 @@
 
 ## TL;DR — what to do *right now*
 
-> **R5.5 implementation iteration STOPPED — architectural review pending.** The R5.5 dogfood pass (2026-05-04) surfaced six architectural-level issues that one-bug-at-a-time fixes cannot resolve. The pattern is the v0 cycle-guard recurrence under new names: each fix exposed the next bug in the layer beneath it. Per the systematic-debugging skill's "3+ fixes failed → question the architecture" criterion (met three times over within one iteration), iteration is paused.
+> **R5.5 marker-paragraph implementation complete; dogfood gate is the final acceptance.** The v2-holes design was retired after the 2026-05-04 architectural review surfaced cycle-guard recurrence under new names. The replacement design — marker-paragraph (`docs/specs/2026-05-03-marker-paragraph-design.md`) — uses an invisible ZWSP character (U+200B) to make EOB-Enter and start-of-paragraph-Enter produce a real parser block whose content is the marker. An atomic-bundled-edit replaces the marker with the user's first keystroke as a single CRDT op (no race window). A `MarkerScrubber` service handles the three leakage paths (focus-out, pre-save, post-load).
 >
-> **Recommended next:** READ `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md` (the architectural-review document). It enumerates the six bugs, the cycle-guard pattern, the open architectural questions (most importantly §3.1 — what is a hole, structurally?), five candidate doc amendments, and a specific recommendation. The recommendation is to spike §3.1(c) (marker-character approach) on a throwaway branch first, then re-plan R5.5 from the answers.
+> Plan tasks 1–17 of `docs/plans/2026-05-03-live-render-r5-5-marker-paragraph.md` are landed. Task 18 — manual dogfood gate — is the remaining acceptance criterion. The harness suite (16 tests across save / load / undo / stacked-Enter / focus-out / stress / EOB-then-type) is green; v2-holes code (`LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, the discriminated `BlockId` variant) is deleted; clipboard scrubber strips ZWSP; backspace at qtPos 0 after a marker block scrubs the marker; `UndoCoalescer` is back to a single CRDT-undo regime.
 >
-> **DO NOT** start a new fix iteration from the current code state. The implementation passes 10/10 fast-tier tests and is "usable for slow-typing dogfood" but does not meet the spec's R5.5 acceptance criteria, and the architectural questions in the review doc must be answered before further code work.
+> **Recommended next:** Run the §13 dogfood script on `markoff-live-render-app` (≥200 words across ≥10 paragraphs; verify no scramble, clean save, marker-free reload).
 >
 > **Read first** (in this order):
-> 1. `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md` — the load-bearing document for the next decisions.
-> 2. `docs/handoff/2026-05-03-r5-holes-postmortem.md` — the v1/v2 design rationale; partially superseded by §4 of the review doc.
-> 3. `docs/specs/2026-05-03-v2-holes-design.md` — the v2 design as currently implemented; may be archived depending on §3.1's answer.
-> 4. `docs/plans/2026-05-03-live-render-r5-5-holes.md` — the executed plan; will be re-planned per §3.1's answer.
+> 1. `docs/specs/2026-05-03-marker-paragraph-design.md` — the active design (replaces the archived v2-holes spec).
+> 2. `docs/plans/2026-05-03-live-render-r5-5-marker-paragraph.md` — the active plan (tasks 1–17 landed; task 18 dogfood gate pending).
+> 3. `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md` — the architectural review that retired v2 holes.
+> 4. `docs/handoff/2026-05-03-section-3-1-spike-findings.md` — the spike that validated the marker approach against the parser.
+> 5. `docs/archive/2026-05-03-v2-holes-design.md` and `docs/archive/2026-05-03-live-render-r5-5-holes.md` — retired v2-holes design and plan, kept for historical reference.
 
 ---
 
@@ -38,7 +39,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 | **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | `3484c11`, `2225061`, `e837710`, `1f26ec8`, `18abd96` | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. Dogfood-surfaced fixes: selection-paint, scroll-then-click hit-test, HR source-faithful copy. 114/114. |
 | **R4** | [r4-paragraph-editing](plans/2026-05-02-live-render-r4-paragraph-editing.md) | `complete` | `1b75d37`, `ce0494f`, `3181fe8`, `dec12e7`, `7ae29e1`, `033d7e7`, `fa8e80d`, `99c616f`, `5e12f10`, `563c1f3`, `77a84eb`, `28e1c8f`, `a24c766`, `26dc802`, `7252498`, `324de05`, `201cbd3`, `5662f95`, `7d49718`, `c7dca41`, `37b97bf` | Paragraph + heading + code-block writable via LiveEditBinding; freshness gate; three cycle guards; previousText cache; cachedByteOffset refresh; click-focus routing; Enter swallowed (R5). 6/6 fast-tier; 8 paragraph_edit slots. |
 | **R5** | [r5-structural-keys](plans/2026-05-02-live-render-r5-structural-keys.md) | `in-progress (paused — Tasks 12–18 pending; superseded in part by R5.5's hole dispatch)` | `7c6f7f6`, `6da5698`, `dff19de`, `9d9d157`, `abc1005`, `4901383`, `05363f2`, `9a6c9f8`, `1ab0da9`, `cc64af9`, `21be140`, `b8fb639` | Tasks 1–11 landed. EOB-Enter / start-Enter now handled by R5.5 (holes); R5 dogfood criterion amended (spec §11 R5). Tasks 12–17 (delegate wiring + integration) — most are now subsumed by R5.5 work; remaining items can close independently. |
-| **R5.5** | [r5-5-holes](plans/2026-05-03-live-render-r5-5-holes.md) | `paused — architectural review` | `c641c39..4ddd146` + 2026-05-04 dogfood-iteration commits | Implementation passes 10/10 fast-tier and is usable for slow-typing dogfood, but six architectural issues surfaced in dogfood (Bug A–F per the review doc) that resist one-bug-at-a-time fixes. Iteration paused per systematic-debugging "3+ fixes → question architecture" criterion. **Next step: read `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md`, decide §3.1 (hole abstraction), re-plan from there.** |
+| **R5.5** | [r5-5-marker-paragraph](plans/2026-05-03-live-render-r5-5-marker-paragraph.md) (active) — supersedes archived [r5-5-holes](archive/2026-05-03-live-render-r5-5-holes.md) | `dogfood` | `a895817..5473e81` (marker plan tasks 1–17) | Marker-paragraph design (`docs/specs/2026-05-03-marker-paragraph-design.md`) replaces v2 holes. Tasks 1–17 landed: `Marker.h` constant, `MarkerScrubber` service (predicate + scrubOnFocusOut / scrubBeforeSave / scrubAfterLoad), atomic-bundled-edit primitive in `LiveEditBinding`, EOB / start-of-paragraph Enter switched to marker insertion (with corrected start-of-paragraph byte order — Gap A), stacked-Enter no-op, focus-out / save / load wiring (with two-step contract for load — Gap B), backspace-after-marker scrub, clipboard ZWSP stripping, single-regime `UndoCoalescer`, `BlockId` reverted to `Markoff::BlockAnchor`, all v2-hole code deleted (`LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, three test executables). 16 harness tests green. **Next step: Task 18 — manual dogfood gate.** |
 | **R6** | *not yet written* | `pending` | — | Other text blocks + speculation refresh. |
 | **R7** | *not yet written* | `pending` | — | Lists + blockquotes (II.a, II.b). |
 | **R8** | *not yet written* | `pending` | — | Math block + BlockInternalEdit (I.a, L8). |
@@ -60,7 +61,32 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-04 | (this commit) | docs(handoff): R5.5 dogfood architectural review — six bugs surfaced in dogfood, cycle-guard pattern recurrence, R5.5 paused pending architectural decisions |
+| 2026-05-04 | (this commit) | docs(spec): R5.5 marker-paragraph C-restoration amendments + restoration-status update — A2 supersedes A1; §14 amendment table applied; Gap A (start-of-paragraph payload byte order) and Gap B (`scrubAfterLoad` two-step timing contract) captured in marker-paragraph design §4.2 / §6.4 / §17 open question 8 |
+| 2026-05-04 | `5473e81` | r5.5(marker): converge LiveEditBinding cache after marker-bundled edit (R5.5-marker Task 16 step 7 follow-up) |
+| 2026-05-04 | `dee7b77` | r5.5(marker): test undo returns to marker then pre-Enter state (R5.5-marker Task 16 step 7) |
+| 2026-05-04 | `9018f84` | r5.5(marker): test stacked-Enter on marker block is no-op (R5.5-marker Task 16 step 6) |
+| 2026-05-04 | `2e4e1a7` | r5.5(marker): test load-time scrubber removes markers (R5.5-marker Task 16 step 5) |
+| 2026-05-04 | `d609671` | r5.5(marker): test save path flushes pending markers (R5.5-marker Task 16 step 4) |
+| 2026-05-04 | `45a669a` | r5.5(marker): test focus-out without typing scrubs marker (R5.5-marker Task 16 step 3) |
+| 2026-05-04 | `52d859e` | r5.5(marker): test stress-typing race verification (R5.5-marker Task 16 step 2) |
+| 2026-05-04 | `e88cd78` | r5.5(marker): test EOB-Enter then type atomic scrub (R5.5-marker Task 16 step 1) |
+| 2026-05-04 | `0de76cc` | r5.5(marker): retire three v2 hole-specific test executables (R5.5-marker Task 14) |
+| 2026-05-04 | `bb20558` | r5.5(marker): retire LiveHoleLayer / LiveProxyBlockModel / BlockHole (R5.5-marker Task 13) |
+| 2026-05-04 | `df9878d` | r5.5(marker): revert BlockId to Markoff::BlockAnchor (R5.5-marker Task 12) |
+| 2026-05-04 | `bcd5ca5` | r5.5(marker): UndoCoalescer single regime — drop hole branches (R5.5-marker Task 11) |
+| 2026-05-04 | `29032eb` | r5.5(marker): clipboard scrubber strips ZWSP from copy output (R5.5-marker Task 10) |
+| 2026-05-04 | `df1cd43` | r5.5(marker): backspace at qtPos 0 after marker block scrubs the marker (R5.5-marker Task 9) |
+| 2026-05-04 | `1c38539` | r5.5(marker): wire MarkerScrubber to focus-out / save / load events (R5.5-marker Task 8) |
+| 2026-05-04 | `89f0945` | r5.5(marker): no-op rule excludes Shift-Enter (soft-break still fires) (R5.5-marker Task 7 follow-up) |
+| 2026-05-04 | `20d6c66` | r5.5(marker): stacked-Enter on a marker-only block is a no-op (R5.5-marker Task 7) |
+| 2026-05-04 | `bc4dee5` | r5.5(marker): EOB-Enter and start-of-block-Enter insert marker paragraph (R5.5-marker Task 6) |
+| 2026-05-04 | `27a836b` | r5.5(marker): atomic-bundled-edit primitive in LiveEditBinding (R5.5-marker Task 5) |
+| 2026-05-04 | `0df4888` | r5.5(marker): contract test for cursor delivery into a marker paragraph (R5.5-marker Task 4) |
+| 2026-05-04 | `37fec5d` | r5.5(marker): MarkerScrubber edit-emission methods (R5.5-marker Task 3) |
+| 2026-05-04 | `f00e658` | r5.5(marker): MarkerScrubber predicate + skeleton (R5.5-marker Task 2) |
+| 2026-05-04 | `a895817` | r5.5(marker): land marker constants header + parser-acceptance contract tests (R5.5-marker Task 1) |
+| 2026-05-04 | `1e3d2ef` | docs: archive v2-holes design + plan; surface marker-paragraph design and plan as the live R5.5 references |
+| 2026-05-04 | (earlier) | docs(handoff): R5.5 dogfood architectural review — six bugs surfaced in dogfood, cycle-guard pattern recurrence, R5.5 paused pending architectural decisions |
 | 2026-05-04 | (pending) | feat(live-render): R5.5 dogfood-iteration fixes — proxy targeted insert, requestTextCaretAtNewRow, holeReified cursor delivery, anchorRenumbered for BlockAnchor instability, BlockWalker trailing-`\n` trim. All correct in isolation; full architectural rationale in 2026-05-04 review doc. |
 | 2026-05-03 | (earlier) | feat(live-render): R5.5 implementation complete — test-app title bumped; entering dogfood gate |
 | 2026-05-03 | `4ddd146` | test(live-render): selection across hole includes bufferText in copy (R5.5 Task 18) |
@@ -232,10 +258,33 @@ Concrete amendments (per design doc §13):
 5. **§6.1 L6** — add `LiveHoleLayer` and `LiveProxyBlockModel` as L6 components alongside `LiveSpeculationLayer`. Architecture diagram updated.
 6. **§7.2 structural-edit data flow** — replace EOB-Enter flow with hole-create → local-typing → commit-on-trigger flow; mid-block split flow unchanged.
 7. **§11 R5** — caveat dogfood criterion: end-of-paragraph and start-of-paragraph Enter cases require R5.5; R5 ships with these as documented limitations.
-8. **§11 (new R5.5)** — paragraph holes phase between R5 and R6; plan at `docs/plans/2026-05-03-live-render-r5-5-holes.md`.
+8. **§11 (new R5.5)** — paragraph holes phase between R5 and R6; plan at `docs/plans/2026-05-03-live-render-r5-5-holes.md` (later archived at `docs/archive/2026-05-03-live-render-r5-5-holes.md`; superseded by A2 / marker-paragraph plan).
 9. **§15 open questions** — resolve §3.1 BlockId question; add v2-holes scope note (paragraph-only initially; full hole inventory deferred to R7+).
 User decision: **PRE-APPROVED.** User authorised autonomous execution of spec amendments + R5.5 plan + implementation start (2026-05-03 conversation transcript).
 Spec edit commit: `8d8ea00` (`docs(spec): R5/R5.5 amendment — v2 holes`).
+
+### A2 — 2026-05-04 — Replace v2 holes with marker-paragraph (supersedes A1)
+
+Proposed by: agent (during 2026-05-04 R5.5 dogfood architectural review; design refined through `docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md` §3.1 spike + `docs/handoff/2026-05-03-section-3-1-spike-findings.md`).
+Affects: spec premise 6, §3.1 (BlockId type), §4.4 cycle-guards table, §5.4 structural keys, §6.1 L6, §7.2 structural-edit data flow, §11 R5 + R5.5 phase scope, §15 open questions. (Same surface area as A1; the cumulative effect is "A1 reverted, replaced with marker-paragraph design.")
+Reason: R5.5 v2-holes implementation passed all unit tests but dogfood surfaced six architectural-level bugs (Bug A–F per the architectural-review handoff) where each fix exposed the next bug in the layer beneath. The cycle-guard pattern that A1's v2 design was supposed to eliminate had recurred under new names (proxy↔model anchor renumbering, holeReified vs rowsInserted ordering, BlockWalker trailing-`\n` trim, etc.). The §3.1 spike validated approach (c) — marker character — against the parser: a U+200B in source produces a real paragraph block; the existing parser-driven row pipeline delivers it; cursor lands via the existing `requestTextCaretAtNewRow`. The marker design eliminates `LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, the `HoleBlockId` discriminator, the per-hole undo regime, the IME hole guard, the idle-commit timer, ~690 LOC of production code and ~870 LOC of tests. The atomic-bundled-edit primitive in `LiveEditBinding` makes the "type into the marker paragraph" case race-free as a single CRDT op.
+Concrete amendments (per design doc §14):
+1. **Premise 6** — replace v2 holes language with marker-design language: paragraph EOB-Enter inserts `"\n\n​"`, start-of-paragraph-Enter inserts `"​\n\n"` (note byte-order difference), `MarkerScrubber` handles focus-out / pre-save / post-load leakage paths.
+2. **§3.1 BlockId type** — revert to `using BlockId = Markoff::BlockAnchor`. No discriminated union; every block is parser-real.
+3. **§4.4 cycle-guards-retired table** — replace the two "v2 holes return" rows with marker-design pointer (atomic-bundled-edit eliminates the hole authority; one named predicate `isMarkerOnlyParagraph` shared across three deterministic event points).
+4. **§5.4 structural keys** — paragraph EOB-Enter and start-of-paragraph-Enter follow the §4 source-edit contract from the marker design; cursor delivery via standard `requestTextCaretAtNewRow`. No hole-row dispatch.
+5. **§6.1 L6** — drop `LiveHoleLayer` and `LiveProxyBlockModel`; add `MarkerScrubber` as a stateless service (not a layer).
+6. **§7.2 structural-edit data flow** — replace hole-create → bufferText → commit flow with source-edit → parse-back → row arrival → cursor lands; marker scrubbed atomically by first keystroke or by `MarkerScrubber` on leakage paths.
+7. **§11 R5** — caveat updated to "EOB-Enter / start-Enter delivered by R5.5 marker-paragraph"; no R5.5-specific limitation language remains.
+8. **§11 R5.5** — phase scope re-described in marker-design terms; plan reference updated to `docs/plans/2026-05-03-live-render-r5-5-marker-paragraph.md`.
+9. **§15 open questions** — A1's "v2 holes scope" entry resolved as "marker-paragraph scope, paragraph-only initially"; A1's "BlockId discriminated union" answer reverted (BlockId is again `BlockAnchor`).
+
+Two spec gaps surfaced during plan execution and captured in the marker-paragraph design:
+- **Gap A (Task 6 finding) — §4.2 atStart payload byte order.** The spec said start-of-paragraph Enter inserts the same `"\n\n​"` payload as EOB. Wrong. The start-of-paragraph payload must be `"​\n\n"` so the marker becomes the *leading* paragraph and the existing block becomes the second paragraph. Implementation in `LiveStructuralKeyHandler.cpp` got this right; the spec text is corrected in §4.2 (and a marginal note records the correction).
+- **Gap B (Task 16 finding) — §6.4 `scrubAfterLoad` timing.** `MarkoffDocument::documentReloaded` fires synchronously inside `resetContent` *before* the parse worker populates the model. The auto-scrub via that connection is therefore a no-op at load time. The integration contract is now two-step: (1) the wiring stays as documentation of intent; (2) the host (or a future helper) must call `binding.markerScrubber()->scrubAfterLoad()` after the model populates from the first parse-back. Documented in §6.4 + §13 test row + §17 open question 8 (foundation-level fix candidate).
+
+User decision: **PRE-APPROVED.** User authorised autonomous execution of marker-paragraph design + plan + implementation (2026-05-04 conversation; the dogfood gate at Task 18 is the user's explicit checkpoint).
+Spec edit commit: (this commit) — `docs(spec): R5.5 marker-paragraph C-restoration amendments + restoration-status update`.
 
 **The bar for amendment:** the spec is wrong about something material, OR a premise turned out to be unworkable, OR a phase boundary needs reshaping based on what the prior phase taught us. The bar is **not** "I have a different opinion" — agents implement the design as specified unless something genuinely contradicts.
 
@@ -256,9 +305,16 @@ Predecessor acceptance: [SHA / date of the prior phase reaching `complete`]
 Self-review notes: [anything surprising the writing-plans pass surfaced]
 ```
 
-### 2026-05-03 — R5.5 — 2026-05-03-live-render-r5-5-holes.md
+### 2026-05-04 — R5.5 (marker-paragraph) — 2026-05-03-live-render-r5-5-marker-paragraph.md
 
-Generated from: spec §11 R5.5 (added by amendment A1 / commit `8d8ea00`); design doc `docs/specs/2026-05-03-v2-holes-design.md`.
+Generated from: spec §11 R5.5 (re-derived per amendment A2 / 2026-05-04); design doc `docs/specs/2026-05-03-marker-paragraph-design.md`.
+Generated by: fresh agent context (autonomous-execution authorisation 2026-05-04).
+Predecessor acceptance: v2-holes design + plan archived at commit `1e3d2ef`; the 2026-05-04 architectural review (`docs/handoff/2026-05-04-r5.5-dogfood-architectural-review.md`) and the §3.1 spike (`docs/handoff/2026-05-03-section-3-1-spike-findings.md`) closed the architectural questions A1 left open.
+Self-review notes: 18 tasks; 17 landed (commits `a895817..5473e81`), Task 18 dogfood gate pending. Surfaced two execution-time spec gaps (Gap A — start-of-paragraph payload byte order; Gap B — `scrubAfterLoad` post-parse timing) which are amendment-A2 marginalia in the marker-paragraph design (§4.2 / §6.4 / §17). Task 16's harness suite landed as 7 sub-steps (EOB-then-type, stress-typing, focus-out scrub, save flush, load-time scrub, stacked-Enter no-op, undo round-trip) plus a follow-up convergence fix for `LiveEditBinding.cachedText` after the marker-bundled `setPlainText` (commit `5473e81`). One follow-up tracked separately in the task list (cursor-position preservation after marker bundle setPlainText).
+
+### 2026-05-03 — R5.5 — 2026-05-03-live-render-r5-5-holes.md (archived)
+
+Generated from: spec §11 R5.5 (added by amendment A1 / commit `8d8ea00`); design doc `docs/specs/2026-05-03-v2-holes-design.md` (since archived at `docs/archive/2026-05-03-v2-holes-design.md`).
 Generated by: fresh agent context (autonomous-execution authorisation 2026-05-03).
 Predecessor acceptance: R5 Tasks 1–11 landed; R5 Tasks 12–18 may close independently of R5.5 (Tasks 12–17 are integration plumbing that holds for the holes-augmented design; Task 18 dogfood gate happens after R5.5 closes the EOB-Enter limitation).
 Self-review notes: 19 tasks. Resolves design-doc §16 open questions inline in the plan preamble: per-hole QTimer (vs single cycling timer); per-hole undo coalescing on 1 s idle threshold (matching legacy `UndoCoalescer`); cursor preserves qtPos on external bufferText updates (paste case); reifyAnchor via `MarkoffDocument::anchorAtByte`; full mapping rebuild on parse-back (cheap; holes sparse); synthetic broken stub format; harness gap-time tuning starts at 30 ms with documented procedure if it doesn't reproduce v0 race. Task 2 lands the harness AND a synthetic v0-mimic stub; gate test asserts harness sees scramble; stub deleted in Task 3 before any v2 hole code lands. Task 4 lands the BlockId variant change cascade (small refactor across LiveCursorState / LiveSelectionView / LiveStructuralKeyHandler call sites). Task 17 is the load-bearing stress-typing test (the v0 equivalent that wasn't written). Tasks 11/12/13 stage the structural-key handler in three slices: source-row Enter (creates hole), hole-row Enter (commit / split), hole-row abandon (Esc / Backspace-empty / Delete-empty). The plan includes flag-for-verification points where the implementer should confirm exact API names against the current branch tip (e.g. `Markoff::TextAnchor::resolvedByteOffset`); these are intentional, not placeholders.

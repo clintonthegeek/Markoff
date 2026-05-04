@@ -154,7 +154,25 @@ return HR::Handled;
 
 ### 4.2 Start-of-paragraph Enter
 
-Symmetric: `byteOffset = c.currentBlockStart`; `requestTextCaretAtNewRow(c.blockIndex, 0)` (the new row replaces the current row's index; the original block shifts down by one).
+Symmetric in *position* but not in *payload byte order*. The payload is `"<ZWSP>\n\n"` (marker first, then the separator), not `"\n\n<ZWSP>"` — so that the inserted marker becomes the *leading* paragraph and the existing block becomes the second paragraph. EOB-Enter (§4.1) keeps `"\n\n<ZWSP>"` (separator first, then marker) for the symmetric reason.
+
+```cpp
+// In LiveStructuralKeyHandler::paragraphEnter, start-of-block branch.
+const quint32 byteOffset = c.currentBlockStart;
+Markoff::MarkoffEdit ed;
+ed.oldStart = byteOffset;
+ed.oldEnd   = byteOffset;
+ed.newText  = QByteArrayLiteral("\xE2\x80\x8B\n\n");          // <ZWSP>\n\n
+c.document->applyLocalEdit({ ed });
+c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
+c.cursorState->requestTextCaretAtNewRow(c.blockIndex, 0);
+if (c.undoCoalescer) c.undoCoalescer->recordStructural();
+return HR::Handled;
+```
+
+The new row replaces the current row's index; the original block shifts down by one.
+
+**(Spec correction, Task 6 finding.)** An earlier draft of §4.2 stated the start-of-paragraph payload was the same `"\n\n<ZWSP>"` as EOB. That was wrong — using EOB's byte order at the start of a paragraph splices a leading `\n\n` into the *previous* block (or, at document start, prepends two empty lines before the marker), producing the wrong block topology. The implementation in `LiveStructuralKeyHandler.cpp` got the byte order right; the spec text is corrected here to match.
 
 ### 4.3 Mid-block Enter (unchanged from R5)
 
@@ -261,6 +279,19 @@ Multi-paragraph batched scrubs run as one `applyLocalEdit({list})` to produce on
 - `LiveEditBinding` holds a pointer to the `MarkerScrubber` (passed by `LiveListModelBinding` at construction). Its existing focus-tracking code calls `scrubber->scrubOnFocusOut(blockIndex)` on `focusOut` if the block matches the predicate at that moment.
 - The host application's save path calls `scrubber->scrubBeforeSave()` before serializing bytes.
 - `LiveListModelBinding` connects `MarkoffDocument::documentReloaded → MarkerScrubber::scrubAfterLoad`.
+
+**Note (Task 16 finding — `scrubAfterLoad` timing).** `MarkoffDocument::documentReloaded` fires synchronously inside `resetContent`, **before** the parse worker has populated the model. The auto-scrub via that connection is therefore a no-op at load time — the model is empty when it runs and the predicate finds nothing.
+
+For the load-time scrub to actually clean markers loaded from disk, the host must additionally call `binding.markerScrubber()->scrubAfterLoad()` (or the convenience wrapper `binding.flushPendingMarkers()` if exposed) **after the model populates from the first parse-back** — i.e., after `parseUpdated` delivers the first non-empty model state derived from the just-loaded source.
+
+The integration contract is therefore two-step:
+
+1. The `documentReloaded → scrubAfterLoad` wiring stays (cheap; harmless when it no-ops; documents the intent).
+2. The host (or a future helper inside `LiveListModelBinding` that watches for the first `parseUpdated` after a load) calls `scrubAfterLoad()` post-parse.
+
+A foundation-level fix — re-emitting `documentReloaded` after the parse settles, or adding a separate `documentReadyAfterLoad` signal — is out of scope for this spec but recorded as §17 open question 8.
+
+The §13 "Load file with markers in source" test row reflects this two-step contract: the unit test must trigger the second call (synthetic post-parse `scrubAfterLoad`) to assert the document ends marker-free.
 
 ---
 
@@ -383,7 +414,7 @@ No `HoleBlockId`; no variant. `TextCaret::block` always references a real CRDT-a
 | Race verification | Type 200 chars at 30 ms gap immediately after EOB-Enter. Source after settling equals `"...\n\n<all typed chars in order>"` with no marker, no scrambling. | Harness — load-bearing |
 | Focus-out without typing scrubs | EOB-Enter, then click another paragraph. Source returns to pre-Enter state. | Harness |
 | Save while marker present | Type EOB-Enter, immediately save. Saved bytes contain no marker; on-disk file matches the document's logical pre-Enter state. | Harness |
-| Load file with markers in source | Open a `.md` file containing ZWSPs; `documentReloaded` fires; the in-memory document is marker-free. | Unit (no UI needed) |
+| Load file with markers in source | Open a `.md` file containing ZWSPs; `documentReloaded` fires (no-op — model still empty); after the first `parseUpdated` populates the model, the host calls `scrubAfterLoad()` and the in-memory document becomes marker-free. Two-step contract per §6.4. | Unit (no UI needed) |
 | Ctrl-Z after typing into marker block | First Ctrl-Z restores marker block; second Ctrl-Z restores pre-Enter state. | Harness |
 | Stacked Enter is no-op | Press Enter twice; second press produces no source change. Press a third time after typing into marker block; the third press creates a new marker block at the new EOB. | Harness |
 | Cross-row selection across marker block | Select from paragraph above through paragraph below; clipboard text contains the marker block's content (which is just ZWSP); the clipboard scrubber strips it. | Harness |
@@ -449,6 +480,7 @@ These are deliberately not pinned here; the plan resolves them.
 5. **What happens if `setRowEditSequence` for the new (post-EOB-Enter) marker paragraph is needed.** The marker paragraph has just been created via `applyLocalEdit`; is its `lastEditEditSequence` correctly tagged so the freshness rule doesn't squash subsequent text-role updates? The plan validates.
 6. **Performance of `scrubBeforeSave` on large documents.** O(parserRows) walk; should be cheap. The plan adds a benchmark gate if there's any concern.
 7. **Test fixture taxonomy (per review §3.5).** This design's tests should follow the multi-fixture rule from the review's §3.5: short-snippet, llm-wrapped, human-long-line, multi-block-mixed, hundred-block-scroll. The plan instantiates each.
+8. **Foundation-level fix for `scrubAfterLoad` timing (Task 16 finding).** §6.4 documents a two-step contract because `MarkoffDocument::documentReloaded` fires synchronously inside `resetContent` *before* the parse worker populates the model. A foundation change — re-emitting `documentReloaded` after the first post-load `parseUpdated`, or adding a separate `documentReadyAfterLoad` signal that fires when the model is in sync with the loaded source — would let the marker library auto-scrub on load without a host call. Out of scope for this spec (foundation-level change); flag for the foundation backlog.
 
 ---
 
