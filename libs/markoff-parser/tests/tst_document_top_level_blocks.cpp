@@ -28,6 +28,8 @@ private Q_SLOTS:
     void pipeTable();
     void mixedDocumentInOrder();
     void noTrailingNewline();
+    void markerProducesParagraph();
+    void markerRunProducesMultiple();
 };
 
 static QList<TopLevelBlock> blocksOf(const QString &source)
@@ -230,6 +232,33 @@ void TestDocumentTopLevelBlocks::noTrailingNewline()
     auto blocks = blocksOf(src);
     QCOMPARE(blocks.size(), 2);
     QCOMPARE(blocks[1].byteEnd, src.toUtf8().size());
+}
+
+void TestDocumentTopLevelBlocks::markerProducesParagraph()
+{
+    // U+200B ZWSP at end of "hello\n\n" must produce a 2-block parse:
+    // paragraph "hello", paragraph "<ZWSP>". This contract is what the
+    // marker-paragraph design relies on (spec §3, premise M2).
+    const QString src = QStringLiteral("hello\n\n") + QChar(0x200B);
+    auto blocks = blocksOf(src);
+    QCOMPARE(blocks.size(), 2);
+    QCOMPARE(blocks[0].kind, Kind::Paragraph);
+    QCOMPARE(blocks[1].kind, Kind::Paragraph);
+    QCOMPARE(blocks[1].byteEnd - blocks[1].byteStart, 3); // ZWSP is 3 UTF-8 bytes
+}
+
+void TestDocumentTopLevelBlocks::markerRunProducesMultiple()
+{
+    // Two consecutive marker-only paragraphs (separated by \n\n) parse
+    // as two distinct paragraph blocks. The MarkerScrubber's run-collapse
+    // mode (premise M6) targets exactly this shape.
+    const QString src = QStringLiteral("hello\n\n")
+                       + QChar(0x200B) + QStringLiteral("\n\n")
+                       + QChar(0x200B);
+    auto blocks = blocksOf(src);
+    QCOMPARE(blocks.size(), 3);
+    QCOMPARE(blocks[1].kind, Kind::Paragraph);
+    QCOMPARE(blocks[2].kind, Kind::Paragraph);
 }
 
 QTEST_GUILESS_MAIN(TestDocumentTopLevelBlocks)
