@@ -494,6 +494,36 @@ private Q_SLOTS:
         QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()), preEditSrc);
     }
 
+    void paragraphEnter_shiftEnterOnMarkerBlock_insertsSoftBreak() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        doc.resetContent(QStringLiteral("alpha\n\n%1\n").arg(kMarkerChar).toUtf8(),
+                         Markoff::Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+
+        auto *handler = binding.structuralKeyHandler();
+        QVERIFY(handler);
+
+        const quint64 preEditSeq = doc.editSequence();
+
+        const bool handled = handler->tryHandle(
+            Qt::Key_Return, /*mods=*/Qt::ShiftModifier,
+            /*blockIndex=*/1,
+            /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            /*blockText=*/QString(kMarkerChar));
+        QVERIFY(handled);
+        // Source MUST have changed (a soft-break was inserted into the marker
+        // block) — i.e., editSequence advanced.
+        QVERIFY(doc.editSequence() > preEditSeq);
+        // The marker block now contains a soft-break newline. The marker
+        // character is still present and the source is no longer the pre-edit shape.
+        QVERIFY(QString::fromUtf8(doc.toMarkdownUtf8()).contains(kMarkerChar));
+    }
+
 };
 
 QTEST_MAIN(TstLiveRenderStructural)

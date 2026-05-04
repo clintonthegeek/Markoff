@@ -101,14 +101,16 @@ void LiveStructuralKeyHandler::registerBuiltins()
 
     // ---------- paragraph: Enter (all positions, Shift-aware) ----------
     auto paragraphEnter = [](const Ctx &c) -> HR {
-        // Marker design §4.5: stacked Enter on a marker-only block is a
-        // no-op. CommonMark collapses consecutive blank lines anyway;
-        // visual "gap" can't survive a save/load cycle.
-        if (Markoff::LiveRender::MarkerScrubber::isMarkerOnly(c.blockText)) {
+        const bool isShift = (c.modifiers & Qt::ShiftModifier) != 0;
+
+        // Marker design §4.5: plain (unmodified) Enter on a marker-only
+        // block is a no-op. CommonMark collapses consecutive blank lines
+        // anyway; visual "gap" can't survive a save/load cycle.
+        // Spec §4.4: Shift-Enter on a marker block is NOT covered by this
+        // rule — it still inserts a soft-break newline (handled below).
+        if (!isShift && Markoff::LiveRender::MarkerScrubber::isMarkerOnly(c.blockText)) {
             return HR::Handled;
         }
-
-        const bool isShift = (c.modifiers & Qt::ShiftModifier) != 0;
 
         if (isShift) {
             // Soft break — insert \n, stay in block.
