@@ -218,22 +218,14 @@ void TstLiveRenderMarkerFlow::step2_eobEnter_stressType_noScramble()
     eb.setText(QString(kMarkerChar));
     eb.setRawTextDocument(editor.document());
 
-    // Replicate the QML `text: model.text` binding the production
-    // delegate uses: when the row's text changes (e.g. after a parse
-    // arrival), push the new text into `eb.setText(...)`. Without this
-    // re-sync, `m_previousText` lags and qtPos→byte translation
-    // computes against stale pre-edit text.
-    QObject::connect(binding.model(), &QAbstractItemModel::dataChanged,
-        [&binding, &eb](const QModelIndex &tl, const QModelIndex &br,
-                        const QList<int> &roles) {
-            const int row = eb.modelIndex();
-            if (row < tl.row() || row > br.row()) return;
-            // TextRole == Qt::UserRole + 1 typically; LiveBlockModel
-            // exposes role names via model.text. We sniff via record.
-            if (row >= binding.model()->rowCount()) return;
-            const QString newText = binding.model()->recordAt(row).text;
-            eb.setText(newText);
-        });
+    // NOTE: The dataChanged listener that was here (replicating QML `text:
+    // model.text`) has been REMOVED. It was a workaround for the Task 16
+    // race: after applyLocalEdit in the marker-bundle branch, m_previousText
+    // was left stale ("x<ZWSP>") until the QML text: binding repaired it via
+    // dataChanged. The production fix (LiveEditBinding.cpp: assign
+    // m_previousText = postEditText immediately after applyLocalEdit) makes
+    // the workaround unnecessary. Step 2 passing WITHOUT the listener is the
+    // proof of fix.
 
     // Deterministic 200-character payload with no spaces (mirrors the
     // pattern called out in the task description: spaces have a

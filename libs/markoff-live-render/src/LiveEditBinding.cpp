@@ -132,7 +132,7 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
                       << "applyingModel=" << m_binding->applyingModelUpdate()
                       << "composing=" << m_composing;
 
-    const QString postQt = m_listenedDoc->toPlainText();
+    QString postQt = m_listenedDoc->toPlainText();  // mutable: bundle branch updates it to the ZWSP-stripped value before scope guard fires
     auto _ = qScopeGuard([&]{ m_previousText = postQt; });
 
     // Guard: pushTextToDocument-driven update echo. Set when LiveEditBinding
@@ -194,6 +194,21 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
                 ed.newText  = postEditText.toUtf8() + "\n";
 
                 doc->applyLocalEdit({ ed });
+                // Strip the marker character from the QTextDocument and
+                // synchronise m_previousText (via postQt, which the qScopeGuard
+                // will assign on exit) to the ZWSP-stripped state.
+                //
+                // Without this, subsequent keystrokes compute qtPosToByte against
+                // a document that still contains the ZWSP character, yielding an
+                // inflated byte offset (ZWSP is 3 UTF-8 bytes) and a wrong CRDT
+                // edit — the Task 16 race fix. The applyingTextUpdate guard
+                // suppresses the contentsChange echo that setPlainText fires.
+                m_applyingTextUpdate = true;
+                {
+                    auto _u = qScopeGuard([this]{ m_applyingTextUpdate = false; });
+                    m_listenedDoc->setPlainText(postEditText);
+                }
+                postQt = postEditText;
                 model->setRowEditSequence(m_modelIndex, doc->editSequence());
                 return;
             }
