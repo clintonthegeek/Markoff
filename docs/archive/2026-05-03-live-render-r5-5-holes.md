@@ -1,5 +1,13 @@
 # R5.5 — Paragraph Holes Implementation Plan
 
+> **ARCHIVED 2026-05-03.** This plan was paused mid-implementation pending
+> the §3.1 architectural-review decision; the review chose approach (c)
+> (marker character), which retires the hole abstraction this plan
+> implemented. A new R5.5 plan derived from
+> `docs/specs/2026-05-03-marker-paragraph-design.md` will replace this
+> one. The original plan text follows verbatim for historical reference;
+> do not execute it.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Re-introduce paragraph holes in the live-render library — view-side rows the parser cannot represent yet — using the v2 IME-preedit-pattern design (no source mutation until commit) over the audit's L9 phantom-rows + concatenating-proxy structure. Pressing Enter at end-of-paragraph or start-of-paragraph creates a hole row the user types into; on idle / focus-out / save / explicit Enter, the hole reifies into a real paragraph; on Esc / Backspace-at-0-empty / Delete-at-end-empty the hole abandons cleanly with no source mutation. Stress-typing into a hole produces in-order source bytes — verified by a `LiveRealisticInputHarness` whose gate test proves it would have caught v0's F2 character-scramble race.

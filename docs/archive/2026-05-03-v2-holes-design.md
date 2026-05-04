@@ -1,5 +1,12 @@
 # v2 holes — design
 
+> **ARCHIVED 2026-05-03.** Superseded by the marker-paragraph design at
+> `docs/specs/2026-05-03-marker-paragraph-design.md` (R5.5 architectural-
+> review §3.1 chose approach (c) — marker character — over the hole
+> abstraction this document specified). The §3.1 spike findings are at
+> `docs/handoff/2026-05-03-section-3-1-spike-findings.md`. The original
+> document text follows verbatim for historical reference.
+
 **Date:** 2026-05-03
 **Branch:** `exploration/new-foundation`
 **Status:** design — supersedes v1 hole design (`docs/specs/2026-05-01-live-projection-layer.md` §3.1–§3.5) for paragraph holes; the v1 spec's §3.6 v0 forensics carry forward unchanged.
