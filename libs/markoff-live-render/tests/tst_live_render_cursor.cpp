@@ -280,6 +280,39 @@ private Q_SLOTS:
         QCOMPARE(spy.count(), 0);
     }
 
+    void requestTextCaretAtNewRow_markerParagraph_landsAtQtPos0() {
+        Markoff::MarkoffDocument document(/*replicaId=*/1);
+
+        LiveListModelBinding binding;
+        binding.setDocument(&document);
+
+        QSignalSpy parseSpy(&document, &Markoff::MarkoffDocument::parseUpdated);
+
+        // Initial: one paragraph; cursor at end of it.
+        document.resetContent(QByteArrayLiteral("alpha\n"), Markoff::Origin::TestFixture);
+        QVERIFY(parseSpy.wait(2000));
+        QCOMPARE(binding.model()->rowCount(), 1);
+
+        // Schedule a pending request for "the row that's about to be born".
+        binding.cursorState()->requestTextCaretAtNewRow(/*expectedRow=*/1, /*qtPos=*/0);
+
+        // Insert "\n\n<ZWSP>" at end of "alpha". The new row arrives
+        // asynchronously via parse-back; the pending request resolves on
+        // its rowsInserted.
+        Markoff::MarkoffEdit ed;
+        ed.oldStart = 5; ed.oldEnd = 5;
+        ed.newText  = QByteArrayLiteral("\n\n\xE2\x80\x8B");
+        document.applyLocalEdit({ ed });
+
+        // Wait for parse-back to arrive (resolves the pending cursor request).
+        QVERIFY(parseSpy.wait(2000));
+
+        // Verify the cursor was placed at row 1, qtPos 0.
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 1);
+        QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
+    }
+
     // ---- LiveListModelBinding: cachedByteOffset refresh tests ----
 
     void textcaret_cached_offset_refreshes_on_parse_arrival() {
