@@ -13,6 +13,8 @@
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextEdit>
+#include <QClipboard>
+#include <QApplication>
 
 #include <markoff/live-render/LiveEditBinding.h>
 #include <markoff/live-render/LiveListModelBinding.h>
@@ -21,6 +23,7 @@
 #include <markoff/live-render/Coordinates.h>
 #include <markoff/live-render/Marker.h>
 #include <markoff/live-render/MarkerScrubber.h>
+#include <markoff/live-render/LiveSelectionView.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/MarkoffEdit.h>
@@ -292,6 +295,8 @@ private Q_SLOTS:
 
     void firstEdit_intoMarkerOnlyBlock_bundlesScrubAndInsert();
 
+    void copyToClipboard_acrossMarker_stripsMarkerChars();
+
     void model_update_does_not_echo_back_to_apply_local_edit() {
         // Setup: a doc with one paragraph; binding wired; user has typed
         // and the row sequence is stamped at N.
@@ -379,6 +384,48 @@ void TstLiveRenderParagraphEdit::firstEdit_intoMarkerOnlyBlock_bundlesScrubAndIn
     QVERIFY(!document.toMarkdown().contains(kMarkerChar));
     QCOMPARE(document.toMarkdown(), QStringLiteral("alpha\n\nx\n"));
     QCOMPARE(document.editSequence(), preEditSeq + 1);
+}
+
+void TstLiveRenderParagraphEdit::copyToClipboard_acrossMarker_stripsMarkerChars()
+{
+    using namespace Markoff::LiveRender;
+
+    Markoff::MarkoffDocument document(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&document);
+
+    // Set up: a doc with three paragraphs: "alpha", marker-only, and "beta".
+    // "alpha\n\n<MARKER>\n\nbeta\n" => 3 blocks in the model.
+    const QString content = QStringLiteral("alpha\n\n%1\n\nbeta\n").arg(kMarkerChar);
+    QVERIFY(waitForModelRows(binding, document, content.toUtf8(), 3));
+    QCOMPARE(binding.model()->rowCount(), 3);
+
+    // Sanity: middle block's text is the marker.
+    QVERIFY(MarkerScrubber::isMarkerOnly(binding.model()->recordAt(1).text));
+
+    LiveSelectionView selView;
+    selView.setDocument(&document);
+    selView.setSession(nullptr);  // selection sync doesn't happen without session
+    selView.setModel(binding.model());
+
+    // Select all three blocks by setting anchor at (0,0) and active at (2, end).
+    selView.begin(0, 0);
+    selView.extend(2, binding.model()->recordAt(2).text.length());
+
+    // Gather block texts from the model.
+    QStringList blockTexts;
+    for (int i = 0; i < binding.model()->rowCount(); ++i) {
+        blockTexts << binding.model()->recordAt(i).text;
+    }
+
+    // Copy to clipboard.
+    selView.copyToClipboard(blockTexts);
+
+    // Verify the clipboard text contains no marker characters.
+    QString clipboardText = QApplication::clipboard()->text();
+    QVERIFY(!clipboardText.contains(kMarkerChar));
+    // Clipboard should have "alpha", marker stripped, "beta" joined with newlines.
+    QCOMPARE(clipboardText, QStringLiteral("alpha\n\nbeta"));
 }
 
 QTEST_MAIN(TstLiveRenderParagraphEdit)
