@@ -2,16 +2,16 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-04 (D2 spec landed; D-arc scaffolding initialized; orientation roadmap published.)
+**Last updated:** 2026-05-04 (D2 plan landed; ready for execution.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **D2** (foundation reshape) — spec written, plan pending.
+**Active phase:** **D2** (foundation reshape) — spec approved + plan written; ready for execution.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **D2 spec is approved (`docs/specs/2026-05-04-d2-foundation-reshape-design.md`). The next concrete action is to invoke `superpowers:writing-plans` to derive the implementation plan from the spec.** D1 is already done (collabtext shipped `IdList` on 2026-05-04), so plan execution can begin as soon as the plan lands — no external dependency to wait on.
+> **D2 spec and plan are both approved.** Spec at `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; plan at `docs/plans/2026-05-04-d2-foundation-reshape.md` (~85 tasks across 16 phases; estimated 6–10 weeks). D1 (collabtext IdList) is shipped, so execution can begin immediately. Recommended execution mode: subagent-driven (per `superpowers:subagent-driven-development`), with the user reviewing between tasks.
 >
 > **Read first** (in this order, for a fresh agent context):
 > 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation
@@ -27,7 +27,7 @@
 |---|---|---|
 | **D0** | `complete` | Joint design — proposal + response delivered and accepted. |
 | **D1** | `complete` | `CollabText::Crdt::IdList` shipped 2026-05-04. Available for D2 consumption. |
-| **D2** | `spec-approved` | Spec at `docs/specs/2026-05-04-d2-foundation-reshape-design.md`. Plan pending. |
+| **D2** | `plan-approved` | Spec at `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; plan at `docs/plans/2026-05-04-d2-foundation-reshape.md`. Ready for execution. |
 | **D3** | `stubbed` | `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md`. Substantive design post-D2. |
 | **D4** | `stubbed` | `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`. Substantive design post-D2/D3. |
 | **D5** | `stubbed` | `docs/specs/2026-05-04-d5-collab-activation-STUB.md`. Substantive design post-D4. |
@@ -44,7 +44,8 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-04 | (this commit) | D2 spec landed (`docs/specs/2026-05-04-d2-foundation-reshape-design.md`); D-arc roadmap + status board + scope-line doc + D3/D4/D5 stub specs published; worktree `CLAUDE.md` banner updated to point at the roadmap. |
+| 2026-05-04 | (this commit) | D2 implementation plan landed (`docs/plans/2026-05-04-d2-foundation-reshape.md`) — ~85 tasks across 16 phases (Phase 0 setup through Phase 15 dogfood). |
+| 2026-05-04 | `afdbc1c` | D2 spec landed (`docs/specs/2026-05-04-d2-foundation-reshape-design.md`); D-arc roadmap + status board + scope-line doc + D3/D4/D5 stub specs published; worktree `CLAUDE.md` banner updated to point at the roadmap. |
 | 2026-05-04 | `0fa0111` | C-restoration bookend committed; spike/marker-hole worktree retired. (See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`.) |
 | 2026-05-04 | (external) | collabtext maintainers shipped `IdList` v1 (Option β); D1 complete. |
 | 2026-05-04 | (external) | collabtext maintainer response to D-evolution proposal: yes to β with six explicit "won't do" lines. (`~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md`.) |
