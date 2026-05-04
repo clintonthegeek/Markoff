@@ -78,9 +78,7 @@ Item {
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (!cs) return
-        const proxy = root.liveBinding ? root.liveBinding.proxyModel : null
-        if (proxy && cs.focusedAnchorRow >= 0
-                && proxy.proxyRowForInner(cs.focusedAnchorRow) === root.modelIndex) {
+        if (cs.focusedAnchorRow === root.modelIndex) {
             Qt.callLater(function() { focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0) })
         }
     }

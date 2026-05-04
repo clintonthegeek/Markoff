@@ -9,8 +9,6 @@
 #include <markoff/live-render/LiveSelectionView.h>
 #include <markoff/live-render/LiveStructuralKeyHandler.h>
 #include <markoff/live-render/UndoCoalescer.h>
-#include <markoff/live-render/LiveHoleLayer.h>
-#include <markoff/live-render/LiveProxyBlockModel.h>
 #include <markoff/live-render/MarkerScrubber.h>
 
 #include <QObject>
@@ -42,10 +40,6 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveListModelBinding : public QObject {
                READ structuralKeyHandler CONSTANT)
     Q_PROPERTY(Markoff::LiveRender::UndoCoalescer *undoCoalescer
                READ undoCoalescer CONSTANT)
-    Q_PROPERTY(Markoff::LiveRender::LiveHoleLayer *holeLayer
-               READ holeLayer NOTIFY holeLayerChanged)
-    Q_PROPERTY(Markoff::LiveRender::LiveProxyBlockModel *proxyModel
-               READ proxyModel NOTIFY proxyModelChanged)
     Q_PROPERTY(Markoff::LiveRender::MarkerScrubber *markerScrubber
                READ markerScrubber NOTIFY markerScrubberChanged)
 
@@ -63,8 +57,6 @@ public:
     LiveStructuralKeyHandler *structuralKeyHandler() const;
     UndoCoalescer            *undoCoalescer()       const;
     const BlockKindRegistry  *registry()            const;
-    LiveHoleLayer            *holeLayer()           const;
-    LiveProxyBlockModel      *proxyModel()          const;
     MarkerScrubber           *markerScrubber()      const;
 
     /// True for the synchronous duration of `applyOps` while parse
@@ -74,26 +66,15 @@ public:
     /// suppression cycle guard).
     bool applyingModelUpdate() const;
 
-    /// Commit all pending holes to source in ascending reifyAnchor byte
-    /// order. Hosts must call this BEFORE serializing the document
-    /// (Ctrl-S / save-to-disk path). After this returns, the layer holds
-    /// zero holes and `document.toMarkdown()` equals the on-screen content.
-    /// No-op when no doc is attached or no holes exist.
-    Q_INVOKABLE void flushPendingHoles();
-
     /// Marker-paragraph save path (spec §6.4): hosts call this from
     /// their Ctrl-S / save-to-disk handler before serializing bytes.
     /// Routes to `MarkerScrubber::scrubBeforeSave`, which removes any
     /// marker-only paragraphs leaked into source. No-op when no doc is
-    /// attached. Replaces `flushPendingHoles` for the marker-paragraph
-    /// regime; the v2 hole flush stays in place until Tasks 13/15 retire
-    /// the hole-layer code paths.
+    /// attached.
     Q_INVOKABLE void flushPendingMarkers();
 
 Q_SIGNALS:
     void documentChanged();
-    void holeLayerChanged();
-    void proxyModelChanged();
     void markerScrubberChanged();
 
 private:

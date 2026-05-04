@@ -36,11 +36,11 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveCursorState : public QObject {
 
     Q_PROPERTY(QString cursorKind READ cursorKind NOTIFY cursorChanged)
     /// The inner-model row index for the active anchor-side TextCaret, else -1.
-    /// QML uses this (combined with `proxyModel.proxyRowForInner`) to find the
-    /// delegate that should receive keyboard focus after a structural edit
-    /// (mid-block split, Backspace-merge, Delete-merge).
+    /// QML uses this directly as the ListView row index to find the delegate
+    /// that should receive keyboard focus after a structural edit (mid-block
+    /// split, Backspace-merge, Delete-merge, marker insertion).
     Q_PROPERTY(int focusedAnchorRow READ focusedAnchorRow NOTIFY cursorChanged)
-    /// The qtPos of the active TextCaret (anchor-side or hole), else -1.
+    /// The qtPos of the active TextCaret, else -1.
     Q_PROPERTY(int focusedQtPos READ focusedQtPos NOTIFY cursorChanged)
 
 public:
@@ -54,12 +54,10 @@ public:
     int focusedQtPos() const;
 
     /// Override the model whose `rowsInserted` resolves pending requests.
-    /// Defaults to the inner LiveBlockModel passed to the constructor; the
-    /// LiveListModelBinding switches this to the proxy once the proxy is
-    /// wired so resolution fires AFTER the proxy's row state is consistent
-    /// (otherwise QML lookups for the new row's delegate race the proxy
-    /// update). Pending-request row indices are interpreted in the new
-    /// model's coordinate space.
+    /// Defaults to the inner LiveBlockModel passed to the constructor.
+    /// Pending-request row indices are interpreted in this model's
+    /// coordinate space. Retained as a public seam for future use; in the
+    /// marker-paragraph regime the inner LiveBlockModel is the only model.
     void setSignalModel(QAbstractItemModel *signalModel);
 
     void request(const Cursor &newCursor);

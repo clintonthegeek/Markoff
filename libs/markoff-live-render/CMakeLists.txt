@@ -32,7 +32,6 @@ qt_add_qml_module(markoff_live_render
         # Block value types
         include/markoff/live-render/BlockRecord.h
         include/markoff/live-render/BlockKind.h
-        include/markoff/live-render/BlockHole.h
         include/markoff/live-render/BlockKindDescriptor.h
         include/markoff/live-render/BlockKindRegistry.h
         include/markoff/live-render/Coordinates.h
@@ -67,11 +66,6 @@ qt_add_qml_module(markoff_live_render
         src/UndoCoalescer.cpp
         include/markoff/live-render/LiveStructuralKeyHandler.h
         src/LiveStructuralKeyHandler.cpp
-        # R5.5: holes
-        include/markoff/live-render/LiveHoleLayer.h
-        src/LiveHoleLayer.cpp
-        include/markoff/live-render/LiveProxyBlockModel.h
-        src/LiveProxyBlockModel.cpp
     QML_FILES
         qml/LiveView.qml
         qml/delegates/ParagraphDelegate.qml

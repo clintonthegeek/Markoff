@@ -2,7 +2,6 @@
 #include <markoff/live-render/LiveEditBinding.h>
 #include <markoff/live-render/LiveListModelBinding.h>
 #include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/LiveHoleLayer.h>
 #include <markoff/live-render/Coordinates.h>
 #include <markoff/live-render/Marker.h>
 #include <markoff/live-render/MarkerScrubber.h>
@@ -75,14 +74,6 @@ void LiveEditBinding::setText(const QString &t)
     m_pendingMarkerScrub = MarkerScrubber::isMarkerOnly(t);
 }
 
-quint64 LiveEditBinding::holeId() const { return m_holeId; }
-void LiveEditBinding::setHoleId(quint64 id)
-{
-    if (m_holeId == id) return;
-    m_holeId = id;
-    Q_EMIT holeIdChanged();
-}
-
 void LiveEditBinding::pushTextToDocument()
 {
     if (!m_listenedDoc) return;
@@ -103,13 +94,6 @@ void LiveEditBinding::setComposing(bool c)
     const bool wasComposing = m_composing;
     m_composing = c;
     Q_EMIT composingChanged();
-    // Hole-side IME: propagate composing state to the layer so the
-    // per-hole idle timer is paused during preedit.
-    if (m_holeId != 0 && m_binding) {
-        if (auto *layer = m_binding->holeLayer())
-            if (layer->exists(m_holeId))
-                layer->setHoleComposition(m_holeId, c);
-    }
     if (wasComposing && !c)
         flushPendingComposition();
 }
@@ -141,7 +125,6 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
 
     qInfo().noquote() << "[dogfood] EditBinding: onContentsChange"
                       << "modelIndex=" << m_modelIndex
-                      << "holeId=" << m_holeId
                       << "qtPos=" << qtPos
                       << "removed=" << charsRemoved
                       << "added=" << charsAdded
@@ -183,8 +166,7 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     // and scrub.
     if (m_pendingMarkerScrub) {
         m_pendingMarkerScrub = false;
-        // Only applies to inner-model rows (not hole rows).
-        if (m_holeId == 0 && m_modelIndex < m_binding->model()->rowCount()) {
+        if (m_modelIndex < m_binding->model()->rowCount()) {
             auto *doc   = m_binding->document();
             auto *model = m_binding->model();
             const auto &record = model->recordAt(m_modelIndex);
@@ -217,18 +199,6 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
             }
         }
         // Fall through to normal edit path if we couldn't do the bundled edit.
-    }
-
-    // Hole routing: if this binding is attached to a hole row, write to
-    // LiveHoleLayer::setBlockHoleBuffer instead of CRDT-applyLocalEdit.
-    // Hole proxy rows are beyond the inner model's rowCount, so this check
-    // must come before the rowCount guard below (F1 mitigation).
-    if (m_holeId != 0) {
-        auto *layer = m_binding ? m_binding->holeLayer() : nullptr;
-        if (!layer) return;
-        if (!layer->exists(m_holeId)) return;
-        layer->setBlockHoleBuffer(m_holeId, postQt);
-        return;
     }
 
     // Inner-row guard: m_modelIndex must be a valid row in the inner model.
@@ -296,18 +266,6 @@ void LiveEditBinding::flushPendingComposition()
         return;
     if (m_modelIndex < 0)
         return;
-
-    // Hole routing: flush goes to the layer when a hole is attached.
-    // Must come before the inner-model rowCount guard — hole rows are
-    // beyond the inner model's rowCount.
-    if (m_holeId != 0) {
-        auto *layer = m_binding ? m_binding->holeLayer() : nullptr;
-        if (!layer || !layer->exists(m_holeId)) return;
-        const QString postQt = m_listenedDoc->toPlainText();
-        layer->setBlockHoleBuffer(m_holeId, postQt);
-        m_previousText = postQt;
-        return;
-    }
 
     // Inner-row guard.
     if (m_modelIndex >= m_binding->model()->rowCount())

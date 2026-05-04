@@ -16,7 +16,7 @@ ListView {
 
     required property var binding   // LiveListModelBinding *
 
-    model: binding ? binding.proxyModel : null
+    model: binding ? binding.model : null
     clip: true
     spacing: 2
     focus: true
@@ -95,12 +95,10 @@ ListView {
 
     // ---- Cursor-state focus routing ----
     // When a structural key (Enter mid-block, Backspace-merge, Delete-merge,
-    // EOB-Enter creating a hole, etc.) updates the cursor state, route
-    // keyboard focus into the target delegate's TextEdit so subsequent typing
-    // lands in the right place.
+    // marker insert, etc.) updates the cursor state, route keyboard focus
+    // into the target delegate's TextEdit so subsequent typing lands in the
+    // right place.
     //
-    // The cursor-state listener fires after the proxy's row state has caught
-    // up with the inner model (LiveCursorState's signal model is the proxy).
     // If the target delegate is already realized, focusEditAt runs here; if
     // not (newly-inserted row outside the realized window, or QML hasn't yet
     // incubated the delegate), the delegate's Component.onCompleted does
@@ -108,7 +106,7 @@ ListView {
     Connections {
         target: binding ? binding.cursorState : null
         function onCursorChanged() {
-            if (!binding || !binding.cursorState || !binding.proxyModel) return
+            if (!binding || !binding.cursorState) return
             const cs = binding.cursorState
 
             const innerRow = cs.focusedAnchorRow
@@ -116,13 +114,10 @@ ListView {
                 console.log("[dogfood] LiveView.onCursorChanged NONE (no anchor)")
                 return
             }
-            const proxyRow = binding.proxyModel.proxyRowForInner(innerRow)
-            const item = (proxyRow >= 0) ? root.itemAtIndex(proxyRow) : null
+            const item = root.itemAtIndex(innerRow)
             console.log("[dogfood] LiveView.onCursorChanged ANCHOR innerRow=" + innerRow
-                + " proxyRow=" + proxyRow
                 + " itemFound=" + (item !== null)
                 + " qtPos=" + cs.focusedQtPos)
-            if (proxyRow < 0) return
             if (item && item.focusEditAt) item.focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0)
         }
     }

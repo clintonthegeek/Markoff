@@ -18,9 +18,8 @@ LiveCursorState::LiveCursorState(const BlockKindRegistry *registry,
     , m_registry(registry)
     , m_model(model)
 {
-    // Default signal source is the inner LiveBlockModel; LiveListModelBinding
-    // calls setSignalModel(proxy) once the proxy exists so resolution fires
-    // after the proxy's row state is consistent with QML's view.
+    // Signal source is the inner LiveBlockModel — the only model in the
+    // marker-paragraph regime.
     setSignalModel(const_cast<LiveBlockModel *>(model));
 
     // Survive the foundation's per-keystroke BlockAnchor renumbering at

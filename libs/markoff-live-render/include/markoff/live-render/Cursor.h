@@ -14,11 +14,10 @@ namespace Markoff::LiveRender {
 /// Opaque block identity. Spec §3.1: a CRDT-anchored parser block.
 ///
 /// Historical note: spec §3.1 amendment A1 had widened this to a variant
-/// over `Markoff::BlockAnchor` and `HoleBlockId` to support v2 phantom
+/// over `Markoff::BlockAnchor` and a phantom-row id to support v2 phantom
 /// rows. The marker-paragraph design (R5.5) retires phantom rows in
 /// favour of a single source-of-truth marker block, so the variant is
-/// reverted. `HoleBlockId` still exists in `BlockHole.h` for the v2
-/// hole files retained until Task 13.
+/// reverted.
 using BlockId = Markoff::BlockAnchor;
 
 /// Caret inside a text-bearing block at a CRDT-anchored byte position.

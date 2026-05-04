@@ -12,7 +12,6 @@ Item {
 
     property int modelIndex: index
     readonly property string blockText: model.text
-    property bool isHole: model.isHole === true
 
     readonly property var liveBinding:
         ListView.view ? ListView.view.binding : null
@@ -25,8 +24,7 @@ Item {
         modelIndex: root.modelIndex
         textDocument: edit.textDocument
         composing: edit.inputMethodComposing
-        text: root.isHole ? (model.bufferText || "") : model.text
-        holeId: model.holeId || 0
+        text: model.text
     }
 
     TextEdit {
@@ -44,7 +42,7 @@ Item {
 
         // Forward structural keys (Return / Enter / Esc / Backspace / Delete)
         // to LiveStructuralKeyHandler. R5 + R5.5 logic dispatches based on
-        // row kind (paragraph / heading / code-block) and hole-vs-inner-row.
+        // row kind (paragraph / heading / code-block).
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
             const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
@@ -63,7 +61,7 @@ Item {
                 root.modelIndex,
                 edit.cursorPosition,
                 edit.selectionStart === edit.selectionEnd,
-                root.isHole ? (model.bufferText || "") : model.text
+                model.text
             )
             event.accepted = handled
         }
@@ -91,7 +89,6 @@ Item {
     /// programmatically.
     function focusEditAt(qtPos) {
         console.log("[dogfood] ParaDelegate.focusEditAt modelIndex=" + root.modelIndex
-            + " isHole=" + root.isHole + " holeId=" + (model.holeId || 0)
             + " qtPos=" + qtPos + " editLen=" + edit.length)
         edit.forceActiveFocus()
         if (qtPos >= 0 && qtPos <= edit.length)
@@ -100,25 +97,20 @@ Item {
 
     /// When a new delegate appears, check if the cursor state is already
     /// pointing at this row (set synchronously by the structural-key handler
-    /// during Enter / Backspace-merge / Delete-merge / EOB-Enter). If so,
-    /// focus immediately — the delegate just became live and the LiveView's
-    /// onCursorChanged handler couldn't reach us via itemAtIndex earlier.
+    /// during Enter / Backspace-merge / Delete-merge / marker insertion). If
+    /// so, focus immediately — the delegate just became live and the
+    /// LiveView's onCursorChanged handler couldn't reach us via itemAtIndex
+    /// earlier.
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (!cs) {
             console.log("[dogfood] ParaDelegate.onCompleted modelIndex=" + root.modelIndex
-                + " isHole=" + root.isHole + " holeId=" + (model.holeId || 0)
                 + " NO cursorState")
             return
         }
-        const proxy = root.liveBinding ? root.liveBinding.proxyModel : null
-
-        const focusedProxy = (proxy && cs.focusedAnchorRow >= 0)
-                                ? proxy.proxyRowForInner(cs.focusedAnchorRow) : -1
-        const match = (focusedProxy === root.modelIndex)
+        const match = (cs.focusedAnchorRow === root.modelIndex)
         console.log("[dogfood] ParaDelegate.onCompleted modelIndex=" + root.modelIndex
-            + " isHole=false focusedAnchorRow=" + cs.focusedAnchorRow
-            + " focusedProxy=" + focusedProxy
+            + " focusedAnchorRow=" + cs.focusedAnchorRow
             + " match=" + match)
         if (match) {
             Qt.callLater(function() { focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0) })
