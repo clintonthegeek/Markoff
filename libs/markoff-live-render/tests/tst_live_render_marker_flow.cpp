@@ -89,6 +89,14 @@ private Q_SLOTS:
     /// in exactly two `editSequence` bumps (one for the marker insert,
     /// one for the bundled scrub+insert on first keystroke).
     void step1_eobEnter_thenType_atomicScrub();
+
+    /// Step 2: stress-typing race verification. After EOB-Enter, type
+    /// 200 characters with 30 ms inter-keystroke gap (matching the
+    /// LiveRealisticInputHarness default) — interleaving with the
+    /// async parse worker that may deliver `parseUpdated` mid-typing.
+    /// The final source must end with the typed string in order, with
+    /// no character scrambling and no marker bytes.
+    void step2_eobEnter_stressType_noScramble();
 };
 
 // ---------- Step 1 ----------
@@ -141,6 +149,96 @@ void TstLiveRenderMarkerFlow::step1_eobEnter_thenType_atomicScrub()
     QCOMPARE(QString::fromUtf8(doc.toMarkdownUtf8()),
              QStringLiteral("alpha\n\nx\n"));
     QVERIFY(!QString::fromUtf8(doc.toMarkdownUtf8()).contains(kMarkerChar));
+}
+
+// ---------- Step 2 ----------
+
+void TstLiveRenderMarkerFlow::step2_eobEnter_stressType_noScramble()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+
+    QVERIFY(waitForRows(binding, doc, QByteArrayLiteral("alpha"), 1));
+
+    // EOB-Enter inserts a marker paragraph.
+    QVERIFY(binding.structuralKeyHandler()->tryHandle(
+        Qt::Key_Return, Qt::NoModifier, /*blockIndex=*/0, /*qtPos=*/5,
+        /*selectionEmpty=*/true, QStringLiteral("alpha")));
+    QVERIFY(waitForRowCount(binding, 2));
+
+    // Wire LiveEditBinding to a QTextEdit-backed document mirroring the
+    // marker block (model index 1). The marker text is the model's
+    // payload; user typing into a marker-only block triggers the
+    // bundled scrub+insert primitive, which on the FIRST keystroke
+    // also wipes the marker. Subsequent keystrokes are plain inserts.
+    QTextEdit editor;
+    editor.setPlainText(QString(kMarkerChar));
+    LiveEditBinding eb;
+    eb.setBinding(&binding);
+    eb.setModelIndex(1);
+    eb.setText(QString(kMarkerChar));
+    eb.setRawTextDocument(editor.document());
+
+    // Replicate the QML `text: model.text` binding the production
+    // delegate uses: when the row's text changes (e.g. after a parse
+    // arrival), push the new text into `eb.setText(...)`. Without this
+    // re-sync, `m_previousText` lags and qtPos→byte translation
+    // computes against stale pre-edit text.
+    QObject::connect(binding.model(), &QAbstractItemModel::dataChanged,
+        [&binding, &eb](const QModelIndex &tl, const QModelIndex &br,
+                        const QList<int> &roles) {
+            const int row = eb.modelIndex();
+            if (row < tl.row() || row > br.row()) return;
+            // TextRole == Qt::UserRole + 1 typically; LiveBlockModel
+            // exposes role names via model.text. We sniff via record.
+            if (row >= binding.model()->rowCount()) return;
+            const QString newText = binding.model()->recordAt(row).text;
+            eb.setText(newText);
+        });
+
+    // Deterministic 200-character payload with no spaces (mirrors the
+    // pattern called out in the task description: spaces have a
+    // separate code path in QTest::keyClick — and the production
+    // edit-binding path doesn't care, but we keep the test honest).
+    // The string is a 200-char alphanumeric stream chosen to exhibit
+    // any ordering bug (mixed letters + digits, no repeating runs).
+    QString payload;
+    payload.reserve(200);
+    static const char kAlphabet[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    for (int i = 0; i < 200; ++i) {
+        payload.append(QLatin1Char(kAlphabet[i % (sizeof(kAlphabet) - 1)]));
+    }
+    QCOMPARE(payload.size(), 200);
+
+    // Type each character at the current end of the document.
+    // Between keystrokes, qWait + processEvents lets the parse worker
+    // interleave (matching LiveRealisticInputHarness::typeChar timing).
+    for (int i = 0; i < payload.size(); ++i) {
+        QTextCursor cur(editor.document());
+        cur.movePosition(QTextCursor::End);
+        cur.insertText(QString(payload.at(i)));
+        QTest::qWait(30);
+        QCoreApplication::processEvents();
+    }
+
+    // Drain any in-flight parse so the doc reflects the final state.
+    QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+    parseSpy.wait(500);
+
+    const QString src = QString::fromUtf8(doc.toMarkdownUtf8());
+    QVERIFY2(!src.contains(kMarkerChar),
+             "marker byte must not survive the bundled-edit primitive");
+    // Source must end with the payload — preceded by the alpha block
+    // and its inter-block separator.
+    const QString expectedTail = payload + QStringLiteral("\n");
+    QVERIFY2(src.endsWith(expectedTail),
+             qPrintable(QStringLiteral("source did not end with payload; tail=%1")
+                            .arg(src.right(40))));
+    // And starts with "alpha\n\n".
+    QVERIFY(src.startsWith(QStringLiteral("alpha\n\n")));
+    // Stronger: the full source equals exactly "alpha\n\n<payload>\n".
+    QCOMPARE(src, QStringLiteral("alpha\n\n%1\n").arg(payload));
 }
 
 QTEST_MAIN(TstLiveRenderMarkerFlow)
