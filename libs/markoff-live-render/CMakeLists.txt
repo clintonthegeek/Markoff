@@ -47,6 +47,10 @@ qt_add_qml_module(markoff_live_render
         src/BlockWalker.cpp
         src/LiveBlockModel.cpp
         src/LiveListModelBinding.cpp
+        # R5.5: marker paragraph design
+        include/markoff/live-render/Marker.h
+        include/markoff/live-render/MarkerScrubber.h
+        src/MarkerScrubber.cpp
         # R3: cursor + selection
         include/markoff/live-render/Cursor.h
         include/markoff/live-render/LiveCursorState.h
