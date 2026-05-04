@@ -554,6 +554,74 @@ private Q_SLOTS:
                  QStringLiteral("alpha\n\nbeta\n"));
     }
 
+// ---------- R5.5 Bug 1 (Task 18 dogfood) — list-item Enter ----------
+
+    void paragraphEnter_atStartOfListItem_doesNotMangleList() {
+        using namespace Markoff;
+        using namespace Markoff::LiveRender;
+        MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
+        auto *model   = binding.model();
+        auto *handler = binding.structuralKeyHandler();
+
+        doc.resetContent(QByteArrayLiteral("- item1\n- item2\n- item3\n"),
+                         Origin::FirstOpen);
+        QVERIFY(parseSpy.wait(2000));
+        QTRY_VERIFY(model->rowCount() >= 1);
+
+        // Locate the row that contains "item2". The whole list is one row in
+        // R2's BlockWalker mapping (lists collapse to BlockKind::Paragraph),
+        // so this is row 0; the loop is defensive in case classification
+        // changes later.
+        int item2Row = -1;
+        for (int i = 0; i < model->rowCount(); ++i) {
+            if (model->recordAt(i).text.contains(QStringLiteral("item2"))) {
+                item2Row = i;
+                break;
+            }
+        }
+        QVERIFY(item2Row >= 0);
+
+        // Find the qtPos of "- item2" within that row's text. The dogfood
+        // scenario is "caret BEFORE the dash of item2"; with the list
+        // collapsed into one row, that's mid-block, not row-start.
+        const QString rowText = model->recordAt(item2Row).text;
+        const int qtPosBeforeItem2 = rowText.indexOf(QStringLiteral("- item2"));
+        QVERIFY(qtPosBeforeItem2 >= 0);
+
+        const QString preEditSrc = QString::fromUtf8(doc.toMarkdownUtf8());
+
+        const bool handled = handler->tryHandle(
+            Qt::Key_Return, Qt::NoModifier,
+            item2Row, qtPosBeforeItem2,
+            /*selectionEmpty=*/true,
+            rowText);
+
+        // Per spec §0 the marker design is paragraph-only. If the handler
+        // claims it (mid-block split), it must NOT inject a ZWSP marker;
+        // even better, the gate returns NotHandled so QTextEdit's default
+        // Enter handling delivers a soft-break — non-destructive.
+        if (handled) {
+            QVERIFY(!QString::fromUtf8(doc.toMarkdownUtf8())
+                         .contains(QChar(0x200B)));
+        }
+        // Source must not have been mangled — all three items still present.
+        const QString postEditSrc = QString::fromUtf8(doc.toMarkdownUtf8());
+        QVERIFY(postEditSrc.contains(QStringLiteral("item1")));
+        QVERIFY(postEditSrc.contains(QStringLiteral("item2")));
+        QVERIFY(postEditSrc.contains(QStringLiteral("item3")));
+
+        // Stronger invariant: source must remain a single contiguous list.
+        // The destructive failure mode inserts "\n\n" between list items,
+        // which CommonMark interprets as TWO lists with an empty paragraph
+        // between. The post-edit source must NOT contain a "\n\n" between
+        // two list-marker lines.
+        QVERIFY2(!postEditSrc.contains(QStringLiteral("\n\n-")),
+                 qPrintable(QStringLiteral("source split list with \\n\\n: ") + postEditSrc));
+    }
+
     void paragraphEnter_shiftEnterOnMarkerBlock_insertsSoftBreak() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;

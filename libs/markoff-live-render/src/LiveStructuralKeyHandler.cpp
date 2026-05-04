@@ -14,10 +14,54 @@
 #include <markoff-foundation/MarkoffEdit.h>
 
 #include <QLoggingCategory>
+#include <QRegularExpression>
 
 Q_LOGGING_CATEGORY(lcStruct, "markoff.live.struct", QtWarningMsg)
 
 namespace Markoff::LiveRender {
+
+namespace {
+
+/// Marker design (spec §0) is bounded to "paragraph holes only" — list items,
+/// blockquotes, and similar block-likes are out of scope. R2's BlockWalker
+/// collapses lists/blockquotes/HTML/etc. into a single row whose `kind` is
+/// `BlockKind::Paragraph` but whose `text` carries the source-faithful
+/// markdown including the list/quote markers. Without a guard, paragraphEnter
+/// fires its marker-insertion / mid-block-split logic on that row and
+/// destructively rewrites the source (e.g. injects `\n\n` between two list
+/// items, splitting the list into two with an empty paragraph in between —
+/// the dogfood Bug 1 symptom).
+///
+/// Strategy B (text-pattern heuristic): treat a row as non-paragraph if its
+/// text starts with a markdown list marker (`-`, `*`, `+`, `1.`, `1)`) or a
+/// blockquote marker (`>`). Returning `HR::NotHandled` from paragraphEnter in
+/// that case lets QTextEdit's default Enter handling apply — a literal `\n`
+/// soft-break inside the row, which the parser keeps as a soft line break
+/// inside the existing list/quote. Non-destructive; the user sees something
+/// happen rather than silent swallowing.
+///
+/// This is a heuristic, not a parser query. False-positive risk: a true
+/// paragraph whose first line happens to start with `- ` (e.g. a literal
+/// dash-space at column 0) would be mis-gated. CommonMark would also parse
+/// such a paragraph as a list, so the heuristic agrees with the parser's
+/// classification — there is no observable false-positive in standard
+/// markdown. False-negative risk: indented list items (≥4 leading spaces
+/// without a list parent) — not a concern at top level.
+///
+/// Future work (spec §17): a parser-side "is this row a list/quote
+/// container?" query would let us swap this for Strategy D and add proper
+/// list-item Enter UX (split items, exit on empty item).
+bool rowIsListOrQuoteContent(const QString &blockText)
+{
+    static const QRegularExpression kListOrQuotePrefix(
+        QStringLiteral(R"(^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)])\s)"));
+    static const QRegularExpression kBlockQuotePrefix(
+        QStringLiteral(R"(^[ \t]{0,3}>)"));
+    return kListOrQuotePrefix.match(blockText).hasMatch()
+        || kBlockQuotePrefix.match(blockText).hasMatch();
+}
+
+}  // namespace
 
 LiveStructuralKeyHandler::LiveStructuralKeyHandler(
     Markoff::MarkoffDocument *document,
@@ -102,6 +146,19 @@ void LiveStructuralKeyHandler::registerBuiltins()
     // ---------- paragraph: Enter (all positions, Shift-aware) ----------
     auto paragraphEnter = [](const Ctx &c) -> HR {
         const bool isShift = (c.modifiers & Qt::ShiftModifier) != 0;
+
+        // Bug 1 (Task 18 dogfood) gate. Spec §0: marker design is bounded
+        // to top-level paragraphs. R2's BlockWalker collapses lists and
+        // blockquotes into a single Paragraph-kinded row; without this
+        // guard, mid-block Enter splits the row with `\n\n`, splitting
+        // the list into two and scattering cursor delivery. Returning
+        // NotHandled lets QTextEdit's default Enter (a literal `\n`)
+        // apply — non-destructive soft-break inside the list/quote.
+        // Shift-Enter is also gated: it inserts a `\n` too, which we'd
+        // otherwise duplicate; default Qt Shift-Enter does the same.
+        if (rowIsListOrQuoteContent(c.blockText)) {
+            return HR::NotHandled;
+        }
 
         // Marker design §4.5: plain (unmodified) Enter on a marker-only
         // block is a no-op. CommonMark collapses consecutive blank lines

@@ -332,6 +332,23 @@ Pre-marker design: the previous "block" was a hole; backspace either abandoned t
 
 This is a small extension to the R5 backspace-merge handler — when the previous block is marker-only, the merge edit is the scrub edit, not a paragraph-merge.
 
+### 8.4 List/blockquote gate (Bug 1, Task 18 dogfood)
+
+Per §0 the marker design is bounded to top-level paragraphs. R2's `BlockWalker` collapses `list`, `block_quote`, and other container blocks into a single row keyed `BlockKind::Paragraph` whose `text` is the source-faithful markdown including the leading list/quote marker. Without a guard, `paragraphEnter` fires its marker-insertion (atStart/atEnd) and mid-block-split (`\n\n` insertion) logic on those rows and destructively mangles the source — e.g. inserting `\n\n` between two list items splits one list into two with an empty paragraph in between, after which CRDT row identities scatter and cursor delivery lands on the wrong row.
+
+The gate sits at the top of `paragraphEnter` and matches `c.blockText` against two regexes:
+
+- list marker: `^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)])\s`
+- blockquote marker: `^[ \t]{0,3}>`
+
+If either matches, `paragraphEnter` returns `HR::NotHandled`, and `QTextEdit`'s default Enter handling delivers a literal `\n` soft-break inside the existing list/quote — non-destructive (the parser keeps it as a soft line break inside the list item).
+
+**Strategy.** This is Strategy B from the Bug 1 investigation (text-pattern heuristic). Strategy A (kind-based) is unavailable because lists already collapse to `BlockKind::Paragraph`. Strategy D (parser API) is the cleanest end state and is recorded as §17 follow-up; doing it now would require a new parser query and is out of scope for the bug fix.
+
+**False-positive risk.** A literal paragraph whose first line happens to start with `- ` would be mis-gated. CommonMark would also parse such a paragraph as a list, so the heuristic agrees with the parser's classification — there is no observable false-positive in standard markdown.
+
+**False-negative risk.** Indented list items (≥ 4 leading spaces with no list parent) are a corner case not handled by the heuristic. Top-level standard markdown is unaffected.
+
 ---
 
 ## 9. `LiveEditBinding` integration
@@ -480,7 +497,8 @@ These are deliberately not pinned here; the plan resolves them.
 5. **What happens if `setRowEditSequence` for the new (post-EOB-Enter) marker paragraph is needed.** The marker paragraph has just been created via `applyLocalEdit`; is its `lastEditEditSequence` correctly tagged so the freshness rule doesn't squash subsequent text-role updates? The plan validates.
 6. **Performance of `scrubBeforeSave` on large documents.** O(parserRows) walk; should be cheap. The plan adds a benchmark gate if there's any concern.
 7. **Test fixture taxonomy (per review §3.5).** This design's tests should follow the multi-fixture rule from the review's §3.5: short-snippet, llm-wrapped, human-long-line, multi-block-mixed, hundred-block-scroll. The plan instantiates each.
-8. **Foundation-level fix for `scrubAfterLoad` timing (Task 16 finding).** §6.4 documents a two-step contract because `MarkoffDocument::documentReloaded` fires synchronously inside `resetContent` *before* the parse worker populates the model. A foundation change — re-emitting `documentReloaded` after the first post-load `parseUpdated`, or adding a separate `documentReadyAfterLoad` signal that fires when the model is in sync with the loaded source — would let the marker library auto-scrub on load without a host call. Out of scope for this spec (foundation-level change); flag for the foundation backlog.
+8. **Proper list-item / blockquote Enter UX (Bug 1 follow-up).** §8.4's gate stops the destructive behaviour but only delivers a soft-break inside the list item. Real list-item UX wants Enter at end-of-item to start a *new* list item (with a fresh `- ` marker, preserving indent), and Enter on an empty list item to *exit* the list (delete the marker, leave a paragraph). Implementing this needs either (a) a parser-side per-row "is in list, what is the marker prefix?" query (Strategy D from the Bug 1 investigation), or (b) a richer `BlockKind` taxonomy that splits `BlockKind::ListItem` / `BlockKind::BlockQuote` out of `Paragraph` so the structural handler can register dedicated handlers per kind. Phase R7 (per `BlockWalker.cpp`'s "Lists/blockquotes/tables gain dedicated kinds in R7" note) is the natural home; until then, soft-break-inside-list is the documented behaviour.
+9. **Foundation-level fix for `scrubAfterLoad` timing (Task 16 finding).** §6.4 documents a two-step contract because `MarkoffDocument::documentReloaded` fires synchronously inside `resetContent` *before* the parse worker populates the model. A foundation change — re-emitting `documentReloaded` after the first post-load `parseUpdated`, or adding a separate `documentReadyAfterLoad` signal that fires when the model is in sync with the loaded source — would let the marker library auto-scrub on load without a host call. Out of scope for this spec (foundation-level change); flag for the foundation backlog.
 
 ---
 
