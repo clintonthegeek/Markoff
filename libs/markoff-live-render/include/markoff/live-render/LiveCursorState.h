@@ -35,10 +35,6 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveCursorState : public QObject {
     QML_UNCREATABLE("LiveCursorState is provided by LiveListModelBinding")
 
     Q_PROPERTY(QString cursorKind READ cursorKind NOTIFY cursorChanged)
-    /// The holeId if the active cursor is a TextCaret targeting a hole, else 0.
-    /// Exposed so QML LiveView can route keyboard focus into the hole's delegate
-    /// TextEdit when the hole is created via a structural key (e.g. Enter at EOB).
-    Q_PROPERTY(quint64 focusedHoleId READ focusedHoleId NOTIFY cursorChanged)
     /// The inner-model row index for the active anchor-side TextCaret, else -1.
     /// QML uses this (combined with `proxyModel.proxyRowForInner`) to find the
     /// delegate that should receive keyboard focus after a structural edit
@@ -54,7 +50,6 @@ public:
 
     Cursor cursor() const { return m_cursor; }
     QString cursorKind() const;
-    quint64 focusedHoleId() const;
     int focusedAnchorRow() const;
     int focusedQtPos() const;
 

@@ -209,7 +209,7 @@ private Q_SLOTS:
 
         const Cursor cur = binding.cursorState()->cursor();
         QVERIFY(std::holds_alternative<TextCaret>(cur));
-        QCOMPARE(anchorOf(std::get<TextCaret>(cur).block),
+        QCOMPARE(std::get<TextCaret>(cur).block,
                  binding.model()->recordAt(1).blockAnchor);
     }
 

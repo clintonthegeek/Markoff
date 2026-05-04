@@ -2,7 +2,6 @@
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff/live-render/BlockHole.h>
 #include <markoff-foundation/BlockAnchor.h>
 #include <markoff-foundation/TextAnchor.h>
 
@@ -12,24 +11,20 @@
 
 namespace Markoff::LiveRender {
 
-/// Opaque block identity (spec §3.1 amendment A1):
-/// either a CRDT-anchored parser block or a layer-local hole.
-using BlockId = std::variant<Markoff::BlockAnchor, HoleBlockId>;
-
-inline bool isHoleBlockId(const BlockId &id) {
-    return std::holds_alternative<HoleBlockId>(id);
-}
-inline quint64 holeIdOf(const BlockId &id) {
-    return std::get<HoleBlockId>(id).holeId;
-}
-inline const Markoff::BlockAnchor &anchorOf(const BlockId &id) {
-    return std::get<Markoff::BlockAnchor>(id);
-}
+/// Opaque block identity. Spec §3.1: a CRDT-anchored parser block.
+///
+/// Historical note: spec §3.1 amendment A1 had widened this to a variant
+/// over `Markoff::BlockAnchor` and `HoleBlockId` to support v2 phantom
+/// rows. The marker-paragraph design (R5.5) retires phantom rows in
+/// favour of a single source-of-truth marker block, so the variant is
+/// reverted. `HoleBlockId` still exists in `BlockHole.h` for the v2
+/// hole files retained until Task 13.
+using BlockId = Markoff::BlockAnchor;
 
 /// Caret inside a text-bearing block at a CRDT-anchored byte position.
 /// Rendered as a blinking I-beam. Spec §3.1.
 struct MARKOFF_LIVE_RENDER_EXPORT TextCaret {
-    BlockId              block;           ///< was Markoff::BlockAnchor; widened by spec §3.1 amendment A1
+    BlockId              block;           ///< CRDT-anchored parser block.
     Markoff::TextAnchor  positionAnchor;  ///< CRDT anchor; survives remote edits.
     quint32              cachedByteOffset = 0; ///< Resolved byte offset; refreshed on use.
 
@@ -42,13 +37,13 @@ struct MARKOFF_LIVE_RENDER_EXPORT TextCaret {
 /// Block focused as a unit — no caret. Rendered as a focus ring.
 /// Used by non-text blocks (hr, image) in their default state. Spec §3.1.
 struct MARKOFF_LIVE_RENDER_EXPORT BlockSelected {
-    BlockId block;                        ///< was Markoff::BlockAnchor; widened by spec §3.1 amendment A1
+    BlockId block;                        ///< CRDT-anchored parser block.
     bool operator==(const BlockSelected &o) const noexcept { return block == o.block; }
 };
 
 /// Block in its own internal-edit mode. Deferred to R8 (math block). Spec §3.1.
 struct MARKOFF_LIVE_RENDER_EXPORT BlockInternalEdit {
-    BlockId block;                        ///< was Markoff::BlockAnchor; widened by spec §3.1 amendment A1
+    BlockId block;                        ///< CRDT-anchored parser block.
     QString mode;  ///< Block-kind-defined token, e.g. "editing-latex".
     bool operator==(const BlockInternalEdit &o) const noexcept {
         return block == o.block && mode == o.mode;

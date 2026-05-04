@@ -41,13 +41,12 @@ void LiveCursorState::onAnchorRenumbered(int /*row*/,
 {
     auto *tc = std::get_if<TextCaret>(&m_cursor);
     if (!tc) return;
-    if (std::holds_alternative<HoleBlockId>(tc->block)) return;
-    if (anchorOf(tc->block) != oldAnchor) return;
+    if (tc->block != oldAnchor) return;
     qInfo().noquote() << "[dogfood] CursorState: onAnchorRenumbered swap-in-place";
     // In-place swap: don't emit cursorChanged. The QML delegate is the
     // same QQuickItem — re-firing focusEditAt would clobber the user's
     // current cursor position inside the TextEdit.
-    tc->block = BlockId{newAnchor};
+    tc->block = newAnchor;
 }
 
 void LiveCursorState::setSignalModel(QAbstractItemModel *signalModel)
@@ -72,21 +71,11 @@ QString LiveCursorState::cursorKind() const
     return QStringLiteral("none");
 }
 
-quint64 LiveCursorState::focusedHoleId() const
-{
-    if (const auto *tc = std::get_if<TextCaret>(&m_cursor)) {
-        if (std::holds_alternative<HoleBlockId>(tc->block))
-            return std::get<HoleBlockId>(tc->block).holeId;
-    }
-    return 0;
-}
-
 int LiveCursorState::focusedAnchorRow() const
 {
     if (!m_model) return -1;
     if (const auto *tc = std::get_if<TextCaret>(&m_cursor)) {
-        if (std::holds_alternative<HoleBlockId>(tc->block)) return -1;
-        return rowForBlock(anchorOf(tc->block));
+        return rowForBlock(tc->block);
     }
     return -1;
 }
@@ -115,15 +104,9 @@ void LiveCursorState::request(const Cursor &newCursor)
 
     QString desc = QStringLiteral("None");
     if (auto *tc = std::get_if<TextCaret>(&newCursor)) {
-        if (std::holds_alternative<HoleBlockId>(tc->block)) {
-            desc = QStringLiteral("TextCaret(holeId=%1, qtPos=%2)")
-                       .arg(std::get<HoleBlockId>(tc->block).holeId)
-                       .arg(tc->cachedByteOffset);
-        } else {
-            const int row = m_model ? rowForBlock(anchorOf(tc->block)) : -1;
-            desc = QStringLiteral("TextCaret(innerRow=%1, qtPos=%2)")
-                       .arg(row).arg(tc->cachedByteOffset);
-        }
+        const int row = m_model ? rowForBlock(tc->block) : -1;
+        desc = QStringLiteral("TextCaret(innerRow=%1, qtPos=%2)")
+                   .arg(row).arg(tc->cachedByteOffset);
     } else if (std::holds_alternative<NoCursor>(newCursor)) {
         desc = QStringLiteral("NoCursor");
     }
@@ -208,9 +191,9 @@ void LiveCursorState::resolvePendingForRow(int row)
     const QVariant v = m_signalModel->data(
         m_signalModel->index(row, 0), LiveBlockModel::BlockAnchorRole);
     if (!v.isValid() || !v.canConvert<Markoff::BlockAnchor>()) {
-        // Hole rows return an empty QVariant for BlockAnchorRole; the
-        // pending mechanism is anchor-side only. Hole-row carets are set
-        // directly by LiveStructuralKeyHandler via request(HoleBlockId).
+        // Rows with no BlockAnchor (e.g. legacy v2 hole rows pending
+        // Task 13 retirement) cannot be addressed by anchor-side carets;
+        // skip resolution and let the pending request expire.
         return;
     }
 
@@ -221,7 +204,7 @@ void LiveCursorState::resolvePendingForRow(int row)
     m_pendingRow.reset();
 
     TextCaret tc;
-    tc.block            = BlockId{v.value<Markoff::BlockAnchor>()};
+    tc.block            = v.value<Markoff::BlockAnchor>();
     tc.cachedByteOffset = static_cast<quint32>(qtPos);
     // positionAnchor: left default — selection projection refreshes it.
     request(tc);
@@ -237,12 +220,7 @@ bool LiveCursorState::validateVariant(const Cursor &c) const
     else if (auto *bi = std::get_if<BlockInternalEdit>(&c))  blockIdPtr = &bi->block;
     if (!blockIdPtr) return false;
 
-    // Holes don't (yet) pass through validateVariant — they bypass normal
-    // validation because LiveHoleLayer manages their lifecycle directly.
-    // Task 4: all live cursors are anchor-side; hole path is reserved for R5.5+.
-    if (isHoleBlockId(*blockIdPtr)) return true;
-
-    const int row = rowForBlock(anchorOf(*blockIdPtr));
+    const int row = rowForBlock(*blockIdPtr);
     if (row < 0) {
         qCWarning(lcCursor) << "cursor request for unknown block";
         return false;

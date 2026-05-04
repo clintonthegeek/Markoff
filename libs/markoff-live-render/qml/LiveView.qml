@@ -111,22 +111,9 @@ ListView {
             if (!binding || !binding.cursorState || !binding.proxyModel) return
             const cs = binding.cursorState
 
-            const holeId = cs.focusedHoleId
-            if (holeId !== 0) {
-                const proxyRow = binding.proxyModel.proxyRowForHole(holeId)
-                const item = (proxyRow >= 0) ? root.itemAtIndex(proxyRow) : null
-                console.log("[dogfood] LiveView.onCursorChanged HOLE holeId=" + holeId
-                    + " proxyRow=" + proxyRow
-                    + " itemFound=" + (item !== null)
-                    + " qtPos=" + cs.focusedQtPos)
-                if (proxyRow < 0) return
-                if (item && item.focusEditAt) item.focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0)
-                return
-            }
-
             const innerRow = cs.focusedAnchorRow
             if (innerRow < 0) {
-                console.log("[dogfood] LiveView.onCursorChanged NONE (no hole, no anchor)")
+                console.log("[dogfood] LiveView.onCursorChanged NONE (no anchor)")
                 return
             }
             const proxyRow = binding.proxyModel.proxyRowForInner(innerRow)

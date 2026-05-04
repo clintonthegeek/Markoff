@@ -193,9 +193,7 @@ void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
     if (d->cursorState) {
         const Cursor cur = d->cursorState->cursor();
         if (auto *tc = std::get_if<TextCaret>(&cur)) {
-            // Hole-side carets don't have a foundation block range; skip refresh.
-            if (isHoleBlockId(tc->block)) return;
-            const auto blockRangeOpt = d->document->blockByteRange(anchorOf(tc->block));
+            const auto blockRangeOpt = d->document->blockByteRange(tc->block);
             if (blockRangeOpt) {
                 const quint32 blockStart = blockRangeOpt->first;
                 const quint32 resolvedAbs = d->document->resolveTextAnchor(tc->positionAnchor);

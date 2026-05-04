@@ -113,18 +113,6 @@ Item {
         }
         const proxy = root.liveBinding ? root.liveBinding.proxyModel : null
 
-        if (root.isHole) {
-            const match = (cs.focusedHoleId !== 0 && cs.focusedHoleId === (model.holeId || 0))
-            console.log("[dogfood] ParaDelegate.onCompleted modelIndex=" + root.modelIndex
-                + " isHole=true holeId=" + (model.holeId || 0)
-                + " focusedHoleId=" + cs.focusedHoleId
-                + " match=" + match)
-            if (match) {
-                Qt.callLater(function() { focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0) })
-            }
-            return
-        }
-
         const focusedProxy = (proxy && cs.focusedAnchorRow >= 0)
                                 ? proxy.proxyRowForInner(cs.focusedAnchorRow) : -1
         const match = (focusedProxy === root.modelIndex)
