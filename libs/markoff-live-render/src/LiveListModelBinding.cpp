@@ -76,11 +76,11 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->session = d->document->createSession({});
         d->selectionView->setDocument(d->document);
         d->selectionView->setSession(d->session);
-        // Construction order: holeLayer first (undoCoalescer needs it),
-        // undoCoalescer second (wired to cursorState + holeLayer),
-        // proxyModel last (depends on doc + model + layer).
+        // Construction order: holeLayer first (proxyModel still depends on
+        // it pending Task 13 retirement), undoCoalescer next (marker design:
+        // routes undo/redo straight to MarkoffDocument), proxyModel last.
         d->holeLayer      = new LiveHoleLayer(d->document, d->model, this);
-        d->undoCoalescer  = new UndoCoalescer(d->document, d->cursorState, d->holeLayer, this);
+        d->undoCoalescer  = new UndoCoalescer(d->document, d->cursorState, this);
         d->proxyModel     = new LiveProxyBlockModel(d->document, d->model, d->holeLayer, this);
         // Pending-cursor resolution must fire AFTER the proxy's row state
         // catches up with the inner model. Listening on inner would resolve

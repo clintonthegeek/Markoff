@@ -13,7 +13,6 @@ namespace Markoff { class MarkoffDocument; }
 
 namespace Markoff::LiveRender {
 class LiveCursorState;
-class LiveHoleLayer;
 }
 
 namespace Markoff::LiveRender {
@@ -40,9 +39,9 @@ namespace Markoff::LiveRender {
 /// `LiveView.qml`) calls `notifyFocusChanged` when `cursorState.cursorChanged`
 /// arrives with a different `blockAnchor` than the prior cursor.
 ///
-/// Task 15: undo() and redo() are the Ctrl-Z / Ctrl-Shift-Z entry points.
-/// They route to LiveHoleLayer when the cursor is on a hole row, and to
-/// MarkoffDocument otherwise.
+/// undo() and redo() are the Ctrl-Z / Ctrl-Shift-Z entry points; they route
+/// directly to `MarkoffDocument::undo()/redo()` (the marker design has no
+/// per-hole undo stack).
 class MARKOFF_LIVE_RENDER_EXPORT UndoCoalescer : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -53,7 +52,6 @@ public:
 
     explicit UndoCoalescer(Markoff::MarkoffDocument *document,
                            LiveCursorState          *cursorState = nullptr,
-                           LiveHoleLayer            *holeLayer   = nullptr,
                            QObject                  *parent      = nullptr);
 
     bool recordPrintable(const Markoff::BlockAnchor &anchor);
@@ -64,12 +62,10 @@ public:
     void notifyMovement();
     void notifyIdleExpired();
 
-    /// Ctrl-Z entry point. If the focused row is a hole, routes to
-    /// LiveHoleLayer::undoBlockHole; on empty-buffer-empty-stack,
-    /// abandons the hole. Otherwise routes to MarkoffDocument::undo().
+    /// Ctrl-Z entry point. Routes to MarkoffDocument::undo().
     Q_INVOKABLE void undo();
 
-    /// Ctrl-Shift-Z entry point. Symmetric to undo().
+    /// Ctrl-Shift-Z entry point. Routes to MarkoffDocument::redo().
     Q_INVOKABLE void redo();
 
 private:
@@ -77,7 +73,6 @@ private:
 
     QPointer<Markoff::MarkoffDocument> m_document;
     QPointer<LiveCursorState>          m_cursorState;
-    QPointer<LiveHoleLayer>            m_holeLayer;
 
     // Last-record state. m_haveLast == false means the chain is broken;
     // the next recordPrintable cannot coalesce.
