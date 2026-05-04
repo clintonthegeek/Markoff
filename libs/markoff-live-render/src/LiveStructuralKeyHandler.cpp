@@ -227,15 +227,24 @@ void LiveStructuralKeyHandler::registerBuiltins()
         c.document->applyLocalEdit({ ed });
         c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
 
-        // Cursor goes to qtPos 0 of the user's content row.
-        // - atStart: marker paragraph takes index `blockIndex`, original content
-        //   shifts down to `blockIndex + 1`. Cursor follows the user's content.
-        // - atEnd: marker paragraph is appended at `blockIndex + 1`. Cursor lands
-        //   in it so the user can type immediately into the new (visually empty)
-        //   paragraph.
-        // Both cases: newRow == blockIndex + 1.
-        const int newRow = c.blockIndex + 1;
-        c.cursorState->requestTextCaretAtNewRow(newRow, /*qtPos=*/0);
+        // Cursor delivery diverges by side:
+        // - atEnd: the new marker block is born at `blockIndex + 1`. Use the
+        //   row-keyed pure-pending request — the cursor MUST land on the new
+        //   row (not the existing user content). requestTextCaretAtNewRow
+        //   resolves on rowsInserted whose range covers blockIndex+1.
+        // - atStart: the new marker block is born at `blockIndex`, and the
+        //   existing user content (whose anchor we already hold) shifts to
+        //   `blockIndex + 1`. Use the anchor-keyed pure-pending request —
+        //   the cursor MUST follow the user's content, and its row index
+        //   after the diff is unpredictable (anchor renumbering or multi-
+        //   row diffs can shift it). The anchor identity is stable.
+        //   Bug 3 fix (Task 18 dogfood pass 2).
+        if (atStart) {
+            c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, /*qtPos=*/0);
+        } else {
+            const int newRow = c.blockIndex + 1;
+            c.cursorState->requestTextCaretAtNewRow(newRow, /*qtPos=*/0);
+        }
 
         if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;

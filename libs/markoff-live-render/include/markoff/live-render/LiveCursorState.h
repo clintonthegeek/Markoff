@@ -86,6 +86,19 @@ public:
     /// requestTextCaretAtRow above.
     Q_INVOKABLE void requestTextCaretAtNewRow(int expectedRow, int qtPos);
 
+    /// Anchor-keyed pure-pending variant. Use when the structural edit
+    /// shifts an existing block (whose `BlockAnchor` we already know)
+    /// rather than creating a brand-new block. The pending request
+    /// resolves on the next `rowsInserted` event by searching the model
+    /// for `expectedAnchor`'s row, NOT by indexing a row position.
+    /// This is robust to any number of intervening Insert/Delete/Equal
+    /// ops in the parse-back diff: the user's content's row index can
+    /// shift unpredictably (anchor renumbering, multi-row diffs), but
+    /// its BlockAnchor identity is stable. Bug 3 fix (Task 18 dogfood
+    /// pass 2): start-of-paragraph Enter in mid-document context must
+    /// land the cursor on the user's content, not on the row after it.
+    void requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor, int qtPos);
+
     /// Called by LiveListModelBinding from onParseUpdated. Increments the
     /// pending request's parse-cycle counter; drops on the SECOND call
     /// after the request was recorded (i.e. drops at parseCyclesSeen >= 2).
@@ -113,8 +126,16 @@ private:
         int row;
         int qtPos;
         int parseCyclesSeen = 0;  // bumped on each noteParseArrived
+        // If set, treat this pending request as anchor-keyed: ignore the
+        // `row` field and resolve by searching the model for this
+        // BlockAnchor on every rowsInserted event. Used by start-of-
+        // paragraph Enter (marker insert before an existing block) where
+        // the user's content's row index is not stable across the diff
+        // but its BlockAnchor identity is.
+        std::optional<Markoff::BlockAnchor> anchor;
     };
     std::optional<PendingRow> m_pendingRow;
+    void resolvePendingForAnchor();
 };
 
 }  // namespace Markoff::LiveRender

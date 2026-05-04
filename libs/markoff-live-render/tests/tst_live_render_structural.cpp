@@ -501,6 +501,87 @@ private Q_SLOTS:
         QCOMPARE(cs->focusedQtPos(), 0);
     }
 
+    void paragraphEnter_atStartOfMidDocParagraph_cursorOnUserContent() {
+        using namespace Markoff;
+        using namespace Markoff::LiveRender;
+        // Dogfood Bug 3 (Task 18 pass 2): pressing Enter at qtPos 0 of a
+        // paragraph in the MIDDLE of a multi-paragraph document must leave
+        // the cursor on the user's content row, not on the row AFTER it.
+        // The simple single-paragraph atStart test (above) passed by
+        // coincidence; multi-paragraph context exposes an off-by-one.
+        MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        auto *model   = binding.model();
+        auto *cs      = binding.cursorState();
+        auto *handler = binding.structuralKeyHandler();
+
+        doc.resetContent(QByteArrayLiteral("prev\n\nP\n\nQ\n"), Origin::TestFixture);
+        QTRY_COMPARE(model->rowCount(), 3);
+        QCOMPARE(model->recordAt(0).text, QStringLiteral("prev"));
+        QCOMPARE(model->recordAt(1).text, QStringLiteral("P"));
+        QCOMPARE(model->recordAt(2).text, QStringLiteral("Q"));
+
+        bool handled = handler->tryHandle(Qt::Key_Return, Qt::NoModifier,
+                                          /*blockIndex=*/1,
+                                          /*qtPos=*/0,
+                                          /*selectionEmpty=*/true,
+                                          /*blockText=*/QStringLiteral("P"));
+        QVERIFY(handled);
+        QTRY_COMPARE(model->rowCount(), 4);
+
+        // Post-edit layout:
+        QCOMPARE(model->recordAt(0).text, QStringLiteral("prev"));
+        // row 1 is the marker paragraph (text = QString(kMarkerChar))
+        QCOMPARE(model->recordAt(1).text, QString(kMarkerChar));
+        // row 2 is P (the user's content)
+        QCOMPARE(model->recordAt(2).text, QStringLiteral("P"));
+        // row 3 is Q
+        QCOMPARE(model->recordAt(3).text, QStringLiteral("Q"));
+
+        // Cursor must land in P (row 2), not in Q (row 3).
+        QTRY_COMPARE(cs->focusedAnchorRow(), 2);
+        QCOMPARE(cs->focusedQtPos(), 0);
+    }
+
+    void paragraphEnter_atStartOfMidDocParagraph_largerDoc_cursorOnUserContent() {
+        using namespace Markoff;
+        using namespace Markoff::LiveRender;
+        // Larger-doc variant: more paragraphs, the target is "in the last
+        // third" per dogfood report wording.
+        MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        auto *model   = binding.model();
+        auto *cs      = binding.cursorState();
+        auto *handler = binding.structuralKeyHandler();
+
+        QByteArray src;
+        for (int i = 0; i < 9; ++i) {
+            src += QByteArrayLiteral("para") + QByteArray::number(i) + QByteArrayLiteral("\n\n");
+        }
+        // 9 paragraphs separated by blank lines.
+        doc.resetContent(src, Origin::TestFixture);
+        QTRY_COMPARE(model->rowCount(), 9);
+        QCOMPARE(model->recordAt(6).text, QStringLiteral("para6"));
+
+        bool handled = handler->tryHandle(Qt::Key_Return, Qt::NoModifier,
+                                          /*blockIndex=*/6,
+                                          /*qtPos=*/0,
+                                          /*selectionEmpty=*/true,
+                                          /*blockText=*/QStringLiteral("para6"));
+        QVERIFY(handled);
+        QTRY_COMPARE(model->rowCount(), 10);
+
+        QCOMPARE(model->recordAt(6).text, QString(kMarkerChar));
+        QCOMPARE(model->recordAt(7).text, QStringLiteral("para6"));
+        QCOMPARE(model->recordAt(8).text, QStringLiteral("para7"));
+
+        // Cursor must land on para6 at row 7.
+        QTRY_COMPARE(cs->focusedAnchorRow(), 7);
+        QCOMPARE(cs->focusedQtPos(), 0);
+    }
+
     void paragraphEnter_onMarkerOnlyBlock_isNoOp() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;

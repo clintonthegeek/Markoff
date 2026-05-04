@@ -38,6 +38,15 @@ void LiveCursorState::onAnchorRenumbered(int /*row*/,
                                           Markoff::BlockAnchor oldAnchor,
                                           Markoff::BlockAnchor newAnchor)
 {
+    // Also follow the renumbering through any pending anchor-keyed request.
+    // The collapsed-Equal in AstBlockDiff (Delete+Insert at the same row,
+    // same kind) is the source of these renumberings; without this hop, a
+    // pending requestTextCaretAtAnchor whose anchor was renumbered out from
+    // under it would never resolve.
+    if (m_pendingRow && m_pendingRow->anchor && *m_pendingRow->anchor == oldAnchor) {
+        qInfo().noquote() << "[dogfood] CursorState: onAnchorRenumbered pending-anchor swap";
+        m_pendingRow->anchor = newAnchor;
+    }
     auto *tc = std::get_if<TextCaret>(&m_cursor);
     if (!tc) return;
     if (tc->block != oldAnchor) return;
@@ -137,7 +146,7 @@ void LiveCursorState::requestTextCaretAtRow(int expectedRow, int qtPos)
     qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtRow row=" << expectedRow
                       << "qtPos=" << qtPos
                       << "(signalModel.rowCount=" << m_signalModel->rowCount() << ")";
-    m_pendingRow = PendingRow{ expectedRow, qtPos, 0 };
+    m_pendingRow = PendingRow{ expectedRow, qtPos, 0, std::nullopt };
     if (expectedRow < m_signalModel->rowCount())
         resolvePendingForRow(expectedRow);
 }
@@ -153,7 +162,21 @@ void LiveCursorState::requestTextCaretAtNewRow(int expectedRow, int qtPos)
     // that would land the cursor on whatever block currently sits there
     // (the block that's about to be SHIFTED by the upcoming insertion).
     // Wait for the next rowsInserted whose range covers expectedRow.
-    m_pendingRow = PendingRow{ expectedRow, qtPos, 0 };
+    m_pendingRow = PendingRow{ expectedRow, qtPos, 0, std::nullopt };
+}
+
+void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor,
+                                               int qtPos)
+{
+    if (!m_signalModel) return;
+    qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtAnchor qtPos=" << qtPos
+                      << "(signalModel.rowCount=" << m_signalModel->rowCount() << ")";
+    // Anchor-keyed pure-pending. Do NOT resolve immediately — the model
+    // currently still reflects the PRE-edit state (the anchor sits at its
+    // OLD row, which is about to be displaced by the upcoming insertion).
+    // Wait for rowsInserted to fire during parse-back applyOps; at that
+    // point the anchor's CURRENT row is the right cursor target.
+    m_pendingRow = PendingRow{ -1, qtPos, 0, expectedAnchor };
 }
 
 void LiveCursorState::noteParseArrived(quint64 /*parseSeq*/)
@@ -173,21 +196,51 @@ void LiveCursorState::onRowsInserted(const QModelIndex &parent, int first, int l
 {
     if (parent.isValid()) return;  // top-level only
     qInfo().noquote() << "[dogfood] CursorState: onRowsInserted [" << first << "," << last << "]"
-                      << "pending=" << (m_pendingRow ? QString::number(m_pendingRow->row) : QStringLiteral("none"));
+                      << "pending=" << (m_pendingRow
+                                            ? (m_pendingRow->anchor
+                                                   ? QStringLiteral("anchor")
+                                                   : QString::number(m_pendingRow->row))
+                                            : QStringLiteral("none"));
     if (!m_pendingRow) return;
-    // Resolve if the pending row is in the inserted range OR if rows were
-    // inserted before the pending row (shifting it from its old position into
-    // the current position). In the latter case, check if the row is now valid.
+    if (m_pendingRow->anchor) {
+        // Anchor-keyed: re-search the model on every insert event. The
+        // user's content's row index can drift across the diff, but the
+        // anchor identity is stable. Bug 3 fix.
+        resolvePendingForAnchor();
+        return;
+    }
+    // Row-keyed: resolve only when the pending row is INSIDE the inserted
+    // range. Insertions before the pending row shift it but do NOT bring a
+    // new block into existence at the pending position, so resolving on
+    // those events would land the cursor on a shifted-existing block (the
+    // user's content row that was supposed to be the cursor target ends up
+    // one row past where we look) — Bug 3 symptom in mid-doc Enter.
     if (m_pendingRow->row >= first && m_pendingRow->row <= last) {
-        // Row is explicitly in the inserted range.
-        resolvePendingForRow(m_pendingRow->row);
-    } else if (first <= m_pendingRow->row) {
-        // Rows were inserted at or before our pending row. If our row now
-        // exists in the model (because it was shifted into place by the
-        // insertion), resolve it. This handles the start-of-block Enter case:
-        // pending row 1, rowsInserted(0, 0) means old row 0 shifted to row 1.
         resolvePendingForRow(m_pendingRow->row);
     }
+}
+
+void LiveCursorState::resolvePendingForAnchor()
+{
+    if (!m_signalModel) return;
+    if (!m_pendingRow || !m_pendingRow->anchor) return;
+    const Markoff::BlockAnchor target = *m_pendingRow->anchor;
+    const int rows = m_signalModel->rowCount();
+    for (int r = 0; r < rows; ++r) {
+        const QVariant v = m_signalModel->data(
+            m_signalModel->index(r, 0), LiveBlockModel::BlockAnchorRole);
+        if (!v.isValid() || !v.canConvert<Markoff::BlockAnchor>()) continue;
+        if (v.value<Markoff::BlockAnchor>() == target) {
+            const int qtPos = m_pendingRow->qtPos;
+            m_pendingRow.reset();
+            TextCaret tc;
+            tc.block            = target;
+            tc.cachedByteOffset = static_cast<quint32>(qtPos);
+            request(tc);
+            return;
+        }
+    }
+    // Anchor not (yet) present in the model. Wait for the next event.
 }
 
 void LiveCursorState::resolvePendingForRow(int row)
