@@ -18,7 +18,6 @@ namespace Markoff::LiveRender {
 class LiveBlockModel;
 class LiveCursorState;
 class BlockKindRegistry;
-class UndoCoalescer;
 
 /// Single dispatcher for structural key events (Enter, Backspace-edge,
 /// Delete-edge, Shift-Enter; future Tab/Shift-Tab in R7). Looks up the
@@ -29,6 +28,10 @@ class UndoCoalescer;
 /// Returns `true` if the key was consumed (caller sets event.accepted);
 /// `false` otherwise (caller falls back to TextEdit's native handling
 /// — that's how code-block's Enter inserts a literal newline).
+///
+/// D2 migration: all handlers use Cmd::* functions (enterAtEnd,
+/// backspaceMerge, deleteMerge, insertSoftBreak) rather than building
+/// flat-buffer MarkoffEdits.
 class MARKOFF_LIVE_RENDER_EXPORT LiveStructuralKeyHandler : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -41,14 +44,13 @@ public:
         Markoff::MarkoffDocument *document;
         LiveBlockModel           *model;
         LiveCursorState          *cursorState;
-        UndoCoalescer            *undoCoalescer;
 
-        int                       blockIndex;       ///< model row (used for both byte arithmetic and cursor delivery)
-        Markoff::BlockAnchor      blockAnchor;
+        int                       blockIndex;       ///< model row
+        Markoff::BlockAnchor      blockAnchor;      ///< == BlockId in D2
         quint32                   currentBlockStart;
         quint32                   currentBlockEnd;
         int                       qtPos;
-        int                       modifiers;       ///< Qt::KeyboardModifiers
+        int                       modifiers;        ///< Qt::KeyboardModifiers
         QString                   blockText;
     };
 
@@ -60,7 +62,6 @@ public:
                              LiveBlockModel           *model,
                              LiveCursorState          *cursorState,
                              const BlockKindRegistry  *registry,
-                             UndoCoalescer            *undoCoalescer,
                              QObject                  *parent = nullptr);
 
     /// Register a kind-specific handler for `key` (a `Qt::Key_*` value).
@@ -82,7 +83,6 @@ private:
     LiveBlockModel                    *m_model;
     LiveCursorState                   *m_cursorState;
     const BlockKindRegistry           *m_registry;
-    UndoCoalescer                     *m_undoCoalescer;
 
     // Outer key: kind ("paragraph", etc.). Inner key: Qt::Key_*.
     QHash<QString, QHash<int, HandlerFn>> m_handlers;

@@ -6,12 +6,10 @@
 #include <markoff/live-render/BlockKind.h>
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveCursorState.h>
-#include <markoff/live-render/UndoCoalescer.h>
-#include <markoff/live-render/Marker.h>
-#include <markoff/live-render/MarkerScrubber.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/UndoLog.h>
+#include <markoff-foundation/Cmd/D2.h>
 
 #include <QLoggingCategory>
 #include <QRegularExpression>
@@ -27,30 +25,15 @@ namespace {
 /// collapses lists/blockquotes/HTML/etc. into a single row whose `kind` is
 /// `BlockKind::Paragraph` but whose `text` carries the source-faithful
 /// markdown including the list/quote markers. Without a guard, paragraphEnter
-/// fires its marker-insertion / mid-block-split logic on that row and
-/// destructively rewrites the source (e.g. injects `\n\n` between two list
-/// items, splitting the list into two with an empty paragraph in between —
-/// the dogfood Bug 1 symptom).
+/// fires its mid-block-split logic on that row and destructively rewrites the
+/// source (e.g. injects a paragraph break between two list items).
 ///
 /// Strategy B (text-pattern heuristic): treat a row as non-paragraph if its
 /// text starts with a markdown list marker (`-`, `*`, `+`, `1.`, `1)`) or a
 /// blockquote marker (`>`). Returning `HR::NotHandled` from paragraphEnter in
 /// that case lets QTextEdit's default Enter handling apply — a literal `\n`
 /// soft-break inside the row, which the parser keeps as a soft line break
-/// inside the existing list/quote. Non-destructive; the user sees something
-/// happen rather than silent swallowing.
-///
-/// This is a heuristic, not a parser query. False-positive risk: a true
-/// paragraph whose first line happens to start with `- ` (e.g. a literal
-/// dash-space at column 0) would be mis-gated. CommonMark would also parse
-/// such a paragraph as a list, so the heuristic agrees with the parser's
-/// classification — there is no observable false-positive in standard
-/// markdown. False-negative risk: indented list items (≥4 leading spaces
-/// without a list parent) — not a concern at top level.
-///
-/// Future work (spec §17): a parser-side "is this row a list/quote
-/// container?" query would let us swap this for Strategy D and add proper
-/// list-item Enter UX (split items, exit on empty item).
+/// inside the existing list/quote. Non-destructive.
 bool rowIsListOrQuoteContent(const QString &blockText)
 {
     static const QRegularExpression kListOrQuotePrefix(
@@ -68,14 +51,12 @@ LiveStructuralKeyHandler::LiveStructuralKeyHandler(
     LiveBlockModel           *model,
     LiveCursorState          *cursorState,
     const BlockKindRegistry  *registry,
-    UndoCoalescer            *undoCoalescer,
     QObject                  *parent)
     : QObject(parent)
     , m_document(document)
     , m_model(model)
     , m_cursorState(cursorState)
     , m_registry(registry)
-    , m_undoCoalescer(undoCoalescer)
 {
     registerBuiltins();
 }
@@ -92,7 +73,7 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
                                          bool selectionEmpty,
                                          const QString &blockText)
 {
-    qInfo().noquote() << "[dogfood] StructHandler: tryHandle key=" << key
+    qCDebug(lcStruct) << "tryHandle key=" << key
                       << "mod=" << modifiers
                       << "blockIndex=" << blockIndex
                       << "qtPos=" << qtPos
@@ -102,7 +83,7 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     if (!selectionEmpty) {
         // R5 limitation: non-empty selection defers to TextEdit's native
         // selection-replacement (which routes through LiveEditBinding's
-        // contentsChange path). Documented in plan scope notes.
+        // contentsChange path).
         return false;
     }
 
@@ -118,20 +99,28 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     auto keyIt = kindIt.value().constFind(key);
     if (keyIt == kindIt.value().constEnd()) return false;
 
-    // Sanity: block must resolve in the foundation.
-    const auto blockRangeOpt = m_document->blockByteRange(rec.blockAnchor);
-    if (!blockRangeOpt) return false;
+    // In D2, blockByteRange is based on the last parse, which may not have run
+    // after a loadFromMarkdown. Provide fallback values: start=0, end=textSize.
+    // D2 handlers use block-local byte offsets (not absolute), so these
+    // fallback values are only used by the legacy Ctx fields which D2 handlers
+    // should not rely on for byte arithmetic. They are kept for the handful
+    // of remaining checks that are block-structure-agnostic (e.g. "is the
+    // cursor at the end of the block's text?").
+    quint32 currentBlockStart = 0;
+    quint32 currentBlockEnd   = static_cast<quint32>(blockText.toUtf8().size());
+    if (const auto blockRangeOpt = m_document->blockByteRange(rec.blockAnchor)) {
+        currentBlockStart = blockRangeOpt->first;
+        currentBlockEnd   = blockRangeOpt->second;
+    }
 
     Ctx ctx;
     ctx.document          = m_document.data();
     ctx.model             = m_model;
     ctx.cursorState       = m_cursorState;
-    ctx.undoCoalescer     = m_undoCoalescer;
     ctx.blockIndex        = blockIndex;
     ctx.blockAnchor       = rec.blockAnchor;
-    ctx.currentBlockStart = blockRangeOpt->first;
-    ctx.currentBlockEnd   = ctx.currentBlockStart
-                          + static_cast<quint32>(blockText.toUtf8().size());
+    ctx.currentBlockStart = currentBlockStart;
+    ctx.currentBlockEnd   = currentBlockEnd;
     ctx.qtPos             = qtPos;
     ctx.modifiers         = modifiers;
     ctx.blockText         = blockText;
@@ -147,115 +136,90 @@ void LiveStructuralKeyHandler::registerBuiltins()
     auto paragraphEnter = [](const Ctx &c) -> HR {
         const bool isShift = (c.modifiers & Qt::ShiftModifier) != 0;
 
-        // Bug 1 (Task 18 dogfood) gate. Spec §0: marker design is bounded
-        // to top-level paragraphs. R2's BlockWalker collapses lists and
-        // blockquotes into a single Paragraph-kinded row; without this
-        // guard, mid-block Enter splits the row with `\n\n`, splitting
-        // the list into two and scattering cursor delivery. Returning
-        // NotHandled lets QTextEdit's default Enter (a literal `\n`)
-        // apply — non-destructive soft-break inside the list/quote.
-        // Shift-Enter is also gated: it inserts a `\n` too, which we'd
-        // otherwise duplicate; default Qt Shift-Enter does the same.
-
+        // Bug 1 gate: marker design is bounded to top-level paragraphs.
+        // R2's BlockWalker collapses lists/blockquotes into a Paragraph-
+        // kinded row; without this guard, Enter splices the row with a
+        // paragraph break, destructively splitting the list.
         if (rowIsListOrQuoteContent(c.blockText)) {
             return HR::NotHandled;
         }
 
-        // Marker design §4.5: plain (unmodified) Enter on a marker-only
-        // block is a no-op. CommonMark collapses consecutive blank lines
-        // anyway; visual "gap" can't survive a save/load cycle.
-        // Spec §4.4: Shift-Enter on a marker block is NOT covered by this
-        // rule — it still inserts a soft-break newline (handled below).
-        if (!isShift && Markoff::LiveRender::MarkerScrubber::isMarkerOnly(c.blockText)) {
-            return HR::Handled;
-        }
-
         if (isShift) {
-            // Soft break — insert \n, stay in block.
+            // Soft break — insert \n within the block, stay in same block.
+            // D2: use Cmd::insertSoftBreak with within-block byte offset.
             const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
-            const quint32 byteOffset =
-                c.currentBlockStart + static_cast<quint32>(prefixUtf8.size());
-            Markoff::MarkoffEdit ed;
-            ed.oldStart = byteOffset;
-            ed.oldEnd   = byteOffset;
-            ed.newText  = QByteArrayLiteral("\n");
-            c.document->applyLocalEdit({ ed });
-            c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
+            const uint32_t byteOff = static_cast<uint32_t>(prefixUtf8.size());
+            Markoff::Cmd::insertSoftBreak(*c.document, c.blockAnchor, byteOff);
             c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 1);
-            if (c.undoCoalescer) c.undoCoalescer->recordStructural();
             return HR::Handled;
         }
 
         const bool atStart = (c.qtPos == 0);
         const bool atEnd   = (c.qtPos == c.blockText.length());
 
-        if (!atStart && !atEnd) {
-            // Mid-block split — applyLocalEdit("\n\n") creates a NEW row at
-            // blockIndex+1. Use requestTextCaretAtNewRow (pure-pending) —
-            // requestTextCaretAtRow would resolve against whatever block
-            // currently sits at that index (the block about to be shifted
-            // down by the insertion), landing the cursor on the wrong row.
-            const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
-            const quint32 byteOffset =
-                c.currentBlockStart + static_cast<quint32>(prefixUtf8.size());
-            Markoff::MarkoffEdit ed;
-            ed.oldStart = byteOffset;
-            ed.oldEnd   = byteOffset;
-            ed.newText  = QByteArrayLiteral("\n\n");
-            c.document->applyLocalEdit({ ed });
-            c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
+        if (atEnd) {
+            // EOB Enter: create a new paragraph block after the current one.
+            // D2: use Cmd::enterAtEnd.
+            Markoff::BlockId newBlock = Markoff::Cmd::enterAtEnd(*c.document, c.blockAnchor);
+            Q_UNUSED(newBlock)
+            // The new block will appear at blockIndex+1 once structureChanged fires.
             c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
-            if (c.undoCoalescer) c.undoCoalescer->recordStructural();
             return HR::Handled;
         }
 
-        // EOB or start-of-block: insert marker paragraph and let the
-        // existing parser-driven row pipeline deliver the new row.
-        // Spec §4.1 / §4.2 (R5.5 marker-paragraph design).
-        //
-        // Byte layout depends on which side the new (empty marker) block
-        // sits relative to the existing block:
-        //   atEnd:   "<existing>\n\n<marker>"  → newText = "\n\n" + marker
-        //   atStart: "<marker>\n\n<existing>"  → newText = marker + "\n\n"
-        const quint32 byteOffset = atStart ? c.currentBlockStart
-                                            : c.currentBlockEnd;
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = byteOffset;
-        ed.oldEnd   = byteOffset;
-        ed.newText  = atStart
-                        ? (QByteArray(kMarkerUtf8) + QByteArrayLiteral("\n\n"))
-                        : (QByteArrayLiteral("\n\n") + QByteArray(kMarkerUtf8));
-        c.document->applyLocalEdit({ ed });
-        c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-
-        // Cursor delivery diverges by side:
-        // - atEnd: the new marker block is born at `blockIndex + 1`. Use the
-        //   row-keyed pure-pending request — the cursor MUST land on the new
-        //   row (not the existing user content). requestTextCaretAtNewRow
-        //   resolves on rowsInserted whose range covers blockIndex+1.
-        // - atStart: the new marker block is born at `blockIndex`, and the
-        //   existing user content shifts to byte
-        //   `currentBlockStart + markerBytes`. Use the byte-keyed pending
-        //   request — the cursor MUST follow the user's content, and the
-        //   only stable identifier across the parse-back diff is the
-        //   post-edit byte position of the user's content. Anchor identity
-        //   was tried in commit 3c86b76 but mis-resolved in some mid-doc
-        //   cases (dogfood pass 3 / Bug 3 v2): the resolver can match a
-        //   row whose anchor coincidentally equals the captured anchor in
-        //   a transient state, landing the cursor on the originally-
-        //   following paragraph. Byte-keyed resolution sidesteps anchor-
-        //   identity quirks entirely by asking the foundation directly:
-        //   "which row's byte range now contains target byte X?".
         if (atStart) {
-            const quint32 markerBytes = static_cast<quint32>(ed.newText.size());
-            const quint32 userContentByte = c.currentBlockStart + markerBytes;
-            c.cursorState->requestTextCaretAtByte(c.document, userContentByte, /*qtPos=*/0);
-        } else {
-            const int newRow = c.blockIndex + 1;
-            c.cursorState->requestTextCaretAtNewRow(newRow, /*qtPos=*/0);
+            // SOB Enter: insert a new empty paragraph BEFORE the current block.
+            // Strategy: if there's a previous block, use Cmd::enterAtEnd on it
+            // (which inserts after it, i.e. before the current block). Otherwise
+            // use d2InsertBlock at the head.
+            Markoff::BlockId newBlock;
+            if (c.blockIndex > 0) {
+                const Markoff::BlockAnchor prevAnchor =
+                    c.model->recordAt(c.blockIndex - 1).blockAnchor;
+                newBlock = Markoff::Cmd::enterAtEnd(*c.document, prevAnchor);
+            } else {
+                // Insert before the first block: insert after null block.
+                auto &undoLog = c.document->d2UndoLog();
+                UndoLog::Transaction t(undoLog);
+                newBlock = c.document->d2InsertBlock(Markoff::BlockId{},
+                                                     Markoff::BlockKind::Paragraph, t);
+            }
+            Q_UNUSED(newBlock)
+            // The user's content shifts down to blockIndex+1 (relative to the
+            // pre-edit layout); cursor must follow the user's content.
+            // Use anchor-keyed pending to find the user's content after the diff.
+            c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, 0);
+            return HR::Handled;
         }
 
-        if (c.undoCoalescer) c.undoCoalescer->recordStructural();
+        // Mid-block split: split at qtPos.
+        // D2: truncate the current block, insert new block after, set its text
+        // to the suffix — all in a single transaction.
+        {
+            const QByteArray fullUtf8   = c.blockText.toUtf8();
+            const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
+            const QByteArray suffixUtf8 = c.blockText.mid(c.qtPos).toUtf8();
+            const uint32_t byteOff      = static_cast<uint32_t>(prefixUtf8.size());
+            const uint32_t tailBytes    = static_cast<uint32_t>(
+                fullUtf8.size() - prefixUtf8.size());
+
+            auto &undoLog = c.document->d2UndoLog();
+            UndoLog::Transaction t(undoLog);
+
+            // 1. Truncate current block to prefix.
+            c.document->d2ApplyBufferEdit(c.blockAnchor, byteOff, tailBytes,
+                                          QByteArray{}, t);
+
+            // 2. Insert new block after current.
+            Markoff::BlockId newBlock = c.document->d2InsertBlock(
+                c.blockAnchor, Markoff::BlockKind::Paragraph, t);
+
+            // 3. Set new block's text to suffix.
+            c.document->d2ApplyBufferEdit(newBlock, 0, 0, suffixUtf8, t);
+
+            // Cursor goes to start of new block.
+            c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
+        }
         return HR::Handled;
     };
     m_handlers[BlockKind::Paragraph][Qt::Key_Return] = paragraphEnter;
@@ -264,50 +228,18 @@ void LiveStructuralKeyHandler::registerBuiltins()
     auto paragraphBackspace = [](const Ctx &c) -> HR {
         if (c.qtPos != 0) return HR::NotHandled;     // not at row-start
         if (c.blockIndex == 0) return HR::NotHandled; // first block
-        if (c.currentBlockStart == 0) return HR::NotHandled;
 
-        // Marker design §8.3: if the previous block is a marker-only
-        // paragraph, delete it (and its leading "\n\n" separator) instead
-        // of running the regular paragraph-merge.
-        const auto &prevRec = c.model->recordAt(c.blockIndex - 1);
-        if (Markoff::LiveRender::MarkerScrubber::isMarkerOnly(prevRec.text)) {
-            const auto prevRange = c.document->blockByteRange(prevRec.blockAnchor);
-            if (prevRange) {
-                quint32 start = prevRange->first;
-                // blockByteRange already includes the block's trailing \n
-                // (Task 3 discovery), so we only need to absorb 1 byte of
-                // leading separator here.
-                const quint32 absorb = (start >= 1) ? 1 : start;
-                start -= absorb;
-                Markoff::MarkoffEdit ed;
-                ed.oldStart = start;
-                ed.oldEnd   = prevRange->second;
-                ed.newText  = QByteArray();
-                c.document->applyLocalEdit({ ed });
-                // Cursor lands at qtPos 0 of the user's row, which after the
-                // marker block is removed sits at index blockIndex - 1.
-                c.cursorState->requestTextCaretAtRow(c.blockIndex - 1, 0);
-                if (c.undoCoalescer) c.undoCoalescer->recordStructural();
-                return HR::Handled;
-            }
-        }
+        // D2: use Cmd::backspaceMerge.
+        auto result = Markoff::Cmd::backspaceMerge(*c.document, c.blockAnchor);
+        if (result.mergedInto.isNull()) return HR::NotHandled;
 
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = c.currentBlockStart - 1;
-        ed.oldEnd   = c.currentBlockStart;
-        ed.newText  = QByteArray();
-        c.document->applyLocalEdit({ ed });
-        c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-        c.model->setRowEditSequence(c.blockIndex - 1, c.document->editSequence());
-
-        // After parse-back: blockIndex - 1 contains the merged content;
-        // blockIndex is gone. Cursor lands at qtPos = previous block's
-        // text length (the merge point). Compute the qtPos at edit time
-        // since the previous block's text is still current in the model.
+        // Cursor lands at the merge point in the merged block.
+        // The merged block's text was at blockIndex-1; it stays at that index.
+        // Compute cursor position from the previous block's text length
+        // (the merge point is at end of the previous block's pre-merge content).
         const int prevQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
         c.cursorState->requestTextCaretAtRow(c.blockIndex - 1, prevQtPos);
 
-        if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;
     };
     m_handlers[BlockKind::Paragraph][Qt::Key_Backspace] = paragraphBackspace;
@@ -315,23 +247,13 @@ void LiveStructuralKeyHandler::registerBuiltins()
     auto paragraphDelete = [](const Ctx &c) -> HR {
         if (c.qtPos != c.blockText.length()) return HR::NotHandled;
         if (c.blockIndex >= c.model->rowCount() - 1) return HR::NotHandled;
-        const quint32 docLen = c.document->visibleLength();
-        if (c.currentBlockEnd >= docLen) return HR::NotHandled;
 
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = c.currentBlockEnd;
-        ed.oldEnd   = c.currentBlockEnd + 1;
-        ed.newText  = QByteArray();
-        c.document->applyLocalEdit({ ed });
-        c.model->setRowEditSequence(c.blockIndex, c.document->editSequence());
-        c.model->setRowEditSequence(c.blockIndex + 1, c.document->editSequence());
+        // D2: use Cmd::deleteMerge (merges next block into current).
+        Markoff::Cmd::deleteMerge(*c.document, c.blockAnchor);
 
         // Cursor stays at end of the (now-merged) block — same row, same qtPos.
-        // Use requestTextCaretAtRow so it survives the parse-back's row
-        // reshuffle even if the block changes identity.
         c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos);
 
-        if (c.undoCoalescer) c.undoCoalescer->recordStructural();
         return HR::Handled;
     };
     m_handlers[BlockKind::Paragraph][Qt::Key_Delete] = paragraphDelete;
@@ -347,12 +269,6 @@ void LiveStructuralKeyHandler::registerBuiltins()
     // TextEdit's native \n insertion routes through LiveEditBinding as
     // a regular text edit, producing the literal newline the user
     // expects inside fenced code.
-    //
-    // Limitation: blockText excludes the fences, so currentBlockEnd
-    // underestimates the true block end. Delete-at-body-end therefore
-    // deletes a fence byte rather than the inter-block separator. Not
-    // exercised by the R5 dogfood script; full fix lands in R6 with
-    // proper code-block byte arithmetic.
     m_handlers[BlockKind::CodeBlock][Qt::Key_Backspace] = paragraphBackspace;
     m_handlers[BlockKind::CodeBlock][Qt::Key_Delete]    = paragraphDelete;
 }
