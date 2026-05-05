@@ -169,10 +169,9 @@ void LiveStructuralKeyHandler::registerBuiltins()
                                                      Markoff::BlockKind::Paragraph, t);
             }
             Q_UNUSED(newBlock)
-            // The user's content shifts down to blockIndex+1 (relative to the
-            // pre-edit layout); cursor must follow the user's content.
-            // Use anchor-keyed pending to find the user's content after the diff.
-            c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, 0);
+            // Cursor stays at the current visual row (blockIndex) — the new
+            // empty block occupies that row after the insert.
+            c.cursorState->requestTextCaretAtNewRow(c.blockIndex, 0);
             return HR::Handled;
         }
 
