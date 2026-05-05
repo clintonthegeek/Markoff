@@ -962,7 +962,9 @@ bool MarkoffDocument::save(const QString &path)
     QSaveFile f(path);
     if (!f.open(QIODevice::WriteOnly)) return false;
     f.write(serializeForSave());
-    return f.commit();
+    if (!f.commit()) return false;
+    // GC trigger deferred to Phase 9 — call d->watermark.onSaveSucceeded() here
+    return true;
 }
 
 }  // namespace Markoff

@@ -25,9 +25,9 @@ private Q_SLOTS:
     void fallbackSerializer_unknownKind_returnsContent();
 
     // Task 8.4 — touch test
-    void untouchedBlock_isNotTouched();
+    void untouchedBlock_savesLoadTimeBytes();
     void editedBlock_savesCanonical();
-    void kindChangedBlock_isTouched();
+    void kindChangedBlock_savesCanonical();
     void bornAfterLoadBlock_alwaysCanonical();
 
     // Task 8.5 — serializeForSave
@@ -141,12 +141,16 @@ void TstD2Save::fallbackSerializer_unknownKind_returnsContent()
 
 // ── Task 8.4 ─────────────────────────────────────────────────────────────────
 
-void TstD2Save::untouchedBlock_isNotTouched()
+void TstD2Save::untouchedBlock_savesLoadTimeBytes()
 {
     MarkoffDocument doc(1);
     doc.loadFromMarkdown("Hello world\n");
     BlockId blk = doc.iterateBlocks().front();
     QVERIFY(!doc.isBlockTouched(blk));
+    // Untouched block → serializeForSave uses the original load-time bytes
+    QByteArray serialized = doc.serializeForSave();
+    QVERIFY(serialized.contains("Hello world"));
+    QCOMPARE(serialized, doc.blockLoadTimeBytes(blk));
 }
 
 void TstD2Save::editedBlock_savesCanonical()
@@ -163,7 +167,7 @@ void TstD2Save::editedBlock_savesCanonical()
     QVERIFY(doc.isBlockTouched(blk));
 }
 
-void TstD2Save::kindChangedBlock_isTouched()
+void TstD2Save::kindChangedBlock_savesCanonical()
 {
     MarkoffDocument doc(1);
     doc.loadFromMarkdown("Hello world\n");
@@ -174,6 +178,9 @@ void TstD2Save::kindChangedBlock_isTouched()
     doc.d2SetBlockKind(blk, BlockKind::Heading, t);
 
     QVERIFY(doc.isBlockTouched(blk));
+    // Kind-changed block → serializeForSave uses canonical heading serializer
+    QByteArray serialized = doc.serializeForSave();
+    QVERIFY(serialized.startsWith("# "));
 }
 
 void TstD2Save::bornAfterLoadBlock_alwaysCanonical()
