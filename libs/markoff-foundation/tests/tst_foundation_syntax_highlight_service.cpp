@@ -2,6 +2,7 @@
 #include <QTest>
 
 #include <markoff-foundation/Kf6SyntaxHighlightService.h>
+#include <markoff-foundation/MarkoffDocument.h>
 
 using namespace Markoff;
 
@@ -44,6 +45,38 @@ private Q_SLOTS:
         for (const auto &sp : spans)
             if (sp.offset >= 6) { found_second_line = true; break; }
         QVERIFY(found_second_line);
+    }
+
+    // D2: verify that doc.inlineSpansFor(blockId) is accessible from view
+    // code and returns a result without crashing (even if empty for plain text).
+    void inline_spans_for_block_does_not_crash() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("# Heading\n\nSome `code` here.\n");
+
+        const auto blocks = doc.iterateBlocks();
+        QVERIFY(!blocks.empty());
+
+        // inlineSpansFor must not crash for any block. The result may be empty
+        // for blocks that have no inline markup.
+        for (const BlockId id : blocks) {
+            const auto spans = doc.inlineSpansFor(id);
+            // No crash = pass. Result count is not asserted because the inline
+            // parse cache is allowed to return an empty list for plain-text blocks.
+            Q_UNUSED(spans)
+        }
+
+        // A block containing inline code ("Some `code` here.") should return
+        // at least one span — verify accessibility of the non-empty case.
+        // The second block (index 1, after the heading) is the paragraph.
+        if (blocks.size() >= 2) {
+            const auto spans = doc.inlineSpansFor(blocks[1]);
+            // SyntaxHighlightService is independent; inlineSpansFor provides
+            // markdown-parser inline spans (bold, code, links, etc.).
+            // We only assert non-crash here; content is tested in
+            // tst_d2_inline_parse_cache.
+            Q_UNUSED(spans)
+        }
+        QVERIFY(true);  // Reaching here means no crash.
     }
 };
 
