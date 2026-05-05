@@ -34,11 +34,22 @@ CompletionDetector::detect(const MarkoffDocument *doc,
                             const CollabText::Crdt::Anchor &cursor)
 {
     CompletionContext ctx;
-    ctx.cursorAnchor = cursor;
     if (!doc) return ctx;
 
+    const quint32 cursorByteOffset = doc->resolveAnchor(cursor);
+
+    // Populate cursorBlock + cursorByteOffset from the flat anchor.
+    {
+        const TextAnchor ta = doc->textAnchorAt(cursorByteOffset, /*rightBias*/ false);
+        if (const auto blockId = doc->blockAt(ta)) {
+            ctx.cursorBlock      = *blockId;
+            ctx.cursorByteOffset = static_cast<uint32_t>(
+                doc->offsetInBlock(*blockId, ta));
+        }
+    }
+
     const QString text = doc->toMarkdown();
-    const QByteArray prefixBytes = doc->toMarkdownUtf8().left(doc->resolveAnchor(cursor));
+    const QByteArray prefixBytes = doc->toMarkdownUtf8().left(cursorByteOffset);
     const int u16cur = QString::fromUtf8(prefixBytes).size();
 
     if (insideFencedCodeBlock(text, u16cur)) return ctx;
@@ -48,6 +59,18 @@ CompletionDetector::detect(const MarkoffDocument *doc,
     const QString prefix = text.mid(i, u16cur - i);
     if (i == 0) return ctx;
     const QChar trig = text.at(i - 1);
+
+    // Compute trigger flat byte offset and map to block-local position.
+    const quint32 triggerFlatByte = static_cast<quint32>(
+        text.left(i - 1).toUtf8().size());
+    {
+        const TextAnchor ta = doc->textAnchorAt(triggerFlatByte, /*rightBias*/ false);
+        if (const auto blockId = doc->blockAt(ta)) {
+            ctx.triggerBlock      = *blockId;
+            ctx.triggerByteOffset = static_cast<uint32_t>(
+                doc->offsetInBlock(*blockId, ta));
+        }
+    }
 
     if (trig == ':') {
         ctx.trigger = CompletionTrigger::Emoji;
