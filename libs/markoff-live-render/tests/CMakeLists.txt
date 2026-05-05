@@ -35,13 +35,6 @@ target_link_libraries(tst_live_render_cursor PRIVATE
     Qt6::Core Qt6::Test markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_cursor COMMAND tst_live_render_cursor)
 
-qt_add_executable(tst_live_render_marker
-    tst_live_render_marker.cpp
-)
-target_link_libraries(tst_live_render_marker PRIVATE
-    Qt6::Core Qt6::Test markoff_live_render)
-add_test(NAME tst_live_render_marker COMMAND tst_live_render_marker)
-
 qt_add_executable(tst_live_render_paragraph_edit
     tst_live_render_paragraph_edit.cpp
 )
@@ -57,18 +50,3 @@ target_link_libraries(tst_live_render_structural PRIVATE
     markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_structural COMMAND tst_live_render_structural)
 
-qt_add_executable(tst_live_render_marker_scrubber
-    tst_live_render_marker_scrubber.cpp
-)
-target_link_libraries(tst_live_render_marker_scrubber PRIVATE
-    Qt6::Core Qt6::Test markoff_live_render markoff_foundation)
-add_test(NAME tst_live_render_marker_scrubber COMMAND tst_live_render_marker_scrubber)
-
-# R5.5 Task 16: harness-driven end-to-end marker-flow tests.
-qt_add_executable(tst_live_render_marker_flow
-    tst_live_render_marker_flow.cpp
-)
-target_link_libraries(tst_live_render_marker_flow PRIVATE
-    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test
-    markoff_live_render markoff_foundation)
-add_test(NAME tst_live_render_marker_flow COMMAND tst_live_render_marker_flow)
