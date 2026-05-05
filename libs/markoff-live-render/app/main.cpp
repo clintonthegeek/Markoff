@@ -8,7 +8,6 @@
 #include <QQuickStyle>
 
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
 
 /// Test app for markoff-live-render R2. Loads a Markdown file and renders
 /// it read-only via LiveListModelBinding + LiveView. No editing.
@@ -34,7 +33,7 @@ int main(int argc, char *argv[])
     const quint16 replicaId =
         static_cast<quint16>(QRandomGenerator::global()->generate() & 0xFFFF);
     auto doc = std::make_unique<Markoff::MarkoffDocument>(replicaId);
-    doc->resetContent(content, Markoff::Origin::FirstOpen);
+    doc->loadFromMarkdown(content);
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(
