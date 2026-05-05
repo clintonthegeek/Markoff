@@ -20,8 +20,8 @@ namespace Markoff::LiveRender {
 /// TopLevelBlock::inlineSpans. Populated by BlockWalker. Read-only in R2;
 /// consumed by InlineFormatHighlighter in R6.
 ///
-/// `blockAnchor` is left default-constructed by BlockWalker; filled in
-/// by LiveListModelBinding from the `blockAnchors` list in parseUpdated.
+/// `blockAnchor` is populated from `doc->iterateBlocks()` in
+/// `LiveListModelBinding::onD2Changed` during each parse update.
 struct MARKOFF_LIVE_RENDER_EXPORT BlockRecord {
     QString              kind;
     QString              text;              ///< Source-faithful markdown for this block.

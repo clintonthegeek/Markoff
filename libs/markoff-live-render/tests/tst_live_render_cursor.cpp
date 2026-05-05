@@ -12,7 +12,6 @@
 #include <markoff/live-render/LiveListModelBinding.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/CrdtProxies.h>
 #include <markoff-foundation/Cmd/D2.h>

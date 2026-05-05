@@ -99,28 +99,12 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     auto keyIt = kindIt.value().constFind(key);
     if (keyIt == kindIt.value().constEnd()) return false;
 
-    // In D2, blockByteRange is based on the last parse, which may not have run
-    // after a loadFromMarkdown. Provide fallback values: start=0, end=textSize.
-    // D2 handlers use block-local byte offsets (not absolute), so these
-    // fallback values are only used by the legacy Ctx fields which D2 handlers
-    // should not rely on for byte arithmetic. They are kept for the handful
-    // of remaining checks that are block-structure-agnostic (e.g. "is the
-    // cursor at the end of the block's text?").
-    quint32 currentBlockStart = 0;
-    quint32 currentBlockEnd   = static_cast<quint32>(blockText.toUtf8().size());
-    if (const auto blockRangeOpt = m_document->blockByteRange(rec.blockAnchor)) {
-        currentBlockStart = blockRangeOpt->first;
-        currentBlockEnd   = blockRangeOpt->second;
-    }
-
     Ctx ctx;
     ctx.document          = m_document.data();
     ctx.model             = m_model;
     ctx.cursorState       = m_cursorState;
     ctx.blockIndex        = blockIndex;
     ctx.blockAnchor       = rec.blockAnchor;
-    ctx.currentBlockStart = currentBlockStart;
-    ctx.currentBlockEnd   = currentBlockEnd;
     ctx.qtPos             = qtPos;
     ctx.modifiers         = modifiers;
     ctx.blockText         = blockText;

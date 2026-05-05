@@ -47,8 +47,6 @@ public:
 
         int                       blockIndex;       ///< model row
         Markoff::BlockAnchor      blockAnchor;      ///< == BlockId in D2
-        quint32                   currentBlockStart;
-        quint32                   currentBlockEnd;
         int                       qtPos;
         int                       modifiers;        ///< Qt::KeyboardModifiers
         QString                   blockText;

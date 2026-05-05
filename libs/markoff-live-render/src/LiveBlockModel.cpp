@@ -53,6 +53,9 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
             case AstBlockDiff::OpKind::Equal: {
                 const BlockRecord &next = nextRecords[op.nextIndex];
                 BlockRecord merged = next;
+                // D2: parseInputEditSeq is always std::numeric_limits<quint64>::max() in D2
+                // (every row is always fresh; the stale-text preservation path is dead).
+                // Cleanup deferred to Phase 14.
                 const bool fresh = (m_rowEditSequences[row] <= parseInputEditSeq);
                 if (!fresh) {
                     // Stale: keep our text; accept everything else from parse.
