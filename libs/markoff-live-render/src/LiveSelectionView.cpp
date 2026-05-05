@@ -2,7 +2,6 @@
 #include <markoff/live-render/LiveSelectionView.h>
 #include <markoff/live-render/Coordinates.h>
 #include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/Marker.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/Selection.h>
@@ -96,9 +95,6 @@ void LiveSelectionView::copyToClipboard(const QStringList &blockTexts) const
         if (!text.isEmpty()) text += QLatin1Char('\n');
         text += bt.mid(start, end - start);
     }
-
-    // Strip ZWSP marker characters from clipboard output (spec §10.2).
-    text.remove(kMarkerChar);
 
     QApplication::clipboard()->setText(text);
 }

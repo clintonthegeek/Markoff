@@ -8,8 +8,6 @@
 #include <markoff/live-render/BlockHitTester.h>
 #include <markoff/live-render/LiveSelectionView.h>
 #include <markoff/live-render/LiveStructuralKeyHandler.h>
-#include <markoff/live-render/UndoCoalescer.h>
-#include <markoff/live-render/MarkerScrubber.h>
 
 #include <QObject>
 #include <memory>
@@ -17,8 +15,6 @@
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/BlockAnchor.h>
-
-namespace Markoff { class Document; class Session; }
 
 namespace Markoff::LiveRender {
 
@@ -38,10 +34,6 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveListModelBinding : public QObject {
                READ selectionView CONSTANT)
     Q_PROPERTY(Markoff::LiveRender::LiveStructuralKeyHandler *structuralKeyHandler
                READ structuralKeyHandler CONSTANT)
-    Q_PROPERTY(Markoff::LiveRender::UndoCoalescer *undoCoalescer
-               READ undoCoalescer CONSTANT)
-    Q_PROPERTY(Markoff::LiveRender::MarkerScrubber *markerScrubber
-               READ markerScrubber NOTIFY markerScrubberChanged)
 
 public:
     explicit LiveListModelBinding(QObject *parent = nullptr);
@@ -55,33 +47,19 @@ public:
     BlockHitTester           *hitTester()           const;
     LiveSelectionView        *selectionView()       const;
     LiveStructuralKeyHandler *structuralKeyHandler() const;
-    UndoCoalescer            *undoCoalescer()       const;
     const BlockKindRegistry  *registry()            const;
-    MarkerScrubber           *markerScrubber()      const;
 
-    /// True for the synchronous duration of `applyOps` while parse
-    /// arrival is mutating model rows. LiveEditBinding queries this
+    /// True for the synchronous duration of `applyOps` while D2 CRDT change
+    /// notification is mutating model rows. LiveEditBinding queries this
     /// inside its `contentsChange` slot to suppress the synchronous
-    /// QML-binding echo. Spec §4.5 (surviving setPlainText-echo
-    /// suppression cycle guard).
+    /// QML-binding echo.
     bool applyingModelUpdate() const;
-
-    /// Marker-paragraph save path (spec §6.4): hosts call this from
-    /// their Ctrl-S / save-to-disk handler before serializing bytes.
-    /// Routes to `MarkerScrubber::scrubBeforeSave`, which removes any
-    /// marker-only paragraphs leaked into source. No-op when no doc is
-    /// attached.
-    Q_INVOKABLE void flushPendingMarkers();
 
 Q_SIGNALS:
     void documentChanged();
-    void markerScrubberChanged();
 
 private:
-    void onParseUpdated(const Markoff::Document *parsed,
-                        quint64 parseSequence,
-                        const QList<Markoff::BlockAnchor> &blockAnchors,
-                        quint64 parseInputEditSequence);
+    void onD2Changed();
 
     struct Private;
     std::unique_ptr<Private> d;
