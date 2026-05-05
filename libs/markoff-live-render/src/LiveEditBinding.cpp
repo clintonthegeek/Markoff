@@ -3,11 +3,9 @@
 #include <markoff/live-render/LiveListModelBinding.h>
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/Coordinates.h>
-#include <markoff/live-render/Marker.h>
-#include <markoff/live-render/MarkerScrubber.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/UndoLog.h>
 
 #include <QDebug>
 #include <QQuickTextDocument>
@@ -27,11 +25,6 @@ void LiveEditBinding::setBinding(LiveListModelBinding *b)
 {
     if (m_binding == b) return;
     m_binding = b;
-    // Cache the borrowed MarkerScrubber pointer (owned by the binding).
-    // QPointer auto-clears if the binding tears it down; the QPointer
-    // null-check on use covers both "binding cleared" and "binding without
-    // a doc / scrubber".
-    m_markerScrubber = m_binding ? m_binding->markerScrubber() : nullptr;
     Q_EMIT bindingChanged();
 }
 
@@ -68,10 +61,6 @@ void LiveEditBinding::setText(const QString &t)
     m_text = t;
     Q_EMIT textChanged();
     pushTextToDocument();
-    // Marker-aware first-edit bundling: if the model just pushed a
-    // marker-only string into this delegate, mark the next user edit
-    // as one that should atomically replace the marker content.
-    m_pendingMarkerScrub = MarkerScrubber::isMarkerOnly(t);
 }
 
 void LiveEditBinding::pushTextToDocument()
@@ -79,8 +68,7 @@ void LiveEditBinding::pushTextToDocument()
     if (!m_listenedDoc) return;
     if (m_listenedDoc->toPlainText() == m_text) return;
     // Setting the document text fires contentsChange synchronously; the
-    // applyingTextUpdate guard makes onContentsChange treat that as a
-    // model-driven update (no applyLocalEdit, no row-seq stamp).
+    // applyingTextUpdate guard makes onContentsChange skip it.
     m_applyingTextUpdate = true;
     auto _ = qScopeGuard([this]{ m_applyingTextUpdate = false; });
     m_listenedDoc->setPlainText(m_text);
@@ -123,153 +111,61 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     if (!m_listenedDoc)
         return;
 
-    qInfo().noquote() << "[dogfood] EditBinding: onContentsChange"
-                      << "modelIndex=" << m_modelIndex
-                      << "qtPos=" << qtPos
-                      << "removed=" << charsRemoved
-                      << "added=" << charsAdded
-                      << "applyingTextUpdate=" << m_applyingTextUpdate
-                      << "applyingModel=" << m_binding->applyingModelUpdate()
-                      << "composing=" << m_composing;
+    qCDebug(lcEdit) << "onContentsChange"
+                    << "modelIndex=" << m_modelIndex
+                    << "qtPos=" << qtPos
+                    << "removed=" << charsRemoved
+                    << "added=" << charsAdded
+                    << "applyingTextUpdate=" << m_applyingTextUpdate
+                    << "composing=" << m_composing;
 
-    QString postQt = m_listenedDoc->toPlainText();  // mutable: bundle branch updates it to the ZWSP-stripped value before scope guard fires
+    const QString postQt = m_listenedDoc->toPlainText();
     auto _ = qScopeGuard([&]{ m_previousText = postQt; });
 
-    // Guard: pushTextToDocument-driven update echo. Set when LiveEditBinding
-    // itself is calling setPlainText to mirror the bound `text` property
-    // (initial delegate load, ListView recycling, parse-arrival fresh-row
-    // updates routed through the QML text property). Without this guard
-    // those non-user document writes would be misread as user edits and
-    // pumped back into the CRDT, duplicating content on every parse cycle.
+    // Guard: pushTextToDocument-driven update echo. Prevents non-user
+    // writes (initial delegate load, model updates) from being pumped back
+    // into the CRDT.
     if (m_applyingTextUpdate) {
         qCDebug(lcEdit) << "skip: applyingTextUpdate";
         return;
     }
 
-    // Guard: model-driven update echo via applyOps (spec §4.5).
-    if (m_binding->applyingModelUpdate()) {
-        qCDebug(lcEdit) << "skip: applyingModelUpdate";
-        return;
-    }
-
-    // Guard: IME composition (spec §4.5). Note the touch so the commit
-    // pass knows there's pending state to flush.
+    // Guard: IME composition. Defer until commit.
     if (m_composing) {
         m_compositionPendingFlush = true;
         return;
     }
 
-    // Marker-scrub bundling (Task 5): if the previously-pushed model content
-    // was a marker-only string, bundle the marker removal and the user's
-    // typed bytes into a single applyLocalEdit. This produces one CRDT op,
-    // one parse-back, and one undo entry — no race window between insert
-    // and scrub.
-    if (m_pendingMarkerScrub) {
-        m_pendingMarkerScrub = false;
-        if (m_modelIndex < m_binding->model()->rowCount()) {
-            auto *doc   = m_binding->document();
-            auto *model = m_binding->model();
-            const auto &record = model->recordAt(m_modelIndex);
-            const auto rangeOpt = doc->blockByteRange(record.blockAnchor);
-            if (rangeOpt) {
-                // The block byte range INCLUDES the trailing '\n'. We
-                // replace the entire block range (including the trailing
-                // '\n') with the post-edit plain text stripped of any
-                // marker characters, plus the preserved trailing '\n'.
-                // This produces exactly "x\n" where the old content was
-                // "<MARKER>\n", keeping downstream block structure intact.
-                const quint32 blockStart = rangeOpt->first;
-                const quint32 blockEnd   = rangeOpt->second;
-
-                // Strip any remaining marker chars from the post-edit
-                // plain text. The QTextDocument shows "x<ZWSP>" because
-                // the user typed before the marker and onContentsChange
-                // fires before the document is further modified.
-                QString postEditText = m_listenedDoc->toPlainText();
-                postEditText.remove(kMarkerChar);
-
-                Markoff::MarkoffEdit ed;
-                ed.oldStart = blockStart;
-                ed.oldEnd   = blockEnd;
-                ed.newText  = postEditText.toUtf8() + "\n";
-
-                doc->applyLocalEdit({ ed });
-                // Strip the marker character from the QTextDocument and
-                // synchronise m_previousText (via postQt, which the qScopeGuard
-                // will assign on exit) to the ZWSP-stripped state.
-                //
-                // Without this, subsequent keystrokes compute qtPosToByte against
-                // a document that still contains the ZWSP character, yielding an
-                // inflated byte offset (ZWSP is 3 UTF-8 bytes) and a wrong CRDT
-                // edit — the Task 16 race fix. The applyingTextUpdate guard
-                // suppresses the contentsChange echo that setPlainText fires.
-                m_applyingTextUpdate = true;
-                {
-                    auto _u = qScopeGuard([this]{ m_applyingTextUpdate = false; });
-                    m_listenedDoc->setPlainText(postEditText);
-                }
-                postQt = postEditText;
-                model->setRowEditSequence(m_modelIndex, doc->editSequence());
-                return;
-            }
-        }
-        // Fall through to normal edit path if we couldn't do the bundled edit.
-    }
-
-    // Inner-row guard: m_modelIndex must be a valid row in the inner model.
+    // Inner-row guard.
     if (m_modelIndex >= m_binding->model()->rowCount())
         return;
 
-    auto *doc = m_binding->document();
+    auto *doc   = m_binding->document();
     auto *model = m_binding->model();
     const auto &record = model->recordAt(m_modelIndex);
 
-    const auto blockRangeOpt = doc->blockByteRange(record.blockAnchor);
-    if (!blockRangeOpt) {
-        qCWarning(lcEdit) << "blockByteRange failed for row" << m_modelIndex;
-        return;
-    }
-    const quint32 blockStart = blockRangeOpt->first;
-
-    // Pre-edit text for old-coordinate translation: m_previousText (the
-    // CRDT-coherent before-state of THIS edit). Using record.text instead
-    // would lag behind by any local edits since the last parse arrival,
-    // producing scrambled bytes when the user types faster than parses.
+    // In D2, each block has its own buffer. The within-block byte offset
+    // is the only coordinate needed — no absolute document offset required.
     const QByteArray preUtf8 = m_previousText.toUtf8();
+    const uint32_t byteOff = static_cast<uint32_t>(
+        Coordinates::qtPosToByte(preUtf8, qtPos));
+    const uint32_t removedBytes = static_cast<uint32_t>(
+        Coordinates::qtPosToByte(preUtf8, qtPos + charsRemoved)) - byteOff;
 
-    // Old block-local byte range:
-    const qsizetype oldStartLocal =
-        Coordinates::qtPosToByte(preUtf8, qtPos);
-    const qsizetype oldEndLocal =
-        Coordinates::qtPosToByte(preUtf8, qtPos + charsRemoved);
-
-    // New text slice. Skip toPlainText work in pure-deletion (no chars added).
-    QByteArray addedUtf8;
+    QByteArray inserted;
     if (charsAdded > 0)
-        addedUtf8 = postQt.mid(qtPos, charsAdded).toUtf8();
+        inserted = postQt.mid(qtPos, charsAdded).toUtf8();
 
-    Markoff::MarkoffEdit edit;
-    edit.oldStart = blockStart + static_cast<quint32>(oldStartLocal);
-    edit.oldEnd   = blockStart + static_cast<quint32>(oldEndLocal);
-    edit.newText  = addedUtf8;
-
-    doc->applyLocalEdit({ edit });
-
-    // Stamp the row for the freshness rule (spec §4.3).
-    model->setRowEditSequence(m_modelIndex, doc->editSequence());
+    // Apply via D2 per-block API.
+    auto &undoLog = doc->d2UndoLog();
+    UndoLog::Transaction t(undoLog);
+    doc->d2ApplyBufferEdit(record.blockAnchor, byteOff, removedBytes, inserted, t);
 }
 
 void LiveEditBinding::onFocusLost()
 {
-    // Marker-paragraph focus-out scrub (spec §6.4): if the model pushed
-    // a marker-only payload into this delegate and the user focused
-    // in/out without typing, drop the marker paragraph from source.
-    // The pending flag is cleared either way so re-focus doesn't double-
-    // emit.
-    if (m_pendingMarkerScrub && m_markerScrubber && m_modelIndex >= 0) {
-        m_markerScrubber->scrubOnFocusOut(m_modelIndex);
-    }
-    m_pendingMarkerScrub = false;
+    // Marker-paragraph design is retired in D2; this is a no-op kept for
+    // QML API stability.
 }
 
 void LiveEditBinding::flushPendingComposition()
@@ -290,26 +186,21 @@ void LiveEditBinding::flushPendingComposition()
     auto *model = m_binding->model();
     const auto &record = model->recordAt(m_modelIndex);
 
-    const auto blockRangeOpt = doc->blockByteRange(record.blockAnchor);
-    if (!blockRangeOpt) return;
-    const quint32 blockStart = blockRangeOpt->first;
-    const quint32 blockEnd   = blockRangeOpt->second;
+    // For IME composition flush: replace the entire block content with the
+    // post-composition text. Use the pre-composition text (m_previousText)
+    // to compute what the block currently holds, and the post-composition
+    // text from the QTextDocument.
+    const QByteArray preUtf8  = m_previousText.toUtf8();
+    const QByteArray postUtf8 = m_listenedDoc->toPlainText().toUtf8();
 
-    const QString postQt = m_listenedDoc->toPlainText();
-    const QByteArray postUtf8 = postQt.toUtf8();
+    const uint32_t removedBytes = static_cast<uint32_t>(preUtf8.size());
 
-    Markoff::MarkoffEdit edit;
-    edit.oldStart = blockStart;
-    edit.oldEnd   = blockEnd;
-    edit.newText  = postUtf8;
+    auto &undoLog = doc->d2UndoLog();
+    UndoLog::Transaction t(undoLog);
+    doc->d2ApplyBufferEdit(record.blockAnchor, 0, removedBytes, postUtf8, t);
 
-    doc->applyLocalEdit({ edit });
-    model->setRowEditSequence(m_modelIndex, doc->editSequence());
-
-    // Keep the cache in sync with the post-commit document state so the
-    // next non-composing contentsChange computes its byte range against
-    // the right pre-edit reference.
-    m_previousText = postQt;
+    // Keep the cache in sync with the post-commit state.
+    m_previousText = m_listenedDoc->toPlainText();
 }
 
 }  // namespace Markoff::LiveRender
