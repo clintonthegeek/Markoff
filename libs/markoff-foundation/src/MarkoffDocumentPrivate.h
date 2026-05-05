@@ -29,13 +29,12 @@
 #include "BlockAnchorComputation.h"
 #include "ParsePool.h"
 
+#include <markoff-foundation/InlineParseCache.h>
+
 namespace Markoff {
 
 class Session;
-class WatermarkCoordinator;  // full type in WatermarkCoordinator.h; Private holds unique_ptr
-
-// Stub placeholders — real implementations in their phases
-class InlineParseCache     { public: explicit InlineParseCache() = default; };
+class WatermarkCoordinator;  // full type in WatermarkCoordinator.h; Private holds unique_ptr;
 
 // ============================================================================
 // MarkoffDocument::Private
@@ -81,7 +80,7 @@ struct MarkoffDocument::Private {
     FootnoteDefMap  footnoteDefMap;
     Markoff::UndoLog undoLog;
     std::unique_ptr<Markoff::WatermarkCoordinator> watermark;
-    InlineParseCache     inlineCache;
+    std::unique_ptr<Markoff::InlineParseCache> inlineCache;
 
     // Per-block edit sequence counters (D2 dirty-tracking)
     QHash<BlockId, quint64> blockEditSequences;

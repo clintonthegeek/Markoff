@@ -102,6 +102,9 @@ add_library(markoff_foundation STATIC
     # --- GC / WatermarkCoordinator (Phase 9) ---
     include/markoff-foundation/WatermarkCoordinator.h
     src/WatermarkCoordinator.cpp
+    # --- InlineParseCache (Phase 10) ---
+    include/markoff-foundation/InlineParseCache.h
+    src/InlineParseCache.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h

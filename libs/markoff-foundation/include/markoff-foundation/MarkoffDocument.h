@@ -18,6 +18,7 @@
 #include <crdt/Operations.h>
 
 #include <markoff-foundation/BlockAnchor.h>
+#include <markoff-parser/SourceSpan.h>
 #include <markoff-foundation/BlockAttrsMap.h>
 #include <markoff-foundation/BlockEdit.h>
 #include <markoff-foundation/BlockKind.h>
@@ -244,6 +245,11 @@ public:
     /// Returns the KindTagMap proxy. Views connect to mapChanged() to detect
     /// block kind changes.
     Markoff::SiblingMapProxy *kindTagMapProxy() const;
+
+    // ===== D2 inline cache (Phase 10) =====
+    /// Returns inline formatting spans for block `id`, computed on first access
+    /// and cached until the block's edit sequence increments.
+    QList<Markoff::SourceSpan> inlineSpansFor(Markoff::BlockId id);
 
     // ===== D2 load =====
     /// Parse `src` as UTF-8 Markdown, populate frontmatter, footnote defs,

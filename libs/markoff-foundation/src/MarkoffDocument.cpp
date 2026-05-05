@@ -23,6 +23,7 @@
 #include "AnchorConversion.h"
 #include "BlockAnchorComputation.h"
 #include <markoff-foundation/WatermarkCoordinator.h>
+#include <markoff-foundation/InlineParseCache.h>
 
 namespace {
 
@@ -89,6 +90,9 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
 
     // ── D2: initialise WatermarkCoordinator (Phase 9) ───────────────────────
     d->watermark = std::make_unique<WatermarkCoordinator>(*this);
+
+    // ── D2: initialise InlineParseCache (Phase 10) ──────────────────────────
+    d->inlineCache = std::make_unique<InlineParseCache>(*this);
 
     QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p, quint64 inputEditSeq) {
@@ -612,6 +616,12 @@ quint64 MarkoffDocument::d2EditSequence() const noexcept
     return sum;
 }
 
+QList<SourceSpan> MarkoffDocument::inlineSpansFor(BlockId id)
+{
+    if (d->inlineCache) return d->inlineCache->spansFor(id);
+    return {};
+}
+
 // ============================================================================
 // D2: testInsertBlock (declared in public header under MARKOFF_TESTING guard;
 // implementation always compiled so test executables can link against the lib)
@@ -663,6 +673,12 @@ void MarkoffDocument::d2ApplyBufferEdit(BlockId block, uint32_t offset,
     auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
     t.registerOp(CrdtTarget::buffer(block), lamportToOpId(ts));
     ++d->blockEditSequences[block];
+
+    // Notify per-block buffer proxy synchronously (same as applyBlockEdit).
+    auto proxyIt = d->bufferProxies.find(block);
+    if (proxyIt != d->bufferProxies.end() && proxyIt.value())
+        proxyIt.value()->notifyChanged();
+
     scheduleD2Changed();
 }
 

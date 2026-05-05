@@ -66,3 +66,8 @@ add_test(NAME tst_d2_roundtrip COMMAND tst_d2_roundtrip)
 qt_add_executable(tst_d2_gc tst_d2_gc.cpp)
 target_link_libraries(tst_d2_gc PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_d2_gc COMMAND tst_d2_gc)
+
+# Phase 10: InlineParseCache
+qt_add_executable(tst_d2_inline_cache tst_d2_inline_cache.cpp)
+target_link_libraries(tst_d2_inline_cache PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_inline_cache COMMAND tst_d2_inline_cache)
