@@ -1,15 +1,15 @@
 # Markoff (exploration/new-foundation branch)
 
-> **ACTIVE WORK — D2 (foundation reshape, per-block CRDT).** As of 2026-05-04
-> this branch is on the D-evolution arc. D0 (joint design) and D1 (collabtext
-> `IdList` primitive) are done; D2 spec is approved and awaiting plan
-> derivation. **A fresh agent context picking up this work must read, in order:**
+> **D2 dogfood — awaiting user sign-off.** D2 implementation is complete (Phases 0–14 committed; 140/141 tests pass). The next action is the user dogfood pass per `docs/plans/2026-05-04-d2-foundation-reshape.md` §15.2. After user sign-off, update `docs/d-arc/d-arc-status.md` D2 → `complete` and brainstorm D3.
+>
+> **D3 is next.** Read `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` for the stub scope.
+>
+> **A fresh agent context picking up this work must read, in order:**
 >
 > 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation across the whole D arc (D0 → D5)
-> 2. `docs/d-arc/d-arc-status.md` — live status board (where D2 stands right now)
+> 2. `docs/d-arc/d-arc-status.md` — live status board (D2 = dogfood; D3 = stubbed)
 > 3. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items binding every D-arc spec
-> 4. `docs/specs/2026-05-04-d2-foundation-reshape-design.md` — the binding D2 spec
-> 5. `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut from C-restoration that opened the D arc
+> 4. `docs/specs/2026-05-04-d2-foundation-reshape-design.md` — the binding D2 spec (reference for dogfood verification)
 >
 > The C-restoration's status board (`docs/restoration-status.md`) is now
 > historical. The marker-paragraph design and R5.5 plan are retired. R5.5
@@ -21,8 +21,7 @@
 > R5/R5.5 work (will be rewritten or retired during D3 implementation).
 > Do not delete `libs/markoff-view-qml` prematurely.
 >
-> All other content below describes the project at large; D2 is the active
-> subject within that.
+> All other content below describes the project at large; D2 dogfood is the active subject within that.
 
 ---
 

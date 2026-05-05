@@ -2,10 +2,10 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-04 (D2 plan landed; ready for execution.)
+**Last updated:** 2026-05-04 (D2 implementation complete through Phase 14; awaiting user dogfood pass.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **D2** (foundation reshape) — spec approved + plan written; ready for execution.
+**Active phase:** **D2** (foundation reshape) — implementation complete; in dogfood. See Task 15.2 for the dogfood script.
 
 ---
 
@@ -27,7 +27,7 @@
 |---|---|---|
 | **D0** | `complete` | Joint design — proposal + response delivered and accepted. |
 | **D1** | `complete` | `CollabText::Crdt::IdList` shipped 2026-05-04. Available for D2 consumption. |
-| **D2** | `plan-approved` | Spec at `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; plan at `docs/plans/2026-05-04-d2-foundation-reshape.md`. Ready for execution. |
+| **D2** | `dogfood` | All 15 phases implemented (Phases 0–14 committed). 140/141 tests pass (1 pre-existing QML failure unrelated to D2). Awaiting user dogfood pass per plan §15.2. |
 | **D3** | `stubbed` | `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md`. Substantive design post-D2. |
 | **D4** | `stubbed` | `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`. Substantive design post-D2/D3. |
 | **D5** | `stubbed` | `docs/specs/2026-05-04-d5-collab-activation-STUB.md`. Substantive design post-D4. |
@@ -35,6 +35,8 @@
 **Phase status legend.** `pending` (not yet started) · `stubbed` (inputs + scope captured, no substantive design) · `spec-in-brainstorm` · `spec-approved` (spec written and user-approved) · `plan-approved` (writing-plans output landed) · `in-progress` (commits landing) · `dogfood` (implementation done; user is testing) · `complete` (acceptance criteria met).
 
 **D2 acceptance criterion.** All foundation tests pass against the new internals; round-trip corpus tests pass; markoff-live-render L4 / L5 migration completes (marker-paragraph machinery deleted); user signs off on a dogfood pass per the plan's dogfood script.
+
+**D2 dogfood status.** Implementation complete. Foundation tests: 140/141 pass (1 pre-existing QML selection failure unrelated to D2). Marker-paragraph machinery deleted in Phase 11. Awaiting user sign-off on interactive dogfood pass (plan §15.2).
 
 ---
 
@@ -44,6 +46,12 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-04 | `6b45b4a` | D2 Phase 14 complete — deprecated `ParsePool`, `parseUpdated`, `parseSequence`, `MarkoffEdit` with D4-deletion markers. D2 implementation done; status → dogfood. |
+| 2026-05-04 | `a862ce0` | D2 Phase 13 — CRDT primitive convergence tests: structural convergence, buffer content convergence, mixed ops, remove-vs-edit race, local undo. |
+| 2026-05-04 | `dd00234` | D2 Phase 12 — `SearchEngine::findByBlock`, `ReplaceController::replaceInBlock`, `CompletionContext`/`CompletionDetector` off Crdt::Anchor. |
+| 2026-05-04 | `473fb1f` | D2 Phase 11 — live-render migrated to D2: `LiveEditBinding` uses D2 buffer edits, `LiveStructuralKeyHandler` uses `Cmd::*`, `LiveListModelBinding` uses `d2DocumentChanged`. Marker/UndoCoalescer machinery deleted. |
+| 2026-05-04 | (multiple) | D2 Phases 5–10 — sibling maps, `Cmd::*` commands, `loadFromMarkdown`, `serializeForSave` + GC, `InlineParseCache`, `WatermarkCoordinator`. |
+| 2026-05-04 | (multiple) | D2 Phases 1–4 — foundation primitives (`BlockId`, `BlockEdit`, `StructuralOp`, `CausalLwwMap`), `UndoLog`, `TextAnchor` + `BlockAnchor` reshape, `MarkoffDocument` new D2 internals. |
 | 2026-05-04 | (this commit) | D2 implementation plan landed (`docs/plans/2026-05-04-d2-foundation-reshape.md`) — ~85 tasks across 16 phases (Phase 0 setup through Phase 15 dogfood). |
 | 2026-05-04 | `afdbc1c` | D2 spec landed (`docs/specs/2026-05-04-d2-foundation-reshape-design.md`); D-arc roadmap + status board + scope-line doc + D3/D4/D5 stub specs published; worktree `CLAUDE.md` banner updated to point at the roadmap. |
 | 2026-05-04 | `0fa0111` | C-restoration bookend committed; spike/marker-hole worktree retired. (See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`.) |

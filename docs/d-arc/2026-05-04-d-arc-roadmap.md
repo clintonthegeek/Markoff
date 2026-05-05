@@ -14,12 +14,12 @@ D = "per-block CRDT + structural CRDT" — the long-term Markoff foundation arch
 |---|---|---|---|---|
 | **D0** | ✅ done | joint (Markoff + collabtext maintainers) | Architectural alignment: per-block CRDT direction + collabtext supporting primitive | `docs/specs/2026-05-02-d-evolution-proposal.md` (Markoff side) and `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` (collabtext side) |
 | **D1** | ✅ done | collabtext maintainers | `CollabText::Crdt::IdList` primitive shipped (opaque uint64 elements, sharing the existing Anchor / Operation / Undo / GC machinery) | collabtext header `~/dev/collabtext/include/collabtext/Crdt/IdList.h` |
-| **D2** | 🟢 active | Markoff | Foundation reshape — `Markoff::MarkoffDocument` rebuilt on `IdList` + per-block `Buffer`s + sibling causal-LWW maps | `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; status `docs/d-arc/d-arc-status.md` |
+| **D2** | 🟡 dogfood | Markoff | Foundation reshape — `Markoff::MarkoffDocument` rebuilt on `IdList` + per-block `Buffer`s + sibling causal-LWW maps | `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; status `docs/d-arc/d-arc-status.md` |
 | **D3** | ⏸ stubbed | Markoff | View-layer adaptation — `markoff-live-render` L4–L5 reshape; marker-paragraph machinery deletion; structural-key dispatch on `Cmd::*` | `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` (stub; substantive design happens after D2 lands) |
 | **D4** | ⏸ stubbed | Markoff | Parser scope reduction — trim parser library API to load-time-doc + per-block-inline; delete `ParsePool` and `IncrementalParseSession` | `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md` |
 | **D5** | ⏸ stubbed | Markoff + collabtext | Collab activation — wire format, transport, presence, conflict UI | `docs/specs/2026-05-04-d5-collab-activation-STUB.md` |
 
-Status legend: ✅ done · 🟢 active · ⏸ stubbed (inputs and intended scope captured; substantive design deferred).
+Status legend: ✅ done · 🟢 active · 🟡 dogfood (implementation done; awaiting user sign-off) · ⏸ stubbed (inputs and intended scope captured; substantive design deferred).
 
 ---
 
