@@ -210,6 +210,17 @@ void LiveCursorState::requestTextCaretAtByte(Markoff::MarkoffDocument *document,
 void LiveCursorState::noteParseArrived(quint64 /*parseSeq*/)
 {
     if (!m_pendingRow) return;
+
+    // Resolve anchor-keyed pending here — after applyOps has returned and the
+    // model is stable. Merge ops remove rows rather than insert them, so
+    // onRowsInserted never fires for them; this is their natural resolution
+    // point. For insertion-based ops the anchor was already resolved in
+    // onRowsInserted, so m_pendingRow will be null and we return early above.
+    if (m_pendingRow->anchor) {
+        resolvePendingForAnchor();
+        if (!m_pendingRow) return;
+    }
+
     ++m_pendingRow->parseCyclesSeen;
     if (m_pendingRow->parseCyclesSeen >= 2) {
         qCInfo(lcCursor) << "pending cursor request dropped after"

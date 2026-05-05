@@ -213,16 +213,21 @@ void LiveStructuralKeyHandler::registerBuiltins()
         if (c.qtPos != 0) return HR::NotHandled;     // not at row-start
         if (c.blockIndex == 0) return HR::NotHandled; // first block
 
-        // D2: use Cmd::backspaceMerge.
+        // Compute join position BEFORE the merge while the model is still in
+        // the pre-merge state. The join point is the character-count end of the
+        // preceding block's text (which has its trailing '\n' stripped by the
+        // model's display layer).
+        const int joinQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
+
         auto result = Markoff::Cmd::backspaceMerge(*c.document, c.blockAnchor);
         if (result.mergedInto.isNull()) return HR::NotHandled;
 
-        // Cursor lands at the merge point in the merged block.
-        // The merged block's text was at blockIndex-1; it stays at that index.
-        // Compute cursor position from the previous block's text length
-        // (the merge point is at end of the previous block's pre-merge content).
-        const int prevQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
-        c.cursorState->requestTextCaretAtRow(c.blockIndex - 1, prevQtPos);
+        // Use anchor-keyed pending so the cursor resolves in noteParseArrived,
+        // AFTER applyOps has updated the model text and QML has processed it.
+        // requestTextCaretAtRow resolves immediately (row exists), but the text
+        // update then resets QML's cursor to the end — anchor-keyed pending
+        // avoids that race.
+        c.cursorState->requestTextCaretAtAnchor(result.mergedInto, joinQtPos);
 
         return HR::Handled;
     };
@@ -235,8 +240,10 @@ void LiveStructuralKeyHandler::registerBuiltins()
         // D2: use Cmd::deleteMerge (merges next block into current).
         Markoff::Cmd::deleteMerge(*c.document, c.blockAnchor);
 
-        // Cursor stays at end of the (now-merged) block — same row, same qtPos.
-        c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos);
+        // Same race as backspace: requestTextCaretAtRow resolves before the
+        // model text is updated, then QML resets the cursor. Use anchor-keyed
+        // pending so it resolves in noteParseArrived after the text is stable.
+        c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, c.qtPos);
 
         return HR::Handled;
     };
