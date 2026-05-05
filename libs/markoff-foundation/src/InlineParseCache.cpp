@@ -9,7 +9,7 @@ InlineParseCache::InlineParseCache(MarkoffDocument &doc)
     : m_doc(doc)
 {}
 
-QList<SourceSpan> InlineParseCache::spansFor(BlockId id)
+QList<SourceSpan> InlineParseCache::spansFor(BlockId id) const
 {
     auto curSeq = m_doc.blockEditSequence(id);
     auto it = m_cache.find(id);

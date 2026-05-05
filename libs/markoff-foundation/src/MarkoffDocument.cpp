@@ -616,7 +616,7 @@ quint64 MarkoffDocument::d2EditSequence() const noexcept
     return sum;
 }
 
-QList<SourceSpan> MarkoffDocument::inlineSpansFor(BlockId id)
+QList<SourceSpan> MarkoffDocument::inlineSpansFor(BlockId id) const
 {
     if (d->inlineCache) return d->inlineCache->spansFor(id);
     return {};
@@ -869,6 +869,7 @@ void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
     d->blockEditSequences.clear();
     d->structuralEditSequence = 0;
     d->touchedSinceLoad.clear();
+    if (d->inlineCache) d->inlineCache->clear();
 
     // 6. Notify
     Q_EMIT documentLoaded();

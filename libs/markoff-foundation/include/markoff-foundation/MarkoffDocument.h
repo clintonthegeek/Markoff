@@ -249,7 +249,7 @@ public:
     // ===== D2 inline cache (Phase 10) =====
     /// Returns inline formatting spans for block `id`, computed on first access
     /// and cached until the block's edit sequence increments.
-    QList<Markoff::SourceSpan> inlineSpansFor(Markoff::BlockId id);
+    QList<Markoff::SourceSpan> inlineSpansFor(Markoff::BlockId id) const;
 
     // ===== D2 load =====
     /// Parse `src` as UTF-8 Markdown, populate frontmatter, footnote defs,

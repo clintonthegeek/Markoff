@@ -27,7 +27,11 @@ public:
     /// given (id, blockEditSequence) pair, parses the block's current UTF-8
     /// text via inlineSpansFor() and caches the result. On subsequent calls
     /// with the same edit sequence, returns the cached result directly.
-    QList<SourceSpan> spansFor(BlockId id);
+    QList<SourceSpan> spansFor(BlockId id) const;
+
+    /// Evict all cache entries. Call this when the document is reloaded so
+    /// stale entries keyed by now-retired BlockIds do not linger.
+    void clear() { m_cache.clear(); }
 
 private:
     struct Entry {
@@ -36,7 +40,7 @@ private:
     };
 
     MarkoffDocument &m_doc;
-    QHash<BlockId, Entry> m_cache;
+    mutable QHash<BlockId, Entry> m_cache;
 };
 
 }  // namespace Markoff
