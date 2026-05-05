@@ -2,15 +2,24 @@
 #pragma once
 
 #include <QFlags>
+#include <QList>
 #include <QObject>
 #include <QString>
 
+#include <markoff-foundation/BlockId.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
 class MarkoffDocument;
 class Session;
+
+/// A single search match located within a specific block.
+struct MARKOFF_FOUNDATION_EXPORT SearchHit {
+    BlockId  blockId;
+    uint32_t matchStart = 0;  ///< byte offset within block
+    uint32_t matchLen   = 0;  ///< byte length of match
+};
 
 class MARKOFF_FOUNDATION_EXPORT SearchEngine : public QObject {
     Q_OBJECT
@@ -32,6 +41,12 @@ public:
     bool findNext(MarkoffDocument *, Session *);
     bool findPrevious(MarkoffDocument *, Session *);
     void clearMatches(Session *);
+
+    /// D2: iterate blocks directly and return one SearchHit per match.
+    /// Does not touch Sessions or Selections; pure query.
+    static QList<SearchHit> findByBlock(const MarkoffDocument &doc,
+                                        const QString &needle,
+                                        FindFlags flags = {});
 };
 
 }  // namespace Markoff

@@ -85,6 +85,28 @@ private Q_SLOTS:
         for (const Selection &x : sess->secondarySelections())
             QVERIFY(x.kind != Selection::Kind::SearchMatch);
     }
+
+    // D2: per-block search finds matches in multiple blocks
+    void search_findsMatchAcrossBlocks() {
+        MarkoffDocument doc(1);
+        // Two paragraphs separated by a blank line: block 0 = "foo bar",
+        // block 1 = "baz foo".
+        doc.loadFromMarkdown("foo bar\n\nbaz foo\n");
+
+        const auto hits = SearchEngine::findByBlock(doc, "foo");
+        QCOMPARE(hits.size(), 2);
+
+        // The two blocks must be distinct.
+        QVERIFY(hits[0].blockId != hits[1].blockId);
+
+        // First block: "foo" at byte offset 0, length 3.
+        QCOMPARE(hits[0].matchStart, uint32_t(0));
+        QCOMPARE(hits[0].matchLen,   uint32_t(3));
+
+        // Second block: "baz foo" — "foo" starts at byte offset 4, length 3.
+        QCOMPARE(hits[1].matchStart, uint32_t(4));
+        QCOMPARE(hits[1].matchLen,   uint32_t(3));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationSearchEngine)
