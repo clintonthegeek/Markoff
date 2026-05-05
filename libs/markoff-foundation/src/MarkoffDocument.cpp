@@ -5,6 +5,9 @@
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/StructuralOp.h>
 #include <markoff-foundation/UndoLog.h>
+#include <markoff-foundation/BlockSerializer.h>
+
+#include <QSaveFile>
 
 #include <markoff-parser/Document.h>
 
@@ -704,6 +707,7 @@ void MarkoffDocument::d2SetBlockKind(BlockId block, BlockKind newKind,
 {
     OpId opId = d->kindTagMap.setWithNextStamp(block, newKind);
     t.registerOp(CrdtTarget::kindTagMap(), opId);
+    d->touchedSinceLoad.insert(block);
     scheduleD2Changed();
 }
 
@@ -714,6 +718,7 @@ void MarkoffDocument::d2SetBlockAttr(BlockId block, const QByteArray &attrName,
     BlockAttrKey key{block, attrName};
     OpId opId = d->blockAttrsMap.setWithNextStamp(key, value);
     t.registerOp(CrdtTarget::blockAttrsMap(), opId);
+    d->touchedSinceLoad.insert(block);
     scheduleD2Changed();
 }
 
@@ -843,6 +848,7 @@ void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
     // 5. Reset load baseline (mark "clean" post-load state)
     d->blockEditSequences.clear();
     d->structuralEditSequence = 0;
+    d->touchedSinceLoad.clear();
 
     // 6. Notify
     Q_EMIT documentLoaded();
@@ -857,6 +863,106 @@ QByteArray MarkoffDocument::blockLoadTimeBytes(BlockId id) const
 std::optional<QByteArray> MarkoffDocument::frontmatterValue(const QByteArray &key) const
 {
     return d->frontmatterMap.get(key);
+}
+
+// ============================================================================
+// D2 save (Phase 8)
+// ============================================================================
+
+QHash<AttrName, AttrValue> MarkoffDocument::blockAttrs(BlockId id) const
+{
+    QHash<AttrName, AttrValue> result;
+    d->blockAttrsMap.forEachValue([&](const BlockAttrKey &k, const AttrValue &v) {
+        if (k.block == id) result.insert(k.name, v);
+    });
+    return result;
+}
+
+bool MarkoffDocument::isBlockTouched(BlockId id) const
+{
+    // Born after load — no load-time bytes snapshot
+    if (!d->blockLoadTimeBytes.contains(id)) return true;
+    // Content edited via applyBlockEdit / d2ApplyBufferEdit
+    if (d->blockEditSequences.value(id, 0) > 0) return true;
+    // Kind or attrs changed via d2SetBlockKind / d2SetBlockAttr
+    if (d->touchedSinceLoad.contains(id)) return true;
+    return false;
+}
+
+namespace {
+
+QByteArray serializeFrontmatter(const Markoff::FrontmatterMap &fm)
+{
+    auto raw = fm.get("raw");
+    if (!raw.has_value() || raw->isEmpty()) return {};
+    return "---\n" + *raw + "\n---\n\n";
+}
+
+QByteArray interBlockSeparator()
+{
+    // Each block's load-time bytes already end with '\n'. Adding one more '\n'
+    // produces the blank line that separates top-level blocks in standard Markdown.
+    // This matches the tree-sitter parser's block byte ranges: for
+    // "Para one\n\nPara two\n", block 0 = "Para one\n" and block 1 = "Para two\n"
+    // — the blank line ('\n' at offset 9) is not included in either block's range.
+    return "\n";
+}
+
+QByteArray serializeFootnoteDefs(const Markoff::FootnoteDefMap &fdm)
+{
+    QByteArray out;
+    fdm.forEachValue([&](const QByteArray &label, const QByteArray &content) {
+        out += "[^" + label + "]: " + content + "\n";
+    });
+    return out;
+}
+
+}  // anonymous namespace
+
+QByteArray MarkoffDocument::serializeForSave() const
+{
+    // Ensure built-in serializers are registered (idempotent)
+    BlockSerializerRegistry::instance().registerBuiltins();
+
+    QByteArray out;
+
+    // 1. Frontmatter
+    out += serializeFrontmatter(d->frontmatterMap);
+
+    // 2. Blocks
+    auto blocks = iterateBlocks();
+    auto &reg = BlockSerializerRegistry::instance();
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        BlockId id = blocks[i];
+        QByteArray bytes;
+        if (!isBlockTouched(id)) {
+            // Untouched: use original load-time bytes for byte-identical round-trip
+            bytes = d->blockLoadTimeBytes.value(id);
+        } else {
+            // Touched: re-serialize from CRDT state
+            auto fn = reg.get(blockKind(id));
+            bytes = fn(blockKind(id), blockAttrs(id), blockText(id));
+        }
+        out += bytes;
+        if (i + 1 < blocks.size())
+            out += interBlockSeparator();
+    }
+
+    // 3. Link refs (v1: skip — stored with naive key, proper extraction is Phase 9+)
+    // out += serializeLinkRefs(d->linkRefMap);
+
+    // 4. Footnote definitions
+    out += serializeFootnoteDefs(d->footnoteDefMap);
+
+    return out;
+}
+
+bool MarkoffDocument::save(const QString &path)
+{
+    QSaveFile f(path);
+    if (!f.open(QIODevice::WriteOnly)) return false;
+    f.write(serializeForSave());
+    return f.commit();
 }
 
 }  // namespace Markoff

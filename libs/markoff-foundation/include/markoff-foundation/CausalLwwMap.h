@@ -152,6 +152,16 @@ public:
         );
     }
 
+    /// Iterate all non-tombstoned entries. Calls fn(key, value) for each live entry.
+    /// Order is unspecified (QHash iteration order).
+    template <typename F>
+    void forEachValue(F &&fn) const {
+        for (auto it = m_entries.cbegin(); it != m_entries.cend(); ++it) {
+            if (!it->tombstone)
+                fn(it.key(), it->value);
+        }
+    }
+
     // Apply a write from a remote replica — does NOT enter the local undo stack.
     void applyRemote(const RemoteOp &op) {
         auto it = m_entries.find(op.key);

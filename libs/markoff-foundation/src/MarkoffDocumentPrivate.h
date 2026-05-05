@@ -14,6 +14,7 @@
 
 #include <QList>
 #include <QHash>
+#include <QSet>
 #include <QByteArray>
 #include <QString>
 
@@ -91,6 +92,10 @@ struct MarkoffDocument::Private {
 
     // Structural edit sequence counter — bumps on every applyStructural call.
     quint64 structuralEditSequence = 0;
+
+    // Blocks whose kind or attrs changed post-load (Phase 8 touch-test).
+    // Cleared in loadFromMarkdown; populated by d2SetBlockKind/d2SetBlockAttr.
+    QSet<BlockId> touchedSinceLoad;
 
     // Debounce flag for d2DocumentChanged signal
     bool d2ChangePending = false;

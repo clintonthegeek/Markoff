@@ -6,6 +6,7 @@
 #include <QObject>
 #include <QString>
 #include <QtGlobal>
+#include <QHash>
 
 #include <memory>
 #include <optional>
@@ -260,6 +261,26 @@ public:
     /// std::nullopt if `key` is absent. In Phase 7 the map contains a
     /// single "raw" entry whose value is the raw frontmatter string.
     std::optional<QByteArray> frontmatterValue(const QByteArray &key) const;
+
+    // ===== D2 save (Phase 8) =====
+
+    /// Returns all non-tombstoned attrs for the given block as a QHash.
+    QHash<Markoff::AttrName, Markoff::AttrValue> blockAttrs(Markoff::BlockId id) const;
+
+    /// Returns true if the block has been modified since the last loadFromMarkdown:
+    ///   - born after load (no load-time bytes)
+    ///   - content edited (blockEditSequence > 0)
+    ///   - kind or attrs changed (d2SetBlockKind / d2SetBlockAttr called)
+    bool isBlockTouched(Markoff::BlockId id) const;
+
+    /// Serialise the document to UTF-8 Markdown bytes ready for writing to disk.
+    /// For untouched blocks uses the original load-time bytes; for touched blocks
+    /// calls the registered BlockSerializer for that block's kind.
+    QByteArray serializeForSave() const;
+
+    /// Atomically write serializeForSave() to `path` via QSaveFile.
+    /// Returns true on success, false on any I/O error.
+    bool save(const QString &path);
 
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
