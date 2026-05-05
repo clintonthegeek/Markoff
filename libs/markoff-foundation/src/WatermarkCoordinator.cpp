@@ -50,11 +50,16 @@ void WatermarkCoordinator::advanceAndCompact()
     auto fdStamp = d.footnoteDefMap.currentStamp();
     d.footnoteDefMap.compact(fdStamp);
 
-    // Trim UndoLog — all ops are now compacted, so all entries are collapsed
+    // Discard all undo entries — all ops have been observed and compacted
     d.undoLog.compact([](const CrdtTarget &, OpId) { return true; });
 
-    // Update snapshot
-    m_watermark = currentWatermark();
+    // Snapshot post-compact state directly (D2 single-user: idListVersion stays 0;
+    // Crdt::Global is a vector type and doesn't map cleanly to quint64)
+    m_watermark.kindTagMapSeq  = kmStamp.counter;
+    m_watermark.blockAttrsSeq  = baStamp.counter;
+    m_watermark.frontmatterSeq = fmStamp.counter;
+    m_watermark.linkRefSeq     = lrStamp.counter;
+    m_watermark.footnoteDefSeq = fdStamp.counter;
 }
 
 void WatermarkCoordinator::disposeOrphans()

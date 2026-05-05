@@ -967,7 +967,8 @@ bool MarkoffDocument::save(const QString &path)
     if (!f.open(QIODevice::WriteOnly)) return false;
     f.write(serializeForSave());
     if (!f.commit()) return false;
-    if (d->watermark) d->watermark->onSaveSucceeded();
+    if (d->watermark && !d->watermark->onSaveSucceeded())
+        qWarning("MarkoffDocument::save: GC deferred — transaction open at save time");
     return true;
 }
 
