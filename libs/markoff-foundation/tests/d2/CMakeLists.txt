@@ -61,3 +61,8 @@ target_link_libraries(tst_d2_roundtrip PRIVATE Qt6::Test markoff_foundation)
 target_compile_definitions(tst_d2_roundtrip PRIVATE
     CORPUS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/roundtrip/corpus")
 add_test(NAME tst_d2_roundtrip COMMAND tst_d2_roundtrip)
+
+# Phase 9: Garbage Collection / WatermarkCoordinator
+qt_add_executable(tst_d2_gc tst_d2_gc.cpp)
+target_link_libraries(tst_d2_gc PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_gc COMMAND tst_d2_gc)
