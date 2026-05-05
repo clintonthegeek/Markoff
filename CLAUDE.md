@@ -1,8 +1,6 @@
 # Markoff (exploration/new-foundation branch)
 
-> **D2 dogfood — awaiting user sign-off.** D2 implementation is complete (Phases 0–14 committed; 140/141 tests pass). The next action is the user dogfood pass per `docs/plans/2026-05-04-d2-foundation-reshape.md` §15.2. After user sign-off, update `docs/d-arc/d-arc-status.md` D2 → `complete` and brainstorm D3.
->
-> **D3 is next.** Read `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` for the stub scope.
+> **D2 complete — D3 is next.** D2 user sign-off received 2026-05-05. D3 (view-layer adaptation) is the active phase. Read `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` for stub scope and inputs. Brainstorm the substantive D3 spec before writing the plan.
 >
 > **A fresh agent context picking up this work must read, in order:**
 >
