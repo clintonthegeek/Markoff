@@ -44,3 +44,20 @@ add_test(NAME tst_d2_cmd_decomposition COMMAND tst_d2_cmd_decomposition)
 qt_add_executable(tst_d2_load tst_d2_load.cpp)
 target_link_libraries(tst_d2_load PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_d2_load COMMAND tst_d2_load)
+
+# Temporary byte-range diagnostic (always passes)
+qt_add_executable(tst_d2_byterange_probe tst_d2_byterange_probe.cpp)
+target_link_libraries(tst_d2_byterange_probe PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_byterange_probe COMMAND tst_d2_byterange_probe)
+
+# Phase 8: Save
+qt_add_executable(tst_d2_save tst_d2_save.cpp)
+target_link_libraries(tst_d2_save PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_save COMMAND tst_d2_save)
+
+# Phase 8: Round-trip corpus
+qt_add_executable(tst_d2_roundtrip tst_d2_roundtrip.cpp)
+target_link_libraries(tst_d2_roundtrip PRIVATE Qt6::Test markoff_foundation)
+target_compile_definitions(tst_d2_roundtrip PRIVATE
+    CORPUS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/roundtrip/corpus")
+add_test(NAME tst_d2_roundtrip COMMAND tst_d2_roundtrip)
