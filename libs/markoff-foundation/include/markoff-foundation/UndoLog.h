@@ -64,6 +64,14 @@ public:
 
     size_t entryCount() const noexcept { return m_entries.size(); }
     const UndoEntry &lastEntry() const { return m_entries.back(); }
+    bool isTransactionOpen() const noexcept { return m_nestingDepth > 0; }
+    bool isBlockReferenced(BlockId id) const noexcept {
+        for (const auto &entry : m_entries)
+            for (const auto &[target, opId] : entry.targets)
+                if (auto *b = std::get_if<CrdtTarget::BufferT>(&target.kind))
+                    if (b->blockId == id) return true;
+        return false;
+    }
 
     void setDispatcher(Dispatcher d) { m_dispatcher = std::move(d); }
 

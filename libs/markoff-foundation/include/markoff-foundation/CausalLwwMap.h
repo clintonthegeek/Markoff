@@ -90,6 +90,7 @@ public:
     }
 
     CausalStamp nextStamp() { return CausalStamp{m_replicaId, ++m_localCounter}; }
+    CausalStamp currentStamp() const noexcept { return CausalStamp{m_replicaId, m_localCounter}; }
 
     static OpId stampToOpId(CausalStamp s) noexcept {
         return (static_cast<uint64_t>(s.replicaId) << 48) | (s.counter & 0x0000FFFFFFFFFFFFull);
