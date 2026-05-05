@@ -32,7 +32,11 @@ namespace Markoff::Parse::Detail {
 /// the underlying intent is the same — currently we treat them as distinct
 /// streams: once a Reset is pending, subsequent schedule() calls upgrade
 /// the pending utf8 but keep the Reset kind.
-class ParsePool : public QObject {
+///
+/// @deprecated D2: ParsePool drives the legacy single-buffer parse pipeline
+/// (MarkoffDocument::parseUpdated). D4 will remove it once the single-buffer
+/// internals are retired. Do not add new callers.
+class [[deprecated("D2: remove after markoff-foundation is fully off ParsePool — D4 will delete")]] ParsePool : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(ParsePool)
 public:

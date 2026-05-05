@@ -94,6 +94,9 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     // ── D2: initialise InlineParseCache (Phase 10) ──────────────────────────
     d->inlineCache = std::make_unique<InlineParseCache>(*this);
 
+    // ParsePool is deprecated (D4 will delete); suppressed here because foundation owns the impl.
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_GCC("-Wdeprecated-declarations")
     QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p, quint64 inputEditSeq) {
                          d->latestParse.reset(p);
@@ -115,6 +118,7 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
                          Q_EMIT parseUpdated(p, d->parseSequence, d->latestBlockAnchors,
                                              inputEditSeq);
                      });
+QT_WARNING_POP
 }
 
 MarkoffDocument::~MarkoffDocument() = default;

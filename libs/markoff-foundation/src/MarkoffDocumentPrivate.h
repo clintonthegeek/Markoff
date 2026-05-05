@@ -27,7 +27,11 @@
 #include <crdt/IdList.h>
 
 #include "BlockAnchorComputation.h"
+// ParsePool is deprecated (D4 will delete it); foundation still owns the impl.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include "ParsePool.h"
+#pragma GCC diagnostic pop
 
 #include <markoff-foundation/InlineParseCache.h>
 
@@ -60,7 +64,10 @@ struct MarkoffDocument::Private {
     QList<Markoff::BlockAnchor>               latestBlockAnchors;
     QList<Markoff::Detail::BlockByteRange>    latestBlockRanges;
     QList<Session *>                          sessions;
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_GCC("-Wdeprecated-declarations")
     Markoff::Parse::Detail::ParsePool         parsePool;
+QT_WARNING_POP
     std::unique_ptr<const Markoff::Document>  latestParse;
 
     // ── New D2 internals (Phase 4+) ──────────────────────────────────────
