@@ -130,6 +130,11 @@ QList<SearchHit> SearchEngine::findByBlock(const MarkoffDocument &doc,
                                             const QString &needle,
                                             FindFlags flags)
 {
+    // Only CaseSensitive is implemented for findByBlock; Regex and WholeWords
+    // are not yet supported and passing them is a programming error.
+    Q_ASSERT(!(flags & Regex));
+    Q_ASSERT(!(flags & WholeWords));
+
     QList<SearchHit> hits;
     if (needle.isEmpty()) return hits;
 

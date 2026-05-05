@@ -5,7 +5,6 @@
 #include <markoff-foundation/MarkoffDocument.h>
 
 using namespace Markoff;
-using CollabText::Crdt::Bias;
 
 namespace {
 void seed(MarkoffDocument &doc, const QByteArray &text) {
@@ -23,7 +22,7 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         seed(doc, "see [[no");
         const auto ctx = CompletionDetector::detect(&doc,
-            doc.anchorAt(8, Bias::Left));
+            doc.textAnchorAt(8, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::WikiLink);
         QCOMPARE(ctx.prefix, QStringLiteral("no"));
     }
@@ -32,7 +31,7 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         seed(doc, "hi :smi");
         const auto ctx = CompletionDetector::detect(&doc,
-            doc.anchorAt(7, Bias::Left));
+            doc.textAnchorAt(7, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::Emoji);
         QCOMPARE(ctx.prefix, QStringLiteral("smi"));
     }
@@ -41,7 +40,7 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         seed(doc, "body #ta");
         const auto ctx = CompletionDetector::detect(&doc,
-            doc.anchorAt(8, Bias::Left));
+            doc.textAnchorAt(8, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::Tag);
         QCOMPARE(ctx.prefix, QStringLiteral("ta"));
     }
@@ -50,7 +49,7 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         seed(doc, "#h");
         const auto ctx = CompletionDetector::detect(&doc,
-            doc.anchorAt(2, Bias::Left));
+            doc.textAnchorAt(2, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::None);
     }
 
@@ -58,7 +57,7 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         seed(doc, "```\n[[no");
         const auto ctx = CompletionDetector::detect(&doc,
-            doc.anchorAt(8, Bias::Left));
+            doc.textAnchorAt(8, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::None);
     }
 
@@ -66,7 +65,7 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         seed(doc, "see \\[[no");
         const auto ctx = CompletionDetector::detect(&doc,
-            doc.anchorAt(9, Bias::Left));
+            doc.textAnchorAt(9, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::None);
     }
 
@@ -74,7 +73,7 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         seed(doc, "see [^fn");
         const auto ctx = CompletionDetector::detect(&doc,
-            doc.anchorAt(8, Bias::Left));
+            doc.textAnchorAt(8, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::Footnote);
         QCOMPARE(ctx.prefix, QStringLiteral("fn"));
     }

@@ -31,12 +31,12 @@ bool isEscaped(const QString &text, int idx) {
 
 CompletionContext
 CompletionDetector::detect(const MarkoffDocument *doc,
-                            const CollabText::Crdt::Anchor &cursor)
+                            TextAnchor cursor)
 {
     CompletionContext ctx;
     if (!doc) return ctx;
 
-    const quint32 cursorByteOffset = doc->resolveAnchor(cursor);
+    const quint32 cursorByteOffset = doc->resolveTextAnchor(cursor);
 
     // Populate cursorBlock + cursorByteOffset from the flat anchor.
     {

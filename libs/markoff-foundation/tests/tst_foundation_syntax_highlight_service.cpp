@@ -76,7 +76,6 @@ private Q_SLOTS:
             // tst_d2_inline_parse_cache.
             Q_UNUSED(spans)
         }
-        QVERIFY(true);  // Reaching here means no crash.
     }
 };
 
