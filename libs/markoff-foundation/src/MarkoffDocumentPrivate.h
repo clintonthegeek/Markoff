@@ -28,10 +28,10 @@
 
 #include "BlockAnchorComputation.h"
 // ParsePool is deprecated (D4 will delete it); foundation still owns the impl.
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+QT_WARNING_PUSH
+QT_WARNING_DISABLE_GCC("-Wdeprecated-declarations")
 #include "ParsePool.h"
-#pragma GCC diagnostic pop
+QT_WARNING_POP
 
 #include <markoff-foundation/InlineParseCache.h>
 
