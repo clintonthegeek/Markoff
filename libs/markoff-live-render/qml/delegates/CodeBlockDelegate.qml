@@ -41,11 +41,17 @@ Rectangle {
         selectByMouse: true
         persistentSelection: true
 
-        // R4 limitation: structural Enter belongs to R5. Swallow it.
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
-            if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-                event.accepted = true
+            const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
+            if (!handler) { event.accepted = false; return }
+            const k = event.key
+            if (k !== Qt.Key_Backspace && k !== Qt.Key_Delete) {
+                return
+            }
+            const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,
+                edit.cursorPosition, edit.selectionStart === edit.selectionEnd, model.text)
+            event.accepted = handled
         }
 
         SyntaxHighlighter {
