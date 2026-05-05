@@ -17,8 +17,10 @@ private Q_SLOTS:
     void enterAtEnd_newBlockIsEmpty();
     void backspaceMerge_appendsContentToPrev();
     void backspaceMerge_firstBlock_noOp();
+    void backspaceMerge_stripsTrailingNewlineAtBoundary();
     void deleteMerge_appendsNextBlockContent();
     void deleteMerge_lastBlock_noOp();
+    void deleteMerge_stripsTrailingNewlineAtBoundary();
     void changeKind_updatesBlockKind();
     void changeKind_withAttrs();
     void pasteMarkdown_singleParagraph_contentAppearsInNewBlock();
@@ -83,6 +85,30 @@ void TstD2Cmd::backspaceMerge_appendsContentToPrev()
     QCOMPARE(doc.iterateBlocks().size(), 1u);
 }
 
+void TstD2Cmd::backspaceMerge_stripsTrailingNewlineAtBoundary()
+{
+    // Blocks loaded from markdown carry a trailing '\n' as a structural delimiter.
+    // backspaceMerge must replace that '\n' (not append after it) so the merged
+    // text has no mid-block newline and the cursor lands at the join point.
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("hello\n\nworld\n");
+    auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), 2u);
+    BlockId blkA = blocks[0];
+    BlockId blkB = blocks[1];
+
+    // Verify the trailing-newline precondition (the fix is a no-op without it).
+    QVERIFY(doc.blockText(blkA).endsWith('\n'));
+
+    auto result = Cmd::backspaceMerge(doc, blkB);
+    QCOMPARE(result.mergedInto, blkA);
+    // Cursor at join point — after "hello", before "world".
+    QCOMPARE(result.cursorByteOffset, 5u);
+    // No mid-block '\n': merged text is "helloworld\n", not "hello\nworld\n".
+    QCOMPARE(doc.blockText(blkA), QByteArray("helloworld\n"));
+    QCOMPARE(doc.iterateBlocks().size(), 1u);
+}
+
 void TstD2Cmd::backspaceMerge_firstBlock_noOp()
 {
     MarkoffDocument doc(1);
@@ -100,6 +126,21 @@ void TstD2Cmd::deleteMerge_appendsNextBlockContent()
     BlockId blkB = doc.testInsertBlock(BlockKind::Paragraph, " world");
     Cmd::deleteMerge(doc, blkA);
     QCOMPARE(doc.blockText(blkA), QByteArray("hello world"));
+    QCOMPARE(doc.iterateBlocks().size(), 1u);
+}
+
+void TstD2Cmd::deleteMerge_stripsTrailingNewlineAtBoundary()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("hello\n\nworld\n");
+    auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), 2u);
+    BlockId blkA = blocks[0];
+
+    QVERIFY(doc.blockText(blkA).endsWith('\n'));
+
+    Cmd::deleteMerge(doc, blkA);
+    QCOMPARE(doc.blockText(blkA), QByteArray("helloworld\n"));
     QCOMPARE(doc.iterateBlocks().size(), 1u);
 }
 
