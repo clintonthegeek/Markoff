@@ -71,3 +71,8 @@ add_test(NAME tst_d2_gc COMMAND tst_d2_gc)
 qt_add_executable(tst_d2_inline_cache tst_d2_inline_cache.cpp)
 target_link_libraries(tst_d2_inline_cache PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_d2_inline_cache COMMAND tst_d2_inline_cache)
+
+# Phase 13: Convergence tests (CRDT primitive level — IdList + Buffer)
+qt_add_executable(tst_d2_convergence tst_d2_convergence.cpp)
+target_link_libraries(tst_d2_convergence PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_convergence COMMAND tst_d2_convergence)
