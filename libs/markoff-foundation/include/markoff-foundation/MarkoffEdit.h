@@ -17,7 +17,9 @@ namespace Markoff {
 ///
 /// oldStart and oldEnd are UTF-8 byte offsets. oldEnd >= oldStart.
 /// newText is UTF-8 bytes (empty for pure deletion).
-struct MARKOFF_FOUNDATION_EXPORT MarkoffEdit {
+///
+/// @deprecated D2: replaced by BlockEdit + StructuralOp. D4 will delete.
+struct [[deprecated("D2: replaced by BlockEdit + StructuralOp; D4 will delete")]] MARKOFF_FOUNDATION_EXPORT MarkoffEdit {
     quint32    oldStart = 0;
     quint32    oldEnd = 0;
     QByteArray newText;

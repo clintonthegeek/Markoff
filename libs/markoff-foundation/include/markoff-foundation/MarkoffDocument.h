@@ -78,6 +78,7 @@ public:
     /// ordering ("is this a newer parse than what I rendered?") without
     /// holding a Crdt::Global. Decoupled from the CRDT version vector.
     /// See spec §10 decision 3.
+    [[deprecated("D2: use d2EditSequence(); D4 will delete")]]
     quint64 parseSequence() const noexcept;
 
     // ===== Local writes =====
@@ -303,6 +304,7 @@ Q_SIGNALS:
     /// output for a given row is stale relative to user intent.
     /// See restoration spec §4.
     // D2: deprecated, migrating to d2DocumentChanged
+    [[deprecated("D2: use d2DocumentChanged + documentLoaded; D4 will delete")]]
     void parseUpdated(const Markoff::Document *parsed,
                       quint64 parseSequence,
                       QList<Markoff::BlockAnchor> blockAnchors,
