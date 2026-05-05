@@ -8,6 +8,7 @@
 #include <markoff-foundation/SearchEngine.h>
 #include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
+#include <markoff-foundation/UndoLog.h>
 
 namespace Markoff {
 
@@ -61,6 +62,19 @@ ReplaceController::replaceAll(MarkoffDocument *doc, Session *sess,
     res.count = edits.size();
     SearchEngine().clearMatches(sess);
     return res;
+}
+
+// D2: single-block replacement using d2ApplyBufferEdit.
+bool ReplaceController::replaceInBlock(MarkoffDocument &doc,
+                                        BlockId blockId,
+                                        uint32_t byteStart,
+                                        uint32_t byteLen,
+                                        const QByteArray &replacement)
+{
+    if (blockId.isNull()) return false;
+    UndoLog::Transaction t(doc.d2UndoLog());
+    doc.d2ApplyBufferEdit(blockId, byteStart, byteLen, replacement, t);
+    return true;
 }
 
 }  // namespace Markoff

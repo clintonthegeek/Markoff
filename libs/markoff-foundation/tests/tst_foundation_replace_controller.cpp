@@ -44,6 +44,30 @@ private Q_SLOTS:
         QCOMPARE(r.count, 3);
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("X bar X baz X"));
     }
+
+    // D2: replaceInBlock replaces bytes within a specific block.
+    void replaceInBlock_replacesMatch() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("hello world\n");
+
+        const auto blocks = doc.iterateBlocks();
+        QVERIFY(!blocks.empty());
+        const BlockId firstBlockId = blocks.front();
+
+        // Determine the actual block text to get the correct byte layout.
+        // "hello world" is the paragraph content; blockText may include a
+        // trailing newline depending on how the block was stored.
+        const QByteArray original = doc.blockText(firstBlockId);
+        QVERIFY(original.startsWith("hello world"));
+
+        // "world" starts at byte offset 6, length 5.
+        const bool ok = ReplaceController::replaceInBlock(
+            doc, firstBlockId, 6, 5, QByteArray("earth"));
+        QVERIFY(ok);
+
+        const QByteArray updated = doc.blockText(firstBlockId);
+        QVERIFY(updated.startsWith("hello earth"));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationReplaceController)
