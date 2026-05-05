@@ -123,12 +123,14 @@ private Q_SLOTS:
         // Original block content must be preserved.
         QCOMPARE(doc.blockText(origBlock), QByteArrayLiteral("hello world"));
 
-        // Cursor must follow the user's content (not the new empty block).
+        // Cursor stays at the new empty block (same visual row), not the
+        // shifted content. origBlock is now at row 1.
         QTRY_COMPARE(binding.model()->rowCount(), 2);
-        // The cursor should resolve to the row containing "hello world".
         QTRY_VERIFY(binding.cursorState()->focusedAnchorRow() >= 0);
         const int row = binding.cursorState()->focusedAnchorRow();
-        QCOMPARE(binding.model()->recordAt(row).blockAnchor, origBlock);
+        // Row 0 is the new empty block; row 1 is "hello world".
+        QCOMPARE(row, 0);
+        QVERIFY(binding.model()->recordAt(row).blockAnchor != origBlock);
     }
 
     // ---------- LiveStructuralKeyHandler — paragraph Backspace at row-start ----------
