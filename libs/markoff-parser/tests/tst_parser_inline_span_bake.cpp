@@ -3,6 +3,7 @@
 
 #include <markoff-parser/Document.h>
 #include <markoff-parser/SourceSpan.h>
+#include <markoff-parser/TreeSitterParser.h>
 
 using namespace Markoff;
 
@@ -117,6 +118,20 @@ private Q_SLOTS:
         for (const SourceSpan &s : blocks[0].inlineSpans) {
             QVERIFY(!(s.bold && !s.isDelimiter));
         }
+    }
+
+    void inlineSpansFor_paragraph_returnsBoldSpan() {
+        // inlineSpansFor() parses a single block's content in isolation and
+        // returns at least one bold (non-delimiter) span for "Hello **world**".
+        QList<SourceSpan> spans = inlineSpansFor(QByteArray("Hello **world**\n"));
+        bool foundBold = false;
+        for (const SourceSpan &s : spans) {
+            if (s.bold && !s.isDelimiter) {
+                foundBold = true;
+                break;
+            }
+        }
+        QVERIFY2(foundBold, "inlineSpansFor should return at least one bold non-delimiter span");
     }
 };
 

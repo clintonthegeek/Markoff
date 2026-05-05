@@ -1462,4 +1462,15 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries(
     return result;
 }
 
+// ---------------------------------------------------------------------------
+// inlineSpansFor — standalone per-block inline parse entry point (Phase 10)
+// ---------------------------------------------------------------------------
+
+QList<SourceSpan> inlineSpansFor(const QByteArray &blockContent)
+{
+    TreeSitterParser parser;
+    parser.parse(QString::fromUtf8(blockContent));
+    return parser.buildSpanMap();
+}
+
 } // namespace Markoff

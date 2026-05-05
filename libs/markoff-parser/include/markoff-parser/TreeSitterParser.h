@@ -159,6 +159,12 @@ private:
     std::vector<ByteRange> m_lastChangedRanges;
 };
 
+/// Parse a single block's UTF-8 content and return its inline formatting spans.
+/// Convenience free function: constructs a temporary TreeSitterParser, parses
+/// `blockContent`, and returns the resulting span map. Spans are document-relative
+/// (offsets from byte 0 of `blockContent`).
+QList<SourceSpan> inlineSpansFor(const QByteArray &blockContent);
+
 } // namespace Markoff
 
 #endif // MARKOFF_TREESITTERPARSER_H
