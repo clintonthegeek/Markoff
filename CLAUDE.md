@@ -1,13 +1,13 @@
 # Markoff (exploration/new-foundation branch)
 
-> **D2 complete — D3 is next.** D2 user sign-off received 2026-05-05. D3 (view-layer adaptation) is the active phase. Read `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` for stub scope and inputs. Brainstorm the substantive D3 spec before writing the plan.
+> **D3 spec approved — plan derivation next.** D3 (view-layer adaptation) spec landed 2026-05-05. Run `superpowers:writing-plans` against `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` to generate the implementation plan.
 >
 > **A fresh agent context picking up this work must read, in order:**
 >
 > 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation across the whole D arc (D0 → D5)
-> 2. `docs/d-arc/d-arc-status.md` — live status board (D2 = dogfood; D3 = stubbed)
+> 2. `docs/d-arc/d-arc-status.md` — live status board (D3 = spec-approved; plan pending)
 > 3. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items binding every D-arc spec
-> 4. `docs/specs/2026-05-04-d2-foundation-reshape-design.md` — the binding D2 spec (reference for dogfood verification)
+> 4. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — the binding D3 spec
 >
 > The C-restoration's status board (`docs/restoration-status.md`) is now
 > historical. The marker-paragraph design and R5.5 plan are retired. R5.5

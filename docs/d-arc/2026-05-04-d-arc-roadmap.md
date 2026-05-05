@@ -15,7 +15,7 @@ D = "per-block CRDT + structural CRDT" — the long-term Markoff foundation arch
 | **D0** | ✅ done | joint (Markoff + collabtext maintainers) | Architectural alignment: per-block CRDT direction + collabtext supporting primitive | `docs/specs/2026-05-02-d-evolution-proposal.md` (Markoff side) and `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` (collabtext side) |
 | **D1** | ✅ done | collabtext maintainers | `CollabText::Crdt::IdList` primitive shipped (opaque uint64 elements, sharing the existing Anchor / Operation / Undo / GC machinery) | collabtext header `~/dev/collabtext/include/collabtext/Crdt/IdList.h` |
 | **D2** | ✅ done | Markoff | Foundation reshape — `Markoff::MarkoffDocument` rebuilt on `IdList` + per-block `Buffer`s + sibling causal-LWW maps | `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; status `docs/d-arc/d-arc-status.md` |
-| **D3** | 🟢 active | Markoff | View-layer adaptation — `markoff-live-render` L4–L5 reshape; marker-paragraph machinery deletion; structural-key dispatch on `Cmd::*` | `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` (stub; brainstorm pending) |
+| **D3** | 🟢 active | Markoff | View-layer adaptation — cursor delivery redesign; inline span consumption; kind-transition detection; L6/L7/L8 full delegates; per-block undo UI | `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` (spec approved; plan pending) |
 | **D4** | ⏸ stubbed | Markoff | Parser scope reduction — trim parser library API to load-time-doc + per-block-inline; delete `ParsePool` and `IncrementalParseSession` | `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md` |
 | **D5** | ⏸ stubbed | Markoff + collabtext | Collab activation — wire format, transport, presence, conflict UI | `docs/specs/2026-05-04-d5-collab-activation-STUB.md` |
 
@@ -31,7 +31,7 @@ Status legend: ✅ done · 🟢 active · 🟡 dogfood (implementation done; awa
 | Understand the architectural premise | `docs/specs/2026-05-02-d-evolution-proposal.md` §3 (data model) |
 | Understand collabtext's commitments and limits | `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` AND `docs/d-arc/collabtext-scope-line.md` (the six "won't do" items quoted verbatim) |
 | Implement D2 | `docs/specs/2026-05-04-d2-foundation-reshape-design.md` (binding spec) — implementation plan to follow once writing-plans runs |
-| Pick up D3 | `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` (intended scope + inputs); brainstorm the substantive design from there |
+| Pick up D3 | `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` (binding spec); implementation plan at `docs/plans/2026-05-05-d3-view-layer-adaptation.md` (once writing-plans runs) |
 | Pick up D4 | `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md` |
 | Pick up D5 | `docs/specs/2026-05-04-d5-collab-activation-STUB.md` |
 | Track D2 progress in real time | `docs/d-arc/d-arc-status.md` |
@@ -78,7 +78,8 @@ docs/
 ├─ handoff/
 │  └─ 2026-05-04-c-restoration-bookend-d-pivot.md  ← the cut from C to D
 ├─ plans/
-│  └─ 2026-05-XX-d2-foundation-reshape-plan.md    ← will exist once writing-plans runs
+│  ├─ 2026-05-04-d2-foundation-reshape.md          ← D2 plan (complete)
+│  └─ 2026-05-05-d3-view-layer-adaptation.md       ← D3 plan (pending writing-plans)
 └─ ...
 ```
 

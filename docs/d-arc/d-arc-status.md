@@ -2,16 +2,16 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-05 (D2 dogfood complete — user signed off. D3 is next.)
+**Last updated:** 2026-05-05 (D3 spec approved — plan derivation next.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **D3** (view-layer adaptation) — brainstorm pending. Read stub spec at `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md`.
+**Active phase:** **D3** (view-layer adaptation) — spec approved; plan pending. Read spec at `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md`.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **D2 spec and plan are both approved.** Spec at `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; plan at `docs/plans/2026-05-04-d2-foundation-reshape.md` (~85 tasks across 16 phases; estimated 6–10 weeks). D1 (collabtext IdList) is shipped, so execution can begin immediately. Recommended execution mode: subagent-driven (per `superpowers:subagent-driven-development`), with the user reviewing between tasks.
+> **D3 spec approved.** Spec at `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md`. Run `superpowers:writing-plans` to generate the implementation plan. Scope: cursor delivery redesign, inline span population, kind-transition detection, BlockKindRegistry injection, L6 (Heading/CodeBlock/HR/Image full delegates), L7 (ListItem + Blockquote), L8 (Math + BlockInternalEdit), per-block undo UI.
 >
 > **Read first** (in this order, for a fresh agent context):
 > 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation
@@ -28,7 +28,7 @@
 | **D0** | `complete` | Joint design — proposal + response delivered and accepted. |
 | **D1** | `complete` | `CollabText::Crdt::IdList` shipped 2026-05-04. Available for D2 consumption. |
 | **D2** | `complete` | All 15 phases implemented and dogfooded. 141/141 tests pass (3 pre-existing QML selection failures unrelated to D2 cleared during dogfood). User signed off 2026-05-05. |
-| **D3** | `stubbed` | `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md`. Substantive design pending brainstorm. |
+| **D3** | `spec-approved` | `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md`. Plan derivation next. |
 | **D4** | `stubbed` | `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`. Substantive design post-D2/D3. |
 | **D5** | `stubbed` | `docs/specs/2026-05-04-d5-collab-activation-STUB.md`. Substantive design post-D4. |
 
