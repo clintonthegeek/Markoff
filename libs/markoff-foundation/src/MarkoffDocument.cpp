@@ -22,6 +22,7 @@
 #include "MarkoffDocumentPrivate.h"
 #include "AnchorConversion.h"
 #include "BlockAnchorComputation.h"
+#include <markoff-foundation/WatermarkCoordinator.h>
 
 namespace {
 
@@ -85,6 +86,9 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
             (void)opId;  // opId used for CausalLwwMap-specific undo; IdList/Buffer use stack-based undo
         }, target.kind);
     });
+
+    // ── D2: initialise WatermarkCoordinator (Phase 9) ───────────────────────
+    d->watermark = std::make_unique<WatermarkCoordinator>(*this);
 
     QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p, quint64 inputEditSeq) {
@@ -963,8 +967,14 @@ bool MarkoffDocument::save(const QString &path)
     if (!f.open(QIODevice::WriteOnly)) return false;
     f.write(serializeForSave());
     if (!f.commit()) return false;
-    // GC trigger deferred to Phase 9 — call d->watermark.onSaveSucceeded() here
+    if (d->watermark) d->watermark->onSaveSucceeded();
     return true;
+}
+
+bool MarkoffDocument::triggerGc()
+{
+    if (d->watermark) return d->watermark->onSaveSucceeded();
+    return false;
 }
 
 }  // namespace Markoff

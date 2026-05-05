@@ -99,6 +99,9 @@ add_library(markoff_foundation STATIC
     # --- Save (Phase 8) ---
     include/markoff-foundation/BlockSerializer.h
     src/BlockSerializers.cpp
+    # --- GC / WatermarkCoordinator (Phase 9) ---
+    include/markoff-foundation/WatermarkCoordinator.h
+    src/WatermarkCoordinator.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/Helpers.h

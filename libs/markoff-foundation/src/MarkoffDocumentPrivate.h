@@ -32,9 +32,9 @@
 namespace Markoff {
 
 class Session;
+class WatermarkCoordinator;  // full type in WatermarkCoordinator.h; Private holds unique_ptr
 
 // Stub placeholders — real implementations in their phases
-class WatermarkCoordinator { public: explicit WatermarkCoordinator() = default; };
 class InlineParseCache     { public: explicit InlineParseCache() = default; };
 
 // ============================================================================
@@ -80,7 +80,7 @@ struct MarkoffDocument::Private {
     LinkRefMap      linkRefMap;
     FootnoteDefMap  footnoteDefMap;
     Markoff::UndoLog undoLog;
-    WatermarkCoordinator watermark;
+    std::unique_ptr<Markoff::WatermarkCoordinator> watermark;
     InlineParseCache     inlineCache;
 
     // Per-block edit sequence counters (D2 dirty-tracking)

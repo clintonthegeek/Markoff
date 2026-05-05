@@ -282,6 +282,10 @@ public:
     /// Returns true on success, false on any I/O error.
     bool save(const QString &path);
 
+    // ===== Garbage collection (Phase 9) =====
+    /// Trigger GC manually (e.g. after save). Returns false if a transaction is open.
+    bool triggerGc();
+
 Q_SIGNALS:
     void contentsChanged(QList<Markoff::MarkoffEdit> edits);
     /// Emitted on the main thread each time a parse completes.
@@ -309,6 +313,8 @@ Q_SIGNALS:
     void documentLoaded();
 
 private:
+    friend class WatermarkCoordinator;
+
     void scheduleD2Changed();
     void materializeBlocksFromParsedDoc(const Markoff::Document &parsed,
                                         const QString &body);
