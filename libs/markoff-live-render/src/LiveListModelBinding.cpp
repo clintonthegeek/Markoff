@@ -59,7 +59,7 @@ LiveListModelBinding::LiveListModelBinding(QObject *parent)
     , d(std::make_unique<Private>())
 {
     d->model         = new LiveBlockModel(this);
-    d->cursorState   = new LiveCursorState(&d->registry, d->model, this);
+    d->cursorState   = new LiveCursorState(&d->registry, d->model, this, this);
     d->hitTester     = new BlockHitTester(this);
     d->selectionView = new LiveSelectionView(this);
     d->selectionView->setModel(d->model);

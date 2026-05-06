@@ -4,21 +4,16 @@
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
 #include <markoff/live-render/Cursor.h>
 
-#include <QAbstractItemModel>
 #include <QObject>
-#include <QPointer>
 #include <QString>
 #include <optional>
 #include <qqmlintegration.h>
-
-namespace Markoff {
-class MarkoffDocument;
-}
 
 namespace Markoff::LiveRender {
 
 class BlockKindRegistry;
 class LiveBlockModel;
+class LiveListModelBinding;
 
 /// Owns the single canonical cursor value for the live view. Validates
 /// `request()` calls against the target block's `BlockKindDescriptor`
@@ -51,19 +46,13 @@ class MARKOFF_LIVE_RENDER_EXPORT LiveCursorState : public QObject {
 public:
     explicit LiveCursorState(const BlockKindRegistry *registry,
                              const LiveBlockModel    *model,
+                             LiveListModelBinding    *binding,
                              QObject                 *parent = nullptr);
 
     Cursor cursor() const { return m_cursor; }
     QString cursorKind() const;
     int focusedAnchorRow() const;
     int focusedQtPos() const;
-
-    /// Override the model whose `rowsInserted` resolves pending requests.
-    /// Defaults to the inner LiveBlockModel passed to the constructor.
-    /// Pending-request row indices are interpreted in this model's
-    /// coordinate space. Retained as a public seam for future use; in the
-    /// marker-paragraph regime the inner LiveBlockModel is the only model.
-    void setSignalModel(QAbstractItemModel *signalModel);
 
     void request(const Cursor &newCursor);
     void clear();
@@ -104,36 +93,13 @@ public:
     /// land the cursor on the user's content, not on the row after it.
     void requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor, int qtPos);
 
-    /// Byte-position-keyed pure-pending variant. Use when the structural
-    /// edit shifts an existing block to a known POST-EDIT byte position
-    /// (e.g. start-of-paragraph Enter inserts a marker before the user's
-    /// content; the user's content's first byte is now at
-    /// `currentBlockStart + markerBytes`). The pending request resolves on
-    /// every `rowsInserted` event by asking the foundation document for
-    /// each row's byte range and finding the row whose range contains
-    /// `targetByte`. Robust against:
-    ///   - anchor renumbering during AstBlockDiff collapse,
-    ///   - off-by-one row-index drift across the parse-back diff,
-    ///   - any other anchor-identity quirks the foundation may expose.
-    /// Bug 3 v2 fix (Task 18 dogfood pass 3): the previous anchor-keyed
-    /// path landed on the wrong paragraph in some mid-document cases.
-    void requestTextCaretAtByte(Markoff::MarkoffDocument *document,
-                                quint32 targetByte,
-                                int qtPos);
-
-    /// Called by LiveListModelBinding from onParseUpdated. Increments the
-    /// pending request's parse-cycle counter; drops on the SECOND call
-    /// after the request was recorded (i.e. drops at parseCyclesSeen >= 2).
-    /// `parseSeq` is unused as a value (we only care about the count);
-    /// keep the signature so the call-site is self-documenting.
-    void noteParseArrived(quint64 parseSeq);
-
 Q_SIGNALS:
     void cursorChanged();
 
 private:
     bool validateVariant(const Cursor &c) const;
-    void onRowsInserted(const QModelIndex &parent, int first, int last);
+    void onStructuralRowsInserted(int first, int last);
+    void onStructuralRowRemoved(int row);
     void resolvePendingForRow(int row);
     void onAnchorRenumbered(int row,
                             Markoff::BlockAnchor oldAnchor,
@@ -142,30 +108,20 @@ private:
     Cursor                   m_cursor;
     const BlockKindRegistry *m_registry;
     const LiveBlockModel    *m_model;
-    QAbstractItemModel      *m_signalModel = nullptr;
 
     struct PendingRow {
         int row;
         int qtPos;
-        int parseCyclesSeen = 0;  // bumped on each noteParseArrived
         // If set, treat this pending request as anchor-keyed: ignore the
         // `row` field and resolve by searching the model for this
-        // BlockAnchor on every rowsInserted event. Used by start-of-
+        // BlockAnchor on every structural signal event. Used by start-of-
         // paragraph Enter (marker insert before an existing block) where
         // the user's content's row index is not stable across the diff
         // but its BlockAnchor identity is.
         std::optional<Markoff::BlockAnchor> anchor;
-        // If set, treat this pending request as byte-keyed: resolve by
-        // asking the foundation document which row's byte range contains
-        // `targetByte`. This is the most robust resolution path; used by
-        // start-of-paragraph Enter after the previous anchor-keyed path
-        // mis-resolved in some mid-document cases (Bug 3 v2).
-        QPointer<Markoff::MarkoffDocument> byteDocument;
-        std::optional<quint32>             targetByte;
     };
     std::optional<PendingRow> m_pendingRow;
     void resolvePendingForAnchor();
-    void resolvePendingForByte();
 };
 
 }  // namespace Markoff::LiveRender

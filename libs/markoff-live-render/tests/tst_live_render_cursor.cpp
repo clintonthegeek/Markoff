@@ -56,7 +56,7 @@ private Q_SLOTS:
     void cursor_starts_with_no_focus() {
         BlockKindRegistry reg;
         LiveBlockModel model;
-        LiveCursorState cs(&reg, &model);
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QVERIFY(std::holds_alternative<NoCursor>(cs.cursor()));
         QCOMPARE(cs.cursorKind(), QStringLiteral("none"));
     }
@@ -67,7 +67,7 @@ private Q_SLOTS:
         const auto recs = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "hello") };
         model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]) }), recs);
 
-        LiveCursorState cs(&reg, &model);
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
 
         TextCaret tc;
@@ -86,7 +86,7 @@ private Q_SLOTS:
         const auto recs = QList<BlockRecord>{ makeRec(BlockKind::HorizontalRule, "---") };
         model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]) }), recs);
 
-        LiveCursorState cs(&reg, &model);
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
 
         BlockSelected bs;
@@ -104,7 +104,7 @@ private Q_SLOTS:
         const auto recs = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "hello") };
         model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]) }), recs);
 
-        LiveCursorState cs(&reg, &model);
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
 
         BlockSelected bs;
@@ -121,7 +121,7 @@ private Q_SLOTS:
         const auto recs = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "hi") };
         model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]) }), recs);
 
-        LiveCursorState cs(&reg, &model);
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         TextCaret tc;
         tc.block = recs[0].blockAnchor;
         tc.cachedByteOffset = 0;
@@ -138,7 +138,7 @@ private Q_SLOTS:
         const auto recs = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "hi") };
         model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]) }), recs);
 
-        LiveCursorState cs(&reg, &model);
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         TextCaret tc;
         tc.block = recs[0].blockAnchor;
         cs.request(tc);
@@ -210,7 +210,7 @@ private Q_SLOTS:
         for (const auto &r : recs) keys << keyOf(r);
         model.applyOps(AstBlockDiff::diff({}, keys), recs);
 
-        LiveCursorState cs(&reg, &model);
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
 
         cs.requestTextCaretAtRow(/*expectedRow=*/1, /*qtPos=*/0);
@@ -222,64 +222,25 @@ private Q_SLOTS:
         QCOMPARE(std::get<TextCaret>(cur).block, recs[1].blockAnchor);
     }
 
-    void requestTextCaretAtRow_pending_resolves_on_rowsInserted() {
+    void requestTextCaretAtRow_pending_cleared_by_clear() {
+        // A pending requestTextCaretAtRow that has not resolved yet is
+        // cancelled when clear() is called. No cursorChanged fires.
         BlockKindRegistry reg;
         LiveBlockModel model;
-        const auto first = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "alpha") };
-        QList<BlockKey> firstKeys; firstKeys << keyOf(first[0]);
-        model.applyOps(AstBlockDiff::diff({}, firstKeys), first);
+        const auto recs = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "alpha") };
+        QList<BlockKey> keys; keys << keyOf(recs[0]);
+        model.applyOps(AstBlockDiff::diff({}, keys), recs);
 
-        LiveCursorState cs(&reg, &model);
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
 
-        // Request row 1: doesn't exist yet (rowCount == 1, valid rows are 0..0).
+        // Request row 1: doesn't exist yet.
         cs.requestTextCaretAtRow(/*expectedRow=*/1, /*qtPos=*/0);
+        QCOMPARE(spy.count(), 0);
 
-        // No cursorChanged yet — pending.
+        cs.clear();
         QCOMPARE(spy.count(), 0);
         QVERIFY(std::holds_alternative<NoCursor>(cs.cursor()));
-
-        // Row 1 appears: applyOps with an Insert at row 1.
-        const auto second = QList<BlockRecord>{
-            first[0],
-            makeRec(BlockKind::Paragraph, "beta"),
-        };
-        QList<BlockKey> secondKeys;
-        for (const auto &r : second) secondKeys << keyOf(r);
-        model.applyOps(AstBlockDiff::diff(firstKeys, secondKeys), second);
-
-        QCOMPARE(spy.count(), 1);
-        QVERIFY(std::holds_alternative<TextCaret>(cs.cursor()));
-        QCOMPARE(std::get<TextCaret>(cs.cursor()).block, second[1].blockAnchor);
-    }
-
-    void requestTextCaretAtRow_pending_dropped_after_two_parse_cycles() {
-        BlockKindRegistry reg;
-        LiveBlockModel model;
-        const auto first = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "alpha") };
-        QList<BlockKey> firstKeys; firstKeys << keyOf(first[0]);
-        model.applyOps(AstBlockDiff::diff({}, firstKeys), first);
-
-        LiveCursorState cs(&reg, &model);
-        QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
-
-        cs.requestTextCaretAtRow(/*expectedRow=*/1, /*qtPos=*/0);
-
-        // Two parse arrivals with no row insertion at the expected row:
-        // pending should be dropped, cursorChanged not fired.
-        cs.noteParseArrived(/*parseSeq=*/1);
-        cs.noteParseArrived(/*parseSeq=*/2);
-
-        // A third parse with the row inserted should NOT fire (pending dropped).
-        const auto third = QList<BlockRecord>{
-            first[0],
-            makeRec(BlockKind::Paragraph, "beta"),
-        };
-        QList<BlockKey> thirdKeys;
-        for (const auto &r : third) thirdKeys << keyOf(r);
-        model.applyOps(AstBlockDiff::diff(firstKeys, thirdKeys), third);
-
-        QCOMPARE(spy.count(), 0);
     }
 
     void requestTextCaretAtNewRow_landsAtQtPos0() {
