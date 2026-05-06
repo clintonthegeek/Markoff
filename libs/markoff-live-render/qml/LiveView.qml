@@ -30,6 +30,9 @@ ListView {
         DelegateChoice { roleValue: "code-block"; delegate: CodeBlockDelegate  {} }
         DelegateChoice { roleValue: "hr";         delegate: HorizontalRuleDelegate {} }
         DelegateChoice { roleValue: "image";      delegate: ImageDelegate      {} }
+        DelegateChoice { roleValue: "list-item";  delegate: ListItemDelegate   {} }
+        DelegateChoice { roleValue: "blockquote"; delegate: BlockquoteDelegate {} }
+        DelegateChoice { roleValue: "math";       delegate: MathDelegate       {} }
     }
 
     // ---- Hit-test (ported from .spike/cross-block-selection/Main.qml) ----
