@@ -72,7 +72,7 @@ Item {
             visible: !root.isAltEditing && root.imgAlt !== ""
         }
 
-        TextInput {
+        TextField {
             id: altInput
             visible: root.isAltEditing
             anchors { top: imgDisplay.bottom; left: parent.left; right: parent.right }
@@ -80,6 +80,7 @@ Item {
             text: root.imgAlt
             font.pixelSize: 12
             placeholderText: "Alt text…"
+            background: null
 
             Keys.onReturnPressed: {
                 const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
