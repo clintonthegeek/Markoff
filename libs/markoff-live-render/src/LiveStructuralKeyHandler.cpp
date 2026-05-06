@@ -397,25 +397,37 @@ void LiveStructuralKeyHandler::registerBuiltins()
 
     // ---- ListItem handlers ----
 
-    // Enter: insert new ListItem after current, or exit list on empty item.
+    // Enter: insert a new item line within the current block, or exit the list
+    // on an empty item. The whole list lives in one CRDT block separated by
+    // newlines, so "new item" = d2ApplyBufferEdit('\n' + marker), never a new
+    // block. Only an empty item at indentLevel==0 triggers an actual block-level
+    // change (exit/split).
     m_handlers[BlockKind::ListItem][Qt::Key_Return] =
     m_handlers[BlockKind::ListItem][Qt::Key_Enter]  = [](const Ctx &c) -> HR {
         const Markoff::BlockId id(c.blockAnchor);
+        const QString &blockText = c.blockText;
 
-        // Extract the marker prefix (e.g. "- ", "* ", "1. ").
-        QByteArray markerPrefix;
-        {
-            static const QRegularExpression kMarker(
-                QStringLiteral(R"(^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)]) )"));
-            auto m = kMarker.match(c.blockText);
-            markerPrefix = m.hasMatch()
-                ? c.blockText.left(m.capturedLength()).toUtf8()
-                : QByteArray("- ");
-        }
-        // "Empty" = text is exactly the marker prefix (no content after it).
-        const bool isEmpty = (c.blockText.toUtf8().trimmed() == markerPrefix.trimmed());
+        // 1. Locate the line the cursor is on.
+        int lineStart = 0;
+        for (int i = 0; i < c.qtPos; ++i)
+            if (blockText[i] == u'\n') lineStart = i + 1;
+        const int lineEnd = blockText.indexOf(u'\n', lineStart);
+        const QString curLine = (lineEnd >= 0)
+            ? blockText.mid(lineStart, lineEnd - lineStart)
+            : blockText.mid(lineStart);
 
-        // Determine indentLevel from attrs.
+        // 2. Extract marker from the current line (not from line 0).
+        static const QRegularExpression kMarker(
+            QStringLiteral(R"(^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)]) )"));
+        auto mMatch = kMarker.match(curLine);
+        QByteArray markerPrefix = mMatch.hasMatch()
+            ? curLine.left(mMatch.capturedLength()).toUtf8()
+            : QByteArray("- ");
+
+        // 3. "Empty" = current line contains only the marker (no content).
+        const bool isEmpty = (curLine.trimmed().toUtf8() == markerPrefix.trimmed());
+
+        // 4. Fetch indent level from block attrs.
         const auto attrs = c.document->blockAttrs(id);
         const int indentLevel = attrs.contains(Markoff::AttrNames::IndentLevel)
             ? std::get<int>(attrs.value(Markoff::AttrNames::IndentLevel)) : 0;
@@ -429,20 +441,60 @@ void LiveStructuralKeyHandler::registerBuiltins()
                 static_cast<int>(markerPrefix.length()));
             return HR::Handled;
         }
+
         if (isEmpty && indentLevel == 0) {
-            // Exit list: demote to Paragraph and strip the marker prefix.
+            const int newlineCount = static_cast<int>(blockText.count(u'\n'));
             UndoLog::Transaction t(c.document->d2UndoLog());
-            if (!markerPrefix.isEmpty())
-                c.document->d2ApplyBufferEdit(id, 0,
-                    static_cast<uint32_t>(markerPrefix.length()), {}, t);
-            c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
-            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+
+            if (newlineCount == 0) {
+                // Single-item block: demote the whole block to Paragraph.
+                if (!markerPrefix.isEmpty())
+                    c.document->d2ApplyBufferEdit(id, 0,
+                        static_cast<uint32_t>(markerPrefix.length()), {}, t);
+                c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
+                c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+                return HR::Handled;
+            }
+
+            // Multi-item block: remove the empty current line, then append a
+            // new Paragraph block after the list block.
+            int removeQtStart, removeQtCount;
+            if (lineStart > 0) {
+                // Remove the preceding '\n' + the empty line.
+                removeQtStart = lineStart - 1;
+                const int lineQtEnd = (lineEnd >= 0) ? lineEnd : blockText.length() - 1;
+                removeQtCount = lineQtEnd - removeQtStart + 1;
+            } else {
+                // First line is the empty one; remove it + its trailing '\n'.
+                removeQtStart = 0;
+                removeQtCount = (lineEnd >= 0) ? lineEnd + 1 : blockText.length();
+            }
+            const uint32_t removeByteStart = static_cast<uint32_t>(
+                blockText.left(removeQtStart).toUtf8().size());
+            const uint32_t removeByteCount = static_cast<uint32_t>(
+                blockText.mid(removeQtStart, removeQtCount).toUtf8().size());
+            c.document->d2ApplyBufferEdit(id,
+                removeByteStart, removeByteCount, {}, t);
+
+            c.document->d2InsertBlock(c.blockAnchor,
+                Markoff::BlockKind::Paragraph, t);
+            c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
             return HR::Handled;
         }
-        // For ordered markers (e.g. "1. ", "6) "), increment the sequence number
-        // so the new block carries the next number, not a copy of the current one.
-        {
-            static const QRegularExpression kOrd(QStringLiteral(R"(^(\d{1,9})([.)]) )"));
+
+        // 5. Non-empty line: increment ordered marker, then insert a new item
+        // line as a text edit within the existing block (no new block created).
+        //
+        // Two sub-cases based on where the cursor sits:
+        //   • At start of a line (lineStart == qtPos): insert markerPrefix+'\n'
+        //     BEFORE the current line — new empty item above, cursor stays there.
+        //   • Anywhere else: insert '\n'+nextMarker AFTER the cursor — new item
+        //     below, cursor moves to it.
+        const bool atLineStart = (lineStart == c.qtPos);
+
+        if (!atLineStart) {
+            static const QRegularExpression kOrd(
+                QStringLiteral(R"(^(\d{1,9})([.)]) )"));
             auto om = kOrd.match(QString::fromUtf8(markerPrefix));
             if (om.hasMatch()) {
                 const int next = om.captured(1).toInt() + 1;
@@ -451,20 +503,19 @@ void LiveStructuralKeyHandler::registerBuiltins()
             }
         }
 
-        // Non-empty: insert new ListItem after current with same marker style.
-        // Insert directly as ListItem so onD2Changed sees the correct kind
-        // immediately (no kind-transition round-trip needed).
+        const uint32_t byteOff = static_cast<uint32_t>(
+            blockText.left(c.qtPos).toUtf8().size());
+        const QByteArray insertion = atLineStart
+            ? (markerPrefix + "\n")
+            : ("\n" + markerPrefix);
         UndoLog::Transaction t(c.document->d2UndoLog());
-        const Markoff::BlockId newId =
-            c.document->d2InsertBlock(id, Markoff::BlockKind::ListItem, t);
-        c.document->d2ApplyBufferEdit(newId, 0, 0, markerPrefix, t);
-        // Copy indent level to new block.
-        if (indentLevel > 0)
-            c.document->d2SetBlockAttr(newId, Markoff::AttrNames::IndentLevel,
-                                        indentLevel, t);
-        c.cursorState->requestTextCaretAtAnchor(
-            Markoff::BlockId(newId),
-            static_cast<int>(markerPrefix.length()));
+        c.document->d2ApplyBufferEdit(id, byteOff, 0, insertion, t);
+        // Cursor: at-line-start → stay at new empty item (same qtPos);
+        //         otherwise → move to start of new item below.
+        const int newQtPos = atLineStart
+            ? c.qtPos
+            : (c.qtPos + 1 + static_cast<int>(QString::fromUtf8(markerPrefix).size()));
+        c.cursorState->requestTextCaretAtRow(c.blockIndex, newQtPos);
         return HR::Handled;
     };
 

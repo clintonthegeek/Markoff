@@ -382,15 +382,17 @@ private Q_SLOTS:
         QCOMPARE(binding.model()->data(binding.model()->index(0, 0),
                  LiveBlockModel::KindRole).toString(), QStringLiteral("list-item"));
 
-        // Enter at end of "- hello" (full text, length 7)
+        // Enter at end of "- hello" (full text, length 7).
+        // New behavior: inserts '\n- ' within the same block — no new block created.
         binding.structuralKeyHandler()->tryHandle(
             Qt::Key_Return, Qt::NoModifier, 0, 7, true, QStringLiteral("- hello"));
         QCoreApplication::processEvents();
         QCoreApplication::processEvents();
 
-        QTRY_COMPARE(binding.model()->rowCount(), 2);
-        QTRY_COMPARE(binding.model()->data(binding.model()->index(1, 0),
-                     LiveBlockModel::KindRole).toString(), QStringLiteral("list-item"));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QTRY_COMPARE(binding.model()->data(binding.model()->index(0, 0),
+                     LiveBlockModel::TextRole).toString(),
+                     QStringLiteral("- hello\n- "));
     }
 
     void list_item_enter_on_empty_exits_list() {
