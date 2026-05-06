@@ -12,7 +12,7 @@ Menu {
 
     function showForBlock(blockAnchor, globalPos) {
         root._anchor = blockAnchor
-        root.popup(globalPos.x, globalPos.y)
+        root.popup(globalPos)
     }
 
     MenuItem {

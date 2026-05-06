@@ -40,8 +40,8 @@ ListView {
     function _getContextMenu() {
         if (!root._contextMenu) {
             const comp = Qt.createComponent("LiveContextMenu.qml")
-            if (comp.status === Component.Ready)
-                root._contextMenu = comp.createObject(root, { binding: root.binding })
+            if (comp.status !== Component.Ready) return null
+            root._contextMenu = comp.createObject(root, { binding: root.binding })
         }
         return root._contextMenu
     }
