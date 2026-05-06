@@ -35,6 +35,17 @@ ListView {
         DelegateChoice { roleValue: "math";       delegate: MathDelegate       {} }
     }
 
+    // ---- Context menu (lazy, right-click) ----
+    property var _contextMenu: null
+    function _getContextMenu() {
+        if (!root._contextMenu) {
+            const comp = Qt.createComponent("LiveContextMenu.qml")
+            if (comp.status === Component.Ready)
+                root._contextMenu = comp.createObject(root, { binding: root.binding })
+        }
+        return root._contextMenu
+    }
+
     // ---- Hit-test (ported from .spike/cross-block-selection/Main.qml) ----
     // Returns {blockIndex, qtPos} or null on miss.
     // blockIndex is the delegate's modelIndex; qtPos is -1 for non-text blocks.
@@ -148,13 +159,28 @@ ListView {
     MouseArea {
         id: mouseArea
         anchors.fill: parent
-        acceptedButtons: Qt.LeftButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.IBeamCursor
         preventStealing: true
 
         property var _pressResult: null
 
+        onClicked: (mouse) => {
+            if (mouse.button === Qt.RightButton) {
+                const r = root.hit(mouse.x, mouse.y)
+                if (r && r.blockIndex >= 0) {
+                    const item = root.itemAtIndex(r.blockIndex)
+                    const anchor = item ? item.model.blockAnchor : null
+                    if (anchor) {
+                        const menu = root._getContextMenu()
+                        if (menu) menu.showForBlock(anchor, mapToGlobal(mouse.x, mouse.y))
+                    }
+                }
+            }
+        }
+
         onPressed: (mouse) => {
+            if (mouse.button === Qt.RightButton) return
             if (!binding || !binding.selectionView) return
             const r = root.hit(mouse.x, mouse.y)
             mouseArea._pressResult = r
@@ -176,6 +202,7 @@ ListView {
         }
 
         onPositionChanged: (mouse) => {
+            if (mouse.button === Qt.RightButton) return
             if (!pressed || !binding || !binding.selectionView) return
             const r = root.hit(mouse.x, mouse.y)
             if (r && r.blockIndex >= 0)
@@ -183,6 +210,7 @@ ListView {
         }
 
         onReleased: (mouse) => {
+            if (mouse.button === Qt.RightButton) return
             const press = mouseArea._pressResult
             mouseArea._pressResult = null
             if (!press || press.blockIndex < 0 || !binding || !binding.selectionView) return

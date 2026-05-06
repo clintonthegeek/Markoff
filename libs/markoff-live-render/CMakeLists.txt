@@ -65,6 +65,7 @@ qt_add_qml_module(markoff_live_render
         src/MathRenderer.cpp
     QML_FILES
         qml/LiveView.qml
+        qml/LiveContextMenu.qml
         qml/delegates/ParagraphDelegate.qml
         qml/delegates/HeadingDelegate.qml
         qml/delegates/CodeBlockDelegate.qml

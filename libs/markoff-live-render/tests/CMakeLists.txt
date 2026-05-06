@@ -61,3 +61,10 @@ target_link_libraries(tst_live_render_kind_transition PRIVATE
 add_test(NAME tst_live_render_kind_transition
          COMMAND tst_live_render_kind_transition)
 
+qt_add_executable(tst_live_render_context_menu
+    tst_live_render_context_menu.cpp
+)
+target_link_libraries(tst_live_render_context_menu PRIVATE
+    Qt6::Core Qt6::Test markoff_live_render markoff_foundation)
+add_test(NAME tst_live_render_context_menu COMMAND tst_live_render_context_menu)
+
