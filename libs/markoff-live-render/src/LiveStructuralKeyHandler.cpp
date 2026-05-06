@@ -539,6 +539,22 @@ void LiveStructuralKeyHandler::registerBuiltins()
     };
     m_handlers[BlockKind::Image][Qt::Key_Delete]    = imgDelete;
     m_handlers[BlockKind::Image][Qt::Key_Backspace] = imgDelete;
+
+    // Math: Backspace/Delete removes the block (same as HR/Image).
+    auto mathDelete = [](const Ctx &c) -> HR {
+        const Markoff::BlockId id(c.blockAnchor);
+        const int targetRow = std::max(0, c.blockIndex - 1);
+        UndoLog::Transaction t(c.document->d2UndoLog());
+        c.document->d2RemoveBlock(id, t);
+        if (c.model->rowCount() > 1) {
+            const int resolveRow = std::min(targetRow, c.model->rowCount() - 2);
+            c.cursorState->requestTextCaretAtRow(resolveRow,
+                c.model->recordAt(resolveRow).text.length());
+        }
+        return HR::Handled;
+    };
+    m_handlers[BlockKind::Math][Qt::Key_Delete]    = mathDelete;
+    m_handlers[BlockKind::Math][Qt::Key_Backspace] = mathDelete;
 }
 
 }  // namespace Markoff::LiveRender
