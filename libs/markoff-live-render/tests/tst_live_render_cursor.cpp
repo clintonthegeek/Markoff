@@ -15,6 +15,7 @@
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/CrdtProxies.h>
 #include <markoff-foundation/Cmd/D2.h>
+#include <markoff-foundation/UndoLog.h>
 
 using namespace Markoff::LiveRender;
 
@@ -328,6 +329,52 @@ private Q_SLOTS:
         QCOMPARE(binding.model()->rowCount(), 2);
         QCOMPARE(binding.model()->recordAt(0).text, QStringLiteral("first"));
         QCOMPARE(binding.model()->recordAt(1).text, QStringLiteral("second"));
+    }
+
+    // ---- LiveListModelBinding: structural signals ----
+
+    void structural_rows_inserted_emitted_on_new_block()
+    {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("hello");
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        QSignalSpy spy(&binding, &LiveListModelBinding::structuralRowsInserted);
+
+        // Insert a new block (Transaction commits on scope exit)
+        auto ids = doc.iterateBlocks();
+        QVERIFY(!ids.empty());
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2InsertBlock(ids.back(), Markoff::BlockKind::Paragraph, t);
+        }
+
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
+        // row index for the inserted block
+        QCOMPARE(spy[0][0].toInt(), 1);
+    }
+
+    void structural_row_removed_emitted_on_block_removal()
+    {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("hello\n\nworld");
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+
+        QSignalSpy spy(&binding, &LiveListModelBinding::structuralRowRemoved);
+
+        auto ids = doc.iterateBlocks();
+        QVERIFY(ids.size() >= 2);
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2RemoveBlock(ids[1], t);
+        }
+
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
+        QCOMPARE(spy[0][0].toInt(), 1);
     }
 };
 
