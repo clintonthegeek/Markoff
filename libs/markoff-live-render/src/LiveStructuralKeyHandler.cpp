@@ -370,6 +370,119 @@ void LiveStructuralKeyHandler::registerBuiltins()
     m_handlers[BlockKind::HorizontalRule][Qt::Key_Delete]    = hrDelete;
     m_handlers[BlockKind::HorizontalRule][Qt::Key_Backspace] = hrDelete;
 
+    // ---- ListItem handlers ----
+
+    // Enter: insert new ListItem after current, or exit list on empty item.
+    m_handlers[BlockKind::ListItem][Qt::Key_Return] =
+    m_handlers[BlockKind::ListItem][Qt::Key_Enter]  = [](const Ctx &c) -> HR {
+        const Markoff::BlockId id(c.blockAnchor);
+
+        // Extract the marker prefix (e.g. "- ", "* ", "1. ").
+        QByteArray markerPrefix;
+        {
+            static const QRegularExpression kMarker(
+                QStringLiteral(R"(^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)]) )"));
+            auto m = kMarker.match(c.blockText);
+            markerPrefix = m.hasMatch()
+                ? c.blockText.left(m.capturedLength()).toUtf8()
+                : QByteArray("- ");
+        }
+        // "Empty" = text is exactly the marker prefix (no content after it).
+        const bool isEmpty = (c.blockText.toUtf8().trimmed() == markerPrefix.trimmed());
+
+        // Determine indentLevel from attrs.
+        const auto attrs = c.document->blockAttrs(id);
+        const int indentLevel = attrs.contains(Markoff::AttrNames::IndentLevel)
+            ? std::get<int>(attrs.value(Markoff::AttrNames::IndentLevel)) : 0;
+
+        if (isEmpty && indentLevel > 0) {
+            // Outdent one level.
+            UndoLog::Transaction t(c.document->d2UndoLog());
+            c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
+                                        indentLevel - 1, t);
+            c.cursorState->requestTextCaretAtRow(c.blockIndex,
+                static_cast<int>(markerPrefix.length()));
+            return HR::Handled;
+        }
+        if (isEmpty && indentLevel == 0) {
+            // Exit list: demote to Paragraph and strip the marker prefix.
+            UndoLog::Transaction t(c.document->d2UndoLog());
+            if (!markerPrefix.isEmpty())
+                c.document->d2ApplyBufferEdit(id, 0,
+                    static_cast<uint32_t>(markerPrefix.length()), {}, t);
+            c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
+            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+            return HR::Handled;
+        }
+        // Non-empty: insert new ListItem after current with same marker style.
+        // Insert directly as ListItem so onD2Changed sees the correct kind
+        // immediately (no kind-transition round-trip needed).
+        UndoLog::Transaction t(c.document->d2UndoLog());
+        const Markoff::BlockId newId =
+            c.document->d2InsertBlock(id, Markoff::BlockKind::ListItem, t);
+        c.document->d2ApplyBufferEdit(newId, 0, 0, markerPrefix, t);
+        // Copy indent level to new block.
+        if (indentLevel > 0)
+            c.document->d2SetBlockAttr(newId, Markoff::AttrNames::IndentLevel,
+                                        indentLevel, t);
+        c.cursorState->requestTextCaretAtAnchor(
+            Markoff::BlockId(newId),
+            static_cast<int>(markerPrefix.length()));
+        return HR::Handled;
+    };
+
+    // Backspace: outdent if indented and at row-start, else merge with previous.
+    m_handlers[BlockKind::ListItem][Qt::Key_Backspace] = [](const Ctx &c) -> HR {
+        const Markoff::BlockId id(c.blockAnchor);
+        const auto attrs = c.document->blockAttrs(id);
+        const int indentLevel = attrs.contains(Markoff::AttrNames::IndentLevel)
+            ? std::get<int>(attrs.value(Markoff::AttrNames::IndentLevel)) : 0;
+        if (c.qtPos == 0 && indentLevel > 0) {
+            UndoLog::Transaction t(c.document->d2UndoLog());
+            c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
+                                        indentLevel - 1, t);
+            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+            return HR::Handled;
+        }
+        // qtPos > 0 or indentLevel == 0: normal merge with previous block.
+        if (c.qtPos != 0) return HR::NotHandled;
+        if (c.blockIndex == 0) return HR::NotHandled;
+        const int joinQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
+        auto result = Markoff::Cmd::backspaceMerge(*c.document, c.blockAnchor);
+        if (result.mergedInto.isNull()) return HR::NotHandled;
+        c.cursorState->requestTextCaretAtAnchor(result.mergedInto, joinQtPos);
+        return HR::Handled;
+    };
+
+    // Delete: merge with next block.
+    m_handlers[BlockKind::ListItem][Qt::Key_Delete] = [](const Ctx &c) -> HR {
+        if (c.qtPos < c.blockText.length()) return HR::NotHandled;
+        if (c.blockIndex >= c.model->rowCount() - 1) return HR::NotHandled;
+        Markoff::Cmd::deleteMerge(*c.document, c.blockAnchor);
+        c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, c.qtPos);
+        return HR::Handled;
+    };
+
+    // Tab: indent; Shift+Tab: outdent.
+    m_handlers[BlockKind::ListItem][Qt::Key_Tab] = [](const Ctx &c) -> HR {
+        const Markoff::BlockId id(c.blockAnchor);
+        const auto attrs = c.document->blockAttrs(id);
+        const int indentLevel = attrs.contains(Markoff::AttrNames::IndentLevel)
+            ? std::get<int>(attrs.value(Markoff::AttrNames::IndentLevel)) : 0;
+        UndoLog::Transaction t(c.document->d2UndoLog());
+        const bool shift = (c.modifiers & Qt::ShiftModifier) != 0;
+        if (shift) {
+            if (indentLevel > 0)
+                c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
+                                            indentLevel - 1, t);
+        } else {
+            c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
+                                        std::min(indentLevel + 1, 6), t);
+        }
+        c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos);
+        return HR::Handled;
+    };
+
     // Image: Backspace/Delete removes the block (same as HR).
     auto imgDelete = [](const Ctx &c) -> HandleResult {
         const Markoff::BlockId id(c.blockAnchor);

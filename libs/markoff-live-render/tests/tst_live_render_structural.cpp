@@ -369,6 +369,71 @@ private Q_SLOTS:
         QTRY_COMPARE(binding.model()->rowCount(), 2);
     }
 
+    // ---------- ListItem structural keys ----------
+
+    void list_item_enter_creates_new_list_item() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "- hello", 1));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(binding.model()->data(binding.model()->index(0, 0),
+                 LiveBlockModel::KindRole).toString(), QStringLiteral("list-item"));
+
+        // Enter at end of "- hello" (full text, length 7)
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier, 0, 7, true, QStringLiteral("- hello"));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+        QTRY_COMPARE(binding.model()->data(binding.model()->index(1, 0),
+                     LiveBlockModel::KindRole).toString(), QStringLiteral("list-item"));
+    }
+
+    void list_item_enter_on_empty_exits_list() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        // "- " is a list item with just the marker prefix
+        QVERIFY(waitForModelRows(binding, doc, "- ", 1));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier, 0, 2, true, QStringLiteral("- "));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        QTRY_COMPARE(binding.model()->data(binding.model()->index(0, 0),
+                     LiveBlockModel::KindRole).toString(), QStringLiteral("paragraph"));
+    }
+
+    void list_item_tab_indents() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "- item", 1));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QTRY_COMPARE(binding.model()->data(binding.model()->index(0, 0),
+                     LiveBlockModel::KindRole).toString(), QStringLiteral("list-item"));
+
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Tab, Qt::NoModifier, 0, 3, true, QStringLiteral("- item"));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        const auto blockId = doc.iterateBlocks()[0];
+        const auto attrs = doc.blockAttrs(blockId);
+        QVERIFY(attrs.contains(QByteArray("indentLevel")));
+        QCOMPARE(std::get<int>(attrs.value(QByteArray("indentLevel"))), 1);
+    }
+
     // ---------- Heading level-change via Ctrl+Shift+1-6/0 ----------
 
     void heading_level_change_via_ctrl_shift() {
