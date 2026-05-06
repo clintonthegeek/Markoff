@@ -227,6 +227,19 @@ private Q_SLOTS:
         // No third arg -> default UINT64_MAX -> 999 <= MAX -> fresh -> "b".
         QCOMPARE(model.recordAt(0).text, QString("b"));
     }
+
+    void blockAttrsRole_returns_variant_map() {
+        LiveBlockModel m;
+        BlockRecord r = makeRecord(BlockKind::Paragraph, "hello");
+        r.attrs.insert("testKey", QString("testVal"));
+        QList<BlockKey> keys = { keyOf(r) };
+        m.applyOps(AstBlockDiff::diff({}, keys), { r });
+
+        QVariant v = m.data(m.index(0, 0), LiveBlockModel::BlockAttrsRole);
+        QVERIFY(v.isValid());
+        QVariantMap map = v.toMap();
+        QCOMPARE(map["testKey"].toString(), QString("testVal"));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstLiveRenderBlockModel)

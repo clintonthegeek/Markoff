@@ -3,9 +3,11 @@
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
 #include <markoff-foundation/BlockAnchor.h>
+#include <markoff-foundation/BlockAttrsMap.h>
 #include <markoff-parser/SourceSpan.h>
 
 #include <QString>
+#include <QHash>
 #include <QList>
 
 namespace Markoff::LiveRender {
@@ -29,6 +31,7 @@ struct MARKOFF_LIVE_RENDER_EXPORT BlockRecord {
     QString              codeLanguage;      ///< Fence info-string if kind=="code-block".
     Markoff::BlockAnchor blockAnchor;       ///< CRDT-stable identity (block's first byte).
     QList<Markoff::SourceSpan> inlineSpans; ///< Pre-baked inline spans (R1B). Used in R6.
+    QHash<Markoff::AttrName, Markoff::AttrValue> attrs; ///< Block-kind attributes (e.g. level, infoString).
 
     bool operator==(const BlockRecord &o) const noexcept {
         // inlineSpans excluded from equality: diff identity is (kind, anchor).

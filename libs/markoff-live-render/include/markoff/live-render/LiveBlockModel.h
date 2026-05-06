@@ -34,6 +34,7 @@ public:
         HeadingLevelRole,
         CodeLanguageRole,
         BlockAnchorRole,
+        BlockAttrsRole,   // QVariantMap of block-kind attributes
     };
 
     explicit LiveBlockModel(QObject *parent = nullptr);

@@ -3,6 +3,9 @@
 
 #include <markoff-foundation/BlockAnchor.h>
 
+#include <QVariantMap>
+#include <variant>
+
 namespace Markoff::LiveRender {
 
 namespace {
@@ -25,6 +28,7 @@ QHash<int, QByteArray> LiveBlockModel::roleNames() const
         { HeadingLevelRole, "headingLevel" },
         { CodeLanguageRole, "codeLanguage" },
         { BlockAnchorRole,  "blockAnchor" },
+        { BlockAttrsRole,   "blockAttrs" },
     };
 }
 
@@ -39,6 +43,17 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
         case HeadingLevelRole:  return r.headingLevel;
         case CodeLanguageRole:  return r.codeLanguage;
         case BlockAnchorRole:   return QVariant::fromValue(r.blockAnchor);
+        case BlockAttrsRole: {
+            const auto &a = r.attrs;
+            QVariantMap map;
+            for (auto it = a.cbegin(); it != a.cend(); ++it) {
+                const QString key = QString::fromLatin1(it.key());
+                map.insert(key, std::visit([](auto &&v) -> QVariant {
+                    return QVariant::fromValue(v);
+                }, it.value()));
+            }
+            return map;
+        }
         default:                return {};
     }
 }
