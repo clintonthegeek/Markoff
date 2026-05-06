@@ -78,6 +78,9 @@ public:
     Q_INVOKABLE void changeCodeLanguage(Markoff::BlockAnchor anchor,
                                         const QString &lang);
 
+    /// Update the alt-text attribute of an Image block.
+    Q_INVOKABLE void changeImageAlt(Markoff::BlockAnchor anchor, const QString &alt);
+
 private:
     void registerBuiltins();
 

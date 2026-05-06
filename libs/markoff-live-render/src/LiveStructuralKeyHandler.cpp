@@ -165,6 +165,15 @@ void LiveStructuralKeyHandler::changeCodeLanguage(Markoff::BlockAnchor anchor,
     m_document->d2SetBlockAttr(id, Markoff::AttrNames::InfoString, lang, t);
 }
 
+void LiveStructuralKeyHandler::changeImageAlt(Markoff::BlockAnchor anchor,
+                                               const QString &alt)
+{
+    if (!m_document) return;
+    const Markoff::BlockId id(anchor);
+    UndoLog::Transaction t(m_document->d2UndoLog());
+    m_document->d2SetBlockAttr(id, Markoff::AttrNames::Alt, alt, t);
+}
+
 void LiveStructuralKeyHandler::registerBuiltins()
 {
     using HR = HandleResult;
@@ -360,6 +369,22 @@ void LiveStructuralKeyHandler::registerBuiltins()
     };
     m_handlers[BlockKind::HorizontalRule][Qt::Key_Delete]    = hrDelete;
     m_handlers[BlockKind::HorizontalRule][Qt::Key_Backspace] = hrDelete;
+
+    // Image: Backspace/Delete removes the block (same as HR).
+    auto imgDelete = [](const Ctx &c) -> HandleResult {
+        const Markoff::BlockId id(c.blockAnchor);
+        const int targetRow = std::max(0, c.blockIndex - 1);
+        UndoLog::Transaction t(c.document->d2UndoLog());
+        c.document->d2RemoveBlock(id, t);
+        if (c.model->rowCount() > 1) {
+            const int resolveRow = std::min(targetRow, c.model->rowCount() - 2);
+            c.cursorState->requestTextCaretAtRow(resolveRow,
+                c.model->recordAt(resolveRow).text.length());
+        }
+        return HandleResult::Handled;
+    };
+    m_handlers[BlockKind::Image][Qt::Key_Delete]    = imgDelete;
+    m_handlers[BlockKind::Image][Qt::Key_Backspace] = imgDelete;
 }
 
 }  // namespace Markoff::LiveRender
