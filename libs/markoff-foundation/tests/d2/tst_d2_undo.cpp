@@ -3,6 +3,7 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/BlockEdit.h>
 #include <markoff-foundation/BlockKind.h>
+#include <markoff-foundation/BlockAnchor.h>
 
 using namespace Markoff;
 
@@ -12,6 +13,9 @@ private Q_SLOTS:
     void undoUndoesLastEdit();
     void redoRestoresEdit();
     void undoForBlock_picksRecentBlockEntry();
+    void canUndoForBlock_returns_false_when_no_history();
+    void canUndoForBlock_returns_true_after_edit();
+    void undoForBlock_via_anchor_undoes_edit();
 };
 
 void TstD2Undo::undoUndoesLastEdit()
@@ -45,6 +49,36 @@ void TstD2Undo::undoForBlock_picksRecentBlockEntry()
     doc.undoForBlock(blkA);
     QCOMPARE(doc.blockText(blkA), QByteArray("hello"));
     QCOMPARE(doc.blockText(blkB), QByteArray("world?"));  // blkB unaffected
+}
+
+void TstD2Undo::canUndoForBlock_returns_false_when_no_history()
+{
+    MarkoffDocument doc(1);
+    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
+    BlockAnchor anchor = blk;
+    QVERIFY(!doc.canUndoForBlock(anchor));
+}
+
+void TstD2Undo::canUndoForBlock_returns_true_after_edit()
+{
+    MarkoffDocument doc(1);
+    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
+    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
+    BlockAnchor anchor = blk;
+    QVERIFY(doc.canUndoForBlock(anchor));
+}
+
+void TstD2Undo::undoForBlock_via_anchor_undoes_edit()
+{
+    MarkoffDocument doc(1);
+    BlockId blkA = doc.testInsertBlock(BlockKind::Paragraph, "hello");
+    BlockId blkB = doc.testInsertBlock(BlockKind::Paragraph, "world");
+    doc.applyBlockEdit(BlockEdit{blkA, 5, 0, "!"});
+    doc.applyBlockEdit(BlockEdit{blkB, 5, 0, "?"});
+    BlockAnchor anchorA = blkA;
+    doc.undoForBlock(anchorA);
+    QCOMPARE(doc.blockText(blkA), QByteArray("hello"));
+    QCOMPARE(doc.blockText(blkB), QByteArray("world?"));
 }
 
 QTEST_GUILESS_MAIN(TstD2Undo)

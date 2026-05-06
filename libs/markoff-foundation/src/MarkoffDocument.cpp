@@ -37,9 +37,11 @@ static Markoff::OpId lamportToOpId(CollabText::Crdt::Lamport ts) noexcept {
 
 namespace Markoff {
 
-MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
+MarkoffDocument::MarkoffDocument(quint16 replicaId,
+                                 const Markoff::BlockSerializerRegistry *registry,
+                                 QObject *parent)
     : QObject(parent)
-    , d(std::make_unique<Private>(replicaId))
+    , d(std::make_unique<Private>(replicaId, registry))
 {
     // Runtime registration so QList<BlockId> (= QList<BlockAnchor>) survives
     // any cross-thread QueuedConnection slot. Q_DECLARE_METATYPE on its own
@@ -581,6 +583,16 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
 void MarkoffDocument::undoD2() { d->undoLog.undo(); }
 void MarkoffDocument::redoD2() { d->undoLog.redo(); }
 void MarkoffDocument::undoForBlock(BlockId block) { d->undoLog.undoForBlock(block); }
+
+const Markoff::BlockSerializerRegistry *MarkoffDocument::serializerRegistry() const
+{
+    return d->serializerRegistry;
+}
+
+bool MarkoffDocument::canUndoForBlock(Markoff::BlockAnchor blockAnchor) const
+{
+    return d->undoLog.isBlockReferenced(blockAnchor);
+}
 
 // ============================================================================
 // D2: block accessors

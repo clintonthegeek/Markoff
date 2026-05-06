@@ -18,6 +18,7 @@
 #include <crdt/Operations.h>
 
 #include <markoff-foundation/BlockAnchor.h>
+#include <markoff-foundation/BlockSerializerRegistry.h>
 #include <markoff-parser/SourceSpan.h>
 #include <markoff-foundation/BlockAttrsMap.h>
 #include <markoff-foundation/BlockEdit.h>
@@ -45,9 +46,17 @@ class MARKOFF_FOUNDATION_EXPORT MarkoffDocument : public QObject {
 public:
     /// Construct an empty document with the given replica ID. ReplicaId is
     /// the CRDT identity for this MarkoffDocument instance; for single-user
-    /// use, a random quint16 is fine.
-    explicit MarkoffDocument(quint16 replicaId, QObject *parent = nullptr);
+    /// use, a random quint16 is fine. An optional BlockSerializerRegistry
+    /// may be passed in for host-provided serializers (view layer injection);
+    /// nullptr means "use BuiltinBlockSerializerRegistry only".
+    explicit MarkoffDocument(quint16 replicaId,
+                             const Markoff::BlockSerializerRegistry *registry = nullptr,
+                             QObject *parent = nullptr);
     ~MarkoffDocument() override;
+
+    /// Returns the BlockSerializerRegistry passed at construction, or nullptr
+    /// if none was provided.
+    const Markoff::BlockSerializerRegistry *serializerRegistry() const;
 
     // ===== Reads =====
     QByteArray toMarkdownUtf8() const;        ///< Buffer::text() as QByteArray
@@ -182,7 +191,14 @@ public:
     void redoD2();
 
     /// Undo the most recent D2 action that touched the given block.
-    void undoForBlock(Markoff::BlockId block);
+    /// BlockAnchor is a type alias for BlockId; Q_INVOKABLE for QML/signal access.
+    Q_INVOKABLE void undoForBlock(Markoff::BlockId block);
+
+    /// Returns true if the UndoLog contains at least one entry that touched
+    /// the given block, i.e. whether undoForBlock(blockAnchor) would do
+    /// anything useful. View-layer code uses this to enable/disable undo UI.
+    /// BlockAnchor is a type alias for BlockId.
+    Q_INVOKABLE bool canUndoForBlock(Markoff::BlockAnchor blockAnchor) const;
 
     // ===== D2 block accessors =====
     /// Returns the current ordered list of block IDs from the IdList CRDT.

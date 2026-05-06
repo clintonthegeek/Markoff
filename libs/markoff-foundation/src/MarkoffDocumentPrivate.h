@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/BlockSerializerRegistry.h>
 #include <markoff-foundation/CausalLwwMap.h>
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/UndoLog.h>
@@ -45,9 +46,11 @@ class WatermarkCoordinator;  // full type in WatermarkCoordinator.h; Private hol
 // ============================================================================
 
 struct MarkoffDocument::Private {
-    explicit Private(uint16_t replicaId)
+    explicit Private(uint16_t replicaId,
+                     const Markoff::BlockSerializerRegistry *registry = nullptr)
         : buffer(replicaId)
         , replicaId(replicaId)
+        , serializerRegistry(registry)
         , idList(replicaId)
         , kindTagMap(replicaId)
         , blockAttrsMap(replicaId)
@@ -59,6 +62,7 @@ struct MarkoffDocument::Private {
     // ── Legacy single-buffer internals (retained until Phase 14) ──────────
     CollabText::Crdt::Buffer                  buffer;
     quint16                                   replicaId;
+    const Markoff::BlockSerializerRegistry   *serializerRegistry = nullptr;
     quint64                                   editSequence = 0;   ///< Bumps on every state-change op.
     quint64                                   parseSequence = 0;  ///< Bumps each time parseUpdated is emitted.
     QList<Markoff::BlockAnchor>               latestBlockAnchors;
