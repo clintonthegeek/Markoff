@@ -1,6 +1,6 @@
 # Markoff (exploration/new-foundation branch)
 
-> **D3 spec approved — plan derivation next.** D3 (view-layer adaptation) spec landed 2026-05-05. Run `superpowers:writing-plans` against `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` to generate the implementation plan.
+> **D3 plan written — begin implementation.** D3 (view-layer adaptation) plan landed 2026-05-05. Run `superpowers:subagent-driven-development` against `docs/plans/2026-05-05-d3-view-layer-adaptation.md` (Part 1, Tasks 1–16) then `docs/plans/2026-05-05-d3-view-layer-adaptation-part2.md` (Part 2, Tasks 17–27).
 >
 > **A fresh agent context picking up this work must read, in order:**
 >
