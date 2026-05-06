@@ -325,6 +325,38 @@ private Q_SLOTS:
         // One block was removed.
         QCOMPARE(static_cast<int>(doc.iterateBlocks().size()), blocksBefore - 1);
     }
+
+    // ---------- Heading level-change via Ctrl+Shift+1-6/0 ----------
+
+    void heading_level_change_via_ctrl_shift() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "## Hello\n", 1));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(binding.model()->data(binding.model()->index(0, 0),
+                 LiveBlockModel::HeadingLevelRole).toInt(), 2);
+
+        // Ctrl+Shift+1 → H1
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_1, Qt::ControlModifier | Qt::ShiftModifier,
+            0, 0, true, QStringLiteral("## Hello"));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        QTRY_COMPARE(binding.model()->data(binding.model()->index(0, 0),
+                     LiveBlockModel::HeadingLevelRole).toInt(), 1);
+
+        // Ctrl+Shift+0 → demote to paragraph
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_0, Qt::ControlModifier | Qt::ShiftModifier,
+            0, 0, true, QStringLiteral("# Hello"));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        QTRY_VERIFY(binding.model()->data(binding.model()->index(0, 0),
+                    LiveBlockModel::KindRole).toString() != QStringLiteral("heading"));
+    }
 };
 
 QTEST_MAIN(TstLiveRenderStructural)

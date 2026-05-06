@@ -92,6 +92,49 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     const BlockRecord &rec = m_model->recordAt(blockIndex);
     const auto *desc = m_registry->find(rec.kind);
     if (!desc) return false;
+
+    // Heading level-change: Ctrl+Shift+0-6 before consuming from the keys set.
+    // Strategy: rewrite the leading `# ` prefix in the block text so that
+    // onD2Changed's text-based inference picks up the new level naturally.
+    // For level=0 (demote to paragraph) we strip the prefix and set the block
+    // kind to Paragraph.
+    if (rec.kind == BlockKind::Heading
+            && (modifiers & Qt::ControlModifier) && (modifiers & Qt::ShiftModifier)
+            && key >= Qt::Key_0 && key <= Qt::Key_6) {
+        const int newLevel = key - Qt::Key_0;
+        const Markoff::BlockId id(rec.blockAnchor);
+
+        // Compute the existing `# ` prefix length from blockText.
+        // Heading text is stored as "## Hello" (source-faithful, with # prefix).
+        const QByteArray textUtf8 = blockText.toUtf8();
+        int oldPrefixLen = 0;
+        while (oldPrefixLen < textUtf8.size() && textUtf8[oldPrefixLen] == '#')
+            ++oldPrefixLen;
+        // Skip one trailing space after the hashes, if present.
+        const int spaceAfterHash = (oldPrefixLen < textUtf8.size()
+                                    && textUtf8[oldPrefixLen] == ' ') ? 1 : 0;
+        const int oldPrefixBytes = oldPrefixLen + spaceAfterHash;
+
+        auto &undoLog = m_document->d2UndoLog();
+        UndoLog::Transaction t(undoLog);
+
+        if (newLevel == 0) {
+            // Demote to paragraph: remove the entire `## ` prefix, change kind.
+            m_document->d2ApplyBufferEdit(id, 0,
+                                          static_cast<uint32_t>(oldPrefixBytes),
+                                          QByteArray{}, t);
+            m_document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
+        } else {
+            // Build new prefix: newLevel hashes + space.
+            QByteArray newPrefix(newLevel, '#');
+            newPrefix.append(' ');
+            m_document->d2ApplyBufferEdit(id, 0,
+                                          static_cast<uint32_t>(oldPrefixBytes),
+                                          newPrefix, t);
+        }
+        return true;
+    }
+
     if (!desc->consumedStructuralKeys.contains(key)) return false;
 
     auto kindIt = m_handlers.constFind(rec.kind);

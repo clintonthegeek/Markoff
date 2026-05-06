@@ -51,11 +51,15 @@ Item {
             const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
             if (!handler) { event.accepted = false; return }
             const k = event.key
+            const mods = event.modifiers
+            const isLevelChange = (mods & Qt.ControlModifier) && (mods & Qt.ShiftModifier)
+                                  && k >= Qt.Key_0 && k <= Qt.Key_6
             if (k !== Qt.Key_Return && k !== Qt.Key_Enter
-                    && k !== Qt.Key_Backspace && k !== Qt.Key_Delete) {
+                    && k !== Qt.Key_Backspace && k !== Qt.Key_Delete
+                    && !isLevelChange) {
                 return
             }
-            const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,
+            const handled = handler.tryHandle(k, mods, root.modelIndex,
                 edit.cursorPosition, edit.selectionStart === edit.selectionEnd, model.text)
             event.accepted = handled
         }
