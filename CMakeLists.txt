@@ -59,6 +59,10 @@ endif()
 
 add_subdirectory(libs/markoff-foundation)
 add_subdirectory(libs/markoff-view-qml)
+# jkqtmathtext — LaTeX math rendering for Math blocks in markoff-live-render.
+if(NOT TARGET jkqtmathtext)
+    add_subdirectory(libs/jkqtmathtext)
+endif()
 add_subdirectory(libs/markoff-live-render)
 add_subdirectory(libs/markoff-source-widget)
 add_subdirectory(libs/markoff-bench)

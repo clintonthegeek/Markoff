@@ -85,6 +85,7 @@ target_link_libraries(markoff_live_render PUBLIC
     Qt6::Quick
     Qt6::QuickControls2
     markoff_foundation
+    jkqtmathtext
 )
 
 add_subdirectory(app)
