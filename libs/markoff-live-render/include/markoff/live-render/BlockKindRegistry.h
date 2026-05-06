@@ -3,6 +3,7 @@
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
 #include <markoff/live-render/BlockKindDescriptor.h>
+#include <markoff-foundation/BlockSerializerRegistry.h>
 
 #include <QHash>
 #include <QStringList>
@@ -13,13 +14,19 @@ namespace Markoff::LiveRender {
 /// the constructor. Plugin authors register custom kinds via register_().
 /// LiveListModelBinding owns one instance; passes a pointer to downstream
 /// components (LiveCursorState, LiveStructuralKeyHandler) in R3+.
-class MARKOFF_LIVE_RENDER_EXPORT BlockKindRegistry {
+class MARKOFF_LIVE_RENDER_EXPORT BlockKindRegistry
+    : public Markoff::BlockSerializerRegistry {
 public:
-    BlockKindRegistry();  ///< Registers all five built-in kinds.
+    BlockKindRegistry();  ///< Registers all built-in kinds.
 
     void register_(BlockKindDescriptor descriptor);
     const BlockKindDescriptor *find(const QString &id) const;
     QStringList kinds() const;
+
+    // Markoff::BlockSerializerRegistry implementation
+    QByteArray serialize(Markoff::BlockKind kind,
+                         const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs,
+                         const QByteArray &content) const override;
 
 private:
     void registerBuiltins();

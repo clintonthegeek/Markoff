@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live-render/BlockKindRegistry.h>
 #include <markoff/live-render/BlockKind.h>
+#include <markoff-foundation/BlockKind.h>
+#include <markoff-foundation/BlockAttrsMap.h>
 
 namespace Markoff::LiveRender {
 
@@ -57,18 +59,86 @@ void BlockKindRegistry::registerBuiltins()
         d.id = BlockKind::HorizontalRule;
         d.acceptsTextRoleUpdates = false;
         d.supportedCursorVariants = { QStringLiteral("BlockSelected") };
+        d.consumedStructuralKeys = {
+            Qt::Key_Delete, Qt::Key_Backspace,
+            Qt::Key_Up, Qt::Key_Down,
+        };
         d.delegateUrl = QStringLiteral(
             "qrc:/qt/qml/org/markoff/live/render/delegates/HorizontalRuleDelegate.qml");
         m_descriptors.insert(d.id, d);
     }
-    // Image: non-text, BlockSelected (default) + optional alt-edit (post-R6).
+    // Image: non-text, BlockSelected (default) + optional alt-edit.
     {
         BlockKindDescriptor d;
         d.id = BlockKind::Image;
         d.acceptsTextRoleUpdates = false;
-        d.supportedCursorVariants = { QStringLiteral("BlockSelected") };
+        d.supportedCursorVariants = {
+            QStringLiteral("BlockSelected"),
+            QStringLiteral("BlockInternalEdit"),
+        };
+        d.internalEditModes = { QStringLiteral("alt-edit") };
         d.delegateUrl = QStringLiteral(
             "qrc:/qt/qml/org/markoff/live/render/delegates/ImageDelegate.qml");
+        m_descriptors.insert(d.id, d);
+    }
+    // ListItem: text-bearing, TextCaret. Structural keys: Enter/Backspace/Delete/Tab.
+    {
+        BlockKindDescriptor d;
+        d.id = BlockKind::ListItem;
+        d.acceptsTextRoleUpdates = true;
+        d.supportedCursorVariants = { QStringLiteral("TextCaret") };
+        d.consumedStructuralKeys = {
+            Qt::Key_Return, Qt::Key_Enter,
+            Qt::Key_Backspace, Qt::Key_Delete,
+            Qt::Key_Tab,
+        };
+        d.delegateUrl = QStringLiteral(
+            "qrc:/qt/qml/org/markoff/live/render/delegates/ListItemDelegate.qml");
+        d.serializer = [](const QByteArray &text,
+                          const QHash<Markoff::AttrName, Markoff::AttrValue> &) {
+            return text;
+        };
+        m_descriptors.insert(d.id, d);
+    }
+    // Blockquote: text-bearing, TextCaret. Enter/Backspace/Delete consumed.
+    {
+        BlockKindDescriptor d;
+        d.id = BlockKind::Blockquote;
+        d.acceptsTextRoleUpdates = true;
+        d.supportedCursorVariants = { QStringLiteral("TextCaret") };
+        d.consumedStructuralKeys = {
+            Qt::Key_Return, Qt::Key_Enter,
+            Qt::Key_Backspace, Qt::Key_Delete,
+        };
+        d.delegateUrl = QStringLiteral(
+            "qrc:/qt/qml/org/markoff/live/render/delegates/BlockquoteDelegate.qml");
+        d.serializer = [](const QByteArray &text,
+                          const QHash<Markoff::AttrName, Markoff::AttrValue> &) {
+            return text;
+        };
+        m_descriptors.insert(d.id, d);
+    }
+    // Math: non-text initially, BlockSelected + BlockInternalEdit for latex editing.
+    {
+        BlockKindDescriptor d;
+        d.id = BlockKind::Math;
+        d.acceptsTextRoleUpdates = true;
+        d.supportedCursorVariants = {
+            QStringLiteral("BlockSelected"),
+            QStringLiteral("BlockInternalEdit"),
+        };
+        d.internalEditModes = { QStringLiteral("editing-latex") };
+        d.consumedStructuralKeys = {
+            Qt::Key_Return, Qt::Key_Enter,
+            Qt::Key_Backspace, Qt::Key_Delete,
+            Qt::Key_F2,
+        };
+        d.delegateUrl = QStringLiteral(
+            "qrc:/qt/qml/org/markoff/live/render/delegates/MathDelegate.qml");
+        d.serializer = [](const QByteArray &text,
+                          const QHash<Markoff::AttrName, Markoff::AttrValue> &) {
+            return text;
+        };
         m_descriptors.insert(d.id, d);
     }
 }
@@ -87,6 +157,28 @@ const BlockKindDescriptor *BlockKindRegistry::find(const QString &id) const
 QStringList BlockKindRegistry::kinds() const
 {
     return QStringList(m_descriptors.keys());
+}
+
+QByteArray BlockKindRegistry::serialize(Markoff::BlockKind kind,
+                                         const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs,
+                                         const QByteArray &content) const
+{
+    using BK = Markoff::BlockKind;
+    QString kindStr;
+    switch (kind) {
+    case BK::Heading:        kindStr = BlockKind::Heading;        break;
+    case BK::CodeBlock:      kindStr = BlockKind::CodeBlock;      break;
+    case BK::HorizontalRule: kindStr = BlockKind::HorizontalRule; break;
+    case BK::Image:          kindStr = BlockKind::Image;          break;
+    case BK::ListItem:       kindStr = BlockKind::ListItem;       break;
+    case BK::BlockQuote:     kindStr = BlockKind::Blockquote;     break;
+    case BK::Math:           kindStr = BlockKind::Math;           break;
+    default:                 kindStr = BlockKind::Paragraph;      break;
+    }
+    const auto *desc = find(kindStr);
+    if (desc && desc->serializer)
+        return desc->serializer(content, attrs);
+    return content;  // passthrough fallback
 }
 
 }  // namespace Markoff::LiveRender

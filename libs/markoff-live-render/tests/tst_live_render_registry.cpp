@@ -3,6 +3,8 @@
 #include <markoff/live-render/BlockKind.h>
 #include <markoff/live-render/BlockKindDescriptor.h>
 #include <markoff/live-render/BlockKindRegistry.h>
+#include <markoff-foundation/BlockKind.h>
+#include <markoff-foundation/BlockSerializerRegistry.h>
 
 using namespace Markoff::LiveRender;
 
@@ -102,10 +104,37 @@ private Q_SLOTS:
         QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Delete));
     }
 
-    void hr_image_descriptors_have_no_structural_keys() {
+    void image_descriptor_has_no_structural_keys() {
         BlockKindRegistry r;
-        QVERIFY(r.find(BlockKind::HorizontalRule)->consumedStructuralKeys.isEmpty());
         QVERIFY(r.find(BlockKind::Image)->consumedStructuralKeys.isEmpty());
+    }
+
+    void hr_descriptor_consumes_structural_keys() {
+        BlockKindRegistry r;
+        const auto *d = r.find(BlockKind::HorizontalRule);
+        QVERIFY(d);
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Delete));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Backspace));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Up));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Down));
+    }
+
+    void blockKindRegistry_implements_serializer_interface() {
+        BlockKindRegistry reg;
+        const Markoff::BlockSerializerRegistry *iface = &reg;
+        QVERIFY(iface != nullptr);
+    }
+
+    void serialize_paragraph_returns_content() {
+        BlockKindRegistry reg;
+        QByteArray result = reg.serialize(Markoff::BlockKind::Paragraph, {}, "hello world");
+        QCOMPARE(result, QByteArray("hello world"));
+    }
+
+    void serialize_list_item_returns_content() {
+        BlockKindRegistry reg;
+        QByteArray result = reg.serialize(Markoff::BlockKind::ListItem, {}, "- item");
+        QCOMPARE(result, QByteArray("- item"));
     }
 };
 

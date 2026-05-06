@@ -2,10 +2,14 @@
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff-foundation/BlockAttrsMap.h>
 
+#include <QByteArray>
+#include <QHash>
 #include <QSet>
 #include <QString>
 #include <QStringList>
+#include <functional>
 
 namespace Markoff::LiveRender {
 
@@ -39,6 +43,12 @@ struct MARKOFF_LIVE_RENDER_EXPORT BlockKindDescriptor {
 
     /// Structural keys this kind consumes (Qt::Key_* values). R5 dispatch.
     QSet<int> consumedStructuralKeys;
+
+    /// Serializer: (text, attrs) → markdown bytes.
+    /// Null = passthrough (returns text unchanged).
+    std::function<QByteArray(const QByteArray &text,
+                              const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs)>
+        serializer;
 };
 
 }  // namespace Markoff::LiveRender
