@@ -6,6 +6,7 @@
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/CrdtProxies.h>
 #include <markoff-foundation/StructuralOp.h>
+#include <markoff-foundation/UndoLog.h>
 
 using namespace Markoff;
 
@@ -20,6 +21,8 @@ private Q_SLOTS:
     void idListProxy_firesOnApplyStructural();
     void kindTagMapProxy_firesOnChangeKind();
     void d2EditSequence_incrementsOnStructural();
+    void idListProxy_firesOnD2InsertBlock();
+    void idListProxy_firesOnD2RemoveBlock();
 };
 
 void TstD2Signals::d2DocumentChanged_firesOnApplyBlockEdit()
@@ -104,6 +107,34 @@ void TstD2Signals::d2EditSequence_incrementsOnStructural()
     op.payload = StructuralOp::InsertEntry{BlockId{}, BlockKind::Paragraph};
     doc.applyStructural(op);
     QVERIFY(doc.d2EditSequence() > seq0);
+}
+
+void TstD2Signals::idListProxy_firesOnD2InsertBlock()
+{
+    MarkoffDocument doc(1);
+    BlockId existing = doc.testInsertBlock(BlockKind::Paragraph, "hello");
+    QSignalSpy idSpy(doc.idListProxy(), &IdListProxy::structureChanged);
+    QSignalSpy kindSpy(doc.kindTagMapProxy(), &SiblingMapProxy::mapChanged);
+
+    UndoLog::Transaction t(doc.d2UndoLog());
+    doc.d2InsertBlock(existing, BlockKind::Paragraph, t);
+
+    QCOMPARE(idSpy.count(), 1);
+    QCOMPARE(kindSpy.count(), 1);
+}
+
+void TstD2Signals::idListProxy_firesOnD2RemoveBlock()
+{
+    MarkoffDocument doc(1);
+    BlockId existing = doc.testInsertBlock(BlockKind::Paragraph, "hello");
+    QSignalSpy idSpy(doc.idListProxy(), &IdListProxy::structureChanged);
+    QSignalSpy kindSpy(doc.kindTagMapProxy(), &SiblingMapProxy::mapChanged);
+
+    UndoLog::Transaction t(doc.d2UndoLog());
+    doc.d2RemoveBlock(existing, t);
+
+    QCOMPARE(idSpy.count(), 1);
+    QCOMPARE(kindSpy.count(), 1);
 }
 
 QTEST_MAIN(TstD2Signals)  // needs event loop for QTimer::singleShot

@@ -720,6 +720,8 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
     t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
 
     ++d->structuralEditSequence;
+    d->idListProxy->notifyChanged();
+    d->kindTagMapProxy->notifyChanged();
     scheduleD2Changed();
     return newId;
 }
@@ -735,6 +737,8 @@ void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
     t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
 
     ++d->structuralEditSequence;
+    d->idListProxy->notifyChanged();
+    d->kindTagMapProxy->notifyChanged();
     scheduleD2Changed();
 }
 
