@@ -50,3 +50,14 @@ target_link_libraries(tst_live_render_structural PRIVATE
     markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_structural COMMAND tst_live_render_structural)
 
+qt_add_executable(tst_live_render_kind_transition
+    tst_live_render_kind_transition.cpp
+)
+target_include_directories(tst_live_render_kind_transition PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+target_link_libraries(tst_live_render_kind_transition PRIVATE
+    Qt6::Core Qt6::Test markoff_live_render)
+add_test(NAME tst_live_render_kind_transition
+         COMMAND tst_live_render_kind_transition)
+

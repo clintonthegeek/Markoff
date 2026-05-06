@@ -42,8 +42,8 @@ qt_add_qml_module(markoff_live_render
         src/BlockKindRegistry.cpp
         src/Coordinates.cpp
         src/AstBlockDiff.cpp
-        src/BlockWalker.h
-        src/BlockWalker.cpp
+        src/KindTransition.h
+        src/KindTransition.cpp
         src/LiveBlockModel.cpp
         src/LiveListModelBinding.cpp
         # R3: cursor + selection
