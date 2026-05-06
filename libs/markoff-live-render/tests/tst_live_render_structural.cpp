@@ -434,6 +434,49 @@ private Q_SLOTS:
         QCOMPARE(std::get<int>(attrs.value(QByteArray("indentLevel"))), 1);
     }
 
+    // ---------- Blockquote structural keys ----------
+
+    void blockquote_enter_creates_new_blockquote() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("> quote text\n");
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(binding.model()->data(binding.model()->index(0, 0),
+                 LiveBlockModel::KindRole).toString(), QStringLiteral("blockquote"));
+
+        const QString text = binding.model()->recordAt(0).text;
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier, 0,
+            text.length(), true, text);
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+        QTRY_COMPARE(binding.model()->data(binding.model()->index(1, 0),
+                     LiveBlockModel::KindRole).toString(), QStringLiteral("blockquote"));
+    }
+
+    void blockquote_enter_on_empty_exits() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("> \n");
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier, 0, 2, true, QStringLiteral("> "));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        QTRY_COMPARE(binding.model()->data(binding.model()->index(0, 0),
+                     LiveBlockModel::KindRole).toString(), QStringLiteral("paragraph"));
+    }
+
     // ---------- Heading level-change via Ctrl+Shift+1-6/0 ----------
 
     void heading_level_change_via_ctrl_shift() {

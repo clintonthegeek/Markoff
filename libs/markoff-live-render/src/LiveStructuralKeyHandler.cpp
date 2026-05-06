@@ -483,6 +483,47 @@ void LiveStructuralKeyHandler::registerBuiltins()
         return HR::Handled;
     };
 
+    // ---- Blockquote handlers ----
+    m_handlers[BlockKind::Blockquote][Qt::Key_Return] =
+    m_handlers[BlockKind::Blockquote][Qt::Key_Enter]  = [](const Ctx &c) -> HR {
+        const Markoff::BlockId id(c.blockAnchor);
+        // Empty = text is just "> " or ">"
+        const bool isEmpty = (c.blockText.trimmed() == QStringLiteral(">")
+                           || c.blockText.trimmed() == QStringLiteral("> "));
+        if (isEmpty) {
+            // Exit blockquote: demote to Paragraph
+            UndoLog::Transaction t(c.document->d2UndoLog());
+            c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
+            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+            return HR::Handled;
+        }
+        // Insert new Blockquote after current
+        UndoLog::Transaction t(c.document->d2UndoLog());
+        const Markoff::BlockId newId =
+            c.document->d2InsertBlock(id, Markoff::BlockKind::BlockQuote, t);
+        c.cursorState->requestTextCaretAtAnchor(
+            Markoff::BlockAnchor(newId), 0);
+        return HR::Handled;
+    };
+
+    m_handlers[BlockKind::Blockquote][Qt::Key_Backspace] = [](const Ctx &c) -> HR {
+        if (c.qtPos > 0) return HR::NotHandled;
+        if (c.blockIndex == 0) return HR::NotHandled;
+        const int joinQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
+        auto result = Markoff::Cmd::backspaceMerge(*c.document, c.blockAnchor);
+        if (result.mergedInto.isNull()) return HR::NotHandled;
+        c.cursorState->requestTextCaretAtAnchor(result.mergedInto, joinQtPos);
+        return HR::Handled;
+    };
+
+    m_handlers[BlockKind::Blockquote][Qt::Key_Delete] = [](const Ctx &c) -> HR {
+        if (c.qtPos < c.blockText.length()) return HR::NotHandled;
+        Markoff::Cmd::deleteMerge(*c.document, c.blockAnchor);
+        c.cursorState->requestTextCaretAtAnchor(c.blockAnchor,
+            static_cast<int>(c.blockText.length()));
+        return HR::Handled;
+    };
+
     // Image: Backspace/Delete removes the block (same as HR).
     auto imgDelete = [](const Ctx &c) -> HandleResult {
         const Markoff::BlockId id(c.blockAnchor);

@@ -68,6 +68,7 @@ qt_add_qml_module(markoff_live_render
         qml/delegates/HorizontalRuleDelegate.qml
         qml/delegates/ImageDelegate.qml
         qml/delegates/ListItemDelegate.qml
+        qml/delegates/BlockquoteDelegate.qml
 )
 
 target_include_directories(markoff_live_render
