@@ -845,7 +845,7 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         }
         if (kind == BlockKind::CodeBlock && !tb.codeLanguage.isEmpty()) {
             d->blockAttrsMap.setWithNextStamp(
-                BlockAttrKey{newId, "info"}, AttrValue{tb.codeLanguage});
+                BlockAttrKey{newId, "infoString"}, AttrValue{tb.codeLanguage});
         }
 
         // Buffer content: full source range in UTF-8 bytes

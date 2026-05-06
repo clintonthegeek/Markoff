@@ -98,7 +98,7 @@ void TstD2Save::codeBlockSerializer_wrapsInFences()
 
     // With info string
     QHash<AttrName, AttrValue> attrs;
-    attrs["info"] = AttrValue{QString("cpp")};
+    attrs["infoString"] = AttrValue{QString("cpp")};
     QByteArray result = fn(BlockKind::CodeBlock, attrs, "int x = 0;");
     QCOMPARE(result, QByteArray("```cpp\nint x = 0;\n```"));
 

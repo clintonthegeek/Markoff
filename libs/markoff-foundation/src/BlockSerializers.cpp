@@ -63,7 +63,7 @@ QByteArray serializeCodeBlock(BlockKind, const QHash<AttrName, AttrValue> &attrs
                                const QByteArray &content)
 {
     QByteArray info;
-    auto it = attrs.constFind("info");
+    auto it = attrs.constFind("infoString");
     if (it != attrs.cend()) {
         if (const QString *p = std::get_if<QString>(&it.value()))
             info = p->toUtf8();

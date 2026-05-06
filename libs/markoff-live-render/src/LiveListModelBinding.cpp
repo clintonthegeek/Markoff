@@ -4,10 +4,14 @@
 #include <markoff/live-render/LiveStructuralKeyHandler.h>
 #include <markoff/live-render/BlockKind.h>
 
+#include "KindTransition.h"
+
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/BlockAnchor.h>
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/CrdtProxies.h>
+#include <markoff-foundation/AttrNames.h>
+#include <markoff-foundation/Cmd/D2.h>
 
 #include <QList>
 #include <QScopeGuard>
@@ -132,6 +136,7 @@ void LiveListModelBinding::onD2Changed()
         BlockRecord r;
         r.blockAnchor = id;   // BlockAnchor == BlockId
         r.kind        = blockKindToString(doc->blockKind(id));
+
         QByteArray raw = doc->blockText(id);
         // Trim the trailing newline that the D2 block buffer stores as a
         // block delimiter (analogous to BlockWalker's trailing-\n trim).
@@ -140,6 +145,26 @@ void LiveListModelBinding::onD2Changed()
         if (raw.endsWith('\n'))
             raw.chop(1);
         r.text = QString::fromUtf8(raw);
+
+        // Populate inline spans and block attrs from the foundation CRDT.
+        r.inlineSpans = doc->inlineSpansFor(id);
+        r.attrs       = doc->blockAttrs(id);
+
+        // Populate kind-specific extras from attrs map.
+        if (r.kind == BlockKind::Heading) {
+            auto it = r.attrs.find(Markoff::AttrNames::Level);
+            if (it != r.attrs.end()) {
+                if (const int *v = std::get_if<int>(&it.value()))
+                    r.headingLevel = *v;
+            }
+        } else if (r.kind == BlockKind::CodeBlock) {
+            auto it = r.attrs.find(Markoff::AttrNames::InfoString);
+            if (it != r.attrs.end()) {
+                if (const QString *v = std::get_if<QString>(&it.value()))
+                    r.codeLanguage = *v;
+            }
+        }
+
         records.append(r);
     }
 
@@ -150,13 +175,66 @@ void LiveListModelBinding::onD2Changed()
 
     const QList<AstBlockDiff::Op> ops = AstBlockDiff::diff(d->lastKeys, nextKeys);
 
+    // Kind-transition detection: for Equal-op blocks, check if the text now
+    // implies a different kind than what the CRDT stores. If so, issue a
+    // changeKind command and return — the resulting d2DocumentChanged signal
+    // will re-fire onD2Changed with the corrected kind.
+    for (const auto &op : ops) {
+        if (op.kind != AstBlockDiff::OpKind::Equal) continue;
+        const int idx = op.nextIndex;
+        if (idx < 0 || idx >= records.size()) continue;
+        const auto &rec = records[idx];
+
+        bool displayMode = false;
+        const QString inferred = inferBlockKind(rec.text, &displayMode);
+
+        if (inferred == rec.kind) {
+            // Same kind — check if heading level changed.
+            if (rec.kind == BlockKind::Heading) {
+                const int newLevel = countLeadingHashes(rec.text);
+                if (newLevel > 0 && newLevel != rec.headingLevel) {
+                    Markoff::Cmd::changeKind(*doc,
+                                             Markoff::BlockId(rec.blockAnchor),
+                                             Markoff::BlockKind::Heading,
+                                             {Markoff::AttrNames::Level},
+                                             {newLevel});
+                    return;
+                }
+            }
+            continue;
+        }
+
+        // Map inferred string to foundation BlockKind enum.
+        Markoff::BlockKind fk = Markoff::BlockKind::Paragraph;
+        if      (inferred == BlockKind::Heading)        fk = Markoff::BlockKind::Heading;
+        else if (inferred == BlockKind::CodeBlock)      fk = Markoff::BlockKind::CodeBlock;
+        else if (inferred == BlockKind::HorizontalRule) fk = Markoff::BlockKind::HorizontalRule;
+        else if (inferred == BlockKind::Image)          fk = Markoff::BlockKind::Image;
+        else if (inferred == BlockKind::Math)           fk = Markoff::BlockKind::Math;
+        else if (inferred == BlockKind::ListItem)       fk = Markoff::BlockKind::ListItem;
+        else if (inferred == BlockKind::Blockquote)     fk = Markoff::BlockKind::BlockQuote;
+
+        QList<Markoff::AttrName> attrNames;
+        QList<Markoff::AttrValue> attrVals;
+        if (fk == Markoff::BlockKind::Heading) {
+            attrNames << Markoff::AttrNames::Level;
+            attrVals  << int(countLeadingHashes(rec.text));
+        } else if (fk == Markoff::BlockKind::Math) {
+            attrNames << Markoff::AttrNames::DisplayMode;
+            attrVals  << displayMode;
+        }
+
+        Markoff::Cmd::changeKind(*doc,
+                                  Markoff::BlockId(rec.blockAnchor),
+                                  fk, attrNames, attrVals);
+        // changeKind will schedule another d2DocumentChanged; return to let
+        // the next spin re-run onD2Changed with the corrected kind.
+        return;
+    }
+
     d->applyingModelUpdate = true;
     auto _ = qScopeGuard([this]{ d->applyingModelUpdate = false; });
-    // Pass max quint64 as parseInputEditSeq — in D2 every edit is always
-    // "fresh" (no parse-back staleness window), so the freshness gate in
-    // applyOps should be a no-op.
     d->model->applyOps(ops, records);
-
     d->lastKeys = std::move(nextKeys);
 
     // Advance the pending-cursor drop counter.

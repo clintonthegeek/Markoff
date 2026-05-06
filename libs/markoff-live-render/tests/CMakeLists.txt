@@ -25,7 +25,7 @@ qt_add_executable(tst_live_render_block_model
     tst_live_render_block_model.cpp
 )
 target_link_libraries(tst_live_render_block_model PRIVATE
-    Qt6::Core Qt6::Test markoff_live_render)
+    Qt6::Core Qt6::Test markoff_live_render markoff_foundation)
 add_test(NAME tst_live_render_block_model COMMAND tst_live_render_block_model)
 
 qt_add_executable(tst_live_render_cursor

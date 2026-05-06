@@ -4,7 +4,10 @@
 #include <QSignalSpy>
 
 #include <markoff/live-render/LiveBlockModel.h>
+#include <markoff/live-render/LiveListModelBinding.h>
 #include <markoff/live-render/BlockKind.h>
+
+#include <markoff-foundation/MarkoffDocument.h>
 
 using namespace Markoff::LiveRender;
 
@@ -240,7 +243,30 @@ private Q_SLOTS:
         QVariantMap map = v.toMap();
         QCOMPARE(map["testKey"].toString(), QString("testVal"));
     }
+
+    void onD2Changed_populates_headingLevel()
+    {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("## Section");
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(binding.model()->data(binding.model()->index(0, 0),
+                 LiveBlockModel::HeadingLevelRole).toInt(), 2);
+    }
+
+    void onD2Changed_populates_codeLanguage()
+    {
+        Markoff::MarkoffDocument doc(1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("```rust\nlet x = 1;\n```");
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(binding.model()->data(binding.model()->index(0, 0),
+                 LiveBlockModel::CodeLanguageRole).toString(),
+                 QStringLiteral("rust"));
+    }
 };
 
-QTEST_APPLESS_MAIN(TstLiveRenderBlockModel)
+QTEST_GUILESS_MAIN(TstLiveRenderBlockModel)
 #include "tst_live_render_block_model.moc"
