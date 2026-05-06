@@ -439,6 +439,18 @@ void LiveStructuralKeyHandler::registerBuiltins()
             c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
             return HR::Handled;
         }
+        // For ordered markers (e.g. "1. ", "6) "), increment the sequence number
+        // so the new block carries the next number, not a copy of the current one.
+        {
+            static const QRegularExpression kOrd(QStringLiteral(R"(^(\d{1,9})([.)]) )"));
+            auto om = kOrd.match(QString::fromUtf8(markerPrefix));
+            if (om.hasMatch()) {
+                const int next = om.captured(1).toInt() + 1;
+                const char sep  = om.captured(2).at(0).toLatin1();
+                markerPrefix = QByteArray::number(next) + sep + ' ';
+            }
+        }
+
         // Non-empty: insert new ListItem after current with same marker style.
         // Insert directly as ListItem so onD2Changed sees the correct kind
         // immediately (no kind-transition round-trip needed).

@@ -38,8 +38,8 @@ Item {
         anchors.fill: parent
         leftPadding: 8 + root.indentLevel * 16
         rightPadding: 8
-        topPadding: 4
-        bottomPadding: 4
+        topPadding: 2
+        bottomPadding: 2
         readOnly: false
         textFormat: TextEdit.PlainText
         wrapMode: TextEdit.Wrap
