@@ -26,9 +26,12 @@ QString blockKindToString(Markoff::BlockKind k)
     case BK::CodeBlock:      return BlockKind::CodeBlock;
     case BK::HorizontalRule: return BlockKind::HorizontalRule;
     case BK::Image:          return BlockKind::Image;
-    // Paragraph and all other kinds (list items, blockquotes, etc.) map to
-    // Paragraph in the current LiveRender model — same as BlockWalker's
-    // catch-all. Specialised kinds gain their own strings in future phases.
+    case BK::ListItem:       return BlockKind::ListItem;
+    case BK::BlockQuote:     return BlockKind::Blockquote;
+    case BK::Math:           return BlockKind::Math;
+    // Paragraph and all other kinds map to Paragraph in the current LiveRender
+    // model — same as BlockWalker's catch-all. Additional kinds gain their own
+    // strings in future phases.
     default:                 return BlockKind::Paragraph;
     }
 }

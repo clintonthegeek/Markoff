@@ -8,5 +8,8 @@ const QString Heading        = QStringLiteral("heading");
 const QString CodeBlock      = QStringLiteral("code-block");
 const QString HorizontalRule = QStringLiteral("hr");
 const QString Image          = QStringLiteral("image");
+const QString ListItem       = QStringLiteral("list-item");
+const QString Blockquote     = QStringLiteral("blockquote");
+const QString Math           = QStringLiteral("math");
 
 }  // namespace Markoff::LiveRender::BlockKind

@@ -6,7 +6,7 @@
 
 namespace Markoff::LiveRender {
 
-/// String constants for the five built-in block kinds. String-keyed
+/// String constants for the built-in block kinds. String-keyed
 /// (not a closed enum) so plugin-registered kinds don't require
 /// recompiling this library — they call BlockKindRegistry::register_.
 namespace BlockKind {
@@ -15,6 +15,9 @@ namespace BlockKind {
     MARKOFF_LIVE_RENDER_EXPORT extern const QString CodeBlock;       // "code-block"
     MARKOFF_LIVE_RENDER_EXPORT extern const QString HorizontalRule;  // "hr"
     MARKOFF_LIVE_RENDER_EXPORT extern const QString Image;           // "image"
+    MARKOFF_LIVE_RENDER_EXPORT extern const QString ListItem;        // "list-item"
+    MARKOFF_LIVE_RENDER_EXPORT extern const QString Blockquote;      // "blockquote"
+    MARKOFF_LIVE_RENDER_EXPORT extern const QString Math;            // "math"
 }
 
 }  // namespace Markoff::LiveRender

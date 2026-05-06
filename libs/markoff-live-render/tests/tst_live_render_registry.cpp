@@ -17,6 +17,9 @@ private Q_SLOTS:
         QVERIFY(reg.find(BlockKind::CodeBlock) != nullptr);
         QVERIFY(reg.find(BlockKind::HorizontalRule) != nullptr);
         QVERIFY(reg.find(BlockKind::Image) != nullptr);
+        QVERIFY(reg.find(BlockKind::ListItem) != nullptr);
+        QVERIFY(reg.find(BlockKind::Blockquote) != nullptr);
+        QVERIFY(reg.find(BlockKind::Math) != nullptr);
     }
 
     void unknown_kind_returns_nullptr() {
@@ -64,6 +67,9 @@ private Q_SLOTS:
         QVERIFY(kinds.contains(BlockKind::CodeBlock));
         QVERIFY(kinds.contains(BlockKind::HorizontalRule));
         QVERIFY(kinds.contains(BlockKind::Image));
+        QVERIFY(kinds.contains(BlockKind::ListItem));
+        QVERIFY(kinds.contains(BlockKind::Blockquote));
+        QVERIFY(kinds.contains(BlockKind::Math));
     }
 
     void paragraph_descriptor_consumes_structural_keys() {
