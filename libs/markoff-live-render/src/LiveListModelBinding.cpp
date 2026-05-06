@@ -247,9 +247,6 @@ void LiveListModelBinding::onD2Changed()
         }
     }
 
-    // Advance the pending-cursor drop counter.
-    if (d->cursorState)
-        d->cursorState->noteParseArrived(doc->d2EditSequence());
 }
 
 }  // namespace Markoff::LiveRender
