@@ -12,8 +12,8 @@ class MARKOFF_FOUNDATION_EXPORT BlockSerializerRegistry {
 public:
     virtual ~BlockSerializerRegistry() = default;
     virtual QByteArray serialize(BlockKind kind,
-                                 const QByteArray &text,
-                                 const QHash<AttrName, AttrValue> &attrs) const = 0;
+                                 const QHash<AttrName, AttrValue> &attrs,
+                                 const QByteArray &content) const = 0;
 };
 
 }  // namespace Markoff
