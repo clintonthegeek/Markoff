@@ -328,6 +328,38 @@ void LiveStructuralKeyHandler::registerBuiltins()
         c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 4);
         return HR::Handled;
     };
+
+    // HorizontalRule: Up/Down navigation, Delete/Backspace removes the block.
+    auto hrNavigate = [](const Ctx &c, int targetRow) -> HR {
+        if (targetRow < 0 || targetRow >= c.model->rowCount()) return HR::NotHandled;
+        c.cursorState->requestTextCaretAtRow(targetRow,
+            (targetRow < c.model->rowCount()) ? c.model->recordAt(targetRow).text.length() : 0);
+        return HR::Handled;
+    };
+
+    m_handlers[BlockKind::HorizontalRule][Qt::Key_Up] = [hrNavigate](const Ctx &c) {
+        return hrNavigate(c, c.blockIndex - 1);
+    };
+    m_handlers[BlockKind::HorizontalRule][Qt::Key_Down] = [hrNavigate](const Ctx &c) {
+        return hrNavigate(c, c.blockIndex + 1);
+    };
+
+    auto hrDelete = [](const Ctx &c) -> HR {
+        const Markoff::BlockId id(c.blockAnchor);
+        const int targetRow = std::max(0, c.blockIndex - 1);
+        UndoLog::Transaction t(c.document->d2UndoLog());
+        c.document->d2RemoveBlock(id, t);
+        // Resolve cursor AFTER delete — model will reflect removal after d2DocumentChanged fires.
+        // Use requestTextCaretAtRow; if targetRow was before the deleted row, its index is stable.
+        if (c.model->rowCount() > 1) {
+            const int resolveRow = std::min(targetRow, c.model->rowCount() - 1);
+            c.cursorState->requestTextCaretAtRow(resolveRow,
+                c.model->recordAt(resolveRow).text.length());
+        }
+        return HR::Handled;
+    };
+    m_handlers[BlockKind::HorizontalRule][Qt::Key_Delete]    = hrDelete;
+    m_handlers[BlockKind::HorizontalRule][Qt::Key_Backspace] = hrDelete;
 }
 
 }  // namespace Markoff::LiveRender

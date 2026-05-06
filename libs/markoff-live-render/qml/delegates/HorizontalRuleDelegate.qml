@@ -1,50 +1,68 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls
+import org.markoff.live.render 1.0
 
-/// Horizontal rule. BlockSelected focus ring when focused.
-/// positionAt returns -1: tells BlockHitTester this is a non-text block.
 Item {
     id: root
     width: ListView.view ? ListView.view.width : 600
-    height: 17
+    implicitHeight: 20
 
     property int modelIndex: index
-    // Source-faithful copy: the HR's raw markdown ("---", "***", etc.) so a
-    // selection spanning paragraphs and HRs round-trips intact. Matches the
-    // spec's serializeForCopy() intent (§6) and the other block delegates.
     readonly property string blockText: model.text
 
-    // Focused when cursorKind == "BlockSelected" and block matches.
-    // We compare by modelIndex since we can't inspect BlockAnchor from QML.
-    readonly property bool isFocused: {
-        const cs = ListView.view && ListView.view.binding
-                   ? ListView.view.binding.cursorState : null
-        return cs ? cs.cursorKind === "BlockSelected" && _checkFocus() : false
-    }
-
-    function _checkFocus() {
-        // Heuristic: if cursorKind is BlockSelected and this is the most recently
-        // clicked non-text block, show the ring. Full anchor comparison needs R4.
-        return false  // refined in R4 when LiveCursorState exposes focused row index
-    }
+    readonly property var liveBinding: ListView.view ? ListView.view.binding : null
+    readonly property var cursorState: liveBinding ? liveBinding.cursorState : null
 
     Rectangle {
-        anchors.centerIn: parent
-        width: parent.width - 16
-        height: 1
-        color: palette.mid
+        anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter }
+        height: 2
+        color: root.isSelected ? palette.highlight : palette.mid
+        radius: 1
     }
 
+    readonly property bool isSelected:
+        cursorState !== null
+        && cursorState.cursorKind === "BlockSelected"
+        && cursorState.focusedAnchorRow === root.modelIndex
+
     Rectangle {
+        visible: root.isSelected
         anchors.fill: parent
-        anchors.margins: 1
-        color: "transparent"
+        anchors.margins: -2
         border.color: palette.highlight
-        border.width: root.isFocused ? 2 : 0
-        radius: 2
+        border.width: 2
+        color: "transparent"
+        radius: 3
     }
 
-    // positionAt: -1 signals to BlockHitTester that this is non-text.
     function positionAt(x, y) { return -1 }
+
+    function focusEditAt(qtPos) {
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (!cs) return
+        root.forceActiveFocus()
+        cs.request({ variant: "BlockSelected", block: model.blockAnchor })
+    }
+
+    Keys.priority: Keys.BeforeItem
+    Keys.onPressed: (event) => {
+        if (!root.isSelected) { event.accepted = false; return }
+        const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
+        if (!handler) { event.accepted = false; return }
+        const k = event.key
+        if (k !== Qt.Key_Delete && k !== Qt.Key_Backspace
+                && k !== Qt.Key_Up && k !== Qt.Key_Down) {
+            event.accepted = false; return
+        }
+        const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,
+            -1, true, model.text)
+        event.accepted = handled
+    }
+
+    Component.onCompleted: {
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs && cs.focusedAnchorRow === root.modelIndex)
+            Qt.callLater(function() { focusEditAt(-1) })
+    }
 }

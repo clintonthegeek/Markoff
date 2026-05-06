@@ -348,6 +348,27 @@ private Q_SLOTS:
         QCOMPARE(static_cast<int>(doc.iterateBlocks().size()), blocksBefore - 1);
     }
 
+    // ---------- HorizontalRule structural keys ----------
+
+    void hr_delete_removes_block() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "hello\n\n---\n\nworld\n", 3));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 3);
+        QCOMPARE(binding.model()->data(binding.model()->index(1, 0),
+                 LiveBlockModel::KindRole).toString(), QStringLiteral("hr"));
+
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Delete, Qt::NoModifier, 1, -1, true, QStringLiteral("---"));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        QTRY_COMPARE(binding.model()->rowCount(), 2);
+    }
+
     // ---------- Heading level-change via Ctrl+Shift+1-6/0 ----------
 
     void heading_level_change_via_ctrl_shift() {
