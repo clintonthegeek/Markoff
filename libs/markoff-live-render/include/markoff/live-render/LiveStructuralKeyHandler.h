@@ -74,6 +74,10 @@ public:
                                bool selectionEmpty,
                                const QString &blockText);
 
+    /// Update the info-string (language tag) of a CodeBlock.
+    Q_INVOKABLE void changeCodeLanguage(Markoff::BlockAnchor anchor,
+                                        const QString &lang);
+
 private:
     void registerBuiltins();
 

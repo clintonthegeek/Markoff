@@ -46,7 +46,7 @@ Rectangle {
             const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
             if (!handler) { event.accepted = false; return }
             const k = event.key
-            if (k !== Qt.Key_Backspace && k !== Qt.Key_Delete) {
+            if (k !== Qt.Key_Backspace && k !== Qt.Key_Delete && k !== Qt.Key_Tab) {
                 return
             }
             const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,
@@ -84,6 +84,48 @@ Rectangle {
                 const cs = root.liveBinding ? root.liveBinding.cursorState : null
                 if (cs && cs.focusedAnchorRow === root.modelIndex && cs.focusedQtPos >= 0)
                     edit.cursorPosition = cs.focusedQtPos
+            }
+        }
+    }
+
+    Row {
+        id: langTagRow
+        anchors { top: parent.top; right: parent.right; margins: 4 }
+        spacing: 4
+
+        property bool editing: false
+
+        Text {
+            visible: !langTagRow.editing && model.codeLanguage !== ""
+            text: model.codeLanguage
+            font.pixelSize: 11
+            color: palette.mid
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: {
+                    langTagRow.editing = true
+                    langInput.forceActiveFocus()
+                    langInput.selectAll()
+                }
+            }
+        }
+        TextInput {
+            id: langInput
+            visible: langTagRow.editing
+            text: model.codeLanguage
+            font.pixelSize: 11
+            color: palette.text
+            onActiveFocusChanged: if (!activeFocus) langTagRow.editing = false
+            Keys.onReturnPressed: {
+                const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
+                if (handler) handler.changeCodeLanguage(model.blockAnchor, text)
+                langTagRow.editing = false
+                edit.forceActiveFocus()
+            }
+            Keys.onEscapePressed: {
+                langTagRow.editing = false
+                edit.forceActiveFocus()
             }
         }
     }

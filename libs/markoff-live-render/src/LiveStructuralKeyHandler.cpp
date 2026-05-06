@@ -10,6 +10,7 @@
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/UndoLog.h>
 #include <markoff-foundation/Cmd/D2.h>
+#include <markoff-foundation/AttrNames.h>
 
 #include <QLoggingCategory>
 #include <QRegularExpression>
@@ -153,6 +154,15 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     ctx.blockText         = blockText;
 
     return keyIt.value()(ctx) == HandleResult::Handled;
+}
+
+void LiveStructuralKeyHandler::changeCodeLanguage(Markoff::BlockAnchor anchor,
+                                                    const QString &lang)
+{
+    if (!m_document) return;
+    const Markoff::BlockId id(anchor);
+    UndoLog::Transaction t(m_document->d2UndoLog());
+    m_document->d2SetBlockAttr(id, Markoff::AttrNames::InfoString, lang, t);
 }
 
 void LiveStructuralKeyHandler::registerBuiltins()
@@ -304,6 +314,20 @@ void LiveStructuralKeyHandler::registerBuiltins()
     // expects inside fenced code.
     m_handlers[BlockKind::CodeBlock][Qt::Key_Backspace] = paragraphBackspace;
     m_handlers[BlockKind::CodeBlock][Qt::Key_Delete]    = paragraphDelete;
+
+    // CodeBlock Tab: insert 4 spaces at cursor position.
+    m_handlers[BlockKind::CodeBlock][Qt::Key_Tab] = [](const Ctx &c) -> HR {
+        const Markoff::BlockId id(c.blockAnchor);
+        const QByteArray spaces("    ");  // 4 spaces
+        UndoLog::Transaction t(c.document->d2UndoLog());
+        c.document->d2ApplyBufferEdit(id,
+                                       static_cast<uint32_t>(c.qtPos),
+                                       0,
+                                       spaces,
+                                       t);
+        c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 4);
+        return HR::Handled;
+    };
 }
 
 }  // namespace Markoff::LiveRender

@@ -48,7 +48,7 @@ void BlockKindRegistry::registerBuiltins()
         d.id = BlockKind::CodeBlock;
         d.acceptsTextRoleUpdates = true;
         d.supportedCursorVariants = { QStringLiteral("TextCaret") };
-        d.consumedStructuralKeys = { Qt::Key_Backspace, Qt::Key_Delete };
+        d.consumedStructuralKeys = { Qt::Key_Backspace, Qt::Key_Delete, Qt::Key_Tab };
         d.delegateUrl = QStringLiteral(
             "qrc:/qt/qml/org/markoff/live/render/delegates/CodeBlockDelegate.qml");
         m_descriptors.insert(d.id, d);

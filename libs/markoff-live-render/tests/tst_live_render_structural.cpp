@@ -305,6 +305,28 @@ private Q_SLOTS:
         QVERIFY(!consumed);
     }
 
+    void codeblock_tab_inserts_4_spaces() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "```\nhello\n```", 1));
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::CodeBlock);
+
+        const Markoff::BlockId blockId = binding.model()->recordAt(0).blockAnchor;
+
+        // Tab at position 0 inside the code block body.
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Tab, Qt::NoModifier,
+            /*blockIndex=*/0, /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            QStringLiteral("hello\n"));
+        QVERIFY(consumed);
+
+        // Block should now start with 4 spaces.
+        QTRY_VERIFY(doc.blockText(blockId).startsWith("    "));
+    }
+
     void backspace_at_start_of_code_block_merges_with_previous() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
