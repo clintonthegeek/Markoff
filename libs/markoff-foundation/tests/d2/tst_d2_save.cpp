@@ -43,7 +43,7 @@ private Q_SLOTS:
 
 void TstD2Save::registry_registerAndGet()
 {
-    auto &reg = BlockSerializerRegistry::instance();
+    auto &reg = BuiltinBlockSerializerRegistry::instance();
     // Register a custom serializer for Paragraph, verify we get it back
     bool called = false;
     reg.registerSerializer(BlockKind::Paragraph,
@@ -66,16 +66,16 @@ void TstD2Save::registry_registerAndGet()
 
 void TstD2Save::paragraphSerializer_returnsContentAsIs()
 {
-    BlockSerializerRegistry::instance().registerBuiltins();
-    auto fn = BlockSerializerRegistry::instance().get(BlockKind::Paragraph);
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
+    auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::Paragraph);
     QByteArray result = fn(BlockKind::Paragraph, {}, "Hello world");
     QCOMPARE(result, QByteArray("Hello world"));
 }
 
 void TstD2Save::headingSerializer_prependsHashes()
 {
-    BlockSerializerRegistry::instance().registerBuiltins();
-    auto fn = BlockSerializerRegistry::instance().get(BlockKind::Heading);
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
+    auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::Heading);
 
     // Level 1
     QHash<AttrName, AttrValue> attrs1;
@@ -93,8 +93,8 @@ void TstD2Save::headingSerializer_prependsHashes()
 
 void TstD2Save::codeBlockSerializer_wrapsInFences()
 {
-    BlockSerializerRegistry::instance().registerBuiltins();
-    auto fn = BlockSerializerRegistry::instance().get(BlockKind::CodeBlock);
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
+    auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::CodeBlock);
 
     // With info string
     QHash<AttrName, AttrValue> attrs;
@@ -109,8 +109,8 @@ void TstD2Save::codeBlockSerializer_wrapsInFences()
 
 void TstD2Save::listItemSerializer_prependsMarker()
 {
-    BlockSerializerRegistry::instance().registerBuiltins();
-    auto fn = BlockSerializerRegistry::instance().get(BlockKind::ListItem);
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
+    auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::ListItem);
 
     // Default marker
     QCOMPARE(fn(BlockKind::ListItem, {}, "Item text"), QByteArray("- Item text"));
@@ -125,17 +125,17 @@ void TstD2Save::listItemSerializer_prependsMarker()
 
 void TstD2Save::fallbackSerializer_unknownKind_returnsContent()
 {
-    BlockSerializerRegistry::instance().registerBuiltins();
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
     // HtmlBlock, Math, Mermaid, Table, Image are all passthrough
     for (BlockKind kind : { BlockKind::HtmlBlock, BlockKind::Math,
                              BlockKind::Mermaid, BlockKind::Table,
                              BlockKind::Image }) {
-        auto fn = BlockSerializerRegistry::instance().get(kind);
+        auto fn = BuiltinBlockSerializerRegistry::instance().get(kind);
         QCOMPARE(fn(kind, {}, "raw content"), QByteArray("raw content"));
     }
     // Unregistered numeric kind (cast from a value not in the enum) → fallback
     BlockKind unknown = static_cast<BlockKind>(0xFF);
-    auto fallback = BlockSerializerRegistry::instance().get(unknown);
+    auto fallback = BuiltinBlockSerializerRegistry::instance().get(unknown);
     QCOMPARE(fallback(unknown, {}, "raw content"), QByteArray("raw content"));
 }
 
