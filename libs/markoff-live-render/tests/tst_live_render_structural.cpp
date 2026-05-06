@@ -395,6 +395,110 @@ private Q_SLOTS:
                      QStringLiteral("- hello\n- "));
     }
 
+    void list_item_enter_compound_six_items_then_three_enters_no_new_blocks() {
+        // Simulates the exact dogfood scenario: 6 numbered items in ONE block,
+        // press Enter at end → "7. ", type "seven", Enter → "8. ", type "eight",
+        // Enter → "9. ". rowCount must remain 1 throughout.
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        const QByteArray six =
+            "1. one\n2. two\n3. three\n4. four\n5. five\n6. six\n";
+        QVERIFY(waitForModelRows(binding, doc, six, 1));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        // Press Enter three times at end (with bracketing buffer edits to
+        // simulate typing "seven" / "eight" between each Enter).
+        auto pressEnterAtEnd = [&]() {
+            const QString cur = binding.model()->recordAt(0).text;
+            binding.structuralKeyHandler()->tryHandle(
+                Qt::Key_Return, Qt::NoModifier, 0, cur.length(), true, cur);
+            QCoreApplication::processEvents();
+            QCoreApplication::processEvents();
+        };
+        auto typeText = [&](const QByteArray &text) {
+            const auto id = doc.iterateBlocks()[0];
+            const QByteArray buf = doc.blockText(id);
+            uint32_t end = static_cast<uint32_t>(buf.size());
+            // Trim trailing '\n' from CRDT buffer for offset computation; the
+            // model text is this buf with one trailing '\n' chopped, so the
+            // visual end maps back to buf.size() - (1 if endsWith \n else 0).
+            if (buf.endsWith('\n')) --end;
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2ApplyBufferEdit(id, end, 0, text, t);
+            QCoreApplication::processEvents();
+            QCoreApplication::processEvents();
+        };
+
+        pressEnterAtEnd();
+        typeText("seven");
+        const QString afterSeven = binding.model()->recordAt(0).text;
+        qDebug() << "[probe] afterSeven=" << afterSeven
+                 << "rowCount=" << binding.model()->rowCount();
+        QCOMPARE(binding.model()->rowCount(), 1);
+        QVERIFY2(afterSeven.endsWith(QStringLiteral("\n7. seven")),
+                 qPrintable(QStringLiteral("expected \"\\n7. seven\" suffix, got: %1").arg(afterSeven)));
+
+        pressEnterAtEnd();
+        typeText("eight");
+        const QString afterEight = binding.model()->recordAt(0).text;
+        qDebug() << "[probe] afterEight=" << afterEight
+                 << "rowCount=" << binding.model()->rowCount();
+        QCOMPARE(binding.model()->rowCount(), 1);
+        QVERIFY2(afterEight.endsWith(QStringLiteral("\n8. eight")),
+                 qPrintable(QStringLiteral("expected \"\\n8. eight\" suffix, got: %1").arg(afterEight)));
+
+        pressEnterAtEnd();
+        typeText("nine");
+        const QString afterNine = binding.model()->recordAt(0).text;
+        qDebug() << "[probe] afterNine=" << afterNine
+                 << "rowCount=" << binding.model()->rowCount();
+        QCOMPARE(binding.model()->rowCount(), 1);
+        QVERIFY2(afterNine.endsWith(QStringLiteral("\n9. nine")),
+                 qPrintable(QStringLiteral("expected \"\\n9. nine\" suffix, got: %1").arg(afterNine)));
+    }
+
+    void list_item_enter_six_item_ordered_list_at_end_appends_in_block() {
+        // Mirrors the user's dogfood scenario: a 6-item numbered list in
+        // ONE CRDT block. Pressing Enter at end of item 6 must insert
+        // "\n7. " IN-BLOCK (rowCount stays 1, text gets a 7th line).
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        const QByteArray six =
+            "1. one\n2. two\n3. three\n4. four\n5. five\n6. six\n";
+        QVERIFY(waitForModelRows(binding, doc, six, 1));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(binding.model()->data(binding.model()->index(0, 0),
+                 LiveBlockModel::KindRole).toString(),
+                 QStringLiteral("list-item"));
+
+        const QString rowText = binding.model()->recordAt(0).text;
+        qDebug() << "[probe] rowText =" << rowText
+                 << "len=" << rowText.length()
+                 << "blockCount=" << doc.iterateBlocks().size();
+        // After model trim, rowText = "1. one\n...\n6. six" (no trailing \n).
+        // Press Enter at end of "6. six".
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier, 0, rowText.length(), true, rowText);
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        const QString afterText = binding.model()->recordAt(0).text;
+        qDebug() << "[probe] afterText =" << afterText
+                 << "rowCount=" << binding.model()->rowCount()
+                 << "blockCount=" << doc.iterateBlocks().size();
+
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QVERIFY2(afterText.endsWith(QStringLiteral("\n7. ")),
+                 qPrintable(QStringLiteral("expected text to end with '\\n7. ', got: %1")
+                            .arg(afterText)));
+    }
+
     void list_item_enter_on_empty_exits_list() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
