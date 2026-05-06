@@ -191,12 +191,18 @@ void LiveCursorState::onStructuralRowsInserted(int first, int last)
     }
 }
 
-void LiveCursorState::onStructuralRowRemoved(int /*row*/)
+void LiveCursorState::onStructuralRowRemoved(int row)
 {
-    // A block was removed. If we have an anchor-keyed pending, try to
-    // resolve it now (the surviving block may have the right anchor).
-    if (m_pendingRow && m_pendingRow->anchor)
+    if (!m_pendingRow) return;
+    if (m_pendingRow->anchor) {
+        // A block was removed. If we have an anchor-keyed pending, try to
+        // resolve it now (the surviving block may have the right anchor).
         resolvePendingForAnchor();
+        return;
+    }
+    // Row-keyed pending is orphaned if its target row is deleted.
+    if (m_pendingRow->row == row)
+        m_pendingRow.reset();
 }
 
 void LiveCursorState::resolvePendingForAnchor()

@@ -273,6 +273,37 @@ private Q_SLOTS:
         QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
     }
 
+    void requestTextCaretAtRow_pending_resolves_on_structural_insert()
+    {
+        // Set up a single-block document
+        Markoff::MarkoffDocument document(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&document);
+
+        document.loadFromMarkdown("Hello\n");
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        // Get the block anchor for the existing block.
+        const Markoff::BlockId block0 = binding.model()->recordAt(0).blockAnchor;
+
+        // Request a TextCaret at row 1, which does not yet exist
+        binding.cursorState()->requestTextCaretAtRow(1, 0);
+
+        // The pending should not have resolved yet (row 1 doesn't exist)
+        QCOMPARE(binding.cursorState()->cursorKind(), QStringLiteral("none"));
+
+        // Apply a D2 command that inserts a new block (which fires structuralRowsInserted)
+        Markoff::Cmd::enterAtEnd(document, block0);
+        // Process events so the debounced d2DocumentChanged fires → onD2Changed → structural signal
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        // The pending should now be resolved: cursor at row 1, qtPos 0
+        QCOMPARE(binding.cursorState()->cursorKind(), QStringLiteral("TextCaret"));
+        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 1);
+        QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
+    }
+
     // ---- LiveListModelBinding: D2 model drive via structureChanged ----
 
     void model_populates_from_d2_load() {
