@@ -8,21 +8,21 @@
 namespace Markoff {
 
 // ============================================================================
-// BlockSerializerRegistry — singleton + registration
+// BuiltinBlockSerializerRegistry — singleton + registration
 // ============================================================================
 
-BlockSerializerRegistry &BlockSerializerRegistry::instance()
+BuiltinBlockSerializerRegistry &BuiltinBlockSerializerRegistry::instance()
 {
-    static BlockSerializerRegistry s_instance;
+    static BuiltinBlockSerializerRegistry s_instance;
     return s_instance;
 }
 
-void BlockSerializerRegistry::registerSerializer(BlockKind kind, BlockSerializer fn)
+void BuiltinBlockSerializerRegistry::registerSerializer(BlockKind kind, BlockSerializer fn)
 {
     m_serializers.insert(static_cast<uint8_t>(kind), std::move(fn));
 }
 
-BlockSerializer BlockSerializerRegistry::get(BlockKind kind) const
+BlockSerializer BuiltinBlockSerializerRegistry::get(BlockKind kind) const
 {
     auto it = m_serializers.constFind(static_cast<uint8_t>(kind));
     if (it != m_serializers.cend())
@@ -109,7 +109,7 @@ QByteArray serializePassthrough(BlockKind, const QHash<AttrName, AttrValue> &,
 
 }  // anonymous namespace
 
-void BlockSerializerRegistry::registerBuiltins()
+void BuiltinBlockSerializerRegistry::registerBuiltins()
 {
     if (m_builtinsRegistered) return;
     m_builtinsRegistered = true;

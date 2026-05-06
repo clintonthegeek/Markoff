@@ -947,7 +947,7 @@ QByteArray serializeFootnoteDefs(const Markoff::FootnoteDefMap &fdm)
 QByteArray MarkoffDocument::serializeForSave() const
 {
     // Ensure built-in serializers are registered (idempotent)
-    BlockSerializerRegistry::instance().registerBuiltins();
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
 
     QByteArray out;
 
@@ -956,7 +956,7 @@ QByteArray MarkoffDocument::serializeForSave() const
 
     // 2. Blocks
     auto blocks = iterateBlocks();
-    auto &reg = BlockSerializerRegistry::instance();
+    auto &reg = BuiltinBlockSerializerRegistry::instance();
     for (size_t i = 0; i < blocks.size(); ++i) {
         BlockId id = blocks[i];
         QByteArray bytes;

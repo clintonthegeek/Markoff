@@ -19,9 +19,9 @@ using BlockSerializer = std::function<QByteArray(BlockKind,
 
 /// Singleton registry mapping BlockKind → BlockSerializer. Built-in serializers
 /// are registered by registerBuiltins(); callers may override or extend.
-class MARKOFF_FOUNDATION_EXPORT BlockSerializerRegistry {
+class MARKOFF_FOUNDATION_EXPORT BuiltinBlockSerializerRegistry {
 public:
-    static BlockSerializerRegistry &instance();
+    static BuiltinBlockSerializerRegistry &instance();
 
     /// Register a serializer for the given kind. Overwrites any previous entry.
     void registerSerializer(BlockKind kind, BlockSerializer fn);
