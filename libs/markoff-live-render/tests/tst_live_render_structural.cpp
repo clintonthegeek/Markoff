@@ -477,6 +477,39 @@ private Q_SLOTS:
                      LiveBlockModel::KindRole).toString(), QStringLiteral("paragraph"));
     }
 
+    // ---------- F2 / Escape — BlockInternalEdit transitions ----------
+
+    void f2_on_math_block_enters_internal_edit() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("$x^2$\n");
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+        QTRY_COMPARE(binding.model()->data(binding.model()->index(0, 0),
+                     LiveBlockModel::KindRole).toString(), QStringLiteral("math"));
+
+        // Set BlockSelected cursor on the math block
+        const Markoff::LiveRender::BlockSelected sel{
+            binding.model()->recordAt(0).blockAnchor
+        };
+        binding.cursorState()->request(sel);
+        QCOMPARE(binding.cursorState()->cursorKind(), QStringLiteral("BlockSelected"));
+
+        // F2 should transition to BlockInternalEdit
+        const bool handled = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_F2, Qt::NoModifier, 0, -1, true, QStringLiteral("$x^2$"));
+        QVERIFY(handled);
+        QCOMPARE(binding.cursorState()->cursorKind(), QStringLiteral("BlockInternalEdit"));
+
+        // Escape should return to BlockSelected
+        const bool handled2 = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Escape, Qt::NoModifier, 0, -1, true, QStringLiteral("$x^2$"));
+        QVERIFY(handled2);
+        QCOMPARE(binding.cursorState()->cursorKind(), QStringLiteral("BlockSelected"));
+    }
+
     // ---------- Heading level-change via Ctrl+Shift+1-6/0 ----------
 
     void heading_level_change_via_ctrl_shift() {

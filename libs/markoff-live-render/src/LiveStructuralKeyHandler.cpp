@@ -6,6 +6,7 @@
 #include <markoff/live-render/BlockKind.h>
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveCursorState.h>
+#include <markoff/live-render/Cursor.h>
 
 #include <markoff-foundation/MarkoffDocument.h>
 #include <markoff-foundation/UndoLog.h>
@@ -93,6 +94,30 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     const BlockRecord &rec = m_model->recordAt(blockIndex);
     const auto *desc = m_registry->find(rec.kind);
     if (!desc) return false;
+
+    // F2: enter BlockInternalEdit on kinds that support it.
+    if (key == Qt::Key_F2) {
+        if (desc && !desc->internalEditModes.isEmpty()
+                 && desc->supportedCursorVariants.contains(QStringLiteral("BlockInternalEdit"))) {
+            BlockInternalEdit bie;
+            bie.block = rec.blockAnchor;
+            bie.mode  = desc->internalEditModes.first();
+            m_cursorState->request(bie);
+            return true;
+        }
+        return false;
+    }
+
+    // Escape: exit BlockInternalEdit → BlockSelected.
+    if (key == Qt::Key_Escape) {
+        if (m_cursorState->cursorKind() == QStringLiteral("BlockInternalEdit")) {
+            BlockSelected sel;
+            sel.block = rec.blockAnchor;
+            m_cursorState->request(sel);
+            return true;
+        }
+        return false;
+    }
 
     // Heading level-change: Ctrl+Shift+0-6 before consuming from the keys set.
     // Strategy: rewrite the leading `# ` prefix in the block text so that
