@@ -78,6 +78,21 @@ Item {
             target: root.selectionView
             function onSelectionChanged() { edit.applySelection() }
         }
+
+        onTextChanged: {
+            const cs = root.liveBinding ? root.liveBinding.cursorState : null
+            if (cs && cs.focusedAnchorRow === root.modelIndex && cs.focusedQtPos >= 0)
+                cursorPosition = cs.focusedQtPos
+        }
+
+        Connections {
+            target: root.liveBinding ? root.liveBinding.cursorState : null
+            function onCursorChanged() {
+                const cs = root.liveBinding ? root.liveBinding.cursorState : null
+                if (cs && cs.focusedAnchorRow === root.modelIndex && cs.focusedQtPos >= 0)
+                    edit.cursorPosition = cs.focusedQtPos
+            }
+        }
     }
 
     function positionAt(x, y) { return edit.positionAt(x - edit.leftPadding, y - edit.topPadding) }
