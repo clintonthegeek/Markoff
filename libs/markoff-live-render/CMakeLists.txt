@@ -60,6 +60,9 @@ qt_add_qml_module(markoff_live_render
         # R5: structural keys
         include/markoff/live-render/LiveStructuralKeyHandler.h
         src/LiveStructuralKeyHandler.cpp
+        # Math rendering
+        src/MathRenderer.h
+        src/MathRenderer.cpp
     QML_FILES
         qml/LiveView.qml
         qml/delegates/ParagraphDelegate.qml
