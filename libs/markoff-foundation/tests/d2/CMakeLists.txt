@@ -76,3 +76,8 @@ add_test(NAME tst_d2_inline_cache COMMAND tst_d2_inline_cache)
 qt_add_executable(tst_d2_convergence tst_d2_convergence.cpp)
 target_link_libraries(tst_d2_convergence PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_d2_convergence COMMAND tst_d2_convergence)
+
+# D3-correction Task 5: per-item ListItem materialization roundtrip (TDD red)
+qt_add_executable(tst_d2_list_roundtrip tst_d2_list_roundtrip.cpp)
+target_link_libraries(tst_d2_list_roundtrip PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_list_roundtrip COMMAND tst_d2_list_roundtrip)
