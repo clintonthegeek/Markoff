@@ -97,31 +97,6 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
     // ── D2: initialise InlineParseCache (Phase 10) ──────────────────────────
     d->inlineCache = std::make_unique<InlineParseCache>(*this);
 
-    // ParsePool is deprecated (D4 will delete); suppressed here because foundation owns the impl.
-QT_WARNING_PUSH
-QT_WARNING_DISABLE_GCC("-Wdeprecated-declarations")
-    QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
-                     this, [this](const Markoff::Document *p, quint64 inputEditSeq) {
-                         d->latestParse.reset(p);
-                         ++d->parseSequence;
-
-                         // Compute BlockAnchors against the CURRENT CRDT buffer (main-thread,
-                         // synchronous). Anchors are derived from the parser's tree-sitter
-                         // top-level-block enumeration (`Markoff::Document::topLevelBlocks()`),
-                         // matching what view-qml's BlockWalker consumes — so anchors[i] and
-                         // the view's records[i] always describe the same block. The parse
-                         // itself reflects the buffer at parse-schedule time; if intervening
-                         // edits moved a block's first-byte char, that block's BlockAnchor
-                         // for one parse cycle identifies a slightly different character —
-                         // the next parse cycle delivers a corrected anchor. See spec §3.
-                         auto bundle = Markoff::Detail::computeBlockAnchors(*this, p);
-                         d->latestBlockAnchors = std::move(bundle.anchors);
-                         d->latestBlockRanges  = std::move(bundle.ranges);
-
-                         Q_EMIT parseUpdated(p, d->parseSequence, d->latestBlockAnchors,
-                                             inputEditSeq);
-                     });
-QT_WARNING_POP
 }
 
 MarkoffDocument::~MarkoffDocument() = default;
@@ -149,7 +124,7 @@ const Markoff::Document *MarkoffDocument::parsedDocument() const
 
 bool MarkoffDocument::parseIsPending() const
 {
-    return d->parsePool.isPending();
+    return false;
 }
 
 quint16 MarkoffDocument::replicaId() const
@@ -211,10 +186,8 @@ MarkoffDocument::applyLocalEdit(const QList<MarkoffEdit> &edits)
         resultingEdits << me;
     }
 
-    if (!resultingEdits.isEmpty()) {
+    if (!resultingEdits.isEmpty())
         Q_EMIT contentsChanged(resultingEdits);
-        d->parsePool.schedule(toMarkdownUtf8(), d->editSequence);
-    }
 
     return op;
 }
@@ -239,10 +212,8 @@ std::optional<CollabText::Crdt::Operation> MarkoffDocument::undo()
                                 static_cast<int>(te.new_text.size()));
         resultingEdits << me;
     }
-    if (!resultingEdits.isEmpty()) {
+    if (!resultingEdits.isEmpty())
         Q_EMIT contentsChanged(resultingEdits);
-        d->parsePool.schedule(toMarkdownUtf8(), d->editSequence);
-    }
 
     return op;
 }
@@ -267,10 +238,8 @@ std::optional<CollabText::Crdt::Operation> MarkoffDocument::redo()
                                 static_cast<int>(te.new_text.size()));
         resultingEdits << me;
     }
-    if (!resultingEdits.isEmpty()) {
+    if (!resultingEdits.isEmpty())
         Q_EMIT contentsChanged(resultingEdits);
-        d->parsePool.schedule(toMarkdownUtf8(), d->editSequence);
-    }
 
     return op;
 }
@@ -308,10 +277,8 @@ void MarkoffDocument::applyRemoteOps(
         resultingEdits << me;
     }
 
-    if (!resultingEdits.isEmpty()) {
+    if (!resultingEdits.isEmpty())
         Q_EMIT contentsChanged(resultingEdits);
-        d->parsePool.schedule(toMarkdownUtf8(), d->editSequence);
-    }
 }
 
 void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
@@ -356,7 +323,6 @@ void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
         Q_UNREACHABLE();
         break;
     }
-    d->parsePool.scheduleReset(toMarkdownUtf8(), d->editSequence);
     Q_EMIT documentReloaded();
 }
 
@@ -528,7 +494,7 @@ qsizetype MarkoffDocument::compact(const CollabText::Crdt::Global &watermark)
 
 void MarkoffDocument::setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept
 {
-    d->parsePool.setRenderPhaseTaps(taps);
+    Q_UNUSED(taps);
 }
 
 // ============================================================================
