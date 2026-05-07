@@ -174,36 +174,39 @@ void TstD2Load::eachBlock_hasLoadTimeBytesSet()
         QVERIFY(!doc.blockLoadTimeBytes(id).isEmpty());
 }
 
-// ── Task 7.3 (v1 parser limitation) ─────────────────────────────────────────
+// ── Task 7.3 (updated to per-item shape) ────────────────────────────────────
 
 void TstD2Load::tightList_threeItems_threeListItemBlocks()
 {
-    // v1: parser doesn't expose item byte ranges; whole list → 1 ListItem block.
+    // Per-item shape: each list item becomes its own ListItem block.
     MarkoffDocument doc(1);
     doc.loadFromMarkdown("- A\n- B\n- C\n");
     auto blocks = doc.iterateBlocks();
-    QCOMPARE(blocks.size(), static_cast<size_t>(1));
-    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::ListItem);
+    QCOMPARE(blocks.size(), static_cast<size_t>(3));
+    for (auto id : blocks)
+        QCOMPARE(doc.blockKind(id), BlockKind::ListItem);
 }
 
 void TstD2Load::looseList_marker_inAttrs()
 {
-    // v1: whole list materializes as one ListItem block.
+    // Per-item shape: each list item becomes its own ListItem block.
     MarkoffDocument doc(1);
     doc.loadFromMarkdown("- A\n\n- B\n");
     auto blocks = doc.iterateBlocks();
-    QCOMPARE(blocks.size(), static_cast<size_t>(1));
-    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::ListItem);
+    QCOMPARE(blocks.size(), static_cast<size_t>(2));
+    for (auto id : blocks)
+        QCOMPARE(doc.blockKind(id), BlockKind::ListItem);
 }
 
 void TstD2Load::orderedList_startNumber_inAttrs()
 {
-    // v1: whole list materializes as one ListItem block.
+    // Per-item shape: each list item becomes its own ListItem block.
     MarkoffDocument doc(1);
     doc.loadFromMarkdown("1. First\n2. Second\n");
     auto blocks = doc.iterateBlocks();
-    QCOMPARE(blocks.size(), static_cast<size_t>(1));
-    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::ListItem);
+    QCOMPARE(blocks.size(), static_cast<size_t>(2));
+    for (auto id : blocks)
+        QCOMPARE(doc.blockKind(id), BlockKind::ListItem);
 }
 
 // ── Task 7.4 ────────────────────────────────────────────────────────────────

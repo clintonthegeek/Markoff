@@ -951,6 +951,35 @@ bool MarkoffDocument::isBlockTouched(BlockId id) const
 
 namespace {
 
+// Reconstruct the list marker bytes from a ListItem's attrs.
+QByteArray markerForListItem(const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs)
+{
+    using namespace Markoff::AttrNames;
+    auto it = attrs.constFind(MarkerStyle);
+    if (it == attrs.cend()) return "-";
+    const QString style = std::get<QString>(it.value());
+
+    if (style == QStringLiteral("dot")) {
+        auto ni = attrs.constFind(MarkerNumber);
+        const int n = (ni != attrs.cend()) ? std::get<int>(ni.value()) : 1;
+        return QByteArray::number(n) + ".";
+    }
+    if (style == QStringLiteral("paren")) {
+        auto ni = attrs.constFind(MarkerNumber);
+        const int n = (ni != attrs.cend()) ? std::get<int>(ni.value()) : 1;
+        return QByteArray::number(n) + ")";
+    }
+    if (style == QStringLiteral("minus")) return "-";
+    if (style == QStringLiteral("plus"))  return "+";
+    if (style == QStringLiteral("star"))  return "*";
+    if (style == QStringLiteral("task")) {
+        auto ci = attrs.constFind(Checked);
+        const bool c = (ci != attrs.cend()) ? std::get<bool>(ci.value()) : false;
+        return c ? "- [x]" : "- [ ]";
+    }
+    return "-";  // fallback
+}
+
 QByteArray serializeFrontmatter(const Markoff::FrontmatterMap &fm)
 {
     auto raw = fm.get("raw");
@@ -994,14 +1023,45 @@ QByteArray MarkoffDocument::serializeForSave() const
     auto &reg = BuiltinBlockSerializerRegistry::instance();
     for (size_t i = 0; i < blocks.size(); ++i) {
         BlockId id = blocks[i];
+        const BlockKind kind = blockKind(id);
+
+        // ListItem blocks need marker+indent reconstruction from attrs;
+        // the buffer holds content-only (no marker, no indent, no newline).
+        // Handle them unconditionally — bypassing the touched/untouched split.
+        if (kind == BlockKind::ListItem) {
+            const auto attrs = blockAttrs(id);
+
+            int indent = 0;
+            auto indIt = attrs.constFind(AttrNames::IndentLevel);
+            if (indIt != attrs.cend()) indent = std::get<int>(indIt.value());
+
+            bool looseRun = false;
+            auto looseIt = attrs.constFind(AttrNames::LooseRun);
+            if (looseIt != attrs.cend()) looseRun = std::get<bool>(looseIt.value());
+
+            const QByteArray indentBytes(indent * 3, ' ');
+            const QByteArray marker = markerForListItem(attrs);
+            const QByteArray content = blockText(id);
+
+            // Emit: <indent><marker> <content>\n
+            out += indentBytes + marker + " " + content + "\n";
+
+            // For loose runs, insert a blank line after the item — but only
+            // if there is a following block (no trailing blank line after the last item).
+            if (looseRun && (i + 1 < blocks.size())) {
+                out += "\n";
+            }
+            continue;
+        }
+
         QByteArray bytes;
         if (!isBlockTouched(id)) {
             // Untouched: use original load-time bytes for byte-identical round-trip
             bytes = d->blockLoadTimeBytes.value(id);
         } else {
             // Touched: re-serialize from CRDT state
-            auto fn = reg.get(blockKind(id));
-            bytes = fn(blockKind(id), blockAttrs(id), blockText(id));
+            auto fn = reg.get(kind);
+            bytes = fn(kind, blockAttrs(id), blockText(id));
         }
         out += bytes;
         if (i + 1 < blocks.size())

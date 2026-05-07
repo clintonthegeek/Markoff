@@ -1307,10 +1307,15 @@ static void harvestListItem(TSNode item, const QByteArray &utf8,
         // Empty item — point both ends at the item's end byte
         b.byteStart = b.byteEnd = static_cast<int>(ts_node_end_byte(item));
     } else {
-        // Strip trailing '\n' from content end
+        // Strip trailing whitespace (newlines + spaces/tabs that tree-sitter
+        // may include in the paragraph node as continuation-indent bytes of
+        // the following sibling item).
         while (contentEnd > contentStart
                && static_cast<uint32_t>(contentEnd - 1) < static_cast<uint32_t>(utf8.size())
-               && utf8[contentEnd - 1] == '\n') {
+               && (utf8[contentEnd - 1] == '\n'
+                   || utf8[contentEnd - 1] == '\r'
+                   || utf8[contentEnd - 1] == ' '
+                   || utf8[contentEnd - 1] == '\t')) {
             --contentEnd;
         }
         b.byteStart = contentStart;
