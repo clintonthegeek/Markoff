@@ -86,3 +86,8 @@ add_test(NAME tst_d2_list_roundtrip COMMAND tst_d2_list_roundtrip)
 qt_add_executable(tst_d2_list_renumber tst_d2_list_renumber.cpp)
 target_link_libraries(tst_d2_list_renumber PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_d2_list_renumber COMMAND tst_d2_list_renumber)
+
+# D4 Phase 1: applyFlatEdit primitive
+qt_add_executable(tst_d4_apply_flat_edit tst_d4_apply_flat_edit.cpp)
+target_link_libraries(tst_d4_apply_flat_edit PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d4_apply_flat_edit COMMAND tst_d4_apply_flat_edit)

@@ -13,6 +13,7 @@ enum class Origin {
     ExternalReloadResolved, ///< stack cleared (post-merge-modal resolution)
     UserRevertToSaved,      ///< pushes one mega edit so Ctrl+Z reverses it
     TestFixture,            ///< stack cleared (test setup)
+    UserEdit,               ///< live edit from a flat-text view (D4 applyFlatEdit)
 };
 
 }  // namespace Markoff
