@@ -92,6 +92,9 @@ add_library(markoff_core STATIC
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/D2.cpp
+    # --- MarkdownView polymorphic base (Task 4.5) ---
+    include/markoff/core/MarkdownView.h
+    src/MarkdownView.cpp
 )
 
 target_include_directories(markoff_core

@@ -126,4 +126,8 @@ add_test(NAME tst_v10_action_id COMMAND tst_v10_action_id)
 target_link_libraries(tst_v10_action_id PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_v10_action_id PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_v10_markdown_view_base tst_v10_markdown_view_base.cpp)
+add_test(NAME tst_v10_markdown_view_base COMMAND tst_v10_markdown_view_base)
+target_link_libraries(tst_v10_markdown_view_base PRIVATE Qt6::Test Qt6::Widgets markoff_core)
+
 add_subdirectory(d2)
