@@ -433,8 +433,8 @@ void LiveStructuralKeyHandler::registerBuiltins()
         if (c.qtPos == 0) {
             // Cursor at start of non-empty content: insert a new empty item
             // before the current one. The current item shifts to blockIndex+1.
-            Markoff::Cmd::insertListItemBefore(*c.document, id, t);
-            Markoff::Cmd::renumberRunStartingAt(*c.document, id, t);
+            const Markoff::BlockId newId = Markoff::Cmd::insertListItemBefore(*c.document, id, t);
+            Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
             // Follow the original (content-bearing) item, now at blockIndex+1.
             c.cursorState->requestTextCaretAtAnchor(id, 0);
             return HR::Handled;
@@ -489,8 +489,9 @@ void LiveStructuralKeyHandler::registerBuiltins()
         const int joinQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
         auto result = Markoff::Cmd::backspaceMerge(*c.document, c.blockAnchor);
         if (result.mergedInto.isNull()) return HR::NotHandled;
-        // backspaceMerge uses its own transaction; renumber in a follow-up transaction
-        // so the merged block's run stays consistent if it is still a ListItem.
+        // backspaceMerge uses its own internal transaction; renumber in a follow-up.
+        // This creates two undo entries for one Backspace, which is an acceptable
+        // limitation until backspaceMerge gains a transaction parameter.
         {
             UndoLog::Transaction t(c.document->d2UndoLog());
             Markoff::Cmd::renumberRunStartingAt(*c.document, result.mergedInto, t);
@@ -505,6 +506,11 @@ void LiveStructuralKeyHandler::registerBuiltins()
         if (c.blockIndex >= c.model->rowCount() - 1) return HR::NotHandled;
 
         Markoff::Cmd::deleteMerge(*c.document, c.blockAnchor);
+        {
+            UndoLog::Transaction t(c.document->d2UndoLog());
+            Markoff::Cmd::renumberRunStartingAt(*c.document,
+                Markoff::BlockId(c.blockAnchor), t);
+        }
         c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, c.qtPos);
         return HR::Handled;
     };
