@@ -74,8 +74,6 @@ foundation library + two canonical view leaves.
 - `libs/markoff-source-widget` — canonical QPlainTextEdit-based source
                                  widget (replaces the retired Qutepart-
                                  based `markoff-source`).
-- `libs/markoff-bench`         — benchmarking harness (`tst_benchmark`,
-                                 `tst_realistic`).
 - `libs/jkqtmathtext`          — LaTeX math rendering. Untracked sibling
                                  wired in for D3's Math delegate.
 
@@ -87,12 +85,8 @@ cmake --build build-dev -j
 cd build-dev && ctest -j
 ```
 
-143/143 tests pass at the tip of `exploration/new-foundation` (post-D3,
-mid-D3-correction).
-
-`tst_benchmark` (~7 minutes wall) and `tst_realistic` (~90 seconds) are
-the slow tail; everything else completes in <10 seconds. Use
-`-E "tst_realistic|tst_benchmark"` for a fast inner loop.
+141/141 fast tests pass at the tip of `exploration/new-foundation` (post-D3,
+mid-D4). Use `-E "tst_realistic|tst_benchmark"` for a fast inner loop.
 
 ## Conventions
 

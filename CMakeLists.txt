@@ -8,7 +8,6 @@ project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 #   - libs/markoff-foundation (Markoff::Foundation — MarkoffDocument + ParsePool + Sessions)
 #   - libs/markoff-view-qml   (QML view library)
 #   - libs/markoff-source-widget (QPlainTextEdit-based source widget)
-#   - libs/markoff-bench         (in-tree benchmark harness; STATIC, internal)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project.
 # Qt6 / KF6 are discovered via find_package — parent projects that already find
@@ -65,12 +64,6 @@ if(NOT TARGET jkqtmathtext)
 endif()
 add_subdirectory(libs/markoff-live-render)
 add_subdirectory(libs/markoff-source-widget)
-add_subdirectory(libs/markoff-bench)
-
-option(MARKOFF_BUILD_BENCH_APPS "Build standalone bench CLIs" ON)
-if(MARKOFF_BUILD_BENCH_APPS)
-    add_subdirectory(apps/bench)
-endif()
 
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
 if(MARKOFF_BUILD_TESTS)
