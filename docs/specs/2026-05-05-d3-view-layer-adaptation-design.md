@@ -2,10 +2,20 @@
 
 **Date:** 2026-05-05
 **Branch:** `exploration/new-foundation`
-**Status:** Approved for plan derivation (brainstorming complete).
+**Status:** Implemented + partial dogfood. **§6 ListItem section requires
+the corrective spec** at
+`docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — read that for
+all list-related decisions. The rest of this spec (Heading, CodeBlock, HR,
+Image, Math, Blockquote, per-block undo, cursor signals, `BlockKindRegistry`
+injection) stands as-shipped. §1 premise 6 ("each list item is a separate
+`BlockKind::ListItem` block") was load-bearing and correct; the
+implementation compromised it; the corrective spec restores it.
 **Audience:** the implementer; the user (review gate); fresh-context agents picking up D4 or D5.
 
 **Supersedes:** `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` (stub).
+**Partially superseded by:** `docs/specs/2026-05-06-per-item-listitem-blocks-design.md`
+(ListItem-specific sections only; everything else in this spec is
+authoritative).
 
 **Predecessors (read first):**
 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation

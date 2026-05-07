@@ -2,22 +2,33 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-05 (D3 plan written — implementation next.)
+**Last updated:** 2026-05-06 (D3 dogfooded; corrective ListItem spec landed.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **D3** (view-layer adaptation) — plan written. Read plan at `docs/plans/2026-05-05-d3-view-layer-adaptation.md` (Part 1) and `docs/plans/2026-05-05-d3-view-layer-adaptation-part2.md` (Part 2).
+**Active phase:** **D3-correction** — D3's original 27-task plan implemented
+2026-05-05. Dogfood 2026-05-06 surfaced that ListItem blocks were
+implemented as whole-multi-line-list-blocks, contradicting D3 §1 premise 6
+("each list item is a separate block"). Corrective spec landed at
+`docs/specs/2026-05-06-per-item-listitem-blocks-design.md`. Implementation
+plan pending. Heading / CodeBlock / HR / Image / Math / Blockquote / per-
+block undo / structural cursor signals from D3 stand as-shipped.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **D3 plan written.** Begin implementation using `superpowers:subagent-driven-development` against `docs/plans/2026-05-05-d3-view-layer-adaptation.md` (Tasks 1–16, Phases 1–4) then `docs/plans/2026-05-05-d3-view-layer-adaptation-part2.md` (Tasks 17–27, Phases 5–8).
+> **D3-correction implementation pending.** Read the corrective spec and
+> derive an implementation plan (writing-plans).
 >
 > **Read first** (in this order, for a fresh agent context):
 > 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation
 > 2. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items
-> 3. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — the binding D3 spec
-> 4. `docs/plans/2026-05-05-d3-view-layer-adaptation.md` — Part 1 plan
+> 3. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — original D3 spec (premise 6 is the load-bearing line)
+> 4. **`docs/specs/2026-05-06-per-item-listitem-blocks-design.md`** — the corrective spec, active subject
+>
+> **Do not** continue patching `LiveStructuralKeyHandler.cpp`'s multi-line
+> ListItem path. Commits `cc62280`, `799eb94`, `21b2ce3` are the dead
+> end the corrective spec replaces.
 
 ---
 
@@ -28,7 +39,7 @@
 | **D0** | `complete` | Joint design — proposal + response delivered and accepted. |
 | **D1** | `complete` | `CollabText::Crdt::IdList` shipped 2026-05-04. Available for D2 consumption. |
 | **D2** | `complete` | All 15 phases implemented and dogfooded. 141/141 tests pass (3 pre-existing QML selection failures unrelated to D2 cleared during dogfood). User signed off 2026-05-05. |
-| **D3** | `plan-approved` | Spec at `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md`. Plan at `docs/plans/2026-05-05-d3-view-layer-adaptation.md` + part2. Implementation next. |
+| **D3** | `partial-dogfood` | Original 27-task plan implemented and dogfooded. Heading/CodeBlock/HR/Image/Math/Blockquote/per-block-undo land as-shipped. **ListItem path requires correction** — corrective spec at `docs/specs/2026-05-06-per-item-listitem-blocks-design.md`; implementation plan pending. D3 closes when the corrective spec ships. |
 | **D4** | `stubbed` | `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`. Substantive design post-D2/D3. |
 | **D5** | `stubbed` | `docs/specs/2026-05-04-d5-collab-activation-STUB.md`. Substantive design post-D4. |
 
@@ -46,7 +57,9 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-05 | (this session) | D3 implementation plan written (27 tasks, 9 phases, two plan files). D3 status → plan-approved. |
+| 2026-05-06 | `37661b5` (+ amendments) | D3 dogfood found ListItem implementation compromised D3 §1 premise 6 (lists were stored as one whole-list block, not one block per item). Corrective spec `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` landed; resolves marker storage (attribute, `MarkerStyle`+`MarkerNumber`), loose-list (per-item `LooseRun` attr), renumber location (caller-driven via `Cmd::renumberRunStartingAt`), task-list scope (in). Implementation plan pending. D3 status → partial-dogfood. |
+| 2026-05-06 | `cc62280`, `21b2ce3`, `799eb94` | Band-aid fixes for ListItem dogfood bugs (in-block insert, ordered-marker increment, multi-trailing-`\n` strip). These over-fitted the wrong shape; the corrective spec replaces them. Do not extend this lineage. |
+| 2026-05-05 | (D3 plan + impl session) | D3 implementation plan written (27 tasks). Implementation completed; pre-corrective dogfood reported clean for non-list block kinds. D3 status was → plan-approved → in-progress → partial-dogfood. |
 | 2026-05-05 | `edcd104` | D2 dogfood complete — user signed off. Six bugs fixed during pass (empty view, merge newline, merge cursor, heading/code-block dispatch, SOB Enter cursor). D2 → complete; D3 brainstorm next. |
 | 2026-05-04 | `6b45b4a` | D2 Phase 14 complete — deprecated `ParsePool`, `parseUpdated`, `parseSequence`, `MarkoffEdit` with D4-deletion markers. D2 implementation done; status → dogfood. |
 | 2026-05-04 | `a862ce0` | D2 Phase 13 — CRDT primitive convergence tests: structural convergence, buffer content convergence, mixed ops, remove-vs-edit race, local undo. |

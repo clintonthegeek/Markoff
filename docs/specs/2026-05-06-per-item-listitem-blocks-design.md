@@ -1,9 +1,26 @@
 # Per-Item ListItem Blocks Design
 
 **Date:** 2026-05-06
-**Status:** Draft for review
-**Replaces:** the "list = one block containing multi-line text" compromise that
-landed in D2's `materializeBlocksFromParsedDoc` and propagated through D3.
+**Status:** Approved (open questions resolved 2026-05-06; see §"Open questions" at end).
+**Relationship to D3:** This spec is **not a redesign of D3** — it is the
+corrective spec that fulfills D3 §1 premise 6 ("Each list item is a separate
+`BlockKind::ListItem` block in IdList"). The D3 *spec* always required
+per-item granularity; the D3 *implementation* compromised in
+`materializeBlocksFromParsedDoc` ("item-level unwrapping is deferred").
+That deferral is the root of the dogfood bug class around lists. This spec
+removes the deferral and brings the implementation back in line with D3.
+
+**Position in the D arc:** D3-correction. After this lands, D3 is complete
+in spirit and substance (not just in checkbox count). D4 / D5 are unchanged.
+
+**Read first:**
+1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D arc orientation
+2. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items
+3. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 binding
+   spec; §1 premise 6 and §7 (`AttrNames`) are the load-bearing parts this
+   spec fulfills
+4. `docs/specs/2026-05-04-d2-foundation-reshape-design.md` §6 — parser
+   surface contract (we add one extra parser surface here, see §"Parser-side")
 
 ## Why we're doing this
 
@@ -28,16 +45,26 @@ CRDT block.
 
 ## Goal
 
-Turn every `list_item` parser node into one `BlockKind::ListItem` block with:
-- `indent` (int) — nesting depth from outer `list` ancestors
-- `markerKind` (enum) — Dot ("1."), Paren ("1)"), Minus, Plus, Star, TaskUnchecked, TaskChecked
-- `markerNumber` (int, 1+) — only meaningful for ordered (`Dot`/`Paren`)
-- buffer text — **the item's content only** (no marker, no leading whitespace,
-  no item-separator newlines)
+Turn every `list_item` parser node into one `BlockKind::ListItem` block with
+these attributes (all stored in the per-block `BlockAttrsMap`, AttrNames declared
+in `markoff-foundation/AttrNames.h`):
 
-Adjacent ListItem blocks render visually as a list. Renumbering is a walk over
-consecutive same-indent ordered items in the model, run after every change in
-`onD2Changed`.
+| AttrName | Type | Meaning | Set on |
+|---|---|---|---|
+| `IndentLevel` | int (0+) | Nesting depth from outer `list` ancestors | every ListItem |
+| `MarkerStyle` | QString | Marker shape: `"dot"` / `"paren"` / `"minus"` / `"plus"` / `"star"` / `"task"` | every ListItem |
+| `MarkerNumber` | int (1+) | Sequence number; **only set for `MarkerStyle ∈ {"dot", "paren"}`** | ordered ListItems |
+| `Checked` | bool | Task-list checkbox state; **only set for `MarkerStyle == "task"`** | task-list ListItems |
+| `LooseRun` | bool | Whether this item belongs to a loose list (blank lines between items) | every ListItem |
+
+Buffer text is **the item's content only** — no marker, no leading indent
+whitespace, no trailing newlines. The buffer holds what the user actually
+edits as text within the item. Marker and indent are presentation +
+serialization concerns reconstructed from attrs.
+
+Adjacent ListItem blocks render visually as a list. Renumbering is a
+caller-driven helper invoked from each structural handler that affects
+ordered-marker sequencing (see §"Renumbering" below).
 
 ## Non-goals
 
@@ -69,60 +96,137 @@ ListItem text="1. one\n2. two\n   - sub a\n   - sub b\n3. three" indentLevel=0
 
 The target model has five blocks, in `iterateBlocks()` order:
 ```
-ListItem text="one"   indent=0  markerKind=Dot    markerNumber=1
-ListItem text="two"   indent=0  markerKind=Dot    markerNumber=2
-ListItem text="sub a" indent=1  markerKind=Minus
-ListItem text="sub b" indent=1  markerKind=Minus
-ListItem text="three" indent=0  markerKind=Dot    markerNumber=3
+ListItem text="one"   IndentLevel=0  MarkerStyle="dot"   MarkerNumber=1  LooseRun=false
+ListItem text="two"   IndentLevel=0  MarkerStyle="dot"   MarkerNumber=2  LooseRun=false
+ListItem text="sub a" IndentLevel=1  MarkerStyle="minus"                 LooseRun=false
+ListItem text="sub b" IndentLevel=1  MarkerStyle="minus"                 LooseRun=false
+ListItem text="three" IndentLevel=0  MarkerStyle="dot"   MarkerNumber=3  LooseRun=false
 ```
 
+For the same source as a *loose* list (blank lines between items):
+```
+1. one
+
+2. two
+```
+Both items get `LooseRun=true`. Serialization emits the blank lines back.
+
 The `text` is the item's content **without** the marker. Marker presentation
-is the delegate's responsibility (or `LiveBlockModel` synthesizes a display
-prefix from attrs).
+is the delegate's responsibility — `ListItemDelegate.qml` reads `MarkerStyle`
++ `MarkerNumber` + `Checked` from `model.attrs` and renders a non-editable
+marker label to the left of the TextEdit. Indent is rendered as left padding.
 
-## Marker rendering: where does the "1." come from?
+## Marker storage and rendering
 
-Two choices, with a recommendation:
+Marker lives in attrs, **not** in the buffer text. Buffer is content-only.
+The `MarkerStyle` + `MarkerNumber` encoding (two attrs, not one mashed
+QString like `"1."`) is chosen so renumbering is a single int LWW edit per
+item, not a string parse-and-rewrite.
 
-**A. Delegate prepends from attrs.** `ListItemDelegate.qml` reads
-`model.markerKind` + `model.markerNumber` + `model.indent` and renders the
-marker as a non-editable label to the left of the TextEdit. The TextEdit
-holds only the content text. **Recommended.** This is what makes Tab,
-renumbering, and indent visualization clean — the marker is not in the
-editing buffer.
+`ListItemDelegate.qml` renders the marker as a non-editable `Text` element
+to the left of the TextEdit, populated from `model.attrs`:
 
-**B. Buffer text includes the marker.** `text="1. one"` like today, but per
-item. Source-faithful in the buffer, but every Enter handler re-parses the
-marker out, the cursor model is awkward (qtPos=0 sits before "1"), and Tab
-has to manipulate leading whitespace.
+| `MarkerStyle` | Rendered prefix |
+|---|---|
+| `"dot"` | `"<MarkerNumber>."` (e.g., `"3."`) |
+| `"paren"` | `"<MarkerNumber>)"` |
+| `"minus"` | `"-"` |
+| `"plus"` | `"+"` |
+| `"star"` | `"*"` |
+| `"task"` | clickable checkbox; `"[ ]"` when `Checked=false`, `"[x]"` when `true` |
 
-I'm going with **A** in this spec. Buffer is content-only; marker is
-display-only-from-attrs; serialization reconstructs `"<indent><marker> <text>"`.
+The marker label sits inside the TextEdit's `leftPadding`. `leftPadding =
+8 + IndentLevel * indentWidth` puts the marker at the right indent level.
+The TextEdit holds the content text only; cursor positions are relative
+to content (qtPos=0 is at the start of "one", not before "1").
+
+For task lists, click on the checkbox toggles `Checked` via
+`d2SetBlockAttr` (one attr edit, picked up by the next `onD2Changed` cycle).
+This is a clean stress-test of the per-item architecture: if the toggle
+doesn't show up correctly, something is wrong with the attr-edit path.
+
+Serialization (`serializeForSave`) reconstructs the source line from attrs:
+`"<indent_spaces><marker> <text>"`, joined with `\n` between items, with an
+extra `\n\n` between items in the same `LooseRun=true` run.
+
+## Renumbering
+
+**Caller-driven**, in a shared helper `Cmd::renumberRunStartingAt(doc,
+blockId, transaction)`. Each structural handler that may have changed
+ordered-marker sequencing calls this helper inside its own
+`UndoLog::Transaction`. The helper:
+
+1. Walks forward and backward from `blockId` to find the contiguous run of
+   `ListItem` blocks at the same `IndentLevel` with the same
+   `MarkerStyle ∈ {"dot", "paren"}` (one run = one ordered list visually).
+2. Assigns `MarkerNumber = (firstItem.MarkerNumber + offset)` for each
+   item in the run.
+3. Issues `d2SetBlockAttr(blockId, MarkerNumber, n, transaction)` for each
+   item where the new number differs from the stored value.
+
+Callers:
+- `ListItem` Enter handler (insert-after, insert-before, mid-split)
+- `Cmd::backspaceMerge` and `Cmd::deleteMerge` (when the merged-out block
+  was a ListItem)
+- Tab / Shift-Tab handlers (indent change re-runs items into different
+  contiguous runs)
+- Kind-transition (Paragraph → ListItem promotion seeds a new run; ListItem
+  → Paragraph demotion may re-seed the surviving run)
+
+**Why caller-driven, not post-applyOps in `onD2Changed`.** D2 §4.2
+specifies one `UndoEntry(actionId, targets[])` per user action.
+Caller-driven puts the renumber ops into the *same* transaction as the
+originating action, so undo is one step. A post-applyOps pass would create
+a second `UndoEntry`, leaving an undo to "1. one\n2. two\n3. \n3. three"
+intermediate state that requires a second undo to actually revert.
+
+**Known gap (out of scope for this spec).** Selection-spanning-multiple-
+blocks-then-Delete goes through the QML TextEdit's native handling →
+`LiveEditBinding::onContentsChange`, not through a structural handler. With
+per-item blocks, multi-block selection is a separate refactor (selection
+model needs to handle cross-block ranges). When that lands, the cross-
+block-delete path will need to call `Cmd::renumberRunStartingAt` too.
 
 ## Parser-side changes
 
 `libs/markoff-parser/src/TreeSitterParser.cpp`:
 
-1. **`TopLevelBlock::Kind`** — add `ListItem`. Keep `ListTight`/`ListLoose`
-   only if anything else uses them (probably retire — grep says foundation's
-   `mapTopLevelKind` is the only consumer and switches on them).
+1. **`TopLevelBlock::Kind`** — add `ListItem`. Retire `ListTight` and
+   `ListLoose` (their only consumer is foundation's `mapTopLevelKind`,
+   which switches over after this change).
 2. **`classifyTopLevelKind`** — `"list_item"` → `Kind::ListItem`. `"list"`
-   nodes are *not* emitted as TopLevelBlocks anymore — they're traversed for
-   their children only.
-3. **`collectTopLevelBlocks`** — when the walker hits a `list` node, recurse
-   into its `list_item` children. Track an `indentDepth` counter incremented
-   per nested `list`. Each `list_item` gets emitted as one `TopLevelBlock`.
+   nodes are *not* emitted as TopLevelBlocks anymore — the walker
+   traverses into them but only emits their `list_item` children.
+3. **`collectTopLevelBlocks`** — when the walker hits a `list` node,
+   recurse into its `list_item` children. Track an `indentDepth` counter
+   incremented per nested `list`. Each `list_item` emits one
+   `TopLevelBlock`. Also track `looseRun` (true if the parent `list` node's
+   tree-sitter type indicates loose; tree-sitter-markdown emits
+   distinct types for this).
 4. **`TopLevelBlock` fields** — add:
-   - `int indentDepth` (0-based)
-   - `enum class MarkerKind { Dot, Paren, Minus, Plus, Star, TaskUnchecked, TaskChecked }` `markerKind`
-   - `int markerNumber` (only set for Dot/Paren)
-   - The `byteStart` / `byteEnd` are now the item's **content** range, not
-     the whole item including marker and trailing newline. Compute by:
-     `content_start = first non-marker child's start_byte`,
-     `content_end = last non-marker child's end_byte` (strip trailing `\n`s).
-5. **Test:** `tst_parser_list_items` (new) — a fixture markdown with mixed
-   ordered, unordered, nested, task-list, and verifies one TopLevelBlock per
-   item with correct indent/marker.
+   - `int indentDepth` (0-based; from nested-`list` ancestor count)
+   - `QString markerStyle` (one of the strings from §"Goal":
+     `"dot"`/`"paren"`/`"minus"`/`"plus"`/`"star"`/`"task"`)
+   - `int markerNumber` (only meaningful when `markerStyle ∈ {"dot",
+     "paren"}`)
+   - `bool checked` (only meaningful when `markerStyle == "task"`; from
+     `task_list_marker_checked` vs `task_list_marker_unchecked`)
+   - `bool looseRun` (true if parent list is loose)
+   - The existing `byteStart` / `byteEnd` are now the item's **content**
+     range, not the whole item including marker and trailing newline.
+     Compute by: `content_start = first non-marker, non-block_continuation
+     child's start_byte`, `content_end = last non-marker child's end_byte`,
+     then strip trailing `\n`s.
+5. **Test:** `tst_parser_list_items` (new) — fixtures: mixed ordered+
+   unordered, nested 2-deep, task-list with checked + unchecked + extended,
+   tight + loose. Verify one `TopLevelBlock` per `list_item` with correct
+   `indentDepth`/`markerStyle`/`markerNumber`/`checked`/`looseRun`.
+
+**Note re: D4 (parser scope reduction).** D4 deletes `ParsePool` and
+`IncrementalParseSession` — surviving parser surface is `Document::fromMarkdown`
++ `inlineSpansFor`. This spec doesn't change that contract; we're just
+*emitting more information* through the existing `Document::fromMarkdown`
+load-time call. D4 stays unchanged.
 
 ## Foundation-side changes
 
@@ -131,24 +235,47 @@ display-only-from-attrs; serialization reconstructs `"<indent><marker> <text>"`.
 1. **`mapTopLevelKind`** — `Kind::ListItem` → `BlockKind::ListItem`. Remove
    the `ListTight`/`ListLoose` cases.
 2. **`materializeBlocksFromParsedDoc`** — for `tb.kind == ListItem`, set
-   block attrs from `tb.indentDepth`, `tb.markerKind`, `tb.markerNumber`.
+   block attrs:
+   - `IndentLevel` ← `tb.indentDepth`
+   - `MarkerStyle` ← `tb.markerStyle`
+   - `MarkerNumber` ← `tb.markerNumber` (only when style is "dot"/"paren")
+   - `Checked` ← `tb.checked` (only when style is "task")
+   - `LooseRun` ← `tb.looseRun`
    The buffer content is `bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart)`
-   (which is now content-only, per parser fix above). **Delete** the comment
-   about "item-level unwrapping is deferred."
-3. **`AttrNames.h`** — add `MarkerKind`, `MarkerNumber`. Replace
-   `IndentLevel` with `Indent` (rename for clarity; `IndentLevel` was
-   ambiguous when block ≠ item).
-4. **Serialization** (`saveToMarkdown` / wherever we emit markdown) — when a
-   ListItem is encountered, prepend `<indent_spaces><marker> ` to the buffer
-   text. Marker text from `markerKind` + `markerNumber`:
-   - `Dot` → `"<n>."`
-   - `Paren` → `"<n>)"`
-   - `Minus`/`Plus`/`Star` → `"-"` / `"+"` / `"*"`
-   - `TaskUnchecked` → `"- [ ]"`
-   - `TaskChecked` → `"- [x]"`
-5. **Test:** `tst_d2_list_roundtrip` (new) — load → iterate blocks → assert
-   per-item structure → serialize → assert source identity for tight,
-   loose, nested, ordered, unordered, mixed, task-list cases.
+   (now content-only per parser fix). **Delete** the comment about
+   "item-level unwrapping is deferred."
+3. **`AttrNames.h`** — keep existing `IndentLevel`, `MarkerStyle`, `Checked`
+   (already declared). Add `MarkerNumber`, `LooseRun`. Do **not** rename
+   `IndentLevel` to `Indent` — the original name reads naturally under
+   per-item granularity (the rename was prompted by the wrong "block ≠
+   item" mental model).
+4. **Serialization** (`serializeForSave` and any other emit-markdown path):
+   when a contiguous run of ListItem blocks is encountered, emit each as:
+   `"<' ' * IndentLevel * 2><marker> <buffer text>"` joined by `\n`,
+   with extra `\n` between items if `LooseRun=true`. Marker text:
+   - `MarkerStyle="dot"` → `"<MarkerNumber>."`
+   - `MarkerStyle="paren"` → `"<MarkerNumber>)"`
+   - `MarkerStyle="minus"`/`"plus"`/`"star"` → `"-"`/`"+"`/`"*"`
+   - `MarkerStyle="task"` + `Checked=false` → `"- [ ]"`
+   - `MarkerStyle="task"` + `Checked=true` → `"- [x]"`
+5. **`Cmd::D2.cpp`** — add helpers (caller-driven renumber depends on these
+   being callable from the structural handlers):
+   - `BlockId insertListItemAfter(MarkoffDocument&, BlockId currentItem, UndoLog::Transaction&)`
+     — copies `IndentLevel`, `MarkerStyle`, `LooseRun`; sets
+     `MarkerNumber = current + 1` when ordered. Returns new BlockId.
+   - `BlockId insertListItemBefore(MarkoffDocument&, BlockId currentItem, UndoLog::Transaction&)`
+     — analogous; sets `MarkerNumber = current` (caller renumbers afterward).
+   - `void renumberRunStartingAt(MarkoffDocument&, BlockId anyItemInRun, UndoLog::Transaction&)`
+     — see §"Renumbering" above.
+6. **Test:** `tst_d2_list_roundtrip` (new) — load → iterate blocks →
+   assert per-item structure (kind, attrs, content) → serialize → assert
+   source identity (byte-equal) for: tight ordered, tight unordered,
+   loose ordered, mixed-marker (some `1.` and some `1)` in same source),
+   nested 2-deep, task-list (checked + unchecked + extended).
+7. **Test:** `tst_d2_list_renumber` (new) — exercise `renumberRunStartingAt`:
+   insert mid-run, delete mid-run, indent change splits a run into two,
+   ordered + unordered mix in the same indent doesn't get cross-run
+   renumbered.
 
 ## Live-render-side changes
 
@@ -187,25 +314,33 @@ display-only-from-attrs; serialization reconstructs `"<indent><marker> <text>"`.
 
 This file shrinks dramatically. The ListItem section becomes:
 
-- **Enter at end of a non-empty item** → `Cmd::insertListItemAfter(doc, blockId)`.
-  Helper inserts a new ListItem block after, copies `indent` + `markerKind`,
-  sets `markerNumber = current + 1` for ordered. `requestTextCaretAtNewRow(blockIndex+1, 0)`.
-- **Enter mid-item** → split: truncate current item's buffer at byteOff,
-  `insertListItemAfter`, set new item's buffer = the suffix, copy marker.
-  Cursor at start of new row.
-- **Enter at start of non-empty item** → `insertListItemBefore` (or
-  `enterAtEnd` of previous block, falling back to head insert) with same
-  marker/indent. Cursor stays at original row.
-- **Enter on empty item** → if `indent > 0`: decrement indent attr.
-  Otherwise: change kind to Paragraph (clears attrs, leaves empty buffer).
-- **Tab** → `indent` attr += 1 (cap at 6 or whatever the max is).
-- **Shift-Tab** → `indent` attr -= 1, clamp at 0; if 0 and Shift-Tab again,
-  no-op (not list-exit; that's Enter-on-empty).
-- **Backspace at qtPos=0** → if `indent > 0`: decrement. Otherwise: merge
-  with previous block. If previous is ListItem at same/lower indent, merge
-  contents and remove this block (`Cmd::backspaceMerge` already does this).
-  If previous is Paragraph, demote this to Paragraph then merge.
-- **Delete at qtPos=length** → merge next block in (`Cmd::deleteMerge`).
+- **Enter at end of a non-empty item** →
+  `Cmd::insertListItemAfter(doc, blockId, t)` then
+  `Cmd::renumberRunStartingAt(doc, blockId, t)` in the same transaction.
+  Cursor: `requestTextCaretAtNewRow(blockIndex+1, 0)`.
+- **Enter mid-item** → split in one transaction: truncate current item's
+  buffer at byteOff, `insertListItemAfter`, set new item's buffer = the
+  suffix, then `renumberRunStartingAt`. Cursor at start of new row.
+- **Enter at start of non-empty item** → `insertListItemBefore` with same
+  `MarkerStyle`/`IndentLevel`/`LooseRun`; `renumberRunStartingAt`. Cursor
+  stays at original row.
+- **Enter on empty item** → if `IndentLevel > 0`: decrement IndentLevel
+  attr (item joins outer run; `renumberRunStartingAt` on the outer run).
+  Otherwise: change kind to Paragraph (clears all list attrs, leaves
+  empty buffer); old run renumbers.
+- **Tab** → `IndentLevel` attr += 1 (cap at 6); `renumberRunStartingAt`
+  on both the old run (now missing this item) and the new (now containing
+  this item).
+- **Shift-Tab** → `IndentLevel` attr -= 1, clamp at 0; renumber both runs.
+  If at 0 and Shift-Tab again, no-op (not list-exit; that's Enter-on-empty).
+- **Backspace at qtPos=0** → if `IndentLevel > 0`: decrement (same as
+  Shift-Tab). Otherwise: merge with previous block via
+  `Cmd::backspaceMerge`. If previous was ListItem in same run, run
+  shrinks; renumber. If previous was Paragraph, demote this to Paragraph
+  before merging; renumber the surviving run.
+- **Delete at qtPos=length** → merge next block in via
+  `Cmd::deleteMerge`. If next was ListItem in same run, run shrinks;
+  renumber.
 
 **Deleted from this file:** the marker-prefix regex (`kMarker`), the
 ordered-marker regex (`kOrd`), the renumber tail-builder, the `atLineStart`
@@ -236,24 +371,20 @@ are unchanged.
 - `BlockRecord` gets corresponding fields, populated from attrs in
   `LiveListModelBinding::onD2Changed`.
 
-### `Cmd::D2.cpp`
-
-- **Add** `insertListItemAfter(MarkoffDocument&, BlockId currentItem)` —
-  inserts a new ListItem after, copies `indent`, `markerKind`, sets
-  `markerNumber` to +1 for ordered. Returns the new BlockId.
-- **Add** `insertListItemBefore(MarkoffDocument&, BlockId currentItem)` —
-  inserts a new ListItem before. Cursor stays in current row visually.
-
 ### `qml/delegates/ListItemDelegate.qml`
 
-- **Render** the marker as a non-editable `Text` element to the left of the
-  TextEdit, populated from `model.markerKind` + `model.markerNumber`.
+- **Render** marker as a non-editable `Text` element (or, for task items, a
+  clickable checkbox) to the left of the TextEdit, populated from
+  `model.attrs` per the table in §"Marker storage and rendering".
 - The TextEdit shows `model.text` (content only). Cursor positions are
-  relative to content — much cleaner.
-- **Indent** rendering uses `leftPadding: 8 + model.indent * indentWidth`.
-  Marker label sits inside the padding.
-- Structural keys still go through `tryHandle` like today, with no
-  handler-side regex.
+  relative to content — qtPos=0 is at the start of the item's content.
+- **Indent** rendering uses `leftPadding: 8 + model.attrs.IndentLevel *
+  indentWidth`. Marker label sits inside the padding.
+- **Task-list checkbox** click handler calls
+  `binding.document.d2SetBlockAttr(model.blockAnchor, "checked", !checked)`
+  inside a fresh transaction.
+- Structural keys still go through `tryHandle` like today; the handler is
+  much shorter (no regex marker parsing).
 
 ## Tests to update
 
@@ -280,30 +411,10 @@ was in a loose list, and serialize blank lines accordingly.
 loads through `loadFromMarkdown` which goes through the parser, so it picks
 up the new representation automatically. No migration script needed.
 
-**Per-block undo with structural changes.** Per-block undo today undoes only
-buffer edits within that block. After this change, a renumber pass that
-fixes 3 markers does 3 attr edits — undo on any one item undoes its number
-back to the wrong value. The renumber pass should be marked as
-"non-undoable" or grouped with the originating user action via
-`UndoLog::Transaction` so the whole renumber undoes/redoes together. Spec
-detail: bracket the renumber edits with the user's transaction by passing
-the same `Transaction&` from the originating Enter handler.
-
-(Actually — the renumber pass runs in `onD2Changed`, which is *outside* any
-caller's transaction. The cleanest fix: detect renumber-needed in the
-*caller* (the structural key handler) and queue the marker edits in the
-caller's transaction. That makes renumber a *consequence of the user
-action*, not a separate model concern. Reconsider where renumber lives:
-either caller-driven (in handlers, with a shared helper) or
-post-applyOps (uncoupled, but undo-fragile). Open question — favoring
-caller-driven for undo coherence.)
-
-**Open question on the renumber location.** Caller-driven means each
-structural handler that affects ordered numbering (Enter, Backspace merge,
-Delete merge, indent change, kind change to/from ListItem) calls a
-`renumberAround(blockId)` helper. Post-applyOps means a single pass after
-every model update. Caller-driven is more code but undo-coherent.
-Recommend caller-driven; revisit if it gets noisy.
+**Per-block undo with structural changes.** Resolved in §"Renumbering"
+above: caller-driven, all renumber attr-edits go into the originating
+action's `UndoLog::Transaction`. One user action = one `UndoEntry` =
+one undo step.
 
 ## What gets deleted
 
@@ -315,24 +426,31 @@ Rough LOC estimate (positive = deletion):
 - `LiveListModelBinding.cpp` `while raw.endsWith('\n')`: **+5 LOC**
 - `LiveCursorState.cpp` `requestTextCaretAtRow` immediate-resolve path,
   `resolvePendingForRow`: **+30 LOC**
-- `KindTransition.cpp` ListItem regex: **+5 LOC**
-- Compound `tst_live_render_structural` integration tests built around the
-  multi-line-block assumption: **+80 LOC** (replaced by simpler per-item
-  tests)
+- `KindTransition.cpp` ListItem regex on multi-line text: **+5 LOC** (kept
+  for paragraph-→-list promotion; just simpler against single-line text)
+- `tst_live_render_structural` integration tests built around the multi-
+  line-block assumption: **+80 LOC** (replaced by simpler per-item tests)
 
 Rough LOC additions:
 
-- Parser `collectTopLevelBlocks` recursion into list_item: **-40 LOC**
-- Foundation marker/indent/markerNumber attr handling + serialize: **-30 LOC**
-- `Cmd::insertListItemAfter`/`Before` helpers: **-30 LOC**
-- ListItemDelegate marker rendering: **-30 LOC**
-- New foundation roundtrip test: **-50 LOC**
+- Parser `collectTopLevelBlocks` recursion + marker harvest: **-50 LOC**
+- Foundation `materializeBlocksFromParsedDoc` attr population: **-15 LOC**
+- Foundation `serializeForSave` list reconstruction (incl. task lists): **-40 LOC**
+- `Cmd::insertListItemAfter` / `Before` / `renumberRunStartingAt`: **-50 LOC**
+- `AttrNames.h` two new attrs (`MarkerNumber`, `LooseRun`): **-4 LOC**
+- `LiveBlockModel` new roles (MarkerStyleRole, MarkerNumberRole,
+  IndentLevelRole, CheckedRole, LooseRunRole): **-25 LOC**
+- `ListItemDelegate.qml` marker label + indent + task-list checkbox: **-50 LOC**
+- New tests (`tst_parser_list_items`, `tst_d2_list_roundtrip`,
+  `tst_d2_list_renumber`): **-150 LOC**
 
-**Net: ~+60 LOC deleted overall**, dramatic complexity reduction in the
-hottest path (`LiveStructuralKeyHandler`), and the two-day class of dogfood
-bugs (phantom newlines, marker race, no-renumber-on-delete, cursor delivery
-race for in-block multi-line edits, nested-list Tab broken) **stops
-existing**.
+**Net: ~-50 LOC overall** (slight net add because of the new tests, which
+are *value*, not bloat). Dramatic complexity reduction in the hot path
+(`LiveStructuralKeyHandler` ListItem section: ~-100 LOC of regex + scan
+gone). The dogfood bug class — phantom newlines, no-renumber-on-insert
+(fixed band-aid-style today, replaced cleanly here), no-renumber-on-delete,
+cursor delivery race for in-block multi-line edits, broken nested-list
+Tab — **stops existing as a category**, not "is fixed."
 
 ## Plan after this spec
 
@@ -353,16 +471,39 @@ churn. Two days total. The result is the feature set we promised:
 block-based editing with interactive blocks mixing freely with familiar
 text editing, and lists that *are* blocks.
 
-## Open questions for review
+## Decisions (open questions resolved 2026-05-06)
 
-1. **Marker as attr vs in buffer text.** Spec recommends attr. Confirm?
-2. **Loose lists** — separate `looseRun` attr per item, or a property of
-   the run? Implementation detail; either works.
-3. **Renumber location** — caller-driven vs post-applyOps. Spec recommends
-   caller-driven. Confirm?
-4. **`indentLevel` rename to `indent`** — is the rename worth the churn,
-   or keep the old name for compat with anything that already references it?
-5. **Task lists** — fully in scope here, or punt to a follow-up? Markers
-   exist in the parser; indent + content are the same as bullet items;
-   `markerKind = TaskChecked/TaskUnchecked` covers it. I'd include it; it's
-   <20 extra LOC.
+1. **Marker storage:** attribute, two-attr encoding (`MarkerStyle` QString
+   + `MarkerNumber` int). Renumbering = one int LWW edit per item, not
+   string parse-and-rewrite. Spec's pre-existing `MarkerStyle` declaration
+   stays; `MarkerNumber` is new.
+2. **Loose lists:** per-item `LooseRun` bool attr, parser-set at load.
+   Preserved through edits; serialization emits blank lines between items
+   in loose runs.
+3. **Renumber location:** caller-driven via `Cmd::renumberRunStartingAt`,
+   called from each structural handler within the originating
+   `UndoLog::Transaction`. Forced by D2 §4.2's one-UndoEntry-per-action
+   undo model — a post-applyOps renumber would require two undos to
+   revert one user action.
+4. **`IndentLevel` naming:** keep. The rename to `Indent` was prompted by
+   the wrong "block ≠ item" mental model; under per-item granularity, the
+   original name reads naturally.
+5. **Task lists:** fully in scope. Same shape as regular ListItem
+   (parser already classifies via `task_list_marker_*` nodes); adds
+   `MarkerStyle="task"` + `Checked` bool + clickable-checkbox rendering
+   in `ListItemDelegate.qml`. ~25 extra LOC; included now to avoid a
+   second rework pass.
+
+## Future / follow-up
+
+- **Multi-block selection + delete.** Out of scope for this spec. With
+  per-item blocks, selecting across items means the selection model needs
+  cross-block range support. When that lands, the cross-block-delete path
+  must call `Cmd::renumberRunStartingAt` to keep ordered runs sequential.
+- **Loose ↔ tight conversion gesture.** No UI for it in this spec. Lists
+  preserve their parser-emitted loose/tight status through edits.
+  A future "convert this list to loose" command would set `LooseRun=true`
+  on every item in the run.
+- **`MoveAfter` for drag-to-reorder.** Per the collabtext scope-line item
+  1, no `moveAfter` in collabtext v1; reorder decomposes to remove +
+  insert. Acceptable.

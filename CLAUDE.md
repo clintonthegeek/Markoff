@@ -1,13 +1,31 @@
 # Markoff (exploration/new-foundation branch)
 
-> **D3 plan written — begin implementation.** D3 (view-layer adaptation) plan landed 2026-05-05. Run `superpowers:subagent-driven-development` against `docs/plans/2026-05-05-d3-view-layer-adaptation.md` (Part 1, Tasks 1–16) then `docs/plans/2026-05-05-d3-view-layer-adaptation-part2.md` (Part 2, Tasks 17–27).
+> **D3-correction in flight.** The D3 implementation landed 2026-05-05 and
+> dogfooded 2026-05-06; dogfood surfaced that lists were stored as
+> "one block = one whole list of multi-line text" instead of D3 §1
+> premise 6's "one block = one list item." That compromise (a TODO in
+> `materializeBlocksFromParsedDoc`) was the root of every list-related
+> dogfood bug. The corrective spec is:
 >
-> **A fresh agent context picking up this work must read, in order:**
+> **`docs/specs/2026-05-06-per-item-listitem-blocks-design.md`** — read
+> this BEFORE picking up any list-related work. It supersedes the
+> ListItem portions of the original D3 implementation plan; the rest of
+> D3 (Heading, CodeBlock, HR, Image, Math, Blockquote, per-block undo,
+> structural cursor signals) stands.
 >
-> 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation across the whole D arc (D0 → D5)
-> 2. `docs/d-arc/d-arc-status.md` — live status board (D3 = spec-approved; plan pending)
+> **Fresh agent context — read in order:**
+>
+> 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation across D0 → D5
+> 2. `docs/d-arc/d-arc-status.md` — live status board
 > 3. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items binding every D-arc spec
-> 4. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — the binding D3 spec
+> 4. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — original D3 spec (still authoritative for non-list pieces)
+> 5. **`docs/specs/2026-05-06-per-item-listitem-blocks-design.md`** — the active corrective spec for ListItem
+>
+> Implementation plan for the corrective spec is pending; do **not** add
+> new band-aid fixes to the multi-line list code in
+> `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp` —
+> commits `cc62280`, `799eb94` and `21b2ce3` already over-fitted that path
+> and the spec replaces them.
 >
 > The C-restoration's status board (`docs/restoration-status.md`) is now
 > historical. The marker-paragraph design and R5.5 plan are retired. R5.5
@@ -19,7 +37,8 @@
 > R5/R5.5 work (will be rewritten or retired during D3 implementation).
 > Do not delete `libs/markoff-view-qml` prematurely.
 >
-> All other content below describes the project at large; D2 dogfood is the active subject within that.
+> All other content below describes the project at large; the D3-correction
+> rework is the active subject within that.
 
 ---
 
@@ -38,19 +57,35 @@ foundation library + two canonical view leaves.
                                  `parseIncremental()`.
 - `libs/collabtext`            — CRDT text engine, sibling-symlinked
                                  from `/home/clinton/dev/collabtext`.
-- `libs/markoff-foundation`    — `Markoff::MarkoffDocument` (CRDT-
-                                 backed canonical text + Sessions +
-                                 ParsePool). The ParsePool worker owns
-                                 a long-lived `IncrementalParseSession`
-                                 that reuses tree-sitter trees across
-                                 calls.
-- `libs/markoff-view-qml`      — canonical QML view (Phase 1: source-
-                                 mode editor; Phase 2: live preview).
+- `libs/markoff-foundation`    — `Markoff::MarkoffDocument` (D2: per-
+                                 block CRDT buffers + `IdList` for block
+                                 order + sibling causal-LWW maps for
+                                 kind/attrs/link-refs/footnotes/
+                                 frontmatter). `Cmd::*` command set,
+                                 `UndoLog`, `WatermarkCoordinator`.
+                                 `ParsePool` and `IncrementalParseSession`
+                                 are deprecated in D2 and slated for
+                                 deletion in D4.
+- `libs/markoff-view-qml`      — legacy QML view (source mode + a stale
+                                 live mode). Source mode stays; live
+                                 mode retires when `markoff-live-render`
+                                 reaches dogfood-stable. Do not delete
+                                 prematurely — source mode still ships.
+- `libs/markoff-live-render`   — **the active live-preview view leaf.**
+                                 Built on D2's per-block CRDT buffers via
+                                 `LiveListModelBinding`, `LiveBlockModel`,
+                                 `LiveCursorState`, `LiveStructuralKeyHandler`,
+                                 `LiveEditBinding`, `BlockKindRegistry`.
+                                 Layered L0–L8 (see lib's CLAUDE.md). D3
+                                 is implemented here; D3-correction (per-
+                                 item ListItem blocks) is the active rework.
 - `libs/markoff-source-widget` — canonical QPlainTextEdit-based source
                                  widget (replaces the retired Qutepart-
                                  based `markoff-source`).
-- `libs/jkqtmathtext`          — LaTeX math rendering (untracked
-                                 sibling, used by future view work).
+- `libs/markoff-bench`         — benchmarking harness (`tst_benchmark`,
+                                 `tst_realistic`).
+- `libs/jkqtmathtext`          — LaTeX math rendering. Untracked sibling
+                                 wired in for D3's Math delegate.
 
 ## Building
 
@@ -60,7 +95,8 @@ cmake --build build-dev -j
 cd build-dev && ctest -j
 ```
 
-78/78 tests pass at the tip of `exploration/new-foundation`.
+143/143 tests pass at the tip of `exploration/new-foundation` (post-D3,
+mid-D3-correction).
 
 `tst_benchmark` (~7 minutes wall) and `tst_realistic` (~90 seconds) are
 the slow tail; everything else completes in <10 seconds. Use
@@ -77,40 +113,35 @@ the slow tail; everything else completes in <10 seconds. Use
   changing (rename test contracts to match the new shape, don't
   retrofit).
 
-## Parser hot path (typing latency)
+## Edit hot path (D2, current)
 
-For each keystroke the foundation runs:
+In D2, typing does not reparse the document. The path is:
 
-1. `MarkoffDocument::applyLocalEdit` → `ParsePool::schedule(utf8)`.
-2. Worker: `Document::extract(raw)` strips frontmatter and harvests
-   footnote metadata (definitions and per-reference numbering). It
-   does NOT mutate the body — `extracted.body == raw.mid(frontmatter
-   BlockEnd)` byte-for-byte. Footnote refs are surfaced via
-   `Document::footnoteRefs()` for renderers.
-3. `IncrementalParseSession` diffs prior body vs new body via prefix/
-   suffix scan to derive a single `ByteEdit`. Since body equals post-
-   frontmatter source, body diff equals source diff modulo the
-   frontmatter offset.
-4. `TreeSitterParser::parseIncremental({edit}, newBody)`:
-   - Block tree: `ts_tree_edit` + `ts_parser_parse(prevTree, …)`,
-     reusing unchanged subtrees.
-   - Inline trees: snapshot old ranges before the edit, shift each
-     through `sortedEdits` to derive its post-edit range, and reuse
-     `m_inlineTrees[i]` for any region whose byte range is unchanged.
-     Overlap-with-edit invalidates a region; unmatched new ranges
-     parse fresh. Reuse count exposed via
-     `TreeSitterParser::inlineTreeReuseCount()` for benchmarks.
-5. `parser.buildDocumentQueries()` walks the tree to bake
-   `DocumentQueryResult`.
-6. `Document::fromComponents()` snapshots a value-shaped Document.
+1. QML `TextEdit::contentsChange(qtPos, removed, added)` →
+   `LiveEditBinding::onContentsChange`.
+2. Compute byte offset from QChar pos via `Coordinates::qtPosToByte`.
+3. `MarkoffDocument::d2ApplyBufferEdit(blockId, byteOffset, removeBytes,
+   insertedUtf8, transaction)` — directly mutates the per-block CRDT
+   buffer.
+4. `scheduleD2Changed()` queues a debounced `d2DocumentChanged` signal
+   (one per event loop iteration).
+5. `LiveListModelBinding::onD2Changed` rebuilds `BlockRecord`s from
+   `iterateBlocks()`, runs kind-transition heuristics on Equal-op
+   blocks (issuing `Cmd::changeKind` if the prefix-rule inference
+   disagrees with stored kind), runs `applyOps` against the model.
+6. Model emits `dataChanged` / `rowsInserted` / `rowsRemoved`. QML
+   delegates re-render. `LiveCursorState` resolves pending cursor
+   requests via the `structuralRowsInserted/Removed` signals.
 
-`resetContent` uses `ParsePool::scheduleReset(utf8)` which drops
-session state and full-parses. The pool's pending-coalesce honors
-Reset precedence (Reset wins over a pending incremental update).
+The parser is only called at **load time** (`Document::fromMarkdown` in
+`loadFromMarkdown`) and **per-block on demand** (`inlineSpansFor(blockId)`,
+cached). The `ParsePool` / `IncrementalParseSession` plumbing carries a
+`[[deprecated]]` mark and is slated for D4 deletion.
 
 ## Per-library guides
 
 - `libs/markoff-foundation/CLAUDE.md`
+- `libs/markoff-live-render/CLAUDE.md` — **active view leaf**
 - `libs/markoff-view-qml/CLAUDE.md`
 - `libs/markoff-source-widget/CLAUDE.md`
 - `libs/markoff-parser/` (no per-lib CLAUDE.md; docs in `docs/specs/`)

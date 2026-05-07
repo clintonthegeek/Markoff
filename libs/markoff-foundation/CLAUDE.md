@@ -3,6 +3,20 @@
 The CRDT-backed document + sessions + parse-pool layer. Exposes a
 view-layer-safe public API; CRDT primitives stay internal.
 
+## Status (2026-05-06)
+
+D2 (foundation reshape) shipped — per-block CRDT buffers, sibling
+causal-LWW maps, `Cmd::*` command set, `UndoLog`, `WatermarkCoordinator`.
+
+**Active corrective work:**
+`docs/specs/2026-05-06-per-item-listitem-blocks-design.md` requires
+foundation-side amendments — `mapTopLevelKind`, `materializeBlocksFromParsedDoc`
+(no more "deferred item-level unwrapping" comment), `AttrNames`
+(`MarkerNumber`, `LooseRun` additions), `serializeForSave` list
+reconstruction, and new `Cmd::insertListItemAfter/Before` +
+`Cmd::renumberRunStartingAt` helpers. Read the spec before touching
+list-related code.
+
 ## Public-boundary types (no `<crdt/...>` dependency)
 
 - **`Markoff::TextAnchor`** — opaque wrapper for a CRDT byte anchor
