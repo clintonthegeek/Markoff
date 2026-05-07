@@ -2213,6 +2213,52 @@ EOF
 )"
 ```
 
+### Task 12.2: Update the live-render comment that mentions `parseUpdated`
+
+**Files:**
+- Modify: `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`
+
+- [ ] **Step 1: Edit the comment block at lines 11-13**
+
+Current text:
+
+```cpp
+// D2 migration: tests use loadFromMarkdown + structureChanged instead of
+// resetContent + parseUpdated. Model rows arrive via onD2Changed driven
+// by the IdListProxy and KindTagMap signals.
+```
+
+Replace `parseUpdated` with a phrasing that doesn't name a now-deleted symbol:
+
+```cpp
+// Tests use loadFromMarkdown + structureChanged. Model rows arrive via
+// onD2Changed driven by the IdListProxy and KindTagMap signals.
+```
+
+(Or rewrite the whole comment for clarity if the migration context is no longer relevant — D4 ships the migration in full, so historical "instead of …" wording is anachronistic.)
+
+- [ ] **Step 2: Build and run**
+
+```bash
+cmake --build build-dev -j 8 --target tst_live_render_paragraph_edit
+ctest -j 8 -R "tst_live_render_paragraph_edit" --output-on-failure
+```
+Expected: PASS (comment-only change).
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp
+git commit -m "$(cat <<'EOF'
+test(live-render/d4): drop parseUpdated mention from migration comment
+
+D4 deleted parseUpdated; the comment is now anachronistic.
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+EOF
+)"
+```
+
 ---
 
 # Phase 13 — Doc updates (post-execution)
