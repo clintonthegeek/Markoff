@@ -30,10 +30,10 @@ target_link_libraries(markoff_source
 
 add_library(Markoff::Source ALIAS markoff_source)
 
-if(NOT DEFINED MARKOFF_SOURCE_WIDGET_BUILD_TESTS)
-    set(MARKOFF_SOURCE_WIDGET_BUILD_TESTS ON)
+if(NOT DEFINED MARKOFF_SOURCE_BUILD_TESTS)
+    set(MARKOFF_SOURCE_BUILD_TESTS ON)
 endif()
-if(MARKOFF_SOURCE_WIDGET_BUILD_TESTS)
+if(MARKOFF_SOURCE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()
