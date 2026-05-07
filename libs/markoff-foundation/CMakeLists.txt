@@ -18,7 +18,6 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/Selection.h
     include/markoff-foundation/FoldRef.h
     include/markoff-foundation/MarkoffDocument.h
-    include/markoff-foundation/RenderPhases.h
     include/markoff-foundation/SessionParams.h
     include/markoff-foundation/Session.h
     include/markoff-foundation/Theme.h
@@ -51,9 +50,6 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/Cmd/D2.h
     src/MarkoffDocumentPrivate.h
     src/SessionPrivate.h
-    src/ParsePool.h
-    src/ParsePoolWorker.h
-    src/IncrementalParseSession.h
     src/AnchorConversion.cpp
     src/BlockAnchorComputation.cpp
     src/AnchorJson.cpp
@@ -61,9 +57,6 @@ add_library(markoff_foundation STATIC
     src/FoldRef.cpp
     src/MarkoffDocument.cpp
     src/Session.cpp
-    src/ParsePool.cpp
-    src/ParsePoolWorker.cpp
-    src/IncrementalParseSession.cpp
     src/Theme.cpp
     src/LinkService.cpp
     src/DefaultLinkService.cpp
