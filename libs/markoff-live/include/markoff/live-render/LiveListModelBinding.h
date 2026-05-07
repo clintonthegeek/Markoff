@@ -13,8 +13,8 @@
 #include <memory>
 #include <qqmlintegration.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockAnchor.h>
 
 namespace Markoff::Live {
 

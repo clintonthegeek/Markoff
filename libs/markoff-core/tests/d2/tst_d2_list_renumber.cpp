@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QtTest/QtTest>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/AttrNames.h>
-#include <markoff-foundation/UndoLog.h>
-#include <markoff-foundation/Cmd/D2.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/UndoLog.h>
+#include <markoff/core/Cmd/D2.h>
 
 using namespace Markoff;
 

@@ -8,7 +8,7 @@
 
 #include <markoff/source/widget/Editor.h>
 #include <markoff/source/widget/FindBar.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 int main(int argc, char **argv) {
     QApplication app(argc, argv);

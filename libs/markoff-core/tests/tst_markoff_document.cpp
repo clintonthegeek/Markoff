@@ -4,10 +4,10 @@
 #include <QCoreApplication>
 #include <QSignalSpy>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
-#include <markoff-foundation/Session.h>
-#include <markoff-foundation/SessionParams.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/Session.h>
+#include <markoff/core/SessionParams.h>
 
 using namespace Markoff;
 

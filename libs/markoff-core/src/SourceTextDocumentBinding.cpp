@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/SourceTextDocumentBinding.h>
+#include <markoff/core/SourceTextDocumentBinding.h>
 
 #include <QTextDocument>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 
 namespace Markoff {
 

@@ -2,7 +2,7 @@
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff-foundation/BlockAttrsMap.h>
+#include <markoff/core/BlockAttrsMap.h>
 
 #include <QByteArray>
 #include <QHash>

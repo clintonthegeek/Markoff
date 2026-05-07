@@ -3,9 +3,9 @@
 #include <markoff/live-render/Coordinates.h>
 #include <markoff/live-render/LiveBlockModel.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 
 #include <QApplication>
 #include <QClipboard>

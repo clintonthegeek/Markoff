@@ -7,7 +7,7 @@
 #include <QRandomGenerator>
 #include <QQuickStyle>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 /// Test app for markoff-live R2. Loads a Markdown file and renders
 /// it read-only via LiveListModelBinding + LiveView. No editing.

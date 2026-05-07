@@ -2,8 +2,8 @@
 #include <QTest>
 #include <QSignalSpy>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/UndoLog.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/UndoLog.h>
 #include <markoff-parser/SourceSpan.h>
 
 using namespace Markoff;

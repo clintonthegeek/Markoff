@@ -358,7 +358,7 @@ private:
 #include <markoff/live-render/MarkerScrubber.h>
 
 #include <markoff/live-render/LiveBlockModel.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff::LiveRender {
 
@@ -447,7 +447,7 @@ EOF
 #include <markoff/live-render/MarkerScrubber.h>
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/BlockKindRegistry.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff;
 using namespace Markoff::LiveRender;
@@ -631,7 +631,7 @@ int Markoff::LiveRender::MarkerScrubber::scrubAfterLoad() {
 }
 ```
 
-Add `#include <optional>` to the top of `MarkerScrubber.cpp` and `#include <markoff-foundation/MarkoffEdit.h>` if not already present.
+Add `#include <optional>` to the top of `MarkerScrubber.cpp` and `#include <markoff/core/MarkoffEdit.h>` if not already present.
 
 - [ ] **Step 5: Run the test to verify it passes**
 

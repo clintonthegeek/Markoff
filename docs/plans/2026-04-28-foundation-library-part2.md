@@ -53,9 +53,9 @@ Create `libs/markoff-core/tests/tst_foundation_session.cpp`:
 #include <QColor>
 #include <QString>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Session.h>
-#include <markoff-foundation/SessionParams.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Session.h>
+#include <markoff/core/SessionParams.h>
 
 using namespace Markoff;
 
@@ -122,7 +122,7 @@ Create `libs/markoff-core/include/markoff-foundation/SessionParams.h`:
 #include <QColor>
 #include <QString>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -155,10 +155,10 @@ Create `libs/markoff-core/include/markoff-foundation/Session.h`:
 
 #include <crdt/Anchor.h>
 
-#include <markoff-foundation/FoldRef.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/SessionParams.h>
+#include <markoff/core/FoldRef.h>
+#include <markoff/core/MarkoffFoundationExport.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/SessionParams.h>
 
 namespace Markoff {
 
@@ -231,8 +231,8 @@ Create `libs/markoff-core/src/SessionPrivate.h`:
 
 #include <crdt/Anchor.h>
 
-#include <markoff-foundation/FoldRef.h>
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/FoldRef.h>
+#include <markoff/core/Selection.h>
 
 namespace Markoff {
 
@@ -261,7 +261,7 @@ Create `libs/markoff-core/src/Session.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Session.h>
+#include <markoff/core/Session.h>
 
 #include <QUuid>
 
@@ -322,7 +322,7 @@ struct SessionParams; // forward
 with:
 
 ```cpp
-#include <markoff-foundation/SessionParams.h>
+#include <markoff/core/SessionParams.h>
 ```
 
 (`SessionParams` is now a complete type and can be included directly.) Also drop the surrounding NOTE comment about the forward declaration, and restore the `= {}`:
@@ -827,7 +827,7 @@ Add the includes at the top of `Session.cpp`:
 
 ```cpp
 #include <QJsonArray>
-#include <markoff-foundation/AnchorJson.h>
+#include <markoff/core/AnchorJson.h>
 ```
 
 - [ ] **Step 4: Build + run.** Expected: pass.
@@ -856,7 +856,7 @@ Wires `MarkoffDocument::createSession / destroySession / sessions / sessionForPa
 Add to `tst_foundation_markoff_document.cpp`:
 
 ```cpp
-#include <markoff-foundation/Session.h>
+#include <markoff/core/Session.h>
 // ... inside the test class ...
 
     void create_session_returns_owned_session() {
@@ -896,7 +896,7 @@ Add to `tst_foundation_markoff_document.cpp`:
 Edit `libs/markoff-core/src/MarkoffDocument.cpp`. Add at the top:
 
 ```cpp
-#include <markoff-foundation/Session.h>
+#include <markoff/core/Session.h>
 ```
 
 Replace the stubs:
@@ -980,8 +980,8 @@ Create `libs/markoff-core/tests/tst_foundation_parse_pool.cpp`:
 #include <QSignalSpy>
 #include <QTest>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff;
 
@@ -1199,7 +1199,7 @@ Create `libs/markoff-core/tests/tst_foundation_theme.cpp`:
 #include <QTest>
 #include <QColor>
 
-#include <markoff-foundation/Theme.h>
+#include <markoff/core/Theme.h>
 
 using namespace Markoff;
 
@@ -1258,7 +1258,7 @@ Create `libs/markoff-core/include/markoff-foundation/Theme.h`:
 #include <QJsonObject>
 #include <QtCore/qmetatype.h>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -1335,7 +1335,7 @@ Create `libs/markoff-core/src/Theme.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Theme.h>
+#include <markoff/core/Theme.h>
 
 namespace Markoff {
 
@@ -1637,13 +1637,13 @@ git commit -m "feat(foundation): Theme defaults (light/dark) + JSON roundtrip"
 Implements `colorForCodeToken(CodeTokenKind)` — depends on Task 43 having defined the `CodeTokenKind` enum. **Reorder note:** if Task 43 has not landed yet at this point, defer this task until after Phase 11; the `colorForCodeToken` body can stay returning `color(Slot::CodeBlock)` until then. This block assumes Task 43's `CodeTokenKind` is available; otherwise complete Task 43 first.
 
 **Files:**
-- Modify: `libs/markoff-core/src/Theme.cpp` (add `#include <markoff-foundation/CodeTokenKind.h>` and replace the stub body)
+- Modify: `libs/markoff-core/src/Theme.cpp` (add `#include <markoff/core/CodeTokenKind.h>` and replace the stub body)
 - Modify: `libs/markoff-core/tests/tst_foundation_theme.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
 ```cpp
-#include <markoff-foundation/CodeTokenKind.h>
+#include <markoff/core/CodeTokenKind.h>
 // ... inside the test class ...
 
     void colorForCodeToken_maps_to_code_slots() {
@@ -1723,7 +1723,7 @@ Implements spec §7.6.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <QtCore/qmetatype.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -1748,8 +1748,8 @@ enum class LinkKind {
 #include <QString>
 #include <QUrl>
 
-#include <markoff-foundation/LinkKind.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/LinkKind.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -1777,9 +1777,9 @@ Q_DECLARE_METATYPE(Markoff::LinkActivation)
 #include <QString>
 #include <QUrl>
 
-#include <markoff-foundation/LinkActivation.h>
-#include <markoff-foundation/LinkKind.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/LinkActivation.h>
+#include <markoff/core/LinkKind.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -1809,7 +1809,7 @@ Q_SIGNALS:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/LinkService.h>
+#include <markoff/core/LinkService.h>
 
 namespace Markoff {
 
@@ -1875,7 +1875,7 @@ Create `libs/markoff-core/tests/tst_foundation_link_service.cpp`:
 #include <QSignalSpy>
 #include <QTest>
 
-#include <markoff-foundation/DefaultLinkService.h>
+#include <markoff/core/DefaultLinkService.h>
 
 using namespace Markoff;
 
@@ -1940,7 +1940,7 @@ set_tests_properties(tst_foundation_link_service PROPERTIES ENVIRONMENT "QT_QPA_
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff-foundation/LinkService.h>
+#include <markoff/core/LinkService.h>
 
 namespace Markoff {
 
@@ -1959,7 +1959,7 @@ public:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/DefaultLinkService.h>
+#include <markoff/core/DefaultLinkService.h>
 
 namespace Markoff {
 
@@ -2034,8 +2034,8 @@ Create `libs/markoff-core/tests/tst_foundation_cmd_edit.cpp`:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/Cmd/Edit.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/Cmd/Edit.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff;
 
@@ -2084,7 +2084,7 @@ set_tests_properties(tst_foundation_cmd_edit PROPERTIES ENVIRONMENT "QT_QPA_PLAT
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 class MarkoffDocument;
@@ -2100,8 +2100,8 @@ MARKOFF_FOUNDATION_EXPORT void redo(MarkoffDocument *);
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Cmd/Edit.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/Cmd/Edit.h>
+#include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff::Cmd {
 
@@ -2143,8 +2143,8 @@ std::pair<quint32, quint32>
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Helpers.h"
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
 
 namespace Markoff::Cmd::Detail {
 
@@ -2212,9 +2212,9 @@ Create `libs/markoff-core/tests/tst_foundation_cmd_inline_format.cpp`:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/Cmd/InlineFormat.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/Cmd/InlineFormat.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
 
 using namespace Markoff;
 using CollabText::Crdt::Bias;
@@ -2292,8 +2292,8 @@ set_tests_properties(tst_foundation_cmd_inline_format PROPERTIES ENVIRONMENT "QT
 
 #include <crdt/Operations.h>
 
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 class MarkoffDocument;
@@ -2328,10 +2328,10 @@ MARKOFF_FOUNDATION_EXPORT CollabText::Crdt::Operation
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Cmd/InlineFormat.h>
+#include <markoff/core/Cmd/InlineFormat.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
 
 #include "Helpers.h"
 
@@ -2474,9 +2474,9 @@ Create `libs/markoff-core/tests/tst_foundation_cmd_block.cpp`:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/Cmd/Block.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/Cmd/Block.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
 
 using namespace Markoff;
 using CollabText::Crdt::Bias;
@@ -2546,8 +2546,8 @@ set_tests_properties(tst_foundation_cmd_block PROPERTIES ENVIRONMENT "QT_QPA_PLA
 
 #include <crdt/Operations.h>
 
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 class MarkoffDocument;
@@ -2578,10 +2578,10 @@ MARKOFF_FOUNDATION_EXPORT CollabText::Crdt::Operation
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Cmd/Block.h>
+#include <markoff/core/Cmd/Block.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
 
 #include "Helpers.h"
 
@@ -2832,8 +2832,8 @@ Insert at a given anchor.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/Cmd/Insert.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/Cmd/Insert.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff;
 using CollabText::Crdt::Bias;
@@ -2887,8 +2887,8 @@ Append target to `tests/CMakeLists.txt` mirroring the prior pattern.
 #include <crdt/Anchor.h>
 #include <crdt/Operations.h>
 
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 class MarkoffDocument;
@@ -2927,9 +2927,9 @@ MARKOFF_FOUNDATION_EXPORT CollabText::Crdt::Operation
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Cmd/Insert.h>
+#include <markoff/core/Cmd/Insert.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff::Cmd {
 
@@ -3043,10 +3043,10 @@ Create `libs/markoff-core/tests/tst_foundation_cmd_multi.cpp`:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/Cmd.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Session.h>
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/Cmd.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Session.h>
+#include <markoff/core/Selection.h>
 
 using namespace Markoff;
 using CollabText::Crdt::Bias;
@@ -3093,12 +3093,12 @@ Create `libs/markoff-core/include/markoff-foundation/Cmd.h`:
 
 #include <functional>
 
-#include <markoff-foundation/Cmd/Block.h>
-#include <markoff-foundation/Cmd/Edit.h>
-#include <markoff-foundation/Cmd/InlineFormat.h>
-#include <markoff-foundation/Cmd/Insert.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/Cmd/Block.h>
+#include <markoff/core/Cmd/Edit.h>
+#include <markoff/core/Cmd/InlineFormat.h>
+#include <markoff/core/Cmd/Insert.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 class MarkoffDocument;
@@ -3119,8 +3119,8 @@ MARKOFF_FOUNDATION_EXPORT void applyToAllPrimaryAndSecondaries(
 Add the impl in `Cmd/Helpers.cpp`:
 
 ```cpp
-#include <markoff-foundation/Cmd.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/Cmd.h>
+#include <markoff/core/Session.h>
 
 namespace Markoff::Cmd {
 
@@ -3184,10 +3184,10 @@ Implements spec §7.7's QML-facing facade.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/CommandFacade.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/CommandFacade.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 
 using namespace Markoff;
 using CollabText::Crdt::Bias;
@@ -3245,7 +3245,7 @@ Append the test target.
 #include <QObject>
 #include <QString>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -3296,12 +3296,12 @@ private:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/CommandFacade.h>
+#include <markoff/core/CommandFacade.h>
 
-#include <markoff-foundation/Cmd.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/Cmd.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 
 namespace Markoff {
 
@@ -3382,9 +3382,9 @@ Implements spec §7.8.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/SearchEngine.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/SearchEngine.h>
+#include <markoff/core/Session.h>
 
 using namespace Markoff;
 
@@ -3456,7 +3456,7 @@ Append target.
 #include <QObject>
 #include <QString>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -3494,13 +3494,13 @@ Q_DECLARE_OPERATORS_FOR_FLAGS(Markoff::SearchEngine::FindFlags)
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/SearchEngine.h>
+#include <markoff/core/SearchEngine.h>
 
 #include <QRegularExpression>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 
 #include <crdt/Anchor.h>
 
@@ -3719,10 +3719,10 @@ Replace the active match (the one whose range matches `primarySelection`); advan
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/ReplaceController.h>
-#include <markoff-foundation/SearchEngine.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/ReplaceController.h>
+#include <markoff/core/SearchEngine.h>
+#include <markoff/core/Session.h>
 
 using namespace Markoff;
 
@@ -3768,7 +3768,7 @@ Append target.
 
 #include <crdt/Operations.h>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 class MarkoffDocument;
@@ -3798,13 +3798,13 @@ public:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/ReplaceController.h>
+#include <markoff/core/ReplaceController.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/SearchEngine.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/SearchEngine.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 
 namespace Markoff {
 
@@ -3954,8 +3954,8 @@ Plain enum + value struct.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/CodeSpan.h>
-#include <markoff-foundation/CodeTokenKind.h>
+#include <markoff/core/CodeSpan.h>
+#include <markoff/core/CodeTokenKind.h>
 
 using namespace Markoff;
 
@@ -3991,7 +3991,7 @@ Append target.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4016,8 +4016,8 @@ enum class CodeTokenKind {
 
 #include <QtGlobal>
 
-#include <markoff-foundation/CodeTokenKind.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/CodeTokenKind.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4067,8 +4067,8 @@ Abstract base.
 #include <QString>
 #include <QStringList>
 
-#include <markoff-foundation/CodeSpan.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/CodeSpan.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4091,7 +4091,7 @@ public:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/SyntaxHighlightService.h>
+#include <markoff/core/SyntaxHighlightService.h>
 
 namespace Markoff {
 
@@ -4135,7 +4135,7 @@ KF6::SyntaxHighlighting backend; translate KF6 token classes → `CodeTokenKind`
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/Kf6SyntaxHighlightService.h>
+#include <markoff/core/Kf6SyntaxHighlightService.h>
 
 using namespace Markoff;
 
@@ -4180,7 +4180,7 @@ Append target.
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff-foundation/SyntaxHighlightService.h>
+#include <markoff/core/SyntaxHighlightService.h>
 
 namespace Markoff {
 
@@ -4213,7 +4213,7 @@ Add `#include <memory>`.
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Kf6SyntaxHighlightService.h>
+#include <markoff/core/Kf6SyntaxHighlightService.h>
 
 #include <KSyntaxHighlighting/AbstractHighlighter>
 #include <KSyntaxHighlighting/Definition>
@@ -4350,8 +4350,8 @@ Abstract processor base + value struct for output.
 #include <QSize>
 #include <QString>
 
-#include <markoff-foundation/CodeSpan.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/CodeSpan.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4378,8 +4378,8 @@ struct MARKOFF_FOUNDATION_EXPORT RenderedBlock {
 #include <QByteArray>
 #include <QString>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
-#include <markoff-foundation/RenderedBlock.h>
+#include <markoff/core/MarkoffFoundationExport.h>
+#include <markoff/core/RenderedBlock.h>
 
 namespace Markoff {
 
@@ -4427,9 +4427,9 @@ Register / unregister / lookup.
 #include <QSignalSpy>
 #include <QTest>
 
-#include <markoff-foundation/CodeBlockProcessor.h>
-#include <markoff-foundation/CodeBlockProcessorRegistry.h>
-#include <markoff-foundation/Theme.h>
+#include <markoff/core/CodeBlockProcessor.h>
+#include <markoff/core/CodeBlockProcessorRegistry.h>
+#include <markoff/core/Theme.h>
 
 using namespace Markoff;
 
@@ -4484,8 +4484,8 @@ Append target.
 
 #include <memory>
 
-#include <markoff-foundation/CodeBlockProcessor.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/CodeBlockProcessor.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4515,7 +4515,7 @@ private:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/CodeBlockProcessorRegistry.h>
+#include <markoff/core/CodeBlockProcessorRegistry.h>
 
 namespace Markoff {
 
@@ -4588,9 +4588,9 @@ Plain types.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/CompletionCandidate.h>
-#include <markoff-foundation/CompletionContext.h>
-#include <markoff-foundation/CompletionTrigger.h>
+#include <markoff/core/CompletionCandidate.h>
+#include <markoff/core/CompletionContext.h>
+#include <markoff/core/CompletionTrigger.h>
 
 using namespace Markoff;
 
@@ -4631,7 +4631,7 @@ Append target.
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4661,8 +4661,8 @@ enum class CompletionTrigger {
 
 #include <crdt/Anchor.h>
 
-#include <markoff-foundation/CompletionTrigger.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/CompletionTrigger.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4686,7 +4686,7 @@ struct MARKOFF_FOUNDATION_EXPORT CompletionContext {
 
 #include <QString>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4734,8 +4734,8 @@ Static `CompletionDetector::detect(doc, cursor)` returns a `CompletionContext` d
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/CompletionDetector.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/CompletionDetector.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff;
 using CollabText::Crdt::Bias;
@@ -4796,8 +4796,8 @@ Append target.
 
 #include <crdt/Anchor.h>
 
-#include <markoff-foundation/CompletionContext.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/CompletionContext.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -4816,9 +4816,9 @@ public:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/CompletionDetector.h>
+#include <markoff/core/CompletionDetector.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff {
 
@@ -5033,9 +5033,9 @@ Abstract provider; registry aggregates synchronous candidates and forwards async
 #include <QSignalSpy>
 #include <QTest>
 
-#include <markoff-foundation/CompletionContext.h>
-#include <markoff-foundation/CompletionProvider.h>
-#include <markoff-foundation/CompletionRegistry.h>
+#include <markoff/core/CompletionContext.h>
+#include <markoff/core/CompletionProvider.h>
+#include <markoff/core/CompletionRegistry.h>
 
 using namespace Markoff;
 
@@ -5102,10 +5102,10 @@ Append target.
 #include <QObject>
 #include <QSet>
 
-#include <markoff-foundation/CompletionCandidate.h>
-#include <markoff-foundation/CompletionContext.h>
-#include <markoff-foundation/CompletionTrigger.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/CompletionCandidate.h>
+#include <markoff/core/CompletionContext.h>
+#include <markoff/core/CompletionTrigger.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -5138,10 +5138,10 @@ Q_SIGNALS:
 #include <memory>
 #include <vector>
 
-#include <markoff-foundation/CompletionCandidate.h>
-#include <markoff-foundation/CompletionContext.h>
-#include <markoff-foundation/CompletionProvider.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/CompletionCandidate.h>
+#include <markoff/core/CompletionContext.h>
+#include <markoff/core/CompletionProvider.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -5174,7 +5174,7 @@ Add a `CompletionProvider.cpp` (vtable anchor) — or place the trivial bodies i
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/CompletionProvider.h>
+#include <markoff/core/CompletionProvider.h>
 
 namespace Markoff {
 
@@ -5188,7 +5188,7 @@ CompletionProvider::~CompletionProvider() = default;
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/CompletionRegistry.h>
+#include <markoff/core/CompletionRegistry.h>
 
 namespace Markoff {
 
@@ -5260,7 +5260,7 @@ Default provider with a baked-in emoji table. Test asserts that prefix `smi` ret
 Append to `tst_foundation_completion_registry.cpp`:
 
 ```cpp
-#include <markoff-foundation/EmojiCompletionProvider.h>
+#include <markoff/core/EmojiCompletionProvider.h>
 // ... inside the class ...
 
     void emoji_provider_returns_smile_for_smi_prefix() {
@@ -5355,7 +5355,7 @@ constexpr std::array<EmojiEntry, 50> kEmojis = {{
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff-foundation/CompletionProvider.h>
+#include <markoff/core/CompletionProvider.h>
 
 namespace Markoff {
 
@@ -5376,7 +5376,7 @@ public:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/EmojiCompletionProvider.h>
+#include <markoff/core/EmojiCompletionProvider.h>
 
 #include "EmojiData.h"
 
@@ -5446,7 +5446,7 @@ A plain struct bundling non-owning service pointers. Tested transitively via int
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -5471,11 +5471,11 @@ struct MARKOFF_FOUNDATION_EXPORT MarkoffServices {
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/CodeBlockProcessorRegistry.h>
-#include <markoff-foundation/CompletionRegistry.h>
-#include <markoff-foundation/DefaultLinkService.h>
-#include <markoff-foundation/Kf6SyntaxHighlightService.h>
-#include <markoff-foundation/MarkoffServices.h>
+#include <markoff/core/CodeBlockProcessorRegistry.h>
+#include <markoff/core/CompletionRegistry.h>
+#include <markoff/core/DefaultLinkService.h>
+#include <markoff/core/Kf6SyntaxHighlightService.h>
+#include <markoff/core/MarkoffServices.h>
 
 using namespace Markoff;
 
@@ -5538,7 +5538,7 @@ Property-based test: random sequence of `applyLocalEdit` calls; assert `toMarkdo
 #include <QRandomGenerator>
 #include <QTest>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff;
 

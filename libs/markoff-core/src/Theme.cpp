@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Theme.h>
-#include <markoff-foundation/CodeTokenKind.h>
+#include <markoff/core/Theme.h>
+#include <markoff/core/CodeTokenKind.h>
 
 namespace Markoff {
 

@@ -2,9 +2,9 @@
 #include <QTest>
 #include <QCoreApplication>
 
-#include <markoff-foundation/Cmd/Edit.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
+#include <markoff/core/Cmd/Edit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
 
 using namespace Markoff;
 

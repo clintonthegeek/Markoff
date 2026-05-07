@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockEdit.h>
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockEdit.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/BlockAnchor.h>
 
 using namespace Markoff;
 

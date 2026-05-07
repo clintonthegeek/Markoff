@@ -119,7 +119,7 @@ A view-layer-safe wrapper for a CRDT byte anchor. Header includes no CRDT types.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/TextAnchor.h>
 
 using namespace Markoff;
 
@@ -191,7 +191,7 @@ set_tests_properties(tst_foundation_text_anchor PROPERTIES ENVIRONMENT "QT_QPA_P
 
 #include <QtGlobal>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -316,7 +316,7 @@ Expected: build fails with "AnchorConversion.h not found" or "Markoff::Detail::t
 #pragma once
 
 #include <crdt/Anchor.h>
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/TextAnchor.h>
 
 namespace Markoff::Detail {
 
@@ -410,7 +410,7 @@ Trivial wrapper around `TextAnchor` to give block-identity its own type.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/BlockAnchor.h>
 
 using namespace Markoff;
 
@@ -474,7 +474,7 @@ Expected: build fails — `BlockAnchor.h` does not exist.
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/TextAnchor.h>
 
 namespace Markoff {
 
@@ -530,8 +530,8 @@ Locally-monotonic counter for "has the doc state changed since some prior point"
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff;
 
@@ -735,8 +735,8 @@ Locally-monotonic counter for "this is the i-th parse to return on this MarkoffD
 #include <QTest>
 #include <QSignalSpy>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff;
 
@@ -922,9 +922,9 @@ Append to `tst_foundation_text_anchor.cpp` (inside the class):
 Also add to includes if not already there:
 
 ```cpp
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/Origin.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/Origin.h>
 ```
 
 - [x] **Step 6.2: Verify failure**
@@ -953,7 +953,7 @@ In `MarkoffDocument.h`, find the existing `// ===== Anchors =====` section (arou
 Also add to the top-of-header `#include` block:
 
 ```cpp
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/TextAnchor.h>
 ```
 
 - [x] **Step 6.4: Implement in `MarkoffDocument.cpp`**
@@ -1300,8 +1300,8 @@ A thin helper: given the parsed `Markoff::Document` and the `MarkoffDocument`, p
 #include <QTest>
 #include <QSignalSpy>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff;
 
@@ -1391,7 +1391,7 @@ Add `#include <QMetaType>` to the header.
 
 #include <QList>
 
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/BlockAnchor.h>
 #include "TopLevelBlockScanner.h"
 
 namespace Markoff {
@@ -1421,7 +1421,7 @@ BlockAnchorBundle computeBlockAnchors(const MarkoffDocument &doc,
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "BlockAnchorComputation.h"
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff::Detail {
 
@@ -1473,7 +1473,7 @@ with:
                       QList<Markoff::BlockAnchor> blockAnchors);
 ```
 
-Add `#include <markoff-foundation/BlockAnchor.h>` near the top of the header (it's already implied via TextAnchor.h but make it explicit for the signal type).
+Add `#include <markoff/core/BlockAnchor.h>` near the top of the header (it's already implied via TextAnchor.h but make it explicit for the signal type).
 
 - [x] **Step 7B.10: Update the relay lambda**
 
@@ -1598,8 +1598,8 @@ git commit -m "feat(foundation): parseUpdated ships BlockAnchor list + parseSequ
 #include <QTest>
 #include <QSignalSpy>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff;
 
@@ -1887,8 +1887,8 @@ Exercise each of the §4 mutations and assert the right anchors stable / new / o
 #include <QTest>
 #include <QSignalSpy>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff;
 
@@ -2090,7 +2090,7 @@ In `libs/markoff-core/include/markoff-foundation/Selection.h`, replace:
 with:
 
 ```cpp
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/TextAnchor.h>
 ```
 
 And replace:
@@ -2219,7 +2219,7 @@ For each line where `m_sess->primarySelection().anchor` or `.active` is passed t
 
 Pattern: prefer pushing `TextAnchor` deeper rather than wrapping at the call site. Receivers that exist purely to be called from `Selection`-driven code can switch their signatures to `TextAnchor`.
 
-For each touched line, also remove `#include <crdt/Anchor.h>` from the file if it's no longer needed; add `#include <markoff-foundation/TextAnchor.h>` and `#include "AnchorConversion.h"` if not present.
+For each touched line, also remove `#include <crdt/Anchor.h>` from the file if it's no longer needed; add `#include <markoff/core/TextAnchor.h>` and `#include "AnchorConversion.h"` if not present.
 
 - [x] **Step 11.3: Update `SearchEngine.cpp`**
 
@@ -2329,7 +2329,7 @@ Replace:
 with:
 
 ```cpp
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/TextAnchor.h>
 ```
 
 If a `Q_DECLARE_METATYPE(CollabText::Crdt::Anchor)` exists at file scope (per the view-qml CLAUDE.md), replace it with:
@@ -2346,7 +2346,7 @@ If properties exposed to QML reference the anchor type — e.g. `Q_PROPERTY(Coll
 
 Wherever the file reads `sel.anchor` (now TextAnchor) and assigns to `m_selectionAnchor`, the assignment is now type-clean. Wherever it calls `m_doc->anchorAt(...)` to construct an anchor for the session, switch to `m_doc->textAnchorAt(...)`. Wherever it calls `m_doc->resolveAnchor(...)`, switch to `m_doc->resolveTextAnchor(...)`.
 
-Add `#include <markoff-foundation/MarkoffDocument.h>` if not present (probably already included).
+Add `#include <markoff/core/MarkoffDocument.h>` if not present (probably already included).
 
 - [x] **Step 12.4: Update the test**
 
@@ -2408,8 +2408,8 @@ Verify per-parse BlockAnchor compute stays under 1 ms wall-time on a 50 KB / 100
 #include <QSignalSpy>
 #include <QElapsedTimer>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 #include "TopLevelBlockScanner.h"
 #include "BlockAnchorComputation.h"

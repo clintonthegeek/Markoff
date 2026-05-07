@@ -3,7 +3,7 @@
 
 #include <QList>
 
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/BlockAnchor.h>
 
 namespace Markoff {
 class MarkoffDocument;

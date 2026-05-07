@@ -3,7 +3,7 @@
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
 #include <markoff/live-render/BlockKindDescriptor.h>
-#include <markoff-foundation/BlockSerializerRegistry.h>
+#include <markoff/core/BlockSerializerRegistry.h>
 
 #include <QHash>
 #include <QStringList>

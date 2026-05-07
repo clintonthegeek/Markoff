@@ -76,10 +76,10 @@ Write `libs/markoff-view-qml/tests/tst_view_qml_live_view_qml.cpp`:
 
 Q_IMPORT_PLUGIN(org_markoff_view_qmlPlugin)
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/Origin.h>
-#include <markoff-foundation/Theme.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/Theme.h>
 
 class TstLiveViewQml : public QObject {
     Q_OBJECT

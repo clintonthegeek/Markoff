@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #define MARKOFF_TESTING
 #include <QTest>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Cmd/D2.h>
-#include <markoff-foundation/BlockKind.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Cmd/D2.h>
+#include <markoff/core/BlockKind.h>
 
 using namespace Markoff;
 

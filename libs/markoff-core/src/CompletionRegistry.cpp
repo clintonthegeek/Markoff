@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/CompletionRegistry.h>
+#include <markoff/core/CompletionRegistry.h>
 
 namespace Markoff {
 

@@ -12,42 +12,42 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 # Sources are added incrementally as tasks land. Initial skeleton is just
 # the export header so the target builds.
 add_library(markoff_core STATIC
-    include/markoff-foundation/MarkoffFoundationExport.h
-    include/markoff-foundation/Origin.h
-    include/markoff-foundation/AnchorJson.h
-    include/markoff-foundation/Selection.h
-    include/markoff-foundation/FoldRef.h
-    include/markoff-foundation/MarkoffDocument.h
-    include/markoff-foundation/SessionParams.h
-    include/markoff-foundation/Session.h
-    include/markoff-foundation/Theme.h
-    include/markoff-foundation/CodeTokenKind.h
-    include/markoff-foundation/CodeSpan.h
-    include/markoff-foundation/LinkKind.h
-    include/markoff-foundation/LinkActivation.h
-    include/markoff-foundation/LinkService.h
-    include/markoff-foundation/DefaultLinkService.h
-    include/markoff-foundation/SyntaxHighlightService.h
-    include/markoff-foundation/Kf6SyntaxHighlightService.h
-    include/markoff-foundation/RenderedBlock.h
-    include/markoff-foundation/CodeBlockProcessor.h
-    include/markoff-foundation/CodeBlockProcessorRegistry.h
+    include/markoff/core/MarkoffCoreExport.h
+    include/markoff/core/Origin.h
+    include/markoff/core/AnchorJson.h
+    include/markoff/core/Selection.h
+    include/markoff/core/FoldRef.h
+    include/markoff/core/MarkoffDocument.h
+    include/markoff/core/SessionParams.h
+    include/markoff/core/Session.h
+    include/markoff/core/Theme.h
+    include/markoff/core/CodeTokenKind.h
+    include/markoff/core/CodeSpan.h
+    include/markoff/core/LinkKind.h
+    include/markoff/core/LinkActivation.h
+    include/markoff/core/LinkService.h
+    include/markoff/core/DefaultLinkService.h
+    include/markoff/core/SyntaxHighlightService.h
+    include/markoff/core/Kf6SyntaxHighlightService.h
+    include/markoff/core/RenderedBlock.h
+    include/markoff/core/CodeBlockProcessor.h
+    include/markoff/core/CodeBlockProcessorRegistry.h
     # --- Completion/ (public) ---
-    include/markoff-foundation/CompletionTrigger.h
-    include/markoff-foundation/CompletionContext.h
-    include/markoff-foundation/CompletionCandidate.h
-    include/markoff-foundation/CompletionDetector.h
-    include/markoff-foundation/CompletionProvider.h
-    include/markoff-foundation/CompletionRegistry.h
-    include/markoff-foundation/EmojiCompletionProvider.h
-    include/markoff-foundation/SourceTextDocumentBinding.h
-    include/markoff-foundation/SearchEngine.h
-    include/markoff-foundation/MarkoffServices.h
+    include/markoff/core/CompletionTrigger.h
+    include/markoff/core/CompletionContext.h
+    include/markoff/core/CompletionCandidate.h
+    include/markoff/core/CompletionDetector.h
+    include/markoff/core/CompletionProvider.h
+    include/markoff/core/CompletionRegistry.h
+    include/markoff/core/EmojiCompletionProvider.h
+    include/markoff/core/SourceTextDocumentBinding.h
+    include/markoff/core/SearchEngine.h
+    include/markoff/core/MarkoffServices.h
     # --- Cmd/ (public) ---
     # Cmd aggregate
-    include/markoff-foundation/Cmd.h
-    include/markoff-foundation/Cmd/Edit.h
-    include/markoff-foundation/Cmd/D2.h
+    include/markoff/core/Cmd.h
+    include/markoff/core/Cmd/Edit.h
+    include/markoff/core/Cmd/D2.h
     src/MarkoffDocumentPrivate.h
     src/SessionPrivate.h
     src/AnchorConversion.cpp
@@ -70,24 +70,24 @@ add_library(markoff_core STATIC
     src/CompletionRegistry.cpp
     src/EmojiCompletionProvider.cpp
     src/EmojiData.h
-    include/markoff-foundation/UndoLog.h
+    include/markoff/core/UndoLog.h
     src/UndoLog.cpp
-    include/markoff-foundation/CrdtProxies.h
+    include/markoff/core/CrdtProxies.h
     src/CrdtProxies.cpp
     # --- Sibling map public headers (Phase 5) ---
-    include/markoff-foundation/KindTagMap.h
-    include/markoff-foundation/BlockAttrsMap.h
-    include/markoff-foundation/FrontmatterMap.h
-    include/markoff-foundation/LinkRefMap.h
-    include/markoff-foundation/FootnoteDefMap.h
+    include/markoff/core/KindTagMap.h
+    include/markoff/core/BlockAttrsMap.h
+    include/markoff/core/FrontmatterMap.h
+    include/markoff/core/LinkRefMap.h
+    include/markoff/core/FootnoteDefMap.h
     # --- Save (Phase 8) ---
-    include/markoff-foundation/BlockSerializer.h
+    include/markoff/core/BlockSerializer.h
     src/BlockSerializers.cpp
     # --- GC / WatermarkCoordinator (Phase 9) ---
-    include/markoff-foundation/WatermarkCoordinator.h
+    include/markoff/core/WatermarkCoordinator.h
     src/WatermarkCoordinator.cpp
     # --- InlineParseCache (Phase 10) ---
-    include/markoff-foundation/InlineParseCache.h
+    include/markoff/core/InlineParseCache.h
     src/InlineParseCache.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp

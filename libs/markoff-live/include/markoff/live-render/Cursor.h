@@ -2,8 +2,8 @@
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff-foundation/BlockAnchor.h>
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/TextAnchor.h>
 
 #include <variant>
 #include <QString>

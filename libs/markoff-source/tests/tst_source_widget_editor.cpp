@@ -3,8 +3,8 @@
 #include <QTest>
 
 #include <markoff/source/widget/Editor.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Theme.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Theme.h>
 
 class TstSourceWidgetEditor : public QObject {
     Q_OBJECT

@@ -538,11 +538,11 @@ Create `libs/markoff-live/tests/tst_live_render_structural.cpp` with the followi
 #include <QSignalSpy>
 
 #include <markoff/live-render/UndoCoalescer.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/Origin.h>
-#include <markoff-foundation/BlockAnchor.h>
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/TextAnchor.h>
 
 using namespace Markoff::LiveRender;
 
@@ -741,7 +741,7 @@ Expected: `UndoCoalescer.h` not found.
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/BlockAnchor.h>
 
 #include <QElapsedTimer>
 #include <QObject>
@@ -811,7 +811,7 @@ private:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live-render/UndoCoalescer.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff::LiveRender {
 
@@ -1016,7 +1016,7 @@ Expected: `LiveStructuralKeyHandler.h` not found, `binding.structuralKeyHandler(
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/BlockAnchor.h>
 
 #include <QHash>
 #include <QObject>
@@ -1118,8 +1118,8 @@ private:
 #include <markoff/live-render/LiveCursorState.h>
 #include <markoff/live-render/UndoCoalescer.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 #include <QLoggingCategory>
 

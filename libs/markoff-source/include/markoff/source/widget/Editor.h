@@ -6,9 +6,9 @@
 
 #include <KSyntaxHighlighting/SyntaxHighlighter>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/SourceTextDocumentBinding.h>
-#include <markoff-foundation/Theme.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/SourceTextDocumentBinding.h>
+#include <markoff/core/Theme.h>
 
 namespace Markoff::Source::Widget {
 

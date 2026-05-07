@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-foundation/UndoLog.h>
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/UndoLog.h>
+#include <markoff/core/BlockId.h>
 
 class TstUndoLog : public QObject {
     Q_OBJECT

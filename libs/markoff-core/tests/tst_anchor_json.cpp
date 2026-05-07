@@ -2,7 +2,7 @@
 #include <QTest>
 #include <QJsonObject>
 
-#include <markoff-foundation/AnchorJson.h>
+#include <markoff/core/AnchorJson.h>
 #include <crdt/Anchor.h>
 
 using namespace Markoff;

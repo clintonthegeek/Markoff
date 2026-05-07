@@ -4,8 +4,8 @@
 // This test always passes; output goes to stdout.
 #include <QTest>
 #include <QDebug>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockKind.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockKind.h>
 
 using namespace Markoff;
 

@@ -6,11 +6,11 @@
 #include <QString>
 
 #include <crdt/Anchor.h>
-#include <markoff-foundation/BlockId.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Session.h>
-#include <markoff-foundation/SessionParams.h>
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/BlockId.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Session.h>
+#include <markoff/core/SessionParams.h>
+#include <markoff/core/TextAnchor.h>
 
 using namespace Markoff;
 

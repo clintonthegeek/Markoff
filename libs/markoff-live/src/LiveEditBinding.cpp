@@ -4,8 +4,8 @@
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/Coordinates.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/UndoLog.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/UndoLog.h>
 
 #include <QDebug>
 #include <QQuickTextDocument>

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/FoldRef.h>
+#include <markoff/core/FoldRef.h>
 
 #include <QJsonArray>
 
-#include <markoff-foundation/AnchorJson.h>
+#include <markoff/core/AnchorJson.h>
 
 namespace Markoff {
 

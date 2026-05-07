@@ -2,7 +2,7 @@
 #include <QSignalSpy>
 #include <QTest>
 
-#include <markoff-foundation/DefaultLinkService.h>
+#include <markoff/core/DefaultLinkService.h>
 
 using namespace Markoff;
 

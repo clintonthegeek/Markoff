@@ -77,8 +77,8 @@ Create `libs/markoff-live/include/markoff/live-render/Cursor.h`:
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff-foundation/BlockAnchor.h>
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/TextAnchor.h>
 
 #include <variant>
 #include <QString>
@@ -1032,9 +1032,9 @@ Create `libs/markoff-live/src/LiveSelectionView.cpp`:
 #include <markoff/live-render/Coordinates.h>
 #include <markoff/live-render/LiveBlockModel.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 
 #include <QApplication>
 #include <QClipboard>
@@ -1204,8 +1204,8 @@ Replace the contents of `libs/markoff-live/include/markoff/live-render/LiveListM
 #include <memory>
 #include <qqmlintegration.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockAnchor.h>
 
 namespace Markoff { class Document; }
 
@@ -1265,9 +1265,9 @@ Replace the contents of `libs/markoff-live/src/LiveListModelBinding.cpp`:
 #include <markoff/live-render/AstBlockDiff.h>
 #include "BlockWalker.h"
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockAnchor.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/Session.h>
 #include <markoff-parser/Document.h>
 
 #include <QList>

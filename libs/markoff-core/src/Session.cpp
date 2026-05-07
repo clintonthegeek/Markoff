@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Session.h>
+#include <markoff/core/Session.h>
 
 #include <algorithm>
 
 #include <QJsonArray>
 #include <QUuid>
 
-#include <markoff-foundation/AnchorJson.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/AnchorJson.h>
+#include <markoff/core/MarkoffDocument.h>
 #include "SessionPrivate.h"
 
 namespace Markoff {

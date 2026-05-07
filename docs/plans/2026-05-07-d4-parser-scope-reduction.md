@@ -199,8 +199,8 @@ Per spec §8, the order is bottom-up: build the new primitive, migrate consumers
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
 
 using namespace Markoff;
 
@@ -1080,7 +1080,7 @@ m_doc->applyFlatEdit(bytes, bytes + removeBytes, inserted,
                      Markoff::Origin::UserKeystroke);
 ```
 
-Drop the `#include <markoff-foundation/MarkoffEdit.h>` line at the top of `SourceTextDocumentBinding.cpp` — only do this once the reverse direction migration in Task 2.3 is done, otherwise the reverse path's `MarkoffEdit` includes break.
+Drop the `#include <markoff/core/MarkoffEdit.h>` line at the top of `SourceTextDocumentBinding.cpp` — only do this once the reverse direction migration in Task 2.3 is done, otherwise the reverse path's `MarkoffEdit` includes break.
 
 - [ ] **Step 2: Build (forward direction only is now D2)**
 
@@ -1163,7 +1163,7 @@ void SourceTextDocumentBinding::onD2DocumentChanged()
 
 - [ ] **Step 2: Drop the MarkoffEdit include**
 
-Remove `#include <markoff-foundation/MarkoffEdit.h>` from `SourceTextDocumentBinding.cpp` (and the header if present). Build to find any straggler references.
+Remove `#include <markoff/core/MarkoffEdit.h>` from `SourceTextDocumentBinding.cpp` (and the header if present). Build to find any straggler references.
 
 - [ ] **Step 3: Build**
 
@@ -1236,7 +1236,7 @@ Concrete pattern:
 doc.applyFlatEdit(0, 0, QByteArray("hello"), Markoff::Origin::Local);
 ```
 
-Drop `#include <markoff-foundation/MarkoffEdit.h>`. Add `#include <markoff-foundation/Origin.h>` if needed.
+Drop `#include <markoff/core/MarkoffEdit.h>`. Add `#include <markoff/core/Origin.h>` if needed.
 
 - [ ] **Step 3: Run the test**
 
@@ -1340,7 +1340,7 @@ EOF
 grep -n "applyLocalEdit\|MarkoffEdit" libs/markoff-source/app/main.cpp
 ```
 
-Replace each occurrence by the Task 3.1 pattern. Drop the `#include <markoff-foundation/MarkoffEdit.h>`.
+Replace each occurrence by the Task 3.1 pattern. Drop the `#include <markoff/core/MarkoffEdit.h>`.
 
 - [ ] **Step 2: Build**
 
@@ -1908,7 +1908,7 @@ EOF
 - The `applyLocalEdit(const QList<MarkoffEdit> &edits)` method declaration (around line 100)
 - The `parseUpdated` signal declaration (in the signals: section, around line 328)
 - The `setRenderPhaseTaps` declaration (around line 174) and its `Markoff::Render::RenderPhaseTaps` forward declaration / include
-- Any `#include <markoff-foundation/MarkoffEdit.h>` line (top of file)
+- Any `#include <markoff/core/MarkoffEdit.h>` line (top of file)
 - Any `Q_DECLARE_METATYPE(...)` lines for `MarkoffEdit` and `QList<MarkoffEdit>` (bottom of file or in the metatype header)
 
 - [ ] **Step 2: From `MarkoffDocument.cpp`, delete:**

@@ -91,7 +91,7 @@ Create `libs/markoff-live/include/markoff/live-render/BlockRecord.h`:
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/BlockAnchor.h>
 #include <markoff-parser/SourceSpan.h>
 
 #include <QString>
@@ -1446,7 +1446,7 @@ Create `libs/markoff-live/src/LiveBlockModel.cpp`:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live-render/LiveBlockModel.h>
 
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/BlockAnchor.h>
 
 namespace Markoff::LiveRender {
 
@@ -1672,8 +1672,8 @@ Create `libs/markoff-live/src/LiveListModelBinding.cpp`:
 #include <markoff/live-render/AstBlockDiff.h>
 #include "BlockWalker.h"
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockAnchor.h>
 #include <markoff-parser/Document.h>
 
 #include <QList>
@@ -2047,8 +2047,8 @@ Replace the contents of `libs/markoff-live/app/main.cpp`:
 #include <QRandomGenerator>
 #include <QQuickStyle>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
 
 /// Test app for markoff-live-render R2. Loads a Markdown file and renders
 /// it read-only via LiveListModelBinding + LiveView. No editing.

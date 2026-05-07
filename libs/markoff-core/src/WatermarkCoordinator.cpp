@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/WatermarkCoordinator.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/WatermarkCoordinator.h>
+#include <markoff/core/MarkoffDocument.h>
 #include <QSet>
 
 // Full Markoff::Document (parser type) must be complete before MarkoffDocumentPrivate.h

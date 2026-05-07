@@ -2,8 +2,8 @@
 #pragma once
 
 #include <crdt/Anchor.h>
-#include <markoff-foundation/TextAnchor.h>
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/TextAnchor.h>
+#include <markoff/core/BlockId.h>
 
 namespace Markoff::Detail {
 

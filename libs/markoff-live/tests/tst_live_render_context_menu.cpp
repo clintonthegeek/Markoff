@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 #include <markoff/live-render/LiveListModelBinding.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Cmd/D2.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Cmd/D2.h>
 
 using namespace Markoff::Live;
 using namespace Markoff;

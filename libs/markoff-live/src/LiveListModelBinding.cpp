@@ -6,12 +6,12 @@
 
 #include "KindTransition.h"
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockAnchor.h>
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/CrdtProxies.h>
-#include <markoff-foundation/AttrNames.h>
-#include <markoff-foundation/Cmd/D2.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/CrdtProxies.h>
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/Cmd/D2.h>
 
 #include <QList>
 #include <QRegularExpression>

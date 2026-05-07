@@ -282,7 +282,7 @@ git commit -m "d2(foundation): test scaffolding — d2/ test subdirectory"
 `libs/markoff-core/tests/d2/tst_causal_lww_map.cpp`:
 ```cpp
 #include <QTest>
-#include <markoff-foundation/CausalLwwMap.h>
+#include <markoff/core/CausalLwwMap.h>
 
 class TstCausalLwwMap : public QObject {
     Q_OBJECT
@@ -791,7 +791,7 @@ git commit -m "d2(foundation): CausalLwwMap applyRemote — foreign writes bypas
 `tst_block_id.cpp`:
 ```cpp
 #include <QTest>
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/BlockId.h>
 
 class TstBlockId : public QObject {
     Q_OBJECT
@@ -922,7 +922,7 @@ enum class BlockKind : uint8_t {
 `BlockEdit.h`:
 ```cpp
 #pragma once
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/BlockId.h>
 #include <QByteArray>
 namespace Markoff {
 struct BlockEdit {
@@ -937,8 +937,8 @@ struct BlockEdit {
 `StructuralOp.h`:
 ```cpp
 #pragma once
-#include <markoff-foundation/BlockId.h>
-#include <markoff-foundation/BlockKind.h>
+#include <markoff/core/BlockId.h>
+#include <markoff/core/BlockKind.h>
 #include <variant>
 namespace Markoff {
 struct StructuralOp {
@@ -972,7 +972,7 @@ git commit -m "d2(foundation): BlockEdit + StructuralOp + BlockKind value types"
 
 ```cpp
 #include <QTest>
-#include <markoff-foundation/UndoLog.h>
+#include <markoff/core/UndoLog.h>
 
 class TstUndoLog : public QObject {
     Q_OBJECT
@@ -1017,7 +1017,7 @@ void TstUndoLog::nestedTransaction_joinsOuter() {
 `UndoLog.h`:
 ```cpp
 #pragma once
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/BlockId.h>
 #include <variant>
 #include <vector>
 
@@ -1082,7 +1082,7 @@ private:
 - [ ] **Step 3: Write `UndoLog.cpp`**
 
 ```cpp
-#include <markoff-foundation/UndoLog.h>
+#include <markoff/core/UndoLog.h>
 namespace Markoff {
 
 UndoLog::Transaction::Transaction(UndoLog &log) : m_log(log) {
@@ -1402,7 +1402,7 @@ void TstTextAnchor::nullAnchor_isDistinctFromAnyBlock();
 `TextAnchor.h`:
 ```cpp
 #pragma once
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/BlockId.h>
 #include <cstdint>
 namespace Markoff {
 
@@ -1463,7 +1463,7 @@ git commit -m "d2(foundation): TextAnchor reshape — wraps (BlockId, per-block 
 `BlockAnchor.h`:
 ```cpp
 #pragma once
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/BlockId.h>
 namespace Markoff {
 // Compatibility alias; new code should use BlockId directly.
 using BlockAnchor = BlockId;
@@ -1543,7 +1543,7 @@ git commit -m "d2(foundation): MarkoffDocument new D2 internals declared (old st
 `tst_d2_apply_block_edit.cpp`:
 ```cpp
 #include <QTest>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 class TstD2ApplyBlockEdit : public QObject {
     Q_OBJECT
@@ -1806,9 +1806,9 @@ void TstD2SiblingMaps::kindTagMap_concurrentSetByCausalStamp();
 
 ```cpp
 #pragma once
-#include <markoff-foundation/CausalLwwMap.h>
-#include <markoff-foundation/BlockId.h>
-#include <markoff-foundation/BlockKind.h>
+#include <markoff/core/CausalLwwMap.h>
+#include <markoff/core/BlockId.h>
+#include <markoff/core/BlockKind.h>
 namespace Markoff {
 using KindTagMap = CausalLwwMap<BlockId, BlockKind>;
 }

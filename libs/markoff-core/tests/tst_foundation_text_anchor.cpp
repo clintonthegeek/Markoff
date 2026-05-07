@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
-#include <markoff-foundation/TextAnchor.h>
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/TextAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <crdt/Anchor.h>
 #include "AnchorConversion.h"  // tests reach into foundation src/ for internals
 

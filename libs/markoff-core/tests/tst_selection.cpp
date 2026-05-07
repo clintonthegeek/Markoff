@@ -2,8 +2,8 @@
 #include <QTest>
 #include <QColor>
 
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/TextAnchor.h>
 
 using namespace Markoff;
 

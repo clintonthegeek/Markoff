@@ -470,7 +470,7 @@ Initial `tst_live_render_holes_layer.cpp`:
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live-render/BlockHole.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 #include <QtTest/QtTest>
 
 using namespace Markoff::LiveRender;
@@ -516,7 +516,7 @@ Expected: compile error — `BlockHole.h: No such file or directory`.
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/TextAnchor.h>
 
 #include <QString>
 #include <QtGlobal>
@@ -813,7 +813,7 @@ private:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live-render/LiveHoleLayer.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff::LiveRender {
 
@@ -1317,7 +1317,7 @@ Skeleton proxy that, with zero holes, behaves identically to `LiveBlockModel`.
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/LiveHoleLayer.h>
 #include <markoff/live-render/LiveProxyBlockModel.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 #include <QtTest/QtTest>
 
 using namespace Markoff::LiveRender;

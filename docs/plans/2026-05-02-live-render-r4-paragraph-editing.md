@@ -680,9 +680,9 @@ Create `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`:
 #include <markoff/live-render/BlockKind.h>
 #include <markoff/live-render/Coordinates.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/Origin.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/Origin.h>
 
 using namespace Markoff::LiveRender;
 
@@ -860,8 +860,8 @@ In `libs/markoff-live/src/LiveEditBinding.cpp`, add the includes:
 #include <markoff/live-render/LiveBlockModel.h>
 #include <markoff/live-render/Coordinates.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 ```
 
 Replace the empty `onContentsChange` body:

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-foundation/CausalLwwMap.h>
+#include <markoff/core/CausalLwwMap.h>
 
 class TstCausalLwwMap : public QObject {
     Q_OBJECT

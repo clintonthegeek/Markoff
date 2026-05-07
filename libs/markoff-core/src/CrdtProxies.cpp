@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/CrdtProxies.h>
+#include <markoff/core/CrdtProxies.h>
 
 namespace Markoff {
 

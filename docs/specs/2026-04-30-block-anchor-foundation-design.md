@@ -53,7 +53,7 @@ The implementation cost is mostly type-safety scaffolding plus a handful of conv
 // TextAnchor.h — does NOT include <crdt/Anchor.h>
 #pragma once
 #include <QtGlobal>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -74,7 +74,7 @@ struct MARKOFF_FOUNDATION_EXPORT TextAnchor {
 
 // BlockAnchor.h — includes TextAnchor.h
 #pragma once
-#include <markoff-foundation/TextAnchor.h>
+#include <markoff/core/TextAnchor.h>
 
 namespace Markoff {
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Kf6SyntaxHighlightService.h>
+#include <markoff/core/Kf6SyntaxHighlightService.h>
 
 #include <KSyntaxHighlighting/AbstractHighlighter>
 #include <KSyntaxHighlighting/Definition>

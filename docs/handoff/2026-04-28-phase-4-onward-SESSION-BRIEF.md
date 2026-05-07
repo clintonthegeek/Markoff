@@ -185,7 +185,7 @@ The prior session encountered these — bake them into implementer briefings:
 
 2. **`SessionParams` forward-declared default arg compile-time hazard** — already resolved in Task 18 (the `= {}` default was restored once `SessionParams` became a complete type).
 
-3. **`MarkoffDocument *` upcast to `QObject *`** — Task 18 needed `Session.cpp` to `#include <markoff-foundation/MarkoffDocument.h>` and use a normal upcast (`QObject(doc)`), NOT `reinterpret_cast`. The Part 2 plan literal had the unsafe cast; the implementer was steered around it. Watch for similar forward-decl-vs-upcast hazards in any task that creates a Q_OBJECT child of `MarkoffDocument` (e.g., other Phase 8/10/11 services that take a `MarkoffDocument *` parent).
+3. **`MarkoffDocument *` upcast to `QObject *`** — Task 18 needed `Session.cpp` to `#include <markoff/core/MarkoffDocument.h>` and use a normal upcast (`QObject(doc)`), NOT `reinterpret_cast`. The Part 2 plan literal had the unsafe cast; the implementer was steered around it. Watch for similar forward-decl-vs-upcast hazards in any task that creates a Q_OBJECT child of `MarkoffDocument` (e.g., other Phase 8/10/11 services that take a `MarkoffDocument *` parent).
 
 4. **Worktree had no `libs/jkqtmathtext`** — main checkout has it as an untracked symlink to `Corbomite/libs/jkqtmathtext`; the worktree didn't inherit it. The prior session created the same symlink as one-time setup. **It is now in place** — `ls -la libs/jkqtmathtext` should show `→ /home/clinton/dev/Corbomite/libs/jkqtmathtext`. If a fresh worktree is ever set up from scratch again, this step needs to be replicated.
 

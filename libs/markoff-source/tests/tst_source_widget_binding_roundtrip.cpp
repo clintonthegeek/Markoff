@@ -5,9 +5,9 @@
 #include <QTest>
 
 #include <markoff/source/widget/Editor.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/Session.h>
 
 namespace {
 // Read the D2 flat view: concatenation of per-block buffers.

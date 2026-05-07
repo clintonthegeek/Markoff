@@ -2,10 +2,10 @@
 #include <QSignalSpy>
 #include <QTest>
 
-#include <markoff-foundation/CompletionContext.h>
-#include <markoff-foundation/CompletionProvider.h>
-#include <markoff-foundation/CompletionRegistry.h>
-#include <markoff-foundation/EmojiCompletionProvider.h>
+#include <markoff/core/CompletionContext.h>
+#include <markoff/core/CompletionProvider.h>
+#include <markoff/core/CompletionRegistry.h>
+#include <markoff/core/EmojiCompletionProvider.h>
 
 using namespace Markoff;
 

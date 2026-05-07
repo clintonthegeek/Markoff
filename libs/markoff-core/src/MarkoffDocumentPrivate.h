@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockSerializerRegistry.h>
-#include <markoff-foundation/CausalLwwMap.h>
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/UndoLog.h>
-#include <markoff-foundation/CrdtProxies.h>
-#include <markoff-foundation/KindTagMap.h>
-#include <markoff-foundation/BlockAttrsMap.h>
-#include <markoff-foundation/FrontmatterMap.h>
-#include <markoff-foundation/LinkRefMap.h>
-#include <markoff-foundation/FootnoteDefMap.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockSerializerRegistry.h>
+#include <markoff/core/CausalLwwMap.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/UndoLog.h>
+#include <markoff/core/CrdtProxies.h>
+#include <markoff/core/KindTagMap.h>
+#include <markoff/core/BlockAttrsMap.h>
+#include <markoff/core/FrontmatterMap.h>
+#include <markoff/core/LinkRefMap.h>
+#include <markoff/core/FootnoteDefMap.h>
 
 #include <QList>
 #include <QHash>
@@ -29,7 +29,7 @@
 
 #include "BlockAnchorComputation.h"
 
-#include <markoff-foundation/InlineParseCache.h>
+#include <markoff/core/InlineParseCache.h>
 
 namespace Markoff {
 

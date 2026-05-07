@@ -410,7 +410,7 @@ Create `libs/markoff-core/include/markoff-foundation/Origin.h`:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -480,7 +480,7 @@ Create `libs/markoff-core/tests/tst_markoff_edit.cpp`:
 #include <QJsonObject>
 #include <QJsonDocument>
 
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff;
 
@@ -590,7 +590,7 @@ Create `libs/markoff-core/include/markoff-foundation/MarkoffEdit.h`:
 #include <QList>
 #include <QtGlobal>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -623,7 +623,7 @@ Create `libs/markoff-core/src/MarkoffEdit.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffEdit.h>
 
 #include <QJsonValue>
 #include <QString>
@@ -710,7 +710,7 @@ Create `libs/markoff-core/tests/tst_anchor_json.cpp`:
 #include <QTest>
 #include <QJsonObject>
 
-#include <markoff-foundation/AnchorJson.h>
+#include <markoff/core/AnchorJson.h>
 #include <crdt/Anchor.h>
 
 using namespace Markoff;
@@ -788,7 +788,7 @@ Create `libs/markoff-core/include/markoff-foundation/AnchorJson.h`:
 
 #include <crdt/Anchor.h>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -810,7 +810,7 @@ Create `libs/markoff-core/src/AnchorJson.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/AnchorJson.h>
+#include <markoff/core/AnchorJson.h>
 
 namespace Markoff {
 
@@ -892,7 +892,7 @@ Create `libs/markoff-core/tests/tst_selection.cpp`:
 #include <QTest>
 #include <QColor>
 
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/Selection.h>
 #include <crdt/Anchor.h>
 
 using namespace Markoff;
@@ -996,7 +996,7 @@ Create `libs/markoff-core/include/markoff-foundation/Selection.h`:
 
 #include <crdt/Anchor.h>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -1039,9 +1039,9 @@ Create `libs/markoff-core/src/Selection.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/Selection.h>
 
-#include <markoff-foundation/AnchorJson.h>
+#include <markoff/core/AnchorJson.h>
 
 namespace Markoff {
 
@@ -1173,7 +1173,7 @@ Create `libs/markoff-core/tests/tst_fold_ref.cpp`:
 #include <QTest>
 #include <QStringList>
 
-#include <markoff-foundation/FoldRef.h>
+#include <markoff/core/FoldRef.h>
 #include <crdt/Anchor.h>
 
 using namespace Markoff;
@@ -1264,7 +1264,7 @@ Create `libs/markoff-core/include/markoff-foundation/FoldRef.h`:
 
 #include <crdt/Anchor.h>
 
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -1295,11 +1295,11 @@ Create `libs/markoff-core/src/FoldRef.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/FoldRef.h>
+#include <markoff/core/FoldRef.h>
 
 #include <QJsonArray>
 
-#include <markoff-foundation/AnchorJson.h>
+#include <markoff/core/AnchorJson.h>
 
 namespace Markoff {
 
@@ -1395,7 +1395,7 @@ Create `libs/markoff-core/tests/tst_markoff_document.cpp`:
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff;
 
@@ -1459,9 +1459,9 @@ Create `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`:
 #include <crdt/Clock.h>
 #include <crdt/Operations.h>
 
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/Origin.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 
 namespace Markoff {
 
@@ -1590,7 +1590,7 @@ Create `libs/markoff-core/src/MarkoffDocument.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 #include "MarkoffDocumentPrivate.h"
 

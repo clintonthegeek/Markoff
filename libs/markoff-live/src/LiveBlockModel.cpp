@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live-render/LiveBlockModel.h>
 
-#include <markoff-foundation/BlockAnchor.h>
-#include <markoff-foundation/AttrNames.h>
+#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/AttrNames.h>
 
 #include <QVariantMap>
 #include <variant>

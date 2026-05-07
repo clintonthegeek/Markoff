@@ -2,9 +2,9 @@
 #include <QSignalSpy>
 #include <QTest>
 
-#include <markoff-foundation/CodeBlockProcessor.h>
-#include <markoff-foundation/CodeBlockProcessorRegistry.h>
-#include <markoff-foundation/Theme.h>
+#include <markoff/core/CodeBlockProcessor.h>
+#include <markoff/core/CodeBlockProcessorRegistry.h>
+#include <markoff/core/Theme.h>
 
 using namespace Markoff;
 

@@ -8,8 +8,8 @@
 
 #include <crdt/Anchor.h>
 
-#include <markoff-foundation/FoldRef.h>
-#include <markoff-foundation/Selection.h>
+#include <markoff/core/FoldRef.h>
+#include <markoff/core/Selection.h>
 
 namespace Markoff {
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-foundation/KindTagMap.h>
-#include <markoff-foundation/BlockAttrsMap.h>
-#include <markoff-foundation/FrontmatterMap.h>
-#include <markoff-foundation/LinkRefMap.h>
-#include <markoff-foundation/FootnoteDefMap.h>
-#include <markoff-foundation/BlockId.h>
-#include <markoff-foundation/BlockKind.h>
+#include <markoff/core/KindTagMap.h>
+#include <markoff/core/BlockAttrsMap.h>
+#include <markoff/core/FrontmatterMap.h>
+#include <markoff/core/LinkRefMap.h>
+#include <markoff/core/FootnoteDefMap.h>
+#include <markoff/core/BlockId.h>
+#include <markoff/core/BlockKind.h>
 
 using namespace Markoff;
 

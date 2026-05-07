@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/Cmd/D2.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/UndoLog.h>
-#include <markoff-foundation/BlockEdit.h>
-#include <markoff-foundation/BlockAttrsMap.h>
-#include <markoff-foundation/AttrNames.h>
+#include <markoff/core/Cmd/D2.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/UndoLog.h>
+#include <markoff/core/BlockEdit.h>
+#include <markoff/core/BlockAttrsMap.h>
+#include <markoff/core/AttrNames.h>
 
 #include <markoff-parser/Document.h>
 

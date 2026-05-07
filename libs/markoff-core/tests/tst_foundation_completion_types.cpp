@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/CompletionCandidate.h>
-#include <markoff-foundation/CompletionContext.h>
-#include <markoff-foundation/CompletionTrigger.h>
+#include <markoff/core/CompletionCandidate.h>
+#include <markoff/core/CompletionContext.h>
+#include <markoff/core/CompletionTrigger.h>
 
 using namespace Markoff;
 

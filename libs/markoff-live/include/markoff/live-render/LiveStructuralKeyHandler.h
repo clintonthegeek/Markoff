@@ -2,7 +2,7 @@
 #pragma once
 
 #include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/BlockAnchor.h>
 
 #include <QHash>
 #include <QObject>

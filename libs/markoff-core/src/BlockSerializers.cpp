@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/BlockSerializer.h>
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/BlockAttrsMap.h>
+#include <markoff/core/BlockSerializer.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/BlockAttrsMap.h>
 
 #include <variant>
 

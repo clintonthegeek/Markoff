@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/CodeBlockProcessorRegistry.h>
+#include <markoff/core/CodeBlockProcessorRegistry.h>
 
 namespace Markoff {
 

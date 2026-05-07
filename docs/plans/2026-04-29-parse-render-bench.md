@@ -1721,7 +1721,7 @@ Create `libs/markoff-bench/include/markoff-bench/Scenario.h`:
 #include <QByteArray>
 #include <QtGlobal>
 
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffEdit.h>
 
 namespace Markoff::Bench {
 
@@ -2211,8 +2211,8 @@ Append to `libs/markoff-bench/src/ScenarioRunner.cpp`:
 #include <QEventLoop>
 #include <QSignalSpy>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 namespace Markoff::Bench {
 

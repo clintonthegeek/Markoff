@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/CodeSpan.h>
-#include <markoff-foundation/CodeTokenKind.h>
+#include <markoff/core/CodeSpan.h>
+#include <markoff/core/CodeTokenKind.h>
 
 using namespace Markoff;
 

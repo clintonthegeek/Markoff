@@ -14,9 +14,9 @@
 #include <markoff/live-render/LiveCursorState.h>
 #include <markoff/live-render/Cursor.h>
 #include <markoff/live-render/BlockKind.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/CrdtProxies.h>
-#include <markoff-foundation/BlockAnchor.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/CrdtProxies.h>
+#include <markoff/core/BlockAnchor.h>
 
 using namespace Markoff::Live;
 

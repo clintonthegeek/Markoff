@@ -4,7 +4,7 @@
 #include <QDir>
 #include <QFileInfo>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff;
 

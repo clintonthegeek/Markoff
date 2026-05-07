@@ -74,9 +74,9 @@ Full new header:
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/BlockAttrsMap.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/BlockAttrsMap.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 #include <QByteArray>
 #include <QHash>
 #include <functional>
@@ -120,9 +120,9 @@ Create `libs/markoff-core/include/markoff-foundation/BlockSerializerRegistry.h`:
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/BlockAttrsMap.h>
-#include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/BlockAttrsMap.h>
+#include <markoff/core/MarkoffFoundationExport.h>
 #include <QByteArray>
 #include <QHash>
 
@@ -170,7 +170,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff-foundation/BlockAttrsMap.h>
+#include <markoff/core/BlockAttrsMap.h>
 
 namespace Markoff::AttrNames {
     inline const AttrName Level       = "level";        // Heading: int 1–6
@@ -249,7 +249,7 @@ Q_INVOKABLE bool canUndoForBlock(Markoff::BlockAnchor blockAnchor) const;
 Q_INVOKABLE void undoForBlock(Markoff::BlockAnchor blockAnchor);
 ```
 
-Also add `#include <markoff-foundation/BlockSerializerRegistry.h>` to the header.
+Also add `#include <markoff/core/BlockSerializerRegistry.h>` to the header.
 
 - [ ] **Step 4: Implement in MarkoffDocument.cpp**
 
@@ -522,7 +522,7 @@ Expected: compile errors.
 
 ```cpp
 // In BlockRecord.h, add include:
-#include <markoff-foundation/BlockAttrsMap.h>
+#include <markoff/core/BlockAttrsMap.h>
 // In struct BlockRecord, add field:
 QHash<Markoff::AttrName, Markoff::AttrValue> attrs;
 // attrs is excluded from operator== (same as inlineSpans):
@@ -615,8 +615,8 @@ void serialize_paragraph_returns_text() {
 
 ```cpp
 // In BlockKindDescriptor.h add include:
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/BlockAttrsMap.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/BlockAttrsMap.h>
 #include <functional>
 // In struct BlockKindDescriptor, add field:
 /// Serializer callback: (text, attrs) → markdown bytes for this block.
@@ -630,7 +630,7 @@ std::function<QByteArray(const QByteArray &text,
 
 ```cpp
 // In BlockKindRegistry.h add include:
-#include <markoff-foundation/BlockSerializerRegistry.h>
+#include <markoff/core/BlockSerializerRegistry.h>
 // Change class declaration:
 class MARKOFF_LIVE_RENDER_EXPORT BlockKindRegistry
     : public Markoff::BlockSerializerRegistry {
@@ -1032,8 +1032,8 @@ Expected: new tests fail (headingLevel and codeLanguage are 0/empty).
 Add includes:
 ```cpp
 #include "KindTransition.h"
-#include <markoff-foundation/AttrNames.h>
-#include <markoff-foundation/BlockSerializerRegistry.h>
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/BlockSerializerRegistry.h>
 ```
 
 Update `Private` struct to add owned registry and pointer:
@@ -1174,7 +1174,7 @@ void LiveListModelBinding::onD2Changed()
 
 Add missing include for `Cmd`:
 ```cpp
-#include <markoff-foundation/Cmd/D2.h>
+#include <markoff/core/Cmd/D2.h>
 ```
 
 - [ ] **Step 4: Run tests**

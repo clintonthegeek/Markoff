@@ -168,7 +168,7 @@ Each file gets the SPDX header `// SPDX-License-Identifier: GPL-3.0-or-later` an
 #pragma once
 
 #include <QPlainTextEdit>
-#include <markoff-foundation/Theme.h>
+#include <markoff/core/Theme.h>
 
 namespace Markoff { class MarkoffDocument; class SourceTextDocumentBinding; }
 
@@ -450,8 +450,8 @@ Append to `tst_source_widget_editor.cpp`:
 Includes for that test method (add at top):
 
 ```cpp
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
 #include <QSignalSpy>
 ```
 
@@ -464,10 +464,10 @@ Create `tests/tst_source_widget_binding_roundtrip.cpp`:
 #include <QTest>
 
 #include <markoff/source/widget/Editor.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/Origin.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/Session.h>
 
 class TstSourceWidgetBindingRoundtrip : public QObject {
     Q_OBJECT
@@ -535,7 +535,7 @@ Update `Editor.h` to declare members + methods:
 
 ```cpp
 #include <KSyntaxHighlighting/SyntaxHighlighter>
-#include <markoff-foundation/SourceTextDocumentBinding.h>
+#include <markoff/core/SourceTextDocumentBinding.h>
 
 namespace Markoff { class MarkoffDocument; }
 
@@ -586,8 +586,8 @@ private:
 #include <KSyntaxHighlighting/SyntaxHighlighter>
 #include <KSyntaxHighlighting/Theme>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/SourceTextDocumentBinding.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/SourceTextDocumentBinding.h>
 
 #include <QKeyEvent>
 
@@ -1100,8 +1100,8 @@ void FindBar::updateCountLabel() {
 
 #include <markoff/source/widget/Editor.h>
 #include <markoff/source/widget/FindBar.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 class TstSourceWidgetFindBar : public QObject {
     Q_OBJECT
@@ -1226,9 +1226,9 @@ target_link_libraries(markoff-source-widget-app
 
 #include <markoff/source/widget/Editor.h>
 #include <markoff/source/widget/FindBar.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/Origin.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
+#include <markoff/core/Origin.h>
 
 int main(int argc, char **argv) {
     QApplication app(argc, argv);

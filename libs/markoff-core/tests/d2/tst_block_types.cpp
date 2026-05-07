@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-foundation/BlockEdit.h>
-#include <markoff-foundation/StructuralOp.h>
-#include <markoff-foundation/BlockKind.h>
+#include <markoff/core/BlockEdit.h>
+#include <markoff/core/StructuralOp.h>
+#include <markoff/core/BlockKind.h>
 #include <variant>
 
 class TstBlockTypes : public QObject {

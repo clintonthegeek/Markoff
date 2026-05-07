@@ -3,9 +3,9 @@
 #include <QFile>
 #include <QTemporaryDir>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/BlockSerializer.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/BlockSerializer.h>
 
 using namespace Markoff;
 

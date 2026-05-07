@@ -7,7 +7,7 @@
 // belongs to the view layer: the view holds both the MarkoffDocument and the
 // LinkService, and may call doc.linkRefMap().get(id) before delegating to
 // LinkService::activate(). No changes to this file are required for Phase 12.
-#include <markoff-foundation/LinkService.h>
+#include <markoff/core/LinkService.h>
 
 namespace Markoff {
 

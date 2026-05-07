@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-foundation/CodeBlockProcessorRegistry.h>
-#include <markoff-foundation/CompletionRegistry.h>
-#include <markoff-foundation/DefaultLinkService.h>
-#include <markoff-foundation/Kf6SyntaxHighlightService.h>
-#include <markoff-foundation/MarkoffServices.h>
+#include <markoff/core/CodeBlockProcessorRegistry.h>
+#include <markoff/core/CompletionRegistry.h>
+#include <markoff/core/DefaultLinkService.h>
+#include <markoff/core/Kf6SyntaxHighlightService.h>
+#include <markoff/core/MarkoffServices.h>
 
 using namespace Markoff;
 

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/DefaultLinkService.h>
+#include <markoff/core/DefaultLinkService.h>
 
 namespace Markoff {
 

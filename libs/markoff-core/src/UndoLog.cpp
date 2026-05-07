@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/UndoLog.h>
+#include <markoff/core/UndoLog.h>
 #include <algorithm>
 #include <QtAssert>
 

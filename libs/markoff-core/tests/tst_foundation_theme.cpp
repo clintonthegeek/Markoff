@@ -2,8 +2,8 @@
 #include <QTest>
 #include <QColor>
 
-#include <markoff-foundation/Theme.h>
-#include <markoff-foundation/CodeTokenKind.h>
+#include <markoff/core/Theme.h>
+#include <markoff/core/CodeTokenKind.h>
 
 using namespace Markoff;
 

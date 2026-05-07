@@ -2,7 +2,7 @@
 #include <QTest>
 #include <QStringList>
 
-#include <markoff-foundation/FoldRef.h>
+#include <markoff/core/FoldRef.h>
 #include <crdt/Anchor.h>
 
 using namespace Markoff;

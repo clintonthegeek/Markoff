@@ -1729,8 +1729,8 @@ Create `libs/markoff-view-qml/tests/tst_view_qml_live_list_model_binding.cpp`:
 #include <markoff/view/qml/LiveListModelBinding.h>
 #include <markoff/view/qml/LiveBlockModel.h>
 #include <markoff/view/qml/LiveSelectionModel.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff::View::Qml;
 
@@ -1947,7 +1947,7 @@ private:
 #include "AstBlockDiff.h"
 
 #include <markoff-parser/Document.h>
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 #include <QSet>
 
@@ -2839,8 +2839,8 @@ Create `libs/markoff-view-qml/tests/tst_view_qml_live_view_smoke.cpp`:
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/LiveListModelBinding.h>
 #include <markoff/view/qml/LiveBlockModel.h>
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffEdit.h>
 
 using namespace Markoff::View::Qml;
 

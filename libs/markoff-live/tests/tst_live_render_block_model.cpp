@@ -7,7 +7,7 @@
 #include <markoff/live-render/LiveListModelBinding.h>
 #include <markoff/live-render/BlockKind.h>
 
-#include <markoff-foundation/MarkoffDocument.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff::Live;
 

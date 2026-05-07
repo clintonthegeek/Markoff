@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/SearchEngine.h>
+#include <markoff/core/SearchEngine.h>
 
 #include <algorithm>
 
 #include <QRegularExpression>
 
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Selection.h>
-#include <markoff-foundation/Session.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 
 namespace Markoff {
 

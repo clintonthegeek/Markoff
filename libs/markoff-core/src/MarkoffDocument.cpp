@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Session.h>
-#include <markoff-foundation/BlockEdit.h>
-#include <markoff-foundation/BlockKind.h>
-#include <markoff-foundation/StructuralOp.h>
-#include <markoff-foundation/UndoLog.h>
-#include <markoff-foundation/BlockSerializer.h>
-#include <markoff-foundation/AttrNames.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Session.h>
+#include <markoff/core/BlockEdit.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/StructuralOp.h>
+#include <markoff/core/UndoLog.h>
+#include <markoff/core/BlockSerializer.h>
+#include <markoff/core/AttrNames.h>
 
 #include <QSaveFile>
 
@@ -23,8 +23,8 @@
 #include "MarkoffDocumentPrivate.h"
 #include "AnchorConversion.h"
 #include "BlockAnchorComputation.h"
-#include <markoff-foundation/WatermarkCoordinator.h>
-#include <markoff-foundation/InlineParseCache.h>
+#include <markoff/core/WatermarkCoordinator.h>
+#include <markoff/core/InlineParseCache.h>
 
 namespace {
 

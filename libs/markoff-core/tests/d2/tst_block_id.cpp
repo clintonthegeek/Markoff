@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-foundation/BlockId.h>
+#include <markoff/core/BlockId.h>
 
 class TstBlockId : public QObject {
     Q_OBJECT

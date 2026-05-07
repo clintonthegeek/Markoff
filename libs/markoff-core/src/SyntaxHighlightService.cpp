@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-foundation/SyntaxHighlightService.h>
+#include <markoff/core/SyntaxHighlightService.h>
 
 namespace Markoff {
 
