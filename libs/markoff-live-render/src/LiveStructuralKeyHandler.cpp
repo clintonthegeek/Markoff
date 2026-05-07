@@ -396,210 +396,140 @@ void LiveStructuralKeyHandler::registerBuiltins()
     m_handlers[BlockKind::HorizontalRule][Qt::Key_Backspace] = hrDelete;
 
     // ---- ListItem handlers ----
+    // Per-item block model: each ListItem is its own CRDT block.
+    // blockText = content only (no marker prefix); marker/indent are attrs.
 
-    // Enter: insert a new item line within the current block, or exit the list
-    // on an empty item. The whole list lives in one CRDT block separated by
-    // newlines, so "new item" = d2ApplyBufferEdit('\n' + marker), never a new
-    // block. Only an empty item at indentLevel==0 triggers an actual block-level
-    // change (exit/split).
+    // Enter: split, exit list, or outdent — depending on content and cursor
+    // position. All ops go on a single transaction (one undo step).
     m_handlers[BlockKind::ListItem][Qt::Key_Return] =
     m_handlers[BlockKind::ListItem][Qt::Key_Enter]  = [](const Ctx &c) -> HR {
         const Markoff::BlockId id(c.blockAnchor);
-        const QString &blockText = c.blockText;
+        const QString &content = c.blockText;  // content only, no marker
 
-        // 1. Locate the line the cursor is on.
-        int lineStart = 0;
-        for (int i = 0; i < c.qtPos; ++i)
-            if (blockText[i] == u'\n') lineStart = i + 1;
-        const int lineEnd = blockText.indexOf(u'\n', lineStart);
-        const QString curLine = (lineEnd >= 0)
-            ? blockText.mid(lineStart, lineEnd - lineStart)
-            : blockText.mid(lineStart);
-
-        // 2. Extract marker from the current line (not from line 0).
-        static const QRegularExpression kMarker(
-            QStringLiteral(R"(^[ \t]{0,3}(?:[-*+]|\d{1,9}[.)]) )"));
-        auto mMatch = kMarker.match(curLine);
-        QByteArray markerPrefix = mMatch.hasMatch()
-            ? curLine.left(mMatch.capturedLength()).toUtf8()
-            : QByteArray("- ");
-
-        // 3. "Empty" = current line contains only the marker (no content).
-        const bool isEmpty = (curLine.trimmed().toUtf8() == markerPrefix.trimmed());
-
-        // 4. Fetch indent level from block attrs.
         const auto attrs = c.document->blockAttrs(id);
-        const int indentLevel = attrs.contains(Markoff::AttrNames::IndentLevel)
+        const int indent = attrs.contains(Markoff::AttrNames::IndentLevel)
             ? std::get<int>(attrs.value(Markoff::AttrNames::IndentLevel)) : 0;
 
-        if (isEmpty && indentLevel > 0) {
-            // Outdent one level.
-            UndoLog::Transaction t(c.document->d2UndoLog());
+        UndoLog::Transaction t(c.document->d2UndoLog());
+
+        if (content.isEmpty() && indent > 0) {
+            // Outdent: reduce indent level by one.
             c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
-                                        indentLevel - 1, t);
-            c.cursorState->requestTextCaretAtRow(c.blockIndex,
-                static_cast<int>(markerPrefix.length()));
+                                        indent - 1, t);
+            Markoff::Cmd::renumberRunStartingAt(*c.document, id, t);
+            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
             return HR::Handled;
         }
 
-        if (isEmpty && indentLevel == 0) {
-            const int newlineCount = static_cast<int>(blockText.count(u'\n'));
-            UndoLog::Transaction t(c.document->d2UndoLog());
+        if (content.isEmpty() && indent == 0) {
+            // Exit list: demote to Paragraph, clear MarkerStyle.
+            c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
+            c.document->d2SetBlockAttr(id, Markoff::AttrNames::MarkerStyle,
+                                        QString{}, t);
+            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+            return HR::Handled;
+        }
 
-            if (newlineCount == 0) {
-                // Single-item block: demote the whole block to Paragraph.
-                if (!markerPrefix.isEmpty())
-                    c.document->d2ApplyBufferEdit(id, 0,
-                        static_cast<uint32_t>(markerPrefix.length()), {}, t);
-                c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
-                c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
-                return HR::Handled;
-            }
+        if (c.qtPos == 0) {
+            // Cursor at start of non-empty content: insert a new empty item
+            // before the current one. The current item shifts to blockIndex+1.
+            Markoff::Cmd::insertListItemBefore(*c.document, id, t);
+            Markoff::Cmd::renumberRunStartingAt(*c.document, id, t);
+            // Follow the original (content-bearing) item, now at blockIndex+1.
+            c.cursorState->requestTextCaretAtAnchor(id, 0);
+            return HR::Handled;
+        }
 
-            // Multi-item block: remove the empty current line, then append a
-            // new Paragraph block after the list block.
-            int removeQtStart, removeQtCount;
-            if (lineStart > 0) {
-                // Remove the preceding '\n' + the empty line.
-                removeQtStart = lineStart - 1;
-                const int lineQtEnd = (lineEnd >= 0) ? lineEnd : blockText.length() - 1;
-                removeQtCount = lineQtEnd - removeQtStart + 1;
-            } else {
-                // First line is the empty one; remove it + its trailing '\n'.
-                removeQtStart = 0;
-                removeQtCount = (lineEnd >= 0) ? lineEnd + 1 : blockText.length();
-            }
-            const uint32_t removeByteStart = static_cast<uint32_t>(
-                blockText.left(removeQtStart).toUtf8().size());
-            const uint32_t removeByteCount = static_cast<uint32_t>(
-                blockText.mid(removeQtStart, removeQtCount).toUtf8().size());
-            c.document->d2ApplyBufferEdit(id,
-                removeByteStart, removeByteCount, {}, t);
-
-            c.document->d2InsertBlock(c.blockAnchor,
-                Markoff::BlockKind::Paragraph, t);
+        if (c.qtPos == content.length()) {
+            // Cursor at end: insert a new empty item after the current one.
+            Markoff::BlockId newId =
+                Markoff::Cmd::insertListItemAfter(*c.document, id, t);
+            Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
             c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
             return HR::Handled;
         }
 
-        // 5. Non-empty line: insert a new item line within the block AND
-        // renumber subsequent ordered markers if the inserted marker is ordered.
-        //
-        // Two sub-cases based on where the cursor sits:
-        //   • At start of a line (lineStart == qtPos): insert markerPrefix+'\n'
-        //     BEFORE the current line — new empty item above, cursor stays there.
-        //   • Anywhere else: insert '\n'+nextMarker AFTER the cursor — new item
-        //     below, cursor moves to it.
-        const bool atLineStart = (lineStart == c.qtPos);
-
-        // For at-end / mid-line: increment the marker so the new item carries
-        // the next number. For at-line-start: keep the same marker (the new
-        // empty item assumes the current line's number; renumbering shifts
-        // everything below by 1).
-        bool insertedIsOrdered = false;
-        int  insertedNumber    = 0;
-        char insertedSeparator = '.';
-        {
-            static const QRegularExpression kOrd(
-                QStringLiteral(R"(^(\d{1,9})([.)]) )"));
-            auto om = kOrd.match(QString::fromUtf8(markerPrefix));
-            if (om.hasMatch()) {
-                insertedIsOrdered = true;
-                insertedSeparator = om.captured(2).at(0).toLatin1();
-                insertedNumber    = om.captured(1).toInt() + (atLineStart ? 0 : 1);
-                markerPrefix = QByteArray::number(insertedNumber)
-                             + insertedSeparator + ' ';
-            }
-        }
-
-        const uint32_t byteOff = static_cast<uint32_t>(
-            blockText.left(c.qtPos).toUtf8().size());
-        const QByteArray insertion = atLineStart
-            ? (markerPrefix + "\n")
-            : ("\n" + markerPrefix);
-
-        // Build the renumbered tail. Start from the original tail (cursor →
-        // end-of-block); split into lines; if the inserted item is ordered,
-        // increment any subsequent ordered markers by 1 so the source stays
-        // sequential.
-        QString origTail = blockText.mid(c.qtPos);
-        if (insertedIsOrdered && !origTail.isEmpty()) {
-            QStringList lines = origTail.split(u'\n');
-            static const QRegularExpression kOrdLine(
-                QStringLiteral(R"(^([ \t]{0,3})(\d{1,9})([.)]) )"));
-            for (auto &ln : lines) {
-                auto m = kOrdLine.match(ln);
-                if (!m.hasMatch()) continue;
-                const int oldN = m.captured(2).toInt();
-                ln = m.captured(1) + QString::number(oldN + 1) + m.captured(3)
-                   + QStringLiteral(" ") + ln.mid(m.capturedLength());
-            }
-            origTail = lines.join(u'\n');
-        }
-
-        const QByteArray newTail = origTail.toUtf8();
-        const QByteArray oldTail = blockText.mid(c.qtPos).toUtf8();
-
-        UndoLog::Transaction t(c.document->d2UndoLog());
-        c.document->d2ApplyBufferEdit(id, byteOff,
-                                       static_cast<uint32_t>(oldTail.size()),
-                                       insertion + newTail, t);
-        // Cursor: at-line-start → stay at new empty item (same qtPos);
-        //         otherwise → move to start of new item below.
-        const int newQtPos = atLineStart
-            ? c.qtPos
-            : (c.qtPos + 1 + static_cast<int>(QString::fromUtf8(markerPrefix).size()));
-        c.cursorState->requestTextCaretAtRow(c.blockIndex, newQtPos);
+        // Mid-content split: truncate current to prefix, set new item to suffix.
+        const QByteArray prefixUtf8 = content.left(c.qtPos).toUtf8();
+        const QByteArray suffixUtf8 = content.mid(c.qtPos).toUtf8();
+        // Truncate current block: remove the suffix bytes.
+        c.document->d2ApplyBufferEdit(id,
+            static_cast<uint32_t>(prefixUtf8.size()),
+            static_cast<uint32_t>(suffixUtf8.size()),
+            QByteArray{}, t);
+        // Insert new item after current, set its content to the suffix.
+        Markoff::BlockId newId =
+            Markoff::Cmd::insertListItemAfter(*c.document, id, t);
+        c.document->d2ApplyBufferEdit(newId, 0, 0, suffixUtf8, t);
+        Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
+        c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
         return HR::Handled;
     };
 
-    // Backspace: outdent if indented and at row-start, else merge with previous.
+    // Backspace: outdent if indented and at start, else merge with previous block.
     m_handlers[BlockKind::ListItem][Qt::Key_Backspace] = [](const Ctx &c) -> HR {
+        if (c.qtPos != 0) return HR::NotHandled;  // in-line: let TextEdit handle
+
         const Markoff::BlockId id(c.blockAnchor);
         const auto attrs = c.document->blockAttrs(id);
-        const int indentLevel = attrs.contains(Markoff::AttrNames::IndentLevel)
+        const int indent = attrs.contains(Markoff::AttrNames::IndentLevel)
             ? std::get<int>(attrs.value(Markoff::AttrNames::IndentLevel)) : 0;
-        if (c.qtPos == 0 && indentLevel > 0) {
+
+        if (indent > 0) {
             UndoLog::Transaction t(c.document->d2UndoLog());
             c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
-                                        indentLevel - 1, t);
+                                        indent - 1, t);
+            Markoff::Cmd::renumberRunStartingAt(*c.document, id, t);
             c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
             return HR::Handled;
         }
-        // qtPos > 0 or indentLevel == 0: normal merge with previous block.
-        if (c.qtPos != 0) return HR::NotHandled;
-        if (c.blockIndex == 0) return HR::NotHandled;
+
+        if (c.blockIndex == 0) return HR::NotHandled;  // nothing before to merge into
+
         const int joinQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
         auto result = Markoff::Cmd::backspaceMerge(*c.document, c.blockAnchor);
         if (result.mergedInto.isNull()) return HR::NotHandled;
+        // backspaceMerge uses its own transaction; renumber in a follow-up transaction
+        // so the merged block's run stays consistent if it is still a ListItem.
+        {
+            UndoLog::Transaction t(c.document->d2UndoLog());
+            Markoff::Cmd::renumberRunStartingAt(*c.document, result.mergedInto, t);
+        }
         c.cursorState->requestTextCaretAtAnchor(result.mergedInto, joinQtPos);
         return HR::Handled;
     };
 
-    // Delete: merge with next block.
+    // Delete: merge the next block into the current one.
     m_handlers[BlockKind::ListItem][Qt::Key_Delete] = [](const Ctx &c) -> HR {
         if (c.qtPos < c.blockText.length()) return HR::NotHandled;
         if (c.blockIndex >= c.model->rowCount() - 1) return HR::NotHandled;
+
         Markoff::Cmd::deleteMerge(*c.document, c.blockAnchor);
         c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, c.qtPos);
         return HR::Handled;
     };
 
-    // Tab: indent; Shift+Tab: outdent.
+    // Tab: indent (or Shift+Tab: outdent). Cursor stays at same qtPos.
     m_handlers[BlockKind::ListItem][Qt::Key_Tab] = [](const Ctx &c) -> HR {
         const Markoff::BlockId id(c.blockAnchor);
         const auto attrs = c.document->blockAttrs(id);
-        const int indentLevel = attrs.contains(Markoff::AttrNames::IndentLevel)
+        const int indent = attrs.contains(Markoff::AttrNames::IndentLevel)
             ? std::get<int>(attrs.value(Markoff::AttrNames::IndentLevel)) : 0;
+
+        const bool shift    = (c.modifiers & Qt::ShiftModifier) != 0;
+        const int newIndent = shift ? std::max(0, indent - 1)
+                                    : std::min(6, indent + 1);
+        if (newIndent == indent) return HR::Handled;  // already at boundary
+
         UndoLog::Transaction t(c.document->d2UndoLog());
-        const bool shift = (c.modifiers & Qt::ShiftModifier) != 0;
-        if (shift) {
-            if (indentLevel > 0)
-                c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
-                                            indentLevel - 1, t);
-        } else {
-            c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
-                                        std::min(indentLevel + 1, 6), t);
+        c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
+                                    newIndent, t);
+        Markoff::Cmd::renumberRunStartingAt(*c.document, id, t);
+        // Also renumber the run this item left, if the previous block was a ListItem.
+        if (c.blockIndex > 0) {
+            const Markoff::BlockId prevId =
+                c.model->recordAt(c.blockIndex - 1).blockAnchor;
+            Markoff::Cmd::renumberRunStartingAt(*c.document, prevId, t);
         }
         c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos);
         return HR::Handled;
