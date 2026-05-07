@@ -29,6 +29,8 @@ private Q_SLOTS:
         QVERIFY(doc);
         const auto blocks = doc->topLevelBlocks();
         QCOMPARE(blocks.size(), 2);
+        QCOMPARE(blocks[0].kind, TLB::Kind::ListItem);
+        QCOMPARE(blocks[1].kind, TLB::Kind::ListItem);
         QCOMPARE(blocks[0].markerStyle, QStringLiteral("minus"));
         QCOMPARE(blocks[1].markerStyle, QStringLiteral("minus"));
         QCOMPARE(blocks[0].markerNumber, 0);
@@ -49,6 +51,7 @@ private Q_SLOTS:
         QCOMPARE(blocks[1].indentDepth, 1);
         QCOMPARE(blocks[1].markerStyle, QStringLiteral("minus"));
         QCOMPARE(blocks[2].indentDepth, 1);
+        QCOMPARE(blocks[2].markerStyle, QStringLiteral("minus"));
         QCOMPARE(blocks[3].indentDepth, 0);
         QCOMPARE(blocks[3].markerNumber, 2);
     }
@@ -89,6 +92,8 @@ private Q_SLOTS:
         const auto blocks = doc->topLevelBlocks();
         QCOMPARE(blocks.size(), 2);
         QCOMPARE(blocks[0].markerStyle, QStringLiteral("paren"));
+        QCOMPARE(blocks[0].markerNumber, 1);
+        QCOMPARE(blocks[1].markerStyle, QStringLiteral("paren"));
         QCOMPARE(blocks[1].markerNumber, 2);
     }
 
