@@ -352,6 +352,9 @@ void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
         d->buffer.apply_local_edit(ranges, texts);
         break;
     }
+    case Origin::UserEdit:
+        Q_UNREACHABLE();
+        break;
     }
     d->parsePool.scheduleReset(toMarkdownUtf8(), d->editSequence);
     Q_EMIT documentReloaded();
