@@ -1,31 +1,22 @@
 # Markoff (exploration/new-foundation branch)
 
-> **D3-correction in flight.** The D3 implementation landed 2026-05-05 and
-> dogfooded 2026-05-06; dogfood surfaced that lists were stored as
-> "one block = one whole list of multi-line text" instead of D3 §1
-> premise 6's "one block = one list item." That compromise (a TODO in
-> `materializeBlocksFromParsedDoc`) was the root of every list-related
-> dogfood bug. The corrective spec is:
->
-> **`docs/specs/2026-05-06-per-item-listitem-blocks-design.md`** — read
-> this BEFORE picking up any list-related work. It supersedes the
-> ListItem portions of the original D3 implementation plan; the rest of
-> D3 (Heading, CodeBlock, HR, Image, Math, Blockquote, per-block undo,
-> structural cursor signals) stands.
+> **D3 complete (corrective spec landed and tested).** D3-correction
+> per `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` is
+> implemented and passes 146/146 tests. ListItem blocks are per-item;
+> renumbering is caller-driven in UndoLog::Transaction; marker rendering
+> is delegate-driven from attrs. BlockRecord::operator== now covers attrs
+> so indent/renumber changes reach the QML model.
 >
 > **Fresh agent context — read in order:**
 >
-> 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation across D0 → D5
-> 2. `docs/d-arc/d-arc-status.md` — live status board
-> 3. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items binding every D-arc spec
-> 4. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — original D3 spec (still authoritative for non-list pieces)
-> 5. **`docs/specs/2026-05-06-per-item-listitem-blocks-design.md`** — the active corrective spec for ListItem
+> 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation
+> 2. `docs/d-arc/d-arc-status.md` — live status board (D3 complete)
+> 3. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items
+> 4. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 spec
+> 5. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — corrective spec (landed)
 >
-> Implementation plan for the corrective spec is pending; do **not** add
-> new band-aid fixes to the multi-line list code in
-> `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp` —
-> commits `cc62280`, `799eb94` and `21b2ce3` already over-fitted that path
-> and the spec replaces them.
+> Next phase: D4 (parser scope reduction). Stub at
+> `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`.
 >
 > The C-restoration's status board (`docs/restoration-status.md`) is now
 > historical. The marker-paragraph design and R5.5 plan are retired. R5.5
@@ -33,12 +24,10 @@
 > CRDT race window that D removes structurally.
 >
 > The legacy `libs/markoff-view-qml` continues to ship; the in-tree
-> `libs/markoff-live-render` keeps L0–L3 (carries forward to D3) and the existing
-> R5/R5.5 work (will be rewritten or retired during D3 implementation).
+> `libs/markoff-live-render` carries L0–L3 and all D3 work.
 > Do not delete `libs/markoff-view-qml` prematurely.
 >
-> All other content below describes the project at large; the D3-correction
-> rework is the active subject within that.
+> All other content below describes the project at large.
 
 ---
 
