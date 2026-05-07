@@ -58,3 +58,8 @@ add_executable(tst_parser_inline_span_bake tst_parser_inline_span_bake.cpp)
 add_test(NAME tst_parser_inline_span_bake COMMAND tst_parser_inline_span_bake)
 target_link_libraries(tst_parser_inline_span_bake PRIVATE Qt6::Test markoff-parser)
 set_tests_properties(tst_parser_inline_span_bake PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_parser_list_items tst_parser_list_items.cpp)
+add_test(NAME tst_parser_list_items COMMAND tst_parser_list_items)
+target_link_libraries(tst_parser_list_items PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_parser_list_items PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
