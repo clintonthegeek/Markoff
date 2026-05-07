@@ -42,18 +42,13 @@ add_library(markoff_foundation STATIC
     include/markoff-foundation/CompletionProvider.h
     include/markoff-foundation/CompletionRegistry.h
     include/markoff-foundation/EmojiCompletionProvider.h
-    include/markoff-foundation/CommandFacade.h
     include/markoff-foundation/SourceTextDocumentBinding.h
     include/markoff-foundation/SearchEngine.h
-    include/markoff-foundation/ReplaceController.h
     include/markoff-foundation/MarkoffServices.h
     # --- Cmd/ (public) ---
     # Cmd aggregate
     include/markoff-foundation/Cmd.h
     include/markoff-foundation/Cmd/Edit.h
-    include/markoff-foundation/Cmd/InlineFormat.h
-    include/markoff-foundation/Cmd/Block.h
-    include/markoff-foundation/Cmd/Insert.h
     include/markoff-foundation/Cmd/D2.h
     src/MarkoffDocumentPrivate.h
     src/SessionPrivate.h
@@ -76,10 +71,8 @@ add_library(markoff_foundation STATIC
     src/DefaultLinkService.cpp
     src/SyntaxHighlightService.cpp
     src/Kf6SyntaxHighlightService.cpp
-    src/CommandFacade.cpp
     src/SourceTextDocumentBinding.cpp
     src/SearchEngine.cpp
-    src/ReplaceController.cpp
     src/CodeBlockProcessorRegistry.cpp
     src/CompletionDetector.cpp
     src/CompletionProvider.cpp
@@ -107,11 +100,6 @@ add_library(markoff_foundation STATIC
     src/InlineParseCache.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
-    src/Cmd/Helpers.h
-    src/Cmd/Helpers.cpp
-    src/Cmd/InlineFormat.cpp
-    src/Cmd/Block.cpp
-    src/Cmd/Insert.cpp
     src/Cmd/D2.cpp
 )
 
