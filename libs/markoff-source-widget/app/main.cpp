@@ -9,8 +9,6 @@
 #include <markoff/source/widget/Editor.h>
 #include <markoff/source/widget/FindBar.h>
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
-#include <markoff-foundation/Origin.h>
 
 int main(int argc, char **argv) {
     QApplication app(argc, argv);
@@ -22,7 +20,8 @@ int main(int argc, char **argv) {
         QFile f(QString::fromUtf8(argv[1]));
         if (f.open(QIODevice::ReadOnly)) seed = f.readAll();
     }
-    if (!seed.isEmpty()) doc.resetContent(seed, Markoff::Origin::FirstOpen);
+    if (!seed.isEmpty()) doc.loadFromMarkdown(seed);
+    else doc.loadFromMarkdown(QByteArray());
 
     QMainWindow win;
     auto *central = new QWidget;
