@@ -3,6 +3,7 @@
 #include <QTest>
 
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Origin.h>
 #include <markoff-foundation/SearchEngine.h>
 #include <markoff/view/qml/EditorBackend.h>
 #include <markoff/view/qml/SearchBackend.h>
@@ -28,10 +29,8 @@ private Q_SLOTS:
 
     void find_all_returns_match_count() {
         Markoff::MarkoffDocument doc(1);
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = 0; ed.oldEnd = 0;
-        ed.newText = QByteArray("the quick brown fox jumps over the lazy fox");
-        doc.applyLocalEdit({ ed });
+        doc.resetContent(QByteArray("the quick brown fox jumps over the lazy fox"),
+                         Markoff::Origin::FirstOpen);
 
         EditorBackend backend;
         backend.setDocument(&doc);
@@ -48,10 +47,8 @@ private Q_SLOTS:
 
     void find_next_advances_and_find_prev_retreats() {
         Markoff::MarkoffDocument doc(1);
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = 0; ed.oldEnd = 0;
-        ed.newText = QByteArray("the quick brown fox jumps over the lazy fox");
-        doc.applyLocalEdit({ ed });
+        doc.resetContent(QByteArray("the quick brown fox jumps over the lazy fox"),
+                         Markoff::Origin::FirstOpen);
 
         EditorBackend backend;
         backend.setDocument(&doc);
@@ -67,10 +64,7 @@ private Q_SLOTS:
 
     void clear_resets_match_count() {
         Markoff::MarkoffDocument doc(1);
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = 0; ed.oldEnd = 0;
-        ed.newText = QByteArray("foo bar foo");
-        doc.applyLocalEdit({ ed });
+        doc.resetContent(QByteArray("foo bar foo"), Markoff::Origin::FirstOpen);
 
         EditorBackend backend;
         backend.setDocument(&doc);
@@ -86,10 +80,7 @@ private Q_SLOTS:
 
     void case_sensitive_flag_changes_results() {
         Markoff::MarkoffDocument doc(1);
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = 0; ed.oldEnd = 0;
-        ed.newText = QByteArray("Foo foo FOO");
-        doc.applyLocalEdit({ ed });
+        doc.resetContent(QByteArray("Foo foo FOO"), Markoff::Origin::FirstOpen);
 
         EditorBackend backend;
         backend.setDocument(&doc);
