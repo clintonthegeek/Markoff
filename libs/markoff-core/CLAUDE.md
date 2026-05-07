@@ -61,6 +61,18 @@ after the edit lands.
 - Block content does NOT get an auto-appended `\n`; content is exactly
   what `loadFromMarkdown` / `applyFlatEdit` puts in.
 
+## v1.0 public surface (since 2026-05-07)
+
+The consumer-facing primitives in `markoff-core` are:
+
+- `Markoff::CursorPos` — `{line, column}`, 1-based. Header: `<markoff/core/CursorPos.h>`.
+- `Markoff::Theme` — opaque value type for editor colours and fonts. Header: `<markoff/core/Theme.h>`.
+- `Markoff::EditorContext` — `{blockKind, headingLevel, inTable, tableRow, tableCol}`. `blockKind` is a `QString`; canonical names are `Markoff::BlockKindNames::*`. Header: `<markoff/core/EditorContext.h>`.
+- `Markoff::ActionId` — toolbar / formatting action identifier (`Q_ENUM_NS`). Header: `<markoff/core/ActionId.h>`.
+- `Markoff::MarkdownView` — concrete QWidget base class for live-edit, live-read-only, and source widgets. Header: `<markoff/core/MarkdownView.h>`.
+
+The CRDT internals (`Markoff::Cmd::*`, `BlockId`, `IdList`, `UndoLog`, `applyFlatEdit`) are in the same `Markoff::` namespace but are not part of the consumer-facing UI surface — they are used by `markoff-live` and `markoff-source` internally.
+
 ## CRDT internals (foundation-only)
 
 - `version() → Crdt::Global` is foundation-internal — public boundary
