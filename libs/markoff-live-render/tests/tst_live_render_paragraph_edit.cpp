@@ -8,9 +8,8 @@
 // get a properly-wired QTextDocument; setRawTextDocument(editor.document())
 // wires the binding to the editor's underlying document.
 //
-// D2 migration: tests use loadFromMarkdown + structureChanged instead of
-// resetContent + parseUpdated. Model rows arrive via onD2Changed driven
-// by the IdListProxy and KindTagMap signals.
+// Tests use loadFromMarkdown + structureChanged. Model rows arrive via
+// onD2Changed driven by the IdListProxy and KindTagMap signals.
 
 #include <QTest>
 #include <QSignalSpy>
