@@ -957,16 +957,20 @@ QByteArray markerForListItem(const QHash<Markoff::AttrName, Markoff::AttrValue> 
     using namespace Markoff::AttrNames;
     auto it = attrs.constFind(MarkerStyle);
     if (it == attrs.cend()) return "-";
-    const QString style = std::get<QString>(it.value());
+    const auto *stylePtr = std::get_if<QString>(&it.value());
+    if (!stylePtr) return "-";
+    const QString &style = *stylePtr;
 
     if (style == QStringLiteral("dot")) {
         auto ni = attrs.constFind(MarkerNumber);
-        const int n = (ni != attrs.cend()) ? std::get<int>(ni.value()) : 1;
+        const auto *np = (ni != attrs.cend()) ? std::get_if<int>(&ni.value()) : nullptr;
+        const int n = np ? *np : 1;
         return QByteArray::number(n) + ".";
     }
     if (style == QStringLiteral("paren")) {
         auto ni = attrs.constFind(MarkerNumber);
-        const int n = (ni != attrs.cend()) ? std::get<int>(ni.value()) : 1;
+        const auto *np = (ni != attrs.cend()) ? std::get_if<int>(&ni.value()) : nullptr;
+        const int n = np ? *np : 1;
         return QByteArray::number(n) + ")";
     }
     if (style == QStringLiteral("minus")) return "-";
@@ -974,7 +978,8 @@ QByteArray markerForListItem(const QHash<Markoff::AttrName, Markoff::AttrValue> 
     if (style == QStringLiteral("star"))  return "*";
     if (style == QStringLiteral("task")) {
         auto ci = attrs.constFind(Checked);
-        const bool c = (ci != attrs.cend()) ? std::get<bool>(ci.value()) : false;
+        const auto *cp = (ci != attrs.cend()) ? std::get_if<bool>(&ci.value()) : nullptr;
+        const bool c = cp ? *cp : false;
         return c ? "- [x]" : "- [ ]";
     }
     return "-";  // fallback
@@ -1039,7 +1044,7 @@ QByteArray MarkoffDocument::serializeForSave() const
             auto looseIt = attrs.constFind(AttrNames::LooseRun);
             if (looseIt != attrs.cend()) looseRun = std::get<bool>(looseIt.value());
 
-            const QByteArray indentBytes(indent * 3, ' ');
+            const QByteArray indentBytes(std::max(0, indent) * 3, ' ');
             const QByteArray marker = markerForListItem(attrs);
             const QByteArray content = blockText(id);
 
