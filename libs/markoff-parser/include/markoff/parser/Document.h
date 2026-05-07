@@ -8,8 +8,8 @@
 #include <QString>
 #include <QList>
 #include <QVariant>
-#include <markoff-parser/SourceSpan.h>
-#include <markoff-parser/YamlValue.h>
+#include <markoff/parser/SourceSpan.h>
+#include <markoff/parser/YamlValue.h>
 
 namespace Markoff {
 

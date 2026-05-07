@@ -3,7 +3,7 @@
 #include <QTextDocument>
 #include <QTextTable>
 #include <QTextCursor>
-#include <markoff-parser/TableHandler.h>
+#include <markoff/parser/TableHandler.h>
 
 class TestTable : public QObject
 {

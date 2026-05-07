@@ -3,8 +3,8 @@
 #include <QLineEdit>
 #include <QTest>
 
-#include <markoff/source/widget/Editor.h>
-#include <markoff/source/widget/FindBar.h>
+#include <markoff/source/Editor.h>
+#include <markoff/source/FindBar.h>
 #include <markoff/core/MarkoffDocument.h>
 
 class TstSourceWidgetFindBar : public QObject {

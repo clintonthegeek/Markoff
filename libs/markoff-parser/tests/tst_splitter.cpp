@@ -2,8 +2,8 @@
 #include <QTest>
 #include <QFile>
 #include <QTextStream>
-#include <markoff-parser/MarkdownSplitter.h>
-#include <markoff-parser/TreeSitterParser.h>
+#include <markoff/parser/MarkdownSplitter.h>
+#include <markoff/parser/TreeSitterParser.h>
 
 #ifndef SHOWCASE_PATH
 #define SHOWCASE_PATH "/home/clinton/dev/Corbomite/libs/markoff-parser/tests/showcase.md"

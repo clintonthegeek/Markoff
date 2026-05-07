@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/source/widget/Editor.h>
+#include <markoff/source/Editor.h>
 #include "Gutter.h"
 
 #include <KSyntaxHighlighting/Definition>

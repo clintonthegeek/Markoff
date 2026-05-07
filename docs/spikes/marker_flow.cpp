@@ -9,7 +9,7 @@
 //   4. None of these steps requires a hole layer — they are pure source
 //      edits + parser-driven row updates.
 
-#include <markoff-parser/Document.h>
+#include <markoff/parser/Document.h>
 #include <QString>
 #include <QStringLiteral>
 #include <cstdio>

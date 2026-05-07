@@ -12,8 +12,8 @@ add_library(markoff_source STATIC
     src/Editor.cpp
     src/FindBar.cpp
     src/Gutter.cpp
-    include/markoff/source/widget/Editor.h
-    include/markoff/source/widget/FindBar.h
+    include/markoff/source/Editor.h
+    include/markoff/source/FindBar.h
     src/Gutter.h
 )
 

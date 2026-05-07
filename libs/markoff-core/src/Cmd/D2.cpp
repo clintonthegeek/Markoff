@@ -6,7 +6,7 @@
 #include <markoff/core/BlockAttrsMap.h>
 #include <markoff/core/AttrNames.h>
 
-#include <markoff-parser/Document.h>
+#include <markoff/parser/Document.h>
 
 #include <QDateTime>
 #include <QString>

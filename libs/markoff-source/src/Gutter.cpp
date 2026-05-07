@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Gutter.h"
-#include <markoff/source/widget/Editor.h>
+#include <markoff/source/Editor.h>
 
 #include <QPainter>
 #include <QPaintEvent>

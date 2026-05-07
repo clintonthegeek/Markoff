@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-parser/Document.h>
+#include <markoff/parser/Document.h>
 
 using Markoff::Document;
 using Markoff::TopLevelBlock;

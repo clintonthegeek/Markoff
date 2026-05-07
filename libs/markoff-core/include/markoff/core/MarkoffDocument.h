@@ -19,7 +19,7 @@
 
 #include <markoff/core/BlockAnchor.h>
 #include <markoff/core/BlockSerializerRegistry.h>
-#include <markoff-parser/SourceSpan.h>
+#include <markoff/parser/SourceSpan.h>
 #include <markoff/core/BlockAttrsMap.h>
 #include <markoff/core/BlockEdit.h>
 #include <markoff/core/BlockKind.h>

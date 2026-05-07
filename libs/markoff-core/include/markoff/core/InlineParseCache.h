@@ -3,7 +3,7 @@
 
 #include <markoff/core/BlockId.h>
 #include <markoff/core/MarkoffCoreExport.h>
-#include <markoff-parser/SourceSpan.h>
+#include <markoff/parser/SourceSpan.h>
 
 #include <QHash>
 #include <QList>

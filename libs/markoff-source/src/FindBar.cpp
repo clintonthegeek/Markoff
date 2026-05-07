@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/source/widget/FindBar.h>
-#include <markoff/source/widget/Editor.h>
+#include <markoff/source/FindBar.h>
+#include <markoff/source/Editor.h>
 
 #include <QHBoxLayout>
 #include <QIcon>

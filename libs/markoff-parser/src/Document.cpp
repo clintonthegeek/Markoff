@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-parser/Document.h>
-#include <markoff-parser/YamlValue.h>
-#include <markoff-parser/TreeSitterParser.h>
+#include <markoff/parser/Document.h>
+#include <markoff/parser/YamlValue.h>
+#include <markoff/parser/TreeSitterParser.h>
 
 #include <QStringList>
 #include <QRegularExpression>

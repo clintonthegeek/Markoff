@@ -1,7 +1,7 @@
 // libs/markoff/tests/tst_document_queries.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-parser/Document.h>
+#include <markoff/parser/Document.h>
 
 class TestDocumentQueries : public QObject
 {

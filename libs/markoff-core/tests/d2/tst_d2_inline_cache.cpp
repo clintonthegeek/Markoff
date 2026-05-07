@@ -4,7 +4,7 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/UndoLog.h>
-#include <markoff-parser/SourceSpan.h>
+#include <markoff/parser/SourceSpan.h>
 
 using namespace Markoff;
 

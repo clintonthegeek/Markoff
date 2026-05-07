@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 
-#include <markoff-parser/Document.h>
-#include <markoff-parser/SourceSpan.h>
-#include <markoff-parser/TreeSitterParser.h>
+#include <markoff/parser/Document.h>
+#include <markoff/parser/SourceSpan.h>
+#include <markoff/parser/TreeSitterParser.h>
 
 using namespace Markoff;
 

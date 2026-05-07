@@ -2,7 +2,7 @@
 #include "BlockAnchorComputation.h"
 
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff-parser/Document.h>
+#include <markoff/parser/Document.h>
 
 namespace Markoff::Detail {
 

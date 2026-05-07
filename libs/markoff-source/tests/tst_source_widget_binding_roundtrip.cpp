@@ -4,7 +4,7 @@
 #include <QSignalSpy>
 #include <QTest>
 
-#include <markoff/source/widget/Editor.h>
+#include <markoff/source/Editor.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>

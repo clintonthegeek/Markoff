@@ -5,7 +5,7 @@
 
 // Full Markoff::Document (parser type) must be complete before MarkoffDocumentPrivate.h
 // instantiates std::unique_ptr<const Markoff::Document>'s destructor.
-#include <markoff-parser/Document.h>
+#include <markoff/parser/Document.h>
 
 #include "MarkoffDocumentPrivate.h"
 

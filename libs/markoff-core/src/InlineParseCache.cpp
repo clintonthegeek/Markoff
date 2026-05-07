@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/core/InlineParseCache.h>
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff-parser/TreeSitterParser.h>
+#include <markoff/parser/TreeSitterParser.h>
 
 namespace Markoff {
 

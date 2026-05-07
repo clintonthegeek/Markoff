@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-parser/YamlValue.h>
+#include <markoff/parser/YamlValue.h>
 
 #include <ryml.hpp>
 #include <ryml_std.hpp>

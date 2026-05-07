@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-parser/TreeSitterParser.h>
-#include <markoff-parser/SourceSpan.h>
-#include <markoff-parser/Document.h>
+#include <markoff/parser/TreeSitterParser.h>
+#include <markoff/parser/SourceSpan.h>
+#include <markoff/parser/Document.h>
 
 #include <tree_sitter/api.h>
 #include <tree-sitter/tree-sitter-markdown.h>

@@ -10,7 +10,7 @@
 
 #include <QSaveFile>
 
-#include <markoff-parser/Document.h>
+#include <markoff/parser/Document.h>
 
 #include <algorithm>
 #include <atomic>

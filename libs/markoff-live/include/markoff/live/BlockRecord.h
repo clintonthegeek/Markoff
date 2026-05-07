@@ -4,7 +4,7 @@
 #include <markoff/live/MarkoffLiveExport.h>
 #include <markoff/core/BlockAnchor.h>
 #include <markoff/core/BlockAttrsMap.h>
-#include <markoff-parser/SourceSpan.h>
+#include <markoff/parser/SourceSpan.h>
 
 #include <QString>
 #include <QHash>

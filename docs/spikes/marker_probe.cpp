@@ -8,7 +8,7 @@
 // We need a configuration that produces TWO blocks (paragraph "hello"
 // and a paragraph containing the marker).
 
-#include <markoff-parser/Document.h>
+#include <markoff/parser/Document.h>
 #include <QString>
 #include <QStringLiteral>
 #include <QDebug>

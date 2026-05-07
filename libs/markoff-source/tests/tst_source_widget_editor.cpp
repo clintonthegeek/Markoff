@@ -2,7 +2,7 @@
 #include <QPalette>
 #include <QTest>
 
-#include <markoff/source/widget/Editor.h>
+#include <markoff/source/Editor.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
 
