@@ -318,9 +318,11 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
     Markoff::MarkoffDocument *doc = m_markoffDocument;
 
     // Compute byte offsets against the PRE-CHANGE document state.
-    // doc->toMarkdownUtf8() still holds the pre-change bytes because we haven't
-    // called applyLocalEdit yet.
-    const QByteArray preBytes = doc->toMarkdownUtf8();
+    // Derive from block-buffer flat text (D2 convention): concatenation of
+    // blockText(id) for each block in iterateBlocks() order.
+    QByteArray preBytes;
+    for (Markoff::BlockId id : doc->iterateBlocks())
+        preBytes += doc->blockText(id);
     const QString preText = QString::fromUtf8(preBytes);
     const quint32 oldStart = qtPosToByteOffset(preText, qtPos);
     const quint32 oldEnd   = qtPosToByteOffset(preText, qtPos + charsRemoved);
@@ -330,13 +332,8 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
     const QString insertedText = postPlain.mid(qtPos, charsAdded);
     const QByteArray newText = insertedText.toUtf8();
 
-    Markoff::MarkoffEdit ed;
-    ed.oldStart = oldStart;
-    ed.oldEnd   = oldEnd;
-    ed.newText  = newText;
-
     m_applyingLocalEdit = true;
-    doc->applyLocalEdit({ ed });
+    doc->applyFlatEdit(oldStart, oldEnd, newText, Markoff::Origin::UserEdit);
     m_applyingLocalEdit = false;
 }
 
