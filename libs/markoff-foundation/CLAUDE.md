@@ -1,21 +1,17 @@
 # markoff-foundation — library guide
 
-The CRDT-backed document + sessions + parse-pool layer. Exposes a
-view-layer-safe public API; CRDT primitives stay internal.
+The CRDT-backed document + sessions layer. Exposes a view-layer-safe
+public API; CRDT primitives stay internal.
 
-## Status (2026-05-06)
+## Status (2026-05-07)
 
-D2 (foundation reshape) shipped — per-block CRDT buffers, sibling
-causal-LWW maps, `Cmd::*` command set, `UndoLog`, `WatermarkCoordinator`.
+D2 (foundation reshape) + D3 (view-layer adaptation, foundation side) +
+D4 (parser scope reduction, foundation side) all complete.
 
-**Active corrective work:**
-`docs/specs/2026-05-06-per-item-listitem-blocks-design.md` requires
-foundation-side amendments — `mapTopLevelKind`, `materializeBlocksFromParsedDoc`
-(no more "deferred item-level unwrapping" comment), `AttrNames`
-(`MarkerNumber`, `LooseRun` additions), `serializeForSave` list
-reconstruction, and new `Cmd::insertListItemAfter/Before` +
-`Cmd::renumberRunStartingAt` helpers. Read the spec before touching
-list-related code.
+D4 landed: `ParsePool`, `ParsePoolWorker`, `IncrementalParseSession`,
+`RenderPhases`, `parseUpdated`, `parseSequence`, `MarkoffEdit`,
+`applyLocalEdit` all deleted. `applyFlatEdit` is the new flat-text
+entry point for source-widget-style edits (see below).
 
 ## Public-boundary types (no `<crdt/...>` dependency)
 
@@ -34,13 +30,11 @@ list-related code.
 
 ## Public `MarkoffDocument` accessors (CRDT-free)
 
-- `quint64 editSequence() const noexcept` — bumps on every state-
-  change op (applyLocalEdit, undo, redo, applyRemoteOps, resetContent).
-  Use for dirty-tracking ("[modified]" window title) without holding
-  a `Crdt::Global`.
-- `quint64 parseSequence() const noexcept` — bumps each time
-  `parseUpdated` fires. Use for parse-ordering ("is this a newer
-  parse than what I rendered?").
+- `quint64 editSequence() const noexcept` — bumps on every legacy undo/redo
+  and `resetContent` call. Use for dirty-tracking ("[modified]" window title)
+  when the legacy undo stack is in use.
+- `quint64 d2EditSequence() const noexcept` — bumps on every `applyFlatEdit`
+  and block-level D2 edit. Use for dirty-tracking in D2-native views.
 - `TextAnchor textAnchorAt(quint32, bool rightBias)` /
   `quint32 resolveTextAnchor(TextAnchor)` — companions to the
   CRDT-typed `anchorAt`/`resolveAnchor` (which stay foundation-
@@ -49,19 +43,23 @@ list-related code.
   `blockAt(TextAnchor)`, `offsetInBlock(BlockAnchor, TextAnchor)`,
   `textAnchorAt(BlockAnchor, int offset, bool rightBias)`.
 
-## `parseUpdated` signal shape
+## `applyFlatEdit` — flat-text entry point (D4)
 
 ```cpp
-void parseUpdated(const Markoff::Document *parsed,
-                  quint64 parseSequence,
-                  QList<Markoff::BlockAnchor> blockAnchors);
+void applyFlatEdit(int startByte, int endByte,
+                   const QByteArray &newText, Origin origin);
 ```
 
-The signal is fired on the main thread from a relay lambda in
-`MarkoffDocument`'s constructor; BlockAnchors are computed there
-against the current CRDT buffer (see
-`docs/specs/2026-04-30-block-anchor-foundation-design.md` §3 for
-the staleness caveat).
+Decomposes a global byte-range edit into per-block D2 buffer ops.
+This is the interface for flat-text consumers (source widget, paste,
+programmatic edits) that don't have per-block structure. On an empty
+document it auto-creates one Paragraph block. Emits `d2DocumentChanged`
+after the edit lands.
+
+- Bumps `d2EditSequence()` (NOT `editSequence()`).
+- Undo/redo via `undoD2()` / `redoD2()` (NOT legacy `undo()`/`redo()`).
+- Block content does NOT get an auto-appended `\n`; content is exactly
+  what `loadFromMarkdown` / `applyFlatEdit` puts in.
 
 ## CRDT internals (foundation-only)
 
@@ -69,8 +67,6 @@ the staleness caveat).
   uses the sequence accessors above.
 - `anchorAt(quint32, Crdt::Bias)` / `resolveAnchor(Crdt::Anchor)` are
   the underlying CRDT-typed primitives the TextAnchor versions delegate to.
-- `applyLocalEdit` returns `Crdt::Operation` (legacy public surface;
-  consumers don't typically use the return value).
 
 ## Conventions
 

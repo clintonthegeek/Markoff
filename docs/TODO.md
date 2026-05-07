@@ -14,18 +14,17 @@ corrupt data — the item serializes and round-trips correctly, and the
 delegate renders the extra indentation faithfully. It's cosmetically
 weird and semantically wrong but not a regression from anything prior.
 
-**When to fix:** D4 or as a small standalone. The fix should walk the
+**When to fix:** D5 or as a small standalone. The fix should walk the
 preceding blocks and refuse the indent if no block at `newIndent - 1`
 exists within the same style/indent boundary that `renumberRunStartingAt`
 would recognise as a run.
 
 ---
 
-> **2026-05-04 — ACTIVE: D-evolution design (D2).** The C-restoration arc is closed.
-> See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` for the cut.
-> All R-phase entries in `docs/restoration-status.md` are now historical. The new
-> active work tracker for D2 will be opened when the D2 spec is brainstormed and
-> written; until then this TODO file is dormant for new entries.
+> **2026-05-07 — D4 complete. D5 (collab activation) is the next design target.**
+> See `docs/d-arc/d-arc-status.md` for the live status board.
+> D2 / D3 / D4 are all shipped; the D-arc roadmap is at
+> `docs/d-arc/2026-05-04-d-arc-roadmap.md`.
 
 > **2026-05-02 — (closed by 2026-05-04 banner above) live render restoration arc.** All entries
 > below this banner predate the restoration arc and are paused/superseded

@@ -1,34 +1,30 @@
 # Markoff (exploration/new-foundation branch)
 
-> **Active phase: D4 (parser scope reduction).** Spec and plan landed;
-> ready for execution. D4 retires the document-wide-incremental-parse
-> pipeline (`ParsePool`, `IncrementalParseSession`, `parseUpdated`,
-> `parseSequence`, `MarkoffEdit`, `applyLocalEdit`), migrates
-> source-widget to D2 primitives via a new `applyFlatEdit`, retires
-> markoff-bench and view-qml live mode, and deletes the dead legacy
-> `Cmd::*` family + `CommandFacade` + `ReplaceController`.
+> **D4 complete; D5 (collab activation) pending substantive design.**
+> D4 retired the incremental-parse pipeline (`ParsePool`,
+> `IncrementalParseSession`, `parseUpdated`, `parseSequence`, `MarkoffEdit`,
+> `applyLocalEdit`), migrated source-widget to D2 via `applyFlatEdit`,
+> retired markoff-bench and view-qml live mode, and deleted dead legacy
+> `Cmd::*` + `CommandFacade` + `ReplaceController`. 103/103 tests pass.
 >
 > **Fresh agent context — read in order:**
 >
 > 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation
-> 2. `docs/d-arc/d-arc-status.md` — live status board (D4 plan-approved)
+> 2. `docs/d-arc/d-arc-status.md` — live status board (D4 complete; D5 next)
 > 3. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items
-> 4. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — **D4 spec (active)**
-> 5. `docs/plans/2026-05-07-d4-parser-scope-reduction.md` — **D4 implementation plan**
+> 4. `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — **D5 stub (next design target)**
+> 5. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — D4 spec (background; complete)
 > 6. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 spec (background; complete)
 > 7. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — D3 corrective (background; complete)
->
-> The D4 stub (`docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`)
-> is superseded — do not work from it.
 >
 > The C-restoration's status board (`docs/restoration-status.md`) is now
 > historical. The marker-paragraph design and R5.5 plan are retired. R5.5
 > Bug 3 is **cancelled, not paused** — the bug lives inside the parser-vs-
 > CRDT race window that D removes structurally.
 >
-> The legacy `libs/markoff-view-qml` continues to ship; the in-tree
-> `libs/markoff-live-render` carries L0–L3 and all D3 work.
-> Do not delete `libs/markoff-view-qml` prematurely.
+> The legacy `libs/markoff-view-qml` continues to ship (source mode only;
+> live mode retired in D4); the in-tree `libs/markoff-live-render` carries
+> L0–L8 and all D3 work.
 >
 > All other content below describes the project at large.
 
@@ -45,8 +41,8 @@ foundation library + two canonical view leaves.
 - `libs/markoff-parser`        — tree-sitter Markdown AST + frontmatter.
                                  Public type `Markoff::Document` is a
                                  value snapshot; `TreeSitterParser`
-                                 supports incremental reparse via
-                                 `parseIncremental()`.
+                                 parses on demand (no incremental path
+                                 after D4).
 - `libs/collabtext`            — CRDT text engine, sibling-symlinked
                                  from `/home/clinton/dev/collabtext`.
 - `libs/markoff-foundation`    — `Markoff::MarkoffDocument` (D2: per-
@@ -54,15 +50,12 @@ foundation library + two canonical view leaves.
                                  order + sibling causal-LWW maps for
                                  kind/attrs/link-refs/footnotes/
                                  frontmatter). `Cmd::*` command set,
-                                 `UndoLog`, `WatermarkCoordinator`.
-                                 `ParsePool` and `IncrementalParseSession`
-                                 are deprecated in D2 and slated for
-                                 deletion in D4.
-- `libs/markoff-view-qml`      — legacy QML view (source mode + a stale
-                                 live mode). Source mode stays; live
-                                 mode retires when `markoff-live-render`
-                                 reaches dogfood-stable. Do not delete
-                                 prematurely — source mode still ships.
+                                 `UndoLog`, `WatermarkCoordinator`,
+                                 `applyFlatEdit` (D4: flat-text entry
+                                 point for source-widget edits).
+- `libs/markoff-view-qml`      — legacy QML view (source mode only;
+                                 live mode retired in D4). Source mode
+                                 still ships; do not delete prematurely.
 - `libs/markoff-live-render`   — **the active live-preview view leaf.**
                                  Built on D2's per-block CRDT buffers via
                                  `LiveListModelBinding`, `LiveBlockModel`,
@@ -121,8 +114,8 @@ In D2, typing does not reparse the document. The path is:
 
 The parser is only called at **load time** (`Document::fromMarkdown` in
 `loadFromMarkdown`) and **per-block on demand** (`inlineSpansFor(blockId)`,
-cached). The `ParsePool` / `IncrementalParseSession` plumbing carries a
-`[[deprecated]]` mark and is slated for D4 deletion.
+cached). The incremental-parse pipeline (`ParsePool`, `IncrementalParseSession`)
+was deleted in D4.
 
 ## Per-library guides
 

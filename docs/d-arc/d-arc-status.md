@@ -2,26 +2,24 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-07 (D4 spec + plan landed; status `plan-approved`.)
+**Last updated:** 2026-05-07 (D4 complete; all 14 phases shipped.)
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **D4** (parser scope reduction) — plan ready for execution.
+**Active phase:** **D5** (collab activation) — substantive design pending.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **D4 spec + plan written. Execute the plan.**
+> **D4 complete. D5 (collab activation) is the next substantive design step.**
 >
 > **Read first** (in this order, for a fresh agent context):
 > 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation
 > 2. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items
-> 3. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — **D4 spec (active subject)**
-> 4. `docs/plans/2026-05-07-d4-parser-scope-reduction.md` — **D4 implementation plan**
+> 3. `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — **D5 stub (next design target)**
+> 4. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — D4 spec (complete; background)
 > 5. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 spec (background; complete)
 > 6. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — D3 corrective spec (background; complete)
->
-> The D4 stub (`docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`) is superseded by the substantive spec; do not work from it.
 
 ---
 
@@ -33,7 +31,7 @@
 | **D1** | `complete` | `CollabText::Crdt::IdList` shipped 2026-05-04. Available for D2 consumption. |
 | **D2** | `complete` | All 15 phases implemented and dogfooded. 141/141 tests pass (3 pre-existing QML selection failures unrelated to D2 cleared during dogfood). User signed off 2026-05-05. |
 | **D3** | `complete` | Original plan + corrective spec both shipped. Per-item ListItem blocks, caller-driven renumbering, marker attrs, delegate rendering, 146/146 tests pass. |
-| **D4** | `plan-approved` | Spec: `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md`. Plan: `docs/plans/2026-05-07-d4-parser-scope-reduction.md`. (Stub superseded.) |
+| **D4** | `complete` | Spec: `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md`. Plan: `docs/plans/2026-05-07-d4-parser-scope-reduction.md`. Final commit: `22ea352`. 103/103 tests pass. |
 | **D5** | `stubbed` | `docs/specs/2026-05-04-d5-collab-activation-STUB.md`. Substantive design post-D4. |
 
 **Phase status legend.** `pending` (not yet started) · `stubbed` (inputs + scope captured, no substantive design) · `spec-in-brainstorm` · `spec-approved` (spec written and user-approved) · `plan-approved` (writing-plans output landed) · `in-progress` (commits landing) · `dogfood` (implementation done; user is testing) · `complete` (acceptance criteria met).
@@ -50,6 +48,16 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-07 | `22ea352` | D4 complete. All 14 phases shipped. 103/103 tests pass. D4 → complete; D5 (collab activation) is the next design target. |
+| 2026-05-07 | `9b0aabd` | D4 Phase 11 — parser-library deletions: `ByteEdit`, `parseIncremental`, `buildDocumentQueries(prior,edits)`, pruned-walk helpers, observability counters, `fromComponents` all deleted. `tst_incremental_parse.cpp` removed. |
+| 2026-05-07 | `5db6c98` | D4 Phase 10 — delete foundation-internal deprecated infra: `ParsePool`, `ParsePoolWorker`, `IncrementalParseSession`, `RenderPhases`. |
+| 2026-05-07 | `3478132` | D4 Phase 9 — delete `parseUpdated` / `parseSequence` / `MarkoffEdit` / `applyLocalEdit` from `MarkoffDocument`. |
+| 2026-05-07 | `d87bb1f` | D4 Phase 8 — excise `parsePool` from `MarkoffDocument` runtime. |
+| 2026-05-07 | `499bdc6` | D4 Phase 7 — delete deprecated foundation parse/anchor tests. |
+| 2026-05-07 | `275dae7` | D4 Phase 6 — retire view-qml live mode (source mode stays); delete live-mode tests. |
+| 2026-05-07 | `868d651` | D4 Phase 5 — retire `markoff-bench` library + `apps/bench`. |
+| 2026-05-07 | `7dfd040` | D4 Phase 4 — delete dead legacy `Cmd::*` family + `CommandFacade` + `ReplaceController`. |
+| 2026-05-07 | `1c9cf98` | D4 Phases 1–3 — `applyFlatEdit` primitive + source-widget D2 migration + test rewrite. |
 | 2026-05-07 | (plan landing commit) | D4 substantive spec + implementation plan landed. Spec covers parser-library deletions, foundation-side parsePool/parseUpdated/MarkoffEdit/applyLocalEdit retirement, source-widget D2 migration via new `applyFlatEdit` primitive, markoff-bench retirement, view-qml live-mode retirement, and dead-code deletion of legacy `Cmd::*` family + `CommandFacade` + `ReplaceController` (zero external consumers). D4 status → `plan-approved`. Stub superseded. |
 | 2026-05-07 | `be4e079` | D4 spec landed (substantive). |
 | 2026-05-06 | `5da92dc` | D3-correction complete — 17-task plan implemented. Parser emits one `TopLevelBlock::Kind::ListItem` per `list_item` node; foundation materializes per-block CRDT with marker attrs; `Cmd::renumberRunStartingAt` caller-driven in transaction; `ListItemDelegate.qml` renders marker from model roles; `BlockRecord::operator==` extended to include attrs; kind-transition inference guarded to Paragraph-only. 146/146 tests pass. D3 → complete; D4 design next. |

@@ -1,6 +1,6 @@
 # D-arc roadmap — orientation for fresh contexts
 
-**Date:** 2026-05-04
+**Date:** 2026-05-07
 **Branch:** `exploration/new-foundation`
 **Purpose:** This is the canonical orientation doc for the D-evolution work arc. An empty agent context picking up any phase of D should read this first to understand where each piece lives, what depends on what, what's been decided vs deferred, and what the binding cross-arc constraints are.
 
@@ -16,7 +16,7 @@ D = "per-block CRDT + structural CRDT" — the long-term Markoff foundation arch
 | **D1** | ✅ done | collabtext maintainers | `CollabText::Crdt::IdList` primitive shipped (opaque uint64 elements, sharing the existing Anchor / Operation / Undo / GC machinery) | collabtext header `~/dev/collabtext/include/collabtext/Crdt/IdList.h` |
 | **D2** | ✅ done | Markoff | Foundation reshape — `Markoff::MarkoffDocument` rebuilt on `IdList` + per-block `Buffer`s + sibling causal-LWW maps | `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; status `docs/d-arc/d-arc-status.md` |
 | **D3** | ✅ done | Markoff | View-layer adaptation — cursor delivery redesign; inline span consumption; kind-transition detection; L6/L7/L8 full delegates; per-block undo UI. ListItem path corrected per the post-dogfood corrective spec. | Original: `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md`. Corrective: `docs/specs/2026-05-06-per-item-listitem-blocks-design.md`. |
-| **D4** | 🟢 plan-approved | Markoff | Parser scope reduction — retire `ParsePool` / `IncrementalParseSession` / `parseUpdated` / `MarkoffEdit` / `applyLocalEdit`; migrate source-widget to D2 primitives; retire markoff-bench and view-qml live mode; delete dead legacy `Cmd::*` family + `CommandFacade` + `ReplaceController` | Spec: `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md`. Plan: `docs/plans/2026-05-07-d4-parser-scope-reduction.md`. (Stub `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md` is superseded.) |
+| **D4** | ✅ done | Markoff | Parser scope reduction — retired `ParsePool` / `IncrementalParseSession` / `parseUpdated` / `MarkoffEdit` / `applyLocalEdit`; source-widget migrated to D2 via `applyFlatEdit`; markoff-bench and view-qml live mode retired; dead legacy `Cmd::*` + `CommandFacade` + `ReplaceController` deleted | Spec: `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md`. Plan: `docs/plans/2026-05-07-d4-parser-scope-reduction.md`. |
 | **D5** | ⏸ stubbed | Markoff + collabtext | Collab activation — wire format, transport, presence, conflict UI | `docs/specs/2026-05-04-d5-collab-activation-STUB.md` |
 
 Status legend: ✅ done · 🟢 active · 🟡 dogfood (implementation done; awaiting user sign-off) · ⏸ stubbed (inputs and intended scope captured; substantive design deferred).
@@ -32,8 +32,8 @@ Status legend: ✅ done · 🟢 active · 🟡 dogfood (implementation done; awa
 | Understand collabtext's commitments and limits | `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` AND `docs/d-arc/collabtext-scope-line.md` (the six "won't do" items quoted verbatim) |
 | Implement D2 | `docs/specs/2026-05-04-d2-foundation-reshape-design.md` (binding spec) — implementation plan to follow once writing-plans runs |
 | Pick up D3 | `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` (original D3 spec; non-ListItem sections still authoritative) AND `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` (corrective spec for ListItem; active subject) |
-| Pick up D4 | `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` (spec) and `docs/plans/2026-05-07-d4-parser-scope-reduction.md` (plan) |
-| Pick up D5 | `docs/specs/2026-05-04-d5-collab-activation-STUB.md` |
+| Review D4 (complete) | `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` (spec) and `docs/plans/2026-05-07-d4-parser-scope-reduction.md` (plan) |
+| Pick up D5 | `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — substantive design needed before execution |
 | Track D2 progress in real time | `docs/d-arc/d-arc-status.md` |
 | Audit a design decision in D2 | The corresponding "Why this and not the alternatives" subsection in `docs/specs/2026-05-04-d2-foundation-reshape-design.md` (every major section ends with one) |
 
