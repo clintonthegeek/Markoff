@@ -1,4 +1,4 @@
-# markoff-foundation — library guide
+# markoff-core — library guide
 
 The CRDT-backed document + sessions layer. Exposes a view-layer-safe
 public API; CRDT primitives stay internal.
@@ -17,13 +17,13 @@ entry point for source-widget-style edits (see below).
 
 - **`Markoff::TextAnchor`** — opaque wrapper for a CRDT byte anchor
   (replicaId + charValue + bias). Defined in
-  `include/markoff-foundation/TextAnchor.h`. View layers hold these
-  by value; conversion to/from `CollabText::Crdt::Anchor` is foundation-
+  `include/markoff/core/TextAnchor.h`. View layers hold these
+  by value; conversion to/from `CollabText::Crdt::Anchor` is core-
   internal (`src/AnchorConversion.h`, `Markoff::Detail` namespace).
 - **`Markoff::BlockAnchor`** — wrapper struct holding a `TextAnchor`
   at a top-level block's first byte. Type-distinct from `TextAnchor`
   so signatures self-document. Defined in
-  `include/markoff-foundation/BlockAnchor.h`.
+  `include/markoff/core/BlockAnchor.h`.
 - **`Markoff::Selection`** — `(anchor, active)` are `TextAnchor`-typed
   (no longer `Crdt::Anchor`). `Selection.h` does NOT include
   `<crdt/Anchor.h>`.

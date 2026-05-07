@@ -36,7 +36,7 @@
 
 **Phase status legend.** `pending` (not yet started) · `stubbed` (inputs + scope captured, no substantive design) · `spec-in-brainstorm` · `spec-approved` (spec written and user-approved) · `plan-approved` (writing-plans output landed) · `in-progress` (commits landing) · `dogfood` (implementation done; user is testing) · `complete` (acceptance criteria met).
 
-**D2 acceptance criterion.** All foundation tests pass against the new internals; round-trip corpus tests pass; markoff-live-render L4 / L5 migration completes (marker-paragraph machinery deleted); user signs off on a dogfood pass per the plan's dogfood script. **MET 2026-05-05.**
+**D2 acceptance criterion.** All core tests pass against the new internals; round-trip corpus tests pass; markoff-live L4 / L5 migration completes (marker-paragraph machinery deleted); user signs off on a dogfood pass per the plan's dogfood script. **MET 2026-05-05.**
 
 **D2 dogfood status.** Complete. Bugs surfaced during dogfood pass and fixed: empty-view (loadFromMarkdown fix), merge newline contamination (trailing-\\n stripping in backspaceMerge/deleteMerge), merge cursor race (anchor-keyed deferred resolution), heading/code-block key dispatch (delegate forwarding stubs replaced), SOB Enter cursor (goes to new empty block, not shifted content). User signed off 2026-05-05.
 

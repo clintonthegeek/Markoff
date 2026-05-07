@@ -1,6 +1,6 @@
 # markoff-source
 
-Fully-owned QtWidgets Source view on `markoff-foundation`. Replaces the Qutepart-based `markoff-source` (legacy) over time.
+Fully-owned QtWidgets Source view on `markoff-core`. Replaces the Qutepart-based legacy source view over time.
 
 ## Public surface
 - `Markoff::Source::Widget::Editor` — `QPlainTextEdit` subclass; main public widget.
@@ -12,7 +12,7 @@ Fully-owned QtWidgets Source view on `markoff-foundation`. Replaces the Qutepart
 ## Dependencies
 - Qt6 Core / Gui / Widgets
 - KF6::SyntaxHighlighting
-- `markoff-foundation` (Theme, MarkoffDocument, Session, SourceTextDocumentBinding, SearchEngine)
+- `markoff-core` (Theme, MarkoffDocument, Session, SourceTextDocumentBinding, SearchEngine)
 
 ## Conventions
 - C++20, Qt6.8+, CMake 3.19+.

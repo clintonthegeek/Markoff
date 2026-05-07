@@ -13,11 +13,11 @@ internal source file, included via the `collabtext` CMake target's
 
 collabtext is brought in via `add_subdirectory(libs/collabtext)` in the root
 `CMakeLists.txt`. `libs/collabtext` is a symlink to
-`/home/clinton/dev/collabtext`. The `markoff-foundation` target links it:
+`/home/clinton/dev/collabtext`. The `markoff-core` target links it:
 
 ```cmake
 # libs/markoff-core/CMakeLists.txt
-target_link_libraries(markoff-foundation ... collabtext)
+target_link_libraries(markoff-core ... collabtext)
 ```
 
 CMake configure completes cleanly with no collabtext-related errors.
@@ -29,14 +29,14 @@ build-dev/libs/collabtext/libs/collabtext/libcollabtext.a
 ```
 
 Present and up to date. Link probe: **pass via CMake target** — the library
-builds and links successfully as part of the `markoff-foundation` target.
+builds and links successfully as part of the `markoff-core` target.
 
 ## Link probe status
 
 **N/A — internal header, included via CMake target.**
 
 The header is not reachable through an installed include path; it is made
-available to `markoff-foundation` via `collabtext`'s
+available to `markoff-core` via `collabtext`'s
 `target_include_directories(collabtext PUBLIC ...)` in the collabtext
 CMakeLists. A standalone compile of a translation unit that does
 `#include "crdt/IdList.h"` would only work if linked against the collabtext

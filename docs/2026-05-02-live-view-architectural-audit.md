@@ -153,4 +153,4 @@ Out of scope here, but the architecture should be such that adding it does not r
 
 - It does not consult `docs/specs/`, `docs/plans/`, `docs/handoff/`, commit history, or dogfood transcripts. Those are the next pass; they will either confirm, refine, or contradict the layering proposed above.
 - It does not propose a migration plan from the current codebase to the layered design. That is a separate document, predicated on the L4 decision being made first.
-- It does not assess whether `markoff-foundation`, `markoff-parser`, or the QML host shell need changes. The scope here is the live-view library.
+- It does not assess whether `markoff-core`, `markoff-parser`, or the QML host shell need changes. The scope here is the live-view library.
