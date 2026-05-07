@@ -29,7 +29,7 @@ target_compile_definitions(ts-markdown-parser PRIVATE
 )
 set_target_properties(ts-markdown-parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# MarkoffParser library
+# Markoff::Parser library
 add_library(markoff-parser STATIC
     src/TreeSitterParser.cpp
     src/SourceSpan.cpp
@@ -40,7 +40,7 @@ add_library(markoff-parser STATIC
     src/YamlValue.cpp
 )
 set_target_properties(markoff-parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
-add_library(MarkoffParser::MarkoffParser ALIAS markoff-parser)
+add_library(Markoff::Parser ALIAS markoff-parser)
 
 target_include_directories(markoff-parser
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

@@ -3,7 +3,7 @@ project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 
 # Markoff-family libraries (new-foundation branch):
 #   - libs/rapidyaml          (ryml::ryml — YAML parser, vendored)
-#   - libs/markoff-parser     (MarkoffParser::MarkoffParser — tree-sitter Markdown AST + YAML frontmatter)
+#   - libs/markoff-parser     (Markoff::Parser — tree-sitter Markdown AST + YAML frontmatter)
 #   - libs/collabtext         (CRDT text engine, sibling-symlinked from /home/clinton/dev/collabtext)
 #   - libs/markoff-core (Markoff::Core — MarkoffDocument + ParsePool + Sessions)
 #   - libs/markoff-source (QPlainTextEdit-based source widget)
@@ -29,7 +29,7 @@ if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
 endif()
 
 # rapidyaml uses exceptions in its default callback — required for our
-# error-propagation contract in MarkoffParser.
+# error-propagation contract in Markoff::Parser.
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "" FORCE)
 
 add_subdirectory(libs/rapidyaml)

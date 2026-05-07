@@ -106,7 +106,7 @@ target_link_libraries(markoff_core
         Qt6::Widgets
         KF6::SyntaxHighlighting
         collabtext
-        MarkoffParser::MarkoffParser
+        Markoff::Parser
 )
 
 # Alias under the Markoff:: namespace for consumers.
