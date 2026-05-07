@@ -1220,7 +1220,8 @@ static TopLevelBlock::Kind classifyTopLevelKind(const char *type)
     if (strcmp(type, "fenced_code_block") == 0)         return TopLevelBlock::Kind::FencedCodeBlock;
     if (strcmp(type, "indented_code_block") == 0)       return TopLevelBlock::Kind::IndentedCodeBlock;
     if (strcmp(type, "block_quote") == 0)               return TopLevelBlock::Kind::BlockQuote;
-    if (strcmp(type, "list") == 0)                      return TopLevelBlock::Kind::ListTight;
+    if (strcmp(type, "list") == 0)                      return TopLevelBlock::Kind::ListTight;  // retired Task 3
+    if (strcmp(type, "list_item") == 0)                 return TopLevelBlock::Kind::ListItem;   // NEW
     if (strcmp(type, "thematic_break") == 0)            return TopLevelBlock::Kind::ThematicBreak;
     if (strcmp(type, "html_block") == 0)                return TopLevelBlock::Kind::HtmlBlock;
     if (strcmp(type, "link_reference_definition") == 0) return TopLevelBlock::Kind::LinkReferenceDefinition;

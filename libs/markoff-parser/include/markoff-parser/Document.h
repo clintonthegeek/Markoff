@@ -82,8 +82,9 @@ struct TopLevelBlock {
         FencedCodeBlock,
         IndentedCodeBlock,
         BlockQuote,
-        ListTight,                  // top-level list (tight, default)
-        ListLoose,                  // top-level list (loose)
+        ListTight,                  // RETIRED in Task 3 (kept temporarily for build)
+        ListLoose,                  // RETIRED in Task 3
+        ListItem,                   // NEW: emitted per list_item node (Task 3)
         ThematicBreak,              // <hr> / horizontal rule
         HtmlBlock,
         LinkReferenceDefinition,
@@ -126,6 +127,26 @@ struct TopLevelBlock {
     /// v1 leaves this false; consumers re-walk via buildSpanMap()
     /// for fine-grained inline info.
     bool hasInlineContent = false;
+
+    /// For Kind::ListItem: nesting depth from outer `list` ancestors.
+    /// 0 = top-level list. Otherwise unset (0).
+    int indentDepth = 0;
+
+    /// For Kind::ListItem: marker shape. One of "dot", "paren", "minus",
+    /// "plus", "star", "task". Empty for non-ListItem kinds.
+    QString markerStyle;
+
+    /// For Kind::ListItem with markerStyle in {"dot","paren"}: 1-based
+    /// sequence number from source (e.g. 1 for "1.", 3 for "3)"). 0 otherwise.
+    int markerNumber = 0;
+
+    /// For Kind::ListItem with markerStyle == "task": checkbox state.
+    /// Always false for non-task items.
+    bool checked = false;
+
+    /// For Kind::ListItem: true iff the parent `list` node was loose
+    /// (blank lines separated items in source). Always false for non-ListItem.
+    bool looseRun = false;
 
     /// Inline structural spans (bold, italic, code, link, etc.) within
     /// this block's source range. Offsets are *block-relative*:
