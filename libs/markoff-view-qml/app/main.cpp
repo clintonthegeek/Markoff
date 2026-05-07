@@ -29,8 +29,6 @@ Q_IMPORT_PLUGIN(org_markoff_view_qmlPlugin)
 #include <markoff-foundation/Theme.h>
 
 #include <markoff/view/qml/CompletionPopupModel.h>
-#include <markoff/view/qml/LiveListModelBinding.h>
-#include <markoff/view/qml/LiveProjectionLayer.h>
 
 // ---------------------------------------------------------------------------
 // CloseGuard — event filter that intercepts QEvent::Close on the root window
@@ -124,7 +122,6 @@ int main(int argc, char *argv[])
     QApplication app(argc, argv);
 
     const QStringList cliArgs = QCoreApplication::arguments();
-    const bool startInLiveMode = cliArgs.contains(QStringLiteral("--live"));
 
     // Find the first non-flag argument as the file path.
     QString filePath;
@@ -135,7 +132,7 @@ int main(int argc, char *argv[])
         break;
     }
     if (filePath.isEmpty()) {
-        qWarning("Usage: %s [--live] <markdown-file>", argv[0]);
+        qWarning("Usage: %s <markdown-file>", argv[0]);
         return 1;
     }
 
@@ -177,8 +174,6 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty(
         "ctxTheme", QVariant::fromValue(Markoff::Theme::defaultLight()));
     engine.rootContext()->setContextProperty("ctxCompletionModel", popupModel.get());
-    engine.rootContext()->setContextProperty(QStringLiteral("startInLiveMode"),
-                                             QVariant(startInLiveMode));
     // T14.2 — expose dirty flag before QML loads.
     engine.rootContext()->setContextProperty(QStringLiteral("ctxDirty"),
                                              QVariant(dirty));
@@ -215,18 +210,8 @@ int main(int argc, char *argv[])
                          updateDirty();
                      });
 
-    // Flush any pending projection-layer hole(s) before saving so the file
-    // on disk matches what the user sees on screen. v1 invariant: at most
-    // one hole pending. Walks the engine roots for the LiveListModelBinding;
-    // a no-op when running in source mode (no live binding constructed).
-    auto flushPendingHoles = [&]() {
-        for (QObject *root : engine.rootObjects()) {
-            auto *binding = root->findChild<Markoff::View::Qml::LiveListModelBinding *>();
-            if (!binding) continue;
-            if (auto *layer = binding->projectionLayer())
-                layer->commitAllPendingHoles();
-        }
-    };
+    // No-op flush: source mode has no projection-layer holes.
+    auto flushPendingHoles = [&]() {};
 
     // T14.3 — Ctrl+S save shortcut.
     auto *saveShortcut = new QShortcut(QKeySequence::Save, window);

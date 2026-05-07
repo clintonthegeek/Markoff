@@ -27,45 +27,11 @@ qt_add_qml_module(markoff_view_qml
         include/markoff/view/qml/SearchBackend.h
         src/CompletionPopupModel.cpp
         include/markoff/view/qml/CompletionPopupModel.h
-        src/LiveSelectionView.cpp
-        include/markoff/view/qml/LiveSelectionView.h
-        src/LiveContextMenuHandler.cpp
-        include/markoff/view/qml/LiveContextMenuHandler.h
-        src/LiveBlockModel.cpp
-        include/markoff/view/qml/LiveBlockModel.h
-        src/BlockKind.cpp
-        include/markoff/view/qml/BlockKind.h
-        include/markoff/view/qml/BlockRecord.h
-        src/BlockWalker.cpp
-        src/BlockWalker.h
-        src/AstBlockDiff.cpp
-        src/AstBlockDiff.h
-        src/LiveListModelBinding.cpp
-        include/markoff/view/qml/LiveListModelBinding.h
-        src/InlineFormatHighlighter.cpp
-        include/markoff/view/qml/InlineFormatHighlighter.h
-        src/LiveEditBinding.cpp
-        include/markoff/view/qml/LiveEditBinding.h
-        src/LiveStructuralKeyHandler.cpp
-        include/markoff/view/qml/LiveStructuralKeyHandler.h
-        src/LiveSpeculativeFenceController.cpp
-        include/markoff/view/qml/LiveSpeculativeFenceController.h
-        src/LiveProjectionLayer.cpp
-        include/markoff/view/qml/LiveProjectionLayer.h
-        include/markoff/view/qml/ProjectionItem.h
-        src/LiveClipboardController.cpp
-        include/markoff/view/qml/LiveClipboardController.h
     QML_FILES
         qml/SourceEditor.qml
         qml/SearchBar.qml
         qml/CompletionPopup.qml
         qml/MarkoffEditor.qml
-        qml/LiveView.qml
-        qml/delegates/ParagraphDelegate.qml
-        qml/delegates/HeadingDelegate.qml
-        qml/delegates/HorizontalRuleDelegate.qml
-        qml/delegates/ImageDelegate.qml
-        qml/delegates/CodeBlockDelegate.qml
 )
 
 target_include_directories(markoff_view_qml

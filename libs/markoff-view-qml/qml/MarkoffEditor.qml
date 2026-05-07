@@ -5,18 +5,13 @@ import QtQuick.Layouts
 
 import org.markoff.view.qml
 
-/// Outer shell. Phase-1 wraps a single SourceEditor; Phase-2 will sibling it
-/// with a LiveEditor that consumes the same EditorBackend via the same
-/// MarkoffDocument + Session.
+/// Outer shell. Wraps a SourceEditor with search bar and completion popup.
 ///
 /// External property contract:
 ///   - document         : Markoff.MarkoffDocument *
 ///   - theme            : Markoff.Theme
 ///   - completionModel  : CompletionPopupModel  (optional — host-supplied so
 ///                        emoji + future tag/wikilink providers can be wired in)
-///
-/// This is the architectural seam. Read libs/markoff-view-qml/CLAUDE.md (T23)
-/// for the Phase-2 plan.
 Item {
     id: root
 
@@ -24,35 +19,15 @@ Item {
     property var theme
     property var completionModel: null
 
-    /// Either "source" or "live". Default: "source" (unchanged from Phase 1).
-    property string mode: "source"
-
-    /// Exposes the inner EditorBackend so the host (e.g. AstInspectorPane) can
-    /// subscribe to parseUpdatedAt without going through the document directly.
+    /// Exposes the inner EditorBackend so the host can bind to document/session.
     readonly property alias editorBackend: sourceEditor.editorBackend
 
-    // PHASE-2 SEAM: SourceEditor and LiveView are siblings; `mode` toggles which
-    // is visible/enabled. Both share the same EditorBackend (LiveView consumes
-    // sourceEditor.editorBackend).
     SourceEditor {
         id: sourceEditor
         anchors.fill: parent
         anchors.bottomMargin: searchBar.visible ? searchBar.implicitHeight : 0
         document: root.document
         theme: root.theme
-        focus: root.mode === "source"
-        visible: root.mode === "source"
-        enabled: root.mode === "source"
-    }
-    LiveView {
-        id: liveView
-        anchors.fill: parent
-        anchors.bottomMargin: searchBar.visible ? searchBar.implicitHeight : 0
-        editorBackend: sourceEditor.editorBackend
-        theme: root.theme
-        focus: root.mode === "live"
-        visible: root.mode === "live"
-        enabled: root.mode === "live"
     }
 
     // Internal SearchBackend wired to the source editor's EditorBackend.
