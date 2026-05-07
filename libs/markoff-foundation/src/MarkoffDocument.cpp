@@ -595,6 +595,19 @@ bool MarkoffDocument::canUndoForBlock(Markoff::BlockAnchor blockAnchor) const
     return d->undoLog.isBlockReferenced(blockAnchor);
 }
 
+void MarkoffDocument::toggleListItemChecked(BlockAnchor anchor)
+{
+    const BlockId id(anchor);
+    if (blockKind(id) != BlockKind::ListItem) return;
+    const auto attrs = blockAttrs(id);
+    if (!attrs.contains(AttrNames::Checked)) return;
+    const AttrValue val = attrs.value(AttrNames::Checked);
+    const bool *v = std::get_if<bool>(&val);
+    if (!v) return;
+    UndoLog::Transaction t(d2UndoLog());
+    d2SetBlockAttr(id, AttrNames::Checked, !*v, t);
+}
+
 // ============================================================================
 // D2: block accessors
 // ============================================================================

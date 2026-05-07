@@ -3,9 +3,11 @@ import QtQuick
 import QtQuick.Controls
 import org.markoff.live.render 1.0
 
-/// Editable list-item delegate. Stores full markdown text including the
-/// "- " marker prefix in the CRDT buffer (source-faithful). Structural keys
-/// (Enter / Backspace / Delete / Tab) are forwarded to LiveStructuralKeyHandler.
+/// Per-item ListItem delegate. Marker is rendered as a non-editable
+/// label (or task-list checkbox) to the left of the TextEdit, populated
+/// from model.markerStyle / model.markerNumber / model.checked. Indent
+/// is rendered as left padding (3 spaces of width per indent level).
+/// Buffer holds content only; the marker is reconstructed at serialize.
 Item {
     id: root
     width: ListView.view ? ListView.view.width : 600
@@ -19,10 +21,22 @@ Item {
     readonly property var selectionView:
         liveBinding ? liveBinding.selectionView : null
 
-    readonly property int indentLevel: {
-        const a = model.blockAttrs
-        return (a && a["indentLevel"]) ? a["indentLevel"] : 0
+    readonly property int indentLevel: model.indentLevel || 0
+    readonly property string markerStyle: model.markerStyle || ""
+    readonly property int markerNumber: model.markerNumber || 0
+    readonly property bool checked: model.checked || false
+
+    readonly property string markerText: {
+        if (markerStyle === "dot")   return markerNumber + "."
+        if (markerStyle === "paren") return markerNumber + ")"
+        if (markerStyle === "minus") return "-"
+        if (markerStyle === "plus")  return "+"
+        if (markerStyle === "star")  return "*"
+        if (markerStyle === "task")  return checked ? "[x]" : "[ ]"
+        return "•"
     }
+
+    readonly property int indentPx: 8 + indentLevel * 24
 
     LiveEditBinding {
         id: editBinding
@@ -33,10 +47,34 @@ Item {
         text: model.text
     }
 
+    Text {
+        id: markerLabel
+        anchors {
+            left: parent.left
+            top: parent.top
+        }
+        leftPadding: root.indentPx
+        topPadding: 2
+        text: root.markerText
+        font.family: "monospace"
+        font.pixelSize: 14
+        color: palette.text
+
+        MouseArea {
+            visible: root.markerStyle === "task"
+            anchors.fill: parent
+            cursorShape: Qt.PointingHandCursor
+            onClicked: {
+                if (!root.liveBinding || !root.liveBinding.document) return
+                root.liveBinding.document.toggleListItemChecked(model.blockAnchor)
+            }
+        }
+    }
+
     TextEdit {
         id: edit
         anchors.fill: parent
-        leftPadding: 8 + root.indentLevel * 16
+        leftPadding: markerLabel.implicitWidth + 12
         rightPadding: 8
         topPadding: 2
         bottomPadding: 2
@@ -48,7 +86,6 @@ Item {
         selectByMouse: true
         persistentSelection: true
 
-        // Forward structural keys to LiveStructuralKeyHandler.
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
             const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null

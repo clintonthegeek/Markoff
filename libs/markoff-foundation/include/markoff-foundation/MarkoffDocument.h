@@ -200,6 +200,10 @@ public:
     /// BlockAnchor is a type alias for BlockId.
     Q_INVOKABLE bool canUndoForBlock(Markoff::BlockAnchor blockAnchor) const;
 
+    /// Toggle the Checked attr on a ListItem block. No-op if the block is not
+    /// a ListItem or does not have a Checked attr. Q_INVOKABLE for QML use.
+    Q_INVOKABLE void toggleListItemChecked(Markoff::BlockAnchor anchor);
+
     // ===== D2 block accessors =====
     /// Returns the current ordered list of block IDs from the IdList CRDT.
     std::vector<Markoff::BlockId> iterateBlocks() const;
