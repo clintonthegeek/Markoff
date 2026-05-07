@@ -111,4 +111,19 @@ target_link_libraries(tst_foundation_edit_sequence PRIVATE Qt6::Test markoff_cor
 set_tests_properties(tst_foundation_edit_sequence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 
+add_executable(tst_v10_cursor_pos tst_v10_cursor_pos.cpp)
+add_test(NAME tst_v10_cursor_pos COMMAND tst_v10_cursor_pos)
+target_link_libraries(tst_v10_cursor_pos PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_v10_cursor_pos PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_v10_editor_context tst_v10_editor_context.cpp)
+add_test(NAME tst_v10_editor_context COMMAND tst_v10_editor_context)
+target_link_libraries(tst_v10_editor_context PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_v10_editor_context PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_v10_action_id tst_v10_action_id.cpp)
+add_test(NAME tst_v10_action_id COMMAND tst_v10_action_id)
+target_link_libraries(tst_v10_action_id PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_v10_action_id PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_subdirectory(d2)
