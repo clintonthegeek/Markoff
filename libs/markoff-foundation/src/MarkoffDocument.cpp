@@ -6,6 +6,7 @@
 #include <markoff-foundation/StructuralOp.h>
 #include <markoff-foundation/UndoLog.h>
 #include <markoff-foundation/BlockSerializer.h>
+#include <markoff-foundation/AttrNames.h>
 
 #include <QSaveFile>
 
@@ -846,10 +847,30 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
             d->blockAttrsMap.setWithNextStamp(
                 BlockAttrKey{newId, "infoString"}, AttrValue{tb.codeLanguage});
         }
+        if (kind == BlockKind::ListItem) {
+            d->blockAttrsMap.setWithNextStamp(
+                BlockAttrKey{newId, AttrNames::IndentLevel}, AttrValue{tb.indentDepth});
+            d->blockAttrsMap.setWithNextStamp(
+                BlockAttrKey{newId, AttrNames::MarkerStyle}, AttrValue{tb.markerStyle});
+            if (tb.markerStyle == QStringLiteral("dot")
+             || tb.markerStyle == QStringLiteral("paren")) {
+                d->blockAttrsMap.setWithNextStamp(
+                    BlockAttrKey{newId, AttrNames::MarkerNumber}, AttrValue{tb.markerNumber});
+            }
+            if (tb.markerStyle == QStringLiteral("task")) {
+                d->blockAttrsMap.setWithNextStamp(
+                    BlockAttrKey{newId, AttrNames::Checked}, AttrValue{tb.checked});
+            }
+            d->blockAttrsMap.setWithNextStamp(
+                BlockAttrKey{newId, AttrNames::LooseRun}, AttrValue{tb.looseRun});
+        }
 
         // Buffer content: full source range in UTF-8 bytes
         // For FencedCodeBlock, full source is stored (fences preserved for round-trip).
-        // For ListItem, content-only bytes (marker excluded) are stored per-item.
+        // For ListItem (one per parser list_item node), the buffer holds the
+        // item's content only — no marker, no leading indent whitespace, no
+        // trailing newlines. Marker and indent are reconstructed from attrs at
+        // serialize time.
         QByteArray content = bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart);
 
         auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);
