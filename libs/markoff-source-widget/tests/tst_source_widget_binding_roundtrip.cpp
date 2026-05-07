@@ -1,13 +1,24 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QApplication>
+#include <QCoreApplication>
 #include <QSignalSpy>
 #include <QTest>
 
 #include <markoff/source/widget/Editor.h>
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/Session.h>
+
+namespace {
+// Read the D2 flat view: concatenation of per-block buffers.
+QByteArray fullText(Markoff::MarkoffDocument &doc)
+{
+    QByteArray out;
+    for (Markoff::BlockId id : doc.iterateBlocks())
+        out += doc.blockText(id);
+    return out;
+}
+} // namespace
 
 class TstSourceWidgetBindingRoundtrip : public QObject {
     Q_OBJECT
@@ -15,42 +26,48 @@ private Q_SLOTS:
     void typing_propagates_to_markoff_document() {
         Markoff::Source::Widget::Editor e;
         Markoff::MarkoffDocument doc(1);
+        // D2: document must have at least one block before edits can land.
+        doc.loadFromMarkdown(QByteArray());
         e.setDocument(&doc);
         e.show();
         QTest::keyClicks(&e, QStringLiteral("abc"));
-        QTRY_COMPARE(doc.toMarkdownUtf8(), QByteArrayLiteral("abc"));
+        QTRY_COMPARE(fullText(doc), QByteArrayLiteral("abc"));
     }
 
     void external_doc_edit_propagates_to_editor() {
         Markoff::Source::Widget::Editor e;
         Markoff::MarkoffDocument doc(1);
+        // D2: document must have at least one block before edits can land.
+        doc.loadFromMarkdown(QByteArray());
         e.setDocument(&doc);
 
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello");
-        doc.applyLocalEdit({ ed });
+        doc.applyFlatEdit(0, 0, QByteArray("hello"), Markoff::Origin::UserEdit);
+        // d2DocumentChanged is deferred (QTimer::singleShot(0)); let it settle.
+        QCoreApplication::processEvents();
         QTRY_COMPARE(e.toPlainText(), QStringLiteral("hello"));
     }
 
     void crdt_undo_via_ctrl_z() {
-        // Ctrl+Z must route to MarkoffDocument::undo() (CRDT undo), not to
+        // Ctrl+Z must route to MarkoffDocument::undoD2() (D2 undo), not to
         // QPlainTextEdit's QTextDocument undo stack (which is disabled by
         // SourceTextDocumentBinding::rewireQtDocument).
         //
-        // Each keystroke produces one applyLocalEdit -> one undo entry, so
+        // Each keystroke produces one applyFlatEdit -> one undo entry, so
         // three keystrokes need three Ctrl+Z presses to fully revert.
         // Auto-coalescing of adjacent inserts is a foundation concern (not
         // yet implemented), not a widget concern.
         Markoff::Source::Widget::Editor e;
         Markoff::MarkoffDocument doc(1);
+        // D2: document must have at least one block before edits can land.
+        doc.loadFromMarkdown(QByteArray());
         e.setDocument(&doc);
         e.show();
         QTest::keyClicks(&e, QStringLiteral("abc"));
-        QTRY_COMPARE(doc.toMarkdownUtf8(), QByteArrayLiteral("abc"));
+        QTRY_COMPARE(fullText(doc), QByteArrayLiteral("abc"));
         QTest::keyClick(&e, Qt::Key_Z, Qt::ControlModifier);
         QTest::keyClick(&e, Qt::Key_Z, Qt::ControlModifier);
         QTest::keyClick(&e, Qt::Key_Z, Qt::ControlModifier);
-        QTRY_COMPARE(doc.toMarkdownUtf8(), QByteArray());
+        QTRY_COMPARE(fullText(doc), QByteArray());
     }
 };
 
