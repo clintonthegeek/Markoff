@@ -9,7 +9,6 @@
 #include <QtGlobal>
 
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
 #include <markoff-foundation/Session.h>
 
@@ -19,9 +18,9 @@ namespace Markoff {
 /// QML `TextArea` or a widget-side `QPlainTextEdit`) and a foundation
 /// `MarkoffDocument` + `Session`.
 ///
-/// Forward path: `QTextDocument::contentsChange` → `MarkoffDocument::applyLocalEdit`.
-/// Reverse path: `MarkoffDocument::contentsChanged` → cursor-driven
-/// remove/insert on `QTextDocument`.
+/// Forward path: `QTextDocument::contentsChange` → `MarkoffDocument::applyFlatEdit`.
+/// Reverse path: `MarkoffDocument::d2DocumentChanged` → full-replace
+/// `QTextDocument::setPlainText` with block-buffer flat text.
 ///
 /// Cursor + selection are lifted to `Session::primarySelection()` (anchors,
 /// not ints) so they survive concurrent edits and round-trip through the
@@ -98,7 +97,7 @@ Q_SIGNALS:
 
 private Q_SLOTS:
     void onQtContentsChange(int qtPos, int charsRemoved, int charsAdded);
-    void onMarkoffContentsChanged(const QList<Markoff::MarkoffEdit> &edits);
+    void onD2DocumentChanged();
     void onSessionPrimarySelectionChanged(const Markoff::Selection &);
 
 private:

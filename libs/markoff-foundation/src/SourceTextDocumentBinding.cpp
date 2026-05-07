@@ -1,13 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff-foundation/SourceTextDocumentBinding.h>
 
-#include <algorithm>
-
-#include <QTextCursor>
 #include <QTextDocument>
 
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/Origin.h>
 #include <markoff-foundation/Selection.h>
 #include <markoff-foundation/Session.h>
 
@@ -226,15 +223,15 @@ void SourceTextDocumentBinding::rebindMarkoffDocumentSubscription()
     if (newDoc == m_subscribedDoc) return;
 
     if (m_subscribedDoc) {
-        QObject::disconnect(m_subscribedDoc, &Markoff::MarkoffDocument::contentsChanged,
-                            this, &SourceTextDocumentBinding::onMarkoffContentsChanged);
+        QObject::disconnect(m_subscribedDoc, &Markoff::MarkoffDocument::d2DocumentChanged,
+                            this, &SourceTextDocumentBinding::onD2DocumentChanged);
     }
 
     m_subscribedDoc = newDoc;
 
     if (m_subscribedDoc) {
-        QObject::connect(m_subscribedDoc, &Markoff::MarkoffDocument::contentsChanged,
-                         this, &SourceTextDocumentBinding::onMarkoffContentsChanged);
+        QObject::connect(m_subscribedDoc, &Markoff::MarkoffDocument::d2DocumentChanged,
+                         this, &SourceTextDocumentBinding::onD2DocumentChanged);
     }
 
     // If both doc and qtDoc are captured, seed the qtDoc with the doc's
@@ -300,7 +297,9 @@ void SourceTextDocumentBinding::rewireQtDocument()
 void SourceTextDocumentBinding::syncQtDocumentFromMarkoff()
 {
     if (!m_subscribedDoc || !m_textDocument) return;
-    const QByteArray utf8 = m_subscribedDoc->toMarkdownUtf8();
+    QByteArray utf8;
+    for (Markoff::BlockId id : m_subscribedDoc->iterateBlocks())
+        utf8 += m_subscribedDoc->blockText(id);
     const QString text = QString::fromUtf8(utf8);
     if (m_textDocument->toPlainText() == text) return;  // already in sync
     m_applyingRemoteEdit = true;
@@ -337,44 +336,26 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
     m_applyingLocalEdit = false;
 }
 
-void SourceTextDocumentBinding::onMarkoffContentsChanged(const QList<Markoff::MarkoffEdit> &edits)
+void SourceTextDocumentBinding::onD2DocumentChanged()
 {
-    // Cycle guard: if WE just called applyLocalEdit (T12 forward path), this is
-    // the echo of our own change — don't re-apply.
+    // Cycle guard: if WE just called applyFlatEdit (forward path), m_applyingLocalEdit
+    // is true for synchronous echoes. d2DocumentChanged is debounced, so by the time
+    // it fires m_applyingLocalEdit is already false; primary protection is the
+    // equality check below.
     if (m_applyingLocalEdit) return;
     if (!m_textDocument) return;
     if (!m_subscribedDoc) return;
 
-    // Capture the pre-change plain text from QTextDocument (it hasn't been
-    // touched yet) for byte→Qt-pos conversion.
-    const QString preText = m_textDocument->toPlainText();
-    const QByteArray preBytes = preText.toUtf8();
+    QByteArray expected;
+    for (Markoff::BlockId id : m_subscribedDoc->iterateBlocks())
+        expected += m_subscribedDoc->blockText(id);
+    const QString expectedStr = QString::fromUtf8(expected);
+    // After a forward edit the QTextDocument already holds the new text;
+    // this equality check prevents the unnecessary setPlainText re-application.
+    if (m_textDocument->toPlainText() == expectedStr) return;
 
     m_applyingRemoteEdit = true;
-    QTextCursor cursor(m_textDocument);
-
-    // Walk edits in reverse byte-offset order so that earlier edits' positions
-    // are not invalidated by the mutations we apply to later (higher-offset) regions.
-    // All offsets in the list are OLD-text coordinates (pre-batch state), so
-    // reverse application keeps them valid throughout the loop.
-    QList<Markoff::MarkoffEdit> sorted = edits;
-    std::sort(sorted.begin(), sorted.end(),
-              [](const Markoff::MarkoffEdit &a, const Markoff::MarkoffEdit &b) {
-                  return a.oldStart > b.oldStart;
-              });
-
-    for (const Markoff::MarkoffEdit &ed : sorted) {
-        const int qtStart = byteOffsetToQtPos(preBytes, ed.oldStart);
-        const int qtEnd   = byteOffsetToQtPos(preBytes, ed.oldEnd);
-
-        cursor.setPosition(qtStart);
-        cursor.setPosition(qtEnd, QTextCursor::KeepAnchor);
-        cursor.removeSelectedText();
-        if (!ed.newText.isEmpty()) {
-            cursor.insertText(QString::fromUtf8(ed.newText));
-        }
-    }
-
+    m_textDocument->setPlainText(expectedStr);
     m_applyingRemoteEdit = false;
 }
 
