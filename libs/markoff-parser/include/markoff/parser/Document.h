@@ -160,7 +160,7 @@ struct TopLevelBlock {
 };
 
 /// Result of walking a parsed tree to extract structured queries. Defined
-/// in <markoff-parser/TreeSitterParser.h>.
+/// in <markoff/parser/TreeSitterParser.h>.
 struct DocumentQueryResult;
 
 /// Frontmatter-aware extraction output. After this call:
