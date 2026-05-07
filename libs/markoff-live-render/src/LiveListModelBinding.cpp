@@ -14,6 +14,7 @@
 #include <markoff-foundation/Cmd/D2.h>
 
 #include <QList>
+#include <QRegularExpression>
 #include <QScopeGuard>
 
 namespace Markoff::LiveRender {
@@ -212,6 +213,57 @@ void LiveListModelBinding::onD2Changed()
         else if (inferred == BlockKind::Math)           fk = Markoff::BlockKind::Math;
         else if (inferred == BlockKind::ListItem)       fk = Markoff::BlockKind::ListItem;
         else if (inferred == BlockKind::Blockquote)     fk = Markoff::BlockKind::BlockQuote;
+
+        // ListItem promotion: parse marker, strip buffer, set attrs in one transaction.
+        if (fk == Markoff::BlockKind::ListItem) {
+            static const QRegularExpression kPromoteMarker(
+                QStringLiteral(R"(^([ \t]{0,3})(\d{1,9})([.)]) (.*)$|^([ \t]{0,3})([-*+]) (.*)$)"));
+            auto pm = kPromoteMarker.match(rec.text);
+            if (!pm.hasMatch()) {
+                // inferBlockKind matched but our parse failed — change kind without attrs.
+                Markoff::Cmd::changeKind(*doc, Markoff::BlockId(rec.blockAnchor), fk, {}, {});
+                return;
+            }
+
+            QString style;
+            int number = 0;
+            QString content;
+            int leadingSpaces = 0;
+            if (!pm.captured(2).isEmpty()) {
+                leadingSpaces = pm.captured(1).size();
+                number        = pm.captured(2).toInt();
+                style         = (pm.captured(3) == QStringLiteral(".")) ? QStringLiteral("dot")
+                                                                         : QStringLiteral("paren");
+                content = pm.captured(4);
+            } else {
+                leadingSpaces = pm.captured(5).size();
+                const QString c = pm.captured(6);
+                style   = (c == QStringLiteral("-")) ? QStringLiteral("minus")
+                        : (c == QStringLiteral("*")) ? QStringLiteral("star")
+                                                      : QStringLiteral("plus");
+                content = pm.captured(7);
+            }
+            const int indent = leadingSpaces / 2;
+
+            UndoLog::Transaction t(doc->d2UndoLog());
+
+            const QByteArray oldBuf = doc->blockText(Markoff::BlockId(rec.blockAnchor));
+            doc->d2ApplyBufferEdit(Markoff::BlockId(rec.blockAnchor),
+                                   0, static_cast<uint32_t>(oldBuf.size()),
+                                   content.toUtf8(), t);
+            doc->d2SetBlockKind(Markoff::BlockId(rec.blockAnchor), Markoff::BlockKind::ListItem, t);
+            doc->d2SetBlockAttr(Markoff::BlockId(rec.blockAnchor),
+                                Markoff::AttrNames::IndentLevel, indent, t);
+            doc->d2SetBlockAttr(Markoff::BlockId(rec.blockAnchor),
+                                Markoff::AttrNames::MarkerStyle, style, t);
+            if (style == QStringLiteral("dot") || style == QStringLiteral("paren"))
+                doc->d2SetBlockAttr(Markoff::BlockId(rec.blockAnchor),
+                                    Markoff::AttrNames::MarkerNumber, number, t);
+            doc->d2SetBlockAttr(Markoff::BlockId(rec.blockAnchor),
+                                Markoff::AttrNames::LooseRun, false, t);
+            Markoff::Cmd::renumberRunStartingAt(*doc, Markoff::BlockId(rec.blockAnchor), t);
+            return;
+        }
 
         QList<Markoff::AttrName> attrNames;
         QList<Markoff::AttrValue> attrVals;
