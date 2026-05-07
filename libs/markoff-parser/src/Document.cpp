@@ -17,10 +17,6 @@ struct Document::Private {
     QList<FootnoteInfo> footnotes;
     QList<FootnoteRefInfo> refs;
 
-    // Baked at construction by walking the parsed tree once.  Document
-    // does not retain the TreeSitterParser instance; callers that need
-    // a long-lived parser (e.g., ParsePool worker for incremental reparse)
-    // own it externally and bake a Document via fromComponents().
     DocumentQueryResult queries;
 
     // Lazy-parsed
@@ -135,30 +131,22 @@ ExtractedSource Document::extract(const QString &source)
     return out;
 }
 
-std::unique_ptr<Document> Document::fromComponents(
-    QString source,
-    ExtractedSource extracted,
-    const DocumentQueryResult &queries)
-{
-    auto doc = std::unique_ptr<Document>(new Document());
-    doc->d->source                = std::move(source);
-    doc->d->frontmatter           = std::move(extracted.frontmatter);
-    doc->d->frontmatterBlockStart = extracted.frontmatterBlockStart;
-    doc->d->frontmatterBlockEnd   = extracted.frontmatterBlockEnd;
-    doc->d->eofClose              = extracted.frontmatterEofClose;
-    doc->d->footnotes             = std::move(extracted.footnotes);
-    doc->d->refs                  = std::move(extracted.refs);
-    doc->d->queries               = queries;
-    return doc;
-}
-
 std::unique_ptr<Document> Document::fromMarkdown(const QString &source)
 {
     ExtractedSource extracted = extract(source);
     TreeSitterParser parser;
     parser.parse(extracted.body);
     DocumentQueryResult q = parser.buildDocumentQueries();
-    return fromComponents(source, std::move(extracted), q);
+    auto doc = std::unique_ptr<Document>(new Document());
+    doc->d->source                = source;
+    doc->d->frontmatter           = std::move(extracted.frontmatter);
+    doc->d->frontmatterBlockStart = extracted.frontmatterBlockStart;
+    doc->d->frontmatterBlockEnd   = extracted.frontmatterBlockEnd;
+    doc->d->eofClose              = extracted.frontmatterEofClose;
+    doc->d->footnotes             = std::move(extracted.footnotes);
+    doc->d->refs                  = std::move(extracted.refs);
+    doc->d->queries               = q;
+    return doc;
 }
 
 QString Document::sourceText() const

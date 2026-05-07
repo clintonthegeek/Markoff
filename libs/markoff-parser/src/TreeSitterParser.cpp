@@ -9,9 +9,6 @@
 
 #include <QStringList>
 #include <QPair>
-#include <chrono>
-#include <optional>
-#include <unordered_map>
 #include <vector>
 #include <algorithm>
 
@@ -186,11 +183,6 @@ TreeSitterParser::~TreeSitterParser()
 
 bool TreeSitterParser::parse(const QString &text)
 {
-    m_lastInlineReuseCount = 0;
-    m_lastBlockChangedBytes = -1;
-    m_lastParseBlockNs  = 0;
-    m_lastParseInlineNs = 0;
-    m_lastChangedRanges.clear();
     m_utf8 = text.toUtf8();
     m_byteToChar = buildByteToCharMap(m_utf8);
 
@@ -227,204 +219,6 @@ bool TreeSitterParser::parse(const QString &text)
         }
         ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
     }
-
-    return true;
-}
-
-bool TreeSitterParser::parseIncremental(const QList<ByteEdit> &edits,
-                                        const QByteArray &newUtf8)
-{
-    m_lastParseBlockNs  = 0;
-    m_lastParseInlineNs = 0;
-    m_lastChangedRanges.clear();
-
-    // No prior tree → full parse of the new buffer. Callers don't need
-    // a first-parse branch.
-    if (!m_blockTree) {
-        return parse(QString::fromUtf8(newUtf8));
-    }
-
-    using Clock = std::chrono::steady_clock;
-    auto toNs = [](Clock::duration d) {
-        return static_cast<quint64>(
-            std::chrono::duration_cast<std::chrono::nanoseconds>(d).count());
-    };
-    const auto tStart = Clock::now();
-
-    // Snapshot inline state from before any edit, so we can reuse trees
-    // whose post-edit byte range is unchanged. m_inlineRanges is cached
-    // from the previous parse / parseIncremental and mirrors m_inlineTrees,
-    // so we don't need to re-walk the old block tree here.
-    const std::vector<ByteRange> oldInlineRanges = m_inlineRanges;
-    QList<TSTree *> oldInlineTrees = m_inlineTrees;
-    m_inlineTrees.clear();
-    const auto tInlinePrepDone = Clock::now();
-
-    QList<ByteEdit> sortedEdits;
-
-    if (edits.isEmpty()) {
-        // No edits but caller still asked for incremental: nothing to do
-        // for the block tree (it's already valid). Refresh the buffer-of-
-        // record (caller may have replaced it with an identical-looking
-        // newUtf8) and fall through to the inline reuse pass — every
-        // inline region's range will match exactly, so all trees reuse.
-        m_lastBlockChangedBytes = 0;
-        m_utf8       = newUtf8;
-        m_byteToChar = buildByteToCharMap(m_utf8);
-    } else {
-        // Sort by ascending oldStart, then apply ts_tree_edit in DESCENDING
-        // order. Each ts_tree_edit shifts node positions to a new frame; by
-        // editing right-to-left, each edit's old-frame offsets remain valid
-        // against the tree's then-current state (because we haven't touched
-        // anything to the right yet).
-        sortedEdits = edits;
-        std::sort(sortedEdits.begin(), sortedEdits.end(),
-                  [](const ByteEdit &a, const ByteEdit &b) {
-                      return a.oldStart < b.oldStart;
-                  });
-
-        for (auto it = sortedEdits.rbegin(); it != sortedEdits.rend(); ++it) {
-            const ByteEdit &e = *it;
-            TSInputEdit ed{};
-            ed.start_byte    = e.oldStart;
-            ed.old_end_byte  = e.oldEnd;
-            ed.new_end_byte  = e.oldStart + e.newLength;
-            // Points are unused downstream (we read trees by byte only),
-            // so leave them zero. tree-sitter uses points for some
-            // decisions but byte offsets dominate; this is the documented
-            // safe shortcut for byte-only consumers.
-            ts_tree_edit(m_blockTree, &ed);
-            // Apply the same edit to all old inline trees so that their
-            // node byte positions are updated to the new frame. Trees that
-            // are later reused will then emit spans with correct offsets.
-            for (TSTree *inlineTree : oldInlineTrees)
-                ts_tree_edit(inlineTree, &ed);
-        }
-
-        // Now reparse the block tree against the new buffer, supplying the
-        // edited prior tree. tree-sitter reuses unchanged subtrees.
-        m_utf8       = newUtf8;
-        m_byteToChar = buildByteToCharMap(m_utf8);
-
-        TSTree *newTree = ts_parser_parse_string(m_blockParser, m_blockTree,
-                                                  m_utf8.constData(),
-                                                  static_cast<uint32_t>(m_utf8.size()));
-        if (!newTree) {
-            // Block reparse failed. Restore the old inline-tree handles so
-            // the parser stays in a valid state, and report failure.
-            m_inlineTrees = oldInlineTrees;
-            return false;
-        }
-        {
-            uint32_t nRanges = 0;
-            TSRange *ranges = ts_tree_get_changed_ranges(m_blockTree, newTree, &nRanges);
-            quint64 totalBytes = 0;
-            m_lastChangedRanges.reserve(nRanges + sortedEdits.size());
-            for (uint32_t i = 0; i < nRanges; ++i) {
-                totalBytes += static_cast<quint64>(ranges[i].end_byte) - ranges[i].start_byte;
-                m_lastChangedRanges.push_back(
-                    ByteRange{ ranges[i].start_byte, ranges[i].end_byte });
-            }
-            if (ranges) free(ranges);
-            m_lastBlockChangedBytes = static_cast<int>(qMin<quint64>(totalBytes, INT_MAX));
-
-            // Tree-sitter reports STRUCTURAL changes on the block tree only:
-            // an inline-only edit (typing inside a heading or paragraph)
-            // often produces no block-tree changed-range. The edits
-            // themselves are the authoritative lower bound on changed
-            // bytes; project each edit into the new frame and union it
-            // into m_lastChangedRanges so the queries layer sees inline
-            // edits too.
-            qint64 delta = 0;
-            for (const ByteEdit &e : sortedEdits) {
-                const quint32 newStart = static_cast<quint32>(qint64(e.oldStart) + delta);
-                const quint32 newEnd   = newStart + e.newLength;
-                m_lastChangedRanges.push_back(ByteRange{ newStart, newEnd });
-                delta += qint64(e.newLength) - qint64(e.oldEnd - e.oldStart);
-            }
-        }
-        ts_tree_delete(m_blockTree);
-        m_blockTree = newTree;
-    }
-
-    const auto tBlockEnd = Clock::now();
-
-    // Phase 2: reuse inline trees for regions whose post-edit byte range
-    // is unchanged. Shift each old range through the sorted edits to
-    // derive its post-edit byte range, or mark it invalid if any edit
-    // overlaps. Index valid shifted ranges by packed (start,end) so new
-    // ranges look up matches in O(1) rather than scanning O(N).
-    TSNode root = ts_tree_root_node(m_blockTree);
-    std::vector<TSRange> newInlineRanges;
-    collectInlineRanges(root, newInlineRanges);
-
-    m_lastInlineReuseCount = 0;
-
-    // Build a hash map: packed (startByte, endByte) → oldIdx, for valid
-    // shifted ranges only. Since old ranges were disjoint pre-edit and
-    // edits shift each contiguous span by the same delta, the post-edit
-    // ranges are also pairwise distinct — so a plain unordered_map works
-    // (no collisions among valid entries).
-    std::unordered_map<quint64, int> shiftedByKey;
-    shiftedByKey.reserve(oldInlineRanges.size());
-    for (size_t i = 0; i < oldInlineRanges.size(); ++i) {
-        const quint32 s = oldInlineRanges[i].startByte;
-        const quint32 e = oldInlineRanges[i].endByte;
-        bool valid = true;
-        qint64 delta = 0;
-        for (const ByteEdit &ed : sortedEdits) {
-            if (ed.oldEnd <= s) {
-                delta += static_cast<qint64>(ed.newLength)
-                       - static_cast<qint64>(ed.oldEnd - ed.oldStart);
-            } else if (ed.oldStart >= e) {
-                // edit lies entirely past this range — no impact.
-            } else {
-                valid = false;
-                break;
-            }
-        }
-        if (!valid) continue;
-        const quint32 ns = static_cast<quint32>(static_cast<qint64>(s) + delta);
-        const quint32 ne = static_cast<quint32>(static_cast<qint64>(e) + delta);
-        const quint64 key = (static_cast<quint64>(ns) << 32) | ne;
-        shiftedByKey.emplace(key, static_cast<int>(i));
-    }
-
-    std::vector<bool> consumed(oldInlineTrees.size(), false);
-    m_inlineRanges.clear();
-    m_inlineRanges.reserve(newInlineRanges.size());
-
-    for (const TSRange &nr : newInlineRanges) {
-        const quint64 key = (static_cast<quint64>(nr.start_byte) << 32) | nr.end_byte;
-        auto it = shiftedByKey.find(key);
-        int reuseIdx = -1;
-        if (it != shiftedByKey.end() && !consumed[it->second]) {
-            reuseIdx = it->second;
-        }
-        if (reuseIdx >= 0) {
-            m_inlineTrees.append(oldInlineTrees[reuseIdx]);
-            consumed[reuseIdx] = true;
-            ++m_lastInlineReuseCount;
-        } else {
-            ts_parser_set_included_ranges(m_inlineParser, &nr, 1);
-            TSTree *tree = ts_parser_parse_string(m_inlineParser, nullptr,
-                                                   m_utf8.constData(),
-                                                   static_cast<uint32_t>(m_utf8.size()));
-            if (tree)
-                m_inlineTrees.append(tree);
-            ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
-        }
-        m_inlineRanges.push_back(ByteRange{nr.start_byte, nr.end_byte});
-    }
-
-    for (size_t i = 0; i < oldInlineTrees.size(); ++i) {
-        if (!consumed[i])
-            ts_tree_delete(oldInlineTrees[i]);
-    }
-
-    const auto tEnd = Clock::now();
-    m_lastParseBlockNs  = toNs(tBlockEnd - tInlinePrepDone);
-    m_lastParseInlineNs = toNs(tInlinePrepDone - tStart) + toNs(tEnd - tBlockEnd);
 
     return true;
 }
@@ -948,17 +742,6 @@ QList<TreeSitterParser::BlockBoundary> TreeSitterParser::findBlockBoundaries() c
 
 namespace {
 
-using ByteRange = TreeSitterParser::ByteRange;
-
-bool rangesOverlap(quint32 aStart, quint32 aEnd,
-                   const std::vector<ByteRange> &ranges)
-{
-    for (const auto &r : ranges) {
-        if (r.startByte < aEnd && r.endByte > aStart) return true;
-    }
-    return false;
-}
-
 // Pure node-to-Info extractors. Return true if the node matched the expected
 // shape. Used by both the full walk and the pruned-by-changed-ranges walk.
 
@@ -1104,58 +887,6 @@ void collectInlineQueries(TSNode node, const QByteArray &utf8,
     uint32_t count = ts_node_child_count(node);
     for (uint32_t i = 0; i < count; ++i)
         collectInlineQueries(ts_node_child(node, i), utf8, links, tags);
-}
-
-// ---------- pruned walks (used by buildDocumentQueries(prior, edits)) ------
-
-// Emit gate: an entry is emitted by the pruned walk when its full byte
-// range overlaps any changed range. This is the inverse of the carry-over
-// keep gate (which keeps entries whose range does NOT overlap), so for
-// any individual entry exactly one of carry-over and pruned-walk emits it.
-
-void collectHeadingsForQueryInRanges(TSNode node, const QByteArray &utf8,
-                                     const std::vector<ByteRange> &ranges,
-                                     QList<HeadingInfo> &headings)
-{
-    const quint32 ns = ts_node_start_byte(node);
-    const quint32 ne = ts_node_end_byte(node);
-    if (!rangesOverlap(ns, ne, ranges)) return;
-    HeadingInfo h;
-    if (extractHeadingFromNode(node, utf8, h)) {
-        if (rangesOverlap(quint32(h.sourceOffset),
-                          quint32(h.sourceOffset + h.sourceLength), ranges))
-            headings.append(h);
-        return;
-    }
-    uint32_t count = ts_node_child_count(node);
-    for (uint32_t i = 0; i < count; ++i)
-        collectHeadingsForQueryInRanges(ts_node_child(node, i), utf8, ranges, headings);
-}
-
-void collectInlineQueriesInRanges(TSNode node, const QByteArray &utf8,
-                                  const std::vector<ByteRange> &ranges,
-                                  QList<LinkInfo> &links, QList<TagInfo> &tags)
-{
-    const quint32 ns = ts_node_start_byte(node);
-    const quint32 ne = ts_node_end_byte(node);
-    if (!rangesOverlap(ns, ne, ranges)) return;
-    LinkInfo li;
-    if (extractLinkFromNode(node, utf8, li)) {
-        if (rangesOverlap(quint32(li.sourceOffset),
-                          quint32(li.sourceOffset + li.sourceLength), ranges))
-            links.append(li);
-        return;
-    }
-    TagInfo ti;
-    if (extractTagFromNode(node, utf8, ti)) {
-        if (rangesOverlap(quint32(ti.sourceOffset),
-                          quint32(ti.sourceOffset + ti.sourceLength), ranges))
-            tags.append(ti);
-        return;
-    }
-    uint32_t count = ts_node_child_count(node);
-    for (uint32_t i = 0; i < count; ++i)
-        collectInlineQueriesInRanges(ts_node_child(node, i), utf8, ranges, links, tags);
 }
 
 // ---------- top-level block walker (used by buildDocumentQueries) ----------
@@ -1486,106 +1217,6 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
 
     // Bake per-block inline spans (R1B). buildSpanMap is O(N) over inline
     // trees; bucketing is O(spans + blocks) on top.
-    bakeInlineSpansIntoBlocks(buildSpanMap(), result.topLevelBlocks, m_utf8);
-
-    return result;
-}
-
-DocumentQueryResult TreeSitterParser::buildDocumentQueries(
-    const DocumentQueryResult &prior,
-    const QList<ByteEdit> &edits) const
-{
-    if (!m_blockTree)
-        return {};
-
-    // Sort edits by oldStart so we can apply shift math left-to-right per
-    // entry. (parseIncremental does its own sort internally; we must match
-    // the shape of edits the caller used.)
-    QList<ByteEdit> sortedEdits = edits;
-    std::sort(sortedEdits.begin(), sortedEdits.end(),
-              [](const ByteEdit &a, const ByteEdit &b) {
-                  return a.oldStart < b.oldStart;
-              });
-
-    // Map an old-frame byte offset to the new-frame. Returns std::nullopt
-    // if the offset falls strictly inside an edit's old range (entry was
-    // overwritten and must be re-discovered, not carried over).
-    auto shiftOldOffset = [&sortedEdits](int oldOff) -> std::optional<int> {
-        qint64 cur = oldOff;
-        for (const ByteEdit &e : sortedEdits) {
-            if (qint64(e.oldStart) > cur) break;            // edit lies past us
-            if (qint64(e.oldEnd) <= cur) {                  // edit lies entirely before us
-                cur += qint64(e.newLength) - qint64(e.oldEnd - e.oldStart);
-            } else {                                        // cur is inside [oldStart, oldEnd)
-                return std::nullopt;
-            }
-        }
-        return int(cur);
-    };
-
-    DocumentQueryResult result;
-
-    // 1. Carry over prior entries whose byte range did not intersect any
-    //    changed range. The entry's full range — [sourceOffset, sourceOffset
-    //    + sourceLength) in old-frame coords — must shift cleanly (start byte
-    //    survives; we conservatively require the start to shift) AND must
-    //    not overlap any changed range in the new frame.
-    auto carry = [&](auto &outList, const auto &priorList) {
-        for (const auto &item : priorList) {
-            const std::optional<int> nf = shiftOldOffset(item.sourceOffset);
-            if (!nf) continue;
-            const int len = item.sourceLength > 0 ? item.sourceLength : 1;
-            if (rangesOverlap(quint32(*nf), quint32(*nf + len), m_lastChangedRanges))
-                continue;
-            auto shifted = item;
-            shifted.sourceOffset = *nf;
-            outList.append(shifted);
-        }
-    };
-    carry(result.headings, prior.headings);
-    carry(result.links,    prior.links);
-    carry(result.tags,     prior.tags);
-
-    // 2. Walk only the subtrees of the new tree that overlap a changed
-    //    range, emitting entries whose start byte sits in a changed range.
-    //    If there are no changed ranges (e.g. parseIncremental({}, sameBuf))
-    //    this is a no-op and the carry-over above is the entire result.
-    if (!m_lastChangedRanges.empty()) {
-        TSNode blockRoot = ts_tree_root_node(m_blockTree);
-        collectHeadingsForQueryInRanges(blockRoot, m_utf8, m_lastChangedRanges,
-                                         result.headings);
-        for (TSTree *tree : m_inlineTrees) {
-            TSNode inlineRoot = ts_tree_root_node(tree);
-            collectInlineQueriesInRanges(inlineRoot, m_utf8, m_lastChangedRanges,
-                                          result.links, result.tags);
-        }
-    }
-
-    // 3. Sort by source offset for stable order and equality with the
-    //    fresh-walk reference.
-    std::sort(result.headings.begin(), result.headings.end(),
-              [](const HeadingInfo &a, const HeadingInfo &b) {
-                  return a.sourceOffset < b.sourceOffset;
-              });
-    std::sort(result.links.begin(), result.links.end(),
-              [](const LinkInfo &a, const LinkInfo &b) {
-                  return a.sourceOffset < b.sourceOffset;
-              });
-    std::sort(result.tags.begin(), result.tags.end(),
-              [](const TagInfo &a, const TagInfo &b) {
-                  return a.sourceOffset < b.sourceOffset;
-              });
-
-    // Top-level blocks: inherently order-dependent (consumers expect a
-    // linear document-order sequence) and there are typically far fewer
-    // of them than headings/links/tags. A fresh full walk is simpler
-    // and correct; revisit if profiling shows it as a hot spot.
-    {
-        TSNode blockRoot = ts_tree_root_node(m_blockTree);
-        collectTopLevelBlocks(blockRoot, m_utf8, result.topLevelBlocks);
-    }
-
-    // Bake per-block inline spans (R1B).
     bakeInlineSpansIntoBlocks(buildSpanMap(), result.topLevelBlocks, m_utf8);
 
     return result;

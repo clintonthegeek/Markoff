@@ -177,9 +177,8 @@ struct DocumentQueryResult;
 ///     in order of appearance, with the same numbering scheme. Refs
 ///     whose label has no definition carry number 0.
 ///
-/// Used by long-lived parsers (e.g., foundation's IncrementalParseSession)
-/// that want to share Document::extract()'s logic without going through the
-/// fromMarkdown() one-shot path.
+/// Used by callers that want to share Document::extract()'s logic without
+/// going through the fromMarkdown() one-shot path.
 struct ExtractedSource {
     QString                  body;
     QString                  frontmatter;
@@ -201,22 +200,8 @@ public:
     static std::unique_ptr<Document> fromMarkdown(const QString &source);
 
     /// Extract frontmatter + footnote pre-processing from a raw markdown
-    /// source. Pure function over `source`; no tree-sitter involved. The
-    /// returned `body` is what callers should feed to TreeSitterParser
-    /// (whether for a one-shot parse() or an incremental parseIncremental()).
+    /// source. Pure function over `source`; no tree-sitter involved.
     static ExtractedSource extract(const QString &source);
-
-    /// Bake a Document from pre-computed components — used by long-lived
-    /// parsers (foundation's IncrementalParseSession) so that a single
-    /// TreeSitterParser instance can persist across calls and feed
-    /// successive Document snapshots without re-parsing.
-    ///
-    /// `queries` should be the result of buildDocumentQueries() called on
-    /// the parser whose tree was built against `extracted.body`.
-    static std::unique_ptr<Document> fromComponents(
-        QString source,
-        ExtractedSource extracted,
-        const DocumentQueryResult &queries);
 
     QString sourceText() const;
     bool isEmpty() const;
