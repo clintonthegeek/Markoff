@@ -18,12 +18,12 @@
 #include <QTextEdit>
 #include <QApplication>
 
-#include <markoff/live-render/LiveEditBinding.h>
-#include <markoff/live-render/LiveListModelBinding.h>
-#include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/BlockKind.h>
-#include <markoff/live-render/Coordinates.h>
-#include <markoff/live-render/LiveSelectionView.h>
+#include <markoff/live/LiveEditBinding.h>
+#include <markoff/live/LiveListModelBinding.h>
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/BlockKind.h>
+#include <markoff/live/Coordinates.h>
+#include <markoff/live/LiveSelectionView.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/CrdtProxies.h>

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff/live-render/BlockKindDescriptor.h>
+#include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/live/BlockKindDescriptor.h>
 #include <markoff/core/BlockSerializerRegistry.h>
 
 #include <QHash>
@@ -14,7 +14,7 @@ namespace Markoff::Live {
 /// the constructor. Plugin authors register custom kinds via register_().
 /// LiveListModelBinding owns one instance; passes a pointer to downstream
 /// components (LiveCursorState, LiveStructuralKeyHandler) in R3+.
-class MARKOFF_LIVE_RENDER_EXPORT BlockKindRegistry
+class MARKOFF_LIVE_EXPORT BlockKindRegistry
     : public Markoff::BlockSerializerRegistry {
 public:
     BlockKindRegistry();  ///< Registers all built-in kinds.

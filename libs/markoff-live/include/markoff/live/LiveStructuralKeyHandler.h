@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 #include <markoff/core/BlockAnchor.h>
 
 #include <QHash>
@@ -32,7 +32,7 @@ class BlockKindRegistry;
 /// D2 migration: all handlers use Cmd::* functions (enterAtEnd,
 /// backspaceMerge, deleteMerge, insertSoftBreak) rather than building
 /// flat-buffer MarkoffEdits.
-class MARKOFF_LIVE_RENDER_EXPORT LiveStructuralKeyHandler : public QObject {
+class MARKOFF_LIVE_EXPORT LiveStructuralKeyHandler : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("LiveStructuralKeyHandler is provided by LiveListModelBinding")

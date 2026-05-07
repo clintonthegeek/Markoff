@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 #include <QObject>
 #include <QPixmap>
 #include <QString>
@@ -10,7 +10,7 @@ namespace Markoff::Live {
 
 /// Wraps JKQTMathText to render LaTeX source to a QPixmap.
 /// Registered as a QML singleton so delegates can call render() from JS.
-class MARKOFF_LIVE_RENDER_EXPORT MathRenderer : public QObject {
+class MARKOFF_LIVE_EXPORT MathRenderer : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_SINGLETON

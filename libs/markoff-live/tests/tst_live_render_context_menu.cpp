@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff/live-render/LiveListModelBinding.h>
+#include <markoff/live/LiveListModelBinding.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Cmd/D2.h>
 

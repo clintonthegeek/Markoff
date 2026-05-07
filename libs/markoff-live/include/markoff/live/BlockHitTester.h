@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 
 #include <QObject>
 #include <QVariantMap>
@@ -20,7 +20,7 @@ namespace Markoff::Live {
 /// `BlockHitTester` is exposed as a QML property of `LiveListModelBinding`
 /// so that `LiveView.qml` can bind to it in Component.onCompleted and
 /// connect signals.
-class MARKOFF_LIVE_RENDER_EXPORT BlockHitTester : public QObject {
+class MARKOFF_LIVE_EXPORT BlockHitTester : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("BlockHitTester is provided by LiveListModelBinding")

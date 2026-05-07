@@ -2,7 +2,7 @@
 #include <QTest>
 #include <QByteArray>
 
-#include <markoff/live-render/Coordinates.h>
+#include <markoff/live/Coordinates.h>
 
 using namespace Markoff::Live::Coordinates;
 

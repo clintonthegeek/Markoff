@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 #include <markoff/core/BlockAnchor.h>
 #include <markoff/core/TextAnchor.h>
 
@@ -22,7 +22,7 @@ using BlockId = Markoff::BlockAnchor;
 
 /// Caret inside a text-bearing block at a CRDT-anchored byte position.
 /// Rendered as a blinking I-beam. Spec §3.1.
-struct MARKOFF_LIVE_RENDER_EXPORT TextCaret {
+struct MARKOFF_LIVE_EXPORT TextCaret {
     BlockId              block;           ///< CRDT-anchored parser block.
     Markoff::TextAnchor  positionAnchor;  ///< CRDT anchor; survives remote edits.
     quint32              cachedByteOffset = 0; ///< Resolved byte offset; refreshed on use.
@@ -35,13 +35,13 @@ struct MARKOFF_LIVE_RENDER_EXPORT TextCaret {
 
 /// Block focused as a unit — no caret. Rendered as a focus ring.
 /// Used by non-text blocks (hr, image) in their default state. Spec §3.1.
-struct MARKOFF_LIVE_RENDER_EXPORT BlockSelected {
+struct MARKOFF_LIVE_EXPORT BlockSelected {
     BlockId block;                        ///< CRDT-anchored parser block.
     bool operator==(const BlockSelected &o) const noexcept { return block == o.block; }
 };
 
 /// Block in its own internal-edit mode. Deferred to R8 (math block). Spec §3.1.
-struct MARKOFF_LIVE_RENDER_EXPORT BlockInternalEdit {
+struct MARKOFF_LIVE_EXPORT BlockInternalEdit {
     BlockId block;                        ///< CRDT-anchored parser block.
     QString mode;  ///< Block-kind-defined token, e.g. "editing-latex".
     bool operator==(const BlockInternalEdit &o) const noexcept {
@@ -50,7 +50,7 @@ struct MARKOFF_LIVE_RENDER_EXPORT BlockInternalEdit {
 };
 
 /// No-focus sentinel — cursor is not placed anywhere.
-struct MARKOFF_LIVE_RENDER_EXPORT NoCursor {
+struct MARKOFF_LIVE_EXPORT NoCursor {
     bool operator==(const NoCursor &) const noexcept { return true; }
 };
 
@@ -61,7 +61,7 @@ using Cursor = std::variant<NoCursor, TextCaret, BlockSelected, BlockInternalEdi
 
 /// View-layer selection: two Cursor endpoints. Collapsed when anchor == active.
 /// Spec §3.1 Selection.
-struct MARKOFF_LIVE_RENDER_EXPORT LiveRenderSelection {
+struct MARKOFF_LIVE_EXPORT LiveRenderSelection {
     Cursor anchor;
     Cursor active;
 

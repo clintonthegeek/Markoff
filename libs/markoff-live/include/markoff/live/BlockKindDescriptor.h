@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 #include <markoff/core/BlockAttrsMap.h>
 
 #include <QByteArray>
@@ -23,7 +23,7 @@ namespace Markoff::Live {
 /// URL for dynamic Loader dispatch in R3+.
 ///
 /// Spec §5.1.
-struct MARKOFF_LIVE_RENDER_EXPORT BlockKindDescriptor {
+struct MARKOFF_LIVE_EXPORT BlockKindDescriptor {
     QString     id;          ///< "paragraph", "heading", etc.
     QString     delegateUrl; ///< qrc: URL of the QML delegate (R3+ dispatch).
 

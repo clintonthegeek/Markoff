@@ -8,12 +8,12 @@
 #include <QTest>
 #include <QSignalSpy>
 
-#include <markoff/live-render/LiveStructuralKeyHandler.h>
-#include <markoff/live-render/LiveListModelBinding.h>
-#include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/LiveCursorState.h>
-#include <markoff/live-render/Cursor.h>
-#include <markoff/live-render/BlockKind.h>
+#include <markoff/live/LiveStructuralKeyHandler.h>
+#include <markoff/live/LiveListModelBinding.h>
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/LiveCursorState.h>
+#include <markoff/live/Cursor.h>
+#include <markoff/live/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/CrdtProxies.h>
 #include <markoff/core/BlockAnchor.h>

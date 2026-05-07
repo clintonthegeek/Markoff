@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "KindTransition.h"
-#include <markoff/live-render/BlockKind.h>
+#include <markoff/live/BlockKind.h>
 #include <QRegularExpression>
 
 namespace Markoff::Live {

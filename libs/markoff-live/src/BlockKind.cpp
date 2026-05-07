@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/BlockKind.h>
+#include <markoff/live/BlockKind.h>
 
 namespace Markoff::Live::BlockKind {
 

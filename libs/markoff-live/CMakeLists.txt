@@ -27,17 +27,17 @@ qt_add_qml_module(markoff_live
     OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/org/markoff/live
     SOURCES
         src/Version.cpp
-        include/markoff/live-render/MarkoffLiveRenderExport.h
-        include/markoff/live-render/Version.h
+        include/markoff/live/MarkoffLiveExport.h
+        include/markoff/live/Version.h
         # Block value types
-        include/markoff/live-render/BlockRecord.h
-        include/markoff/live-render/BlockKind.h
-        include/markoff/live-render/BlockKindDescriptor.h
-        include/markoff/live-render/BlockKindRegistry.h
-        include/markoff/live-render/Coordinates.h
-        include/markoff/live-render/AstBlockDiff.h
-        include/markoff/live-render/LiveBlockModel.h
-        include/markoff/live-render/LiveListModelBinding.h
+        include/markoff/live/BlockRecord.h
+        include/markoff/live/BlockKind.h
+        include/markoff/live/BlockKindDescriptor.h
+        include/markoff/live/BlockKindRegistry.h
+        include/markoff/live/Coordinates.h
+        include/markoff/live/AstBlockDiff.h
+        include/markoff/live/LiveBlockModel.h
+        include/markoff/live/LiveListModelBinding.h
         src/BlockKind.cpp
         src/BlockKindRegistry.cpp
         src/Coordinates.cpp
@@ -47,18 +47,18 @@ qt_add_qml_module(markoff_live
         src/LiveBlockModel.cpp
         src/LiveListModelBinding.cpp
         # R3: cursor + selection
-        include/markoff/live-render/Cursor.h
-        include/markoff/live-render/LiveCursorState.h
-        include/markoff/live-render/BlockHitTester.h
-        include/markoff/live-render/LiveSelectionView.h
+        include/markoff/live/Cursor.h
+        include/markoff/live/LiveCursorState.h
+        include/markoff/live/BlockHitTester.h
+        include/markoff/live/LiveSelectionView.h
         src/LiveCursorState.cpp
         src/BlockHitTester.cpp
         src/LiveSelectionView.cpp
         # R4: per-delegate edit binding
-        include/markoff/live-render/LiveEditBinding.h
+        include/markoff/live/LiveEditBinding.h
         src/LiveEditBinding.cpp
         # R5: structural keys
-        include/markoff/live-render/LiveStructuralKeyHandler.h
+        include/markoff/live/LiveStructuralKeyHandler.h
         src/LiveStructuralKeyHandler.cpp
         # Math rendering
         src/MathRenderer.h
@@ -78,7 +78,7 @@ qt_add_qml_module(markoff_live
 
 target_include_directories(markoff_live
     PUBLIC include/
-    PRIVATE include/markoff/live-render/
+    PRIVATE include/markoff/live/
     PRIVATE src/
 )
 

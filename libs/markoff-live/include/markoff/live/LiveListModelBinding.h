@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/BlockKindRegistry.h>
-#include <markoff/live-render/LiveCursorState.h>
-#include <markoff/live-render/BlockHitTester.h>
-#include <markoff/live-render/LiveSelectionView.h>
-#include <markoff/live-render/LiveStructuralKeyHandler.h>
+#include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/BlockKindRegistry.h>
+#include <markoff/live/LiveCursorState.h>
+#include <markoff/live/BlockHitTester.h>
+#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveStructuralKeyHandler.h>
 
 #include <QObject>
 #include <memory>
@@ -18,7 +18,7 @@
 
 namespace Markoff::Live {
 
-class MARKOFF_LIVE_RENDER_EXPORT LiveListModelBinding : public QObject {
+class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
     Q_OBJECT
     QML_ELEMENT
 

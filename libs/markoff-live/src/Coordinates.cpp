@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/Coordinates.h>
+#include <markoff/live/Coordinates.h>
 
 namespace Markoff::Live::Coordinates {
 

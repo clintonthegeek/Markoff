@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 
-#include <markoff/live-render/LiveListModelBinding.h>
+#include <markoff/live/LiveListModelBinding.h>
 
 #include <QObject>
 #include <QPointer>
@@ -34,7 +34,7 @@ namespace Markoff::Live {
 ///     as user edits and pumped back into the CRDT, duplicating content.
 ///   - composing: skip during IME preedit; on commit (composing → false)
 ///     re-sync to the post-commit text via flushPendingComposition().
-class MARKOFF_LIVE_RENDER_EXPORT LiveEditBinding : public QObject {
+class MARKOFF_LIVE_EXPORT LiveEditBinding : public QObject {
     Q_OBJECT
     QML_ELEMENT
 

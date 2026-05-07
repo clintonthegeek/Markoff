@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/LiveSelectionView.h>
-#include <markoff/live-render/Coordinates.h>
-#include <markoff/live-render/LiveBlockModel.h>
+#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/Coordinates.h>
+#include <markoff/live/LiveBlockModel.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Selection.h>

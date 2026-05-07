@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff/live-render/Cursor.h>
+#include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/live/Cursor.h>
 
 #include <QObject>
 #include <QString>
@@ -32,7 +32,7 @@ class LiveListModelBinding;
 /// already stable at the time of the call — do not use immediately after
 /// a d2ApplyBufferEdit that changes the row content (use
 /// requestTextCaretAtAnchor instead). Spec §5.3 step 6.
-class MARKOFF_LIVE_RENDER_EXPORT LiveCursorState : public QObject {
+class MARKOFF_LIVE_EXPORT LiveCursorState : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("LiveCursorState is provided by LiveListModelBinding")

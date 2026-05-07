@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/AstBlockDiff.h>
+#include <markoff/live/AstBlockDiff.h>
 
 #include <vector>
 

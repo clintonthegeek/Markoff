@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 
 #include <QtGlobal>
 
@@ -14,6 +14,6 @@ namespace Markoff::Live {
 
 /// Library version number, integer-encoded `major * 10000 + minor * 100 + patch`.
 /// R1 ships at 0 (= 0.0.0).
-MARKOFF_LIVE_RENDER_EXPORT quint32 version() noexcept;
+MARKOFF_LIVE_EXPORT quint32 version() noexcept;
 
 }  // namespace Markoff::Live

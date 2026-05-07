@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff/live-render/BlockRecord.h>
+#include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/live/BlockRecord.h>
 #include <QList>
 
 namespace Markoff::Live {
@@ -11,7 +11,7 @@ namespace Markoff::Live {
 /// edit operations referencing indices in `prev` and `next`. Used by
 /// LiveListModelBinding to emit the minimal Qt model signal sequence so
 /// ListView preserves delegates whose AST block still exists.
-class MARKOFF_LIVE_RENDER_EXPORT AstBlockDiff {
+class MARKOFF_LIVE_EXPORT AstBlockDiff {
 public:
     enum class OpKind { Equal, Insert, Delete };
 

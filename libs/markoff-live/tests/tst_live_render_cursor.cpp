@@ -2,14 +2,14 @@
 #include <QTest>
 #include <QSignalSpy>
 
-#include <markoff/live-render/Cursor.h>
-#include <markoff/live-render/LiveCursorState.h>
-#include <markoff/live-render/BlockHitTester.h>
-#include <markoff/live-render/BlockKind.h>
-#include <markoff/live-render/BlockKindRegistry.h>
-#include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/AstBlockDiff.h>
-#include <markoff/live-render/LiveListModelBinding.h>
+#include <markoff/live/Cursor.h>
+#include <markoff/live/LiveCursorState.h>
+#include <markoff/live/BlockHitTester.h>
+#include <markoff/live/BlockKind.h>
+#include <markoff/live/BlockKindRegistry.h>
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/AstBlockDiff.h>
+#include <markoff/live/LiveListModelBinding.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>

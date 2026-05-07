@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 #include <markoff/core/BlockAnchor.h>
 #include <markoff/core/BlockAttrsMap.h>
 #include <markoff-parser/SourceSpan.h>
@@ -24,7 +24,7 @@ namespace Markoff::Live {
 ///
 /// `blockAnchor` is populated from `doc->iterateBlocks()` in
 /// `LiveListModelBinding::onD2Changed` during each parse update.
-struct MARKOFF_LIVE_RENDER_EXPORT BlockRecord {
+struct MARKOFF_LIVE_EXPORT BlockRecord {
     QString              kind;
     QString              text;              ///< Source-faithful markdown for this block.
     int                  headingLevel = 0;  ///< 1–6 if kind=="heading"; else 0.
@@ -50,7 +50,7 @@ struct MARKOFF_LIVE_RENDER_EXPORT BlockRecord {
 /// Diff identity key. Two blocks with the same kind+anchor are "the same
 /// block" across parses: content edits keep delegates alive; kind-changes
 /// and structural edits (splits/merges) produce Delete+Insert pairs.
-struct MARKOFF_LIVE_RENDER_EXPORT BlockKey {
+struct MARKOFF_LIVE_EXPORT BlockKey {
     QString              kind;
     Markoff::BlockAnchor anchor;
     bool operator==(const BlockKey &o) const noexcept {

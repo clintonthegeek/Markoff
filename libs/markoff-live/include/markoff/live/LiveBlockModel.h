@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
-#include <markoff/live-render/BlockRecord.h>
-#include <markoff/live-render/AstBlockDiff.h>
+#include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/live/BlockRecord.h>
+#include <markoff/live/AstBlockDiff.h>
 
 #include <QAbstractListModel>
 #include <QHash>
@@ -22,7 +22,7 @@ namespace Markoff::Live {
 /// Simplified from `markoff-view-qml`'s LiveBlockModel: no hole rows, no
 /// composing-row deferral, no speculative-kind registry — those are retired
 /// in the C-architecture per spec §4.4.
-class MARKOFF_LIVE_RENDER_EXPORT LiveBlockModel : public QAbstractListModel {
+class MARKOFF_LIVE_EXPORT LiveBlockModel : public QAbstractListModel {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("LiveBlockModel is provided by LiveListModelBinding")

@@ -3,9 +3,9 @@
 #include <QAbstractItemModelTester>
 #include <QSignalSpy>
 
-#include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/LiveListModelBinding.h>
-#include <markoff/live-render/BlockKind.h>
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/LiveListModelBinding.h>
+#include <markoff/live/BlockKind.h>
 
 #include <markoff/core/MarkoffDocument.h>
 

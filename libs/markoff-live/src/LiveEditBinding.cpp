@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/LiveEditBinding.h>
-#include <markoff/live-render/LiveListModelBinding.h>
-#include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/Coordinates.h>
+#include <markoff/live/LiveEditBinding.h>
+#include <markoff/live/LiveListModelBinding.h>
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/Coordinates.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/UndoLog.h>

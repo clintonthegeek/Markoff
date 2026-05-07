@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/LiveListModelBinding.h>
-#include <markoff/live-render/AstBlockDiff.h>
-#include <markoff/live-render/LiveStructuralKeyHandler.h>
-#include <markoff/live-render/BlockKind.h>
+#include <markoff/live/LiveListModelBinding.h>
+#include <markoff/live/AstBlockDiff.h>
+#include <markoff/live/LiveStructuralKeyHandler.h>
+#include <markoff/live/BlockKind.h>
 
 #include "KindTransition.h"
 

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/LiveStructuralKeyHandler.h>
+#include <markoff/live/LiveStructuralKeyHandler.h>
 
-#include <markoff/live-render/BlockKindRegistry.h>
-#include <markoff/live-render/BlockKindDescriptor.h>
-#include <markoff/live-render/BlockKind.h>
-#include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/LiveCursorState.h>
-#include <markoff/live-render/Cursor.h>
+#include <markoff/live/BlockKindRegistry.h>
+#include <markoff/live/BlockKindDescriptor.h>
+#include <markoff/live/BlockKind.h>
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/LiveCursorState.h>
+#include <markoff/live/Cursor.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/UndoLog.h>

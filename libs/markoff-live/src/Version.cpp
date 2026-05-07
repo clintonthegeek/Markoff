@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/Version.h>
+#include <markoff/live/Version.h>
 
 namespace Markoff::Live {
 

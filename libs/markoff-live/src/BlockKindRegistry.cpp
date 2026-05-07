@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/BlockKindRegistry.h>
-#include <markoff/live-render/BlockKind.h>
+#include <markoff/live/BlockKindRegistry.h>
+#include <markoff/live/BlockKind.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/BlockAttrsMap.h>
 

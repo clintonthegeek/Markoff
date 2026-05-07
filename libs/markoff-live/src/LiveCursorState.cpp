@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/LiveCursorState.h>
-#include <markoff/live-render/BlockKindRegistry.h>
-#include <markoff/live-render/LiveBlockModel.h>
-#include <markoff/live-render/LiveListModelBinding.h>
+#include <markoff/live/LiveCursorState.h>
+#include <markoff/live/BlockKindRegistry.h>
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/LiveListModelBinding.h>
 
 #include <QLoggingCategory>
 

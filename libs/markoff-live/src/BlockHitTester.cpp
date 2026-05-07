@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff/live-render/BlockHitTester.h>
+#include <markoff/live/BlockHitTester.h>
 
 namespace Markoff::Live {
 

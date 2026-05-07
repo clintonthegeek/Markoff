@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live-render/MarkoffLiveRenderExport.h>
+#include <markoff/live/MarkoffLiveExport.h>
 
 #include <QObject>
 #include <QPoint>
@@ -28,7 +28,7 @@ class LiveBlockModel;
 /// After every begin/extend the selection is synced to Session::setPrimarySelection
 /// (converting qtPos → TextAnchor via MarkoffDocument::textAnchorAt) so the
 /// CRDT layer has accurate cursor state.
-class MARKOFF_LIVE_RENDER_EXPORT LiveSelectionView : public QObject {
+class MARKOFF_LIVE_EXPORT LiveSelectionView : public QObject {
     Q_OBJECT
     QML_ELEMENT
     QML_UNCREATABLE("LiveSelectionView is provided by LiveListModelBinding")
