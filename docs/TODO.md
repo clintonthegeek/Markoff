@@ -1,5 +1,26 @@
 # Markoff TODO
 
+## 2026-05-07 — ListItem Tab/Shift-Tab: no parent-existence guard
+
+The Tab (indent) and Shift-Tab (outdent) handlers in
+`LiveStructuralKeyHandler.cpp` increment/decrement `IndentLevel` by one
+with only a floor-of-zero and ceiling-of-6 boundary check. There is no
+check that a parent item at `newIndent - 1` actually exists in the
+surrounding run. A lone item at level 2 can be tabbed to level 3 even
+though no sibling at level 2 is present to parent it.
+
+In practice this produces a structurally odd list but does not crash or
+corrupt data — the item serializes and round-trips correctly, and the
+delegate renders the extra indentation faithfully. It's cosmetically
+weird and semantically wrong but not a regression from anything prior.
+
+**When to fix:** D4 or as a small standalone. The fix should walk the
+preceding blocks and refuse the indent if no block at `newIndent - 1`
+exists within the same style/indent boundary that `renumberRunStartingAt`
+would recognise as a run.
+
+---
+
 > **2026-05-04 — ACTIVE: D-evolution design (D2).** The C-restoration arc is closed.
 > See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` for the cut.
 > All R-phase entries in `docs/restoration-status.md` are now historical. The new

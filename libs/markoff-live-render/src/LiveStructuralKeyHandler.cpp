@@ -526,6 +526,8 @@ void LiveStructuralKeyHandler::registerBuiltins()
         const int newIndent = shift ? std::max(0, indent - 1)
                                     : std::min(6, indent + 1);
         if (newIndent == indent) return HR::Handled;  // already at boundary
+        // TODO(docs/TODO.md 2026-05-07): no check that a parent at newIndent-1
+        // exists in the surrounding run — a lone item can tab to an orphan level.
 
         UndoLog::Transaction t(c.document->d2UndoLog());
         c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
