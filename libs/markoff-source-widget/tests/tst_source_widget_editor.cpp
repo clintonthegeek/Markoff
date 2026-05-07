@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QPalette>
-#include <QSignalSpy>
 #include <QTest>
 
 #include <markoff/source/widget/Editor.h>
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/Origin.h>
 #include <markoff-foundation/Theme.h>
 
 class TstSourceWidgetEditor : public QObject {
@@ -19,10 +17,12 @@ private Q_SLOTS:
     void setDocument_attaches_and_seed_text_appears() {
         Markoff::Source::Widget::Editor e;
         Markoff::MarkoffDocument doc(1);
-        doc.resetContent(QByteArray("hello world"), Markoff::Origin::FirstOpen);
+        // D2: loadFromMarkdown populates the per-block structure the binding
+        // reads; resetContent writes only to the legacy flat buffer.
+        doc.loadFromMarkdown(QByteArray("hello world"));
         e.setDocument(&doc);
-        QSignalSpy parseSpy(&doc, &Markoff::MarkoffDocument::parseUpdated);
-        // setDocument may itself trigger a parse-flow; allow brief settle.
+        // setDocument triggers syncQtDocumentFromMarkoff synchronously;
+        // d2DocumentChanged is deferred — let it settle.
         QTest::qWait(50);
         QCOMPARE(e.toPlainText(), QStringLiteral("hello world"));
         QCOMPARE(e.document(), &doc);
