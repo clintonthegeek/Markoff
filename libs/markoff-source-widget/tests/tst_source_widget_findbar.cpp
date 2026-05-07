@@ -6,18 +6,15 @@
 #include <markoff/source/widget/Editor.h>
 #include <markoff/source/widget/FindBar.h>
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
 
 class TstSourceWidgetFindBar : public QObject {
     Q_OBJECT
 private:
     Markoff::MarkoffDocument *makeDoc(const QByteArray &seed) {
         auto *d = new Markoff::MarkoffDocument(1);
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = 0;
-        ed.oldEnd = 0;
-        ed.newText = seed;
-        d->applyLocalEdit({ed});
+        // D2: loadFromMarkdown populates the per-block structure that
+        // the binding and find engine read from.
+        d->loadFromMarkdown(seed);
         return d;
     }
 
