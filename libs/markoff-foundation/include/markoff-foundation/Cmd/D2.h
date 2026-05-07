@@ -5,6 +5,7 @@
 #include <markoff-foundation/BlockId.h>
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
+#include <markoff-foundation/UndoLog.h>
 
 #include <QByteArray>
 #include <QChar>
@@ -64,5 +65,26 @@ MARKOFF_FOUNDATION_EXPORT void pasteMarkdown(MarkoffDocument &doc,
                                               BlockId targetBlock,
                                               uint32_t byteOffset,
                                               const QByteArray &source);
+
+/// Insert a new ListItem block after `currentItem`. Copies IndentLevel,
+/// MarkerStyle, LooseRun from current; sets MarkerNumber = current+1
+/// for ordered styles; sets Checked=false for task. Returns the new
+/// block's BlockId. Caller usually follows up with renumberRunStartingAt.
+MARKOFF_FOUNDATION_EXPORT BlockId insertListItemAfter(
+    MarkoffDocument &doc, BlockId currentItem, UndoLog::Transaction &t);
+
+/// Insert a new ListItem block before `currentItem`. Sets
+/// MarkerNumber = current's number (caller renumbers afterward). Same
+/// attribute copy semantics as insertListItemAfter.
+MARKOFF_FOUNDATION_EXPORT BlockId insertListItemBefore(
+    MarkoffDocument &doc, BlockId currentItem, UndoLog::Transaction &t);
+
+/// Renumber the contiguous ordered-list run that contains `anyItemInRun`.
+/// A run = consecutive ListItem blocks at the same IndentLevel with the
+/// same MarkerStyle in {"dot","paren"}. The first item's MarkerNumber
+/// is preserved as the seed; subsequent items get MarkerNumber =
+/// seed + offset. No-op for non-ordered styles or single-item runs.
+MARKOFF_FOUNDATION_EXPORT void renumberRunStartingAt(
+    MarkoffDocument &doc, BlockId anyItemInRun, UndoLog::Transaction &t);
 
 }}  // namespace Markoff::Cmd
