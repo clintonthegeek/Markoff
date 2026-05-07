@@ -138,13 +138,10 @@ void LiveListModelBinding::onD2Changed()
         r.kind        = blockKindToString(doc->blockKind(id));
 
         QByteArray raw = doc->blockText(id);
-        // Trim ALL trailing newlines. The D2 block buffer stores the parser's
-        // byte range verbatim, which can include MORE than just the single
-        // block-delimiter '\n' (e.g. when the source has trailing blank lines
-        // after a list, the parser includes those '\n's in the list's range).
-        // Without stripping all of them, the model text shows phantom empty
-        // visual lines and qtPos at end of model lands inside the separator.
-        while (raw.endsWith('\n'))
+        // Trim trailing newline. Per-item ListItem blocks have content-only
+        // buffers (the parser strips all trailing newlines from the per-item
+        // content). The single trailing '\n' is the block-delimiter convention.
+        if (raw.endsWith('\n'))
             raw.chop(1);
         r.text = QString::fromUtf8(raw);
 
