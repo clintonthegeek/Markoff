@@ -740,6 +740,17 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
     return newId;
 }
 
+// ===== D4: applyFlatEdit =====
+
+void MarkoffDocument::applyFlatEdit(uint32_t /*oldStart*/,
+                                    uint32_t /*oldEnd*/,
+                                    const QByteArray & /*newText*/,
+                                    Origin /*origin*/)
+{
+    Q_ASSERT_X(false, "applyFlatEdit",
+               "not yet implemented; covered by tst_d4_apply_flat_edit");
+}
+
 void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
 {
     CollabText::Crdt::Anchor anchor = d->idList.anchor_of(block.raw(), CollabText::Crdt::Bias::Left);

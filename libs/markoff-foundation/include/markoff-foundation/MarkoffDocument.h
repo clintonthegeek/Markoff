@@ -178,6 +178,16 @@ public:
     /// recorded in the UndoLog as a single undoable action.
     void applyBlockEdit(const Markoff::BlockEdit &edit);
 
+    /// Apply a flat (source-widget) edit expressed as global UTF-8 byte
+    /// offsets across the concatenated block buffers. Opens an UndoLog
+    /// transaction and decomposes the edit into per-block d2ApplyBufferEdit
+    /// calls + structural ops (d2InsertBlock, d2RemoveBlock). The entire
+    /// edit lands in one transaction so a single undoD2() reverses it.
+    void applyFlatEdit(uint32_t oldStart,
+                       uint32_t oldEnd,
+                       const QByteArray &newText,
+                       Origin origin);
+
     /// Apply a structural operation (insert/remove/change-kind) to the
     /// IdList and related CRDTs. Recorded in the UndoLog.
     void applyStructural(const Markoff::StructuralOp &op);
