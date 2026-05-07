@@ -373,7 +373,30 @@ quint32 MarkoffDocument::resolveAnchor(const CollabText::Crdt::Anchor &a) const
 
 TextAnchor MarkoffDocument::textAnchorAt(quint32 byteOffset, bool rightBias) const
 {
-    // Find the block containing this byte offset
+    // D2 path: if D2 block buffers exist, anchor within the per-block CRDT.
+    const auto blocks = iterateBlocks();
+    if (!blocks.empty()) {
+        const auto bias = rightBias ? CollabText::Crdt::Bias::Right : CollabText::Crdt::Bias::Left;
+        uint32_t cursor = 0;
+        for (size_t i = 0; i < blocks.size(); ++i) {
+            const BlockId id = blocks[i];
+            auto it = d->blockBuffers.find(id);
+            if (it == d->blockBuffers.end()) continue;
+            const uint32_t sz = static_cast<uint32_t>(it->second->visible_length());
+            const uint32_t blkEnd = cursor + sz;
+            // Last block or byteOffset falls within this block.
+            if (byteOffset <= blkEnd || i + 1 == blocks.size()) {
+                const uint32_t localOff = byteOffset >= cursor
+                    ? std::min(byteOffset - cursor, sz)
+                    : 0;
+                const CollabText::Crdt::Anchor a = it->second->anchor_at(localOff, bias);
+                return Detail::toTextAnchor(id, a);
+            }
+            cursor = blkEnd;
+        }
+    }
+
+    // Legacy fallback (pre-D2 or single-buffer path).
     BlockId blockId;
     for (int i = 0; i < d->latestBlockRanges.size(); ++i) {
         const auto &r = d->latestBlockRanges[i];
@@ -389,6 +412,27 @@ TextAnchor MarkoffDocument::textAnchorAt(quint32 byteOffset, bool rightBias) con
 
 quint32 MarkoffDocument::resolveTextAnchor(const TextAnchor &t) const
 {
+    // D2 path: if the TextAnchor carries a block id, resolve against that block's
+    // per-block CRDT buffer and add the cumulative offset of preceding blocks.
+    const BlockId blk = t.block();
+    if (!blk.isNull()) {
+        auto it = d->blockBuffers.find(blk);
+        if (it != d->blockBuffers.end()) {
+            const CollabText::Crdt::Anchor a = Detail::toCrdtAnchor(t);
+            const uint32_t localOff = it->second->resolve_anchor(a);
+            // Sum the sizes of all preceding blocks.
+            uint32_t baseOffset = 0;
+            for (const auto &blockId : iterateBlocks()) {
+                if (blockId == blk) break;
+                auto jt = d->blockBuffers.find(blockId);
+                if (jt != d->blockBuffers.end())
+                    baseOffset += static_cast<uint32_t>(jt->second->visible_length());
+            }
+            return baseOffset + localOff;
+        }
+    }
+
+    // Legacy fallback.
     return resolveAnchor(Detail::toCrdtAnchor(t));
 }
 
@@ -584,8 +628,8 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
 // D2: undo/redo/undoForBlock
 // ============================================================================
 
-void MarkoffDocument::undoD2() { d->undoLog.undo(); }
-void MarkoffDocument::redoD2() { d->undoLog.redo(); }
+void MarkoffDocument::undoD2() { d->undoLog.undo(); scheduleD2Changed(); }
+void MarkoffDocument::redoD2() { d->undoLog.redo(); scheduleD2Changed(); }
 void MarkoffDocument::undoForBlock(BlockId block) { d->undoLog.undoForBlock(block); }
 
 const Markoff::BlockSerializerRegistry *MarkoffDocument::serializerRegistry() const

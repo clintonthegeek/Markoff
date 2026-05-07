@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QCoreApplication>
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
 #include <QQuickTextDocument>
@@ -11,6 +12,18 @@
 
 using Markoff::SourceTextDocumentBinding;
 using Markoff::View::Qml::EditorBackend;
+
+// Helper: concatenate D2 block-buffer text into a single UTF-8 QByteArray.
+// This is the canonical way to read a MarkoffDocument's content after
+// applyFlatEdit (which writes to per-block CRDT buffers, not the legacy
+// single-buffer toMarkdownUtf8()).
+static QByteArray d2Text(Markoff::MarkoffDocument &doc)
+{
+    QByteArray out;
+    for (Markoff::BlockId id : doc.iterateBlocks())
+        out += doc.blockText(id);
+    return out;
+}
 
 class TstViewQmlSourceBinding : public QObject {
     Q_OBJECT
@@ -194,7 +207,7 @@ private Q_SLOTS:
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello"));
 
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+        QCOMPARE(d2Text(doc), QByteArray("hello"));
     }
 
     void deleting_text_in_qtextdocument_propagates_to_markoffdocument() {
@@ -212,13 +225,13 @@ private Q_SLOTS:
 
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello world"));
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello world"));
+        QCOMPARE(d2Text(doc), QByteArray("hello world"));
 
         // Select " world" and delete.
         cursor.setPosition(5);
         cursor.setPosition(11, QTextCursor::KeepAnchor);
         cursor.removeSelectedText();
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+        QCOMPARE(d2Text(doc), QByteArray("hello"));
     }
 
     void replacing_text_in_qtextdocument_propagates_to_markoffdocument() {
@@ -241,7 +254,7 @@ private Q_SLOTS:
         cursor.setPosition(6);
         cursor.setPosition(11, QTextCursor::KeepAnchor);
         cursor.insertText(QStringLiteral("there"));
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello there"));
+        QCOMPARE(d2Text(doc), QByteArray("hello there"));
     }
 
     void typing_non_ascii_propagates_correctly() {
@@ -261,7 +274,7 @@ private Q_SLOTS:
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("héllo"));
 
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("h\xC3\xA9llo"));
+        QCOMPARE(d2Text(doc), QByteArray("h\xC3\xA9llo"));
     }
     // -----------------------------------------------------------------------
     // Reverse edit path: MarkoffDocument → QTextDocument (T13)
@@ -283,12 +296,13 @@ private Q_SLOTS:
         // Type into TextArea, propagating to MarkoffDocument.
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello"));
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+        QCOMPARE(d2Text(doc), QByteArray("hello"));
         QCOMPARE(qqtd->textDocument()->toPlainText(), QStringLiteral("hello"));
 
-        // Undo via foundation; T13's reverse path applies the change to QTextDocument.
-        backend.undo();
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
+        // Undo via D2 foundation; T13's reverse path applies the change to QTextDocument.
+        doc.undoD2();
+        QCoreApplication::processEvents();  // let debounced d2DocumentChanged fire
+        QCOMPARE(d2Text(doc), QByteArray());
         QCOMPARE(qqtd->textDocument()->toPlainText(), QString());
     }
 
@@ -305,19 +319,19 @@ private Q_SLOTS:
         binding.setSession(backend.session());
         binding.setTextDocument(qqtd->textDocument());
 
-        // Apply edit directly via the foundation, NOT via TextArea.
-        // T13 reverse path should apply it to QTextDocument.
-        Markoff::MarkoffEdit ed;
-        ed.oldStart = 0; ed.oldEnd = 0; ed.newText = QByteArray("hello world");
-        doc.applyLocalEdit({ ed });
+        // Apply edit directly via the D2 foundation API, NOT via TextArea.
+        // T13 reverse path should apply it to QTextDocument after the deferred
+        // d2DocumentChanged signal fires.
+        doc.applyFlatEdit(0, 0, QByteArray("hello world"), Markoff::Origin::UserEdit);
+        QCoreApplication::processEvents();  // let debounced d2DocumentChanged fire
 
         QCOMPARE(qqtd->textDocument()->toPlainText(), QStringLiteral("hello world"));
     }
 
     void local_edit_does_not_double_apply() {
-        // The most paranoid test: a TextArea edit echoes back via contentsChanged.
+        // The most paranoid test: a TextArea edit echoes back via d2DocumentChanged.
         // The forward path cycle guard (m_applyingLocalEdit) must suppress the
-        // reverse path; the reverse path's removed-text re-apply must NOT happen.
+        // reverse path; the reverse path's re-apply must NOT happen.
         QQmlApplicationEngine engine;
         QQuickTextDocument *qqtd = seedQQuickTextDocument(engine);
         if (!qqtd) QSKIP("QML engine failed to load — offscreen QtQuick unavailable");
@@ -333,7 +347,7 @@ private Q_SLOTS:
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello"));
 
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
+        QCOMPARE(d2Text(doc), QByteArray("hello"));
         QCOMPARE(qqtd->textDocument()->toPlainText(), QStringLiteral("hello"));
         // Crucially, after the local edit + echo, BOTH sides hold "hello",
         // not "hellohello" (which would happen if the cycle guard was missing).
@@ -355,13 +369,16 @@ private Q_SLOTS:
         QTextCursor cursor(qqtd->textDocument());
         cursor.insertText(QStringLiteral("hello"));
 
-        backend.undo();
+        doc.undoD2();
+        QCoreApplication::processEvents();
         QCOMPARE(qqtd->textDocument()->toPlainText(), QString());
 
-        backend.redo();
+        doc.redoD2();
+        QCoreApplication::processEvents();
         QCOMPARE(qqtd->textDocument()->toPlainText(), QStringLiteral("hello"));
 
-        backend.undo();
+        doc.undoD2();
+        QCoreApplication::processEvents();
         QCOMPARE(qqtd->textDocument()->toPlainText(), QString());
     }
 

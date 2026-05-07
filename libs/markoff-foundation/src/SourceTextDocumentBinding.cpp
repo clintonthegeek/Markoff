@@ -196,7 +196,13 @@ void SourceTextDocumentBinding::syncFromSession()
     const Markoff::Selection sel = m_session->primarySelection();
     const quint32 anchorByte = m_markoffDocument->resolveTextAnchor(sel.anchor);
     const quint32 activeByte = m_markoffDocument->resolveTextAnchor(sel.active);
-    const QByteArray utf8 = m_markoffDocument->toMarkdownUtf8();
+    // Use D2 block-buffer concatenation for the UTF-8 text (matches what the
+    // QTextDocument holds after forward edits via applyFlatEdit).
+    QByteArray utf8;
+    for (Markoff::BlockId id : m_markoffDocument->iterateBlocks())
+        utf8 += m_markoffDocument->blockText(id);
+    if (utf8.isEmpty())
+        utf8 = m_markoffDocument->toMarkdownUtf8();  // legacy fallback
     const int newStart = byteOffsetToQtPos(utf8, anchorByte);
     const int newEnd   = byteOffsetToQtPos(utf8, activeByte);
 
