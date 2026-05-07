@@ -44,16 +44,16 @@ This plan resolves the following remaining open questions:
 
 ## File map
 
-**New — public headers** (`libs/markoff-live-render/include/markoff/live-render/`):
+**New — public headers** (`libs/markoff-live/include/markoff/live-render/`):
 - `BlockHole.h` — value type: `HoleKind`, `HoleBlockId`, `BlockHole` struct (kind, reifyAnchor, bufferText, holeId).
 - `LiveHoleLayer.h` — owns `BlockHole` items; lifecycle (create/setBuffer/commit/abandon); per-hole idle timer; per-hole undo stack; IME guard.
 - `LiveProxyBlockModel.h` — `QAbstractListModel` over inner `LiveBlockModel` + `LiveHoleLayer`; mapping helpers; role passthrough; `IsHoleRole` / `BufferTextRole` / `HoleIdRole`.
 
-**New — sources** (`libs/markoff-live-render/src/`):
+**New — sources** (`libs/markoff-live/src/`):
 - `LiveHoleLayer.cpp`
 - `LiveProxyBlockModel.cpp`
 
-**New — tests** (`libs/markoff-live-render/tests/`):
+**New — tests** (`libs/markoff-live/tests/`):
 - `LiveRealisticInputHarness.h` (header-only; `LiveRealisticInputHarness` class with `keyClick`, `typeString`, `burst`, `idle`).
 - `synthetic/SyntheticBrokenParagraphDelegate.qml` — v0-mimicking stub for the gate test.
 - `tst_live_render_holes_gate.cpp` — the harness gate test against the synthetic stub.
@@ -81,8 +81,8 @@ This plan resolves the following remaining open questions:
 - `app/Main.qml` — title suffix `"(R5.5)"`.
 
 **Modified — CMake:**
-- `libs/markoff-live-render/CMakeLists.txt` — add new sources / headers to `qt_add_qml_module`.
-- `libs/markoff-live-render/tests/CMakeLists.txt` — add four new test executables; register `LiveRealisticInputHarness` as part of the test-utilities link target.
+- `libs/markoff-live/CMakeLists.txt` — add new sources / headers to `qt_add_qml_module`.
+- `libs/markoff-live/tests/CMakeLists.txt` — add four new test executables; register `LiveRealisticInputHarness` as part of the test-utilities link target.
 
 **Modified — docs:**
 - `docs/restoration-status.md` — TL;DR + Phase board + recent-changes log entries (last task).
@@ -105,12 +105,12 @@ docs/specs/2026-05-02-live-render-restoration-design.md                   §3.1,
 docs/specs/2026-05-01-live-projection-layer.md                            §3.1–§3.6 (v1 design + v0 forensics)
 docs/handoff/2026-05-01-projection-layer-stage4-redesign-SESSION-BRIEF.md (test-discipline gate)
 libs/markoff-core/include/markoff-foundation/MarkoffDocument.h       (applyLocalEdit, undo, redo, coalesceLastUndo, resolveTextAnchor, anchorAtByte)
-libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h    (requestTextCaretAtRow)
-libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h  (the dispatch table; we add a hole branch)
-libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp                  (paragraph EOB-Enter handler — the line we replace)
-libs/markoff-live-render/src/LiveListModelBinding.cpp                      (where we wire LiveHoleLayer + LiveProxyBlockModel)
-libs/markoff-live-render/qml/LiveView.qml                                  (the ListView model: binding to swap)
-libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml               (where isHole plumbing lands)
+libs/markoff-live/include/markoff/live-render/LiveCursorState.h    (requestTextCaretAtRow)
+libs/markoff-live/include/markoff/live-render/LiveStructuralKeyHandler.h  (the dispatch table; we add a hole branch)
+libs/markoff-live/src/LiveStructuralKeyHandler.cpp                  (paragraph EOB-Enter handler — the line we replace)
+libs/markoff-live/src/LiveListModelBinding.cpp                      (where we wire LiveHoleLayer + LiveProxyBlockModel)
+libs/markoff-live/qml/LiveView.qml                                  (the ListView model: binding to swap)
+libs/markoff-live/qml/delegates/ParagraphDelegate.qml               (where isHole plumbing lands)
 libs/markoff-view-qml/src/LiveProjectionLayer.cpp                          (LEGACY — read for byte-arithmetic patterns; do NOT port the holes branches; v0 design is wrong)
 libs/markoff-view-qml/src/LiveProjectionLayer.h                            (LEGACY — same)
 ```
@@ -120,7 +120,7 @@ No code changes.
 - [ ] **Step 2: Run the existing fast-tier test suite to confirm a clean baseline.**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
 ctest --test-dir build-dev -R '^tst_live_render_' --output-on-failure -j 8
 ```
 
@@ -131,10 +131,10 @@ Expected: all `tst_live_render_*` executables green. Record the count; R5.5 must
 ## Task 2: `LiveRealisticInputHarness` + gate test (TDD-against-synthetic-broken-stub)
 
 **Files:**
-- Create: `libs/markoff-live-render/tests/LiveRealisticInputHarness.h` (header-only)
-- Create: `libs/markoff-live-render/tests/synthetic/SyntheticBrokenParagraphDelegate.qml`
-- Create: `libs/markoff-live-render/tests/tst_live_render_holes_gate.cpp`
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt`
+- Create: `libs/markoff-live/tests/LiveRealisticInputHarness.h` (header-only)
+- Create: `libs/markoff-live/tests/synthetic/SyntheticBrokenParagraphDelegate.qml`
+- Create: `libs/markoff-live/tests/tst_live_render_holes_gate.cpp`
+- Modify: `libs/markoff-live/tests/CMakeLists.txt`
 
 The harness lands first AND its gate test must FAIL initially against a synthetic v0-mimic, then PASS after tuning. The brief's gate ("Why will my test see the v0 race?") is converted into a binary CI artifact.
 
@@ -217,7 +217,7 @@ private:
 
 - [ ] **Step 2: Write the synthetic broken delegate.**
 
-`libs/markoff-live-render/tests/synthetic/SyntheticBrokenParagraphDelegate.qml`:
+`libs/markoff-live/tests/synthetic/SyntheticBrokenParagraphDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -281,7 +281,7 @@ Item {
 
 - [ ] **Step 3: Write the failing gate test.**
 
-`libs/markoff-live-render/tests/tst_live_render_holes_gate.cpp`:
+`libs/markoff-live/tests/tst_live_render_holes_gate.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -347,7 +347,7 @@ QTEST_MAIN(TstHolesGate)
 
 - [ ] **Step 4: Wire into CMake.**
 
-`libs/markoff-live-render/tests/CMakeLists.txt` — add an executable + the synthetic resource bundle:
+`libs/markoff-live/tests/CMakeLists.txt` — add an executable + the synthetic resource bundle:
 
 ```cmake
 add_executable(tst_live_render_holes_gate
@@ -387,10 +387,10 @@ Edit `tst_live_render_holes_gate.cpp` line `LiveRealisticInputHarness h(&view, /
 - [ ] **Step 7: Commit.**
 
 ```bash
-git add libs/markoff-live-render/tests/LiveRealisticInputHarness.h \
-        libs/markoff-live-render/tests/synthetic/SyntheticBrokenParagraphDelegate.qml \
-        libs/markoff-live-render/tests/tst_live_render_holes_gate.cpp \
-        libs/markoff-live-render/tests/CMakeLists.txt
+git add libs/markoff-live/tests/LiveRealisticInputHarness.h \
+        libs/markoff-live/tests/synthetic/SyntheticBrokenParagraphDelegate.qml \
+        libs/markoff-live/tests/tst_live_render_holes_gate.cpp \
+        libs/markoff-live/tests/CMakeLists.txt
 git commit -m "test(live-render): LiveRealisticInputHarness + gate test (R5.5 Task 2)
 
 The harness wraps QTest::keyClick with qWait + processEvents so async
@@ -412,16 +412,16 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 The synthetic stub has served its purpose. Per the design (and the post-mortem §6.2), it's deleted before any v2 hole code lands so it doesn't pollute the production codebase.
 
 **Files:**
-- Delete: `libs/markoff-live-render/tests/synthetic/SyntheticBrokenParagraphDelegate.qml`
-- Delete: `libs/markoff-live-render/tests/tst_live_render_holes_gate.cpp` (the test had one purpose; now done)
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt` — remove the gate-test executable + resource block.
+- Delete: `libs/markoff-live/tests/synthetic/SyntheticBrokenParagraphDelegate.qml`
+- Delete: `libs/markoff-live/tests/tst_live_render_holes_gate.cpp` (the test had one purpose; now done)
+- Modify: `libs/markoff-live/tests/CMakeLists.txt` — remove the gate-test executable + resource block.
 
 - [ ] **Step 1: Delete the synthetic-stub files.**
 
 ```bash
-rm libs/markoff-live-render/tests/synthetic/SyntheticBrokenParagraphDelegate.qml
-rmdir libs/markoff-live-render/tests/synthetic/
-rm libs/markoff-live-render/tests/tst_live_render_holes_gate.cpp
+rm libs/markoff-live/tests/synthetic/SyntheticBrokenParagraphDelegate.qml
+rmdir libs/markoff-live/tests/synthetic/
+rm libs/markoff-live/tests/tst_live_render_holes_gate.cpp
 ```
 
 - [ ] **Step 2: Remove the gate-test stanza from CMakeLists.**
@@ -440,7 +440,7 @@ Expected: same count green as before Task 2 (the gate test is gone; no other new
 - [ ] **Step 4: Commit.**
 
 ```bash
-git add -A libs/markoff-live-render/tests/
+git add -A libs/markoff-live/tests/
 git commit -m "test(live-render): retire synthetic broken stub + gate test (R5.5 Task 3)
 
 The stub + gate test served their purpose in Task 2 — proving the
@@ -459,9 +459,9 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Lands the spec amendment A1's §3.1 BlockId change in code. This is a small surface change that propagates into the cursor model.
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/BlockHole.h`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/Cursor.h`
-- Create: `libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp` (skeleton; tests fill in over Tasks 4–14)
+- Create: `libs/markoff-live/include/markoff/live-render/BlockHole.h`
+- Modify: `libs/markoff-live/include/markoff/live-render/Cursor.h`
+- Create: `libs/markoff-live/tests/tst_live_render_holes_layer.cpp` (skeleton; tests fill in over Tasks 4–14)
 
 - [ ] **Step 1: Write the failing test for `BlockHole` shape.**
 
@@ -553,7 +553,7 @@ struct MARKOFF_LIVE_RENDER_EXPORT BlockHole {
 
 - [ ] **Step 4: Add to `qt_add_qml_module` SOURCES list.**
 
-`libs/markoff-live-render/CMakeLists.txt` — add `include/markoff/live-render/BlockHole.h` to the `HEADERS` list of `qt_add_qml_module(markoff_live_render ...)`.
+`libs/markoff-live/CMakeLists.txt` — add `include/markoff/live-render/BlockHole.h` to the `HEADERS` list of `qt_add_qml_module(markoff_live_render ...)`.
 
 - [ ] **Step 5: Add `tst_live_render_holes_layer` to `tests/CMakeLists.txt`.**
 
@@ -637,12 +637,12 @@ Expected: every existing test still PASS; the new `tst_live_render_holes_layer` 
 - [ ] **Step 10: Commit.**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/BlockHole.h \
-        libs/markoff-live-render/include/markoff/live-render/Cursor.h \
-        libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp \
-        libs/markoff-live-render/tests/CMakeLists.txt \
-        libs/markoff-live-render/CMakeLists.txt \
-        libs/markoff-live-render/src/  # any cascade fixes
+git add libs/markoff-live/include/markoff/live-render/BlockHole.h \
+        libs/markoff-live/include/markoff/live-render/Cursor.h \
+        libs/markoff-live/tests/tst_live_render_holes_layer.cpp \
+        libs/markoff-live/tests/CMakeLists.txt \
+        libs/markoff-live/CMakeLists.txt \
+        libs/markoff-live/src/  # any cascade fixes
 git commit -m "feat(live-render): BlockHole + HoleBlockId; BlockId is now a variant (R5.5 Task 4)
 
 Implements spec amendment A1 §3.1: BlockId becomes
@@ -663,10 +663,10 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Lifecycle methods that don't touch the CRDT. Reification (commit) is Task 7.
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h`
-- Create: `libs/markoff-live-render/src/LiveHoleLayer.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp` (add lifecycle tests)
+- Create: `libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h`
+- Create: `libs/markoff-live/src/LiveHoleLayer.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
+- Modify: `libs/markoff-live/tests/tst_live_render_holes_layer.cpp` (add lifecycle tests)
 
 - [ ] **Step 1: Write failing tests for create / setBuffer / abandon.**
 
@@ -896,7 +896,7 @@ QList<quint64> LiveHoleLayer::holesInOrder() const {
 
 - [ ] **Step 5: Add to CMake `qt_add_qml_module` SOURCES + HEADERS.**
 
-`libs/markoff-live-render/CMakeLists.txt`:
+`libs/markoff-live/CMakeLists.txt`:
 
 ```
 HEADERS:
@@ -917,10 +917,10 @@ Expected: 5 PASS.
 - [ ] **Step 7: Commit.**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h \
-        libs/markoff-live-render/src/LiveHoleLayer.cpp \
-        libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp \
-        libs/markoff-live-render/CMakeLists.txt
+git add libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h \
+        libs/markoff-live/src/LiveHoleLayer.cpp \
+        libs/markoff-live/tests/tst_live_render_holes_layer.cpp \
+        libs/markoff-live/CMakeLists.txt
 git commit -m "feat(live-render): LiveHoleLayer lifecycle skeleton (R5.5 Task 5)
 
 create/setBuffer/abandon — three signals (holeInserted,
@@ -939,9 +939,9 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 The 250 ms idle timer that drives the commit-on-quiet path.
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h`
-- Modify: `libs/markoff-live-render/src/LiveHoleLayer.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h`
+- Modify: `libs/markoff-live/src/LiveHoleLayer.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_holes_layer.cpp`
 
 - [ ] **Step 1: Write failing tests for idle-timer behaviour.**
 
@@ -1134,9 +1134,9 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 7: `commitBlockHole` — applyLocalEdit + drop + holeReified
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h`
-- Modify: `libs/markoff-live-render/src/LiveHoleLayer.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h`
+- Modify: `libs/markoff-live/src/LiveHoleLayer.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_holes_layer.cpp`
 
 - [ ] **Step 1: Write failing tests for commit semantics.**
 
@@ -1304,11 +1304,11 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Skeleton proxy that, with zero holes, behaves identically to `LiveBlockModel`.
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/LiveProxyBlockModel.h`
-- Create: `libs/markoff-live-render/src/LiveProxyBlockModel.cpp`
-- Create: `libs/markoff-live-render/tests/tst_live_render_proxy_model.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt`
+- Create: `libs/markoff-live/include/markoff/live-render/LiveProxyBlockModel.h`
+- Create: `libs/markoff-live/src/LiveProxyBlockModel.cpp`
+- Create: `libs/markoff-live/tests/tst_live_render_proxy_model.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
+- Modify: `libs/markoff-live/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Failing test — passthrough behaviour.**
 
@@ -1582,8 +1582,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 The mapping rule and proper signal propagation.
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveProxyBlockModel.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_proxy_model.cpp`
+- Modify: `libs/markoff-live/src/LiveProxyBlockModel.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_proxy_model.cpp`
 
 - [ ] **Step 1: Failing tests for hole-row insertion.**
 
@@ -1768,9 +1768,9 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 10: Wire `LiveHoleLayer` + `LiveProxyBlockModel` into `LiveListModelBinding`
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
-- Modify: `libs/markoff-live-render/qml/LiveView.qml`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/qml/LiveView.qml`
 
 - [ ] **Step 1: Add Q_PROPERTYs.**
 
@@ -1836,8 +1836,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 Replaces R5's `applyLocalEdit("\n\n")` for these two cases.
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 - [ ] **Step 1: Failing tests for hole-on-Enter.**
 
@@ -1919,8 +1919,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 12: Hole-row dispatch — Enter (commit + new hole / mid-buffer split)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_holes_qml.cpp` (new file or extend)
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_holes_qml.cpp` (new file or extend)
 
 This is QML-level testing using the harness.
 
@@ -2038,8 +2038,8 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 13: Hole-row dispatch — Esc / Backspace-empty / Delete-empty abandon paths
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_holes_qml.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_holes_qml.cpp`
 
 - [ ] **Step 1: Failing tests.**
 
@@ -2120,9 +2120,9 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 14: `LiveEditBinding` + `ParagraphDelegate` — buffer mirror + IME state + isHole plumbing
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveEditBinding.cpp`
-- Modify: `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveEditBinding.h`
+- Modify: `libs/markoff-live/src/LiveEditBinding.cpp`
+- Modify: `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`
 
 - [ ] **Step 1: Add `setHoleId(quint64)` and IME exposure to `LiveEditBinding`.**
 
@@ -2208,11 +2208,11 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 15: Per-hole undo stack + `UndoCoalescer` integration
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h`
-- Modify: `libs/markoff-live-render/src/LiveHoleLayer.cpp`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/UndoCoalescer.h`
-- Modify: `libs/markoff-live-render/src/UndoCoalescer.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h`
+- Modify: `libs/markoff-live/src/LiveHoleLayer.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/UndoCoalescer.h`
+- Modify: `libs/markoff-live/src/UndoCoalescer.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_holes_layer.cpp`
 
 - [ ] **Step 1: Failing tests.**
 
@@ -2383,7 +2383,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 The single most important test of R5.5 — the equivalent of v0's missed F2.
 
 **Files:**
-- Modify: `libs/markoff-live-render/tests/tst_live_render_holes_qml.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_holes_qml.cpp`
 
 - [ ] **Step 1: Write the stress test.**
 
@@ -2431,7 +2431,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 18: Selection-across-hole verification
 
 **Files:**
-- Modify: `libs/markoff-live-render/tests/tst_live_render_holes_qml.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_holes_qml.cpp`
 
 - [ ] **Step 1: Failing test.**
 
@@ -2470,7 +2470,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 19: Test app polish + dogfood gate
 
 **Files:**
-- Modify: `libs/markoff-live-render/app/Main.qml`
+- Modify: `libs/markoff-live/app/Main.qml`
 - Modify: `docs/restoration-status.md`
 
 - [ ] **Step 1: Update title.**
@@ -2481,7 +2481,7 @@ title: qsTr("Markoff Live Render — R5.5 Holes")
 
 - [ ] **Step 2: Manual dogfood pass.**
 
-User runs `./build-dev/bin/markoff-live-render-app` and exercises the R5.5 dogfood script (spec §10.3 R5.5 entry). Any feedback goes into `docs/restoration-status.md`'s Dogfood log per the session brief format.
+User runs `./build-dev/bin/markoff-live-app` and exercises the R5.5 dogfood script (spec §10.3 R5.5 entry). Any feedback goes into `docs/restoration-status.md`'s Dogfood log per the session brief format.
 
 If dogfood surfaces a regression, **stop and diagnose**. Do not paper over.
 

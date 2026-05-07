@@ -21,8 +21,8 @@
 |---|---|
 | `libs/markoff-core/include/markoff-foundation/BlockSerializerRegistry.h` | Abstract `Markoff::BlockSerializerRegistry` interface |
 | `libs/markoff-core/include/markoff-foundation/AttrNames.h` | `Markoff::AttrNames` inline constants |
-| `libs/markoff-live-render/src/KindTransition.h` | `inferBlockKind` free function declaration |
-| `libs/markoff-live-render/src/KindTransition.cpp` | `inferBlockKind` implementation |
+| `libs/markoff-live/src/KindTransition.h` | `inferBlockKind` free function declaration |
+| `libs/markoff-live/src/KindTransition.cpp` | `inferBlockKind` implementation |
 
 ### Modified files
 | File | Change |
@@ -31,26 +31,26 @@
 | `libs/markoff-core/src/BlockSerializer.cpp` | Update class name |
 | `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h` | Add `BlockSerializerRegistry*` ctor param + `Q_INVOKABLE` undo methods |
 | `libs/markoff-core/src/MarkoffDocument.cpp` | Implement new methods; fix `d2InsertBlock`/`d2RemoveBlock` |
-| `libs/markoff-live-render/include/markoff/live-render/BlockKind.h` | Add `ListItem`, `Blockquote`, `Math` constants |
-| `libs/markoff-live-render/src/BlockKind.cpp` | Add string definitions |
-| `libs/markoff-live-render/include/markoff/live-render/BlockRecord.h` | Add `attrs` field |
-| `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h` | Add `BlockAttrsRole` |
-| `libs/markoff-live-render/src/LiveBlockModel.cpp` | Implement `BlockAttrsRole` |
-| `libs/markoff-live-render/include/markoff/live-render/BlockKindDescriptor.h` | Add `serializer` callback field |
-| `libs/markoff-live-render/include/markoff/live-render/BlockKindRegistry.h` | Inherit `Markoff::BlockSerializerRegistry` |
-| `libs/markoff-live-render/src/BlockKindRegistry.cpp` | Implement `serialize()`; register ListItem/Blockquote/Math |
-| `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h` | Add `structuralRowsInserted`/`structuralRowRemoved` signals |
-| `libs/markoff-live-render/src/LiveListModelBinding.cpp` | Emit structural signals; populate spans/attrs; kind-transition; registry injection |
-| `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h` | Remove parse-cycle path; add structural signal wiring |
-| `libs/markoff-live-render/src/LiveCursorState.cpp` | Implement new structural signal handlers |
-| `libs/markoff-live-render/CMakeLists.txt` | Add `KindTransition.cpp` to SOURCES; add jkqtmathtext to link deps |
+| `libs/markoff-live/include/markoff/live-render/BlockKind.h` | Add `ListItem`, `Blockquote`, `Math` constants |
+| `libs/markoff-live/src/BlockKind.cpp` | Add string definitions |
+| `libs/markoff-live/include/markoff/live-render/BlockRecord.h` | Add `attrs` field |
+| `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h` | Add `BlockAttrsRole` |
+| `libs/markoff-live/src/LiveBlockModel.cpp` | Implement `BlockAttrsRole` |
+| `libs/markoff-live/include/markoff/live-render/BlockKindDescriptor.h` | Add `serializer` callback field |
+| `libs/markoff-live/include/markoff/live-render/BlockKindRegistry.h` | Inherit `Markoff::BlockSerializerRegistry` |
+| `libs/markoff-live/src/BlockKindRegistry.cpp` | Implement `serialize()`; register ListItem/Blockquote/Math |
+| `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h` | Add `structuralRowsInserted`/`structuralRowRemoved` signals |
+| `libs/markoff-live/src/LiveListModelBinding.cpp` | Emit structural signals; populate spans/attrs; kind-transition; registry injection |
+| `libs/markoff-live/include/markoff/live-render/LiveCursorState.h` | Remove parse-cycle path; add structural signal wiring |
+| `libs/markoff-live/src/LiveCursorState.cpp` | Implement new structural signal handlers |
+| `libs/markoff-live/CMakeLists.txt` | Add `KindTransition.cpp` to SOURCES; add jkqtmathtext to link deps |
 | `CMakeLists.txt` (root) | Add `add_subdirectory(libs/jkqtmathtext)` |
 
 ### Deleted files
 | File |
 |---|
-| `libs/markoff-live-render/src/BlockWalker.h` |
-| `libs/markoff-live-render/src/BlockWalker.cpp` |
+| `libs/markoff-live/src/BlockWalker.h` |
+| `libs/markoff-live/src/BlockWalker.cpp` |
 
 ---
 
@@ -411,8 +411,8 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 5: Add `ListItem`, `Blockquote`, `Math` to `BlockKind`
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/BlockKind.h`
-- Modify: `libs/markoff-live-render/src/BlockKind.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/BlockKind.h`
+- Modify: `libs/markoff-live/src/BlockKind.cpp`
 
 - [ ] **Step 1: Write failing test**
 
@@ -475,9 +475,9 @@ Expected: clean build. (Registry tests still fail — fixed in Task 8 when regis
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/BlockKind.h \
-        libs/markoff-live-render/src/BlockKind.cpp \
-        libs/markoff-live-render/src/LiveListModelBinding.cpp
+git add libs/markoff-live/include/markoff/live-render/BlockKind.h \
+        libs/markoff-live/src/BlockKind.cpp \
+        libs/markoff-live/src/LiveListModelBinding.cpp
 git commit -m "feat(live-render): add ListItem/Blockquote/Math BlockKind string constants
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -488,9 +488,9 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 6: Add `attrs` field to `BlockRecord`; add `BlockAttrsRole` to `LiveBlockModel`
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/BlockRecord.h`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h`
-- Modify: `libs/markoff-live-render/src/LiveBlockModel.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/BlockRecord.h`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h`
+- Modify: `libs/markoff-live/src/LiveBlockModel.cpp`
 
 - [ ] **Step 1: Write failing test**
 
@@ -576,9 +576,9 @@ Expected: all pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/BlockRecord.h \
-        libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h \
-        libs/markoff-live-render/src/LiveBlockModel.cpp
+git add libs/markoff-live/include/markoff/live-render/BlockRecord.h \
+        libs/markoff-live/include/markoff/live-render/LiveBlockModel.h \
+        libs/markoff-live/src/LiveBlockModel.cpp
 git commit -m "feat(live-render): BlockRecord.attrs field + LiveBlockModel BlockAttrsRole
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -589,9 +589,9 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 7: `BlockKindDescriptor` serializer field + `BlockKindRegistry` inherits abstract interface + registers new kinds
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/BlockKindDescriptor.h`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/BlockKindRegistry.h`
-- Modify: `libs/markoff-live-render/src/BlockKindRegistry.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/BlockKindDescriptor.h`
+- Modify: `libs/markoff-live/include/markoff/live-render/BlockKindRegistry.h`
+- Modify: `libs/markoff-live/src/BlockKindRegistry.cpp`
 
 - [ ] **Step 1: Write failing tests**
 
@@ -767,9 +767,9 @@ Expected: all pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/BlockKindDescriptor.h \
-        libs/markoff-live-render/include/markoff/live-render/BlockKindRegistry.h \
-        libs/markoff-live-render/src/BlockKindRegistry.cpp
+git add libs/markoff-live/include/markoff/live-render/BlockKindDescriptor.h \
+        libs/markoff-live/include/markoff/live-render/BlockKindRegistry.h \
+        libs/markoff-live/src/BlockKindRegistry.cpp
 git commit -m "feat(live-render): BlockKindRegistry inherits BlockSerializerRegistry; registers ListItem/Blockquote/Math
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -780,15 +780,15 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 8: Delete `BlockWalker`; add `KindTransition.h/cpp`
 
 **Files:**
-- Delete: `libs/markoff-live-render/src/BlockWalker.h`
-- Delete: `libs/markoff-live-render/src/BlockWalker.cpp`
-- Create: `libs/markoff-live-render/src/KindTransition.h`
-- Create: `libs/markoff-live-render/src/KindTransition.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Delete: `libs/markoff-live/src/BlockWalker.h`
+- Delete: `libs/markoff-live/src/BlockWalker.cpp`
+- Create: `libs/markoff-live/src/KindTransition.h`
+- Create: `libs/markoff-live/src/KindTransition.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Write failing test for `inferBlockKind`**
 
-Create `libs/markoff-live-render/tests/tst_live_render_kind_transition.cpp`:
+Create `libs/markoff-live/tests/tst_live_render_kind_transition.cpp`:
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
@@ -939,7 +939,7 @@ QString inferBlockKind(const QString &text, bool *displayMode)
 
 - [ ] **Step 4: Remove BlockWalker from CMakeLists; add KindTransition**
 
-In `libs/markoff-live-render/CMakeLists.txt`:
+In `libs/markoff-live/CMakeLists.txt`:
 - Remove `src/BlockWalker.h` and `src/BlockWalker.cpp` from SOURCES.
 - Add `src/KindTransition.h` and `src/KindTransition.cpp` to SOURCES.
 - Add test target at bottom:
@@ -954,13 +954,13 @@ add_test(NAME tst_live_render_kind_transition
          COMMAND tst_live_render_kind_transition)
 ```
 
-Add the test target to `libs/markoff-live-render/tests/CMakeLists.txt` as well (or whichever file manages tests — check).
+Add the test target to `libs/markoff-live/tests/CMakeLists.txt` as well (or whichever file manages tests — check).
 
 - [ ] **Step 5: Delete BlockWalker files**
 
 ```bash
-rm libs/markoff-live-render/src/BlockWalker.h \
-   libs/markoff-live-render/src/BlockWalker.cpp
+rm libs/markoff-live/src/BlockWalker.h \
+   libs/markoff-live/src/BlockWalker.cpp
 ```
 
 - [ ] **Step 6: Build and run kind-transition tests**
@@ -974,13 +974,13 @@ Expected: all 18 tests pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/KindTransition.h \
-        libs/markoff-live-render/src/KindTransition.cpp \
-        libs/markoff-live-render/tests/tst_live_render_kind_transition.cpp \
-        libs/markoff-live-render/CMakeLists.txt \
-        libs/markoff-live-render/tests/CMakeLists.txt
-git rm libs/markoff-live-render/src/BlockWalker.h \
-       libs/markoff-live-render/src/BlockWalker.cpp
+git add libs/markoff-live/src/KindTransition.h \
+        libs/markoff-live/src/KindTransition.cpp \
+        libs/markoff-live/tests/tst_live_render_kind_transition.cpp \
+        libs/markoff-live/CMakeLists.txt \
+        libs/markoff-live/tests/CMakeLists.txt
+git rm libs/markoff-live/src/BlockWalker.h \
+       libs/markoff-live/src/BlockWalker.cpp
 git commit -m "feat(live-render): add KindTransition (inferBlockKind); delete dead BlockWalker
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -993,8 +993,8 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 This is the core of Phase 2. `onD2Changed` gains: inline span population, headingLevel/codeLanguage population, blockAttrs population, kind-transition detection call, and updated registry wiring from `doc->serializerRegistry()`.
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h` (Private registry injection)
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h` (Private registry injection)
 
 - [ ] **Step 1: Write failing test**
 
@@ -1196,8 +1196,8 @@ Expected: all pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveListModelBinding.cpp \
-        libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h
+git add libs/markoff-live/src/LiveListModelBinding.cpp \
+        libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h
 git commit -m "feat(live-render): onD2Changed populates inline spans, attrs, headingLevel, codeLanguage; kind-transition detection
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1210,8 +1210,8 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 10: Add structural signals to `LiveListModelBinding`; emit from `onD2Changed`
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
 
 - [ ] **Step 1: Write failing test**
 
@@ -1292,8 +1292,8 @@ Expected: all pass including new structural signal tests.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h \
-        libs/markoff-live-render/src/LiveListModelBinding.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h \
+        libs/markoff-live/src/LiveListModelBinding.cpp
 git commit -m "feat(live-render): LiveListModelBinding emits structuralRowsInserted/Removed from onD2Changed
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1306,15 +1306,15 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 This is the largest cursor change. Removes `setSignalModel`, `noteParseArrived`, `requestTextCaretAtByte`, `parseCyclesSeen`, and the `onRowsInserted` handler. Adds `onStructuralRowsInserted` and `onStructuralRowRemoved` handlers.
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h`
-- Modify: `libs/markoff-live-render/src/LiveCursorState.cpp`
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp` (remove `requestTextCaretAtByte` call sites)
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveCursorState.h`
+- Modify: `libs/markoff-live/src/LiveCursorState.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp` (remove `requestTextCaretAtByte` call sites)
 
 - [ ] **Step 1: Check all callers of removed methods**
 
 ```bash
 grep -rn "noteParseArrived\|requestTextCaretAtByte\|setSignalModel\|parseCyclesSeen" \
-  libs/markoff-live-render/
+  libs/markoff-live/
 ```
 Note every file and line number.
 
@@ -1412,7 +1412,7 @@ d->cursorState = new LiveCursorState(&d->ownedRegistry, d->model, this, this);
 Find all `requestTextCaretAtByte` calls and replace with `requestTextCaretAtAnchor` using the known BlockAnchor (the anchor of the surviving/new block, which is already available at the call site).
 
 ```bash
-grep -n "requestTextCaretAtByte" libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp
+grep -n "requestTextCaretAtByte" libs/markoff-live/src/LiveStructuralKeyHandler.cpp
 ```
 For each, replace with:
 ```cpp
@@ -1430,10 +1430,10 @@ Expected: all pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h \
-        libs/markoff-live-render/src/LiveCursorState.cpp \
-        libs/markoff-live-render/src/LiveListModelBinding.cpp \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveCursorState.h \
+        libs/markoff-live/src/LiveCursorState.cpp \
+        libs/markoff-live/src/LiveListModelBinding.cpp \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp
 git commit -m "refactor(live-render): LiveCursorState subscribes to structural signals; retire parse-cycle cursor path
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1446,9 +1446,9 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 When `text` changes on a QML `TextEdit`, Qt resets `cursorPosition` to 0. Add `onTextChanged` to re-assert the cursor position.
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`
-- Modify: `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`
-- Modify: `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/HeadingDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`
 
 - [ ] **Step 1: Update ParagraphDelegate.qml**
 
@@ -1480,16 +1480,16 @@ Identical addition in the TextEdit block of each delegate.
 
 Start the test app:
 ```bash
-./build-dev/bin/markoff-live-render-app
+./build-dev/bin/markoff-live-app
 ```
 Type to create a multi-block document. Use Backspace-merge to merge two blocks. Verify cursor lands at the correct position after merge, not at position 0.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml \
-        libs/markoff-live-render/qml/delegates/HeadingDelegate.qml \
-        libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml
+git add libs/markoff-live/qml/delegates/ParagraphDelegate.qml \
+        libs/markoff-live/qml/delegates/HeadingDelegate.qml \
+        libs/markoff-live/qml/delegates/CodeBlockDelegate.qml
 git commit -m "fix(live-render): re-assert cursor position after text change in text-bearing delegates
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1502,8 +1502,8 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 13: Heading — level-change gesture (Cmd+Shift+1–6, Cmd+Shift+0)
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp` (or handle in QML directly)
+- Modify: `libs/markoff-live/qml/delegates/HeadingDelegate.qml`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp` (or handle in QML directly)
 
 The level-change gesture is view-side only (calls `Cmd::changeKind`). It can live in the QML delegate's `Keys.onPressed` handler since it doesn't need the structural key handler's routing logic.
 
@@ -1632,8 +1632,8 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/HeadingDelegate.qml \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp
+git add libs/markoff-live/qml/delegates/HeadingDelegate.qml \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp
 git commit -m "feat(live-render): heading level-change via Ctrl+Shift+1-6/0 in structural key handler
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1644,8 +1644,8 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 14: CodeBlock — Tab inserts 4 spaces; language-tag editing
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
 
 - [ ] **Step 1: Add Tab to CodeBlock consumed keys**
 
@@ -1756,9 +1756,9 @@ void codeblock_tab_inserts_4_spaces() {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h
+git add libs/markoff-live/qml/delegates/CodeBlockDelegate.qml \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/include/markoff/live-render/LiveStructuralKeyHandler.h
 git commit -m "feat(live-render): CodeBlock Tab inserts 4 spaces; language-tag inline editing
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1769,12 +1769,12 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 15: `HorizontalRuleDelegate.qml` — BlockSelected focus + structural key routing
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/HorizontalRuleDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/HorizontalRuleDelegate.qml`
 
 - [ ] **Step 1: Read current HrDelegate**
 
 ```bash
-cat libs/markoff-live-render/qml/delegates/HorizontalRuleDelegate.qml
+cat libs/markoff-live/qml/delegates/HorizontalRuleDelegate.qml
 ```
 
 - [ ] **Step 2: Rewrite HrDelegate**
@@ -1903,8 +1903,8 @@ void hr_delete_removes_block() {
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/HorizontalRuleDelegate.qml \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp
+git add libs/markoff-live/qml/delegates/HorizontalRuleDelegate.qml \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp
 git commit -m "feat(live-render): HorizontalRuleDelegate BlockSelected focus + Up/Down/Delete navigation
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1915,7 +1915,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 16: `ImageDelegate.qml` — BlockSelected + BlockInternalEdit alt-edit rebuild
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/ImageDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/ImageDelegate.qml`
 
 - [ ] **Step 1: Rewrite ImageDelegate**
 
@@ -2098,16 +2098,16 @@ Expected: clean build.
 - [ ] **Step 3: Test manually**
 
 ```bash
-./build-dev/bin/markoff-live-render-app
+./build-dev/bin/markoff-live-app
 ```
 Load a file with `![alt text](url)`. Verify image renders (or placeholder). Click image → BlockSelected ring. Press Enter → alt edit mode. Type new alt → Enter → confirm kind stored.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/ImageDelegate.qml \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h
+git add libs/markoff-live/qml/delegates/ImageDelegate.qml \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/include/markoff/live-render/LiveStructuralKeyHandler.h
 git commit -m "feat(live-render): ImageDelegate full rebuild — BlockSelected + BlockInternalEdit alt-edit
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"

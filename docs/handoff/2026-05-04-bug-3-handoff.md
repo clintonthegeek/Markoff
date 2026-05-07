@@ -72,10 +72,10 @@ The R5.5 marker design is fundamentally about top-level paragraphs (spec §0). B
 
 ## Files affected by the three Bug 3 attempts
 
-- `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h`
-- `libs/markoff-live-render/src/LiveCursorState.cpp`
-- `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- `libs/markoff-live/include/markoff/live-render/LiveCursorState.h`
+- `libs/markoff-live/src/LiveCursorState.cpp`
+- `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- `libs/markoff-live/tests/tst_live_render_structural.cpp`
 - `docs/specs/2026-05-03-marker-paragraph-design.md`
 
 The structural handler's atStart branch is currently the byte-keyed path. The cursor state has both anchor-keyed (`requestTextCaretAtAnchor`, `resolvePendingForAnchor`) and byte-keyed (`requestTextCaretAtByte`) public methods; consider whether the next investigation needs either or whether the right answer is upstream/downstream of these entirely.

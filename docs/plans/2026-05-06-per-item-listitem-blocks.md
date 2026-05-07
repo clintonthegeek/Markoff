@@ -41,16 +41,16 @@ QML, ctest. Build directory `build-dev`. Cap parallelism at `-j 8`.
 | `libs/markoff-core/tests/d2/tst_d2_list_roundtrip.cpp` | Create | Source → blocks → source byte-equal round-trip. |
 | `libs/markoff-core/tests/d2/tst_d2_list_renumber.cpp` | Create | Exercise renumber in mid-run insert/delete/indent-change. |
 | `libs/markoff-core/tests/CMakeLists.txt` | Modify | Register the two new test executables. |
-| `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h` | Modify | New roles: `MarkerStyleRole`, `MarkerNumberRole`, `IndentLevelRole`, `CheckedRole`, `LooseRunRole`. |
-| `libs/markoff-live-render/src/LiveBlockModel.cpp` | Modify | `data()` switch returns new roles; `roleNames()` registers them. |
-| `libs/markoff-live-render/include/markoff/live-render/BlockRecord.h` | Modify | Drop `headingLevel`/`codeLanguage`-style ad-hoc fields if any are list-shaped; rely on `attrs` for marker/indent/etc. |
-| `libs/markoff-live-render/src/LiveListModelBinding.cpp` | Modify | Revert the `while raw.endsWith('\n')` to `if`; remove ListItem detection from kind-transition equal-op path; promotion path (Paragraph→ListItem) extracts marker + sets attrs + content-only buffer. |
-| `libs/markoff-live-render/src/KindTransition.cpp` | Modify | `inferBlockKind` ListItem regex still fires on Paragraph text (for promotion); no other change. |
-| `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp` | Modify | ListItem section rewritten: regex/scan/manual-renumber gone; uses `Cmd::insertListItemAfter`, `Cmd::renumberRunStartingAt`, `Cmd::backspaceMerge`, `Cmd::deleteMerge`. |
-| `libs/markoff-live-render/src/LiveCursorState.cpp` | Modify | Delete `requestTextCaretAtRow` immediate-resolve path + `resolvePendingForRow`; `requestTextCaretAtNewRow` and `requestTextCaretAtAnchor` survive. |
-| `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h` | Modify | Remove the deleted method declaration. |
-| `libs/markoff-live-render/qml/delegates/ListItemDelegate.qml` | Modify | Render marker label from `model.attrs`; padding from `IndentLevelRole`; task-list checkbox toggles `Checked`. |
-| `libs/markoff-live-render/tests/tst_live_render_structural.cpp` | Modify | Replace ListItem tests with per-item-block assertions. |
+| `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h` | Modify | New roles: `MarkerStyleRole`, `MarkerNumberRole`, `IndentLevelRole`, `CheckedRole`, `LooseRunRole`. |
+| `libs/markoff-live/src/LiveBlockModel.cpp` | Modify | `data()` switch returns new roles; `roleNames()` registers them. |
+| `libs/markoff-live/include/markoff/live-render/BlockRecord.h` | Modify | Drop `headingLevel`/`codeLanguage`-style ad-hoc fields if any are list-shaped; rely on `attrs` for marker/indent/etc. |
+| `libs/markoff-live/src/LiveListModelBinding.cpp` | Modify | Revert the `while raw.endsWith('\n')` to `if`; remove ListItem detection from kind-transition equal-op path; promotion path (Paragraph→ListItem) extracts marker + sets attrs + content-only buffer. |
+| `libs/markoff-live/src/KindTransition.cpp` | Modify | `inferBlockKind` ListItem regex still fires on Paragraph text (for promotion); no other change. |
+| `libs/markoff-live/src/LiveStructuralKeyHandler.cpp` | Modify | ListItem section rewritten: regex/scan/manual-renumber gone; uses `Cmd::insertListItemAfter`, `Cmd::renumberRunStartingAt`, `Cmd::backspaceMerge`, `Cmd::deleteMerge`. |
+| `libs/markoff-live/src/LiveCursorState.cpp` | Modify | Delete `requestTextCaretAtRow` immediate-resolve path + `resolvePendingForRow`; `requestTextCaretAtNewRow` and `requestTextCaretAtAnchor` survive. |
+| `libs/markoff-live/include/markoff/live-render/LiveCursorState.h` | Modify | Remove the deleted method declaration. |
+| `libs/markoff-live/qml/delegates/ListItemDelegate.qml` | Modify | Render marker label from `model.attrs`; padding from `IndentLevelRole`; task-list checkbox toggles `Checked`. |
+| `libs/markoff-live/tests/tst_live_render_structural.cpp` | Modify | Replace ListItem tests with per-item-block assertions. |
 | `CLAUDE.md`, `docs/d-arc/d-arc-status.md` | Modify | Status updates after dogfood. |
 
 ---
@@ -1308,8 +1308,8 @@ EOF
 ### Task 10: LiveBlockModel new roles
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h`
-- Modify: `libs/markoff-live-render/src/LiveBlockModel.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h`
+- Modify: `libs/markoff-live/src/LiveBlockModel.cpp`
 
 - [ ] **Step 1: Add role enum values**
 
@@ -1394,7 +1394,7 @@ Expected: builds.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h libs/markoff-live-render/src/LiveBlockModel.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveBlockModel.h libs/markoff-live/src/LiveBlockModel.cpp
 git commit -m "live-render: LiveBlockModel roles for ListItem marker/indent/checked/looseRun
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1405,7 +1405,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 11: LiveListModelBinding cleanup — revert chop loop, simplify kind transition
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
 
 - [ ] **Step 1: Revert the multi-trailing-`\n` strip**
 
@@ -1446,7 +1446,7 @@ Expected: builds.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveListModelBinding.cpp
+git add libs/markoff-live/src/LiveListModelBinding.cpp
 git commit -m "$(cat <<'EOF'
 live-render: revert multi-trailing-\\n strip — per-item blocks don't need it
 
@@ -1465,7 +1465,7 @@ EOF
 ### Task 12: LiveStructuralKeyHandler ListItem rewrite
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
 
 - [ ] **Step 1: Delete the existing ListItem section**
 
@@ -1618,7 +1618,7 @@ m_handlers[BlockKind::ListItem][Qt::Key_Delete] = [](const Ctx &c) -> HR {
 - [ ] **Step 3: Verify no regex/scan remains**
 
 ```bash
-grep -n "kMarker\|kOrd\|markerPrefix" libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp
+grep -n "kMarker\|kOrd\|markerPrefix" libs/markoff-live/src/LiveStructuralKeyHandler.cpp
 ```
 Expected: no matches in the ListItem section. (The Heading section may still
 have its own regex; that's unrelated.)
@@ -1631,7 +1631,7 @@ Expected: builds.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp
 git commit -m "$(cat <<'EOF'
 live-render: rewrite ListItem structural handlers for per-item blocks
 
@@ -1653,7 +1653,7 @@ EOF
 ### Task 13: Paragraph→ListItem promotion path
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
 
 - [ ] **Step 1: Find the kind-transition site**
 
@@ -1749,7 +1749,7 @@ covered in tst_live_render_structural's promotion test added in Task 16.)
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveListModelBinding.cpp
+git add libs/markoff-live/src/LiveListModelBinding.cpp
 git commit -m "$(cat <<'EOF'
 live-render: Paragraph→ListItem promotion strips marker, sets attrs
 
@@ -1768,13 +1768,13 @@ EOF
 ### Task 14: LiveCursorState collapse
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveCursorState.cpp`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h`
+- Modify: `libs/markoff-live/src/LiveCursorState.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveCursorState.h`
 
 - [ ] **Step 1: Find all callers of requestTextCaretAtRow**
 
 ```bash
-grep -rn "requestTextCaretAtRow" libs/markoff-live-render/
+grep -rn "requestTextCaretAtRow" libs/markoff-live/
 ```
 
 After Task 12, the surviving callers are likely only the heading
@@ -1803,7 +1803,7 @@ Expected: all cursor tests pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveCursorState.cpp libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h
+git add libs/markoff-live/src/LiveCursorState.cpp libs/markoff-live/include/markoff/live-render/LiveCursorState.h
 git commit -m "$(cat <<'EOF'
 live-render: LiveCursorState collapse — remove requestTextCaretAtRow
 
@@ -1827,7 +1827,7 @@ that documents the residual valid uses instead.)
 ### Task 15: ListItemDelegate.qml — marker label, indent, task checkbox
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/ListItemDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/ListItemDelegate.qml`
 
 - [ ] **Step 1: Replace the delegate body**
 
@@ -2009,7 +2009,7 @@ ListItem cases (those need rewriting in Task 16).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/ListItemDelegate.qml libs/markoff-core/src/MarkoffDocument.cpp libs/markoff-core/include/markoff-foundation/MarkoffDocument.h
+git add libs/markoff-live/qml/delegates/ListItemDelegate.qml libs/markoff-core/src/MarkoffDocument.cpp libs/markoff-core/include/markoff-foundation/MarkoffDocument.h
 git commit -m "$(cat <<'EOF'
 live-render: ListItemDelegate renders marker label + indent + task checkbox
 
@@ -2031,7 +2031,7 @@ EOF
 ### Task 16: Rewrite tst_live_render_structural ListItem tests
 
 **Files:**
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 - [ ] **Step 1: Delete obsolete tests**
 
@@ -2149,7 +2149,7 @@ Expected: all pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "$(cat <<'EOF'
 test(live-render): rewrite ListItem structural tests for per-item blocks
 
@@ -2186,7 +2186,7 @@ Expected: all tests pass. The new tests added in this plan are
 - [ ] **Step 2: Manual dogfood**
 
 ```bash
-./build-dev/bin/markoff-live-render-app docs/specs/2026-05-06-per-item-listitem-blocks-design.md
+./build-dev/bin/markoff-live-app docs/specs/2026-05-06-per-item-listitem-blocks-design.md
 ```
 
 Test each scenario:

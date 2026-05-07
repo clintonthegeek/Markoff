@@ -205,7 +205,7 @@ CLAUDE.md says live mode retires "when markoff-live-render reaches dogfood-stabl
 - The QML source view's widget, bindings, and tests
 - `tst_view_qml_search_backend` if its target is the source-mode search; otherwise it goes too — classified at plan time
 
-### 4.6 `libs/markoff-live-render`
+### 4.6 `libs/markoff-live`
 
 A single comment update in `tst_live_render_paragraph_edit.cpp` (it references `parseUpdated` in a comment only). Zero behaviour change.
 

@@ -9,38 +9,38 @@
 **Tech stack:** C++20, Qt 6.8 (Quick, QuickControls2, Test), `Markoff::Session` + `Markoff::MarkoffDocument` (markoff-foundation), `QMetaObject::invokeMethod` for C++→QML-item bridging. `QTest` for unit tests.
 
 **Reference spec:** `docs/specs/2026-05-02-live-render-restoration-design.md` §3 (cursor model), §5.3 (focus protocol), §11 R3.
-**Prerequisites:** R2 complete. `libs/markoff-live-render/` has `LiveBlockModel`, `LiveListModelBinding`, `BlockKindRegistry`, `Coordinates`.
+**Prerequisites:** R2 complete. `libs/markoff-live/` has `LiveBlockModel`, `LiveListModelBinding`, `BlockKindRegistry`, `Coordinates`.
 
 ---
 
 ## File map
 
-**New — public headers** (`libs/markoff-live-render/include/markoff/live-render/`):
+**New — public headers** (`libs/markoff-live/include/markoff/live-render/`):
 - `Cursor.h` — `TextCaret`, `BlockSelected`, `BlockInternalEdit`, `Cursor = std::variant<...>`, `LiveRenderSelection`
 - `LiveCursorState.h` — `QML_ELEMENT`; owns `Cursor`; validates via `BlockKindRegistry`; `cursorChanged()` signal
 - `BlockHitTester.h` — `QML_ELEMENT`; translates viewport coords to `Cursor`; calls into ListView via `QMetaObject::invokeMethod`
 - `LiveSelectionView.h` — `QML_ELEMENT`; anchor+active cursor pair; per-block `rangeForBlock`; syncs to `Markoff::Session`
 
-**New — sources** (`libs/markoff-live-render/src/`):
+**New — sources** (`libs/markoff-live/src/`):
 - `LiveCursorState.cpp`
 - `BlockHitTester.cpp`
 - `LiveSelectionView.cpp`
 
-**New — tests** (`libs/markoff-live-render/tests/`):
+**New — tests** (`libs/markoff-live/tests/`):
 - `tst_live_render_cursor.cpp`
 
 **Modified:**
-- `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h` — add Session creation, expose `LiveCursorState*`, `BlockHitTester*`, `LiveSelectionView*`
-- `libs/markoff-live-render/src/LiveListModelBinding.cpp`
-- `libs/markoff-live-render/CMakeLists.txt` — add new SOURCES + test
-- `libs/markoff-live-render/tests/CMakeLists.txt` — add test target
-- `libs/markoff-live-render/qml/LiveView.qml` — MouseArea, ScrollBar, Keys handlers
-- `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml` — cursor + selection highlight
-- `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml` — cursor + selection highlight
-- `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml` — cursor + selection highlight
-- `libs/markoff-live-render/qml/delegates/HorizontalRuleDelegate.qml` — focus ring
-- `libs/markoff-live-render/qml/delegates/ImageDelegate.qml` — focus ring
-- `libs/markoff-live-render/app/Main.qml` — expose clipboard shortcut
+- `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h` — add Session creation, expose `LiveCursorState*`, `BlockHitTester*`, `LiveSelectionView*`
+- `libs/markoff-live/src/LiveListModelBinding.cpp`
+- `libs/markoff-live/CMakeLists.txt` — add new SOURCES + test
+- `libs/markoff-live/tests/CMakeLists.txt` — add test target
+- `libs/markoff-live/qml/LiveView.qml` — MouseArea, ScrollBar, Keys handlers
+- `libs/markoff-live/qml/delegates/ParagraphDelegate.qml` — cursor + selection highlight
+- `libs/markoff-live/qml/delegates/HeadingDelegate.qml` — cursor + selection highlight
+- `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml` — cursor + selection highlight
+- `libs/markoff-live/qml/delegates/HorizontalRuleDelegate.qml` — focus ring
+- `libs/markoff-live/qml/delegates/ImageDelegate.qml` — focus ring
+- `libs/markoff-live/app/Main.qml` — expose clipboard shortcut
 
 ---
 
@@ -54,9 +54,9 @@ libs/markoff-view-qml/include/markoff/view/qml/LiveSelectionView.h  (the product
 libs/markoff-core/include/markoff-foundation/Session.h
 libs/markoff-core/include/markoff-foundation/Selection.h
 libs/markoff-core/include/markoff-foundation/MarkoffDocument.h  (textAnchorAt, resolveTextAnchor, blockByteRange, offsetInBlock)
-libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h
-libs/markoff-live-render/include/markoff/live-render/BlockKindRegistry.h
-libs/markoff-live-render/include/markoff/live-render/Coordinates.h
+libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h
+libs/markoff-live/include/markoff/live-render/BlockKindRegistry.h
+libs/markoff-live/include/markoff/live-render/Coordinates.h
 ```
 
 No code changes in this task.
@@ -66,11 +66,11 @@ No code changes in this task.
 ## Task 2: Cursor types
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/Cursor.h`
+- Create: `libs/markoff-live/include/markoff/live-render/Cursor.h`
 
 - [ ] **Step 1: Write `Cursor.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/Cursor.h`:
+Create `libs/markoff-live/include/markoff/live-render/Cursor.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -148,7 +148,7 @@ No `.cpp` file — all value types, no non-inline code.
 
 - [ ] **Step 2: Add to library CMakeLists**
 
-Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES inside `qt_add_qml_module`:
+Edit `libs/markoff-live/CMakeLists.txt` — append to SOURCES inside `qt_add_qml_module`:
 
 ```cmake
         include/markoff/live-render/Cursor.h
@@ -159,13 +159,13 @@ Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES inside `qt_
 ## Task 3: LiveCursorState (test-first)
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h`
-- Create: `libs/markoff-live-render/src/LiveCursorState.cpp`
-- Create: `libs/markoff-live-render/tests/tst_live_render_cursor.cpp` (initial slice)
+- Create: `libs/markoff-live/include/markoff/live-render/LiveCursorState.h`
+- Create: `libs/markoff-live/src/LiveCursorState.cpp`
+- Create: `libs/markoff-live/tests/tst_live_render_cursor.cpp` (initial slice)
 
 - [ ] **Step 1: Write the failing tests for LiveCursorState**
 
-Create `libs/markoff-live-render/tests/tst_live_render_cursor.cpp`:
+Create `libs/markoff-live/tests/tst_live_render_cursor.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -336,7 +336,7 @@ QTEST_APPLESS_MAIN(TstLiveRenderCursor)
 
 - [ ] **Step 2: Write `LiveCursorState.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h`:
+Create `libs/markoff-live/include/markoff/live-render/LiveCursorState.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -403,7 +403,7 @@ private:
 
 - [ ] **Step 3: Write `LiveCursorState.cpp`**
 
-Create `libs/markoff-live-render/src/LiveCursorState.cpp`:
+Create `libs/markoff-live/src/LiveCursorState.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -494,14 +494,14 @@ bool LiveCursorState::validateVariant(const Cursor &c) const
 
 - [ ] **Step 4: Update CMakeLists — add sources and test target**
 
-Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES:
+Edit `libs/markoff-live/CMakeLists.txt` — append to SOURCES:
 ```cmake
         include/markoff/live-render/Cursor.h
         include/markoff/live-render/LiveCursorState.h
         src/LiveCursorState.cpp
 ```
 
-Edit `libs/markoff-live-render/tests/CMakeLists.txt` — append:
+Edit `libs/markoff-live/tests/CMakeLists.txt` — append:
 ```cmake
 qt_add_executable(tst_live_render_cursor
     tst_live_render_cursor.cpp
@@ -528,13 +528,13 @@ Expected: `8/8 tests passed`.
 `BlockHitTester` translates viewport (mouseX, mouseY) to a `{blockIndex, qtPos}` pair by calling `itemAt` and `positionAt` on the QML ListView. It lives in C++ so it can be unit-tested with a mock ListView object.
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/BlockHitTester.h`
-- Create: `libs/markoff-live-render/src/BlockHitTester.cpp`
+- Create: `libs/markoff-live/include/markoff/live-render/BlockHitTester.h`
+- Create: `libs/markoff-live/src/BlockHitTester.cpp`
 - Extend: `tst_live_render_cursor.cpp` (add BlockHitTester tests)
 
 - [ ] **Step 1: Write `BlockHitTester.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/BlockHitTester.h`:
+Create `libs/markoff-live/include/markoff/live-render/BlockHitTester.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -622,7 +622,7 @@ private:
 
 - [ ] **Step 2: Write `BlockHitTester.cpp`**
 
-Create `libs/markoff-live-render/src/BlockHitTester.cpp`:
+Create `libs/markoff-live/src/BlockHitTester.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -898,7 +898,7 @@ Then the three hit-tester test slots reference these file-scope classes.
 
 - [ ] **Step 4: Add BlockHitTester to CMakeLists**
 
-Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES:
+Edit `libs/markoff-live/CMakeLists.txt` — append to SOURCES:
 ```cmake
         include/markoff/live-render/BlockHitTester.h
         src/BlockHitTester.cpp
@@ -921,12 +921,12 @@ Expected: `11/11 tests passed` (8 LiveCursorState + 3 BlockHitTester).
 `LiveSelectionView` owns the anchor+active selection (using block-index + qtPos), derives per-block highlight ranges, syncs the active cursor to `Session::primarySelection`, and provides Ctrl-C copy. It is a simplified port of `markoff-view-qml`'s `LiveSelectionView` without the collab-read-back path (R3 is write-only to Session).
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/LiveSelectionView.h`
-- Create: `libs/markoff-live-render/src/LiveSelectionView.cpp`
+- Create: `libs/markoff-live/include/markoff/live-render/LiveSelectionView.h`
+- Create: `libs/markoff-live/src/LiveSelectionView.cpp`
 
 - [ ] **Step 1: Write `LiveSelectionView.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/LiveSelectionView.h`:
+Create `libs/markoff-live/include/markoff/live-render/LiveSelectionView.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1024,7 +1024,7 @@ private:
 
 - [ ] **Step 2: Write `LiveSelectionView.cpp`**
 
-Create `libs/markoff-live-render/src/LiveSelectionView.cpp`:
+Create `libs/markoff-live/src/LiveSelectionView.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1169,7 +1169,7 @@ void LiveSelectionView::syncToSession()
 
 - [ ] **Step 3: Add to CMakeLists**
 
-Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES:
+Edit `libs/markoff-live/CMakeLists.txt` — append to SOURCES:
 ```cmake
         include/markoff/live-render/LiveSelectionView.h
         src/LiveSelectionView.cpp
@@ -1182,12 +1182,12 @@ Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES:
 `LiveListModelBinding` creates the `Markoff::Session`, instantiates and owns `LiveCursorState`, `BlockHitTester`, and `LiveSelectionView`, and exposes them as properties for QML.
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
 
 - [ ] **Step 1: Update `LiveListModelBinding.h`**
 
-Replace the contents of `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`:
+Replace the contents of `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1257,7 +1257,7 @@ private:
 
 - [ ] **Step 2: Update `LiveListModelBinding.cpp`**
 
-Replace the contents of `libs/markoff-live-render/src/LiveListModelBinding.cpp`:
+Replace the contents of `libs/markoff-live/src/LiveListModelBinding.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1374,11 +1374,11 @@ Expected: builds cleanly.
 ## Task 7: LiveView.qml — mouse, scrollbar, keyboard
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/LiveView.qml`
+- Modify: `libs/markoff-live/qml/LiveView.qml`
 
 - [ ] **Step 1: Rewrite `LiveView.qml`**
 
-Replace the contents of `libs/markoff-live-render/qml/LiveView.qml`:
+Replace the contents of `libs/markoff-live/qml/LiveView.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1502,15 +1502,15 @@ ListView {
 Add `blockText` (readable text), `blockIndex`, and selection-highlight properties to each delegate so `LiveView.qml` can read block text for copy and QML bindings can highlight selected ranges.
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`
-- Modify: `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`
-- Modify: `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`
-- Modify: `libs/markoff-live-render/qml/delegates/HorizontalRuleDelegate.qml`
-- Modify: `libs/markoff-live-render/qml/delegates/ImageDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/HeadingDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/HorizontalRuleDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/ImageDelegate.qml`
 
 - [ ] **Step 1: Rewrite `ParagraphDelegate.qml`**
 
-Replace contents of `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`:
+Replace contents of `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1568,7 +1568,7 @@ Item {
 
 - [ ] **Step 2: Rewrite `HeadingDelegate.qml`**
 
-Replace contents of `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`:
+Replace contents of `libs/markoff-live/qml/delegates/HeadingDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1623,7 +1623,7 @@ Item {
 
 - [ ] **Step 3: Rewrite `CodeBlockDelegate.qml`**
 
-Replace contents of `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`:
+Replace contents of `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1680,7 +1680,7 @@ Rectangle {
 
 - [ ] **Step 4: Rewrite `HorizontalRuleDelegate.qml`**
 
-Replace contents of `libs/markoff-live-render/qml/delegates/HorizontalRuleDelegate.qml`:
+Replace contents of `libs/markoff-live/qml/delegates/HorizontalRuleDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1727,7 +1727,7 @@ Item {
 
 - [ ] **Step 5: Rewrite `ImageDelegate.qml`**
 
-Replace contents of `libs/markoff-live-render/qml/delegates/ImageDelegate.qml`:
+Replace contents of `libs/markoff-live/qml/delegates/ImageDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1763,11 +1763,11 @@ Item {
 ## Task 9: App — Ctrl-C shortcut wiring
 
 **Files:**
-- Modify: `libs/markoff-live-render/app/Main.qml`
+- Modify: `libs/markoff-live/app/Main.qml`
 
 - [ ] **Step 1: Update `Main.qml` to forward Ctrl-C to the LiveView**
 
-Replace contents of `libs/markoff-live-render/app/Main.qml`:
+Replace contents of `libs/markoff-live/app/Main.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1806,7 +1806,7 @@ ApplicationWindow {
 
 ```bash
 cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build-dev --target markoff_live_render tst_live_render_cursor markoff-live-render-app -j 8 2>&1 | tail -10
+cmake --build build-dev --target markoff_live_render tst_live_render_cursor markoff-live-app -j 8 2>&1 | tail -10
 ```
 
 Expected: all three targets build cleanly.
@@ -1830,7 +1830,7 @@ Expected: 100% pass, no regressions.
 - [ ] **Step 4: Manual acceptance check**
 
 ```bash
-./build-dev/bin/markoff-live-render-app docs/specs/2026-05-02-live-render-restoration-design.md
+./build-dev/bin/markoff-live-app docs/specs/2026-05-02-live-render-restoration-design.md
 ```
 
 Verify:
@@ -1865,7 +1865,7 @@ Recent-changes log entry:
 - [ ] **Step 2: Commit**
 
 ```bash
-git add libs/markoff-live-render docs/restoration-status.md
+git add libs/markoff-live docs/restoration-status.md
 git commit -m "$(cat <<'EOF'
 feat(live-render): R3 — cursor + selection + keyboard nav
 

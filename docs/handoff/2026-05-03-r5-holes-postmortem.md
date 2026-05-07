@@ -194,7 +194,7 @@ The brief's answer was right but never codified: realistic-keyboard timing requi
 
 For v1, this is not optional. The test discipline must be a **standing pattern** for every async-UX test in R5.5, R6, R7, R8, R10. Otherwise R6+ keep adding new async races and the test suite keeps lying about coverage.
 
-**Proposed resolution.** Pin a `LiveRenderRealisticInputHarness` (or the design doc's chosen name) as a test utility under `libs/markoff-live-render/tests/`. API: `keyClickRealistic(QQuickWindow *, Qt::Key, modifiers, gapMs = 30)` which `keyClick`s, then `qWait(gapMs)`, then `processEvents()`. Every async-UX test uses this rather than raw `QTest::keyClick`. Pre-existing fast tests stay on raw `keyClick` if they don't exercise async paths (rationale: not every test needs the gap; the harness is for stress-typing and async-race assertions).
+**Proposed resolution.** Pin a `LiveRenderRealisticInputHarness` (or the design doc's chosen name) as a test utility under `libs/markoff-live/tests/`. API: `keyClickRealistic(QQuickWindow *, Qt::Key, modifiers, gapMs = 30)` which `keyClick`s, then `qWait(gapMs)`, then `processEvents()`. Every async-UX test uses this rather than raw `QTest::keyClick`. Pre-existing fast tests stay on raw `keyClick` if they don't exercise async paths (rationale: not every test needs the gap; the harness is for stress-typing and async-race assertions).
 
 The R5.5 plan's first test task is the harness, not a hole feature. If that test pattern doesn't fail for the v0 race scenario *before any v1 feature exists*, the harness is too lenient and we fix it before building anything. (The plan's phrasing per the brief: *"the stress-typing test is load-bearing; if it doesn't fail before T20-T22 are wired, your test is too lenient."*)
 

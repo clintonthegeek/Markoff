@@ -120,7 +120,7 @@ The user-visible trace: press Enter, see new paragraph with cursor in it, type, 
 ## 3. The marker character
 
 ```cpp
-// libs/markoff-live-render/include/markoff/live-render/Marker.h
+// libs/markoff-live/include/markoff/live-render/Marker.h
 namespace Markoff::LiveRender {
 constexpr QChar       kMarkerChar = QChar(0x200B);          // U+200B ZWSP
 constexpr const char *kMarkerUtf8 = "\xE2\x80\x8B";         // 3 bytes
@@ -233,7 +233,7 @@ IME composition works without special handling. The composition events go throug
 ### 6.1 Header sketch
 
 ```cpp
-// libs/markoff-live-render/include/markoff/live-render/MarkerScrubber.h
+// libs/markoff-live/include/markoff/live-render/MarkerScrubber.h
 namespace Markoff::LiveRender {
 
 class MarkerScrubber : public QObject {
@@ -452,7 +452,7 @@ No `HoleBlockId`; no variant. `TextCaret::block` always references a real CRDT-a
 | Ctrl-Z after typing into marker block | First Ctrl-Z restores marker block; second Ctrl-Z restores pre-Enter state. | Harness |
 | Stacked Enter is no-op | Press Enter twice; second press produces no source change. Press a third time after typing into marker block; the third press creates a new marker block at the new EOB. | Harness |
 | Cross-row selection across marker block | Select from paragraph above through paragraph below; clipboard text contains the marker block's content (which is just ZWSP); the clipboard scrubber strips it. | Harness |
-| Dogfood gate | User types ≥200 words across ≥10 paragraphs in `markoff-live-render-app`; every Enter creates a paragraph; saved file is clean; reload preserves the document. | Manual |
+| Dogfood gate | User types ≥200 words across ≥10 paragraphs in `markoff-live-app`; every Enter creates a paragraph; saved file is clean; reload preserves the document. | Manual |
 
 The retained `LiveRealisticInputHarness` (per M9) drives the "Harness" rows.
 
@@ -508,7 +508,7 @@ R5.5-marker ships when:
 These are deliberately not pinned here; the plan resolves them.
 
 1. **Soft-Enter in a marker paragraph (§15 last bullet).** Should the marker-only predicate match `^(​|\n)+$` instead of `^​+$`? Or should soft-Enter also bundle the marker scrub? The cleanest answer is probably to broaden the predicate; the plan picks and tests.
-2. **`MarkerScrubber` placement.** In `libs/markoff-live-render` (with the rest of the editing concerns) or in `libs/markoff-core` (as a foundation-level affordance other consumers could reuse)? Default: live-render. The plan validates against any prospective second consumer.
+2. **`MarkerScrubber` placement.** In `libs/markoff-live` (with the rest of the editing concerns) or in `libs/markoff-core` (as a foundation-level affordance other consumers could reuse)? Default: live-render. The plan validates against any prospective second consumer.
 3. **`scrubBeforeSave` integration with the host.** The host owns the save path; the wiring is whatever `MarkdownView::saveAs` (or its successor) calls into. The plan picks the exact integration site.
 4. **Atomic-bundled-edit primitive: keystroke level vs IME-commit level.** §5.2 says "first `onContentsChange`"; for IME, "first commit" might be the wrong granularity if the IME emits intermediate composition events. The plan tests against IME composition fixtures.
 5. **What happens if `setRowEditSequence` for the new (post-EOB-Enter) marker paragraph is needed.** The marker paragraph has just been created via `applyLocalEdit`; is its `lastEditEditSequence` correctly tagged so the freshness rule doesn't squash subsequent text-role updates? The plan validates.

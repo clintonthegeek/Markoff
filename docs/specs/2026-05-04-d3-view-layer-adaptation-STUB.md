@@ -23,7 +23,7 @@ When you sit down to design D3, you'll need:
 
 1. **`docs/specs/2026-05-04-d2-foundation-reshape-design.md`** — the D2 spec. The foundation's public API after D2 (BlockEdit, StructuralOp, Cmd::*, the per-block + structural signals) is what D3 consumes.
 2. **`docs/specs/2026-05-02-live-render-restoration-design.md`** — the C-restoration spec. The lower-layer decisions (L0 coordinate primitives, L1 read-only render, L2 diff-driven model, L3 cursor model in Shape 1 discriminated form) carry forward to D3 unchanged. The upper-layer decisions (L4 sequence-tagged staleness, L5 structural keys with marker-paragraph machinery) **retire**.
-3. **The current `libs/markoff-live-render/` source tree** — the in-tree code that D3 reshapes. Specifically the L4 `LiveEditBinding`, L5 `LiveStructuralKeyHandler`, and the marker-paragraph machinery (`MarkerScrubber`, atomic-bundled-edit primitive, ZWSP scrubbing) that delete entirely.
+3. **The current `libs/markoff-live/` source tree** — the in-tree code that D3 reshapes. Specifically the L4 `LiveEditBinding`, L5 `LiveStructuralKeyHandler`, and the marker-paragraph machinery (`MarkerScrubber`, atomic-bundled-edit primitive, ZWSP scrubbing) that delete entirely.
 4. **D2's `Migration` section (§9)** — the layer-by-layer transition table is D3's starting point. D3 owns the substantive design of how each transformed layer actually works.
 
 ---

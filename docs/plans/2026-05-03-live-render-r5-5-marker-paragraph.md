@@ -44,37 +44,37 @@
 
 | File | Status | Responsibility |
 |------|--------|----------------|
-| `libs/markoff-live-render/include/markoff/live-render/Marker.h` | **Create** | Marker constants — `kMarkerChar`, `kMarkerUtf8`, `kMarkerUtf8Len`. |
-| `libs/markoff-live-render/include/markoff/live-render/MarkerScrubber.h` | **Create** | `MarkerScrubber` API: predicate + 3 entry points. |
-| `libs/markoff-live-render/src/MarkerScrubber.cpp` | **Create** | Implementation. |
-| `libs/markoff-live-render/tests/tst_live_render_marker.cpp` | **Create** | Unit tests for the constants and the predicate. |
-| `libs/markoff-live-render/tests/tst_live_render_marker_scrubber.cpp` | **Create** | Unit tests for `MarkerScrubber`. |
-| `libs/markoff-live-render/tests/tst_live_render_marker_flow.cpp` | **Create** | Harness-driven end-to-end tests (race / save / load / undo / stacked-Enter / backspace-merge). |
+| `libs/markoff-live/include/markoff/live-render/Marker.h` | **Create** | Marker constants — `kMarkerChar`, `kMarkerUtf8`, `kMarkerUtf8Len`. |
+| `libs/markoff-live/include/markoff/live-render/MarkerScrubber.h` | **Create** | `MarkerScrubber` API: predicate + 3 entry points. |
+| `libs/markoff-live/src/MarkerScrubber.cpp` | **Create** | Implementation. |
+| `libs/markoff-live/tests/tst_live_render_marker.cpp` | **Create** | Unit tests for the constants and the predicate. |
+| `libs/markoff-live/tests/tst_live_render_marker_scrubber.cpp` | **Create** | Unit tests for `MarkerScrubber`. |
+| `libs/markoff-live/tests/tst_live_render_marker_flow.cpp` | **Create** | Harness-driven end-to-end tests (race / save / load / undo / stacked-Enter / backspace-merge). |
 | `libs/markoff-parser/tests/tst_document_top_level_blocks.cpp` | Modify | Add `markerProducesParagraph` and `markerRunProducesMultiple` test slots (promote spike findings to permanent unit tests). |
-| `libs/markoff-live-render/include/markoff/live-render/Cursor.h` | Modify | Revert `BlockId` to `Markoff::BlockAnchor`. |
-| `libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h` | Modify | Drop `holeLayer` / `proxyModel` ctor parameters; drop hole-row dispatch helpers; add `MarkerScrubber*` member. |
-| `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp` | Modify | Replace EOB-Enter / start-of-block-Enter branches with marker insertion; add stacked-Enter no-op rule; add marker-aware backspace-merge case; drop hole-row dispatch. |
-| `libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h` | Modify | Drop `holeId` Q_PROPERTY and friend grants for hole tests; add `m_pendingMarkerScrub` flag and `markerScrubber` setter. |
-| `libs/markoff-live-render/src/LiveEditBinding.cpp` | Modify | First-edit bundling on focus-in to a marker block; drop hole-routing in `onContentsChange`. |
-| `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h` | Modify | Drop `focusedHoleId` Q_PROPERTY (and its definition). |
-| `libs/markoff-live-render/src/LiveCursorState.cpp` | Modify | Drop hole-aware code paths. |
-| `libs/markoff-live-render/include/markoff/live-render/UndoCoalescer.h` | Modify | Drop `holeLayer` ctor parameter; drop hole-routing in `undo()` / `redo()`. |
-| `libs/markoff-live-render/src/UndoCoalescer.cpp` | Modify | Implementation drop. |
-| `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h` | Modify | Drop `holeLayer` / `proxyModel` properties; add `markerScrubber` property; rewire `LiveCursorState::setSignalModel` to use the inner `LiveBlockModel` directly. |
-| `libs/markoff-live-render/src/LiveListModelBinding.cpp` | Modify | Construct `MarkerScrubber`; wire `documentReloaded` → `scrubAfterLoad`; remove `flushPendingHoles`. |
-| `libs/markoff-live-render/qml/LiveView.qml` | Modify | Drop `proxyModel` references; bind `ListView.model` directly to `binding.model`. |
-| `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml` | Modify | Drop `isHole` / `bufferText` / `holeId` branches; bind to `model.text` only. |
-| `libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h` | **Delete** | — |
-| `libs/markoff-live-render/src/LiveHoleLayer.cpp` | **Delete** | — |
-| `libs/markoff-live-render/include/markoff/live-render/LiveProxyBlockModel.h` | **Delete** | — |
-| `libs/markoff-live-render/src/LiveProxyBlockModel.cpp` | **Delete** | — |
-| `libs/markoff-live-render/include/markoff/live-render/BlockHole.h` | **Delete** | — |
-| `libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp` | **Delete** | — |
-| `libs/markoff-live-render/tests/tst_live_render_holes_qml.cpp` | **Delete** | — |
-| `libs/markoff-live-render/tests/tst_live_render_proxy_model.cpp` | **Delete** | — |
-| `libs/markoff-live-render/tests/CMakeLists.txt` | Modify | Add three new test executables; remove three deleted ones. |
-| `libs/markoff-live-render/CMakeLists.txt` | Modify | Add `MarkerScrubber.cpp` to sources; remove `LiveHoleLayer.cpp` and `LiveProxyBlockModel.cpp`. |
-| `libs/markoff-live-render/src/LiveSelectionView.cpp` | Modify | Strip ZWSP from clipboard bytes in `serializeForCopy`. |
+| `libs/markoff-live/include/markoff/live-render/Cursor.h` | Modify | Revert `BlockId` to `Markoff::BlockAnchor`. |
+| `libs/markoff-live/include/markoff/live-render/LiveStructuralKeyHandler.h` | Modify | Drop `holeLayer` / `proxyModel` ctor parameters; drop hole-row dispatch helpers; add `MarkerScrubber*` member. |
+| `libs/markoff-live/src/LiveStructuralKeyHandler.cpp` | Modify | Replace EOB-Enter / start-of-block-Enter branches with marker insertion; add stacked-Enter no-op rule; add marker-aware backspace-merge case; drop hole-row dispatch. |
+| `libs/markoff-live/include/markoff/live-render/LiveEditBinding.h` | Modify | Drop `holeId` Q_PROPERTY and friend grants for hole tests; add `m_pendingMarkerScrub` flag and `markerScrubber` setter. |
+| `libs/markoff-live/src/LiveEditBinding.cpp` | Modify | First-edit bundling on focus-in to a marker block; drop hole-routing in `onContentsChange`. |
+| `libs/markoff-live/include/markoff/live-render/LiveCursorState.h` | Modify | Drop `focusedHoleId` Q_PROPERTY (and its definition). |
+| `libs/markoff-live/src/LiveCursorState.cpp` | Modify | Drop hole-aware code paths. |
+| `libs/markoff-live/include/markoff/live-render/UndoCoalescer.h` | Modify | Drop `holeLayer` ctor parameter; drop hole-routing in `undo()` / `redo()`. |
+| `libs/markoff-live/src/UndoCoalescer.cpp` | Modify | Implementation drop. |
+| `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h` | Modify | Drop `holeLayer` / `proxyModel` properties; add `markerScrubber` property; rewire `LiveCursorState::setSignalModel` to use the inner `LiveBlockModel` directly. |
+| `libs/markoff-live/src/LiveListModelBinding.cpp` | Modify | Construct `MarkerScrubber`; wire `documentReloaded` → `scrubAfterLoad`; remove `flushPendingHoles`. |
+| `libs/markoff-live/qml/LiveView.qml` | Modify | Drop `proxyModel` references; bind `ListView.model` directly to `binding.model`. |
+| `libs/markoff-live/qml/delegates/ParagraphDelegate.qml` | Modify | Drop `isHole` / `bufferText` / `holeId` branches; bind to `model.text` only. |
+| `libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h` | **Delete** | — |
+| `libs/markoff-live/src/LiveHoleLayer.cpp` | **Delete** | — |
+| `libs/markoff-live/include/markoff/live-render/LiveProxyBlockModel.h` | **Delete** | — |
+| `libs/markoff-live/src/LiveProxyBlockModel.cpp` | **Delete** | — |
+| `libs/markoff-live/include/markoff/live-render/BlockHole.h` | **Delete** | — |
+| `libs/markoff-live/tests/tst_live_render_holes_layer.cpp` | **Delete** | — |
+| `libs/markoff-live/tests/tst_live_render_holes_qml.cpp` | **Delete** | — |
+| `libs/markoff-live/tests/tst_live_render_proxy_model.cpp` | **Delete** | — |
+| `libs/markoff-live/tests/CMakeLists.txt` | Modify | Add three new test executables; remove three deleted ones. |
+| `libs/markoff-live/CMakeLists.txt` | Modify | Add `MarkerScrubber.cpp` to sources; remove `LiveHoleLayer.cpp` and `LiveProxyBlockModel.cpp`. |
+| `libs/markoff-live/src/LiveSelectionView.cpp` | Modify | Strip ZWSP from clipboard bytes in `serializeForCopy`. |
 | `docs/specs/2026-05-02-live-render-restoration-design.md` | Modify | Apply spec amendments per design §14. |
 | `docs/restoration-status.md` | Modify | Update phase board to point at the marker design + this plan; archive references. |
 
@@ -87,7 +87,7 @@ These tasks add the new code beside the existing v2 hole code without changing a
 ### Task 1: Marker constants header + parser-level test
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/Marker.h`
+- Create: `libs/markoff-live/include/markoff/live-render/Marker.h`
 - Modify: `libs/markoff-parser/tests/tst_document_top_level_blocks.cpp`
 
 - [ ] **Step 1: Write the failing parser-level test**
@@ -142,7 +142,7 @@ Expected: build OK (these are pure assertions; the parser already supports them 
 - [ ] **Step 3: Create the marker constants header**
 
 ```cpp
-// libs/markoff-live-render/include/markoff/live-render/Marker.h
+// libs/markoff-live/include/markoff/live-render/Marker.h
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
@@ -179,7 +179,7 @@ Expected: builds OK (header is unused but valid).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/Marker.h \
+git add libs/markoff-live/include/markoff/live-render/Marker.h \
         libs/markoff-parser/tests/tst_document_top_level_blocks.cpp
 git commit -m "$(cat <<'EOF'
 r5.5(marker): land marker constants header + parser-acceptance contract tests
@@ -199,16 +199,16 @@ EOF
 ### Task 2: `MarkerScrubber` predicate
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/MarkerScrubber.h`
-- Create: `libs/markoff-live-render/src/MarkerScrubber.cpp`
-- Create: `libs/markoff-live-render/tests/tst_live_render_marker.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt`
+- Create: `libs/markoff-live/include/markoff/live-render/MarkerScrubber.h`
+- Create: `libs/markoff-live/src/MarkerScrubber.cpp`
+- Create: `libs/markoff-live/tests/tst_live_render_marker.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
+- Modify: `libs/markoff-live/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Write the failing test for the predicate**
 
 ```cpp
-// libs/markoff-live-render/tests/tst_live_render_marker.cpp
+// libs/markoff-live/tests/tst_live_render_marker.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 #include <markoff/live-render/Marker.h>
@@ -292,7 +292,7 @@ Expected: FAIL with `MarkerScrubber.h: No such file or directory`.
 - [ ] **Step 4: Create the header**
 
 ```cpp
-// libs/markoff-live-render/include/markoff/live-render/MarkerScrubber.h
+// libs/markoff-live/include/markoff/live-render/MarkerScrubber.h
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
@@ -353,7 +353,7 @@ private:
 - [ ] **Step 5: Create the implementation (predicate only; other methods are stubs for now)**
 
 ```cpp
-// libs/markoff-live-render/src/MarkerScrubber.cpp
+// libs/markoff-live/src/MarkerScrubber.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live-render/MarkerScrubber.h>
 
@@ -397,7 +397,7 @@ int MarkerScrubber::scrubAfterLoad() {
 
 - [ ] **Step 6: Add `MarkerScrubber.cpp` to the library `CMakeLists.txt`**
 
-In `libs/markoff-live-render/CMakeLists.txt`, find the source list (probably under `qt_add_library(markoff_live_render ...)`) and add `src/MarkerScrubber.cpp` next to the other entries (preserve alphabetic order around `LiveListModelBinding.cpp` and `LiveProxyBlockModel.cpp`).
+In `libs/markoff-live/CMakeLists.txt`, find the source list (probably under `qt_add_library(markoff_live_render ...)`) and add `src/MarkerScrubber.cpp` next to the other entries (preserve alphabetic order around `LiveListModelBinding.cpp` and `LiveProxyBlockModel.cpp`).
 
 - [ ] **Step 7: Run the test to verify it passes**
 
@@ -411,11 +411,11 @@ Expected: 7 PASS, 0 FAIL.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/MarkerScrubber.h \
-        libs/markoff-live-render/src/MarkerScrubber.cpp \
-        libs/markoff-live-render/tests/tst_live_render_marker.cpp \
-        libs/markoff-live-render/CMakeLists.txt \
-        libs/markoff-live-render/tests/CMakeLists.txt
+git add libs/markoff-live/include/markoff/live-render/MarkerScrubber.h \
+        libs/markoff-live/src/MarkerScrubber.cpp \
+        libs/markoff-live/tests/tst_live_render_marker.cpp \
+        libs/markoff-live/CMakeLists.txt \
+        libs/markoff-live/tests/CMakeLists.txt
 git commit -m "$(cat <<'EOF'
 r5.5(marker): MarkerScrubber predicate + skeleton
 
@@ -433,14 +433,14 @@ EOF
 ### Task 3: `MarkerScrubber` edit-emission methods
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/MarkerScrubber.cpp`
-- Create: `libs/markoff-live-render/tests/tst_live_render_marker_scrubber.cpp`
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt`
+- Modify: `libs/markoff-live/src/MarkerScrubber.cpp`
+- Create: `libs/markoff-live/tests/tst_live_render_marker_scrubber.cpp`
+- Modify: `libs/markoff-live/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Write the failing tests for the three entry points**
 
 ```cpp
-// libs/markoff-live-render/tests/tst_live_render_marker_scrubber.cpp
+// libs/markoff-live/tests/tst_live_render_marker_scrubber.cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 #include <markoff/live-render/Marker.h>
@@ -655,9 +655,9 @@ Expected: every previously-passing test still passes; the two new tests pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/MarkerScrubber.cpp \
-        libs/markoff-live-render/tests/tst_live_render_marker_scrubber.cpp \
-        libs/markoff-live-render/tests/CMakeLists.txt
+git add libs/markoff-live/src/MarkerScrubber.cpp \
+        libs/markoff-live/tests/tst_live_render_marker_scrubber.cpp \
+        libs/markoff-live/tests/CMakeLists.txt
 git commit -m "$(cat <<'EOF'
 r5.5(marker): MarkerScrubber edit-emission methods
 
@@ -677,7 +677,7 @@ EOF
 The spec §7.1 says cursor delivery uses `requestTextCaretAtNewRow(row, /*qtPos=*/0)`. The existing API already supports this; the *caller* (LiveStructuralKeyHandler) does the qtPos=0 part. So no `LiveCursorState` change is needed for the marker design's primary path. This task is *only* about confirming the existing API behaves correctly when the target row's text starts with the marker.
 
 **Files:**
-- Modify: `libs/markoff-live-render/tests/tst_live_render_cursor.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_cursor.cpp`
 
 - [ ] **Step 1: Add a regression test verifying qtPos=0 lands the cursor before the marker**
 
@@ -732,7 +732,7 @@ Expected: PASS. (The existing `requestTextCaretAtNewRow` already supports this; 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/tests/tst_live_render_cursor.cpp
+git add libs/markoff-live/tests/tst_live_render_cursor.cpp
 git commit -m "$(cat <<'EOF'
 r5.5(marker): contract test for cursor delivery into a marker paragraph
 
@@ -750,9 +750,9 @@ EOF
 ### Task 5: `LiveEditBinding` atomic-bundled-edit primitive
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveEditBinding.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveEditBinding.h`
+- Modify: `libs/markoff-live/src/LiveEditBinding.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`
 
 - [ ] **Step 1: Add a failing test for the bundling behaviour**
 
@@ -888,9 +888,9 @@ ctest --test-dir build-dev -R '^tst_live_render_' --output-on-failure -j 8
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h \
-        libs/markoff-live-render/src/LiveEditBinding.cpp \
-        libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveEditBinding.h \
+        libs/markoff-live/src/LiveEditBinding.cpp \
+        libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp
 git commit -m "$(cat <<'EOF'
 r5.5(marker): atomic-bundled-edit primitive in LiveEditBinding
 
@@ -913,8 +913,8 @@ These tasks change the live behaviour. After Phase 2 commits land, the marker de
 ### Task 6: `LiveStructuralKeyHandler` EOB-Enter and start-of-block-Enter switch to marker insertion
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 - [ ] **Step 1: Add a failing test for the new EOB-Enter behaviour**
 
@@ -1057,7 +1057,7 @@ Drop the `#include`s for `LiveHoleLayer.h` and `LiveProxyBlockModel.h` from the 
 Search for the constructor call sites:
 
 ```bash
-grep -rn "LiveStructuralKeyHandler(" libs/markoff-live-render
+grep -rn "LiveStructuralKeyHandler(" libs/markoff-live
 ```
 
 Update each one to drop the `holeLayer` and `proxyModel` arguments. The known sites are `LiveListModelBinding.cpp` and the existing tests `tst_live_render_structural.cpp` and possibly `tst_live_render_paragraph_edit.cpp`. Each call gets two fewer args.
@@ -1087,11 +1087,11 @@ Expected: every test in the suite passes EXCEPT the v2-hole-specific test execut
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/src/LiveListModelBinding.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp \
-        libs/markoff-live-render/tests/CMakeLists.txt
+git add libs/markoff-live/include/markoff/live-render/LiveStructuralKeyHandler.h \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/src/LiveListModelBinding.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp \
+        libs/markoff-live/tests/CMakeLists.txt
 git commit -m "$(cat <<'EOF'
 r5.5(marker): EOB-Enter and start-of-block-Enter insert marker paragraph
 
@@ -1113,8 +1113,8 @@ EOF
 ### Task 7: Stacked-Enter no-op rule
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 - [ ] **Step 1: Add a failing test**
 
@@ -1184,8 +1184,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "$(cat <<'EOF'
 r5.5(marker): stacked-Enter on a marker-only block is a no-op
 
@@ -1203,11 +1203,11 @@ EOF
 ### Task 8: Wire `MarkerScrubber` to focus-out, save, and load events
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveEditBinding.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_marker_scrubber.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveEditBinding.h`
+- Modify: `libs/markoff-live/src/LiveEditBinding.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_marker_scrubber.cpp`
 
 - [ ] **Step 1: Wire `MarkerScrubber` ownership in `LiveListModelBinding`**
 
@@ -1320,11 +1320,11 @@ Expected: every test passes.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h \
-        libs/markoff-live-render/src/LiveListModelBinding.cpp \
-        libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h \
-        libs/markoff-live-render/src/LiveEditBinding.cpp \
-        libs/markoff-live-render/tests/tst_live_render_marker_scrubber.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h \
+        libs/markoff-live/src/LiveListModelBinding.cpp \
+        libs/markoff-live/include/markoff/live-render/LiveEditBinding.h \
+        libs/markoff-live/src/LiveEditBinding.cpp \
+        libs/markoff-live/tests/tst_live_render_marker_scrubber.cpp
 git commit -m "$(cat <<'EOF'
 r5.5(marker): wire MarkerScrubber to focus-out / save / load events
 
@@ -1345,8 +1345,8 @@ EOF
 Per spec §8.3: when the user presses Backspace at qtPos 0 of a paragraph whose preceding block is marker-only, the marker paragraph + its `\n\n` separator are deleted (using the same edit `MarkerScrubber::scrubOnFocusOut` would emit), and the cursor stays at qtPos 0 of the user's original paragraph.
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 - [ ] **Step 1: Add a failing test**
 
@@ -1423,8 +1423,8 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "$(cat <<'EOF'
 r5.5(marker): backspace at qtPos 0 after marker block scrubs the marker
 
@@ -1446,14 +1446,14 @@ The marker design is live and tested by Phase 2. These tasks delete the now-unus
 ### Task 10: Clipboard scrubber (`LiveSelectionView::serializeForCopy`)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveSelectionView.cpp`
-- Modify: `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml` (if `serializeForCopy` lives there)
+- Modify: `libs/markoff-live/src/LiveSelectionView.cpp`
+- Modify: `libs/markoff-live/qml/delegates/ParagraphDelegate.qml` (if `serializeForCopy` lives there)
 - Modify: a relevant test (`tst_live_render_paragraph_edit.cpp` or a new selection-test file)
 
 - [ ] **Step 1: Find the `serializeForCopy` implementation**
 
 ```bash
-grep -rn "serializeForCopy" libs/markoff-live-render
+grep -rn "serializeForCopy" libs/markoff-live
 ```
 
 - [ ] **Step 2: Add a failing test asserting the clipboard string contains no markers**
@@ -1510,8 +1510,8 @@ EOF
 ### Task 11: Simplify `UndoCoalescer` (drop hole branches)
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/UndoCoalescer.h`
-- Modify: `libs/markoff-live-render/src/UndoCoalescer.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/UndoCoalescer.h`
+- Modify: `libs/markoff-live/src/UndoCoalescer.cpp`
 - Modify callers' constructions to drop the `holeLayer` argument.
 
 - [ ] **Step 1: Drop the `holeLayer` parameter from the ctor**
@@ -1547,7 +1547,7 @@ void UndoCoalescer::redo() {
 - [ ] **Step 3: Update construction sites**
 
 ```bash
-grep -rn "UndoCoalescer(" libs/markoff-live-render
+grep -rn "UndoCoalescer(" libs/markoff-live
 ```
 
 Drop the `holeLayer` argument at every call site.
@@ -1580,7 +1580,7 @@ EOF
 ### Task 12: Revert `BlockId` to `Markoff::BlockAnchor`
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/Cursor.h`
+- Modify: `libs/markoff-live/include/markoff/live-render/Cursor.h`
 - Modify: every consumer that pattern-matched on the variant.
 
 - [ ] **Step 1: Replace the `BlockId` definition**
@@ -1602,7 +1602,7 @@ Drop `isHoleBlockId`, `holeIdOf`, `anchorOf`, and the `#include <markoff/live-re
 - [ ] **Step 2: Find consumers and adapt**
 
 ```bash
-grep -rn "isHoleBlockId\|holeIdOf\|anchorOf\|HoleBlockId" libs/markoff-live-render
+grep -rn "isHoleBlockId\|holeIdOf\|anchorOf\|HoleBlockId" libs/markoff-live
 ```
 
 For each match: if it was checking for the hole variant, the branch is dead — delete it. If it was unwrapping the variant via `anchorOf(...)`, replace with the `BlockId` itself (now a `BlockAnchor`).
@@ -1637,23 +1637,23 @@ EOF
 ### Task 13: Delete `LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`
 
 **Files:**
-- Delete: `libs/markoff-live-render/src/LiveHoleLayer.cpp`
-- Delete: `libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h`
-- Delete: `libs/markoff-live-render/src/LiveProxyBlockModel.cpp`
-- Delete: `libs/markoff-live-render/include/markoff/live-render/LiveProxyBlockModel.h`
-- Delete: `libs/markoff-live-render/include/markoff/live-render/BlockHole.h`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
+- Delete: `libs/markoff-live/src/LiveHoleLayer.cpp`
+- Delete: `libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h`
+- Delete: `libs/markoff-live/src/LiveProxyBlockModel.cpp`
+- Delete: `libs/markoff-live/include/markoff/live-render/LiveProxyBlockModel.h`
+- Delete: `libs/markoff-live/include/markoff/live-render/BlockHole.h`
+- Modify: `libs/markoff-live/CMakeLists.txt`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
 
 - [ ] **Step 1: Delete the files**
 
 ```bash
-git rm libs/markoff-live-render/src/LiveHoleLayer.cpp \
-       libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h \
-       libs/markoff-live-render/src/LiveProxyBlockModel.cpp \
-       libs/markoff-live-render/include/markoff/live-render/LiveProxyBlockModel.h \
-       libs/markoff-live-render/include/markoff/live-render/BlockHole.h
+git rm libs/markoff-live/src/LiveHoleLayer.cpp \
+       libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h \
+       libs/markoff-live/src/LiveProxyBlockModel.cpp \
+       libs/markoff-live/include/markoff/live-render/LiveProxyBlockModel.h \
+       libs/markoff-live/include/markoff/live-render/BlockHole.h
 ```
 
 - [ ] **Step 2: Drop the source entries from the library `CMakeLists.txt`**
@@ -1666,9 +1666,9 @@ Remove the Q_PROPERTYs, getters, and member fields. Drop their #include lines.
 
 - [ ] **Step 4: Adapt QML wiring**
 
-Open `libs/markoff-live-render/qml/LiveView.qml`. Where it binds `ListView.model: binding.proxyModel` (or similar), change to `ListView.model: binding.model`. Remove any references to `binding.holeLayer`.
+Open `libs/markoff-live/qml/LiveView.qml`. Where it binds `ListView.model: binding.proxyModel` (or similar), change to `ListView.model: binding.model`. Remove any references to `binding.holeLayer`.
 
-Open `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`. Remove `isHole`, `bufferText`, `holeId` references; bind `text:` directly to `model.text`. Drop any `if (model.isHole) ...` branches.
+Open `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`. Remove `isHole`, `bufferText`, `holeId` references; bind `text:` directly to `model.text`. Drop any `if (model.isHole) ...` branches.
 
 - [ ] **Step 5: Reset the cursor-state's signal-model wiring**
 
@@ -1708,17 +1708,17 @@ EOF
 ### Task 14: Delete v2 hole-specific tests
 
 **Files:**
-- Delete: `libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp`
-- Delete: `libs/markoff-live-render/tests/tst_live_render_holes_qml.cpp`
-- Delete: `libs/markoff-live-render/tests/tst_live_render_proxy_model.cpp`
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt` (un-comment + drop)
+- Delete: `libs/markoff-live/tests/tst_live_render_holes_layer.cpp`
+- Delete: `libs/markoff-live/tests/tst_live_render_holes_qml.cpp`
+- Delete: `libs/markoff-live/tests/tst_live_render_proxy_model.cpp`
+- Modify: `libs/markoff-live/tests/CMakeLists.txt` (un-comment + drop)
 
 - [ ] **Step 1: Delete the files and their CMake entries**
 
 ```bash
-git rm libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp \
-       libs/markoff-live-render/tests/tst_live_render_holes_qml.cpp \
-       libs/markoff-live-render/tests/tst_live_render_proxy_model.cpp
+git rm libs/markoff-live/tests/tst_live_render_holes_layer.cpp \
+       libs/markoff-live/tests/tst_live_render_holes_qml.cpp \
+       libs/markoff-live/tests/tst_live_render_proxy_model.cpp
 ```
 
 In `tests/CMakeLists.txt`, remove the three `qt_add_executable` blocks for these tests (they were temporarily commented out in Task 6 — now delete them outright).
@@ -1753,8 +1753,8 @@ EOF
 ### Task 15: `LiveListModelBinding` final cleanup
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
 
 Most of the cleanup landed in Tasks 8 and 13. This task removes the last residue: any leftover `flushPendingHoles` references, stale forward declarations, etc.
 
@@ -1762,7 +1762,7 @@ Most of the cleanup landed in Tasks 8 and 13. This task removes the last residue
 
 ```bash
 grep -n "flushPendingHoles\|holeLayer\|proxyModel\|HoleLayer\|ProxyBlockModel" \
-  libs/markoff-live-render/{include,src,qml}
+  libs/markoff-live/{include,src,qml}
 ```
 
 For each remaining match: delete or rename to the marker-design equivalent.
@@ -1792,8 +1792,8 @@ EOF
 ### Task 16: Harness-driven end-to-end tests
 
 **Files:**
-- Create: `libs/markoff-live-render/tests/tst_live_render_marker_flow.cpp`
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt`
+- Create: `libs/markoff-live/tests/tst_live_render_marker_flow.cpp`
+- Modify: `libs/markoff-live/tests/CMakeLists.txt`
 
 Tests to land (each one exercises the full LiveListModelBinding stack with the realistic-input harness):
 
@@ -1830,8 +1830,8 @@ After each step, build, run, commit:
 ```bash
 cmake --build build-dev --target tst_live_render_marker_flow -j 8 \
   && ctest --test-dir build-dev -R '^tst_live_render_marker_flow$' --output-on-failure
-git add libs/markoff-live-render/tests/tst_live_render_marker_flow.cpp \
-        libs/markoff-live-render/tests/CMakeLists.txt
+git add libs/markoff-live/tests/tst_live_render_marker_flow.cpp \
+        libs/markoff-live/tests/CMakeLists.txt
 git commit -m "r5.5(marker): test <step name>"
 ```
 
@@ -1892,13 +1892,13 @@ This is a manual gate, not a test. Per spec §16 acceptance #3.
 - [ ] **Step 1: Build the test app**
 
 ```bash
-cmake --build build-dev --target markoff-live-render-app -j 8
+cmake --build build-dev --target markoff-live-app -j 8
 ```
 
 - [ ] **Step 2: Run the dogfood session**
 
 ```bash
-./build-dev/bin/markoff-live-render-app
+./build-dev/bin/markoff-live-app
 ```
 
 Open a real `.md` file (or paste real content). Type ≥ 200 words across ≥ 10 paragraphs. For each Enter:
@@ -1951,5 +1951,5 @@ EOF
 - **If a step's expected output doesn't match,** stop and investigate before proceeding. Never paper over a failure with a workaround at the next step's level — that's the cycle-guard pattern the review doc warns against.
 - **The harness tests in Task 16 are load-bearing** for the no-async-race claim. If any of them are flaky, fix the underlying race; do not retry until green.
 - **Tasks 13–15 are bulk deletions.** Use `git rm`, not `rm`, to keep history clean. Verify the deletions compile via the full build target before committing.
-- **The QML side of Task 13** (LiveView.qml, ParagraphDelegate.qml) needs visual verification in `markoff-live-render-app` after the changes. The plan does not currently codify a programmatic test for "delegate renders the marker as zero-width"; if a regression slips, add one.
+- **The QML side of Task 13** (LiveView.qml, ParagraphDelegate.qml) needs visual verification in `markoff-live-app` after the changes. The plan does not currently codify a programmatic test for "delegate renders the marker as zero-width"; if a regression slips, add one.
 - **Open questions from spec §17** are flagged inline in the relevant tasks. None blocks task progression; each has a default the plan picks (matched-as-soft-break-too predicate; live-render-lib placement; first commit granularity).

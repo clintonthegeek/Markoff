@@ -1,8 +1,8 @@
-# R1C — New library scaffold: `libs/markoff-live-render`
+# R1C — New library scaffold: `libs/markoff-live`
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Stand up the empty greenfield library for the C-restoration architecture: `libs/markoff-live-render/`, with namespace `Markoff::LiveRender`, QML module URI `org.markoff.live.render 1.0`, build wiring, an empty test executable that proves the test infrastructure is alive, and an empty test app that boots a window. No functionality. R2 onwards fills it in.
+**Goal:** Stand up the empty greenfield library for the C-restoration architecture: `libs/markoff-live/`, with namespace `Markoff::LiveRender`, QML module URI `org.markoff.live.render 1.0`, build wiring, an empty test executable that proves the test infrastructure is alive, and an empty test app that boots a window. No functionality. R2 onwards fills it in.
 
 **Architecture:** Mirror `libs/markoff-view-qml`'s structure (CMakeLists, `include/`, `src/`, `qml/`, `tests/`, `app/`, per-library `CLAUDE.md`) since that's the project's established pattern. Use `qt_add_qml_module(STATIC ...)`. Link against `markoff_core` (downstream consumer; no inverse dependency).
 
@@ -17,20 +17,20 @@
 ## File map
 
 **Modified (top-level):**
-- `CMakeLists.txt` — add `add_subdirectory(libs/markoff-live-render)`.
+- `CMakeLists.txt` — add `add_subdirectory(libs/markoff-live)`.
 
 **New:**
-- `libs/markoff-live-render/CMakeLists.txt` — library + tests + app wiring.
-- `libs/markoff-live-render/CLAUDE.md` — per-library guide stub.
-- `libs/markoff-live-render/include/markoff/live-render/MarkoffLiveRenderExport.h` — export macro.
-- `libs/markoff-live-render/include/markoff/live-render/Version.h` — version + namespace declaration; serves as the public-include anchor.
-- `libs/markoff-live-render/src/Version.cpp` — single TU so the static library has at least one object file.
-- `libs/markoff-live-render/qml/Placeholder.qml` — minimal QML file so `qt_add_qml_module` has at least one QML source (nothing functional; replaced in R2).
-- `libs/markoff-live-render/tests/CMakeLists.txt` — test wiring.
-- `libs/markoff-live-render/tests/tst_live_render_skeleton.cpp` — single trivial test (proves the test-infrastructure is wired).
-- `libs/markoff-live-render/app/CMakeLists.txt` — test-app wiring.
-- `libs/markoff-live-render/app/main.cpp` — `QApplication` + `QQmlApplicationEngine` boot.
-- `libs/markoff-live-render/app/Main.qml` — minimal `Window`.
+- `libs/markoff-live/CMakeLists.txt` — library + tests + app wiring.
+- `libs/markoff-live/CLAUDE.md` — per-library guide stub.
+- `libs/markoff-live/include/markoff/live-render/MarkoffLiveRenderExport.h` — export macro.
+- `libs/markoff-live/include/markoff/live-render/Version.h` — version + namespace declaration; serves as the public-include anchor.
+- `libs/markoff-live/src/Version.cpp` — single TU so the static library has at least one object file.
+- `libs/markoff-live/qml/Placeholder.qml` — minimal QML file so `qt_add_qml_module` has at least one QML source (nothing functional; replaced in R2).
+- `libs/markoff-live/tests/CMakeLists.txt` — test wiring.
+- `libs/markoff-live/tests/tst_live_render_skeleton.cpp` — single trivial test (proves the test-infrastructure is wired).
+- `libs/markoff-live/app/CMakeLists.txt` — test-app wiring.
+- `libs/markoff-live/app/main.cpp` — `QApplication` + `QQmlApplicationEngine` boot.
+- `libs/markoff-live/app/Main.qml` — minimal `Window`.
 
 ---
 
@@ -59,26 +59,26 @@ No code changes in this task.
 ### Task 2: Create the library directory layout
 
 **Files to create (as empty placeholder content; populated in subsequent tasks):**
-- `libs/markoff-live-render/CMakeLists.txt`
-- `libs/markoff-live-render/include/markoff/live-render/Version.h`
-- `libs/markoff-live-render/include/markoff/live-render/MarkoffLiveRenderExport.h`
-- `libs/markoff-live-render/src/Version.cpp`
-- `libs/markoff-live-render/qml/Placeholder.qml`
-- `libs/markoff-live-render/tests/CMakeLists.txt`
-- `libs/markoff-live-render/tests/tst_live_render_skeleton.cpp`
-- `libs/markoff-live-render/app/CMakeLists.txt`
-- `libs/markoff-live-render/app/main.cpp`
-- `libs/markoff-live-render/app/Main.qml`
-- `libs/markoff-live-render/CLAUDE.md`
+- `libs/markoff-live/CMakeLists.txt`
+- `libs/markoff-live/include/markoff/live-render/Version.h`
+- `libs/markoff-live/include/markoff/live-render/MarkoffLiveRenderExport.h`
+- `libs/markoff-live/src/Version.cpp`
+- `libs/markoff-live/qml/Placeholder.qml`
+- `libs/markoff-live/tests/CMakeLists.txt`
+- `libs/markoff-live/tests/tst_live_render_skeleton.cpp`
+- `libs/markoff-live/app/CMakeLists.txt`
+- `libs/markoff-live/app/main.cpp`
+- `libs/markoff-live/app/Main.qml`
+- `libs/markoff-live/CLAUDE.md`
 
 - [ ] **Step 1: Create the directory tree**
 
 ```bash
-mkdir -p libs/markoff-live-render/include/markoff/live-render
-mkdir -p libs/markoff-live-render/src
-mkdir -p libs/markoff-live-render/qml
-mkdir -p libs/markoff-live-render/tests
-mkdir -p libs/markoff-live-render/app
+mkdir -p libs/markoff-live/include/markoff/live-render
+mkdir -p libs/markoff-live/src
+mkdir -p libs/markoff-live/qml
+mkdir -p libs/markoff-live/tests
+mkdir -p libs/markoff-live/app
 ```
 
 The remaining tasks fill files into these directories.
@@ -88,12 +88,12 @@ The remaining tasks fill files into these directories.
 ### Task 3: Public include skeleton
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/MarkoffLiveRenderExport.h`
-- Create: `libs/markoff-live-render/include/markoff/live-render/Version.h`
+- Create: `libs/markoff-live/include/markoff/live-render/MarkoffLiveRenderExport.h`
+- Create: `libs/markoff-live/include/markoff/live-render/Version.h`
 
 - [ ] **Step 1: Write the export macro header**
 
-Create `libs/markoff-live-render/include/markoff/live-render/MarkoffLiveRenderExport.h`:
+Create `libs/markoff-live/include/markoff/live-render/MarkoffLiveRenderExport.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -110,7 +110,7 @@ The minimal version is fine; `markoff-foundation` uses a similar pattern with a 
 
 - [ ] **Step 2: Write the version + namespace anchor header**
 
-Create `libs/markoff-live-render/include/markoff/live-render/Version.h`:
+Create `libs/markoff-live/include/markoff/live-render/Version.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -136,7 +136,7 @@ MARKOFF_LIVE_RENDER_EXPORT quint32 version() noexcept;
 
 - [ ] **Step 3: Write the matching .cpp**
 
-Create `libs/markoff-live-render/src/Version.cpp`:
+Create `libs/markoff-live/src/Version.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -159,11 +159,11 @@ This is the single TU that ensures the static library has at least one object fi
 ### Task 4: Library CMakeLists.txt
 
 **Files:**
-- Create: `libs/markoff-live-render/CMakeLists.txt`
+- Create: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Write the library CMakeLists**
 
-Create `libs/markoff-live-render/CMakeLists.txt`:
+Create `libs/markoff-live/CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.19)
@@ -220,7 +220,7 @@ endif()
 
 - [ ] **Step 2: Add a placeholder QML file**
 
-Create `libs/markoff-live-render/qml/Placeholder.qml`:
+Create `libs/markoff-live/qml/Placeholder.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -239,12 +239,12 @@ Item {
 ### Task 5: Test infrastructure
 
 **Files:**
-- Create: `libs/markoff-live-render/tests/CMakeLists.txt`
-- Create: `libs/markoff-live-render/tests/tst_live_render_skeleton.cpp`
+- Create: `libs/markoff-live/tests/CMakeLists.txt`
+- Create: `libs/markoff-live/tests/tst_live_render_skeleton.cpp`
 
 - [ ] **Step 1: Write the placeholder test**
 
-Create `libs/markoff-live-render/tests/tst_live_render_skeleton.cpp`:
+Create `libs/markoff-live/tests/tst_live_render_skeleton.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -269,7 +269,7 @@ QTEST_MAIN(TstLiveRenderSkeleton)
 
 - [ ] **Step 2: Write the tests CMakeLists**
 
-Create `libs/markoff-live-render/tests/CMakeLists.txt`:
+Create `libs/markoff-live/tests/CMakeLists.txt`:
 
 ```cmake
 # R1C provides one trivial test that proves the test infrastructure is
@@ -295,13 +295,13 @@ add_test(NAME tst_live_render_skeleton COMMAND tst_live_render_skeleton)
 ### Task 6: Test app skeleton
 
 **Files:**
-- Create: `libs/markoff-live-render/app/CMakeLists.txt`
-- Create: `libs/markoff-live-render/app/main.cpp`
-- Create: `libs/markoff-live-render/app/Main.qml`
+- Create: `libs/markoff-live/app/CMakeLists.txt`
+- Create: `libs/markoff-live/app/main.cpp`
+- Create: `libs/markoff-live/app/Main.qml`
 
 - [ ] **Step 1: Write the app's main**
 
-Create `libs/markoff-live-render/app/main.cpp`:
+Create `libs/markoff-live/app/main.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -324,7 +324,7 @@ int main(int argc, char *argv[])
 
 - [ ] **Step 2: Write the app's QML**
 
-Create `libs/markoff-live-render/app/Main.qml`:
+Create `libs/markoff-live/app/Main.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -351,28 +351,28 @@ ApplicationWindow {
 
 - [ ] **Step 3: Write the app CMakeLists**
 
-Create `libs/markoff-live-render/app/CMakeLists.txt`:
+Create `libs/markoff-live/app/CMakeLists.txt`:
 
 ```cmake
-qt_add_executable(markoff-live-render-app
+qt_add_executable(markoff-live-app
     main.cpp
 )
 
-qt_add_qml_module(markoff-live-render-app
+qt_add_qml_module(markoff-live-app
     URI org.markoff.live.render.app
     VERSION 1.0
     QML_FILES
         Main.qml
 )
 
-target_link_libraries(markoff-live-render-app PRIVATE
+target_link_libraries(markoff-live-app PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2 Qt6::Qml
     markoff_live_render
     markoff_live_renderplugin
     markoff_core
 )
 
-qt_import_qml_plugins(markoff-live-render-app)
+qt_import_qml_plugins(markoff-live-app)
 ```
 
 (Note: `markoff_live_renderplugin` — the QML plugin auto-target Qt generates from the library's `qt_add_qml_module` — must match the underscore-name `markoff_live_render` used in the library's own `qt_add_qml_module`. If you used a different library target name, adjust accordingly.)
@@ -382,11 +382,11 @@ qt_import_qml_plugins(markoff-live-render-app)
 ### Task 7: Per-library guide
 
 **Files:**
-- Create: `libs/markoff-live-render/CLAUDE.md`
+- Create: `libs/markoff-live/CLAUDE.md`
 
 - [ ] **Step 1: Write a brief CLAUDE.md**
 
-Create `libs/markoff-live-render/CLAUDE.md`:
+Create `libs/markoff-live/CLAUDE.md`:
 
 ```markdown
 # markoff-live-render — library guide
@@ -413,13 +413,13 @@ Standalone (within the project's existing presets):
 ```bash
 cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build build-dev --target markoff_live_render -j 8
-cmake --build build-dev --target markoff-live-render-app -j 8
+cmake --build build-dev --target markoff-live-app -j 8
 ```
 
 Run the test app:
 
 ```bash
-./build-dev/bin/markoff-live-render-app
+./build-dev/bin/markoff-live-app
 ```
 
 (Until R2 wires in real content, this just opens an empty window.)
@@ -469,7 +469,7 @@ add_subdirectory(libs/markoff-view-qml)
 
 ```cmake
 add_subdirectory(libs/markoff-view-qml)
-add_subdirectory(libs/markoff-live-render)
+add_subdirectory(libs/markoff-live)
 add_subdirectory(libs/markoff-source)
 ```
 
@@ -492,7 +492,7 @@ Expected: configure succeeds. The new library is registered. If a "duplicate tar
 ```bash
 cmake --build build-dev --target markoff_live_render -j 8
 cmake --build build-dev --target tst_live_render_skeleton -j 8
-cmake --build build-dev --target markoff-live-render-app -j 8
+cmake --build build-dev --target markoff-live-app -j 8
 ```
 
 Expected: all three build cleanly. If anything fails, the most likely causes:
@@ -511,10 +511,10 @@ Expected: pass.
 - [ ] **Step 4: Briefly run the test app**
 
 ```bash
-./build-dev/libs/markoff-live-render/app/markoff-live-render-app
+./build-dev/libs/markoff-live/app/markoff-live-app
 ```
 
-(Or whatever path the build produced — `find build-dev -name 'markoff-live-render-app'` if you're not sure.)
+(Or whatever path the build produced — `find build-dev -name 'markoff-live-app'` if you're not sure.)
 
 Expected: a window opens with the placeholder text. Close it. The point is just that the app boots and the QML loads — not that anything is functional.
 
@@ -541,20 +541,20 @@ git diff CMakeLists.txt
 
 Expected:
 - `CMakeLists.txt` modified (one new `add_subdirectory` line).
-- `libs/markoff-live-render/` directory created with all the files from Tasks 2–7.
+- `libs/markoff-live/` directory created with all the files from Tasks 2–7.
 
 - [ ] **Step 2: Commit**
 
 ```bash
-git add CMakeLists.txt libs/markoff-live-render
+git add CMakeLists.txt libs/markoff-live
 
 git commit -m "$(cat <<'EOF'
-feat(live-render): scaffold libs/markoff-live-render
+feat(live-render): scaffold libs/markoff-live
 
 Empty side-by-side library for the C-restoration live render. Builds
 clean as a static QML module under URI org.markoff.live.render 1.0;
 ships one trivial test (tst_live_render_skeleton) and a window-shaped
-test app (markoff-live-render-app). No architecture yet — R2 onwards
+test app (markoff-live-app). No architecture yet — R2 onwards
 builds the library up per spec §11.
 
 Existing markoff-view-qml stays in service of source mode and the
@@ -592,7 +592,7 @@ After completing all tasks:
 This plan is complete when:
 
 1. `tst_live_render_skeleton` passes (1/1 green).
-2. `markoff-live-render-app` builds and links cleanly.
+2. `markoff-live-app` builds and links cleanly.
 3. The full fast-tier suite passes — N+1 expected.
 4. One commit on the branch (the scaffold commit).
 

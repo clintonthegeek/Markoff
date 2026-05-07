@@ -100,7 +100,7 @@ Scenarios verified (each produced the expected block tree at every step):
 
 ### 1.3 What I did *not* test
 
-- **No interactive QML test.** I cannot drive `markoff-live-render-app`
+- **No interactive QML test.** I cannot drive `markoff-live-app`
   through human keystrokes from this environment. The parser-level
   simulation covers the source-edit and parse-back legs; the cursor-
   delivery, focus-routing, and TextEdit-binding legs need separate
@@ -112,7 +112,7 @@ Scenarios verified (each produced the expected block tree at every step):
   is a structural argument, not a measured one. A harness test against
   the implemented marker path is required before claiming the race is
   resolved.
-- **No `markoff-live-render-app` build of the spike branch.** I did
+- **No `markoff-live-app` build of the spike branch.** I did
   configure the build (`cmake -S . -B build-dev`) and built the parser
   library + my standalone probes, but did not build the full live-render
   + QML stack. The spike does not propose code changes; it produces a
@@ -223,15 +223,15 @@ via `wc -l`.
 
 | File | LOC |
 |------|----:|
-| `libs/markoff-live-render/src/LiveHoleLayer.cpp` | 214 |
-| `libs/markoff-live-render/include/markoff/live-render/LiveHoleLayer.h` | 98 |
-| `libs/markoff-live-render/src/LiveProxyBlockModel.cpp` | 204 |
-| `libs/markoff-live-render/include/markoff/live-render/LiveProxyBlockModel.h` | 75 |
-| `libs/markoff-live-render/include/markoff/live-render/BlockHole.h` | 37 |
+| `libs/markoff-live/src/LiveHoleLayer.cpp` | 214 |
+| `libs/markoff-live/include/markoff/live-render/LiveHoleLayer.h` | 98 |
+| `libs/markoff-live/src/LiveProxyBlockModel.cpp` | 204 |
+| `libs/markoff-live/include/markoff/live-render/LiveProxyBlockModel.h` | 75 |
+| `libs/markoff-live/include/markoff/live-render/BlockHole.h` | 37 |
 | **Subtotal — production code, full-file deletion** | **628** |
-| `libs/markoff-live-render/tests/tst_live_render_holes_layer.cpp` | 526 |
-| `libs/markoff-live-render/tests/tst_live_render_holes_qml.cpp` | 88 |
-| `libs/markoff-live-render/tests/tst_live_render_proxy_model.cpp` | 256 |
+| `libs/markoff-live/tests/tst_live_render_holes_layer.cpp` | 526 |
+| `libs/markoff-live/tests/tst_live_render_holes_qml.cpp` | 88 |
+| `libs/markoff-live/tests/tst_live_render_proxy_model.cpp` | 256 |
 | **Subtotal — tests, full-file deletion** | **870** |
 
 ### 3.2 Files that lose hole-related code (partial deletion)

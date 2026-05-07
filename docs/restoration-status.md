@@ -42,7 +42,7 @@ Status legend: `pending` (not started) · `in-progress` (commits landing) · `do
 |---|---|---|---|---|
 | **R1A** | [r1a-parse-edit-sequence](plans/2026-05-02-live-render-r1a-parse-edit-sequence.md) | `complete` | `466121e`, `818485b` | Foundation surface: `parseUpdated` 4th arg. |
 | **R1B** | [r1b-inline-span-bake](plans/2026-05-02-live-render-r1b-inline-span-bake.md) | `complete` | `65cafdf`, `d3e6384` | Parser surface: `TopLevelBlock::inlineSpans`. |
-| **R1C** | [r1c-library-scaffold](plans/2026-05-02-live-render-r1c-library-scaffold.md) | `complete` | `48ba7d6` | New library shell: `libs/markoff-live-render`. |
+| **R1C** | [r1c-library-scaffold](plans/2026-05-02-live-render-r1c-library-scaffold.md) | `complete` | `48ba7d6` | New library shell: `libs/markoff-live`. |
 | **R2** | [r2-read-only-render](plans/2026-05-02-live-render-r2-read-only-render.md) | `complete` | `5a0dae7` | L0 Coordinates + L1 read-only view + L2 diff model. 113/113 fast-tier. |
 | **R3** | [r3-cursor-selection](plans/2026-05-02-live-render-r3-cursor-selection.md) | `complete` | `3484c11`, `2225061`, `e837710`, `1f26ec8`, `18abd96` | LiveCursorState + BlockHitTester + LiveSelectionView + scrollbar. Dogfood-surfaced fixes: selection-paint, scroll-then-click hit-test, HR source-faithful copy. 114/114. |
 | **R4** | [r4-paragraph-editing](plans/2026-05-02-live-render-r4-paragraph-editing.md) | `complete` | `1b75d37`, `ce0494f`, `3181fe8`, `dec12e7`, `7ae29e1`, `033d7e7`, `fa8e80d`, `99c616f`, `5e12f10`, `563c1f3`, `77a84eb`, `28e1c8f`, `a24c766`, `26dc802`, `7252498`, `324de05`, `201cbd3`, `5662f95`, `7d49718`, `c7dca41`, `37b97bf` | Paragraph + heading + code-block writable via LiveEditBinding; freshness gate; three cycle guards; previousText cache; cachedByteOffset refresh; click-focus routing; Enter swallowed (R5). 6/6 fast-tier; 8 paragraph_edit slots. |
@@ -166,7 +166,7 @@ Append-only chronological record. Each entry: date, commit short SHA, one-senten
 | 2026-05-02 | `5a0dae7` | feat(live-render): R2 complete — read-only render with diff model |
 | 2026-05-02 | `ba0db23` | docs(plan): R2 implementation plan — read-only render with diff model |
 | 2026-05-02 | `5bc9db2` | docs(status): fix R1C commit SHA in restoration-status.md |
-| 2026-05-02 | `48ba7d6` | feat(live-render): scaffold libs/markoff-live-render (R1C complete) |
+| 2026-05-02 | `48ba7d6` | feat(live-render): scaffold libs/markoff-live (R1C complete) |
 | 2026-05-02 | `bd10576` | docs: code-only architectural audit of live render |
 | 2026-05-02 | `f6b7427` | docs(spec): live render restoration design (C-architecture, 9 layers, 10 phases) |
 | 2026-05-02 | `136d600` | docs(spec): d-evolution proposal for collabtext review |
@@ -184,7 +184,7 @@ The user does manual dogfood testing between phases. Their feedback lives here v
 
 ### 2026-05-04 — R5.5 (marker-paragraph) — pass 3
 
-User script: dogfood the live render in `markoff-live-render-app` on `docs/phase-c-status.md`, repeating the §13 marker-paragraph dogfood script after the Bug 3 v2 (byte-keyed cursor delivery) fix landed in `dd64de5`.
+User script: dogfood the live render in `markoff-live-app` on `docs/phase-c-status.md`, repeating the §13 marker-paragraph dogfood script after the Bug 3 v2 (byte-keyed cursor delivery) fix landed in `dd64de5`.
 
 User result: Bug 3 reproduced again. Cursor lands one row past the user's content (on the originally-following paragraph) when pressing Enter at qtPos 0 of a regular paragraph mid-document. The byte-keyed delivery did not address it. User stopped iterating.
 
@@ -192,7 +192,7 @@ Action: docs-only commit (this commit) — captures honest state of the bug, ret
 
 ### 2026-05-04 — R5.5 (marker-paragraph) — pass 2
 
-User script: dogfood the live render in `markoff-live-render-app` on `docs/phase-c-status.md`, repeating the §13 marker-paragraph dogfood script after the Bug 3 v1 (anchor-keyed cursor delivery) fix landed in `3c86b76`.
+User script: dogfood the live render in `markoff-live-app` on `docs/phase-c-status.md`, repeating the §13 marker-paragraph dogfood script after the Bug 3 v1 (anchor-keyed cursor delivery) fix landed in `3c86b76`.
 
 User result: Bug 3 reproduced. Cursor consistently lands on the originally-following paragraph instead of the user's shifted content. Reproduced 3 times in a row. Log captured at `/tmp/dogfood2.txt` (529 lines).
 
@@ -200,7 +200,7 @@ Action: Bug 3 v2 attempt landed (`dd64de5`) — switched cursor delivery from an
 
 ### 2026-05-04 — R5.5 (marker-paragraph) — pass 1
 
-User script: dogfood the live render in `markoff-live-render-app` per the §13 marker-paragraph dogfood script (≥200 words across ≥10 paragraphs; verify no scramble, clean save, marker-free reload).
+User script: dogfood the live render in `markoff-live-app` per the §13 marker-paragraph dogfood script (≥200 words across ≥10 paragraphs; verify no scramble, clean save, marker-free reload).
 
 User result: two bugs surfaced.
 
@@ -211,7 +211,7 @@ Action: Bug 1 fixed in `114b807` (list-gate predicate `rowIsListOrQuoteContent` 
 
 ### 2026-05-02 — R4 (paragraph editing through sequence-tagged binding)
 
-User script: dogfood the live render in `markoff-live-render-app` on a long markdown document (`docs/phase-c-status.md`). Click into a paragraph and type a sentence; verify the cursor appears and characters land at the cursor position without scrambling or duplication.
+User script: dogfood the live render in `markoff-live-app` on a long markdown document (`docs/phase-c-status.md`). Click into a paragraph and type a sentence; verify the cursor appears and characters land at the cursor position without scrambling or duplication.
 
 User result (verbatim):
 
@@ -237,7 +237,7 @@ Action: four fixes landed during the dogfood pass; R4 closes with two scope note
 
 ### 2026-05-02 — R3 (cursor + selection + keyboard nav)
 
-User script: dogfood the live render in `markoff-live-render-app` on a long markdown document (~150 blocks). Drag-select within a paragraph; drag-select across paragraph boundaries; scroll a long way; drag-select again in a different region; copy a multi-block selection (including a horizontal rule in the range) and paste into a text editor.
+User script: dogfood the live render in `markoff-live-app` on a long markdown document (~150 blocks). Drag-select within a paragraph; drag-select across paragraph boundaries; scroll a long way; drag-select again in a different region; copy a multi-block selection (including a horizontal rule in the range) and paste into a text editor.
 
 User result (verbatim):
 

@@ -23,7 +23,7 @@ collabtext approved Option β: a single new `CollabText::Crdt::IdList` primitive
 
 ### 2.1 Code state
 
-- `libs/markoff-live-render` exists with L0 → L4 implemented, L5 partially implemented (R5 paused at Tasks 1–11; Tasks 12–17 effectively replaced by R5.5).
+- `libs/markoff-live` exists with L0 → L4 implemented, L5 partially implemented (R5 paused at Tasks 1–11; Tasks 12–17 effectively replaced by R5.5).
 - R5.5 marker-paragraph implementation (commits `a895817..5473e81` plus the four post-Task-17 fixes) is in the tree. Tests green; dogfood blocked on Bug 3.
 - The marker-paragraph machinery (`MarkerScrubber`, ZWSP scrubbing, atomic-bundled-edit primitive in `LiveEditBinding`, the no-op stacked-Enter rule, the marker-aware initial-qtPos rule in cursor delivery) exists and is functional within the limits Bug 3 reveals.
 - v2-holes code (`LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, the discriminated `BlockId` variant) was already deleted by R5.5 Tasks 11–14.
@@ -31,7 +31,7 @@ collabtext approved Option β: a single new `CollabText::Crdt::IdList` primitive
 
 ### 2.2 What ships, what doesn't
 
-This branch never ships to master in its current shape. D2 will replace `libs/markoff-live-render`'s L4+ layers; the lower layers carry forward (see §4). Master continues to ship Phase C of the original Markoff family for CorbomiteApp until D2 is ready to supersede it.
+This branch never ships to master in its current shape. D2 will replace `libs/markoff-live`'s L4+ layers; the lower layers carry forward (see §4). Master continues to ship Phase C of the original Markoff family for CorbomiteApp until D2 is ready to supersede it.
 
 ### 2.3 The Bug 3 handoff is cancelled
 
@@ -66,7 +66,7 @@ The C-restoration spec was written against a "collab-ready" premise (C spec prem
 
 | Carry-forward | From | Notes for D2 |
 |---|---|---|
-| L0 coordinate primitives | `libs/markoff-live-render` | byte/qtPos/block-local conversions; D removes the document-level byte conversion needs but block-local primitives stay |
+| L0 coordinate primitives | `libs/markoff-live` | byte/qtPos/block-local conversions; D removes the document-level byte conversion needs but block-local primitives stay |
 | L1 read-only render | same | `ListView` + delegates, no events |
 | L2 diff-driven model | same | Diff target changes from parser-derived `BlockAnchor`s to structural-CRDT element ids; the layer's *shape* is sound |
 | L3 cursor model (Shape 1) | C spec §3 | `BlockId` becomes the structural-CRDT element id — *more* stable than the current `BlockAnchor`; the discriminated union holds |

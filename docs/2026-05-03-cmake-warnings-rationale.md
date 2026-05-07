@@ -70,7 +70,7 @@ Distinct plugin names mentioned in #1 (per app target):
 
 **Files:**
 - `libs/markoff-view-qml/app/CMakeLists.txt` line 20
-- `libs/markoff-live-render/app/CMakeLists.txt` line 19
+- `libs/markoff-live/app/CMakeLists.txt` line 19
 
 **Proposed change:** delete the `qt_import_qml_plugins(<target>)` line in
 both files.
@@ -102,7 +102,7 @@ pre-6.5 Qt patterns and is now noise.
   `markoff-*-app`. The find_package floor of 6.8 makes this a
   non-concern in practice.
 - After applying, run `./build-dev/bin/markoff-view-qml-app
-  /path/to/file.md` and `./build-dev/bin/markoff-live-render-app` and
+  /path/to/file.md` and `./build-dev/bin/markoff-live-app` and
   confirm no QML import errors appear at startup (e.g., missing
   `QtQuick.Controls.Fusion` style). If any do, `qt_import_plugins(<tgt>
   INCLUDE Qt6::QQuick2Plugin ...)` listing each by name is the
@@ -122,7 +122,7 @@ emitted from inside `qt_import_qml_plugins`'s lookup logic).
 
 **Files:**
 - `libs/markoff-view-qml/CMakeLists.txt` `qt_add_qml_module(markoff_view_qml ...)` block (line 12)
-- `libs/markoff-live-render/CMakeLists.txt` `qt_add_qml_module(markoff_live_render ...)` block (line 13)
+- `libs/markoff-live/CMakeLists.txt` `qt_add_qml_module(markoff_live_render ...)` block (line 13)
 
 **Proposed change:** add `OUTPUT_DIRECTORY` argument to each call:
 
@@ -201,7 +201,7 @@ qt_policy(SET QTP0004 NEW)
 ```
 
 then create `libs/markoff-view-qml/qml/delegates/qmldir` and
-`libs/markoff-live-render/qml/delegates/qmldir`, each containing at
+`libs/markoff-live/qml/delegates/qmldir`, each containing at
 minimum:
 ```
 module org.markoff.view.qml.delegates
@@ -308,7 +308,7 @@ Please reply to / annotate these before applying:
 1. What Qt version is the master/CI environment on? (Affects QTP0001
    and QTP0004 availability.)
 2. Are the two test apps (`markoff-view-qml-app`,
-   `markoff-live-render-app`) actually launched in CI, or are they
+   `markoff-live-app`) actually launched in CI, or are they
    build-only? (Determines how aggressively we should test Fix 1's
    plugin-loading behaviour.)
 3. Is there an existing `qt_policy` call elsewhere I should align

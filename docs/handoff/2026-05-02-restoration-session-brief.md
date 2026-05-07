@@ -67,7 +67,7 @@ If you find yourself wanting to deviate from the plan's commit structure, that's
 
 ### 3.4 Dogfood gates
 
-Phases R4–R10 have dogfood scripts in spec §10.3 that the user runs manually (we don't try to automate UI testing; `QTest::keyClick` doesn't reproduce the async parse round-trip's timing reliably enough). The user runs these on `markoff-live-render-app` after a phase's implementation is done.
+Phases R4–R10 have dogfood scripts in spec §10.3 that the user runs manually (we don't try to automate UI testing; `QTest::keyClick` doesn't reproduce the async parse round-trip's timing reliably enough). The user runs these on `markoff-live-app` after a phase's implementation is done.
 
 - The phase enters `dogfood` status after all the phase's plans are merged.
 - The user runs the script and posts feedback in the dogfood log of `restoration-status.md`.

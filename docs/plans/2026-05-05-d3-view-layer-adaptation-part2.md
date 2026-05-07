@@ -13,9 +13,9 @@
 ### Task 17: `ListItemDelegate.qml` + structural key handlers
 
 **Files:**
-- Create: `libs/markoff-live-render/qml/delegates/ListItemDelegate.qml`
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt` (add QML file)
+- Create: `libs/markoff-live/qml/delegates/ListItemDelegate.qml`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt` (add QML file)
 
 - [ ] **Step 1: Write failing structural test**
 
@@ -321,9 +321,9 @@ Expected: all pass including new list-item tests.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/ListItemDelegate.qml \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/CMakeLists.txt
+git add libs/markoff-live/qml/delegates/ListItemDelegate.qml \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/CMakeLists.txt
 git commit -m "feat(live-render): ListItemDelegate + Enter/Backspace/Tab/indent structural handlers
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -334,9 +334,9 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 18: `BlockquoteDelegate.qml` + structural key handlers
 
 **Files:**
-- Create: `libs/markoff-live-render/qml/delegates/BlockquoteDelegate.qml`
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Create: `libs/markoff-live/qml/delegates/BlockquoteDelegate.qml`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Write failing test**
 
@@ -530,9 +530,9 @@ Expected: all pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/BlockquoteDelegate.qml \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/CMakeLists.txt
+git add libs/markoff-live/qml/delegates/BlockquoteDelegate.qml \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/CMakeLists.txt
 git commit -m "feat(live-render): BlockquoteDelegate + Enter/exit structural handlers
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -543,7 +543,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 19: Update `LiveView.qml` — add DelegateChoices for new kinds
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/LiveView.qml`
+- Modify: `libs/markoff-live/qml/LiveView.qml`
 
 - [ ] **Step 1: Add DelegateChoices**
 
@@ -590,17 +590,17 @@ Item {
 - [ ] **Step 3: Build and test app**
 
 ```bash
-cmake --build build-dev --target markoff-live-render-app -j 8 && \
-./build-dev/bin/markoff-live-render-app
+cmake --build build-dev --target markoff-live-app -j 8 && \
+./build-dev/bin/markoff-live-app
 ```
 Load a markdown file with various block types. Verify list items, blockquotes render with their delegates.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/LiveView.qml \
-        libs/markoff-live-render/qml/delegates/MathDelegate.qml \
-        libs/markoff-live-render/CMakeLists.txt
+git add libs/markoff-live/qml/LiveView.qml \
+        libs/markoff-live/qml/delegates/MathDelegate.qml \
+        libs/markoff-live/CMakeLists.txt
 git commit -m "feat(live-render): LiveView DelegateChoices for ListItem/Blockquote/Math
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -614,11 +614,11 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 **Files:**
 - Modify: `CMakeLists.txt` (root)
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Add jkqtmathtext to root CMakeLists**
 
-In `CMakeLists.txt`, before `add_subdirectory(libs/markoff-live-render)`, add:
+In `CMakeLists.txt`, before `add_subdirectory(libs/markoff-live)`, add:
 ```cmake
 # jkqtmathtext — LaTeX math rendering. Used by markoff-live-render for Math blocks.
 if(NOT TARGET jkqtmathtext)
@@ -628,7 +628,7 @@ endif()
 
 - [ ] **Step 2: Link jkqtmathtext in markoff-live-render**
 
-In `libs/markoff-live-render/CMakeLists.txt`, add to `target_link_libraries`:
+In `libs/markoff-live/CMakeLists.txt`, add to `target_link_libraries`:
 ```cmake
 target_link_libraries(markoff_live_render PUBLIC
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2
@@ -648,7 +648,7 @@ Expected: jkqtmathtext compiles and links cleanly.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add CMakeLists.txt libs/markoff-live-render/CMakeLists.txt
+git add CMakeLists.txt libs/markoff-live/CMakeLists.txt
 git commit -m "build: wire jkqtmathtext into markoff-live-render for Math block rendering
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -659,9 +659,9 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 21: `MathRenderer` C++ class + singleton QML registration
 
 **Files:**
-- Create: `libs/markoff-live-render/src/MathRenderer.h`
-- Create: `libs/markoff-live-render/src/MathRenderer.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Create: `libs/markoff-live/src/MathRenderer.h`
+- Create: `libs/markoff-live/src/MathRenderer.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Create `MathRenderer.h`**
 
@@ -769,9 +769,9 @@ Expected: clean build with MathRenderer compiled.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/MathRenderer.h \
-        libs/markoff-live-render/src/MathRenderer.cpp \
-        libs/markoff-live-render/CMakeLists.txt
+git add libs/markoff-live/src/MathRenderer.h \
+        libs/markoff-live/src/MathRenderer.cpp \
+        libs/markoff-live/CMakeLists.txt
 git commit -m "feat(live-render): MathRenderer wraps jkqtmathtext for QML math rendering
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -782,7 +782,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 22: Full `MathDelegate.qml` — render + edit modes
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/MathDelegate.qml` (replace stub)
+- Modify: `libs/markoff-live/qml/delegates/MathDelegate.qml` (replace stub)
 
 - [ ] **Step 1: Replace stub with full delegate**
 
@@ -980,14 +980,14 @@ Expected: clean build.
 - [ ] **Step 3: Manual test**
 
 ```bash
-./build-dev/bin/markoff-live-render-app
+./build-dev/bin/markoff-live-app
 ```
 Type `$x^2$` in a paragraph block. Verify it transitions to a Math block (kind-transition detection). Press F2 → verify edit mode activates. Press Escape → verify returns to BlockSelected.
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/MathDelegate.qml
+git add libs/markoff-live/qml/delegates/MathDelegate.qml
 git commit -m "feat(live-render): MathDelegate with render/edit modes (F2 entry, Escape exit)
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1000,8 +1000,8 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 The `tryHandle` method needs to handle `F2` on BlockSelected blocks (enter internal-edit mode) and `Escape` on `BlockInternalEdit` blocks (return to BlockSelected). These are kind-agnostic transitions.
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveStructuralKeyHandler.h`
 
 - [ ] **Step 1: Write test**
 
@@ -1076,7 +1076,7 @@ Expected: all pass including F2 transition test.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp
 git commit -m "feat(live-render): F2 enters BlockInternalEdit; Escape exits to BlockSelected
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1089,11 +1089,11 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 24: `LiveContextMenu.qml` + expose via `LiveListModelBinding`
 
 **Files:**
-- Create: `libs/markoff-live-render/qml/LiveContextMenu.qml`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
-- Modify: `libs/markoff-live-render/qml/LiveView.qml`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Create: `libs/markoff-live/qml/LiveContextMenu.qml`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/qml/LiveView.qml`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Create `LiveContextMenu.qml`**
 
@@ -1202,7 +1202,7 @@ onClicked: (mouse) => {
 
 - [ ] **Step 3: Add `LiveContextMenu.qml` to CMakeLists QML_FILES**
 
-In `libs/markoff-live-render/CMakeLists.txt`, add `qml/LiveContextMenu.qml` to QML_FILES.
+In `libs/markoff-live/CMakeLists.txt`, add `qml/LiveContextMenu.qml` to QML_FILES.
 
 - [ ] **Step 4: Build**
 
@@ -1262,7 +1262,7 @@ QTEST_MAIN(TstContextMenu)
 #include "tst_live_render_context_menu.moc"
 ```
 
-Add to `libs/markoff-live-render/tests/CMakeLists.txt`:
+Add to `libs/markoff-live/tests/CMakeLists.txt`:
 ```cmake
 qt_add_executable(tst_live_render_context_menu
     tst_live_render_context_menu.cpp
@@ -1283,11 +1283,11 @@ Expected: all pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/LiveContextMenu.qml \
-        libs/markoff-live-render/qml/LiveView.qml \
-        libs/markoff-live-render/tests/tst_live_render_context_menu.cpp \
-        libs/markoff-live-render/tests/CMakeLists.txt \
-        libs/markoff-live-render/CMakeLists.txt
+git add libs/markoff-live/qml/LiveContextMenu.qml \
+        libs/markoff-live/qml/LiveView.qml \
+        libs/markoff-live/tests/tst_live_render_context_menu.cpp \
+        libs/markoff-live/tests/CMakeLists.txt \
+        libs/markoff-live/CMakeLists.txt
 git commit -m "feat(live-render): right-click LiveContextMenu with per-block undo; tst_live_render_context_menu
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -1343,7 +1343,7 @@ This is the manual user-facing test. Run the test app and exercise all D3 featur
 - [ ] **Step 1: Launch app**
 
 ```bash
-./build-dev/bin/markoff-live-render-app
+./build-dev/bin/markoff-live-app
 ```
 
 - [ ] **Step 2: Kind-transition detection**

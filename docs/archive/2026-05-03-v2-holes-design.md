@@ -148,7 +148,7 @@ The user-visible trace: press Enter, see new paragraph, type into it, idle, para
 ### 3.1 Header sketch
 
 ```cpp
-// libs/markoff-live-render/include/markoff-live-render/LiveHoleLayer.h
+// libs/markoff-live/include/markoff-live-render/LiveHoleLayer.h
 
 namespace Markoff::LiveRender {
 
@@ -279,7 +279,7 @@ private:
 A `QAbstractListModel` (not `QAbstractProxyModel` — the proxy model class assumes a stable 1:1 mapping with one source, which doesn't fit two-sourced row composition cleanly). Implementation pattern: hold a flat `QVector<ProxyRow>` recomputed on input changes; emit Qt model signals (`beginInsertRows`/`endInsertRows`, etc.) around mutations.
 
 ```cpp
-// libs/markoff-live-render/include/markoff-live-render/LiveProxyBlockModel.h
+// libs/markoff-live/include/markoff-live-render/LiveProxyBlockModel.h
 
 namespace Markoff::LiveRender {
 
@@ -545,7 +545,7 @@ This is a small change to the C-spec's §3.1 type definition and a §15 open que
 ### 11.1 Header
 
 ```cpp
-// libs/markoff-live-render/tests/LiveRealisticInputHarness.h
+// libs/markoff-live/tests/LiveRealisticInputHarness.h
 
 namespace Markoff::LiveRender::Test {
 
@@ -688,7 +688,7 @@ R5.5 ships when:
 1. All §12 unit tests pass.
 2. The harness gate test passes (synthetic broken stub fails → delete stub).
 3. All §12 harness-driven tests pass.
-4. Dogfood gate: user types ≥200 words across ≥10 paragraphs in `markoff-live-render-app`; every Enter creates a hole that reifies into a real paragraph; no character scramble; no double-spacing; no source leak (saved file equals on-screen content); arrow keys navigate freely; Esc/Backspace-at-0-empty/Delete-at-end-empty abandon as specified.
+4. Dogfood gate: user types ≥200 words across ≥10 paragraphs in `markoff-live-app`; every Enter creates a hole that reifies into a real paragraph; no character scramble; no double-spacing; no source leak (saved file equals on-screen content); arrow keys navigate freely; Esc/Backspace-at-0-empty/Delete-at-end-empty abandon as specified.
 5. C-restoration spec amendments (§13) are landed and approved.
 6. R5 closes (Tasks 12–18 land independently of R5.5; the EOB-Enter limitation goes away once R5.5 lands).
 7. Restoration-status updated: phase board shows R5.5 as `complete`; recent-changes log includes the dogfood-pass entry.

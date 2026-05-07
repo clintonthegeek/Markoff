@@ -52,7 +52,7 @@ The plan's `paragraphEnter` handler in Tasks 4/5/8 was implemented faithfully ag
 
 Tree-sitter's CommonMark grammar (`tree-sitter-markdown`) follows the CommonMark specification, which defines a paragraph as one or more non-blank lines of inline content. **A blank line is not a paragraph; it is a separator.** Multiple consecutive blank lines are equivalent to one. The parser emits zero block nodes for blank-only regions.
 
-We confirmed this via the post-correction R5 test in `libs/markoff-live-render/tests/tst_live_render_structural.cpp`:
+We confirmed this via the post-correction R5 test in `libs/markoff-live/tests/tst_live_render_structural.cpp`:
 
 ```cpp
 void enter_at_end_of_paragraph_inserts_paragraph_break() {
@@ -181,7 +181,7 @@ The "Insert(B_new)" line is the load-bearing claim. It is wrong for end-of-parag
 
 1. Read §3.1–§3.5 and §3.6 of that spec carefully.
 2. Verify that the v1 design's failure-mode mitigations are real, given the C architecture as it now stands.
-3. Determine which parts of the v1 spec carry forward intact and which need adaptation to the new library structure (`libs/markoff-live-render/` not `libs/markoff-view-qml/`; `LiveSpeculationLayer` not `LiveProjectionLayer`).
+3. Determine which parts of the v1 spec carry forward intact and which need adaptation to the new library structure (`libs/markoff-live/` not `libs/markoff-view-qml/`; `LiveSpeculationLayer` not `LiveProjectionLayer`).
 4. Write a new spec for v2 holes — short, citing v1 wholesale where the design is unchanged, calling out adaptations precisely.
 5. Propose the C-architecture spec amendments that follow.
 
@@ -225,7 +225,7 @@ Answer concretely:
 
 ### 7.3 Adapt the v1 design to the new library
 
-The v1 spec was written for `libs/markoff-view-qml/`. The new library is `libs/markoff-live-render/`. Carry the v1 design forward with these specific adaptations to consider:
+The v1 spec was written for `libs/markoff-view-qml/`. The new library is `libs/markoff-live/`. Carry the v1 design forward with these specific adaptations to consider:
 
 - **Where holes live.** Spec §6.1 L6 names `LiveSpeculationLayer` as the renamed `LiveProjectionLayer` for predictions only. R6 currently scopes that layer to inline-format predictions and fence-kind speculation. Holes are a third item-kind that needs to live in this layer (or a sibling). Decide: extend `LiveSpeculationLayer` to host holes too, or create a parallel `LiveHoleLayer`?
 - **Integration with `LiveCursorState::requestTextCaretAtRow`.** When a hole is created, the cursor request resolves immediately into the hole's row (the row exists in the model from the moment the hole is created). When the hole is reified, the cursor stays in the row that just transitioned from hole to real-block — the existing pending mechanism may not apply directly. Determine the semantics.

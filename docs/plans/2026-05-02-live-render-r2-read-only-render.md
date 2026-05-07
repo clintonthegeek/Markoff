@@ -9,13 +9,13 @@
 **Tech stack:** C++20, Qt 6.8 (Core, Gui, Widgets, Quick, QuickControls2, QmlModels, Test), KF6::SyntaxHighlighting (runtime QML import only — no C++ link), CMake 3.19+. `QTest` for unit tests. Foundation: `markoff_core` + `markoff-parser` (transitively available).
 
 **Reference spec:** `docs/specs/2026-05-02-live-render-restoration-design.md` §6 (components), §7 (data flow), §11 R2.
-**Prerequisite:** R1A (`parseUpdated` 4-arg signal) and R1B (`TopLevelBlock::inlineSpans`) are landed. R1C scaffold exists at `libs/markoff-live-render/`.
+**Prerequisite:** R1A (`parseUpdated` 4-arg signal) and R1B (`TopLevelBlock::inlineSpans`) are landed. R1C scaffold exists at `libs/markoff-live/`.
 
 ---
 
 ## File map
 
-**New — public headers** (`libs/markoff-live-render/include/markoff/live-render/`):
+**New — public headers** (`libs/markoff-live/include/markoff/live-render/`):
 - `BlockRecord.h` — `BlockRecord` (value type per block; holds kind, text, headingLevel, codeLanguage, blockAnchor, inlineSpans) + `BlockKey` (diff identity key)
 - `BlockKind.h` — string constants `BlockKind::Paragraph`, `::Heading`, etc.
 - `BlockKindDescriptor.h` — `BlockKindDescriptor` struct (full shape from spec §5.1; most fields default-empty in R2)
@@ -24,7 +24,7 @@
 - `LiveBlockModel.h` — `QAbstractListModel` over `BlockRecord` list; per-row edit sequence tracking
 - `LiveListModelBinding.h` — `QML_ELEMENT`; subscribes to `MarkoffDocument::parseUpdated`; owns the model
 
-**New — private sources** (`libs/markoff-live-render/src/`):
+**New — private sources** (`libs/markoff-live/src/`):
 - `BlockKind.cpp` — constant definitions
 - `BlockKindRegistry.cpp` — built-in registration logic
 - `Coordinates.cpp` — `byteToQtPos` + `qtPosToByte` implementations
@@ -33,7 +33,7 @@
 - `LiveBlockModel.cpp` — model implementation
 - `LiveListModelBinding.cpp` — binding implementation
 
-**New — QML** (`libs/markoff-live-render/qml/`):
+**New — QML** (`libs/markoff-live/qml/`):
 - `LiveView.qml` — replaces `Placeholder.qml`; `ListView` + `DelegateChooser` for 5 kinds
 - `delegates/ParagraphDelegate.qml`
 - `delegates/HeadingDelegate.qml`
@@ -42,10 +42,10 @@
 - `delegates/ImageDelegate.qml`
 
 **Modified:**
-- `libs/markoff-live-render/CMakeLists.txt` — add new SOURCES + QML_FILES + KF6 (runtime); remove Placeholder.qml
-- `libs/markoff-live-render/tests/CMakeLists.txt` — add `tst_live_render_coords`, `tst_live_render_block_model`
-- `libs/markoff-live-render/app/main.cpp` — take file argument, load content
-- `libs/markoff-live-render/app/Main.qml` — wire `LiveListModelBinding` + `LiveView`
+- `libs/markoff-live/CMakeLists.txt` — add new SOURCES + QML_FILES + KF6 (runtime); remove Placeholder.qml
+- `libs/markoff-live/tests/CMakeLists.txt` — add `tst_live_render_coords`, `tst_live_render_block_model`
+- `libs/markoff-live/app/main.cpp` — take file argument, load content
+- `libs/markoff-live/app/Main.qml` — wire `LiveListModelBinding` + `LiveView`
 
 ---
 
@@ -65,7 +65,7 @@ libs/markoff-view-qml/src/LiveBlockModel.cpp    (model for our simplified versio
 libs/markoff-core/include/markoff-foundation/MarkoffDocument.h  (parseUpdated signal)
 libs/markoff-parser/include/markoff-parser/Document.h   (topLevelBlocks, markdownContent)
 libs/markoff-parser/include/markoff-parser/SourceSpan.h (inlineSpans element type)
-libs/markoff-live-render/CMakeLists.txt         (what we'll modify)
+libs/markoff-live/CMakeLists.txt         (what we'll modify)
 ```
 
 No code changes in this task.
@@ -77,14 +77,14 @@ No code changes in this task.
 Create the public value-type headers that everything else builds on.
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/BlockRecord.h`
-- Create: `libs/markoff-live-render/include/markoff/live-render/BlockKind.h`
-- Create: `libs/markoff-live-render/src/BlockKind.cpp`
-- Create: `libs/markoff-live-render/include/markoff/live-render/BlockKindDescriptor.h`
+- Create: `libs/markoff-live/include/markoff/live-render/BlockRecord.h`
+- Create: `libs/markoff-live/include/markoff/live-render/BlockKind.h`
+- Create: `libs/markoff-live/src/BlockKind.cpp`
+- Create: `libs/markoff-live/include/markoff/live-render/BlockKindDescriptor.h`
 
 - [ ] **Step 1: Write `BlockRecord.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/BlockRecord.h`:
+Create `libs/markoff-live/include/markoff/live-render/BlockRecord.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -148,7 +148,7 @@ struct MARKOFF_LIVE_RENDER_EXPORT BlockKey {
 
 - [ ] **Step 2: Write `BlockKind.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/BlockKind.h`:
+Create `libs/markoff-live/include/markoff/live-render/BlockKind.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -175,7 +175,7 @@ namespace BlockKind {
 
 - [ ] **Step 3: Write `BlockKind.cpp`**
 
-Create `libs/markoff-live-render/src/BlockKind.cpp`:
+Create `libs/markoff-live/src/BlockKind.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -194,7 +194,7 @@ const QString Image         = QStringLiteral("image");
 
 - [ ] **Step 4: Write `BlockKindDescriptor.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/BlockKindDescriptor.h`:
+Create `libs/markoff-live/include/markoff/live-render/BlockKindDescriptor.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -251,15 +251,15 @@ No source file for `BlockKindDescriptor` — it is a pure header value type.
 ## Task 3: BlockKindRegistry (test-first)
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/BlockKindRegistry.h`
-- Create: `libs/markoff-live-render/src/BlockKindRegistry.cpp`
-- Create: `libs/markoff-live-render/tests/tst_live_render_registry.cpp`
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt`
-- Modify: `libs/markoff-live-render/CMakeLists.txt` (add new SOURCES)
+- Create: `libs/markoff-live/include/markoff/live-render/BlockKindRegistry.h`
+- Create: `libs/markoff-live/src/BlockKindRegistry.cpp`
+- Create: `libs/markoff-live/tests/tst_live_render_registry.cpp`
+- Modify: `libs/markoff-live/tests/CMakeLists.txt`
+- Modify: `libs/markoff-live/CMakeLists.txt` (add new SOURCES)
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-live-render/tests/tst_live_render_registry.cpp`:
+Create `libs/markoff-live/tests/tst_live_render_registry.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -337,7 +337,7 @@ QTEST_APPLESS_MAIN(TstLiveRenderRegistry)
 
 - [ ] **Step 2: Write `BlockKindRegistry.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/BlockKindRegistry.h`:
+Create `libs/markoff-live/include/markoff/live-render/BlockKindRegistry.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -374,7 +374,7 @@ private:
 
 - [ ] **Step 3: Write `BlockKindRegistry.cpp`**
 
-Create `libs/markoff-live-render/src/BlockKindRegistry.cpp`:
+Create `libs/markoff-live/src/BlockKindRegistry.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -459,7 +459,7 @@ QStringList BlockKindRegistry::kinds() const
 
 - [ ] **Step 4: Add `BlockKind.cpp`, `BlockKindRegistry.cpp` to library CMakeLists**
 
-Edit `libs/markoff-live-render/CMakeLists.txt`. Change the `qt_add_qml_module` SOURCES block:
+Edit `libs/markoff-live/CMakeLists.txt`. Change the `qt_add_qml_module` SOURCES block:
 
 ```cmake
 qt_add_qml_module(markoff_live_render
@@ -492,7 +492,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
 
 - [ ] **Step 5: Add test to `tests/CMakeLists.txt`**
 
-Edit `libs/markoff-live-render/tests/CMakeLists.txt`:
+Edit `libs/markoff-live/tests/CMakeLists.txt`:
 
 ```cmake
 # R1C provides one trivial test that proves the test infrastructure is
@@ -537,15 +537,15 @@ Expected: `6/6 tests passed`.
 ## Task 4: Coordinates (test-first)
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/Coordinates.h`
-- Create: `libs/markoff-live-render/src/Coordinates.cpp`
-- Create: `libs/markoff-live-render/tests/tst_live_render_coords.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt` (add Coordinates.cpp to SOURCES)
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt` (add tst_live_render_coords)
+- Create: `libs/markoff-live/include/markoff/live-render/Coordinates.h`
+- Create: `libs/markoff-live/src/Coordinates.cpp`
+- Create: `libs/markoff-live/tests/tst_live_render_coords.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt` (add Coordinates.cpp to SOURCES)
+- Modify: `libs/markoff-live/tests/CMakeLists.txt` (add tst_live_render_coords)
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-live-render/tests/tst_live_render_coords.cpp`:
+Create `libs/markoff-live/tests/tst_live_render_coords.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -663,7 +663,7 @@ QTEST_APPLESS_MAIN(TstLiveRenderCoords)
 
 - [ ] **Step 2: Write `Coordinates.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/Coordinates.h`:
+Create `libs/markoff-live/include/markoff/live-render/Coordinates.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -693,7 +693,7 @@ qsizetype qtPosToByte(const QByteArray &utf8, qsizetype qtPos);
 
 - [ ] **Step 3: Write `Coordinates.cpp`**
 
-Create `libs/markoff-live-render/src/Coordinates.cpp`:
+Create `libs/markoff-live/src/Coordinates.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -751,13 +751,13 @@ qsizetype qtPosToByte(const QByteArray &utf8, qsizetype qtPos)
 
 - [ ] **Step 4: Add Coordinates.cpp to library CMakeLists and add test**
 
-Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES:
+Edit `libs/markoff-live/CMakeLists.txt` — append to SOURCES:
 ```cmake
         src/Coordinates.cpp
         include/markoff/live-render/Coordinates.h
 ```
 
-Edit `libs/markoff-live-render/tests/CMakeLists.txt` — append:
+Edit `libs/markoff-live/tests/CMakeLists.txt` — append:
 ```cmake
 qt_add_executable(tst_live_render_coords
     tst_live_render_coords.cpp
@@ -784,15 +784,15 @@ Expected: `11/11 tests passed`.
 These are internal (private headers in `src/`). Port from `markoff-view-qml` with namespace change. No new tests — their behavior is covered by `tst_live_render_block_model` in Task 7.
 
 **Files:**
-- Create: `libs/markoff-live-render/src/AstBlockDiff.h`
-- Create: `libs/markoff-live-render/src/AstBlockDiff.cpp`
-- Create: `libs/markoff-live-render/src/BlockWalker.h`
-- Create: `libs/markoff-live-render/src/BlockWalker.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Create: `libs/markoff-live/src/AstBlockDiff.h`
+- Create: `libs/markoff-live/src/AstBlockDiff.cpp`
+- Create: `libs/markoff-live/src/BlockWalker.h`
+- Create: `libs/markoff-live/src/BlockWalker.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Write `AstBlockDiff.h`**
 
-Create `libs/markoff-live-render/src/AstBlockDiff.h`:
+Create `libs/markoff-live/src/AstBlockDiff.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -830,7 +830,7 @@ public:
 
 - [ ] **Step 2: Write `AstBlockDiff.cpp`**
 
-Create `libs/markoff-live-render/src/AstBlockDiff.cpp`:
+Create `libs/markoff-live/src/AstBlockDiff.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -892,7 +892,7 @@ QList<AstBlockDiff::Op> AstBlockDiff::diff(const QList<BlockKey> &prev,
 
 - [ ] **Step 3: Write `BlockWalker.h`**
 
-Create `libs/markoff-live-render/src/BlockWalker.h`:
+Create `libs/markoff-live/src/BlockWalker.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -922,7 +922,7 @@ public:
 
 - [ ] **Step 4: Write `BlockWalker.cpp`**
 
-Create `libs/markoff-live-render/src/BlockWalker.cpp`:
+Create `libs/markoff-live/src/BlockWalker.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1028,7 +1028,7 @@ QList<BlockRecord> BlockWalker::walk(const Markoff::Document *parsed)
 
 - [ ] **Step 5: Add private sources to library CMakeLists**
 
-Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES in `qt_add_qml_module`:
+Edit `libs/markoff-live/CMakeLists.txt` — append to SOURCES in `qt_add_qml_module`:
 
 ```cmake
         src/AstBlockDiff.h
@@ -1042,14 +1042,14 @@ Edit `libs/markoff-live-render/CMakeLists.txt` — append to SOURCES in `qt_add_
 ## Task 6: LiveBlockModel (test-first)
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h`
-- Create: `libs/markoff-live-render/src/LiveBlockModel.cpp`
-- Create: `libs/markoff-live-render/tests/tst_live_render_block_model.cpp`
+- Create: `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h`
+- Create: `libs/markoff-live/src/LiveBlockModel.cpp`
+- Create: `libs/markoff-live/tests/tst_live_render_block_model.cpp`
 - Modify: CMakeLists (both files)
 
 - [ ] **Step 1: Write the failing tests**
 
-Create `libs/markoff-live-render/tests/tst_live_render_block_model.cpp`:
+Create `libs/markoff-live/tests/tst_live_render_block_model.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1229,7 +1229,7 @@ Actually: Remove the `#include "helpers.h"` line from the test file — it is no
 
 - [ ] **Step 2: Write `LiveBlockModel.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h`:
+Create `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1440,7 +1440,7 @@ Apply this correction when executing Task 5 Step 1.
 
 - [ ] **Step 3: Write `LiveBlockModel.cpp`**
 
-Create `libs/markoff-live-render/src/LiveBlockModel.cpp`:
+Create `libs/markoff-live/src/LiveBlockModel.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1558,7 +1558,7 @@ This is sufficient.
 
 - [ ] **Step 5: Update CMakeLists files**
 
-Edit `libs/markoff-live-render/CMakeLists.txt` — add to SOURCES:
+Edit `libs/markoff-live/CMakeLists.txt` — add to SOURCES:
 ```cmake
         include/markoff/live-render/AstBlockDiff.h
         src/AstBlockDiff.cpp
@@ -1568,7 +1568,7 @@ Edit `libs/markoff-live-render/CMakeLists.txt` — add to SOURCES:
         src/LiveBlockModel.cpp
 ```
 
-Edit `libs/markoff-live-render/tests/CMakeLists.txt` — append:
+Edit `libs/markoff-live/tests/CMakeLists.txt` — append:
 ```cmake
 qt_add_executable(tst_live_render_block_model
     tst_live_render_block_model.cpp
@@ -1595,13 +1595,13 @@ Expected: `8/8 tests passed`.
 The binding subscribes to `MarkoffDocument::parseUpdated` (4-arg), runs `BlockWalker`, computes the diff, and applies ops to the model.
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Create: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Create: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Create: `libs/markoff-live/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Write `LiveListModelBinding.h`**
 
-Create `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`:
+Create `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1664,7 +1664,7 @@ private:
 
 - [ ] **Step 2: Write `LiveListModelBinding.cpp`**
 
-Create `libs/markoff-live-render/src/LiveListModelBinding.cpp`:
+Create `libs/markoff-live/src/LiveListModelBinding.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1758,7 +1758,7 @@ void LiveListModelBinding::onParseUpdated(const Markoff::Document *parsed,
 
 - [ ] **Step 3: Add to library CMakeLists**
 
-Edit `libs/markoff-live-render/CMakeLists.txt` — add to SOURCES:
+Edit `libs/markoff-live/CMakeLists.txt` — add to SOURCES:
 
 ```cmake
         include/markoff/live-render/LiveListModelBinding.h
@@ -1781,23 +1781,23 @@ Expected: library builds cleanly.
 Create the minimal `LiveView.qml` and five read-only block delegates. Also create the `qml/delegates/` directory.
 
 **Files:**
-- Create: `libs/markoff-live-render/qml/LiveView.qml` (replaces Placeholder.qml)
-- Create: `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`
-- Create: `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`
-- Create: `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`
-- Create: `libs/markoff-live-render/qml/delegates/HorizontalRuleDelegate.qml`
-- Create: `libs/markoff-live-render/qml/delegates/ImageDelegate.qml`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Create: `libs/markoff-live/qml/LiveView.qml` (replaces Placeholder.qml)
+- Create: `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`
+- Create: `libs/markoff-live/qml/delegates/HeadingDelegate.qml`
+- Create: `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`
+- Create: `libs/markoff-live/qml/delegates/HorizontalRuleDelegate.qml`
+- Create: `libs/markoff-live/qml/delegates/ImageDelegate.qml`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 - [ ] **Step 1: Create the `qml/delegates/` directory**
 
 ```bash
-mkdir -p libs/markoff-live-render/qml/delegates
+mkdir -p libs/markoff-live/qml/delegates
 ```
 
 - [ ] **Step 2: Write `LiveView.qml`**
 
-Create `libs/markoff-live-render/qml/LiveView.qml`:
+Create `libs/markoff-live/qml/LiveView.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1851,7 +1851,7 @@ ListView {
 
 - [ ] **Step 3: Write `ParagraphDelegate.qml`**
 
-Create `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`:
+Create `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1880,7 +1880,7 @@ TextEdit {
 
 - [ ] **Step 4: Write `HeadingDelegate.qml`**
 
-Create `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`:
+Create `libs/markoff-live/qml/delegates/HeadingDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1915,7 +1915,7 @@ TextEdit {
 
 - [ ] **Step 5: Write `CodeBlockDelegate.qml`**
 
-Create `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`:
+Create `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1956,7 +1956,7 @@ Rectangle {
 
 - [ ] **Step 6: Write `HorizontalRuleDelegate.qml`**
 
-Create `libs/markoff-live-render/qml/delegates/HorizontalRuleDelegate.qml`:
+Create `libs/markoff-live/qml/delegates/HorizontalRuleDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1974,7 +1974,7 @@ Rectangle {
 
 - [ ] **Step 7: Write `ImageDelegate.qml`**
 
-Create `libs/markoff-live-render/qml/delegates/ImageDelegate.qml`:
+Create `libs/markoff-live/qml/delegates/ImageDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2002,7 +2002,7 @@ TextEdit {
 
 - [ ] **Step 8: Update CMakeLists.txt — replace Placeholder.qml, add all new QML files**
 
-Edit `libs/markoff-live-render/CMakeLists.txt`. Replace the QML_FILES block:
+Edit `libs/markoff-live/CMakeLists.txt`. Replace the QML_FILES block:
 
 ```cmake
     QML_FILES
@@ -2019,7 +2019,7 @@ Edit `libs/markoff-live-render/CMakeLists.txt`. Replace the QML_FILES block:
 Also delete the placeholder file from disk:
 
 ```bash
-rm libs/markoff-live-render/qml/Placeholder.qml
+rm libs/markoff-live/qml/Placeholder.qml
 ```
 
 ---
@@ -2029,13 +2029,13 @@ rm libs/markoff-live-render/qml/Placeholder.qml
 Wire the test app to load a Markdown file and display it via `LiveListModelBinding` + `LiveView`.
 
 **Files:**
-- Modify: `libs/markoff-live-render/app/main.cpp`
-- Modify: `libs/markoff-live-render/app/Main.qml`
-- Modify: `libs/markoff-live-render/app/CMakeLists.txt` (add foundation headers)
+- Modify: `libs/markoff-live/app/main.cpp`
+- Modify: `libs/markoff-live/app/Main.qml`
+- Modify: `libs/markoff-live/app/CMakeLists.txt` (add foundation headers)
 
 - [ ] **Step 1: Rewrite `app/main.cpp`**
 
-Replace the contents of `libs/markoff-live-render/app/main.cpp`:
+Replace the contents of `libs/markoff-live/app/main.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2052,7 +2052,7 @@ Replace the contents of `libs/markoff-live-render/app/main.cpp`:
 
 /// Test app for markoff-live-render R2. Loads a Markdown file and renders
 /// it read-only via LiveListModelBinding + LiveView. No editing.
-/// Usage: markoff-live-render-app <markdown-file>
+/// Usage: markoff-live-app <markdown-file>
 int main(int argc, char *argv[])
 {
     QQuickStyle::setStyle(QStringLiteral("Basic"));
@@ -2092,7 +2092,7 @@ int main(int argc, char *argv[])
 
 - [ ] **Step 2: Rewrite `app/Main.qml`**
 
-Replace the contents of `libs/markoff-live-render/app/Main.qml`:
+Replace the contents of `libs/markoff-live/app/Main.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2123,28 +2123,28 @@ ApplicationWindow {
 
 The app's C++ now includes `<markoff-foundation/MarkoffDocument.h>`. `markoff_core` is already reachable transitively via `markoff_live_render`, but explicit linking is cleaner:
 
-Replace the contents of `libs/markoff-live-render/app/CMakeLists.txt`:
+Replace the contents of `libs/markoff-live/app/CMakeLists.txt`:
 
 ```cmake
-qt_add_executable(markoff-live-render-app
+qt_add_executable(markoff-live-app
     main.cpp
 )
 
-qt_add_qml_module(markoff-live-render-app
+qt_add_qml_module(markoff-live-app
     URI org.markoff.live.render.app
     VERSION 1.0
     QML_FILES
         Main.qml
 )
 
-target_link_libraries(markoff-live-render-app PRIVATE
+target_link_libraries(markoff-live-app PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2 Qt6::Qml
     markoff_live_render
     markoff_live_renderplugin
     markoff_core
 )
 
-qt_import_qml_plugins(markoff-live-render-app)
+qt_import_qml_plugins(markoff-live-app)
 ```
 
 ---
@@ -2162,7 +2162,7 @@ Expected: configure succeeds, no errors.
 - [ ] **Step 2: Build all targets**
 
 ```bash
-cmake --build build-dev --target markoff_live_render tst_live_render_coords tst_live_render_block_model tst_live_render_registry tst_live_render_skeleton markoff-live-render-app -j 8 2>&1 | tail -20
+cmake --build build-dev --target markoff_live_render tst_live_render_coords tst_live_render_block_model tst_live_render_registry tst_live_render_skeleton markoff-live-app -j 8 2>&1 | tail -20
 ```
 
 Expected: all six targets build without error.
@@ -2186,7 +2186,7 @@ Expected: N+K tests pass (prior baseline +K new tests). No regressions.
 - [ ] **Step 5: Manual acceptance check — launch the app**
 
 ```bash
-./build-dev/bin/markoff-live-render-app docs/specs/2026-05-02-live-render-restoration-design.md
+./build-dev/bin/markoff-live-app docs/specs/2026-05-02-live-render-restoration-design.md
 ```
 
 Expected:
@@ -2230,7 +2230,7 @@ Verify staged files match what was planned: new library files, updated CMakeList
 - [ ] **Step 3: Commit**
 
 ```bash
-git add CMakeLists.txt libs/markoff-live-render docs/restoration-status.md
+git add CMakeLists.txt libs/markoff-live docs/restoration-status.md
 
 git commit -m "$(cat <<'EOF'
 feat(live-render): R2 — read-only render with diff-driven model

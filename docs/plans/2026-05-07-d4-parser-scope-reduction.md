@@ -22,7 +22,7 @@ A fresh agent picking up D4 should read these in order. The plan assumes you've 
 4. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — the D4 spec
 5. `CLAUDE.md` (worktree root) — branch posture and lib layout
 6. `libs/markoff-core/CLAUDE.md` — foundation-internal guide
-7. `libs/markoff-live-render/CLAUDE.md` — view leaf guide
+7. `libs/markoff-live/CLAUDE.md` — view leaf guide
 
 ---
 
@@ -107,7 +107,7 @@ Per spec §8, the order is bottom-up: build the new primitive, migrate consumers
 - `libs/markoff-source/tests/tst_source_widget_binding_roundtrip.cpp` — replace `applyLocalEdit` / `MarkoffEdit` with new entry point
 - `libs/markoff-source/tests/tst_source_widget_findbar.cpp` — same
 - `libs/markoff-source/app/main.cpp` — same
-- `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp` — comment update only
+- `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp` — comment update only
 - `libs/markoff-parser/include/markoff-parser/TreeSitterParser.h` — remove deleted methods/structs; trim observability counters
 - `libs/markoff-parser/src/TreeSitterParser.cpp` — remove implementations
 - `libs/markoff-parser/include/markoff-parser/Document.h` — remove `Document::fromComponents`
@@ -2216,7 +2216,7 @@ EOF
 ### Task 12.2: Update the live-render comment that mentions `parseUpdated`
 
 **Files:**
-- Modify: `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`
 
 - [ ] **Step 1: Edit the comment block at lines 11-13**
 
@@ -2248,7 +2248,7 @@ Expected: PASS (comment-only change).
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp
+git add libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp
 git commit -m "$(cat <<'EOF'
 test(live-render/d4): drop parseUpdated mention from migration comment
 

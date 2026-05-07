@@ -24,42 +24,42 @@ This plan resolves the following open questions noted in spec §15:
 
 - **§15.1 (descriptor consumedStructuralKeys + handler-registration mechanism).** Resolved as: `BlockKindDescriptor::consumedStructuralKeys` is a `QSet<int>` of `Qt::Key_*` values (already declared in `BlockKindDescriptor.h`). Registration is a separate per-kind handler-table held inside `LiveStructuralKeyHandler`: a `QHash<QString, QHash<int, HandlerFn>>` where `HandlerFn = std::function<HandleResult(const Ctx&)>`. Built-in kind handlers are registered alongside the descriptors in `BlockKindRegistry::registerBuiltins()`'s sibling: `LiveStructuralKeyHandler::registerBuiltinHandlers()`. Plugin authors register both the descriptor (via `BlockKindRegistry::register_`) and any kind-specific handlers (via `LiveStructuralKeyHandler::registerHandler(kind, key, fn)`) as paired calls. Falls back to the default character-insertion path on `NotHandled`/`DeferToCharacterInsertion`.
 - **§15.4 (undo-coalescing idle threshold).** Resolved as: pinned at 1000 ms (matches the legacy `markoff-view-qml::LiveEditBinding` value). Not exposed as a Setting in R5. Future-Setting work is out of scope.
-- **§15.8 (rename moment for the test app's `--live` flag).** Out of R5 scope: the legacy `markoff-view-qml-app`'s `--live` flag is owned by `markoff-view-qml`; this plan does not touch that codebase. R5 keeps `markoff-live-render-app` as the dogfood vehicle. The flag flip is R10 work.
+- **§15.8 (rename moment for the test app's `--live` flag).** Out of R5 scope: the legacy `markoff-view-qml-app`'s `--live` flag is owned by `markoff-view-qml`; this plan does not touch that codebase. R5 keeps `markoff-live-app` as the dogfood vehicle. The flag flip is R10 work.
 
 ---
 
 ## File map
 
-**New — public headers** (`libs/markoff-live-render/include/markoff/live-render/`):
+**New — public headers** (`libs/markoff-live/include/markoff/live-render/`):
 - `LiveStructuralKeyHandler.h` — `QML_ELEMENT`; descriptor-driven structural-key dispatcher.
 - `UndoCoalescer.h` — `QML_ELEMENT` (consumed via `LiveListModelBinding` Q_PROPERTY); printable-coalesce policy.
 
-**New — sources** (`libs/markoff-live-render/src/`):
+**New — sources** (`libs/markoff-live/src/`):
 - `LiveStructuralKeyHandler.cpp`
 - `UndoCoalescer.cpp`
 
-**New — tests** (`libs/markoff-live-render/tests/`):
+**New — tests** (`libs/markoff-live/tests/`):
 - `tst_live_render_structural.cpp`
 
 **Modified — headers:**
-- `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h` — add `requestTextCaretAtRow(int expectedRow, int qtPos)` + private pending-state + `rowsInserted` slot.
-- `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h` — own + expose `LiveStructuralKeyHandler *structuralKeyHandler` and `UndoCoalescer *undoCoalescer` Q_PROPERTYs (CONSTANT).
-- `libs/markoff-live-render/include/markoff/live-render/BlockKindDescriptor.h` — already has `consumedStructuralKeys`; no header change. (The R3 builtins do not populate it; R5 populates.)
+- `libs/markoff-live/include/markoff/live-render/LiveCursorState.h` — add `requestTextCaretAtRow(int expectedRow, int qtPos)` + private pending-state + `rowsInserted` slot.
+- `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h` — own + expose `LiveStructuralKeyHandler *structuralKeyHandler` and `UndoCoalescer *undoCoalescer` Q_PROPERTYs (CONSTANT).
+- `libs/markoff-live/include/markoff/live-render/BlockKindDescriptor.h` — already has `consumedStructuralKeys`; no header change. (The R3 builtins do not populate it; R5 populates.)
 
 **Modified — sources:**
-- `libs/markoff-live-render/src/LiveCursorState.cpp` — implement `requestTextCaretAtRow` + the rowsInserted-driven resolver + parse-cycle bookkeeping.
-- `libs/markoff-live-render/src/LiveListModelBinding.cpp` — construct + wire the new components; reset pending requests' deadline on each parseUpdated.
-- `libs/markoff-live-render/src/BlockKindRegistry.cpp` — populate `consumedStructuralKeys` for paragraph, heading, code-block.
-- `libs/markoff-live-render/src/LiveEditBinding.cpp` — call `undoCoalescer->recordPrintable(blockAnchor)` after each user-typed `applyLocalEdit`; on parse-arrival (which rebuilds the document state), no change needed.
-- `libs/markoff-live-render/CMakeLists.txt` — add the two new sources and the new header to `qt_add_qml_module`.
-- `libs/markoff-live-render/tests/CMakeLists.txt` — add `tst_live_render_structural` executable.
+- `libs/markoff-live/src/LiveCursorState.cpp` — implement `requestTextCaretAtRow` + the rowsInserted-driven resolver + parse-cycle bookkeeping.
+- `libs/markoff-live/src/LiveListModelBinding.cpp` — construct + wire the new components; reset pending requests' deadline on each parseUpdated.
+- `libs/markoff-live/src/BlockKindRegistry.cpp` — populate `consumedStructuralKeys` for paragraph, heading, code-block.
+- `libs/markoff-live/src/LiveEditBinding.cpp` — call `undoCoalescer->recordPrintable(blockAnchor)` after each user-typed `applyLocalEdit`; on parse-arrival (which rebuilds the document state), no change needed.
+- `libs/markoff-live/CMakeLists.txt` — add the two new sources and the new header to `qt_add_qml_module`.
+- `libs/markoff-live/tests/CMakeLists.txt` — add `tst_live_render_structural` executable.
 
 **Modified — QML:**
-- `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml` — remove the R4 Enter-swallow `Keys.onPressed`; replace with structural-key dispatcher.
-- `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml` — same.
-- `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml` — same; code-block consumes only Backspace-at-start and Delete-at-end (Enter passes through to TextEdit's literal `\n` insertion).
-- `libs/markoff-live-render/qml/LiveView.qml` — add a single `Connections{target: binding.cursorState; onCursorChanged: ...}` block that, when the cursor is a `TextCaret` for a row whose delegate is currently incubated, calls `focusEditAt(qtPos)` on it.
-- `libs/markoff-live-render/app/Main.qml` — title suffix `"(R5)"`.
+- `libs/markoff-live/qml/delegates/ParagraphDelegate.qml` — remove the R4 Enter-swallow `Keys.onPressed`; replace with structural-key dispatcher.
+- `libs/markoff-live/qml/delegates/HeadingDelegate.qml` — same.
+- `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml` — same; code-block consumes only Backspace-at-start and Delete-at-end (Enter passes through to TextEdit's literal `\n` insertion).
+- `libs/markoff-live/qml/LiveView.qml` — add a single `Connections{target: binding.cursorState; onCursorChanged: ...}` block that, when the cursor is a `TextCaret` for a row whose delegate is currently incubated, calls `focusEditAt(qtPos)` on it.
+- `libs/markoff-live/app/Main.qml` — title suffix `"(R5)"`.
 
 **Modified — docs:**
 - `docs/restoration-status.md` — TL;DR + Phase board + recent-changes log entries (last task).
@@ -78,18 +78,18 @@ This plan resolves the following open questions noted in spec §15:
 docs/specs/2026-05-02-live-render-restoration-design.md   §5.3, §5.4, §6.1 L5, §7.2, §11 R5, §15.1, §15.4
 docs/plans/2026-05-02-live-render-r4-paragraph-editing.md (skim — recent commit shape and test patterns)
 libs/markoff-core/include/markoff-foundation/MarkoffDocument.h    (applyLocalEdit, coalesceLastUndo, resolveTextAnchor, blockByteRange, visibleLength)
-libs/markoff-live-render/include/markoff/live-render/BlockKindDescriptor.h    (consumedStructuralKeys field; declared, not yet populated)
-libs/markoff-live-render/src/BlockKindRegistry.cpp                      (the five built-in registrations; we populate consumedStructuralKeys here)
-libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h  (request, validateVariant — we add requestTextCaretAtRow)
-libs/markoff-live-render/src/LiveCursorState.cpp                        (current implementation; matches the header)
-libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h
-libs/markoff-live-render/src/LiveListModelBinding.cpp                   (where the new components attach + how onParseUpdated is shaped)
-libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h
-libs/markoff-live-render/src/LiveEditBinding.cpp                        (where recordPrintable hook lands)
-libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml            (the R4 Enter-swallow we're replacing)
-libs/markoff-live-render/qml/delegates/HeadingDelegate.qml
-libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml
-libs/markoff-live-render/qml/LiveView.qml                               (where the new cursorChanged Connections block lands)
+libs/markoff-live/include/markoff/live-render/BlockKindDescriptor.h    (consumedStructuralKeys field; declared, not yet populated)
+libs/markoff-live/src/BlockKindRegistry.cpp                      (the five built-in registrations; we populate consumedStructuralKeys here)
+libs/markoff-live/include/markoff/live-render/LiveCursorState.h  (request, validateVariant — we add requestTextCaretAtRow)
+libs/markoff-live/src/LiveCursorState.cpp                        (current implementation; matches the header)
+libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h
+libs/markoff-live/src/LiveListModelBinding.cpp                   (where the new components attach + how onParseUpdated is shaped)
+libs/markoff-live/include/markoff/live-render/LiveEditBinding.h
+libs/markoff-live/src/LiveEditBinding.cpp                        (where recordPrintable hook lands)
+libs/markoff-live/qml/delegates/ParagraphDelegate.qml            (the R4 Enter-swallow we're replacing)
+libs/markoff-live/qml/delegates/HeadingDelegate.qml
+libs/markoff-live/qml/delegates/CodeBlockDelegate.qml
+libs/markoff-live/qml/LiveView.qml                               (where the new cursorChanged Connections block lands)
 libs/markoff-view-qml/src/LiveStructuralKeyHandler.cpp                  (legacy reference — useful for byte-arithmetic patterns; do NOT port the projection-layer / hole branches)
 libs/markoff-view-qml/src/LiveEditBinding.cpp lines 220-243              (legacy printable-coalesce pattern that UndoCoalescer extracts)
 ```
@@ -99,7 +99,7 @@ No code changes in this task.
 - [ ] **Step 2: Run the existing fast-tier test suite to confirm a clean baseline**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
 ctest --test-dir build-dev -R '^tst_live_render_' --output-on-failure -j 8
 ```
 
@@ -110,9 +110,9 @@ Expected: all six `tst_live_render_*` executables green (skeleton, registry, coo
 ## Task 2: Extend `LiveCursorState` with `requestTextCaretAtRow` (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h`
-- Modify: `libs/markoff-live-render/src/LiveCursorState.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_cursor.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveCursorState.h`
+- Modify: `libs/markoff-live/src/LiveCursorState.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_cursor.cpp`
 
 The structural-key handler emits an edit that creates a new row, but the row doesn't exist in the model until the parse-back arrives. Per spec §5.3 step 6, focus delivery into not-yet-incubated rows is deterministic via `LiveBlockModel::rowsInserted` — no `Qt.callLater` retry loops. This task adds the pending-request mechanism.
 
@@ -126,7 +126,7 @@ Behaviour:
 
 - [ ] **Step 1: Add a failing test for the row-already-exists fast path**
 
-In `libs/markoff-live-render/tests/tst_live_render_cursor.cpp`, append the following test slots (right before the closing `};` of the test class):
+In `libs/markoff-live/tests/tst_live_render_cursor.cpp`, append the following test slots (right before the closing `};` of the test class):
 
 ```cpp
     void requestTextCaretAtRow_already_exists_resolves_immediately() {
@@ -223,7 +223,7 @@ Expected: compile fails on `requestTextCaretAtRow` and `noteParseArrived` (don't
 
 - [ ] **Step 3: Update the header**
 
-In `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h`, add the new methods + private state. Replace the file with:
+In `libs/markoff-live/include/markoff/live-render/LiveCursorState.h`, add the new methods + private state. Replace the file with:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -318,7 +318,7 @@ private:
 
 - [ ] **Step 4: Update the source**
 
-Replace `libs/markoff-live-render/src/LiveCursorState.cpp` with:
+Replace `libs/markoff-live/src/LiveCursorState.cpp` with:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -493,9 +493,9 @@ Expected: all three new test slots pass; previous tests still green.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h \
-        libs/markoff-live-render/src/LiveCursorState.cpp \
-        libs/markoff-live-render/tests/tst_live_render_cursor.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveCursorState.h \
+        libs/markoff-live/src/LiveCursorState.cpp \
+        libs/markoff-live/tests/tst_live_render_cursor.cpp
 git commit -m "feat(live-render): pending TextCaret request via rowsInserted
 
 Adds LiveCursorState::requestTextCaretAtRow + noteParseArrived for
@@ -509,11 +509,11 @@ drops after two parse cycles per spec §8.4."
 ## Task 3: Add `UndoCoalescer` (TDD)
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/UndoCoalescer.h`
-- Create: `libs/markoff-live-render/src/UndoCoalescer.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt` (add the two new files to `qt_add_qml_module`)
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp` (created in this task)
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt` (add the new executable)
+- Create: `libs/markoff-live/include/markoff/live-render/UndoCoalescer.h`
+- Create: `libs/markoff-live/src/UndoCoalescer.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt` (add the two new files to `qt_add_qml_module`)
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp` (created in this task)
+- Modify: `libs/markoff-live/tests/CMakeLists.txt` (add the new executable)
 
 `UndoCoalescer` extracts the legacy printable-coalesce logic (`markoff-view-qml/src/LiveEditBinding.cpp:227-240`) into its own component and adds the explicit context-break rules from spec §6.1 L5. Policy:
 
@@ -530,7 +530,7 @@ The coalescer is owned by `LiveListModelBinding`. `LiveEditBinding` calls `recor
 
 - [ ] **Step 1: Create the test file with failing tests**
 
-Create `libs/markoff-live-render/tests/tst_live_render_structural.cpp` with the following content (this file will accumulate tests across many subsequent tasks — start it here with the UndoCoalescer suite):
+Create `libs/markoff-live/tests/tst_live_render_structural.cpp` with the following content (this file will accumulate tests across many subsequent tasks — start it here with the UndoCoalescer suite):
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -714,7 +714,7 @@ QTEST_MAIN(TstLiveRenderStructural)
 
 - [ ] **Step 2: Add the executable to the test CMakeLists**
 
-Append to `libs/markoff-live-render/tests/CMakeLists.txt`:
+Append to `libs/markoff-live/tests/CMakeLists.txt`:
 
 ```cmake
 qt_add_executable(tst_live_render_structural
@@ -874,7 +874,7 @@ void UndoCoalescer::clearLast()
 
 - [ ] **Step 6: Wire into the library CMakeLists**
 
-In `libs/markoff-live-render/CMakeLists.txt`, add the new files inside the `qt_add_qml_module(markoff_live_render ...)` SOURCES list, alongside `LiveEditBinding`:
+In `libs/markoff-live/CMakeLists.txt`, add the new files inside the `qt_add_qml_module(markoff_live_render ...)` SOURCES list, alongside `LiveEditBinding`:
 
 ```cmake
         # R4: per-delegate edit binding
@@ -899,11 +899,11 @@ Expected: all seven UndoCoalescer test slots pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/UndoCoalescer.h \
-        libs/markoff-live-render/src/UndoCoalescer.cpp \
-        libs/markoff-live-render/CMakeLists.txt \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp \
-        libs/markoff-live-render/tests/CMakeLists.txt
+git add libs/markoff-live/include/markoff/live-render/UndoCoalescer.h \
+        libs/markoff-live/src/UndoCoalescer.cpp \
+        libs/markoff-live/CMakeLists.txt \
+        libs/markoff-live/tests/tst_live_render_structural.cpp \
+        libs/markoff-live/tests/CMakeLists.txt
 git commit -m "feat(live-render): UndoCoalescer policy (R5)
 
 Extracts the legacy markoff-view-qml printable-coalesce policy
@@ -921,10 +921,10 @@ R5 tasks add structural-key tests to it."
 ## Task 4: `LiveStructuralKeyHandler` skeleton + paragraph end-of-block Enter (TDD)
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h`
-- Create: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Create: `libs/markoff-live/include/markoff/live-render/LiveStructuralKeyHandler.h`
+- Create: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 The handler is a `QObject` with one Q_INVOKABLE: `bool tryHandle(int key, int modifiers, int blockIndex, int qtPos, bool selectionEmpty, const QString &blockText)`. Returns `true` if the key was consumed (caller sets `event.accepted = true`); `false` otherwise (caller falls back to TextEdit's native handling).
 
@@ -950,7 +950,7 @@ The remaining built-in handlers (mid-block split, start-of-block, Backspace-edge
 
 - [ ] **Step 1: Add a failing test for end-of-block Enter on paragraph**
 
-Append to `libs/markoff-live-render/tests/tst_live_render_structural.cpp`, before the closing `};`:
+Append to `libs/markoff-live/tests/tst_live_render_structural.cpp`, before the closing `};`:
 
 ```cpp
     // ---------- LiveStructuralKeyHandler — paragraph Enter at end ----------
@@ -1230,7 +1230,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
 
 - [ ] **Step 5: Wire `LiveStructuralKeyHandler` into the library CMakeLists**
 
-In `libs/markoff-live-render/CMakeLists.txt`, append to the SOURCES list (next to UndoCoalescer):
+In `libs/markoff-live/CMakeLists.txt`, append to the SOURCES list (next to UndoCoalescer):
 
 ```cmake
         # R5: structural keys + undo coalescing
@@ -1242,7 +1242,7 @@ In `libs/markoff-live-render/CMakeLists.txt`, append to the SOURCES list (next t
 
 - [ ] **Step 6: Wire `LiveStructuralKeyHandler` + `UndoCoalescer` into `LiveListModelBinding`**
 
-In `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`, add after the existing `selectionView()` Q_PROPERTY:
+In `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`, add after the existing `selectionView()` Q_PROPERTY:
 
 ```cpp
     Q_PROPERTY(Markoff::LiveRender::LiveStructuralKeyHandler *structuralKeyHandler
@@ -1269,7 +1269,7 @@ In the public section, after `LiveSelectionView *selectionView() const;`:
     UndoCoalescer            *undoCoalescer()        const;
 ```
 
-In `libs/markoff-live-render/src/LiveListModelBinding.cpp`:
+In `libs/markoff-live/src/LiveListModelBinding.cpp`:
 
 1. Add includes:
 
@@ -1401,12 +1401,12 @@ Expected: all green.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h \
-        libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h \
-        libs/markoff-live-render/src/LiveListModelBinding.cpp \
-        libs/markoff-live-render/CMakeLists.txt \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveStructuralKeyHandler.h \
+        libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h \
+        libs/markoff-live/src/LiveListModelBinding.cpp \
+        libs/markoff-live/CMakeLists.txt \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "feat(live-render): LiveStructuralKeyHandler skeleton + paragraph end-of-block Enter
 
 Descriptor-driven dispatch (spec §5.4): tryHandle looks up the focused
@@ -1424,8 +1424,8 @@ destroyed on document switch). Existing tests still green."
 ## Task 5: Paragraph mid-block split + cursor focus into new row (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 Mid-block Enter (`0 < qtPos < blockText.length()`) inserts `\n\n` at the byte offset corresponding to qtPos. The original block keeps its prefix; a new block appears with the suffix. The caret should land at qtPos 0 of the new row.
 
@@ -1544,8 +1544,8 @@ Expected: all paragraph-Enter tests pass (end-of-block from Task 4, plus mid-blo
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "feat(live-render): paragraph Enter — mid-block split and start-of-block
 
 Generalises the paragraph Enter handler to cover all three qtPos
@@ -1558,8 +1558,8 @@ the cursor at row blockIndex+1 qtPos 0. Spec §7.2."
 ## Task 6: Paragraph Backspace at row-start (merge with previous block) (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 Backspace at qtPos 0 deletes the inter-block separator (the byte just before `currentBlockStart`), merging this block with the previous one. The cursor lands at the position where the merge happened — qtPos = previous block's length.
 
@@ -1657,8 +1657,8 @@ Expected: both new tests pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "feat(live-render): paragraph Backspace at row-start merges with previous
 
 Deletes the inter-block separator byte before currentBlockStart. Caret
@@ -1672,8 +1672,8 @@ Backspace handles the qtPos==0 case as a no-op."
 ## Task 7: Paragraph Delete at row-end (merge with next block) (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 Symmetric to Backspace-at-start: at qtPos == blockText.length(), delete the byte just after `currentBlockEnd`, merging with the next block. Cursor stays where it is — at the end of the (now-merged) block.
 
@@ -1762,8 +1762,8 @@ Expected: both new tests pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "feat(live-render): paragraph Delete at row-end merges with next
 
 Symmetric to Backspace-at-start: deletes the byte after currentBlockEnd.
@@ -1776,8 +1776,8 @@ NotHandled for the last block."
 ## Task 8: Shift-Enter — soft break (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 Shift-Enter inserts a single `\n` (line separator within the current paragraph). The block stays a single paragraph; the parser may render it differently (line break inside a paragraph vs. paragraph break) but at this layer the operation is a one-byte insert. Cursor stays in the same block at qtPos + 1.
 
@@ -1857,8 +1857,8 @@ Expected: the new test plus the previous Enter tests all green.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "feat(live-render): paragraph Shift-Enter — soft break
 
 Inserts \\n instead of \\n\\n. Cursor advances by one within the same
@@ -1870,8 +1870,8 @@ block. Reuses the paragraph Enter handler with a modifiers branch."
 ## Task 9: Heading structural keys (mirror paragraph) (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 Headings register the same Enter / Shift-Enter / Backspace / Delete handlers as paragraphs. Re-using the paragraph lambdas keeps the policy uniform.
 
@@ -1943,8 +1943,8 @@ Expected: heading tests pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "feat(live-render): heading structural keys mirror paragraph
 
 Source-faithful blockText means qtPos arithmetic is identical. Same four
@@ -1957,8 +1957,8 @@ kind."
 ## Task 10: Code-block structural keys — Backspace + Delete only (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_structural.cpp`
+- Modify: `libs/markoff-live/src/LiveStructuralKeyHandler.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_structural.cpp`
 
 Code blocks consume Backspace-at-start and Delete-at-end (same merge semantics as paragraph). They do NOT consume Enter — TextEdit's native `\n` insertion runs, the LiveEditBinding routes it as a regular text edit, and the parse-back updates the code-block's text role. Tab is also not consumed; TextEdit inserts `\t`.
 
@@ -2046,8 +2046,8 @@ Expected: both tests pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp \
-        libs/markoff-live-render/tests/tst_live_render_structural.cpp
+git add libs/markoff-live/src/LiveStructuralKeyHandler.cpp \
+        libs/markoff-live/tests/tst_live_render_structural.cpp
 git commit -m "feat(live-render): code-block consumes only Backspace/Delete edges
 
 Enter is NOT consumed; TextEdit's native \\n insertion routes through
@@ -2061,8 +2061,8 @@ handlers as paragraph; full fence-aware arithmetic is R6."
 ## Task 11: Populate `BlockKindDescriptor::consumedStructuralKeys` (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/BlockKindRegistry.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_registry.cpp`
+- Modify: `libs/markoff-live/src/BlockKindRegistry.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_registry.cpp`
 
 The handler registrations in Task 4–10 are inert until each kind's descriptor declares the corresponding `consumedStructuralKeys`. `LiveStructuralKeyHandler::tryHandle` checks the descriptor BEFORE looking up the handler; without this, every key returns `false`.
 
@@ -2088,7 +2088,7 @@ For this Task 11: the descriptor wiring itself.
 
 - [ ] **Step 1: Add a failing test for descriptor wiring**
 
-In `libs/markoff-live-render/tests/tst_live_render_registry.cpp`, add (read the file first to find an existing test slot to model after):
+In `libs/markoff-live/tests/tst_live_render_registry.cpp`, add (read the file first to find an existing test slot to model after):
 
 ```cpp
     void paragraph_descriptor_consumes_structural_keys() {
@@ -2130,7 +2130,7 @@ In `libs/markoff-live-render/tests/tst_live_render_registry.cpp`, add (read the 
 
 - [ ] **Step 2: Update `registerBuiltins`**
 
-In `libs/markoff-live-render/src/BlockKindRegistry.cpp`, add `consumedStructuralKeys` to the paragraph, heading, and code-block branches:
+In `libs/markoff-live/src/BlockKindRegistry.cpp`, add `consumedStructuralKeys` to the paragraph, heading, and code-block branches:
 
 ```cpp
     // Paragraph: text-bearing, TextCaret (R3), Enter/Backspace/Delete (R5).
@@ -2197,8 +2197,8 @@ Expected: ALL structural tests pass — Tasks 4–10's tests are unblocked by th
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/BlockKindRegistry.cpp \
-        libs/markoff-live-render/tests/tst_live_render_registry.cpp
+git add libs/markoff-live/src/BlockKindRegistry.cpp \
+        libs/markoff-live/tests/tst_live_render_registry.cpp
 git commit -m "feat(live-render): populate consumedStructuralKeys on built-in descriptors
 
 Paragraph + heading consume Return/Enter/Backspace/Delete; code-block
@@ -2211,8 +2211,8 @@ Unblocks the R5 structural tests in tst_live_render_structural."
 ## Task 12: `LiveEditBinding` integrates `UndoCoalescer` (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveEditBinding.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`
+- Modify: `libs/markoff-live/src/LiveEditBinding.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`
 
 After every user-typed `applyLocalEdit`, classify the edit and call the appropriate `recordPrintable` / `recordOther` on the binding-owned coalescer.
 
@@ -2224,7 +2224,7 @@ The IME-flush path (`flushPendingComposition`) commits a single batched edit on 
 
 - [ ] **Step 1: Add a failing test**
 
-Append to `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`:
+Append to `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`:
 
 ```cpp
     void consecutive_printables_coalesce_via_binding() {
@@ -2260,7 +2260,7 @@ Append to `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`:
 
 - [ ] **Step 2: Modify `LiveEditBinding::onContentsChange`**
 
-In `libs/markoff-live-render/src/LiveEditBinding.cpp`, after the existing `doc->applyLocalEdit({ edit });` and `model->setRowEditSequence(...)` lines, add:
+In `libs/markoff-live/src/LiveEditBinding.cpp`, after the existing `doc->applyLocalEdit({ edit });` and `model->setRowEditSequence(...)` lines, add:
 
 ```cpp
     // R5 undo coalescing.
@@ -2295,8 +2295,8 @@ Expected: new test passes; previous tests still green.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveEditBinding.cpp \
-        libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp
+git add libs/markoff-live/src/LiveEditBinding.cpp \
+        libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp
 git commit -m "feat(live-render): LiveEditBinding records edits in UndoCoalescer
 
 Single-char inserts → recordPrintable(blockAnchor); other shapes →
@@ -2309,7 +2309,7 @@ in the same block within 1000 ms coalesce into one undo entry."
 ## Task 13: QML delegate wiring — paragraph (TDD via dogfood + headless smoke)
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`
 
 R4 swallowed Enter at the delegate level. R5 removes the swallow and routes Enter / Backspace / Delete / Shift-Enter through `binding.structuralKeyHandler.tryHandle(...)`. If handled, the event is accepted; otherwise it falls through to TextEdit's native handling (which routes through `LiveEditBinding` for character-insertion paths).
 
@@ -2317,7 +2317,7 @@ QML side has no unit-test framework comparable to QSignalSpy for this exact scen
 
 - [ ] **Step 1: Replace the R4 Enter-swallow Keys.onPressed**
 
-Open `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`. Replace the entire `Keys.priority` + `Keys.onPressed` block (the part that swallows Enter — lines 43–52 in the R4 file) with:
+Open `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`. Replace the entire `Keys.priority` + `Keys.onPressed` block (the part that swallows Enter — lines 43–52 in the R4 file) with:
 
 ```qml
         // R5: route structural keys (Enter, Backspace at start, Delete at end,
@@ -2353,8 +2353,8 @@ Leave everything else in the delegate unchanged (LiveEditBinding wiring, TextEdi
 - [ ] **Step 2: Build the test app and smoke-test**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
-./build-dev/bin/markoff-live-render-app /tmp/r5-smoke.md &
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
+./build-dev/bin/markoff-live-app /tmp/r5-smoke.md &
 APP_PID=$!
 sleep 2
 kill $APP_PID
@@ -2387,7 +2387,7 @@ Expected: all green.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml
+git add libs/markoff-live/qml/delegates/ParagraphDelegate.qml
 git commit -m "feat(live-render): paragraph delegate routes structural keys to handler
 
 Removes the R4 Enter-swallow workaround. Enter / Backspace / Delete /
@@ -2401,19 +2401,19 @@ routes printables through LiveEditBinding)."
 ## Task 14: QML delegate wiring — heading
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/HeadingDelegate.qml`
 
 Same change as paragraph; same pattern; replicate the Keys.onPressed block.
 
 - [ ] **Step 1: Replace the R4 Enter-swallow**
 
-In `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`, replace lines 49–54 (the R4 Enter-swallow `Keys.onPressed`) with the same structural-key dispatch block as Task 13. The block is identical text-by-text — paste it in place.
+In `libs/markoff-live/qml/delegates/HeadingDelegate.qml`, replace lines 49–54 (the R4 Enter-swallow `Keys.onPressed`) with the same structural-key dispatch block as Task 13. The block is identical text-by-text — paste it in place.
 
 - [ ] **Step 2: Smoke-test**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
-./build-dev/bin/markoff-live-render-app /tmp/r5-smoke.md &
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
+./build-dev/bin/markoff-live-app /tmp/r5-smoke.md &
 APP_PID=$!
 sleep 2
 kill $APP_PID
@@ -2422,7 +2422,7 @@ kill $APP_PID
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/HeadingDelegate.qml
+git add libs/markoff-live/qml/delegates/HeadingDelegate.qml
 git commit -m "feat(live-render): heading delegate routes structural keys to handler
 
 Same wiring as paragraph (Task 13). Removes the R4 Enter-swallow."
@@ -2433,18 +2433,18 @@ Same wiring as paragraph (Task 13). Removes the R4 Enter-swallow."
 ## Task 15: QML delegate wiring — code-block
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`
 
 Same change. Code-block's descriptor only declares Backspace/Delete as consumed keys, so Enter falls through and TextEdit inserts a literal `\n` — that's the expected behaviour inside a fenced code block.
 
 - [ ] **Step 1: Replace the R4 Enter-swallow**
 
-In `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`, replace lines 44–49 with the same structural-key dispatch block. (Identical text to Tasks 13–14.)
+In `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`, replace lines 44–49 with the same structural-key dispatch block. (Identical text to Tasks 13–14.)
 
 - [ ] **Step 2: Smoke-test**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
 
 cat > /tmp/r5-smoke-code.md <<'EOF'
 First paragraph.
@@ -2457,7 +2457,7 @@ code line 2
 Last paragraph.
 EOF
 
-./build-dev/bin/markoff-live-render-app /tmp/r5-smoke-code.md &
+./build-dev/bin/markoff-live-app /tmp/r5-smoke-code.md &
 APP_PID=$!
 sleep 2
 kill $APP_PID
@@ -2466,7 +2466,7 @@ kill $APP_PID
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml
+git add libs/markoff-live/qml/delegates/CodeBlockDelegate.qml
 git commit -m "feat(live-render): code-block delegate routes structural keys to handler
 
 Code-block declares only Backspace/Delete as consumed; Enter falls
@@ -2479,7 +2479,7 @@ inside fenced code."
 ## Task 16: LiveView focus-routing on cursorChanged
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/LiveView.qml`
+- Modify: `libs/markoff-live/qml/LiveView.qml`
 
 When `LiveCursorState::cursorChanged` fires with a `TextCaret` (the structural-key handler's pending request just resolved on `rowsInserted`), the corresponding delegate must receive keyboard focus and place the caret at the requested qtPos.
 
@@ -2498,7 +2498,7 @@ A simpler alternative: add a `Q_PROPERTY(int focusedRow READ focusedRow NOTIFY c
 
 - [ ] **Step 1: Add `focusedRow` Q_PROPERTY to LiveCursorState**
 
-In `libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h`, add:
+In `libs/markoff-live/include/markoff/live-render/LiveCursorState.h`, add:
 
 ```cpp
     Q_PROPERTY(int focusedRow READ focusedRow NOTIFY cursorChanged)
@@ -2512,7 +2512,7 @@ In the public section:
     int focusedQtPos() const;
 ```
 
-In `libs/markoff-live-render/src/LiveCursorState.cpp`, add the implementations:
+In `libs/markoff-live/src/LiveCursorState.cpp`, add the implementations:
 
 ```cpp
 int LiveCursorState::focusedRow() const
@@ -2535,7 +2535,7 @@ int LiveCursorState::focusedQtPos() const
 
 - [ ] **Step 2: Add the focus-routing Connections in LiveView.qml**
 
-In `libs/markoff-live-render/qml/LiveView.qml`, add inside the top-level `ListView` (e.g. just before the `MouseArea` block):
+In `libs/markoff-live/qml/LiveView.qml`, add inside the top-level `ListView` (e.g. just before the `MouseArea` block):
 
 ```qml
     // R5: focus-route into a delegate when the cursor changes (structural-key
@@ -2559,8 +2559,8 @@ In `libs/markoff-live-render/qml/LiveView.qml`, add inside the top-level `ListVi
 - [ ] **Step 3: Smoke-test**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
-./build-dev/bin/markoff-live-render-app /tmp/r5-smoke.md &
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
+./build-dev/bin/markoff-live-app /tmp/r5-smoke.md &
 APP_PID=$!
 sleep 3
 kill $APP_PID
@@ -2579,9 +2579,9 @@ Expected: all green.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h \
-        libs/markoff-live-render/src/LiveCursorState.cpp \
-        libs/markoff-live-render/qml/LiveView.qml
+git add libs/markoff-live/include/markoff/live-render/LiveCursorState.h \
+        libs/markoff-live/src/LiveCursorState.cpp \
+        libs/markoff-live/qml/LiveView.qml
 git commit -m "feat(live-render): focus-route delegate on cursorChanged
 
 LiveCursorState exposes focusedRow + focusedQtPos as Q_PROPERTYs.
@@ -2595,11 +2595,11 @@ calls focusEditAt on the matching delegate when the cursor changes
 ## Task 17: Test app polish — title bump
 
 **Files:**
-- Modify: `libs/markoff-live-render/app/Main.qml`
+- Modify: `libs/markoff-live/app/Main.qml`
 
 - [ ] **Step 1: Update the title**
 
-In `libs/markoff-live-render/app/Main.qml`, change `(R4)` to `(R5)`:
+In `libs/markoff-live/app/Main.qml`, change `(R4)` to `(R5)`:
 
 ```qml
     title: ctxTitle + " — markoff-live-render (R5)"
@@ -2608,8 +2608,8 @@ In `libs/markoff-live-render/app/Main.qml`, change `(R4)` to `(R5)`:
 - [ ] **Step 2: Build & launch**
 
 ```bash
-cmake --build build-dev --target markoff-live-render-app -j 8
-./build-dev/bin/markoff-live-render-app /tmp/r5-smoke.md &
+cmake --build build-dev --target markoff-live-app -j 8
+./build-dev/bin/markoff-live-app /tmp/r5-smoke.md &
 APP_PID=$!
 sleep 2
 kill $APP_PID
@@ -2620,7 +2620,7 @@ Confirm the title says `(R5)`.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/app/Main.qml
+git add libs/markoff-live/app/Main.qml
 git commit -m "chore(live-render): test app title bumps to R5"
 ```
 
@@ -2638,7 +2638,7 @@ This task is the user's pass — the agent does NOT mark R5 complete; the user d
 - [ ] **Step 1: Build the test app fresh**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
 ctest --test-dir build-dev -R '^tst_live_render_' --output-on-failure -j 8
 ```
 
@@ -2680,7 +2680,7 @@ EOF
 - [ ] **Step 3: Confirm the test app loads**
 
 ```bash
-./build-dev/bin/markoff-live-render-app /tmp/r5-dogfood.md
+./build-dev/bin/markoff-live-app /tmp/r5-dogfood.md
 ```
 
 Confirm: file loads, all blocks render, click + Enter at end of paragraph creates a new empty paragraph with the caret in it. Close the app.
@@ -2744,7 +2744,7 @@ git commit -m "docs(restoration-status): R5 in dogfood gate"
 
 Tell the user (in chat, not committed):
 
-> R5 implementation is complete and tests are green (7/7 live-render fast-tier including the new tst_live_render_structural). The dogfood script for R5 is: press Enter at the end of every paragraph in a 10-block doc; caret lands in the new empty paragraph each time; Backspace at the start of each merges back, restoring the original. Also try mid-paragraph Enter (block splits, caret goes to start of new row), Shift-Enter (soft break, stays in same paragraph), Delete at end of paragraph (merges with next), and typing inside a fenced code block (literal \\n on Enter). Try `./build-dev/bin/markoff-live-render-app /tmp/r5-dogfood.md` (or any markdown of yours). If anything misbehaves, paste your description verbatim and I'll diagnose. If clean, say so and we'll flip R5 to `complete` and write R6.
+> R5 implementation is complete and tests are green (7/7 live-render fast-tier including the new tst_live_render_structural). The dogfood script for R5 is: press Enter at the end of every paragraph in a 10-block doc; caret lands in the new empty paragraph each time; Backspace at the start of each merges back, restoring the original. Also try mid-paragraph Enter (block splits, caret goes to start of new row), Shift-Enter (soft break, stays in same paragraph), Delete at end of paragraph (merges with next), and typing inside a fenced code block (literal \\n on Enter). Try `./build-dev/bin/markoff-live-app /tmp/r5-dogfood.md` (or any markdown of yours). If anything misbehaves, paste your description verbatim and I'll diagnose. If clean, say so and we'll flip R5 to `complete` and write R6.
 
 R5 is **not** complete from the agent's side until the user signs off in the dogfood log.
 

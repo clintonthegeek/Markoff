@@ -537,7 +537,7 @@ Retiring `parseUpdated` cleanly (rather than keeping it as a derived signal that
 
 ## 9. Migration
 
-### 9.1 Layer-by-layer transition (`libs/markoff-live-render`)
+### 9.1 Layer-by-layer transition (`libs/markoff-live`)
 
 | Layer | Today | D2 migration |
 |---|---|---|

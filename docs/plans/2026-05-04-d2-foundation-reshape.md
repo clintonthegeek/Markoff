@@ -111,7 +111,7 @@ libs/markoff-core/
 │  └─ AnchorConversion.h                     # Phase 3
 └─ CMakeLists.txt                            # Phase 1 onward (add new sources)
 
-libs/markoff-live-render/
+libs/markoff-live/
 ├─ src/
 │  ├─ LiveEditBinding.cpp                    # Phase 11.1 (rewrite)
 │  ├─ LiveStructuralKeyHandler.cpp           # Phase 11.2 (rewrite)
@@ -2839,7 +2839,7 @@ git commit -m "d2(foundation): inlineSpansChanged signal fires on cache invalida
 - [ ] **Step 1: Update all sites in `markoff-live-render` that read inline spans to call `doc.inlineSpansFor(blockId)` instead of pulling from R1B's pre-baked `TopLevelBlock::inlineSpans`**
 
 ```bash
-grep -rn "inlineSpans" libs/markoff-live-render/src/
+grep -rn "inlineSpans" libs/markoff-live/src/
 ```
 
 (For each site, swap to the new accessor. Compile passes; behavior may need adjustment in Phase 11.)
@@ -2857,13 +2857,13 @@ git commit -m "d2(view): consume InlineParseCache via doc.inlineSpansFor(blockId
 ### Task 11.1: `LiveEditBinding` rewrite
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveEditBinding.cpp`
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h`
+- Modify: `libs/markoff-live/src/LiveEditBinding.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveEditBinding.h`
 
 - [ ] **Step 1: Read current LiveEditBinding to understand the shape being replaced**
 
 ```bash
-cat libs/markoff-live-render/src/LiveEditBinding.cpp | head -100
+cat libs/markoff-live/src/LiveEditBinding.cpp | head -100
 ```
 
 Note what's being deleted: `m_applyingModelUpdate` cycle guard, `previousText` cache, freshness gate, `parseInputEditSeq`-based staleness check.
@@ -2922,23 +2922,23 @@ git commit -m "d2(view): LiveStructuralKeyHandler dispatches to Cmd::* instead o
 ### Task 11.3: Delete marker-paragraph machinery
 
 **Files:**
-- Delete: `libs/markoff-live-render/src/MarkerScrubber.{h,cpp}`
-- Delete: `libs/markoff-live-render/include/markoff/Marker.h`
-- Modify: `libs/markoff-live-render/CMakeLists.txt` (remove deleted sources)
-- Delete: `libs/markoff-live-render/tests/tst_marker_*.cpp` (the marker-only tests; structural tests stay)
+- Delete: `libs/markoff-live/src/MarkerScrubber.{h,cpp}`
+- Delete: `libs/markoff-live/include/markoff/Marker.h`
+- Modify: `libs/markoff-live/CMakeLists.txt` (remove deleted sources)
+- Delete: `libs/markoff-live/tests/tst_marker_*.cpp` (the marker-only tests; structural tests stay)
 
 - [ ] **Step 1: Identify all marker-paragraph references**
 
 ```bash
-grep -rn -E "MarkerScrubber|markerParagraph|ZWSP|0x200B|atomicBundledEdit" libs/markoff-live-render/
+grep -rn -E "MarkerScrubber|markerParagraph|ZWSP|0x200B|atomicBundledEdit" libs/markoff-live/
 ```
 
 - [ ] **Step 2: Delete the files and remove from CMake**
 
 ```bash
-git rm libs/markoff-live-render/src/MarkerScrubber.h libs/markoff-live-render/src/MarkerScrubber.cpp
-git rm libs/markoff-live-render/include/markoff/Marker.h
-git rm libs/markoff-live-render/tests/tst_marker_*.cpp
+git rm libs/markoff-live/src/MarkerScrubber.h libs/markoff-live/src/MarkerScrubber.cpp
+git rm libs/markoff-live/include/markoff/Marker.h
+git rm libs/markoff-live/tests/tst_marker_*.cpp
 # Update CMakeLists.txt
 ```
 
@@ -3133,7 +3133,7 @@ git commit -m "d2(foundation): convergence — local undo of structural-ins fall
 - [ ] **Step 1: Verify no caller remains**
 
 ```bash
-grep -rn "ParsePool" libs/markoff-core/ libs/markoff-live-render/
+grep -rn "ParsePool" libs/markoff-core/ libs/markoff-live/
 ```
 
 Expected: zero hits (post-Phase 11).
@@ -3220,7 +3220,7 @@ git commit -m "d2(docs): D-arc status — Phase N complete; Phase N+1 in-progres
 - [ ] **Step 1: User opens the live-render test app against a representative document**
 
 ```bash
-./build-dev/bin/markoff-live-render-app docs/specs/2026-05-04-d2-foundation-reshape-design.md
+./build-dev/bin/markoff-live-app docs/specs/2026-05-04-d2-foundation-reshape-design.md
 ```
 
 - [ ] **Step 2: User exercises:**

@@ -58,11 +58,11 @@ endif()
 
 add_subdirectory(libs/markoff-core)
 add_subdirectory(libs/markoff-view-qml)
-# jkqtmathtext — LaTeX math rendering for Math blocks in markoff-live-render.
+# jkqtmathtext — LaTeX math rendering for Math blocks in markoff-live.
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)
 endif()
-add_subdirectory(libs/markoff-live-render)
+add_subdirectory(libs/markoff-live)
 add_subdirectory(libs/markoff-source)
 
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)

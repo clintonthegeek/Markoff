@@ -23,7 +23,7 @@
 > CRDT race window that D removes structurally.
 >
 > The legacy `libs/markoff-view-qml` continues to ship (source mode only;
-> live mode retired in D4); the in-tree `libs/markoff-live-render` carries
+> live mode retired in D4); the in-tree `libs/markoff-live` carries
 > L0–L8 and all D3 work.
 >
 > All other content below describes the project at large.
@@ -56,7 +56,7 @@ foundation library + two canonical view leaves.
 - `libs/markoff-view-qml`      — legacy QML view (source mode only;
                                  live mode retired in D4). Source mode
                                  still ships; do not delete prematurely.
-- `libs/markoff-live-render`   — **the active live-preview view leaf.**
+- `libs/markoff-live`   — **the active live-preview view leaf.**
                                  Built on D2's per-block CRDT buffers via
                                  `LiveListModelBinding`, `LiveBlockModel`,
                                  `LiveCursorState`, `LiveStructuralKeyHandler`,
@@ -120,7 +120,7 @@ was deleted in D4.
 ## Per-library guides
 
 - `libs/markoff-core/CLAUDE.md`
-- `libs/markoff-live-render/CLAUDE.md` — **active view leaf**
+- `libs/markoff-live/CLAUDE.md` — **active view leaf**
 - `libs/markoff-view-qml/CLAUDE.md`
 - `libs/markoff-source/CLAUDE.md`
 - `libs/markoff-parser/` (no per-lib CLAUDE.md; docs in `docs/specs/`)

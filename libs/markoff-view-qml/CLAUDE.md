@@ -2,7 +2,7 @@
 
 > **2026-05-02 — restoration-arc note.** The *live-mode* portion of
 > this library is being rebuilt as a side-by-side new library
-> `libs/markoff-live-render`. See
+> `libs/markoff-live`. See
 > `docs/specs/2026-05-02-live-render-restoration-design.md` (decision β)
 > and `docs/restoration-status.md` for the active arc. Do not modify
 > live-mode files in this library during the restoration unless the

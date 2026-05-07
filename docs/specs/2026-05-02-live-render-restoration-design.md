@@ -21,7 +21,7 @@ The audit `docs/2026-05-02-live-view-architectural-audit.md` is the diagnostic t
 
 ## 0. TL;DR
 
-The Phase-2 live preview, in its current form, has six overlapping authority claims for "what is the content of block N right now," reconciled pairwise with ad-hoc cycle guards. This spec retires that architecture in favour of a side-by-side new library, `libs/markoff-live-render`, built layer-up around a single principled mechanism: **sequence-tagged reconciliation**. The CRDT remains the canonical source; the parser is asynchronous; the view computes per-row staleness from `editSequence`/`parseSequence` and applies parse output selectively. Speculation, focus delivery, holes-no-longer-needed, IME, and undo coalescing all dispatch off the same primitive.
+The Phase-2 live preview, in its current form, has six overlapping authority claims for "what is the content of block N right now," reconciled pairwise with ad-hoc cycle guards. This spec retires that architecture in favour of a side-by-side new library, `libs/markoff-live`, built layer-up around a single principled mechanism: **sequence-tagged reconciliation**. The CRDT remains the canonical source; the parser is asynchronous; the view computes per-row staleness from `editSequence`/`parseSequence` and applies parse output selectively. Speculation, focus delivery, holes-no-longer-needed, IME, and undo coalescing all dispatch off the same primitive.
 
 The widget is a block-based editor with a text spine: per-block QML delegates, a discriminated-union cursor model that natively admits non-text-cursor blocks, and a block-API contract designed so plugin-authored block kinds (math, mermaid, video, etc.) compose cleanly. Restoration delivers, in nine phases over an estimated 18–30 weeks, a dogfood-stable editor handling paragraphs, headings, code-blocks, lists, blockquotes, images, horizontal rules, and one fully interactive block kind (math), with per-block context menus and a 16ms keystroke-to-pixel target enforced by CI benchmarks. The architecture is collab-ready (every cursor/edit/undo decision is tested against concurrent remote edits) but ships single-user; collab activation is post-restoration. The D evolution (per-block CRDT) is the long-term endpoint the architecture leaves room for and is documented separately as a proposal to the `collabtext` maintainers.
 
@@ -37,7 +37,7 @@ These decisions were made through brainstorming and are inputs to this design, n
 | 2 | Now feature set | I.a math, II.a lists, II.b blockquotes, III.c per-block context menu, plus paragraph / heading / hr / image / code-block carrying forward. Everything else from the Q2 list is *Admit* (architecture must not preclude them) or *Defer*. |
 | 3 | Cursor shape | **Shape 1** — discriminated union: `Cursor = TextCaret | BlockSelected | BlockInternalEdit`. Block kind declares which variants apply to it. CRDT-anchored `BlockId`; within-block position is anchor-tracked. |
 | 4 | Source-of-truth | **C** — sequence-tagged hybrid. CRDT canonical; parser asynchronous; per-row staleness computed from `editSequence`/`parseSequence`. **D** (per-block CRDT) is the long-term endpoint, separate doc. |
-| 5 | Restoration shape | **β** — side-by-side library `libs/markoff-live-render`. Old `markoff-view-qml` keeps source mode and old-live for regression reference until new library reaches dogfood-stability, then retires. |
+| 5 | Restoration shape | **β** — side-by-side library `libs/markoff-live`. Old `markoff-view-qml` keeps source mode and old-live for regression reference until new library reaches dogfood-stability, then retires. |
 | 6 | Enter semantics | **N** — Notion-style: Enter creates a new block; Shift-Enter inserts a soft break (`\n`) within the current block. **(Amended A2, 2026-05-04 — supersedes A1.)** Paragraph EOB-Enter and start-of-paragraph-Enter insert `"\n\n​"` (EOB) or `"​\n\n"` (start) into the source. The U+200B ZERO WIDTH SPACE is invisible; the parser produces a real paragraph block; cursor lands via the standard parser-driven row path (`requestTextCaretAtNewRow` → `LiveBlockModel::rowsInserted`). A `MarkerScrubber` service (live-render lib) ensures the marker doesn't survive focus-out / save / load. Per `docs/specs/2026-05-03-marker-paragraph-design.md`. The v2 hole implementation (`LiveHoleLayer` / `LiveProxyBlockModel` / `BlockHole`) is permanently retired; the v0 hole implementation in `markoff-view-qml` was already retired by A1. Mid-block Enter is unchanged (parser produces both halves; cursor delivery via the same parser-driven row path). |
 | 7 | Performance budget | 16 ms keystroke / 50 ms structural; 4 ms main-thread per keystroke handler; 8 ms parse-arrival on docs ≤ 64 KB. CI-enforced via `tst_benchmark`. |
 
@@ -678,7 +678,7 @@ This is what enables the new library to land in phases — each phase's tests ve
 
 ### 10.3 Dogfood as the verification gate
 
-Per the repair plan's anti-goal #2: `QTest::keyClick` does not reproduce the async parse round-trip's timing. Each phase's acceptance criterion includes a manual dogfood pass on `markoff-live-render-app` (a copy of the existing `markoff-view-qml-app` test app, repointed at the new library) by the user, with concrete scripts:
+Per the repair plan's anti-goal #2: `QTest::keyClick` does not reproduce the async parse round-trip's timing. Each phase's acceptance criterion includes a manual dogfood pass on `markoff-live-app` (a copy of the existing `markoff-view-qml-app` test app, repointed at the new library) by the user, with concrete scripts:
 
 - R4 (paragraph): "Type a 200-word paragraph at 100+ wpm into a 5-page document; cursor never jumps; characters never scramble."
 - R5 (structural): "Press Enter at the end of every paragraph in a 10-block doc; caret lands in the new empty paragraph each time; Backspace at the start of each merges back, restoring the original." **(Amended A2, 2026-05-04 — supersedes A1.)** All Enter cases — mid-block, end-of-paragraph, start-of-paragraph — are delivered by R5 + R5.5 (marker-paragraph). R5 ships mid-block Enter, Backspace-merge, Delete-merge, and Shift-Enter; R5.5 ships EOB-Enter and start-of-paragraph-Enter via the marker design (`docs/specs/2026-05-03-marker-paragraph-design.md`).
@@ -700,7 +700,7 @@ Phases. Each phase has a scope, an acceptance criterion (test passes + dogfood s
 - `MarkoffDocument::parseUpdated` extended to carry `parseInputEditSequence` (4th argument).
 - `markoff-parser` extended: per-block inline span data pre-baked into a public-API value type (e.g. `TopLevelBlock::inlineSpans`). Replaces `InlineFormatHighlighter::rebuildSpans`'s per-delegate parser instantiation.
 - `markoff-view-qml`'s consumers updated to accept the new signal shape (no behaviour change; just a parameter ignored).
-- New library scaffold: `libs/markoff-live-render/` with CMakeLists, public-include skeleton, namespace `Markoff::LiveRender`, empty test executable, empty test app.
+- New library scaffold: `libs/markoff-live/` with CMakeLists, public-include skeleton, namespace `Markoff::LiveRender`, empty test executable, empty test app.
 - Decision pinned: namespace `Markoff::LiveRender`, QML URI `org.markoff.live-render 1.0`, test prefix `tst_live_render_*`.
 
 **Acceptance.** Existing 78/78 foundation+parser+view-qml test pass. New library configures and builds (zero functionality, zero tests yet). Foundation delta has a unit test confirming `parseInputEditSequence` is the captured value.
@@ -765,7 +765,7 @@ Phases. Each phase has a scope, an acceptance criterion (test passes + dogfood s
 - QML clipboard scrubber — `serializeForCopy` strips ZWSP from copy output.
 - All v2-holes code retired: `LiveHoleLayer`, `LiveProxyBlockModel`, `BlockHole`, the `aboutToCommit` / `holeReified` / `holeBufferChanged` / `holeAbandoned` / `holeInserted` signals, the `BufferTextRole` / `IsHoleRole` / `HoleIdRole` model roles, the `HoleBlockId` discriminator on `BlockId`. `LiveBlockModel` is restored as the model the QML `ListView` binds to directly.
 
-**Acceptance.** R5.5 dogfood script (above, in §10.3). All §13 unit tests + harness-driven tests in the marker-paragraph design pass. Manual dogfood of ≥200 words across ≥10 paragraphs in `markoff-live-render-app` with no character scramble, clean save, marker-free reload.
+**Acceptance.** R5.5 dogfood script (above, in §10.3). All §13 unit tests + harness-driven tests in the marker-paragraph design pass. Manual dogfood of ≥200 words across ≥10 paragraphs in `markoff-live-app` with no character scramble, clean save, marker-free reload.
 
 ### R6 — Other text blocks + speculation refresh (2–3 weeks)
 
@@ -902,7 +902,7 @@ Things this spec deliberately does not pin precisely; the next step (writing-pla
 2. The exact form of `applyTextUpdate(newText)` — whether it takes raw bytes, a CRDT anchor + length, or a delta record.
 3. Whether `BlockKindRegistry` is a singleton, a per-binding instance, or a service-locator. (Singleton is simplest; per-binding is more testable.)
 4. The undo-coalescing policy's idle threshold (currently 1 second in `LiveEditBinding`); whether to surface it as a Setting or pin it as a constant.
-5. Test-app shape: is `markoff-live-render-app` a copy of `markoff-view-qml-app` with the URI changed, or a fresh app? Resolved at R1.
+5. Test-app shape: is `markoff-live-app` a copy of `markoff-view-qml-app` with the URI changed, or a fresh app? Resolved at R1.
 6. Which tests in `markoff-view-qml`'s suite migrate to the new library as behaviour contracts (vs tests that probe the old architecture's internals and are deliberately dropped).
 7. How `LiveSelectionView` projects multi-block selections containing non-text variants (for now: collapses to whole-block coverage; precise rendering rules at R8).
 8. The rename moment: when does the test app's `--live` flag default to the new library? Proposed: end of R5 (paragraph + structural keys done) for opt-in; end of R10 for default.

@@ -16,31 +16,31 @@
 
 ## File map
 
-**New — public headers** (`libs/markoff-live-render/include/markoff/live-render/`):
+**New — public headers** (`libs/markoff-live/include/markoff/live-render/`):
 - `LiveEditBinding.h` — `QML_ELEMENT`; per-delegate; wires `QQuickTextDocument::contentsChange` → `applyLocalEdit`.
 
-**New — sources** (`libs/markoff-live-render/src/`):
+**New — sources** (`libs/markoff-live/src/`):
 - `LiveEditBinding.cpp`
 
-**New — tests** (`libs/markoff-live-render/tests/`):
+**New — tests** (`libs/markoff-live/tests/`):
 - `tst_live_render_paragraph_edit.cpp`
 
 **Modified — headers:**
-- `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h` — `applyOps` gains a third parameter `parseInputEditSeq` (default `quint64(-1)` = "all rows fresh", preserves R2/R3 callsites).
-- `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h` — expose `bool applyingModelUpdate() const` for cycle-guard query; expose `MarkoffDocument *document()` to LiveEditBinding via QML.
-- `libs/markoff-live-render/include/markoff/live-render/LiveSelectionView.h` — add `applyingSessionSelection()` re-entrance guard (defensive — read-back path is post-R4).
+- `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h` — `applyOps` gains a third parameter `parseInputEditSeq` (default `quint64(-1)` = "all rows fresh", preserves R2/R3 callsites).
+- `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h` — expose `bool applyingModelUpdate() const` for cycle-guard query; expose `MarkoffDocument *document()` to LiveEditBinding via QML.
+- `libs/markoff-live/include/markoff/live-render/LiveSelectionView.h` — add `applyingSessionSelection()` re-entrance guard (defensive — read-back path is post-R4).
 
 **Modified — sources:**
-- `libs/markoff-live-render/src/LiveBlockModel.cpp` — freshness gate inside the `Equal` op branch.
-- `libs/markoff-live-render/src/LiveListModelBinding.cpp` — set/clear `m_applyingModelUpdate` around `applyOps`; pass `parseInputEditSequence`; re-resolve TextCaret cached offset after parse.
-- `libs/markoff-live-render/src/LiveSelectionView.cpp` — guard `syncToSession`.
-- `libs/markoff-live-render/CMakeLists.txt` — add `LiveEditBinding.{h,cpp}` to `qt_add_qml_module`.
-- `libs/markoff-live-render/tests/CMakeLists.txt` — add `tst_live_render_paragraph_edit`.
-- `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml` — `readOnly: false`, `selectByMouse: true`, attach `LiveEditBinding`.
-- `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml` — same, plus level-aware (the `#`-prefix bytes stay in the source span — see Task 12).
-- `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml` — same.
-- `libs/markoff-live-render/qml/LiveView.qml` — pass-through `binding` already there; no change beyond confirming `Keys` priority for arrow / printable keys still routes correctly with `readOnly: false`.
-- `libs/markoff-live-render/app/Main.qml` — title suffix `"(R4)"`.
+- `libs/markoff-live/src/LiveBlockModel.cpp` — freshness gate inside the `Equal` op branch.
+- `libs/markoff-live/src/LiveListModelBinding.cpp` — set/clear `m_applyingModelUpdate` around `applyOps`; pass `parseInputEditSequence`; re-resolve TextCaret cached offset after parse.
+- `libs/markoff-live/src/LiveSelectionView.cpp` — guard `syncToSession`.
+- `libs/markoff-live/CMakeLists.txt` — add `LiveEditBinding.{h,cpp}` to `qt_add_qml_module`.
+- `libs/markoff-live/tests/CMakeLists.txt` — add `tst_live_render_paragraph_edit`.
+- `libs/markoff-live/qml/delegates/ParagraphDelegate.qml` — `readOnly: false`, `selectByMouse: true`, attach `LiveEditBinding`.
+- `libs/markoff-live/qml/delegates/HeadingDelegate.qml` — same, plus level-aware (the `#`-prefix bytes stay in the source span — see Task 12).
+- `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml` — same.
+- `libs/markoff-live/qml/LiveView.qml` — pass-through `binding` already there; no change beyond confirming `Keys` priority for arrow / printable keys still routes correctly with `readOnly: false`.
+- `libs/markoff-live/app/Main.qml` — title suffix `"(R4)"`.
 - `docs/restoration-status.md` — new entry (last task).
 
 **Untouched (verified-not-broken):**
@@ -57,12 +57,12 @@
 docs/specs/2026-05-02-live-render-restoration-design.md   §4, §5.2, §7.1, §11 R4
 libs/markoff-core/include/markoff-foundation/MarkoffDocument.h     (applyLocalEdit, editSequence, parseUpdated signature)
 libs/markoff-core/include/markoff-foundation/MarkoffEdit.h         (oldStart, oldEnd, newText)
-libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h    (setRowEditSequence, rowEditSequence, applyOps)
-libs/markoff-live-render/src/LiveBlockModel.cpp                          (current applyOps; the Equal branch is what we modify)
-libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h
-libs/markoff-live-render/src/LiveListModelBinding.cpp                    (onParseUpdated; lastParseInputEditSeq is stored but unused)
-libs/markoff-live-render/include/markoff/live-render/Coordinates.h       (qtPosToByte, byteToQtPos)
-libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml             (the TextEdit shape we're making editable)
+libs/markoff-live/include/markoff/live-render/LiveBlockModel.h    (setRowEditSequence, rowEditSequence, applyOps)
+libs/markoff-live/src/LiveBlockModel.cpp                          (current applyOps; the Equal branch is what we modify)
+libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h
+libs/markoff-live/src/LiveListModelBinding.cpp                    (onParseUpdated; lastParseInputEditSeq is stored but unused)
+libs/markoff-live/include/markoff/live-render/Coordinates.h       (qtPosToByte, byteToQtPos)
+libs/markoff-live/qml/delegates/ParagraphDelegate.qml             (the TextEdit shape we're making editable)
 ```
 
 No code changes in this task.
@@ -70,7 +70,7 @@ No code changes in this task.
 - [ ] **Step 2: Run the existing fast-tier test suite to confirm a clean baseline**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
 ctest --test-dir build-dev -R '^tst_live_render_' --output-on-failure -j 8
 ```
 
@@ -81,9 +81,9 @@ Expected: all five `tst_live_render_*` executables green. Record the count; R4 m
 ## Task 2: Extend `LiveBlockModel::applyOps` with the freshness gate (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h`
-- Modify: `libs/markoff-live-render/src/LiveBlockModel.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_block_model.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h`
+- Modify: `libs/markoff-live/src/LiveBlockModel.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_block_model.cpp`
 
 The freshness rule (spec §4.3): for each `Equal` op, the per-row text role is updated only if `row.lastEditEditSequence <= parseInputEditSeq`. Stale rows preserve their existing model text (the CRDT is the canonical source for those bytes — the parse just hasn't caught up). Non-text role fields (`kind`, `headingLevel`, `codeLanguage`, `blockAnchor`) ARE updated regardless — block-shape decisions are the parser's authoritative concern (spec §4.3).
 
@@ -93,7 +93,7 @@ Default behaviour preserved: passing `std::numeric_limits<quint64>::max()` (the 
 
 - [ ] **Step 1: Add a failing test for stale-row preservation**
 
-Append to `libs/markoff-live-render/tests/tst_live_render_block_model.cpp`. (Read the file first to see where the existing tests live and the helpers in scope.)
+Append to `libs/markoff-live/tests/tst_live_render_block_model.cpp`. (Read the file first to see where the existing tests live and the helpers in scope.)
 
 Add this test slot to the existing `TstLiveRenderBlockModel` class:
 
@@ -189,7 +189,7 @@ Expected: compile fails (the third-arg overload of `applyOps` does not yet exist
 
 - [ ] **Step 3: Add the new overload to `LiveBlockModel.h`**
 
-In `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h`, replace the existing `applyOps` declaration with:
+In `libs/markoff-live/include/markoff/live-render/LiveBlockModel.h`, replace the existing `applyOps` declaration with:
 
 ```cpp
     /// Apply a diff op sequence relative to `nextRecords`, applying the
@@ -211,7 +211,7 @@ Add `#include <limits>` at the top of the header next to `<QHash>` if not alread
 
 - [ ] **Step 4: Update the implementation**
 
-In `libs/markoff-live-render/src/LiveBlockModel.cpp`, replace the `applyOps` body. The full new method:
+In `libs/markoff-live/src/LiveBlockModel.cpp`, replace the `applyOps` body. The full new method:
 
 ```cpp
 void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
@@ -270,9 +270,9 @@ Expected: all three new test slots pass; previous tests still green.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h \
-        libs/markoff-live-render/src/LiveBlockModel.cpp \
-        libs/markoff-live-render/tests/tst_live_render_block_model.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveBlockModel.h \
+        libs/markoff-live/src/LiveBlockModel.cpp \
+        libs/markoff-live/tests/tst_live_render_block_model.cpp
 git commit -m "feat(live-render): freshness gate on LiveBlockModel::applyOps
 
 Equal-op text-role updates skip when row.lastEditEditSequence
@@ -286,8 +286,8 @@ preserves R2/R3 callsites."
 ## Task 3: Plumb the freshness rule + applyingModelUpdate guard through `LiveListModelBinding`
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
 
 `onParseUpdated` already carries `parseInputEditSequence` (delivered via the foundation's R1A signal change) but currently only stores it. R4 wires it through to `applyOps`, and brackets the `applyOps` call with `m_applyingModelUpdate = true/false` so each `LiveEditBinding` can detect "the contentsChange I just got is the synchronous echo of the model update I caused" and skip emitting it back to the CRDT.
 
@@ -295,7 +295,7 @@ A new `Q_PROPERTY(MarkoffDocument *document ...)` already exists. We add `Q_PROP
 
 - [ ] **Step 1: Header additions**
 
-In `libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h`:
+In `libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h`:
 
 Add to the public section (after `selectionView()`):
 
@@ -324,7 +324,7 @@ Add to the `public:` interface (do NOT add a Q_PROPERTY — it's not consumed fr
 
 - [ ] **Step 2: Pimpl field + accessor + bracketed applyOps**
 
-In `libs/markoff-live-render/src/LiveListModelBinding.cpp`, modify `Private`:
+In `libs/markoff-live/src/LiveListModelBinding.cpp`, modify `Private`:
 
 ```cpp
 struct LiveListModelBinding::Private {
@@ -402,8 +402,8 @@ Expected: all green; no behaviour change yet because no `LiveEditBinding` exists
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h \
-        libs/markoff-live-render/src/LiveListModelBinding.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveListModelBinding.h \
+        libs/markoff-live/src/LiveListModelBinding.cpp
 git commit -m "feat(live-render): pass parseInputEditSeq + applyingModelUpdate guard
 
 LiveListModelBinding::onParseUpdated now passes the parse-input
@@ -418,9 +418,9 @@ during model-driven updates (spec §4.5)."
 ## Task 4: `LiveEditBinding` — header + skeleton
 
 **Files:**
-- Create: `libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h`
-- Create: `libs/markoff-live-render/src/LiveEditBinding.cpp`
-- Modify: `libs/markoff-live-render/CMakeLists.txt`
+- Create: `libs/markoff-live/include/markoff/live-render/LiveEditBinding.h`
+- Create: `libs/markoff-live/src/LiveEditBinding.cpp`
+- Modify: `libs/markoff-live/CMakeLists.txt`
 
 The class is a per-delegate QML element. It is owned by the QML delegate item and parented to it. Properties are set declaratively from QML; on completion, the binding wires its signals.
 
@@ -598,7 +598,7 @@ void LiveEditBinding::flushPendingComposition()
 
 - [ ] **Step 3: Add to CMakeLists**
 
-In `libs/markoff-live-render/CMakeLists.txt`, inside `qt_add_qml_module`'s `SOURCES` list, after the R3 cursor block (`src/LiveSelectionView.cpp`), append:
+In `libs/markoff-live/CMakeLists.txt`, inside `qt_add_qml_module`'s `SOURCES` list, after the R3 cursor block (`src/LiveSelectionView.cpp`), append:
 
 ```cmake
         # R4: per-delegate edit binding
@@ -619,9 +619,9 @@ Expected: clean build. The class compiles but does nothing yet.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveEditBinding.h \
-        libs/markoff-live-render/src/LiveEditBinding.cpp \
-        libs/markoff-live-render/CMakeLists.txt
+git add libs/markoff-live/include/markoff/live-render/LiveEditBinding.h \
+        libs/markoff-live/src/LiveEditBinding.cpp \
+        libs/markoff-live/CMakeLists.txt
 git commit -m "feat(live-render): scaffold LiveEditBinding (no edit logic yet)
 
 QML element with binding/modelIndex/textDocument/composing properties
@@ -634,9 +634,9 @@ and guards land in subsequent tasks."
 ## Task 5: `LiveEditBinding` — content-change → MarkoffEdit + applyLocalEdit (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveEditBinding.cpp`
-- Create: `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`
-- Modify: `libs/markoff-live-render/tests/CMakeLists.txt`
+- Modify: `libs/markoff-live/src/LiveEditBinding.cpp`
+- Create: `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`
+- Modify: `libs/markoff-live/tests/CMakeLists.txt`
 
 Translation of `(qtPos, charsRemoved, charsAdded)` into a single `MarkoffEdit` against the foundation's CRDT, in UTF-8 byte coordinates inside the focused block:
 
@@ -665,7 +665,7 @@ Important: after `applyLocalEdit`, the model's `record.text` is **still** the pr
 
 - [ ] **Step 1: Create the test file (failing tests)**
 
-Create `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`:
+Create `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -832,7 +832,7 @@ QTEST_GUILESS_MAIN(TstLiveRenderParagraphEdit)
 
 - [ ] **Step 2: Register the test**
 
-In `libs/markoff-live-render/tests/CMakeLists.txt`, append:
+In `libs/markoff-live/tests/CMakeLists.txt`, append:
 
 ```cmake
 qt_add_executable(tst_live_render_paragraph_edit
@@ -854,7 +854,7 @@ Expected: tests fail (the slot does nothing yet — `applyLocalEdit` is never ca
 
 - [ ] **Step 4: Implement `onContentsChange`**
 
-In `libs/markoff-live-render/src/LiveEditBinding.cpp`, add the includes:
+In `libs/markoff-live/src/LiveEditBinding.cpp`, add the includes:
 
 ```cpp
 #include <markoff/live-render/LiveBlockModel.h>
@@ -954,9 +954,9 @@ Expected: all green.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveEditBinding.cpp \
-        libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp \
-        libs/markoff-live-render/tests/CMakeLists.txt
+git add libs/markoff-live/src/LiveEditBinding.cpp \
+        libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp \
+        libs/markoff-live/tests/CMakeLists.txt
 git commit -m "feat(live-render): LiveEditBinding wires contentsChange to applyLocalEdit
 
 Per-delegate binding translates QTextDocument::contentsChange
@@ -974,7 +974,7 @@ multi-byte UTF-8 (é = 2 bytes)."
 ## Task 6: Cycle-guard test — `applyingModelUpdate` actually suppresses the echo (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`
 
 The guard already exists from Task 5 step 4. This task adds the regression test that proves it works: when `LiveListModelBinding` mutates a model row's text, the resulting QML binding echo (we simulate it with a direct `setPlainText`) does **not** trigger a second `applyLocalEdit`. Without the guard, this would create an infinite parse-edit-parse loop on the first parse arrival after a typing burst.
 
@@ -1087,7 +1087,7 @@ Expected: all five slots pass. If `flagSeenDuringUpdate` is false, the bracketin
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp
+git add libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp
 git commit -m "test(live-render): applyingModelUpdate is true during dataChanged
 
 Regression test for the surviving cycle guard (spec §4.5):
@@ -1101,8 +1101,8 @@ slot proves the bracketing in LiveListModelBinding works."
 ## Task 7: IME composition deferral — flush on commit (TDD)
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveEditBinding.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`
+- Modify: `libs/markoff-live/src/LiveEditBinding.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`
 
 During IME preedit, `inputMethodComposing` is true and the document fires `contentsChange` for every preedit-character change. We don't want to apply each preedit character to the CRDT — preedit text is provisional. The contract:
 
@@ -1166,7 +1166,7 @@ Expected: `ime_composition_defers_then_flushes_on_commit` fails — `flushPendin
 
 - [ ] **Step 3: Implement `flushPendingComposition`**
 
-In `libs/markoff-live-render/src/LiveEditBinding.cpp`:
+In `libs/markoff-live/src/LiveEditBinding.cpp`:
 
 ```cpp
 void LiveEditBinding::flushPendingComposition()
@@ -1212,8 +1212,8 @@ Expected: all six slots pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveEditBinding.cpp \
-        libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp
+git add libs/markoff-live/src/LiveEditBinding.cpp \
+        libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp
 git commit -m "feat(live-render): IME composition deferral in LiveEditBinding
 
 While composing is true, contentsChange events are dropped and
@@ -1227,7 +1227,7 @@ committed text. Spec §4.5 surviving guard."
 ## Task 8: Stale-parse preservation regression (TDD — the load-bearing R4 test)
 
 **Files:**
-- Modify: `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp`
 
 The audit's #1 failure mode: typing during an in-flight parse causes the parse-back to scramble characters. R4's freshness rule retires this. The test:
 
@@ -1384,7 +1384,7 @@ Expected: pass. If it fails, the freshness gate from Task 2 is broken — fix th
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp
+git add libs/markoff-live/tests/tst_live_render_paragraph_edit.cpp
 git commit -m "test(live-render): stale parse never clobbers model text
 
 End-to-end regression for the C-architecture freshness rule
@@ -1398,8 +1398,8 @@ for text-role updates. Reproduces the audit's #1 failure mode."
 ## Task 9: Re-resolve `TextCaret::cachedByteOffset` after parse arrival
 
 **Files:**
-- Modify: `libs/markoff-live-render/src/LiveListModelBinding.cpp`
-- Modify: `libs/markoff-live-render/tests/tst_live_render_cursor.cpp`
+- Modify: `libs/markoff-live/src/LiveListModelBinding.cpp`
+- Modify: `libs/markoff-live/tests/tst_live_render_cursor.cpp`
 
 Spec §3.3: "Local edits use `cachedByteOffset` for arithmetic; remote edits trigger a translation pass via `MarkoffDocument::resolveTextAnchor` and refresh the cache." For R4 there are no remote edits, but local edits still shift the cached offset (the user typed `X` before the caret → the caret's anchor's resolved byte position increased by 1).
 
@@ -1407,7 +1407,7 @@ After every applyOps run, refresh `LiveCursorState`'s cursor TextCaret's `cached
 
 - [ ] **Step 1: Add the helper to `LiveListModelBinding::onParseUpdated`**
 
-In `libs/markoff-live-render/src/LiveListModelBinding.cpp`, after `d->lastKeys = std::move(nextKeys);` add:
+In `libs/markoff-live/src/LiveListModelBinding.cpp`, after `d->lastKeys = std::move(nextKeys);` add:
 
 ```cpp
     // Re-resolve the cached byte offset of the active TextCaret cursor.
@@ -1436,7 +1436,7 @@ In `libs/markoff-live-render/src/LiveListModelBinding.cpp`, after `d->lastKeys =
 
 - [ ] **Step 2: Add the regression test**
 
-In `libs/markoff-live-render/tests/tst_live_render_cursor.cpp`, append a new test slot to `TstLiveRenderCursor`. (Read the file first to confirm helper symbols.) The test creates a binding with a document, places a TextCaret, applies a parse round-trip with anchor-shift, and verifies cachedByteOffset updated.
+In `libs/markoff-live/tests/tst_live_render_cursor.cpp`, append a new test slot to `TstLiveRenderCursor`. (Read the file first to confirm helper symbols.) The test creates a binding with a document, places a TextCaret, applies a parse round-trip with anchor-shift, and verifies cachedByteOffset updated.
 
 ```cpp
     void textcaret_cached_offset_refreshes_on_parse_arrival() {
@@ -1491,8 +1491,8 @@ Expected: existing tests + new slot all pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/src/LiveListModelBinding.cpp \
-        libs/markoff-live-render/tests/tst_live_render_cursor.cpp
+git add libs/markoff-live/src/LiveListModelBinding.cpp \
+        libs/markoff-live/tests/tst_live_render_cursor.cpp
 git commit -m "feat(live-render): refresh TextCaret cachedByteOffset on parse arrival
 
 After applyOps, re-resolve any active TextCaret's cached offset
@@ -1506,8 +1506,8 @@ structural-key dispatch. Spec §3.3."
 ## Task 10: Defensive `applyingSessionSelection` guard in `LiveSelectionView`
 
 **Files:**
-- Modify: `libs/markoff-live-render/include/markoff/live-render/LiveSelectionView.h`
-- Modify: `libs/markoff-live-render/src/LiveSelectionView.cpp`
+- Modify: `libs/markoff-live/include/markoff/live-render/LiveSelectionView.h`
+- Modify: `libs/markoff-live/src/LiveSelectionView.cpp`
 
 Spec §4.5 names `m_applyingSessionSelection` as the third surviving guard. Today the LiveSelectionView only WRITES to `Session::setPrimarySelection` — there is no read-back path that could create the echo loop. But once a future phase adds a read-back (e.g. for collab presence rendering or external selection sources), the loop becomes possible. Land the guard now so the wiring is correct when read-back arrives.
 
@@ -1515,7 +1515,7 @@ The guard wraps `setPrimarySelection`: any side-effect that could re-enter `begi
 
 - [ ] **Step 1: Add the field to the header**
 
-In `libs/markoff-live-render/include/markoff/live-render/LiveSelectionView.h`, add to `private:`:
+In `libs/markoff-live/include/markoff/live-render/LiveSelectionView.h`, add to `private:`:
 
 ```cpp
     bool m_applyingSessionSelection = false;
@@ -1523,7 +1523,7 @@ In `libs/markoff-live-render/include/markoff/live-render/LiveSelectionView.h`, a
 
 - [ ] **Step 2: Bracket `setPrimarySelection`**
 
-In `libs/markoff-live-render/src/LiveSelectionView.cpp`, in `syncToSession`, wrap the `m_session->setPrimarySelection(sel);` call:
+In `libs/markoff-live/src/LiveSelectionView.cpp`, in `syncToSession`, wrap the `m_session->setPrimarySelection(sel);` call:
 
 ```cpp
     m_applyingSessionSelection = true;
@@ -1545,8 +1545,8 @@ Expected: green; no behaviour change.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/include/markoff/live-render/LiveSelectionView.h \
-        libs/markoff-live-render/src/LiveSelectionView.cpp
+git add libs/markoff-live/include/markoff/live-render/LiveSelectionView.h \
+        libs/markoff-live/src/LiveSelectionView.cpp
 git commit -m "feat(live-render): defensive applyingSessionSelection guard
 
 Bracket Session::setPrimarySelection writes with the guard so the
@@ -1560,7 +1560,7 @@ guard #3."
 ## Task 11: Make the `ParagraphDelegate` writable; attach `LiveEditBinding`
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`
 
 Replace `readOnly: true` with `false`, enable `selectByMouse`, and instantiate one `LiveEditBinding` per delegate, wiring its four properties.
 
@@ -1573,7 +1573,7 @@ A subtle correctness item: `LiveEditBinding` listens to `QQuickTextDocument::tex
 
 - [ ] **Step 1: Rewrite the delegate**
 
-Replace the body of `libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml`:
+Replace the body of `libs/markoff-live/qml/delegates/ParagraphDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1644,8 +1644,8 @@ Key changes vs. R3:
 - [ ] **Step 2: Build and launch the test app**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
-./build-dev/bin/markoff-live-render-app /tmp/r4-smoke.md   # any markdown file
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
+./build-dev/bin/markoff-live-app /tmp/r4-smoke.md   # any markdown file
 ```
 
 (If `/tmp/r4-smoke.md` doesn't exist, create one with: `printf 'Hello world\n\nA second paragraph.\n' > /tmp/r4-smoke.md`.)
@@ -1670,7 +1670,7 @@ Expected: all green.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/ParagraphDelegate.qml
+git add libs/markoff-live/qml/delegates/ParagraphDelegate.qml
 git commit -m "feat(live-render): paragraph delegate is editable
 
 readOnly=false, selectByMouse=true, and a sibling LiveEditBinding
@@ -1683,7 +1683,7 @@ selection-highlight + blockText surfaces unchanged."
 ## Task 12: Make the `HeadingDelegate` writable
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/HeadingDelegate.qml`
 
 Heading rows have a subtlety: the model's `text` role for a heading is the heading body **without** the leading `#` markers (set by `BlockWalker`; verify by inspecting `BlockWalker::walk` if uncertain). The block's UTF-8 byte range, however, INCLUDES the leading `#`s and the space. So when `LiveEditBinding` translates a `qtPos` into a byte offset, it must add the prefix-bytes count to `oldStart` / `oldEnd`.
 
@@ -1694,7 +1694,7 @@ Check `BlockWalker::walk` — read the file:
 - [ ] **Step 1: Read `BlockWalker.cpp` and confirm what `record.text` contains for headings**
 
 ```
-libs/markoff-live-render/src/BlockWalker.cpp
+libs/markoff-live/src/BlockWalker.cpp
 ```
 
 If `record.text` is the heading **body without `#`**, R4 has two options:
@@ -1724,7 +1724,7 @@ If step 1 confirms `record.text` DOES include the `#` prefix, no change to LiveE
 
 - [ ] **Step 3: Rewrite the delegate (mirroring paragraph)**
 
-Replace `libs/markoff-live-render/qml/delegates/HeadingDelegate.qml`:
+Replace `libs/markoff-live/qml/delegates/HeadingDelegate.qml`:
 
 ```qml
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1794,18 +1794,18 @@ Item {
 - [ ] **Step 4: Build, smoke, run tests**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
-./build-dev/bin/markoff-live-render-app /tmp/r4-smoke.md
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
+./build-dev/bin/markoff-live-app /tmp/r4-smoke.md
 ctest --test-dir build-dev -R '^tst_live_render_' --output-on-failure -j 8
 ```
 
-Smoke: create a markdown with `# H1 heading`, click in, type chars at end → they should append after "heading"; reload the file and confirm the source contains the new bytes (use the test-app's no-save semantics — re-open via `./build-dev/bin/markoff-live-render-app /tmp/r4-smoke.md` after manual save isn't wired; use the in-memory editSequence as the indicator: the title bar still says "(R4)" and the file is unmodified on disk).
+Smoke: create a markdown with `# H1 heading`, click in, type chars at end → they should append after "heading"; reload the file and confirm the source contains the new bytes (use the test-app's no-save semantics — re-open via `./build-dev/bin/markoff-live-app /tmp/r4-smoke.md` after manual save isn't wired; use the in-memory editSequence as the indicator: the title bar still says "(R4)" and the file is unmodified on disk).
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/HeadingDelegate.qml \
-        libs/markoff-live-render/src/LiveEditBinding.cpp
+git add libs/markoff-live/qml/delegates/HeadingDelegate.qml \
+        libs/markoff-live/src/LiveEditBinding.cpp
 git commit -m "feat(live-render): heading delegate is editable
 
 Mirrors paragraph wiring (LiveEditBinding sibling, readOnly=false,
@@ -1821,7 +1821,7 @@ whole-doc offset."
 ## Task 13: Make the `CodeBlockDelegate` writable
 
 **Files:**
-- Modify: `libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml`
+- Modify: `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml`
 
 Same shape as paragraph. Code blocks have fence prefixes (e.g. ` ``` ` and a language line) — the same prefix-bytes computation in LiveEditBinding handles them generically, no special-case needed.
 
@@ -1834,8 +1834,8 @@ Read the current file first, then mirror the paragraph pattern. The KSyntaxHighl
 - [ ] **Step 2: Build, smoke, run tests**
 
 ```bash
-cmake --build build-dev --target markoff_live_render markoff-live-render-app -j 8
-./build-dev/bin/markoff-live-render-app /tmp/r4-smoke.md
+cmake --build build-dev --target markoff_live_render markoff-live-app -j 8
+./build-dev/bin/markoff-live-app /tmp/r4-smoke.md
 ctest --test-dir build-dev -R '^tst_live_render_' --output-on-failure -j 8
 ```
 
@@ -1844,7 +1844,7 @@ Smoke: a markdown with a fenced code block; type chars in the middle of the body
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/CodeBlockDelegate.qml
+git add libs/markoff-live/qml/delegates/CodeBlockDelegate.qml
 git commit -m "feat(live-render): code-block delegate is editable (body-interior only)
 
 Mirrors paragraph wiring. End-of-body Enter is deferred to R5
@@ -1857,13 +1857,13 @@ prefix-bytes adjustment as headings."
 ## Task 14: Test app polish — title, intro hint
 
 **Files:**
-- Modify: `libs/markoff-live-render/app/Main.qml`
+- Modify: `libs/markoff-live/app/Main.qml`
 
 Just bump the title suffix.
 
 - [ ] **Step 1: Update Main.qml title**
 
-In `libs/markoff-live-render/app/Main.qml`, change:
+In `libs/markoff-live/app/Main.qml`, change:
 
 ```qml
 title: ctxTitle + " — markoff-live-render (R3)"
@@ -1878,8 +1878,8 @@ title: ctxTitle + " — markoff-live-render (R4)"
 - [ ] **Step 2: Build & launch**
 
 ```bash
-cmake --build build-dev --target markoff-live-render-app -j 8
-./build-dev/bin/markoff-live-render-app /tmp/r4-smoke.md
+cmake --build build-dev --target markoff-live-app -j 8
+./build-dev/bin/markoff-live-app /tmp/r4-smoke.md
 ```
 
 Confirm the title says "(R4)".
@@ -1887,7 +1887,7 @@ Confirm the title says "(R4)".
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-live-render/app/Main.qml
+git add libs/markoff-live/app/Main.qml
 git commit -m "chore(live-render): test app title bumps to R4"
 ```
 
@@ -1918,7 +1918,7 @@ Pick a candidate (e.g. one of the spec docs). If nothing 5-page-sized exists, co
 - [ ] **Step 2: Run the test app and confirm it loads**
 
 ```bash
-./build-dev/bin/markoff-live-render-app <chosen-file>
+./build-dev/bin/markoff-live-app <chosen-file>
 ```
 
 Confirm: file loads, all blocks render, click + type produces text input. Close.
@@ -1966,7 +1966,7 @@ git commit -m "docs(restoration-status): R4 in dogfood gate"
 
 Surface to the user (chat, not committed):
 
-> R4 implementation is complete and tests are green (X/X live-render fast-tier). The dogfood script for R4 is: type a 200-word paragraph at 100+ wpm into a 5-page document; cursor never jumps; characters never scramble. Run `./build-dev/bin/markoff-live-render-app <a-long-markdown>` and try it. If anything misbehaves, paste your description verbatim and I'll diagnose. If clean, say so and we'll flip R4 to `complete` and write R5.
+> R4 implementation is complete and tests are green (X/X live-render fast-tier). The dogfood script for R4 is: type a 200-word paragraph at 100+ wpm into a 5-page document; cursor never jumps; characters never scramble. Run `./build-dev/bin/markoff-live-app <a-long-markdown>` and try it. If anything misbehaves, paste your description verbatim and I'll diagnose. If clean, say so and we'll flip R4 to `complete` and write R5.
 
 R4 is **not** complete from the agent's side until the user signs off in the dogfood log.
 

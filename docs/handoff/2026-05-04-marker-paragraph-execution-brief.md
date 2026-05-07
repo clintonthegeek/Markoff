@@ -104,7 +104,7 @@ For tasks 1–17:
 9. Mark the plan task complete (in your TodoWrite / TaskUpdate).
 10. Move to the next task.
 
-For task 18 (dogfood gate), do NOT dispatch a subagent — it requires running `markoff-live-render-app` interactively. Surface to the user with build instructions and gate criteria.
+For task 18 (dogfood gate), do NOT dispatch a subagent — it requires running `markoff-live-app` interactively. Surface to the user with build instructions and gate criteria.
 
 After all tasks: dispatch a final code-reviewer subagent for the entire `exploration/new-foundation`-relative diff, then invoke `superpowers:finishing-a-development-branch`.
 
@@ -125,7 +125,7 @@ $ git status -s
 ?? libs/jkqtmathtext       # sibling library (per CLAUDE.md); ignore
 ```
 
-Live-render library is at `libs/markoff-live-render/` — that's the lib the plan modifies. The neighbouring `libs/markoff-core/` and `libs/markoff-parser/` should not need source edits (one parser test addition in Task 1).
+Live-render library is at `libs/markoff-live/` — that's the lib the plan modifies. The neighbouring `libs/markoff-core/` and `libs/markoff-parser/` should not need source edits (one parser test addition in Task 1).
 
 Existing test count: `ctest --test-dir build-dev -N | wc -l` should be 78 at the start of work. Track this — it should stay at 78 ± delta-from-marker-tests at every commit.
 
@@ -141,7 +141,7 @@ The `e94553d` commit captures a 506-line uncommitted iteration the user (or earl
 
 - 18 task commits (or near to it) — small, focused, reviewable.
 - Final `ctest --test-dir build-dev -R '^tst_live_render_' --output-on-failure -j 8`: green, with the marker tests added and the v2 hole tests retired.
-- No reference to `LiveHoleLayer` / `LiveProxyBlockModel` / `BlockHole` / `HoleBlockId` / `holeId` / `bufferText` (in the hole sense) anywhere in `libs/markoff-live-render/` or its QML.
+- No reference to `LiveHoleLayer` / `LiveProxyBlockModel` / `BlockHole` / `HoleBlockId` / `holeId` / `bufferText` (in the hole sense) anywhere in `libs/markoff-live/` or its QML.
 - C-restoration spec amendments (Task 17) landed.
 - Dogfood gate (Task 18) passed and noted in `docs/restoration-status.md`.
 - A summary message to the user: tasks completed, LOC delta, any caveats, ready to consider `superpowers:finishing-a-development-branch`.
