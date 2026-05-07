@@ -35,6 +35,11 @@ public:
         CodeLanguageRole,
         BlockAnchorRole,
         BlockAttrsRole,   // QVariantMap of block-kind attributes
+        MarkerStyleRole,
+        MarkerNumberRole,
+        IndentLevelRole,
+        CheckedRole,
+        LooseRunRole,
     };
 
     explicit LiveBlockModel(QObject *parent = nullptr);

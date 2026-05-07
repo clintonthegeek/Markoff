@@ -2,6 +2,7 @@
 #include <markoff/live-render/LiveBlockModel.h>
 
 #include <markoff-foundation/BlockAnchor.h>
+#include <markoff-foundation/AttrNames.h>
 
 #include <QVariantMap>
 #include <variant>
@@ -29,6 +30,11 @@ QHash<int, QByteArray> LiveBlockModel::roleNames() const
         { CodeLanguageRole, "codeLanguage" },
         { BlockAnchorRole,  "blockAnchor" },
         { BlockAttrsRole,   "blockAttrs" },
+        { MarkerStyleRole,  "markerStyle" },
+        { MarkerNumberRole, "markerNumber" },
+        { IndentLevelRole,  "indentLevel" },
+        { CheckedRole,      "checked" },
+        { LooseRunRole,     "looseRun" },
     };
 }
 
@@ -53,6 +59,41 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
                 }, it.value()));
             }
             return map;
+        }
+        case MarkerStyleRole: {
+            auto it = r.attrs.constFind(Markoff::AttrNames::MarkerStyle);
+            if (it != r.attrs.constEnd()) {
+                if (const auto *v = std::get_if<QString>(&it.value())) return *v;
+            }
+            return QString{};
+        }
+        case MarkerNumberRole: {
+            auto it = r.attrs.constFind(Markoff::AttrNames::MarkerNumber);
+            if (it != r.attrs.constEnd()) {
+                if (const auto *v = std::get_if<int>(&it.value())) return *v;
+            }
+            return 0;
+        }
+        case IndentLevelRole: {
+            auto it = r.attrs.constFind(Markoff::AttrNames::IndentLevel);
+            if (it != r.attrs.constEnd()) {
+                if (const auto *v = std::get_if<int>(&it.value())) return *v;
+            }
+            return 0;
+        }
+        case CheckedRole: {
+            auto it = r.attrs.constFind(Markoff::AttrNames::Checked);
+            if (it != r.attrs.constEnd()) {
+                if (const auto *v = std::get_if<bool>(&it.value())) return *v;
+            }
+            return false;
+        }
+        case LooseRunRole: {
+            auto it = r.attrs.constFind(Markoff::AttrNames::LooseRun);
+            if (it != r.attrs.constEnd()) {
+                if (const auto *v = std::get_if<bool>(&it.value())) return *v;
+            }
+            return false;
         }
         default:                return {};
     }
