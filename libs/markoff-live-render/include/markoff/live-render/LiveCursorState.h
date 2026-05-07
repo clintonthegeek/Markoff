@@ -25,10 +25,13 @@ class LiveListModelBinding;
 /// Values: "none", "TextCaret", "BlockSelected", "BlockInternalEdit".
 ///
 /// `requestTextCaretAtRow` is the deterministic-pending variant used by
-/// the structural-key handler in R5: when a structural edit creates a new
-/// row, the row doesn't exist in the model until the parse-back arrives.
-/// The pending request is held; `rowsInserted` resolves it. Spec §5.3
-/// step 6.
+/// the structural-key handler. When the row already exists in the model
+/// it resolves immediately; when a structural edit has not yet propagated
+/// through the CRDT→model pipeline the request is held until
+/// `rowsInserted` fires. Legitimate use requires that the row's TEXT is
+/// already stable at the time of the call — do not use immediately after
+/// a d2ApplyBufferEdit that changes the row content (use
+/// requestTextCaretAtAnchor instead). Spec §5.3 step 6.
 class MARKOFF_LIVE_RENDER_EXPORT LiveCursorState : public QObject {
     Q_OBJECT
     QML_ELEMENT
