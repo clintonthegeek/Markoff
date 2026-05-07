@@ -107,21 +107,40 @@ Three conditions hold at the start of D4:
 
 ### 4.2 `libs/markoff-foundation`
 
-**Delete:**
+**Delete (parse-pipeline):**
 
 - `src/ParsePool.h` / `.cpp`, `src/ParsePoolWorker.h` / `.cpp`, `src/IncrementalParseSession.h` / `.cpp`, `src/ParsePhases.h`
 - The `parseUpdated` signal, the `parseSequence()` accessor, the backing `parseSequence` and `latestBlockAnchors` members on `MarkoffDocument`
 - The constructor's `parsePool` ownership and its `parseReady → parseUpdated` relay lambda
 - The `parsePool.schedule(...)` and `parsePool.scheduleReset(...)` calls inside `applyLocalEdit` / `undo` / `redo` / `applyRemoteOps` / `resetContent`
-- `MarkoffEdit` (the type, header, `Q_DECLARE_METATYPE`) — gated on the source-widget migration in §4.4 landing first
+- `MarkoffEdit` (the type, header, `Q_DECLARE_METATYPE`) — gated on the source-widget migration in §4.4 and the dead-code deletions below landing first
 - `MarkoffDocument::applyLocalEdit(...)` — same gate
-- `parsePool.isPending()` accessor and `parsePool.setRenderPhaseTaps(...)` accessor (both retire with the pool)
+- `parsePool.isPending()` accessor and `setRenderPhaseTaps(...)` accessor (both retire with the pool); `Markoff::Render::RenderPhaseTaps` if no surviving consumer
 - Tests dedicated to the deprecated machinery:
   - `tst_foundation_parse_pool`
   - `tst_foundation_parse_phases`
   - `tst_foundation_parse_input_edit_seq`
   - `tst_foundation_parse_sequence`
   - `tst_foundation_block_anchor_compute`, `tst_foundation_block_anchor_perf`, `tst_foundation_block_anchor_queries`, `tst_foundation_block_anchor_stability` (all hinge on `parseUpdated`/`applyLocalEdit` reparse-survival, which has no analogue in D2)
+
+**Delete (legacy `Cmd::*` family — dead code with no external consumers, all produce `MarkoffEdit`s and call `applyLocalEdit`):**
+
+- `include/markoff-foundation/Cmd/Block.h`, `src/Cmd/Block.cpp` — `setHeading`, `toggleCheckbox`, `blockQuote`, and their `editsFor*` siblings
+- `include/markoff-foundation/Cmd/Insert.h`, `src/Cmd/Insert.cpp` — `insertTable`, `insertLink`, `insertImage`, `insertHorizontalRule`, and their `editsFor*` siblings
+- `include/markoff-foundation/Cmd/InlineFormat.h`, `src/Cmd/InlineFormat.cpp` — `toggleBold`, `toggleItalic`, `toggleStrikethrough`, `toggleInlineCode`, and their `editsFor*` siblings
+- `src/Cmd/Helpers.cpp` and any `Cmd::*` helpers it defines (private to the legacy family)
+- The legacy parts of `Cmd.h` (the umbrella header that re-exports the legacy three) — keep only the D2-relevant `Cmd/D2.h` / `Cmd/Edit.h` re-exports
+- `include/markoff-foundation/CommandFacade.h`, `src/CommandFacade.cpp` — zero external code consumers; the legacy facade exposed the dead `Cmd::*` family
+- `include/markoff-foundation/ReplaceController.h`, `src/ReplaceController.cpp` — zero external code consumers; deletes alongside its `MarkoffEdit` dependency. A D2-native search-and-replace controller can be re-introduced later when search-and-replace UI is needed
+- Tests for the deleted families:
+  - `tst_foundation_cmd_block`
+  - `tst_foundation_cmd_insert`
+  - `tst_foundation_cmd_inline_format`
+  - `tst_foundation_cmd_multi`
+  - `tst_foundation_command_facade`
+  - `tst_foundation_replace_controller`
+
+The `Cmd::*` namespace itself stays — `Cmd::insertCharacter`, `Cmd::insertSoftBreak`, `Cmd::insertListItemAfter`, `Cmd::insertListItemBefore`, `Cmd::renumberRunStartingAt`, `Cmd::changeKind`, `Cmd::undo`, `Cmd::redo`, etc. (the D2-native helpers in `Cmd/D2.h` and `Cmd/Edit.h`) survive unchanged.
 
 **Keep:**
 
@@ -249,7 +268,9 @@ A single comment update in `tst_live_render_paragraph_edit.cpp` (it references `
 These belong in the implementation plan, but the spec commits to two principles that constrain it:
 
 1. **Bottom-up: retire consumers first, then delete symbols.** Build stays green throughout. Specifically: (a) build the new `applyFlatEdit` primitive and migrate source-widget to it; (b) retire markoff-bench and markoff-view-qml live mode; (c) delete the deprecated foundation tests; (d) delete `parseUpdated`/`parseSequence`/`MarkoffEdit`/`applyLocalEdit` and the parsePool; (e) delete the parser-library deprecated machinery; (f) update top-level CMake and docs.
-2. **Source-widget migration is the gate for `applyLocalEdit` deletion.** The plan does not delete `applyLocalEdit` / `MarkoffEdit` until §4.4 is landed and source-widget tests pass on the new shape.
+2. **Source-widget migration is the gate for `applyLocalEdit` deletion.** The plan does not delete `applyLocalEdit` / `MarkoffEdit` until §4.4 is landed, the legacy `Cmd::*` / `CommandFacade` / `ReplaceController` families are deleted, and source-widget tests pass on the new shape.
+
+3. **Dead-code deletions land before the gated symbols.** The legacy `Cmd::*` family / `CommandFacade` / `ReplaceController` are dead code (no external consumers); deleting them is a precondition for retiring `MarkoffEdit` / `applyLocalEdit`. Order: source-widget migration → dead-code deletion → `MarkoffEdit` / `applyLocalEdit` / parsePool excision.
 
 ## 9. Open questions for plan time
 

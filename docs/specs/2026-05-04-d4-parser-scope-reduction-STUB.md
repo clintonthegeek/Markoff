@@ -1,7 +1,12 @@
-# D4 — Parser scope reduction (STUB)
+# D4 — Parser scope reduction (STUB — SUPERSEDED)
+
+> **Superseded 2026-05-07.** This stub is retained for historical context only.
+> The substantive D4 spec is at `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md`
+> and the implementation plan is at `docs/plans/2026-05-07-d4-parser-scope-reduction.md`.
+> Do not work from this stub.
 
 **Date stub created:** 2026-05-04
-**Status:** STUB — intended scope and inputs captured. **Substantive design happens after D2 lands** and probably parallels D3 (D4 has no D3 dependency; can run concurrently). Practically D4 is the smallest of the post-D1 phases.
+**Status:** STUB — superseded by the substantive spec. The intended scope captured here was correct in shape but understated in size: the substantive spec also covers source-widget migration to D2 primitives (gated by a new `applyFlatEdit` primitive), markoff-bench retirement, view-qml live-mode retirement, and dead-code deletion of the legacy `Cmd::*` family + `CommandFacade` + `ReplaceController` (zero external consumers).
 
 ---
 
