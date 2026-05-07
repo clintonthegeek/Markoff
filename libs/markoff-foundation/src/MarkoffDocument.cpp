@@ -1083,18 +1083,6 @@ void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
     if (parsedDoc)
         materializeBlocksFromParsedDoc(*parsedDoc, extracted.body);
 
-    // 4b. Guarantee at least one empty paragraph block — an empty document
-    // must still have a block so the source binding and applyFlatEdit can
-    // operate without special-casing zero blocks at every call site.
-    if (d->idList.size() == 0) {
-        BlockId newId = allocateD2BlockId();
-        d->idList.insert_after(CollabText::Crdt::Anchor::min(), newId.raw());
-        d->kindTagMap.setWithNextStamp(newId, BlockKind::Paragraph);
-        d->blockBuffers.emplace(newId, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
-        d->blockLoadTimeBytes[newId] = QByteArray();
-        d->bufferProxies.insert(newId, new BufferProxy(newId, this));
-    }
-
     // 5. Reset load baseline (mark "clean" post-load state)
     d->blockEditSequences.clear();
     d->structuralEditSequence = 0;
