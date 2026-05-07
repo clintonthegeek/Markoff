@@ -8,7 +8,7 @@
 
 Corbomite (the only consumer at present) uses `libs/markoff-source` — a vendored Qutepart-cpp wrapper — for its Source view. Qutepart was a quick adopt during the Phase A absorption; it solves a real problem (mature fold engine, indent, Kate-XML highlighting) but the gutter is Kate's native UI and the source-mode visuals are out of our hands. The project is moving toward fully-owned classes so that views can share an aesthetic identity over time.
 
-This spec defines a new library `libs/markoff-source-widget` — a from-scratch QtWidgets Source editor on the new `markoff-foundation`. v0 ships line-numbered editing with CRDT undo, KSyntaxHighlighting, and a find bar. Fold support and other affordances come in subsequent sub-projects without architectural rework.
+This spec defines a new library `libs/markoff-source` — a from-scratch QtWidgets Source editor on the new `markoff-foundation`. v0 ships line-numbered editing with CRDT undo, KSyntaxHighlighting, and a find bar. Fold support and other affordances come in subsequent sub-projects without architectural rework.
 
 ## 2. Scope
 
@@ -22,7 +22,7 @@ This spec defines a new library `libs/markoff-source-widget` — a from-scratch 
 - Cursor + selection round-trip through `Session` via the relocated binding's existing cycle-guard logic.
 - `Ctrl+Z` / `Ctrl+Y` invoke `MarkoffDocument::undo()` / `redo()`. The `QTextDocument`'s undo stack is disabled (the binding already does this).
 - Theme consumption via a `setTheme(const Markoff::Theme &)` method. Repaint on change.
-- Tests at `libs/markoff-source-widget/tests/` covering construction, document binding round-trip, find-bar behaviour.
+- Tests at `libs/markoff-source/tests/` covering construction, document binding round-trip, find-bar behaviour.
 
 **Out of v0 (deferred — none precluded):**
 
@@ -103,7 +103,7 @@ Cursor/selection lifting: the binding already mirrors `m_qtDoc` cursor changes i
 
 ### 3.4 The Gutter
 
-A private `QWidget` subclass at `libs/markoff-source-widget/src/Gutter.{h,cpp}`. Constructor takes a `Editor *` (the parent editor it belongs to).
+A private `QWidget` subclass at `libs/markoff-source/src/Gutter.{h,cpp}`. Constructor takes a `Editor *` (the parent editor it belongs to).
 
 - `sizeHint()` returns `(gutterWidth(), 0)` where `gutterWidth() = digitWidth * digits(blockCount) + (lr-padding)`.
 - `paintEvent` walks `firstVisibleBlock()` → `lastVisibleBlock()`, paints line number digits right-aligned, separator on the right edge.
@@ -120,7 +120,7 @@ This is the canonical Qt pattern. It is single-column at v0; if/when fold arrows
 
 ### 3.5 The FindBar
 
-A `QWidget` at `libs/markoff-source-widget/src/FindBar.{h,cpp}` (header at `libs/markoff-source-widget/include/markoff/source/widget/FindBar.h`).
+A `QWidget` at `libs/markoff-source/src/FindBar.{h,cpp}` (header at `libs/markoff-source/include/markoff/source/widget/FindBar.h`).
 
 ```
 class FindBar : public QWidget {
@@ -160,7 +160,7 @@ The FindBar's button icons use `QIcon::fromTheme()` so they inherit the Plasma i
 ## 4. File layout
 
 ```
-libs/markoff-source-widget/
+libs/markoff-source/
 ├── CMakeLists.txt
 ├── CLAUDE.md
 ├── include/markoff/source/widget/
@@ -199,7 +199,7 @@ libs/markoff-view-qml/
 
 ## 5. Test plan
 
-Three test binaries in `libs/markoff-source-widget/tests/`:
+Three test binaries in `libs/markoff-source/tests/`:
 
 ### 5.1 `tst_source_widget_editor`
 
@@ -224,7 +224,7 @@ All tests use `QT_QPA_PLATFORM=offscreen` and `QApplication` (not `QCoreApplicat
 
 ## 6. Dev sandbox (app)
 
-`libs/markoff-source-widget/app/main.cpp` opens `argv[1]` (a markdown file), creates a `MarkoffDocument`, an `Editor`, a `FindBar`, lays them out in a `QMainWindow` (editor central, find-bar at bottom hidden by default with Ctrl+F to toggle), and shows it. Roughly 60 LOC. Not part of the public API — just a runnable smoke for hand-testing.
+`libs/markoff-source/app/main.cpp` opens `argv[1]` (a markdown file), creates a `MarkoffDocument`, an `Editor`, a `FindBar`, lays them out in a `QMainWindow` (editor central, find-bar at bottom hidden by default with Ctrl+F to toggle), and shows it. Roughly 60 LOC. Not part of the public API — just a runnable smoke for hand-testing.
 
 ## 7. Sequencing
 

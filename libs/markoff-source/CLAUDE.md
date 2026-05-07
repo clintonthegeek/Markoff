@@ -1,4 +1,4 @@
-# markoff-source-widget
+# markoff-source
 
 Fully-owned QtWidgets Source view on `markoff-foundation`. Replaces the Qutepart-based `markoff-source` (legacy) over time.
 

@@ -38,7 +38,7 @@ int main(int argc, char **argv) {
 
     win.setCentralWidget(central);
     win.resize(900, 700);
-    win.setWindowTitle(QObject::tr("markoff-source-widget"));
+    win.setWindowTitle(QObject::tr("markoff-source"));
 
     auto *findShortcut = new QShortcut(QKeySequence::Find, &win);
     QObject::connect(findShortcut, &QShortcut::activated, findbar,

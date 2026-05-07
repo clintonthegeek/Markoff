@@ -103,10 +103,10 @@ Per spec §8, the order is bottom-up: build the new primitive, migrate consumers
 - `libs/markoff-core/CMakeLists.txt` — add new source files; later: remove deleted files; remove tests for deleted families
 - `libs/markoff-core/tests/CMakeLists.txt` — register new test; later: remove deleted tests
 - `libs/markoff-core/CLAUDE.md` — remove `parseUpdated` / `parseSequence` / `applyLocalEdit` / `latestBlockAnchors` / `ParsePool` mentions; add `applyFlatEdit` description (Phase 13)
-- `libs/markoff-source-widget/tests/tst_source_widget_editor.cpp` — drop `parseUpdated` `QSignalSpy`; reshape settle
-- `libs/markoff-source-widget/tests/tst_source_widget_binding_roundtrip.cpp` — replace `applyLocalEdit` / `MarkoffEdit` with new entry point
-- `libs/markoff-source-widget/tests/tst_source_widget_findbar.cpp` — same
-- `libs/markoff-source-widget/app/main.cpp` — same
+- `libs/markoff-source/tests/tst_source_widget_editor.cpp` — drop `parseUpdated` `QSignalSpy`; reshape settle
+- `libs/markoff-source/tests/tst_source_widget_binding_roundtrip.cpp` — replace `applyLocalEdit` / `MarkoffEdit` with new entry point
+- `libs/markoff-source/tests/tst_source_widget_findbar.cpp` — same
+- `libs/markoff-source/app/main.cpp` — same
 - `libs/markoff-live-render/tests/tst_live_render_paragraph_edit.cpp` — comment update only
 - `libs/markoff-parser/include/markoff-parser/TreeSitterParser.h` — remove deleted methods/structs; trim observability counters
 - `libs/markoff-parser/src/TreeSitterParser.cpp` — remove implementations
@@ -1212,12 +1212,12 @@ EOF
 ### Task 3.1: Rewrite `tst_source_widget_binding_roundtrip`
 
 **Files:**
-- Modify: `libs/markoff-source-widget/tests/tst_source_widget_binding_roundtrip.cpp`
+- Modify: `libs/markoff-source/tests/tst_source_widget_binding_roundtrip.cpp`
 
 - [ ] **Step 1: Read the current test**
 
 ```bash
-cat libs/markoff-source-widget/tests/tst_source_widget_binding_roundtrip.cpp
+cat libs/markoff-source/tests/tst_source_widget_binding_roundtrip.cpp
 ```
 
 Identify every spot that constructs `MarkoffEdit` or calls `applyLocalEdit`. Most likely the test issues a sequence of edits via `applyLocalEdit({MarkoffEdit{...}})` to set up scenarios; replace those with calls to `m_doc->applyFlatEdit(start, end, text, Origin::Local)` (or `UserKeystroke` — whichever Origin enum value is the canonical "test fixture" choice; check `Origin.h`).
@@ -1248,7 +1248,7 @@ Expected: PASS. If it fails, diagnose: most likely a coord-translation or settle
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-source-widget/tests/tst_source_widget_binding_roundtrip.cpp
+git add libs/markoff-source/tests/tst_source_widget_binding_roundtrip.cpp
 git commit -m "$(cat <<'EOF'
 test(source-widget): roundtrip uses applyFlatEdit, not MarkoffEdit
 
@@ -1260,12 +1260,12 @@ EOF
 ### Task 3.2: Rewrite `tst_source_widget_findbar`
 
 **Files:**
-- Modify: `libs/markoff-source-widget/tests/tst_source_widget_findbar.cpp`
+- Modify: `libs/markoff-source/tests/tst_source_widget_findbar.cpp`
 
 - [ ] **Step 1: Read and rewrite by the same pattern as Task 3.1**
 
 ```bash
-cat libs/markoff-source-widget/tests/tst_source_widget_findbar.cpp
+cat libs/markoff-source/tests/tst_source_widget_findbar.cpp
 ```
 
 Replace `MarkoffEdit` + `applyLocalEdit` with `applyFlatEdit`. Drop the `MarkoffEdit.h` include.
@@ -1280,7 +1280,7 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-source-widget/tests/tst_source_widget_findbar.cpp
+git add libs/markoff-source/tests/tst_source_widget_findbar.cpp
 git commit -m "$(cat <<'EOF'
 test(source-widget): findbar uses applyFlatEdit, not MarkoffEdit
 
@@ -1292,7 +1292,7 @@ EOF
 ### Task 3.3: Touch `tst_source_widget_editor` — drop `parseUpdated` spy
 
 **Files:**
-- Modify: `libs/markoff-source-widget/tests/tst_source_widget_editor.cpp`
+- Modify: `libs/markoff-source/tests/tst_source_widget_editor.cpp`
 
 - [ ] **Step 1: Open the file and find the `parseUpdated` spy**
 
@@ -1317,7 +1317,7 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-source-widget/tests/tst_source_widget_editor.cpp
+git add libs/markoff-source/tests/tst_source_widget_editor.cpp
 git commit -m "$(cat <<'EOF'
 test(source-widget): drop parseUpdated spy in editor test
 
@@ -1329,15 +1329,15 @@ EOF
 )"
 ```
 
-### Task 3.4: Update `libs/markoff-source-widget/app/main.cpp`
+### Task 3.4: Update `libs/markoff-source/app/main.cpp`
 
 **Files:**
-- Modify: `libs/markoff-source-widget/app/main.cpp`
+- Modify: `libs/markoff-source/app/main.cpp`
 
 - [ ] **Step 1: Replace any `applyLocalEdit` calls or `MarkoffEdit` construction with `applyFlatEdit`**
 
 ```bash
-grep -n "applyLocalEdit\|MarkoffEdit" libs/markoff-source-widget/app/main.cpp
+grep -n "applyLocalEdit\|MarkoffEdit" libs/markoff-source/app/main.cpp
 ```
 
 Replace each occurrence by the Task 3.1 pattern. Drop the `#include <markoff-foundation/MarkoffEdit.h>`.
@@ -1347,14 +1347,14 @@ Replace each occurrence by the Task 3.1 pattern. Drop the `#include <markoff-fou
 ```bash
 cmake --build build-dev -j 8 --target markoff-source-widget-app
 ```
-(If the target name differs, check `libs/markoff-source-widget/app/CMakeLists.txt`. Use the actual target name.)
+(If the target name differs, check `libs/markoff-source/app/CMakeLists.txt`. Use the actual target name.)
 
 Expected: success.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-source-widget/app/main.cpp
+git add libs/markoff-source/app/main.cpp
 git commit -m "$(cat <<'EOF'
 source-widget(app): use applyFlatEdit, drop MarkoffEdit dependency
 
@@ -2456,4 +2456,4 @@ These are reference points the executor may need to reread:
 - `libs/markoff-core/include/markoff-foundation/StructuralOp.h` — what `applyStructural` consumes.
 - `libs/markoff-core/src/MarkoffDocument.cpp:175-220` — the legacy `applyLocalEdit` implementation; useful only as historical context.
 - `libs/markoff-view-qml/src/EditorBackend.cpp:18-45` — the `parseUpdated → parseUpdatedAt` relay being deleted.
-- `libs/markoff-source-widget/src/Editor.cpp` — the source-widget Editor that holds a `SourceTextDocumentBinding`. Don't change the Editor itself; only the binding.
+- `libs/markoff-source/src/Editor.cpp` — the source-widget Editor that holds a `SourceTextDocumentBinding`. Don't change the Editor itself; only the binding.

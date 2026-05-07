@@ -177,7 +177,7 @@ The exact name, return shape, and whether the decomposition lives behind a publi
 
 A fresh bench harness that measures the D2 hot path (per-block buffer edit latency, inline-parse cache miss latency, cold load) is **out of scope** for D4 and may be re-introduced separately in a future arc.
 
-### 4.4 `libs/markoff-source-widget` — migration
+### 4.4 `libs/markoff-source` — migration
 
 The source-widget moves entirely off `MarkoffEdit` / `applyLocalEdit`.
 
@@ -187,7 +187,7 @@ The source-widget moves entirely off `MarkoffEdit` / `applyLocalEdit`.
 
 **Tests to rewrite:** `tst_source_widget_binding_roundtrip`, `tst_source_widget_findbar`, `tst_source_widget_editor`. Test edits issue through `QPlainTextEdit::insertPlainText`, `setPlainText`, simulated keystrokes, or direct calls to `applyFlatEdit` — never `applyLocalEdit`. The `parseUpdated` `QSignalSpy` line in `tst_source_widget_editor::setDocument_attaches_and_seed_text_appears` is removed; the `qWait(50)` settle is replaced with a `d2DocumentChanged`-based wait or a synchronous post-call check.
 
-**App update:** `libs/markoff-source-widget/app/main.cpp` updated to the new entry point.
+**App update:** `libs/markoff-source/app/main.cpp` updated to the new entry point.
 
 ### 4.5 `libs/markoff-view-qml` — live-mode retirement
 

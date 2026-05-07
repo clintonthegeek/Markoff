@@ -470,7 +470,7 @@ add_subdirectory(libs/markoff-view-qml)
 ```cmake
 add_subdirectory(libs/markoff-view-qml)
 add_subdirectory(libs/markoff-live-render)
-add_subdirectory(libs/markoff-source-widget)
+add_subdirectory(libs/markoff-source)
 ```
 
 Order matters: `markoff-live-render` depends on `markoff-foundation` (already added earlier). It does not depend on `markoff-view-qml`.

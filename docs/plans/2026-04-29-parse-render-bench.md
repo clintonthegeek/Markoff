@@ -279,7 +279,7 @@ set(CMAKE_AUTOMOC ON)
 
 - [ ] **Step 2.4: Hook up the root `CMakeLists.txt`**
 
-Edit `CMakeLists.txt` (root). After the existing `add_subdirectory(libs/markoff-source-widget)` line, add:
+Edit `CMakeLists.txt` (root). After the existing `add_subdirectory(libs/markoff-source)` line, add:
 
 ```cmake
 add_subdirectory(libs/markoff-bench)

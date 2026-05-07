@@ -64,7 +64,7 @@ foundation library + two canonical view leaves.
                                  Layered L0–L8 (see lib's CLAUDE.md). D3
                                  is implemented here; D3-correction (per-
                                  item ListItem blocks) is the active rework.
-- `libs/markoff-source-widget` — canonical QPlainTextEdit-based source
+- `libs/markoff-source` — canonical QPlainTextEdit-based source
                                  widget (replaces the retired Qutepart-
                                  based `markoff-source`).
 - `libs/jkqtmathtext`          — LaTeX math rendering. Untracked sibling
@@ -122,7 +122,7 @@ was deleted in D4.
 - `libs/markoff-core/CLAUDE.md`
 - `libs/markoff-live-render/CLAUDE.md` — **active view leaf**
 - `libs/markoff-view-qml/CLAUDE.md`
-- `libs/markoff-source-widget/CLAUDE.md`
+- `libs/markoff-source/CLAUDE.md`
 - `libs/markoff-parser/` (no per-lib CLAUDE.md; docs in `docs/specs/`)
 
 ## Docs layout

@@ -7,7 +7,7 @@ project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 #   - libs/collabtext         (CRDT text engine, sibling-symlinked from /home/clinton/dev/collabtext)
 #   - libs/markoff-core (Markoff::Core — MarkoffDocument + ParsePool + Sessions)
 #   - libs/markoff-view-qml   (QML view library)
-#   - libs/markoff-source-widget (QPlainTextEdit-based source widget)
+#   - libs/markoff-source (QPlainTextEdit-based source widget)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project.
 # Qt6 / KF6 are discovered via find_package — parent projects that already find
@@ -63,7 +63,7 @@ if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)
 endif()
 add_subdirectory(libs/markoff-live-render)
-add_subdirectory(libs/markoff-source-widget)
+add_subdirectory(libs/markoff-source)
 
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
 if(MARKOFF_BUILD_TESTS)

@@ -2560,7 +2560,7 @@ If it doesn't exist, skip — we won't create one purely for this work.
 Verify no view-layer or app-layer code includes `<crdt/Anchor.h>` or `<crdt/Clock.h>` outside foundation src/:
 
 ```bash
-grep -rn "crdt/Anchor.h\|crdt/Clock.h" libs/markoff-view-qml/ libs/markoff-source-widget/ 2>&1
+grep -rn "crdt/Anchor.h\|crdt/Clock.h" libs/markoff-view-qml/ libs/markoff-source/ 2>&1
 ```
 
 Expected: empty. If non-empty, the offending file was missed in Tasks 11/12; fix and re-test.
@@ -2597,7 +2597,7 @@ Before declaring the BlockAnchor foundation work complete:
 
 4. **No view-layer / app-layer file includes `<crdt/Anchor.h>` or `<crdt/Clock.h>`.**
    ```bash
-   grep -rn "crdt/Anchor.h\|crdt/Clock.h" libs/markoff-view-qml/ libs/markoff-source-widget/
+   grep -rn "crdt/Anchor.h\|crdt/Clock.h" libs/markoff-view-qml/ libs/markoff-source/
    ```
    Returns empty.
 

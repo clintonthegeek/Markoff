@@ -1,4 +1,4 @@
-> **Status: completed.** `libs/markoff-source-widget/` and `SourceTextDocumentBinding` foundation relocation are in tree (commit range `89bc241`…`5915520`). Do not execute.
+> **Status: completed.** `libs/markoff-source/` and `SourceTextDocumentBinding` foundation relocation are in tree (commit range `89bc241`…`5915520`). Do not execute.
 
 # `markoff-source-widget` — implementation plan
 
@@ -6,7 +6,7 @@
 
 **Goal:** Build a from-scratch QtWidgets Source view library on `markoff-foundation`, with a `QPlainTextEdit`-subclass editor, a line-number gutter, a find bar, and full document/session round-trip via the foundation's CRDT.
 
-**Architecture:** New library `libs/markoff-source-widget`. Editor is a `QPlainTextEdit` subclass; the gutter is a private `QWidget` child of the viewport (Qt CodeEditor pattern); FindBar is a separate widget the host places. Document binding (`SourceTextDocumentBinding`) relocates from `markoff-view-qml` down into `markoff-foundation` so the new widget and the existing QML SourceEditor share one implementation.
+**Architecture:** New library `libs/markoff-source`. Editor is a `QPlainTextEdit` subclass; the gutter is a private `QWidget` child of the viewport (Qt CodeEditor pattern); FindBar is a separate widget the host places. Document binding (`SourceTextDocumentBinding`) relocates from `markoff-view-qml` down into `markoff-foundation` so the new widget and the existing QML SourceEditor share one implementation.
 
 **Tech Stack:** Qt 6.8+, KF6::SyntaxHighlighting, `markoff-foundation` (CRDT + parser + theme + binding). C++20, CMake 3.19+.
 
@@ -96,28 +96,28 @@ git commit -m "foundation: relocate SourceTextDocumentBinding from view-qml; ren
 
 ## Phase B — Library scaffolding
 
-### Task B1: Create `libs/markoff-source-widget` skeleton
+### Task B1: Create `libs/markoff-source` skeleton
 
 **Files:**
-- Create: `libs/markoff-source-widget/CMakeLists.txt`
-- Create: `libs/markoff-source-widget/CLAUDE.md`
-- Create: `libs/markoff-source-widget/include/markoff/source/widget/Editor.h` (skeleton)
-- Create: `libs/markoff-source-widget/include/markoff/source/widget/FindBar.h` (skeleton)
-- Create: `libs/markoff-source-widget/src/Editor.cpp` (skeleton)
-- Create: `libs/markoff-source-widget/src/FindBar.cpp` (skeleton)
-- Create: `libs/markoff-source-widget/src/Gutter.h` (skeleton)
-- Create: `libs/markoff-source-widget/src/Gutter.cpp` (skeleton)
-- Create: `libs/markoff-source-widget/tests/CMakeLists.txt`
-- Create: `libs/markoff-source-widget/tests/tst_source_widget_editor.cpp` (placeholder)
+- Create: `libs/markoff-source/CMakeLists.txt`
+- Create: `libs/markoff-source/CLAUDE.md`
+- Create: `libs/markoff-source/include/markoff/source/widget/Editor.h` (skeleton)
+- Create: `libs/markoff-source/include/markoff/source/widget/FindBar.h` (skeleton)
+- Create: `libs/markoff-source/src/Editor.cpp` (skeleton)
+- Create: `libs/markoff-source/src/FindBar.cpp` (skeleton)
+- Create: `libs/markoff-source/src/Gutter.h` (skeleton)
+- Create: `libs/markoff-source/src/Gutter.cpp` (skeleton)
+- Create: `libs/markoff-source/tests/CMakeLists.txt`
+- Create: `libs/markoff-source/tests/tst_source_widget_editor.cpp` (placeholder)
 - Modify: top-level `CMakeLists.txt`
 
 - [ ] **Step 1: Add the directory + CMake target**
 
-`libs/markoff-source-widget/CMakeLists.txt`:
+`libs/markoff-source/CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.19)
-project(markoff_source_widget LANGUAGES CXX)
+project(markoff_source LANGUAGES CXX)
 
 find_package(Qt6 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(KF6SyntaxHighlighting REQUIRED)
@@ -126,7 +126,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(markoff_source_widget STATIC
+add_library(markoff_source STATIC
     src/Editor.cpp
     src/FindBar.cpp
     src/Gutter.cpp
@@ -135,18 +135,18 @@ add_library(markoff_source_widget STATIC
     src/Gutter.h
 )
 
-target_include_directories(markoff_source_widget
+target_include_directories(markoff_source
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
-target_link_libraries(markoff_source_widget
+target_link_libraries(markoff_source
     PUBLIC  Qt6::Core Qt6::Gui Qt6::Widgets
             KF6::SyntaxHighlighting
             markoff_core
 )
 
-add_library(Markoff::SourceWidget ALIAS markoff_source_widget)
+add_library(Markoff::Source ALIAS markoff_source)
 
 if(BUILD_TESTING)
     add_subdirectory(tests)
@@ -155,7 +155,7 @@ endif()
 
 - [ ] **Step 2: Add to top-level CMakeLists**
 
-In the worktree's top-level `CMakeLists.txt`, find the existing `add_subdirectory(libs/markoff-view-qml)` line and add `add_subdirectory(libs/markoff-source-widget)` immediately after it.
+In the worktree's top-level `CMakeLists.txt`, find the existing `add_subdirectory(libs/markoff-view-qml)` line and add `add_subdirectory(libs/markoff-source)` immediately after it.
 
 - [ ] **Step 3: Stub headers + impls**
 
@@ -315,7 +315,7 @@ QSize Gutter::sizeHint() const { return QSize(40, 0); }
 
 - [ ] **Step 4: Test directory + placeholder test**
 
-`libs/markoff-source-widget/tests/CMakeLists.txt`:
+`libs/markoff-source/tests/CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.19)
@@ -326,7 +326,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_executable(tst_source_widget_editor tst_source_widget_editor.cpp)
 add_test(NAME tst_source_widget_editor COMMAND tst_source_widget_editor)
-target_link_libraries(tst_source_widget_editor PRIVATE Qt6::Test markoff_source_widget)
+target_link_libraries(tst_source_widget_editor PRIVATE Qt6::Test markoff_source)
 set_tests_properties(tst_source_widget_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -352,7 +352,7 @@ QTEST_MAIN(TstSourceWidgetEditor)
 
 - [ ] **Step 5: CLAUDE.md skeleton**
 
-`libs/markoff-source-widget/CLAUDE.md`:
+`libs/markoff-source/CLAUDE.md`:
 
 ```markdown
 # markoff-source-widget
@@ -386,7 +386,7 @@ Fully-owned QtWidgets Source view on `markoff-foundation`. Replaces the Qutepart
 
 ```bash
 cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build-dev --target markoff_source_widget -j 8
+cmake --build build-dev --target markoff_source -j 8
 cmake --build build-dev --target tst_source_widget_editor -j 8
 ```
 
@@ -411,8 +411,8 @@ Expected: 35/35 PASS (was 34, +1 placeholder).
 - [ ] **Step 9: Commit**
 
 ```bash
-git add libs/markoff-source-widget CMakeLists.txt
-git commit -m "scaffold: libs/markoff-source-widget with skeleton Editor/FindBar/Gutter"
+git add libs/markoff-source CMakeLists.txt
+git commit -m "scaffold: libs/markoff-source with skeleton Editor/FindBar/Gutter"
 ```
 
 ---
@@ -422,11 +422,11 @@ git commit -m "scaffold: libs/markoff-source-widget with skeleton Editor/FindBar
 ### Task C1: Implement `setDocument` + binding wiring + KSyntaxHighlighting
 
 **Files:**
-- Modify: `libs/markoff-source-widget/include/markoff/source/widget/Editor.h`
-- Modify: `libs/markoff-source-widget/src/Editor.cpp`
-- Modify: `libs/markoff-source-widget/tests/tst_source_widget_editor.cpp`
-- Create: `libs/markoff-source-widget/tests/tst_source_widget_binding_roundtrip.cpp`
-- Modify: `libs/markoff-source-widget/tests/CMakeLists.txt`
+- Modify: `libs/markoff-source/include/markoff/source/widget/Editor.h`
+- Modify: `libs/markoff-source/src/Editor.cpp`
+- Modify: `libs/markoff-source/tests/tst_source_widget_editor.cpp`
+- Create: `libs/markoff-source/tests/tst_source_widget_binding_roundtrip.cpp`
+- Modify: `libs/markoff-source/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Write the failing tests first**
 
@@ -516,7 +516,7 @@ Add to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_source_widget_binding_roundtrip tst_source_widget_binding_roundtrip.cpp)
 add_test(NAME tst_source_widget_binding_roundtrip COMMAND tst_source_widget_binding_roundtrip)
-target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_core)
+target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
 set_tests_properties(tst_source_widget_binding_roundtrip PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -666,7 +666,7 @@ Expected: all 4 user methods PASS (placeholder + setDocument + 3 binding-roundtr
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-source-widget
+git add libs/markoff-source
 git commit -m "feat(source-widget): Editor wires MarkoffDocument + KSyntaxHighlighting + CRDT undo"
 ```
 
@@ -677,10 +677,10 @@ git commit -m "feat(source-widget): Editor wires MarkoffDocument + KSyntaxHighli
 ### Task D1: Line-number gutter
 
 **Files:**
-- Modify: `libs/markoff-source-widget/src/Gutter.h`
-- Modify: `libs/markoff-source-widget/src/Gutter.cpp`
-- Modify: `libs/markoff-source-widget/include/markoff/source/widget/Editor.h`
-- Modify: `libs/markoff-source-widget/src/Editor.cpp`
+- Modify: `libs/markoff-source/src/Gutter.h`
+- Modify: `libs/markoff-source/src/Gutter.cpp`
+- Modify: `libs/markoff-source/include/markoff/source/widget/Editor.h`
+- Modify: `libs/markoff-source/src/Editor.cpp`
 
 - [ ] **Step 1: Wire gutter into Editor**
 
@@ -818,7 +818,7 @@ Expected: still all PASS (gutter is purely visual at v0; no test asserts on it d
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-source-widget
+git add libs/markoff-source
 git commit -m "feat(source-widget): line-number gutter (theme-driven, current-line emphasis)"
 ```
 
@@ -829,8 +829,8 @@ git commit -m "feat(source-widget): line-number gutter (theme-driven, current-li
 ### Task E1: Wire `setTheme` to palette + highlighter
 
 **Files:**
-- Modify: `libs/markoff-source-widget/src/Editor.cpp`
-- Modify: `libs/markoff-source-widget/tests/tst_source_widget_editor.cpp`
+- Modify: `libs/markoff-source/src/Editor.cpp`
+- Modify: `libs/markoff-source/tests/tst_source_widget_editor.cpp`
 
 - [ ] **Step 1: Add a setTheme test**
 
@@ -888,7 +888,7 @@ Expected: PASS (all 3 user methods including the new `setTheme_updates_palette_b
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-source-widget
+git add libs/markoff-source
 git commit -m "feat(source-widget): setTheme applies palette + retones KSyntaxHighlighter"
 ```
 
@@ -899,10 +899,10 @@ git commit -m "feat(source-widget): setTheme applies palette + retones KSyntaxHi
 ### Task F1: FindBar implementation + tests
 
 **Files:**
-- Modify: `libs/markoff-source-widget/include/markoff/source/widget/FindBar.h`
-- Modify: `libs/markoff-source-widget/src/FindBar.cpp`
-- Create: `libs/markoff-source-widget/tests/tst_source_widget_findbar.cpp`
-- Modify: `libs/markoff-source-widget/tests/CMakeLists.txt`
+- Modify: `libs/markoff-source/include/markoff/source/widget/FindBar.h`
+- Modify: `libs/markoff-source/src/FindBar.cpp`
+- Create: `libs/markoff-source/tests/tst_source_widget_findbar.cpp`
+- Modify: `libs/markoff-source/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Read foundation's SearchEngine API**
 
@@ -1170,7 +1170,7 @@ Add to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_source_widget_findbar tst_source_widget_findbar.cpp)
 add_test(NAME tst_source_widget_findbar COMMAND tst_source_widget_findbar)
-target_link_libraries(tst_source_widget_findbar PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_core)
+target_link_libraries(tst_source_widget_findbar PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
 set_tests_properties(tst_source_widget_findbar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -1186,7 +1186,7 @@ Expected: 3 source-widget test binaries pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-source-widget
+git add libs/markoff-source
 git commit -m "feat(source-widget): FindBar with next/prev/close + match-count UI"
 ```
 
@@ -1197,23 +1197,23 @@ git commit -m "feat(source-widget): FindBar with next/prev/close + match-count U
 ### Task G1: Stand-alone runnable app
 
 **Files:**
-- Create: `libs/markoff-source-widget/app/CMakeLists.txt`
-- Create: `libs/markoff-source-widget/app/main.cpp`
-- Modify: `libs/markoff-source-widget/CMakeLists.txt`
+- Create: `libs/markoff-source/app/CMakeLists.txt`
+- Create: `libs/markoff-source/app/main.cpp`
+- Modify: `libs/markoff-source/CMakeLists.txt`
 
 - [ ] **Step 1: app CMake**
 
-`libs/markoff-source-widget/app/CMakeLists.txt`:
+`libs/markoff-source/app/CMakeLists.txt`:
 
 ```cmake
 add_executable(markoff-source-widget-app main.cpp)
 target_link_libraries(markoff-source-widget-app
-    PRIVATE Qt6::Widgets markoff_source_widget markoff_core)
+    PRIVATE Qt6::Widgets markoff_source markoff_core)
 ```
 
 - [ ] **Step 2: main.cpp**
 
-`libs/markoff-source-widget/app/main.cpp`:
+`libs/markoff-source/app/main.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1271,7 +1271,7 @@ int main(int argc, char **argv) {
 
 - [ ] **Step 3: Hook into lib CMake**
 
-In `libs/markoff-source-widget/CMakeLists.txt`, append after the test-subdirectory clause:
+In `libs/markoff-source/CMakeLists.txt`, append after the test-subdirectory clause:
 
 ```cmake
 add_subdirectory(app)
@@ -1288,7 +1288,7 @@ Expected: clean build. The binary is at `./build-dev/bin/markoff-source-widget-a
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-source-widget/app libs/markoff-source-widget/CMakeLists.txt
+git add libs/markoff-source/app libs/markoff-source/CMakeLists.txt
 git commit -m "app(source-widget): minimal QMainWindow sandbox for hand-testing"
 ```
 
