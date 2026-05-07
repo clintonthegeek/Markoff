@@ -36,10 +36,13 @@ struct MARKOFF_LIVE_RENDER_EXPORT BlockRecord {
     bool operator==(const BlockRecord &o) const noexcept {
         // inlineSpans excluded from equality: diff identity is (kind, anchor).
         // Text changes update Equal rows via dataChanged without re-keying.
+        // attrs IS included so that MarkerNumber/IndentLevel/etc. changes
+        // (from renumber or Tab ops) trigger dataChanged without a kind change.
         return kind == o.kind && text == o.text
             && headingLevel == o.headingLevel
             && codeLanguage == o.codeLanguage
-            && blockAnchor == o.blockAnchor;
+            && blockAnchor == o.blockAnchor
+            && attrs == o.attrs;
     }
     bool operator!=(const BlockRecord &o) const noexcept { return !(*this == o); }
 };

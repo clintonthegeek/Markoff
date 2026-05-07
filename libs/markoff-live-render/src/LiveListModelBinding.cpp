@@ -204,6 +204,13 @@ void LiveListModelBinding::onD2Changed()
             continue;
         }
 
+        // Only promote FROM Paragraph. Blocks already set to a structural kind
+        // (ListItem, Heading, CodeBlock, …) hold content-only text in their
+        // buffers — inferBlockKind on content-only text would always infer
+        // "paragraph", wrongly demoting the block. Demotion is always via
+        // explicit structural-key actions (Enter-on-empty, Backspace, etc.).
+        if (rec.kind != BlockKind::Paragraph) continue;
+
         // Map inferred string to foundation BlockKind enum.
         Markoff::BlockKind fk = Markoff::BlockKind::Paragraph;
         if      (inferred == BlockKind::Heading)        fk = Markoff::BlockKind::Heading;
