@@ -742,13 +742,158 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
 
 // ===== D4: applyFlatEdit =====
 
-void MarkoffDocument::applyFlatEdit(uint32_t /*oldStart*/,
-                                    uint32_t /*oldEnd*/,
-                                    const QByteArray & /*newText*/,
-                                    Origin /*origin*/)
+void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
+                                    uint32_t oldEnd,
+                                    const QByteArray &newText,
+                                    Origin origin)
 {
-    Q_ASSERT_X(false, "applyFlatEdit",
-               "not yet implemented; covered by tst_d4_apply_flat_edit");
+    Q_UNUSED(origin);
+    Q_ASSERT(oldStart <= oldEnd);
+
+    const auto blocks = iterateBlocks();
+
+    // Walk blocks to find which block(s) the [oldStart, oldEnd) range touches.
+    uint32_t cursor = 0;
+    int startIdx = -1;
+    int endIdx   = -1;
+    uint32_t startWithin = 0;
+    uint32_t endWithin   = 0;
+
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        const uint32_t sz     = static_cast<uint32_t>(blockText(blocks[i]).size());
+        const uint32_t blkEnd = cursor + sz;
+
+        if (startIdx == -1 && oldStart <= blkEnd) {
+            startIdx    = static_cast<int>(i);
+            startWithin = oldStart - cursor;
+        }
+        if (oldEnd <= blkEnd) {
+            endIdx    = static_cast<int>(i);
+            endWithin = oldEnd - cursor;
+            break;
+        }
+        cursor = blkEnd;
+    }
+
+    // Handle empty-document edge case: both indices unset.
+    if (startIdx == -1 && endIdx == -1) {
+        // Document has no blocks; nothing to edit.
+        return;
+    }
+    Q_ASSERT(startIdx >= 0 && endIdx >= 0);
+
+    UndoLog::Transaction t(d2UndoLog());
+
+    // ── Intra-block edit (no embedded newlines) ────────────────────────────
+    if (startIdx == endIdx && newText.indexOf('\n') == -1) {
+        d2ApplyBufferEdit(blocks[startIdx], startWithin,
+                          endWithin - startWithin, newText, t);
+        return;
+    }
+
+    // ── Intra-block edit with embedded newlines (block split) ─────────────
+    if (startIdx == endIdx) {
+        const QByteArray currentText = blockText(blocks[startIdx]);
+        const uint32_t removeLen = endWithin - startWithin;
+        const QByteArray tail = currentText.mid(static_cast<int>(endWithin));
+
+        // Split newText on "\n\n" boundaries to determine new block count.
+        QList<QByteArray> parts;
+        int cursor2 = 0;
+        while (true) {
+            const int nextDouble = newText.indexOf("\n\n", cursor2);
+            if (nextDouble == -1) {
+                parts.append(newText.mid(cursor2));
+                break;
+            }
+            parts.append(newText.mid(cursor2, nextDouble - cursor2));
+            cursor2 = nextDouble + 2;
+        }
+        Q_ASSERT(parts.size() >= 1);
+
+        // Replace the removed range + tail in the current block with the first part.
+        // First block ends with '\n' as its delimiter.
+        QByteArray firstReplacement = parts.front() + QByteArray("\n");
+        d2ApplyBufferEdit(blocks[startIdx], startWithin,
+                          removeLen + static_cast<uint32_t>(tail.size()),
+                          firstReplacement, t);
+
+        // Insert subsequent blocks for each additional part.
+        BlockId after = blocks[startIdx];
+        for (int i = 1; i < parts.size(); ++i) {
+            BlockId newBlk = d2InsertBlock(after, BlockKind::Paragraph, t);
+            const bool isLast = (i == parts.size() - 1);
+            QByteArray seed = parts[i];
+            if (isLast) {
+                seed += tail;  // restore tail into last new block
+            } else {
+                seed += QByteArray("\n");  // delimiter for non-last blocks
+            }
+            if (!seed.isEmpty()) {
+                d2ApplyBufferEdit(newBlk, 0, 0, seed, t);
+            }
+            after = newBlk;
+        }
+        return;
+    }
+
+    // ── Cross-block edit ──────────────────────────────────────────────────
+    const QByteArray startTextBefore = blockText(blocks[startIdx]);
+    const QByteArray endTextBefore   = blockText(blocks[endIdx]);
+    const QByteArray endTail = endTextBefore.mid(static_cast<int>(endWithin));
+
+    // Trim the start block: remove from startWithin to its end.
+    d2ApplyBufferEdit(blocks[startIdx], startWithin,
+                      static_cast<uint32_t>(startTextBefore.size()) - startWithin,
+                      QByteArray(), t);
+
+    // Remove intermediate blocks (between startIdx+1 and endIdx-1 inclusive).
+    for (int i = startIdx + 1; i < endIdx; ++i) {
+        d2RemoveBlock(blocks[i], t);
+    }
+    // Remove the end block.
+    d2RemoveBlock(blocks[endIdx], t);
+
+    // Re-stitch: split newText on "\n\n" boundaries.
+    QList<QByteArray> parts;
+    int cursor2 = 0;
+    while (true) {
+        const int nextDouble = newText.indexOf("\n\n", cursor2);
+        if (nextDouble == -1) {
+            parts.append(newText.mid(cursor2));
+            break;
+        }
+        parts.append(newText.mid(cursor2, nextDouble - cursor2));
+        cursor2 = nextDouble + 2;
+    }
+    Q_ASSERT(parts.size() >= 1);
+
+    if (parts.size() == 1) {
+        // No block splits in newText: append newText + endTail into start block.
+        QByteArray combined = parts.front() + endTail;
+        d2ApplyBufferEdit(blocks[startIdx], startWithin, 0, combined, t);
+    } else {
+        // newText has embedded "\n\n": append first part to start block,
+        // then insert new blocks for the rest.
+        QByteArray firstReplacement = parts.front() + QByteArray("\n");
+        d2ApplyBufferEdit(blocks[startIdx], startWithin, 0, firstReplacement, t);
+
+        BlockId after = blocks[startIdx];
+        for (int i = 1; i < parts.size(); ++i) {
+            BlockId newBlk = d2InsertBlock(after, BlockKind::Paragraph, t);
+            const bool isLast = (i == parts.size() - 1);
+            QByteArray seed = parts[i];
+            if (isLast) {
+                seed += endTail;
+            } else {
+                seed += QByteArray("\n");
+            }
+            if (!seed.isEmpty()) {
+                d2ApplyBufferEdit(newBlk, 0, 0, seed, t);
+            }
+            after = newBlk;
+        }
+    }
 }
 
 void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
