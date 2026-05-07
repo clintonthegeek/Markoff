@@ -111,12 +111,12 @@ void Editor::keyPressEvent(QKeyEvent *e) {
     const auto m = e->modifiers();
     if (m_document && (m & Qt::ControlModifier)) {
         if (e->key() == Qt::Key_Z && !(m & Qt::ShiftModifier)) {
-            m_document->undo();
+            m_document->undoD2();
             e->accept();
             return;
         }
         if (e->key() == Qt::Key_Y || (e->key() == Qt::Key_Z && (m & Qt::ShiftModifier))) {
-            m_document->redo();
+            m_document->redoD2();
             e->accept();
             return;
         }

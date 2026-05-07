@@ -780,7 +780,14 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
 
     // Handle empty-document edge case: both indices unset.
     if (startIdx == -1 && endIdx == -1) {
-        // Document has no blocks; nothing to edit.
+        if (newText.isEmpty()) return;  // delete on empty doc — no-op
+        // Insert into an empty document: auto-create one paragraph block.
+        // This handles the case where a fresh MarkoffDocument (0 blocks) receives
+        // its first keystroke via the binding's forward path.
+        Q_ASSERT(oldStart == 0 && oldEnd == 0);
+        UndoLog::Transaction t(d2UndoLog());
+        BlockId newBlk = d2InsertBlock(BlockId{}, BlockKind::Paragraph, t);
+        d2ApplyBufferEdit(newBlk, 0, 0, newText, t);
         return;
     }
     Q_ASSERT(startIdx >= 0 && endIdx >= 0);
@@ -1075,6 +1082,18 @@ void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
     auto parsedDoc = Markoff::Document::fromMarkdown(extracted.body);
     if (parsedDoc)
         materializeBlocksFromParsedDoc(*parsedDoc, extracted.body);
+
+    // 4b. Guarantee at least one empty paragraph block — an empty document
+    // must still have a block so the source binding and applyFlatEdit can
+    // operate without special-casing zero blocks at every call site.
+    if (d->idList.size() == 0) {
+        BlockId newId = allocateD2BlockId();
+        d->idList.insert_after(CollabText::Crdt::Anchor::min(), newId.raw());
+        d->kindTagMap.setWithNextStamp(newId, BlockKind::Paragraph);
+        d->blockBuffers.emplace(newId, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
+        d->blockLoadTimeBytes[newId] = QByteArray();
+        d->bufferProxies.insert(newId, new BufferProxy(newId, this));
+    }
 
     // 5. Reset load baseline (mark "clean" post-load state)
     d->blockEditSequences.clear();
