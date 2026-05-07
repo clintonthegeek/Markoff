@@ -6,7 +6,6 @@ project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 #   - libs/markoff-parser     (MarkoffParser::MarkoffParser — tree-sitter Markdown AST + YAML frontmatter)
 #   - libs/collabtext         (CRDT text engine, sibling-symlinked from /home/clinton/dev/collabtext)
 #   - libs/markoff-core (Markoff::Core — MarkoffDocument + ParsePool + Sessions)
-#   - libs/markoff-view-qml   (QML view library)
 #   - libs/markoff-source (QPlainTextEdit-based source widget)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project.
@@ -57,7 +56,6 @@ if(NOT TARGET collabtext)
 endif()
 
 add_subdirectory(libs/markoff-core)
-add_subdirectory(libs/markoff-view-qml)
 # jkqtmathtext — LaTeX math rendering for Math blocks in markoff-live.
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)
