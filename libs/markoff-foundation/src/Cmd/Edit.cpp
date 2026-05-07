@@ -4,7 +4,7 @@
 
 namespace Markoff::Cmd {
 
-void undo(MarkoffDocument &d) { (void)d.undo(); }
-void redo(MarkoffDocument &d) { (void)d.redo(); }
+void undo(MarkoffDocument &d) { d.undoD2(); }
+void redo(MarkoffDocument &d) { d.redoD2(); }
 
 }  // namespace Markoff::Cmd

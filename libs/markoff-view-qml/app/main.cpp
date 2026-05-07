@@ -204,11 +204,8 @@ int main(int argc, char *argv[])
             window->setTitle(QStringLiteral("%1 — Markoff").arg(baseName));
     };
 
-    // T14.1 — connect contentsChanged to the dirty check.
-    QObject::connect(doc.get(), &Markoff::MarkoffDocument::contentsChanged,
-                     window, [&](const QList<Markoff::MarkoffEdit> &) {
-                         updateDirty();
-                     });
+    QObject::connect(doc.get(), &Markoff::MarkoffDocument::d2DocumentChanged,
+                     window, [&]() { updateDirty(); });
 
     // No-op flush: source mode has no projection-layer holes.
     auto flushPendingHoles = [&]() {};

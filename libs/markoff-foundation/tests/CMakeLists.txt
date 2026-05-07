@@ -13,11 +13,6 @@ set(CMAKE_AUTOMOC ON)
 #   target_link_libraries(tst_FOO PRIVATE Qt6::Test markoff_foundation)
 #   set_tests_properties(tst_FOO PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-add_executable(tst_markoff_edit tst_markoff_edit.cpp)
-add_test(NAME tst_markoff_edit COMMAND tst_markoff_edit)
-target_link_libraries(tst_markoff_edit PRIVATE Qt6::Test markoff_foundation)
-set_tests_properties(tst_markoff_edit PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-
 add_executable(tst_anchor_json tst_anchor_json.cpp)
 add_test(NAME tst_anchor_json COMMAND tst_anchor_json)
 target_link_libraries(tst_anchor_json PRIVATE Qt6::Test markoff_foundation)
@@ -101,10 +96,6 @@ add_test(NAME tst_foundation_services_bundle COMMAND tst_foundation_services_bun
 target_link_libraries(tst_foundation_services_bundle PRIVATE Qt6::Test markoff_foundation)
 set_tests_properties(tst_foundation_services_bundle PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-add_executable(tst_foundation_markoff_document_property tst_foundation_markoff_document_property.cpp)
-add_test(NAME tst_foundation_markoff_document_property COMMAND tst_foundation_markoff_document_property)
-target_link_libraries(tst_foundation_markoff_document_property PRIVATE Qt6::Test markoff_foundation)
-set_tests_properties(tst_foundation_markoff_document_property PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_text_anchor tst_foundation_text_anchor.cpp)
 add_test(NAME tst_foundation_text_anchor COMMAND tst_foundation_text_anchor)

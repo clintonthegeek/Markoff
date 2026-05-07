@@ -2,7 +2,6 @@
 #include <QTest>
 
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/TextAnchor.h>
 #include <markoff-foundation/BlockId.h>
@@ -80,25 +79,24 @@ private Q_SLOTS:
 
     void document_textAnchorAt_resolves_back_to_same_byte_with_left_bias() {
         MarkoffDocument doc{1};
-        doc.resetContent("hello world", Origin::TestFixture);
+        doc.loadFromMarkdown("hello world");
         const TextAnchor t = doc.textAnchorAt(6, /*rightBias*/ false);
         QCOMPARE(doc.resolveTextAnchor(t), quint32{6});
     }
 
     void document_textAnchorAt_resolves_back_to_same_byte_with_right_bias() {
         MarkoffDocument doc{1};
-        doc.resetContent("hello world", Origin::TestFixture);
+        doc.loadFromMarkdown("hello world");
         const TextAnchor t = doc.textAnchorAt(6, /*rightBias*/ true);
         QCOMPARE(doc.resolveTextAnchor(t), quint32{6});
     }
 
     void document_textAnchorAt_left_bias_survives_insert_before() {
         MarkoffDocument doc{1};
-        doc.resetContent("hello world", Origin::TestFixture);
+        doc.loadFromMarkdown("hello world");
         const TextAnchor t = doc.textAnchorAt(6, /*rightBias*/ false);
         // Insert "X" at position 0 — anchor at byte 6 should now resolve to 7.
-        MarkoffEdit e; e.oldStart = 0; e.oldEnd = 0; e.newText = "X";
-        doc.applyLocalEdit({e});
+        doc.applyFlatEdit(0, 0, "X", Origin::UserEdit);
         QCOMPARE(doc.resolveTextAnchor(t), quint32{7});
     }
 };

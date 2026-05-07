@@ -59,7 +59,6 @@ struct MarkoffDocument::Private {
     quint16                                   replicaId;
     const Markoff::BlockSerializerRegistry   *serializerRegistry = nullptr;
     quint64                                   editSequence = 0;   ///< Bumps on every state-change op.
-    quint64                                   parseSequence = 0;  ///< Bumps each time parseUpdated is emitted.
     QList<Markoff::BlockAnchor>               latestBlockAnchors;
     QList<Markoff::Detail::BlockByteRange>    latestBlockRanges;
     QList<Session *>                          sessions;

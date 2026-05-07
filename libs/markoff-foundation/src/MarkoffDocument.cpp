@@ -122,11 +122,6 @@ const Markoff::Document *MarkoffDocument::parsedDocument() const
     return d->latestParse.get();
 }
 
-bool MarkoffDocument::parseIsPending() const
-{
-    return false;
-}
-
 quint16 MarkoffDocument::replicaId() const
 {
     return d->replicaId;
@@ -142,105 +137,23 @@ quint64 MarkoffDocument::editSequence() const noexcept
     return d->editSequence;
 }
 
-quint64 MarkoffDocument::parseSequence() const noexcept
-{
-    return d->parseSequence;
-}
-
-// applyLocalEdit, undo/redo, applyRemoteOps, resetContent, anchorAt,
-// resolveAnchor, sessions, collectGarbage, compact, coalescing setters
-// are filled in subsequent tasks (10-23).
-
-CollabText::Crdt::Operation
-MarkoffDocument::applyLocalEdit(const QList<MarkoffEdit> &edits)
-{
-    ++d->editSequence;
-
-    // Snapshot version so we can compute the resulting TextEdits afterwards.
-    const CollabText::Crdt::Global oldVersion = d->buffer.version();
-
-    // Translate QList<MarkoffEdit> to the std::vector<pair> + std::vector<string>
-    // pair shape that Buffer::apply_local_edit expects.
-    std::vector<std::pair<uint32_t, uint32_t>> ranges;
-    std::vector<std::string> newTexts;
-    ranges.reserve(static_cast<size_t>(edits.size()));
-    newTexts.reserve(static_cast<size_t>(edits.size()));
-    for (const MarkoffEdit &e : edits) {
-        ranges.emplace_back(e.oldStart, e.oldEnd);
-        newTexts.emplace_back(e.newText.constData(),
-                              static_cast<size_t>(e.newText.size()));
-    }
-
-    const CollabText::Crdt::Operation op = d->buffer.apply_local_edit(ranges, newTexts);
-
-    // Compute resulting visible-text edits from the buffer's diff API.
-    const auto textEdits = d->buffer.edits_since(oldVersion);
-    QList<MarkoffEdit> resultingEdits;
-    resultingEdits.reserve(static_cast<int>(textEdits.size()));
-    for (const auto &te : textEdits) {
-        MarkoffEdit me;
-        me.oldStart = te.old_start;
-        me.oldEnd = te.old_end;
-        me.newText = QByteArray(te.new_text.data(),
-                                static_cast<int>(te.new_text.size()));
-        resultingEdits << me;
-    }
-
-    if (!resultingEdits.isEmpty())
-        Q_EMIT contentsChanged(resultingEdits);
-
-    return op;
-}
-
 std::optional<CollabText::Crdt::Operation> MarkoffDocument::undo()
 {
-    const CollabText::Crdt::Global oldVersion = d->buffer.version();
     auto op = d->buffer.undo();
     if (!op.has_value())
         return std::nullopt;
 
     ++d->editSequence;
-
-    const auto textEdits = d->buffer.edits_since(oldVersion);
-    QList<MarkoffEdit> resultingEdits;
-    resultingEdits.reserve(static_cast<int>(textEdits.size()));
-    for (const auto &te : textEdits) {
-        MarkoffEdit me;
-        me.oldStart = te.old_start;
-        me.oldEnd = te.old_end;
-        me.newText = QByteArray(te.new_text.data(),
-                                static_cast<int>(te.new_text.size()));
-        resultingEdits << me;
-    }
-    if (!resultingEdits.isEmpty())
-        Q_EMIT contentsChanged(resultingEdits);
-
     return op;
 }
 
 std::optional<CollabText::Crdt::Operation> MarkoffDocument::redo()
 {
-    const CollabText::Crdt::Global oldVersion = d->buffer.version();
     auto op = d->buffer.redo();
     if (!op.has_value())
         return std::nullopt;
 
     ++d->editSequence;
-
-    const auto textEdits = d->buffer.edits_since(oldVersion);
-    QList<MarkoffEdit> resultingEdits;
-    resultingEdits.reserve(static_cast<int>(textEdits.size()));
-    for (const auto &te : textEdits) {
-        MarkoffEdit me;
-        me.oldStart = te.old_start;
-        me.oldEnd = te.old_end;
-        me.newText = QByteArray(te.new_text.data(),
-                                static_cast<int>(te.new_text.size()));
-        resultingEdits << me;
-    }
-    if (!resultingEdits.isEmpty())
-        Q_EMIT contentsChanged(resultingEdits);
-
     return op;
 }
 
@@ -261,24 +174,7 @@ void MarkoffDocument::applyRemoteOps(
         return;
 
     ++d->editSequence;
-
-    const CollabText::Crdt::Global oldVersion = d->buffer.version();
     d->buffer.apply_ops(ops);
-
-    const auto textEdits = d->buffer.edits_since(oldVersion);
-    QList<MarkoffEdit> resultingEdits;
-    resultingEdits.reserve(static_cast<int>(textEdits.size()));
-    for (const auto &te : textEdits) {
-        MarkoffEdit me;
-        me.oldStart = te.old_start;
-        me.oldEnd = te.old_end;
-        me.newText = QByteArray(te.new_text.data(),
-                                static_cast<int>(te.new_text.size()));
-        resultingEdits << me;
-    }
-
-    if (!resultingEdits.isEmpty())
-        Q_EMIT contentsChanged(resultingEdits);
 }
 
 void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
@@ -490,11 +386,6 @@ qsizetype MarkoffDocument::collectGarbage()
 qsizetype MarkoffDocument::compact(const CollabText::Crdt::Global &watermark)
 {
     return static_cast<qsizetype>(d->buffer.compact(watermark));
-}
-
-void MarkoffDocument::setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept
-{
-    Q_UNUSED(taps);
 }
 
 // ============================================================================

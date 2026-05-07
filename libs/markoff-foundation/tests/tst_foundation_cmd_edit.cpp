@@ -1,33 +1,41 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
+#include <QCoreApplication>
 
 #include <markoff-foundation/Cmd/Edit.h>
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Origin.h>
 
 using namespace Markoff;
+
+static QByteArray fullText(const MarkoffDocument &doc) {
+    QByteArray out;
+    for (BlockId id : doc.iterateBlocks())
+        out += doc.blockText(id);
+    return out;
+}
 
 class TstFoundationCmdEdit : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void undo_wrapper_reverts_last_local_edit() {
         MarkoffDocument doc(1);
-        QList<MarkoffEdit> ed;
-        MarkoffEdit i; i.oldStart = 0; i.oldEnd = 0; i.newText = "ab";
-        ed << i;
-        doc.applyLocalEdit(ed);
+        doc.applyFlatEdit(0, 0, "ab", Origin::UserEdit);
+        QCoreApplication::processEvents();
         Cmd::undo(doc);
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
+        QCoreApplication::processEvents();
+        QCOMPARE(fullText(doc), QByteArray());
     }
 
     void redo_wrapper_reapplies() {
         MarkoffDocument doc(1);
-        QList<MarkoffEdit> ed;
-        MarkoffEdit i; i.oldStart = 0; i.oldEnd = 0; i.newText = "ab";
-        ed << i;
-        doc.applyLocalEdit(ed);
+        doc.applyFlatEdit(0, 0, "ab", Origin::UserEdit);
+        QCoreApplication::processEvents();
         Cmd::undo(doc);
+        QCoreApplication::processEvents();
         Cmd::redo(doc);
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("ab"));
+        QCoreApplication::processEvents();
+        QCOMPARE(fullText(doc), QByteArray("ab"));
     }
 };
 

@@ -24,12 +24,10 @@
 #include <markoff-foundation/BlockEdit.h>
 #include <markoff-foundation/BlockKind.h>
 #include <markoff-foundation/CrdtProxies.h>
-#include <markoff-foundation/MarkoffEdit.h>
 #include <markoff-foundation/Origin.h>
 #include <markoff-foundation/StructuralOp.h>
 #include <markoff-foundation/TextAnchor.h>
 #include <markoff-foundation/MarkoffFoundationExport.h>
-#include <markoff-foundation/RenderPhases.h>
 #include <markoff-foundation/SessionParams.h>
 #include <markoff-foundation/UndoLog.h>
 
@@ -67,37 +65,15 @@ public:
     /// or nullptr if no parse has completed yet.
     const Markoff::Document *parsedDocument() const;
 
-    /// True when a parse is currently scheduled or running.
-    bool parseIsPending() const;
-
     // ===== CRDT identity =====
     quint16 replicaId() const;
     CollabText::Crdt::Global version() const;
 
     // ===== Sequence accessors (CRDT-free, public-boundary friendly) =====
-    /// Locally-monotonic edit-sequence number that increments on every
-    /// state-change operation (applyLocalEdit, undo, redo, applyRemoteOps,
-    /// resetContent). Used for dirty-tracking ("has the doc changed since
-    /// the last save?") without holding a Crdt::Global. See spec §10
-    /// decision 8.
+    /// Locally-monotonic edit-sequence number. Increments on every state-change
+    /// op (undo, redo, applyRemoteOps, resetContent, applyFlatEdit, etc.).
+    /// Used for dirty-tracking without holding a Crdt::Global.
     quint64 editSequence() const noexcept;
-
-    /// Locally-monotonic parse-sequence number for the most recent parse
-    /// delivered via parseUpdated. View-layer code uses this for parse-
-    /// ordering ("is this a newer parse than what I rendered?") without
-    /// holding a Crdt::Global. Decoupled from the CRDT version vector.
-    /// See spec §10 decision 3.
-    [[deprecated("D2: use d2EditSequence(); D4 will delete")]]
-    quint64 parseSequence() const noexcept;
-
-    // ===== Local writes =====
-    /// Apply a list of local edits as a single batched local edit. Edits are
-    /// in OLD-text byte coordinates; ranges must be non-overlapping; if
-    /// multiple edits, ordering must be ascending by oldStart. Returns the
-    /// resulting Operation for broadcast (CRDT future). Emits contentsChanged.
-    [[deprecated("D2: use applyBlockEdit; will be removed in Phase 14")]]
-    CollabText::Crdt::Operation
-        applyLocalEdit(const QList<MarkoffEdit> &edits);
 
     // ===== Undo / redo =====
     std::optional<CollabText::Crdt::Operation> undo();
@@ -163,15 +139,6 @@ public:
     // ===== Garbage collection =====
     qsizetype collectGarbage();
     qsizetype compact(const CollabText::Crdt::Global &watermark);
-
-    // ===== Bench-only opt-in instrumentation =====
-    /// Wire an external render-tier timestamp tap for benchmarking. The
-    /// document writes worker-thread and main-thread timestamps into the
-    /// passed `RenderPhaseTaps` for every parse iteration that completes
-    /// while the pointer is installed. Pass nullptr (the default) to disable.
-    /// Caller owns the taps and resets them between iterations.
-    /// Production callers leave this null and pay zero overhead.
-    void setRenderPhaseTaps(Markoff::Render::RenderPhaseTaps *taps) noexcept;
 
     // ===== D2 per-block edit API =====
     /// Apply a local edit to a single block's CRDT buffer. The edit is
@@ -324,21 +291,6 @@ public:
     bool triggerGc();
 
 Q_SIGNALS:
-    void contentsChanged(QList<Markoff::MarkoffEdit> edits);
-    /// Emitted on the main thread each time a parse completes.
-    ///
-    /// `parseInputEditSequence` is the value of `editSequence()` at the
-    /// moment this parse's input bytes were captured (the applyLocalEdit /
-    /// resetContent call that triggered the parse). View consumers compare
-    /// this against per-row last-edit sequence to decide whether the parse
-    /// output for a given row is stale relative to user intent.
-    /// See restoration spec §4.
-    // D2: deprecated, migrating to d2DocumentChanged
-    [[deprecated("D2: use d2DocumentChanged + documentLoaded; D4 will delete")]]
-    void parseUpdated(const Markoff::Document *parsed,
-                      quint64 parseSequence,
-                      QList<Markoff::BlockAnchor> blockAnchors,
-                      quint64 parseInputEditSequence);
     void documentReloaded();
     void sessionCreated(Markoff::Session *);
     void sessionDestroyed(Markoff::Session *);

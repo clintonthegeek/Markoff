@@ -1,21 +1,28 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 #include <QApplication>
+#include <QCoreApplication>
 #include <QSignalSpy>
 
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Origin.h>
 #include <markoff-foundation/Session.h>
 #include <markoff-foundation/SessionParams.h>
 
 using namespace Markoff;
 
-Q_DECLARE_METATYPE(QList<Markoff::MarkoffEdit>)
+static QByteArray fullText(const MarkoffDocument &doc) {
+    QByteArray out;
+    for (BlockId id : doc.iterateBlocks())
+        out += doc.blockText(id);
+    return out;
+}
 
 class TstMarkoffDocument : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void constructed_with_replica_id() {
-        MarkoffDocument doc(/*replicaId=*/42);
+        MarkoffDocument doc(42);
         QCOMPARE(doc.replicaId(), quint16(42));
     }
 
@@ -33,270 +40,75 @@ private Q_SLOTS:
         QCOMPARE(b.replicaId(), quint16(13));
     }
 
-    void apply_local_edit_inserts_text() {
+    void applyFlatEdit_inserts_text() {
         MarkoffDocument doc(1);
-        // Seed via direct buffer init through a single insert at offset 0.
-        QList<MarkoffEdit> seed;
-        MarkoffEdit ins;
-        ins.oldStart = 0;
-        ins.oldEnd = 0;
-        ins.newText = "hello";
-        seed << ins;
-        doc.applyLocalEdit(seed);
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello"));
-        QCOMPARE(doc.visibleLength(), quint32(5));
+        doc.loadFromMarkdown("hello\n");
+        doc.applyFlatEdit(5, 5, "!", Origin::UserEdit);
+        QCOMPARE(fullText(doc), QByteArray("hello!\n"));
     }
 
-    void apply_local_edit_replaces_range() {
+    void applyFlatEdit_replaces_range() {
         MarkoffDocument doc(1);
-
-        QList<MarkoffEdit> seed;
-        MarkoffEdit ins;
-        ins.oldStart = 0;
-        ins.oldEnd = 0;
-        ins.newText = "hello world";
-        seed << ins;
-        doc.applyLocalEdit(seed);
-
-        QList<MarkoffEdit> edits;
-        MarkoffEdit replace;
-        replace.oldStart = 6;
-        replace.oldEnd = 11;
-        replace.newText = "there";
-        edits << replace;
-        doc.applyLocalEdit(edits);
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("hello there"));
+        doc.loadFromMarkdown("hello world\n");
+        // "world" = bytes 6..11, trailing \n at byte 11
+        doc.applyFlatEdit(6, 11, "there", Origin::UserEdit);
+        QCOMPARE(fullText(doc), QByteArray("hello there\n"));
     }
 
-    void apply_local_edit_deletes_range() {
+    void applyFlatEdit_deletes_range() {
         MarkoffDocument doc(1);
-        QList<MarkoffEdit> seed;
-        MarkoffEdit ins;
-        ins.oldStart = 0;
-        ins.oldEnd = 0;
-        ins.newText = "abcdef";
-        seed << ins;
-        doc.applyLocalEdit(seed);
-
-        QList<MarkoffEdit> del;
-        MarkoffEdit d;
-        d.oldStart = 2;
-        d.oldEnd = 4;
-        d.newText.clear();
-        del << d;
-        doc.applyLocalEdit(del);
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abef"));
+        doc.loadFromMarkdown("abcdef\n");
+        // Delete "cd" at bytes 2..4
+        doc.applyFlatEdit(2, 4, "", Origin::UserEdit);
+        QCOMPARE(fullText(doc), QByteArray("abef\n"));
     }
 
-    void apply_local_edit_emits_contents_changed() {
+    void applyFlatEdit_emits_d2DocumentChanged() {
         MarkoffDocument doc(1);
-        // Seed.
-        {
-            QList<MarkoffEdit> seed;
-            MarkoffEdit i;
-            i.oldStart = 0;
-            i.oldEnd = 0;
-            i.newText = "abc";
-            seed << i;
-            doc.applyLocalEdit(seed);
-        }
-
-        QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
-        QList<MarkoffEdit> edits;
-        MarkoffEdit ins;
-        ins.oldStart = 1;
-        ins.oldEnd = 1;
-        ins.newText = "X";
-        edits << ins;
-        doc.applyLocalEdit(edits);
-
-        QCOMPARE(spy.count(), 1);
-        const QList<MarkoffEdit> received =
-            spy.takeFirst().at(0).value<QList<MarkoffEdit>>();
-        QVERIFY(!received.isEmpty());
-        // The first received edit should describe the insertion at oldStart=1.
-        QCOMPARE(received.first().oldStart, quint32(1));
-    }
-
-    void apply_local_edit_batch() {
-        MarkoffDocument doc(1);
-        {
-            QList<MarkoffEdit> seed;
-            MarkoffEdit i;
-            i.oldStart = 0;
-            i.oldEnd = 0;
-            i.newText = "aaaa bbbb cccc";
-            seed << i;
-            doc.applyLocalEdit(seed);
-        }
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("aaaa bbbb cccc"));
-
-        // Two non-overlapping replacements in one batch.
-        QList<MarkoffEdit> edits;
-        MarkoffEdit r1;
-        r1.oldStart = 0;
-        r1.oldEnd = 4;
-        r1.newText = "AAAA";
-        edits << r1;
-        MarkoffEdit r2;
-        r2.oldStart = 10;
-        r2.oldEnd = 14;
-        r2.newText = "CCCC";
-        edits << r2;
-        doc.applyLocalEdit(edits);
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("AAAA bbbb CCCC"));
-    }
-
-    void apply_remote_ops_replicates() {
-        MarkoffDocument alice(1);
-        MarkoffDocument bob(2);
-
-        // Alice types.
-        QList<MarkoffEdit> ed;
-        MarkoffEdit ins;
-        ins.oldStart = 0;
-        ins.oldEnd = 0;
-        ins.newText = "hello";
-        ed << ins;
-        const auto op = alice.applyLocalEdit(ed);
-
-        // Bob applies Alice's op.
-        bob.applyRemoteOps({ op });
-        QCOMPARE(bob.toMarkdownUtf8(), QByteArray("hello"));
-    }
-
-    void apply_remote_ops_emits_contents_changed() {
-        MarkoffDocument alice(1);
-        MarkoffDocument bob(2);
-
-        QList<MarkoffEdit> ed;
-        MarkoffEdit ins;
-        ins.oldStart = 0;
-        ins.oldEnd = 0;
-        ins.newText = "x";
-        ed << ins;
-        const auto op = alice.applyLocalEdit(ed);
-
-        QSignalSpy spy(&bob, &MarkoffDocument::contentsChanged);
-        bob.applyRemoteOps({ op });
+        doc.loadFromMarkdown("hello");
+        QSignalSpy spy(&doc, &MarkoffDocument::d2DocumentChanged);
+        doc.applyFlatEdit(5, 5, "!", Origin::UserEdit);
+        QCoreApplication::processEvents();
         QCOMPARE(spy.count(), 1);
     }
 
-    void undo_reverses_last_local_edit() {
+    void undoD2_reverses_applyFlatEdit() {
         MarkoffDocument doc(1);
-        {
-            QList<MarkoffEdit> seed;
-            MarkoffEdit i;
-            i.oldStart = 0;
-            i.oldEnd = 0;
-            i.newText = "ab";
-            seed << i;
-            doc.applyLocalEdit(seed);
-        }
-        {
-            QList<MarkoffEdit> ed;
-            MarkoffEdit i;
-            i.oldStart = 2;
-            i.oldEnd = 2;
-            i.newText = "c";
-            ed << i;
-            doc.applyLocalEdit(ed);
-        }
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abc"));
-        QVERIFY(doc.undo().has_value());
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("ab"));
+        doc.loadFromMarkdown("ab\n");
+        doc.applyFlatEdit(2, 2, "c", Origin::UserEdit);
+        QCOMPARE(fullText(doc), QByteArray("abc\n"));
+        doc.undoD2();
+        QCOMPARE(fullText(doc), QByteArray("ab\n"));
     }
 
-    void redo_reapplies_undone_edit() {
+    void redoD2_reapplies_undone_applyFlatEdit() {
         MarkoffDocument doc(1);
-        {
-            QList<MarkoffEdit> seed;
-            MarkoffEdit i;
-            i.oldStart = 0;
-            i.oldEnd = 0;
-            i.newText = "ab";
-            seed << i;
-            doc.applyLocalEdit(seed);
-        }
-        {
-            QList<MarkoffEdit> ed;
-            MarkoffEdit i;
-            i.oldStart = 2;
-            i.oldEnd = 2;
-            i.newText = "c";
-            ed << i;
-            doc.applyLocalEdit(ed);
-        }
-        doc.undo();
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("ab"));
-        QVERIFY(doc.redo().has_value());
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abc"));
+        doc.loadFromMarkdown("ab\n");
+        doc.applyFlatEdit(2, 2, "c", Origin::UserEdit);
+        doc.undoD2();
+        QCOMPARE(fullText(doc), QByteArray("ab\n"));
+        doc.redoD2();
+        QCOMPARE(fullText(doc), QByteArray("abc\n"));
     }
 
-    void undo_with_no_history_returns_nullopt() {
+    void legacy_undo_with_no_history_returns_nullopt() {
         MarkoffDocument doc(1);
         QVERIFY(!doc.undo().has_value());
     }
 
-    void undo_emits_contents_changed() {
+    void anchor_at_resolves_to_offset() {
         MarkoffDocument doc(1);
-        {
-            QList<MarkoffEdit> seed;
-            MarkoffEdit i;
-            i.oldStart = 0;
-            i.oldEnd = 0;
-            i.newText = "abc";
-            seed << i;
-            doc.applyLocalEdit(seed);
-        }
-        QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
-        doc.undo();
-        QVERIFY(spy.count() >= 1);
-    }
-
-    void coalesce_last_undo_groups_two_edits() {
-        MarkoffDocument doc(1);
-        {
-            QList<MarkoffEdit> seed;
-            MarkoffEdit i;
-            i.oldStart = 0;
-            i.oldEnd = 0;
-            i.newText = "ab";
-            seed << i;
-            doc.applyLocalEdit(seed);
-        }
-        {
-            QList<MarkoffEdit> ed;
-            MarkoffEdit i;
-            i.oldStart = 2;
-            i.oldEnd = 2;
-            i.newText = "c";
-            ed << i;
-            doc.applyLocalEdit(ed);
-        }
-        // Two edits → undoDepth == 2.
-        QCOMPARE(doc.undoDepth(), 2);
-
-        // Coalesce the last two into one undo step.
-        QVERIFY(doc.coalesceLastUndo());
-        QCOMPARE(doc.undoDepth(), 1);
-
-        // One undo should now revert both edits.
-        doc.undo();
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray());
+        // resetContent seeds the legacy CRDT buffer used by anchorAt/resolveAnchor
+        doc.resetContent(QByteArray("abcdef"), Origin::FirstOpen);
+        const auto a = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        QCOMPARE(doc.resolveAnchor(a), quint32(3));
     }
 
     void reset_content_first_open_clears_undo() {
         MarkoffDocument doc(1);
-        QList<MarkoffEdit> ed;
-        MarkoffEdit i;
-        i.oldStart = 0;
-        i.oldEnd = 0;
-        i.newText = "old";
-        ed << i;
-        doc.applyLocalEdit(ed);
+        doc.resetContent(QByteArray("old"), Origin::FirstOpen);
+        doc.resetContent(QByteArray("new"), Origin::UserRevertToSaved);
         QVERIFY(doc.undoDepth() > 0);
-
         doc.resetContent(QByteArray("new content"), Origin::FirstOpen);
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("new content"));
         QCOMPARE(doc.undoDepth(), 0);
@@ -311,66 +123,13 @@ private Q_SLOTS:
 
     void reset_content_user_revert_pushes_undo_entry() {
         MarkoffDocument doc(1);
-        {
-            QList<MarkoffEdit> ed;
-            MarkoffEdit i;
-            i.oldStart = 0;
-            i.oldEnd = 0;
-            i.newText = "draft";
-            ed << i;
-            doc.applyLocalEdit(ed);
-        }
+        doc.resetContent(QByteArray("draft"), Origin::FirstOpen);
         const int beforeDepth = doc.undoDepth();
-
         doc.resetContent(QByteArray("saved"), Origin::UserRevertToSaved);
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("saved"));
-        // UserRevertToSaved pushes one mega-edit so undo reverses the revert.
         QVERIFY(doc.undoDepth() > beforeDepth);
         doc.undo();
         QCOMPARE(doc.toMarkdownUtf8(), QByteArray("draft"));
-    }
-
-    void anchor_at_resolves_to_offset() {
-        MarkoffDocument doc(1);
-        QList<MarkoffEdit> ed;
-        MarkoffEdit i;
-        i.oldStart = 0;
-        i.oldEnd = 0;
-        i.newText = "abcdef";
-        ed << i;
-        doc.applyLocalEdit(ed);
-
-        const auto a = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
-        QCOMPARE(doc.resolveAnchor(a), quint32(3));
-    }
-
-    void anchor_survives_left_insert() {
-        MarkoffDocument doc(1);
-        {
-            QList<MarkoffEdit> ed;
-            MarkoffEdit i;
-            i.oldStart = 0;
-            i.oldEnd = 0;
-            i.newText = "ace";
-            ed << i;
-            doc.applyLocalEdit(ed);
-        }
-        // Anchor at offset 1 (between 'a' and 'c'), right-bias.
-        const auto a = doc.anchorAt(1, CollabText::Crdt::Bias::Right);
-
-        // Insert "b" at offset 1.
-        {
-            QList<MarkoffEdit> ed;
-            MarkoffEdit i;
-            i.oldStart = 1;
-            i.oldEnd = 1;
-            i.newText = "b";
-            ed << i;
-            doc.applyLocalEdit(ed);
-        }
-        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("abce"));
-        // Right-bias anchor moves past the inserted text.
-        QCOMPARE(doc.resolveAnchor(a), quint32(2));
     }
 
     void create_session_returns_owned_session() {
@@ -404,7 +163,6 @@ private Q_SLOTS:
 };
 
 int main(int argc, char *argv[]) {
-    qRegisterMetaType<QList<Markoff::MarkoffEdit>>("QList<Markoff::MarkoffEdit>");
     QApplication app(argc, argv);
     TstMarkoffDocument tc;
     return QTest::qExec(&tc, argc, argv);

@@ -3,24 +3,16 @@
 
 #include <markoff-foundation/CompletionDetector.h>
 #include <markoff-foundation/MarkoffDocument.h>
+#include <markoff-foundation/Origin.h>
 
 using namespace Markoff;
-
-namespace {
-void seed(MarkoffDocument &doc, const QByteArray &text) {
-    QList<MarkoffEdit> ed;
-    MarkoffEdit i; i.oldStart = 0; i.oldEnd = 0; i.newText = text;
-    ed << i;
-    doc.applyLocalEdit(ed);
-}
-}
 
 class TstFoundationCompletionDetector : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void wikilink_after_double_open_bracket() {
         MarkoffDocument doc(1);
-        seed(doc, "see [[no");
+        doc.resetContent("see [[no", Origin::TestFixture);
         const auto ctx = CompletionDetector::detect(&doc,
             doc.textAnchorAt(8, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::WikiLink);
@@ -29,7 +21,7 @@ private Q_SLOTS:
 
     void emoji_after_colon() {
         MarkoffDocument doc(1);
-        seed(doc, "hi :smi");
+        doc.resetContent("hi :smi", Origin::TestFixture);
         const auto ctx = CompletionDetector::detect(&doc,
             doc.textAnchorAt(7, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::Emoji);
@@ -38,7 +30,7 @@ private Q_SLOTS:
 
     void tag_after_hash_in_body() {
         MarkoffDocument doc(1);
-        seed(doc, "body #ta");
+        doc.resetContent("body #ta", Origin::TestFixture);
         const auto ctx = CompletionDetector::detect(&doc,
             doc.textAnchorAt(8, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::Tag);
@@ -47,7 +39,7 @@ private Q_SLOTS:
 
     void heading_marker_not_a_tag() {
         MarkoffDocument doc(1);
-        seed(doc, "#h");
+        doc.resetContent("#h", Origin::TestFixture);
         const auto ctx = CompletionDetector::detect(&doc,
             doc.textAnchorAt(2, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::None);
@@ -55,7 +47,7 @@ private Q_SLOTS:
 
     void inside_fenced_code_block_suppresses_triggers() {
         MarkoffDocument doc(1);
-        seed(doc, "```\n[[no");
+        doc.resetContent("```\n[[no", Origin::TestFixture);
         const auto ctx = CompletionDetector::detect(&doc,
             doc.textAnchorAt(8, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::None);
@@ -63,7 +55,7 @@ private Q_SLOTS:
 
     void escaped_double_bracket_not_a_wikilink() {
         MarkoffDocument doc(1);
-        seed(doc, "see \\[[no");
+        doc.resetContent("see \\[[no", Origin::TestFixture);
         const auto ctx = CompletionDetector::detect(&doc,
             doc.textAnchorAt(9, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::None);
@@ -71,7 +63,7 @@ private Q_SLOTS:
 
     void footnote_marker_recognized() {
         MarkoffDocument doc(1);
-        seed(doc, "see [^fn");
+        doc.resetContent("see [^fn", Origin::TestFixture);
         const auto ctx = CompletionDetector::detect(&doc,
             doc.textAnchorAt(8, /*rightBias*/ false));
         QCOMPARE(ctx.trigger, CompletionTrigger::Footnote);

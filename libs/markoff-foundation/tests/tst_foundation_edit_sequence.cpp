@@ -2,7 +2,7 @@
 #include <QTest>
 
 #include <markoff-foundation/MarkoffDocument.h>
-#include <markoff-foundation/MarkoffEdit.h>
+#include <markoff-foundation/Origin.h>
 
 using namespace Markoff;
 
@@ -14,20 +14,17 @@ private Q_SLOTS:
         QCOMPARE(d.editSequence(), quint64{0});
     }
 
-    void apply_local_edit_increments() {
+    void apply_flat_edit_increments() {
         MarkoffDocument d{1};
-        const auto seq0 = d.editSequence();
-        MarkoffEdit e;
-        e.oldStart = 0; e.oldEnd = 0; e.newText = "x";
-        d.applyLocalEdit({e});
-        QVERIFY(d.editSequence() > seq0);
+        const auto seq0 = d.d2EditSequence();
+        d.applyFlatEdit(0, 0, "x", Origin::UserEdit);
+        QVERIFY(d.d2EditSequence() > seq0);
     }
 
     void undo_increments() {
         MarkoffDocument d{1};
-        MarkoffEdit e;
-        e.oldStart = 0; e.oldEnd = 0; e.newText = "x";
-        d.applyLocalEdit({e});
+        // resetContent(UserRevertToSaved) pushes an undoable entry into the legacy buffer.
+        d.resetContent("x", Origin::UserRevertToSaved);
         const auto seq1 = d.editSequence();
         d.undo();
         QVERIFY(d.editSequence() > seq1);
@@ -35,9 +32,7 @@ private Q_SLOTS:
 
     void redo_increments() {
         MarkoffDocument d{1};
-        MarkoffEdit e;
-        e.oldStart = 0; e.oldEnd = 0; e.newText = "x";
-        d.applyLocalEdit({e});
+        d.resetContent("x", Origin::UserRevertToSaved);
         d.undo();
         const auto seq2 = d.editSequence();
         d.redo();
@@ -53,14 +48,11 @@ private Q_SLOTS:
 
     void monotonic_under_burst() {
         MarkoffDocument d{1};
-        quint64 prev = d.editSequence();
+        quint64 prev = d.d2EditSequence();
         for (int i = 0; i < 20; ++i) {
-            MarkoffEdit e;
-            e.oldStart = static_cast<quint32>(i);
-            e.oldEnd   = static_cast<quint32>(i);
-            e.newText  = "a";
-            d.applyLocalEdit({e});
-            const auto cur = d.editSequence();
+            d.applyFlatEdit(static_cast<quint32>(i), static_cast<quint32>(i),
+                            "a", Origin::UserEdit);
+            const auto cur = d.d2EditSequence();
             QVERIFY(cur > prev);
             prev = cur;
         }

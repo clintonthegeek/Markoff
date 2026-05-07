@@ -14,7 +14,6 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 add_library(markoff_foundation STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
-    include/markoff-foundation/MarkoffEdit.h
     include/markoff-foundation/AnchorJson.h
     include/markoff-foundation/Selection.h
     include/markoff-foundation/FoldRef.h
@@ -57,7 +56,6 @@ add_library(markoff_foundation STATIC
     src/IncrementalParseSession.h
     src/AnchorConversion.cpp
     src/BlockAnchorComputation.cpp
-    src/MarkoffEdit.cpp
     src/AnchorJson.cpp
     src/Selection.cpp
     src/FoldRef.cpp
