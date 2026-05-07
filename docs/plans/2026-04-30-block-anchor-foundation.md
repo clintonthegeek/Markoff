@@ -18,7 +18,7 @@
 - View-qml CLAUDE.md (cross-cutting invariants): [`libs/markoff-view-qml/CLAUDE.md`](../../libs/markoff-view-qml/CLAUDE.md)
 - Existing `BlockWalker` (algorithm to mirror): `libs/markoff-view-qml/src/BlockWalker.cpp`
 - CRDT `Anchor` type: `/home/clinton/dev/collabtext/libs/collabtext/src/crdt/Anchor.h`
-- Anchor JSON precedent: `libs/markoff-foundation/include/markoff-foundation/AnchorJson.h`
+- Anchor JSON precedent: `libs/markoff-core/include/markoff-foundation/AnchorJson.h`
 
 **Out of scope:**
 - Unifying view-qml's `BlockWalker` with the new foundation `TopLevelBlockScanner`. They run the same algorithm; convergence is tested. Unification is the live-editing plan's task 2.2 territory.
@@ -33,7 +33,7 @@
 ### Files created
 
 ```
-libs/markoff-foundation/
+libs/markoff-core/
   include/markoff-foundation/
     TextAnchor.h
     BlockAnchor.h
@@ -59,7 +59,7 @@ libs/markoff-foundation/
 ### Files modified
 
 ```
-libs/markoff-foundation/
+libs/markoff-core/
   include/markoff-foundation/
     MarkoffDocument.h         new public APIs (parseSequence, editSequence,
                               textAnchorAt overloads, resolveTextAnchor,
@@ -107,13 +107,13 @@ No files deleted.
 A view-layer-safe wrapper for a CRDT byte anchor. Header includes no CRDT types.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/TextAnchor.h`
-- Create: `libs/markoff-foundation/tests/tst_foundation_text_anchor.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/TextAnchor.h`
+- Create: `libs/markoff-core/tests/tst_foundation_text_anchor.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [x] **Step 1.1: Write failing test for TextAnchor equality**
 
-`libs/markoff-foundation/tests/tst_foundation_text_anchor.cpp`:
+`libs/markoff-core/tests/tst_foundation_text_anchor.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -172,18 +172,18 @@ Expected: build fails with "TextAnchor.h not found" (header doesn't exist yet) o
 
 - [x] **Step 1.3: Add the test target to `tests/CMakeLists.txt`**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_text_anchor tst_foundation_text_anchor.cpp)
 add_test(NAME tst_foundation_text_anchor COMMAND tst_foundation_text_anchor)
-target_link_libraries(tst_foundation_text_anchor PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_text_anchor PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_text_anchor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
 - [x] **Step 1.4: Create `TextAnchor.h`**
 
-`libs/markoff-foundation/include/markoff-foundation/TextAnchor.h`:
+`libs/markoff-core/include/markoff-foundation/TextAnchor.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -224,9 +224,9 @@ Expected: PASS — all five sub-tests green.
 - [x] **Step 1.6: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/TextAnchor.h \
-        libs/markoff-foundation/tests/tst_foundation_text_anchor.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/TextAnchor.h \
+        libs/markoff-core/tests/tst_foundation_text_anchor.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): add TextAnchor type (no CRDT header dep)"
 ```
 
@@ -237,10 +237,10 @@ git commit -m "feat(foundation): add TextAnchor type (no CRDT header dep)"
 Translate `Crdt::Anchor` ↔ `TextAnchor` for foundation-internal use. Adds round-trip tests as part of `tst_foundation_text_anchor`.
 
 **Files:**
-- Create: `libs/markoff-foundation/src/AnchorConversion.h`
-- Create: `libs/markoff-foundation/src/AnchorConversion.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_text_anchor.cpp`
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
+- Create: `libs/markoff-core/src/AnchorConversion.h`
+- Create: `libs/markoff-core/src/AnchorConversion.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_text_anchor.cpp`
+- Modify: `libs/markoff-core/CMakeLists.txt`
 
 - [x] **Step 2.1: Write the failing round-trip test**
 
@@ -293,7 +293,7 @@ For the test to find `AnchorConversion.h`, add to its CMake registration:
 
 ```cmake
 target_include_directories(tst_foundation_text_anchor PRIVATE
-    ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src)
+    ${CMAKE_SOURCE_DIR}/libs/markoff-core/src)
 ```
 
 (Place this after the existing `target_link_libraries` for the test.)
@@ -309,7 +309,7 @@ Expected: build fails with "AnchorConversion.h not found" or "Markoff::Detail::t
 
 - [x] **Step 2.3: Create `AnchorConversion.h`**
 
-`libs/markoff-foundation/src/AnchorConversion.h`:
+`libs/markoff-core/src/AnchorConversion.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -331,7 +331,7 @@ CollabText::Crdt::Anchor toCrdtAnchor(const TextAnchor &t) noexcept;
 
 - [x] **Step 2.4: Create `AnchorConversion.cpp`**
 
-`libs/markoff-foundation/src/AnchorConversion.cpp`:
+`libs/markoff-core/src/AnchorConversion.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -363,7 +363,7 @@ CollabText::Crdt::Anchor toCrdtAnchor(const TextAnchor &t) noexcept
 
 - [x] **Step 2.5: Add to library `CMakeLists.txt`**
 
-Locate the source-list block in `libs/markoff-foundation/CMakeLists.txt` (the one that lists `*.cpp` files for `markoff_foundation`) and append:
+Locate the source-list block in `libs/markoff-core/CMakeLists.txt` (the one that lists `*.cpp` files for `markoff_core`) and append:
 
 ```cmake
     src/AnchorConversion.cpp
@@ -383,11 +383,11 @@ Expected: all sub-tests PASS, including the four new round-trip tests.
 - [x] **Step 2.7: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/AnchorConversion.h \
-        libs/markoff-foundation/src/AnchorConversion.cpp \
-        libs/markoff-foundation/tests/tst_foundation_text_anchor.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt \
-        libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/src/AnchorConversion.h \
+        libs/markoff-core/src/AnchorConversion.cpp \
+        libs/markoff-core/tests/tst_foundation_text_anchor.cpp \
+        libs/markoff-core/tests/CMakeLists.txt \
+        libs/markoff-core/CMakeLists.txt
 git commit -m "feat(foundation): AnchorConversion helpers (Crdt::Anchor <-> TextAnchor)"
 ```
 
@@ -398,13 +398,13 @@ git commit -m "feat(foundation): AnchorConversion helpers (Crdt::Anchor <-> Text
 Trivial wrapper around `TextAnchor` to give block-identity its own type.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/BlockAnchor.h`
-- Create: `libs/markoff-foundation/tests/tst_foundation_block_anchor.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/BlockAnchor.h`
+- Create: `libs/markoff-core/tests/tst_foundation_block_anchor.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [x] **Step 3.1: Write failing test**
 
-`libs/markoff-foundation/tests/tst_foundation_block_anchor.cpp`:
+`libs/markoff-core/tests/tst_foundation_block_anchor.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -454,7 +454,7 @@ Append:
 ```cmake
 add_executable(tst_foundation_block_anchor tst_foundation_block_anchor.cpp)
 add_test(NAME tst_foundation_block_anchor COMMAND tst_foundation_block_anchor)
-target_link_libraries(tst_foundation_block_anchor PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_block_anchor PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_block_anchor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -468,7 +468,7 @@ Expected: build fails — `BlockAnchor.h` does not exist.
 
 - [x] **Step 3.4: Create `BlockAnchor.h`**
 
-`libs/markoff-foundation/include/markoff-foundation/BlockAnchor.h`:
+`libs/markoff-core/include/markoff-foundation/BlockAnchor.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -503,9 +503,9 @@ Expected: PASS.
 - [x] **Step 3.6: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/BlockAnchor.h \
-        libs/markoff-foundation/tests/tst_foundation_block_anchor.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/BlockAnchor.h \
+        libs/markoff-core/tests/tst_foundation_block_anchor.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): add BlockAnchor wrapper struct"
 ```
 
@@ -516,15 +516,15 @@ git commit -m "feat(foundation): add BlockAnchor wrapper struct"
 Locally-monotonic counter for "has the doc state changed since some prior point". Increments on every state-change op (`applyLocalEdit`, `undo`, `redo`, `applyRemoteOps`, `resetContent`).
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_edit_sequence.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocumentPrivate.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_edit_sequence.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [x] **Step 4.1: Write failing test**
 
-`libs/markoff-foundation/tests/tst_foundation_edit_sequence.cpp`:
+`libs/markoff-core/tests/tst_foundation_edit_sequence.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -602,12 +602,12 @@ QTEST_MAIN(TstFoundationEditSequence)
 
 - [x] **Step 4.2: Register the test executable**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_edit_sequence tst_foundation_edit_sequence.cpp)
 add_test(NAME tst_foundation_edit_sequence COMMAND tst_foundation_edit_sequence)
-target_link_libraries(tst_foundation_edit_sequence PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_edit_sequence PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_edit_sequence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -621,7 +621,7 @@ Expected: build fails — `MarkoffDocument::editSequence` not declared.
 
 - [x] **Step 4.4: Add public accessor declaration**
 
-In `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`, add immediately before the `// ===== Local writes =====` line (around line 56-57):
+In `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`, add immediately before the `// ===== Local writes =====` line (around line 56-57):
 
 ```cpp
     // ===== Sequence accessors (CRDT-free, public-boundary friendly) =====
@@ -635,7 +635,7 @@ In `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`, add i
 
 - [x] **Step 4.5: Add private state**
 
-In `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`, find the `Private` struct (or class) declaration. Add:
+In `libs/markoff-core/src/MarkoffDocumentPrivate.h`, find the `Private` struct (or class) declaration. Add:
 
 ```cpp
     quint64 editSequence = 0;   ///< Bumps on every state-change op.
@@ -645,7 +645,7 @@ In `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`, find the `Private` st
 
 - [x] **Step 4.6: Implement the accessor and bump points**
 
-In `libs/markoff-foundation/src/MarkoffDocument.cpp`:
+In `libs/markoff-core/src/MarkoffDocument.cpp`:
 
 Add (place near `version()`):
 
@@ -705,11 +705,11 @@ Expected: all green.
 - [x] **Step 4.9: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/MarkoffDocumentPrivate.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_foundation_edit_sequence.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/MarkoffDocumentPrivate.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_foundation_edit_sequence.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): add editSequence() for public-boundary dirty-tracking"
 ```
 
@@ -720,15 +720,15 @@ git commit -m "feat(foundation): add editSequence() for public-boundary dirty-tr
 Locally-monotonic counter for "this is the i-th parse to return on this MarkoffDocument instance". Used by view-layer code for parse ordering. Bumped in the lambda that relays the worker's `parsed` to the public `parseUpdated`. The signal-shape change (adding `parseSequence` and `QList<BlockAnchor>` to the signal) lands in Task 7; this task only adds the accessor and its underlying state.
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_parse_sequence.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocumentPrivate.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_parse_sequence.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [x] **Step 5.1: Write failing test**
 
-`libs/markoff-foundation/tests/tst_foundation_parse_sequence.cpp`:
+`libs/markoff-core/tests/tst_foundation_parse_sequence.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -779,12 +779,12 @@ QTEST_MAIN(TstFoundationParseSequence)
 
 - [x] **Step 5.2: Register the test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_parse_sequence tst_foundation_parse_sequence.cpp)
 add_test(NAME tst_foundation_parse_sequence COMMAND tst_foundation_parse_sequence)
-target_link_libraries(tst_foundation_parse_sequence PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_parse_sequence PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_parse_sequence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -819,7 +819,7 @@ In `MarkoffDocumentPrivate.h`, alongside the `editSequence` field added in Task 
 
 - [x] **Step 5.6: Implement accessor + bump in the relay lambda**
 
-In `libs/markoff-foundation/src/MarkoffDocument.cpp`, add the accessor near `editSequence`:
+In `libs/markoff-core/src/MarkoffDocument.cpp`, add the accessor near `editSequence`:
 
 ```cpp
 quint64 MarkoffDocument::parseSequence() const noexcept
@@ -870,11 +870,11 @@ ctest --test-dir build-dev -R '^tst_(markoff_edit|anchor_json|selection|fold_ref
 - [x] **Step 5.9: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/MarkoffDocumentPrivate.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_foundation_parse_sequence.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/MarkoffDocumentPrivate.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_foundation_parse_sequence.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): add parseSequence() (signal-shape change comes in T7)"
 ```
 
@@ -885,9 +885,9 @@ git commit -m "feat(foundation): add parseSequence() (signal-shape change comes 
 The TextAnchor-typed companions to the existing CRDT-typed `anchorAt` / `resolveAnchor`.
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_text_anchor.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_text_anchor.cpp`
 
 - [x] **Step 6.1: Write the failing round-trip test**
 
@@ -992,9 +992,9 @@ Expected: all sub-tests PASS, including the three new round-trip tests.
 - [x] **Step 6.6: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_foundation_text_anchor.cpp
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_foundation_text_anchor.cpp
 git commit -m "feat(foundation): add textAnchorAt + resolveTextAnchor on MarkoffDocument"
 ```
 
@@ -1005,18 +1005,18 @@ git commit -m "feat(foundation): add textAnchorAt + resolveTextAnchor on Markoff
 The meat of the spec. Adds the foundation-internal scanner that enumerates top-level block byte ranges, the `BlockAnchorComputation` helper that maps those ranges to BlockAnchors, and changes the `parseUpdated` signal payload to ship the anchors plus a `quint64 parseSequence`.
 
 **Files:**
-- Create: `libs/markoff-foundation/src/TopLevelBlockScanner.h`
-- Create: `libs/markoff-foundation/src/TopLevelBlockScanner.cpp`
-- Create: `libs/markoff-foundation/src/BlockAnchorComputation.h`
-- Create: `libs/markoff-foundation/src/BlockAnchorComputation.cpp`
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_top_level_block_scanner.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_block_anchor_compute.cpp`
-- Create: `libs/markoff-foundation/tests/fixtures/block_scanner_corpus/` with several `.md` fixtures
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
+- Create: `libs/markoff-core/src/TopLevelBlockScanner.h`
+- Create: `libs/markoff-core/src/TopLevelBlockScanner.cpp`
+- Create: `libs/markoff-core/src/BlockAnchorComputation.h`
+- Create: `libs/markoff-core/src/BlockAnchorComputation.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocumentPrivate.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_top_level_block_scanner.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_block_anchor_compute.cpp`
+- Create: `libs/markoff-core/tests/fixtures/block_scanner_corpus/` with several `.md` fixtures
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
+- Modify: `libs/markoff-core/CMakeLists.txt`
 
 ### Sub-task 7A: TopLevelBlockScanner
 
@@ -1024,7 +1024,7 @@ The scanner mirrors the algorithm in `libs/markoff-view-qml/src/BlockWalker.cpp`
 
 - [x] **Step 7A.1: Write failing test for TopLevelBlockScanner**
 
-`libs/markoff-foundation/tests/tst_foundation_top_level_block_scanner.cpp`:
+`libs/markoff-core/tests/tst_foundation_top_level_block_scanner.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1101,14 +1101,14 @@ QTEST_MAIN(TstFoundationTopLevelBlockScanner)
 
 - [x] **Step 7A.2: Register the test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_top_level_block_scanner tst_foundation_top_level_block_scanner.cpp)
 add_test(NAME tst_foundation_top_level_block_scanner COMMAND tst_foundation_top_level_block_scanner)
-target_link_libraries(tst_foundation_top_level_block_scanner PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_top_level_block_scanner PRIVATE Qt6::Test markoff_core)
 target_include_directories(tst_foundation_top_level_block_scanner PRIVATE
-    ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src)
+    ${CMAKE_SOURCE_DIR}/libs/markoff-core/src)
 set_tests_properties(tst_foundation_top_level_block_scanner PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -1265,7 +1265,7 @@ QList<BlockByteRange> scanTopLevelBlockRanges(const QByteArray &body)
 
 - [x] **Step 7A.6: Add to library `CMakeLists.txt`**
 
-In `libs/markoff-foundation/CMakeLists.txt`, append `src/TopLevelBlockScanner.cpp` to the source list.
+In `libs/markoff-core/CMakeLists.txt`, append `src/TopLevelBlockScanner.cpp` to the source list.
 
 - [x] **Step 7A.7: Build and run the scanner test**
 
@@ -1279,11 +1279,11 @@ Expected: all seven sub-tests PASS.
 - [x] **Step 7A.8: Commit the scanner**
 
 ```bash
-git add libs/markoff-foundation/src/TopLevelBlockScanner.h \
-        libs/markoff-foundation/src/TopLevelBlockScanner.cpp \
-        libs/markoff-foundation/tests/tst_foundation_top_level_block_scanner.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt \
-        libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/src/TopLevelBlockScanner.h \
+        libs/markoff-core/src/TopLevelBlockScanner.cpp \
+        libs/markoff-core/tests/tst_foundation_top_level_block_scanner.cpp \
+        libs/markoff-core/tests/CMakeLists.txt \
+        libs/markoff-core/CMakeLists.txt
 git commit -m "feat(foundation): add TopLevelBlockScanner (BlockWalker-mirror)"
 ```
 
@@ -1293,7 +1293,7 @@ A thin helper: given the parsed `Markoff::Document` and the `MarkoffDocument`, p
 
 - [x] **Step 7B.1: Write failing test**
 
-`libs/markoff-foundation/tests/tst_foundation_block_anchor_compute.cpp`:
+`libs/markoff-core/tests/tst_foundation_block_anchor_compute.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1354,12 +1354,12 @@ QTEST_MAIN(TstFoundationBlockAnchorCompute)
 
 - [x] **Step 7B.2: Register the test**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_block_anchor_compute tst_foundation_block_anchor_compute.cpp)
 add_test(NAME tst_foundation_block_anchor_compute COMMAND tst_foundation_block_anchor_compute)
-target_link_libraries(tst_foundation_block_anchor_compute PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_block_anchor_compute PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_block_anchor_compute PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -1373,7 +1373,7 @@ Expected: build fails — `parseUpdated` signature mismatch (still has `Crdt::Gl
 
 - [x] **Step 7B.4: Add `Q_DECLARE_METATYPE(Markoff::BlockAnchor)`**
 
-In `libs/markoff-foundation/include/markoff-foundation/BlockAnchor.h`, after the namespace closes:
+In `libs/markoff-core/include/markoff-foundation/BlockAnchor.h`, after the namespace closes:
 
 ```cpp
 Q_DECLARE_METATYPE(Markoff::BlockAnchor)
@@ -1383,7 +1383,7 @@ Add `#include <QMetaType>` to the header.
 
 - [x] **Step 7B.5: Create `BlockAnchorComputation.h`**
 
-`libs/markoff-foundation/src/BlockAnchorComputation.h`:
+`libs/markoff-core/src/BlockAnchorComputation.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1444,7 +1444,7 @@ BlockAnchorBundle computeBlockAnchors(const MarkoffDocument &doc,
 
 - [x] **Step 7B.7: Add to library CMakeLists**
 
-Append `src/BlockAnchorComputation.cpp` to the source list in `libs/markoff-foundation/CMakeLists.txt`.
+Append `src/BlockAnchorComputation.cpp` to the source list in `libs/markoff-core/CMakeLists.txt`.
 
 - [x] **Step 7B.8: Update private state**
 
@@ -1514,7 +1514,7 @@ Add `#include "BlockAnchorComputation.h"` near the existing include of `MarkoffD
 Search for foundation-internal subscribers of `parseUpdated` whose signal-slot connections need updating:
 
 ```bash
-grep -rn "parseUpdated\|onParseUpdated" libs/markoff-foundation/src/ libs/markoff-foundation/include/
+grep -rn "parseUpdated\|onParseUpdated" libs/markoff-core/src/ libs/markoff-core/include/
 ```
 
 For each match, update slots that take `(const Markoff::Document *, CollabText::Crdt::Global)` to take `(const Markoff::Document *, quint64, QList<Markoff::BlockAnchor>)`. Foundation-internal subscribers typically don't care about the new arguments — they just ignore them, e.g.:
@@ -1564,15 +1564,15 @@ Expected: all green. If any pre-existing test connected to `parseUpdated` with t
 - [x] **Step 7B.16: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/BlockAnchor.h \
-        libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/BlockAnchorComputation.h \
-        libs/markoff-foundation/src/BlockAnchorComputation.cpp \
-        libs/markoff-foundation/src/MarkoffDocumentPrivate.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/tst_foundation_block_anchor_compute.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/BlockAnchor.h \
+        libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/BlockAnchorComputation.h \
+        libs/markoff-core/src/BlockAnchorComputation.cpp \
+        libs/markoff-core/src/MarkoffDocumentPrivate.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/tst_foundation_block_anchor_compute.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 # (also any other foundation files updated in 7B.11)
 git commit -m "feat(foundation): parseUpdated ships BlockAnchor list + parseSequence"
 ```
@@ -1584,14 +1584,14 @@ git commit -m "feat(foundation): parseUpdated ships BlockAnchor list + parseSequ
 `blockAt`, `offsetInBlock`, `textAnchorAt(BlockAnchor, offset, bias)`, `blockAnchorAt(int)`, `blockByteRange`. All read from the cached `latestBlockAnchors` / `latestBlockRanges` snapshot.
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_block_anchor_queries.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_block_anchor_queries.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [x] **Step 8.1: Write failing test**
 
-`libs/markoff-foundation/tests/tst_foundation_block_anchor_queries.cpp`:
+`libs/markoff-core/tests/tst_foundation_block_anchor_queries.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1731,12 +1731,12 @@ QTEST_MAIN(TstFoundationBlockAnchorQueries)
 
 - [x] **Step 8.2: Register the test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_block_anchor_queries tst_foundation_block_anchor_queries.cpp)
 add_test(NAME tst_foundation_block_anchor_queries COMMAND tst_foundation_block_anchor_queries)
-target_link_libraries(tst_foundation_block_anchor_queries PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_block_anchor_queries PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_block_anchor_queries PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -1861,10 +1861,10 @@ Expected: all green.
 - [x] **Step 8.8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_foundation_block_anchor_queries.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_foundation_block_anchor_queries.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): block-aware queries on MarkoffDocument"
 ```
 
@@ -1875,12 +1875,12 @@ git commit -m "feat(foundation): block-aware queries on MarkoffDocument"
 Exercise each of the §4 mutations and assert the right anchors stable / new / orphaned.
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/tst_foundation_block_anchor_stability.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/tests/tst_foundation_block_anchor_stability.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [x] **Step 9.1: Write the test cases**
 
-`libs/markoff-foundation/tests/tst_foundation_block_anchor_stability.cpp`:
+`libs/markoff-core/tests/tst_foundation_block_anchor_stability.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2040,12 +2040,12 @@ QTEST_MAIN(TstFoundationBlockAnchorStability)
 
 - [x] **Step 9.2: Register test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_block_anchor_stability tst_foundation_block_anchor_stability.cpp)
 add_test(NAME tst_foundation_block_anchor_stability COMMAND tst_foundation_block_anchor_stability)
-target_link_libraries(tst_foundation_block_anchor_stability PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_block_anchor_stability PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_block_anchor_stability PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -2063,8 +2063,8 @@ If any fail, that's a real defect either in the scanner (Task 7A) or the BlockAn
 - [x] **Step 9.4: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_foundation_block_anchor_stability.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/tests/tst_foundation_block_anchor_stability.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "test(foundation): BlockAnchor stability across §4 mutation cases"
 ```
 
@@ -2075,13 +2075,13 @@ git commit -m "test(foundation): BlockAnchor stability across §4 mutation cases
 `Selection.anchor` and `.active` become `TextAnchor`. Header drops `<crdt/Anchor.h>`.
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/Selection.h`
-- Modify: `libs/markoff-foundation/src/Selection.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_selection.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/Selection.h`
+- Modify: `libs/markoff-core/src/Selection.cpp`
+- Modify: `libs/markoff-core/tests/tst_selection.cpp`
 
 - [x] **Step 10.1: Update `Selection.h`**
 
-In `libs/markoff-foundation/include/markoff-foundation/Selection.h`, replace:
+In `libs/markoff-core/include/markoff-foundation/Selection.h`, replace:
 
 ```cpp
 #include <crdt/Anchor.h>
@@ -2111,7 +2111,7 @@ with:
 
 - [x] **Step 10.2: Update `Selection.cpp`**
 
-In `libs/markoff-foundation/src/Selection.cpp`, the `toJson` and `fromJson` implementations currently call `anchorToJson` / `anchorFromJson` from `AnchorJson.h`, which take `CollabText::Crdt::Anchor`. We need to convert to/from `TextAnchor` at the JSON boundary.
+In `libs/markoff-core/src/Selection.cpp`, the `toJson` and `fromJson` implementations currently call `anchorToJson` / `anchorFromJson` from `AnchorJson.h`, which take `CollabText::Crdt::Anchor`. We need to convert to/from `TextAnchor` at the JSON boundary.
 
 Add at top of file:
 
@@ -2148,17 +2148,17 @@ Also update `isEmpty()` / `isReversed()` if they read `.anchor.replica_id` etc. 
 Run a grep to confirm:
 
 ```bash
-grep -n "replica_id\|char_value" libs/markoff-foundation/src/Selection.cpp
+grep -n "replica_id\|char_value" libs/markoff-core/src/Selection.cpp
 ```
 
 Expected after changes: empty output.
 
 - [x] **Step 10.3: Update `tst_selection.cpp`**
 
-Search for usages of `Crdt::Anchor` / `replica_id` / `char_value` in `libs/markoff-foundation/tests/tst_selection.cpp` and update:
+Search for usages of `Crdt::Anchor` / `replica_id` / `char_value` in `libs/markoff-core/tests/tst_selection.cpp` and update:
 
 ```bash
-grep -n "Crdt::Anchor\|replica_id\|char_value" libs/markoff-foundation/tests/tst_selection.cpp
+grep -n "Crdt::Anchor\|replica_id\|char_value" libs/markoff-core/tests/tst_selection.cpp
 ```
 
 For each, change `Crdt::Anchor a{1, 42, Bias::Left}` to construct via `Detail::toTextAnchor` if Crdt::Anchor is needed elsewhere, or directly `TextAnchor{1, 42, 0}` if the test only cares about the wire identity.
@@ -2168,7 +2168,7 @@ If the test relies on JSON round-trip behaviour, ensure the round-trip still wor
 - [x] **Step 10.4: Build the foundation library**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8 2>&1 | tail -50
+cmake --build build-dev --target markoff_core -j 8 2>&1 | tail -50
 ```
 
 Expected: build fails at multiple foundation src/ call sites that pass `sel.anchor` / `sel.active` to `resolveAnchor(Crdt::Anchor)`. **Don't fix these yet** — Task 11 covers them.
@@ -2181,7 +2181,7 @@ Expected: build fails at multiple foundation src/ call sites that pass `sel.anch
 cmake --build build-dev --target tst_selection -j 8 2>&1 | tail -30
 ```
 
-If `markoff_foundation` itself doesn't build because of call-site failures, this won't compile either. In that case skip ahead to Task 11 and run `tst_selection` after that task.
+If `markoff_core` itself doesn't build because of call-site failures, this won't compile either. In that case skip ahead to Task 11 and run `tst_selection` after that task.
 
 - [x] **Step 10.6: Note partial state — DO NOT commit yet**
 
@@ -2196,17 +2196,17 @@ The build is broken at this point; intentionally. Task 11 fixes the call sites. 
 The places that read `sel.anchor` / `sel.active` and pass them to `resolveAnchor(Crdt::Anchor)` switch to `resolveTextAnchor(TextAnchor)`.
 
 **Files (each modified):**
-- `libs/markoff-foundation/src/CommandFacade.cpp` (~5 sites)
-- `libs/markoff-foundation/src/SearchEngine.cpp` (~2 sites)
-- `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp` (~3 sites)
-- `libs/markoff-foundation/src/Cmd/Helpers.cpp` (~2 sites)
-- `libs/markoff-foundation/src/Session.cpp` (~1 selection-equality block)
+- `libs/markoff-core/src/CommandFacade.cpp` (~5 sites)
+- `libs/markoff-core/src/SearchEngine.cpp` (~2 sites)
+- `libs/markoff-core/src/SourceTextDocumentBinding.cpp` (~3 sites)
+- `libs/markoff-core/src/Cmd/Helpers.cpp` (~2 sites)
+- `libs/markoff-core/src/Session.cpp` (~1 selection-equality block)
 
 - [x] **Step 11.1: Inventory call sites**
 
 ```bash
 grep -n "resolveAnchor\|sel\.anchor\|sel\.active\|primarySelection().anchor\|primarySelection().active" \
-    libs/markoff-foundation/src/*.cpp libs/markoff-foundation/src/Cmd/*.cpp 2>&1
+    libs/markoff-core/src/*.cpp libs/markoff-core/src/Cmd/*.cpp 2>&1
 ```
 
 Confirm the inventory matches the list in the spec §5 (~10–15 sites).
@@ -2272,10 +2272,10 @@ if (cur.anchor == sel.anchor
 - [x] **Step 11.7: Build the foundation library**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8 2>&1 | tail -20
+cmake --build build-dev --target markoff_core -j 8 2>&1 | tail -20
 ```
 
-Expected: `markoff_foundation` builds clean. If errors remain, they likely point at a call site missed in steps 11.2–11.6; fix and rebuild.
+Expected: `markoff_core` builds clean. If errors remain, they likely point at a call site missed in steps 11.2–11.6; fix and rebuild.
 
 - [x] **Step 11.8: Run all foundation tests**
 
@@ -2288,14 +2288,14 @@ Expected: all green. If `tst_selection`, `tst_foundation_command_facade`, `tst_f
 - [x] **Step 11.9: Commit Tasks 10 + 11 together**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Selection.h \
-        libs/markoff-foundation/src/Selection.cpp \
-        libs/markoff-foundation/src/CommandFacade.cpp \
-        libs/markoff-foundation/src/SearchEngine.cpp \
-        libs/markoff-foundation/src/SourceTextDocumentBinding.cpp \
-        libs/markoff-foundation/src/Cmd/Helpers.cpp \
-        libs/markoff-foundation/src/Session.cpp \
-        libs/markoff-foundation/tests/tst_selection.cpp
+git add libs/markoff-core/include/markoff-foundation/Selection.h \
+        libs/markoff-core/src/Selection.cpp \
+        libs/markoff-core/src/CommandFacade.cpp \
+        libs/markoff-core/src/SearchEngine.cpp \
+        libs/markoff-core/src/SourceTextDocumentBinding.cpp \
+        libs/markoff-core/src/Cmd/Helpers.cpp \
+        libs/markoff-core/src/Session.cpp \
+        libs/markoff-core/tests/tst_selection.cpp
 git commit -m "refactor(foundation): Selection fields use TextAnchor; resolveTextAnchor at call sites"
 ```
 
@@ -2395,12 +2395,12 @@ git commit -m "refactor(view-qml): EditorBackend selection state uses TextAnchor
 Verify per-parse BlockAnchor compute stays under 1 ms wall-time on a 50 KB / 100-block doc.
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/tst_foundation_block_anchor_perf.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/tests/tst_foundation_block_anchor_perf.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [x] **Step 13.1: Write the perf test**
 
-`libs/markoff-foundation/tests/tst_foundation_block_anchor_perf.cpp`:
+`libs/markoff-core/tests/tst_foundation_block_anchor_perf.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2474,14 +2474,14 @@ QTEST_MAIN(TstFoundationBlockAnchorPerf)
 
 - [x] **Step 13.2: Register the perf test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_block_anchor_perf tst_foundation_block_anchor_perf.cpp)
 add_test(NAME tst_foundation_block_anchor_perf COMMAND tst_foundation_block_anchor_perf)
-target_link_libraries(tst_foundation_block_anchor_perf PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_block_anchor_perf PRIVATE Qt6::Test markoff_core)
 target_include_directories(tst_foundation_block_anchor_perf PRIVATE
-    ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src)
+    ${CMAKE_SOURCE_DIR}/libs/markoff-core/src)
 set_tests_properties(tst_foundation_block_anchor_perf PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -2499,8 +2499,8 @@ If the threshold is exceeded on slow machines, raise it modestly (3 ms / 5 ms) b
 - [x] **Step 13.4: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_foundation_block_anchor_perf.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/tests/tst_foundation_block_anchor_perf.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "test(foundation): per-parse BlockAnchor compute perf guardrail"
 ```
 
@@ -2511,7 +2511,7 @@ git commit -m "test(foundation): per-parse BlockAnchor compute perf guardrail"
 Run the entire test suite to confirm nothing in the wider tree regressed. Update relevant CLAUDE.md sections if any architectural invariants need new prose.
 
 **Files:**
-- Modify (probably): `libs/markoff-foundation/CLAUDE.md` — note new public-API surface (TextAnchor, BlockAnchor, parseSequence, editSequence) and the parseUpdated signal-shape change.
+- Modify (probably): `libs/markoff-core/CLAUDE.md` — note new public-API surface (TextAnchor, BlockAnchor, parseSequence, editSequence) and the parseUpdated signal-shape change.
 
 - [x] **Step 14.1: Run the full non-slow test suite**
 
@@ -2545,7 +2545,7 @@ Expected: the app launches without crashing under the new `parseUpdated` signatu
 - [x] **Step 14.4: Update foundation CLAUDE.md if it exists**
 
 ```bash
-ls libs/markoff-foundation/CLAUDE.md 2>&1
+ls libs/markoff-core/CLAUDE.md 2>&1
 ```
 
 If it exists, add a short "Public-boundary types" section noting:
@@ -2568,7 +2568,7 @@ Expected: empty. If non-empty, the offending file was missed in Tasks 11/12; fix
 - [x] **Step 14.6: Commit any CLAUDE.md update**
 
 ```bash
-git add libs/markoff-foundation/CLAUDE.md  # if updated
+git add libs/markoff-core/CLAUDE.md  # if updated
 git commit -m "docs(foundation): note BlockAnchor public-boundary surface"
 ```
 
@@ -2605,8 +2605,8 @@ Before declaring the BlockAnchor foundation work complete:
 
 6. **The live-editing plan's Task 1.1 grep precondition passes:**
    ```bash
-   grep -E "BlockAnchor|TextAnchor|parseSequence|editSequence" libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
-   grep -E "blockAt|offsetInBlock|textAnchorAt.*BlockAnchor" libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
+   grep -E "BlockAnchor|TextAnchor|parseSequence|editSequence" libs/markoff-core/include/markoff-foundation/MarkoffDocument.h
+   grep -E "blockAt|offsetInBlock|textAnchorAt.*BlockAnchor" libs/markoff-core/include/markoff-foundation/MarkoffDocument.h
    ```
    At least one match for each grep.
 

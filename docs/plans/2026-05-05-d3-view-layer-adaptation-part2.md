@@ -632,7 +632,7 @@ In `libs/markoff-live-render/CMakeLists.txt`, add to `target_link_libraries`:
 ```cmake
 target_link_libraries(markoff_live_render PUBLIC
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2
-    markoff_foundation
+    markoff_core
     jkqtmathtext
 )
 ```
@@ -1268,7 +1268,7 @@ qt_add_executable(tst_live_render_context_menu
     tst_live_render_context_menu.cpp
 )
 target_link_libraries(tst_live_render_context_menu PRIVATE
-    Qt6::Core Qt6::Test markoff_live_render markoff_foundation)
+    Qt6::Core Qt6::Test markoff_live_render markoff_core)
 add_test(NAME tst_live_render_context_menu COMMAND tst_live_render_context_menu)
 ```
 

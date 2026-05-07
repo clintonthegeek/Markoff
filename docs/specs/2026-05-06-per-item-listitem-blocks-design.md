@@ -230,7 +230,7 @@ load-time call. D4 stays unchanged.
 
 ## Foundation-side changes
 
-`libs/markoff-foundation/src/MarkoffDocument.cpp`:
+`libs/markoff-core/src/MarkoffDocument.cpp`:
 
 1. **`mapTopLevelKind`** — `Kind::ListItem` → `BlockKind::ListItem`. Remove
    the `ListTight`/`ListLoose` cases.

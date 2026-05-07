@@ -16,7 +16,7 @@
 - Spec: [`docs/specs/2026-04-30-live-editing-design.md`](../specs/2026-04-30-live-editing-design.md)
 - Foundation precondition: [`docs/specs/2026-04-30-block-anchor-foundation-design.md`](../specs/2026-04-30-block-anchor-foundation-design.md)
 - Walking skeleton spec (parent): [`docs/specs/2026-04-29-live-render-design.md`](../specs/2026-04-29-live-render-design.md)
-- Source widget cycle-guard pattern: `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp`
+- Source widget cycle-guard pattern: `libs/markoff-core/src/SourceTextDocumentBinding.cpp`
 - Library guide: [`libs/markoff-view-qml/CLAUDE.md`](../../libs/markoff-view-qml/CLAUDE.md)
 
 **Out of scope:** Format toggles (Ctrl+B/Ctrl+I/Ctrl+K), cursor-aware delimiter hiding, HTML→MD conversion, image paste, drag-and-drop, spell-check, math/mermaid/table/list/blockquote/callout/frontmatter delegates. See spec §8.
@@ -100,8 +100,8 @@ Before any editing work begins, verify the BlockAnchor + TextAnchor foundation A
 - [ ] **Step 1.1: Confirm foundation symbols exist**
 
 ```bash
-grep -E "BlockAnchor|TextAnchor|parseSequence|editSequence" libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
-grep -E "blockAt|offsetInBlock|textAnchorAt.*BlockAnchor" libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
+grep -E "BlockAnchor|TextAnchor|parseSequence|editSequence" libs/markoff-core/include/markoff-foundation/MarkoffDocument.h
+grep -E "blockAt|offsetInBlock|textAnchorAt.*BlockAnchor" libs/markoff-core/include/markoff-foundation/MarkoffDocument.h
 ```
 
 Expected: at least one match for each. If missing, STOP — the foundation work is not yet landed.

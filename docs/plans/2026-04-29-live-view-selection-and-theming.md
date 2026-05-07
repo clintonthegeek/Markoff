@@ -19,11 +19,11 @@
 Three read-only properties so QML can do `theme.codeBlockBackground` etc.
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/Theme.h`
+- Modify: `libs/markoff-core/include/markoff-foundation/Theme.h`
 
 - [ ] **Step 1: Add Q_PROPERTY declarations and inline getters to Theme.h**
 
-In `libs/markoff-foundation/include/markoff-foundation/Theme.h`, immediately after the existing `Q_ENUM(FontRole)` line (around line 45), add:
+In `libs/markoff-core/include/markoff-foundation/Theme.h`, immediately after the existing `Q_ENUM(FontRole)` line (around line 45), add:
 
 ```cpp
     // QML-facing color views over the most-used slots. New delegates that
@@ -41,7 +41,7 @@ In `libs/markoff-foundation/include/markoff-foundation/Theme.h`, immediately aft
 
 Run:
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8
+cmake --build build-dev --target markoff_core -j 8
 ```
 
 Expected: success.
@@ -58,7 +58,7 @@ Expected: all foundation tests pass (count unchanged).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Theme.h
+git add libs/markoff-core/include/markoff-foundation/Theme.h
 git commit -m "foundation: expose theme color slots as Q_PROPERTYs for QML"
 ```
 

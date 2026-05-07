@@ -166,7 +166,7 @@ if(NOT TARGET collabtext)
     add_subdirectory(libs/collabtext)
 endif()
 add_subdirectory(libs/markoff-parser)        # existing
-add_subdirectory(libs/markoff-foundation)    # NEW
+add_subdirectory(libs/markoff-core)    # NEW
 add_subdirectory(libs/markoff-view-qml)      # NEW
 # Existing markoff-core / markoff-live / markoff-source / markoff-reading
 # add_subdirectory() lines remain so the existing test suite continues to build.
@@ -190,7 +190,7 @@ The audit identified what's worth keeping; this section is the file-by-file acco
 ### 6.1 Salvaged from existing `markoff-core` (transplanted with refinement)
 
 ```
-From libs/markoff-core/  →  libs/markoff-foundation/
+From libs/markoff-core/  →  libs/markoff-core/
 
 include/markoff/
   MarkdownDelta.h           →  refactored as MarkoffEdit + helpers; no longer
@@ -238,7 +238,7 @@ src/
 ### 6.3 New foundation files
 
 ```
-libs/markoff-foundation/
+libs/markoff-core/
   CMakeLists.txt
   include/markoff-foundation/
     MarkoffDocument.h
@@ -284,7 +284,7 @@ libs/markoff-foundation/
 
 These are the commit milestones for implementing this spec. Implementation plan (separate doc) numbers the tasks; this is the structural ordering only:
 
-1. Scaffold `libs/markoff-foundation/` (CMakeLists, headers, no impl).
+1. Scaffold `libs/markoff-core/` (CMakeLists, headers, no impl).
 2. Wire the `libs/collabtext/` symlink and dependency.
 3. Drop in `MarkoffEdit`, `Anchor` aliasing, `Origin` enum.
 4. Implement `MarkoffDocument` over `Buffer` (sync construction, signals, applyLocalEdit, applyRemoteOps, undo/redo, resetContent).
@@ -1350,7 +1350,7 @@ tst_completion_detector       — wikilink/tag/emoji/footnote/mention edge cases
 tst_completion_registry       — multi-provider gather, async candidatesReady
 ```
 
-Fixture markdown files at `libs/markoff-foundation/tests/fixtures/`. Mocks for `CompletionRegistry` (fake provider). Real `CollabText::Crdt::Buffer` with seeded ops where determinism is needed.
+Fixture markdown files at `libs/markoff-core/tests/fixtures/`. Mocks for `CompletionRegistry` (fake provider). Real `CollabText::Crdt::Buffer` with seeded ops where determinism is needed.
 
 ### 11.2 POC tests
 

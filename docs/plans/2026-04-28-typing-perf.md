@@ -81,9 +81,9 @@ Aggregated by area:
 
 | Path | Change | Responsibility |
 |---|---|---|
-| `libs/markoff-foundation/src/ParsePool.h` | Modify | Add `pending` snapshot slot; tighten `schedule()` semantics in doc-comment to match new behaviour. |
-| `libs/markoff-foundation/src/ParsePool.cpp` | Modify | Coalesce `schedule()` calls at request level; drain pending after worker finishes. |
-| `libs/markoff-foundation/tests/tst_foundation_parse_pool.cpp` | Modify | Add a coalescing-behaviour test that proves only one parse runs to completion when `schedule()` is called N times back-to-back. |
+| `libs/markoff-core/src/ParsePool.h` | Modify | Add `pending` snapshot slot; tighten `schedule()` semantics in doc-comment to match new behaviour. |
+| `libs/markoff-core/src/ParsePool.cpp` | Modify | Coalesce `schedule()` calls at request level; drain pending after worker finishes. |
+| `libs/markoff-core/tests/tst_foundation_parse_pool.cpp` | Modify | Add a coalescing-behaviour test that proves only one parse runs to completion when `schedule()` is called N times back-to-back. |
 | `libs/markoff-view-qml/qml/SourceEditor.qml` | Possibly modify (Task 3) | Adjust `SyntaxHighlighter` wiring if it is rehighlighting more than necessary. |
 | `libs/markoff-view-qml/CLAUDE.md` | Modify (Task 5) | Update the "Performance" section to reflect new state. |
 | `docs/plans/2026-04-28-typing-perf.md` | This plan | Append a "Progress log" section at the bottom and record numbers after each task. |
@@ -95,9 +95,9 @@ Aggregated by area:
 **Motivation:** Long-doc profile shows ~32 % of CPU on the parse worker, of which the vast majority is parsing snapshots whose result will be dropped because a newer `schedule()` arrived before the worker finished. Today the worker queue holds one job per keystroke; with sustained typing into a 72 KB doc, the worker spends seconds catching up after the user has stopped. Coalescing at the **request** queue (not just the result) eliminates that wasted CPU and frees the worker core.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/ParsePool.h`
-- Modify: `libs/markoff-foundation/src/ParsePool.cpp`
-- Test: `libs/markoff-foundation/tests/tst_foundation_parse_pool.cpp`
+- Modify: `libs/markoff-core/src/ParsePool.h`
+- Modify: `libs/markoff-core/src/ParsePool.cpp`
+- Test: `libs/markoff-core/tests/tst_foundation_parse_pool.cpp`
 
 - [ ] **Step 1.1: Add a coalescing test (failing first)**
 
@@ -145,7 +145,7 @@ Expected: `schedule_coalesces_in_flight_requests` FAILS with `got 50 deliveries 
 
 - [ ] **Step 1.3: Implement request-level coalescing in ParsePool**
 
-In `libs/markoff-foundation/src/ParsePool.cpp`, replace `ParsePool::Private`, `schedule()`, and the `parsed`-handler lambda. Whole replacement file body (the includes, namespace, ctor structure, and `~ParsePool` stay the same; only the noted regions change):
+In `libs/markoff-core/src/ParsePool.cpp`, replace `ParsePool::Private`, `schedule()`, and the `parsed`-handler lambda. Whole replacement file body (the includes, namespace, ctor structure, and `~ParsePool` stay the same; only the noted regions change):
 
 ```cpp
 struct ParsePool::Private {
@@ -238,7 +238,7 @@ bool ParsePool::isPending() const
 }
 ```
 
-In `libs/markoff-foundation/src/ParsePool.h`, update the doc-comment on the class to read:
+In `libs/markoff-core/src/ParsePool.h`, update the doc-comment on the class to read:
 
 ```cpp
 /// Coalescing: requests are coalesced at the queue. At most one parse runs
@@ -284,7 +284,7 @@ Record in the **Progress log** section at the bottom of this plan:
 - [ ] **Step 1.7: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/ParsePool.h libs/markoff-foundation/src/ParsePool.cpp libs/markoff-foundation/tests/tst_foundation_parse_pool.cpp
+git add libs/markoff-core/src/ParsePool.h libs/markoff-core/src/ParsePool.cpp libs/markoff-core/tests/tst_foundation_parse_pool.cpp
 git commit -m "$(cat <<'EOF'
 perf(foundation): coalesce ParsePool request queue
 
@@ -388,7 +388,7 @@ Add concrete steps for the chosen branch (a/b/c) to this task, mirroring the Ste
 **Motivation:** After Tasks 1 + 3, re-profile. If the main-thread baseline now shows a hot `MarkoffDocument::toMarkdownUtf8` or `Buffer::text` (rope traversal) on the keystroke path, this task fires. If not, **drop this task** — the brief explicitly forbids speculative perf fixes, and the original profile did not show these symbols in the top 30.
 
 **Files (provisional):**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp` — change the `applyLocalEdit` parse-schedule call to defer the snapshot to the worker thread (or skip it when the parse pool reports already-pending).
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp` — change the `applyLocalEdit` parse-schedule call to defer the snapshot to the worker thread (or skip it when the parse pool reports already-pending).
 
 - [ ] **Step 4.1: Re-profile after Tasks 1 + 3**, output `/tmp/perf-long-after-task3.data`.
 

@@ -153,7 +153,7 @@ Catches: regression of the theme-binding plumbing.
 - `libs/markoff-view-qml/qml/delegates/ParagraphDelegate.qml`, `HeadingDelegate.qml` — add `theme` property (uniform surface; no visual change yet).
 - `libs/markoff-view-qml/tests/tst_view_qml_live_view_qml.cpp` — two new test methods.
 
-- `libs/markoff-foundation/include/markoff-foundation/Theme.h` — three new read-only `Q_PROPERTY` views (`codeBlockBackground`, `codeBlock`, `selectionBackground`) plus their inline getters.
+- `libs/markoff-core/include/markoff-foundation/Theme.h` — three new read-only `Q_PROPERTY` views (`codeBlockBackground`, `codeBlock`, `selectionBackground`) plus their inline getters.
 
 No CMake changes. No QML plugin / registration changes. No `Theme.cpp` changes (getters are inline).
 

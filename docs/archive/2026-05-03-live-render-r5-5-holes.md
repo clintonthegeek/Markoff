@@ -104,7 +104,7 @@ docs/handoff/2026-05-03-r5-holes-postmortem.md                            (post-
 docs/specs/2026-05-02-live-render-restoration-design.md                   §3.1, §4.4, §5.4, §6.1 L6, §7.2, §11 R5.5, §15
 docs/specs/2026-05-01-live-projection-layer.md                            §3.1–§3.6 (v1 design + v0 forensics)
 docs/handoff/2026-05-01-projection-layer-stage4-redesign-SESSION-BRIEF.md (test-discipline gate)
-libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h       (applyLocalEdit, undo, redo, coalesceLastUndo, resolveTextAnchor, anchorAtByte)
+libs/markoff-core/include/markoff-foundation/MarkoffDocument.h       (applyLocalEdit, undo, redo, coalesceLastUndo, resolveTextAnchor, anchorAtByte)
 libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h    (requestTextCaretAtRow)
 libs/markoff-live-render/include/markoff/live-render/LiveStructuralKeyHandler.h  (the dispatch table; we add a hole branch)
 libs/markoff-live-render/src/LiveStructuralKeyHandler.cpp                  (paragraph EOB-Enter handler — the line we replace)

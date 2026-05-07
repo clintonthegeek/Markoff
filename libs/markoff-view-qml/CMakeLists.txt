@@ -48,7 +48,7 @@ target_link_libraries(markoff_view_qml PUBLIC
     Qt6::Widgets
     Qt6::Quick
     Qt6::QuickControls2
-    markoff_foundation
+    markoff_core
 )
 
 add_subdirectory(app)

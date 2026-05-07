@@ -77,7 +77,7 @@ This plan resolves the following open questions noted in spec §15:
 ```
 docs/specs/2026-05-02-live-render-restoration-design.md   §5.3, §5.4, §6.1 L5, §7.2, §11 R5, §15.1, §15.4
 docs/plans/2026-05-02-live-render-r4-paragraph-editing.md (skim — recent commit shape and test patterns)
-libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h    (applyLocalEdit, coalesceLastUndo, resolveTextAnchor, blockByteRange, visibleLength)
+libs/markoff-core/include/markoff-foundation/MarkoffDocument.h    (applyLocalEdit, coalesceLastUndo, resolveTextAnchor, blockByteRange, visibleLength)
 libs/markoff-live-render/include/markoff/live-render/BlockKindDescriptor.h    (consumedStructuralKeys field; declared, not yet populated)
 libs/markoff-live-render/src/BlockKindRegistry.cpp                      (the five built-in registrations; we populate consumedStructuralKeys here)
 libs/markoff-live-render/include/markoff/live-render/LiveCursorState.h  (request, validateVariant — we add requestTextCaretAtRow)
@@ -722,7 +722,7 @@ qt_add_executable(tst_live_render_structural
 )
 target_link_libraries(tst_live_render_structural PRIVATE
     Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test
-    markoff_live_render markoff_foundation)
+    markoff_live_render markoff_core)
 add_test(NAME tst_live_render_structural COMMAND tst_live_render_structural)
 ```
 

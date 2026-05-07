@@ -51,9 +51,9 @@
 ```
 .spike/cross-block-selection/SelectionModel.{h,cpp}   (the hit() math and selection range logic)
 libs/markoff-view-qml/include/markoff/view/qml/LiveSelectionView.h  (the production port model)
-libs/markoff-foundation/include/markoff-foundation/Session.h
-libs/markoff-foundation/include/markoff-foundation/Selection.h
-libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h  (textAnchorAt, resolveTextAnchor, blockByteRange, offsetInBlock)
+libs/markoff-core/include/markoff-foundation/Session.h
+libs/markoff-core/include/markoff-foundation/Selection.h
+libs/markoff-core/include/markoff-foundation/MarkoffDocument.h  (textAnchorAt, resolveTextAnchor, blockByteRange, offsetInBlock)
 libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h
 libs/markoff-live-render/include/markoff/live-render/BlockKindRegistry.h
 libs/markoff-live-render/include/markoff/live-render/Coordinates.h

@@ -27,7 +27,7 @@ The POC works: the test app (`build-dev/bin/markoff-view-qml-app <markdown-file>
 1. **POC implementation plan**: `~/.claude/plans/nah-a-is-fine-fuzzy-backus.md` — the 24-task plan that landed.
 2. **POC library guide**: `libs/markoff-view-qml/CLAUDE.md` — invariants + the new "Performance" section.
 3. **Source binding hot path**: `libs/markoff-view-qml/src/SourceTextDocumentBinding.cpp` — read `onQtContentsChange` (~120 LOC) carefully; this is where the allocation pressure is.
-4. **Foundation parse pipeline**: `libs/markoff-foundation/src/MarkoffDocument.cpp` (the `applyLocalEdit` path) and `libs/markoff-foundation/src/ParsePool.cpp` if you go after parser cost.
+4. **Foundation parse pipeline**: `libs/markoff-core/src/MarkoffDocument.cpp` (the `applyLocalEdit` path) and `libs/markoff-core/src/ParsePool.cpp` if you go after parser cost.
 5. **Audit prior pain**: `docs/2026-04-28-codebase-audit.md` §2.2 (legacy `markoff-live` had the same "2-4 redundant parses per keystroke" problem; we shouldn't recreate it but the foundation's coalescing may already prevent some of it).
 
 ## What to do, in order

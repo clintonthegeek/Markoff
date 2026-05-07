@@ -6,7 +6,7 @@
 
 **This is Part 2 of [`docs/plans/2026-04-28-foundation-library.md`](./2026-04-28-foundation-library.md).** It expands the previously-summarized Tasks 18–55 into TDD-detailed task blocks following the same template Part 1 used for Tasks 1–17.
 
-**Pre-conditions:** Tasks 1–17 of Part 1 have landed (commits `90f659d` … `8a121bf`). The library `markoff_foundation` exists and the `tst_markoff_document`, `tst_markoff_edit`, `tst_anchor_json`, `tst_selection`, `tst_fold_ref` tests are green.
+**Pre-conditions:** Tasks 1–17 of Part 1 have landed (commits `90f659d` … `8a121bf`). The library `markoff_core` exists and the `tst_markoff_document`, `tst_markoff_edit`, `tst_anchor_json`, `tst_selection`, `tst_fold_ref` tests are green.
 
 **Naming convention (this part only):** Foundation test executables and the source files that define them use a `tst_foundation_*` prefix (e.g. `tst_foundation_session`, `tst_foundation_session.cpp`) to avoid collision with `libs/markoff-core/tests/` test targets such as `tst_markoff_document`. This differs from Part 1, where the source files are `tst_markoff_edit.cpp` etc.; the existing Part 1 targets stay as-is (only the foundation `tst_markoff_document` was renamed to `tst_foundation_markoff_document` during Task 9 execution to break the collision).
 
@@ -34,18 +34,18 @@ Implements spec §7.2. `Session` is a per-view ephemeral state container owned b
 This task introduces the `SessionParams` value struct and the `Session` Q_OBJECT skeleton (constructor, identity getters, no-op signal declarations). Once `SessionParams` is a complete type, the forward-declared default arg on `MarkoffDocument::createSession` is restored. Implements the `Session` shell from spec §7.2.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/SessionParams.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/Session.h`
-- Create: `libs/markoff-foundation/src/Session.cpp`
-- Create: `libs/markoff-foundation/src/SessionPrivate.h`
-- Create: `libs/markoff-foundation/tests/tst_foundation_session.cpp`
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h` (restore `= {}` default arg)
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/SessionParams.h`
+- Create: `libs/markoff-core/include/markoff-foundation/Session.h`
+- Create: `libs/markoff-core/src/Session.cpp`
+- Create: `libs/markoff-core/src/SessionPrivate.h`
+- Create: `libs/markoff-core/tests/tst_foundation_session.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h` (restore `= {}` default arg)
+- Modify: `libs/markoff-core/CMakeLists.txt`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Write the failing test (identity only, this task)**
 
-Create `libs/markoff-foundation/tests/tst_foundation_session.cpp`:
+Create `libs/markoff-core/tests/tst_foundation_session.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -94,12 +94,12 @@ QTEST_APPLESS_MAIN(TstFoundationSession)
 
 - [ ] **Step 2: Add test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_session tst_foundation_session.cpp)
 add_test(NAME tst_foundation_session COMMAND tst_foundation_session)
-target_link_libraries(tst_foundation_session PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_session PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_session PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -113,7 +113,7 @@ Expected: error: `markoff-foundation/Session.h: No such file or directory`.
 
 - [ ] **Step 4: Create SessionParams header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/SessionParams.h`:
+Create `libs/markoff-core/include/markoff-foundation/SessionParams.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -139,7 +139,7 @@ struct MARKOFF_FOUNDATION_EXPORT SessionParams {
 
 - [ ] **Step 5: Create Session header skeleton**
 
-Create `libs/markoff-foundation/include/markoff-foundation/Session.h`:
+Create `libs/markoff-core/include/markoff-foundation/Session.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -218,7 +218,7 @@ private:
 
 - [ ] **Step 6: Create SessionPrivate.h**
 
-Create `libs/markoff-foundation/src/SessionPrivate.h`:
+Create `libs/markoff-core/src/SessionPrivate.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -257,7 +257,7 @@ struct Session::Private {
 
 - [ ] **Step 7: Create Session.cpp skeleton**
 
-Create `libs/markoff-foundation/src/Session.cpp`:
+Create `libs/markoff-core/src/Session.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -313,7 +313,7 @@ void        Session::fromJson(const QJsonObject &) {}
 
 - [ ] **Step 8: Restore the `= {}` default arg on MarkoffDocument::createSession**
 
-Edit `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`. Replace:
+Edit `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`. Replace:
 
 ```cpp
 struct SessionParams; // forward
@@ -333,10 +333,10 @@ with:
 
 - [ ] **Step 9: Add to library target**
 
-Edit `libs/markoff-foundation/CMakeLists.txt`. Append (after the existing `MarkoffDocument.h`, `MarkoffDocumentPrivate.h`, etc.):
+Edit `libs/markoff-core/CMakeLists.txt`. Append (after the existing `MarkoffDocument.h`, `MarkoffDocumentPrivate.h`, etc.):
 
 ```cmake
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
     include/markoff-foundation/MarkoffEdit.h
@@ -376,14 +376,14 @@ Expected: still passes.
 - [ ] **Step 11: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/SessionParams.h \
-        libs/markoff-foundation/include/markoff-foundation/Session.h \
-        libs/markoff-foundation/src/Session.cpp \
-        libs/markoff-foundation/src/SessionPrivate.h \
-        libs/markoff-foundation/tests/tst_foundation_session.cpp \
-        libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/SessionParams.h \
+        libs/markoff-core/include/markoff-foundation/Session.h \
+        libs/markoff-core/src/Session.cpp \
+        libs/markoff-core/src/SessionPrivate.h \
+        libs/markoff-core/tests/tst_foundation_session.cpp \
+        libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): SessionParams + Session skeleton; restore createSession default arg"
 ```
 
@@ -394,8 +394,8 @@ git commit -m "feat(foundation): SessionParams + Session skeleton; restore creat
 Adds the primary selection getter / setter / `primarySelectionChanged` signal. Builds on Task 18's skeleton.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/Session.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_session.cpp`
+- Modify: `libs/markoff-core/src/Session.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_session.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -451,7 +451,7 @@ Expected: setter is a no-op stub; both new tests fail.
 
 - [ ] **Step 3: Implement setPrimarySelection**
 
-Edit `libs/markoff-foundation/src/Session.cpp`. Replace the stub:
+Edit `libs/markoff-core/src/Session.cpp`. Replace the stub:
 
 ```cpp
 void Session::setPrimarySelection(const Selection &sel)
@@ -484,8 +484,8 @@ Expected: pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/Session.cpp \
-        libs/markoff-foundation/tests/tst_foundation_session.cpp
+git add libs/markoff-core/src/Session.cpp \
+        libs/markoff-core/tests/tst_foundation_session.cpp
 git commit -m "feat(foundation): Session::setPrimarySelection with idempotence guard"
 ```
 
@@ -496,8 +496,8 @@ git commit -m "feat(foundation): Session::setPrimarySelection with idempotence g
 Adds `setSecondarySelections / addSecondarySelection / clearSecondarySelectionsOfKind` plus `secondarySelectionsChanged` signal.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/Session.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_session.cpp`
+- Modify: `libs/markoff-core/src/Session.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_session.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -557,7 +557,7 @@ Append to the test class:
 
 - [ ] **Step 3: Implement the setters**
 
-Edit `libs/markoff-foundation/src/Session.cpp`:
+Edit `libs/markoff-core/src/Session.cpp`:
 
 ```cpp
 void Session::setSecondarySelections(QList<Selection> sels)
@@ -590,8 +590,8 @@ void Session::clearSecondarySelectionsOfKind(Selection::Kind kind)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/Session.cpp \
-        libs/markoff-foundation/tests/tst_foundation_session.cpp
+git add libs/markoff-core/src/Session.cpp \
+        libs/markoff-core/tests/tst_foundation_session.cpp
 git commit -m "feat(foundation): Session secondary selections with kinded clear"
 ```
 
@@ -602,8 +602,8 @@ git commit -m "feat(foundation): Session secondary selections with kinded clear"
 Adds `setTopVisible / topVisibleAnchor / topVisibleFraction / scrollChanged` and `setFoldedRegions / toggleFold / foldedRegionsChanged`. Implements spec §7.2 scroll and fold APIs.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/Session.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_session.cpp`
+- Modify: `libs/markoff-core/src/Session.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_session.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -695,8 +695,8 @@ Add `#include <algorithm>` to `Session.cpp` if not already present.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/Session.cpp \
-        libs/markoff-foundation/tests/tst_foundation_session.cpp
+git add libs/markoff-core/src/Session.cpp \
+        libs/markoff-core/tests/tst_foundation_session.cpp
 git commit -m "feat(foundation): Session scroll + folds with toggleFold by anchor identity"
 ```
 
@@ -707,8 +707,8 @@ git commit -m "feat(foundation): Session scroll + folds with toggleFold by ancho
 `copyStateFrom(other)` copies primary, secondaries, scroll, folds — but NOT identity (id, participantId, etc.). `toJson` / `fromJson` serialize all ephemeral state for host-side persistence.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/Session.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_session.cpp`
+- Modify: `libs/markoff-core/src/Session.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_session.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -835,8 +835,8 @@ Add the includes at the top of `Session.cpp`:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/Session.cpp \
-        libs/markoff-foundation/tests/tst_foundation_session.cpp
+git add libs/markoff-core/src/Session.cpp \
+        libs/markoff-core/tests/tst_foundation_session.cpp
 git commit -m "feat(foundation): Session::copyStateFrom + JSON roundtrip"
 ```
 
@@ -847,9 +847,9 @@ git commit -m "feat(foundation): Session::copyStateFrom + JSON roundtrip"
 Wires `MarkoffDocument::createSession / destroySession / sessions / sessionForParticipant` through to a `QList<Session*>` owned by `Private`. Emits `sessionCreated` / `sessionDestroyed`. Depends on Task 18 (Session is a complete type).
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Modify: `libs/markoff-foundation/src/MarkoffDocumentPrivate.h` (already has `QList<Session*>` from Task 9 — verify)
-- Modify: `libs/markoff-foundation/tests/tst_foundation_markoff_document.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocumentPrivate.h` (already has `QList<Session*>` from Task 9 — verify)
+- Modify: `libs/markoff-core/tests/tst_foundation_markoff_document.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -893,7 +893,7 @@ Add to `tst_foundation_markoff_document.cpp`:
 
 - [ ] **Step 3: Implement the lifecycle**
 
-Edit `libs/markoff-foundation/src/MarkoffDocument.cpp`. Add at the top:
+Edit `libs/markoff-core/src/MarkoffDocument.cpp`. Add at the top:
 
 ```cpp
 #include <markoff-foundation/Session.h>
@@ -943,8 +943,8 @@ Expected: pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_foundation_markoff_document.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_foundation_markoff_document.cpp
 git commit -m "feat(foundation): MarkoffDocument session lifecycle (create/destroy/lookup)"
 ```
 
@@ -958,21 +958,21 @@ Implements spec §6.1 (ParsePool salvage). The existing `markoff-core` ParsePool
 ### Task 24: ParsePool + MarkoffDocument parseUpdated wiring
 
 **Files:**
-- Create: `libs/markoff-foundation/src/ParsePool.h`
-- Create: `libs/markoff-foundation/src/ParsePool.cpp`
-- Create: `libs/markoff-foundation/src/ParsePoolWorker.h`
-- Create: `libs/markoff-foundation/src/ParsePoolWorker.cpp`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Modify: `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`
-- Create: `libs/markoff-foundation/tests/tst_foundation_parse_pool.cpp`
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/src/ParsePool.h`
+- Create: `libs/markoff-core/src/ParsePool.cpp`
+- Create: `libs/markoff-core/src/ParsePoolWorker.h`
+- Create: `libs/markoff-core/src/ParsePoolWorker.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocumentPrivate.h`
+- Create: `libs/markoff-core/tests/tst_foundation_parse_pool.cpp`
+- Modify: `libs/markoff-core/CMakeLists.txt`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 <!-- AMBIGUITY: spec §6.1 says ParsePool is salvaged from existing markoff-core "verbatim, adjust for UTF-8 input"; the precise debounce interval and worker thread shape are picked up from the existing libs/markoff-core/src/ParsePool.cpp. The test below treats those as black-box behaviors and only asserts: (a) parseUpdated fires after a debounce; (b) parsedDocument() becomes non-null thereafter. -->
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_foundation_parse_pool.cpp`:
+Create `libs/markoff-core/tests/tst_foundation_parse_pool.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1014,12 +1014,12 @@ QTEST_MAIN(TstFoundationParsePool)
 
 - [ ] **Step 2: Add test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_parse_pool tst_foundation_parse_pool.cpp)
 add_test(NAME tst_foundation_parse_pool COMMAND tst_foundation_parse_pool)
-target_link_libraries(tst_foundation_parse_pool PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_parse_pool PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_parse_pool PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -1034,9 +1034,9 @@ Expected: parseUpdated never fires (current stub returns nullptr).
 
 - [ ] **Step 4: Salvage ParsePool/Worker from markoff-core**
 
-Copy the existing `libs/markoff-core/src/ParsePool.{h,cpp}` and `libs/markoff-core/src/ParsePoolWorker.{h,cpp}` into `libs/markoff-foundation/src/`. Adjust:
+Copy the existing `libs/markoff-core/src/ParsePool.{h,cpp}` and `libs/markoff-core/src/ParsePoolWorker.{h,cpp}` into `libs/markoff-core/src/`. Adjust:
 
-1. Namespace: change `Markoff::Core` → `Markoff` (or a `Markoff::Foundation::Detail` sub-namespace).
+1. Namespace: change `Markoff::Core` → `Markoff` (or a `Markoff::Core::Detail` sub-namespace).
 2. Input: change the worker's input from `QString` to `QByteArray` (UTF-8).
 3. The output type is `MarkoffParser::Document *` (heap-owned by the pool); no other code touches it.
 4. Strip any `markoff-core`-specific includes; replace with foundation includes.
@@ -1044,7 +1044,7 @@ Copy the existing `libs/markoff-core/src/ParsePool.{h,cpp}` and `libs/markoff-co
 Public API of the salvaged `ParsePool` (header-only as much as possible):
 
 ```cpp
-// libs/markoff-foundation/src/ParsePool.h
+// libs/markoff-core/src/ParsePool.h
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
@@ -1055,7 +1055,7 @@ Public API of the salvaged `ParsePool` (header-only as much as possible):
 
 namespace Markoff { class Document; }  // markoff-parser
 
-namespace Markoff::Foundation {
+namespace Markoff::Core {
 
 class ParsePool : public QObject {
     Q_OBJECT
@@ -1074,12 +1074,12 @@ private:
     std::unique_ptr<Private> d;
 };
 
-}  // namespace Markoff::Foundation
+}  // namespace Markoff::Core
 ```
 
 - [ ] **Step 5: Wire ParsePool into MarkoffDocument::Private**
 
-Edit `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`:
+Edit `libs/markoff-core/src/MarkoffDocumentPrivate.h`:
 
 ```cpp
 #include "ParsePool.h"
@@ -1094,7 +1094,7 @@ struct MarkoffDocument::Private {
     quint16                     replicaId;
     int                         coalescingIdleMs = 250;
     QList<Session *>            sessions;
-    Markoff::Foundation::ParsePool parsePool;
+    Markoff::Core::ParsePool parsePool;
     const Markoff::Document    *latestParse = nullptr;
 };
 ```
@@ -1108,7 +1108,7 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId, QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>(replicaId))
 {
-    QObject::connect(&d->parsePool, &Markoff::Foundation::ParsePool::parseReady,
+    QObject::connect(&d->parsePool, &Markoff::Core::ParsePool::parseReady,
                      this, [this](const Markoff::Document *p) {
                          d->latestParse = p;
                          Q_EMIT parseUpdated(p);
@@ -1140,7 +1140,7 @@ d->parsePool.schedule(toMarkdownUtf8());
 
 - [ ] **Step 7: Add to library target**
 
-Add to `libs/markoff-foundation/CMakeLists.txt`'s `add_library` block:
+Add to `libs/markoff-core/CMakeLists.txt`'s `add_library` block:
 
 ```cmake
 src/ParsePool.h
@@ -1161,15 +1161,15 @@ Expected: pass.
 - [ ] **Step 9: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/ParsePool.h \
-        libs/markoff-foundation/src/ParsePool.cpp \
-        libs/markoff-foundation/src/ParsePoolWorker.h \
-        libs/markoff-foundation/src/ParsePoolWorker.cpp \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/src/MarkoffDocumentPrivate.h \
-        libs/markoff-foundation/tests/tst_foundation_parse_pool.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/src/ParsePool.h \
+        libs/markoff-core/src/ParsePool.cpp \
+        libs/markoff-core/src/ParsePoolWorker.h \
+        libs/markoff-core/src/ParsePoolWorker.cpp \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/src/MarkoffDocumentPrivate.h \
+        libs/markoff-core/tests/tst_foundation_parse_pool.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): salvage ParsePool + wire parseUpdated into MarkoffDocument"
 ```
 
@@ -1182,17 +1182,17 @@ Implements spec §7.5. `Theme` is a Q_GADGET value type with semantic slots, fon
 ### Task 25: Theme slot enum + color/setColor
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Theme.h`
-- Create: `libs/markoff-foundation/src/Theme.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_theme.cpp`
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/Theme.h`
+- Create: `libs/markoff-core/src/Theme.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_theme.cpp`
+- Modify: `libs/markoff-core/CMakeLists.txt`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 > Note: `colorForCodeToken(CodeTokenKind)` referenced in spec §7.5 needs `CodeTokenKind` from §7.9. To avoid a circular dependency, this task forward-declares `enum class CodeTokenKind` (declared as a complete enum in Task 43). The `colorForCodeToken` body is added in Task 28 once the enum is complete.
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_foundation_theme.cpp`:
+Create `libs/markoff-core/tests/tst_foundation_theme.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1227,12 +1227,12 @@ QTEST_APPLESS_MAIN(TstFoundationTheme)
 
 - [ ] **Step 2: Add test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_foundation_theme tst_foundation_theme.cpp)
 add_test(NAME tst_foundation_theme COMMAND tst_foundation_theme)
-target_link_libraries(tst_foundation_theme PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_theme PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_theme PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -1246,7 +1246,7 @@ Expected: header missing.
 
 - [ ] **Step 4: Create Theme header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/Theme.h`:
+Create `libs/markoff-core/include/markoff-foundation/Theme.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1331,7 +1331,7 @@ Q_DECLARE_METATYPE(Markoff::Theme)
 
 - [ ] **Step 5: Create Theme.cpp (this task: color/setColor only)**
 
-Create `libs/markoff-foundation/src/Theme.cpp`:
+Create `libs/markoff-core/src/Theme.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1388,11 +1388,11 @@ Expected: pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Theme.h \
-        libs/markoff-foundation/src/Theme.cpp \
-        libs/markoff-foundation/tests/tst_foundation_theme.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Theme.h \
+        libs/markoff-core/src/Theme.cpp \
+        libs/markoff-core/tests/tst_foundation_theme.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): Theme value type with Slot enum + color/setColor"
 ```
 
@@ -1463,8 +1463,8 @@ void Theme::setFontSizeMultiplier(Slot s, qreal m)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/Theme.cpp \
-        libs/markoff-foundation/tests/tst_foundation_theme.cpp
+git add libs/markoff-core/src/Theme.cpp \
+        libs/markoff-core/tests/tst_foundation_theme.cpp
 git commit -m "feat(foundation): Theme fonts + bold/italic/sizeMul"
 ```
 
@@ -1625,8 +1625,8 @@ Theme Theme::fromJson(const QJsonObject &obj)
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/Theme.cpp \
-        libs/markoff-foundation/tests/tst_foundation_theme.cpp
+git add libs/markoff-core/src/Theme.cpp \
+        libs/markoff-core/tests/tst_foundation_theme.cpp
 git commit -m "feat(foundation): Theme defaults (light/dark) + JSON roundtrip"
 ```
 
@@ -1637,8 +1637,8 @@ git commit -m "feat(foundation): Theme defaults (light/dark) + JSON roundtrip"
 Implements `colorForCodeToken(CodeTokenKind)` — depends on Task 43 having defined the `CodeTokenKind` enum. **Reorder note:** if Task 43 has not landed yet at this point, defer this task until after Phase 11; the `colorForCodeToken` body can stay returning `color(Slot::CodeBlock)` until then. This block assumes Task 43's `CodeTokenKind` is available; otherwise complete Task 43 first.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/Theme.cpp` (add `#include <markoff-foundation/CodeTokenKind.h>` and replace the stub body)
-- Modify: `libs/markoff-foundation/tests/tst_foundation_theme.cpp`
+- Modify: `libs/markoff-core/src/Theme.cpp` (add `#include <markoff-foundation/CodeTokenKind.h>` and replace the stub body)
+- Modify: `libs/markoff-core/tests/tst_foundation_theme.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1695,8 +1695,8 @@ QColor Theme::colorForCodeToken(CodeTokenKind k) const
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/Theme.cpp \
-        libs/markoff-foundation/tests/tst_foundation_theme.cpp
+git add libs/markoff-core/src/Theme.cpp \
+        libs/markoff-core/tests/tst_foundation_theme.cpp
 git commit -m "feat(foundation): Theme::colorForCodeToken slot mapping"
 ```
 
@@ -1709,11 +1709,11 @@ Implements spec §7.6.
 ### Task 29: LinkKind + LinkActivation + abstract LinkService
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/LinkKind.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/LinkActivation.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/LinkService.h`
-- Create: `libs/markoff-foundation/src/LinkService.cpp`
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/LinkKind.h`
+- Create: `libs/markoff-core/include/markoff-foundation/LinkActivation.h`
+- Create: `libs/markoff-core/include/markoff-foundation/LinkService.h`
+- Create: `libs/markoff-core/src/LinkService.cpp`
+- Modify: `libs/markoff-core/CMakeLists.txt`
 
 (No test target for the abstract base alone; tested transitively via `DefaultLinkService` in Task 30.)
 
@@ -1841,7 +1841,7 @@ Add the three new headers + `src/LinkService.cpp` to `add_library`.
 - [ ] **Step 6: Build**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 2>&1 | tail -3
+cmake --build build-dev --target markoff_core -j 2>&1 | tail -3
 ```
 
 Expected: builds clean.
@@ -1849,11 +1849,11 @@ Expected: builds clean.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/LinkKind.h \
-        libs/markoff-foundation/include/markoff-foundation/LinkActivation.h \
-        libs/markoff-foundation/include/markoff-foundation/LinkService.h \
-        libs/markoff-foundation/src/LinkService.cpp \
-        libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/LinkKind.h \
+        libs/markoff-core/include/markoff-foundation/LinkActivation.h \
+        libs/markoff-core/include/markoff-foundation/LinkService.h \
+        libs/markoff-core/src/LinkService.cpp \
+        libs/markoff-core/CMakeLists.txt
 git commit -m "feat(foundation): LinkKind + LinkActivation + abstract LinkService"
 ```
 
@@ -1862,13 +1862,13 @@ git commit -m "feat(foundation): LinkKind + LinkActivation + abstract LinkServic
 ### Task 30: DefaultLinkService implementation
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/DefaultLinkService.h`
-- Create: `libs/markoff-foundation/src/DefaultLinkService.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_link_service.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/DefaultLinkService.h`
+- Create: `libs/markoff-core/src/DefaultLinkService.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_link_service.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_foundation_link_service.cpp`:
+Create `libs/markoff-core/tests/tst_foundation_link_service.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1929,7 +1929,7 @@ Append to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_foundation_link_service tst_foundation_link_service.cpp)
 add_test(NAME tst_foundation_link_service COMMAND tst_foundation_link_service)
-target_link_libraries(tst_foundation_link_service PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_link_service PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_link_service PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -1997,11 +1997,11 @@ Expected: pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/DefaultLinkService.h \
-        libs/markoff-foundation/src/DefaultLinkService.cpp \
-        libs/markoff-foundation/tests/tst_foundation_link_service.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/DefaultLinkService.h \
+        libs/markoff-core/src/DefaultLinkService.cpp \
+        libs/markoff-core/tests/tst_foundation_link_service.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): DefaultLinkService classify/resolve"
 ```
 
@@ -2020,15 +2020,15 @@ For all Phase 8 tasks, command lookups use the buffer's UTF-8 byte text. Selecti
 ### Task 31: Cmd::Edit (undo / redo wrappers) + helpers
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Cmd/Edit.h`
-- Create: `libs/markoff-foundation/src/Cmd/Edit.cpp`
-- Create: `libs/markoff-foundation/src/Cmd/Helpers.h` (impl-side)
-- Create: `libs/markoff-foundation/src/Cmd/Helpers.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_cmd_edit.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/Cmd/Edit.h`
+- Create: `libs/markoff-core/src/Cmd/Edit.cpp`
+- Create: `libs/markoff-core/src/Cmd/Helpers.h` (impl-side)
+- Create: `libs/markoff-core/src/Cmd/Helpers.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_cmd_edit.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_foundation_cmd_edit.cpp`:
+Create `libs/markoff-core/tests/tst_foundation_cmd_edit.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2073,7 +2073,7 @@ Append to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_foundation_cmd_edit tst_foundation_cmd_edit.cpp)
 add_test(NAME tst_foundation_cmd_edit COMMAND tst_foundation_cmd_edit)
-target_link_libraries(tst_foundation_cmd_edit PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_cmd_edit PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_cmd_edit PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -2113,7 +2113,7 @@ void redo(MarkoffDocument *d) { if (d) (void)d->redo(); }
 
 - [ ] **Step 5: Create Helpers.h + Helpers.cpp (skeletons; bodies grow over Phase 8)**
 
-`libs/markoff-foundation/src/Cmd/Helpers.h`:
+`libs/markoff-core/src/Cmd/Helpers.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2137,7 +2137,7 @@ std::pair<quint32, quint32>
 }}  // namespace Markoff::Cmd::Detail
 ```
 
-`libs/markoff-foundation/src/Cmd/Helpers.cpp`:
+`libs/markoff-core/src/Cmd/Helpers.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2183,13 +2183,13 @@ Expected: pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Cmd/Edit.h \
-        libs/markoff-foundation/src/Cmd/Edit.cpp \
-        libs/markoff-foundation/src/Cmd/Helpers.h \
-        libs/markoff-foundation/src/Cmd/Helpers.cpp \
-        libs/markoff-foundation/tests/tst_foundation_cmd_edit.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Cmd/Edit.h \
+        libs/markoff-core/src/Cmd/Edit.cpp \
+        libs/markoff-core/src/Cmd/Helpers.h \
+        libs/markoff-core/src/Cmd/Helpers.cpp \
+        libs/markoff-core/tests/tst_foundation_cmd_edit.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): Cmd::undo/redo wrappers + Cmd::Detail helpers"
 ```
 
@@ -2200,13 +2200,13 @@ git commit -m "feat(foundation): Cmd::undo/redo wrappers + Cmd::Detail helpers"
 Pure `editsForToggleBold(doc, sel)` returns the edits to wrap or unwrap `**...**` around the selection. Convenience `toggleBold(doc, sel)` calls `applyLocalEdit`. Test cases: wrap unstyled, unwrap already-styled, partial overlap, empty selection (no-op).
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Cmd/InlineFormat.h`
-- Create: `libs/markoff-foundation/src/Cmd/InlineFormat.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_cmd_inline_format.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/Cmd/InlineFormat.h`
+- Create: `libs/markoff-core/src/Cmd/InlineFormat.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_cmd_inline_format.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_foundation_cmd_inline_format.cpp`:
+Create `libs/markoff-core/tests/tst_foundation_cmd_inline_format.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2276,7 +2276,7 @@ Append to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_foundation_cmd_inline_format tst_foundation_cmd_inline_format.cpp)
 add_test(NAME tst_foundation_cmd_inline_format COMMAND tst_foundation_cmd_inline_format)
-target_link_libraries(tst_foundation_cmd_inline_format PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_cmd_inline_format PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_cmd_inline_format PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -2400,11 +2400,11 @@ CollabText::Crdt::Operation toggleInlineCode(MarkoffDocument *d, const Selection
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Cmd/InlineFormat.h \
-        libs/markoff-foundation/src/Cmd/InlineFormat.cpp \
-        libs/markoff-foundation/tests/tst_foundation_cmd_inline_format.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Cmd/InlineFormat.h \
+        libs/markoff-core/src/Cmd/InlineFormat.cpp \
+        libs/markoff-core/tests/tst_foundation_cmd_inline_format.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): Cmd::toggleBold + shared inline-format toggler"
 ```
 
@@ -2415,7 +2415,7 @@ git commit -m "feat(foundation): Cmd::toggleBold + shared inline-format toggler"
 The implementations already exist (Task 32 wrote `toggleDelim` parametrically). This task adds explicit test coverage for each delimiter.
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/tst_foundation_cmd_inline_format.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_cmd_inline_format.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2451,7 +2451,7 @@ Append to the test class:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_foundation_cmd_inline_format.cpp
+git add libs/markoff-core/tests/tst_foundation_cmd_inline_format.cpp
 git commit -m "test(foundation): Cmd italic/strikethrough/inlineCode coverage"
 ```
 
@@ -2462,13 +2462,13 @@ git commit -m "test(foundation): Cmd italic/strikethrough/inlineCode coverage"
 `editsForSetHeading(doc, sel, level)` replaces the heading prefix (`#` … `######`) on each affected block with the new level (or strips it for level 0).
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Cmd/Block.h`
-- Create: `libs/markoff-foundation/src/Cmd/Block.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/Cmd/Block.h`
+- Create: `libs/markoff-core/src/Cmd/Block.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_cmd_block.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp`:
+Create `libs/markoff-core/tests/tst_foundation_cmd_block.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -2530,7 +2530,7 @@ Append to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_foundation_cmd_block tst_foundation_cmd_block.cpp)
 add_test(NAME tst_foundation_cmd_block COMMAND tst_foundation_cmd_block)
-target_link_libraries(tst_foundation_cmd_block PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_cmd_block PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_cmd_block PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -2662,11 +2662,11 @@ CollabText::Crdt::Operation blockQuote(MarkoffDocument *d, const Selection &s)
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Cmd/Block.h \
-        libs/markoff-foundation/src/Cmd/Block.cpp \
-        libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Cmd/Block.h \
+        libs/markoff-core/src/Cmd/Block.cpp \
+        libs/markoff-core/tests/tst_foundation_cmd_block.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): Cmd::setHeading with line-prefix replacement"
 ```
 
@@ -2677,8 +2677,8 @@ git commit -m "feat(foundation): Cmd::setHeading with line-prefix replacement"
 `toggleCheckbox` cycles between `[ ]` ↔ `[x]` ↔ no-checkbox on a list item containing the given anchor. `blockQuote` wraps each affected line with a `> ` prefix (or strips it if all selected lines already have one).
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/Cmd/Block.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp`
+- Modify: `libs/markoff-core/src/Cmd/Block.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_cmd_block.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2810,8 +2810,8 @@ QList<MarkoffEdit> editsForBlockQuote(const MarkoffDocument *doc, const Selectio
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/Cmd/Block.cpp \
-        libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp
+git add libs/markoff-core/src/Cmd/Block.cpp \
+        libs/markoff-core/tests/tst_foundation_cmd_block.cpp
 git commit -m "feat(foundation): Cmd::toggleCheckbox + blockQuote"
 ```
 
@@ -2822,9 +2822,9 @@ git commit -m "feat(foundation): Cmd::toggleCheckbox + blockQuote"
 Insert at a given anchor.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Cmd/Insert.h`
-- Create: `libs/markoff-foundation/src/Cmd/Insert.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_cmd_insert.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/Cmd/Insert.h`
+- Create: `libs/markoff-core/src/Cmd/Insert.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_cmd_insert.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3015,11 +3015,11 @@ CollabText::Crdt::Operation insertTable(MarkoffDocument *d,
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Cmd/Insert.h \
-        libs/markoff-foundation/src/Cmd/Insert.cpp \
-        libs/markoff-foundation/tests/tst_foundation_cmd_insert.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Cmd/Insert.h \
+        libs/markoff-core/src/Cmd/Insert.cpp \
+        libs/markoff-core/tests/tst_foundation_cmd_insert.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): Cmd insert family (table/link/image/HR)"
 ```
 
@@ -3030,14 +3030,14 @@ git commit -m "feat(foundation): Cmd insert family (table/link/image/HR)"
 Iterates `session->primarySelection()` plus `session->secondarySelections()` of `Kind::Secondary`, applies the given `editsFn` to each, batches into a single `applyLocalEdit`.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Cmd.h` (aggregate include)
-- Modify: `libs/markoff-foundation/src/Cmd/Helpers.cpp` (add the multi-cursor helper)
-- Modify: `libs/markoff-foundation/src/Cmd/Helpers.h` (declare it)
-- Create: `libs/markoff-foundation/tests/tst_foundation_cmd_multi.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/Cmd.h` (aggregate include)
+- Modify: `libs/markoff-core/src/Cmd/Helpers.cpp` (add the multi-cursor helper)
+- Modify: `libs/markoff-core/src/Cmd/Helpers.h` (declare it)
+- Create: `libs/markoff-core/tests/tst_foundation_cmd_multi.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_foundation_cmd_multi.cpp`:
+Create `libs/markoff-core/tests/tst_foundation_cmd_multi.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -3085,7 +3085,7 @@ Append target.
 
 - [ ] **Step 3: Add applyToAllPrimaryAndSecondaries to Cmd**
 
-Create `libs/markoff-foundation/include/markoff-foundation/Cmd.h`:
+Create `libs/markoff-core/include/markoff-foundation/Cmd.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -3157,11 +3157,11 @@ void applyToAllPrimaryAndSecondaries(MarkoffDocument *doc, Session *session,
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Cmd.h \
-        libs/markoff-foundation/src/Cmd/Helpers.cpp \
-        libs/markoff-foundation/tests/tst_foundation_cmd_multi.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Cmd.h \
+        libs/markoff-core/src/Cmd/Helpers.cpp \
+        libs/markoff-core/tests/tst_foundation_cmd_multi.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): Cmd::applyToAllPrimaryAndSecondaries multi-cursor helper"
 ```
 
@@ -3174,9 +3174,9 @@ Implements spec §7.7's QML-facing facade.
 ### Task 38: CommandFacade Q_OBJECT for QML
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/CommandFacade.h`
-- Create: `libs/markoff-foundation/src/CommandFacade.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_command_facade.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/CommandFacade.h`
+- Create: `libs/markoff-core/src/CommandFacade.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_command_facade.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3353,11 +3353,11 @@ void CommandFacade::redo() { if (m_doc) Cmd::redo(m_doc); }
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/CommandFacade.h \
-        libs/markoff-foundation/src/CommandFacade.cpp \
-        libs/markoff-foundation/tests/tst_foundation_command_facade.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/CommandFacade.h \
+        libs/markoff-core/src/CommandFacade.cpp \
+        libs/markoff-core/tests/tst_foundation_command_facade.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): CommandFacade Q_OBJECT for QML"
 ```
 
@@ -3372,9 +3372,9 @@ Implements spec §7.8.
 `findAll(doc, session, needle, flags)` populates `session->secondarySelections()` with `Kind::SearchMatch` entries (anchor-bound) and returns the count.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/SearchEngine.h`
-- Create: `libs/markoff-foundation/src/SearchEngine.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_search_engine.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/SearchEngine.h`
+- Create: `libs/markoff-core/src/SearchEngine.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_search_engine.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3583,11 +3583,11 @@ void SearchEngine::clearMatches(Session *sess)
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/SearchEngine.h \
-        libs/markoff-foundation/src/SearchEngine.cpp \
-        libs/markoff-foundation/tests/tst_foundation_search_engine.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/SearchEngine.h \
+        libs/markoff-core/src/SearchEngine.cpp \
+        libs/markoff-core/tests/tst_foundation_search_engine.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): SearchEngine::findAll with FindFlags"
 ```
 
@@ -3598,8 +3598,8 @@ git commit -m "feat(foundation): SearchEngine::findAll with FindFlags"
 `findNext` / `findPrevious` cycle through `Kind::SearchMatch` selections in document order; on each call, set `primarySelection` to the next/prev match.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/SearchEngine.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_search_engine.cpp`
+- Modify: `libs/markoff-core/src/SearchEngine.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_search_engine.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3697,8 +3697,8 @@ Add `#include <algorithm>`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/SearchEngine.cpp \
-        libs/markoff-foundation/tests/tst_foundation_search_engine.cpp
+git add libs/markoff-core/src/SearchEngine.cpp \
+        libs/markoff-core/tests/tst_foundation_search_engine.cpp
 git commit -m "feat(foundation): SearchEngine::findNext / findPrevious / clearMatches"
 ```
 
@@ -3709,9 +3709,9 @@ git commit -m "feat(foundation): SearchEngine::findNext / findPrevious / clearMa
 Replace the active match (the one whose range matches `primarySelection`); advance primary to the next match.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/ReplaceController.h`
-- Create: `libs/markoff-foundation/src/ReplaceController.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_replace_controller.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/ReplaceController.h`
+- Create: `libs/markoff-core/src/ReplaceController.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_replace_controller.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3847,11 +3847,11 @@ ReplaceController::replaceAll(MarkoffDocument *, Session *, const QString &)
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/ReplaceController.h \
-        libs/markoff-foundation/src/ReplaceController.cpp \
-        libs/markoff-foundation/tests/tst_foundation_replace_controller.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/ReplaceController.h \
+        libs/markoff-core/src/ReplaceController.cpp \
+        libs/markoff-core/tests/tst_foundation_replace_controller.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): ReplaceController::replaceCurrent"
 ```
 
@@ -3862,8 +3862,8 @@ git commit -m "feat(foundation): ReplaceController::replaceCurrent"
 Batched replace of all matches in document order. Returns count + Operation.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/ReplaceController.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_replace_controller.cpp`
+- Modify: `libs/markoff-core/src/ReplaceController.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_replace_controller.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -3928,8 +3928,8 @@ Add `#include <algorithm>`.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/ReplaceController.cpp \
-        libs/markoff-foundation/tests/tst_foundation_replace_controller.cpp
+git add libs/markoff-core/src/ReplaceController.cpp \
+        libs/markoff-core/tests/tst_foundation_replace_controller.cpp
 git commit -m "feat(foundation): ReplaceController::replaceAll batched"
 ```
 
@@ -3944,9 +3944,9 @@ Implements spec §7.9.
 Plain enum + value struct.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/CodeTokenKind.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/CodeSpan.h`
-- Create: `libs/markoff-foundation/tests/tst_foundation_code_token.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/CodeTokenKind.h`
+- Create: `libs/markoff-core/include/markoff-foundation/CodeSpan.h`
+- Create: `libs/markoff-core/tests/tst_foundation_code_token.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -4037,11 +4037,11 @@ struct MARKOFF_FOUNDATION_EXPORT CodeSpan {
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/CodeTokenKind.h \
-        libs/markoff-foundation/include/markoff-foundation/CodeSpan.h \
-        libs/markoff-foundation/tests/tst_foundation_code_token.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/CodeTokenKind.h \
+        libs/markoff-core/include/markoff-foundation/CodeSpan.h \
+        libs/markoff-core/tests/tst_foundation_code_token.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): CodeTokenKind + CodeSpan value types"
 ```
 
@@ -4052,8 +4052,8 @@ git commit -m "feat(foundation): CodeTokenKind + CodeSpan value types"
 Abstract base.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/SyntaxHighlightService.h`
-- Create: `libs/markoff-foundation/src/SyntaxHighlightService.cpp` (vtable anchor)
+- Create: `libs/markoff-core/include/markoff-foundation/SyntaxHighlightService.h`
+- Create: `libs/markoff-core/src/SyntaxHighlightService.cpp` (vtable anchor)
 
 - [ ] **Step 1: Create header**
 
@@ -4106,15 +4106,15 @@ SyntaxHighlightService::~SyntaxHighlightService() = default;
 - [ ] **Step 4: Build.**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 2>&1 | tail -3
+cmake --build build-dev --target markoff_core -j 2>&1 | tail -3
 ```
 
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/SyntaxHighlightService.h \
-        libs/markoff-foundation/src/SyntaxHighlightService.cpp \
-        libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/SyntaxHighlightService.h \
+        libs/markoff-core/src/SyntaxHighlightService.cpp \
+        libs/markoff-core/CMakeLists.txt
 git commit -m "feat(foundation): SyntaxHighlightService abstract interface"
 ```
 
@@ -4125,9 +4125,9 @@ git commit -m "feat(foundation): SyntaxHighlightService abstract interface"
 KF6::SyntaxHighlighting backend; translate KF6 token classes → `CodeTokenKind`.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Kf6SyntaxHighlightService.h`
-- Create: `libs/markoff-foundation/src/Kf6SyntaxHighlightService.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_syntax_highlight_service.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/Kf6SyntaxHighlightService.h`
+- Create: `libs/markoff-core/src/Kf6SyntaxHighlightService.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_syntax_highlight_service.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -4319,11 +4319,11 @@ bool Kf6SyntaxHighlightService::supportsLanguage(const QString &lang) const
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Kf6SyntaxHighlightService.h \
-        libs/markoff-foundation/src/Kf6SyntaxHighlightService.cpp \
-        libs/markoff-foundation/tests/tst_foundation_syntax_highlight_service.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Kf6SyntaxHighlightService.h \
+        libs/markoff-core/src/Kf6SyntaxHighlightService.cpp \
+        libs/markoff-core/tests/tst_foundation_syntax_highlight_service.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): Kf6SyntaxHighlightService"
 ```
 
@@ -4334,8 +4334,8 @@ git commit -m "feat(foundation): Kf6SyntaxHighlightService"
 Abstract processor base + value struct for output.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/RenderedBlock.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/CodeBlockProcessor.h`
+- Create: `libs/markoff-core/include/markoff-foundation/RenderedBlock.h`
+- Create: `libs/markoff-core/include/markoff-foundation/CodeBlockProcessor.h`
 
 (No tests; tested transitively via the registry in Task 47.)
 
@@ -4403,9 +4403,9 @@ public:
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/RenderedBlock.h \
-        libs/markoff-foundation/include/markoff-foundation/CodeBlockProcessor.h \
-        libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/RenderedBlock.h \
+        libs/markoff-core/include/markoff-foundation/CodeBlockProcessor.h \
+        libs/markoff-core/CMakeLists.txt
 git commit -m "feat(foundation): CodeBlockProcessor + RenderedBlock"
 ```
 
@@ -4416,9 +4416,9 @@ git commit -m "feat(foundation): CodeBlockProcessor + RenderedBlock"
 Register / unregister / lookup.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/CodeBlockProcessorRegistry.h`
-- Create: `libs/markoff-foundation/src/CodeBlockProcessorRegistry.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_code_block_processor_registry.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/CodeBlockProcessorRegistry.h`
+- Create: `libs/markoff-core/src/CodeBlockProcessorRegistry.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_code_block_processor_registry.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -4558,11 +4558,11 @@ QStringList CodeBlockProcessorRegistry::registeredLanguages() const
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/CodeBlockProcessorRegistry.h \
-        libs/markoff-foundation/src/CodeBlockProcessorRegistry.cpp \
-        libs/markoff-foundation/tests/tst_foundation_code_block_processor_registry.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/CodeBlockProcessorRegistry.h \
+        libs/markoff-core/src/CodeBlockProcessorRegistry.cpp \
+        libs/markoff-core/tests/tst_foundation_code_block_processor_registry.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): CodeBlockProcessorRegistry"
 ```
 
@@ -4577,10 +4577,10 @@ Implements spec §7.10.
 Plain types.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/CompletionTrigger.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/CompletionContext.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/CompletionCandidate.h`
-- Create: `libs/markoff-foundation/tests/tst_foundation_completion_types.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/CompletionTrigger.h`
+- Create: `libs/markoff-core/include/markoff-foundation/CompletionContext.h`
+- Create: `libs/markoff-core/include/markoff-foundation/CompletionCandidate.h`
+- Create: `libs/markoff-core/tests/tst_foundation_completion_types.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -4708,12 +4708,12 @@ struct MARKOFF_FOUNDATION_EXPORT CompletionCandidate {
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/CompletionTrigger.h \
-        libs/markoff-foundation/include/markoff-foundation/CompletionContext.h \
-        libs/markoff-foundation/include/markoff-foundation/CompletionCandidate.h \
-        libs/markoff-foundation/tests/tst_foundation_completion_types.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/CompletionTrigger.h \
+        libs/markoff-core/include/markoff-foundation/CompletionContext.h \
+        libs/markoff-core/include/markoff-foundation/CompletionCandidate.h \
+        libs/markoff-core/tests/tst_foundation_completion_types.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): CompletionTrigger + Context + Candidate value types"
 ```
 
@@ -4724,9 +4724,9 @@ git commit -m "feat(foundation): CompletionTrigger + Context + Candidate value t
 Static `CompletionDetector::detect(doc, cursor)` returns a `CompletionContext` describing the active trigger (if any). Basic cases: `[[` → WikiLink, `:` → Emoji, `#` in body context → Tag.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/CompletionDetector.h`
-- Create: `libs/markoff-foundation/src/CompletionDetector.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_completion_detector.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/CompletionDetector.h`
+- Create: `libs/markoff-core/src/CompletionDetector.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_completion_detector.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -4876,11 +4876,11 @@ CompletionDetector::detect(const MarkoffDocument *doc,
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/CompletionDetector.h \
-        libs/markoff-foundation/src/CompletionDetector.cpp \
-        libs/markoff-foundation/tests/tst_foundation_completion_detector.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/CompletionDetector.h \
+        libs/markoff-core/src/CompletionDetector.cpp \
+        libs/markoff-core/tests/tst_foundation_completion_detector.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): CompletionDetector basic triggers (wikilink/emoji/tag)"
 ```
 
@@ -4891,8 +4891,8 @@ git commit -m "feat(foundation): CompletionDetector basic triggers (wikilink/emo
 Heading marker `#` at line start is NOT a tag. Code blocks (inside ``` fences) suppress all triggers. Escaped `\[[` is not a wikilink. `[^foo` is a footnote, not a regular link path.
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/CompletionDetector.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_completion_detector.cpp`
+- Modify: `libs/markoff-core/src/CompletionDetector.cpp`
+- Modify: `libs/markoff-core/tests/tst_foundation_completion_detector.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -5009,8 +5009,8 @@ CompletionDetector::detect(const MarkoffDocument *doc,
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/CompletionDetector.cpp \
-        libs/markoff-foundation/tests/tst_foundation_completion_detector.cpp
+git add libs/markoff-core/src/CompletionDetector.cpp \
+        libs/markoff-core/tests/tst_foundation_completion_detector.cpp
 git commit -m "feat(foundation): CompletionDetector edge cases (heading/fence/escape/footnote)"
 ```
 
@@ -5021,10 +5021,10 @@ git commit -m "feat(foundation): CompletionDetector edge cases (heading/fence/es
 Abstract provider; registry aggregates synchronous candidates and forwards async via `candidatesReady`.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/CompletionProvider.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/CompletionRegistry.h`
-- Create: `libs/markoff-foundation/src/CompletionRegistry.cpp`
-- Create: `libs/markoff-foundation/tests/tst_foundation_completion_registry.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/CompletionProvider.h`
+- Create: `libs/markoff-core/include/markoff-foundation/CompletionRegistry.h`
+- Create: `libs/markoff-core/src/CompletionRegistry.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_completion_registry.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -5170,7 +5170,7 @@ private:
 
 Add a `CompletionProvider.cpp` (vtable anchor) — or place the trivial bodies inline. For consistency with `LinkService`, write a small cpp:
 
-`libs/markoff-foundation/src/CompletionProvider.cpp`:
+`libs/markoff-core/src/CompletionProvider.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -5184,7 +5184,7 @@ CompletionProvider::~CompletionProvider() = default;
 }  // namespace Markoff
 ```
 
-`libs/markoff-foundation/src/CompletionRegistry.cpp`:
+`libs/markoff-core/src/CompletionRegistry.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -5231,13 +5231,13 @@ CompletionRegistry::gather(const CompletionContext &ctx, quint64 reqId)
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/CompletionProvider.h \
-        libs/markoff-foundation/include/markoff-foundation/CompletionRegistry.h \
-        libs/markoff-foundation/src/CompletionProvider.cpp \
-        libs/markoff-foundation/src/CompletionRegistry.cpp \
-        libs/markoff-foundation/tests/tst_foundation_completion_registry.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/CompletionProvider.h \
+        libs/markoff-core/include/markoff-foundation/CompletionRegistry.h \
+        libs/markoff-core/src/CompletionProvider.cpp \
+        libs/markoff-core/src/CompletionRegistry.cpp \
+        libs/markoff-core/tests/tst_foundation_completion_registry.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): CompletionProvider + CompletionRegistry"
 ```
 
@@ -5248,10 +5248,10 @@ git commit -m "feat(foundation): CompletionProvider + CompletionRegistry"
 Default provider with a baked-in emoji table. Test asserts that prefix `smi` returns at least one candidate matching `:smile:` (or similar).
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/EmojiCompletionProvider.h`
-- Create: `libs/markoff-foundation/src/EmojiCompletionProvider.cpp`
-- Create: `libs/markoff-foundation/src/EmojiData.h`
-- Modify: `libs/markoff-foundation/tests/tst_foundation_completion_registry.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/EmojiCompletionProvider.h`
+- Create: `libs/markoff-core/src/EmojiCompletionProvider.cpp`
+- Create: `libs/markoff-core/src/EmojiData.h`
+- Modify: `libs/markoff-core/tests/tst_foundation_completion_registry.cpp`
 
 <!-- AMBIGUITY: spec §7.10 says "~600-emoji table baked in (or a curated subset)". This task ships a curated subset (~50 entries) sufficient for unit tests; expanding to a fuller set is a follow-on. -->
 
@@ -5420,11 +5420,11 @@ EmojiCompletionProvider::candidatesFor(const CompletionContext &ctx, quint64)
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/EmojiCompletionProvider.h \
-        libs/markoff-foundation/src/EmojiCompletionProvider.cpp \
-        libs/markoff-foundation/src/EmojiData.h \
-        libs/markoff-foundation/tests/tst_foundation_completion_registry.cpp \
-        libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/EmojiCompletionProvider.h \
+        libs/markoff-core/src/EmojiCompletionProvider.cpp \
+        libs/markoff-core/src/EmojiData.h \
+        libs/markoff-core/tests/tst_foundation_completion_registry.cpp \
+        libs/markoff-core/CMakeLists.txt
 git commit -m "feat(foundation): EmojiCompletionProvider with curated subset"
 ```
 
@@ -5437,8 +5437,8 @@ git commit -m "feat(foundation): EmojiCompletionProvider with curated subset"
 A plain struct bundling non-owning service pointers. Tested transitively via integration; this task adds a trivial smoke test and the public header.
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/MarkoffServices.h`
-- Create: `libs/markoff-foundation/tests/tst_foundation_services_bundle.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/MarkoffServices.h`
+- Create: `libs/markoff-core/tests/tst_foundation_services_bundle.cpp`
 
 - [ ] **Step 1: Create MarkoffServices.h**
 
@@ -5514,10 +5514,10 @@ Append target.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffServices.h \
-        libs/markoff-foundation/tests/tst_foundation_services_bundle.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/MarkoffServices.h \
+        libs/markoff-core/tests/tst_foundation_services_bundle.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): MarkoffServices bundle"
 ```
 
@@ -5528,7 +5528,7 @@ git commit -m "feat(foundation): MarkoffServices bundle"
 Property-based test: random sequence of `applyLocalEdit` calls; assert `toMarkdownUtf8()` always equals an independently-computed reference text. ~100 sequences seeded by deterministic RNG.
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/tst_foundation_markoff_document_property.cpp`
+- Create: `libs/markoff-core/tests/tst_foundation_markoff_document_property.cpp`
 
 - [ ] **Step 1: Write the test**
 
@@ -5589,7 +5589,7 @@ QTEST_APPLESS_MAIN(TstFoundationMarkoffDocumentProperty)
 ```cmake
 add_executable(tst_foundation_markoff_document_property tst_foundation_markoff_document_property.cpp)
 add_test(NAME tst_foundation_markoff_document_property COMMAND tst_foundation_markoff_document_property)
-target_link_libraries(tst_foundation_markoff_document_property PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_markoff_document_property PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_markoff_document_property PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -5605,8 +5605,8 @@ Expected: 100 sequences pass.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_foundation_markoff_document_property.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/tests/tst_foundation_markoff_document_property.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "test(foundation): property test for MarkoffDocument vs reference text"
 ```
 
@@ -5628,7 +5628,7 @@ cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
 cmake --build build-dev -j 2>&1 | tail -20
 ```
 
-Expected: clean build of `markoff_foundation` and every `tst_foundation_*` target.
+Expected: clean build of `markoff_core` and every `tst_foundation_*` target.
 
 - [ ] **Step 2: Run the full ctest suite**
 

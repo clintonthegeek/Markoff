@@ -45,7 +45,7 @@ foundation library + two canonical view leaves.
                                  after D4).
 - `libs/collabtext`            — CRDT text engine, sibling-symlinked
                                  from `/home/clinton/dev/collabtext`.
-- `libs/markoff-foundation`    — `Markoff::MarkoffDocument` (D2: per-
+- `libs/markoff-core`    — `Markoff::MarkoffDocument` (D2: per-
                                  block CRDT buffers + `IdList` for block
                                  order + sibling causal-LWW maps for
                                  kind/attrs/link-refs/footnotes/
@@ -119,7 +119,7 @@ was deleted in D4.
 
 ## Per-library guides
 
-- `libs/markoff-foundation/CLAUDE.md`
+- `libs/markoff-core/CLAUDE.md`
 - `libs/markoff-live-render/CLAUDE.md` — **active view leaf**
 - `libs/markoff-view-qml/CLAUDE.md`
 - `libs/markoff-source-widget/CLAUDE.md`

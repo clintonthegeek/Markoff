@@ -35,7 +35,7 @@ The benchmark addresses these in two tiers.
 
 ### Tier 1 — parse benchmark (primary, CI-friendly)
 
-Drives the parser components directly **without** a Qt event loop, **without** the QML runtime, and **without** `ParsePool` queuing. Reaches `IncrementalParseSession` and `TreeSitterParser` via foundation-internal headers (the bench library is allowed `PRIVATE` access to `libs/markoff-foundation/src`).
+Drives the parser components directly **without** a Qt event loop, **without** the QML runtime, and **without** `ParsePool` queuing. Reaches `IncrementalParseSession` and `TreeSitterParser` via foundation-internal headers (the bench library is allowed `PRIVATE` access to `libs/markoff-core/src`).
 
 A second, higher-level parse path (Tier 1b) drives `MarkoffDocument::applyLocalEdit` and waits for `ParseUpdated` synchronously, capturing pool-level cost (queueing, coalescing, signal hop). Both Tier 1 paths share the same corpus and scenarios; the difference is only how deep into the stack the bench reaches.
 
@@ -144,13 +144,13 @@ apps/bench/
 ├── markoff-bench-parse.cpp   # CLI frontend, full Tier-1 matrix → JSON
 └── markoff-bench-render.cpp  # CLI frontend, Tier-2 → JSON
 
-libs/markoff-foundation/tests/bench/
+libs/markoff-core/tests/bench/
 └── tst_bench_smoke.cpp       # CTest-registered, label "bench"
                               # runs ONE profile (mid_prose) × ONE scenario (type_end, 50 iters)
                               # to keep the harness honest in CI; emits JSON to a tmp path
 ```
 
-`markoff-bench` links `PRIVATE` against `markoff-foundation` and is allowed `PRIVATE` access to its `src/` headers (`IncrementalParseSession.h` etc.) via a `target_include_directories(markoff-bench PRIVATE libs/markoff-foundation/src)` line in `markoff-bench/CMakeLists.txt`. This is contained within the bench library — no production code learns about bench internals.
+`markoff-bench` links `PRIVATE` against `markoff-foundation` and is allowed `PRIVATE` access to its `src/` headers (`IncrementalParseSession.h` etc.) via a `target_include_directories(markoff-bench PRIVATE libs/markoff-core/src)` line in `markoff-bench/CMakeLists.txt`. This is contained within the bench library — no production code learns about bench internals.
 
 The standalone CLIs accept:
 

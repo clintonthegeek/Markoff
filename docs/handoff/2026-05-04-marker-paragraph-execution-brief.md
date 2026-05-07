@@ -125,7 +125,7 @@ $ git status -s
 ?? libs/jkqtmathtext       # sibling library (per CLAUDE.md); ignore
 ```
 
-Live-render library is at `libs/markoff-live-render/` — that's the lib the plan modifies. The neighbouring `libs/markoff-foundation/` and `libs/markoff-parser/` should not need source edits (one parser test addition in Task 1).
+Live-render library is at `libs/markoff-live-render/` — that's the lib the plan modifies. The neighbouring `libs/markoff-core/` and `libs/markoff-parser/` should not need source edits (one parser test addition in Task 1).
 
 Existing test count: `ctest --test-dir build-dev -N | wc -l` should be 78 at the start of work. Track this — it should stay at 78 ± delta-from-marker-tests at every commit.
 

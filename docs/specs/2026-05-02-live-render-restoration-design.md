@@ -884,8 +884,8 @@ D is therefore not a rewrite of restoration; it is a foundation re-shaping that 
 
 ### Foundation surfaces
 
-- `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h` — public API; `editSequence`/`parseSequence` already exposed.
-- `libs/markoff-foundation/CLAUDE.md` — public-boundary types; CRDT-internal vs CRDT-free split.
+- `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h` — public API; `editSequence`/`parseSequence` already exposed.
+- `libs/markoff-core/CLAUDE.md` — public-boundary types; CRDT-internal vs CRDT-free split.
 - `libs/markoff-parser/include/markoff-parser/Document.h` — `topLevelBlocks()` (post-C-7).
 
 ### Spike artefacts

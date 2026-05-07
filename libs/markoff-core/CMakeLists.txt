@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-project(markoff_foundation VERSION 0.1.0 LANGUAGES CXX)
+project(markoff_core VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,7 +11,7 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 # Library target: STATIC so it can be embedded in test apps + future views.
 # Sources are added incrementally as tasks land. Initial skeleton is just
 # the export header so the target builds.
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
     include/markoff-foundation/AnchorJson.h
@@ -94,12 +94,12 @@ add_library(markoff_foundation STATIC
     src/Cmd/D2.cpp
 )
 
-target_include_directories(markoff_foundation
+target_include_directories(markoff_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-target_link_libraries(markoff_foundation
+target_link_libraries(markoff_core
     PUBLIC
         Qt6::Core
         Qt6::Gui
@@ -110,13 +110,13 @@ target_link_libraries(markoff_foundation
 )
 
 # Alias under the Markoff:: namespace for consumers.
-add_library(Markoff::Foundation ALIAS markoff_foundation)
+add_library(Markoff::Core ALIAS markoff_core)
 
 # Tests.
-if(NOT DEFINED MARKOFF_FOUNDATION_BUILD_TESTS)
-    set(MARKOFF_FOUNDATION_BUILD_TESTS ON)
+if(NOT DEFINED MARKOFF_CORE_BUILD_TESTS)
+    set(MARKOFF_CORE_BUILD_TESTS ON)
 endif()
-if(MARKOFF_FOUNDATION_BUILD_TESTS)
+if(MARKOFF_CORE_BUILD_TESTS)
     enable_testing()
     add_subdirectory(tests)
 endif()

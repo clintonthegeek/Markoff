@@ -48,8 +48,8 @@ This is exactly the situation Stage 0 was in for the parse bench: a single `phas
 3. **`libs/markoff-bench/README.md`** — usage and caveats of the bench harness. Note caveat 3: offscreen QPA ≠ real GPU; numbers are useful for relative comparisons across commits, not absolute UX claims. Honest about that in any commit-body claims.
 4. **`apps/bench/markoff-bench-render.cpp`** — the Tier-2 frontend you'll be instrumenting. Already imports the `MarkoffEditor` QML module and drives `applyLocalEdit` directly to bypass key-event delivery.
 5. **`libs/markoff-bench/include/markoff-bench/PhaseTimer.h`** — the existing `Phase` enum already has `PoolQueue`, `SignalHop`, `RenderFrame` slots reserved. You'll add `ModelUpdate` to that enum (or fold the model-update share into one of the existing slots; see §4).
-6. **`libs/markoff-foundation/src/IncrementalParseSession.h` + `ParsePhases.h`** — the foundation's `ParsePhaseTable` is the reference pattern for opt-in, allocation-free instrumentation. Tier 2 will follow the same shape but at the QML/view boundary.
-7. **`libs/markoff-foundation/src/ParsePool.cpp` / `ParsePoolWorker.cpp`** — where pool-queue and signal-hop happen on the foundation side. Already has timestamp infrastructure (Tier 1b uses `QSignalSpy::wait` to capture combined queue+hop time).
+6. **`libs/markoff-core/src/IncrementalParseSession.h` + `ParsePhases.h`** — the foundation's `ParsePhaseTable` is the reference pattern for opt-in, allocation-free instrumentation. Tier 2 will follow the same shape but at the QML/view boundary.
+7. **`libs/markoff-core/src/ParsePool.cpp` / `ParsePoolWorker.cpp`** — where pool-queue and signal-hop happen on the foundation side. Already has timestamp infrastructure (Tier 1b uses `QSignalSpy::wait` to capture combined queue+hop time).
 8. **`libs/markoff-bench/src/ScenarioRunner.cpp`** — the Tier 1 / Tier 1b reference. The `runPoolParse` function lumps `PoolQueue + SignalHop` into `Phase::SignalHop`. You can either un-lump (split it into two real phases at Tier 1b too) or leave Tier 1b alone and only un-lump at Tier 2. The latter is fewer changes; pick that unless you have a reason.
 
 ---

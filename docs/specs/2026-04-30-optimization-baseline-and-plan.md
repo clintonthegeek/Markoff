@@ -134,7 +134,7 @@ a single keystroke→frame bucket).
 
 ## What's hidden behind `phase_parse_block: 100 %`
 
-`IncrementalParseSession::applyEdit` (`libs/markoff-foundation/src/IncrementalParseSession.cpp:56`)
+`IncrementalParseSession::applyEdit` (`libs/markoff-core/src/IncrementalParseSession.cpp:56`)
 does, every keystroke:
 
 ```

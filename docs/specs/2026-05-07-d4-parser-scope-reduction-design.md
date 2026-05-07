@@ -105,7 +105,7 @@ Three conditions hold at the start of D4:
 - The free function `Markoff::inlineSpansFor(const QByteArray &) → QList<SourceSpan>` — signature unchanged
 - All other parser tests: `tst_document.cpp`, `tst_document_queries.cpp`, `tst_document_top_level_blocks.cpp`, `tst_frontmatter.cpp`, `tst_linktext.cpp`, `tst_parser_inline_span_bake.cpp`, `tst_parser_list_items.cpp`, `tst_splitter.cpp`, `tst_splitter_table_passthrough.cpp`, `tst_table.cpp`
 
-### 4.2 `libs/markoff-foundation`
+### 4.2 `libs/markoff-core`
 
 **Delete (parse-pipeline):**
 
@@ -216,7 +216,7 @@ A single comment update in `tst_live_render_paragraph_edit.cpp` (it references `
 - Any references to retired libraries / apps in `scripts/` are updated or removed.
 - `docs/d-arc/d-arc-status.md`: D4 → `complete`. Roadmap updated. Recent-changes log appended. Phase board's D4 row → `complete`.
 - `CLAUDE.md` (worktree): banner updated to reflect D4 completion and point to D5 stub. Library list adjusted (markoff-bench removed, view-qml notes adjusted).
-- `libs/markoff-foundation/CLAUDE.md`: removes mention of `parseUpdated` / `parseSequence` / `applyLocalEdit` accessor / `latestBlockAnchors` / ParsePool. Adds `applyFlatEdit` description.
+- `libs/markoff-core/CLAUDE.md`: removes mention of `parseUpdated` / `parseSequence` / `applyLocalEdit` accessor / `latestBlockAnchors` / ParsePool. Adds `applyFlatEdit` description.
 
 ## 5. Testing strategy
 

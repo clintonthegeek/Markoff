@@ -19,18 +19,18 @@
 ### New files
 | File | Responsibility |
 |---|---|
-| `libs/markoff-foundation/include/markoff-foundation/BlockSerializerRegistry.h` | Abstract `Markoff::BlockSerializerRegistry` interface |
-| `libs/markoff-foundation/include/markoff-foundation/AttrNames.h` | `Markoff::AttrNames` inline constants |
+| `libs/markoff-core/include/markoff-foundation/BlockSerializerRegistry.h` | Abstract `Markoff::BlockSerializerRegistry` interface |
+| `libs/markoff-core/include/markoff-foundation/AttrNames.h` | `Markoff::AttrNames` inline constants |
 | `libs/markoff-live-render/src/KindTransition.h` | `inferBlockKind` free function declaration |
 | `libs/markoff-live-render/src/KindTransition.cpp` | `inferBlockKind` implementation |
 
 ### Modified files
 | File | Change |
 |---|---|
-| `libs/markoff-foundation/include/markoff-foundation/BlockSerializer.h` | Rename `BlockSerializerRegistry` → `BuiltinBlockSerializerRegistry` |
-| `libs/markoff-foundation/src/BlockSerializer.cpp` | Update class name |
-| `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h` | Add `BlockSerializerRegistry*` ctor param + `Q_INVOKABLE` undo methods |
-| `libs/markoff-foundation/src/MarkoffDocument.cpp` | Implement new methods; fix `d2InsertBlock`/`d2RemoveBlock` |
+| `libs/markoff-core/include/markoff-foundation/BlockSerializer.h` | Rename `BlockSerializerRegistry` → `BuiltinBlockSerializerRegistry` |
+| `libs/markoff-core/src/BlockSerializer.cpp` | Update class name |
+| `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h` | Add `BlockSerializerRegistry*` ctor param + `Q_INVOKABLE` undo methods |
+| `libs/markoff-core/src/MarkoffDocument.cpp` | Implement new methods; fix `d2InsertBlock`/`d2RemoveBlock` |
 | `libs/markoff-live-render/include/markoff/live-render/BlockKind.h` | Add `ListItem`, `Blockquote`, `Math` constants |
 | `libs/markoff-live-render/src/BlockKind.cpp` | Add string definitions |
 | `libs/markoff-live-render/include/markoff/live-render/BlockRecord.h` | Add `attrs` field |
@@ -61,10 +61,10 @@
 The existing `BlockSerializerRegistry` in `BlockSerializer.h` is a concrete singleton. The spec adds an abstract interface with the same name. Rename the concrete one first to clear the name.
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/BlockSerializer.h`
-- Modify: `libs/markoff-foundation/src/BlockSerializer.cpp`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp` (two call sites)
-- Create: `libs/markoff-foundation/include/markoff-foundation/BlockSerializerRegistry.h`
+- Modify: `libs/markoff-core/include/markoff-foundation/BlockSerializer.h`
+- Modify: `libs/markoff-core/src/BlockSerializer.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp` (two call sites)
+- Create: `libs/markoff-core/include/markoff-foundation/BlockSerializerRegistry.h`
 
 - [ ] **Step 1: Rename in header**
 
@@ -108,14 +108,14 @@ Replace all occurrences of `BlockSerializerRegistry` with `BuiltinBlockSerialize
 - [ ] **Step 3: Update MarkoffDocument.cpp call sites**
 
 ```bash
-grep -n "BlockSerializerRegistry" libs/markoff-foundation/src/MarkoffDocument.cpp
+grep -n "BlockSerializerRegistry" libs/markoff-core/src/MarkoffDocument.cpp
 ```
 
 Expected: lines referencing `BlockSerializerRegistry::instance()`. Change both to `BuiltinBlockSerializerRegistry::instance()`.
 
 - [ ] **Step 4: Create abstract interface header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/BlockSerializerRegistry.h`:
+Create `libs/markoff-core/include/markoff-foundation/BlockSerializerRegistry.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -142,17 +142,17 @@ public:
 - [ ] **Step 5: Build to verify rename compiles**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8
+cmake --build build-dev --target markoff_core -j 8
 ```
 Expected: clean build.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/BlockSerializer.h \
-        libs/markoff-foundation/include/markoff-foundation/BlockSerializerRegistry.h \
-        libs/markoff-foundation/src/BlockSerializer.cpp \
-        libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/include/markoff-foundation/BlockSerializer.h \
+        libs/markoff-core/include/markoff-foundation/BlockSerializerRegistry.h \
+        libs/markoff-core/src/BlockSerializer.cpp \
+        libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "refactor(foundation): rename BlockSerializerRegistry singleton → BuiltinBlockSerializerRegistry; add abstract interface
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -163,7 +163,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 2: Add `AttrNames.h`
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/AttrNames.h`
+- Create: `libs/markoff-core/include/markoff-foundation/AttrNames.h`
 
 - [ ] **Step 1: Create header**
 
@@ -188,14 +188,14 @@ namespace Markoff::AttrNames {
 - [ ] **Step 2: Build**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8
+cmake --build build-dev --target markoff_core -j 8
 ```
 Expected: clean build.
 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/AttrNames.h
+git add libs/markoff-core/include/markoff-foundation/AttrNames.h
 git commit -m "feat(foundation): add AttrNames namespace with inline AttrName constants
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -206,12 +206,12 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 3: `MarkoffDocument` — constructor param + Q_INVOKABLE undo methods
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Write failing test**
 
-In `libs/markoff-foundation/tests/tst_foundation_d2.cpp` (or whichever D2 test file exists), add:
+In `libs/markoff-core/tests/tst_foundation_d2.cpp` (or whichever D2 test file exists), add:
 
 ```cpp
 void canUndoForBlock_returns_false_when_no_history() {
@@ -227,7 +227,7 @@ void canUndoForBlock_returns_false_when_no_history() {
 - [ ] **Step 2: Run to verify it fails**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8 2>&1 | grep -E "error:|canUndo"
+cmake --build build-dev --target markoff_core -j 8 2>&1 | grep -E "error:|canUndo"
 ```
 Expected: compile error — `canUndoForBlock` does not exist.
 
@@ -300,7 +300,7 @@ Note: `BlockAnchor` and `BlockId` are the same underlying type (D2 premise). Che
 
 Check if `UndoLog::hasEntryForBlock` exists:
 ```bash
-grep -n "hasEntryForBlock\|hasEntry" libs/markoff-foundation/include/markoff-foundation/UndoLog.h
+grep -n "hasEntryForBlock\|hasEntry" libs/markoff-core/include/markoff-foundation/UndoLog.h
 ```
 If absent, add it:
 ```cpp
@@ -322,7 +322,7 @@ bool UndoLog::hasEntryForBlock(BlockId id) const
 - [ ] **Step 5: Run test**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8 && \
+cmake --build build-dev --target markoff_core -j 8 && \
 ctest --test-dir build-dev -R tst_foundation -j 8 --output-on-failure
 ```
 Expected: all foundation tests pass including new `canUndoForBlock_returns_false_when_no_history`.
@@ -330,10 +330,10 @@ Expected: all foundation tests pass including new `canUndoForBlock_returns_false
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/include/markoff-foundation/UndoLog.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/src/UndoLog.cpp
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/include/markoff-foundation/UndoLog.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/src/UndoLog.cpp
 git commit -m "feat(foundation): MarkoffDocument accepts BlockSerializerRegistry*; add Q_INVOKABLE canUndoForBlock/undoForBlock
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -344,7 +344,7 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 4: Fix `d2InsertBlock`/`d2RemoveBlock` to fire `idListProxy->notifyChanged()`
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Write failing test**
 
@@ -368,7 +368,7 @@ void d2InsertBlock_fires_idListProxy_notifyChanged() {
 - [ ] **Step 2: Run to verify it fails**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8 && \
+cmake --build build-dev --target markoff_core -j 8 && \
 ctest --test-dir build-dev -R tst_foundation -j 8 --output-on-failure 2>&1 | grep -E "FAIL|PASS|spy"
 ```
 Expected: test fails (`spy.count()` is 0).
@@ -390,7 +390,7 @@ d->kindTagMapProxy->notifyChanged();
 - [ ] **Step 4: Run test**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8 && \
+cmake --build build-dev --target markoff_core -j 8 && \
 ctest --test-dir build-dev -R tst_foundation -j 8 --output-on-failure
 ```
 Expected: all foundation tests pass.
@@ -398,7 +398,7 @@ Expected: all foundation tests pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "fix(foundation): d2InsertBlock/d2RemoveBlock fire idListProxy->notifyChanged()
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"

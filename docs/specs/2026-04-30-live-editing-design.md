@@ -387,9 +387,9 @@ These extension points are designed-in but not implemented in v0. The spec calls
 
 - **Walking skeleton (read-only Live):** `docs/specs/2026-04-29-live-render-design.md`
 - **Foundation `BlockAnchor` spec (precondition):** `docs/specs/2026-04-30-block-anchor-foundation-design.md`
-- **Source widget cycle-guarded edit pattern:** `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp`
-- **Foundation `MarkoffDocument` API:** `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- **Foundation `Session` + `Selection`:** `libs/markoff-foundation/include/markoff-foundation/Session.h`, `Selection.h`
+- **Source widget cycle-guarded edit pattern:** `libs/markoff-core/src/SourceTextDocumentBinding.cpp`
+- **Foundation `MarkoffDocument` API:** `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- **Foundation `Session` + `Selection`:** `libs/markoff-core/include/markoff-foundation/Session.h`, `Selection.h`
 - **Cross-block selection spike findings:** `docs/specs/2026-04-29-cross-block-selection-spike-findings.md`
 - **Source-mode editor (mirror its highlighter wiring pattern):** `libs/markoff-view-qml/qml/SourceEditor.qml`
 - **KDAB Widget-window bridge:** https://www.kdab.com/display-widget-windows-in-qt-quick-applications/

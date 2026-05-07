@@ -508,7 +508,7 @@ R5.5-marker ships when:
 These are deliberately not pinned here; the plan resolves them.
 
 1. **Soft-Enter in a marker paragraph (§15 last bullet).** Should the marker-only predicate match `^(​|\n)+$` instead of `^​+$`? Or should soft-Enter also bundle the marker scrub? The cleanest answer is probably to broaden the predicate; the plan picks and tests.
-2. **`MarkerScrubber` placement.** In `libs/markoff-live-render` (with the rest of the editing concerns) or in `libs/markoff-foundation` (as a foundation-level affordance other consumers could reuse)? Default: live-render. The plan validates against any prospective second consumer.
+2. **`MarkerScrubber` placement.** In `libs/markoff-live-render` (with the rest of the editing concerns) or in `libs/markoff-core` (as a foundation-level affordance other consumers could reuse)? Default: live-render. The plan validates against any prospective second consumer.
 3. **`scrubBeforeSave` integration with the host.** The host owns the save path; the wiring is whatever `MarkdownView::saveAs` (or its successor) calls into. The plan picks the exact integration site.
 4. **Atomic-bundled-edit primitive: keystroke level vs IME-commit level.** §5.2 says "first `onContentsChange`"; for IME, "first commit" might be the wrong granularity if the IME emits intermediate composition events. The plan tests against IME composition fixtures.
 5. **What happens if `setRowEditSequence` for the new (post-EOB-Enter) marker paragraph is needed.** The marker paragraph has just been created via `applyLocalEdit`; is its `lastEditEditSequence` correctly tagged so the freshness rule doesn't squash subsequent text-role updates? The plan validates.

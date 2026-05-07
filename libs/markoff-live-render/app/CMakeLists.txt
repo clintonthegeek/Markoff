@@ -13,7 +13,7 @@ target_link_libraries(markoff-live-render-app PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2 Qt6::Qml
     markoff_live_render
     markoff_live_renderplugin
-    markoff_foundation
+    markoff_core
 )
 
 # qt_import_qml_plugins removed: a holdover from pre-Qt-6.5 patterns.

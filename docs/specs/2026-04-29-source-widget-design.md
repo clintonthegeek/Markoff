@@ -17,7 +17,7 @@ This spec defines a new library `libs/markoff-source-widget` — a from-scratch 
 - A `Markoff::Source::Editor` class — `QPlainTextEdit` subclass, the public widget.
 - A `Markoff::Source::FindBar` widget — find UI; standalone, host places it.
 - A private `Gutter` widget child of the editor, painting line numbers.
-- Document binding: `SourceTextDocumentBinding` relocated from `libs/markoff-view-qml/src/` to `libs/markoff-foundation/` so both consumers (the existing QML `SourceEditor.qml` and the new widget) share one implementation.
+- Document binding: `SourceTextDocumentBinding` relocated from `libs/markoff-view-qml/src/` to `libs/markoff-core/` so both consumers (the existing QML `SourceEditor.qml` and the new widget) share one implementation.
 - `KSyntaxHighlighting` attached to the editor's `QTextDocument` for markdown.
 - Cursor + selection round-trip through `Session` via the relocated binding's existing cycle-guard logic.
 - `Ctrl+Z` / `Ctrl+Y` invoke `MarkoffDocument::undo()` / `redo()`. The `QTextDocument`'s undo stack is disabled (the binding already does this).
@@ -47,9 +47,9 @@ This spec defines a new library `libs/markoff-source-widget` — a from-scratch 
 
 Relocation:
 
-- Files move to `libs/markoff-foundation/src/SourceTextDocumentBinding.{h,cpp}` (header in `libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h`).
+- Files move to `libs/markoff-core/src/SourceTextDocumentBinding.{h,cpp}` (header in `libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h`).
 - Property `qtQuickDocument` → `textDocument`. The setter accepts a `QTextDocument *` directly. The QML use-site in `SourceEditor.qml` (`textDocumentBinding.qtQuickDocument: textArea.textDocument`) updates to pass the underlying document via a small one-line accessor (Qt 6's `QQuickTextDocument::textDocument()`).
-- The class's MOC headers move with it. CMake exports it under `Markoff::Foundation` (the foundation library target).
+- The class's MOC headers move with it. CMake exports it under `Markoff::Core` (the foundation library target).
 - The QML library no longer compiles its own copy; it depends on the foundation export.
 - Any tests that currently exercise the binding (none stand out — `tst_view_qml_source_binding.cpp` exercises an integration; that test stays in markoff-view-qml and now uses the foundation-relocated class).
 
@@ -153,7 +153,7 @@ The FindBar does NOT live inside the Editor. The host (Corbomite, our test app, 
 1. Updates `QPalette` for the editor: `Base` → `Slot::EditorBackground`, `Text` → `Slot::TextDefault`, `Highlight` → `Slot::SelectionBackground`, `HighlightedText` → `Slot::TextDefault`.
 2. Calls `setPalette(p)`.
 3. Calls `m_gutter->update()`.
-4. Re-attaches `KSyntaxHighlighter` colours via the foundation's existing `Kf6SyntaxHighlightService` (already present at `libs/markoff-foundation/include/markoff-foundation/Kf6SyntaxHighlightService.h`). If the service exposes a "apply theme" method we use it; otherwise we set the highlighter's theme via its native API (`KSyntaxHighlighting::Repository::theme(...)`) — exact path determined at implementation time when reading the service header.
+4. Re-attaches `KSyntaxHighlighter` colours via the foundation's existing `Kf6SyntaxHighlightService` (already present at `libs/markoff-core/include/markoff-foundation/Kf6SyntaxHighlightService.h`). If the service exposes a "apply theme" method we use it; otherwise we set the highlighter's theme via its native API (`KSyntaxHighlighting::Repository::theme(...)`) — exact path determined at implementation time when reading the service header.
 
 The FindBar's button icons use `QIcon::fromTheme()` so they inherit the Plasma icon set; its colours come from `QPalette` (which the host typically sets), not from `Markoff::Theme`. (The system Theme is for editor content, not chrome.)
 
@@ -182,7 +182,7 @@ libs/markoff-source-widget/
 ```
 
 ```
-libs/markoff-foundation/
+libs/markoff-core/
 ├── include/markoff-foundation/
 │   └── SourceTextDocumentBinding.h        (RELOCATED here from markoff-view-qml)
 └── src/
@@ -242,7 +242,7 @@ The work breaks into logical chunks the implementation plan will sequence:
 
 - **`KSyntaxHighlighting::Repository::theme(...)` API may be different from what `Kf6SyntaxHighlightService` already wraps.** Need to read that header during implementation. Worst case: the service handles it and we just call `service.applyTo(highlighter, theme)`. Best case: it's already exactly the contract we need.
 - **The QML `SourceEditor.qml` update** needs to pass a real `QTextDocument*` to the renamed `textDocument` property. Qt 6's QML `TextArea.textDocument` returns a `QQuickTextDocument` object which has a `textDocument()` accessor. We use `textArea.textDocument.textDocument` on the QML side, OR we accept a `QQuickTextDocument *` in the binding and dereference internally — implementation picks the cleaner one.
-- **`tst_view_qml_source_binding.cpp`** in `markoff-view-qml/tests/` currently links the binding from `markoff-view-qml`. After relocation, the same test should still work — it's now linking through the foundation. CMake update: `target_link_libraries(... markoff_foundation)` is added; the binding's symbols come from there. Verify no regressions in the existing 34-test suite.
+- **`tst_view_qml_source_binding.cpp`** in `markoff-view-qml/tests/` currently links the binding from `markoff-view-qml`. After relocation, the same test should still work — it's now linking through the foundation. CMake update: `target_link_libraries(... markoff_core)` is added; the binding's symbols come from there. Verify no regressions in the existing 34-test suite.
 - **`Editor`'s `Q_PROPERTY` for `document`** is a `MarkoffDocument *` pointer. `Markoff::MarkoffDocument` is already `Q_DECLARE_METATYPE`-d in foundation (it has to be for QML to use it), so this works.
 
 ## 9. Constraints

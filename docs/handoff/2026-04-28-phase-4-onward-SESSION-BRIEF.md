@@ -215,7 +215,7 @@ Final-plan acceptance is the spec's §12 + plan's Task 55 (foundation viability 
 
 1. ✅ One commit per task (Tasks 19–55).
 2. ✅ `cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` configures clean.
-3. ✅ `cmake --build build-dev --target markoff_foundation -j` builds clean.
+3. ✅ `cmake --build build-dev --target markoff_core -j` builds clean.
 4. ✅ `ctest --test-dir build-dev -R '^tst_(markoff_edit|anchor_json|selection|fold_ref|foundation_.*)$' --output-on-failure` passes for all foundation test executables.
 5. ✅ The existing markoff-* libs on this branch still build (your additions did not regress them); pre-existing markoff-live failures (`tst_markoff_undo_grouping`, `tst_markoff_table_operations`) are tracked separately and OK to ignore — they predate the foundation branch.
 

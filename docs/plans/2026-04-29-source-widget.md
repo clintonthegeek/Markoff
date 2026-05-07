@@ -19,8 +19,8 @@
 ### Task A1: Relocate `SourceTextDocumentBinding` to `markoff-foundation`
 
 **Files:**
-- Move (with rename of property): `libs/markoff-view-qml/src/SourceTextDocumentBinding.{h,cpp}` → `libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h` + `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp`
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
+- Move (with rename of property): `libs/markoff-view-qml/src/SourceTextDocumentBinding.{h,cpp}` → `libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h` + `libs/markoff-core/src/SourceTextDocumentBinding.cpp`
+- Modify: `libs/markoff-core/CMakeLists.txt`
 - Modify: `libs/markoff-view-qml/CMakeLists.txt`
 - Modify: `libs/markoff-view-qml/qml/SourceEditor.qml`
 
@@ -30,17 +30,17 @@ Read the existing `libs/markoff-view-qml/src/SourceTextDocumentBinding.h` and `.
 
 - [ ] **Step 2: Create the foundation-side header**
 
-Move the header to `libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h`. Apply the rename: every reference to `qtQuickDocument` becomes `textDocument`, and the property's type changes from the QML-flavoured `QObject *` (or `QQuickTextDocument *`) to `QTextDocument *`. Update include guards. Replace any `MARKOFF_VIEW_QML_EXPORT` (or local export macro) with `MARKOFF_FOUNDATION_EXPORT`. Replace the namespace if needed (the class moves from `Markoff::View::Qml::SourceTextDocumentBinding` to `Markoff::SourceTextDocumentBinding` — fewer nested namespaces in foundation).
+Move the header to `libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h`. Apply the rename: every reference to `qtQuickDocument` becomes `textDocument`, and the property's type changes from the QML-flavoured `QObject *` (or `QQuickTextDocument *`) to `QTextDocument *`. Update include guards. Replace any `MARKOFF_VIEW_QML_EXPORT` (or local export macro) with `MARKOFF_FOUNDATION_EXPORT`. Replace the namespace if needed (the class moves from `Markoff::View::Qml::SourceTextDocumentBinding` to `Markoff::SourceTextDocumentBinding` — fewer nested namespaces in foundation).
 
 - [ ] **Step 3: Move the implementation**
 
-Move the `.cpp` to `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp`. Update the namespace, the include, and any `qtQuickDocument` references inside the implementation to `textDocument`. The internals (cycle guards `m_applyingLocalEdit` / `m_applyingRemoteEdit`, UTF-16/UTF-8 conversion helpers) are unchanged.
+Move the `.cpp` to `libs/markoff-core/src/SourceTextDocumentBinding.cpp`. Update the namespace, the include, and any `qtQuickDocument` references inside the implementation to `textDocument`. The internals (cycle guards `m_applyingLocalEdit` / `m_applyingRemoteEdit`, UTF-16/UTF-8 conversion helpers) are unchanged.
 
 If the implementation had a code path extracting the underlying `QTextDocument` from a `QQuickTextDocument` (e.g. via `qquickTextDoc->textDocument()`), that path is removed; the binding now accepts a `QTextDocument *` directly.
 
 - [ ] **Step 4: Add to foundation's CMakeLists**
 
-In `libs/markoff-foundation/CMakeLists.txt`, add `SourceTextDocumentBinding.cpp` to the library's source list and the public header to the install set. The library already links Qt6::Core + Qt6::Gui (QTextDocument lives in QtGui).
+In `libs/markoff-core/CMakeLists.txt`, add `SourceTextDocumentBinding.cpp` to the library's source list and the public header to the install set. The library already links Qt6::Core + Qt6::Gui (QTextDocument lives in QtGui).
 
 - [ ] **Step 5: Remove from markoff-view-qml**
 
@@ -143,7 +143,7 @@ target_include_directories(markoff_source_widget
 target_link_libraries(markoff_source_widget
     PUBLIC  Qt6::Core Qt6::Gui Qt6::Widgets
             KF6::SyntaxHighlighting
-            markoff_foundation
+            markoff_core
 )
 
 add_library(Markoff::SourceWidget ALIAS markoff_source_widget)
@@ -516,7 +516,7 @@ Add to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_source_widget_binding_roundtrip tst_source_widget_binding_roundtrip.cpp)
 add_test(NAME tst_source_widget_binding_roundtrip COMMAND tst_source_widget_binding_roundtrip)
-target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_foundation)
+target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_core)
 set_tests_properties(tst_source_widget_binding_roundtrip PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -652,7 +652,7 @@ void Editor::keyPressEvent(QKeyEvent *e) {
 } // namespace
 ```
 
-Note: the relocated `SourceTextDocumentBinding`'s API matters here. The implementer reads `libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h` to get the exact setter names. The plan's `setTextDocument(...)` and `setEditorDocument(...)` are placeholder names — the actual setters are whatever survived the relocation rename. The Editor's binding wiring matches.
+Note: the relocated `SourceTextDocumentBinding`'s API matters here. The implementer reads `libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h` to get the exact setter names. The plan's `setTextDocument(...)` and `setEditorDocument(...)` are placeholder names — the actual setters are whatever survived the relocation rename. The Editor's binding wiring matches.
 
 - [ ] **Step 4: Build + run tests**
 
@@ -906,7 +906,7 @@ git commit -m "feat(source-widget): setTheme applies palette + retones KSyntaxHi
 
 - [ ] **Step 1: Read foundation's SearchEngine API**
 
-Read `libs/markoff-foundation/include/markoff-foundation/SearchEngine.h` (or `SearchController.h`) to learn the exact API for find-all / find-next. The FindBar uses whichever is the cleanest fit.
+Read `libs/markoff-core/include/markoff-foundation/SearchEngine.h` (or `SearchController.h`) to learn the exact API for find-all / find-next. The FindBar uses whichever is the cleanest fit.
 
 - [ ] **Step 2: Implement FindBar**
 
@@ -1170,7 +1170,7 @@ Add to `tests/CMakeLists.txt`:
 ```cmake
 add_executable(tst_source_widget_findbar tst_source_widget_findbar.cpp)
 add_test(NAME tst_source_widget_findbar COMMAND tst_source_widget_findbar)
-target_link_libraries(tst_source_widget_findbar PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_foundation)
+target_link_libraries(tst_source_widget_findbar PRIVATE Qt6::Test Qt6::Widgets markoff_source_widget markoff_core)
 set_tests_properties(tst_source_widget_findbar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -1208,7 +1208,7 @@ git commit -m "feat(source-widget): FindBar with next/prev/close + match-count U
 ```cmake
 add_executable(markoff-source-widget-app main.cpp)
 target_link_libraries(markoff-source-widget-app
-    PRIVATE Qt6::Widgets markoff_source_widget markoff_foundation)
+    PRIVATE Qt6::Widgets markoff_source_widget markoff_core)
 ```
 
 - [ ] **Step 2: main.cpp**

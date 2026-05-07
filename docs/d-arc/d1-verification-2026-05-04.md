@@ -16,7 +16,7 @@ collabtext is brought in via `add_subdirectory(libs/collabtext)` in the root
 `/home/clinton/dev/collabtext`. The `markoff-foundation` target links it:
 
 ```cmake
-# libs/markoff-foundation/CMakeLists.txt
+# libs/markoff-core/CMakeLists.txt
 target_link_libraries(markoff-foundation ... collabtext)
 ```
 

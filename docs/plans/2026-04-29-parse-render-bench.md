@@ -6,7 +6,7 @@
 
 **Goal:** Build a two-tier benchmark harness (parse-only + render) for the foundation-exploration parse/render pipeline, per `docs/specs/2026-04-29-parse-render-bench-design.md`. Output is per-phase wall-time + reuse counts + alloc bytes/count + p50/p95/p99/max for 9 synthetic profiles × 7 edit scenarios, emitted as JSON for trending.
 
-**Architecture:** A new internal STATIC library `libs/markoff-bench/` hosts the corpus generator, fixture loader, scenario builders, ScenarioRunner, PhaseTimer, AllocCounter, PercentileReducer, and JsonReporter. Two CLI frontends (`apps/bench/markoff-bench-parse`, `apps/bench/markoff-bench-render`) consume the library plus one CTest-registered smoke target (`tst_bench_smoke`) that runs a small slice on every `ctest -L bench`. Tier 1 reaches `IncrementalParseSession` directly via `PRIVATE` include access into `libs/markoff-foundation/src/`; Tier 2 spins up the QML view under `QT_QPA_PLATFORM=offscreen`.
+**Architecture:** A new internal STATIC library `libs/markoff-bench/` hosts the corpus generator, fixture loader, scenario builders, ScenarioRunner, PhaseTimer, AllocCounter, PercentileReducer, and JsonReporter. Two CLI frontends (`apps/bench/markoff-bench-parse`, `apps/bench/markoff-bench-render`) consume the library plus one CTest-registered smoke target (`tst_bench_smoke`) that runs a small slice on every `ctest -L bench`. Tier 1 reaches `IncrementalParseSession` directly via `PRIVATE` include access into `libs/markoff-core/src/`; Tier 2 spins up the QML view under `QT_QPA_PLATFORM=offscreen`.
 
 **Tech Stack:** C++20, Qt6 (Core, Gui, Widgets, Test, Qml, Quick), KF6::SyntaxHighlighting, tree-sitter, CMake 3.19+. Existing in-repo: `markoff-foundation`, `markoff-parser`, `markoff-view-qml`, `collabtext`.
 
@@ -233,7 +233,7 @@ target_include_directories(markoff_bench
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE
-        ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src
+        ${CMAKE_SOURCE_DIR}/libs/markoff-core/src
 )
 
 target_link_libraries(markoff_bench
@@ -241,7 +241,7 @@ target_link_libraries(markoff_bench
         Qt6::Core
         Qt6::Gui
         Qt6::Widgets
-        markoff_foundation
+        markoff_core
         MarkoffParser::MarkoffParser
 )
 
@@ -306,7 +306,7 @@ git add libs/markoff-bench/CMakeLists.txt \
 git commit -m "feat(bench): scaffold markoff-bench library
 
 Empty STATIC library with PRIVATE include access into
-libs/markoff-foundation/src/ so the harness can reach
+libs/markoff-core/src/ so the harness can reach
 IncrementalParseSession directly. Sources land in subsequent tasks.
 
 Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
@@ -1922,7 +1922,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 
 This task adds the direct-parse path. Tier 1b (pool path) is a separate task. The runner exposes a `RunResult` struct holding distributions per phase + reuse counts + alloc snapshot; consumers reduce/print externally.
 
-The runner drives `Markoff::Parse::Detail::IncrementalParseSession` which lives in `libs/markoff-foundation/src/IncrementalParseSession.h`. Access is via the `PRIVATE` include path we set up in Task 2 — only this library can reach it.
+The runner drives `Markoff::Parse::Detail::IncrementalParseSession` which lives in `libs/markoff-core/src/IncrementalParseSession.h`. Access is via the `PRIVATE` include path we set up in Task 2 — only this library can reach it.
 
 There's no separate test for ScenarioRunner; the smoke target in Task 12 exercises it end-to-end.
 
@@ -2002,7 +2002,7 @@ Create `libs/markoff-bench/src/ScenarioRunner.cpp`:
 #include <markoff-parser/TreeSitterParser.h>
 
 // Foundation-internal — accessible because markoff_bench has PRIVATE
-// include access into libs/markoff-foundation/src/.
+// include access into libs/markoff-core/src/.
 #include <IncrementalParseSession.h>
 
 namespace Markoff::Bench {
@@ -2328,7 +2328,7 @@ Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>"
 ## Task 11: Wire reuse counters; JsonReporter
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/IncrementalParseSession.h`
+- Modify: `libs/markoff-core/src/IncrementalParseSession.h`
 - Modify: `libs/markoff-bench/src/ScenarioRunner.cpp`
 - Create: `libs/markoff-bench/include/markoff-bench/JsonReporter.h`
 - Create: `libs/markoff-bench/src/JsonReporter.cpp`
@@ -2338,7 +2338,7 @@ Two sub-changes: (a) expose `IncrementalParseSession::parser()` so the runner ca
 
 - [ ] **Step 11.1: Expose `parser()` on `IncrementalParseSession`**
 
-In `libs/markoff-foundation/src/IncrementalParseSession.h`, add to the public section:
+In `libs/markoff-core/src/IncrementalParseSession.h`, add to the public section:
 
 ```cpp
     /// Read-only access to the underlying TreeSitterParser. Used by the
@@ -2515,7 +2515,7 @@ Expected: all green.
 - [ ] **Step 11.8: Commit**
 
 ```
-git add libs/markoff-foundation/src/IncrementalParseSession.h \
+git add libs/markoff-core/src/IncrementalParseSession.h \
         libs/markoff-bench/include/markoff-bench/JsonReporter.h \
         libs/markoff-bench/src/JsonReporter.cpp \
         libs/markoff-bench/src/ScenarioRunner.cpp \

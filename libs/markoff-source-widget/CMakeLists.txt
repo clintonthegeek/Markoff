@@ -25,7 +25,7 @@ target_include_directories(markoff_source_widget
 target_link_libraries(markoff_source_widget
     PUBLIC  Qt6::Core Qt6::Gui Qt6::Widgets
             KF6::SyntaxHighlighting
-            markoff_foundation
+            markoff_core
 )
 
 add_library(Markoff::SourceWidget ALIAS markoff_source_widget)

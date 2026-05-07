@@ -21,7 +21,7 @@ A fresh agent picking up D4 should read these in order. The plan assumes you've 
 3. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items
 4. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — the D4 spec
 5. `CLAUDE.md` (worktree root) — branch posture and lib layout
-6. `libs/markoff-foundation/CLAUDE.md` — foundation-internal guide
+6. `libs/markoff-core/CLAUDE.md` — foundation-internal guide
 7. `libs/markoff-live-render/CLAUDE.md` — view leaf guide
 
 ---
@@ -89,20 +89,20 @@ Per spec §8, the order is bottom-up: build the new primitive, migrate consumers
 
 ### 3.1 Created in this plan
 
-- `libs/markoff-foundation/src/ApplyFlatEdit.cpp` — the new flat-edit decomposition implementation
-- `libs/markoff-foundation/include/markoff-foundation/ApplyFlatEdit.h` — header with helper types if any (most logic stays as a method on `MarkoffDocument`)
-- `libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp` — test file
+- `libs/markoff-core/src/ApplyFlatEdit.cpp` — the new flat-edit decomposition implementation
+- `libs/markoff-core/include/markoff-foundation/ApplyFlatEdit.h` — header with helper types if any (most logic stays as a method on `MarkoffDocument`)
+- `libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp` — test file
 
 ### 3.2 Modified
 
-- `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h` — add `applyFlatEdit` method declaration; later: remove `applyLocalEdit`, `parseUpdated`, `parseSequence`, `setRenderPhaseTaps`, includes of `MarkoffEdit.h`
-- `libs/markoff-foundation/src/MarkoffDocument.cpp` — add `applyFlatEdit` definition; later: remove parsePool member usage, `applyLocalEdit` body, `parseSequence`, ctor relay
-- `libs/markoff-foundation/src/MarkoffDocumentPrivate.h` — remove parsePool include + member; later: remove parseSequence, latestBlockAnchors
-- `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp` — migrate forward + reverse direction off `applyLocalEdit` / `MarkoffEdit`; subscribe to `d2DocumentChanged`
-- `libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h` — corresponding declarations
-- `libs/markoff-foundation/CMakeLists.txt` — add new source files; later: remove deleted files; remove tests for deleted families
-- `libs/markoff-foundation/tests/CMakeLists.txt` — register new test; later: remove deleted tests
-- `libs/markoff-foundation/CLAUDE.md` — remove `parseUpdated` / `parseSequence` / `applyLocalEdit` / `latestBlockAnchors` / `ParsePool` mentions; add `applyFlatEdit` description (Phase 13)
+- `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h` — add `applyFlatEdit` method declaration; later: remove `applyLocalEdit`, `parseUpdated`, `parseSequence`, `setRenderPhaseTaps`, includes of `MarkoffEdit.h`
+- `libs/markoff-core/src/MarkoffDocument.cpp` — add `applyFlatEdit` definition; later: remove parsePool member usage, `applyLocalEdit` body, `parseSequence`, ctor relay
+- `libs/markoff-core/src/MarkoffDocumentPrivate.h` — remove parsePool include + member; later: remove parseSequence, latestBlockAnchors
+- `libs/markoff-core/src/SourceTextDocumentBinding.cpp` — migrate forward + reverse direction off `applyLocalEdit` / `MarkoffEdit`; subscribe to `d2DocumentChanged`
+- `libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h` — corresponding declarations
+- `libs/markoff-core/CMakeLists.txt` — add new source files; later: remove deleted files; remove tests for deleted families
+- `libs/markoff-core/tests/CMakeLists.txt` — register new test; later: remove deleted tests
+- `libs/markoff-core/CLAUDE.md` — remove `parseUpdated` / `parseSequence` / `applyLocalEdit` / `latestBlockAnchors` / `ParsePool` mentions; add `applyFlatEdit` description (Phase 13)
 - `libs/markoff-source-widget/tests/tst_source_widget_editor.cpp` — drop `parseUpdated` `QSignalSpy`; reshape settle
 - `libs/markoff-source-widget/tests/tst_source_widget_binding_roundtrip.cpp` — replace `applyLocalEdit` / `MarkoffEdit` with new entry point
 - `libs/markoff-source-widget/tests/tst_source_widget_findbar.cpp` — same
@@ -124,37 +124,37 @@ Per spec §8, the order is bottom-up: build the new primitive, migrate consumers
 
 **Foundation:**
 
-- `libs/markoff-foundation/src/ParsePool.h`, `ParsePool.cpp`
-- `libs/markoff-foundation/src/ParsePoolWorker.h`, `ParsePoolWorker.cpp`
-- `libs/markoff-foundation/src/IncrementalParseSession.h`, `IncrementalParseSession.cpp`
-- `libs/markoff-foundation/src/ParsePhases.h`
-- `libs/markoff-foundation/include/markoff-foundation/MarkoffEdit.h`
-- `libs/markoff-foundation/src/MarkoffEdit.cpp`
-- `libs/markoff-foundation/include/markoff-foundation/Cmd/Block.h`, `src/Cmd/Block.cpp`
-- `libs/markoff-foundation/include/markoff-foundation/Cmd/Insert.h`, `src/Cmd/Insert.cpp`
-- `libs/markoff-foundation/include/markoff-foundation/Cmd/InlineFormat.h`, `src/Cmd/InlineFormat.cpp`
-- `libs/markoff-foundation/src/Cmd/Helpers.cpp` (and any companion `Helpers.h`)
-- `libs/markoff-foundation/include/markoff-foundation/CommandFacade.h`, `src/CommandFacade.cpp`
-- `libs/markoff-foundation/include/markoff-foundation/ReplaceController.h`, `src/ReplaceController.cpp`
-- `libs/markoff-foundation/include/markoff-foundation/Render/RenderPhaseTaps.h` (verify no surviving consumer at Phase 8)
+- `libs/markoff-core/src/ParsePool.h`, `ParsePool.cpp`
+- `libs/markoff-core/src/ParsePoolWorker.h`, `ParsePoolWorker.cpp`
+- `libs/markoff-core/src/IncrementalParseSession.h`, `IncrementalParseSession.cpp`
+- `libs/markoff-core/src/ParsePhases.h`
+- `libs/markoff-core/include/markoff-foundation/MarkoffEdit.h`
+- `libs/markoff-core/src/MarkoffEdit.cpp`
+- `libs/markoff-core/include/markoff-foundation/Cmd/Block.h`, `src/Cmd/Block.cpp`
+- `libs/markoff-core/include/markoff-foundation/Cmd/Insert.h`, `src/Cmd/Insert.cpp`
+- `libs/markoff-core/include/markoff-foundation/Cmd/InlineFormat.h`, `src/Cmd/InlineFormat.cpp`
+- `libs/markoff-core/src/Cmd/Helpers.cpp` (and any companion `Helpers.h`)
+- `libs/markoff-core/include/markoff-foundation/CommandFacade.h`, `src/CommandFacade.cpp`
+- `libs/markoff-core/include/markoff-foundation/ReplaceController.h`, `src/ReplaceController.cpp`
+- `libs/markoff-core/include/markoff-foundation/Render/RenderPhaseTaps.h` (verify no surviving consumer at Phase 8)
 
 **Foundation tests:**
 
-- `libs/markoff-foundation/tests/tst_foundation_parse_pool.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_parse_phases.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_parse_input_edit_seq.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_parse_sequence.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_block_anchor.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_block_anchor_compute.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_block_anchor_perf.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_block_anchor_queries.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_block_anchor_stability.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_cmd_insert.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_cmd_inline_format.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_cmd_multi.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_command_facade.cpp`
-- `libs/markoff-foundation/tests/tst_foundation_replace_controller.cpp`
+- `libs/markoff-core/tests/tst_foundation_parse_pool.cpp`
+- `libs/markoff-core/tests/tst_foundation_parse_phases.cpp`
+- `libs/markoff-core/tests/tst_foundation_parse_input_edit_seq.cpp`
+- `libs/markoff-core/tests/tst_foundation_parse_sequence.cpp`
+- `libs/markoff-core/tests/tst_foundation_block_anchor.cpp`
+- `libs/markoff-core/tests/tst_foundation_block_anchor_compute.cpp`
+- `libs/markoff-core/tests/tst_foundation_block_anchor_perf.cpp`
+- `libs/markoff-core/tests/tst_foundation_block_anchor_queries.cpp`
+- `libs/markoff-core/tests/tst_foundation_block_anchor_stability.cpp`
+- `libs/markoff-core/tests/tst_foundation_cmd_block.cpp`
+- `libs/markoff-core/tests/tst_foundation_cmd_insert.cpp`
+- `libs/markoff-core/tests/tst_foundation_cmd_inline_format.cpp`
+- `libs/markoff-core/tests/tst_foundation_cmd_multi.cpp`
+- `libs/markoff-core/tests/tst_foundation_command_facade.cpp`
+- `libs/markoff-core/tests/tst_foundation_replace_controller.cpp`
 
 **Parser:**
 
@@ -184,15 +184,15 @@ Per spec §8, the order is bottom-up: build the new primitive, migrate consumers
 
 **Why a method on `MarkoffDocument` (not a free `Cmd::applyFlatEdit`):** the decomposition needs `iterateBlocks()`, `blockText(BlockId)`, `d2ApplyBufferEdit`, `d2InsertBlock`, `d2RemoveBlock`, `d2UndoLog()` — all on the document. Putting it on the document keeps the call site clean (`doc.applyFlatEdit(...)`).
 
-**Background — block-buffer convention:** every block's CRDT buffer holds its content; the inter-block delimiter is a trailing `\n` on each block except possibly the last. `Cmd::backspaceMerge` (read it for reference: `libs/markoff-foundation/src/Cmd/D2.cpp:62-87`) handles the trailing-`\n` special case when merging. `applyFlatEdit` follows the same convention.
+**Background — block-buffer convention:** every block's CRDT buffer holds its content; the inter-block delimiter is a trailing `\n` on each block except possibly the last. `Cmd::backspaceMerge` (read it for reference: `libs/markoff-core/src/Cmd/D2.cpp:62-87`) handles the trailing-`\n` special case when merging. `applyFlatEdit` follows the same convention.
 
 **Task structure:** test cases first (each its own commit), then minimal implementation, then full implementation.
 
 ### Task 1.1: Test scaffold + first failing test (intra-block insert)
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp`
-- Modify: `libs/markoff-foundation/tests/d2/CMakeLists.txt`
+- Create: `libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp`
+- Modify: `libs/markoff-core/tests/d2/CMakeLists.txt`
 
 - [ ] **Step 1: Write the test scaffold and first failing test**
 
@@ -243,7 +243,7 @@ QTEST_GUILESS_MAIN(TstD4ApplyFlatEdit)
 
 - [ ] **Step 2: Register the test in CMake**
 
-Edit `libs/markoff-foundation/tests/d2/CMakeLists.txt`. Find the existing pattern (e.g. `tst_d2_apply_block_edit`) and add a sibling entry:
+Edit `libs/markoff-core/tests/d2/CMakeLists.txt`. Find the existing pattern (e.g. `tst_d2_apply_block_edit`) and add a sibling entry:
 
 ```cmake
 add_executable(tst_d4_apply_flat_edit tst_d4_apply_flat_edit.cpp)
@@ -259,13 +259,13 @@ Run:
 ```bash
 cmake --build build-dev -j 8 --target tst_d4_apply_flat_edit
 ```
-Expected: compile error — `applyFlatEdit` is not a member of `MarkoffDocument` and `Origin::UserKeystroke` may need verification (check `libs/markoff-foundation/include/markoff-foundation/Origin.h` for the actual enum value names; if `UserKeystroke` doesn't exist, use whatever the existing convention is for "live edit from a flat-text view" — e.g. `Origin::Local`).
+Expected: compile error — `applyFlatEdit` is not a member of `MarkoffDocument` and `Origin::UserKeystroke` may need verification (check `libs/markoff-core/include/markoff-foundation/Origin.h` for the actual enum value names; if `UserKeystroke` doesn't exist, use whatever the existing convention is for "live edit from a flat-text view" — e.g. `Origin::Local`).
 
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp \
-        libs/markoff-foundation/tests/d2/CMakeLists.txt
+git add libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp \
+        libs/markoff-core/tests/d2/CMakeLists.txt
 git commit -m "$(cat <<'EOF'
 test(d4): tst_d4_apply_flat_edit scaffold + intra-block-insert case
 
@@ -280,8 +280,8 @@ EOF
 ### Task 1.2: Add `applyFlatEdit` declaration + minimal stub
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Add the declaration**
 
@@ -336,8 +336,8 @@ Expected: FAIL with the assertion message.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 foundation(d4): declare applyFlatEdit; stub asserts unimplemented
 
@@ -349,7 +349,7 @@ EOF
 ### Task 1.3: Implement intra-block insert path
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Replace the stub with the intra-block-only implementation**
 
@@ -400,7 +400,7 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 foundation(d4): applyFlatEdit intra-block insert path
 
@@ -415,7 +415,7 @@ EOF
 ### Task 1.4: Test + implement intra-block delete
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp`
+- Modify: `libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp`
 
 - [ ] **Step 1: Add the failing test**
 
@@ -448,7 +448,7 @@ Expected: PASS (the intra-block branch handles deletes too — `oldEnd > oldStar
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp
+git add libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp
 git commit -m "$(cat <<'EOF'
 test(d4): intra-block delete case
 
@@ -463,8 +463,8 @@ EOF
 ### Task 1.5: Test + implement insert-newline = block split
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Add the failing test**
 
@@ -594,8 +594,8 @@ Expected: PASS for all three current tests.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp \
-        libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp \
+        libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 foundation(d4): applyFlatEdit handles \\n\\n at block end → split
 
@@ -611,8 +611,8 @@ EOF
 ### Task 1.6: Test + implement intra-block split (newline mid-block)
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Add the failing test**
 
@@ -731,8 +731,8 @@ Expected: PASS for all four cases (the "\n\n at block end" case still works beca
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp \
-        libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp \
+        libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 foundation(d4): applyFlatEdit handles intra-block split
 
@@ -748,8 +748,8 @@ EOF
 ### Task 1.7: Test + implement cross-block edit (delete spanning two blocks → merge)
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Add the failing test**
 
@@ -879,8 +879,8 @@ Expected: PASS for all five cases.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp \
-        libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp \
+        libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 foundation(d4): applyFlatEdit handles cross-block delete → merge
 
@@ -896,7 +896,7 @@ EOF
 ### Task 1.8: Test + verify undo round-trip
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp`
+- Modify: `libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp`
 
 - [ ] **Step 1: Add the test**
 
@@ -935,7 +935,7 @@ Expected: PASS.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp
+git add libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp
 git commit -m "$(cat <<'EOF'
 test(d4): applyFlatEdit undo round-trip across split + merge
 
@@ -950,7 +950,7 @@ EOF
 ### Task 1.9: Test + verify round-trip identity (random fuzz-style)
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp`
+- Modify: `libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp`
 
 - [ ] **Step 1: Add a deterministic round-trip test**
 
@@ -988,7 +988,7 @@ Expected: PASS. **If a case fails**, that's the boundary condition Phase 1 didn'
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d4_apply_flat_edit.cpp
+git add libs/markoff-core/tests/d2/tst_d4_apply_flat_edit.cpp
 git commit -m "$(cat <<'EOF'
 test(d4): applyFlatEdit round-trip parity for representative cases
 
@@ -1020,16 +1020,16 @@ Expected: PASS — `tst_d4_apply_flat_edit` plus everything pre-existing. If any
 
 **Background:** `SourceTextDocumentBinding` is the bridge between a flat-text widget (e.g. `QPlainTextEdit`) and `MarkoffDocument`. Today it intercepts `QPlainTextEdit::contentsChange(int qtPos, int charsRemoved, int charsAdded)`, builds a `MarkoffEdit{oldStart, oldEnd, newText}` in UTF-8 byte coords, and calls `MarkoffDocument::applyLocalEdit({...})`. Reverse direction listens to `MarkoffDocument::contentsChanged(QList<MarkoffEdit>)` and replays edits into the QPlainTextEdit, with re-entrance guarded.
 
-Read `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp` end-to-end before starting (~384 lines). The file's structure is the source of truth for the migration.
+Read `libs/markoff-core/src/SourceTextDocumentBinding.cpp` end-to-end before starting (~384 lines). The file's structure is the source of truth for the migration.
 
 ### Task 2.1: Audit current binding shape
 
 - [ ] **Step 1: Read the current implementation**
 
 ```bash
-sed -n '1,120p' libs/markoff-foundation/src/SourceTextDocumentBinding.cpp
-sed -n '120,260p' libs/markoff-foundation/src/SourceTextDocumentBinding.cpp
-sed -n '260,400p' libs/markoff-foundation/src/SourceTextDocumentBinding.cpp
+sed -n '1,120p' libs/markoff-core/src/SourceTextDocumentBinding.cpp
+sed -n '120,260p' libs/markoff-core/src/SourceTextDocumentBinding.cpp
+sed -n '260,400p' libs/markoff-core/src/SourceTextDocumentBinding.cpp
 ```
 
 (Reading is the work; no checkbox required for "I read it.") Identify and note:
@@ -1042,10 +1042,10 @@ sed -n '260,400p' libs/markoff-foundation/src/SourceTextDocumentBinding.cpp
 
 - [ ] **Step 2: Note the binding's public API**
 
-Read `libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h`:
+Read `libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h`:
 
 ```bash
-cat libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h
+cat libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h
 ```
 
 The migration must keep the public API unchanged so callers (`Markoff::Source::Widget::Editor`, view-qml's `SourceTextDocumentBindingForeign`) compile without churn. The internal forward/reverse path is what changes.
@@ -1053,7 +1053,7 @@ The migration must keep the public API unchanged so callers (`Markoff::Source::W
 ### Task 2.2: Migrate forward direction (QPlainTextEdit → MarkoffDocument)
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp`
+- Modify: `libs/markoff-core/src/SourceTextDocumentBinding.cpp`
 
 - [ ] **Step 1: Locate and replace the forward call site**
 
@@ -1106,7 +1106,7 @@ Expected: PASS (all non-source-widget tests).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/SourceTextDocumentBinding.cpp
+git add libs/markoff-core/src/SourceTextDocumentBinding.cpp
 git commit -m "$(cat <<'EOF'
 foundation(d4): SourceTextDocumentBinding forward path → applyFlatEdit
 
@@ -1123,8 +1123,8 @@ EOF
 ### Task 2.3: Migrate reverse direction (MarkoffDocument → QPlainTextEdit)
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/SourceTextDocumentBinding.cpp`
-- Modify: `libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h` (if any private slot/method declarations change)
+- Modify: `libs/markoff-core/src/SourceTextDocumentBinding.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h` (if any private slot/method declarations change)
 
 - [ ] **Step 1: Replace the reverse subscription**
 
@@ -1189,8 +1189,8 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/SourceTextDocumentBinding.cpp \
-        libs/markoff-foundation/include/markoff-foundation/SourceTextDocumentBinding.h
+git add libs/markoff-core/src/SourceTextDocumentBinding.cpp \
+        libs/markoff-core/include/markoff-foundation/SourceTextDocumentBinding.h
 git commit -m "$(cat <<'EOF'
 foundation(d4): SourceTextDocumentBinding reverse path → d2DocumentChanged
 
@@ -1383,23 +1383,23 @@ These have zero external code consumers (verified at plan time: `grep -r "Comman
 ### Task 4.1: Delete `Cmd::Block` family
 
 **Files:**
-- Delete: `libs/markoff-foundation/include/markoff-foundation/Cmd/Block.h`
-- Delete: `libs/markoff-foundation/src/Cmd/Block.cpp`
-- Delete: `libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp`
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Delete: `libs/markoff-core/include/markoff-foundation/Cmd/Block.h`
+- Delete: `libs/markoff-core/src/Cmd/Block.cpp`
+- Delete: `libs/markoff-core/tests/tst_foundation_cmd_block.cpp`
+- Modify: `libs/markoff-core/CMakeLists.txt`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Remove the source files**
 
 ```bash
-git rm libs/markoff-foundation/include/markoff-foundation/Cmd/Block.h
-git rm libs/markoff-foundation/src/Cmd/Block.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp
+git rm libs/markoff-core/include/markoff-foundation/Cmd/Block.h
+git rm libs/markoff-core/src/Cmd/Block.cpp
+git rm libs/markoff-core/tests/tst_foundation_cmd_block.cpp
 ```
 
 - [ ] **Step 2: Update CMake**
 
-In `libs/markoff-foundation/CMakeLists.txt`, find and remove the `src/Cmd/Block.cpp` source line. In `libs/markoff-foundation/tests/CMakeLists.txt`, find and remove the `tst_foundation_cmd_block` target registration (executable + add_test).
+In `libs/markoff-core/CMakeLists.txt`, find and remove the `src/Cmd/Block.cpp` source line. In `libs/markoff-core/tests/CMakeLists.txt`, find and remove the `tst_foundation_cmd_block` target registration (executable + add_test).
 
 - [ ] **Step 3: Build**
 
@@ -1415,34 +1415,34 @@ Actually — don't comment out. Combine Tasks 4.1–4.4 into a single transactio
 - [ ] **Step 1 (revised): Bulk delete**
 
 ```bash
-git rm libs/markoff-foundation/include/markoff-foundation/Cmd/Block.h
-git rm libs/markoff-foundation/include/markoff-foundation/Cmd/Insert.h
-git rm libs/markoff-foundation/include/markoff-foundation/Cmd/InlineFormat.h
-git rm libs/markoff-foundation/src/Cmd/Block.cpp
-git rm libs/markoff-foundation/src/Cmd/Insert.cpp
-git rm libs/markoff-foundation/src/Cmd/InlineFormat.cpp
-git rm libs/markoff-foundation/src/Cmd/Helpers.cpp
-git rm libs/markoff-foundation/include/markoff-foundation/CommandFacade.h
-git rm libs/markoff-foundation/src/CommandFacade.cpp
-git rm libs/markoff-foundation/include/markoff-foundation/ReplaceController.h
-git rm libs/markoff-foundation/src/ReplaceController.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_cmd_block.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_cmd_insert.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_cmd_inline_format.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_cmd_multi.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_command_facade.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_replace_controller.cpp
+git rm libs/markoff-core/include/markoff-foundation/Cmd/Block.h
+git rm libs/markoff-core/include/markoff-foundation/Cmd/Insert.h
+git rm libs/markoff-core/include/markoff-foundation/Cmd/InlineFormat.h
+git rm libs/markoff-core/src/Cmd/Block.cpp
+git rm libs/markoff-core/src/Cmd/Insert.cpp
+git rm libs/markoff-core/src/Cmd/InlineFormat.cpp
+git rm libs/markoff-core/src/Cmd/Helpers.cpp
+git rm libs/markoff-core/include/markoff-foundation/CommandFacade.h
+git rm libs/markoff-core/src/CommandFacade.cpp
+git rm libs/markoff-core/include/markoff-foundation/ReplaceController.h
+git rm libs/markoff-core/src/ReplaceController.cpp
+git rm libs/markoff-core/tests/tst_foundation_cmd_block.cpp
+git rm libs/markoff-core/tests/tst_foundation_cmd_insert.cpp
+git rm libs/markoff-core/tests/tst_foundation_cmd_inline_format.cpp
+git rm libs/markoff-core/tests/tst_foundation_cmd_multi.cpp
+git rm libs/markoff-core/tests/tst_foundation_command_facade.cpp
+git rm libs/markoff-core/tests/tst_foundation_replace_controller.cpp
 ```
 
 If `Cmd/Helpers.h` exists, also remove it:
 ```bash
-[ -f libs/markoff-foundation/include/markoff-foundation/Cmd/Helpers.h ] && \
-    git rm libs/markoff-foundation/include/markoff-foundation/Cmd/Helpers.h
+[ -f libs/markoff-core/include/markoff-foundation/Cmd/Helpers.h ] && \
+    git rm libs/markoff-core/include/markoff-foundation/Cmd/Helpers.h
 ```
 
 - [ ] **Step 2: Update foundation CMake**
 
-Edit `libs/markoff-foundation/CMakeLists.txt`. Remove these source-list lines (search for each):
+Edit `libs/markoff-core/CMakeLists.txt`. Remove these source-list lines (search for each):
 
 - `src/Cmd/Block.cpp`
 - `src/Cmd/Insert.cpp`
@@ -1451,7 +1451,7 @@ Edit `libs/markoff-foundation/CMakeLists.txt`. Remove these source-list lines (s
 - `src/CommandFacade.cpp`
 - `src/ReplaceController.cpp`
 
-Edit `libs/markoff-foundation/tests/CMakeLists.txt`. Remove these target-registration blocks:
+Edit `libs/markoff-core/tests/CMakeLists.txt`. Remove these target-registration blocks:
 
 - `tst_foundation_cmd_block`
 - `tst_foundation_cmd_insert`
@@ -1463,7 +1463,7 @@ Edit `libs/markoff-foundation/tests/CMakeLists.txt`. Remove these target-registr
 - [ ] **Step 3: Update `Cmd.h` umbrella header**
 
 ```bash
-cat libs/markoff-foundation/include/markoff-foundation/Cmd.h
+cat libs/markoff-core/include/markoff-foundation/Cmd.h
 ```
 
 Remove `#include "Cmd/Block.h"`, `#include "Cmd/Insert.h"`, `#include "Cmd/InlineFormat.h"` lines. Keep `Cmd/D2.h` and `Cmd/Edit.h` includes.
@@ -1485,9 +1485,9 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt \
-        libs/markoff-foundation/include/markoff-foundation/Cmd.h
+git add libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt \
+        libs/markoff-core/include/markoff-foundation/Cmd.h
 git commit -m "$(cat <<'EOF'
 foundation(d4): delete dead legacy Cmd::* family + CommandFacade + ReplaceController
 
@@ -1780,20 +1780,20 @@ EOF
 - [ ] **Step 1: Delete files**
 
 ```bash
-git rm libs/markoff-foundation/tests/tst_foundation_parse_pool.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_parse_phases.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_parse_input_edit_seq.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_parse_sequence.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_block_anchor.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_block_anchor_compute.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_block_anchor_perf.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_block_anchor_queries.cpp
-git rm libs/markoff-foundation/tests/tst_foundation_block_anchor_stability.cpp
+git rm libs/markoff-core/tests/tst_foundation_parse_pool.cpp
+git rm libs/markoff-core/tests/tst_foundation_parse_phases.cpp
+git rm libs/markoff-core/tests/tst_foundation_parse_input_edit_seq.cpp
+git rm libs/markoff-core/tests/tst_foundation_parse_sequence.cpp
+git rm libs/markoff-core/tests/tst_foundation_block_anchor.cpp
+git rm libs/markoff-core/tests/tst_foundation_block_anchor_compute.cpp
+git rm libs/markoff-core/tests/tst_foundation_block_anchor_perf.cpp
+git rm libs/markoff-core/tests/tst_foundation_block_anchor_queries.cpp
+git rm libs/markoff-core/tests/tst_foundation_block_anchor_stability.cpp
 ```
 
 - [ ] **Step 2: Update tests CMake**
 
-Edit `libs/markoff-foundation/tests/CMakeLists.txt`. Remove every block registering a deleted test target.
+Edit `libs/markoff-core/tests/CMakeLists.txt`. Remove every block registering a deleted test target.
 
 - [ ] **Step 3: Build and run remaining tests**
 
@@ -1806,7 +1806,7 @@ Expected: PASS — only D2-native foundation tests + survivor leaf tests remain.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/tests/CMakeLists.txt
 git commit -m "$(cat <<'EOF'
 test(foundation/d4): delete tests for deprecated parse pipeline
 
@@ -1833,8 +1833,8 @@ EOF
 ### Task 8.1: Remove parsePool member, ctor relay, and schedule calls
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocumentPrivate.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Drop the parsePool member from `MarkoffDocumentPrivate.h`**
 
@@ -1871,8 +1871,8 @@ Expected: PASS. The `parseUpdated` signal never fires now, but no surviving test
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocumentPrivate.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/src/MarkoffDocumentPrivate.h \
+        libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 foundation(d4): excise parsePool from MarkoffDocument runtime
 
@@ -1896,11 +1896,11 @@ EOF
 ### Task 9.1: Delete the public-surface symbols
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Modify: `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`
-- Delete: `libs/markoff-foundation/include/markoff-foundation/MarkoffEdit.h`
-- Delete: `libs/markoff-foundation/src/MarkoffEdit.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocumentPrivate.h`
+- Delete: `libs/markoff-core/include/markoff-foundation/MarkoffEdit.h`
+- Delete: `libs/markoff-core/src/MarkoffEdit.cpp`
 
 - [ ] **Step 1: From `MarkoffDocument.h`, delete:**
 
@@ -1926,13 +1926,13 @@ EOF
 - [ ] **Step 4: Delete `MarkoffEdit.h` and `MarkoffEdit.cpp`**
 
 ```bash
-git rm libs/markoff-foundation/include/markoff-foundation/MarkoffEdit.h
-git rm libs/markoff-foundation/src/MarkoffEdit.cpp
+git rm libs/markoff-core/include/markoff-foundation/MarkoffEdit.h
+git rm libs/markoff-core/src/MarkoffEdit.cpp
 ```
 
 - [ ] **Step 5: Update CMake**
 
-In `libs/markoff-foundation/CMakeLists.txt`, remove the `src/MarkoffEdit.cpp` source line.
+In `libs/markoff-core/CMakeLists.txt`, remove the `src/MarkoffEdit.cpp` source line.
 
 - [ ] **Step 6: Build**
 
@@ -1951,10 +1951,10 @@ Expected: PASS.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/src/MarkoffDocumentPrivate.h \
-        libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/src/MarkoffDocumentPrivate.h \
+        libs/markoff-core/CMakeLists.txt
 git commit -m "$(cat <<'EOF'
 foundation(d4): delete parseUpdated / parseSequence / MarkoffEdit / applyLocalEdit
 
@@ -1975,22 +1975,22 @@ EOF
 ### Task 10.1: Delete ParsePool / IncrementalParseSession / ParsePhases
 
 **Files:**
-- Delete: `libs/markoff-foundation/src/ParsePool.h`, `ParsePool.cpp`
-- Delete: `libs/markoff-foundation/src/ParsePoolWorker.h`, `ParsePoolWorker.cpp`
-- Delete: `libs/markoff-foundation/src/IncrementalParseSession.h`, `IncrementalParseSession.cpp`
-- Delete: `libs/markoff-foundation/src/ParsePhases.h`
-- Delete: `libs/markoff-foundation/include/markoff-foundation/Render/RenderPhaseTaps.h` (if no surviving consumer; verify)
+- Delete: `libs/markoff-core/src/ParsePool.h`, `ParsePool.cpp`
+- Delete: `libs/markoff-core/src/ParsePoolWorker.h`, `ParsePoolWorker.cpp`
+- Delete: `libs/markoff-core/src/IncrementalParseSession.h`, `IncrementalParseSession.cpp`
+- Delete: `libs/markoff-core/src/ParsePhases.h`
+- Delete: `libs/markoff-core/include/markoff-foundation/Render/RenderPhaseTaps.h` (if no surviving consumer; verify)
 
 - [ ] **Step 1: Delete files**
 
 ```bash
-git rm libs/markoff-foundation/src/ParsePool.h
-git rm libs/markoff-foundation/src/ParsePool.cpp
-git rm libs/markoff-foundation/src/ParsePoolWorker.h
-git rm libs/markoff-foundation/src/ParsePoolWorker.cpp
-git rm libs/markoff-foundation/src/IncrementalParseSession.h
-git rm libs/markoff-foundation/src/IncrementalParseSession.cpp
-git rm libs/markoff-foundation/src/ParsePhases.h
+git rm libs/markoff-core/src/ParsePool.h
+git rm libs/markoff-core/src/ParsePool.cpp
+git rm libs/markoff-core/src/ParsePoolWorker.h
+git rm libs/markoff-core/src/ParsePoolWorker.cpp
+git rm libs/markoff-core/src/IncrementalParseSession.h
+git rm libs/markoff-core/src/IncrementalParseSession.cpp
+git rm libs/markoff-core/src/ParsePhases.h
 ```
 
 For `RenderPhaseTaps.h`, first verify no consumer:
@@ -1999,14 +1999,14 @@ grep -r "RenderPhaseTaps\|Markoff::Render::" libs/ apps/ --include="*.cpp" --inc
 ```
 If empty, delete:
 ```bash
-git rm libs/markoff-foundation/include/markoff-foundation/Render/RenderPhaseTaps.h
-[ -d libs/markoff-foundation/include/markoff-foundation/Render ] && \
-    rmdir libs/markoff-foundation/include/markoff-foundation/Render 2>/dev/null
+git rm libs/markoff-core/include/markoff-foundation/Render/RenderPhaseTaps.h
+[ -d libs/markoff-core/include/markoff-foundation/Render ] && \
+    rmdir libs/markoff-core/include/markoff-foundation/Render 2>/dev/null
 ```
 
 - [ ] **Step 2: Update CMake**
 
-In `libs/markoff-foundation/CMakeLists.txt`, remove the source-list lines for:
+In `libs/markoff-core/CMakeLists.txt`, remove the source-list lines for:
 - `src/ParsePool.cpp`
 - `src/ParsePoolWorker.cpp`
 - `src/IncrementalParseSession.cpp`
@@ -2031,7 +2031,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/CMakeLists.txt
 git commit -m "$(cat <<'EOF'
 foundation(d4): delete ParsePool / ParsePoolWorker / IncrementalParseSession / ParsePhases
 
@@ -2269,7 +2269,7 @@ EOF
 - Modify: `docs/d-arc/d-arc-status.md`
 - Modify: `docs/d-arc/2026-05-04-d-arc-roadmap.md`
 - Modify: `CLAUDE.md` (worktree root)
-- Modify: `libs/markoff-foundation/CLAUDE.md`
+- Modify: `libs/markoff-core/CLAUDE.md`
 
 - [ ] **Step 1: Status board**
 
@@ -2295,7 +2295,7 @@ Edit the root-of-worktree `CLAUDE.md` banner block. Replace the "Active phase: D
 
 - [ ] **Step 4: Foundation CLAUDE.md**
 
-Edit `libs/markoff-foundation/CLAUDE.md`:
+Edit `libs/markoff-core/CLAUDE.md`:
 
 - Remove the "Status (2026-05-06)" block's references to corrective work that has shipped; restate the current state (D2/D3/D4 complete).
 - Remove the `parseUpdated` signal section; remove the `parseSequence()` accessor mention; remove `applyLocalEdit` mention; remove `latestBlockAnchors`/`ParsePool` mentions.
@@ -2316,7 +2316,7 @@ Remove any line that names a D4-deletion target as a TODO. Add any newly-noticed
 git add docs/d-arc/d-arc-status.md \
         docs/d-arc/2026-05-04-d-arc-roadmap.md \
         CLAUDE.md \
-        libs/markoff-foundation/CLAUDE.md \
+        libs/markoff-core/CLAUDE.md \
         docs/TODO.md
 git commit -m "$(cat <<'EOF'
 docs(d4): mark D4 complete; advance orienting docs to D5
@@ -2451,9 +2451,9 @@ D4 done.
 
 These are reference points the executor may need to reread:
 
-- `libs/markoff-foundation/src/Cmd/D2.cpp:38-87` — pattern for opening a transaction and using `d2ApplyBufferEdit` + `d2InsertBlock` + `d2RemoveBlock`. The model for `applyFlatEdit`'s implementation.
-- `libs/markoff-foundation/include/markoff-foundation/UndoLog.h:48-110` — `UndoLog::Transaction` lifetime + coalescing API.
-- `libs/markoff-foundation/include/markoff-foundation/StructuralOp.h` — what `applyStructural` consumes.
-- `libs/markoff-foundation/src/MarkoffDocument.cpp:175-220` — the legacy `applyLocalEdit` implementation; useful only as historical context.
+- `libs/markoff-core/src/Cmd/D2.cpp:38-87` — pattern for opening a transaction and using `d2ApplyBufferEdit` + `d2InsertBlock` + `d2RemoveBlock`. The model for `applyFlatEdit`'s implementation.
+- `libs/markoff-core/include/markoff-foundation/UndoLog.h:48-110` — `UndoLog::Transaction` lifetime + coalescing API.
+- `libs/markoff-core/include/markoff-foundation/StructuralOp.h` — what `applyStructural` consumes.
+- `libs/markoff-core/src/MarkoffDocument.cpp:175-220` — the legacy `applyLocalEdit` implementation; useful only as historical context.
 - `libs/markoff-view-qml/src/EditorBackend.cpp:18-45` — the `parseUpdated → parseUpdatedAt` relay being deleted.
 - `libs/markoff-source-widget/src/Editor.cpp` — the source-widget Editor that holds a `SourceTextDocumentBinding`. Don't change the Editor itself; only the binding.

@@ -145,8 +145,8 @@ None. Source widget reads `sourceText()`. View-qml Phase 1 reads `sourceText()`.
 | `libs/markoff-parser/src/Document.cpp` | Rewrite `extract`: drop substitution loop, drop definition-line removal, fold refs scan into numbering, populate `refs`. Add `Document::footnoteRefs()` returning `d->refs`. |
 | `libs/markoff-parser/tests/tst_document.cpp` | Add tests for the new body contract and `footnoteRefs()`. Update any test that asserted `<sup>` in body. |
 | `libs/markoff-parser/tests/tst_document_queries.cpp` | Verify `footnotes()` still returns expected results post-cleanup. Verify `footnoteRefs()` returns expected refs for known fixtures. |
-| `libs/markoff-foundation/tests/tst_foundation_*` | Verify no regression. None should depend on body == post-substitution form. |
-| `libs/markoff-foundation/src/IncrementalParseSession.cpp` | No change required. (Comment update optional.) |
+| `libs/markoff-core/tests/tst_foundation_*` | Verify no regression. None should depend on body == post-substitution form. |
+| `libs/markoff-core/src/IncrementalParseSession.cpp` | No change required. (Comment update optional.) |
 | `docs/TODO.md` | Move follow-up #1 to "landed" once committed. |
 
 ## Tests

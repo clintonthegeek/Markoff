@@ -107,7 +107,7 @@ surfaces them.
   Don't ship a perf claim that doesn't show in numbers — `f3bbdf6`'s
   `reuseItems` trial set the precedent.
 - **No production-side perf instrumentation.** The opt-in `RenderPhaseTaps`
-  pattern in `libs/markoff-foundation/include/markoff-foundation/RenderPhases.h`
+  pattern in `libs/markoff-core/include/markoff-foundation/RenderPhases.h`
   is the model: pointer-default-null, zero overhead in production.
 - **Don't undo the bench's small-replicaId workaround as part of perf
   work.** `docs/TODO.md` flags it as a separate one-shot. Doing both at

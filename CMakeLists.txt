@@ -5,7 +5,7 @@ project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 #   - libs/rapidyaml          (ryml::ryml — YAML parser, vendored)
 #   - libs/markoff-parser     (MarkoffParser::MarkoffParser — tree-sitter Markdown AST + YAML frontmatter)
 #   - libs/collabtext         (CRDT text engine, sibling-symlinked from /home/clinton/dev/collabtext)
-#   - libs/markoff-foundation (Markoff::Foundation — MarkoffDocument + ParsePool + Sessions)
+#   - libs/markoff-core (Markoff::Core — MarkoffDocument + ParsePool + Sessions)
 #   - libs/markoff-view-qml   (QML view library)
 #   - libs/markoff-source-widget (QPlainTextEdit-based source widget)
 #
@@ -56,7 +56,7 @@ if(NOT TARGET collabtext)
     add_subdirectory(libs/collabtext)
 endif()
 
-add_subdirectory(libs/markoff-foundation)
+add_subdirectory(libs/markoff-core)
 add_subdirectory(libs/markoff-view-qml)
 # jkqtmathtext — LaTeX math rendering for Math blocks in markoff-live-render.
 if(NOT TARGET jkqtmathtext)

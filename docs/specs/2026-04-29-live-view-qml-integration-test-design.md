@@ -100,12 +100,12 @@ Add to `libs/markoff-view-qml/tests/CMakeLists.txt`:
 add_executable(tst_view_qml_live_view_qml tst_view_qml_live_view_qml.cpp)
 add_test(NAME tst_view_qml_live_view_qml COMMAND tst_view_qml_live_view_qml)
 target_link_libraries(tst_view_qml_live_view_qml
-    PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml markoff_view_qmlplugin markoff_foundation)
+    PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml markoff_view_qmlplugin markoff_core)
 qt6_import_qml_plugins(tst_view_qml_live_view_qml)
 set_tests_properties(tst_view_qml_live_view_qml PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
-Mirrors `tst_view_qml_integration` plus `markoff_foundation` (for `MarkoffDocument`, `Origin`, etc., used to seed the document directly).
+Mirrors `tst_view_qml_integration` plus `markoff_core` (for `MarkoffDocument`, `Origin`, etc., used to seed the document directly).
 
 ## 6. Non-test changes
 

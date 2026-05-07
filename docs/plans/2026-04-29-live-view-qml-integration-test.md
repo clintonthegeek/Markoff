@@ -107,7 +107,7 @@ Append after the `tst_view_qml_app_smoke` stanza (end of file):
 add_executable(tst_view_qml_live_view_qml tst_view_qml_live_view_qml.cpp)
 add_test(NAME tst_view_qml_live_view_qml COMMAND tst_view_qml_live_view_qml)
 target_link_libraries(tst_view_qml_live_view_qml
-    PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml markoff_view_qmlplugin markoff_foundation)
+    PRIVATE Qt6::Test Qt6::Qml Qt6::Quick markoff_view_qml markoff_view_qmlplugin markoff_core)
 qt6_import_qml_plugins(tst_view_qml_live_view_qml)
 set_tests_properties(tst_view_qml_live_view_qml PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```

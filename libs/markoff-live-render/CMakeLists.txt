@@ -88,7 +88,7 @@ target_link_libraries(markoff_live_render PUBLIC
     Qt6::Widgets
     Qt6::Quick
     Qt6::QuickControls2
-    markoff_foundation
+    markoff_core
     jkqtmathtext
 )
 

@@ -317,7 +317,7 @@ For each kind of source mutation, what happens to BlockAnchors:
 ### Files created
 
 ```
-libs/markoff-foundation/
+libs/markoff-core/
   include/markoff-foundation/
     TextAnchor.h
     BlockAnchor.h
@@ -335,7 +335,7 @@ libs/markoff-foundation/
 ### Files modified
 
 ```
-libs/markoff-foundation/
+libs/markoff-core/
   include/markoff-foundation/
     MarkoffDocument.h         new public APIs per §2 (parseSequence,
                               textAnchorAt overloads, blockAt,
@@ -426,9 +426,9 @@ Add to existing `tst_realistic` or `tst_benchmark`:
 
 - **Driving consumer:** `docs/specs/2026-04-30-live-editing-design.md`
 - **Walking-skeleton parent (for `(kind, content-hash)` BlockKey context):** `docs/specs/2026-04-29-live-render-design.md`
-- **Existing foundation API:** `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`, `Session.h`, `Selection.h`
+- **Existing foundation API:** `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`, `Session.h`, `Selection.h`
 - **CRDT anchor type:** `libs/collabtext/src/crdt/Anchor.h` (sibling-symlinked from `/home/clinton/dev/collabtext/`)
-- **Anchor JSON serialisation precedent:** `libs/markoff-foundation/include/markoff-foundation/AnchorJson.h`
+- **Anchor JSON serialisation precedent:** `libs/markoff-core/include/markoff-foundation/AnchorJson.h`
 
 ---
 

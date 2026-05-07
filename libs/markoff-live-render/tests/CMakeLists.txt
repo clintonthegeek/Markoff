@@ -25,21 +25,21 @@ qt_add_executable(tst_live_render_block_model
     tst_live_render_block_model.cpp
 )
 target_link_libraries(tst_live_render_block_model PRIVATE
-    Qt6::Core Qt6::Test markoff_live_render markoff_foundation)
+    Qt6::Core Qt6::Test markoff_live_render markoff_core)
 add_test(NAME tst_live_render_block_model COMMAND tst_live_render_block_model)
 
 qt_add_executable(tst_live_render_cursor
     tst_live_render_cursor.cpp
 )
 target_link_libraries(tst_live_render_cursor PRIVATE
-    Qt6::Core Qt6::Test markoff_live_render markoff_foundation)
+    Qt6::Core Qt6::Test markoff_live_render markoff_core)
 add_test(NAME tst_live_render_cursor COMMAND tst_live_render_cursor)
 
 qt_add_executable(tst_live_render_paragraph_edit
     tst_live_render_paragraph_edit.cpp
 )
 target_link_libraries(tst_live_render_paragraph_edit PRIVATE
-    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test markoff_live_render markoff_foundation)
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test markoff_live_render markoff_core)
 add_test(NAME tst_live_render_paragraph_edit COMMAND tst_live_render_paragraph_edit)
 
 qt_add_executable(tst_live_render_structural
@@ -47,7 +47,7 @@ qt_add_executable(tst_live_render_structural
 )
 target_link_libraries(tst_live_render_structural PRIVATE
     Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test
-    markoff_live_render markoff_foundation)
+    markoff_live_render markoff_core)
 add_test(NAME tst_live_render_structural COMMAND tst_live_render_structural)
 
 qt_add_executable(tst_live_render_kind_transition
@@ -65,6 +65,6 @@ qt_add_executable(tst_live_render_context_menu
     tst_live_render_context_menu.cpp
 )
 target_link_libraries(tst_live_render_context_menu PRIVATE
-    Qt6::Core Qt6::Test markoff_live_render markoff_foundation)
+    Qt6::Core Qt6::Test markoff_live_render markoff_core)
 add_test(NAME tst_live_render_context_menu COMMAND tst_live_render_context_menu)
 

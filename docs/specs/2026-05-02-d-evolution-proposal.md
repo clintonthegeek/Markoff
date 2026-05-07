@@ -476,7 +476,7 @@ We're framing this proposal early so both projects can shape their roadmaps with
 
 - `docs/specs/2026-05-02-live-render-restoration-design.md` — the C-restoration spec; the architecture this document evolves from.
 - `docs/2026-05-02-live-view-architectural-audit.md` — the diagnostic that drove restoration; useful for understanding the historical context that shaped the C decisions.
-- `libs/markoff-foundation/CLAUDE.md` — the foundation public-API boundary; describes how Markoff today wraps collabtext to keep CRDT internals out of the view layer.
+- `libs/markoff-core/CLAUDE.md` — the foundation public-API boundary; describes how Markoff today wraps collabtext to keep CRDT internals out of the view layer.
 
 ### collabtext context (read for grounding; not authored by us)
 

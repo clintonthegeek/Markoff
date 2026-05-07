@@ -53,7 +53,7 @@ Plan-time-deferred to D3: Q2 (plugin block-kind registration), Q4 (`BlockAttrsMa
 ### New files
 
 ```
-libs/markoff-foundation/
+libs/markoff-core/
 ├─ include/markoff-foundation/
 │  ├─ BlockId.h                              # Phase 1
 │  ├─ BlockEdit.h                            # Phase 1
@@ -100,7 +100,7 @@ libs/markoff-foundation/
 ### Modified files
 
 ```
-libs/markoff-foundation/
+libs/markoff-core/
 ├─ include/markoff-foundation/
 │  ├─ MarkoffDocument.h                      # Phase 4 (public surface reshape; type name preserved)
 │  ├─ TextAnchor.h                           # Phase 3
@@ -122,7 +122,7 @@ libs/markoff-live-render/
    ├─ src/UndoCoalescer.{h,cpp}              # Phase 11.4 — delete
    └─ include/markoff/Marker.h               # Phase 11.3 — delete
 
-libs/markoff-foundation/src/
+libs/markoff-core/src/
 ├─ Search/                                    # Phase 12.1 — adapt to per-block iteration
 ├─ Replace/                                   # Phase 12.2
 ├─ DefaultLinkService.cpp                     # Phase 12.3
@@ -233,12 +233,12 @@ ln -sf build-dev/compile_commands.json compile_commands.json
 ### Task 0.3: D2 test directory scaffolding
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/d2/CMakeLists.txt`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt` (add `add_subdirectory(d2)`)
+- Create: `libs/markoff-core/tests/d2/CMakeLists.txt`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt` (add `add_subdirectory(d2)`)
 
 - [ ] **Step 1: Create the d2 subdirectory CMakeLists**
 
-`libs/markoff-foundation/tests/d2/CMakeLists.txt`:
+`libs/markoff-core/tests/d2/CMakeLists.txt`:
 ```cmake
 # D2 test executables. Each tst_* target is added by its respective phase task.
 # Keep this file minimal; tasks add their own targets.
@@ -246,7 +246,7 @@ ln -sf build-dev/compile_commands.json compile_commands.json
 
 - [ ] **Step 2: Wire it from the parent**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 ```cmake
 add_subdirectory(d2)
 ```
@@ -262,7 +262,7 @@ Expected: clean build.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/CMakeLists.txt libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/tests/d2/CMakeLists.txt libs/markoff-core/tests/CMakeLists.txt
 git commit -m "d2(foundation): test scaffolding — d2/ test subdirectory"
 ```
 
@@ -273,13 +273,13 @@ git commit -m "d2(foundation): test scaffolding — d2/ test subdirectory"
 ### Task 1.1: `CausalLwwMap` header skeleton + first test
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/CausalLwwMap.h`
-- Create: `libs/markoff-foundation/tests/d2/tst_causal_lww_map.cpp`
-- Modify: `libs/markoff-foundation/tests/d2/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/CausalLwwMap.h`
+- Create: `libs/markoff-core/tests/d2/tst_causal_lww_map.cpp`
+- Modify: `libs/markoff-core/tests/d2/CMakeLists.txt`
 
 - [ ] **Step 1: Write the failing test**
 
-`libs/markoff-foundation/tests/d2/tst_causal_lww_map.cpp`:
+`libs/markoff-core/tests/d2/tst_causal_lww_map.cpp`:
 ```cpp
 #include <QTest>
 #include <markoff-foundation/CausalLwwMap.h>
@@ -301,7 +301,7 @@ QTEST_GUILESS_MAIN(TstCausalLwwMap)
 
 - [ ] **Step 2: Wire the test into CMake**
 
-Append to `libs/markoff-foundation/tests/d2/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/d2/CMakeLists.txt`:
 ```cmake
 qt_add_executable(tst_causal_lww_map tst_causal_lww_map.cpp)
 target_link_libraries(tst_causal_lww_map PRIVATE Qt6::Test markoff-foundation)
@@ -318,7 +318,7 @@ Expected: FAIL (`CausalLwwMap.h` not found).
 
 - [ ] **Step 4: Write minimal header**
 
-`libs/markoff-foundation/include/markoff-foundation/CausalLwwMap.h`:
+`libs/markoff-core/include/markoff-foundation/CausalLwwMap.h`:
 ```cpp
 #pragma once
 #include <cstdint>
@@ -358,7 +358,7 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/CausalLwwMap.h libs/markoff-foundation/tests/d2/tst_causal_lww_map.cpp libs/markoff-foundation/tests/d2/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/CausalLwwMap.h libs/markoff-core/tests/d2/tst_causal_lww_map.cpp libs/markoff-core/tests/d2/CMakeLists.txt
 git commit -m "d2(foundation): CausalLwwMap header skeleton + empty-get test"
 ```
 
@@ -366,7 +366,7 @@ git commit -m "d2(foundation): CausalLwwMap header skeleton + empty-get test"
 
 - [ ] **Step 1: Write the failing tests**
 
-Append to `libs/markoff-foundation/tests/d2/tst_causal_lww_map.cpp` `private slots` block:
+Append to `libs/markoff-core/tests/d2/tst_causal_lww_map.cpp` `private slots` block:
 ```cpp
     void set_then_getReturnsValue();
     void setOverwrites_higherStampWins();
@@ -782,9 +782,9 @@ git commit -m "d2(foundation): CausalLwwMap applyRemote — foreign writes bypas
 ### Task 1.7: `BlockId` value type
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/BlockId.h`
-- Create: `libs/markoff-foundation/tests/d2/tst_block_id.cpp`
-- Modify: `libs/markoff-foundation/tests/d2/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/BlockId.h`
+- Create: `libs/markoff-core/tests/d2/tst_block_id.cpp`
+- Modify: `libs/markoff-core/tests/d2/CMakeLists.txt`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -875,9 +875,9 @@ git commit -m "d2(foundation): BlockId value type — null, equality, QHash key"
 ### Task 1.8: `BlockEdit`, `StructuralOp`, `BlockKind`
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/BlockEdit.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/StructuralOp.h`
-- Create: `libs/markoff-foundation/include/markoff-foundation/BlockKind.h`
+- Create: `libs/markoff-core/include/markoff-foundation/BlockEdit.h`
+- Create: `libs/markoff-core/include/markoff-foundation/StructuralOp.h`
+- Create: `libs/markoff-core/include/markoff-foundation/BlockKind.h`
 - Test: extend `tst_block_id.cpp` (or new `tst_block_types.cpp`)
 
 - [ ] **Step 1: Write tests for the three types**
@@ -964,9 +964,9 @@ git commit -m "d2(foundation): BlockEdit + StructuralOp + BlockKind value types"
 ### Task 2.1: `UndoLog::Transaction` RAII skeleton
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/UndoLog.h`
-- Create: `libs/markoff-foundation/src/UndoLog.cpp`
-- Create: `libs/markoff-foundation/tests/d2/tst_undo_log.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/UndoLog.h`
+- Create: `libs/markoff-core/src/UndoLog.cpp`
+- Create: `libs/markoff-core/tests/d2/tst_undo_log.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1378,14 +1378,14 @@ git commit -m "d2(foundation): UndoLog compact — drops entries whose ops are a
 ### Task 3.1: Reshape `TextAnchor` to wrap `(BlockId, Crdt::Anchor)`
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/TextAnchor.h`
-- Modify: `libs/markoff-foundation/src/AnchorConversion.h`
+- Modify: `libs/markoff-core/include/markoff-foundation/TextAnchor.h`
+- Modify: `libs/markoff-core/src/AnchorConversion.h`
 - Test: existing `tst_text_anchor.cpp` (rewrite tests for new shape)
 
 - [ ] **Step 1: Read current TextAnchor**
 
 ```bash
-cat libs/markoff-foundation/include/markoff-foundation/TextAnchor.h
+cat libs/markoff-core/include/markoff-foundation/TextAnchor.h
 ```
 
 Capture the current public surface; the new `TextAnchor` must expose comparable methods.
@@ -1456,7 +1456,7 @@ git commit -m "d2(foundation): TextAnchor reshape — wraps (BlockId, per-block 
 ### Task 3.2: `BlockAnchor.h` becomes typedef for `BlockId`
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/BlockAnchor.h`
+- Modify: `libs/markoff-core/include/markoff-foundation/BlockAnchor.h`
 
 - [ ] **Step 1: Replace contents with typedef**
 
@@ -1492,8 +1492,8 @@ This is the largest phase. Each task touches `MarkoffDocument.h` / `.cpp` and ma
 ### Task 4.1: `MarkoffDocument` private members swap
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Add new private members alongside old; old still wired**
 
@@ -1792,8 +1792,8 @@ Each is a thin typedef + a Qt-signal proxy. Pattern is identical for all five; f
 ### Task 5.1: `KindTagMap`
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/KindTagMap.h`
-- Create test: `libs/markoff-foundation/tests/d2/tst_d2_sibling_maps.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/KindTagMap.h`
+- Create test: `libs/markoff-core/tests/d2/tst_d2_sibling_maps.cpp`
 
 - [ ] **Step 1: Write test**
 
@@ -1885,9 +1885,9 @@ git commit -m "d2(foundation): FootnoteDefMap = CausalLwwMap<FootnoteId, content
 ### Task 6.1: `Cmd::insertCharacter` with coalescing
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/Cmd.h`
-- Create: `libs/markoff-foundation/src/Cmd_d2.cpp` (will replace old `Cmd.cpp` content in Phase 14.3)
-- Test: `libs/markoff-foundation/tests/d2/tst_d2_cmd_decomposition.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/Cmd.h`
+- Create: `libs/markoff-core/src/Cmd_d2.cpp` (will replace old `Cmd.cpp` content in Phase 14.3)
+- Test: `libs/markoff-core/tests/d2/tst_d2_cmd_decomposition.cpp`
 
 - [ ] **Step 1: Write test**
 
@@ -2143,7 +2143,7 @@ git commit -m "d2(foundation): Cmd::pasteMarkdown — sync parse + split target 
 - [ ] **Step 1: List old Cmd functions, remove them, fix call sites**
 
 ```bash
-grep -rn "MarkoffEdit" libs/markoff-foundation/src/Cmd*.cpp libs/markoff-foundation/include/markoff-foundation/Cmd.h
+grep -rn "MarkoffEdit" libs/markoff-core/src/Cmd*.cpp libs/markoff-core/include/markoff-foundation/Cmd.h
 ```
 
 Each remaining MarkoffEdit-shaped Cmd gets removed; callers (which all flagged as deprecated in Task 4.8) are updated to the new shapes.
@@ -2161,8 +2161,8 @@ git commit -m "d2(foundation): retire Cmd::* functions taking MarkoffEdit"
 ### Task 7.1: `loadFromMarkdown` skeleton + frontmatter extraction
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Test: `libs/markoff-foundation/tests/d2/tst_d2_load.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Test: `libs/markoff-core/tests/d2/tst_d2_load.cpp`
 
 - [ ] **Step 1: Test**
 
@@ -2345,8 +2345,8 @@ git commit -m "d2(foundation): load baselines per CRDT + documentLoaded signal"
 ### Task 8.1: `BlockSerializer` interface
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/BlockSerializer.h`
-- Create: `libs/markoff-foundation/src/BlockSerializers.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/BlockSerializer.h`
+- Create: `libs/markoff-core/src/BlockSerializers.cpp`
 
 - [ ] **Step 1: Define the interface**
 
@@ -2530,18 +2530,18 @@ git commit -m "d2(foundation): MarkoffDocument::save — atomic write + fsync + 
 ### Task 8.7: Round-trip corpus infrastructure
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/d2/roundtrip/corpus/` directory + sample files
-- Create: `libs/markoff-foundation/tests/d2/tst_d2_roundtrip.cpp`
+- Create: `libs/markoff-core/tests/d2/roundtrip/corpus/` directory + sample files
+- Create: `libs/markoff-core/tests/d2/tst_d2_roundtrip.cpp`
 
 - [ ] **Step 1: Curate initial corpus** (Q3 plan-time decision)
 
 ```bash
-mkdir -p libs/markoff-foundation/tests/d2/roundtrip/corpus
+mkdir -p libs/markoff-core/tests/d2/roundtrip/corpus
 # Copy GFM examples
-cp /path/to/gfm-spec-examples/*.md libs/markoff-foundation/tests/d2/roundtrip/corpus/
+cp /path/to/gfm-spec-examples/*.md libs/markoff-core/tests/d2/roundtrip/corpus/
 # Copy project's own docs (representative, no license issue)
-cp docs/2026-05-02-live-view-architectural-audit.md libs/markoff-foundation/tests/d2/roundtrip/corpus/
-cp docs/specs/2026-05-04-d2-foundation-reshape-design.md libs/markoff-foundation/tests/d2/roundtrip/corpus/
+cp docs/2026-05-02-live-view-architectural-audit.md libs/markoff-core/tests/d2/roundtrip/corpus/
+cp docs/specs/2026-05-04-d2-foundation-reshape-design.md libs/markoff-core/tests/d2/roundtrip/corpus/
 # Add a CommonMark-spec edge case selection (manually, ~10 small files)
 ```
 
@@ -2593,7 +2593,7 @@ add_test(NAME tst_d2_roundtrip COMMAND tst_d2_roundtrip)
 - [ ] **Step 4: Commit corpus and infrastructure (test will fail until Phase 8.5 lands; that's expected)**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/roundtrip/ libs/markoff-foundation/tests/d2/tst_d2_roundtrip.cpp libs/markoff-foundation/tests/d2/CMakeLists.txt
+git add libs/markoff-core/tests/d2/roundtrip/ libs/markoff-core/tests/d2/tst_d2_roundtrip.cpp libs/markoff-core/tests/d2/CMakeLists.txt
 git commit -m "d2(foundation): round-trip corpus + test driver (passes once 8.5 lands)"
 ```
 
@@ -2638,9 +2638,9 @@ git commit -m "d2(foundation): round-trip corpus — all files byte-identical, s
 ### Task 9.1: `WatermarkCoordinator` skeleton + `onSaveSucceeded`
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/WatermarkCoordinator.h`
-- Create: `libs/markoff-foundation/src/WatermarkCoordinator.cpp`
-- Test: `libs/markoff-foundation/tests/d2/tst_d2_gc.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/WatermarkCoordinator.h`
+- Create: `libs/markoff-core/src/WatermarkCoordinator.cpp`
+- Test: `libs/markoff-core/tests/d2/tst_d2_gc.cpp`
 
 - [ ] **Step 1: Test**
 
@@ -2778,8 +2778,8 @@ git commit -m "d2(parser): extract inlineSpansFor as a clean entry point"
 ### Task 10.2: `InlineParseCache` (sync on read, never-evict)
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/InlineParseCache.h`
-- Create: `libs/markoff-foundation/src/InlineParseCache.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/InlineParseCache.h`
+- Create: `libs/markoff-core/src/InlineParseCache.cpp`
 
 - [ ] **Step 1: Test**
 
@@ -3006,7 +3006,7 @@ git commit -m "d2(view): LiveCursorState — cursor delivery via IdList::structu
 ### Task 12.1: `SearchEngine` per-block iteration
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/SearchEngine.cpp`
+- Modify: `libs/markoff-core/src/SearchEngine.cpp`
 
 - [ ] **Step 1: Test**
 
@@ -3079,7 +3079,7 @@ git commit -m "d2(foundation): SyntaxHighlightService verified against new Inlin
 ### Task 13.1: Two-replica structural ops
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/d2/tst_d2_convergence.cpp`
+- Create: `libs/markoff-core/tests/d2/tst_d2_convergence.cpp`
 
 - [ ] **Step 1: Test**
 
@@ -3133,7 +3133,7 @@ git commit -m "d2(foundation): convergence — local undo of structural-ins fall
 - [ ] **Step 1: Verify no caller remains**
 
 ```bash
-grep -rn "ParsePool" libs/markoff-foundation/ libs/markoff-live-render/
+grep -rn "ParsePool" libs/markoff-core/ libs/markoff-live-render/
 ```
 
 Expected: zero hits (post-Phase 11).
@@ -3168,7 +3168,7 @@ git commit -m "d2(foundation): retire parseUpdated signal + parseSequence access
 
 ### Task 14.3: Delete `MarkoffEdit` type
 
-- [ ] **Step 1: `git rm libs/markoff-foundation/include/markoff-foundation/MarkoffEdit.h`**
+- [ ] **Step 1: `git rm libs/markoff-core/include/markoff-foundation/MarkoffEdit.h`**
 
 - [ ] **Step 2: Build**
 

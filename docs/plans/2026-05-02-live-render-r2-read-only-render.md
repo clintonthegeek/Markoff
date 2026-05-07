@@ -6,7 +6,7 @@
 
 **Architecture:** `Coordinates` provides allocation-free UTF-8↔UTF-16 conversion. `LiveBlockModel` (a `QAbstractListModel`) is kept up-to-date by `LiveListModelBinding` which subscribes to `MarkoffDocument::parseUpdated`, runs `BlockWalker` to snapshot the parsed tree, runs `AstBlockDiff` to produce a minimal edit script, and calls `model.applyOps`. Five read-only QML delegates (paragraph, heading, code-block, hr, image) are dispatched by a `DelegateChooser`. All types are in namespace `Markoff::LiveRender`, QML module `org.markoff.live.render 1.0`.
 
-**Tech stack:** C++20, Qt 6.8 (Core, Gui, Widgets, Quick, QuickControls2, QmlModels, Test), KF6::SyntaxHighlighting (runtime QML import only — no C++ link), CMake 3.19+. `QTest` for unit tests. Foundation: `markoff_foundation` + `markoff-parser` (transitively available).
+**Tech stack:** C++20, Qt 6.8 (Core, Gui, Widgets, Quick, QuickControls2, QmlModels, Test), KF6::SyntaxHighlighting (runtime QML import only — no C++ link), CMake 3.19+. `QTest` for unit tests. Foundation: `markoff_core` + `markoff-parser` (transitively available).
 
 **Reference spec:** `docs/specs/2026-05-02-live-render-restoration-design.md` §6 (components), §7 (data flow), §11 R2.
 **Prerequisite:** R1A (`parseUpdated` 4-arg signal) and R1B (`TopLevelBlock::inlineSpans`) are landed. R1C scaffold exists at `libs/markoff-live-render/`.
@@ -62,7 +62,7 @@ libs/markoff-view-qml/include/markoff/view/qml/BlockRecord.h   (model for our Bl
 libs/markoff-view-qml/include/markoff/view/qml/BlockKind.h
 libs/markoff-view-qml/include/markoff/view/qml/LiveBlockModel.h
 libs/markoff-view-qml/src/LiveBlockModel.cpp    (model for our simplified version)
-libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h  (parseUpdated signal)
+libs/markoff-core/include/markoff-foundation/MarkoffDocument.h  (parseUpdated signal)
 libs/markoff-parser/include/markoff-parser/Document.h   (topLevelBlocks, markdownContent)
 libs/markoff-parser/include/markoff-parser/SourceSpan.h (inlineSpans element type)
 libs/markoff-live-render/CMakeLists.txt         (what we'll modify)
@@ -481,7 +481,7 @@ qt_add_qml_module(markoff_live_render
 )
 ```
 
-Also add `markoff-parser` to `find_package` (it's transitive via markoff_foundation but explicit is safer):
+Also add `markoff-parser` to `find_package` (it's transitive via markoff_core but explicit is safer):
 
 ```cmake
 find_package(Qt6 6.8 REQUIRED COMPONENTS
@@ -2121,7 +2121,7 @@ ApplicationWindow {
 
 - [ ] **Step 3: Update `app/CMakeLists.txt` to link foundation (for markoff-foundation headers)**
 
-The app's C++ now includes `<markoff-foundation/MarkoffDocument.h>`. `markoff_foundation` is already reachable transitively via `markoff_live_render`, but explicit linking is cleaner:
+The app's C++ now includes `<markoff-foundation/MarkoffDocument.h>`. `markoff_core` is already reachable transitively via `markoff_live_render`, but explicit linking is cleaner:
 
 Replace the contents of `libs/markoff-live-render/app/CMakeLists.txt`:
 
@@ -2141,7 +2141,7 @@ target_link_libraries(markoff-live-render-app PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2 Qt6::Qml
     markoff_live_render
     markoff_live_renderplugin
-    markoff_foundation
+    markoff_core
 )
 
 qt_import_qml_plugins(markoff-live-render-app)

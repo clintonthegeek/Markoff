@@ -1,4 +1,4 @@
-> **Status: completed.** All 25 `tst_foundation_*` tests pass; `markoff_foundation` is feature-complete per spec §12. See TODO.md "Phase 13 acceptance passed" entry for confirmation. Do not execute.
+> **Status: completed.** All 25 `tst_foundation_*` tests pass; `markoff_core` is feature-complete per spec §12. See TODO.md "Phase 13 acceptance passed" entry for confirmation. Do not execute.
 
 # Markoff Foundation Library Implementation Plan
 
@@ -27,7 +27,7 @@
 
 ```
 libs/collabtext                                   (symlink → ~/dev/collabtext)
-libs/markoff-foundation/
+libs/markoff-core/
   CMakeLists.txt
   include/markoff-foundation/
     Origin.h
@@ -130,7 +130,7 @@ libs/markoff-foundation/
 ### Files modified
 
 ```
-CMakeLists.txt        — add libs/collabtext + libs/markoff-foundation entries
+CMakeLists.txt        — add libs/collabtext + libs/markoff-core entries
 ```
 
 ### Files NOT modified
@@ -171,7 +171,7 @@ endif()
 
 # markoff-foundation — new foundation library replacing markoff-core's role.
 # Lives alongside the existing markoff-core, which remains master-maintained.
-add_subdirectory(libs/markoff-foundation)
+add_subdirectory(libs/markoff-core)
 ```
 
 - [ ] **Step 3: Verify cmake configure picks up the new path**
@@ -182,9 +182,9 @@ rm -rf build-dev
 cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON 2>&1 | tail -30
 ```
 
-Expected: cmake configure fails (because `libs/markoff-foundation/` doesn't exist yet — that's Task 2). The collabtext add_subdirectory itself should succeed (collabtext has its own CMakeLists.txt).
+Expected: cmake configure fails (because `libs/markoff-core/` doesn't exist yet — that's Task 2). The collabtext add_subdirectory itself should succeed (collabtext has its own CMakeLists.txt).
 
-If you see `Cannot find source directory libs/markoff-foundation`, that's expected. Move to Task 2.
+If you see `Cannot find source directory libs/markoff-core`, that's expected. Move to Task 2.
 
 - [ ] **Step 4: Commit**
 
@@ -207,24 +207,24 @@ EOF
 
 ---
 
-### Task 2: Scaffold libs/markoff-foundation/ skeleton
+### Task 2: Scaffold libs/markoff-core/ skeleton
 
 **Files:**
-- Create: `libs/markoff-foundation/CMakeLists.txt`
-- Create: `libs/markoff-foundation/include/markoff-foundation/MarkoffFoundationExport.h`
-- Create: `libs/markoff-foundation/src/.gitkeep`
+- Create: `libs/markoff-core/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/MarkoffFoundationExport.h`
+- Create: `libs/markoff-core/src/.gitkeep`
 
 - [ ] **Step 1: Create the directory tree**
 
 ```bash
-mkdir -p libs/markoff-foundation/include/markoff-foundation/Cmd
-mkdir -p libs/markoff-foundation/src/Cmd
-mkdir -p libs/markoff-foundation/tests/fixtures
+mkdir -p libs/markoff-core/include/markoff-foundation/Cmd
+mkdir -p libs/markoff-core/src/Cmd
+mkdir -p libs/markoff-core/tests/fixtures
 ```
 
 - [ ] **Step 2: Create the export macro header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/MarkoffFoundationExport.h`:
+Create `libs/markoff-core/include/markoff-foundation/MarkoffFoundationExport.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -238,11 +238,11 @@ Create `libs/markoff-foundation/include/markoff-foundation/MarkoffFoundationExpo
 
 - [ ] **Step 3: Create the library CMakeLists**
 
-Create `libs/markoff-foundation/CMakeLists.txt`:
+Create `libs/markoff-core/CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.19)
-project(markoff_foundation VERSION 0.1.0 LANGUAGES CXX)
+project(markoff_core VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -254,16 +254,16 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 # Library target: STATIC so it can be embedded in test apps + future views.
 # Sources are added incrementally as tasks land. Initial skeleton is just
 # the export header so the target builds.
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
 )
 
-target_include_directories(markoff_foundation
+target_include_directories(markoff_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 
-target_link_libraries(markoff_foundation
+target_link_libraries(markoff_core
     PUBLIC
         Qt6::Core
         Qt6::Gui
@@ -274,7 +274,7 @@ target_link_libraries(markoff_foundation
 )
 
 # Alias under the Markoff:: namespace for consumers.
-add_library(Markoff::Foundation ALIAS markoff_foundation)
+add_library(Markoff::Core ALIAS markoff_core)
 
 # Tests.
 if(NOT DEFINED MARKOFF_FOUNDATION_BUILD_TESTS)
@@ -288,11 +288,11 @@ endif()
 
 - [ ] **Step 4: Create the tests CMakeLists skeleton**
 
-Create `libs/markoff-foundation/tests/CMakeLists.txt`:
+Create `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 cmake_minimum_required(VERSION 3.19)
-project(markoff_foundation_tests LANGUAGES CXX)
+project(markoff_core_tests LANGUAGES CXX)
 enable_testing()
 find_package(Qt6 REQUIRED COMPONENTS Test)
 set(CMAKE_CXX_STANDARD 20)
@@ -303,17 +303,17 @@ set(CMAKE_AUTOMOC ON)
 # Convention:
 #   add_executable(tst_FOO tst_foo.cpp)
 #   add_test(NAME tst_FOO COMMAND tst_FOO)
-#   target_link_libraries(tst_FOO PRIVATE Qt6::Test markoff_foundation)
+#   target_link_libraries(tst_FOO PRIVATE Qt6::Test markoff_core)
 #   set_tests_properties(tst_FOO PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
 - [ ] **Step 5: Add a placeholder src file so the static lib has at least one .o**
 
-Create `libs/markoff-foundation/src/foundation_anchor.cpp`:
+Create `libs/markoff-core/src/foundation_anchor.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Placeholder translation unit so the markoff_foundation static lib
+// Placeholder translation unit so the markoff_core static lib
 // has at least one object file before real sources land. Removed as
 // soon as the first real source file is added.
 namespace Markoff::Detail {
@@ -321,10 +321,10 @@ namespace Markoff::Detail {
 }
 ```
 
-Add it to the library target. Edit `libs/markoff-foundation/CMakeLists.txt`'s `add_library` block to read:
+Add it to the library target. Edit `libs/markoff-core/CMakeLists.txt`'s `add_library` block to read:
 
 ```cmake
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     src/foundation_anchor.cpp
 )
@@ -334,20 +334,20 @@ add_library(markoff_foundation STATIC
 
 ```bash
 cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build-dev --target markoff_foundation -j 2>&1 | tail -10
+cmake --build build-dev --target markoff_core -j 2>&1 | tail -10
 ```
 
-Expected: target `markoff_foundation` builds successfully. Output includes a libmarkoff_foundation.a (or platform equivalent).
+Expected: target `markoff_core` builds successfully. Output includes a libmarkoff_core.a (or platform equivalent).
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/
+git add libs/markoff-core/
 git commit -m "$(cat <<'EOF'
 feat(foundation): scaffold markoff-foundation library skeleton
 
 CMakeLists, export macro, placeholder anchor source. Library target
-markoff_foundation links Qt6, KF6::SyntaxHighlighting, collabtext, and
+markoff_core links Qt6, KF6::SyntaxHighlighting, collabtext, and
 MarkoffParser::MarkoffParser. Tests directory and CMakeLists scaffolded
 but no test targets yet — added incrementally.
 
@@ -400,11 +400,11 @@ git commit -m "chore: ensure compile_commands.json symlink"
 ### Task 4: Add Origin enum
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Origin.h`
+- Create: `libs/markoff-core/include/markoff-foundation/Origin.h`
 
 - [ ] **Step 1: Create the Origin header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/Origin.h`:
+Create `libs/markoff-core/include/markoff-foundation/Origin.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -433,10 +433,10 @@ Origin is a plain enum; it has no behavior to test in isolation. Tests for `Mark
 
 - [ ] **Step 3: Add header to library target so AUTOMOC sees it**
 
-Edit `libs/markoff-foundation/CMakeLists.txt`'s `add_library` block. Add `include/markoff-foundation/Origin.h` to the source list:
+Edit `libs/markoff-core/CMakeLists.txt`'s `add_library` block. Add `include/markoff-foundation/Origin.h` to the source list:
 
 ```cmake
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
     src/foundation_anchor.cpp
@@ -446,7 +446,7 @@ add_library(markoff_foundation STATIC
 - [ ] **Step 4: Verify build**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 2>&1 | tail -5
+cmake --build build-dev --target markoff_core -j 2>&1 | tail -5
 ```
 
 Expected: builds clean.
@@ -454,8 +454,8 @@ Expected: builds clean.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Origin.h \
-        libs/markoff-foundation/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Origin.h \
+        libs/markoff-core/CMakeLists.txt
 git commit -m "feat(foundation): add Origin enum"
 ```
 
@@ -464,15 +464,15 @@ git commit -m "feat(foundation): add Origin enum"
 ### Task 5: Add MarkoffEdit struct + JSON roundtrip + tests
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/MarkoffEdit.h`
-- Create: `libs/markoff-foundation/src/MarkoffEdit.cpp`
-- Create: `libs/markoff-foundation/tests/tst_markoff_edit.cpp`
-- Modify: `libs/markoff-foundation/CMakeLists.txt`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/include/markoff-foundation/MarkoffEdit.h`
+- Create: `libs/markoff-core/src/MarkoffEdit.cpp`
+- Create: `libs/markoff-core/tests/tst_markoff_edit.cpp`
+- Modify: `libs/markoff-core/CMakeLists.txt`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_markoff_edit.cpp`:
+Create `libs/markoff-core/tests/tst_markoff_edit.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -560,12 +560,12 @@ QTEST_MAIN(TstMarkoffEdit)
 
 - [ ] **Step 2: Add test target to tests CMakeLists**
 
-Edit `libs/markoff-foundation/tests/CMakeLists.txt`. Append:
+Edit `libs/markoff-core/tests/CMakeLists.txt`. Append:
 
 ```cmake
 add_executable(tst_markoff_edit tst_markoff_edit.cpp)
 add_test(NAME tst_markoff_edit COMMAND tst_markoff_edit)
-target_link_libraries(tst_markoff_edit PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_markoff_edit PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_markoff_edit PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -579,7 +579,7 @@ Expected: build error: `markoff-foundation/MarkoffEdit.h: No such file or direct
 
 - [ ] **Step 4: Create the header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/MarkoffEdit.h`:
+Create `libs/markoff-core/include/markoff-foundation/MarkoffEdit.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -619,7 +619,7 @@ struct MARKOFF_FOUNDATION_EXPORT MarkoffEdit {
 
 - [ ] **Step 5: Create the implementation**
 
-Create `libs/markoff-foundation/src/MarkoffEdit.cpp`:
+Create `libs/markoff-core/src/MarkoffEdit.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -654,10 +654,10 @@ MarkoffEdit MarkoffEdit::fromJson(const QJsonObject &obj)
 
 - [ ] **Step 6: Add to library target**
 
-Edit `libs/markoff-foundation/CMakeLists.txt`. Update `add_library` to include the new header + source. Also remove the placeholder anchor file (now we have a real source):
+Edit `libs/markoff-core/CMakeLists.txt`. Update `add_library` to include the new header + source. Also remove the placeholder anchor file (now we have a real source):
 
 ```cmake
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
     include/markoff-foundation/MarkoffEdit.h
@@ -665,10 +665,10 @@ add_library(markoff_foundation STATIC
 )
 ```
 
-Delete `libs/markoff-foundation/src/foundation_anchor.cpp`:
+Delete `libs/markoff-core/src/foundation_anchor.cpp`:
 
 ```bash
-rm libs/markoff-foundation/src/foundation_anchor.cpp
+rm libs/markoff-core/src/foundation_anchor.cpp
 ```
 
 - [ ] **Step 7: Build and run the test**
@@ -683,12 +683,12 @@ Expected: builds clean. All 6 test cases pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffEdit.h \
-        libs/markoff-foundation/src/MarkoffEdit.cpp \
-        libs/markoff-foundation/tests/tst_markoff_edit.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
-git rm libs/markoff-foundation/src/foundation_anchor.cpp
+git add libs/markoff-core/include/markoff-foundation/MarkoffEdit.h \
+        libs/markoff-core/src/MarkoffEdit.cpp \
+        libs/markoff-core/tests/tst_markoff_edit.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
+git rm libs/markoff-core/src/foundation_anchor.cpp
 git commit -m "feat(foundation): add MarkoffEdit value type with JSON roundtrip"
 ```
 
@@ -697,13 +697,13 @@ git commit -m "feat(foundation): add MarkoffEdit value type with JSON roundtrip"
 ### Task 6: Add Anchor JSON helpers + tests
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/AnchorJson.h`
-- Create: `libs/markoff-foundation/src/AnchorJson.cpp`
-- Create: `libs/markoff-foundation/tests/tst_anchor_json.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/AnchorJson.h`
+- Create: `libs/markoff-core/src/AnchorJson.cpp`
+- Create: `libs/markoff-core/tests/tst_anchor_json.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_anchor_json.cpp`:
+Create `libs/markoff-core/tests/tst_anchor_json.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -759,12 +759,12 @@ QTEST_MAIN(TstAnchorJson)
 
 - [ ] **Step 2: Add test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_anchor_json tst_anchor_json.cpp)
 add_test(NAME tst_anchor_json COMMAND tst_anchor_json)
-target_link_libraries(tst_anchor_json PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_anchor_json PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_anchor_json PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
@@ -778,7 +778,7 @@ Expected: error: `markoff-foundation/AnchorJson.h: No such file or directory`.
 
 - [ ] **Step 4: Create the header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/AnchorJson.h`:
+Create `libs/markoff-core/include/markoff-foundation/AnchorJson.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -806,7 +806,7 @@ CollabText::Crdt::Anchor anchorFromJson(const QJsonObject &);
 
 - [ ] **Step 5: Create the implementation**
 
-Create `libs/markoff-foundation/src/AnchorJson.cpp`:
+Create `libs/markoff-core/src/AnchorJson.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -841,10 +841,10 @@ Anchor anchorFromJson(const QJsonObject &obj)
 
 - [ ] **Step 6: Add to library target**
 
-Edit `libs/markoff-foundation/CMakeLists.txt`. Add the header + source:
+Edit `libs/markoff-core/CMakeLists.txt`. Add the header + source:
 
 ```cmake
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
     include/markoff-foundation/MarkoffEdit.h
@@ -866,11 +866,11 @@ Expected: builds clean, all 4 cases pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/AnchorJson.h \
-        libs/markoff-foundation/src/AnchorJson.cpp \
-        libs/markoff-foundation/tests/tst_anchor_json.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/AnchorJson.h \
+        libs/markoff-core/src/AnchorJson.cpp \
+        libs/markoff-core/tests/tst_anchor_json.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): add Anchor JSON serialization helpers"
 ```
 
@@ -879,13 +879,13 @@ git commit -m "feat(foundation): add Anchor JSON serialization helpers"
 ### Task 7: Add Selection struct + tests
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/Selection.h`
-- Create: `libs/markoff-foundation/src/Selection.cpp`
-- Create: `libs/markoff-foundation/tests/tst_selection.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/Selection.h`
+- Create: `libs/markoff-core/src/Selection.cpp`
+- Create: `libs/markoff-core/tests/tst_selection.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_selection.cpp`:
+Create `libs/markoff-core/tests/tst_selection.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -972,18 +972,18 @@ QTEST_MAIN(TstSelection)
 
 - [ ] **Step 2: Add test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_selection tst_selection.cpp)
 add_test(NAME tst_selection COMMAND tst_selection)
-target_link_libraries(tst_selection PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_selection PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
 - [ ] **Step 3: Create the header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/Selection.h`:
+Create `libs/markoff-core/include/markoff-foundation/Selection.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1035,7 +1035,7 @@ struct MARKOFF_FOUNDATION_EXPORT Selection {
 
 - [ ] **Step 4: Create the implementation**
 
-Create `libs/markoff-foundation/src/Selection.cpp`:
+Create `libs/markoff-core/src/Selection.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1120,10 +1120,10 @@ Selection Selection::fromJson(const QJsonObject &obj)
 
 - [ ] **Step 5: Add to library target**
 
-Edit `libs/markoff-foundation/CMakeLists.txt`. Add Selection header + source:
+Edit `libs/markoff-core/CMakeLists.txt`. Add Selection header + source:
 
 ```cmake
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
     include/markoff-foundation/MarkoffEdit.h
@@ -1147,11 +1147,11 @@ Expected: all 6 cases pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Selection.h \
-        libs/markoff-foundation/src/Selection.cpp \
-        libs/markoff-foundation/tests/tst_selection.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/Selection.h \
+        libs/markoff-core/src/Selection.cpp \
+        libs/markoff-core/tests/tst_selection.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): add Selection value type with kinds + JSON roundtrip"
 ```
 
@@ -1160,13 +1160,13 @@ git commit -m "feat(foundation): add Selection value type with kinds + JSON roun
 ### Task 8: Add FoldRef struct + tests
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/FoldRef.h`
-- Create: `libs/markoff-foundation/src/FoldRef.cpp`
-- Create: `libs/markoff-foundation/tests/tst_fold_ref.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/FoldRef.h`
+- Create: `libs/markoff-core/src/FoldRef.cpp`
+- Create: `libs/markoff-core/tests/tst_fold_ref.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
-Create `libs/markoff-foundation/tests/tst_fold_ref.cpp`:
+Create `libs/markoff-core/tests/tst_fold_ref.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1241,18 +1241,18 @@ QTEST_MAIN(TstFoldRef)
 
 - [ ] **Step 2: Add test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_fold_ref tst_fold_ref.cpp)
 add_test(NAME tst_fold_ref COMMAND tst_fold_ref)
-target_link_libraries(tst_fold_ref PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_fold_ref PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_fold_ref PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
 - [ ] **Step 3: Create the header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/FoldRef.h`:
+Create `libs/markoff-core/include/markoff-foundation/FoldRef.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1291,7 +1291,7 @@ struct MARKOFF_FOUNDATION_EXPORT FoldRef {
 
 - [ ] **Step 4: Create the implementation**
 
-Create `libs/markoff-foundation/src/FoldRef.cpp`:
+Create `libs/markoff-core/src/FoldRef.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1338,10 +1338,10 @@ FoldRef FoldRef::fromJson(const QJsonObject &obj)
 
 - [ ] **Step 5: Add to library target**
 
-Edit `libs/markoff-foundation/CMakeLists.txt`:
+Edit `libs/markoff-core/CMakeLists.txt`:
 
 ```cmake
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
     include/markoff-foundation/MarkoffEdit.h
@@ -1367,11 +1367,11 @@ Expected: 5 test cases pass.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/FoldRef.h \
-        libs/markoff-foundation/src/FoldRef.cpp \
-        libs/markoff-foundation/tests/tst_fold_ref.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/FoldRef.h \
+        libs/markoff-core/src/FoldRef.cpp \
+        libs/markoff-core/tests/tst_fold_ref.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): add FoldRef value type with anchor binding"
 ```
 
@@ -1382,14 +1382,14 @@ git commit -m "feat(foundation): add FoldRef value type with anchor binding"
 ### Task 9: MarkoffDocument construction + replicaId/version
 
 **Files:**
-- Create: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Create: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Create: `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`
-- Create: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Create: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Create: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Create: `libs/markoff-core/src/MarkoffDocumentPrivate.h`
+- Create: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 - [ ] **Step 1: Write the failing test (only construction + identity, this task)**
 
-Create `libs/markoff-foundation/tests/tst_markoff_document.cpp`:
+Create `libs/markoff-core/tests/tst_markoff_document.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1428,18 +1428,18 @@ QTEST_MAIN(TstMarkoffDocument)
 
 - [ ] **Step 2: Add test target**
 
-Append to `libs/markoff-foundation/tests/CMakeLists.txt`:
+Append to `libs/markoff-core/tests/CMakeLists.txt`:
 
 ```cmake
 add_executable(tst_markoff_document tst_markoff_document.cpp)
 add_test(NAME tst_markoff_document COMMAND tst_markoff_document)
-target_link_libraries(tst_markoff_document PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_markoff_document PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_markoff_document PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 ```
 
 - [ ] **Step 3: Create the public header**
 
-Create `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`:
+Create `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1553,7 +1553,7 @@ private:
 
 - [ ] **Step 4: Create the impl-side private header**
 
-Create `libs/markoff-foundation/src/MarkoffDocumentPrivate.h`:
+Create `libs/markoff-core/src/MarkoffDocumentPrivate.h`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1586,7 +1586,7 @@ struct MarkoffDocument::Private {
 
 - [ ] **Step 5: Create the implementation (just the parts this task needs)**
 
-Create `libs/markoff-foundation/src/MarkoffDocument.cpp`:
+Create `libs/markoff-core/src/MarkoffDocument.cpp`:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -1715,10 +1715,10 @@ int  MarkoffDocument::coalescingIdleMs() const { return d->coalescingIdleMs; }
 
 - [ ] **Step 6: Add to library target**
 
-Edit `libs/markoff-foundation/CMakeLists.txt`:
+Edit `libs/markoff-core/CMakeLists.txt`:
 
 ```cmake
-add_library(markoff_foundation STATIC
+add_library(markoff_core STATIC
     include/markoff-foundation/MarkoffFoundationExport.h
     include/markoff-foundation/Origin.h
     include/markoff-foundation/MarkoffEdit.h
@@ -1747,12 +1747,12 @@ Expected: 3 test cases pass.
 - [ ] **Step 8: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/src/MarkoffDocumentPrivate.h \
-        libs/markoff-foundation/tests/tst_markoff_document.cpp \
-        libs/markoff-foundation/CMakeLists.txt \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/src/MarkoffDocumentPrivate.h \
+        libs/markoff-core/tests/tst_markoff_document.cpp \
+        libs/markoff-core/CMakeLists.txt \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "feat(foundation): MarkoffDocument scaffold with replicaId + version + reads"
 ```
 
@@ -1761,12 +1761,12 @@ git commit -m "feat(foundation): MarkoffDocument scaffold with replicaId + versi
 ### Task 10: MarkoffDocument applyLocalEdit single-edit path
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 - [ ] **Step 1: Add a failing test for applyLocalEdit**
 
-Edit `libs/markoff-foundation/tests/tst_markoff_document.cpp`. Add these slots inside the class (before `QTEST_MAIN`):
+Edit `libs/markoff-core/tests/tst_markoff_document.cpp`. Add these slots inside the class (before `QTEST_MAIN`):
 
 ```cpp
     void apply_local_edit_inserts_text() {
@@ -1835,7 +1835,7 @@ Expected: tests fail with text mismatch (the stub returns an empty Operation and
 
 - [ ] **Step 3: Implement applyLocalEdit in MarkoffDocument.cpp**
 
-Edit `libs/markoff-foundation/src/MarkoffDocument.cpp`. Replace the stub `applyLocalEdit`:
+Edit `libs/markoff-core/src/MarkoffDocument.cpp`. Replace the stub `applyLocalEdit`:
 
 ```cpp
 CollabText::Crdt::Operation
@@ -1890,8 +1890,8 @@ Expected: all 6 cases pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_markoff_document.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_markoff_document.cpp
 git commit -m "feat(foundation): MarkoffDocument::applyLocalEdit (insert/replace/delete)"
 ```
 
@@ -1900,7 +1900,7 @@ git commit -m "feat(foundation): MarkoffDocument::applyLocalEdit (insert/replace
 ### Task 11: MarkoffDocument contentsChanged signal shape
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Modify: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 - [ ] **Step 1: Write a failing test asserting the signal shape**
 
@@ -1980,7 +1980,7 @@ Expected: should pass (the signal is already emitted in Task 10's impl). If the 
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_markoff_document.cpp
+git add libs/markoff-core/tests/tst_markoff_document.cpp
 git commit -m "test(foundation): assert contentsChanged signal shape"
 ```
 
@@ -1989,7 +1989,7 @@ git commit -m "test(foundation): assert contentsChanged signal shape"
 ### Task 12: MarkoffDocument applyLocalEdit batch (multiple edits)
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Modify: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 The single-edit and batch paths both use `Buffer::apply_local_edit` which already accepts a vector of ranges. The implementation in Task 10 already supports batches. This task adds explicit test coverage.
 
@@ -2038,7 +2038,7 @@ Expected: pass.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_markoff_document.cpp
+git add libs/markoff-core/tests/tst_markoff_document.cpp
 git commit -m "test(foundation): batch applyLocalEdit with non-overlapping ranges"
 ```
 
@@ -2047,8 +2047,8 @@ git commit -m "test(foundation): batch applyLocalEdit with non-overlapping range
 ### Task 13: MarkoffDocument applyRemoteOps
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 - [ ] **Step 1: Write the failing test (two MarkoffDocuments exchanging ops)**
 
@@ -2101,7 +2101,7 @@ Expected: bob's text is empty (the stub does nothing).
 
 - [ ] **Step 3: Implement applyRemoteOps**
 
-Edit `libs/markoff-foundation/src/MarkoffDocument.cpp`. Replace the stub:
+Edit `libs/markoff-core/src/MarkoffDocument.cpp`. Replace the stub:
 
 ```cpp
 void MarkoffDocument::applyRemoteOps(
@@ -2142,8 +2142,8 @@ Expected: all current cases pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_markoff_document.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_markoff_document.cpp
 git commit -m "feat(foundation): MarkoffDocument::applyRemoteOps with edits_since translation"
 ```
 
@@ -2152,8 +2152,8 @@ git commit -m "feat(foundation): MarkoffDocument::applyRemoteOps with edits_sinc
 ### Task 14: MarkoffDocument undo / redo
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2311,8 +2311,8 @@ Expected: all undo/redo cases pass.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_markoff_document.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_markoff_document.cpp
 git commit -m "feat(foundation): MarkoffDocument::undo / redo / undoDepth / coalesceLastUndo"
 ```
 
@@ -2321,7 +2321,7 @@ git commit -m "feat(foundation): MarkoffDocument::undo / redo / undoDepth / coal
 ### Task 15: MarkoffDocument coalesceLastUndo test
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Modify: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 - [ ] **Step 1: Add a test asserting coalescing behavior**
 
@@ -2371,7 +2371,7 @@ Expected: pass.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_markoff_document.cpp
+git add libs/markoff-core/tests/tst_markoff_document.cpp
 git commit -m "test(foundation): coalesceLastUndo groups consecutive edits"
 ```
 
@@ -2380,8 +2380,8 @@ git commit -m "test(foundation): coalesceLastUndo groups consecutive edits"
 ### Task 16: MarkoffDocument resetContent + Origin behavior
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- Modify: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -2522,8 +2522,8 @@ Expected: all reset-related cases pass. `reset_content_first_open_clears_undo` s
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/tests/tst_markoff_document.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/tests/tst_markoff_document.cpp
 git commit -m "feat(foundation): MarkoffDocument::resetContent with Origin semantics"
 ```
 
@@ -2532,7 +2532,7 @@ git commit -m "feat(foundation): MarkoffDocument::resetContent with Origin seman
 ### Task 17: MarkoffDocument anchor passthrough tests
 
 **Files:**
-- Modify: `libs/markoff-foundation/tests/tst_markoff_document.cpp`
+- Modify: `libs/markoff-core/tests/tst_markoff_document.cpp`
 
 The implementation already exists; this task adds explicit test coverage.
 
@@ -2595,7 +2595,7 @@ Expected: pass.
 - [ ] **Step 3: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_markoff_document.cpp
+git add libs/markoff-core/tests/tst_markoff_document.cpp
 git commit -m "test(foundation): anchor_at + resolveAnchor through edits"
 ```
 
@@ -2607,7 +2607,7 @@ Continued in next pass — phases 4-13 are written using the same pattern as abo
 
 ### Task 18: SessionParams + Session header skeleton
 
-Define `SessionParams` (participantId, participantLabel, presenceColor) and `Session` Q_OBJECT class declaration in `libs/markoff-foundation/include/markoff-foundation/Session.h`. Empty implementation in `Session.cpp`.
+Define `SessionParams` (participantId, participantLabel, presenceColor) and `Session` Q_OBJECT class declaration in `libs/markoff-core/include/markoff-foundation/Session.h`. Empty implementation in `Session.cpp`.
 
 ### Task 19: Session primary selection
 

@@ -1871,7 +1871,7 @@ QTEST_MAIN(TstLiveListModelBinding)
 
 ```cmake
 qt_add_executable(tst_view_qml_live_list_model_binding tst_view_qml_live_list_model_binding.cpp)
-target_link_libraries(tst_view_qml_live_list_model_binding PRIVATE markoff_view_qml markoff_foundation Qt6::Test)
+target_link_libraries(tst_view_qml_live_list_model_binding PRIVATE markoff_view_qml markoff_core Qt6::Test)
 add_test(NAME tst_view_qml_live_list_model_binding COMMAND tst_view_qml_live_list_model_binding)
 ```
 
@@ -2895,7 +2895,7 @@ In `libs/markoff-view-qml/tests/CMakeLists.txt`:
 
 ```cmake
 qt_add_executable(tst_view_qml_live_view_smoke tst_view_qml_live_view_smoke.cpp)
-target_link_libraries(tst_view_qml_live_view_smoke PRIVATE markoff_view_qml markoff_foundation Qt6::Test)
+target_link_libraries(tst_view_qml_live_view_smoke PRIVATE markoff_view_qml markoff_core Qt6::Test)
 add_test(NAME tst_view_qml_live_view_smoke COMMAND tst_view_qml_live_view_smoke)
 ```
 

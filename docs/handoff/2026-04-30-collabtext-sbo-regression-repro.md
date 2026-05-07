@@ -28,7 +28,7 @@ identical across reproductions:
 #1  CollabText::Crdt::Fragment::summary() const       (libcollabtext + Fragment.h:188)
 #2  CollabText::Crdt::SumTree<Fragment, 6>::push_item (libcollabtext + SumTree.h)
 #3  CollabText::Crdt::Buffer::apply_local_edit        (libcollabtext + Buffer.cpp)
-#4  Markoff::MarkoffDocument::resetContent            (libmarkoff_foundation + .cpp:194)
+#4  Markoff::MarkoffDocument::resetContent            (libmarkoff_core + .cpp:194)
 #5  main                                              (markoff-bench-render)
 ```
 

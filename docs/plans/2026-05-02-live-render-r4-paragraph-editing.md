@@ -55,8 +55,8 @@
 
 ```
 docs/specs/2026-05-02-live-render-restoration-design.md   §4, §5.2, §7.1, §11 R4
-libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h     (applyLocalEdit, editSequence, parseUpdated signature)
-libs/markoff-foundation/include/markoff-foundation/MarkoffEdit.h         (oldStart, oldEnd, newText)
+libs/markoff-core/include/markoff-foundation/MarkoffDocument.h     (applyLocalEdit, editSequence, parseUpdated signature)
+libs/markoff-core/include/markoff-foundation/MarkoffEdit.h         (oldStart, oldEnd, newText)
 libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h    (setRowEditSequence, rowEditSequence, applyOps)
 libs/markoff-live-render/src/LiveBlockModel.cpp                          (current applyOps; the Equal branch is what we modify)
 libs/markoff-live-render/include/markoff/live-render/LiveListModelBinding.h
@@ -839,7 +839,7 @@ qt_add_executable(tst_live_render_paragraph_edit
     tst_live_render_paragraph_edit.cpp
 )
 target_link_libraries(tst_live_render_paragraph_edit PRIVATE
-    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Test markoff_live_render markoff_foundation)
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Test markoff_live_render markoff_core)
 add_test(NAME tst_live_render_paragraph_edit COMMAND tst_live_render_paragraph_edit)
 ```
 

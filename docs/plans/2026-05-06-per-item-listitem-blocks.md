@@ -34,13 +34,13 @@ QML, ctest. Build directory `build-dev`. Cap parallelism at `-j 8`.
 | `libs/markoff-parser/src/TreeSitterParser.cpp` | Modify | Recurse into `list_item` children, harvest marker info, track indent depth, detect loose-run. |
 | `libs/markoff-parser/tests/tst_parser_list_items.cpp` | Create | Verify per-item emission with correct attrs. |
 | `libs/markoff-parser/tests/tst_document_top_level_blocks.cpp` | Modify | Update existing assertions that referenced the retired list kinds. |
-| `libs/markoff-foundation/include/markoff-foundation/AttrNames.h` | Modify | Add `MarkerNumber`, `LooseRun`. |
-| `libs/markoff-foundation/src/MarkoffDocument.cpp` | Modify | `mapTopLevelKind` Kind::ListItem→BlockKind::ListItem; `materializeBlocksFromParsedDoc` populates list-item attrs; delete the "deferred" comment; serialization reconstructs source. |
-| `libs/markoff-foundation/include/markoff-foundation/Cmd/D2.h` | Modify | New helpers `insertListItemAfter`, `insertListItemBefore`, `renumberRunStartingAt`. |
-| `libs/markoff-foundation/src/Cmd/D2.cpp` | Modify | Implement those helpers. |
-| `libs/markoff-foundation/tests/d2/tst_d2_list_roundtrip.cpp` | Create | Source → blocks → source byte-equal round-trip. |
-| `libs/markoff-foundation/tests/d2/tst_d2_list_renumber.cpp` | Create | Exercise renumber in mid-run insert/delete/indent-change. |
-| `libs/markoff-foundation/tests/CMakeLists.txt` | Modify | Register the two new test executables. |
+| `libs/markoff-core/include/markoff-foundation/AttrNames.h` | Modify | Add `MarkerNumber`, `LooseRun`. |
+| `libs/markoff-core/src/MarkoffDocument.cpp` | Modify | `mapTopLevelKind` Kind::ListItem→BlockKind::ListItem; `materializeBlocksFromParsedDoc` populates list-item attrs; delete the "deferred" comment; serialization reconstructs source. |
+| `libs/markoff-core/include/markoff-foundation/Cmd/D2.h` | Modify | New helpers `insertListItemAfter`, `insertListItemBefore`, `renumberRunStartingAt`. |
+| `libs/markoff-core/src/Cmd/D2.cpp` | Modify | Implement those helpers. |
+| `libs/markoff-core/tests/d2/tst_d2_list_roundtrip.cpp` | Create | Source → blocks → source byte-equal round-trip. |
+| `libs/markoff-core/tests/d2/tst_d2_list_renumber.cpp` | Create | Exercise renumber in mid-run insert/delete/indent-change. |
+| `libs/markoff-core/tests/CMakeLists.txt` | Modify | Register the two new test executables. |
 | `libs/markoff-live-render/include/markoff/live-render/LiveBlockModel.h` | Modify | New roles: `MarkerStyleRole`, `MarkerNumberRole`, `IndentLevelRole`, `CheckedRole`, `LooseRunRole`. |
 | `libs/markoff-live-render/src/LiveBlockModel.cpp` | Modify | `data()` switch returns new roles; `roleNames()` registers them. |
 | `libs/markoff-live-render/include/markoff/live-render/BlockRecord.h` | Modify | Drop `headingLevel`/`codeLanguage`-style ad-hoc fields if any are list-shaped; rely on `attrs` for marker/indent/etc. |
@@ -593,7 +593,7 @@ EOF
 ### Task 4: AttrNames additions
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/AttrNames.h`
+- Modify: `libs/markoff-core/include/markoff-foundation/AttrNames.h`
 
 - [ ] **Step 1: Add MarkerNumber and LooseRun**
 
@@ -620,7 +620,7 @@ Run: `cmake --build build-dev --target markoff-foundation -j 8`
 Expected: builds.
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/AttrNames.h
+git add libs/markoff-core/include/markoff-foundation/AttrNames.h
 git commit -m "foundation: add AttrNames::MarkerNumber and ::LooseRun for per-item ListItem
 
 Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
@@ -631,8 +631,8 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 ### Task 5: tst_d2_list_roundtrip — failing test for per-item materialization
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/d2/tst_d2_list_roundtrip.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/tests/d2/tst_d2_list_roundtrip.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Write the test**
 
@@ -720,7 +720,7 @@ QTEST_GUILESS_MAIN(TstD2ListRoundtrip)
 - [ ] **Step 2: Register in CMake**
 
 Find the `add_executable` lines for other `tst_d2_*` tests in
-`libs/markoff-foundation/tests/CMakeLists.txt` and follow the same pattern:
+`libs/markoff-core/tests/CMakeLists.txt` and follow the same pattern:
 
 ```cmake
 add_executable(tst_d2_list_roundtrip d2/tst_d2_list_roundtrip.cpp)
@@ -751,7 +751,7 @@ behavior (or has been broken by parser changes; either way, asserts fail).
 - [ ] **Step 4: Commit (red state)**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d2_list_roundtrip.cpp libs/markoff-foundation/tests/CMakeLists.txt libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/tests/d2/tst_d2_list_roundtrip.cpp libs/markoff-core/tests/CMakeLists.txt libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 test(foundation): tst_d2_list_roundtrip — failing baseline for Tasks 6+7
 
@@ -770,7 +770,7 @@ EOF
 ### Task 6: mapTopLevelKind + materializeBlocksFromParsedDoc
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Update mapTopLevelKind**
 
@@ -864,7 +864,7 @@ reconstruct list source — that's Task 7.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 foundation: per-item ListItem materialization with attrs
 
@@ -885,12 +885,12 @@ EOF
 ### Task 7: serializeForSave list reconstruction
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 - [ ] **Step 1: Locate serializeForSave**
 
 ```bash
-grep -n "serializeForSave\|serializeForSave\b" libs/markoff-foundation/src/MarkoffDocument.cpp
+grep -n "serializeForSave\|serializeForSave\b" libs/markoff-core/src/MarkoffDocument.cpp
 ```
 
 The existing implementation iterates blocks and asks the serializer for
@@ -963,7 +963,7 @@ parser observed 3 spaces in the test fixture).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-foundation/src/MarkoffDocument.cpp
+git add libs/markoff-core/src/MarkoffDocument.cpp
 git commit -m "$(cat <<'EOF'
 foundation: serializeForSave reconstructs list items from attrs
 
@@ -983,8 +983,8 @@ EOF
 ### Task 8: Cmd helpers — insertListItemAfter, insertListItemBefore, renumberRunStartingAt
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/Cmd/D2.h`
-- Modify: `libs/markoff-foundation/src/Cmd/D2.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/Cmd/D2.h`
+- Modify: `libs/markoff-core/src/Cmd/D2.cpp`
 
 - [ ] **Step 1: Add declarations to D2.h**
 
@@ -1149,7 +1149,7 @@ Expected: builds.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/Cmd/D2.h libs/markoff-foundation/src/Cmd/D2.cpp
+git add libs/markoff-core/include/markoff-foundation/Cmd/D2.h libs/markoff-core/src/Cmd/D2.cpp
 git commit -m "$(cat <<'EOF'
 foundation: Cmd::insertListItemAfter/Before + renumberRunStartingAt
 
@@ -1171,8 +1171,8 @@ EOF
 ### Task 9: tst_d2_list_renumber
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/d2/tst_d2_list_renumber.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/tests/d2/tst_d2_list_renumber.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Write the test**
 
@@ -1288,7 +1288,7 @@ shape — fix those as you find them.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add libs/markoff-foundation/tests/d2/tst_d2_list_renumber.cpp libs/markoff-foundation/tests/CMakeLists.txt libs/markoff-foundation/tests/d2/
+git add libs/markoff-core/tests/d2/tst_d2_list_renumber.cpp libs/markoff-core/tests/CMakeLists.txt libs/markoff-core/tests/d2/
 git commit -m "$(cat <<'EOF'
 test(foundation): tst_d2_list_renumber — exercise renumberRunStartingAt
 
@@ -2009,7 +2009,7 @@ ListItem cases (those need rewriting in Task 16).
 - [ ] **Step 4: Commit**
 
 ```bash
-git add libs/markoff-live-render/qml/delegates/ListItemDelegate.qml libs/markoff-foundation/src/MarkoffDocument.cpp libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
+git add libs/markoff-live-render/qml/delegates/ListItemDelegate.qml libs/markoff-core/src/MarkoffDocument.cpp libs/markoff-core/include/markoff-foundation/MarkoffDocument.h
 git commit -m "$(cat <<'EOF'
 live-render: ListItemDelegate renders marker label + indent + task checkbox
 

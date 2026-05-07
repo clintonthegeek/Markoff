@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.19)
-project(markoff_foundation_tests LANGUAGES CXX)
+project(markoff_core_tests LANGUAGES CXX)
 enable_testing()
 find_package(Qt6 REQUIRED COMPONENTS Test)
 set(CMAKE_CXX_STANDARD 20)
@@ -10,104 +10,104 @@ set(CMAKE_AUTOMOC ON)
 # Convention:
 #   add_executable(tst_FOO tst_foo.cpp)
 #   add_test(NAME tst_FOO COMMAND tst_FOO)
-#   target_link_libraries(tst_FOO PRIVATE Qt6::Test markoff_foundation)
+#   target_link_libraries(tst_FOO PRIVATE Qt6::Test markoff_core)
 #   set_tests_properties(tst_FOO PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_anchor_json tst_anchor_json.cpp)
 add_test(NAME tst_anchor_json COMMAND tst_anchor_json)
-target_link_libraries(tst_anchor_json PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_anchor_json PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_anchor_json PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_selection tst_selection.cpp)
 add_test(NAME tst_selection COMMAND tst_selection)
-target_link_libraries(tst_selection PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_selection PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_fold_ref tst_fold_ref.cpp)
 add_test(NAME tst_fold_ref COMMAND tst_fold_ref)
-target_link_libraries(tst_fold_ref PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_fold_ref PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_fold_ref PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 # Note: target name differentiated from markoff-core's tst_markoff_document
 # (CMake target names must be globally unique within a single build tree).
 add_executable(tst_foundation_markoff_document tst_markoff_document.cpp)
 add_test(NAME tst_foundation_markoff_document COMMAND tst_foundation_markoff_document)
-target_link_libraries(tst_foundation_markoff_document PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_markoff_document PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_markoff_document PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_session tst_foundation_session.cpp)
 add_test(NAME tst_foundation_session COMMAND tst_foundation_session)
-target_link_libraries(tst_foundation_session PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_session PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_session PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 
 add_executable(tst_foundation_theme tst_foundation_theme.cpp)
 add_test(NAME tst_foundation_theme COMMAND tst_foundation_theme)
-target_link_libraries(tst_foundation_theme PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_theme PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_theme PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_link_service tst_foundation_link_service.cpp)
 add_test(NAME tst_foundation_link_service COMMAND tst_foundation_link_service)
-target_link_libraries(tst_foundation_link_service PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_link_service PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_link_service PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_cmd_edit tst_foundation_cmd_edit.cpp)
 add_test(NAME tst_foundation_cmd_edit COMMAND tst_foundation_cmd_edit)
-target_link_libraries(tst_foundation_cmd_edit PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_cmd_edit PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_cmd_edit PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_search_engine tst_foundation_search_engine.cpp)
 add_test(NAME tst_foundation_search_engine COMMAND tst_foundation_search_engine)
-target_link_libraries(tst_foundation_search_engine PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_search_engine PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_search_engine PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_code_token tst_foundation_code_token.cpp)
 add_test(NAME tst_foundation_code_token COMMAND tst_foundation_code_token)
-target_link_libraries(tst_foundation_code_token PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_code_token PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_code_token PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_syntax_highlight_service tst_foundation_syntax_highlight_service.cpp)
 add_test(NAME tst_foundation_syntax_highlight_service COMMAND tst_foundation_syntax_highlight_service)
-target_link_libraries(tst_foundation_syntax_highlight_service PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_syntax_highlight_service PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_syntax_highlight_service PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_code_block_processor_registry tst_foundation_code_block_processor_registry.cpp)
 add_test(NAME tst_foundation_code_block_processor_registry COMMAND tst_foundation_code_block_processor_registry)
-target_link_libraries(tst_foundation_code_block_processor_registry PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_code_block_processor_registry PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_code_block_processor_registry PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_completion_types tst_foundation_completion_types.cpp)
 add_test(NAME tst_foundation_completion_types COMMAND tst_foundation_completion_types)
-target_link_libraries(tst_foundation_completion_types PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_completion_types PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_completion_types PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_completion_detector tst_foundation_completion_detector.cpp)
 add_test(NAME tst_foundation_completion_detector COMMAND tst_foundation_completion_detector)
-target_link_libraries(tst_foundation_completion_detector PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_completion_detector PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_completion_detector PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_completion_registry tst_foundation_completion_registry.cpp)
 add_test(NAME tst_foundation_completion_registry COMMAND tst_foundation_completion_registry)
-target_link_libraries(tst_foundation_completion_registry PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_completion_registry PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_completion_registry PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_foundation_services_bundle tst_foundation_services_bundle.cpp)
 add_test(NAME tst_foundation_services_bundle COMMAND tst_foundation_services_bundle)
-target_link_libraries(tst_foundation_services_bundle PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_services_bundle PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_services_bundle PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 
 add_executable(tst_foundation_text_anchor tst_foundation_text_anchor.cpp)
 add_test(NAME tst_foundation_text_anchor COMMAND tst_foundation_text_anchor)
-target_link_libraries(tst_foundation_text_anchor PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_text_anchor PRIVATE Qt6::Test markoff_core)
 target_include_directories(tst_foundation_text_anchor PRIVATE
-    ${CMAKE_SOURCE_DIR}/libs/markoff-foundation/src)
+    ${CMAKE_SOURCE_DIR}/libs/markoff-core/src)
 set_tests_properties(tst_foundation_text_anchor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 
 add_executable(tst_foundation_edit_sequence tst_foundation_edit_sequence.cpp)
 add_test(NAME tst_foundation_edit_sequence COMMAND tst_foundation_edit_sequence)
-target_link_libraries(tst_foundation_edit_sequence PRIVATE Qt6::Test markoff_foundation)
+target_link_libraries(tst_foundation_edit_sequence PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_edit_sequence PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 

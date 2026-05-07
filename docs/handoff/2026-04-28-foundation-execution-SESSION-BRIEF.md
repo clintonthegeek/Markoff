@@ -143,7 +143,7 @@ Sub-acceptance for the pause point at Task 17:
 
 1. ✅ Branch `exploration/new-foundation` has commits for each of Tasks 1–17 (one commit per task except where the plan groups, e.g., Task 11 adds tests to a previous task's class).
 2. ✅ `cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` configures clean.
-3. ✅ `cmake --build build-dev --target markoff_foundation -j` builds clean (no warnings as errors are not enforced; document any deprecations).
+3. ✅ `cmake --build build-dev --target markoff_core -j` builds clean (no warnings as errors are not enforced; document any deprecations).
 4. ✅ `ctest --test-dir build-dev -R '^tst_(markoff_edit|anchor_json|selection|fold_ref|markoff_document)$' --output-on-failure` reports all tests pass.
 5. ✅ The existing tests on this branch (existing markoff-core/live/source/reading tests) still build and pass — your additions did not regress anything.
 
@@ -159,7 +159,7 @@ When this brief is read, before invoking any skill:
 2. `git rev-parse --show-toplevel && git branch --show-current` — confirm worktree + branch.
 3. `git log --oneline -5` — confirm commits present (audit, spec, plan).
 4. `ls libs/collabtext` — confirm symlink target. If missing, plan Task 1 will create it.
-5. `ls libs/markoff-foundation 2>/dev/null` — likely empty/nonexistent (Task 2 creates it).
+5. `ls libs/markoff-core 2>/dev/null` — likely empty/nonexistent (Task 2 creates it).
 6. Read the plan's Phase 1 (Tasks 1–3) to understand the scaffolding before dispatching.
 7. Invoke `superpowers:subagent-driven-development`.
 

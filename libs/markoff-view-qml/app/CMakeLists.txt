@@ -14,7 +14,7 @@ target_link_libraries(markoff-view-qml-app PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2 Qt6::Qml
     markoff_view_qml
     markoff_view_qmlplugin
-    markoff_foundation
+    markoff_core
 )
 
 # qt_import_qml_plugins removed — see live-render/app rationale.

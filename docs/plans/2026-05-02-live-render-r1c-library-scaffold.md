@@ -4,7 +4,7 @@
 
 **Goal:** Stand up the empty greenfield library for the C-restoration architecture: `libs/markoff-live-render/`, with namespace `Markoff::LiveRender`, QML module URI `org.markoff.live.render 1.0`, build wiring, an empty test executable that proves the test infrastructure is alive, and an empty test app that boots a window. No functionality. R2 onwards fills it in.
 
-**Architecture:** Mirror `libs/markoff-view-qml`'s structure (CMakeLists, `include/`, `src/`, `qml/`, `tests/`, `app/`, per-library `CLAUDE.md`) since that's the project's established pattern. Use `qt_add_qml_module(STATIC ...)`. Link against `markoff_foundation` (downstream consumer; no inverse dependency).
+**Architecture:** Mirror `libs/markoff-view-qml`'s structure (CMakeLists, `include/`, `src/`, `qml/`, `tests/`, `app/`, per-library `CLAUDE.md`) since that's the project's established pattern. Use `qt_add_qml_module(STATIC ...)`. Link against `markoff_core` (downstream consumer; no inverse dependency).
 
 **Tech stack:** C++20, Qt6.8 (Core, Gui, Widgets, Quick, QuickControls2, Test), CMake 3.19+. `QTest` for the placeholder test.
 
@@ -204,7 +204,7 @@ target_link_libraries(markoff_live_render PUBLIC
     Qt6::Widgets
     Qt6::Quick
     Qt6::QuickControls2
-    markoff_foundation
+    markoff_core
 )
 
 add_subdirectory(app)
@@ -369,7 +369,7 @@ target_link_libraries(markoff-live-render-app PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Quick Qt6::QuickControls2 Qt6::Qml
     markoff_live_render
     markoff_live_renderplugin
-    markoff_foundation
+    markoff_core
 )
 
 qt_import_qml_plugins(markoff-live-render-app)

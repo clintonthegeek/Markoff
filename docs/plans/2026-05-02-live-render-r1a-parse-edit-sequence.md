@@ -20,19 +20,19 @@
 ## File map
 
 **Modified (foundation):**
-- `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h` — add 4th arg to `parseUpdated` signal; documentation.
-- `libs/markoff-foundation/src/MarkoffDocument.cpp` — capture editSequence at schedule time in `applyLocalEdit` and `resetContent`; thread into ParsePool calls; relay through to `parseUpdated`.
-- `libs/markoff-foundation/src/ParsePool.h` — add `inputEditSeq` parameter to `schedule()` and `scheduleReset()`; add it to the `parseReady` signal.
-- `libs/markoff-foundation/src/ParsePool.cpp` — store pending `inputEditSeq` alongside `pending`/`pendingGen`; thread through `dispatch()`; relay from worker.
-- `libs/markoff-foundation/src/ParsePoolWorker.h` — add `inputEditSeq` to `parseSnapshot`/`parseReset` slots and the `parsed` signal.
-- `libs/markoff-foundation/src/ParsePoolWorker.cpp` — pass `inputEditSeq` through the parse functions; emit on `parsed`.
+- `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h` — add 4th arg to `parseUpdated` signal; documentation.
+- `libs/markoff-core/src/MarkoffDocument.cpp` — capture editSequence at schedule time in `applyLocalEdit` and `resetContent`; thread into ParsePool calls; relay through to `parseUpdated`.
+- `libs/markoff-core/src/ParsePool.h` — add `inputEditSeq` parameter to `schedule()` and `scheduleReset()`; add it to the `parseReady` signal.
+- `libs/markoff-core/src/ParsePool.cpp` — store pending `inputEditSeq` alongside `pending`/`pendingGen`; thread through `dispatch()`; relay from worker.
+- `libs/markoff-core/src/ParsePoolWorker.h` — add `inputEditSeq` to `parseSnapshot`/`parseReset` slots and the `parsed` signal.
+- `libs/markoff-core/src/ParsePoolWorker.cpp` — pass `inputEditSeq` through the parse functions; emit on `parsed`.
 
 **Modified (downstream consumer; ignore-the-new-arg):**
 - `libs/markoff-view-qml/src/EditorBackend.cpp` — the existing connection to `MarkoffDocument::parseUpdated` adopts the 4-arg shape; the new arg is unused for now.
 
 **New (test):**
-- `libs/markoff-foundation/tests/tst_foundation_parse_input_edit_seq.cpp` — exercises the full path: applyLocalEdit → wait for parseUpdated → assert 4th arg equals the editSequence value captured at apply time.
-- `libs/markoff-foundation/tests/CMakeLists.txt` — register the new test executable.
+- `libs/markoff-core/tests/tst_foundation_parse_input_edit_seq.cpp` — exercises the full path: applyLocalEdit → wait for parseUpdated → assert 4th arg equals the editSequence value captured at apply time.
+- `libs/markoff-core/tests/CMakeLists.txt` — register the new test executable.
 
 **No changes (verified, will pass after plumbing):**
 - All other foundation tests, parser tests, view-qml tests.
@@ -49,12 +49,12 @@ Read these files in order. Don't skim — the relationships are subtle.
 
 ```
 docs/specs/2026-05-02-live-render-restoration-design.md      §4.6 only (~30 lines)
-libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h
-libs/markoff-foundation/src/MarkoffDocument.cpp              lines 15–110
-libs/markoff-foundation/src/ParsePool.h
-libs/markoff-foundation/src/ParsePool.cpp
-libs/markoff-foundation/src/ParsePoolWorker.h
-libs/markoff-foundation/src/ParsePoolWorker.cpp
+libs/markoff-core/include/markoff-foundation/MarkoffDocument.h
+libs/markoff-core/src/MarkoffDocument.cpp              lines 15–110
+libs/markoff-core/src/ParsePool.h
+libs/markoff-core/src/ParsePool.cpp
+libs/markoff-core/src/ParsePoolWorker.h
+libs/markoff-core/src/ParsePoolWorker.cpp
 ```
 
 Confirm in your head the signal-relay chain: `worker::parsed` (worker thread, queued connection) → ParsePool's lambda receiver (main thread) → `ParsePool::parseReady` → MarkoffDocument's lambda receiver → `MarkoffDocument::parseUpdated`.
@@ -66,12 +66,12 @@ No code changes in this task.
 ### Task 2: Add the failing acceptance test
 
 **Files:**
-- Create: `libs/markoff-foundation/tests/tst_foundation_parse_input_edit_seq.cpp`
-- Modify: `libs/markoff-foundation/tests/CMakeLists.txt`
+- Create: `libs/markoff-core/tests/tst_foundation_parse_input_edit_seq.cpp`
+- Modify: `libs/markoff-core/tests/CMakeLists.txt`
 
 - [ ] **Step 1: Write the test file**
 
-Create `libs/markoff-foundation/tests/tst_foundation_parse_input_edit_seq.cpp` with:
+Create `libs/markoff-core/tests/tst_foundation_parse_input_edit_seq.cpp` with:
 
 ```cpp
 // SPDX-License-Identifier: GPL-3.0-or-later
@@ -160,11 +160,11 @@ QTEST_MAIN(TstFoundationParseInputEditSeq)
 
 - [ ] **Step 2: Register the test in the foundation tests' CMakeLists**
 
-Open `libs/markoff-foundation/tests/CMakeLists.txt` and find the block where existing tests like `tst_foundation_edit_sequence` are registered. The pattern is repeated per test; add a new entry following the same pattern. The exact CMake helper macro will be `markoff_foundation_test(...)` or similar — read the file to confirm and copy the most-similar test's invocation, replacing the source filename with `tst_foundation_parse_input_edit_seq.cpp`.
+Open `libs/markoff-core/tests/CMakeLists.txt` and find the block where existing tests like `tst_foundation_edit_sequence` are registered. The pattern is repeated per test; add a new entry following the same pattern. The exact CMake helper macro will be `markoff_core_test(...)` or similar — read the file to confirm and copy the most-similar test's invocation, replacing the source filename with `tst_foundation_parse_input_edit_seq.cpp`.
 
 ```cmake
 # (Pattern; verify against the existing entries before pasting verbatim.)
-markoff_foundation_test(tst_foundation_parse_input_edit_seq
+markoff_core_test(tst_foundation_parse_input_edit_seq
     SOURCES tst_foundation_parse_input_edit_seq.cpp
 )
 ```
@@ -182,7 +182,7 @@ Expected: build fails at the line `const QList<QVariant> args = spy.takeFirst();
 If the test does compile, run it and confirm the runtime failure:
 
 ```bash
-./build-dev/libs/markoff-foundation/tests/tst_foundation_parse_input_edit_seq
+./build-dev/libs/markoff-core/tests/tst_foundation_parse_input_edit_seq
 ```
 
 Expected: `parse_carries_input_edit_sequence` fails with `Compared values are not the same: Actual (args.size()): 3   Expected (4): 4`.
@@ -190,8 +190,8 @@ Expected: `parse_carries_input_edit_sequence` fails with `Compared values are no
 - [ ] **Step 4: Commit the failing test**
 
 ```bash
-git add libs/markoff-foundation/tests/tst_foundation_parse_input_edit_seq.cpp \
-        libs/markoff-foundation/tests/CMakeLists.txt
+git add libs/markoff-core/tests/tst_foundation_parse_input_edit_seq.cpp \
+        libs/markoff-core/tests/CMakeLists.txt
 git commit -m "test(foundation): parseUpdated carries parseInputEditSequence (failing)"
 ```
 
@@ -202,14 +202,14 @@ The commit lands a deliberately-failing test — that's the TDD cycle. The next 
 ### Task 3: Thread inputEditSeq through ParsePoolWorker
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/ParsePoolWorker.h`
-- Modify: `libs/markoff-foundation/src/ParsePoolWorker.cpp`
+- Modify: `libs/markoff-core/src/ParsePoolWorker.h`
+- Modify: `libs/markoff-core/src/ParsePoolWorker.cpp`
 
 The worker is the lowest-level link in the chain. We add the new value as a parameter on its slots and on the `parsed` signal. The worker doesn't *use* the value — it just forwards it — but the signal-slot signatures must accept it for the upper layers to plumb it through.
 
 - [ ] **Step 1: Update `ParsePoolWorker.h`**
 
-Open `libs/markoff-foundation/src/ParsePoolWorker.h`. The current slot signatures are:
+Open `libs/markoff-core/src/ParsePoolWorker.h`. The current slot signatures are:
 
 ```cpp
 void parseSnapshot(QByteArray utf8, quint64 generation);
@@ -239,7 +239,7 @@ Q_SIGNALS:
 
 - [ ] **Step 2: Update `ParsePoolWorker.cpp`**
 
-Open `libs/markoff-foundation/src/ParsePoolWorker.cpp`. The `parseSnapshot` and `parseReset` function bodies need to:
+Open `libs/markoff-core/src/ParsePoolWorker.cpp`. The `parseSnapshot` and `parseReset` function bodies need to:
 1. Accept the new parameter (signature update mirrors the header).
 2. Forward it through to `Q_EMIT parsed(...)`.
 
@@ -257,26 +257,26 @@ Update the function signatures to match the header.
 - [ ] **Step 3: Build and verify the worker compiles in isolation**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8
+cmake --build build-dev --target markoff_core -j 8
 ```
 
 Expected: a chain of compile errors in `ParsePool.cpp` (where `worker->parseSnapshot(...)` and `worker->parseReset(...)` are invoked, plus the `connect(worker, &ParsePoolWorker::parsed, ...)` lambda), because their callers haven't been updated yet. **This is the expected intermediate state**; the next task fixes ParsePool.
 
-If `markoff_foundation` builds cleanly without errors, you've miscounted — likely the worker emits weren't updated. Re-check.
+If `markoff_core` builds cleanly without errors, you've miscounted — likely the worker emits weren't updated. Re-check.
 
 ---
 
 ### Task 4: Thread inputEditSeq through ParsePool
 
 **Files:**
-- Modify: `libs/markoff-foundation/src/ParsePool.h`
-- Modify: `libs/markoff-foundation/src/ParsePool.cpp`
+- Modify: `libs/markoff-core/src/ParsePool.h`
+- Modify: `libs/markoff-core/src/ParsePool.cpp`
 
 ParsePool is the middle link. It holds the value while parses are pending (coalescing) and re-emits to the main thread.
 
 - [ ] **Step 1: Update `ParsePool.h`**
 
-Open `libs/markoff-foundation/src/ParsePool.h`. The current public methods:
+Open `libs/markoff-core/src/ParsePool.h`. The current public methods:
 
 ```cpp
 void schedule(QByteArray utf8);
@@ -306,7 +306,7 @@ Q_SIGNALS:
 
 - [ ] **Step 2: Update `ParsePool.cpp` — the `Private` struct**
 
-Open `libs/markoff-foundation/src/ParsePool.cpp`. Find the `Private` struct (~line 21). Add a new field alongside `pendingGen`:
+Open `libs/markoff-core/src/ParsePool.cpp`. Find the `Private` struct (~line 21). Add a new field alongside `pendingGen`:
 
 ```cpp
 struct ParsePool::Private {
@@ -454,7 +454,7 @@ connect(d->worker, &ParsePoolWorker::parsed,
 - [ ] **Step 6: Build and verify ParsePool compiles**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8
+cmake --build build-dev --target markoff_core -j 8
 ```
 
 Expected: compile errors now move to `MarkoffDocument.cpp`, where `parsePool.schedule(utf8)` and `parsePool.scheduleReset(utf8)` are called, plus the connection lambda for `parseReady`. Next task fixes those.
@@ -464,14 +464,14 @@ Expected: compile errors now move to `MarkoffDocument.cpp`, where `parsePool.sch
 ### Task 5: Thread inputEditSeq through MarkoffDocument
 
 **Files:**
-- Modify: `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- Modify: `libs/markoff-foundation/src/MarkoffDocument.cpp`
+- Modify: `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- Modify: `libs/markoff-core/src/MarkoffDocument.cpp`
 
 The top of the chain. `MarkoffDocument` captures `editSequence` at scheduling time, threads through the pool, and re-emits as the 4th arg of `parseUpdated`.
 
 - [ ] **Step 1: Update `MarkoffDocument.h`**
 
-Open `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`. Find the `parseUpdated` signal declaration (line 159):
+Open `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`. Find the `parseUpdated` signal declaration (line 159):
 
 ```cpp
 void parseUpdated(const Markoff::Document *parsed,
@@ -502,7 +502,7 @@ Also update the doc comment for `parseSequence()` (around line 71) to add a brie
 
 - [ ] **Step 2: Update `MarkoffDocument.cpp` — the constructor lambda**
 
-Open `libs/markoff-foundation/src/MarkoffDocument.cpp`. Find the constructor's `parseReady` connection (~line 25). Update the lambda signature to accept the new arg and pass it through to `parseUpdated`:
+Open `libs/markoff-core/src/MarkoffDocument.cpp`. Find the constructor's `parseReady` connection (~line 25). Update the lambda signature to accept the new arg and pass it through to `parseUpdated`:
 
 ```cpp
 QObject::connect(&d->parsePool, &Markoff::Parse::Detail::ParsePool::parseReady,
@@ -548,10 +548,10 @@ Search the file for both `parsePool.schedule(` and `parsePool.scheduleReset(`. U
 - [ ] **Step 4: Build the foundation**
 
 ```bash
-cmake --build build-dev --target markoff_foundation -j 8
+cmake --build build-dev --target markoff_core -j 8
 ```
 
-Expected: clean build of `markoff_foundation`. If errors remain in `markoff_foundation`, you've missed a `parsePool.schedule(` call site — search again.
+Expected: clean build of `markoff_core`. If errors remain in `markoff_core`, you've missed a `parsePool.schedule(` call site — search again.
 
 Compile errors in `markoff_view_qml` are expected; the next task fixes them.
 
@@ -657,24 +657,24 @@ git diff
 ```
 
 Expected files modified:
-- `libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h`
-- `libs/markoff-foundation/src/MarkoffDocument.cpp`
-- `libs/markoff-foundation/src/ParsePool.h`
-- `libs/markoff-foundation/src/ParsePool.cpp`
-- `libs/markoff-foundation/src/ParsePoolWorker.h`
-- `libs/markoff-foundation/src/ParsePoolWorker.cpp`
+- `libs/markoff-core/include/markoff-foundation/MarkoffDocument.h`
+- `libs/markoff-core/src/MarkoffDocument.cpp`
+- `libs/markoff-core/src/ParsePool.h`
+- `libs/markoff-core/src/ParsePool.cpp`
+- `libs/markoff-core/src/ParsePoolWorker.h`
+- `libs/markoff-core/src/ParsePoolWorker.cpp`
 - `libs/markoff-view-qml/src/EditorBackend.cpp` (and possibly its header)
-- `libs/markoff-foundation/tests/CMakeLists.txt` (already in the prior commit; should be no further change here)
+- `libs/markoff-core/tests/CMakeLists.txt` (already in the prior commit; should be no further change here)
 
 - [ ] **Step 2: Commit**
 
 ```bash
-git add libs/markoff-foundation/include/markoff-foundation/MarkoffDocument.h \
-        libs/markoff-foundation/src/MarkoffDocument.cpp \
-        libs/markoff-foundation/src/ParsePool.h \
-        libs/markoff-foundation/src/ParsePool.cpp \
-        libs/markoff-foundation/src/ParsePoolWorker.h \
-        libs/markoff-foundation/src/ParsePoolWorker.cpp \
+git add libs/markoff-core/include/markoff-foundation/MarkoffDocument.h \
+        libs/markoff-core/src/MarkoffDocument.cpp \
+        libs/markoff-core/src/ParsePool.h \
+        libs/markoff-core/src/ParsePool.cpp \
+        libs/markoff-core/src/ParsePoolWorker.h \
+        libs/markoff-core/src/ParsePoolWorker.cpp \
         libs/markoff-view-qml/src/EditorBackend.cpp
 # and EditorBackend.h if you touched it
 

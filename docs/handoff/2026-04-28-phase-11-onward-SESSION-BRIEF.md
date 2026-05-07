@@ -136,7 +136,7 @@ Library-internal helpers live in per-feature `Detail` namespaces:
 - `Markoff::Cmd::Detail::*` for Cmd helpers (currently just `selectionByteRange`)
 - `Markoff::Parse::Detail::ParsePool` (post `36950e9` rename)
 
-Do **not** reintroduce a library-wide `Markoff::Foundation::*` namespace for impl-side code (that one was renamed). The CMake target alias `Markoff::Foundation` (Qt-style) is unrelated and stays.
+Do **not** reintroduce a library-wide `Markoff::Core::*` namespace for impl-side code (that one was renamed). The CMake target alias `Markoff::Core` (Qt-style) is unrelated and stays.
 
 For Phase 11 code-block services, expect a new `Markoff::Code::Detail::*` (or similar feature name) for impl-side helpers.
 
@@ -150,7 +150,7 @@ Qt6 MOC's `QMetaType` requires complete type definitions for `Q_PROPERTY` of poi
 
 ### 3.7 CMake `add_library` grouping
 
-`libs/markoff-foundation/CMakeLists.txt` has labeled comment groups:
+`libs/markoff-core/CMakeLists.txt` has labeled comment groups:
 - Top-level public headers (MarkoffDocument.h, Theme.h, LinkService.h, CommandFacade.h, SearchEngine.h, ReplaceController.h, etc.) — alongside each other.
 - `# --- Cmd/ (public) ---` — under-Cmd public headers (Edit.h, InlineFormat.h, Block.h, Insert.h) plus the aggregate `Cmd.h`.
 - Top-level impl sources (mirroring public layout).
@@ -249,7 +249,7 @@ Final-plan acceptance is the spec's §12 + plan's Task 55 (foundation viability 
 
 1. ✅ One commit per task. Cross-task bug fixes get their own `fix:` commit (lesson 14).
 2. ✅ `cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON` configures clean.
-3. ✅ `cmake --build build-dev --target markoff_foundation -j` builds clean.
+3. ✅ `cmake --build build-dev --target markoff_core -j` builds clean.
 4. ✅ `ctest --test-dir build-dev -R '^tst_(markoff_edit|anchor_json|selection|fold_ref|foundation_.*)$' --output-on-failure` passes for all foundation test executables. After Phase 11, expect ~22 executables; after Phase 13, ~25+.
 5. ✅ Existing markoff-* libs still build. Pre-existing `markoff-live` failures (undo_grouping, table_operations) OK to ignore — they predate this branch.
 

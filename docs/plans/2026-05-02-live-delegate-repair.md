@@ -264,8 +264,8 @@ The next agent can disagree. This is a starting point.
 - Speculative fence controller: `libs/markoff-view-qml/src/LiveSpeculativeFenceController.cpp`.
 - Projection layer: `libs/markoff-view-qml/{include,src}/markoff/view/qml/LiveProjectionLayer.{h,cpp}`.
 - Block converter (post-C-2): `libs/markoff-view-qml/src/BlockWalker.{h,cpp}` (now a thin shim over `Document::topLevelBlocks()`).
-- Foundation parse pipeline relay: `libs/markoff-foundation/src/MarkoffDocument.cpp` lines 25-43 (the `parseReady` lambda).
-- Foundation block-anchor computation: `libs/markoff-foundation/src/BlockAnchorComputation.cpp` (uses `parsed->topLevelBlocks()` post-C-7).
+- Foundation parse pipeline relay: `libs/markoff-core/src/MarkoffDocument.cpp` lines 25-43 (the `parseReady` lambda).
+- Foundation block-anchor computation: `libs/markoff-core/src/BlockAnchorComputation.cpp` (uses `parsed->topLevelBlocks()` post-C-7).
 - Parser top-level walker: `libs/markoff-parser/src/TreeSitterParser.cpp` (`collectTopLevelBlocks`, `classifyTopLevelKind`, `fillFencedCodeFields`).
 - Parser top-level API: `libs/markoff-parser/include/markoff-parser/Document.h` (`TopLevelBlock` struct + `Document::topLevelBlocks()`).
 
@@ -277,7 +277,7 @@ The next agent can disagree. This is a starting point.
 - `docs/plans/2026-05-01-live-projection-layer.md` — plan that produced commits `c96b71d`..`bcf64cd`. Stage 4 marked as work-in-progress in this plan's terminology.
 - `docs/handoff/2026-05-01-projection-layer-stage4-redesign-SESSION-BRIEF.md` — useful narrative on the v0 failure modes and v1 design rationale; written before C-1..C-9.
 - `libs/markoff-view-qml/CLAUDE.md` — library guide. Editing invariants §; Architectural invariants §. The `activeFocus` skip in §3.4 above violates invariant #1 and #2; flag this discrepancy when fixing.
-- `libs/markoff-foundation/CLAUDE.md` — foundation guide. Documents the `parseUpdated` signal shape and the BlockAnchor staleness-for-one-cycle behavior that's now anchored to `topLevelBlocks()`.
+- `libs/markoff-core/CLAUDE.md` — foundation guide. Documents the `parseUpdated` signal shape and the BlockAnchor staleness-for-one-cycle behavior that's now anchored to `topLevelBlocks()`.
 
 ### Cold review (no commit; transcript-only, summary preserved)
 
