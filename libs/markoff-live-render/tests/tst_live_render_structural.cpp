@@ -395,6 +395,108 @@ private Q_SLOTS:
                      QStringLiteral("- hello\n- "));
     }
 
+    void list_item_enter_renumbers_subsequent_ordered_items() {
+        // User UX: insert at end of "2. two" should produce "3. " in-line and
+        // renumber existing 3→4, 4→5, etc. so the source stays sequential.
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        const QByteArray six =
+            "1. one\n2. two\n3. three\n4. four\n5. five\n6. six";
+        QVERIFY(waitForModelRows(binding, doc, six, 1));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        const QString rowText = binding.model()->recordAt(0).text;
+        // qtPos at end of "2. two" — that's position 13 (after 'o' of "two").
+        const int qtPos = QStringLiteral("1. one\n2. two").length();
+        QCOMPARE(qtPos, 13);
+
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier, 0, qtPos, true, rowText);
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        const QString after = binding.model()->recordAt(0).text;
+        qDebug() << "[probe] after enter+renumber:" << after;
+        QCOMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(after,
+            QStringLiteral("1. one\n2. two\n3. \n4. three\n5. four\n6. five\n7. six"));
+    }
+
+    void list_item_enter_at_line_start_renumbers_too() {
+        // Insert empty "2. " above existing "2. two" by pressing Enter at
+        // qtPos=7 (start of "2. two"). New text: "1. one\n2. \n3. two\n4. three..."
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        const QByteArray three = "1. one\n2. two\n3. three";
+        QVERIFY(waitForModelRows(binding, doc, three, 1));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        const QString rowText = binding.model()->recordAt(0).text;
+        const int qtPos = QStringLiteral("1. one\n").length();
+        QCOMPARE(qtPos, 7);
+
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::NoModifier, 0, qtPos, true, rowText);
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+
+        const QString after = binding.model()->recordAt(0).text;
+        qDebug() << "[probe] after at-line-start enter:" << after;
+        QCOMPARE(binding.model()->rowCount(), 1);
+        QCOMPARE(after, QStringLiteral("1. one\n2. \n3. two\n4. three"));
+    }
+
+    void list_item_load_with_double_trailing_newline_has_no_phantom_line() {
+        // Regression: source with multiple trailing newlines must not leave
+        // a phantom empty line in the model text.
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "1. one\n2. two\n\n", 1));
+        QCoreApplication::processEvents();
+        QCoreApplication::processEvents();
+        const QString modelText = binding.model()->recordAt(0).text;
+        QCOMPARE(modelText, QStringLiteral("1. one\n2. two"));
+        QVERIFY(!modelText.endsWith(u'\n'));
+    }
+
+    void list_item_probe_trailing_newline_in_buffer() {
+        // Probe: when source has trailing whitespace after the list, does the
+        // CRDT buffer contain multiple trailing '\n's? If so, the model text
+        // (which only chops ONE trailing '\n') will show a visible empty line.
+        auto trailingNewlines = [](const QByteArray &b) {
+            int n = 0; for (int i = b.size() - 1; i >= 0 && b[i] == '\n'; --i) ++n; return n;
+        };
+        auto trailingNewlinesQ = [](const QString &s) {
+            int n = 0; for (int i = s.size() - 1; i >= 0 && s[i] == u'\n'; --i) ++n; return n;
+        };
+        auto report = [&](const QByteArray &source, const char *label) {
+            Markoff::MarkoffDocument doc(/*replicaId=*/1);
+            LiveListModelBinding binding;
+            binding.setDocument(&doc);
+            doc.loadFromMarkdown(source);
+            QCoreApplication::processEvents();
+            QCoreApplication::processEvents();
+            QCOMPARE(binding.model()->rowCount(), 1);
+            const auto id = doc.iterateBlocks()[0];
+            const QByteArray buf = doc.blockText(id);
+            const QString modelText = binding.model()->recordAt(0).text;
+            qDebug().noquote() << QString("[probe] %1: src=%2b/%3\\n  buf=%4b/%5\\n  model=%6c/%7\\n")
+                .arg(QString::fromUtf8(label))
+                .arg(source.size()).arg(trailingNewlines(source))
+                .arg(buf.size()).arg(trailingNewlines(buf))
+                .arg(modelText.length()).arg(trailingNewlinesQ(modelText));
+        };
+        report("1. one\n2. two\n3. three\n4. four\n5. five\n6. six", "no trailing");
+        report("1. one\n2. two\n3. three\n4. four\n5. five\n6. six\n", "one trailing");
+        report("1. one\n2. two\n3. three\n4. four\n5. five\n6. six\n\n", "two trailing");
+    }
+
     void list_item_enter_compound_six_items_then_three_enters_no_new_blocks() {
         // Simulates the exact dogfood scenario: 6 numbered items in ONE block,
         // press Enter at end → "7. ", type "seven", Enter → "8. ", type "eight",

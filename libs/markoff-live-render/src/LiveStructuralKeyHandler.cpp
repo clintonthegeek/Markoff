@@ -482,8 +482,8 @@ void LiveStructuralKeyHandler::registerBuiltins()
             return HR::Handled;
         }
 
-        // 5. Non-empty line: increment ordered marker, then insert a new item
-        // line as a text edit within the existing block (no new block created).
+        // 5. Non-empty line: insert a new item line within the block AND
+        // renumber subsequent ordered markers if the inserted marker is ordered.
         //
         // Two sub-cases based on where the cursor sits:
         //   • At start of a line (lineStart == qtPos): insert markerPrefix+'\n'
@@ -492,14 +492,23 @@ void LiveStructuralKeyHandler::registerBuiltins()
         //     below, cursor moves to it.
         const bool atLineStart = (lineStart == c.qtPos);
 
-        if (!atLineStart) {
+        // For at-end / mid-line: increment the marker so the new item carries
+        // the next number. For at-line-start: keep the same marker (the new
+        // empty item assumes the current line's number; renumbering shifts
+        // everything below by 1).
+        bool insertedIsOrdered = false;
+        int  insertedNumber    = 0;
+        char insertedSeparator = '.';
+        {
             static const QRegularExpression kOrd(
                 QStringLiteral(R"(^(\d{1,9})([.)]) )"));
             auto om = kOrd.match(QString::fromUtf8(markerPrefix));
             if (om.hasMatch()) {
-                const int next = om.captured(1).toInt() + 1;
-                const char sep  = om.captured(2).at(0).toLatin1();
-                markerPrefix = QByteArray::number(next) + sep + ' ';
+                insertedIsOrdered = true;
+                insertedSeparator = om.captured(2).at(0).toLatin1();
+                insertedNumber    = om.captured(1).toInt() + (atLineStart ? 0 : 1);
+                markerPrefix = QByteArray::number(insertedNumber)
+                             + insertedSeparator + ' ';
             }
         }
 
@@ -508,8 +517,33 @@ void LiveStructuralKeyHandler::registerBuiltins()
         const QByteArray insertion = atLineStart
             ? (markerPrefix + "\n")
             : ("\n" + markerPrefix);
+
+        // Build the renumbered tail. Start from the original tail (cursor →
+        // end-of-block); split into lines; if the inserted item is ordered,
+        // increment any subsequent ordered markers by 1 so the source stays
+        // sequential.
+        QString origTail = blockText.mid(c.qtPos);
+        if (insertedIsOrdered && !origTail.isEmpty()) {
+            QStringList lines = origTail.split(u'\n');
+            static const QRegularExpression kOrdLine(
+                QStringLiteral(R"(^([ \t]{0,3})(\d{1,9})([.)]) )"));
+            for (auto &ln : lines) {
+                auto m = kOrdLine.match(ln);
+                if (!m.hasMatch()) continue;
+                const int oldN = m.captured(2).toInt();
+                ln = m.captured(1) + QString::number(oldN + 1) + m.captured(3)
+                   + QStringLiteral(" ") + ln.mid(m.capturedLength());
+            }
+            origTail = lines.join(u'\n');
+        }
+
+        const QByteArray newTail = origTail.toUtf8();
+        const QByteArray oldTail = blockText.mid(c.qtPos).toUtf8();
+
         UndoLog::Transaction t(c.document->d2UndoLog());
-        c.document->d2ApplyBufferEdit(id, byteOff, 0, insertion, t);
+        c.document->d2ApplyBufferEdit(id, byteOff,
+                                       static_cast<uint32_t>(oldTail.size()),
+                                       insertion + newTail, t);
         // Cursor: at-line-start → stay at new empty item (same qtPos);
         //         otherwise → move to start of new item below.
         const int newQtPos = atLineStart
