@@ -133,18 +133,18 @@ void TestDocumentTopLevelBlocks::blockQuote()
 void TestDocumentTopLevelBlocks::bulletList()
 {
     auto blocks = blocksOf(QStringLiteral("- a\n- b\n- c\n"));
-    QCOMPARE(blocks.size(), 1);
-    // v1: the grammar does not surface a tight/loose attribute on the
-    // `list` node, so we default to ListTight. Either tight or loose
-    // is acceptable.
-    QVERIFY(blocks[0].kind == Kind::ListTight || blocks[0].kind == Kind::ListLoose);
+    // One ListItem per list item.
+    QCOMPARE(blocks.size(), 3);
+    for (const auto &b : blocks)
+        QCOMPARE(b.kind, Kind::ListItem);
 }
 
 void TestDocumentTopLevelBlocks::numberedList()
 {
     auto blocks = blocksOf(QStringLiteral("1. a\n2. b\n"));
-    QCOMPARE(blocks.size(), 1);
-    QVERIFY(blocks[0].kind == Kind::ListTight || blocks[0].kind == Kind::ListLoose);
+    QCOMPARE(blocks.size(), 2);
+    for (const auto &b : blocks)
+        QCOMPARE(b.kind, Kind::ListItem);
 }
 
 void TestDocumentTopLevelBlocks::thematicBreak()
@@ -213,8 +213,7 @@ void TestDocumentTopLevelBlocks::mixedDocumentInOrder()
         if (b.kind == Kind::Paragraph)        sawParagraph = true;
         if (b.kind == Kind::FencedCodeBlock)  sawCode      = true;
         if (b.kind == Kind::BlockQuote)       sawQuote     = true;
-        if (b.kind == Kind::ListTight ||
-            b.kind == Kind::ListLoose)        sawList      = true;
+        if (b.kind == Kind::ListItem)         sawList      = true;
         if (b.kind == Kind::ThematicBreak)    sawHr        = true;
     }
     QVERIFY(sawParagraph);

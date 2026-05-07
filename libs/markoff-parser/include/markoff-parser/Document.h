@@ -82,9 +82,7 @@ struct TopLevelBlock {
         FencedCodeBlock,
         IndentedCodeBlock,
         BlockQuote,
-        ListTight,                  // RETIRED in Task 3 (kept temporarily for build)
-        ListLoose,                  // RETIRED in Task 3
-        ListItem,                   // NEW: emitted per list_item node (Task 3)
+        ListItem,                   // emitted per list_item node
         ThematicBreak,              // <hr> / horizontal rule
         HtmlBlock,
         LinkReferenceDefinition,

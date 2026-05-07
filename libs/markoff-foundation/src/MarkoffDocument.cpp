@@ -793,8 +793,7 @@ static BlockKind mapTopLevelKind(TopLevelBlock::Kind k)
     case Kind::ThematicBreak:         return BlockKind::HorizontalRule;
     case Kind::HtmlBlock:             return BlockKind::HtmlBlock;
     case Kind::Table:                 return BlockKind::Table;
-    case Kind::ListTight:
-    case Kind::ListLoose:             return BlockKind::ListItem;
+    case Kind::ListItem:               return BlockKind::ListItem;
     default:                          return BlockKind::Paragraph;
     }
 }
@@ -850,8 +849,7 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
 
         // Buffer content: full source range in UTF-8 bytes
         // For FencedCodeBlock, full source is stored (fences preserved for round-trip).
-        // For ListTight/ListLoose, full list source is stored; item-level unwrapping
-        // is deferred (the v1 parser doesn't expose item byte ranges).
+        // For ListItem, content-only bytes (marker excluded) are stored per-item.
         QByteArray content = bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart);
 
         auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);

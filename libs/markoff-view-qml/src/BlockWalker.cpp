@@ -30,8 +30,7 @@ QString mapKind(Markoff::TopLevelBlock::Kind k)
         // inline formatting (bold/italic/code spans).
         case K::Paragraph:
         case K::BlockQuote:
-        case K::ListTight:
-        case K::ListLoose:
+        case K::ListItem:
         case K::HtmlBlock:
         case K::LinkReferenceDefinition:
         case K::Table:

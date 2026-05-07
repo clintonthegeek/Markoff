@@ -1220,8 +1220,7 @@ static TopLevelBlock::Kind classifyTopLevelKind(const char *type)
     if (strcmp(type, "fenced_code_block") == 0)         return TopLevelBlock::Kind::FencedCodeBlock;
     if (strcmp(type, "indented_code_block") == 0)       return TopLevelBlock::Kind::IndentedCodeBlock;
     if (strcmp(type, "block_quote") == 0)               return TopLevelBlock::Kind::BlockQuote;
-    if (strcmp(type, "list") == 0)                      return TopLevelBlock::Kind::ListTight;  // retired Task 3
-    if (strcmp(type, "list_item") == 0)                 return TopLevelBlock::Kind::ListItem;   // NEW
+    if (strcmp(type, "list_item") == 0)                 return TopLevelBlock::Kind::ListItem;
     if (strcmp(type, "thematic_break") == 0)            return TopLevelBlock::Kind::ThematicBreak;
     if (strcmp(type, "html_block") == 0)                return TopLevelBlock::Kind::HtmlBlock;
     if (strcmp(type, "link_reference_definition") == 0) return TopLevelBlock::Kind::LinkReferenceDefinition;
@@ -1229,12 +1228,106 @@ static TopLevelBlock::Kind classifyTopLevelKind(const char *type)
     return TopLevelBlock::Kind::Other;
 }
 
+// Returns true if the list node contains a blank line between items
+// (i.e., the list is "loose" in CommonMark terms).
+static bool isListLoose(TSNode listNode, const QByteArray &utf8)
+{
+    const uint32_t start = ts_node_start_byte(listNode);
+    const uint32_t end   = ts_node_end_byte(listNode);
+    if (end <= start + 1 || static_cast<uint32_t>(utf8.size()) < end) return false;
+    for (uint32_t i = start; i + 1 < end; ++i) {
+        if (utf8[i] == '\n' && utf8[i + 1] == '\n') return true;
+    }
+    return false;
+}
+
+// Harvest marker style/number, checked state, and content byte range
+// from a list_item node into the TopLevelBlock b.
+static void harvestListItem(TSNode item, const QByteArray &utf8,
+                            TopLevelBlock &b)
+{
+    const uint32_t n = ts_node_named_child_count(item);
+    int contentStart = -1;
+    int contentEnd   = -1;
+
+    for (uint32_t i = 0; i < n; ++i) {
+        TSNode child = ts_node_named_child(item, i);
+        const char *ctype = ts_node_type(child);
+
+        bool isMarker = false;
+
+        if (strcmp(ctype, "list_marker_dot") == 0) {
+            b.markerStyle = QStringLiteral("dot"); isMarker = true;
+        } else if (strcmp(ctype, "list_marker_parenthesis") == 0) {
+            b.markerStyle = QStringLiteral("paren"); isMarker = true;
+        } else if (strcmp(ctype, "list_marker_minus") == 0) {
+            b.markerStyle = QStringLiteral("minus"); isMarker = true;
+        } else if (strcmp(ctype, "list_marker_plus") == 0) {
+            b.markerStyle = QStringLiteral("plus"); isMarker = true;
+        } else if (strcmp(ctype, "list_marker_star") == 0) {
+            b.markerStyle = QStringLiteral("star"); isMarker = true;
+        } else if (strcmp(ctype, "task_list_marker_unchecked") == 0) {
+            b.markerStyle = QStringLiteral("task");
+            b.checked = false;
+            isMarker = true;
+        } else if (strcmp(ctype, "task_list_marker_checked") == 0) {
+            b.markerStyle = QStringLiteral("task");
+            b.checked = true;
+            isMarker = true;
+        } else if (strcmp(ctype, "list") == 0
+                || strcmp(ctype, "block_continuation") == 0) {
+            // nested list or continuation — not this item's direct content
+        } else {
+            // Real content child (paragraph, fenced_code_block, etc.)
+            const int s = static_cast<int>(ts_node_start_byte(child));
+            const int e = static_cast<int>(ts_node_end_byte(child));
+            if (contentStart < 0) contentStart = s;
+            contentEnd = e;
+        }
+
+        // Extract markerNumber from ordered marker text
+        if (isMarker && (b.markerStyle == QStringLiteral("dot")
+                      || b.markerStyle == QStringLiteral("paren"))) {
+            const int ms = static_cast<int>(ts_node_start_byte(child));
+            const int me = static_cast<int>(ts_node_end_byte(child));
+            if (ms >= 0 && me > ms && me <= static_cast<int>(utf8.size())) {
+                QByteArray digits;
+                for (int j = ms; j < me; ++j) {
+                    const char c = utf8[j];
+                    if (c >= '0' && c <= '9') digits += c;
+                    else break;
+                }
+                if (!digits.isEmpty())
+                    b.markerNumber = digits.toInt();
+            }
+        }
+    }
+
+    if (contentStart < 0) {
+        // Empty item — point both ends at the item's end byte
+        b.byteStart = b.byteEnd = static_cast<int>(ts_node_end_byte(item));
+    } else {
+        // Strip trailing '\n' from content end
+        while (contentEnd > contentStart
+               && static_cast<uint32_t>(contentEnd - 1) < static_cast<uint32_t>(utf8.size())
+               && utf8[contentEnd - 1] == '\n') {
+            --contentEnd;
+        }
+        b.byteStart = contentStart;
+        b.byteEnd   = contentEnd;
+    }
+}
+
 // Walk container nodes (`document`, `section`) recursively, emitting a
 // TopLevelBlock for every block-level child. Sections themselves are
 // containers — their child heading and following blocks are flattened
 // into the linear output sequence.
+// currentIndent: nesting depth from enclosing list ancestors (0 = top-level).
+// currentLooseRun: true iff the nearest enclosing list was loose.
 static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
-                                  QList<TopLevelBlock> &out)
+                                  QList<TopLevelBlock> &out,
+                                  int currentIndent = 0,
+                                  bool currentLooseRun = false)
 {
     const char *type = ts_node_type(node);
 
@@ -1243,7 +1336,37 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
         uint32_t count = ts_node_named_child_count(node);
         for (uint32_t i = 0; i < count; ++i) {
             TSNode child = ts_node_named_child(node, i);
-            collectTopLevelBlocks(child, utf8, out);
+            collectTopLevelBlocks(child, utf8, out, currentIndent, currentLooseRun);
+        }
+        return;
+    }
+
+    // List: recurse into list_item children (one TLB per item).
+    if (strcmp(type, "list") == 0) {
+        const bool loose = isListLoose(node, utf8);
+        const uint32_t count = ts_node_named_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_named_child(node, i);
+            collectTopLevelBlocks(child, utf8, out, currentIndent, loose);
+        }
+        return;
+    }
+
+    // List item: emit one TLB, then recurse into any nested list children.
+    if (strcmp(type, "list_item") == 0) {
+        TopLevelBlock b;
+        b.kind = TopLevelBlock::Kind::ListItem;
+        b.indentDepth = currentIndent;
+        b.looseRun = currentLooseRun;
+        harvestListItem(node, utf8, b);
+        out.append(b);
+        // Recurse into nested list children at increased indent depth
+        const uint32_t count = ts_node_named_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_named_child(node, i);
+            if (strcmp(ts_node_type(child), "list") == 0) {
+                collectTopLevelBlocks(child, utf8, out, currentIndent + 1, currentLooseRun);
+            }
         }
         return;
     }
