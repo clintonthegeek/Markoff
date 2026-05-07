@@ -81,3 +81,8 @@ add_test(NAME tst_d2_convergence COMMAND tst_d2_convergence)
 qt_add_executable(tst_d2_list_roundtrip tst_d2_list_roundtrip.cpp)
 target_link_libraries(tst_d2_list_roundtrip PRIVATE Qt6::Test markoff_foundation)
 add_test(NAME tst_d2_list_roundtrip COMMAND tst_d2_list_roundtrip)
+
+# D3-correction Task 9: renumberRunStartingAt + insertListItemAfter
+qt_add_executable(tst_d2_list_renumber tst_d2_list_renumber.cpp)
+target_link_libraries(tst_d2_list_renumber PRIVATE Qt6::Test markoff_foundation)
+add_test(NAME tst_d2_list_renumber COMMAND tst_d2_list_renumber)
