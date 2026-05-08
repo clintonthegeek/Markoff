@@ -51,6 +51,18 @@ The maintainers explicitly preserved compatibility: *"if D5 ships against curren
 
 The 2026-05-04 six-item D-evolution scope-line is unaffected. This refactor reshapes the boundary of what already exists; it does not add CRDT primitives, generalise `CollabDocument`, or add cross-CRDT coordination.
 
+### 0.1.1 Acceptance addendum (2026-05-08)
+
+Collabtext shipped the OpStream extraction faster than the ~8–10 week estimate above — the full public surface (`OpStream`, `Operations`, `IdListOperations`, `Serialization`, `StreamSync`, `CrdtEngine` callback API, IdList `set_on_local_op`/`apply_remote_op`, `acks.json` ack-frontier) landed 2026-05-08 (collabtext commits `08875fd` → `ef44e41`). Joint-design outcomes recorded at `~/dev/collabtext/docs/handoff/2026-05-08-d5-joint-design-outcomes.md`. Markoff acceptance recorded at `docs/handoff/2026-05-08-collabtext-d5-acceptance.md`.
+
+Phase 0 prerequisite of `docs/plans/2026-05-08-d5-collab-activation.md` is satisfied. Phase 1 can begin.
+
+One open feedback item — `Lamport::replica_id` is exposed as a public field rather than an accessor method, with a one-field carve-out from the otherwise-evolution-reserved field-layout rule. Documentation/three-line fix; not blocking.
+
+Two adaptations from this spec's earlier text:
+- Op-identity accessors are free functions in the public surface — `op_lamport(op)` and `idlist_op_lamport(op)` — rather than `Operation::lamport()` member methods. Reason: `Operation` is `std::variant`. `MarkoffSerializer` and `MarkoffBundleMeta` construction code must use the free-function form.
+- Encoded op payloads on the wire are UTF-8 JSON `std::string` (single line, no trailing newline), trivially convertible to `QByteArray` for `MarkoffOp::payload`.
+
 ---
 
 ## 1. Frame and three-layer split

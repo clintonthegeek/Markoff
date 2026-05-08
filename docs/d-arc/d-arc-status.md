@@ -2,7 +2,7 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-08 (D5 spec approved; writing-plans next).
+**Last updated:** 2026-05-08 (collabtext D5 deliverables landed and accepted; D5 Phase 0 prerequisite met).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Active phase:** **D5** (collab activation) — `spec-approved` 2026-05-08. Implementation plan via writing-plans next; see `docs/specs/2026-05-07-d5-collab-activation-design.md`.
@@ -52,7 +52,8 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-08 | (this commit) | Collabtext maintainers responded YES to Alternative A (`~/dev/collabtext/docs/specs/2026-05-08-d5-negotiation-response.md`). Public op API + public `Serialization.h` land in ~2 weeks; full `OpStream` + `StreamSync` adoption + ack-frontier in ~8–10 weeks. D5 spec §0.1 records the negotiation outcome. D5 implementation plan landed at `docs/plans/2026-05-08-d5-collab-activation.md` (written under writing-plans skill); Phase 0 prerequisite added — Markoff D5 implementation pauses until collabtext items 1–2 land. Joint-design positions on the two open design calls (`Operation`/`IdListOperation` contract surface; ack-frontier file format) recorded at `docs/handoff/2026-05-08-collabtext-joint-design-positions.md`. |
+| 2026-05-08 | (this commit) | Collabtext OpStream extraction landed (their commits `08875fd` → `ef44e41`). Public surface verified: `<collabtext/OpStream.h>`, `<collabtext/Operations.h>`, `<collabtext/IdListOperations.h>`, `<collabtext/Serialization.h>`, `<collabtext/StreamSync.h>`, `CrdtEngine` `setOnLocalOp`/`applyRemoteOp`, IdList `set_on_local_op`/`apply_remote_op`, sibling `acks.json` ack-frontier with all four hard requirements satisfied. One nit raised: `Lamport::replica_id` exposed as field rather than accessor (asymmetric with `counter()`; documentation/three-line fix, not blocking). Markoff acceptance recorded at `docs/handoff/2026-05-08-collabtext-d5-acceptance.md`. **D5 Phase 0 prerequisite is satisfied.** Phase 1 of `docs/plans/2026-05-08-d5-collab-activation.md` (boundary types, includes migration to `<collabtext/...>`) can begin. |
+| 2026-05-08 | (earlier) | Collabtext maintainers responded YES to Alternative A (`~/dev/collabtext/docs/specs/2026-05-08-d5-negotiation-response.md`). Public op API + public `Serialization.h` land in ~2 weeks; full `OpStream` + `StreamSync` adoption + ack-frontier in ~8–10 weeks. D5 spec §0.1 records the negotiation outcome. D5 implementation plan landed at `docs/plans/2026-05-08-d5-collab-activation.md` (written under writing-plans skill); Phase 0 prerequisite added — Markoff D5 implementation pauses until collabtext items 1–2 land. Joint-design positions on the two open design calls (`Operation`/`IdListOperation` contract surface; ack-frontier file format) recorded at `docs/handoff/2026-05-08-collabtext-joint-design-positions.md`. |
 | 2026-05-08 | `8a9d802` | D5 spec-approved. Substantive design at `docs/specs/2026-05-07-d5-collab-activation-design.md` (written 2026-05-07, approved 2026-05-08). Companion negotiation opener at `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. Stub archived. Pivot-doc §4.3 closed; §4.4 (writing-plans for implementation plan) next. D5 → `spec-approved`. |
 | 2026-05-07 | `1f44926` | pivot-doc §4.2 closed: view-qml deletion was already landed in `f646c90`. CLAUDE.md and pivot doc updated to mark §4.2 closed. |
 | 2026-05-07 | `6b0dc03` | docs: point CLAUDE.md, d-arc-status, and citations to pivot doc (final §4.1 commit). |
