@@ -3,7 +3,7 @@
 # separate project() call; we mirror that here so this subdirectory gets the same
 # policies. find_package is guarded since libs/markoff-live already ran it.
 if(NOT TARGET Qt6::Core)
-    find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick QuickControls2 QuickWidgets Qml)
+    find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets Quick QuickControls2 QuickWidgets Qml Test)
 endif()
 qt_standard_project_setup(REQUIRES 6.5)
 
@@ -28,4 +28,5 @@ target_link_libraries(markoff-collab-testapp PRIVATE
     markoff_live
     markoff_liveplugin
 )
+enable_testing()
 add_subdirectory(tests)
