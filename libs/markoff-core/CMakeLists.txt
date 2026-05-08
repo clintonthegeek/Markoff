@@ -98,6 +98,9 @@ add_library(markoff_core STATIC
     # --- Sibling-map op wire envelope (D5 §3.1) ---
     include/markoff/core/SiblingMapOpHeader.h
     src/SiblingMapOpHeader.cpp
+    # --- Bundle encode/decode (D5 §3.2) ---
+    include/markoff/core/MarkoffSerializer.h
+    src/MarkoffSerializer.cpp
 )
 
 target_include_directories(markoff_core
