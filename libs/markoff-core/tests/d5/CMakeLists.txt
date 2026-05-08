@@ -34,3 +34,15 @@ qt_add_executable(tst_d5_idempotency tst_d5_idempotency.cpp)
 target_link_libraries(tst_d5_idempotency PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d5_idempotency COMMAND tst_d5_idempotency)
 
+qt_add_executable(tst_d5_sibling_map_emit tst_d5_sibling_map_emit.cpp)
+target_link_libraries(tst_d5_sibling_map_emit PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_sibling_map_emit COMMAND tst_d5_sibling_map_emit)
+
+qt_add_executable(tst_d5_sibling_map_lww tst_d5_sibling_map_lww.cpp)
+target_link_libraries(tst_d5_sibling_map_lww PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_sibling_map_lww COMMAND tst_d5_sibling_map_lww)
+
+qt_add_executable(tst_d5_sibling_map_edges tst_d5_sibling_map_edges.cpp)
+target_link_libraries(tst_d5_sibling_map_edges PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_sibling_map_edges COMMAND tst_d5_sibling_map_edges)
+
