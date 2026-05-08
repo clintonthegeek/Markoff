@@ -12,7 +12,10 @@
 #include <markoff/core/CrdtProxies.h>
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/Cmd/D2.h>
+#include <markoff/core/Cursor.h>
 
+#include <QAbstractListModel>
+#include <QColor>
 #include <QList>
 #include <QRegularExpression>
 #include <QScopeGuard>
@@ -20,6 +23,85 @@
 namespace Markoff::Live {
 
 namespace {
+
+// ============================================================================
+// RemoteCursorsListModel — QAbstractListModel for remote cursor overlays (D5)
+// ============================================================================
+
+class RemoteCursorsListModel : public QAbstractListModel {
+    Q_OBJECT
+public:
+    enum Roles {
+        ReplicaIdRole = Qt::UserRole + 1,
+        ColorRole,
+        LabelRole,
+    };
+
+    struct RemoteEntry {
+        quint16 replicaId;
+        QColor  color;
+        QString label;
+    };
+
+    explicit RemoteCursorsListModel(QObject *parent = nullptr)
+        : QAbstractListModel(parent) {}
+
+    int rowCount(const QModelIndex &parent = {}) const override {
+        return parent.isValid() ? 0 : static_cast<int>(m_entries.size());
+    }
+
+    QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override {
+        if (!index.isValid() || index.row() < 0 || index.row() >= rowCount())
+            return {};
+        const auto &e = m_entries[index.row()];
+        switch (role) {
+        case ReplicaIdRole: return QVariant::fromValue(e.replicaId);
+        case ColorRole:     return QVariant::fromValue(e.color);
+        case LabelRole:     return e.label;
+        default:            return {};
+        }
+    }
+
+    QHash<int, QByteArray> roleNames() const override {
+        return {
+            { ReplicaIdRole, "replicaId" },
+            { ColorRole,     "color" },
+            { LabelRole,     "label" },
+        };
+    }
+
+    void onRemoteCursorChanged(quint16 replicaId, Markoff::Cursor /*cursor*/,
+                               QColor color, QString label) {
+        for (int i = 0; i < static_cast<int>(m_entries.size()); ++i) {
+            if (m_entries[i].replicaId == replicaId) {
+                m_entries[i].color = color;
+                m_entries[i].label = label;
+                const QModelIndex idx = index(i);
+                Q_EMIT dataChanged(idx, idx, {ColorRole, LabelRole});
+                return;
+            }
+        }
+        // New entry
+        const int row = static_cast<int>(m_entries.size());
+        beginInsertRows({}, row, row);
+        m_entries.push_back({ replicaId, color, label });
+        endInsertRows();
+    }
+
+    void onRemoteCursorCleared(quint16 replicaId) {
+        for (int i = 0; i < static_cast<int>(m_entries.size()); ++i) {
+            if (m_entries[i].replicaId == replicaId) {
+                beginRemoveRows({}, i, i);
+                m_entries.erase(m_entries.begin() + i);
+                endRemoveRows();
+                return;
+            }
+        }
+    }
+
+private:
+    std::vector<RemoteEntry> m_entries;
+};
 
 /// Convert the foundation's BlockKind enum to the LiveRender QString kind
 /// constant used by BlockRecord / BlockKindRegistry.
@@ -44,13 +126,14 @@ QString blockKindToString(Markoff::BlockKind k)
 }  // namespace
 
 struct LiveListModelBinding::Private {
-    Markoff::MarkoffDocument *document      = nullptr;
-    LiveBlockModel            *model        = nullptr;
+    Markoff::MarkoffDocument *document          = nullptr;
+    LiveBlockModel            *model            = nullptr;
     BlockKindRegistry          registry;
-    LiveCursorState           *cursorState   = nullptr;
-    BlockHitTester            *hitTester     = nullptr;
-    LiveSelectionView         *selectionView = nullptr;
-    LiveStructuralKeyHandler  *structuralKeys = nullptr;
+    LiveCursorState           *cursorState      = nullptr;
+    BlockHitTester            *hitTester        = nullptr;
+    LiveSelectionView         *selectionView    = nullptr;
+    LiveStructuralKeyHandler  *structuralKeys   = nullptr;
+    RemoteCursorsListModel    *remoteCursors    = nullptr;
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
 };
@@ -64,6 +147,7 @@ LiveListModelBinding::LiveListModelBinding(QObject *parent)
     d->hitTester     = new BlockHitTester(this);
     d->selectionView = new LiveSelectionView(this);
     d->selectionView->setModel(d->model);
+    d->remoteCursors = new RemoteCursorsListModel(this);
 }
 
 LiveListModelBinding::~LiveListModelBinding() = default;
@@ -99,6 +183,12 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         QObject::connect(d->document, &Markoff::MarkoffDocument::d2DocumentChanged,
                          this, &LiveListModelBinding::onD2Changed);
 
+        // D5: wire remote cursor signals to the overlay model.
+        QObject::connect(d->document, &Markoff::MarkoffDocument::remoteCursorChanged,
+                         d->remoteCursors, &RemoteCursorsListModel::onRemoteCursorChanged);
+        QObject::connect(d->document, &Markoff::MarkoffDocument::remoteCursorCleared,
+                         d->remoteCursors, &RemoteCursorsListModel::onRemoteCursorCleared);
+
         d->selectionView->setDocument(d->document);
         d->selectionView->setSession(nullptr);
 
@@ -118,6 +208,7 @@ BlockHitTester           *LiveListModelBinding::hitTester()           const { re
 LiveSelectionView        *LiveListModelBinding::selectionView()       const { return d->selectionView; }
 LiveStructuralKeyHandler *LiveListModelBinding::structuralKeyHandler() const { return d->structuralKeys; }
 const BlockKindRegistry  *LiveListModelBinding::registry()            const { return &d->registry; }
+QAbstractListModel       *LiveListModelBinding::remoteCursorsModel()  const { return d->remoteCursors; }
 
 bool LiveListModelBinding::applyingModelUpdate() const
 {
@@ -308,3 +399,5 @@ void LiveListModelBinding::onD2Changed()
 }
 
 }  // namespace Markoff::Live
+
+#include "LiveListModelBinding.moc"

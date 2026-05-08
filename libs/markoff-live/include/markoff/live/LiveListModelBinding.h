@@ -10,6 +10,7 @@
 #include <markoff/live/LiveStructuralKeyHandler.h>
 
 #include <QObject>
+#include <QAbstractListModel>
 #include <memory>
 #include <qqmlintegration.h>
 
@@ -34,6 +35,8 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
                READ selectionView CONSTANT)
     Q_PROPERTY(Markoff::Live::LiveStructuralKeyHandler *structuralKeyHandler
                READ structuralKeyHandler CONSTANT)
+    Q_PROPERTY(QAbstractListModel *remoteCursorsModel
+               READ remoteCursorsModel CONSTANT)
 
 public:
     explicit LiveListModelBinding(QObject *parent = nullptr);
@@ -48,6 +51,7 @@ public:
     LiveSelectionView        *selectionView()       const;
     LiveStructuralKeyHandler *structuralKeyHandler() const;
     const BlockKindRegistry  *registry()            const;
+    QAbstractListModel       *remoteCursorsModel()  const;
 
     /// True for the synchronous duration of `applyOps` while D2 CRDT change
     /// notification is mutating model rows. LiveEditBinding queries this

@@ -155,6 +155,16 @@ ListView {
         event.accepted = false
     }
 
+    // ---- Remote cursor overlays (D5, geometry stub) ----
+    Repeater {
+        model: binding ? binding.remoteCursorsModel : null
+        delegate: RemoteCursorOverlay {
+            cursorColor: model.color
+            cursorLabel: model.label
+            x: 0; y: 0
+        }
+    }
+
     // ---- Mouse input ----
     MouseArea {
         id: mouseArea

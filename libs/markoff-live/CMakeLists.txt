@@ -74,6 +74,7 @@ qt_add_qml_module(markoff_live
         qml/delegates/ListItemDelegate.qml
         qml/delegates/BlockquoteDelegate.qml
         qml/delegates/MathDelegate.qml
+        qml/delegates/RemoteCursorOverlay.qml
 )
 
 target_include_directories(markoff_live

@@ -68,3 +68,10 @@ target_link_libraries(tst_live_render_context_menu PRIVATE
     Qt6::Core Qt6::Test markoff_live markoff_core)
 add_test(NAME tst_live_render_context_menu COMMAND tst_live_render_context_menu)
 
+qt_add_executable(tst_d5_remote_cursor_render
+    tst_d5_remote_cursor_render.cpp
+)
+target_link_libraries(tst_d5_remote_cursor_render PRIVATE
+    Qt6::Core Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_d5_remote_cursor_render COMMAND tst_d5_remote_cursor_render)
+

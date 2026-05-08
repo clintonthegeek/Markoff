@@ -7,3 +7,4 @@ CodeBlockDelegate 1.0 CodeBlockDelegate.qml
 ListItemDelegate 1.0 ListItemDelegate.qml
 BlockquoteDelegate 1.0 BlockquoteDelegate.qml
 MathDelegate 1.0 MathDelegate.qml
+RemoteCursorOverlay 1.0 RemoteCursorOverlay.qml
