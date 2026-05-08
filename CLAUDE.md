@@ -32,10 +32,11 @@
 > authoritative and not to be cited in new specs except as historical
 > context. R5.5 Bug 3 is cancelled, not paused.
 >
-> `libs/markoff-view-qml` is flagged for deletion under §4.2 of the
-> pivot doc (next work-unit after this docs cleanup). It currently
-> still ships in source mode. Do not extend it; do not depend on it
-> from new code.
+> `libs/markoff-view-qml` was deleted entirely in commit `f646c90`
+> (landed 2026-05-07 as part of v1.0 Part 1 prep before the v1.0 plan
+> was retired). The deletion stands; the pivot doc §4.2 work-unit was
+> redundant and is closed. `markoff-source` is the canonical source
+> widget.
 >
 > All other content below describes the project at large.
 
@@ -64,11 +65,6 @@ foundation library + two canonical view leaves.
                                  `UndoLog`, `WatermarkCoordinator`,
                                  `applyFlatEdit` (D4: flat-text entry
                                  point for source-widget edits).
-- `libs/markoff-view-qml`      — legacy QML view (source mode only;
-                                 live mode retired in D4). **Flagged
-                                 for deletion under pivot-doc §4.2.**
-                                 Do not extend; do not depend on from
-                                 new code.
 - `libs/markoff-live`   — **the active live-preview view leaf.**
                                  Built on D2's per-block CRDT buffers via
                                  `LiveListModelBinding`, `LiveBlockModel`,
@@ -134,7 +130,6 @@ was deleted in D4.
 
 - `libs/markoff-core/CLAUDE.md`
 - `libs/markoff-live/CLAUDE.md` — **active view leaf**
-- `libs/markoff-view-qml/CLAUDE.md`
 - `libs/markoff-source/CLAUDE.md`
 - `libs/markoff-parser/` (no per-lib CLAUDE.md; docs in `docs/specs/`)
 

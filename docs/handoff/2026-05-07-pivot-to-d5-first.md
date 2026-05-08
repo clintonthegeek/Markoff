@@ -185,16 +185,22 @@ and the Phase B/C handoff.
 No code touched. Output: a single PR-shaped commit series titled
 `docs: retire v1.0 plan, C-restoration paper, Phase B/C handoff`.
 
-### 4.2 view-qml deletion (one work-unit)
+### 4.2 view-qml deletion (CLOSED — already done in `f646c90`)
 
-Delete `libs/markoff-view-qml/` entirely, plus its CMake registration,
-plus any references in the test app and root CMakeLists. If any tests
-move from view-qml to markoff-source as part of the deletion, they move
-intact (no rewrites).
+> **Status:** closed 2026-05-07. The deletion was already landed in
+> commit `f646c90` ("markoff-view-qml: delete (retired in D4;
+> superseded by markoff-source for v1.0)") as part of v1.0 Part 1
+> prep, before this pivot doc was written. It survives under the §2.1
+> "kept commits, plans retire, code stays" rule. The work-unit was
+> redundant; closed without further action beyond updating CLAUDE.md
+> to remove the stale "flagged for deletion" entry.
 
-Tests pass at the end of the commit. If they don't, the deletion is
-incomplete and needs follow-up before the next work-unit begins. No
-"we'll fix it later" — view-qml deletion is one tree state, atomic.
+Original prescription (kept for the record):
+
+> Delete `libs/markoff-view-qml/` entirely, plus its CMake registration,
+> plus any references in the test app and root CMakeLists. If any tests
+> move from view-qml to markoff-source as part of the deletion, they move
+> intact (no rewrites). Tests pass at the end of the commit.
 
 ### 4.3 D5 substantive design
 

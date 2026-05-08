@@ -52,6 +52,8 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-07 | (this commit) | pivot-doc §4.2 closed: view-qml deletion was already landed in `f646c90`. CLAUDE.md and pivot doc updated to mark §4.2 closed. |
+| 2026-05-07 | `6b0dc03` | docs: point CLAUDE.md, d-arc-status, and citations to pivot doc (final §4.1 commit). |
 | 2026-05-07 | `6b77a25` | docs: archive C-restoration paper trail under `docs/archive/c-restoration-arc/` (pivot-doc §2.2). |
 | 2026-05-07 | `390cc58` | docs: archive v1.0 plan series under `docs/archive/v1.0-plan-pre-d5/` (pivot-doc §2.1). |
 | 2026-05-07 | `c054897` | docs: pivot to D5-first; v1.0 plan retired as authoritative. Pivot doc + developmental-history doc landed. |
