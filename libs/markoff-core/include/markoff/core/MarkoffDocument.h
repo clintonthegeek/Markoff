@@ -71,7 +71,7 @@ public:
     const Markoff::Document *parsedDocument() const;
 
     // ===== CRDT identity =====
-    quint16 replicaId() const;
+    quint16 replicaId() const noexcept;
     bool isCollabConfigured() const noexcept;
     CollabText::Crdt::Global version() const;
 

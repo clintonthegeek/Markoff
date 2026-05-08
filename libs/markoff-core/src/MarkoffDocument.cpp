@@ -130,7 +130,7 @@ const Markoff::Document *MarkoffDocument::parsedDocument() const
     return d->latestParse.get();
 }
 
-quint16 MarkoffDocument::replicaId() const
+quint16 MarkoffDocument::replicaId() const noexcept
 {
     return d->replicaId;
 }
