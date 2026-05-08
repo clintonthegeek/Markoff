@@ -12,3 +12,12 @@ qt_add_executable(tst_d5_in_memory_transport
 target_link_libraries(tst_d5_in_memory_transport PRIVATE Qt6::Test Qt6::Core markoff_core)
 target_include_directories(tst_d5_in_memory_transport PRIVATE ..)
 add_test(NAME tst_d5_in_memory_transport COMMAND tst_d5_in_memory_transport)
+
+qt_add_executable(tst_d5_testapp_convergence
+    tst_d5_testapp_convergence.cpp
+    ../InMemoryTransport.cpp
+    ../CollabConsumer.cpp)
+target_link_libraries(tst_d5_testapp_convergence PRIVATE
+    Qt6::Test Qt6::Core markoff_core)
+target_include_directories(tst_d5_testapp_convergence PRIVATE ..)
+add_test(NAME tst_d5_testapp_convergence COMMAND tst_d5_testapp_convergence)
