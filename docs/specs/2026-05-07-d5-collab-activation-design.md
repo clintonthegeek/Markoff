@@ -1,11 +1,12 @@
 # D5 — Collab Activation Design
 
-**Date:** 2026-05-07
-**Status:** spec-approved (pending writing-plans for the implementation plan)
+**Date:** 2026-05-07 (boundary design); revised 2026-05-08 (collabtext response received).
+**Status:** spec-approved.
 **Branch:** `exploration/new-foundation`
 **Supersedes:** `docs/archive/2026-05-04-d5-collab-activation-STUB.md`
-**Companion:** `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md` (collabtext maintainer-facing follow-up)
-**Authoritative parent:** `docs/handoff/2026-05-07-pivot-to-d5-first.md` §4.3
+**Companion:** `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md` (Markoff-side opener).
+**Companion (response):** `~/dev/collabtext/docs/specs/2026-05-08-d5-negotiation-response.md` — collabtext maintainers commit to Alternative A. See §0.1.
+**Authoritative parent:** `docs/handoff/2026-05-07-pivot-to-d5-first.md` §4.3.
 **Audience:** Markoff agents implementing D5 under pivot-doc §4.4.
 
 ---
@@ -31,6 +32,24 @@ D5 implementation produces:
 3. A spec-internal "consumer wiring sketch" (§4) that grounds the API; not a full integration guide. A real integration guide gets written when there's a real consumer.
 
 This document is paired with a **collabtext negotiation opener** addressed to the collabtext maintainers, asking for a refactor that exposes a transport-agnostic boundary on collabtext's side. The negotiation is independent of D5 implementation — Markoff implements D5 against the current collabtext shape; if maintainers refactor during the implementation window, the consumer-side wiring simplifies. The boundary API itself is shape-independent.
+
+---
+
+## 0.1 Negotiation outcome (revised 2026-05-08)
+
+The collabtext maintainers responded with a commitment to **Alternative A** of the negotiation opener. The substantive update:
+
+- **`OpStream` becomes the canonical wiring surface** once collabtext's refactor lands (~8–10 weeks from 2026-05-08; sequenced after IdList β). The "shape-independent" framing in the body of this spec was a hedge against the refactor not happening; with Alternative A committed, that hedge retires.
+- **`include/collabtext/OpStream.h`** will define the boundary, with method signatures matching this spec's §4.1 `ITransport` shape verbatim. `StreamSync` adopts `OpStream` (renamed declined; the name stays).
+- **`include/collabtext/Serialization.h`** becomes a public include path; `encode_operation` / `decode_operation` / `encode_idlist_operation` / `decode_idlist_operation` are public functions consumers (and the Markoff D5 implementation) call directly. Field-level ABI evolves with `schema_version` bumps; round-trip via encode/decode is the consumer contract.
+- **Per-peer ack-frontier publication** is included: `lowest_peer_acked_lamport()` + advance callback, exactly the shape this spec assumes.
+- **Markoff implementation can begin against partial delivery.** Items 1–2 of the response (public op API + public serialisation) land in ~2 weeks; items 3–6 (full `OpStream` + `StreamSync` adoption + ack-frontier publication + tests) land at ~8–10 weeks. D5 implementation pauses until items 1–2 are in tree, then proceeds; the wiring sketch (§4) updates to reference `OpStream` as the canonical surface once the full refactor lands. See `docs/plans/2026-05-08-d5-collab-activation.md` Phase 0 for sequencing.
+- **Joint-design pass scheduled** on the public `OpStream` header and the per-peer ack-frontier file format. Markoff reviews drafts before they set; "a week of back-and-forth on the headers, no more" per the response.
+- **Markoff testapp adopted as the realistic demo consumer** for collabtext (alongside or in place of `CollabPlainTextEdit`). Coordination on timing follows.
+
+The maintainers explicitly preserved compatibility: *"if D5 ships against current shape and we land the refactor afterward, the consumer wiring simplifies but Markoff itself doesn't change."* With this spec's three-layer model, that property holds — the boundary on `MarkoffDocument` is independent of the collabtext shape; only the consumer-side wiring (the integration sketch in §4) updates.
+
+The 2026-05-04 six-item D-evolution scope-line is unaffected. This refactor reshapes the boundary of what already exists; it does not add CRDT primitives, generalise `CollabDocument`, or add cross-CRDT coordination.
 
 ---
 
