@@ -16,6 +16,7 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/BlockAnchor.h>
+#include <markoff/core/Theme.h>
 
 namespace Markoff::Live {
 
@@ -37,6 +38,7 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
                READ structuralKeyHandler CONSTANT)
     Q_PROPERTY(QAbstractListModel *remoteCursorsModel
                READ remoteCursorsModel CONSTANT)
+    Q_PROPERTY(const Markoff::Theme *theme READ theme WRITE setTheme NOTIFY themeChanged)
 
 public:
     explicit LiveListModelBinding(QObject *parent = nullptr);
@@ -53,6 +55,9 @@ public:
     const BlockKindRegistry  *registry()            const;
     QAbstractListModel       *remoteCursorsModel()  const;
 
+    const Markoff::Theme *theme() const noexcept;
+    void setTheme(const Markoff::Theme *theme);
+
     /// True for the synchronous duration of `applyOps` while D2 CRDT change
     /// notification is mutating model rows. LiveEditBinding queries this
     /// inside its `contentsChange` slot to suppress the synchronous
@@ -61,6 +66,7 @@ public:
 
 Q_SIGNALS:
     void documentChanged();
+    void themeChanged();
 
     /// Emitted after applyOps when blocks were structurally inserted.
     /// `first` and `last` are the new model row indices (inclusive).

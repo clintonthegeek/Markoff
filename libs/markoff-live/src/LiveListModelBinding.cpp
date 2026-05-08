@@ -13,6 +13,7 @@
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/Cmd/D2.h>
 #include <markoff/core/Cursor.h>
+#include <markoff/core/Theme.h>
 
 #include <QAbstractListModel>
 #include <QColor>
@@ -136,6 +137,7 @@ struct LiveListModelBinding::Private {
     RemoteCursorsListModel    *remoteCursors    = nullptr;
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
+    Markoff::Theme             theme            = Markoff::Theme::defaultLight();
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
@@ -213,6 +215,18 @@ QAbstractListModel       *LiveListModelBinding::remoteCursorsModel()  const { re
 bool LiveListModelBinding::applyingModelUpdate() const
 {
     return d->applyingModelUpdate;
+}
+
+const Markoff::Theme *LiveListModelBinding::theme() const noexcept
+{
+    return &d->theme;
+}
+
+void LiveListModelBinding::setTheme(const Markoff::Theme *theme)
+{
+    if (!theme || theme == &d->theme) return;
+    d->theme = *theme;
+    Q_EMIT themeChanged();
 }
 
 void LiveListModelBinding::onD2Changed()

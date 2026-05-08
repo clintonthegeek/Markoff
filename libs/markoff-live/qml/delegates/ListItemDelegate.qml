@@ -86,6 +86,12 @@ Item {
         selectByMouse: true
         persistentSelection: true
 
+        InlineHighlighterAttached {
+            target: edit.textDocument
+            spans: model.inlineSpans
+            theme: root.liveBinding ? root.liveBinding.theme : null
+        }
+
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
             const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
