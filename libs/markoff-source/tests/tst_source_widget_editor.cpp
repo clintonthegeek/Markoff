@@ -34,7 +34,8 @@ private Q_SLOTS:
         const QColor sentinel("#abcdef");
         t.setColor(Markoff::Theme::Slot::EditorBackground, sentinel);
         e.setTheme(t);
-        QCOMPARE(e.palette().color(QPalette::Base), sentinel);
+        // Theme applies to the inner QPlainTextEdit, not the outer QWidget.
+        QCOMPARE(e.plainTextEdit()->palette().color(QPalette::Base), sentinel);
     }
 };
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Gutter.h"
+#include "InnerEditor.h"
 #include <markoff/source/Editor.h>
 
 #include <QPainter>
@@ -30,25 +31,27 @@ void Gutter::paintEvent(QPaintEvent *event) {
     p.setPen(sep);
     p.drawLine(width() - 1, event->rect().top(), width() - 1, event->rect().bottom());
 
-    QTextBlock block = m_editor->firstVisibleBlock();
+    // Access protected QPlainTextEdit geometry methods via InnerEditor (promotes them to public).
+    auto *pe = static_cast<InnerEditor *>(m_editor->plainTextEdit());
+    QTextBlock block = pe->firstVisibleBlock();
     int blockNumber = block.blockNumber();
-    qreal top = m_editor->blockBoundingGeometry(block)
-                    .translated(m_editor->contentOffset()).top();
-    qreal bottom = top + m_editor->blockBoundingRect(block).height();
-    const int currentLine = m_editor->textCursor().blockNumber();
+    qreal top = pe->blockBoundingGeometry(block)
+                    .translated(pe->contentOffset()).top();
+    qreal bottom = top + pe->blockBoundingRect(block).height();
+    const int currentLine = pe->textCursor().blockNumber();
 
-    p.setFont(m_editor->font());
+    p.setFont(pe->font());
     while (block.isValid() && top <= event->rect().bottom()) {
         if (block.isVisible() && bottom >= event->rect().top()) {
             p.setPen(blockNumber == currentLine ? digitActive : digit);
             const QString num = QString::number(blockNumber + 1);
             p.drawText(0, int(top), width() - 6,
-                       m_editor->fontMetrics().height(),
+                       pe->fontMetrics().height(),
                        Qt::AlignRight | Qt::AlignVCenter, num);
         }
         block = block.next();
         top = bottom;
-        bottom = top + m_editor->blockBoundingRect(block).height();
+        bottom = top + pe->blockBoundingRect(block).height();
         ++blockNumber;
     }
 }

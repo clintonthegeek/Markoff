@@ -77,7 +77,7 @@ void FindBar::recomputeMatches() {
     if (!m_editor) return;
     const QString needle = m_input->text();
     if (needle.isEmpty()) return;
-    QTextDocument *doc = m_editor->QPlainTextEdit::document();
+    QTextDocument *doc = m_editor->plainTextEdit()->document();
     if (!doc) return;
     QTextCursor c(doc);
     while (true) {

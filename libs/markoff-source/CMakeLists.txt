@@ -15,6 +15,7 @@ add_library(markoff_source STATIC
     include/markoff/source/Editor.h
     include/markoff/source/FindBar.h
     src/Gutter.h
+    src/InnerEditor.h
 )
 
 target_include_directories(markoff_source

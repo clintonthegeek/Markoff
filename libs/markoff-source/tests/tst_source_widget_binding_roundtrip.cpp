@@ -30,7 +30,8 @@ private Q_SLOTS:
         doc.loadFromMarkdown(QByteArray());
         e.setDocument(&doc);
         e.show();
-        QTest::keyClicks(&e, QStringLiteral("abc"));
+        // Key events must target the inner QPlainTextEdit where text input lands.
+        QTest::keyClicks(e.plainTextEdit(), QStringLiteral("abc"));
         QTRY_COMPARE(fullText(doc), QByteArrayLiteral("abc"));
     }
 
@@ -62,11 +63,14 @@ private Q_SLOTS:
         doc.loadFromMarkdown(QByteArray());
         e.setDocument(&doc);
         e.show();
-        QTest::keyClicks(&e, QStringLiteral("abc"));
+        // Key events must target the inner QPlainTextEdit where text input lands.
+        QTest::keyClicks(e.plainTextEdit(), QStringLiteral("abc"));
         QTRY_COMPARE(fullText(doc), QByteArrayLiteral("abc"));
-        QTest::keyClick(&e, Qt::Key_Z, Qt::ControlModifier);
-        QTest::keyClick(&e, Qt::Key_Z, Qt::ControlModifier);
-        QTest::keyClick(&e, Qt::Key_Z, Qt::ControlModifier);
+        // Undo key events also go to the inner widget; the event filter on
+        // Editor intercepts Ctrl+Z and routes it to undoD2().
+        QTest::keyClick(e.plainTextEdit(), Qt::Key_Z, Qt::ControlModifier);
+        QTest::keyClick(e.plainTextEdit(), Qt::Key_Z, Qt::ControlModifier);
+        QTest::keyClick(e.plainTextEdit(), Qt::Key_Z, Qt::ControlModifier);
         QTRY_COMPARE(fullText(doc), QByteArray());
     }
 };

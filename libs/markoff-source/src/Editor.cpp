@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/source/Editor.h>
 #include "Gutter.h"
+#include "InnerEditor.h"
 
 #include <KSyntaxHighlighting/Definition>
 #include <KSyntaxHighlighting/Repository>
@@ -13,6 +14,8 @@
 #include <QKeyEvent>
 #include <QPalette>
 #include <QResizeEvent>
+#include <QScrollBar>
+#include <QVBoxLayout>
 
 namespace Markoff::Source::Widget {
 
@@ -24,77 +27,118 @@ KSyntaxHighlighting::Repository &repo() {
 } // anon
 
 Editor::Editor(QWidget *parent)
-    : QPlainTextEdit(parent),
+    : Markoff::MarkdownView(parent),
+      m_editor(new InnerEditor(this)),
       m_binding(new Markoff::SourceTextDocumentBinding(this)),
       m_highlighter(new KSyntaxHighlighting::SyntaxHighlighter(this)),
       m_theme(Markoff::Theme::defaultLight())
 {
+    auto *layout = new QVBoxLayout(this);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(m_editor);
+
     // The binding talks to the QPlainTextEdit's underlying QTextDocument.
     // It also disables that QTextDocument's own undo stack — CRDT undo via
     // MarkoffDocument is canonical (see SourceTextDocumentBinding::rewireQtDocument).
-    m_binding->setTextDocument(QPlainTextEdit::document());
+    m_binding->setTextDocument(m_editor->document());
 
     // Parent the highlighter to the Editor (not to the QTextDocument) so its
     // lifetime is tied to the Editor regardless of any later setDocument() on
     // the underlying QPlainTextEdit.
-    m_highlighter->setDocument(QPlainTextEdit::document());
+    m_highlighter->setDocument(m_editor->document());
     m_highlighter->setDefinition(repo().definitionForName(QStringLiteral("Markdown")));
     m_highlighter->setTheme(repo().defaultTheme(KSyntaxHighlighting::Repository::LightTheme));
 
-    setLineWrapMode(QPlainTextEdit::WidgetWidth);
+    m_editor->setLineWrapMode(QPlainTextEdit::WidgetWidth);
 
     m_gutter = new Gutter(this);
-    connect(this, &QPlainTextEdit::blockCountChanged,
+    connect(m_editor, &QPlainTextEdit::blockCountChanged,
             this, [this]() { recomputeGutterWidth(); });
-    connect(this, &QPlainTextEdit::updateRequest,
+    connect(m_editor, &QPlainTextEdit::updateRequest,
             this, [this](const QRect &rect, int dy) {
         if (dy) m_gutter->scroll(0, dy);
         else m_gutter->update(0, rect.y(), m_gutter->width(), rect.height());
-        if (rect.contains(viewport()->rect())) recomputeGutterWidth();
+        if (rect.contains(m_editor->viewport()->rect())) recomputeGutterWidth();
     });
-    connect(this, &QPlainTextEdit::cursorPositionChanged,
+    connect(m_editor, &QPlainTextEdit::cursorPositionChanged,
             this, [this]() { if (m_gutter) m_gutter->update(); });
     recomputeGutterWidth();
+
+    // Forward key events (undo/redo) from the inner editor
+    m_editor->installEventFilter(this);
 }
 
 Editor::~Editor() = default;
 
-Markoff::MarkoffDocument *Editor::document() const { return m_document.data(); }
-
 void Editor::setDocument(Markoff::MarkoffDocument *doc) {
-    if (m_document.data() == doc) return;
-
-    // Tear down the previous session, if any. QPointer auto-nulls when the
-    // watched object dies, so we only act if both are still alive.
-    if (m_document && m_session) {
-        m_binding->setSession(nullptr);
-        m_document->destroySession(m_session.data());
-        m_session = nullptr;
+    if (auto *prev = Markoff::MarkdownView::document()) {
+        if (prev == doc) return;
+        // Tear down the previous session, if any.
+        if (m_session) {
+            m_binding->setSession(nullptr);
+            prev->destroySession(m_session.data());
+            m_session = nullptr;
+        }
+        disconnect(prev, nullptr, this, nullptr);
     }
 
-    m_document = doc;
+    Markoff::MarkdownView::setDocument(doc);
 
-    if (m_document) {
-        m_session = m_document->createSession();
-        m_binding->setMarkoffDocument(m_document.data());
+    if (doc) {
+        m_session = doc->createSession();
+        m_binding->setMarkoffDocument(doc);
         m_binding->setSession(m_session.data());
     } else {
         m_binding->setMarkoffDocument(nullptr);
     }
-
-    emit documentChanged();
 }
+
+Markoff::CursorPos Editor::cursorPosition() const {
+    auto cursor = m_editor->textCursor();
+    return { cursor.blockNumber() + 1, cursor.positionInBlock() + 1 };
+}
+
+void Editor::setCursorPosition(Markoff::CursorPos pos) {
+    auto block = m_editor->document()->findBlockByNumber(pos.line - 1);
+    if (!block.isValid()) return;
+    QTextCursor cursor(block);
+    cursor.setPosition(block.position() + qMax(0, pos.column - 1));
+    m_editor->setTextCursor(cursor);
+}
+
+float Editor::scrollPositionVisualLine() const {
+    auto *sb = m_editor->verticalScrollBar();
+    if (!sb || sb->maximum() == 0) return 0.0f;
+    return static_cast<float>(sb->value()) / static_cast<float>(sb->maximum());
+}
+
+void Editor::setScrollPositionVisualLine(float pos) {
+    auto *sb = m_editor->verticalScrollBar();
+    if (!sb || sb->maximum() == 0) return;
+    sb->setValue(static_cast<int>(pos * static_cast<float>(sb->maximum())));
+}
+
+void Editor::setReadOnly(bool ro) {
+    Markoff::MarkdownView::setReadOnly(ro);
+    m_editor->setReadOnly(ro);
+}
+
+bool Editor::isReadOnly() const { return m_editor->isReadOnly(); }
+
+void Editor::showFindBar()    { /* find bar integration: v1.1 */ }
+void Editor::showReplaceBar() { /* replace bar integration: v1.1 */ }
+void Editor::hideFindBar()    { /* find bar integration: v1.1 */ }
 
 Markoff::Theme Editor::theme() const { return m_theme; }
 
 void Editor::setTheme(const Markoff::Theme &t) {
     m_theme = t;
-    QPalette p = palette();
+    QPalette p = m_editor->palette();
     p.setColor(QPalette::Base,            t.color(Markoff::Theme::Slot::EditorBackground));
     p.setColor(QPalette::Text,            t.color(Markoff::Theme::Slot::TextDefault));
     p.setColor(QPalette::Highlight,       t.color(Markoff::Theme::Slot::SelectionBackground));
     p.setColor(QPalette::HighlightedText, t.color(Markoff::Theme::Slot::TextDefault));
-    setPalette(p);
+    m_editor->setPalette(p);
 
     const bool darkUi = t.color(Markoff::Theme::Slot::EditorBackground).lightnessF() < 0.5;
     if (m_highlighter) {
@@ -107,38 +151,39 @@ void Editor::setTheme(const Markoff::Theme &t) {
     emit themeChanged();
 }
 
-void Editor::keyPressEvent(QKeyEvent *e) {
-    const auto m = e->modifiers();
-    if (m_document && (m & Qt::ControlModifier)) {
-        if (e->key() == Qt::Key_Z && !(m & Qt::ShiftModifier)) {
-            m_document->undoD2();
-            e->accept();
-            return;
-        }
-        if (e->key() == Qt::Key_Y || (e->key() == Qt::Key_Z && (m & Qt::ShiftModifier))) {
-            m_document->redoD2();
-            e->accept();
-            return;
+bool Editor::eventFilter(QObject *watched, QEvent *event) {
+    if (watched == m_editor && event->type() == QEvent::KeyPress) {
+        auto *e = static_cast<QKeyEvent *>(event);
+        const auto m = e->modifiers();
+        auto *doc = Markoff::MarkdownView::document();
+        if (doc && (m & Qt::ControlModifier)) {
+            if (e->key() == Qt::Key_Z && !(m & Qt::ShiftModifier)) {
+                doc->undoD2();
+                return true;
+            }
+            if (e->key() == Qt::Key_Y || (e->key() == Qt::Key_Z && (m & Qt::ShiftModifier))) {
+                doc->redoD2();
+                return true;
+            }
         }
     }
-    QPlainTextEdit::keyPressEvent(e);
+    return Markoff::MarkdownView::eventFilter(watched, event);
 }
 
 void Editor::resizeEvent(QResizeEvent *e) {
-    QPlainTextEdit::resizeEvent(e);
-    QRect cr = contentsRect();
-    m_gutter->setGeometry(QRect(cr.left(), cr.top(), gutterWidth(), cr.height()));
+    Markoff::MarkdownView::resizeEvent(e);
+    // Gutter geometry is maintained by the layout; no manual setGeometry needed.
 }
 
 int Editor::gutterWidth() const {
     int digits = 1;
-    int max = qMax(1, blockCount());
+    int max = qMax(1, m_editor->blockCount());
     while (max >= 10) { max /= 10; ++digits; }
-    return 3 + fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits + 6;
+    return 3 + m_editor->fontMetrics().horizontalAdvance(QLatin1Char('9')) * digits + 6;
 }
 
 void Editor::recomputeGutterWidth() {
-    setViewportMargins(gutterWidth(), 0, 0, 0);
+    static_cast<InnerEditor *>(m_editor)->setViewportMargins(gutterWidth(), 0, 0, 0);
 }
 
 } // namespace
