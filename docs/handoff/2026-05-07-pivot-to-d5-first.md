@@ -259,11 +259,18 @@ the user signs off on a dogfood pass.
 With D5 landed, audit and prune the live pipeline. Targets:
 
 - The R5.5 vestigial workarounds (§2.5).
-- Any other dead code surfaced by D5 (e.g. `inlineSpansFor` in the
-  hot path, if D5 didn't already touch it).
 - The full-walk vs targeted-signal question, *now* informed by what D5
   needs from the doc-signal contract rather than by speculation.
 - Open correctness items in `docs/TODO.md`.
+
+> **Narrowed 2026-05-08.** A prior bullet — *"any other dead code
+> surfaced by D5 (e.g. `inlineSpansFor` in the hot path)"* — is
+> retracted. `inlineSpansFor` is load-bearing infrastructure for the
+> post-D5 E-arc (inline-format styling + cursor-aware delimiter
+> visibility), not dead code. Removal would tear out the upstream half
+> of an in-flight foundational feature. See
+> `docs/specs/2026-05-08-e-arc-framing.md` and the §A.7 erratum in
+> `docs/handoff/2026-05-07-live-binding-developmental-history.md`.
 
 This is the work the v1.0 Part 3 plan tried to do prematurely. It is
 done correctly here because by §4.5 the foundation is genuinely
@@ -283,6 +290,26 @@ Whether this happens at all, and on what timeline, is decided after
 §4.5 lands. It is not pre-decided here. The v1.0 plan is retired; the
 post-D5 equivalent will be written from scratch in light of what D5
 actually delivered.
+
+### 4.7 What follows the foundation-bookend (E-arc)
+
+After §4.5 + §4.6 close out the D-arc, the next arc is **E-arc** —
+live-render completion, treated as the maximalist Markoff prototype.
+E-arc completes inline-format rendering, cursor-aware delimiter
+visibility, Obsidian-flavoured affordances (wikilinks/embeds/tags/
+callouts), tables, frontmatter, footnote rendering, and math/mermaid
+Live-mode parity. E-arc bookends with a distillation phase (E6) that
+extracts the foolproof recipe for generalising Markoff into new view
+shapes.
+
+**Authoritative E-arc framing:**
+`docs/specs/2026-05-08-e-arc-framing.md`. **Roadmap:**
+`docs/e-arc/2026-05-08-e-arc-roadmap.md`.
+
+E-arc is named here so that a fresh agent context arriving at §4.6
+knows what comes next without re-deriving it. E-arc work does not
+start until §4.6 ships — building features against an unfrozen public
+surface throws work away.
 
 ---
 

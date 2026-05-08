@@ -1,11 +1,19 @@
 # Live-binding pipeline — developmental history
 
-**Date:** 2026-05-07
+**Date:** 2026-05-07 (with 2026-05-08 erratum on §A.7).
 **Branch:** `exploration/new-foundation`
 **Working tree:** `.worktrees/foundation-exploration/`
 **Audience:** the user, evaluating the v1.0 Part 3 plan
 (`docs/plans/2026-05-07-markoff-v1.0-part3-live-facade-perf.md`) against
 the developmental record. Descriptive, not prescriptive.
+
+> **2026-05-08 erratum.** §A.7's "drop unused `inlineSpansFor`"
+> framing is wrong under the user-stated end-goals. Inline-format
+> styling and cursor-aware delimiter visibility are foundational to
+> live rendering — `inlineSpansFor` is load-bearing infrastructure
+> for E-arc Phase E1, not deferred dead code. See the inline erratum
+> in §A.7 and the constitutional framing at
+> `docs/specs/2026-05-08-e-arc-framing.md`.
 
 This document traces where each piece of the current
 `LiveListModelBinding` ↔ `AstBlockDiff` ↔ `LiveBlockModel` ↔
@@ -436,6 +444,38 @@ explicitly deferred to v1.1 in the v1.0 design spec
 plan's Phase 5 ("Drop unused `inlineSpansFor` from per-block
 extraction") is correct on the developmental record: there is no
 v1.0 consumer.
+
+> **Erratum (2026-05-08).** The "drop unused `inlineSpansFor`"
+> recommendation is **wrong** under the user-stated end-goals for the
+> Markoff widget. Inline-format styling and cursor-aware delimiter
+> visibility (auto-hide of `**` / `__` / etc. unless caret is in the
+> span) are *foundational* to live rendering — without them, the live
+> view is "block-broken plaintext," not a live preview. The
+> `inlineSpansFor` call is therefore not "deferred to v1.1 dead code"
+> but **load-bearing infrastructure for the post-D5 E-arc** (see
+> `docs/specs/2026-05-08-e-arc-framing.md`, phase E1).
+>
+> Specifically: the data path from parser → `InlineParseCache` →
+> `MarkoffDocument::inlineSpansFor` → `LiveListModelBinding::onD2Changed`
+> → `BlockRecord::inlineSpans` → `LiveBlockModel::spansAtRow` is
+> *complete and correct*. The only missing hop is the QML-side
+> consumer (`InlineFormatHighlighter` was that consumer in the
+> deleted view-qml lib; markoff-live's delegates currently use
+> `textFormat: TextEdit.PlainText` and ignore the spans). E1 builds
+> the QML-side consumer; the existing data path is the supplier.
+>
+> The original "Class B dead code" framing in this section (and in the
+> §4.5 audit list of `2026-05-07-pivot-to-d5-first.md`) was
+> retracted on 2026-05-08 after consultation with the user surfaced
+> the end-goal context that made the framing wrong. The retraction is
+> propagated into the pivot-doc §4.5 update of the same date.
+>
+> Performance optimisation note: when E1 lands, evaluate whether
+> per-delegate **lazy** span fetch (delegate calls `spansAtRow(row)`
+> on-demand from `formatBlock`, cache miss triggers the parse via
+> `InlineParseCache`) is cleaner than per-keystroke binding-level
+> extraction into `BlockRecord`. The cache makes that swap trivial.
+> This is a refinement, not a removal.
 
 ---
 

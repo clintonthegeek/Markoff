@@ -103,4 +103,26 @@ When a phase advances:
 - If a stub spec graduates to a substantive spec, update the "Read" column above to point at the substantive spec.
 - The worktree `CLAUDE.md` banner gets a one-line update if the active phase changes.
 
-When the D-arc completes (D5 done): this roadmap stays in tree as historical context, the status board is closed (analog of how `docs/archive/c-restoration-arc/restoration-status.md` was closed at the C-restoration bookend), and a new active arc may begin or the foundation-exploration branch may merge to master.
+When the D-arc completes (D5 done + §4.5/§4.6 bookend per the pivot doc): this roadmap stays in tree as historical context, the status board is closed (analog of how `docs/archive/c-restoration-arc/restoration-status.md` was closed at the C-restoration bookend), and the **E-arc** begins.
+
+---
+
+## 6. What's next (E-arc)
+
+After D-arc closes, the next arc is **E-arc** — live-render completion as the maximalist Markoff prototype. The QML live-render view is treated as the ice-breaker experimental prototype: every other view Markoff will ship is a structural subset of what live-render does once E-arc is complete.
+
+**E-arc phases (sketch):**
+
+- E1 — Inline-format highlighter in QML delegates
+- E2 — Cursor-aware delimiter visibility (auto-hide markers unless caret in span)
+- E3 — Wikilinks, embeds, tags, callouts (Obsidian-flavoured affordances)
+- E4 — Tables, frontmatter, footnote rendering
+- E5 — Math / Mermaid Live-mode parity with Reading mode
+- E6 — Distillation: extract the foolproof view-construction recipe
+
+**Read first:**
+
+- `docs/specs/2026-05-08-e-arc-framing.md` — constitutional framing for E-arc
+- `docs/e-arc/2026-05-08-e-arc-roadmap.md` — orientation doc, mirrors this file's structure
+
+E-arc is named here so the post-D-arc trajectory is visible from D-arc orientation. E-arc work does not begin until D-arc's bookend (`pivot-to-d5-first.md` §4.5 + §4.6) ships.
