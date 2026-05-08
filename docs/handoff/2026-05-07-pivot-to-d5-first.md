@@ -281,6 +281,16 @@ its own short plan if the surface is large.
 
 ### 4.6 Public API freeze + (only then) Corbomite migration
 
+> **Status (2026-05-08): deferred until Corbomite is ready to consume the
+> freeze.** E-arc begins in §4.6's slot in the meantime. §4.6 is *deferred*,
+> not *cancelled*; it resumes when Corbomite signals readiness, or
+> post-E-arc, whichever lands first. Decision record + resumption criteria:
+> `docs/handoff/2026-05-08-defer-46-to-e-arc.md`. Inversion rationale: a
+> migration guide written without a ready consumer goes stale before it
+> ships, and freezing primitives without an exercising consumer risks
+> freezing the wrong shape — exactly the thrash this pivot doc was written
+> to prevent.
+
 The work the v1.0 Parts 1, 2, 4, 5 were leading toward — locking down
 `Markoff::MarkdownView`, `Markoff::MarkoffDocument`, `Markoff::CursorPos`
 etc. as a stable consumer surface, writing a Corbomite migration guide,
@@ -292,6 +302,12 @@ post-D5 equivalent will be written from scratch in light of what D5
 actually delivered.
 
 ### 4.7 What follows the foundation-bookend (E-arc)
+
+> **Status (2026-05-08): E-arc has begun.** §4.6 is deferred (see banner
+> above); E-arc takes §4.6's slot in the work order. The "E-arc work does
+> not start until §4.6 ships" sentence below is overridden by the decision
+> record at `docs/handoff/2026-05-08-defer-46-to-e-arc.md`. Live status:
+> `docs/e-arc/e-arc-status.md`.
 
 After §4.5 + §4.6 close out the D-arc, the next arc is **E-arc** —
 live-render completion, treated as the maximalist Markoff prototype.

@@ -13,7 +13,29 @@
 - `docs/handoff/2026-05-07-pivot-to-d5-first.md` — collab-first posture; this doc complements §4.6
 - `docs/handoff/2026-05-07-live-binding-developmental-history.md` (with 2026-05-08 erratum) — `inlineSpansFor` is load-bearing infrastructure, not dead code
 
-**Companion (live status):** `docs/e-arc/e-arc-status.md` (created when E-arc begins).
+**Companion (live status):** `docs/e-arc/e-arc-status.md`.
+
+---
+
+## 0.1 Amendment (2026-05-08): §4.6 prerequisite removed; E-arc begins now
+
+The §4 prerequisite list called out three D-arc bookend items as required
+before E-arc could begin: D5 implementation, §4.5 audit, and pivot-doc
+§4.6 (public-API freeze + Corbomite migration). The first two are done.
+**§4.6 is removed from the prerequisite list.** Pivot-doc §4.6 is deferred
+until Corbomite is ready to consume the freeze; E-arc begins now in §4.6's
+slot.
+
+The §4 argument *"if §4.6's freeze re-shapes a primitive E1 was about to
+use, E1 wastes work"* is replaced by the inverse: freezing without a ready
+Corbomite consumer is freezing in the dark, and the seams E1–E5 will
+surface are exactly the input §4.6 needs to do its job. Decision record:
+`docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
+
+§4 below is left as-written for the historical record; this addendum
+overrides the §4.6 bullet there. §1.2's statement that E-arc internals are
+out-of-scope for the §4.6 freeze still stands and is unaffected by this
+amendment.
 
 ---
 
@@ -56,6 +78,14 @@ Phase E is **not** a feature wishlist or a Corbomite-driven roadmap. The phases 
 Phase E is also **not** a lock-step plan. Each E-phase is its own spec → plan → implementation cycle, mirroring D2/D3/D4. Phase ordering is suggestive; if E3 (wikilinks/embeds/tags/callouts) surfaces a primitive that E2 (delimiter hide) needed, the dependency rearranges. Re-orderings get a single recent-changes log entry in `e-arc-status.md` and don't need a new framing doc.
 
 Phase E is **not** in scope for the v0.X public-API freeze (pivot-doc §4.6). The freeze targets `MarkdownView`, `MarkoffDocument`, and the consumer primitives that already exist. E-arc internal types (`InlineFormatHighlighter`, projection-layer types, delegate registries) are widget-internal and stay flexible until distillation extracts the stable contracts.
+
+**Out of scope for E-arc** (mentioned here so phase-spec authors don't smuggle them in):
+
+- **Mobile platforms.** Touch event handling (long-press menus, tap-and-hold), virtual-keyboard interactions, gesture recognisers. Markoff is a desktop Qt-Widgets/QML widget at E-arc; mobile is a candidate post-distillation arc.
+- **Accessibility beyond Qt defaults.** Screen-reader custom semantics, high-contrast theme overrides, motion-reduction preferences. `Qt::AccessibleText` defaults are inherited; deeper a11y is a future arc.
+- **I18n beyond `tr()`.** RTL layout in delegates, locale-driven date/number formatting inside frontmatter or embed renderings, bidi text in inline spans. `tr()` for user-visible strings is the existing convention; deeper i18n is out.
+
+These are candidate scopes for future arcs. They are explicitly not E-arc concerns; phase specs that touch them must scope-trim or reject the touch.
 
 ### 1.3 What this enables
 
@@ -239,9 +269,9 @@ The post-E posture, as approved by the user 2026-05-08:
 
 - D5 implementation phases 1–9 must be done.
 - §4.5 audit must run (the live-binding cycle-guards removal; the §4.5 scope is now narrower per the 2026-05-08 framing — see `pivot-to-d5-first.md` updates).
-- §4.6 public-API freeze must land.
+- ~~§4.6 public-API freeze must land.~~ **— overridden by §0.1 amendment (2026-05-08)**: pivot-doc §4.6 is deferred until Corbomite is ready; E-arc begins in §4.6's slot. See `docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
 
-This sequencing is not a queue; it's a dependency. E-arc work on the inline highlighter is harmless to schedule against an evolving public API — but if §4.6's freeze re-shapes a primitive E1 was about to use, E1 wastes work. The clean order is: collab is right, foundation is frozen, then features are built against a stable surface.
+This sequencing is not a queue; it's a dependency. E-arc work on the inline highlighter is harmless to schedule against an evolving public API — but if §4.6's freeze re-shapes a primitive E1 was about to use, E1 wastes work. The clean order is: collab is right, foundation is frozen, then features are built against a stable surface. **(§0.1 inverts this argument: without a ready Corbomite consumer, freezing first is freezing in the dark; build E-arc, surface the seams, freeze post-E-arc.)**
 
 **Within E-arc:** E1 must precede E2 (highlighter is the carrier of the hide-flag). E1 should precede E3 (wikilinks/tags want the highlighter pattern). E5 should be last (math/mermaid is the most isolated and benefits from settled primitives). E4 ordering is flexible.
 
@@ -254,13 +284,73 @@ This sequencing is not a queue; it's a dependency. E-arc work on the inline high
 E-arc inherits and respects all D-arc invariants:
 
 - **Single-user is the default.** New delegates and the highlighter must work without any consumer wired in. Collab is layered on top, not assumed by render.
+- **Collab correctness is preserved.** D5's remote-cursor + structural-op machinery must keep working as features land. Concretely: every E-phase that touches cursor or selection state distinguishes *local caret* from *peer cursor* (e.g., E2's auto-hide reveals on local caret entry only, not on peer cursor entry); every phase that adds a new editing path emits the corresponding `Cmd::*` so collab convergence holds; every phase that adds a new block-kind extends the per-kind sibling-map ops if it stores per-block state outside the buffer. This is implicit in "single-user is the default" but stated separately to forestall slips at phase-spec time.
 - **No `Corbomite`-named types in Markoff public API.**
 - **`master` is append-only.**
 - **Phase milestones tag versions.**
 
 E-arc adds one new invariant:
 
-- **Every E-phase ships with a "subtractability note"** in its spec. The note answers: how would a view that doesn't need this capability avoid linking it / instantiating it / paying its runtime cost? If the answer is "you can't, it's wired in everywhere," that's a recipe-violation flag and the implementation must be reshaped before the phase closes. The distillation pass at E6 audits these notes.
+- **Every E-phase ships with a "subtractability note"** in its spec. The note answers: how would a view that doesn't need this capability avoid linking it / instantiating it / paying its runtime cost? If the answer is "you can't, it's wired in everywhere," that's a recipe-violation flag and the implementation must be reshaped before the phase closes. The distillation pass at E6 audits these notes. (Template, worked example, and violation cadence in §5.1.)
+
+### 5.1 Subtractability note: template, example, cadence
+
+The §5 invariant requires each E-phase to ship a "subtractability note." Its shape:
+
+**Section in the spec.** The note lives in the phase spec under a top-level `## N. Subtractability note` heading, where N is the spec's last numbered section + 1. Conventionally the second-to-last section, with §N+1 reserved for "Acceptance criteria."
+
+**Body shape.** One paragraph per row in the eventual capability matrix (granularity rule in §5.2). Each paragraph answers, for the capability the row represents:
+
+- **What the capability is** in one sentence (the *what* a future view either needs or doesn't).
+- **What a view that needs this capability links / instantiates / pays for** — the dependency chain a consumer cannot avoid.
+- **What a view that doesn't need this capability can do instead** — the subtraction path. Choose from: *omit entirely* (capability is opt-in via registration), *invert* (e.g. inline highlighter: live-render auto-hides delimiters, source-mode never auto-hides), *replace* (use a different rendering for the same data), *no-op* (default implementation that satisfies the contract without exercising it).
+
+**Worked example (E1 inline-format highlighter).**
+
+> **What.** Per-delegate `QSyntaxHighlighter` painting `QTextCharFormat` ranges from `BlockRecord::inlineSpans` over the rendered text in each text-bearing delegate.
+>
+> **A view that needs it links** the inline-span data path (`MarkoffDocument::inlineSpansFor` + `InlineParseCache`), the highlighter class itself, the `Markoff::Theme` token table for inline-kind styling, and any per-delegate cursor watcher that drives reveal/hide (E2-tier).
+>
+> **A view that doesn't need it can:**
+>
+> - **Omit entirely** for a plain-text-style view that renders raw markdown source unstyled — the highlighter is opt-in via delegate-side registration; a delegate that doesn't construct a highlighter pays nothing.
+> - **Invert** for source mode — the highlighter pattern is reused but bound to monospace source rendering, with all delimiter spans always-visible instead of auto-hidden. Inline-kind styling tokens differ (source-style coloration vs. live-render-style typographic emphasis) but the data path is shared.
+> - **Replace** for a Reading-style preview pane — the highlighter is replaced by a one-pass HTML/QML render that bakes spans into static formatting at parse time; the trade-off is no incremental update and no cursor-aware reveal.
+
+**Recipe-violation flag.** If the answer to "what can a view that doesn't need this do?" is *"you can't, it's wired in everywhere"*, the implementation has captured the capability into a load-bearing assumption that the recipe cannot subtract from. The phase **pauses** at green-tree before its acceptance check; the offending capture is reshaped (new injection seam, opt-in registration, default-no-op subclass, etc.) until the subtraction path is real. The arc continues normally once the violation clears. E6 audits the corrected note along with everything else.
+
+A "cannot subtract" answer is not always a violation — fundamental capabilities (e.g., document binding, basic block iteration) genuinely have no subtraction. The judgment is whether the capability is fundamental to *Markoff-the-family-of-views*, in which case `markoff-core` is its right home and the note records that, or fundamental only to *live-render*, in which case the recipe needs an alternate path.
+
+### 5.2 Capability granularity: phase-deliverable rows
+
+E6's capability matrix has one row per **major sub-deliverable** of an E-phase. Concretely:
+
+- E1 → 1 row: *inline-format rendering* (with span-kind list as a note-internal detail, not separate rows).
+- E2 → 1 row: *cursor-aware delimiter visibility*.
+- E3 → 4 rows: *wikilinks*, *embeds*, *tags*, *callouts*. Each row is its own capability because each has a distinct subtraction path (a view that wants tags but not wikilinks is plausible; a view that wants wikilinks but not the auto-hide is plausible).
+- E4 → 3 rows: *tables*, *frontmatter rendering*, *footnote rendering*.
+- E5 → 2 rows: *math rendering*, *Mermaid rendering*. (Inline + block math share a row; the inline carrier rides on E1's row, not its own.)
+- E6 itself → no rows (E6 produces the matrix, doesn't fill a cell in it).
+
+Total at arc close: ~11 rows.
+
+E6 reserves the right to **merge** rows whose subtraction paths turn out identical (e.g., if *frontmatter rendering* and *footnote rendering* both subtract via "render as plain block, no special delegate," they may collapse to one row), or **split** rows whose internal sub-deliverables turn out to have distinct subtraction paths (e.g., if E1's inline kinds turn out to subtract differently — say link/wikilink/tag share a navigation contract that bold/italic/strike/inline-code/highlight don't — the row may split).
+
+The granularity rule lets phases write their subtractability note without waiting on E6. The risk of late merge/split is low: subtraction paths that turn out identical merge cheaply (one-paragraph rewrite); subtraction paths that turn out distinct were going to surface as distinct anyway.
+
+### 5.3 Recipe deliverable: docs-only, with one canonical worked example
+
+E6's deliverables in §2.E6 are docs-only:
+
+- `docs/recipe/2026-XX-XX-view-construction-recipe.md`
+- `docs/recipe/capability-matrix.md`
+- `docs/recipe/delegate-authoring-template.md`
+
+**Not delivered** at E6: a code scaffold (e.g., a `libs/markoff-view-template/` pre-built skeleton). A scaffold is a *consumption-side* artefact that a future arc may produce if-and-when needed. Arguments against scaffolding at E6: the recipe is exercised through documentation, not boilerplate; new-view arcs starting from a scaffold tend to inherit unexamined defaults; the worked-example pattern (below) gives consumers a tested reference without a maintained scaffold.
+
+**The worked example.** `delegate-authoring-template.md` is built around *one canonical worked example* — the best-instantiated existing block-kind delegate from `libs/markoff-live` at E5-close. Every section of the template (kind registration, theme integration, structural-key handling, cursor-state participation, selection-view participation, inline-highlighter integration) annotates how that delegate satisfies the section. A new-view author reads the section, reads the example's matching code, and reproduces the pattern.
+
+E6's "exercise the recipe" acceptance criterion (§2.E6) is satisfied by **rebuilding one existing delegate from the recipe** as a non-trivial verification — either a fresh implementation that round-trips equivalent behaviour, or a new view that subtracts from the recipe in a way no current view does (e.g., a "Markoff Outline" view: subtract delegate variety, subtract inline-format rendering, keep block-kind navigation, keep structural-key contract). The "one new view in scope for the next arc" phrasing in §2.E6 stands; the choice of which view is deferred to the user at E6 time.
 
 ---
 

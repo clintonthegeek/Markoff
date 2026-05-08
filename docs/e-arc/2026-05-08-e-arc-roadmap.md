@@ -20,7 +20,7 @@ E-arc completes the QML live-render view as the **maximalist Markoff prototype**
 
 | Phase | Status | Deliverable | Companion |
 |---|---|---|---|
-| **E1** | `pending` | Inline-format highlighter in QML delegates (bold/italic/strike/inline-code/highlight/link/wikilink/tag) reading `BlockRecord::inlineSpans` | `docs/specs/2026-XX-XX-e1-inline-highlighter-design.md` (TBW) |
+| **E1** | `plan-approved` (ready to execute) | Inline-format highlighter in QML delegates (bold/italic/strike/inline-code/highlight/link/wikilink/tag) reading `BlockRecord::inlineSpans`. Tag: `v0.7.0-e1`. | Spec: [`2026-05-08-e1-inline-highlighter-design.md`](../specs/2026-05-08-e1-inline-highlighter-design.md). Plan: [`2026-05-08-e1-inline-highlighter.md`](../plans/2026-05-08-e1-inline-highlighter.md). |
 | **E2** | `pending` | Cursor-aware delimiter visibility — markers hide unless caret enters the span | `docs/specs/2026-XX-XX-e2-delimiter-visibility-design.md` (TBW) |
 | **E3** | `pending` | Wikilinks, embeds, tags, callouts — Obsidian-flavoured affordances | `docs/specs/2026-XX-XX-e3-obsidian-affordances-design.md` (TBW) |
 | **E4** | `pending` | Tables, frontmatter, footnote rendering | `docs/specs/2026-XX-XX-e4-tables-frontmatter-footnotes-design.md` (TBW) |
@@ -48,13 +48,19 @@ Status legend: `pending` (not yet started) · `spec-in-brainstorm` · `spec-appr
 
 ### 4.1 Prerequisite: D-arc bookend
 
-E-arc cannot begin until:
+D5 + §4.5 must complete before E-arc begins. **Both landed 2026-05-08.**
 
-- D5 implementation completes (all 9 phases of `docs/plans/2026-05-08-d5-collab-activation.md`)
-- §4.5 audit + prune ships (per `docs/handoff/2026-05-07-pivot-to-d5-first.md` §4.5, with the 2026-05-08 narrowing — `inlineSpansFor` is *not* a removal candidate)
-- §4.6 public-API freeze ships
+> **2026-05-08 amendment.** Pivot-doc §4.6 (public-API freeze + Corbomite
+> migration) is **no longer a prerequisite**. §4.6 is deferred until
+> Corbomite is ready to consume the freeze; E-arc begins in §4.6's slot
+> instead. See `docs/handoff/2026-05-08-defer-46-to-e-arc.md` and the
+> framing-doc §0.1 addendum.
 
-The freeze matters because E-phase work touches surfaces that §4.6 will lock. Building E1 against a moving public API risks throwing work away. Inverse: building §4.6 against an unbuilt E1 risks freezing primitives that E1 needs reshaped. The clean order is: collab is right, foundation is frozen, then features are built.
+Originally this section also listed *"§4.6 public-API freeze ships"* with
+the rationale *"building E1 against a moving public API risks throwing
+work away."* That rationale is replaced by the inverse: freezing without a
+ready Corbomite consumer is freezing in the dark; E1–E5 will expose seams
+the freeze should account for; build first, freeze post-E-arc.
 
 ### 4.2 The view-construction discipline
 

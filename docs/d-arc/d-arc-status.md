@@ -2,20 +2,26 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-08 (§4.5 audit complete; D5 complete; §4.6 public-API freeze is next).
+**Last updated:** 2026-05-08 (§4.5 audit complete; D5 complete; §4.6 deferred until Corbomite ready; E-arc opened).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **§4.6** — public-API freeze + Corbomite migration guide.
+**D-arc status:** **closed at §4.5.** §4.6 is deferred (not cancelled). The active arc is now **E-arc**; live status at `docs/e-arc/e-arc-status.md`.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **D-arc §4.5 audit complete. §4.6 (public-API freeze + Corbomite migration guide) is next.**
+> **D-arc closed at §4.5. §4.6 (public-API freeze + Corbomite migration guide) deferred until Corbomite is ready. E-arc begins now in §4.6's slot.**
 > D5 (collab) is done. The §4.5 audit pruned the vestigial R5.5 workarounds
 > (AstBlockDiff collapse post-pass, `anchorRenumbered` / `onAnchorRenumbered`)
 > and added the ListItem Tab parent-existence guard. Full suite green.
-> Next: §4.6 public-API freeze per pivot-doc §4.6; then E-arc begins.
+> §4.6 inverts cost-benefit without a ready Corbomite consumer: freezing in
+> the dark risks freezing primitives E-arc would reshape. Decision record:
+> `docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
+>
+> **Active work has moved to E-arc.** Read `docs/e-arc/e-arc-status.md`
+> next; that is the live status board going forward. This board records
+> D-arc as closed and is reference-only from here.
 >
 > **Read first** (in this order, for a fresh agent context):
 > 1. `docs/handoff/2026-05-07-pivot-to-d5-first.md` — **the pivot doc; authoritative for the branch.**
@@ -54,7 +60,8 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-08 | (§4.5 audit) | §4.5 audit: AstBlockDiff collapse post-pass + `anchorRenumbered` signal + `LiveCursorState::onAnchorRenumbered` deleted (D2 obsolete; BlockId stable under IdList element identity); ListItem Tab parent-existence guard added (refuses indent when no preceding sibling at current level). Full suite green. D5 → complete; §4.6 (public-API freeze + Corbomite migration) is next. |
+| 2026-05-08 | (this commit) | **D-arc closed at §4.5.** Pivot-doc §4.6 (public-API freeze + Corbomite migration) deferred until Corbomite ready — freezing without a ready consumer is freezing in the dark. E-arc begins now in §4.6's slot; E1 (inline-format highlighter) is the active phase. Decision record: `docs/handoff/2026-05-08-defer-46-to-e-arc.md`. New live board: `docs/e-arc/e-arc-status.md`. Framing-doc §0.1 amendment + roadmap §4.1 update + pivot-doc banners + CLAUDE.md update all landed in this commit series. |
+| 2026-05-08 | (§4.5 audit) | §4.5 audit: AstBlockDiff collapse post-pass + `anchorRenumbered` signal + `LiveCursorState::onAnchorRenumbered` deleted (D2 obsolete; BlockId stable under IdList element identity); ListItem Tab parent-existence guard added (refuses indent when no preceding sibling at current level). Full suite green. D5 → complete; §4.6 was originally next, deferred per the entry above. |
 | 2026-05-08 | da1cbf4 | D5 phase 8 complete: apps/markoff-collab-testapp/ scaffold. InMemoryTransport in-memory peer mock + watermark tracking; CollabConsumer wires localOpsProduced → encode → push and setOnInbound → decode → applyRemoteOps; tst_d5_in_memory_transport + tst_d5_testapp_convergence pass; two-pane CollabMain.qml with QQmlApplicationEngine bootstrap. 138/138 tests pass. |
 | 2026-05-08 | 4984df1 | D5 phase 7 complete: remote cursor state + QML overlay. Cursor types moved to markoff-core; MarkoffDocument setRemoteCursor/clearRemoteCursor/clearAllRemoteCursors API + signals; cursor-survival in d2ApplyBufferEdit; LiveListModelBinding::remoteCursorsModel(); RemoteCursorOverlay.qml stub + Repeater in LiveView.qml. Three new tests. 136/136 tests pass. |
 | 2026-05-08 | bcc3df9 | D5 phase 6 complete: watermark/ack gate — wantsAcksAtWatermark, notifyAcksAtWatermark, watermarkCompacted. Four gate tests green. 133/133 total tests pass. |

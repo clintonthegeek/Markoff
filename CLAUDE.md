@@ -7,45 +7,62 @@
 > guide, and before any further perf or facade work. Operating
 > principle: one arc at a time, no side work, retirement is explicit.
 >
-> **2026-05-08 — Trajectory beyond D-arc.** D-arc closes with §4.5
-> audit + §4.6 public-API freeze (per the pivot doc). After that, the
-> next arc is **E-arc** — live-render completion as the maximalist
-> Markoff prototype: inline-format styling, cursor-aware delimiter
-> visibility, Obsidian affordances (wikilinks/embeds/tags/callouts),
-> tables, frontmatter, footnote rendering, math/mermaid Live parity.
-> E-arc bookends with a distillation phase (E6) that extracts the
-> recipe for generalising Markoff into new view shapes — every future
-> view is a structural subset of the live-render prototype. Authoritative
-> framing: `docs/specs/2026-05-08-e-arc-framing.md`. Roadmap:
-> `docs/e-arc/2026-05-08-e-arc-roadmap.md`. E-arc work does not begin
-> until D-arc's bookend ships.
+> **2026-05-08 — D-arc closed at §4.5; E-arc is the active arc; E1 is plan-approved and ready to execute.**
+> D5 + §4.5 audit landed 2026-05-08. **Pivot-doc §4.6 (public-API
+> freeze + Corbomite migration) is deferred until Corbomite is ready
+> to consume the freeze** — freezing without a ready consumer is
+> freezing in the dark. E-arc begins now in §4.6's slot. **E1
+> (inline-format highlighter in QML delegates) is the active phase.**
+>
+> **Fresh-agent execution start:** read
+> `docs/specs/2026-05-08-e1-inline-highlighter-design.md` (§0.2
+> amendment first), then `docs/plans/2026-05-08-e1-inline-highlighter.md`,
+> then choose subagent-driven-development (recommended) or
+> executing-plans, then execute task-by-task with TDD discipline,
+> `-j 8` build cap, and per-task commits.
+>
+> Decision record (§4.6 deferral): `docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
+> Live status: `docs/e-arc/e-arc-status.md`.
+>
+> **E-arc** is live-render completion as the maximalist Markoff
+> prototype: inline-format styling, cursor-aware delimiter visibility,
+> Obsidian affordances (wikilinks/embeds/tags/callouts), tables,
+> frontmatter, footnote rendering, math/mermaid Live parity. E-arc
+> bookends with a distillation phase (E6) that extracts the recipe
+> for generalising Markoff into new view shapes — every future view
+> is a structural subset of the live-render prototype. Authoritative
+> framing: `docs/specs/2026-05-08-e-arc-framing.md` (read §0.1
+> amendment first). Roadmap: `docs/e-arc/2026-05-08-e-arc-roadmap.md`.
 >
 > **Fresh agent context — read in order:**
 >
-> 1. `docs/handoff/2026-05-07-pivot-to-d5-first.md` — **the pivot
->    doc; authoritative for the branch.**
-> 2. `docs/handoff/2026-05-07-live-binding-developmental-history.md` —
+> 1. `docs/specs/2026-05-08-e-arc-framing.md` — **E-arc constitutional
+>    framing; authoritative for the active arc.** Read §0.1 amendment
+>    first (records the §4.6 deferral and that E-arc begins now).
+> 2. `docs/e-arc/2026-05-08-e-arc-roadmap.md` — E-arc orientation,
+>    phase summary, binding constraints.
+> 3. `docs/e-arc/e-arc-status.md` — **live E-arc status board.**
+> 4. `docs/handoff/2026-05-08-defer-46-to-e-arc.md` — decision record
+>    for the §4.6 deferral / E-arc activation.
+> 5. `docs/handoff/2026-05-07-pivot-to-d5-first.md` — D-arc-era pivot
+>    doc; banner in §4.6 records the deferral, banner in §4.7 notes
+>    E-arc begins.
+> 6. `docs/handoff/2026-05-07-live-binding-developmental-history.md` —
 >    pipeline-feature provenance; cited by operating principle 4.
 >    Has 2026-05-08 erratum on §A.7 — `inlineSpansFor` is load-bearing
 >    for E-arc, not dead code.
-> 3. `docs/d-arc/d-arc-status.md` — live D-arc status board
->    (D4 complete; D5 active).
-> 4. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation
+> 7. `docs/d-arc/d-arc-status.md` — D-arc status board (closed at §4.5;
+>    reference-only).
+> 8. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation
 >    (with §6 pointer to E-arc).
-> 5. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items.
-> 6. `docs/specs/2026-05-07-d5-collab-activation-design.md` —
->    **D5 substantive design (spec-approved 2026-05-08).** Companion:
->    `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`.
->    Retired stub at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`.
-> 7. `docs/specs/2026-05-08-e-arc-framing.md` — **E-arc constitutional
->    framing (post-D-arc).** Live-render as maximalist prototype;
->    every other view is a structural subset.
-> 8. `docs/e-arc/2026-05-08-e-arc-roadmap.md` — E-arc orientation.
-> 9. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` —
+> 9. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items.
+> 10. `docs/specs/2026-05-07-d5-collab-activation-design.md` —
+>    D5 substantive design (background; complete).
+> 11. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` —
 >    D4 spec (background; complete).
-> 10. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` —
+> 12. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` —
 >    D3 spec (background; complete).
-> 11. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` —
+> 13. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` —
 >    D3 corrective (background; complete).
 >
 > The C-restoration arc and the v1.0 plan series are retired and
