@@ -141,3 +141,4 @@ target_link_libraries(tst_v10_targeted_block_signals PRIVATE markoff_core Qt6::T
 set_tests_properties(tst_v10_targeted_block_signals PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_subdirectory(d2)
+add_subdirectory(d5)

@@ -4,6 +4,7 @@
 namespace Markoff {
 Q_NAMESPACE
 enum class ActionId {
+    None = 0,
     Bold, Italic, InlineCode, Strikethrough,
     HeadingLevel0, HeadingLevel1, HeadingLevel2,
     HeadingLevel3, HeadingLevel4, HeadingLevel5, HeadingLevel6,
