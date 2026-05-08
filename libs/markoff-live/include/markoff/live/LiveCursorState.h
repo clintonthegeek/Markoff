@@ -104,9 +104,6 @@ private:
     void onStructuralRowsInserted(int first, int last);
     void onStructuralRowRemoved(int row);
     void resolvePendingForRow(int row);
-    void onAnchorRenumbered(int row,
-                            Markoff::BlockAnchor oldAnchor,
-                            Markoff::BlockAnchor newAnchor);
 
     Cursor                   m_cursor;
     const BlockKindRegistry *m_registry;

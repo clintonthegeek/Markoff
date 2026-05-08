@@ -26,39 +26,6 @@ LiveCursorState::LiveCursorState(const BlockKindRegistry *registry,
                 this, &LiveCursorState::onStructuralRowRemoved);
     }
 
-    // Survive the foundation's per-keystroke BlockAnchor renumbering at
-    // qtPos 0 of a block. The model emits anchorRenumbered when an
-    // Equal-op rewrite (collapsed Delete+Insert) replaces a row's anchor
-    // in place; if our cursor's TextCaret is pinned to the old anchor,
-    // we re-pin it to the new one without firing cursorChanged (the
-    // visible delegate is unchanged; we only swap the identity).
-    if (m_model) {
-        QObject::connect(m_model, &LiveBlockModel::anchorRenumbered,
-                         this, &LiveCursorState::onAnchorRenumbered);
-    }
-}
-
-void LiveCursorState::onAnchorRenumbered(int /*row*/,
-                                          Markoff::BlockAnchor oldAnchor,
-                                          Markoff::BlockAnchor newAnchor)
-{
-    // Also follow the renumbering through any pending anchor-keyed request.
-    // The collapsed-Equal in AstBlockDiff (Delete+Insert at the same row,
-    // same kind) is the source of these renumberings; without this hop, a
-    // pending requestTextCaretAtAnchor whose anchor was renumbered out from
-    // under it would never resolve.
-    if (m_pendingRow && m_pendingRow->anchor && *m_pendingRow->anchor == oldAnchor) {
-        qInfo().noquote() << "[dogfood] CursorState: onAnchorRenumbered pending-anchor swap";
-        m_pendingRow->anchor = newAnchor;
-    }
-    auto *tc = std::get_if<TextCaret>(&m_cursor);
-    if (!tc) return;
-    if (tc->block != oldAnchor) return;
-    qInfo().noquote() << "[dogfood] CursorState: onAnchorRenumbered swap-in-place";
-    // In-place swap: don't emit cursorChanged. The QML delegate is the
-    // same QQuickItem — re-firing focusEditAt would clobber the user's
-    // current cursor position inside the TextEdit.
-    tc->block = newAnchor;
 }
 
 QString LiveCursorState::cursorKind() const
