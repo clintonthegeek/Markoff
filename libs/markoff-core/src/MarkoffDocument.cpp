@@ -220,6 +220,7 @@ void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
         break;
     }
     Q_EMIT documentReloaded();
+    Q_EMIT documentChanged();
 }
 
 CollabText::Crdt::Anchor
@@ -992,6 +993,10 @@ void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
     if (d->inlineCache) d->inlineCache->clear();
 
     // 6. Notify
+    // documentChanged() fires synchronously here so connected views can update
+    // their state in the same call stack as loadFromMarkdown(). d2DocumentChanged()
+    // from scheduleD2Changed() is deferred one event-loop iteration (QTimer::singleShot(0));
+    // consumers of both signals must not assume they arrive in the same call stack on load.
     Q_EMIT documentLoaded();
     Q_EMIT documentChanged();
     scheduleD2Changed();

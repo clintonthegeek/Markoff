@@ -12,6 +12,8 @@ private slots:
         QSignalSpy reloaded(&doc, SIGNAL(documentReloaded()));
         doc.loadFromMarkdown(QStringLiteral("# Hello\n").toUtf8());
         QVERIFY(changed.count() >= 1);
+        // loadFromMarkdown emits documentLoaded/documentChanged, not documentReloaded
+        QVERIFY(reloaded.count() == 0);
     }
     void documentChanged_no_args() {
         auto sig = &Markoff::MarkoffDocument::documentChanged;
