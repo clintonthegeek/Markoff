@@ -308,6 +308,21 @@ Q_SIGNALS:
     /// Emitted when loadFromMarkdown() completes successfully.
     void documentLoaded();
 
+    // Targeted block-update signals (v1.0). Subscribers can react to specific
+    // touched blocks without re-walking the whole document.
+
+    /// Emitted synchronously when one or more block buffers are edited
+    /// in-place, carrying the IDs of the touched blocks.
+    void blocksChanged(QList<Markoff::BlockId> ids);
+
+    /// Emitted synchronously when a new block is structurally inserted,
+    /// carrying its ID and its row index in the post-insertion block list.
+    void blockInserted(Markoff::BlockId id, int row);
+
+    /// Emitted synchronously when a block is structurally removed,
+    /// carrying its ID and its former row index.
+    void blockRemoved(Markoff::BlockId id, int row);
+
 private:
     friend class WatermarkCoordinator;
 

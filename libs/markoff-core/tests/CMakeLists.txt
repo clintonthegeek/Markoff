@@ -135,4 +135,9 @@ add_test(NAME tst_v10_document_signal_contract COMMAND tst_v10_document_signal_c
 target_link_libraries(tst_v10_document_signal_contract PRIVATE markoff_core Qt6::Test)
 set_tests_properties(tst_v10_document_signal_contract PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_v10_targeted_block_signals tst_v10_targeted_block_signals.cpp)
+add_test(NAME tst_v10_targeted_block_signals COMMAND tst_v10_targeted_block_signals)
+target_link_libraries(tst_v10_targeted_block_signals PRIVATE markoff_core Qt6::Test)
+set_tests_properties(tst_v10_targeted_block_signals PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_subdirectory(d2)

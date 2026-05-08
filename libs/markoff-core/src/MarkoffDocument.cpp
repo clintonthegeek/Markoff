@@ -50,6 +50,7 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
     qRegisterMetaType<Markoff::BlockId>("Markoff::BlockId");
     qRegisterMetaType<Markoff::BlockAnchor>("Markoff::BlockAnchor");
     qRegisterMetaType<QList<Markoff::BlockAnchor>>("QList<Markoff::BlockAnchor>");
+    qRegisterMetaType<QList<Markoff::BlockId>>("QList<Markoff::BlockId>");
 
     // ── D2: initialise per-CRDT signal proxies ───────────────────────────
     d->idListProxy          = new IdListProxy(this);
@@ -428,6 +429,7 @@ void MarkoffDocument::applyBlockEdit(const BlockEdit &edit)
     if (proxyIt != d->bufferProxies.end() && proxyIt.value())
         proxyIt.value()->notifyChanged();
 
+    Q_EMIT blocksChanged({edit.blockId});
     scheduleD2Changed();
 }
 
@@ -615,6 +617,7 @@ void MarkoffDocument::d2ApplyBufferEdit(BlockId block, uint32_t offset,
     if (proxyIt != d->bufferProxies.end() && proxyIt.value())
         proxyIt.value()->notifyChanged();
 
+    Q_EMIT blocksChanged({block});
     scheduleD2Changed();
 }
 
@@ -642,6 +645,17 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
     ++d->structuralEditSequence;
     d->idListProxy->notifyChanged();
     d->kindTagMapProxy->notifyChanged();
+
+    // Emit blockInserted with the row the new block landed at.
+    {
+        const auto current = iterateBlocks();
+        int row = 0;
+        for (int i = 0; i < static_cast<int>(current.size()); ++i) {
+            if (current[i] == newId) { row = i; break; }
+        }
+        Q_EMIT blockInserted(newId, row);
+    }
+
     scheduleD2Changed();
     return newId;
 }
@@ -811,6 +825,15 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
 
 void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
 {
+    // Capture the former row before the IdList mutation.
+    int formerRow = 0;
+    {
+        const auto before = iterateBlocks();
+        for (int i = 0; i < static_cast<int>(before.size()); ++i) {
+            if (before[i] == block) { formerRow = i; break; }
+        }
+    }
+
     CollabText::Crdt::Anchor anchor = d->idList.anchor_of(block.raw(), CollabText::Crdt::Bias::Left);
     auto idOp = d->idList.remove_at(anchor);
     auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
@@ -822,6 +845,7 @@ void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
     ++d->structuralEditSequence;
     d->idListProxy->notifyChanged();
     d->kindTagMapProxy->notifyChanged();
+    Q_EMIT blockRemoved(block, formerRow);
     scheduleD2Changed();
 }
 
