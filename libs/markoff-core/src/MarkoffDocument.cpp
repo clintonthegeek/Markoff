@@ -98,6 +98,13 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
     // ── D2: initialise InlineParseCache (Phase 10) ──────────────────────────
     d->inlineCache = std::make_unique<InlineParseCache>(*this);
 
+    d->collabConfigured = true;
+}
+
+MarkoffDocument::MarkoffDocument(QObject *parent)
+    : MarkoffDocument(quint16(0x0001), nullptr, parent)
+{
+    d->collabConfigured = false;
 }
 
 MarkoffDocument::~MarkoffDocument() = default;
@@ -126,6 +133,11 @@ const Markoff::Document *MarkoffDocument::parsedDocument() const
 quint16 MarkoffDocument::replicaId() const
 {
     return d->replicaId;
+}
+
+bool MarkoffDocument::isCollabConfigured() const noexcept
+{
+    return d->collabConfigured;
 }
 
 CollabText::Crdt::Global MarkoffDocument::version() const

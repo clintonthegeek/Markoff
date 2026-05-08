@@ -57,6 +57,7 @@ struct MarkoffDocument::Private {
     // ── Legacy single-buffer internals (retained until Phase 14) ──────────
     CollabText::Crdt::Buffer                  buffer;
     quint16                                   replicaId;
+    bool                                      collabConfigured = false;
     const Markoff::BlockSerializerRegistry   *serializerRegistry = nullptr;
     quint64                                   editSequence = 0;   ///< Bumps on every state-change op.
     QList<Markoff::BlockAnchor>               latestBlockAnchors;

@@ -42,11 +42,16 @@ class MARKOFF_CORE_EXPORT MarkoffDocument : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(MarkoffDocument)
 public:
+    /// Single-user mode constructor. Uses replica ID sentinel 0x0001.
+    /// isCollabConfigured() returns false.
+    explicit MarkoffDocument(QObject *parent = nullptr);
+
     /// Construct an empty document with the given replica ID. ReplicaId is
     /// the CRDT identity for this MarkoffDocument instance; for single-user
     /// use, a random quint16 is fine. An optional BlockSerializerRegistry
     /// may be passed in for host-provided serializers (view layer injection);
     /// nullptr means "use BuiltinBlockSerializerRegistry only".
+    /// isCollabConfigured() returns true.
     explicit MarkoffDocument(quint16 replicaId,
                              const Markoff::BlockSerializerRegistry *registry = nullptr,
                              QObject *parent = nullptr);
@@ -67,6 +72,7 @@ public:
 
     // ===== CRDT identity =====
     quint16 replicaId() const;
+    bool isCollabConfigured() const noexcept;
     CollabText::Crdt::Global version() const;
 
     // ===== Sequence accessors (CRDT-free, public-boundary friendly) =====
