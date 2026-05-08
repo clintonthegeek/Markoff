@@ -526,8 +526,22 @@ void LiveStructuralKeyHandler::registerBuiltins()
         const int newIndent = shift ? std::max(0, indent - 1)
                                     : std::min(6, indent + 1);
         if (newIndent == indent) return HR::Handled;  // already at boundary
-        // TODO(docs/TODO.md 2026-05-07): no check that a parent at newIndent-1
-        // exists in the surrounding run — a lone item can tab to an orphan level.
+
+        if (!shift) {
+            // Refuse if no preceding ListItem at indent level (the parent).
+            bool parentFound = false;
+            for (int k = c.blockIndex - 1; k >= 0; --k) {
+                const Markoff::BlockId prevId(c.model->recordAt(k).blockAnchor);
+                if (c.document->blockKind(prevId) != Markoff::BlockKind::ListItem)
+                    break;
+                const auto prevAttrs = c.document->blockAttrs(prevId);
+                const int prevIndent = prevAttrs.contains(Markoff::AttrNames::IndentLevel)
+                    ? std::get<int>(prevAttrs.value(Markoff::AttrNames::IndentLevel)) : 0;
+                if (prevIndent == indent) { parentFound = true; break; }
+                if (prevIndent < indent)  break;
+            }
+            if (!parentFound) return HR::Handled;
+        }
 
         UndoLog::Transaction t(c.document->d2UndoLog());
         c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
