@@ -6,8 +6,6 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
-#include <QVBoxLayout>
-#include <QWidget>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -25,8 +23,12 @@ MainWindow::MainWindow(QWidget *parent)
     m_docA->loadFromMarkdown(initial);
     m_docB->loadFromMarkdown(initial);
 
-    resize(1400, 700);
-    setWindowTitle(QStringLiteral("Markoff D5 Collab Testapp"));
+    QQuickStyle::setStyle(QStringLiteral("Basic"));
+
+    auto *engine = new QQmlApplicationEngine(this);
+    engine->rootContext()->setContextProperty(QStringLiteral("ctxDocumentA"), m_docA.get());
+    engine->rootContext()->setContextProperty(QStringLiteral("ctxDocumentB"), m_docB.get());
+    engine->loadFromModule("org.markoff.collab.app", "CollabMain");
 }
 
 MainWindow::~MainWindow() = default;
