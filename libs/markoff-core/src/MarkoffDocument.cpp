@@ -842,6 +842,15 @@ std::optional<BlockAnchor> MarkoffDocument::blockAt(const TextAnchor &t) const
 
 int MarkoffDocument::offsetInBlock(const BlockAnchor &b, const TextAnchor &t) const
 {
+    // D2 path: resolve anchor directly against the per-block CRDT buffer.
+    auto it = d->blockBuffers.find(b);
+    if (it != d->blockBuffers.end()) {
+        const CollabText::Crdt::Anchor a = Detail::toCrdtAnchor(t);
+        const uint32_t localOff = it->second->resolve_anchor(a);
+        return static_cast<int>(localOff);
+    }
+
+    // Legacy fallback.
     const auto rng = blockByteRange(b);
     if (!rng.has_value()) return 0;
     const quint32 byte = resolveTextAnchor(t);
@@ -854,6 +863,19 @@ TextAnchor MarkoffDocument::textAnchorAt(const BlockAnchor &b,
                                          int offset,
                                          bool rightBias) const
 {
+    // D2 path: use the per-block buffer directly, bypassing latestBlockRanges.
+    auto it = d->blockBuffers.find(b);
+    if (it != d->blockBuffers.end()) {
+        const auto bias = rightBias ? CollabText::Crdt::Bias::Right
+                                    : CollabText::Crdt::Bias::Left;
+        const int sz = static_cast<int>(it->second->visible_length());
+        const int clamped = std::max(0, std::min(offset, sz));
+        const CollabText::Crdt::Anchor a =
+            it->second->anchor_at(static_cast<uint32_t>(clamped), bias);
+        return Detail::toTextAnchor(b, a);
+    }
+
+    // Legacy fallback: use parse-based block byte ranges.
     const auto rng = blockByteRange(b);
     if (!rng.has_value()) return TextAnchor{};
     const int clamped = std::max(0, std::min(offset,
@@ -1139,6 +1161,29 @@ void MarkoffDocument::d2ApplyBufferEdit(BlockId block, uint32_t offset,
 
     Q_EMIT blocksChanged({block});
     scheduleD2Changed();
+
+    // Cursor survival: re-resolve remote TextCaret anchors in this block.
+    // Use the per-block D2 buffer directly to get the local byte offset —
+    // offsetInBlock() relies on latestBlockRanges (stale after D2 edits).
+    {
+        auto bufIt = d->blockBuffers.find(block);
+        if (bufIt != d->blockBuffers.end()) {
+            for (auto it = d->remoteCursors.begin(); it != d->remoteCursors.end(); ++it) {
+                const quint16 replicaId = it.key();
+                auto &rec = it.value();
+                if (auto *tc = std::get_if<Markoff::TextCaret>(&rec.cursor)) {
+                    if (tc->block == block) {
+                        // Resolve anchor against the per-block CRDT buffer.
+                        const CollabText::Crdt::Anchor a =
+                            Markoff::Detail::toCrdtAnchor(tc->positionAnchor);
+                        const uint32_t localOff = bufIt->second->resolve_anchor(a);
+                        tc->cachedByteOffset = static_cast<quint32>(localOff);
+                        Q_EMIT remoteCursorChanged(replicaId, rec.cursor, rec.color, rec.label);
+                    }
+                }
+            }
+        }
+    }
 }
 
 BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
@@ -1779,6 +1824,37 @@ void MarkoffDocument::notifyAcksAtWatermark(quint64 watermark)
         d->watermark->compactNow();
         Q_EMIT watermarkCompacted(d->currentSnapshotWatermark);
     }
+}
+
+// ============================================================================
+// D5: remote cursor state (Phase 7)
+// ============================================================================
+
+void MarkoffDocument::setRemoteCursor(quint16 r, Markoff::Cursor c, QColor color, QString label)
+{
+    d->remoteCursors[r] = { c, color, label };
+    Q_EMIT remoteCursorChanged(r, std::move(c), std::move(color), std::move(label));
+}
+
+void MarkoffDocument::clearRemoteCursor(quint16 r)
+{
+    if (d->remoteCursors.remove(r) > 0)
+        Q_EMIT remoteCursorCleared(r);
+}
+
+void MarkoffDocument::clearAllRemoteCursors()
+{
+    const auto keys = d->remoteCursors.keys();
+    d->remoteCursors.clear();
+    for (quint16 r : keys)
+        Q_EMIT remoteCursorCleared(r);
+}
+
+Markoff::Cursor MarkoffDocument::remoteCursorOf(quint16 r) const
+{
+    auto it = d->remoteCursors.constFind(r);
+    if (it == d->remoteCursors.constEnd()) return Markoff::NoCursor{};
+    return it->cursor;
 }
 
 }  // namespace Markoff

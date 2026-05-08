@@ -1,63 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <markoff/core/Cursor.h>
 #include <markoff/live/MarkoffLiveExport.h>
-#include <markoff/core/BlockAnchor.h>
-#include <markoff/core/TextAnchor.h>
-
-#include <variant>
-#include <QString>
-#include <QtGlobal>
 
 namespace Markoff::Live {
 
-/// Opaque block identity. Spec §3.1: a CRDT-anchored parser block.
-///
-/// Historical note: spec §3.1 amendment A1 had widened this to a variant
-/// over `Markoff::BlockAnchor` and a phantom-row id to support v2 phantom
-/// rows. The marker-paragraph design (R5.5) retires phantom rows in
-/// favour of a single source-of-truth marker block, so the variant is
-/// reverted.
+/// Opaque block identity (backward-compat alias).
 using BlockId = Markoff::BlockAnchor;
 
-/// Caret inside a text-bearing block at a CRDT-anchored byte position.
-/// Rendered as a blinking I-beam. Spec §3.1.
-struct MARKOFF_LIVE_EXPORT TextCaret {
-    BlockId              block;           ///< CRDT-anchored parser block.
-    Markoff::TextAnchor  positionAnchor;  ///< CRDT anchor; survives remote edits.
-    quint32              cachedByteOffset = 0; ///< Resolved byte offset; refreshed on use.
-
-    bool operator==(const TextCaret &o) const noexcept {
-        return block == o.block && positionAnchor == o.positionAnchor
-            && cachedByteOffset == o.cachedByteOffset;
-    }
-};
-
-/// Block focused as a unit — no caret. Rendered as a focus ring.
-/// Used by non-text blocks (hr, image) in their default state. Spec §3.1.
-struct MARKOFF_LIVE_EXPORT BlockSelected {
-    BlockId block;                        ///< CRDT-anchored parser block.
-    bool operator==(const BlockSelected &o) const noexcept { return block == o.block; }
-};
-
-/// Block in its own internal-edit mode. Deferred to R8 (math block). Spec §3.1.
-struct MARKOFF_LIVE_EXPORT BlockInternalEdit {
-    BlockId block;                        ///< CRDT-anchored parser block.
-    QString mode;  ///< Block-kind-defined token, e.g. "editing-latex".
-    bool operator==(const BlockInternalEdit &o) const noexcept {
-        return block == o.block && mode == o.mode;
-    }
-};
-
-/// No-focus sentinel — cursor is not placed anywhere.
-struct MARKOFF_LIVE_EXPORT NoCursor {
-    bool operator==(const NoCursor &) const noexcept { return true; }
-};
-
-/// The canonical cursor value. Discriminated union over the four variants.
-/// Spec §3.1: "using Cursor = std::variant<TextCaret, BlockSelected, BlockInternalEdit>;"
-/// NoCursor is our sentinel for "nothing focused" before first click.
-using Cursor = std::variant<NoCursor, TextCaret, BlockSelected, BlockInternalEdit>;
+// Backward-compatible type aliases — live code can still use Markoff::Live::TextCaret etc.
+using TextCaret        = Markoff::TextCaret;
+using BlockSelected    = Markoff::BlockSelected;
+using BlockInternalEdit = Markoff::BlockInternalEdit;
+using NoCursor         = Markoff::NoCursor;
+using Cursor           = Markoff::Cursor;
 
 /// View-layer selection: two Cursor endpoints. Collapsed when anchor == active.
 /// Spec §3.1 Selection.

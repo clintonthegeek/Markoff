@@ -105,6 +105,9 @@ add_library(markoff_core STATIC
     #     moc_ActionId.cpp (defines Markoff::staticMetaObject from Q_NAMESPACE).
     include/markoff/core/ActionId.h
     include/markoff/core/MarkoffOp.h
+    # --- Cursor types (D5 phase 7) — moved from markoff-live to markoff-core
+    #     so MarkoffDocument can hold/emit Cursor values.
+    include/markoff/core/Cursor.h
 )
 
 target_include_directories(markoff_core

@@ -14,6 +14,7 @@
 #include <markoff/core/LinkRefMap.h>
 #include <markoff/core/FootnoteDefMap.h>
 
+#include <QColor>
 #include <QList>
 #include <QHash>
 #include <QSet>
@@ -101,6 +102,14 @@ struct MarkoffDocument::Private {
 
     // Debounce flag for d2DocumentChanged signal
     bool d2ChangePending = false;
+
+    // D5: remote cursor state (Phase 7)
+    struct RemoteCursorRecord {
+        Markoff::Cursor cursor;
+        QColor          color;
+        QString         label;
+    };
+    QHash<quint16, RemoteCursorRecord> remoteCursors;
 
     // D5: watermark/ack gate fields (Phase 6)
     quint64 currentSnapshotWatermark = 0;  // W from last save attempt

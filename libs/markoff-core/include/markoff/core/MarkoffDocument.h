@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QByteArray>
+#include <QColor>
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -19,6 +20,7 @@
 
 #include <markoff/core/BlockAnchor.h>
 #include <markoff/core/BlockSerializerRegistry.h>
+#include <markoff/core/Cursor.h>
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/core/BlockAttrsMap.h>
 #include <markoff/core/BlockEdit.h>
@@ -365,6 +367,32 @@ public:
     /// Always compiled (same pattern as testInsertBlock) so test
     /// executables can link against the library.
     void simulateSaveSucceeded();
+
+public:
+    // ===== D5 remote cursor state (Phase 7) =====
+
+    /// Store a remote peer's cursor and notify the view layer.
+    void setRemoteCursor(quint16 replicaId,
+                         Markoff::Cursor cursor,
+                         QColor color,
+                         QString label);
+
+    /// Remove a remote peer's cursor and notify the view layer.
+    void clearRemoteCursor(quint16 replicaId);
+
+    /// Remove all remote cursors and emit remoteCursorCleared for each.
+    void clearAllRemoteCursors();
+
+    /// Test inspection: returns the stored cursor for the given replica,
+    /// or NoCursor{} if not present.
+    Markoff::Cursor remoteCursorOf(quint16 replicaId) const;
+
+Q_SIGNALS:
+    void remoteCursorChanged(quint16 replicaId,
+                             Markoff::Cursor cursor,
+                             QColor color,
+                             QString label);
+    void remoteCursorCleared(quint16 replicaId);
 
 private:
     friend class WatermarkCoordinator;

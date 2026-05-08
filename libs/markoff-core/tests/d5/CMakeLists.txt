@@ -50,3 +50,11 @@ qt_add_executable(tst_d5_watermark_gate tst_d5_watermark_gate.cpp)
 target_link_libraries(tst_d5_watermark_gate PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d5_watermark_gate COMMAND tst_d5_watermark_gate)
 
+qt_add_executable(tst_d5_remote_cursor_state tst_d5_remote_cursor_state.cpp)
+target_link_libraries(tst_d5_remote_cursor_state PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_remote_cursor_state COMMAND tst_d5_remote_cursor_state)
+
+qt_add_executable(tst_d5_remote_cursor_survival tst_d5_remote_cursor_survival.cpp)
+target_link_libraries(tst_d5_remote_cursor_survival PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_remote_cursor_survival COMMAND tst_d5_remote_cursor_survival)
+
