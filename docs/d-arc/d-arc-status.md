@@ -52,6 +52,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-08 | 8dd16ed | D5 phase 4 complete: `applyRemoteOps(QList<MarkoffOp>, MarkoffBundleMeta)` for Buffer + IdList targets; `pendingBufferOps` queue for out-of-order arrival; two-doc + three-doc convergence tests; idempotency test. Tier-0 confidence established. 9/9 D5 tests pass (129/129 total). |
 | 2026-05-08 | 3940f79 | D5 phase 3 complete: `localOpsProduced` emission from UndoLog commit callback; Buffer + IdList op serialization via collabtext Serialization.h; round-trip tests green. |
 | 2026-05-08 | 7b8c73e | D5 phase 2 complete: `MarkoffDocument` single-user constructor + `isCollabConfigured()` accessor. `replicaId()` noexcept. 124/124 tests pass. |
 | 2026-05-08 | 1532f1b | D5 phase 1 complete: boundary types (`CrdtTarget`, `MarkoffOp`, `MarkoffBundleMeta`, `SiblingMapOpHeader`) + `MarkoffSerializer::encode/decode`. Round-trip tests green. |
