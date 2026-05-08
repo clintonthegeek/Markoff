@@ -46,3 +46,7 @@ qt_add_executable(tst_d5_sibling_map_edges tst_d5_sibling_map_edges.cpp)
 target_link_libraries(tst_d5_sibling_map_edges PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d5_sibling_map_edges COMMAND tst_d5_sibling_map_edges)
 
+qt_add_executable(tst_d5_watermark_gate tst_d5_watermark_gate.cpp)
+target_link_libraries(tst_d5_watermark_gate PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_watermark_gate COMMAND tst_d5_watermark_gate)
+
