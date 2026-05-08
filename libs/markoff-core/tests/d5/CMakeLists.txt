@@ -30,3 +30,7 @@ qt_add_executable(tst_d5_three_doc_convergence tst_d5_three_doc_convergence.cpp)
 target_link_libraries(tst_d5_three_doc_convergence PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d5_three_doc_convergence COMMAND tst_d5_three_doc_convergence)
 
+qt_add_executable(tst_d5_idempotency tst_d5_idempotency.cpp)
+target_link_libraries(tst_d5_idempotency PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_idempotency COMMAND tst_d5_idempotency)
+
