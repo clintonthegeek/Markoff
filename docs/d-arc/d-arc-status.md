@@ -52,6 +52,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-08 | 4984df1 | D5 phase 7 complete: remote cursor state + QML overlay. Cursor types moved to markoff-core; MarkoffDocument setRemoteCursor/clearRemoteCursor/clearAllRemoteCursors API + signals; cursor-survival in d2ApplyBufferEdit; LiveListModelBinding::remoteCursorsModel(); RemoteCursorOverlay.qml stub + Repeater in LiveView.qml. Three new tests. 136/136 tests pass. |
 | 2026-05-08 | bcc3df9 | D5 phase 6 complete: watermark/ack gate — wantsAcksAtWatermark, notifyAcksAtWatermark, watermarkCompacted. Four gate tests green. 133/133 total tests pass. |
 | 2026-05-08 | 2c36599 | D5 phase 5 complete: sibling-map ops (KindTagMap, BlockAttrsMap, FrontmatterMap, LinkRefMap, FootnoteDefMap) outbound + inbound + LWW. Compound `{type-index, OpId}` key fixes cross-CRDT counter collision. Three new tests (emit / LWW convergence / orphan-block edge case) green. 132/132 total tests pass. |
 | 2026-05-08 | 8dd16ed | D5 phase 4 complete: `applyRemoteOps(QList<MarkoffOp>, MarkoffBundleMeta)` for Buffer + IdList targets; `pendingBufferOps` queue for out-of-order arrival; two-doc + three-doc convergence tests; idempotency test. Tier-0 confidence established. 9/9 D5 tests pass (129/129 total). |
@@ -118,3 +119,14 @@ These are deferred decisions noted at design time that the relevant phase will r
 When the D2 spec is amended (after spec approval but before retiring the arc), record the amendment here with date, section affected, and reason.
 
 *(No amendments yet.)*
+
+---
+
+### Phase 7 — Remote cursor state + QML overlay (complete)
+
+- `Markoff::Cursor` moved to markoff-core (`Cursor.h`)
+- `MarkoffDocument`: `setRemoteCursor` / `clearRemoteCursor` / `clearAllRemoteCursors` / `remoteCursorChanged` / `remoteCursorCleared`
+- Cursor-survival: TextCaret `cachedByteOffset` re-resolved after `d2ApplyBufferEdit`
+- `LiveListModelBinding::remoteCursorsModel()` — `QAbstractListModel` populated from doc signals
+- `RemoteCursorOverlay.qml` stub delegate; `Repeater` in `LiveView.qml`
+- Tests: `tst_d5_remote_cursor_state`, `tst_d5_remote_cursor_survival`, `tst_d5_remote_cursor_render`
