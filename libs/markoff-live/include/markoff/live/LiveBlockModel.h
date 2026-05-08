@@ -40,6 +40,7 @@ public:
         IndentLevelRole,
         CheckedRole,
         LooseRunRole,
+        InlineSpansRole,
     };
 
     explicit LiveBlockModel(QObject *parent = nullptr);
@@ -78,7 +79,8 @@ public:
 
     // ---- R6: C++ accessor for inline spans. ----
     // InlineFormatHighlighter reads pre-baked spans to avoid re-parsing.
-    const QList<Markoff::SourceSpan> &spansAtRow(int row) const;
+    // Returns by value (QList is COW) so QML can invoke it via Q_INVOKABLE.
+    Q_INVOKABLE QList<Markoff::SourceSpan> spansAtRow(int row) const;
 
 private:
     QList<BlockRecord> m_rows;

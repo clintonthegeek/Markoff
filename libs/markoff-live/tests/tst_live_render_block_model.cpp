@@ -232,6 +232,36 @@ private Q_SLOTS:
         QCOMPARE(model.recordAt(0).text, QString("b"));
     }
 
+    void inline_spans_role_exposes_spans_to_qml() {
+        LiveBlockModel m;
+        QVERIFY(m.roleNames().values().contains(QByteArray("inlineSpans")));
+
+        // Empty model: spansAtRow returns empty list, no crash.
+        auto empty = m.spansAtRow(0);
+        QCOMPARE(empty.size(), 0);
+
+        // Push one row via applyOps with a synthesized BlockRecord.
+        BlockRecord rec;
+        rec.kind = "paragraph";
+        rec.text = "hello";
+        rec.blockAnchor = Markoff::BlockAnchor{};
+        Markoff::SourceSpan span{};
+        span.charOffset = 0; span.charLength = 5; span.bold = true;
+        rec.inlineSpans = {span};
+
+        QList<BlockKey> nextKeys = { BlockKey{ rec.kind, rec.blockAnchor } };
+        m.applyOps(AstBlockDiff::diff({}, nextKeys), {rec});
+
+        QCOMPARE(m.rowCount(), 1);
+        QCOMPARE(m.spansAtRow(0).size(), 1);
+        QVERIFY(m.spansAtRow(0)[0].bold);
+
+        // data(InlineSpansRole) returns QList<SourceSpan> wrapped in QVariant.
+        const QVariant v = m.data(m.index(0), LiveBlockModel::InlineSpansRole);
+        QVERIFY(v.canConvert<QList<Markoff::SourceSpan>>());
+        QCOMPARE(v.value<QList<Markoff::SourceSpan>>().size(), 1);
+    }
+
     void blockAttrsRole_returns_variant_map() {
         LiveBlockModel m;
         BlockRecord r = makeRecord(BlockKind::Paragraph, "hello");

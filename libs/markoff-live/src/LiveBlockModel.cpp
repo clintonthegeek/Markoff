@@ -9,11 +9,11 @@
 
 namespace Markoff::Live {
 
-namespace {
-const QList<Markoff::SourceSpan> kEmptySpans;
+LiveBlockModel::LiveBlockModel(QObject *parent) : QAbstractListModel(parent)
+{
+    qRegisterMetaType<Markoff::SourceSpan>("Markoff::SourceSpan");
+    qRegisterMetaType<QList<Markoff::SourceSpan>>("QList<Markoff::SourceSpan>");
 }
-
-LiveBlockModel::LiveBlockModel(QObject *parent) : QAbstractListModel(parent) {}
 
 int LiveBlockModel::rowCount(const QModelIndex &parent) const
 {
@@ -35,6 +35,7 @@ QHash<int, QByteArray> LiveBlockModel::roleNames() const
         { IndentLevelRole,  "indentLevel" },
         { CheckedRole,      "checked" },
         { LooseRunRole,     "looseRun" },
+        { InlineSpansRole,  "inlineSpans" },
     };
 }
 
@@ -95,6 +96,7 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
             }
             return false;
         }
+        case InlineSpansRole:   return QVariant::fromValue(r.inlineSpans);
         default:                return {};
     }
 }
@@ -156,9 +158,9 @@ void LiveBlockModel::setRowEditSequence(int row, quint64 editSeq)
         m_rowEditSequences[row] = editSeq;
 }
 
-const QList<Markoff::SourceSpan> &LiveBlockModel::spansAtRow(int row) const
+QList<Markoff::SourceSpan> LiveBlockModel::spansAtRow(int row) const
 {
-    if (row < 0 || row >= m_rows.size()) return kEmptySpans;
+    if (row < 0 || row >= m_rows.size()) return {};
     return m_rows[row].inlineSpans;
 }
 
