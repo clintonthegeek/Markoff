@@ -2,12 +2,12 @@
 
 **Date:** 2026-05-02
 **Status:** Draft for evaluation; not committed.
-**Authored by:** Markoff design (paired with the C-restoration spec, `docs/specs/2026-05-02-live-render-restoration-design.md`).
+**Authored by:** Markoff design (paired with the C-restoration spec, `docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md`).
 **Audience:**
   - **Primary:** the `collabtext` maintainers, for evaluation of practicality and roadmap fit. Self-contained; assumes no Markoff-internal context beyond what is summarised in §2.
   - **Secondary:** Markoff implementers planning post-restoration architectural moves.
 
-**Companion:** `docs/specs/2026-05-02-live-render-restoration-design.md` — the near-term architecture, hereafter referred to as "C". This proposal is the long-term direction the C architecture deliberately leaves room for.
+**Companion:** `docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md` — the near-term architecture, hereafter referred to as "C". This proposal is the long-term direction the C architecture deliberately leaves room for.
 
 ---
 
@@ -474,7 +474,7 @@ We're framing this proposal early so both projects can shape their roadmaps with
 
 ### Markoff context
 
-- `docs/specs/2026-05-02-live-render-restoration-design.md` — the C-restoration spec; the architecture this document evolves from.
+- `docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md` — the C-restoration spec; the architecture this document evolves from.
 - `docs/2026-05-02-live-view-architectural-audit.md` — the diagnostic that drove restoration; useful for understanding the historical context that shaped the C decisions.
 - `libs/markoff-core/CLAUDE.md` — the foundation public-API boundary; describes how Markoff today wraps collabtext to keep CRDT internals out of the view layer.
 

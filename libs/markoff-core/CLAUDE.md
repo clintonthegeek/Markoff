@@ -61,9 +61,13 @@ after the edit lands.
 - Block content does NOT get an auto-appended `\n`; content is exactly
   what `loadFromMarkdown` / `applyFlatEdit` puts in.
 
-## v1.0 public surface (since 2026-05-07)
+## Consumer-facing types (kept; v1.0-plan retired)
 
-The consumer-facing primitives in `markoff-core` are:
+These types landed before the v1.0 plan was retired (2026-05-07; see
+`docs/handoff/2026-05-07-pivot-to-d5-first.md`). They survive into the
+post-D5 codebase as **internal-to-markoff** types — `markoff-live` and
+`markoff-source` consume them. They are not yet part of a frozen public
+API; the public-API freeze is deferred until §4.6 of the pivot doc.
 
 - `Markoff::CursorPos` — `{line, column}`, 1-based. Header: `<markoff/core/CursorPos.h>`.
 - `Markoff::Theme` — opaque value type for editor colours and fonts. Header: `<markoff/core/Theme.h>`.

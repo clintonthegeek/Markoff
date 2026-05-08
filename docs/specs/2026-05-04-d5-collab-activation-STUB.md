@@ -16,7 +16,7 @@ Orient a fresh agent context picking up D5. Not a substantive design — the sub
 1. **`docs/specs/2026-05-04-d2-foundation-reshape-design.md`** — the foundation. Of particular interest: §3 (BlockId stability), §4.7 (Origin enum + remote-edit handling), §7.4 (collab-evolution path for GC), §8 (signal API including remote-op surfaces).
 2. **`~/dev/collabtext/include/collabtext/StreamSync.h`** (or current equivalent) — the existing transport primitive. Per the maintainer scope line item 5, Markoff composes `DocumentStructure` "directly on top of public `IdList` + `Buffer` + the existing `StreamSync` (which is already multi-stream and won't need changes — register one stream for structure plus one per block, payloads are already opaque to the transport)."
 3. **`~/dev/collabtext/docs/research/2026-04-06-multi-cursor-widget-research.md`** — collabtext maintainers' existing thinking on live-cursor presence; cited in D-evolution-proposal §6.3 as relevant for D5's presence design.
-4. **`docs/specs/2026-05-02-live-render-restoration-design.md` §3.5** — the cursor "survival under remote edits" rules that the C-restoration architected (and D2 §4.7 carries forward). D5 implements the wire format and presence; the local survival logic is already specified.
+4. **`docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md` §3.5** — the cursor "survival under remote edits" rules that the C-restoration architected (and D2 §4.7 carries forward). D5 implements the wire format and presence; the local survival logic is already specified.
 5. **`docs/d-arc/collabtext-scope-line.md`** — what collabtext won't do for D5. Specifically: no `CollabDocument` wrapper (D5 wires transport directly via `StreamSync`), no further primitives.
 
 ---

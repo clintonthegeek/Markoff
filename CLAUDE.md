@@ -1,30 +1,41 @@
 # Markoff (exploration/new-foundation branch)
 
-> **D4 complete; D5 (collab activation) pending substantive design.**
-> D4 retired the incremental-parse pipeline (`ParsePool`,
-> `IncrementalParseSession`, `parseUpdated`, `parseSequence`, `MarkoffEdit`,
-> `applyLocalEdit`), migrated source-widget to D2 via `applyFlatEdit`,
-> retired markoff-bench and view-qml live mode, and deleted dead legacy
-> `Cmd::*` + `CommandFacade` + `ReplaceController`. 103/103 tests pass.
+> **2026-05-07 — Branch is on D5-first posture. v1.0 plan retired.**
+> Authoritative posture for the branch is
+> `docs/handoff/2026-05-07-pivot-to-d5-first.md`. Collab (D5) ships
+> before any public-API freeze, before any Corbomite-facing migration
+> guide, and before any further perf or facade work. Operating
+> principle: one arc at a time, no side work, retirement is explicit.
 >
 > **Fresh agent context — read in order:**
 >
-> 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation
-> 2. `docs/d-arc/d-arc-status.md` — live status board (D4 complete; D5 next)
-> 3. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items
-> 4. `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — **D5 stub (next design target)**
-> 5. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — D4 spec (background; complete)
-> 6. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 spec (background; complete)
-> 7. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — D3 corrective (background; complete)
+> 1. `docs/handoff/2026-05-07-pivot-to-d5-first.md` — **the pivot
+>    doc; authoritative for the branch.**
+> 2. `docs/handoff/2026-05-07-live-binding-developmental-history.md` —
+>    pipeline-feature provenance; cited by operating principle 4.
+> 3. `docs/d-arc/d-arc-status.md` — live D-arc status board
+>    (D4 complete; D5 next).
+> 4. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation.
+> 5. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items.
+> 6. `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — D5 stub
+>    (to be replaced by §4.3 of the pivot doc).
+> 7. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` —
+>    D4 spec (background; complete).
+> 8. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` —
+>    D3 spec (background; complete).
+> 9. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` —
+>    D3 corrective (background; complete).
 >
-> The C-restoration's status board (`docs/restoration-status.md`) is now
-> historical. The marker-paragraph design and R5.5 plan are retired. R5.5
-> Bug 3 is **cancelled, not paused** — the bug lives inside the parser-vs-
-> CRDT race window that D removes structurally.
+> The C-restoration arc and the v1.0 plan series are retired and
+> archived under `docs/archive/c-restoration-arc/` and
+> `docs/archive/v1.0-plan-pre-d5/` respectively. They are not
+> authoritative and not to be cited in new specs except as historical
+> context. R5.5 Bug 3 is cancelled, not paused.
 >
-> The legacy `libs/markoff-view-qml` continues to ship (source mode only;
-> live mode retired in D4); the in-tree `libs/markoff-live` carries
-> L0–L8 and all D3 work.
+> `libs/markoff-view-qml` is flagged for deletion under §4.2 of the
+> pivot doc (next work-unit after this docs cleanup). It currently
+> still ships in source mode. Do not extend it; do not depend on it
+> from new code.
 >
 > All other content below describes the project at large.
 
@@ -54,8 +65,10 @@ foundation library + two canonical view leaves.
                                  `applyFlatEdit` (D4: flat-text entry
                                  point for source-widget edits).
 - `libs/markoff-view-qml`      — legacy QML view (source mode only;
-                                 live mode retired in D4). Source mode
-                                 still ships; do not delete prematurely.
+                                 live mode retired in D4). **Flagged
+                                 for deletion under pivot-doc §4.2.**
+                                 Do not extend; do not depend on from
+                                 new code.
 - `libs/markoff-live`   — **the active live-preview view leaf.**
                                  Built on D2's per-block CRDT buffers via
                                  `LiveListModelBinding`, `LiveBlockModel`,
@@ -127,12 +140,20 @@ was deleted in D4.
 
 ## Docs layout
 
-- `docs/specs/`   — design specs (dated, kebab-case).
-- `docs/plans/`   — implementation plans (one per feature/phase).
+- `docs/handoff/2026-05-07-pivot-to-d5-first.md` — **authoritative
+  posture; read first.**
+- `docs/handoff/2026-05-07-live-binding-developmental-history.md` —
+  developmental record for the live-binding pipeline.
+- `docs/specs/`   — design specs (dated, kebab-case). Live D-arc
+  specs only; retired arcs are under `docs/archive/`.
+- `docs/plans/`   — implementation plans (live D-arc only).
 - `docs/handoff/` — session handoff briefs.
-- `docs/TODO.md`  — running todo list. Read first.
-- `docs/phase-c-status.md` — historical, superseded by the
-  new-foundation branch direction. Do not update.
+- `docs/d-arc/`   — D-arc roadmap, status board, scope-line.
+- `docs/TODO.md`  — running todo list.
+- `docs/archive/` — retired arc paper trails (C-restoration,
+  pre-D5 v1.0 plan, Phase B/C). Reference only; not authoritative.
+- `docs/phase-c-status.md` — master-side historical, superseded.
+  Do not update.
 
 ## Branch posture
 

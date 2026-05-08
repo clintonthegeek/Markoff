@@ -26,13 +26,13 @@ would recognise as a run.
 > D2 / D3 / D4 are all shipped; the D-arc roadmap is at
 > `docs/d-arc/2026-05-04-d-arc-roadmap.md`.
 
-> **2026-05-02 — (closed by 2026-05-04 banner above) live render restoration arc.** All entries
-> below this banner predate the restoration arc and are paused/superseded
-> by it unless explicitly carried forward. The active work tracker is
-> `docs/restoration-status.md`. Read that, the session brief at
-> `docs/handoff/2026-05-02-restoration-session-brief.md`, and the
-> spec at `docs/specs/2026-05-02-live-render-restoration-design.md`
-> before resuming any work in this file. Older entries kept for reference.
+> **2026-05-02 — (closed; arc retired and archived 2026-05-07) live render restoration arc.**
+> All entries below this banner predate the restoration arc. The arc
+> itself was closed by the D-evolution pivot 2026-05-04 and the paper
+> trail was archived under `docs/archive/c-restoration-arc/` on
+> 2026-05-07 (see `docs/handoff/2026-05-07-pivot-to-d5-first.md` §2.2).
+> Older entries kept for historical reference; do not resume them
+> without consulting the pivot doc.
 
 ## 2026-05-02 — R2 dogfood: LiveView needs a scrollbar
 

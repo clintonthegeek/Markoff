@@ -575,7 +575,7 @@ No blockers to spec approval. All deferrable.
 ### Antecedent designs
 
 - `docs/specs/2026-05-04-d2-foundation-reshape-design.md` — D2 spec (D3 consumes its API)
-- `docs/specs/2026-05-02-live-render-restoration-design.md` — C-restoration spec (L0–L3 carry-forward authoritative source)
+- `docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md` — C-restoration spec (L0–L3 carry-forward authoritative source)
 - `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md` — superseded stub
 
 ### Future D-arc designs (stubs)

@@ -3,7 +3,7 @@
 **Date:** 2026-05-03
 **Origin:** the `spike/marker-hole` worktree (retired 2026-05-04 alongside the
 C-restoration bookend; see `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`).
-**Companion findings doc:** `docs/handoff/2026-05-03-section-3-1-spike-findings.md`
+**Companion findings doc:** `docs/archive/c-restoration-arc/2026-05-03-section-3-1-spike-findings.md`
 
 ## What these are
 

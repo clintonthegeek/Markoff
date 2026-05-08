@@ -2,24 +2,28 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-07 (D4 complete; all 14 phases shipped.)
+**Last updated:** 2026-05-07 (branch on D5-first posture; v1.0 retired; docs cleanup in flight).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **D5** (collab activation) — substantive design pending.
+**Active phase:** **D5** (collab activation) — substantive design pending. Branch posture pivoted to D5-first 2026-05-07 (see `docs/handoff/2026-05-07-pivot-to-d5-first.md`).
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **D4 complete. D5 (collab activation) is the next substantive design step.**
+> **Branch is on D5-first posture. v1.0 retired. D5 is the next
+> substantive design step.** No work happens outside the ordered list
+> in pivot-doc §4.
 >
 > **Read first** (in this order, for a fresh agent context):
-> 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — orientation
-> 2. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items
-> 3. `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — **D5 stub (next design target)**
-> 4. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — D4 spec (complete; background)
-> 5. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 spec (background; complete)
-> 6. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — D3 corrective spec (background; complete)
+> 1. `docs/handoff/2026-05-07-pivot-to-d5-first.md` — **the pivot doc; authoritative for the branch.**
+> 2. `docs/handoff/2026-05-07-live-binding-developmental-history.md` — pipeline-feature provenance.
+> 3. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation.
+> 4. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items.
+> 5. `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — D5 stub (to be replaced under §4.3 of the pivot doc).
+> 6. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — D4 spec (complete; background).
+> 7. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 spec (background; complete).
+> 8. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — D3 corrective spec (background; complete).
 
 ---
 
@@ -48,6 +52,9 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-07 | `6b77a25` | docs: archive C-restoration paper trail under `docs/archive/c-restoration-arc/` (pivot-doc §2.2). |
+| 2026-05-07 | `390cc58` | docs: archive v1.0 plan series under `docs/archive/v1.0-plan-pre-d5/` (pivot-doc §2.1). |
+| 2026-05-07 | `c054897` | docs: pivot to D5-first; v1.0 plan retired as authoritative. Pivot doc + developmental-history doc landed. |
 | 2026-05-07 | `22ea352` | D4 complete. All 14 phases shipped. 103/103 tests pass. D4 → complete; D5 (collab activation) is the next design target. |
 | 2026-05-07 | `9b0aabd` | D4 Phase 11 — parser-library deletions: `ByteEdit`, `parseIncremental`, `buildDocumentQueries(prior,edits)`, pruned-walk helpers, observability counters, `fromComponents` all deleted. `tst_incremental_parse.cpp` removed. |
 | 2026-05-07 | `5db6c98` | D4 Phase 10 — delete foundation-internal deprecated infra: `ParsePool`, `ParsePoolWorker`, `IncrementalParseSession`, `RenderPhases`. |
@@ -73,7 +80,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 | 2026-05-04 | (multiple) | D2 Phases 1–4 — foundation primitives (`BlockId`, `BlockEdit`, `StructuralOp`, `CausalLwwMap`), `UndoLog`, `TextAnchor` + `BlockAnchor` reshape, `MarkoffDocument` new D2 internals. |
 | 2026-05-04 | (this commit) | D2 implementation plan landed (`docs/plans/2026-05-04-d2-foundation-reshape.md`) — ~85 tasks across 16 phases (Phase 0 setup through Phase 15 dogfood). |
 | 2026-05-04 | `afdbc1c` | D2 spec landed (`docs/specs/2026-05-04-d2-foundation-reshape-design.md`); D-arc roadmap + status board + scope-line doc + D3/D4/D5 stub specs published; worktree `CLAUDE.md` banner updated to point at the roadmap. |
-| 2026-05-04 | `0fa0111` | C-restoration bookend committed; spike/marker-hole worktree retired. (See `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`.) |
+| 2026-05-04 | `0fa0111` | C-restoration bookend committed; spike/marker-hole worktree retired. (See `docs/archive/c-restoration-arc/2026-05-04-c-restoration-bookend-d-pivot.md`.) |
 | 2026-05-04 | (external) | collabtext maintainers shipped `IdList` v1 (Option β); D1 complete. |
 | 2026-05-04 | (external) | collabtext maintainer response to D-evolution proposal: yes to β with six explicit "won't do" lines. (`~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md`.) |
 | 2026-05-02 | (in-tree) | D-evolution proposal authored (`docs/specs/2026-05-02-d-evolution-proposal.md`). |

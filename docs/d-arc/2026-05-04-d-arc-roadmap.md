@@ -8,7 +8,7 @@
 
 ## 1. Phase summary
 
-D = "per-block CRDT + structural CRDT" — the long-term Markoff foundation architecture. Replaces the C-restoration arc that bookended on 2026-05-04 (see `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md`). The arc is divided into six phases, named D0 through D5.
+D = "per-block CRDT + structural CRDT" — the long-term Markoff foundation architecture. Replaces the C-restoration arc that bookended on 2026-05-04 (see `docs/archive/c-restoration-arc/2026-05-04-c-restoration-bookend-d-pivot.md`). The arc is divided into six phases, named D0 through D5.
 
 | Phase | Status | Owner | Deliverable | Read |
 |---|---|---|---|---|
@@ -27,7 +27,7 @@ Status legend: ✅ done · 🟢 active · 🟡 dogfood (implementation done; awa
 
 | If you want to … | Read |
 |---|---|
-| Understand why we're doing D at all | `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` (the cut from C-restoration) |
+| Understand why we're doing D at all | `docs/archive/c-restoration-arc/2026-05-04-c-restoration-bookend-d-pivot.md` (the cut from C-restoration) |
 | Understand the architectural premise | `docs/specs/2026-05-02-d-evolution-proposal.md` §3 (data model) |
 | Understand collabtext's commitments and limits | `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` AND `docs/d-arc/collabtext-scope-line.md` (the six "won't do" items quoted verbatim) |
 | Implement D2 | `docs/specs/2026-05-04-d2-foundation-reshape-design.md` (binding spec) — implementation plan to follow once writing-plans runs |
@@ -51,7 +51,7 @@ The collabtext maintainers committed to Option β (the `IdList` primitive) under
 
 The C-restoration's lower-layer architectural decisions (L0–L3, the discriminated cursor model, the layered library structure, the inline span pre-bake, the per-layer test contract) carry forward to D2 as authoritative inputs. Specifically:
 
-- **Discriminated cursor model** (Shape 1; `TextCaret | BlockSelected | BlockInternalEdit`) per `docs/specs/2026-05-02-live-render-restoration-design.md` §3 — D2 reuses this shape unchanged with `BlockId` rebound to an `IdList` element id.
+- **Discriminated cursor model** (Shape 1; `TextCaret | BlockSelected | BlockInternalEdit`) per `docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md` §3 — D2 reuses this shape unchanged with `BlockId` rebound to an `IdList` element id.
 - **Layered library structure** (L0 coords → L8 interactive blocks) — D3 picks this up; D2 doesn't touch it.
 - **Inline span pre-bake** (R1B's `TopLevelBlock::inlineSpans`) — repurposed as the per-block `InlineParseCache` in D2.
 - **Per-layer test contract** ("each layer Lₙ tests against L_{k<n} as real, L_{k>n} absent") — survives in D3.
@@ -74,7 +74,7 @@ docs/
 │  ├─ 2026-05-04-d3-view-layer-adaptation-STUB.md
 │  ├─ 2026-05-04-d4-parser-scope-reduction-STUB.md
 │  ├─ 2026-05-04-d5-collab-activation-STUB.md
-│  └─ 2026-05-02-live-render-restoration-design.md  ← C spec (lower layers carry forward)
+│  └─ 2026-05-02-live-render-restoration-design.md  ← C spec (archived) (lower layers carry forward)
 ├─ handoff/
 │  └─ 2026-05-04-c-restoration-bookend-d-pivot.md  ← the cut from C to D
 ├─ plans/
@@ -94,4 +94,4 @@ When a phase advances:
 - If a stub spec graduates to a substantive spec, update the "Read" column above to point at the substantive spec.
 - The worktree `CLAUDE.md` banner gets a one-line update if the active phase changes.
 
-When the D-arc completes (D5 done): this roadmap stays in tree as historical context, the status board is closed (analog of how `docs/restoration-status.md` was closed at the C-restoration bookend), and a new active arc may begin or the foundation-exploration branch may merge to master.
+When the D-arc completes (D5 done): this roadmap stays in tree as historical context, the status board is closed (analog of how `docs/archive/c-restoration-arc/restoration-status.md` was closed at the C-restoration bookend), and a new active arc may begin or the foundation-exploration branch may merge to master.

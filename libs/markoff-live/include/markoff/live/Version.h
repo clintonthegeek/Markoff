@@ -9,7 +9,7 @@
 /// The library is delivered as a Qt6 QML module under URI
 /// `org.markoff.live 1.0`.
 ///
-/// Architecture spec: docs/specs/2026-05-02-live-render-restoration-design.md
+/// Architecture spec: docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md
 namespace Markoff::Live {
 
 /// Library version number, integer-encoded `major * 10000 + minor * 100 + patch`.

@@ -9,13 +9,13 @@
 1. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — the D-arc orientation doc; reads first.
 2. `docs/specs/2026-05-02-d-evolution-proposal.md` — the proposal Markoff sent to collabtext maintainers (the architectural premise behind D).
 3. `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` — the maintainer commitment to Option β + the six "won't do" lines D2 must respect.
-4. `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut from C-restoration to D, what carries forward, what doesn't.
-5. `docs/specs/2026-05-02-live-render-restoration-design.md` — the C-restoration spec; its lower-layer decisions (L0–L3, the discriminated cursor model, the layered library structure, the per-layer test contract) carry forward to D2 as authoritative inputs.
+4. `docs/archive/c-restoration-arc/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut from C-restoration to D, what carries forward, what doesn't.
+5. `docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md` — the C-restoration spec; its lower-layer decisions (L0–L3, the discriminated cursor model, the layered library structure, the per-layer test contract) carry forward to D2 as authoritative inputs.
 
 **Supersedes (in scope):**
 
-- `docs/specs/2026-05-02-live-render-restoration-design.md` §4 (source-of-truth protocol; sequence-tagged staleness retires under D2 — there is no async parse race to gate against).
-- `docs/specs/2026-05-03-marker-paragraph-design.md` (already retired by the bookend; D2 deletes its mechanism by retiring the parser-vs-CRDT race that motivated it).
+- `docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md` §4 (source-of-truth protocol; sequence-tagged staleness retires under D2 — there is no async parse race to gate against).
+- `docs/archive/c-restoration-arc/2026-05-03-marker-paragraph-design.md` (already retired by the bookend; D2 deletes its mechanism by retiring the parser-vs-CRDT race that motivated it).
 
 **Convention used throughout this spec.** Every major section ends with a **"Why this and not the alternatives"** subsection recording the options considered and the reason for the choice. The reasoning is preserved in writing so future contexts (especially fresh-context agents picking up D3/D4/D5) can audit decisions without re-running the brainstorm.
 
@@ -647,9 +647,9 @@ These are issues that need resolution at writing-plans time or during implementa
 
 - `docs/specs/2026-05-02-d-evolution-proposal.md` — Markoff's proposal to collabtext
 - `~/dev/collabtext/docs/specs/2026-05-04-d-evolution-response.md` — collabtext's response (Option β commitment + scope lines)
-- `docs/specs/2026-05-02-live-render-restoration-design.md` — C-restoration spec (lower layers carry forward to D2)
+- `docs/archive/c-restoration-arc/2026-05-02-live-render-restoration-design.md` — C-restoration spec (lower layers carry forward to D2)
 - `docs/2026-05-02-live-view-architectural-audit.md` — diagnostic that drove C, and now drives D
-- `docs/handoff/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut
+- `docs/archive/c-restoration-arc/2026-05-04-c-restoration-bookend-d-pivot.md` — the cut
 
 ### Future D-arc designs (stubs)
 
