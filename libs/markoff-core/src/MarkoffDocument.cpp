@@ -61,30 +61,30 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
     d->footnoteDefMapProxy  = new SiblingMapProxy(this);
 
     // ── D2: wire UndoLog dispatcher ──────────────────────────────────────
-    d->undoLog.setDispatcher([this](const CrdtTarget &target, OpId opId, bool forward) {
+    d->undoLog.setDispatcher([this](const UndoCrdtTarget &target, OpId opId, bool forward) {
         std::visit([&](const auto &t) {
             using T = std::decay_t<decltype(t)>;
-            if constexpr (std::is_same_v<T, CrdtTarget::BufferT>) {
+            if constexpr (std::is_same_v<T, UndoCrdtTarget::BufferT>) {
                 auto it = d->blockBuffers.find(t.blockId);
                 if (it == d->blockBuffers.end()) return;
                 if (forward) it->second->redo();
                 else         it->second->undo();
-            } else if constexpr (std::is_same_v<T, CrdtTarget::IdListT>) {
+            } else if constexpr (std::is_same_v<T, UndoCrdtTarget::IdListT>) {
                 if (forward) d->idList.redo();
                 else         d->idList.undo();
-            } else if constexpr (std::is_same_v<T, CrdtTarget::KindTagMapT>) {
+            } else if constexpr (std::is_same_v<T, UndoCrdtTarget::KindTagMapT>) {
                 if (forward) d->kindTagMap.redo();
                 else         d->kindTagMap.undo();
-            } else if constexpr (std::is_same_v<T, CrdtTarget::BlockAttrsMapT>) {
+            } else if constexpr (std::is_same_v<T, UndoCrdtTarget::BlockAttrsMapT>) {
                 if (forward) d->blockAttrsMap.redo();
                 else         d->blockAttrsMap.undo();
-            } else if constexpr (std::is_same_v<T, CrdtTarget::FrontmatterMapT>) {
+            } else if constexpr (std::is_same_v<T, UndoCrdtTarget::FrontmatterMapT>) {
                 if (forward) d->frontmatterMap.redo();
                 else         d->frontmatterMap.undo();
-            } else if constexpr (std::is_same_v<T, CrdtTarget::LinkRefMapT>) {
+            } else if constexpr (std::is_same_v<T, UndoCrdtTarget::LinkRefMapT>) {
                 if (forward) d->linkRefMap.redo();
                 else         d->linkRefMap.undo();
-            } else if constexpr (std::is_same_v<T, CrdtTarget::FootnoteDefMapT>) {
+            } else if constexpr (std::is_same_v<T, UndoCrdtTarget::FootnoteDefMapT>) {
                 if (forward) d->footnoteDefMap.redo();
                 else         d->footnoteDefMap.undo();
             }
@@ -432,7 +432,7 @@ void MarkoffDocument::applyBlockEdit(const BlockEdit &edit)
         {{edit.withinBlockByteOffset, edit.withinBlockByteOffset + edit.removedBytes}},
         {edit.insertedUtf8.toStdString()});
     auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
-    t.registerOp(CrdtTarget::buffer(edit.blockId), lamportToOpId(ts));
+    t.registerOp(UndoCrdtTarget::buffer(edit.blockId), lamportToOpId(ts));
 
     ++d->blockEditSequences[edit.blockId];
 
@@ -465,14 +465,14 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             CollabText::Crdt::IdListOperation idOp = d->idList.insert_after(after, raw);
             BlockId newBlock = BlockId::fromRaw(raw);
             auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
-            t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
+            t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
             // Create buffer
             d->blockBuffers.emplace(newBlock, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
             // Create buffer proxy for this block (parented to this; Qt owns it)
             d->bufferProxies.insert(newBlock, new BufferProxy(newBlock, this));
             // Set kind
             OpId kindOpId = d->kindTagMap.setWithNextStamp(newBlock, payload.kind);
-            t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+            t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
             // Notify structural + kind proxies
             d->idListProxy->notifyChanged();
             d->kindTagMapProxy->notifyChanged();
@@ -480,15 +480,15 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             CollabText::Crdt::Anchor anchor = d->idList.anchor_of(payload.blockId.raw(), CollabText::Crdt::Bias::Left);
             CollabText::Crdt::IdListOperation idOp = d->idList.remove_at(anchor);
             auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
-            t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
+            t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
             OpId kindOpId = d->kindTagMap.removeWithNextStamp(payload.blockId);
-            t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+            t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
             // Buffer retained for GC (Phase 9)
             d->idListProxy->notifyChanged();
             d->kindTagMapProxy->notifyChanged();
         } else if constexpr (std::is_same_v<T, StructuralOp::ChangeKind>) {
             OpId kindOpId = d->kindTagMap.setWithNextStamp(payload.blockId, payload.newKind);
-            t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+            t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
             d->kindTagMapProxy->notifyChanged();
         }
     }, op.payload);
@@ -621,7 +621,7 @@ void MarkoffDocument::d2ApplyBufferEdit(BlockId block, uint32_t offset,
         {{offset, offset + removedBytes}},
         {insert.toStdString()});
     auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
-    t.registerOp(CrdtTarget::buffer(block), lamportToOpId(ts));
+    t.registerOp(UndoCrdtTarget::buffer(block), lamportToOpId(ts));
     ++d->blockEditSequences[block];
 
     // Notify per-block buffer proxy synchronously (same as applyBlockEdit).
@@ -646,13 +646,13 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
 
     auto idOp = d->idList.insert_after(after, raw);
     auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
-    t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
+    t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
 
     d->blockBuffers.emplace(newId, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
     d->bufferProxies.insert(newId, new BufferProxy(newId, this));
 
     OpId kindOpId = d->kindTagMap.setWithNextStamp(newId, kind);
-    t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+    t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
 
     ++d->structuralEditSequence;
     d->idListProxy->notifyChanged();
@@ -849,10 +849,10 @@ void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
     CollabText::Crdt::Anchor anchor = d->idList.anchor_of(block.raw(), CollabText::Crdt::Bias::Left);
     auto idOp = d->idList.remove_at(anchor);
     auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
-    t.registerOp(CrdtTarget::idList(), lamportToOpId(idTs));
+    t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
 
     OpId kindOpId = d->kindTagMap.removeWithNextStamp(block);
-    t.registerOp(CrdtTarget::kindTagMap(), kindOpId);
+    t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
 
     ++d->structuralEditSequence;
     d->idListProxy->notifyChanged();
@@ -865,7 +865,7 @@ void MarkoffDocument::d2SetBlockKind(BlockId block, BlockKind newKind,
                                       UndoLog::Transaction &t)
 {
     OpId opId = d->kindTagMap.setWithNextStamp(block, newKind);
-    t.registerOp(CrdtTarget::kindTagMap(), opId);
+    t.registerOp(UndoCrdtTarget::kindTagMap(), opId);
     d->touchedSinceLoad.insert(block);
     scheduleD2Changed();
 }
@@ -876,7 +876,7 @@ void MarkoffDocument::d2SetBlockAttr(BlockId block, const QByteArray &attrName,
 {
     BlockAttrKey key{block, attrName};
     OpId opId = d->blockAttrsMap.setWithNextStamp(key, value);
-    t.registerOp(CrdtTarget::blockAttrsMap(), opId);
+    t.registerOp(UndoCrdtTarget::blockAttrsMap(), opId);
     d->touchedSinceLoad.insert(block);
     scheduleD2Changed();
 }

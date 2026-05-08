@@ -101,6 +101,10 @@ add_library(markoff_core STATIC
     # --- Bundle encode/decode (D5 §3.2) ---
     include/markoff/core/MarkoffSerializer.h
     src/MarkoffSerializer.cpp
+    # --- Collab boundary types (D5) — must be in SOURCES so AUTOMOC compiles
+    #     moc_ActionId.cpp (defines Markoff::staticMetaObject from Q_NAMESPACE).
+    include/markoff/core/ActionId.h
+    include/markoff/core/MarkoffOp.h
 )
 
 target_include_directories(markoff_core

@@ -28,6 +28,7 @@
 #include <markoff/core/StructuralOp.h>
 #include <markoff/core/TextAnchor.h>
 #include <markoff/core/MarkoffCoreExport.h>
+#include <markoff/core/MarkoffOp.h>
 #include <markoff/core/SessionParams.h>
 #include <markoff/core/UndoLog.h>
 
@@ -328,6 +329,12 @@ Q_SIGNALS:
     /// Emitted synchronously when a block is structurally removed,
     /// carrying its ID and its former row index.
     void blockRemoved(Markoff::BlockId id, int row);
+
+    /// Emitted once per UndoLog::Transaction commit with all ops the
+    /// transaction produced. Only emitted when isCollabConfigured() is true.
+    /// See D5 spec §2.2.
+    void localOpsProduced(QList<Markoff::MarkoffOp> ops,
+                          Markoff::MarkoffBundleMeta meta);
 
 private:
     friend class WatermarkCoordinator;

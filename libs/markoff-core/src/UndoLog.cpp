@@ -29,7 +29,7 @@ UndoLog::Transaction::~Transaction() {
     }
 }
 
-void UndoLog::Transaction::registerOp(CrdtTarget target, OpId opId) {
+void UndoLog::Transaction::registerOp(UndoCrdtTarget target, OpId opId) {
     Q_ASSERT(m_log.m_pendingEntry && "registerOp called outside a transaction");
     m_log.m_pendingEntry->targets.emplace_back(std::move(target), opId);
 }
@@ -58,7 +58,7 @@ void UndoLog::undoForBlock(BlockId block) {
     if (!m_dispatcher) return;
     auto it = std::find_if(m_entries.rbegin(), m_entries.rend(), [&](const UndoEntry &e) {
         return std::any_of(e.targets.begin(), e.targets.end(), [&](const auto &p) {
-            if (auto *b = std::get_if<CrdtTarget::BufferT>(&p.first.kind))
+            if (auto *b = std::get_if<UndoCrdtTarget::BufferT>(&p.first.kind))
                 return b->blockId == block;
             return false;
         });

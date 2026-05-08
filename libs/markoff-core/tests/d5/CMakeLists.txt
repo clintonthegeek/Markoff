@@ -13,3 +13,7 @@ add_test(NAME tst_d5_serialization COMMAND tst_d5_serialization)
 qt_add_executable(tst_d5_replica_id tst_d5_replica_id.cpp)
 target_link_libraries(tst_d5_replica_id PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d5_replica_id COMMAND tst_d5_replica_id)
+
+qt_add_executable(tst_d5_local_ops_signal tst_d5_local_ops_signal.cpp)
+target_link_libraries(tst_d5_local_ops_signal PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_local_ops_signal COMMAND tst_d5_local_ops_signal)

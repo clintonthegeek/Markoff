@@ -11,9 +11,13 @@
 namespace Markoff {
 
 using OpId = uint64_t;
-using ActionId = uint64_t;
+using UndoActionId = uint64_t;
 
-struct CrdtTarget {
+/// Internal undo-log routing tag. Distinct from the public-boundary
+/// Markoff::CrdtTarget enum (MarkoffOp.h) which routes ops across the
+/// collab wire. Renamed from CrdtTarget in D5 phase 3 to resolve the
+/// name collision. See D5 spec §2.3.
+struct UndoCrdtTarget {
     struct IdListT {};
     struct KindTagMapT {};
     struct BlockAttrsMapT {};
@@ -24,18 +28,18 @@ struct CrdtTarget {
     std::variant<IdListT, KindTagMapT, BlockAttrsMapT, FrontmatterMapT,
                  LinkRefMapT, FootnoteDefMapT, BufferT> kind;
 
-    static CrdtTarget idList()          { return {IdListT{}}; }
-    static CrdtTarget kindTagMap()      { return {KindTagMapT{}}; }
-    static CrdtTarget blockAttrsMap()   { return {BlockAttrsMapT{}}; }
-    static CrdtTarget frontmatterMap()  { return {FrontmatterMapT{}}; }
-    static CrdtTarget linkRefMap()      { return {LinkRefMapT{}}; }
-    static CrdtTarget footnoteDefMap()  { return {FootnoteDefMapT{}}; }
-    static CrdtTarget buffer(BlockId id){ return {BufferT{id}}; }
+    static UndoCrdtTarget idList()          { return {IdListT{}}; }
+    static UndoCrdtTarget kindTagMap()      { return {KindTagMapT{}}; }
+    static UndoCrdtTarget blockAttrsMap()   { return {BlockAttrsMapT{}}; }
+    static UndoCrdtTarget frontmatterMap()  { return {FrontmatterMapT{}}; }
+    static UndoCrdtTarget linkRefMap()      { return {LinkRefMapT{}}; }
+    static UndoCrdtTarget footnoteDefMap()  { return {FootnoteDefMapT{}}; }
+    static UndoCrdtTarget buffer(BlockId id){ return {BufferT{id}}; }
 };
 
 struct UndoEntry {
-    ActionId actionId;
-    std::vector<std::pair<CrdtTarget, OpId>> targets;
+    UndoActionId actionId;
+    std::vector<std::pair<UndoCrdtTarget, OpId>> targets;
 };
 
 struct CoalesceContext {
@@ -51,7 +55,7 @@ public:
     public:
         explicit Transaction(UndoLog &log);
         ~Transaction();
-        void registerOp(CrdtTarget target, OpId opId);
+        void registerOp(UndoCrdtTarget target, OpId opId);
         void rollback() noexcept;
     private:
         UndoLog &m_log;
@@ -59,8 +63,8 @@ public:
         bool m_rolledBack = false;
     };
 
-    using Dispatcher = std::function<void(const CrdtTarget &, OpId, bool forward)>;
-    using IsCollapsedQuery = std::function<bool(const CrdtTarget &, OpId)>;
+    using Dispatcher = std::function<void(const UndoCrdtTarget &, OpId, bool forward)>;
+    using IsCollapsedQuery = std::function<bool(const UndoCrdtTarget &, OpId)>;
 
     size_t entryCount() const noexcept { return m_entries.size(); }
     const UndoEntry &lastEntry() const { return m_entries.back(); }
@@ -68,7 +72,7 @@ public:
     bool isBlockReferenced(BlockId id) const noexcept {
         for (const auto &entry : m_entries)
             for (const auto &[target, opId] : entry.targets)
-                if (auto *b = std::get_if<CrdtTarget::BufferT>(&target.kind))
+                if (auto *b = std::get_if<UndoCrdtTarget::BufferT>(&target.kind))
                     if (b->blockId == id) return true;
         return false;
     }
@@ -115,7 +119,7 @@ private:
     std::vector<UndoEntry> m_redoStack;
     UndoEntry *m_pendingEntry = nullptr;
     int m_nestingDepth = 0;
-    ActionId m_nextActionId = 1;
+    UndoActionId m_nextActionId = 1;
     Dispatcher m_dispatcher;
     std::optional<CoalesceContext> m_lastCoalesceCtx;
 };

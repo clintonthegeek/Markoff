@@ -51,7 +51,7 @@ void WatermarkCoordinator::advanceAndCompact()
     d.footnoteDefMap.compact(fdStamp);
 
     // Discard all undo entries — all ops have been observed and compacted
-    d.undoLog.compact([](const CrdtTarget &, OpId) { return true; });
+    d.undoLog.compact([](const UndoCrdtTarget &, OpId) { return true; });
 
     // Snapshot post-compact state directly (D2 single-user: idListVersion stays 0;
     // Crdt::Global is a vector type and doesn't map cleanly to quint64)

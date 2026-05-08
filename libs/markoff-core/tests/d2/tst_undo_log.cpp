@@ -30,7 +30,7 @@ void TstUndoLog::singleTransaction_producesOneEntry() {
     Markoff::UndoLog log;
     {
         Markoff::UndoLog::Transaction t(log);
-        t.registerOp(Markoff::CrdtTarget::idList(), 42);
+        t.registerOp(Markoff::UndoCrdtTarget::idList(), 42);
     }
     QCOMPARE(log.entryCount(), 1u);
 }
@@ -45,10 +45,10 @@ void TstUndoLog::nestedTransaction_joinsOuter() {
     Markoff::UndoLog log;
     {
         Markoff::UndoLog::Transaction outer(log);
-        outer.registerOp(Markoff::CrdtTarget::idList(), 1);
+        outer.registerOp(Markoff::UndoCrdtTarget::idList(), 1);
         {
             Markoff::UndoLog::Transaction inner(log);
-            inner.registerOp(Markoff::CrdtTarget::buffer(Markoff::BlockId::fromRaw(7)), 2);
+            inner.registerOp(Markoff::UndoCrdtTarget::buffer(Markoff::BlockId::fromRaw(7)), 2);
         }
     }
     QCOMPARE(log.entryCount(), 1u);
@@ -60,14 +60,14 @@ void TstUndoLog::nestedTransaction_joinsOuter() {
 void TstUndoLog::undo_dispatchesTargetsInReverseOpOrder() {
     Markoff::UndoLog log;
     std::vector<Markoff::OpId> dispatched;
-    log.setDispatcher([&](const Markoff::CrdtTarget &, Markoff::OpId opId, bool) {
+    log.setDispatcher([&](const Markoff::UndoCrdtTarget &, Markoff::OpId opId, bool) {
         dispatched.push_back(opId);
     });
     {
         Markoff::UndoLog::Transaction t(log);
-        t.registerOp(Markoff::CrdtTarget::idList(), 100);
-        t.registerOp(Markoff::CrdtTarget::kindTagMap(), 101);
-        t.registerOp(Markoff::CrdtTarget::buffer(Markoff::BlockId::fromRaw(1)), 102);
+        t.registerOp(Markoff::UndoCrdtTarget::idList(), 100);
+        t.registerOp(Markoff::UndoCrdtTarget::kindTagMap(), 101);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(Markoff::BlockId::fromRaw(1)), 102);
     }
     log.undo();
     QCOMPARE(dispatched.size(), 3u);
@@ -79,13 +79,13 @@ void TstUndoLog::undo_dispatchesTargetsInReverseOpOrder() {
 void TstUndoLog::redo_replaysFwd() {
     Markoff::UndoLog log;
     std::vector<Markoff::OpId> dispatched;
-    log.setDispatcher([&](const Markoff::CrdtTarget &, Markoff::OpId opId, bool) {
+    log.setDispatcher([&](const Markoff::UndoCrdtTarget &, Markoff::OpId opId, bool) {
         dispatched.push_back(opId);
     });
     {
         Markoff::UndoLog::Transaction t(log);
-        t.registerOp(Markoff::CrdtTarget::idList(), 10);
-        t.registerOp(Markoff::CrdtTarget::buffer(Markoff::BlockId::fromRaw(1)), 11);
+        t.registerOp(Markoff::UndoCrdtTarget::idList(), 10);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(Markoff::BlockId::fromRaw(1)), 11);
     }
     log.undo();
     dispatched.clear();
@@ -100,7 +100,7 @@ void TstUndoLog::redo_replaysFwd() {
 void TstUndoLog::undoForBlock_picksMostRecentEntryThatTouchesThisBlock() {
     Markoff::UndoLog log;
     std::vector<Markoff::OpId> dispatched;
-    log.setDispatcher([&](const Markoff::CrdtTarget &, Markoff::OpId opId, bool) {
+    log.setDispatcher([&](const Markoff::UndoCrdtTarget &, Markoff::OpId opId, bool) {
         dispatched.push_back(opId);
     });
 
@@ -108,13 +108,13 @@ void TstUndoLog::undoForBlock_picksMostRecentEntryThatTouchesThisBlock() {
     auto blkB = Markoff::BlockId::fromRaw(2);
     auto blkC = Markoff::BlockId::fromRaw(3);
 
-    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::CrdtTarget::buffer(blkA), 10); }
-    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::CrdtTarget::buffer(blkB), 20); }
+    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::UndoCrdtTarget::buffer(blkA), 10); }
+    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::UndoCrdtTarget::buffer(blkB), 20); }
     {
         Markoff::UndoLog::Transaction t(log);
-        t.registerOp(Markoff::CrdtTarget::idList(), 30);
-        t.registerOp(Markoff::CrdtTarget::kindTagMap(), 31);
-        t.registerOp(Markoff::CrdtTarget::buffer(blkC), 32);
+        t.registerOp(Markoff::UndoCrdtTarget::idList(), 30);
+        t.registerOp(Markoff::UndoCrdtTarget::kindTagMap(), 31);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(blkC), 32);
     }
 
     log.undoForBlock(blkB);
@@ -132,11 +132,11 @@ void TstUndoLog::coalescing_extendsPreviousEntry() {
     auto blk = Markoff::BlockId::fromRaw(1);
     Markoff::CoalesceContext ctx{blk, true, 0};
     log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
-        t.registerOp(Markoff::CrdtTarget::buffer(blk), 1);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 1);
     });
     ctx.timestampMs = 100;
     log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
-        t.registerOp(Markoff::CrdtTarget::buffer(blk), 2);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 2);
     });
     QCOMPARE(log.entryCount(), 1u);
     QCOMPARE(log.lastEntry().targets.size(), 2u);
@@ -147,11 +147,11 @@ void TstUndoLog::coalescing_breaksOnFocusChange() {
     auto blk = Markoff::BlockId::fromRaw(1);
     Markoff::CoalesceContext ctx{blk, true, 0, 0};
     log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
-        t.registerOp(Markoff::CrdtTarget::buffer(blk), 1);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 1);
     });
     ctx.focusGeneration = 1;  // focus changed
     log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
-        t.registerOp(Markoff::CrdtTarget::buffer(blk), 2);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 2);
     });
     QCOMPARE(log.entryCount(), 2u);
 }
@@ -161,11 +161,11 @@ void TstUndoLog::coalescing_breaksOnIdleThreshold() {
     auto blk = Markoff::BlockId::fromRaw(1);
     Markoff::CoalesceContext ctx{blk, true, 0};
     log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
-        t.registerOp(Markoff::CrdtTarget::buffer(blk), 1);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 1);
     });
     ctx.timestampMs = 1500;  // >1000ms
     log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
-        t.registerOp(Markoff::CrdtTarget::buffer(blk), 2);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 2);
     });
     QCOMPARE(log.entryCount(), 2u);
 }
@@ -175,12 +175,12 @@ void TstUndoLog::coalescing_breaksOnStructuralOp() {
     auto blk = Markoff::BlockId::fromRaw(1);
     Markoff::CoalesceContext ctx{blk, true, 0};
     log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
-        t.registerOp(Markoff::CrdtTarget::buffer(blk), 1);
+        t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 1);
     });
     // structural op = isPrintable false
     ctx.isPrintable = false;
     log.maybeCoalesceOrTransaction(ctx, [&](Markoff::UndoLog::Transaction &t) {
-        t.registerOp(Markoff::CrdtTarget::idList(), 2);
+        t.registerOp(Markoff::UndoCrdtTarget::idList(), 2);
     });
     QCOMPARE(log.entryCount(), 2u);
 }
@@ -190,13 +190,13 @@ void TstUndoLog::coalescing_breaksOnStructuralOp() {
 void TstUndoLog::compact_dropsEntriesAllOfWhoseOpsAreCollapsed() {
     Markoff::UndoLog log;
     auto blk = Markoff::BlockId::fromRaw(1);
-    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::CrdtTarget::buffer(blk), 10); }
-    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::CrdtTarget::buffer(blk), 20); }
-    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::CrdtTarget::buffer(blk), 30); }
+    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 10); }
+    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 20); }
+    { Markoff::UndoLog::Transaction t(log); t.registerOp(Markoff::UndoCrdtTarget::buffer(blk), 30); }
     QCOMPARE(log.entryCount(), 3u);
 
     // Collapse ops 10 and 20 but not 30
-    log.compact([](const Markoff::CrdtTarget &, Markoff::OpId opId) { return opId <= 20; });
+    log.compact([](const Markoff::UndoCrdtTarget &, Markoff::OpId opId) { return opId <= 20; });
     QCOMPARE(log.entryCount(), 1u);
     QCOMPARE(log.lastEntry().targets[0].second, 30u);
 }
