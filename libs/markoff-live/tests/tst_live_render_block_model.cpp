@@ -298,6 +298,49 @@ private Q_SLOTS:
                  QStringLiteral("rust"));
     }
 
+    void spans_only_change_emits_data_changed_with_inline_spans_role() {
+        LiveBlockModel m;
+
+        // Seed one row.
+        BlockRecord rec1;
+        rec1.kind = "paragraph";
+        rec1.text = "hello";
+        rec1.blockAnchor = Markoff::BlockAnchor{};
+        rec1.inlineSpans = {};
+        QList<BlockKey> keys1 = { BlockKey{ rec1.kind, rec1.blockAnchor } };
+        m.applyOps(AstBlockDiff::diff({}, keys1), {rec1});
+        QCOMPARE(m.rowCount(), 1);
+
+        // Now apply an Equal op where ONLY inlineSpans changes.
+        BlockRecord rec2 = rec1;  // same kind/text/anchor/attrs
+        Markoff::SourceSpan span{};
+        span.charOffset = 0; span.charLength = 5; span.bold = true;
+        rec2.inlineSpans = {span};
+
+        // rec2 has same key as rec1, so diff produces a single Equal op.
+        QList<BlockKey> keys2 = { BlockKey{ rec2.kind, rec2.blockAnchor } };
+
+        QSignalSpy spy(&m, &QAbstractItemModel::dataChanged);
+        m.applyOps(AstBlockDiff::diff(keys1, keys2), {rec2});
+
+        QVERIFY2(spy.count() >= 1, "dataChanged must fire when spans differ");
+
+        // Find an emit that includes InlineSpansRole.
+        bool sawInlineSpansRole = false;
+        for (const auto &emission : spy) {
+            const QList<int> roles = emission.at(2).value<QList<int>>();
+            if (roles.contains(LiveBlockModel::InlineSpansRole) || roles.isEmpty()) {
+                // Empty roles list = "all roles changed", which also covers it.
+                sawInlineSpansRole = true; break;
+            }
+        }
+        QVERIFY(sawInlineSpansRole);
+
+        // The new spans are now in the model.
+        QCOMPARE(m.spansAtRow(0).size(), 1);
+        QVERIFY(m.spansAtRow(0)[0].bold);
+    }
+
     void source_span_equality_and_metatype_round_trip() {
         Markoff::SourceSpan a{};
         a.charOffset = 0; a.charLength = 4; a.bold = true;

@@ -122,6 +122,10 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                 if (m_rows[row] != merged) {
                     m_rows[row] = merged;
                     Q_EMIT dataChanged(index(row), index(row));
+                } else if (m_rows[row].inlineSpans != merged.inlineSpans) {
+                    // Non-span fields are identical; only spans changed.
+                    m_rows[row].inlineSpans = merged.inlineSpans;
+                    Q_EMIT dataChanged(index(row), index(row), {InlineSpansRole});
                 }
                 ++row;
                 break;
