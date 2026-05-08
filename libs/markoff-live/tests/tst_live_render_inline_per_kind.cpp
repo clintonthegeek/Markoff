@@ -134,6 +134,76 @@ private Q_SLOTS:
         });
         QVERIFY(range.first >= 0);  // some range was found
     }
+
+    void highlight_flag_paints_background() {
+        QTextDocument doc;
+        doc.setPlainText("plain ==HL== plain");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc); h.setTheme(&theme);
+        Markoff::SourceSpan span{};
+        span.charOffset = 6; span.charLength = 6;  // ==HL==
+        span.highlight = true;
+        h.setInlineSpans({span});
+
+        auto range = findFormatRange(doc, [&](const QTextCharFormat &f){
+            return f.background().color() == theme.color(Markoff::Theme::Slot::Highlight);
+        });
+        QCOMPARE(range.first, 6);
+        QCOMPARE(range.second, 6);
+    }
+
+    void link_flag_paints_color_and_underline() {
+        QTextDocument doc;
+        doc.setPlainText("[label](url) plain");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc); h.setTheme(&theme);
+        Markoff::SourceSpan span{};
+        span.charOffset = 0; span.charLength = 12;  // [label](url)
+        span.isLink = true;
+        h.setInlineSpans({span});
+
+        auto range = findFormatRange(doc, [&](const QTextCharFormat &f){
+            return f.fontUnderline()
+                && f.foreground().color() == theme.color(Markoff::Theme::Slot::Link);
+        });
+        QCOMPARE(range.first, 0);
+        QCOMPARE(range.second, 12);
+    }
+
+    void wikilink_flag_paints_color_and_underline() {
+        QTextDocument doc;
+        doc.setPlainText("[[Page]] plain");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc); h.setTheme(&theme);
+        Markoff::SourceSpan span{};
+        span.charOffset = 0; span.charLength = 8;  // [[Page]]
+        span.isWikilink = true;
+        h.setInlineSpans({span});
+
+        auto range = findFormatRange(doc, [&](const QTextCharFormat &f){
+            return f.fontUnderline()
+                && f.foreground().color() == theme.color(Markoff::Theme::Slot::WikiLink);
+        });
+        QCOMPARE(range.first, 0);
+        QCOMPARE(range.second, 8);
+    }
+
+    void tag_flag_paints_color() {
+        QTextDocument doc;
+        doc.setPlainText("plain #tag plain");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc); h.setTheme(&theme);
+        Markoff::SourceSpan span{};
+        span.charOffset = 6; span.charLength = 4;  // #tag
+        span.isTag = true;
+        h.setInlineSpans({span});
+
+        auto range = findFormatRange(doc, [&](const QTextCharFormat &f){
+            return f.foreground().color() == theme.color(Markoff::Theme::Slot::Tag);
+        });
+        QCOMPARE(range.first, 6);
+        QCOMPARE(range.second, 4);
+    }
 };
 
 QTEST_MAIN(TstLiveRenderInlinePerKind)

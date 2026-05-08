@@ -77,6 +77,7 @@ Theme Theme::defaultLight()
     t.setColor(Slot::Link,             QColor("#0066cc"));
     t.setColor(Slot::WikiLink,         QColor("#5050cc"));
     t.setColor(Slot::Tag,              QColor("#a04080"));
+    t.setColor(Slot::Highlight,        QColor("#fff176"));
     t.setColor(Slot::Quote,            QColor("#666666"));
     t.setColor(Slot::InlineCode,       QColor("#882020"));
     t.setColor(Slot::CodeBlock,        QColor("#222222"));

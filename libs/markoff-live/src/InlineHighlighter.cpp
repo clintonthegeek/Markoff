@@ -71,6 +71,21 @@ QTextCharFormat InlineHighlighter::formatFor(const Markoff::SourceSpan &span) co
         any = true;
     }
 
+    if (span.highlight) {
+        const QColor c = m_theme->color(Markoff::Theme::Slot::Highlight);
+        if (c.isValid()) fmt.setBackground(c);
+        any = true;
+    }
+    if (span.isLink) {
+        applyEmphasis(Markoff::Theme::Slot::Link);
+        fmt.setFontUnderline(true);
+    }
+    if (span.isWikilink) {
+        applyEmphasis(Markoff::Theme::Slot::WikiLink);
+        fmt.setFontUnderline(true);
+    }
+    if (span.isTag) applyEmphasis(Markoff::Theme::Slot::Tag);
+
     return any ? fmt : QTextCharFormat();
 }
 
