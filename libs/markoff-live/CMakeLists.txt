@@ -63,6 +63,9 @@ qt_add_qml_module(markoff_live
         # Math rendering
         src/MathRenderer.h
         src/MathRenderer.cpp
+        # E1: inline-format highlighter
+        include/markoff/live/InlineHighlighter.h
+        src/InlineHighlighter.cpp
     QML_FILES
         qml/LiveView.qml
         qml/LiveContextMenu.qml
