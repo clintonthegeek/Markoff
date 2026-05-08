@@ -102,6 +102,11 @@ struct MarkoffDocument::Private {
     // Debounce flag for d2DocumentChanged signal
     bool d2ChangePending = false;
 
+    // D5: watermark/ack gate fields (Phase 6)
+    quint64 currentSnapshotWatermark = 0;  // W from last save attempt
+    quint64 ackedWatermark           = 0;  // monotonic, consumer-supplied
+    quint64 maxProducedLamport       = 0;  // max producerLamport ever emitted
+
     // D5: monotonic bundle-ID counter; starts at 1 (0 is reserved / invalid)
     quint64 nextBundleId = 1;
 

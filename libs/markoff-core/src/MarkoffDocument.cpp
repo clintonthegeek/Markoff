@@ -315,6 +315,8 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
 
         auto meta = d->buildBundleMeta(0, maxLamport);
         meta.opCountInBundle = quint16(ops.size());
+        // Track the highest lamport ever produced, for the watermark gate.
+        d->maxProducedLamport = std::max(d->maxProducedLamport, maxLamport);
         Q_EMIT localOpsProduced(std::move(ops), std::move(meta));
     });
 
@@ -1725,8 +1727,7 @@ bool MarkoffDocument::save(const QString &path)
     if (!f.open(QIODevice::WriteOnly)) return false;
     f.write(serializeForSave());
     if (!f.commit()) return false;
-    if (d->watermark && !d->watermark->onSaveSucceeded())
-        qWarning("MarkoffDocument::save: GC deferred — transaction open at save time");
+    onSaveComplete();
     return true;
 }
 
@@ -1734,6 +1735,50 @@ bool MarkoffDocument::triggerGc()
 {
     if (d->watermark) return d->watermark->onSaveSucceeded();
     return false;
+}
+
+void MarkoffDocument::onSaveComplete()
+{
+    if (!d->watermark) return;
+    if (d->undoLog.isTransactionOpen()) {
+        qWarning("MarkoffDocument::onSaveComplete: GC deferred — transaction open");
+        return;
+    }
+
+    const quint64 W = d->maxProducedLamport;
+    d->currentSnapshotWatermark = W;
+    Q_EMIT localWatermarkAdvanced(W);
+
+    if (d->ackedWatermark >= W) {
+        // Gate open: compact immediately.
+        d->watermark->compactNow();
+        Q_EMIT watermarkCompacted(W);
+    } else if (d->collabConfigured) {
+        // Gate closed: wait for peer acks.
+        Q_EMIT wantsAcksAtWatermark(W);
+    } else {
+        // Single-user without explicit notifyAcks: compact immediately.
+        d->watermark->compactNow();
+        Q_EMIT watermarkCompacted(W);
+    }
+}
+
+void MarkoffDocument::simulateSaveSucceeded()
+{
+    onSaveComplete();
+}
+
+void MarkoffDocument::notifyAcksAtWatermark(quint64 watermark)
+{
+    if (watermark <= d->ackedWatermark) return;  // monotonic
+    d->ackedWatermark = watermark;
+    if (d->currentSnapshotWatermark > 0
+        && d->ackedWatermark >= d->currentSnapshotWatermark
+        && d->watermark)
+    {
+        d->watermark->compactNow();
+        Q_EMIT watermarkCompacted(d->currentSnapshotWatermark);
+    }
 }
 
 }  // namespace Markoff

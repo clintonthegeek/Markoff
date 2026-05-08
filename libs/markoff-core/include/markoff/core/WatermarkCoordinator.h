@@ -21,6 +21,11 @@ public:
     explicit WatermarkCoordinator(MarkoffDocument &doc);
     bool onSaveSucceeded();
     Watermark currentWatermark() const;
+
+    /// Run compaction immediately (without gate). Returns false if a
+    /// transaction is open or watermark is null.
+    bool compactNow();
+
 private:
     void advanceAndCompact();
     void disposeOrphans();

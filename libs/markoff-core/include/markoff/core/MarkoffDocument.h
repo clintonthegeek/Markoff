@@ -341,10 +341,36 @@ Q_SIGNALS:
     void localOpsProduced(QList<Markoff::MarkoffOp> ops,
                           Markoff::MarkoffBundleMeta meta);
 
+    /// Emitted after each save when the document advances its local watermark.
+    /// W is the max Lamport counter produced so far. Consumer uses this to
+    /// know "I've committed state up to W" for downstream ack tracking.
+    void localWatermarkAdvanced(quint64 watermark);
+
+    /// Emitted after save in collab mode when the document wants to compact
+    /// but is gated on peer acks. Consumer calls notifyAcksAtWatermark(W)
+    /// once all peers confirm they've seen ops ≤ W.
+    void wantsAcksAtWatermark(quint64 snapshotWatermark);
+
+    /// Emitted after compaction actually runs (either immediately on save
+    /// when ackedWatermark ≥ W, or deferred after notifyAcksAtWatermark).
+    void watermarkCompacted(quint64 watermark);
+
+public:
+    /// Tell the document all known peers have ack'd up to W. Monotonic.
+    /// Triggers deferred compaction if the current snapshot watermark ≤ W.
+    void notifyAcksAtWatermark(quint64 watermark);
+
+    /// Test hook: pretend a save just succeeded, triggering the
+    /// watermark-gate logic. Production code calls this via save().
+    /// Always compiled (same pattern as testInsertBlock) so test
+    /// executables can link against the library.
+    void simulateSaveSucceeded();
+
 private:
     friend class WatermarkCoordinator;
 
     void scheduleD2Changed();
+    void onSaveComplete();
     void materializeBlocksFromParsedDoc(const Markoff::Document &parsed,
                                         const QString &body);
     BlockId allocateD2BlockId() noexcept;

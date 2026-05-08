@@ -82,6 +82,14 @@ void WatermarkCoordinator::disposeOrphans()
     }
 }
 
+bool WatermarkCoordinator::compactNow()
+{
+    if (m_doc.d->undoLog.isTransactionOpen()) return false;
+    advanceAndCompact();
+    disposeOrphans();
+    return true;
+}
+
 Watermark WatermarkCoordinator::currentWatermark() const
 {
     return m_watermark;
