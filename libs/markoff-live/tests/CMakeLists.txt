@@ -89,3 +89,10 @@ target_link_libraries(tst_live_render_inline_combined PRIVATE
     Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
 add_test(NAME tst_live_render_inline_combined COMMAND tst_live_render_inline_combined)
 
+qt_add_executable(tst_live_render_inline_cross_delegate
+    tst_live_render_inline_cross_delegate.cpp
+)
+target_link_libraries(tst_live_render_inline_cross_delegate PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_inline_cross_delegate COMMAND tst_live_render_inline_cross_delegate)
+
