@@ -9,6 +9,7 @@
 
 #include <markoff/core/Theme.h>
 #include <markoff/live/InlineHighlighter.h>
+#include <markoff/live/InlineHighlighterAttached.h>
 #include <markoff/parser/SourceSpan.h>
 
 using namespace Markoff::Live;
@@ -238,6 +239,23 @@ private Q_SLOTS:
             block = block.next();
         }
         QVERIFY2(!anyPaint, "Out-of-scope flags must not paint");
+    }
+
+    void attached_shim_c_plus_plus_surface_works() {
+        // Without a QQuickTextDocument target, rebuildHighlighter is a no-op.
+        // Test the C++ property surface: spans round-trip, theme stored, no crash.
+        Markoff::Live::InlineHighlighterAttached att;
+
+        Markoff::SourceSpan span{};
+        span.charOffset = 6; span.charLength = 8; span.bold = true;
+        QVariantList spans;
+        spans.append(QVariant::fromValue(span));
+        att.setSpans(spans);
+        QCOMPARE(att.spans().size(), 1);
+
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        att.setTheme(&theme);
+        QCOMPARE(att.theme(), &theme);
     }
 };
 
