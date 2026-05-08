@@ -40,9 +40,21 @@ void InlineHighlighter::highlightBlock(const QString &text)
 
 QTextCharFormat InlineHighlighter::formatFor(const Markoff::SourceSpan &span) const
 {
-    Q_UNUSED(span);
-    // Step B2 starts populating this; for now: return default = no paint.
-    return QTextCharFormat();
+    if (!m_theme) return QTextCharFormat();
+    QTextCharFormat fmt;
+    bool any = false;
+
+    auto applyEmphasis = [&](Markoff::Theme::Slot slot) {
+        const QColor c = m_theme->color(slot);
+        if (c.isValid()) fmt.setForeground(c);
+        if (m_theme->isBold(slot))   fmt.setFontWeight(QFont::Bold);
+        if (m_theme->isItalic(slot)) fmt.setFontItalic(true);
+        any = true;
+    };
+
+    if (span.bold) applyEmphasis(Markoff::Theme::Slot::BoldEmphasis);
+
+    return any ? fmt : QTextCharFormat();
 }
 
 }  // namespace Markoff::Live
