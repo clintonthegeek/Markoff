@@ -399,6 +399,7 @@ void MarkoffDocument::scheduleD2Changed()
         QTimer::singleShot(0, this, [this]() {
             d->d2ChangePending = false;
             Q_EMIT d2DocumentChanged();
+            Q_EMIT documentChanged();
         });
     }
 }
@@ -992,6 +993,7 @@ void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
 
     // 6. Notify
     Q_EMIT documentLoaded();
+    Q_EMIT documentChanged();
     scheduleD2Changed();
 }
 

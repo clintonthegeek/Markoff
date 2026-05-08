@@ -130,4 +130,9 @@ add_executable(tst_v10_markdown_view_base tst_v10_markdown_view_base.cpp)
 add_test(NAME tst_v10_markdown_view_base COMMAND tst_v10_markdown_view_base)
 target_link_libraries(tst_v10_markdown_view_base PRIVATE Qt6::Test Qt6::Widgets markoff_core)
 
+add_executable(tst_v10_document_signal_contract tst_v10_document_signal_contract.cpp)
+add_test(NAME tst_v10_document_signal_contract COMMAND tst_v10_document_signal_contract)
+target_link_libraries(tst_v10_document_signal_contract PRIVATE markoff_core Qt6::Test)
+set_tests_properties(tst_v10_document_signal_contract PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_subdirectory(d2)

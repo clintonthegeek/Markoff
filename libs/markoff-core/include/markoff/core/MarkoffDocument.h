@@ -295,6 +295,12 @@ Q_SIGNALS:
     void sessionCreated(Markoff::Session *);
     void sessionDestroyed(Markoff::Session *);
 
+    /// Consumer-facing no-arg signal. Emitted whenever the document content
+    /// changes: on loadFromMarkdown(), on every debounced D2 CRDT edit cycle,
+    /// and on resetContent(). Views that only need "something changed" connect
+    /// here instead of the more granular d2DocumentChanged().
+    void documentChanged();
+
     /// Emitted (debounced: once per event-loop spin) whenever any D2 CRDT
     /// changes (applyBlockEdit or applyStructural).
     void d2DocumentChanged();
