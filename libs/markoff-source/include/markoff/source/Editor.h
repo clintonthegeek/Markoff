@@ -3,7 +3,6 @@
 
 #include <QPlainTextEdit>
 #include <QPointer>
-#include <QVBoxLayout>
 
 #include <KSyntaxHighlighting/SyntaxHighlighter>
 
@@ -70,7 +69,6 @@ private:
     KSyntaxHighlighting::SyntaxHighlighter *m_highlighter  = nullptr;
     Gutter                                 *m_gutter        = nullptr;
     Markoff::Theme                          m_theme;
-    bool                                    m_suppressEdit  = false;
 
     friend class Gutter;
 };

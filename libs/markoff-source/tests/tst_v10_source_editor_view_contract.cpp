@@ -37,8 +37,8 @@ private slots:
         Markoff::MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("# A\n\n# B\n\n# C\n"));
         e.setDocument(&doc);
-        // Wait for the binding to seed the inner QPlainTextEdit.
-        QTest::qWait(50);
+        // The binding seeds the inner QPlainTextEdit synchronously; no wait needed.
+        QTRY_VERIFY(!e.plainTextEdit()->toPlainText().isEmpty());
         e.setCursorPosition({3, 1});
         QCOMPARE(e.cursorPosition().line, 3);
         QCOMPARE(e.cursorPosition().column, 1);

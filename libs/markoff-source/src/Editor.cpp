@@ -79,7 +79,8 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
             prev->destroySession(m_session.data());
             m_session = nullptr;
         }
-        disconnect(prev, nullptr, this, nullptr);
+        // No direct prev→this connections exist; SourceTextDocumentBinding
+        // owns all doc subscriptions and cleans them up via setMarkoffDocument(nullptr).
     }
 
     Markoff::MarkdownView::setDocument(doc);
@@ -172,7 +173,9 @@ bool Editor::eventFilter(QObject *watched, QEvent *event) {
 
 void Editor::resizeEvent(QResizeEvent *e) {
     Markoff::MarkdownView::resizeEvent(e);
-    // Gutter geometry is maintained by the layout; no manual setGeometry needed.
+    // Gutter is not in the layout; position it to match the inner editor.
+    QRect r = m_editor->geometry();
+    m_gutter->setGeometry(QRect(r.left(), r.top(), gutterWidth(), r.height()));
 }
 
 int Editor::gutterWidth() const {
