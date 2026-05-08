@@ -40,6 +40,12 @@ Item {
         selectByMouse: true
         persistentSelection: true
 
+        InlineHighlighterAttached {
+            target: edit.textDocument
+            spans: model.inlineSpans
+            theme: root.liveBinding ? root.liveBinding.theme : null
+        }
+
         // Forward structural keys (Return / Enter / Esc / Backspace / Delete)
         // to LiveStructuralKeyHandler. R5 + R5.5 logic dispatches based on
         // row kind (paragraph / heading / code-block).
