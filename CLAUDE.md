@@ -17,8 +17,10 @@
 >    (D4 complete; D5 next).
 > 4. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation.
 > 5. `docs/d-arc/collabtext-scope-line.md` — six "won't do" items.
-> 6. `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — D5 stub
->    (to be replaced by §4.3 of the pivot doc).
+> 6. `docs/specs/2026-05-07-d5-collab-activation-design.md` —
+>    **D5 substantive design (spec-approved 2026-05-08).** Companion:
+>    `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`.
+>    Retired stub at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`.
 > 7. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` —
 >    D4 spec (background; complete).
 > 8. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` —

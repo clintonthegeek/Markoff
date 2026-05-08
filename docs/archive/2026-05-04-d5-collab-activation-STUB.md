@@ -1,4 +1,11 @@
-# D5 — Collab activation (STUB)
+# D5 — Collab activation (STUB) — RETIRED
+
+> **2026-05-08 — RETIRED.** Superseded by the substantive D5 design at
+> `docs/specs/2026-05-07-d5-collab-activation-design.md`. Accompanied by
+> a maintainer-facing negotiation opener at
+> `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. This
+> stub is kept here for historical reference; do not cite in new specs
+> or plans except as historical context.
 
 **Date stub created:** 2026-05-04
 **Status:** STUB — intended scope and inputs captured. **Substantive design happens after D2 / D3 / D4 land.** D5 is the largest open scope of the D arc (the proposal called it "open-ended depending on collab feature scope").

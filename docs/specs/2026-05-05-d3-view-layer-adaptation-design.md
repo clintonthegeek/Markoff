@@ -581,7 +581,7 @@ No blockers to spec approval. All deferrable.
 ### Future D-arc designs (stubs)
 
 - `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`
-- `docs/specs/2026-05-04-d5-collab-activation-STUB.md`
+- `docs/archive/2026-05-04-d5-collab-activation-STUB.md`
 
 ---
 

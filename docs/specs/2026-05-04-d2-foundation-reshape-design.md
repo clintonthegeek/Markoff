@@ -655,7 +655,7 @@ These are issues that need resolution at writing-plans time or during implementa
 
 - `docs/specs/2026-05-04-d3-view-layer-adaptation-STUB.md`
 - `docs/specs/2026-05-04-d4-parser-scope-reduction-STUB.md`
-- `docs/specs/2026-05-04-d5-collab-activation-STUB.md`
+- `docs/archive/2026-05-04-d5-collab-activation-STUB.md`
 
 ### External
 

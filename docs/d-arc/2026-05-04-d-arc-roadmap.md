@@ -17,9 +17,9 @@ D = "per-block CRDT + structural CRDT" — the long-term Markoff foundation arch
 | **D2** | ✅ done | Markoff | Foundation reshape — `Markoff::MarkoffDocument` rebuilt on `IdList` + per-block `Buffer`s + sibling causal-LWW maps | `docs/specs/2026-05-04-d2-foundation-reshape-design.md`; status `docs/d-arc/d-arc-status.md` |
 | **D3** | ✅ done | Markoff | View-layer adaptation — cursor delivery redesign; inline span consumption; kind-transition detection; L6/L7/L8 full delegates; per-block undo UI. ListItem path corrected per the post-dogfood corrective spec. | Original: `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md`. Corrective: `docs/specs/2026-05-06-per-item-listitem-blocks-design.md`. |
 | **D4** | ✅ done | Markoff | Parser scope reduction — retired `ParsePool` / `IncrementalParseSession` / `parseUpdated` / `MarkoffEdit` / `applyLocalEdit`; source-widget migrated to D2 via `applyFlatEdit`; markoff-bench and view-qml live mode retired; dead legacy `Cmd::*` + `CommandFacade` + `ReplaceController` deleted | Spec: `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md`. Plan: `docs/plans/2026-05-07-d4-parser-scope-reduction.md`. |
-| **D5** | ⏸ stubbed | Markoff + collabtext | Collab activation — wire format, transport, presence, conflict UI | `docs/specs/2026-05-04-d5-collab-activation-STUB.md` |
+| **D5** | 🟢 spec-approved | Markoff (boundary) + consumer host (transport/identity/multi-user) + collabtext (negotiation) | Collab activation — boundary API on `MarkoffDocument`, sibling-map sync, watermark/ack mechanics, presence, reference test harness. Transport and identity are consumer-owned (three-layer widget model). | Spec: `docs/specs/2026-05-07-d5-collab-activation-design.md`. Negotiation opener: `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. Retired stub: `docs/archive/2026-05-04-d5-collab-activation-STUB.md`. |
 
-Status legend: ✅ done · 🟢 active · 🟡 dogfood (implementation done; awaiting user sign-off) · ⏸ stubbed (inputs and intended scope captured; substantive design deferred).
+Status legend: ✅ done · 🟢 active (`spec-approved` / `plan-approved` / `in-progress`) · 🟡 dogfood (implementation done; awaiting user sign-off) · ⏸ stubbed (inputs and intended scope captured; substantive design deferred).
 
 ---
 
@@ -33,7 +33,7 @@ Status legend: ✅ done · 🟢 active · 🟡 dogfood (implementation done; awa
 | Implement D2 | `docs/specs/2026-05-04-d2-foundation-reshape-design.md` (binding spec) — implementation plan to follow once writing-plans runs |
 | Pick up D3 | `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` (original D3 spec; non-ListItem sections still authoritative) AND `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` (corrective spec for ListItem; active subject) |
 | Review D4 (complete) | `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` (spec) and `docs/plans/2026-05-07-d4-parser-scope-reduction.md` (plan) |
-| Pick up D5 | `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — substantive design needed before execution |
+| Pick up D5 | `docs/specs/2026-05-07-d5-collab-activation-design.md` (substantive spec, approved 2026-05-08) AND `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md` (collabtext maintainer-facing follow-up) |
 | Track D2 progress in real time | `docs/d-arc/d-arc-status.md` |
 | Audit a design decision in D2 | The corresponding "Why this and not the alternatives" subsection in `docs/specs/2026-05-04-d2-foundation-reshape-design.md` (every major section ends with one) |
 
@@ -69,17 +69,26 @@ docs/
 │  ├─ d-arc-status.md                         ← live status board for active phase
 │  └─ collabtext-scope-line.md                ← the six "won't do" items, verbatim
 ├─ specs/
-│  ├─ 2026-05-02-d-evolution-proposal.md     ← D0 Markoff side (the proposal)
-│  ├─ 2026-05-04-d2-foundation-reshape-design.md  ← D2 (active)
-│  ├─ 2026-05-04-d3-view-layer-adaptation-STUB.md
-│  ├─ 2026-05-04-d4-parser-scope-reduction-STUB.md
-│  ├─ 2026-05-04-d5-collab-activation-STUB.md
-│  └─ 2026-05-02-live-render-restoration-design.md  ← C spec (archived) (lower layers carry forward)
+│  ├─ 2026-05-02-d-evolution-proposal.md           ← D0 Markoff side (the proposal)
+│  ├─ 2026-05-04-d2-foundation-reshape-design.md   ← D2 (complete)
+│  ├─ 2026-05-04-d3-view-layer-adaptation-STUB.md  ← D3 stub (superseded by substantive spec below)
+│  ├─ 2026-05-04-d4-parser-scope-reduction-STUB.md ← D4 stub (superseded by substantive spec below)
+│  ├─ 2026-05-05-d3-view-layer-adaptation-design.md ← D3 substantive (complete)
+│  ├─ 2026-05-06-per-item-listitem-blocks-design.md ← D3 corrective (complete)
+│  ├─ 2026-05-07-d4-parser-scope-reduction-design.md ← D4 substantive (complete)
+│  └─ 2026-05-07-d5-collab-activation-design.md    ← D5 substantive (spec-approved 2026-05-08)
 ├─ handoff/
-│  └─ 2026-05-04-c-restoration-bookend-d-pivot.md  ← the cut from C to D
+│  ├─ 2026-05-07-pivot-to-d5-first.md              ← D5-first posture (authoritative)
+│  ├─ 2026-05-07-live-binding-developmental-history.md ← pipeline provenance
+│  └─ 2026-05-07-collabtext-d5-negotiation-opener.md ← D5 maintainer-facing follow-up
 ├─ plans/
 │  ├─ 2026-05-04-d2-foundation-reshape.md          ← D2 plan (complete)
-│  └─ 2026-05-05-d3-view-layer-adaptation.md       ← D3 plan (pending writing-plans)
+│  ├─ 2026-05-05-d3-view-layer-adaptation.md       ← D3 plan (complete)
+│  └─ 2026-05-07-d4-parser-scope-reduction.md      ← D4 plan (complete)
+├─ archive/
+│  ├─ c-restoration-arc/                           ← retired arc papers
+│  ├─ v1.0-plan-pre-d5/                            ← retired v1.0 plan series
+│  └─ 2026-05-04-d5-collab-activation-STUB.md      ← D5 stub (retired 2026-05-08)
 └─ ...
 ```
 

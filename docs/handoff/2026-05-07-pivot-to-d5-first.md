@@ -33,7 +33,7 @@ The branch has loop-pivoted four times in two months because each pivot
 hedged on whether collab was in scope. Every architectural decision in
 the view layer was hedged against an undecided D5; the v1.0 plan was the
 clearest example — written 2026-05-07, the same day D4 completed, with
-D5 still stubbed at `docs/specs/2026-05-04-d5-collab-activation-STUB.md`.
+D5 still stubbed at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`.
 
 That hedging stops here. The collabtext investment, the IdList work
 (D1), the per-block CRDT foundation (D2), the view-layer adaptation
@@ -202,40 +202,47 @@ Original prescription (kept for the record):
 > move from view-qml to markoff-source as part of the deletion, they move
 > intact (no rewrites). Tests pass at the end of the commit.
 
-### 4.3 D5 substantive design
+### 4.3 D5 substantive design (CLOSED — spec-approved 2026-05-08)
 
-Replace `docs/specs/2026-05-04-d5-collab-activation-STUB.md` with a
-real D5 design spec. The stub names the inputs but not the design.
+> **Status:** closed 2026-05-08. The substantive D5 design was
+> brainstormed in-conversation, written, and user-approved.
+>
+> **Delivered:**
+> - `docs/specs/2026-05-07-d5-collab-activation-design.md` — the D5
+>   spec (boundary API, sibling-map sync, watermark/ack mechanics,
+>   consumer wiring sketch, out-of-scope list, test strategy,
+>   implementation sequencing).
+> - `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md` — a
+>   maintainer-facing companion document (not initially scoped here;
+>   added during brainstorm). Independent track; D5 implementation
+>   does not gate on its outcome.
+> - Stub archived at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`.
+>
+> **Reframing surfaced during brainstorm.** The original prescription
+> below assumed Markoff sat *on top of* collabtext at runtime. The
+> brainstorm rejected that framing: Markoff and collabtext are peer
+> widgets; a host (Corbomite, eventually) owns transport/identity/
+> multi-user/side-channels. The spec reflects this three-layer model.
+> The negotiation opener captures the asks of collabtext maintainers
+> that follow from it.
+>
+> **§4.4 (writing-plans for D5 implementation plan) is the next
+> work-unit.**
 
-The design must answer at minimum:
+Original prescription (kept for the record):
 
-- **Network shape.** What's the transport? Who synchronises whom?
-- **Identity model.** Where do replica IDs come from, and how does
-  the document discover its peers?
-- **Conflict semantics.** D2's per-block CRDT handles intra-block edit
-  conflicts; what happens for structural conflicts (concurrent
-  insert/remove at the same anchor, concurrent kind change, concurrent
-  attr change with different LWW timestamps coming from different
-  replicas)?
-- **Persistence.** How is the CRDT state persisted to disk, and how
-  does load-from-disk reconstitute the IdList + per-block buffers +
-  sibling maps?
-- **Undo across replicas.** Per-block undo is local-only by design
-  (collabtext-scope-line item 3). What does the user see when a remote
-  edit interleaves with a local one?
-- **The view-layer contract.** Does `LiveListModelBinding` need to
-  change to handle remote-origin edits? Does the kind-transition
-  inference need to be replica-aware?
-- **What's explicitly out of scope.** Reaffirm the six "won't do"
-  items from `docs/d-arc/collabtext-scope-line.md` and add any new
-  ones D5 design surfaces.
-
-The design pass is co-owned with the collabtext side, mirroring the D0
-joint-design model. Output: a spec under `docs/specs/2026-05-XX-d5-
-collab-activation-design.md` and a brainstorm trail in
-`docs/d-arc/`.
-
-**No code is written until the spec is user-approved.**
+> Replace `docs/archive/2026-05-04-d5-collab-activation-STUB.md` with
+> a real D5 design spec. The stub names the inputs but not the design.
+>
+> The design must answer at minimum: network shape, identity model,
+> conflict semantics for structural ops, persistence, undo across
+> replicas, view-layer contract impact, scope boundaries. Output: a
+> spec under `docs/specs/2026-05-XX-d5-collab-activation-design.md`
+> and a brainstorm trail in `docs/d-arc/`. The design pass is
+> co-owned with the collabtext side, mirroring the D0 joint-design
+> model.
+>
+> **No code is written until the spec is user-approved.**
 
 ### 4.4 D5 implementation
 
@@ -338,7 +345,7 @@ to any future agent or contributor on this branch.
 - `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation.
 - `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items;
   reaffirmed by §4.3.
-- `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — the stub that
+- `docs/archive/2026-05-04-d5-collab-activation-STUB.md` — the stub that
   §4.3 replaces.
 
 ---

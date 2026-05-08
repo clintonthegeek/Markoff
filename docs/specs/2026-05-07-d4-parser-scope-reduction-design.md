@@ -248,7 +248,7 @@ A single comment update in `tst_live_render_paragraph_edit.cpp` (it references `
 - **Tree-sitter grammar changes.** The Markdown grammar is unchanged. D4 trims the parser-library wrapper, not tree-sitter itself.
 - **Per-block parse cache redesign.** `InlineParseCache` is unchanged.
 - **Bench rewrite.** A D2-aware bench harness is a separate future arc.
-- **D5 (collab activation).** Stubbed at `docs/specs/2026-05-04-d5-collab-activation-STUB.md`.
+- **D5 (collab activation).** Stubbed at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`.
 - **Removing `BlockAnchor`.** It stays as a public anchor primitive.
 - **Source-mode QML view in markoff-view-qml.** Source mode and its tests stay; only live mode retires.
 - **Adding new public types to the parser library.** Surviving signatures are unchanged.

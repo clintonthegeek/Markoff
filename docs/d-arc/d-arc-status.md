@@ -2,10 +2,10 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-07 (branch on D5-first posture; v1.0 retired; docs cleanup in flight).
+**Last updated:** 2026-05-08 (D5 spec approved; writing-plans next).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **D5** (collab activation) — substantive design pending. Branch posture pivoted to D5-first 2026-05-07 (see `docs/handoff/2026-05-07-pivot-to-d5-first.md`).
+**Active phase:** **D5** (collab activation) — `spec-approved` 2026-05-08. Implementation plan via writing-plans next; see `docs/specs/2026-05-07-d5-collab-activation-design.md`.
 
 ---
 
@@ -20,7 +20,7 @@
 > 2. `docs/handoff/2026-05-07-live-binding-developmental-history.md` — pipeline-feature provenance.
 > 3. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation.
 > 4. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items.
-> 5. `docs/specs/2026-05-04-d5-collab-activation-STUB.md` — D5 stub (to be replaced under §4.3 of the pivot doc).
+> 5. `docs/specs/2026-05-07-d5-collab-activation-design.md` — **D5 substantive design (spec-approved 2026-05-08; next work-unit: writing-plans).** Companion: `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. The retired stub is at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`.
 > 6. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — D4 spec (complete; background).
 > 7. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 spec (background; complete).
 > 8. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — D3 corrective spec (background; complete).
@@ -36,7 +36,7 @@
 | **D2** | `complete` | All 15 phases implemented and dogfooded. 141/141 tests pass (3 pre-existing QML selection failures unrelated to D2 cleared during dogfood). User signed off 2026-05-05. |
 | **D3** | `complete` | Original plan + corrective spec both shipped. Per-item ListItem blocks, caller-driven renumbering, marker attrs, delegate rendering, 146/146 tests pass. |
 | **D4** | `complete` | Spec: `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md`. Plan: `docs/plans/2026-05-07-d4-parser-scope-reduction.md`. Final commit: `22ea352`. 103/103 tests pass. |
-| **D5** | `stubbed` | `docs/specs/2026-05-04-d5-collab-activation-STUB.md`. Substantive design post-D4. |
+| **D5** | `spec-approved` | Spec: `docs/specs/2026-05-07-d5-collab-activation-design.md` (approved 2026-05-08). Companion negotiation opener: `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. Retired stub at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`. Implementation plan next via writing-plans. |
 
 **Phase status legend.** `pending` (not yet started) · `stubbed` (inputs + scope captured, no substantive design) · `spec-in-brainstorm` · `spec-approved` (spec written and user-approved) · `plan-approved` (writing-plans output landed) · `in-progress` (commits landing) · `dogfood` (implementation done; user is testing) · `complete` (acceptance criteria met).
 
@@ -52,7 +52,8 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-07 | (this commit) | pivot-doc §4.2 closed: view-qml deletion was already landed in `f646c90`. CLAUDE.md and pivot doc updated to mark §4.2 closed. |
+| 2026-05-08 | (this commit) | D5 spec-approved. Substantive design at `docs/specs/2026-05-07-d5-collab-activation-design.md` (written 2026-05-07, approved 2026-05-08). Companion negotiation opener at `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. Stub archived. Pivot-doc §4.3 closed; §4.4 (writing-plans for implementation plan) next. D5 → `spec-approved`. |
+| 2026-05-07 | `1f44926` | pivot-doc §4.2 closed: view-qml deletion was already landed in `f646c90`. CLAUDE.md and pivot doc updated to mark §4.2 closed. |
 | 2026-05-07 | `6b0dc03` | docs: point CLAUDE.md, d-arc-status, and citations to pivot doc (final §4.1 commit). |
 | 2026-05-07 | `6b77a25` | docs: archive C-restoration paper trail under `docs/archive/c-restoration-arc/` (pivot-doc §2.2). |
 | 2026-05-07 | `390cc58` | docs: archive v1.0 plan series under `docs/archive/v1.0-plan-pre-d5/` (pivot-doc §2.1). |
