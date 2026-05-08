@@ -120,9 +120,12 @@ struct MarkoffDocument::Private {
         return meta;
     }
 
-    // D5: op payloads pending commit — keyed by OpId, populated at each CRDT
-    // edit site, consumed (and removed) by the OnCommit callback.
-    QHash<Markoff::OpId, QByteArray> pendingOpPayloads;
+    // D5: op payloads pending commit — keyed by (target-type-index, OpId).
+    // Different CRDT types have independent Lamport counters that may produce
+    // the same OpId value; the target type index disambiguates the key.
+    // Type index is the std::variant index of UndoCrdtTarget::kind.
+    using PendingOpKey = QPair<quint8, Markoff::OpId>;
+    QHash<PendingOpKey, QByteArray> pendingOpPayloads;
 
     // D5: buffer ops for blocks not yet present in blockBuffers (arrived before
     // the IdList op that inserts them). Drained when the IdList op lands.

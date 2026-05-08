@@ -26,6 +26,7 @@
 #include "BlockAnchorComputation.h"
 #include <markoff/core/WatermarkCoordinator.h>
 #include <markoff/core/InlineParseCache.h>
+#include <markoff/core/SiblingMapOpHeader.h>
 
 namespace {
 
@@ -33,6 +34,166 @@ namespace {
 static Markoff::OpId lamportToOpId(CollabText::Crdt::Lamport ts) noexcept {
     return (static_cast<uint64_t>(ts.replica_id) << 48)
          | (static_cast<uint64_t>(ts.value) & 0x0000FFFFFFFFFFFFull);
+}
+
+// ── D5 pending-op key helpers ─────────────────────────────────────────────────
+
+// Return the variant index of the target (type disambiguation for pendingOpPayloads key).
+static quint8 targetTypeIndex(const Markoff::UndoCrdtTarget &target) noexcept {
+    return static_cast<quint8>(target.kind.index());
+}
+
+// ── D5 sibling-map payload builders ──────────────────────────────────────────
+
+static QByteArray buildKindTagMapPayload(Markoff::BlockId blockId,
+                                         Markoff::BlockKind kind,
+                                         Markoff::OpId opId,
+                                         bool tombstone)
+{
+    using namespace Markoff;
+    // key: quint64 blockId raw
+    QByteArray key;
+    {
+        QDataStream ds(&key, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        ds.setVersion(QDataStream::Qt_6_8);
+        ds << quint64(blockId.raw());
+    }
+    // value: 1-byte kind enum, or empty for tombstone
+    QByteArray value;
+    if (!tombstone) {
+        QDataStream ds(&value, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        ds.setVersion(QDataStream::Qt_6_8);
+        ds << quint8(kind);
+    }
+    SiblingMapOpHeader hdr;
+    hdr.key              = key;
+    hdr.value            = value;
+    hdr.lamportReplicaId = static_cast<quint16>(opId >> 48);
+    hdr.lamportCounter   = opId & 0x0000FFFFFFFFFFFFull;
+    hdr.isTombstone      = tombstone;
+    return SiblingMapOpHeader::encode(hdr);
+}
+
+static QByteArray buildBlockAttrsMapPayload(const Markoff::BlockAttrKey &attrKey,
+                                             const Markoff::AttrValue &attrValue,
+                                             Markoff::OpId opId,
+                                             bool tombstone)
+{
+    using namespace Markoff;
+    // key: quint64 blockId + quint32 nameLen + name bytes
+    QByteArray key;
+    {
+        QDataStream ds(&key, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        ds.setVersion(QDataStream::Qt_6_8);
+        ds << quint64(attrKey.block.raw());
+        ds << quint32(attrKey.name.size());
+        ds.writeRawData(attrKey.name.constData(), attrKey.name.size());
+    }
+    // value: tag byte + payload, or empty for tombstone
+    QByteArray value;
+    if (!tombstone) {
+        QDataStream ds(&value, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        ds.setVersion(QDataStream::Qt_6_8);
+        if (std::holds_alternative<int>(attrValue)) {
+            ds << quint8(0) << qint32(std::get<int>(attrValue));
+        } else if (std::holds_alternative<QString>(attrValue)) {
+            const QByteArray utf8 = std::get<QString>(attrValue).toUtf8();
+            ds << quint8(1) << quint32(utf8.size());
+            ds.writeRawData(utf8.constData(), utf8.size());
+        } else if (std::holds_alternative<bool>(attrValue)) {
+            ds << quint8(2) << quint8(std::get<bool>(attrValue) ? 1 : 0);
+        }
+    }
+    SiblingMapOpHeader hdr;
+    hdr.key              = key;
+    hdr.value            = value;
+    hdr.lamportReplicaId = static_cast<quint16>(opId >> 48);
+    hdr.lamportCounter   = opId & 0x0000FFFFFFFFFFFFull;
+    hdr.isTombstone      = tombstone;
+    return SiblingMapOpHeader::encode(hdr);
+}
+
+static QByteArray buildFrontmatterMapPayload(const QByteArray &mapKey,
+                                              const QByteArray &mapValue,
+                                              Markoff::OpId opId,
+                                              bool tombstone)
+{
+    using namespace Markoff;
+    // key: quint32 len + bytes
+    QByteArray key;
+    {
+        QDataStream ds(&key, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        ds.setVersion(QDataStream::Qt_6_8);
+        ds << quint32(mapKey.size());
+        ds.writeRawData(mapKey.constData(), mapKey.size());
+    }
+    // value: quint32 len + bytes, or empty for tombstone
+    QByteArray value;
+    if (!tombstone) {
+        QDataStream ds(&value, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        ds.setVersion(QDataStream::Qt_6_8);
+        ds << quint32(mapValue.size());
+        ds.writeRawData(mapValue.constData(), mapValue.size());
+    }
+    SiblingMapOpHeader hdr;
+    hdr.key              = key;
+    hdr.value            = value;
+    hdr.lamportReplicaId = static_cast<quint16>(opId >> 48);
+    hdr.lamportCounter   = opId & 0x0000FFFFFFFFFFFFull;
+    hdr.isTombstone      = tombstone;
+    return SiblingMapOpHeader::encode(hdr);
+}
+
+static QByteArray buildLinkRefMapPayload(const QByteArray &mapKey,
+                                          const Markoff::LinkRefValue &refValue,
+                                          Markoff::OpId opId,
+                                          bool tombstone)
+{
+    using namespace Markoff;
+    // key: quint32 len + bytes
+    QByteArray key;
+    {
+        QDataStream ds(&key, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        ds.setVersion(QDataStream::Qt_6_8);
+        ds << quint32(mapKey.size());
+        ds.writeRawData(mapKey.constData(), mapKey.size());
+    }
+    // value: two length-prefixed UTF-8 strings (url, title)
+    QByteArray value;
+    if (!tombstone) {
+        QDataStream ds(&value, QIODevice::WriteOnly);
+        ds.setByteOrder(QDataStream::LittleEndian);
+        ds.setVersion(QDataStream::Qt_6_8);
+        const QByteArray urlUtf8   = refValue.url.toUtf8();
+        const QByteArray titleUtf8 = refValue.title.toUtf8();
+        ds << quint32(urlUtf8.size());
+        ds.writeRawData(urlUtf8.constData(), urlUtf8.size());
+        ds << quint32(titleUtf8.size());
+        ds.writeRawData(titleUtf8.constData(), titleUtf8.size());
+    }
+    SiblingMapOpHeader hdr;
+    hdr.key              = key;
+    hdr.value            = value;
+    hdr.lamportReplicaId = static_cast<quint16>(opId >> 48);
+    hdr.lamportCounter   = opId & 0x0000FFFFFFFFFFFFull;
+    hdr.isTombstone      = tombstone;
+    return SiblingMapOpHeader::encode(hdr);
+}
+
+static QByteArray buildFootnoteDefMapPayload(const QByteArray &mapKey,
+                                              const QByteArray &mapValue,
+                                              Markoff::OpId opId,
+                                              bool tombstone)
+{
+    // Same encoding as FrontmatterMap
+    return buildFrontmatterMapPayload(mapKey, mapValue, opId, tombstone);
 }
 
 }  // anonymous namespace
@@ -99,7 +260,7 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
         if (!d->collabConfigured) {
             // Clean up pendingOpPayloads even in single-user mode to avoid leaks
             for (const auto &cop : committed)
-                d->pendingOpPayloads.remove(cop.opId);
+                d->pendingOpPayloads.remove({targetTypeIndex(cop.target), cop.opId});
             return;
         }
 
@@ -108,9 +269,9 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
         quint64 maxLamport = 0;
 
         for (const auto &cop : committed) {
-            QByteArray payload = d->pendingOpPayloads.take(cop.opId);
+            QByteArray payload = d->pendingOpPayloads.take({targetTypeIndex(cop.target), cop.opId});
             if (payload.isEmpty()) {
-                // Sibling-map op (Phase 5 will populate these) or empty — skip
+                // skip ops with no payload
                 continue;
             }
 
@@ -124,8 +285,23 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
             } else if (std::holds_alternative<UndoCrdtTarget::IdListT>(cop.target.kind)) {
                 op.target = CrdtTarget::IdList;
                 op.blockId = 0;
+            } else if (std::holds_alternative<UndoCrdtTarget::KindTagMapT>(cop.target.kind)) {
+                op.target = CrdtTarget::KindTagMap;
+                op.blockId = 0;
+            } else if (std::holds_alternative<UndoCrdtTarget::BlockAttrsMapT>(cop.target.kind)) {
+                op.target = CrdtTarget::BlockAttrsMap;
+                op.blockId = 0;
+            } else if (std::holds_alternative<UndoCrdtTarget::FrontmatterMapT>(cop.target.kind)) {
+                op.target = CrdtTarget::FrontmatterMap;
+                op.blockId = 0;
+            } else if (std::holds_alternative<UndoCrdtTarget::LinkRefMapT>(cop.target.kind)) {
+                op.target = CrdtTarget::LinkRefMap;
+                op.blockId = 0;
+            } else if (std::holds_alternative<UndoCrdtTarget::FootnoteDefMapT>(cop.target.kind)) {
+                op.target = CrdtTarget::FootnoteDefMap;
+                op.blockId = 0;
             } else {
-                continue;  // sibling-map; Phase 5
+                continue;  // unknown target; skip
             }
 
             // Extract Lamport counter from OpId encoding: (replicaId << 48) | counter
@@ -255,12 +431,19 @@ void MarkoffDocument::applyRemoteOps(QList<MarkoffOp> ops, MarkoffBundleMeta met
             applyRemoteIdListOp(op.payload);
             break;
         case CrdtTarget::KindTagMap:
+            applyRemoteKindTagMapOp(op.payload);
+            break;
         case CrdtTarget::BlockAttrsMap:
+            applyRemoteBlockAttrsMapOp(op.payload);
+            break;
         case CrdtTarget::FrontmatterMap:
+            applyRemoteFrontmatterMapOp(op.payload);
+            break;
         case CrdtTarget::LinkRefMap:
+            applyRemoteLinkRefMapOp(op.payload);
+            break;
         case CrdtTarget::FootnoteDefMap:
-            // Phase 5 handles sibling-map targets.
-            qDebug() << "applyRemoteOps: sibling-map target not yet implemented";
+            applyRemoteFootnoteDefMapOp(op.payload);
             break;
         }
     }
@@ -321,6 +504,185 @@ void MarkoffDocument::applyRemoteIdListOp(const QByteArray &payload)
             d->pendingBufferOps[it.key()] = it.value();  // still unknown
         }
     }
+}
+
+void MarkoffDocument::applyRemoteKindTagMapOp(const QByteArray &payload)
+{
+    SiblingMapOpHeader hdr;
+    if (!SiblingMapOpHeader::decode(payload, &hdr)) {
+        qWarning() << "applyRemoteKindTagMapOp: decode failed; skipping";
+        return;
+    }
+    if (hdr.key.size() < 8) { qWarning() << "applyRemoteKindTagMapOp: bad key size"; return; }
+    quint64 raw = 0;
+    QDataStream ks(hdr.key);
+    ks.setByteOrder(QDataStream::LittleEndian);
+    ks >> raw;
+    BlockId blockId = BlockId::fromRaw(raw);
+
+    BlockKind kind = BlockKind::Paragraph;
+    if (!hdr.isTombstone) {
+        if (hdr.value.isEmpty()) { qWarning() << "applyRemoteKindTagMapOp: empty value for set"; return; }
+        kind = static_cast<BlockKind>(quint8(hdr.value[0]));
+    }
+
+    CausalStamp stamp{hdr.lamportReplicaId, hdr.lamportCounter};
+    KindTagMap::RemoteOp op{blockId, kind, stamp, hdr.isTombstone};
+    d->kindTagMap.applyRemote(op);
+    d->kindTagMapProxy->notifyChanged();
+}
+
+void MarkoffDocument::applyRemoteBlockAttrsMapOp(const QByteArray &payload)
+{
+    SiblingMapOpHeader hdr;
+    if (!SiblingMapOpHeader::decode(payload, &hdr)) {
+        qWarning() << "applyRemoteBlockAttrsMapOp: decode failed; skipping";
+        return;
+    }
+    // Decode key: quint64 blockId + quint32 nameLen + name bytes
+    QDataStream ks(hdr.key);
+    ks.setByteOrder(QDataStream::LittleEndian);
+    quint64 rawId = 0; quint32 nameLen = 0;
+    ks >> rawId >> nameLen;
+    if (ks.status() != QDataStream::Ok || hdr.key.size() < int(12 + nameLen)) {
+        qWarning() << "applyRemoteBlockAttrsMapOp: bad key encoding"; return;
+    }
+    QByteArray name(int(nameLen), Qt::Uninitialized);
+    ks.readRawData(name.data(), int(nameLen));
+    BlockAttrKey key{BlockId::fromRaw(rawId), name};
+
+    AttrValue value;
+    if (!hdr.isTombstone) {
+        QDataStream vs(hdr.value);
+        vs.setByteOrder(QDataStream::LittleEndian);
+        quint8 tag = 0; vs >> tag;
+        if (tag == 0) {
+            qint32 v = 0; vs >> v; value = static_cast<int>(v);
+        } else if (tag == 1) {
+            quint32 len = 0; vs >> len;
+            QByteArray utf8(int(len), Qt::Uninitialized);
+            vs.readRawData(utf8.data(), int(len));
+            value = QString::fromUtf8(utf8);
+        } else if (tag == 2) {
+            quint8 v = 0; vs >> v; value = (v != 0);
+        } else {
+            qWarning() << "applyRemoteBlockAttrsMapOp: unknown value tag" << tag; return;
+        }
+    }
+
+    CausalStamp stamp{hdr.lamportReplicaId, hdr.lamportCounter};
+    BlockAttrsMap::RemoteOp op{key, value, stamp, hdr.isTombstone};
+    d->blockAttrsMap.applyRemote(op);
+    d->blockAttrsMapProxy->notifyChanged();
+}
+
+void MarkoffDocument::applyRemoteFrontmatterMapOp(const QByteArray &payload)
+{
+    SiblingMapOpHeader hdr;
+    if (!SiblingMapOpHeader::decode(payload, &hdr)) {
+        qWarning() << "applyRemoteFrontmatterMapOp: decode failed; skipping";
+        return;
+    }
+    // Decode key: quint32 len + bytes
+    QDataStream ks(hdr.key);
+    ks.setByteOrder(QDataStream::LittleEndian);
+    quint32 keyLen = 0; ks >> keyLen;
+    if (ks.status() != QDataStream::Ok || hdr.key.size() < int(4 + keyLen)) {
+        qWarning() << "applyRemoteFrontmatterMapOp: bad key encoding"; return;
+    }
+    QByteArray mapKey(int(keyLen), Qt::Uninitialized);
+    ks.readRawData(mapKey.data(), int(keyLen));
+
+    QByteArray mapValue;
+    if (!hdr.isTombstone) {
+        QDataStream vs(hdr.value);
+        vs.setByteOrder(QDataStream::LittleEndian);
+        quint32 valLen = 0; vs >> valLen;
+        if (vs.status() != QDataStream::Ok || hdr.value.size() < int(4 + valLen)) {
+            qWarning() << "applyRemoteFrontmatterMapOp: bad value encoding"; return;
+        }
+        mapValue.resize(int(valLen));
+        vs.readRawData(mapValue.data(), int(valLen));
+    }
+
+    CausalStamp stamp{hdr.lamportReplicaId, hdr.lamportCounter};
+    FrontmatterMap::RemoteOp op{mapKey, mapValue, stamp, hdr.isTombstone};
+    d->frontmatterMap.applyRemote(op);
+    d->frontmatterMapProxy->notifyChanged();
+}
+
+void MarkoffDocument::applyRemoteLinkRefMapOp(const QByteArray &payload)
+{
+    SiblingMapOpHeader hdr;
+    if (!SiblingMapOpHeader::decode(payload, &hdr)) {
+        qWarning() << "applyRemoteLinkRefMapOp: decode failed; skipping";
+        return;
+    }
+    // Decode key: quint32 len + bytes
+    QDataStream ks(hdr.key);
+    ks.setByteOrder(QDataStream::LittleEndian);
+    quint32 keyLen = 0; ks >> keyLen;
+    if (ks.status() != QDataStream::Ok || hdr.key.size() < int(4 + keyLen)) {
+        qWarning() << "applyRemoteLinkRefMapOp: bad key encoding"; return;
+    }
+    QByteArray mapKey(int(keyLen), Qt::Uninitialized);
+    ks.readRawData(mapKey.data(), int(keyLen));
+
+    LinkRefValue refValue;
+    if (!hdr.isTombstone) {
+        QDataStream vs(hdr.value);
+        vs.setByteOrder(QDataStream::LittleEndian);
+        quint32 urlLen = 0; vs >> urlLen;
+        if (vs.status() != QDataStream::Ok) { qWarning() << "applyRemoteLinkRefMapOp: bad url len"; return; }
+        QByteArray urlUtf8(int(urlLen), Qt::Uninitialized);
+        vs.readRawData(urlUtf8.data(), int(urlLen));
+        quint32 titleLen = 0; vs >> titleLen;
+        if (vs.status() != QDataStream::Ok) { qWarning() << "applyRemoteLinkRefMapOp: bad title len"; return; }
+        QByteArray titleUtf8(int(titleLen), Qt::Uninitialized);
+        vs.readRawData(titleUtf8.data(), int(titleLen));
+        refValue.url   = QString::fromUtf8(urlUtf8);
+        refValue.title = QString::fromUtf8(titleUtf8);
+    }
+
+    CausalStamp stamp{hdr.lamportReplicaId, hdr.lamportCounter};
+    LinkRefMap::RemoteOp op{mapKey, refValue, stamp, hdr.isTombstone};
+    d->linkRefMap.applyRemote(op);
+    d->linkRefMapProxy->notifyChanged();
+}
+
+void MarkoffDocument::applyRemoteFootnoteDefMapOp(const QByteArray &payload)
+{
+    SiblingMapOpHeader hdr;
+    if (!SiblingMapOpHeader::decode(payload, &hdr)) {
+        qWarning() << "applyRemoteFootnoteDefMapOp: decode failed; skipping";
+        return;
+    }
+    // Decode key: quint32 len + bytes (same as FrontmatterMap)
+    QDataStream ks(hdr.key);
+    ks.setByteOrder(QDataStream::LittleEndian);
+    quint32 keyLen = 0; ks >> keyLen;
+    if (ks.status() != QDataStream::Ok || hdr.key.size() < int(4 + keyLen)) {
+        qWarning() << "applyRemoteFootnoteDefMapOp: bad key encoding"; return;
+    }
+    QByteArray mapKey(int(keyLen), Qt::Uninitialized);
+    ks.readRawData(mapKey.data(), int(keyLen));
+
+    QByteArray mapValue;
+    if (!hdr.isTombstone) {
+        QDataStream vs(hdr.value);
+        vs.setByteOrder(QDataStream::LittleEndian);
+        quint32 valLen = 0; vs >> valLen;
+        if (vs.status() != QDataStream::Ok || hdr.value.size() < int(4 + valLen)) {
+            qWarning() << "applyRemoteFootnoteDefMapOp: bad value encoding"; return;
+        }
+        mapValue.resize(int(valLen));
+        vs.readRawData(mapValue.data(), int(valLen));
+    }
+
+    CausalStamp stamp{hdr.lamportReplicaId, hdr.lamportCounter};
+    FootnoteDefMap::RemoteOp op{mapKey, mapValue, stamp, hdr.isTombstone};
+    d->footnoteDefMap.applyRemote(op);
+    d->footnoteDefMapProxy->notifyChanged();
 }
 
 void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
@@ -566,7 +928,7 @@ void MarkoffDocument::applyBlockEdit(const BlockEdit &edit)
         {edit.insertedUtf8.toStdString()});
     auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
     t.registerOp(UndoCrdtTarget::buffer(edit.blockId), lamportToOpId(ts));
-    d->pendingOpPayloads[lamportToOpId(ts)] =
+    d->pendingOpPayloads[{6, lamportToOpId(ts)}] =
         QByteArray::fromStdString(CollabText::Crdt::encode_operation(op));
 
     ++d->blockEditSequences[edit.blockId];
@@ -601,7 +963,7 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             BlockId newBlock = BlockId::fromRaw(raw);
             auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
             t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
-            d->pendingOpPayloads[lamportToOpId(idTs)] =
+            d->pendingOpPayloads[{0, lamportToOpId(idTs)}] =
                 QByteArray::fromStdString(CollabText::Crdt::encode_idlist_operation(idOp));
             // Create buffer
             d->blockBuffers.emplace(newBlock, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
@@ -610,6 +972,7 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             // Set kind
             OpId kindOpId = d->kindTagMap.setWithNextStamp(newBlock, payload.kind);
             t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
+            d->pendingOpPayloads[{1, kindOpId}] = buildKindTagMapPayload(newBlock, payload.kind, kindOpId, false);
             // Notify structural + kind proxies
             d->idListProxy->notifyChanged();
             d->kindTagMapProxy->notifyChanged();
@@ -618,16 +981,18 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             CollabText::Crdt::IdListOperation idOp = d->idList.remove_at(anchor);
             auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
             t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
-            d->pendingOpPayloads[lamportToOpId(idTs)] =
+            d->pendingOpPayloads[{0, lamportToOpId(idTs)}] =
                 QByteArray::fromStdString(CollabText::Crdt::encode_idlist_operation(idOp));
             OpId kindOpId = d->kindTagMap.removeWithNextStamp(payload.blockId);
             t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
+            d->pendingOpPayloads[{1, kindOpId}] = buildKindTagMapPayload(payload.blockId, BlockKind::Paragraph, kindOpId, true);
             // Buffer retained for GC (Phase 9)
             d->idListProxy->notifyChanged();
             d->kindTagMapProxy->notifyChanged();
         } else if constexpr (std::is_same_v<T, StructuralOp::ChangeKind>) {
             OpId kindOpId = d->kindTagMap.setWithNextStamp(payload.blockId, payload.newKind);
             t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
+            d->pendingOpPayloads[{1, kindOpId}] = buildKindTagMapPayload(payload.blockId, payload.newKind, kindOpId, false);
             d->kindTagMapProxy->notifyChanged();
         }
     }, op.payload);
@@ -761,7 +1126,7 @@ void MarkoffDocument::d2ApplyBufferEdit(BlockId block, uint32_t offset,
         {insert.toStdString()});
     auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
     t.registerOp(UndoCrdtTarget::buffer(block), lamportToOpId(ts));
-    d->pendingOpPayloads[lamportToOpId(ts)] =
+    d->pendingOpPayloads[{6, lamportToOpId(ts)}] =
         QByteArray::fromStdString(CollabText::Crdt::encode_operation(op));
     ++d->blockEditSequences[block];
 
@@ -788,7 +1153,7 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
     auto idOp = d->idList.insert_after(after, raw);
     auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
     t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
-    d->pendingOpPayloads[lamportToOpId(idTs)] =
+    d->pendingOpPayloads[{0, lamportToOpId(idTs)}] =
         QByteArray::fromStdString(CollabText::Crdt::encode_idlist_operation(idOp));
 
     d->blockBuffers.emplace(newId, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
@@ -796,6 +1161,7 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
 
     OpId kindOpId = d->kindTagMap.setWithNextStamp(newId, kind);
     t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
+    d->pendingOpPayloads[{1, kindOpId}] = buildKindTagMapPayload(newId, kind, kindOpId, false);
 
     ++d->structuralEditSequence;
     d->idListProxy->notifyChanged();
@@ -993,11 +1359,12 @@ void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
     auto idOp = d->idList.remove_at(anchor);
     auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
     t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
-    d->pendingOpPayloads[lamportToOpId(idTs)] =
+    d->pendingOpPayloads[{0, lamportToOpId(idTs)}] =
         QByteArray::fromStdString(CollabText::Crdt::encode_idlist_operation(idOp));
 
     OpId kindOpId = d->kindTagMap.removeWithNextStamp(block);
     t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
+    d->pendingOpPayloads[{1, kindOpId}] = buildKindTagMapPayload(block, BlockKind::Paragraph, kindOpId, true);
 
     ++d->structuralEditSequence;
     d->idListProxy->notifyChanged();
@@ -1011,6 +1378,7 @@ void MarkoffDocument::d2SetBlockKind(BlockId block, BlockKind newKind,
 {
     OpId opId = d->kindTagMap.setWithNextStamp(block, newKind);
     t.registerOp(UndoCrdtTarget::kindTagMap(), opId);
+    d->pendingOpPayloads[{1, opId}] = buildKindTagMapPayload(block, newKind, opId, false);
     d->touchedSinceLoad.insert(block);
     scheduleD2Changed();
 }
@@ -1022,6 +1390,7 @@ void MarkoffDocument::d2SetBlockAttr(BlockId block, const QByteArray &attrName,
     BlockAttrKey key{block, attrName};
     OpId opId = d->blockAttrsMap.setWithNextStamp(key, value);
     t.registerOp(UndoCrdtTarget::blockAttrsMap(), opId);
+    d->pendingOpPayloads[{2, opId}] = buildBlockAttrsMapPayload(key, value, opId, false);
     d->touchedSinceLoad.insert(block);
     scheduleD2Changed();
 }

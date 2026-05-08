@@ -350,6 +350,11 @@ private:
     BlockId allocateD2BlockId() noexcept;
     void applyRemoteBufferOp(Markoff::BlockId blockId, const QByteArray &payload);
     void applyRemoteIdListOp(const QByteArray &payload);
+    void applyRemoteKindTagMapOp(const QByteArray &payload);
+    void applyRemoteBlockAttrsMapOp(const QByteArray &payload);
+    void applyRemoteFrontmatterMapOp(const QByteArray &payload);
+    void applyRemoteLinkRefMapOp(const QByteArray &payload);
+    void applyRemoteFootnoteDefMapOp(const QByteArray &payload);
 
     struct Private;
     std::unique_ptr<Private> d;
