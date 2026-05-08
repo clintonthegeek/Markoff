@@ -31,10 +31,16 @@ void InlineHighlighter::highlightBlock(const QString &text)
     Q_UNUSED(text);
     if (!m_theme) return;
     for (const Markoff::SourceSpan &span : std::as_const(m_spans)) {
-        const QTextCharFormat fmt = formatFor(span);
-        if (fmt == QTextCharFormat()) continue;
+        const QTextCharFormat spanFmt = formatFor(span);
+        if (spanFmt == QTextCharFormat()) continue;
         if (span.charLength <= 0) continue;
-        setFormat(span.charOffset, span.charLength, fmt);
+        // Merge span format into existing per-character formats so that
+        // overlapping spans accumulate properties rather than replacing them.
+        for (int i = span.charOffset; i < span.charOffset + span.charLength; ++i) {
+            QTextCharFormat merged = format(i);
+            merged.merge(spanFmt);
+            setFormat(i, 1, merged);
+        }
     }
 }
 
@@ -67,7 +73,12 @@ QTextCharFormat InlineHighlighter::formatFor(const Markoff::SourceSpan &span) co
         const QColor bg = m_theme->color(Markoff::Theme::Slot::CodeBlockBackground);
         if (fg.isValid()) fmt.setForeground(fg);
         if (bg.isValid()) fmt.setBackground(bg);
-        fmt.setFont(m_theme->font(Markoff::Theme::FontRole::Monospace));
+        // Apply monospace font family without clobbering other font properties
+        // (e.g. strikethrough). Merge the monospace font via fontMerge so that
+        // only the family/size change; decoration flags set earlier are preserved.
+        QFont mono = m_theme->font(Markoff::Theme::FontRole::Monospace);
+        fmt.setFontFamilies(mono.families());
+        fmt.setFontPointSize(mono.pointSizeF() > 0 ? mono.pointSizeF() : fmt.fontPointSize());
         any = true;
     }
 

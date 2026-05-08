@@ -82,3 +82,10 @@ target_link_libraries(tst_live_render_inline_per_kind PRIVATE
     Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
 add_test(NAME tst_live_render_inline_per_kind COMMAND tst_live_render_inline_per_kind)
 
+qt_add_executable(tst_live_render_inline_combined
+    tst_live_render_inline_combined.cpp
+)
+target_link_libraries(tst_live_render_inline_combined PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_inline_combined COMMAND tst_live_render_inline_combined)
+
