@@ -62,6 +62,7 @@ if(NOT TARGET jkqtmathtext)
 endif()
 add_subdirectory(libs/markoff-live)
 add_subdirectory(libs/markoff-source)
+add_subdirectory(apps)
 
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
 if(MARKOFF_BUILD_TESTS)
