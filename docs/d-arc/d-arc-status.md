@@ -52,6 +52,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-08 | bcc3df9 | D5 phase 6 complete: watermark/ack gate — wantsAcksAtWatermark, notifyAcksAtWatermark, watermarkCompacted. Four gate tests green. 133/133 total tests pass. |
 | 2026-05-08 | 2c36599 | D5 phase 5 complete: sibling-map ops (KindTagMap, BlockAttrsMap, FrontmatterMap, LinkRefMap, FootnoteDefMap) outbound + inbound + LWW. Compound `{type-index, OpId}` key fixes cross-CRDT counter collision. Three new tests (emit / LWW convergence / orphan-block edge case) green. 132/132 total tests pass. |
 | 2026-05-08 | 8dd16ed | D5 phase 4 complete: `applyRemoteOps(QList<MarkoffOp>, MarkoffBundleMeta)` for Buffer + IdList targets; `pendingBufferOps` queue for out-of-order arrival; two-doc + three-doc convergence tests; idempotency test. Tier-0 confidence established. 9/9 D5 tests pass (129/129 total). |
 | 2026-05-08 | 3940f79 | D5 phase 3 complete: `localOpsProduced` emission from UndoLog commit callback; Buffer + IdList op serialization via collabtext Serialization.h; round-trip tests green. |
