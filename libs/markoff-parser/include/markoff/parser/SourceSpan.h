@@ -3,6 +3,7 @@
 #define MARKOFF_SOURCESPAN_H
 
 #include <QList>
+#include <QMetaType>
 #include <QString>
 
 namespace Markoff {
@@ -57,6 +58,33 @@ struct SourceSpan {
     // anywhere within the parent range, not just adjacent to the delimiter.
     int parentCharStart = -1;
     int parentCharEnd = -1;
+
+    bool operator==(const SourceSpan &o) const noexcept {
+        return utf8Offset == o.utf8Offset && utf8Length == o.utf8Length
+            && charOffset == o.charOffset && charLength == o.charLength
+            && bold == o.bold && italic == o.italic
+            && strikethrough == o.strikethrough && code == o.code
+            && math == o.math && mathDisplay == o.mathDisplay
+            && highlight == o.highlight && comment == o.comment
+            && isTag == o.isTag && isLink == o.isLink
+            && isWikilink == o.isWikilink && isImage == o.isImage
+            && isFootnoteRef == o.isFootnoteRef
+            && isHeading == o.isHeading && headingLevel == o.headingLevel
+            && isBlockquoteMarker == o.isBlockquoteMarker
+            && isListMarker == o.isListMarker
+            && isCodeBlockFence == o.isCodeBlockFence
+            && isCodeBlockContent == o.isCodeBlockContent
+            && isFrontmatter == o.isFrontmatter
+            && isHorizontalRule == o.isHorizontalRule
+            && isBlockquote == o.isBlockquote
+            && blockquoteDepth == o.blockquoteDepth
+            && isCalloutMarker == o.isCalloutMarker
+            && isTaskMarker == o.isTaskMarker
+            && isDelimiter == o.isDelimiter
+            && parentCharStart == o.parentCharStart
+            && parentCharEnd == o.parentCharEnd;
+    }
+    bool operator!=(const SourceSpan &o) const noexcept { return !(*this == o); }
 };
 
 /// Build a UTF-8 byte offset → QString char offset mapping table.
@@ -64,5 +92,8 @@ struct SourceSpan {
 QList<int> buildUtf8ToCharMap(const QByteArray &utf8);
 
 } // namespace Markoff
+
+Q_DECLARE_METATYPE(Markoff::SourceSpan)
+Q_DECLARE_METATYPE(QList<Markoff::SourceSpan>)
 
 #endif // MARKOFF_SOURCESPAN_H

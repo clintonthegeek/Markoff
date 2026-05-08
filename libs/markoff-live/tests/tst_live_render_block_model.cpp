@@ -8,6 +8,7 @@
 #include <markoff/live/BlockKind.h>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/parser/SourceSpan.h>
 
 using namespace Markoff::Live;
 
@@ -265,6 +266,23 @@ private Q_SLOTS:
         QCOMPARE(binding.model()->data(binding.model()->index(0, 0),
                  LiveBlockModel::CodeLanguageRole).toString(),
                  QStringLiteral("rust"));
+    }
+
+    void source_span_equality_and_metatype_round_trip() {
+        Markoff::SourceSpan a{};
+        a.charOffset = 0; a.charLength = 4; a.bold = true;
+        Markoff::SourceSpan b = a;
+        QVERIFY(a == b);
+        b.italic = true;
+        QVERIFY(!(a == b));
+
+        QList<Markoff::SourceSpan> spans{a, b};
+        QVariant v = QVariant::fromValue(spans);
+        QVERIFY(v.canConvert<QList<Markoff::SourceSpan>>());
+        auto restored = v.value<QList<Markoff::SourceSpan>>();
+        QCOMPARE(restored.size(), 2);
+        QVERIFY(restored[0] == a);
+        QVERIFY(restored[1] == b);
     }
 };
 
