@@ -124,6 +124,10 @@ struct MarkoffDocument::Private {
     // edit site, consumed (and removed) by the OnCommit callback.
     QHash<Markoff::OpId, QByteArray> pendingOpPayloads;
 
+    // D5: buffer ops for blocks not yet present in blockBuffers (arrived before
+    // the IdList op that inserts them). Drained when the IdList op lands.
+    QHash<BlockId, QList<QByteArray>> pendingBufferOps;
+
     // Load-time block ID counter — block IDs minted during loadFromMarkdown
     // start here to avoid colliding with testInsertBlock (1...) and
     // d2InsertBlock (0x2000000...) and applyStructural (0x1000000...) ranges.

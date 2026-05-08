@@ -240,6 +240,89 @@ void MarkoffDocument::applyRemoteOps(
     d->buffer.apply_ops(ops);
 }
 
+void MarkoffDocument::applyRemoteOps(QList<MarkoffOp> ops, MarkoffBundleMeta meta)
+{
+    for (const MarkoffOp &op : ops) {
+        if (op.producerReplicaId != meta.producerReplicaId) {
+            qWarning() << "MarkoffDocument::applyRemoteOps: producer mismatch, skipping";
+            continue;
+        }
+        switch (op.target) {
+        case CrdtTarget::Buffer:
+            applyRemoteBufferOp(BlockId::fromRaw(op.blockId), op.payload);
+            break;
+        case CrdtTarget::IdList:
+            applyRemoteIdListOp(op.payload);
+            break;
+        case CrdtTarget::KindTagMap:
+        case CrdtTarget::BlockAttrsMap:
+        case CrdtTarget::FrontmatterMap:
+        case CrdtTarget::LinkRefMap:
+        case CrdtTarget::FootnoteDefMap:
+            // Phase 5 handles sibling-map targets.
+            qDebug() << "applyRemoteOps: sibling-map target not yet implemented";
+            break;
+        }
+    }
+    scheduleD2Changed();
+}
+
+void MarkoffDocument::applyRemoteBufferOp(BlockId blockId, const QByteArray &payload)
+{
+    auto it = d->blockBuffers.find(blockId);
+    if (it == d->blockBuffers.end()) {
+        // Unknown block — queue until IdList op arrives and creates the buffer.
+        d->pendingBufferOps[blockId].append(payload);
+        return;
+    }
+    const std::string json(payload.constData(), size_t(payload.size()));
+    const auto opt = CollabText::Crdt::decode_operation(json);
+    if (!opt) {
+        qWarning() << "applyRemoteBufferOp: decode_operation failed; skipping";
+        return;
+    }
+    it->second->apply_ops({*opt});
+    auto proxyIt = d->bufferProxies.find(blockId);
+    if (proxyIt != d->bufferProxies.end() && proxyIt.value())
+        proxyIt.value()->notifyChanged();
+    Q_EMIT blocksChanged({blockId});
+}
+
+void MarkoffDocument::applyRemoteIdListOp(const QByteArray &payload)
+{
+    const std::string json(payload.constData(), size_t(payload.size()));
+    const auto opt = CollabText::Crdt::decode_idlist_operation(json);
+    if (!opt) {
+        qWarning() << "applyRemoteIdListOp: decode_idlist_operation failed; skipping";
+        return;
+    }
+    d->idList.apply_remote_op(*opt);
+    d->idListProxy->notifyChanged();
+
+    // Create Buffer + proxy for any block IDs that are now in the IdList but
+    // not yet in blockBuffers. This happens when a remote insert arrives.
+    for (uint64_t raw : d->idList.ids()) {
+        const BlockId blockId = BlockId::fromRaw(raw);
+        if (d->blockBuffers.find(blockId) == d->blockBuffers.end()) {
+            d->blockBuffers.emplace(blockId,
+                std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
+            d->bufferProxies.insert(blockId, new BufferProxy(blockId, this));
+        }
+    }
+
+    // Drain any pending buffer ops for blocks that are now known.
+    auto pending = d->pendingBufferOps;
+    d->pendingBufferOps.clear();
+    for (auto it = pending.begin(); it != pending.end(); ++it) {
+        if (d->blockBuffers.find(it.key()) != d->blockBuffers.end()) {
+            for (const QByteArray &p : it.value())
+                applyRemoteBufferOp(it.key(), p);
+        } else {
+            d->pendingBufferOps[it.key()] = it.value();  // still unknown
+        }
+    }
+}
+
 void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
 {
     ++d->editSequence;
