@@ -95,6 +95,9 @@ add_library(markoff_core STATIC
     # --- MarkdownView polymorphic base (Task 4.5) ---
     include/markoff/core/MarkdownView.h
     src/MarkdownView.cpp
+    # --- Sibling-map op wire envelope (D5 §3.1) ---
+    include/markoff/core/SiblingMapOpHeader.h
+    src/SiblingMapOpHeader.cpp
 )
 
 target_include_directories(markoff_core
