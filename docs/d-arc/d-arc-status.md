@@ -2,25 +2,27 @@
 
 **This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-08 (D5 Phase 8 complete; 138/138 tests pass).
+**Last updated:** 2026-05-08 (§4.5 audit complete; D5 complete; §4.6 public-API freeze is next).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **D5** (collab activation) — `spec-approved` 2026-05-08. Implementation plan via writing-plans next; see `docs/specs/2026-05-07-d5-collab-activation-design.md`.
+**Active phase:** **§4.6** — public-API freeze + Corbomite migration guide.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **Branch is on D5-first posture. v1.0 retired. D5 is the next
-> substantive design step.** No work happens outside the ordered list
-> in pivot-doc §4.
+> **D-arc §4.5 audit complete. §4.6 (public-API freeze + Corbomite migration guide) is next.**
+> D5 (collab) is done. The §4.5 audit pruned the vestigial R5.5 workarounds
+> (AstBlockDiff collapse post-pass, `anchorRenumbered` / `onAnchorRenumbered`)
+> and added the ListItem Tab parent-existence guard. Full suite green.
+> Next: §4.6 public-API freeze per pivot-doc §4.6; then E-arc begins.
 >
 > **Read first** (in this order, for a fresh agent context):
 > 1. `docs/handoff/2026-05-07-pivot-to-d5-first.md` — **the pivot doc; authoritative for the branch.**
 > 2. `docs/handoff/2026-05-07-live-binding-developmental-history.md` — pipeline-feature provenance.
 > 3. `docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation.
 > 4. `docs/d-arc/collabtext-scope-line.md` — the six "won't do" items.
-> 5. `docs/specs/2026-05-07-d5-collab-activation-design.md` — **D5 substantive design (spec-approved 2026-05-08; next work-unit: writing-plans).** Companion: `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. The retired stub is at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`.
+> 5. `docs/specs/2026-05-07-d5-collab-activation-design.md` — **D5 substantive design (complete).** Companion: `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. The retired stub is at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`.
 > 6. `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md` — D4 spec (complete; background).
 > 7. `docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — D3 spec (background; complete).
 > 8. `docs/specs/2026-05-06-per-item-listitem-blocks-design.md` — D3 corrective spec (background; complete).
@@ -36,7 +38,7 @@
 | **D2** | `complete` | All 15 phases implemented and dogfooded. 141/141 tests pass (3 pre-existing QML selection failures unrelated to D2 cleared during dogfood). User signed off 2026-05-05. |
 | **D3** | `complete` | Original plan + corrective spec both shipped. Per-item ListItem blocks, caller-driven renumbering, marker attrs, delegate rendering, 146/146 tests pass. |
 | **D4** | `complete` | Spec: `docs/specs/2026-05-07-d4-parser-scope-reduction-design.md`. Plan: `docs/plans/2026-05-07-d4-parser-scope-reduction.md`. Final commit: `22ea352`. 103/103 tests pass. |
-| **D5** | `in-progress` | Spec: `docs/specs/2026-05-07-d5-collab-activation-design.md` (approved 2026-05-08). Companion negotiation opener: `docs/handoff/2026-05-07-collabtext-d5-negotiation-opener.md`. Retired stub at `docs/archive/2026-05-04-d5-collab-activation-STUB.md`. Implementation plan next via writing-plans. |
+| **D5** | `complete` | Spec: `docs/specs/2026-05-07-d5-collab-activation-design.md`. 8 phases shipped; 138/138 tests pass. §4.5 audit (anchorRenumbered + collapse-pass deletion + ListItem Tab guard) complete 2026-05-08. |
 
 **Phase status legend.** `pending` (not yet started) · `stubbed` (inputs + scope captured, no substantive design) · `spec-in-brainstorm` · `spec-approved` (spec written and user-approved) · `plan-approved` (writing-plans output landed) · `in-progress` (commits landing) · `dogfood` (implementation done; user is testing) · `complete` (acceptance criteria met).
 
@@ -52,6 +54,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-08 | (§4.5 audit) | §4.5 audit: AstBlockDiff collapse post-pass + `anchorRenumbered` signal + `LiveCursorState::onAnchorRenumbered` deleted (D2 obsolete; BlockId stable under IdList element identity); ListItem Tab parent-existence guard added (refuses indent when no preceding sibling at current level). Full suite green. D5 → complete; §4.6 (public-API freeze + Corbomite migration) is next. |
 | 2026-05-08 | da1cbf4 | D5 phase 8 complete: apps/markoff-collab-testapp/ scaffold. InMemoryTransport in-memory peer mock + watermark tracking; CollabConsumer wires localOpsProduced → encode → push and setOnInbound → decode → applyRemoteOps; tst_d5_in_memory_transport + tst_d5_testapp_convergence pass; two-pane CollabMain.qml with QQmlApplicationEngine bootstrap. 138/138 tests pass. |
 | 2026-05-08 | 4984df1 | D5 phase 7 complete: remote cursor state + QML overlay. Cursor types moved to markoff-core; MarkoffDocument setRemoteCursor/clearRemoteCursor/clearAllRemoteCursors API + signals; cursor-survival in d2ApplyBufferEdit; LiveListModelBinding::remoteCursorsModel(); RemoteCursorOverlay.qml stub + Repeater in LiveView.qml. Three new tests. 136/136 tests pass. |
 | 2026-05-08 | bcc3df9 | D5 phase 6 complete: watermark/ack gate — wantsAcksAtWatermark, notifyAcksAtWatermark, watermarkCompacted. Four gate tests green. 133/133 total tests pass. |

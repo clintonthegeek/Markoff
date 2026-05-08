@@ -2,22 +2,12 @@
 
 ## 2026-05-07 — ListItem Tab/Shift-Tab: no parent-existence guard
 
-The Tab (indent) and Shift-Tab (outdent) handlers in
-`LiveStructuralKeyHandler.cpp` increment/decrement `IndentLevel` by one
-with only a floor-of-zero and ceiling-of-6 boundary check. There is no
-check that a parent item at `newIndent - 1` actually exists in the
-surrounding run. A lone item at level 2 can be tabbed to level 3 even
-though no sibling at level 2 is present to parent it.
+**Fixed 2026-05-08 (§4.5 audit).** Guard implemented.
 
-In practice this produces a structurally odd list but does not crash or
-corrupt data — the item serializes and round-trips correctly, and the
-delegate renders the extra indentation faithfully. It's cosmetically
-weird and semantically wrong but not a regression from anything prior.
-
-**When to fix:** D5 or as a small standalone. The fix should walk the
-preceding blocks and refuse the indent if no block at `newIndent - 1`
-exists within the same style/indent boundary that `renumberRunStartingAt`
-would recognise as a run.
+The Tab handler now walks preceding blocks and refuses to indent if no
+ListItem at the current `indent` level exists in the run (which would
+serve as parent). Shift-Tab (outdent) already had correct floor-of-zero
+boundary and needs no parent check.
 
 ---
 
