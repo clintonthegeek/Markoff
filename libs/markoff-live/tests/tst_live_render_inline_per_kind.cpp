@@ -204,6 +204,41 @@ private Q_SLOTS:
         QCOMPARE(range.first, 6);
         QCOMPARE(range.second, 4);
     }
+
+    void out_of_scope_flags_do_not_paint() {
+        QTextDocument doc;
+        doc.setPlainText("plain $x^2$ plain");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc); h.setTheme(&theme);
+
+        // Math, footnote, image, isDelimiter, comment — all out of scope for E1.
+        Markoff::SourceSpan math{};       math.charOffset = 6;  math.charLength = 5; math.math = true;
+        Markoff::SourceSpan footnote{};   footnote.charOffset = 0; footnote.charLength = 4; footnote.isFootnoteRef = true;
+        Markoff::SourceSpan image{};      image.charOffset = 0;  image.charLength = 4; image.isImage = true;
+        Markoff::SourceSpan delimiter{};  delimiter.charOffset = 6; delimiter.charLength = 1; delimiter.isDelimiter = true;
+        Markoff::SourceSpan comment{};    comment.charOffset = 0; comment.charLength = 4; comment.comment = true;
+
+        h.setInlineSpans({math, footnote, image, delimiter, comment});
+
+        // Walk layout format ranges; none should have any non-default property.
+        bool anyPaint = false;
+        QTextBlock block = doc.firstBlock();
+        while (block.isValid()) {
+            const auto ranges = block.layout()->formats();
+            for (const QTextLayout::FormatRange &r : ranges) {
+                const QTextCharFormat &f = r.format;
+                if (f.fontWeight() == QFont::Bold || f.fontItalic()
+                    || f.fontStrikeOut() || f.fontUnderline()
+                    || f.foreground().color().isValid()
+                    || (f.background().style() != Qt::NoBrush
+                        && f.background().color() != Qt::transparent)) {
+                    anyPaint = true; break;
+                }
+            }
+            block = block.next();
+        }
+        QVERIFY2(!anyPaint, "Out-of-scope flags must not paint");
+    }
 };
 
 QTEST_MAIN(TstLiveRenderInlinePerKind)
