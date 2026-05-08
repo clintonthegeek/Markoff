@@ -19,6 +19,7 @@
 
 #include <crdt/IdList.h>
 #include <crdt/IdListOperations.h>
+#include <collabtext/Serialization.h>
 
 #include "MarkoffDocumentPrivate.h"
 #include "AnchorConversion.h"
@@ -90,6 +91,55 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
             }
             (void)opId;  // opId used for CausalLwwMap-specific undo; IdList/Buffer use stack-based undo
         }, target.kind);
+    });
+
+    // ── D5: wire transaction commit → localOpsProduced emission ────────────
+    d->undoLog.setOnCommit([this](const std::vector<UndoLog::CommittedOp> &committed,
+                                   UndoActionId /*internalActionId*/) {
+        if (!d->collabConfigured) {
+            // Clean up pendingOpPayloads even in single-user mode to avoid leaks
+            for (const auto &cop : committed)
+                d->pendingOpPayloads.remove(cop.opId);
+            return;
+        }
+
+        QList<MarkoffOp> ops;
+        ops.reserve(int(committed.size()));
+        quint64 maxLamport = 0;
+
+        for (const auto &cop : committed) {
+            QByteArray payload = d->pendingOpPayloads.take(cop.opId);
+            if (payload.isEmpty()) {
+                // Sibling-map op (Phase 5 will populate these) or empty — skip
+                continue;
+            }
+
+            MarkoffOp op;
+            op.producerReplicaId = d->replicaId;
+            op.payload = std::move(payload);
+
+            if (auto *b = std::get_if<UndoCrdtTarget::BufferT>(&cop.target.kind)) {
+                op.target = CrdtTarget::Buffer;
+                op.blockId = b->blockId.raw();
+            } else if (std::holds_alternative<UndoCrdtTarget::IdListT>(cop.target.kind)) {
+                op.target = CrdtTarget::IdList;
+                op.blockId = 0;
+            } else {
+                continue;  // sibling-map; Phase 5
+            }
+
+            // Extract Lamport counter from OpId encoding: (replicaId << 48) | counter
+            const quint64 counter = cop.opId & 0x0000FFFFFFFFFFFFull;
+            maxLamport = std::max(maxLamport, counter);
+
+            ops.append(std::move(op));
+        }
+
+        if (ops.isEmpty()) return;
+
+        auto meta = d->buildBundleMeta(0, maxLamport);
+        meta.opCountInBundle = quint16(ops.size());
+        Q_EMIT localOpsProduced(std::move(ops), std::move(meta));
     });
 
     // ── D2: initialise WatermarkCoordinator (Phase 9) ───────────────────────
@@ -433,6 +483,8 @@ void MarkoffDocument::applyBlockEdit(const BlockEdit &edit)
         {edit.insertedUtf8.toStdString()});
     auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
     t.registerOp(UndoCrdtTarget::buffer(edit.blockId), lamportToOpId(ts));
+    d->pendingOpPayloads[lamportToOpId(ts)] =
+        QByteArray::fromStdString(CollabText::Crdt::encode_operation(op));
 
     ++d->blockEditSequences[edit.blockId];
 
@@ -466,6 +518,8 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             BlockId newBlock = BlockId::fromRaw(raw);
             auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
             t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
+            d->pendingOpPayloads[lamportToOpId(idTs)] =
+                QByteArray::fromStdString(CollabText::Crdt::encode_idlist_operation(idOp));
             // Create buffer
             d->blockBuffers.emplace(newBlock, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
             // Create buffer proxy for this block (parented to this; Qt owns it)
@@ -481,6 +535,8 @@ void MarkoffDocument::applyStructural(const StructuralOp &op)
             CollabText::Crdt::IdListOperation idOp = d->idList.remove_at(anchor);
             auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
             t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
+            d->pendingOpPayloads[lamportToOpId(idTs)] =
+                QByteArray::fromStdString(CollabText::Crdt::encode_idlist_operation(idOp));
             OpId kindOpId = d->kindTagMap.removeWithNextStamp(payload.blockId);
             t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);
             // Buffer retained for GC (Phase 9)
@@ -622,6 +678,8 @@ void MarkoffDocument::d2ApplyBufferEdit(BlockId block, uint32_t offset,
         {insert.toStdString()});
     auto ts = std::visit([](const auto &o) -> CollabText::Crdt::Lamport { return o.timestamp; }, op);
     t.registerOp(UndoCrdtTarget::buffer(block), lamportToOpId(ts));
+    d->pendingOpPayloads[lamportToOpId(ts)] =
+        QByteArray::fromStdString(CollabText::Crdt::encode_operation(op));
     ++d->blockEditSequences[block];
 
     // Notify per-block buffer proxy synchronously (same as applyBlockEdit).
@@ -647,6 +705,8 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
     auto idOp = d->idList.insert_after(after, raw);
     auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
     t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
+    d->pendingOpPayloads[lamportToOpId(idTs)] =
+        QByteArray::fromStdString(CollabText::Crdt::encode_idlist_operation(idOp));
 
     d->blockBuffers.emplace(newId, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
     d->bufferProxies.insert(newId, new BufferProxy(newId, this));
@@ -850,6 +910,8 @@ void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
     auto idOp = d->idList.remove_at(anchor);
     auto idTs = CollabText::Crdt::get_idlist_op_timestamp(idOp);
     t.registerOp(UndoCrdtTarget::idList(), lamportToOpId(idTs));
+    d->pendingOpPayloads[lamportToOpId(idTs)] =
+        QByteArray::fromStdString(CollabText::Crdt::encode_idlist_operation(idOp));
 
     OpId kindOpId = d->kindTagMap.removeWithNextStamp(block);
     t.registerOp(UndoCrdtTarget::kindTagMap(), kindOpId);

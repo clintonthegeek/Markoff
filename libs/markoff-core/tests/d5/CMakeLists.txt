@@ -17,3 +17,7 @@ add_test(NAME tst_d5_replica_id COMMAND tst_d5_replica_id)
 qt_add_executable(tst_d5_local_ops_signal tst_d5_local_ops_signal.cpp)
 target_link_libraries(tst_d5_local_ops_signal PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d5_local_ops_signal COMMAND tst_d5_local_ops_signal)
+
+qt_add_executable(tst_d5_local_ops_emission tst_d5_local_ops_emission.cpp)
+target_link_libraries(tst_d5_local_ops_emission PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_local_ops_emission COMMAND tst_d5_local_ops_emission)

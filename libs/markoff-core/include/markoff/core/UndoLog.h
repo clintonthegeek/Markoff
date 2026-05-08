@@ -79,6 +79,19 @@ public:
 
     void setDispatcher(Dispatcher d) { m_dispatcher = std::move(d); }
 
+    /// Per-op record delivered to the OnCommitFn.
+    struct CommittedOp {
+        UndoCrdtTarget target;
+        OpId           opId;     // same Lamport-based OpId as registerOp receives
+    };
+
+    using OnCommitFn = std::function<void(const std::vector<CommittedOp> &ops,
+                                           UndoActionId actionId)>;
+
+    /// Register a commit callback. Fires after every outermost Transaction
+    /// commits with at least one op. Replaces any previous callback.
+    void setOnCommit(OnCommitFn fn) { m_onCommit = std::move(fn); }
+
     void undo();
     void redo();
     void undoForBlock(BlockId block);
@@ -121,6 +134,7 @@ private:
     int m_nestingDepth = 0;
     UndoActionId m_nextActionId = 1;
     Dispatcher m_dispatcher;
+    OnCommitFn m_onCommit;
     std::optional<CoalesceContext> m_lastCoalesceCtx;
 };
 

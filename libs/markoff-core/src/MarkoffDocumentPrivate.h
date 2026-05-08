@@ -120,6 +120,10 @@ struct MarkoffDocument::Private {
         return meta;
     }
 
+    // D5: op payloads pending commit — keyed by OpId, populated at each CRDT
+    // edit site, consumed (and removed) by the OnCommit callback.
+    QHash<Markoff::OpId, QByteArray> pendingOpPayloads;
+
     // Load-time block ID counter — block IDs minted during loadFromMarkdown
     // start here to avoid colliding with testInsertBlock (1...) and
     // d2InsertBlock (0x2000000...) and applyStructural (0x1000000...) ranges.

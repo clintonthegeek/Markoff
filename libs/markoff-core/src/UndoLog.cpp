@@ -24,6 +24,15 @@ UndoLog::Transaction::~Transaction() {
         if (m_rolledBack || m_log.m_pendingEntry->targets.empty()) {
             m_log.m_entries.pop_back();
             --m_log.m_nextActionId;  // reclaim action id — entry was discarded
+        } else {
+            // Committed: fire the callback (before clearing m_pendingEntry).
+            if (m_log.m_onCommit) {
+                std::vector<CommittedOp> committed;
+                committed.reserve(m_log.m_pendingEntry->targets.size());
+                for (const auto &[target, opId] : m_log.m_pendingEntry->targets)
+                    committed.push_back({target, opId});
+                m_log.m_onCommit(committed, m_log.m_pendingEntry->actionId);
+            }
         }
         m_log.m_pendingEntry = nullptr;
     }
