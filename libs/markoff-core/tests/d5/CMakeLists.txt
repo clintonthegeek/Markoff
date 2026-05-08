@@ -21,3 +21,8 @@ add_test(NAME tst_d5_local_ops_signal COMMAND tst_d5_local_ops_signal)
 qt_add_executable(tst_d5_local_ops_emission tst_d5_local_ops_emission.cpp)
 target_link_libraries(tst_d5_local_ops_emission PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d5_local_ops_emission COMMAND tst_d5_local_ops_emission)
+
+qt_add_executable(tst_d5_two_doc_convergence tst_d5_two_doc_convergence.cpp)
+target_link_libraries(tst_d5_two_doc_convergence PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_two_doc_convergence COMMAND tst_d5_two_doc_convergence)
+
