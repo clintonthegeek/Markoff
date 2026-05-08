@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffOp.h>
 #include <markoff/core/BlockSerializerRegistry.h>
 #include <markoff/core/CausalLwwMap.h>
 #include <markoff/core/BlockKind.h>
@@ -100,6 +101,24 @@ struct MarkoffDocument::Private {
 
     // Debounce flag for d2DocumentChanged signal
     bool d2ChangePending = false;
+
+    // D5: monotonic bundle-ID counter; starts at 1 (0 is reserved / invalid)
+    quint64 nextBundleId = 1;
+
+    // D5: Build a MarkoffBundleMeta for a transaction that just committed.
+    // actionIdRaw is the raw UndoLog UndoActionId (uint64_t); cast to the
+    // public ActionId enum class here to bridge the two distinct type aliases.
+    // opCountInBundle is left 0 and filled in by the emission site.
+    MarkoffBundleMeta buildBundleMeta(quint64 actionIdRaw, quint64 producerLamport)
+    {
+        MarkoffBundleMeta meta;
+        meta.producerReplicaId = replicaId;
+        meta.bundleId          = nextBundleId++;
+        meta.opCountInBundle   = 0;
+        meta.actionId          = static_cast<ActionId>(actionIdRaw);
+        meta.producerLamport   = producerLamport;
+        return meta;
+    }
 
     // Load-time block ID counter — block IDs minted during loadFromMarkdown
     // start here to avoid colliding with testInsertBlock (1...) and
