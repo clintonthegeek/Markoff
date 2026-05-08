@@ -74,6 +74,66 @@ private Q_SLOTS:
         QCOMPARE(range.first, 6);
         QCOMPARE(range.second, 8);
     }
+    void italic_flag_paints_italic() {
+        QTextDocument doc;
+        doc.setPlainText("plain *italic* plain");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc);
+        h.setTheme(&theme);
+
+        Markoff::SourceSpan span{};
+        span.charOffset = 6; span.charLength = 8;  // *italic*
+        span.italic = true;
+        h.setInlineSpans({span});
+
+        // QSyntaxHighlighter writes to layout()->formats(), not fragment formats.
+        // Use findFormatRange to check the layout-level format ranges.
+        auto range = findFormatRange(doc, [](const QTextCharFormat &f){
+            return f.fontItalic();
+        });
+        QCOMPARE(range.first, 6);
+        QCOMPARE(range.second, 8);
+    }
+
+    void strikethrough_flag_paints_strike() {
+        QTextDocument doc;
+        doc.setPlainText("plain ~~struck~~ plain");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc);
+        h.setTheme(&theme);
+
+        Markoff::SourceSpan span{};
+        span.charOffset = 6; span.charLength = 10;  // ~~struck~~
+        span.strikethrough = true;
+        h.setInlineSpans({span});
+
+        auto range = findFormatRange(doc, [](const QTextCharFormat &f){
+            return f.fontStrikeOut();
+        });
+        QCOMPARE(range.first, 6);
+        QCOMPARE(range.second, 10);
+    }
+
+    void inline_code_flag_paints_monospace_and_bg() {
+        QTextDocument doc;
+        doc.setPlainText("plain `code` plain");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc);
+        h.setTheme(&theme);
+
+        Markoff::SourceSpan span{};
+        span.charOffset = 6; span.charLength = 6;  // `code`
+        span.code = true;
+        h.setInlineSpans({span});
+
+        const QString monoFamily =
+            theme.font(Markoff::Theme::FontRole::Monospace).family();
+        auto range = findFormatRange(doc, [&](const QTextCharFormat &f){
+            return f.background().style() != Qt::NoBrush
+                || f.fontFamilies().toStringList().contains(monoFamily);
+        });
+        QVERIFY(range.first >= 0);  // some range was found
+    }
 };
 
 QTEST_MAIN(TstLiveRenderInlinePerKind)

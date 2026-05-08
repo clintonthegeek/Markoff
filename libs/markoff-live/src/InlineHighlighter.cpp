@@ -52,7 +52,24 @@ QTextCharFormat InlineHighlighter::formatFor(const Markoff::SourceSpan &span) co
         any = true;
     };
 
-    if (span.bold) applyEmphasis(Markoff::Theme::Slot::BoldEmphasis);
+    if (span.bold)   applyEmphasis(Markoff::Theme::Slot::BoldEmphasis);
+    if (span.italic) applyEmphasis(Markoff::Theme::Slot::ItalicEmphasis);
+
+    if (span.strikethrough) {
+        fmt.setFontStrikeOut(true);
+        const QColor c = m_theme->color(Markoff::Theme::Slot::StrikeEmphasis);
+        if (c.isValid()) fmt.setForeground(c);
+        any = true;
+    }
+
+    if (span.code) {
+        const QColor fg = m_theme->color(Markoff::Theme::Slot::InlineCode);
+        const QColor bg = m_theme->color(Markoff::Theme::Slot::CodeBlockBackground);
+        if (fg.isValid()) fmt.setForeground(fg);
+        if (bg.isValid()) fmt.setBackground(bg);
+        fmt.setFont(m_theme->font(Markoff::Theme::FontRole::Monospace));
+        any = true;
+    }
 
     return any ? fmt : QTextCharFormat();
 }
