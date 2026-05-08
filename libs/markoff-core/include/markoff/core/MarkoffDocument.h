@@ -91,6 +91,11 @@ public:
     // ===== Remote ops =====
     void applyRemoteOps(const std::vector<CollabText::Crdt::Operation> &ops);
 
+    /// Apply remote ops in arrival order. Dispatches by CrdtTarget.
+    /// See D5 spec §2.4.
+    void applyRemoteOps(QList<Markoff::MarkoffOp> ops,
+                        Markoff::MarkoffBundleMeta meta);
+
     // ===== Wholesale reload =====
     void resetContent(const QByteArray &newContent, Origin origin);
 
@@ -343,6 +348,8 @@ private:
     void materializeBlocksFromParsedDoc(const Markoff::Document &parsed,
                                         const QString &body);
     BlockId allocateD2BlockId() noexcept;
+    void applyRemoteBufferOp(Markoff::BlockId blockId, const QByteArray &payload);
+    void applyRemoteIdListOp(const QByteArray &payload);
 
     struct Private;
     std::unique_ptr<Private> d;
