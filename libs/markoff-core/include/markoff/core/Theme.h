@@ -5,6 +5,7 @@
 #include <QFont>
 #include <QHash>
 #include <QJsonObject>
+#include <QTextCharFormat>
 #include <QtCore/qmetatype.h>
 
 #include <markoff/core/MarkoffCoreExport.h>
@@ -24,6 +25,7 @@ public:
         Quote,
         BoldEmphasis, ItalicEmphasis, StrikeEmphasis,
         Highlight,
+        HiddenMarker,
         SelectionBackground,
         CursorPrimary, CursorSecondary, CursorPresence,
         SearchMatchBackground, SearchActiveMatchBackground,
@@ -54,8 +56,9 @@ public:
     QColor codeBlockColor()      const { return color(Slot::CodeBlock); }
     QColor selectionBackground() const { return color(Slot::SelectionBackground); }
 
-    QColor color(Slot) const;
-    void   setColor(Slot, QColor);
+    QColor         color(Slot) const;
+    void           setColor(Slot, QColor);
+    QTextCharFormat charFormat(Slot) const;
 
     QFont  font(FontRole) const;
     void   setFont(FontRole, QFont);

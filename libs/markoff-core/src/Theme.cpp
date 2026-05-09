@@ -38,6 +38,22 @@ void Theme::setFontSizeMultiplier(Slot s, qreal m)
     m_sizeMul[static_cast<int>(s)] = m;
 }
 
+QTextCharFormat Theme::charFormat(Slot s) const
+{
+    QTextCharFormat fmt;
+    if (s == Slot::HiddenMarker) {
+        QFont f = fmt.font();
+        f.setLetterSpacing(QFont::AbsoluteSpacing, -1000.0);
+        fmt.setFont(f);
+        return fmt;
+    }
+    const QColor c = color(s);
+    if (c.isValid()) fmt.setForeground(c);
+    if (isBold(s))   fmt.setFontWeight(QFont::Bold);
+    if (isItalic(s)) fmt.setFontItalic(true);
+    return fmt;
+}
+
 QColor Theme::colorForCodeToken(CodeTokenKind k) const
 {
     using K = CodeTokenKind;

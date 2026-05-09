@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
 #include <QColor>
+#include <QTextCharFormat>
 
 #include <markoff/core/Theme.h>
 #include <markoff/core/CodeTokenKind.h>
@@ -66,6 +67,14 @@ private Q_SLOTS:
                  QColor("#ff0000").name());
         QCOMPARE(t.colorForCodeToken(CodeTokenKind::String).name(),
                  QColor("#00ff00").name());
+    }
+
+    void hiddenMarker_charFormat_has_negative_letter_spacing() {
+        Markoff::Theme theme;
+        const QTextCharFormat fmt = theme.charFormat(Markoff::Theme::Slot::HiddenMarker);
+        QFont f = fmt.font();
+        QCOMPARE(f.letterSpacingType(), QFont::AbsoluteSpacing);
+        QVERIFY(f.letterSpacing() < 0.0);
     }
 
     void theme_json_roundtrip() {
