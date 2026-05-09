@@ -63,6 +63,32 @@ void InlineHighlighterAttached::rebuildHighlighter()
     m_highlighter->setParent(this);
     m_highlighter->setTheme(m_theme);
     m_highlighter->setInlineSpans(m_spans);
+    m_highlighter->setLocalCaretPosition(m_caretPos);
+    m_highlighter->setSelectionRange(m_selStart, m_selEnd);
+}
+
+void InlineHighlighterAttached::setCaretPosition(int qtPos)
+{
+    if (m_caretPos == qtPos) return;
+    m_caretPos = qtPos;
+    if (m_highlighter) m_highlighter->setLocalCaretPosition(qtPos);
+    Q_EMIT caretPositionChanged();
+}
+
+void InlineHighlighterAttached::setSelectionStart(int qtPos)
+{
+    if (m_selStart == qtPos) return;
+    m_selStart = qtPos;
+    if (m_highlighter) m_highlighter->setSelectionRange(m_selStart, m_selEnd);
+    Q_EMIT selectionStartChanged();
+}
+
+void InlineHighlighterAttached::setSelectionEnd(int qtPos)
+{
+    if (m_selEnd == qtPos) return;
+    m_selEnd = qtPos;
+    if (m_highlighter) m_highlighter->setSelectionRange(m_selStart, m_selEnd);
+    Q_EMIT selectionEndChanged();
 }
 
 }  // namespace Markoff::Live
