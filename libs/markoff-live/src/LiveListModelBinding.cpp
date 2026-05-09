@@ -11,6 +11,7 @@
 #include <markoff/core/BlockAnchor.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/CrdtProxies.h>
+#include <markoff/core/Session.h>
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/Cmd/D2.h>
 #include <markoff/core/Cursor.h>
@@ -205,6 +206,11 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->lastKeys.clear();
     }
     Q_EMIT documentChanged();
+}
+
+void LiveListModelBinding::setSession(Markoff::Session *session)
+{
+    d->selectionView->setSession(session);
 }
 
 LiveBlockModel           *LiveListModelBinding::model()               const { return d->model; }

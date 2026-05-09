@@ -269,3 +269,35 @@ target_link_libraries(tst_live_render_selection_delete
 add_test(NAME tst_live_render_selection_delete
          COMMAND tst_live_render_selection_delete)
 
+# B3: Session subscription — external setPrimarySelection propagates to view.
+qt_add_executable(tst_live_render_session_apply
+    tst_live_render_session_apply.cpp)
+target_link_libraries(tst_live_render_session_apply
+    PRIVATE markoff_live markoff_core Qt6::Core Qt6::Test)
+add_test(NAME tst_live_render_session_apply
+         COMMAND tst_live_render_session_apply)
+
+# B4: Two bindings share one session — binding A selection visible in binding B.
+qt_add_executable(tst_live_render_session_two_bindings
+    tst_live_render_session_two_bindings.cpp)
+target_link_libraries(tst_live_render_session_two_bindings
+    PRIVATE markoff_live markoff_core Qt6::Core Qt6::Test)
+add_test(NAME tst_live_render_session_two_bindings
+         COMMAND tst_live_render_session_two_bindings)
+
+# B5a: Out-of-range TextAnchor clamps to block length — no crash.
+qt_add_executable(tst_live_render_session_clamp
+    tst_live_render_session_clamp.cpp)
+target_link_libraries(tst_live_render_session_clamp
+    PRIVATE markoff_live markoff_core Qt6::Core Qt6::Test)
+add_test(NAME tst_live_render_session_clamp
+         COMMAND tst_live_render_session_clamp)
+
+# B5b: Selection on a now-deleted block clears gracefully — no crash.
+qt_add_executable(tst_live_render_session_orphaned_block
+    tst_live_render_session_orphaned_block.cpp)
+target_link_libraries(tst_live_render_session_orphaned_block
+    PRIVATE markoff_live markoff_core Qt6::Core Qt6::Test)
+add_test(NAME tst_live_render_session_orphaned_block
+         COMMAND tst_live_render_session_orphaned_block)
+

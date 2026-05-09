@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/core/Selection.h>
 
 #include <QObject>
 #include <QPoint>
@@ -63,6 +64,9 @@ public:
 
 Q_SIGNALS:
     void selectionChanged();
+
+private Q_SLOTS:
+    void onSessionPrimarySelectionChanged(const Markoff::Selection &sel);
 
 private:
     void normalized(int &fb, int &fo, int &lb, int &lo) const;

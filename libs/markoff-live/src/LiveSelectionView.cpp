@@ -16,7 +16,19 @@ namespace Markoff::Live {
 LiveSelectionView::LiveSelectionView(QObject *parent) : QObject(parent) {}
 
 void LiveSelectionView::setDocument(Markoff::MarkoffDocument *doc) { m_document = doc; }
-void LiveSelectionView::setSession(Markoff::Session *session)       { m_session  = session; }
+
+void LiveSelectionView::setSession(Markoff::Session *session)
+{
+    if (m_session == session) return;
+    if (m_session)
+        QObject::disconnect(m_session, &Markoff::Session::primarySelectionChanged,
+                            this, &LiveSelectionView::onSessionPrimarySelectionChanged);
+    m_session = session;
+    if (m_session)
+        QObject::connect(m_session, &Markoff::Session::primarySelectionChanged,
+                         this, &LiveSelectionView::onSessionPrimarySelectionChanged);
+}
+
 void LiveSelectionView::setModel(const LiveBlockModel *model)       { m_model    = model; }
 
 bool LiveSelectionView::hasSelection() const
@@ -158,6 +170,65 @@ void LiveSelectionView::deleteSelection()
 
     m_document->applyFlatEdit(startByte, endByte, QByteArray(), Markoff::Origin::UserEdit);
     clear();
+}
+
+void LiveSelectionView::onSessionPrimarySelectionChanged(const Markoff::Selection &sel)
+{
+    // Reentrancy guard: we ourselves called setPrimarySelection in syncToSession();
+    // don't echo back.
+    if (m_applyingSessionSelection) return;
+    if (!m_document || !m_model) return;
+
+    // Helper: resolve a TextAnchor → (blockRowIndex, qtPos).
+    // TextAnchor carries its BlockId directly via t.block(), so we don't need
+    // the (stale) latestBlockRanges-based blockAt() API.
+    // Returns {-1, -1} if the anchor's block is not currently in the model
+    // (orphaned anchor → callers must clear selection).
+    const auto resolve = [&](const Markoff::TextAnchor &ta) -> std::pair<int,int> {
+        if (ta.isNull()) return {-1, -1};
+        const Markoff::BlockAnchor ba = ta.block();  // BlockAnchor == BlockId
+
+        // Find the row in the model that has this BlockId.
+        const int rowCount = m_model->rowCount();
+        int row = -1;
+        for (int i = 0; i < rowCount; ++i) {
+            if (m_model->recordAt(i).blockAnchor == ba) {
+                row = i;
+                break;
+            }
+        }
+        if (row < 0) return {-1, -1};
+
+        // offsetInBlock() uses the per-block CRDT buffer directly (D2 path),
+        // which is always current. Clamp to [0, model-text-byte-length].
+        const int byteOff = m_document->offsetInBlock(ba, ta);
+        const QByteArray utf8 = m_model->recordAt(row).text.toUtf8();
+        const int clamped = qBound(0, byteOff, static_cast<int>(utf8.size()));
+        const int qtPos   = static_cast<int>(Coordinates::byteToQtPos(utf8, clamped));
+        return {row, qtPos};
+    };
+
+    const auto [anchorRow, anchorQtPos] = resolve(sel.anchor);
+    const auto [activeRow,  activeQtPos] = resolve(sel.active);
+
+    if (anchorRow < 0 || activeRow < 0) {
+        // Orphaned anchor: clear selection gracefully.
+        if (m_anchorBlock >= 0) {
+            m_anchorBlock = m_anchorQtPos = m_activeBlock = m_activeQtPos = -1;
+            Q_EMIT selectionChanged();
+        }
+        return;
+    }
+
+    if (m_anchorBlock == anchorRow && m_anchorQtPos == anchorQtPos
+        && m_activeBlock == activeRow && m_activeQtPos == activeQtPos)
+        return;  // No change.
+
+    m_anchorBlock  = anchorRow;
+    m_anchorQtPos  = anchorQtPos;
+    m_activeBlock  = activeRow;
+    m_activeQtPos  = activeQtPos;
+    Q_EMIT selectionChanged();
 }
 
 void LiveSelectionView::syncToSession()
