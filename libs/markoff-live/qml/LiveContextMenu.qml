@@ -15,6 +15,61 @@ Menu {
         root.popup(globalPos)
     }
 
+    // Clipboard cluster
+    MenuItem {
+        text: binding && binding.actionController
+              ? binding.actionController.cutAction.text : qsTr("Cut")
+        enabled: binding && binding.actionController
+                 && binding.actionController.cutAction.enabled
+        onTriggered: if (binding && binding.actionController)
+                         binding.actionController.cutAction.trigger()
+    }
+    MenuItem {
+        text: binding && binding.actionController
+              ? binding.actionController.copyAction.text : qsTr("Copy")
+        enabled: binding && binding.actionController
+                 && binding.actionController.copyAction.enabled
+        onTriggered: if (binding && binding.actionController)
+                         binding.actionController.copyAction.trigger()
+    }
+    MenuItem {
+        text: binding && binding.actionController
+              ? binding.actionController.pasteAction.text : qsTr("Paste")
+        enabled: binding && binding.actionController
+                 && binding.actionController.pasteAction.enabled
+        onTriggered: if (binding && binding.actionController)
+                         binding.actionController.pasteAction.trigger()
+    }
+    MenuItem {
+        text: binding && binding.actionController
+              ? binding.actionController.selectAllAction.text : qsTr("Select All")
+        enabled: binding && binding.actionController
+                 && binding.actionController.selectAllAction.enabled
+        onTriggered: if (binding && binding.actionController)
+                         binding.actionController.selectAllAction.trigger()
+    }
+
+    MenuSeparator {}
+
+    MenuItem {
+        text: binding && binding.actionController
+              ? binding.actionController.undoAction.text : qsTr("Undo")
+        enabled: binding && binding.actionController
+                 && binding.actionController.undoAction.enabled
+        onTriggered: if (binding && binding.actionController)
+                         binding.actionController.undoAction.trigger()
+    }
+    MenuItem {
+        text: binding && binding.actionController
+              ? binding.actionController.redoAction.text : qsTr("Redo")
+        enabled: binding && binding.actionController
+                 && binding.actionController.redoAction.enabled
+        onTriggered: if (binding && binding.actionController)
+                         binding.actionController.redoAction.trigger()
+    }
+
+    MenuSeparator {}
+
     MenuItem {
         text: qsTr("Undo in this block")
         enabled: root._anchor !== null
@@ -25,18 +80,5 @@ Menu {
             if (root.binding && root.binding.document && root._anchor)
                 root.binding.document.undoForBlock(root._anchor)
         }
-    }
-
-    MenuSeparator {}
-
-    MenuItem {
-        text: qsTr("Undo")
-        enabled: root.binding !== null && root.binding.document !== null
-        onTriggered: if (root.binding && root.binding.document) root.binding.document.undoD2()
-    }
-    MenuItem {
-        text: qsTr("Redo")
-        enabled: root.binding !== null && root.binding.document !== null
-        onTriggered: if (root.binding && root.binding.document) root.binding.document.redoD2()
     }
 }
