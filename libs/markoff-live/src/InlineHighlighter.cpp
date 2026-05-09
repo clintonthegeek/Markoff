@@ -4,6 +4,7 @@
 #include <markoff/core/Theme.h>
 
 #include <QFontMetricsF>
+#include <algorithm>
 
 namespace Markoff::Live {
 
@@ -30,15 +31,26 @@ void InlineHighlighter::setTheme(const Markoff::Theme *theme)
 
 void InlineHighlighter::highlightBlock(const QString &text)
 {
-    Q_UNUSED(text);
     if (!m_theme) return;
     for (const Markoff::SourceSpan &span : std::as_const(m_spans)) {
+        if (span.charLength <= 0) continue;
+        const bool hide = delimiterShouldHide(span);
+        if (hide) {
+            // Apply per-char hidden format (negative letterSpacing tuned per glyph).
+            for (int i = span.charOffset; i < span.charOffset + span.charLength; ++i) {
+                if (i < 0 || i >= text.length()) continue;
+                QTextCharFormat merged = format(i);
+                merged.merge(hiddenFormatForChar(text[i]));
+                setFormat(i, 1, merged);
+            }
+            continue;
+        }
         const QTextCharFormat spanFmt = formatFor(span);
         if (spanFmt == QTextCharFormat()) continue;
-        if (span.charLength <= 0) continue;
         // Merge span format into existing per-character formats so that
         // overlapping spans accumulate properties rather than replacing them.
         for (int i = span.charOffset; i < span.charOffset + span.charLength; ++i) {
+            if (i < 0 || i >= text.length()) continue;
             QTextCharFormat merged = format(i);
             merged.merge(spanFmt);
             setFormat(i, 1, merged);
@@ -119,8 +131,25 @@ void InlineHighlighter::setSelectionRange(int startQtPos, int endQtPos)
 
 bool InlineHighlighter::delimiterShouldHide(const Markoff::SourceSpan &span) const
 {
-    Q_UNUSED(span);
-    return false;  // Phase A: never hide. Phase B fills in real logic.
+    if (!span.isDelimiter) return false;
+    if (span.parentCharStart < 0 || span.parentCharEnd < 0) return false;
+
+    // Selection touches the parent range? Reveal.
+    if (m_selStart >= 0 && m_selEnd >= 0) {
+        const int lo = std::min(m_selStart, m_selEnd);
+        const int hi = std::max(m_selStart, m_selEnd);
+        if (lo <= span.parentCharEnd && hi >= span.parentCharStart) return false;
+    }
+
+    // Caret in [parentCharStart - 1, parentCharEnd + 1]? Reveal.
+    // m_localCaretPos == -1 means "no caret in this block" — never reveal.
+    if (m_localCaretPos >= 0 &&
+        m_localCaretPos >= span.parentCharStart - 1 &&
+        m_localCaretPos <= span.parentCharEnd + 1) {
+        return false;
+    }
+
+    return true;  // hide
 }
 
 QTextCharFormat InlineHighlighter::hiddenFormatForChar(QChar ch) const
