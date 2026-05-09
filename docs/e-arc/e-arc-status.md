@@ -61,6 +61,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-09 | `64e2fae` | **Phase D complete (E2.5 LiveActionController: 11 QActions + enabled-state + dispatch).** `LiveActionController` with Cut/Copy/Paste/SelectAll/Delete/Undo/Redo/Bold/Italic/Link/Save actions, correct shortcuts, connected to `LiveSelectionView`/`LiveClipboardController`. `updateEnabledStates()` public slot. 3 new test files (D2 enabled-state 4 cases, D3 dispatch 3 cases, D4 clipboard-change 1 case). 47/47 live-render tests green. |
 | 2026-05-09 | `0c19ab1` | **Phase C complete (E2.5 LiveClipboardController: copy/cut/paste with hybrid flat+structured path).** Cut/Copy/Paste with `application/x-markoff-blocks` MIME; flat fallback; foreign-Markoff-MIME new-IDs path; round-trip test. 44/44 live-render tests green. |
 | 2026-05-09 | `87d2786` | **Phase B complete (E2.5 LiveSelectionView extensions).** `selectAll`, `deleteSelection`, `Session` subscription (`primarySelectionChanged`) + edge-case tests. 39/39 live-render tests green; 10/10 markoff-core/parser tests green (no regressions). |
 | 2026-05-09 | `949bdc8` | **Phase A complete (E2.5 markoff-core primitives).** `MarkoffDocument` save-watermark API (`savedSequence/markSaved/dirty/dirtyChanged`), `PasteMeta` + recent-cuts cache (`RecentCutsCache`), `applyStructuredPaste`. 10/10 markoff-core/parser tests green; 33/33 live-render tests green (no regressions). |
