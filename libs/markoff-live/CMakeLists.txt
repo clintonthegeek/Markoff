@@ -71,6 +71,9 @@ qt_add_qml_module(markoff_live
         # E2: navigation controller
         include/markoff/live/LiveNavigationController.h
         src/LiveNavigationController.cpp
+        # E2.5 Phase C: clipboard controller
+        include/markoff/live/LiveClipboardController.h
+        src/LiveClipboardController.cpp
     QML_FILES
         qml/LiveView.qml
         qml/LiveContextMenu.qml

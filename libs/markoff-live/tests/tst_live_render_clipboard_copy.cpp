@@ -11,10 +11,15 @@
 #include <QTest>
 #include <QApplication>
 #include <QClipboard>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QMimeData>
 
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/LiveClipboardController.h>
 
 #include <markoff/core/MarkoffDocument.h>
 
@@ -75,6 +80,41 @@ private Q_SLOTS:
 
         const QString clip = QApplication::clipboard()->text();
         QCOMPARE(clip, QStringLiteral("abet\nbravado\nchar"));
+    }
+
+    void copy_writes_markoff_mime_payload() {
+        // LiveClipboardController::copy() must write both text/plain and
+        // application/x-markoff-blocks with version==1, sourceReplicaId,
+        // and a blocks array of size 1 when one block is (partially) selected.
+        Markoff::MarkoffDocument doc(/*replicaId=*/42);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("hello world\n");
+        QCOMPARE(binding.model()->rowCount(), 1);
+
+        auto *sv = binding.selectionView();
+        sv->begin(0, 0);
+        sv->extend(0, 5);  // select "hello"
+
+        LiveClipboardController cc;
+        cc.setDocument(&doc);
+        cc.setSelectionView(sv);
+        cc.setModel(binding.model());
+        cc.copy();
+
+        const QMimeData *mime = QApplication::clipboard()->mimeData();
+        QVERIFY(mime->hasFormat(LiveClipboardController::kBlocksMime));
+        QCOMPARE(mime->text(), QStringLiteral("hello"));
+
+        const QJsonDocument jdoc = QJsonDocument::fromJson(
+            mime->data(LiveClipboardController::kBlocksMime));
+        QVERIFY(jdoc.isObject());
+        QCOMPARE(jdoc.object().value("version").toInt(), 1);
+        QCOMPARE(jdoc.object().value("sourceReplicaId").toInt(), 42);
+        QCOMPARE(jdoc.object().value("blocks").toArray().size(), 1);
+        QCOMPARE(jdoc.object().value("blocks").toArray().at(0)
+                     .toObject().value("text").toString(),
+                 QStringLiteral("hello"));
     }
 };
 

@@ -62,6 +62,12 @@ public:
     /// contribute empty strings.
     Q_INVOKABLE void copyToClipboard() const;
 
+    // Accessors used by LiveClipboardController to compute paste byte offsets.
+    int anchorBlock() const { return m_anchorBlock; }
+    int anchorQtPos() const { return m_anchorQtPos; }
+    int activeBlock() const { return m_activeBlock; }
+    int activeQtPos() const { return m_activeQtPos; }
+
 Q_SIGNALS:
     void selectionChanged();
 

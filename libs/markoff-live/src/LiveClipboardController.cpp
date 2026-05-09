@@ -1,0 +1,214 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include <markoff/live/LiveClipboardController.h>
+
+#include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/Coordinates.h>
+
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/PasteMeta.h>
+
+#include <QApplication>
+#include <QClipboard>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QMimeData>
+#include <QStringList>
+
+namespace Markoff::Live {
+
+LiveClipboardController::LiveClipboardController(QObject *parent) : QObject(parent) {}
+
+void LiveClipboardController::setDocument(Markoff::MarkoffDocument *doc) { m_document = doc; }
+void LiveClipboardController::setSelectionView(LiveSelectionView *sv) { m_selection = sv; }
+void LiveClipboardController::setModel(const LiveBlockModel *model) { m_model = model; }
+
+// ---------------------------------------------------------------------------
+// Internal helpers
+// ---------------------------------------------------------------------------
+
+namespace {
+
+/// Serialize the selected spans of each block to a JSON array.
+/// Each object has "kind" (QString) and "text" (the selected substring).
+QJsonArray serializeSelection(const LiveSelectionView &sel, const LiveBlockModel &model)
+{
+    QJsonArray out;
+    if (!sel.hasSelection()) return out;
+    const int rowCount = model.rowCount();
+    for (int i = 0; i < rowCount; ++i) {
+        const QPoint r = sel.rangeForBlock(i);
+        if (r.x() < 0) continue;  // block not in selection
+        const auto &rec = model.recordAt(i);
+        const int startPos = r.x();
+        const int endPos   = (r.y() == INT_MAX) ? rec.text.length() : r.y();
+        const QString text = rec.text.mid(startPos, endPos - startPos);
+        QJsonObject obj;
+        obj["kind"] = rec.kind;
+        obj["text"] = text;
+        out.append(obj);
+    }
+    return out;
+}
+
+/// Join block texts with '\n' for the text/plain MIME type.
+QString joinPlain(const QJsonArray &blocks)
+{
+    QStringList parts;
+    for (const auto &v : blocks)
+        parts << v.toObject().value("text").toString();
+    return parts.join('\n');
+}
+
+/// Compute the flat byte offset of (blockIndex, qtPos) by walking
+/// the document's iterateBlocks() list.  Uses the same model-text-UTF8
+/// approach as LiveSelectionView::deleteSelection().
+/// Returns UINT32_MAX if blockIndex is out of range.
+uint32_t flatByteOffset(const LiveBlockModel &model,
+                        Markoff::MarkoffDocument &doc,
+                        int blockIndex, int qtPos)
+{
+    const auto allIds = doc.iterateBlocks();
+    uint32_t cursor   = 0;
+    for (int i = 0; i < static_cast<int>(allIds.size()); ++i) {
+        const QByteArray rawText = doc.blockText(allIds[i]);
+        if (i == blockIndex) {
+            const QByteArray modelUtf8 = model.recordAt(blockIndex).text.toUtf8();
+            const int clamped = qBound(0, qtPos, static_cast<int>(modelUtf8.size()));
+            return cursor + static_cast<uint32_t>(
+                Coordinates::qtPosToByte(modelUtf8, clamped));
+        }
+        cursor += static_cast<uint32_t>(rawText.size());
+    }
+    return UINT32_MAX;
+}
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// Public slots
+// ---------------------------------------------------------------------------
+
+void LiveClipboardController::copy()
+{
+    if (!m_selection || !m_model || !m_document) return;
+    if (!m_selection->hasSelection()) return;
+
+    const QJsonArray blocks = serializeSelection(*m_selection, *m_model);
+    if (blocks.isEmpty()) return;
+
+    QJsonObject payload;
+    payload["version"]         = 1;
+    payload["sourceReplicaId"] = static_cast<qint64>(m_document->replicaId());
+    payload["blocks"]          = blocks;
+
+    auto *mime = new QMimeData();
+    mime->setText(joinPlain(blocks));
+    mime->setData(kBlocksMime,
+                  QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    QApplication::clipboard()->setMimeData(mime);
+}
+
+void LiveClipboardController::cut()
+{
+    if (!m_selection || !m_model || !m_document) return;
+    if (!m_selection->hasSelection()) return;
+
+    // Capture cutSeq = d2EditSequence + 1, the sequence the deletion will use.
+    const quint64 cutSeq = m_document->d2EditSequence() + 1;
+
+    // Collect the BlockIds of all selected blocks (for the recent-cuts cache).
+    std::vector<Markoff::BlockId> affected;
+    const auto allIds  = m_document->iterateBlocks();
+    const int rc       = m_model->rowCount();
+    for (int i = 0; i < rc; ++i) {
+        const QPoint r = m_selection->rangeForBlock(i);
+        if (r.x() < 0) continue;
+        if (i < static_cast<int>(allIds.size()))
+            affected.push_back(allIds[i]);
+    }
+
+    // Build clipboard payload (same as copy, plus cutSequenceNumber).
+    const QJsonArray blocks = serializeSelection(*m_selection, *m_model);
+    QJsonObject payload;
+    payload["version"]             = 1;
+    payload["sourceReplicaId"]     = static_cast<qint64>(m_document->replicaId());
+    payload["cutSequenceNumber"]   = static_cast<qint64>(cutSeq);
+    payload["blocks"]              = blocks;
+
+    auto *mime = new QMimeData();
+    mime->setText(joinPlain(blocks));
+    mime->setData(kBlocksMime,
+                  QJsonDocument(payload).toJson(QJsonDocument::Compact));
+    QApplication::clipboard()->setMimeData(mime);
+
+    // Delete the selection (applies the flat edit, clears selection).
+    m_selection->deleteSelection();
+
+    // Register the BlockIds in the recent-cuts cache.
+    m_document->recordRecentCut(cutSeq, std::move(affected));
+}
+
+void LiveClipboardController::paste()
+{
+    if (!m_selection || !m_document || !m_model) return;
+    const QMimeData *mime = QApplication::clipboard()->mimeData();
+    if (!mime || (!mime->hasText() && !mime->hasFormat(kBlocksMime))) return;
+
+    // We need anchor positions to compute start/end byte offsets.
+    // Use the private members through the public accessors we added to
+    // LiveSelectionView (anchorBlock/anchorQtPos/activeBlock/activeQtPos).
+    const int ab = m_selection->anchorBlock();
+    const int ap = m_selection->anchorQtPos();
+    const int xb = m_selection->activeBlock();
+    const int xp = m_selection->activeQtPos();
+
+    if (ab < 0 || xb < 0) return;
+
+    // Sort anchor/active so first ≤ last.
+    int fb, fo, lb, lo;
+    if (ab < xb || (ab == xb && ap <= xp)) {
+        fb = ab; fo = ap; lb = xb; lo = xp;
+    } else {
+        fb = xb; fo = xp; lb = ab; lo = ap;
+    }
+
+    const uint32_t startByte = flatByteOffset(*m_model, *m_document, fb, fo);
+    const uint32_t endByte   = flatByteOffset(*m_model, *m_document, lb, lo);
+    if (startByte == UINT32_MAX || endByte == UINT32_MAX) return;
+
+    // Try the structured fast-path.
+    if (mime->hasFormat(kBlocksMime)) {
+        const QJsonDocument jdoc =
+            QJsonDocument::fromJson(mime->data(kBlocksMime));
+        if (jdoc.isObject() && jdoc.object().value("version").toInt() == 1) {
+            const QJsonObject obj    = jdoc.object();
+            const QJsonArray  bArr   = obj.value("blocks").toArray();
+            const quint16 srcReplica =
+                static_cast<quint16>(obj.value("sourceReplicaId").toInt(0));
+
+            Markoff::PasteMeta meta;
+            if (srcReplica == m_document->replicaId()
+                && obj.contains("cutSequenceNumber")) {
+                meta.reuseBlockIds = true;
+                meta.cutSeq = static_cast<quint64>(
+                    obj.value("cutSequenceNumber").toDouble());
+            }
+            m_document->applyStructuredPaste(startByte, endByte, bArr, meta);
+            m_selection->clear();
+            return;
+        }
+    }
+
+    // Flat text fallback.
+    if (mime->hasText()) {
+        const QByteArray inserted = mime->text().toUtf8();
+        m_document->applyFlatEdit(startByte, endByte, inserted,
+                                  Markoff::Origin::UserEdit);
+        m_selection->clear();
+    }
+}
+
+}  // namespace Markoff::Live
