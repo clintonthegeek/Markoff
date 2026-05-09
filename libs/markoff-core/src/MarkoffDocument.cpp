@@ -927,6 +927,10 @@ qsizetype MarkoffDocument::compact(const CollabText::Crdt::Global &watermark)
 
 void MarkoffDocument::scheduleD2Changed()
 {
+    // Emit dirtyChanged synchronously on every edit — callers need the
+    // transition signal immediately, not after the debounce delay.
+    maybeEmitDirtyChanged();
+
     if (!d->d2ChangePending) {
         d->d2ChangePending = true;
         QTimer::singleShot(0, this, [this]() {
@@ -1103,6 +1107,32 @@ quint64 MarkoffDocument::d2EditSequence() const noexcept
     for (const auto &seq : d->blockEditSequences)
         sum += seq;
     return sum;
+}
+
+// ============================================================================
+// Save-watermark API (E2.5 Task A1)
+// ============================================================================
+
+quint64 MarkoffDocument::savedSequence() const noexcept { return d->savedSeq; }
+
+bool MarkoffDocument::dirty() const noexcept
+{
+    return d->savedSeq != d2EditSequence();
+}
+
+void MarkoffDocument::markSaved(quint64 seq)
+{
+    d->savedSeq = seq;
+    maybeEmitDirtyChanged();
+}
+
+void MarkoffDocument::maybeEmitDirtyChanged()
+{
+    const bool nowDirty = dirty();
+    if (nowDirty != d->lastDirtyEmitted) {
+        d->lastDirtyEmitted = nowDirty;
+        Q_EMIT dirtyChanged(nowDirty);
+    }
 }
 
 QList<SourceSpan> MarkoffDocument::inlineSpansFor(BlockId id) const

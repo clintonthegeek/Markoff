@@ -140,6 +140,11 @@ add_test(NAME tst_v10_targeted_block_signals COMMAND tst_v10_targeted_block_sign
 target_link_libraries(tst_v10_targeted_block_signals PRIVATE markoff_core Qt6::Test)
 set_tests_properties(tst_v10_targeted_block_signals PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_markoff_doc_save_watermark tst_markoff_doc_save_watermark.cpp)
+add_test(NAME tst_markoff_doc_save_watermark COMMAND tst_markoff_doc_save_watermark)
+target_link_libraries(tst_markoff_doc_save_watermark PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markoff_doc_save_watermark PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_subdirectory(d2)
 add_subdirectory(d5)
 

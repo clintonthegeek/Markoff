@@ -103,6 +103,10 @@ struct MarkoffDocument::Private {
     // Debounce flag for d2DocumentChanged signal
     bool d2ChangePending = false;
 
+    // Save-watermark state (E2.5 Task A1)
+    quint64 savedSeq          = 0;
+    bool    lastDirtyEmitted  = false;
+
     // D5: remote cursor state (Phase 7)
     struct RemoteCursorRecord {
         Markoff::Cursor cursor;

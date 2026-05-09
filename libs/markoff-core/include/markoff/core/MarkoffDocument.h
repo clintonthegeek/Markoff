@@ -215,6 +215,15 @@ public:
     /// tracker for D2 internals).
     quint64 d2EditSequence() const noexcept;
 
+    /// Save-watermark API. The view-layer / host calls markSaved with the
+    /// d2EditSequence captured immediately before its file write started;
+    /// dirty() returns whether subsequent edits have advanced the sequence.
+    /// dirtyChanged fires only on transitions (false→true and true→false),
+    /// not on every edit.
+    quint64 savedSequence() const noexcept;
+    void    markSaved(quint64 seq);
+    bool    dirty() const noexcept;
+
     /// Test helper: insert a block with the given kind and content directly
     /// into D2 internals. Callable from test code; do not call in production.
     Markoff::BlockId testInsertBlock(Markoff::BlockKind kind, const QByteArray &content);
@@ -346,6 +355,12 @@ Q_SIGNALS:
     /// carrying its ID and its former row index.
     void blockRemoved(Markoff::BlockId id, int row);
 
+    /// Emitted on dirty-state transitions: true when the document becomes
+    /// dirty (d2EditSequence diverges from savedSequence), false when
+    /// markSaved() is called with the current sequence. Fires only on
+    /// transitions, not on every edit.
+    void dirtyChanged(bool dirty);
+
     /// Emitted once per UndoLog::Transaction commit with all ops the
     /// transaction produced. Only emitted when isCollabConfigured() is true.
     /// See D5 spec §2.2.
@@ -407,6 +422,7 @@ private:
     friend class WatermarkCoordinator;
 
     void scheduleD2Changed();
+    void maybeEmitDirtyChanged();
     void onSaveComplete();
     void materializeBlocksFromParsedDoc(const Markoff::Document &parsed,
                                         const QString &body);
