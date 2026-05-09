@@ -458,6 +458,14 @@ void LiveListModelBinding::onD2Changed()
         if (fk == Markoff::BlockKind::Heading) {
             attrNames << Markoff::AttrNames::Level;
             attrVals  << int(countLeadingHashes(rec.text));
+            attrNames << Markoff::AttrNames::HeadingForm;
+            const int setextLvl = matchesSetextShape(rec.text);
+            if (setextLvl > 0) {
+                attrVals[0] = setextLvl;  // overwrite the count-leading-hashes 0
+                attrVals  << QString("setext");
+            } else {
+                attrVals  << QString("atx");
+            }
         } else if (fk == Markoff::BlockKind::Math) {
             attrNames << Markoff::AttrNames::DisplayMode;
             attrVals  << displayMode;
