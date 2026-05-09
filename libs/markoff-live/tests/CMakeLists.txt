@@ -234,3 +234,17 @@ target_link_libraries(tst_live_render_e2_nav_shift_extend
 add_test(NAME tst_live_render_e2_nav_shift_extend
          COMMAND tst_live_render_e2_nav_shift_extend)
 
+qt_add_executable(tst_live_render_e2_perf_caret_move
+    tst_live_render_e2_perf_caret_move.cpp)
+target_link_libraries(tst_live_render_e2_perf_caret_move
+    PRIVATE markoff_live Qt6::Test markoff_core)
+add_test(NAME tst_live_render_e2_perf_caret_move
+         COMMAND tst_live_render_e2_perf_caret_move)
+
+qt_add_executable(tst_live_render_e2_perf_caret_inline
+    tst_live_render_e2_perf_caret_inline.cpp)
+target_link_libraries(tst_live_render_e2_perf_caret_inline
+    PRIVATE markoff_live Qt6::Test)
+add_test(NAME tst_live_render_e2_perf_caret_inline
+         COMMAND tst_live_render_e2_perf_caret_inline)
+
