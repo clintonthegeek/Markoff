@@ -159,3 +159,27 @@ target_link_libraries(tst_live_render_e2_autohide_block_prefix PRIVATE
 add_test(NAME tst_live_render_e2_autohide_block_prefix
          COMMAND tst_live_render_e2_autohide_block_prefix)
 
+qt_add_executable(tst_live_render_e2_autohide_nested
+    tst_live_render_e2_autohide_nested.cpp
+)
+target_link_libraries(tst_live_render_e2_autohide_nested PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_e2_autohide_nested
+         COMMAND tst_live_render_e2_autohide_nested)
+
+qt_add_executable(tst_live_render_e2_autohide_selection
+    tst_live_render_e2_autohide_selection.cpp
+)
+target_link_libraries(tst_live_render_e2_autohide_selection PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_e2_autohide_selection
+         COMMAND tst_live_render_e2_autohide_selection)
+
+qt_add_executable(tst_live_render_e2_autohide_peer_cursor
+    tst_live_render_e2_autohide_peer_cursor.cpp
+)
+target_link_libraries(tst_live_render_e2_autohide_peer_cursor PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_e2_autohide_peer_cursor
+         COMMAND tst_live_render_e2_autohide_peer_cursor)
+
