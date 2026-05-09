@@ -42,6 +42,7 @@ QTextCharFormat Theme::charFormat(Slot s) const
 {
     QTextCharFormat fmt;
     if (s == Slot::HiddenMarker) {
+        // QTextCharFormat has no direct letter-spacing setters; must go via QFont.
         QFont f = fmt.font();
         f.setLetterSpacing(QFont::AbsoluteSpacing, -1000.0);
         fmt.setFont(f);

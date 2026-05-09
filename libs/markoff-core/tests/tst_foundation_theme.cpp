@@ -70,8 +70,8 @@ private Q_SLOTS:
     }
 
     void hiddenMarker_charFormat_has_negative_letter_spacing() {
-        Markoff::Theme theme;
-        const QTextCharFormat fmt = theme.charFormat(Markoff::Theme::Slot::HiddenMarker);
+        Theme theme;
+        const QTextCharFormat fmt = theme.charFormat(Theme::Slot::HiddenMarker);
         QFont f = fmt.font();
         QCOMPARE(f.letterSpacingType(), QFont::AbsoluteSpacing);
         QVERIFY(f.letterSpacing() < 0.0);
