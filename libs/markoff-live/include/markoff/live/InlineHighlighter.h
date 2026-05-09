@@ -28,14 +28,29 @@ public:
     void setTheme(const Markoff::Theme *theme);
     const Markoff::Theme *theme() const noexcept { return m_theme; }
 
+    /// Local caret qtPos within the bound block, or -1 for "no local caret
+    /// in this block". Spec §3.1 / §4.4 — peer cursors do NOT use this slot.
+    void setLocalCaretPosition(int qtPos);
+    int  localCaretPosition() const noexcept { return m_localCaretPos; }
+
+    /// Selection range within the bound block in qtPos coords. -1/-1 = no selection.
+    void setSelectionRange(int startQtPos, int endQtPos);
+    int  selectionStart() const noexcept { return m_selStart; }
+    int  selectionEnd()   const noexcept { return m_selEnd;   }
+
 protected:
     void highlightBlock(const QString &text) override;
 
 private:
     QTextCharFormat formatFor(const Markoff::SourceSpan &span) const;
+    bool delimiterShouldHide(const Markoff::SourceSpan &span) const;
+    QTextCharFormat hiddenFormatForChar(QChar ch) const;
 
     QList<Markoff::SourceSpan> m_spans;
     const Markoff::Theme      *m_theme = nullptr;
+    int m_localCaretPos = -1;
+    int m_selStart      = -1;
+    int m_selEnd        = -1;
 };
 
 }  // namespace Markoff::Live

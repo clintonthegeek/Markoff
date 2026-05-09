@@ -3,6 +3,8 @@
 
 #include <markoff/core/Theme.h>
 
+#include <QFontMetricsF>
+
 namespace Markoff::Live {
 
 InlineHighlighter::InlineHighlighter(QTextDocument *parent)
@@ -98,6 +100,40 @@ QTextCharFormat InlineHighlighter::formatFor(const Markoff::SourceSpan &span) co
     if (span.isTag) applyEmphasis(Markoff::Theme::Slot::Tag);
 
     return any ? fmt : QTextCharFormat();
+}
+
+void InlineHighlighter::setLocalCaretPosition(int qtPos)
+{
+    if (m_localCaretPos == qtPos) return;
+    m_localCaretPos = qtPos;
+    rehighlight();
+}
+
+void InlineHighlighter::setSelectionRange(int startQtPos, int endQtPos)
+{
+    if (m_selStart == startQtPos && m_selEnd == endQtPos) return;
+    m_selStart = startQtPos;
+    m_selEnd   = endQtPos;
+    rehighlight();
+}
+
+bool InlineHighlighter::delimiterShouldHide(const Markoff::SourceSpan &span) const
+{
+    Q_UNUSED(span);
+    return false;  // Phase A: never hide. Phase B fills in real logic.
+}
+
+QTextCharFormat InlineHighlighter::hiddenFormatForChar(QChar ch) const
+{
+    QTextCharFormat fmt;
+    if (!m_theme) return fmt;
+    fmt = m_theme->charFormat(Markoff::Theme::Slot::HiddenMarker);
+    // QTextCharFormat has no direct letter-spacing setters; must go via QFont.
+    QFont f = fmt.font();
+    const qreal advance = QFontMetricsF(f).horizontalAdvance(ch);
+    f.setLetterSpacing(QFont::AbsoluteSpacing, -advance);
+    fmt.setFont(f);
+    return fmt;
 }
 
 }  // namespace Markoff::Live

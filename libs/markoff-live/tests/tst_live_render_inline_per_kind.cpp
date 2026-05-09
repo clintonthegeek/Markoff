@@ -241,6 +241,43 @@ private Q_SLOTS:
         QVERIFY2(!anyPaint, "Out-of-scope flags must not paint");
     }
 
+    void set_local_caret_position_triggers_rehighlight() {
+        QTextDocument doc;
+        doc.setPlainText("**bold**");
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        InlineHighlighter h(&doc);
+        h.setTheme(&theme);
+
+        Markoff::SourceSpan boldSpan{};
+        boldSpan.charOffset = 2; boldSpan.charLength = 4;
+        boldSpan.bold = true;
+        Markoff::SourceSpan openMarker{};
+        openMarker.charOffset = 0; openMarker.charLength = 2;
+        openMarker.bold = true; openMarker.isDelimiter = true;
+        openMarker.parentCharStart = 0; openMarker.parentCharEnd = 8;
+        Markoff::SourceSpan closeMarker{};
+        closeMarker.charOffset = 6; closeMarker.charLength = 2;
+        closeMarker.bold = true; closeMarker.isDelimiter = true;
+        closeMarker.parentCharStart = 0; closeMarker.parentCharEnd = 8;
+        h.setInlineSpans({openMarker, boldSpan, closeMarker});
+
+        h.setLocalCaretPosition(4);  // inside the span
+        QCOMPARE(h.localCaretPosition(), 4);
+        h.setLocalCaretPosition(20);
+        QCOMPARE(h.localCaretPosition(), 20);
+    }
+
+    void set_selection_range_records_state() {
+        QTextDocument doc;
+        InlineHighlighter h(&doc);
+        h.setSelectionRange(3, 7);
+        QCOMPARE(h.selectionStart(), 3);
+        QCOMPARE(h.selectionEnd(), 7);
+        h.setSelectionRange(-1, -1);  // no-selection sentinel
+        QCOMPARE(h.selectionStart(), -1);
+        QCOMPARE(h.selectionEnd(), -1);
+    }
+
     void attached_shim_c_plus_plus_surface_works() {
         // Without a QQuickTextDocument target, rebuildHighlighter is a no-op.
         // Test the C++ property surface: spans round-trip, theme stored, no crash.
