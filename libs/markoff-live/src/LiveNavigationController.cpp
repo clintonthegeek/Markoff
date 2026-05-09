@@ -3,6 +3,7 @@
 
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveCursorState.h>
+#include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/BlockKindRegistry.h>
 #include <markoff/live/BlockKindDescriptor.h>
 #include <markoff/live/BlockRecord.h>
@@ -16,11 +17,13 @@ namespace Markoff::Live {
 
 LiveNavigationController::LiveNavigationController(
     const BlockKindRegistry *registry, LiveBlockModel *model,
-    LiveCursorState *cursorState, QObject *parent)
+    LiveCursorState *cursorState, LiveSelectionView *selectionView,
+    QObject *parent)
     : QObject(parent)
     , m_registry(registry)
     , m_model(model)
     , m_cursorState(cursorState)
+    , m_selectionView(selectionView)
 {
 }
 
@@ -97,6 +100,67 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
             const int targetRow = nextNavigableRow(blockIndex);
             if (targetRow < 0) return Handled;
             m_cursorState->requestTextCaretAtRow(targetRow, 0);
+            return Handled;
+        }
+    }
+
+    // Shift+Arrow: extend selection across blocks.
+    if (modifiers == Qt::ShiftModifier) {
+        if (key == Qt::Key_Left) {
+            if (qtPos > 0) return NotHandled;  // TextEdit handles within-block shift
+            m_cursorState->clearDesiredVisualX();
+            const int targetRow = previousNavigableRow(blockIndex);
+            if (targetRow < 0) return Handled;
+            if (!m_model) return Handled;
+            const int targetLen = m_model->recordAt(targetRow).text.length();
+            if (m_selectionView) m_selectionView->extend(targetRow, targetLen);
+            m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
+            return Handled;
+        }
+        if (key == Qt::Key_Right) {
+            if (qtPos < blockText.length()) return NotHandled;  // TextEdit handles within-block shift
+            m_cursorState->clearDesiredVisualX();
+            const int targetRow = nextNavigableRow(blockIndex);
+            if (targetRow < 0) return Handled;
+            if (m_selectionView) m_selectionView->extend(targetRow, 0);
+            m_cursorState->requestTextCaretAtRow(targetRow, 0);
+            return Handled;
+        }
+        if (key == Qt::Key_Up) {
+            if (!isAtVisualTopLine(editItem)) return NotHandled;
+            qreal desiredX = m_cursorState->desiredVisualX();
+            if (desiredX < 0) {
+                const QVariant rectV = editItem ? editItem->property("cursorRectangle") : QVariant();
+                desiredX = rectV.canConvert<QRectF>() ? rectV.toRectF().x() : 0.0;
+                m_cursorState->setDesiredVisualX(desiredX);
+            }
+            const int targetRow = previousNavigableRow(blockIndex);
+            if (targetRow < 0) return Handled;
+            if (m_selectionView) {
+                // Use desiredVisualX position as an approximation; QML will refine.
+                m_selectionView->extend(targetRow, 0);
+            }
+            m_cursorState->requestTextCaretAtRowVisualX(
+                targetRow, LiveCursorState::VisualLineHint::LastLine);
+            return Handled;
+        }
+        if (key == Qt::Key_Down) {
+            if (!isAtVisualBottomLine(editItem)) return NotHandled;
+            qreal desiredX = m_cursorState->desiredVisualX();
+            if (desiredX < 0) {
+                const QVariant rectV = editItem ? editItem->property("cursorRectangle") : QVariant();
+                desiredX = rectV.canConvert<QRectF>() ? rectV.toRectF().x() : 0.0;
+                m_cursorState->setDesiredVisualX(desiredX);
+            }
+            const int targetRow = nextNavigableRow(blockIndex);
+            if (targetRow < 0) return Handled;
+            if (m_selectionView) {
+                // Use end of target block as position; QML will refine.
+                const int targetLen = m_model ? m_model->recordAt(targetRow).text.length() : 0;
+                m_selectionView->extend(targetRow, targetLen);
+            }
+            m_cursorState->requestTextCaretAtRowVisualX(
+                targetRow, LiveCursorState::VisualLineHint::FirstLine);
             return Handled;
         }
     }

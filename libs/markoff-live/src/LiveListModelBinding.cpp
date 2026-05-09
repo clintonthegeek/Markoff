@@ -151,7 +151,7 @@ LiveListModelBinding::LiveListModelBinding(QObject *parent)
     d->hitTester       = new BlockHitTester(this);
     d->selectionView   = new LiveSelectionView(this);
     d->selectionView->setModel(d->model);
-    d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, this);
+    d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, d->selectionView, this);
     d->remoteCursors   = new RemoteCursorsListModel(this);
 }
 

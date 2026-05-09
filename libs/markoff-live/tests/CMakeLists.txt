@@ -227,3 +227,10 @@ target_link_libraries(tst_live_render_e2_nav_page
 add_test(NAME tst_live_render_e2_nav_page
          COMMAND tst_live_render_e2_nav_page)
 
+qt_add_executable(tst_live_render_e2_nav_shift_extend
+    tst_live_render_e2_nav_shift_extend.cpp)
+target_link_libraries(tst_live_render_e2_nav_shift_extend
+    PRIVATE markoff_live Qt6::Test Qt6::Gui)
+add_test(NAME tst_live_render_e2_nav_shift_extend
+         COMMAND tst_live_render_e2_nav_shift_extend)
+
