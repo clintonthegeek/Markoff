@@ -111,3 +111,11 @@ target_link_libraries(tst_live_render_inline_typing_perf PRIVATE
 add_test(NAME tst_live_render_inline_typing_perf
          COMMAND tst_live_render_inline_typing_perf)
 
+qt_add_executable(tst_live_render_e2_zero_width_mechanism
+    tst_live_render_e2_zero_width_mechanism.cpp
+)
+target_link_libraries(tst_live_render_e2_zero_width_mechanism PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_core)
+add_test(NAME tst_live_render_e2_zero_width_mechanism
+         COMMAND tst_live_render_e2_zero_width_mechanism)
+
