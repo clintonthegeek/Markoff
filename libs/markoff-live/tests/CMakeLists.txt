@@ -430,3 +430,11 @@ target_link_libraries(tst_live_render_cut_to_empty
 add_test(NAME tst_live_render_cut_to_empty
          COMMAND tst_live_render_cut_to_empty)
 
+# I1: Bulk-paste perf bench — 1000-block paste under 200 ms.
+qt_add_executable(tst_live_render_e2_5_perf_bulk_paste
+    tst_live_render_e2_5_perf_bulk_paste.cpp)
+target_link_libraries(tst_live_render_e2_5_perf_bulk_paste
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_e2_5_perf_bulk_paste
+         COMMAND tst_live_render_e2_5_perf_bulk_paste)
+
