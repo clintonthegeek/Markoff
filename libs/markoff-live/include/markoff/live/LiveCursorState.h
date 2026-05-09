@@ -73,7 +73,7 @@ public:
     /// Like requestTextCaretAtRow, but qtPos is computed by the destination
     /// delegate from desiredVisualX projected onto the line indicated by hint.
     void requestTextCaretAtRowVisualX(int expectedRow, VisualLineHint hint);
-    VisualLineHint pendingVisualLineHint() const noexcept { return m_pendingVlhint; }
+    Q_INVOKABLE VisualLineHint pendingVisualLineHint() const noexcept { return m_pendingVlhint; }
 
     void request(const Cursor &newCursor);
     void clear();
