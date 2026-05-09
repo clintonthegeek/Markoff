@@ -317,3 +317,11 @@ target_link_libraries(tst_live_render_clipboard_paste_flat
 add_test(NAME tst_live_render_clipboard_paste_flat
          COMMAND tst_live_render_clipboard_paste_flat)
 
+# C4: Paste — structured fast-path (local cut→paste via x-markoff-blocks).
+qt_add_executable(tst_live_render_clipboard_paste_structured
+    tst_live_render_clipboard_paste_structured.cpp)
+target_link_libraries(tst_live_render_clipboard_paste_structured
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_clipboard_paste_structured
+         COMMAND tst_live_render_clipboard_paste_structured)
+
