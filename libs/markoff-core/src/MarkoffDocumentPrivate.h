@@ -22,6 +22,7 @@
 #include <QString>
 
 #include <atomic>
+#include <deque>
 #include <memory>
 #include <unordered_map>
 #include <variant>
@@ -106,6 +107,15 @@ struct MarkoffDocument::Private {
     // Save-watermark state (E2.5 Task A1)
     quint64 savedSeq          = 0;
     bool    lastDirtyEmitted  = false;
+
+    // Recent-cuts cache (E2.5 Task A2): FIFO, capped at kRecentCutsMax.
+    // Allows a local cut→paste to reuse the same BlockIds (preserving CRDT identity).
+    struct CutCacheEntry {
+        quint64              cutSeq;
+        std::vector<BlockId> blockIds;
+    };
+    std::deque<CutCacheEntry> recentCuts;
+    static constexpr size_t   kRecentCutsMax = 8;
 
     // D5: remote cursor state (Phase 7)
     struct RemoteCursorRecord {

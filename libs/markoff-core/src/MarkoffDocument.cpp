@@ -1135,6 +1135,29 @@ void MarkoffDocument::maybeEmitDirtyChanged()
     }
 }
 
+// ============================================================================
+// Recent-cuts cache (E2.5 Task A2)
+// ============================================================================
+
+void MarkoffDocument::recordRecentCut(quint64 cutSeq, std::vector<BlockId> ids)
+{
+    d->recentCuts.push_back({cutSeq, std::move(ids)});
+    while (d->recentCuts.size() > Private::kRecentCutsMax)
+        d->recentCuts.pop_front();
+}
+
+std::vector<BlockId> MarkoffDocument::takeRecentCut(quint64 cutSeq)
+{
+    for (auto it = d->recentCuts.begin(); it != d->recentCuts.end(); ++it) {
+        if (it->cutSeq == cutSeq) {
+            auto ids = std::move(it->blockIds);
+            d->recentCuts.erase(it);
+            return ids;
+        }
+    }
+    return {};
+}
+
 QList<SourceSpan> MarkoffDocument::inlineSpansFor(BlockId id) const
 {
     if (d->inlineCache) return d->inlineCache->spansFor(id);

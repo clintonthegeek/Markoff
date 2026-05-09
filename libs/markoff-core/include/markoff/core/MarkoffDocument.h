@@ -224,6 +224,15 @@ public:
     void    markSaved(quint64 seq);
     bool    dirty() const noexcept;
 
+    /// Record the BlockIds removed in a Cut so a subsequent local Paste
+    /// can reuse them (preserving CRDT identity for cut→paste-back).
+    /// `cutSeq` is the d2EditSequence captured immediately before the cut.
+    /// FIFO-capped at 8 entries.
+    void recordRecentCut(quint64 cutSeq, std::vector<BlockId> ids);
+
+    /// Returns the cached BlockIds for `cutSeq` if still present, else empty.
+    std::vector<BlockId> takeRecentCut(quint64 cutSeq);
+
     /// Test helper: insert a block with the given kind and content directly
     /// into D2 internals. Callable from test code; do not call in production.
     Markoff::BlockId testInsertBlock(Markoff::BlockKind kind, const QByteArray &content);
