@@ -8,13 +8,15 @@ ApplicationWindow {
     width: 900
     height: 700
     visible: true
-    title: ctxTitle + " — markoff-live (R5.5)"
+    title: ctxMain.title
 
     LiveListModelBinding {
         id: modelBinding
         document: ctxDocument
         Component.onCompleted: {
             selectionView.setSession(ctxSession)
+            if (actionController)
+                actionController.saveRequested.connect(ctxMain.save)
         }
     }
 

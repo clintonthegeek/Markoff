@@ -1,5 +1,7 @@
 qt_add_executable(markoff-live-app
     main.cpp
+    MainController.h
+    MainController.cpp
 )
 
 qt_add_qml_module(markoff-live-app
