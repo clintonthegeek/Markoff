@@ -68,6 +68,9 @@ qt_add_qml_module(markoff_live
         src/InlineHighlighter.cpp
         include/markoff/live/InlineHighlighterAttached.h
         src/InlineHighlighterAttached.cpp
+        # E2: navigation controller
+        include/markoff/live/LiveNavigationController.h
+        src/LiveNavigationController.cpp
     QML_FILES
         qml/LiveView.qml
         qml/LiveContextMenu.qml

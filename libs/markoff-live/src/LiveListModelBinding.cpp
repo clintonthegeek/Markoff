@@ -2,6 +2,7 @@
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/AstBlockDiff.h>
 #include <markoff/live/LiveStructuralKeyHandler.h>
+#include <markoff/live/LiveNavigationController.h>
 #include <markoff/live/BlockKind.h>
 
 #include "KindTransition.h"
@@ -134,6 +135,7 @@ struct LiveListModelBinding::Private {
     BlockHitTester            *hitTester        = nullptr;
     LiveSelectionView         *selectionView    = nullptr;
     LiveStructuralKeyHandler  *structuralKeys   = nullptr;
+    LiveNavigationController  *navigationCtrl   = nullptr;
     RemoteCursorsListModel    *remoteCursors    = nullptr;
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
@@ -144,12 +146,13 @@ LiveListModelBinding::LiveListModelBinding(QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>())
 {
-    d->model         = new LiveBlockModel(this);
-    d->cursorState   = new LiveCursorState(&d->registry, d->model, this, this);
-    d->hitTester     = new BlockHitTester(this);
-    d->selectionView = new LiveSelectionView(this);
+    d->model           = new LiveBlockModel(this);
+    d->cursorState     = new LiveCursorState(&d->registry, d->model, this, this);
+    d->hitTester       = new BlockHitTester(this);
+    d->selectionView   = new LiveSelectionView(this);
     d->selectionView->setModel(d->model);
-    d->remoteCursors = new RemoteCursorsListModel(this);
+    d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, this);
+    d->remoteCursors   = new RemoteCursorsListModel(this);
 }
 
 LiveListModelBinding::~LiveListModelBinding() = default;
@@ -209,6 +212,7 @@ LiveCursorState          *LiveListModelBinding::cursorState()         const { re
 BlockHitTester           *LiveListModelBinding::hitTester()           const { return d->hitTester; }
 LiveSelectionView        *LiveListModelBinding::selectionView()       const { return d->selectionView; }
 LiveStructuralKeyHandler *LiveListModelBinding::structuralKeyHandler() const { return d->structuralKeys; }
+LiveNavigationController *LiveListModelBinding::navigationController() const { return d->navigationCtrl; }
 const BlockKindRegistry  *LiveListModelBinding::registry()            const { return &d->registry; }
 QAbstractListModel       *LiveListModelBinding::remoteCursorsModel()  const { return d->remoteCursors; }
 

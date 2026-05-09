@@ -191,3 +191,11 @@ target_link_libraries(tst_live_render_e2_cross_delegate PRIVATE
 add_test(NAME tst_live_render_e2_cross_delegate
          COMMAND tst_live_render_e2_cross_delegate)
 
+qt_add_executable(tst_live_render_e2_nav_arrows
+    tst_live_render_e2_nav_arrows.cpp
+)
+target_link_libraries(tst_live_render_e2_nav_arrows PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_e2_nav_arrows
+         COMMAND tst_live_render_e2_nav_arrows)
+

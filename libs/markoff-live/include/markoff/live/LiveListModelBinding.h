@@ -8,6 +8,7 @@
 #include <markoff/live/BlockHitTester.h>
 #include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/LiveStructuralKeyHandler.h>
+#include <markoff/live/LiveNavigationController.h>
 
 #include <QObject>
 #include <QAbstractListModel>
@@ -36,6 +37,8 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
                READ selectionView CONSTANT)
     Q_PROPERTY(Markoff::Live::LiveStructuralKeyHandler *structuralKeyHandler
                READ structuralKeyHandler CONSTANT)
+    Q_PROPERTY(Markoff::Live::LiveNavigationController *navigationController
+               READ navigationController CONSTANT)
     Q_PROPERTY(QAbstractListModel *remoteCursorsModel
                READ remoteCursorsModel CONSTANT)
     Q_PROPERTY(const Markoff::Theme *theme READ theme WRITE setTheme NOTIFY themeChanged)
@@ -52,6 +55,7 @@ public:
     BlockHitTester           *hitTester()           const;
     LiveSelectionView        *selectionView()       const;
     LiveStructuralKeyHandler *structuralKeyHandler() const;
+    LiveNavigationController *navigationController() const;
     const BlockKindRegistry  *registry()            const;
     QAbstractListModel       *remoteCursorsModel()  const;
 
