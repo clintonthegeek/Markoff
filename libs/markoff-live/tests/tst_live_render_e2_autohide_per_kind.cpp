@@ -4,51 +4,11 @@
 #include <markoff/core/Theme.h>
 #include <markoff/live/InlineHighlighter.h>
 #include <markoff/parser/SourceSpan.h>
+#include "E2TestHelpers.h"
 
 using namespace Markoff;
 using Markoff::Live::InlineHighlighter;
-
-namespace {
-QTextCharFormat formatAt(QTextDocument *doc, int charPos) {
-    QTextBlock block = doc->firstBlock();
-    while (block.isValid() && (charPos < block.position() ||
-           charPos >= block.position() + block.length())) {
-        const QTextBlock next = block.next();
-        if (!next.isValid()) break;
-        block = next;
-    }
-    auto layout = block.layout();
-    for (const QTextLayout::FormatRange &fr : layout->formats()) {
-        if (charPos - block.position() >= fr.start &&
-            charPos - block.position() <  fr.start + fr.length)
-            return fr.format;
-    }
-    return QTextCharFormat();
-}
-
-bool isHidden(const QTextCharFormat &fmt) {
-    return fmt.font().letterSpacingType() == QFont::AbsoluteSpacing
-        && fmt.font().letterSpacing() < 0.0;
-}
-
-SourceSpan delimiterSpan(int charOffset, int charLength,
-                         int parentStart, int parentEnd,
-                         auto setKind) {
-    SourceSpan s;
-    s.charOffset = charOffset; s.charLength = charLength;
-    s.isDelimiter = true;
-    s.parentCharStart = parentStart;
-    s.parentCharEnd = parentEnd;
-    setKind(s);
-    return s;
-}
-SourceSpan contentSpan(int charOffset, int charLength, auto setKind) {
-    SourceSpan s;
-    s.charOffset = charOffset; s.charLength = charLength;
-    setKind(s);
-    return s;
-}
-}  // namespace
+using namespace E2Test;
 
 class TestE2AutohidePerKind : public QObject {
     Q_OBJECT
