@@ -20,7 +20,7 @@ E-arc completes the QML live-render view as the **maximalist Markoff prototype**
 
 | Phase | Status | Deliverable | Companion |
 |---|---|---|---|
-| **E1** | `plan-approved` (ready to execute) | Inline-format highlighter in QML delegates (bold/italic/strike/inline-code/highlight/link/wikilink/tag) reading `BlockRecord::inlineSpans`. Tag: `v0.7.0-e1`. | Spec: [`2026-05-08-e1-inline-highlighter-design.md`](../specs/2026-05-08-e1-inline-highlighter-design.md). Plan: [`2026-05-08-e1-inline-highlighter.md`](../plans/2026-05-08-e1-inline-highlighter.md). |
+| **E1** | `complete` (2026-05-08) | Inline-format highlighter in QML delegates (bold/italic/strike/inline-code/highlight/link/wikilink/tag) reading `BlockRecord::inlineSpans`. 8 kinds, 143/143 tests pass, dogfood signed off. Tag: `v0.7.0-e1`. | Spec: [`2026-05-08-e1-inline-highlighter-design.md`](../specs/2026-05-08-e1-inline-highlighter-design.md). Plan: [`2026-05-08-e1-inline-highlighter.md`](../plans/2026-05-08-e1-inline-highlighter.md). Tag: `v0.7.0-e1`. |
 | **E2** | `pending` | Cursor-aware delimiter visibility — markers hide unless caret enters the span | `docs/specs/2026-XX-XX-e2-delimiter-visibility-design.md` (TBW) |
 | **E3** | `pending` | Wikilinks, embeds, tags, callouts — Obsidian-flavoured affordances | `docs/specs/2026-XX-XX-e3-obsidian-affordances-design.md` (TBW) |
 | **E4** | `pending` | Tables, frontmatter, footnote rendering | `docs/specs/2026-XX-XX-e4-tables-frontmatter-footnotes-design.md` (TBW) |

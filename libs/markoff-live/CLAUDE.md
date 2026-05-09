@@ -96,12 +96,38 @@ context_menu, skeleton}`. Per-layer per-test contract per the C spec
 - Library URI: `org.markoff.live 1.0`
 - App URI: `org.markoff.live.app 1.0` (private to `app/`).
 
+## Inline-format highlighter (E1)
+
+`Markoff::Live::InlineHighlighter` (header `<markoff/live/InlineHighlighter.h>`)
+is a per-delegate `QSyntaxHighlighter` painting `QTextCharFormat` ranges
+from `BlockRecord::inlineSpans`. The QML shim `InlineHighlighterAttached`
+wraps it for delegate-side property bindings.
+
+8 inline kinds rendered via existing `Markoff::Theme::Slot` tokens:
+`bold` → `BoldEmphasis`, `italic` → `ItalicEmphasis`, `strikethrough` →
+`StrikeEmphasis`, `code` → `InlineCode`, `highlight` → `Highlight`,
+`isLink` → `Link`, `isWikilink` → `WikiLink`, `isTag` → `Tag`.
+
+`highlightBlock` iterates character-by-character (not span-by-span) to
+correctly merge overlapping spans without erasure.
+
+Markers (`**`, `_`, `~~`, `` ` ``, `==`, `[]()`, `[[]]`, `#`) render
+visible in E1; auto-hide is E2's work via `SourceSpan::isDelimiter`.
+
+Tests: `tst_live_render_inline_per_kind`, `tst_live_render_inline_combined`,
+`tst_live_render_inline_cross_delegate`, `tst_live_render_inline_edge_cases`,
+`tst_live_render_inline_typing_perf`.
+
+Known edge case: tight-list + fenced code block (no surrounding blank
+lines) — parser misclassifies fence content as list-item text; tracked
+for a future parser fix.
+
 ## Conventions
 
 - C++20, Qt 6.8+.
 - `// SPDX-License-Identifier: GPL-3.0-or-later` on every file.
 - C++ namespace: `Markoff::Live`.
 - Test prefix `tst_live_render_*`.
-- Public headers under `include/markoff/live-render/`; consumers include
-  via `#include <markoff/live-render/HeaderName.h>`.
+- Public headers under `include/markoff/live/`; consumers include
+  via `#include <markoff/live/HeaderName.h>`.
 - No `Corbomite`-named types in the public API.
