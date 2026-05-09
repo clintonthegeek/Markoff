@@ -2,23 +2,20 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-08 (E2 plan landed; ready for fresh-agent execution).
+**Last updated:** 2026-05-08 (E2 implementation complete; pending dogfood pass for tag).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **E2** — cursor-aware view (auto-hide + cross-block nav). Spec + plan `plan-approved` 2026-05-08.
+**Active phase:** **E2** — cursor-aware view (auto-hide + cross-block nav). All 9 phases (A–I) implemented; dogfood pass (I1) required before tagging `v0.7.0-e2`.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **E1 is ready to execute.** Substantive spec + bite-sized implementation plan both landed 2026-05-08; user-approved.
+> **E2 is awaiting dogfood.** All 32 tests pass (32/32). Build `markoff-live-app` and exercise: typing in paragraphs/headings/lists, Up/Down across blocks preserving column, Left/Right at block boundaries, Ctrl+Home/End, Page-Up/Down, Shift+arrow selection, inline marker auto-hide on caret entry/exit.
 >
-> **Fresh-agent execution start:**
+> After dogfood sign-off: tag `v0.7.0-e2` and update phase board.
 >
-> 1. Read `docs/specs/2026-05-08-e1-inline-highlighter-design.md` — substantive design. Read §0.2 amendment first (records codebase-discovery corrections).
-> 2. Read `docs/plans/2026-05-08-e1-inline-highlighter.md` — bite-sized task list with concrete code, build commands, and TDD discipline. Skim the plan header for build cap (`-j 8`), commit convention, and per-task cadence.
-> 3. Choose execution mode: subagent-driven-development (recommended; fresh subagent per task with review checkpoints) or executing-plans (inline batch execution).
-> 4. Execute task-by-task. Each task ends green-tree + commit; each phase ends with full-suite ctest run; closeout (Task G1) requires user dogfood pass before tagging.
+> **Next phase after E2:** E3 (Wikilinks, embeds, tags, callouts). Start with `superpowers:brainstorming` before drafting spec.
 >
 > **Background reading** (for first principles / constitutional context):
 >
@@ -36,7 +33,7 @@
 | Phase | Status | Spec | Plan | Notes |
 |---|---|---|---|---|
 | **E1** | `complete` (2026-05-08, tag `v0.7.0-e1`) | [E1 spec](../specs/2026-05-08-e1-inline-highlighter-design.md) | [E1 plan](../plans/2026-05-08-e1-inline-highlighter.md) | Inline-format highlighter in QML delegates. Reads `BlockRecord::inlineSpans` via `LiveBlockModel::spansAtRow(row)`. 143/143 tests pass. Dogfood signed off. Tag: `v0.7.0-e1`. |
-| **E2** | `plan-approved` (2026-05-08) | [E2 spec](../specs/2026-05-08-e2-cursor-aware-view-design.md) | [E2 plan](../plans/2026-05-08-e2-cursor-aware-view.md) | Cursor-aware view: auto-hide markers (true zero-width collapse) + full-parity cross-block keyboard nav. Scope expanded from framing-doc to fold in arrow-nav (was a regression-of-omission against `2026-04-30-live-editing-design.md`). Depends on E1's per-span `QTextCharFormat` carrier. ~36 bite-sized tasks across 9 phases (A pre-flight, B auto-hide impl, C delegate QML wiring, D nav controller skeleton, E four-arrow nav, F extended nav, G shift-extend, H perf, I dogfood/tag). User pre-approved both spec and plan. |
+| **E2** | `dogfood` (2026-05-08) | [E2 spec](../specs/2026-05-08-e2-cursor-aware-view-design.md) | [E2 plan](../plans/2026-05-08-e2-cursor-aware-view.md) | Cursor-aware view: auto-hide markers (true zero-width collapse) + full-parity cross-block keyboard nav. 32/32 tests pass. New: `LiveNavigationController` (Up/Down/Left/Right column-preserve, Ctrl+Home/End, Ctrl+Left/Right word-boundary, Page-Up/Down via `LiveView.hit`, Shift+arrow + Ctrl+Shift extends `LiveSelectionView`); `LiveCursorState::VisualLineHint` + `requestTextCaretAtRowVisualX`; `InlineHighlighter` caret/selection auto-hide wiring in all 5 delegates; `Theme::Slot::HiddenMarker`. Perf: caret-move p99 0.012ms (gate <5ms); inline rehighlight p99 0.010ms (gate <33ms). Awaiting dogfood + tag `v0.7.0-e2`. |
 | **E3** | `pending` | TBW | TBW | Wikilinks, embeds, tags, callouts (Obsidian affordances). |
 | **E4** | `pending` | TBW | TBW | Tables, frontmatter, footnote rendering. |
 | **E5** | `pending` | TBW | TBW | Math / Mermaid Live-mode parity with Reading mode. |
@@ -52,6 +49,14 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-08 | `ad33c40` | **E2 H1+H2 landed:** caret-move benchmark (100-block doc, p50=0.008ms p99=0.012ms, gate <5ms pass); caret-inline rehighlight benchmark (10-span block, p50=0.007ms p99=0.010ms, gate <33ms pass); E1 typing-perf no regression (p99=0.003ms). 32/32 `tst_live_render_` tests green. |
+| 2026-05-08 | `b4b024c` | **E2 G1+G2 landed:** `LiveNavigationController` extended with `LiveSelectionView *` param; Shift+Up/Down/Left/Right extends selection; Ctrl+Shift+Left/Right word-extend across blocks. 14 new test cases in `tst_live_render_e2_nav_shift_extend`. 30/30 tests green. |
+| 2026-05-08 | `78c9bca` | **E2 F4 landed:** Page-Up/Down via `LiveView.hit(x, y)` QML invocation from C++; delegate `Keys.onPressed` catches Page keys; coordinate mapping through `editItem->parent()->property("y")` + cursor-rect. |
+| 2026-05-08 | `8b78c8f` | **E2 F3 landed:** Ctrl+Left/Right cross-block word-boundary nav (cross-block only; within-block delegated to TextEdit natively). |
+| 2026-05-08 | — | **E2 F1+F2 landed:** Home/End native pass-through verified; Ctrl+Home/End jump to document first/last text-bearing row. `LiveNavigationController::findFirstTextBearingRow` + `findLastTextBearingRow` using `BlockKindRegistry`. |
+| 2026-05-08 | — | **E2 E1–E7 landed:** Up/Down/Left/Right with column preservation via `VisualLineHint` enum + `requestTextCaretAtRowVisualX`; `LiveCursorState::desiredVisualX`; all 5 text-bearing delegates wire arrow keys; `focusEditAt` honors `pendingVisualLineHint` via `positionAt`. |
+| 2026-05-08 | — | **E2 D1+D2 landed:** `LiveNavigationController` class scaffold; `previousNavigableRow` / `nextNavigableRow`; `LiveListModelBinding::navigationController()` accessor. |
+| 2026-05-08 | — | **E2 A–C landed:** `Theme::Slot::HiddenMarker`; zero-width measurement test; `LiveCursorState::desiredVisualX`; `InlineHighlighter::setLocalCaretPosition` + `setSelectionRange`; `InlineHighlighterAttached` caret/selection props; all 5 text-bearing delegates wired. |
 | 2026-05-08 | (this commit) | **E2 plan landed:** `docs/plans/2026-05-08-e2-cursor-aware-view.md`. ~36 bite-sized tasks across 9 phases (A pre-flight: Theme HiddenMarker slot, zero-width mechanism measurement test, LiveCursorState desiredVisualX field, InlineHighlighter caret/selection slots; B auto-hide TDD per kind: symmetric kinds, caret-adjacent regression, link/wikilink atomic reveal, tag always-shown, heading prefix, code fence, list/blockquote always-shown, nested spans, selection cover, peer cursor invariant; C delegate QML wiring: InlineHighlighterAttached caret+selection props, per-delegate wiring; D nav controller skeleton: class scaffold + binding accessor + navigable-row helpers; E four-arrow nav: Up/Down/Left/Right with column preservation, focusEditAt visual-line-hint extension, key-forward delegate wiring; F extended nav: Home/End passthrough, Ctrl+Home/End, Ctrl+Left/Right word-boundary across blocks, Page-Up/Down via LiveView.hit; G shift-extend: Shift+Arrow extends LiveSelectionView, Ctrl+Shift+Arrow word-extend; H perf: caret-move benchmark + E1 typing-perf no-regression; I dogfood + tag v0.7.0-e2). TDD discipline (failing test → run → impl → run-pass → commit). Build cap `-j 8`. New API: `LiveCursorState::requestTextCaretAtRowVisualX(row, hint)` + `VisualLineHint` enum (FirstLine/LastLine) for column preservation, `setDesiredVisualX/clearDesiredVisualX`; new `LiveNavigationController` (sibling to `LiveStructuralKeyHandler`); `Theme::Slot::HiddenMarker`; `InlineHighlighter::setLocalCaretPosition` + `setSelectionRange`. Implementation risk surfaced as Task A2 measurement test (negative `QFont::letterSpacing` mechanism); halts plan if mechanism unreliable. Phase board E2 → `plan-approved`. |
 | 2026-05-08 | (earlier commit) | **E2 spec landed:** `docs/specs/2026-05-08-e2-cursor-aware-view-design.md`. User pre-approved during brainstorm (visual companion used for caret-adjacent / block-prefix / link-wikilink-tag / nested-spans policy decisions). Scope: auto-hide of inline markers + heading prefixes + code-fence lines (true zero-width collapse — line widens/shrinks on caret-in/out) AND full-parity cross-block keyboard navigation (Up/Down/Left/Right with column preservation, Home/End, Ctrl+Home/End, Ctrl+Left/Right word boundaries, Page-Up/Down, Shift- and Ctrl+Shift- selection extension). Scope expanded from framing-doc-named "delimiter visibility" to fold in arrow-nav, which was named in `2026-04-30-live-editing-design.md` (`LiveStructuralKeyHandler` "Ctrl+Home/End/arrow crossings") but never delivered — a regression-of-omission, not new feature. Architecture: new `LiveNavigationController` (sibling to `LiveStructuralKeyHandler`); extend `InlineHighlighter` with `setLocalCaretPosition`; extend `LiveCursorState` with `desiredVisualX` for column preservation; extend `Theme` with `HiddenMarker` slot. Implementation risk flagged: zero-width via negative `QFont::letterSpacing` is font-dependent; fallback to combine with `setStretch(1)` if needed; display-buffer fallback unauthorized without explicit user decision. Test surface: ~14 test files split between auto-hide and nav. Perf gates: typing perf must not regress E1's `<33ms p99`; caret-move `<5ms` regression guard, `<1ms` target. Tag on completion: `v0.7.0-e2`. Phase board E2 → `spec-approved`. |
 | 2026-05-08 | (earlier commit) | **E1 complete:** InlineHighlighter + InlineHighlighterAttached landed. 8 inline kinds (bold/italic/strike/code/highlight/link/wikilink/tag) paint in all 4 text-bearing delegates. 143/143 tests pass. Dogfood signed off. Two pre-existing issues noted (pipeline perf on large files; tight-list+code-block parser edge case). Tag: `v0.7.0-e1`. Phase board E1 → `complete`. E2 (cursor-aware delimiter visibility) is next. |
