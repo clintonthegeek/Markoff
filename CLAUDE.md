@@ -7,11 +7,15 @@
 > guide, and before any further perf or facade work. Operating
 > principle: one arc at a time, no side work, retirement is explicit.
 >
-> **2026-05-08 — E1 complete (tag `v0.7.0-e1`); E2 is the active phase.**
+> **2026-05-08 — E1 complete (tag `v0.7.0-e1`); E2 spec-approved.**
 > D5 + §4.5 audit landed 2026-05-08. E1 (inline-format highlighter)
 > shipped same day — 143/143 tests pass, dogfood signed off.
-> **E2 (cursor-aware delimiter visibility / auto-hide) is the active
-> phase.** Spec and plan TBW; brainstorm first per the E-arc framing.
+> **E2 (cursor-aware view: auto-hide markers + cross-block keyboard
+> nav) is `spec-approved` as of 2026-05-08.** Spec:
+> `docs/specs/2026-05-08-e2-cursor-aware-view-design.md`. Plan TBW.
+> Scope expanded from framing-doc-named "delimiter visibility" to also
+> fold in arrow-key cross-block navigation (was a regression-of-omission
+> against `2026-04-30-live-editing-design.md`).
 >
 > **Fresh-agent execution start:** read `docs/e-arc/e-arc-status.md`
 > (TL;DR + phase board), then `docs/specs/2026-05-08-e-arc-framing.md`

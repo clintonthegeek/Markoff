@@ -2,10 +2,10 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-08 (E1 complete; tag v0.7.0-e1 landed; E2 is next).
+**Last updated:** 2026-05-08 (E2 spec landed; plan TBW).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **E2** — cursor-aware delimiter visibility. E1 is `complete` as of 2026-05-08.
+**Active phase:** **E2** — cursor-aware view (auto-hide + cross-block nav). Spec `spec-approved` 2026-05-08.
 
 ---
 
@@ -36,7 +36,7 @@
 | Phase | Status | Spec | Plan | Notes |
 |---|---|---|---|---|
 | **E1** | `complete` (2026-05-08, tag `v0.7.0-e1`) | [E1 spec](../specs/2026-05-08-e1-inline-highlighter-design.md) | [E1 plan](../plans/2026-05-08-e1-inline-highlighter.md) | Inline-format highlighter in QML delegates. Reads `BlockRecord::inlineSpans` via `LiveBlockModel::spansAtRow(row)`. 143/143 tests pass. Dogfood signed off. Tag: `v0.7.0-e1`. |
-| **E2** | `pending` | TBW | TBW | Cursor-aware delimiter visibility (auto-hide). Depends on E1's per-span `QTextCharFormat` carrier. |
+| **E2** | `spec-approved` (2026-05-08) | [E2 spec](../specs/2026-05-08-e2-cursor-aware-view-design.md) | TBW | Cursor-aware view: auto-hide markers (true zero-width collapse) + full-parity cross-block keyboard nav. Scope expanded from framing-doc to fold in arrow-nav (was a regression-of-omission against `2026-04-30-live-editing-design.md`). Depends on E1's per-span `QTextCharFormat` carrier. |
 | **E3** | `pending` | TBW | TBW | Wikilinks, embeds, tags, callouts (Obsidian affordances). |
 | **E4** | `pending` | TBW | TBW | Tables, frontmatter, footnote rendering. |
 | **E5** | `pending` | TBW | TBW | Math / Mermaid Live-mode parity with Reading mode. |
@@ -52,7 +52,8 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
-| 2026-05-08 | (this commit) | **E1 complete:** InlineHighlighter + InlineHighlighterAttached landed. 8 inline kinds (bold/italic/strike/code/highlight/link/wikilink/tag) paint in all 4 text-bearing delegates. 143/143 tests pass. Dogfood signed off. Two pre-existing issues noted (pipeline perf on large files; tight-list+code-block parser edge case). Tag: `v0.7.0-e1`. Phase board E1 → `complete`. E2 (cursor-aware delimiter visibility) is next. |
+| 2026-05-08 | (this commit) | **E2 spec landed:** `docs/specs/2026-05-08-e2-cursor-aware-view-design.md`. User pre-approved during brainstorm (visual companion used for caret-adjacent / block-prefix / link-wikilink-tag / nested-spans policy decisions). Scope: auto-hide of inline markers + heading prefixes + code-fence lines (true zero-width collapse — line widens/shrinks on caret-in/out) AND full-parity cross-block keyboard navigation (Up/Down/Left/Right with column preservation, Home/End, Ctrl+Home/End, Ctrl+Left/Right word boundaries, Page-Up/Down, Shift- and Ctrl+Shift- selection extension). Scope expanded from framing-doc-named "delimiter visibility" to fold in arrow-nav, which was named in `2026-04-30-live-editing-design.md` (`LiveStructuralKeyHandler` "Ctrl+Home/End/arrow crossings") but never delivered — a regression-of-omission, not new feature. Architecture: new `LiveNavigationController` (sibling to `LiveStructuralKeyHandler`); extend `InlineHighlighter` with `setLocalCaretPosition`; extend `LiveCursorState` with `desiredVisualX` for column preservation; extend `Theme` with `HiddenMarker` slot. Implementation risk flagged: zero-width via negative `QFont::letterSpacing` is font-dependent; fallback to combine with `setStretch(1)` if needed; display-buffer fallback unauthorized without explicit user decision. Test surface: ~14 test files split between auto-hide and nav. Perf gates: typing perf must not regress E1's `<33ms p99`; caret-move `<5ms` regression guard, `<1ms` target. Tag on completion: `v0.7.0-e2`. Phase board E2 → `spec-approved`. |
+| 2026-05-08 | (earlier commit) | **E1 complete:** InlineHighlighter + InlineHighlighterAttached landed. 8 inline kinds (bold/italic/strike/code/highlight/link/wikilink/tag) paint in all 4 text-bearing delegates. 143/143 tests pass. Dogfood signed off. Two pre-existing issues noted (pipeline perf on large files; tight-list+code-block parser edge case). Tag: `v0.7.0-e1`. Phase board E1 → `complete`. E2 (cursor-aware delimiter visibility) is next. |
 | 2026-05-08 | (earlier commit) | E1 plan landed: `docs/plans/2026-05-08-e1-inline-highlighter.md`. ~13 bite-sized tasks across 7 phases (Phase A pre-flight: SourceSpan operator==, InlineSpansRole, applyOps spans-comparison; Phase B InlineHighlighter TDD per flag-family; Phase C QML attached shim; Phase D delegate integration + cross-delegate tests; Phase E edge cases; Phase F perf benchmark; Phase G dogfood + tag + closeout docs). TDD discipline (failing test → run → impl → run-pass → commit). Build cap `-j 8`. Phase board E1 → `plan-approved` — ready for fresh-agent execution. |
 | 2026-05-08 | (this commit) | Spec corrected post-codebase-discovery (added §0.2 amendment): `Markoff::SourceSpan` is flag-based not enum-based; `Theme` already has all 8 needed `Slot`s; `BlockRecord::inlineSpans` and `LiveBlockModel::spansAtRow` already exist; `BlockRecord::operator==` excludes `inlineSpans` (E1 adds explicit spans-comparison in `applyOps`); tests live in `libs/markoff-live/tests/` with `tst_live_render_inline_*` naming. Design decisions unchanged; implementation specifics simplified — most data-path infrastructure already in place. |
 | 2026-05-08 | (this commit) | E1 substantive spec landed: `docs/specs/2026-05-08-e1-inline-highlighter-design.md`. User pre-approved 2026-05-08 in brainstorm. Scope: all 8 inline kinds, render-only (no navigation contract). Architecture: per-delegate `Markoff::Live::InlineHighlighter` (`QSyntaxHighlighter` subclass) reading `BlockRecord::inlineSpans`. No extension API. 8 inline kinds via existing `Markoff::Theme::Slot` palette. Test surface: ~20 behavioral slots + perf benchmark (`<33ms p99` CI gate, `<16ms` dev aspiration). Tag on completion: `v0.7.0-e1`. Phase board E1 → `spec-approved`. Q4 added to open questions (footnote pre-existing render). |
