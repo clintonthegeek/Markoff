@@ -143,17 +143,16 @@ ListView {
     }
 
     // ---- Keyboard: Ctrl-C copy ----
+    // copyToClipboard reads block texts from the bound model directly. Don't
+    // walk ListView delegates here: ListView only realises the visible window,
+    // and a cross-block selection that includes off-screen rows would lose
+    // those rows' contents.
     Keys.onPressed: (event) => {
         if (!binding) { event.accepted = false; return }
         if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C) {
             const sv = binding.selectionView
             if (sv && sv.hasSelection) {
-                const texts = []
-                for (let i = 0; i < root.count; ++i) {
-                    const it = root.itemAtIndex(i)
-                    texts.push(it ? (it.blockText || "") : "")
-                }
-                sv.copyToClipboard(texts)
+                sv.copyToClipboard()
                 event.accepted = true
                 return
             }

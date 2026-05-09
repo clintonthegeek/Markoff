@@ -248,3 +248,10 @@ target_link_libraries(tst_live_render_e2_perf_caret_inline
 add_test(NAME tst_live_render_e2_perf_caret_inline
          COMMAND tst_live_render_e2_perf_caret_inline)
 
+qt_add_executable(tst_live_render_clipboard_copy
+    tst_live_render_clipboard_copy.cpp)
+target_link_libraries(tst_live_render_clipboard_copy
+    PRIVATE markoff_live Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_clipboard_copy
+         COMMAND tst_live_render_clipboard_copy)
+

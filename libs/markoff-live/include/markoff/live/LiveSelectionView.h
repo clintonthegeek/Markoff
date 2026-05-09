@@ -52,9 +52,12 @@ public:
     /// end may be INT32_MAX — consumers must clamp to textEdit.length.
     Q_INVOKABLE QPoint rangeForBlock(int blockIndex) const;
 
-    /// Copy selected text to the system clipboard.
-    /// `blockTexts` must be the ordered list of all block source texts.
-    Q_INVOKABLE void copyToClipboard(const QStringList &blockTexts) const;
+    /// Copy the current selection to the system clipboard. Reads block
+    /// texts directly from the bound `LiveBlockModel` — DO NOT walk
+    /// ListView delegates from QML: ListView only realises the visible
+    /// window, so off-screen rows in a cross-block selection would
+    /// contribute empty strings.
+    Q_INVOKABLE void copyToClipboard() const;
 
 Q_SIGNALS:
     void selectionChanged();

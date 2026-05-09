@@ -79,16 +79,17 @@ QPoint LiveSelectionView::rangeForBlock(int blockIndex) const
     return QPoint(0, INT_MAX);  // intermediate: whole block
 }
 
-void LiveSelectionView::copyToClipboard(const QStringList &blockTexts) const
+void LiveSelectionView::copyToClipboard() const
 {
-    if (!hasSelection()) return;
+    if (!hasSelection() || !m_model) return;
 
     int fb, fo, lb, lo;
     normalized(fb, fo, lb, lo);
 
+    const int rowCount = m_model->rowCount();
     QString text;
-    for (int i = fb; i <= lb && i < blockTexts.size(); ++i) {
-        const QString &bt = blockTexts[i];
+    for (int i = fb; i <= lb && i < rowCount; ++i) {
+        const QString bt = m_model->recordAt(i).text;
         const int start = (i == fb) ? fo : 0;
         const int end   = qMin((i == lb) ? lo : bt.length(), bt.length());
         if (start > end) continue;
