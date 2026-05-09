@@ -7,38 +7,35 @@
 > guide, and before any further perf or facade work. Operating
 > principle: one arc at a time, no side work, retirement is explicit.
 >
-> **2026-05-09 — E1 + E2 complete (tags `v0.7.0-e1`, `v0.7.0-e2`); E2.5 plan-approved.**
-> D5 + §4.5 audit landed 2026-05-08. E1 (inline-format highlighter)
-> shipped 2026-05-08. E2 (cursor-aware view: auto-hide markers +
-> cross-block keyboard nav) shipped 2026-05-09 with 162/162 tests
-> green and same-day dogfood sign-off + a CollabText O(replicaId)
-> perf bug found-reported-fixed-upstream-and-workaround-retired.
+> **2026-05-09 — E1 + E2 complete (tags `v0.7.0-e1`, `v0.7.0-e2`); E2.5 implemented,
+> dogfood surfaced bugs — debug phase active.**
+> D5 + §4.5 audit landed 2026-05-08. E1 shipped 2026-05-08. E2 shipped 2026-05-09
+> (162/162 tests). E2.5 phases A–I executed and tested (56/56 live-render tests
+> green) but dogfood on 2026-05-09 found 4 critical bugs blocking the
+> `v0.7.0-e2.5` tag.
 >
-> **E2.5 (editing-affordances pack) is `plan-approved` as of
-> 2026-05-09, ready for fresh-agent execution.**
+> **E2.5 is in debug phase. Tag `v0.7.0-e2.5` is blocked until D1–D4 are fixed.**
 >
-> - Spec: `docs/specs/2026-05-09-e2.5-editing-affordances-design.md` (commit `616797d`)
-> - Plan: `docs/plans/2026-05-09-e2.5-editing-affordances.md` (commit `42f20ac`; ~50 tasks across 10 phases A–J)
-> - Session brief: `docs/specs/2026-05-09-e2.5-SESSION-BRIEF.md` — **start here**
+> Dogfood findings: `docs/handoff/2026-05-09-e2.5-dogfood-findings.md`
 >
-> What E2.5 ships: Cut/Copy/Paste with hybrid flat / structure-aware
-> paths; per-binding `LiveActionController` (eleven QActions); right-
-> click context menu wired from actions; format toggles (Ctrl+B/I/K)
-> with per-block independent application; save/dirty/window-title for
-> `markoff-live-app` via new `MarkoffDocument` save-watermark API
-> (`savedSequence/markSaved/dirty/dirtyChanged`); Live-side
-> `Session::primarySelectionChanged` subscription; empty-doc focus
-> verification; `Capabilities` flag on `LiveListModelBinding` for
-> E6-friendly subtractability.
+> **Critical bugs (must fix before tag):**
+> - **D1** Ctrl+S does not save — QAction not registered on window at startup
+> - **D2** Multi-block copy/cut affects only one block (anchor or active)
+> - **D3** Arrow-key selection inert for clipboard — TextEdit selection not
+>   synced to `LiveSelectionView`
+> - **D4** No right-click context menu — must use native `QMenu`/Widget-bridge
+>   (see `docs/specs/2026-04-29-live-render-design.md` §Widget-window bridge),
+>   not QtQuick `Menu`
 >
-> Out of E2.5 (subsequent phases): theme wire-up + zoom (E2.6);
-> speculative paths (E2.7).
+> **Important (may defer to E2.5.x):**
+> - **D5** Doc-wide undo/redo absent (per-block CRDT limitation; plan-level fix)
+> - **D6** Shift+↓ from block-start skips anchor block
+> - **D7/D8** Double/triple click don't select word/block
 >
-> **Fresh-agent execution start:** read
-> `docs/specs/2026-05-09-e2.5-SESSION-BRIEF.md` first, then the spec,
-> then the plan. The brief tells you what to load, what your first
-> move is, and which sub-skill to dispatch
-> (`superpowers:subagent-driven-development` recommended).
+> **Fresh-agent start for debugging:** read
+> `docs/handoff/2026-05-09-e2.5-dogfood-findings.md` first. It contains
+> root-cause hypotheses and fix directions for each bug. Then read
+> `docs/e-arc/e-arc-status.md` for the live status board.
 >
 > Decision record (§4.6 deferral): `docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
 > Live status: `docs/e-arc/e-arc-status.md`.

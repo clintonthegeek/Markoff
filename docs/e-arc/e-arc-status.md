@@ -2,25 +2,28 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-09 (Phase I complete — bulk-paste perf bench passes 200ms budget at 1000 blocks without mitigation; 56/56 live-render tests green). Phase J (dogfood + tag) pending.
+**Last updated:** 2026-05-09 (E2.5 dogfood surfaced 4 critical bugs; tag blocked; debug phase active).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **E2.5** — `dogfood`. Phases A–I complete (commits `949bdc8`→`829413f`). Phase J pending.
+**Active phase:** **E2.5** — `debug`. Phases A–I complete (commits `949bdc8`→`829413f`). Tag blocked on D1–D4 fixes. See `docs/handoff/2026-05-09-e2.5-dogfood-findings.md`.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **E2.5 is plan-approved.** Spec at [`docs/specs/2026-05-09-e2.5-editing-affordances-design.md`](../specs/2026-05-09-e2.5-editing-affordances-design.md) (commit `616797d`). Plan at [`docs/plans/2026-05-09-e2.5-editing-affordances.md`](../plans/2026-05-09-e2.5-editing-affordances.md) (commit `42f20ac`). 10 phases A–J; ~50 tasks; ~3 weeks; tag `v0.7.0-e2.5` on completion.
+> **E2.5 is in debug phase.** Phases A–I complete (56/56 live-render tests green). Dogfood
+> 2026-05-09 found 4 critical bugs blocking the `v0.7.0-e2.5` tag. A debugging agent must
+> resolve D1–D4 before the tag can be created.
 >
-> **Fresh-agent execution start:** read in this order
+> **Fresh-agent debug start:** read in this order
 >
-> 1. [`docs/specs/2026-05-09-e2.5-SESSION-BRIEF.md`](../specs/2026-05-09-e2.5-SESSION-BRIEF.md) — execution brief (this document tells you what context to load and what your first move is).
-> 2. [`docs/specs/2026-05-09-e2.5-editing-affordances-design.md`](../specs/2026-05-09-e2.5-editing-affordances-design.md) — substantive design.
-> 3. [`docs/plans/2026-05-09-e2.5-editing-affordances.md`](../plans/2026-05-09-e2.5-editing-affordances.md) — task-by-task implementation plan.
-> 4. [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.5 — scope capture (frozen reference).
+> 1. [`docs/handoff/2026-05-09-e2.5-dogfood-findings.md`](../handoff/2026-05-09-e2.5-dogfood-findings.md) — **START HERE.** All bugs, root-cause hypotheses, fix directions, priority order.
+> 2. [`docs/specs/2026-04-29-live-render-design.md`](../specs/2026-04-29-live-render-design.md) §Widget-window bridge — authoritative design for native `QMenu` context menus (D4 fix context).
+> 3. [`docs/specs/2026-05-09-e2.5-editing-affordances-design.md`](../specs/2026-05-09-e2.5-editing-affordances-design.md) — E2.5 design (for context on D1–D3).
 >
-> **What E2.5 ships:** Cut/Copy/Paste with hybrid flat / structure-aware paths; per-binding `QAction` surface (`LiveActionController`); right-click context menu wired from actions; format toggles (Ctrl+B/I/K, per-block independent application); save/dirty/title for `markoff-live-app` via new `MarkoffDocument` save-watermark API; Live-side `Session::primarySelectionChanged` subscription; empty-doc focus + first-keystroke verification.
+> **Critical (tag blocked):** D1 Ctrl+S silent, D2 multi-block clipboard broken,
+> D3 arrow-key selection inert, D4 no native context menu.
+> **Deferrable:** D5 doc-wide undo, D6 Shift+↓ anchor skip, D7/D8 click selection.
 >
 > **Out of E2.5** (subsequent phases): theme wire-up + zoom (E2.6); speculative paths (E2.7).
 >
@@ -43,7 +46,7 @@
 |---|---|---|---|---|
 | **E1** | `complete` (2026-05-08, tag `v0.7.0-e1`) | [E1 spec](../specs/2026-05-08-e1-inline-highlighter-design.md) | [E1 plan](../plans/2026-05-08-e1-inline-highlighter.md) | Inline-format highlighter in QML delegates. Reads `BlockRecord::inlineSpans` via `LiveBlockModel::spansAtRow(row)`. 143/143 tests pass. Dogfood signed off. Tag: `v0.7.0-e1`. |
 | **E2** | `complete` (2026-05-09, tag `v0.7.0-e2`) | [E2 spec](../specs/2026-05-08-e2-cursor-aware-view-design.md) | [E2 plan](../plans/2026-05-08-e2-cursor-aware-view.md) | Cursor-aware view: auto-hide markers (true zero-width collapse) + full-parity cross-block keyboard nav. 162/162 tests pass (incl. `tst_realistic` 70.8 s, `tst_benchmark` 338.7 s). Six dogfood-surfaced bugs fixed end-of-arc (cursor placement / multi-line render / HR nav / HR demotion / cross-block copy) plus a CollabText O(replicaId) perf bug found, reported, fixed upstream, and the workaround retired same day. Tag: `v0.7.0-e2`. |
-| **E2.5** | `plan-approved` (2026-05-09) | [E2.5 spec](../specs/2026-05-09-e2.5-editing-affordances-design.md) | [E2.5 plan](../plans/2026-05-09-e2.5-editing-affordances.md) | **Editing affordances pack.** Cut/Copy/Paste with hybrid path; `LiveActionController` (eleven QActions); context-menu wired from actions; per-block format toggles (Ctrl+B/I/K); save/dirty/title via new `MarkoffDocument::savedSequence/markSaved/dirty/dirtyChanged` API; Live-side `Session` subscription; empty-doc verification. Plan-approved 2026-05-09 (spec `616797d`, plan `42f20ac`). Fresh-agent execution start: [`docs/specs/2026-05-09-e2.5-SESSION-BRIEF.md`](../specs/2026-05-09-e2.5-SESSION-BRIEF.md). |
+| **E2.5** | `debug` (dogfood 2026-05-09) | [E2.5 spec](../specs/2026-05-09-e2.5-editing-affordances-design.md) | [E2.5 plan](../plans/2026-05-09-e2.5-editing-affordances.md) | **Editing affordances pack.** Phases A–I complete (56/56 tests green). Dogfood 2026-05-09 found 4 critical bugs blocking `v0.7.0-e2.5` tag: D1 Ctrl+S doesn't save, D2 multi-block copy/cut broken, D3 arrow-key selection inert for clipboard, D4 no right-click context menu (must use native QMenu/Widget-bridge). Findings: [`docs/handoff/2026-05-09-e2.5-dogfood-findings.md`](../handoff/2026-05-09-e2.5-dogfood-findings.md). Tag blocked on D1–D4 resolution. |
 | **E2.6** | `pending` (scope captured 2026-05-09) | TBW | TBW | **Theme wire-up + zoom.** Route every delegate's font.family/pixelSize/bold/italic through `Markoff::Theme`; replace HeadingDelegate's literal-pixel switch with theme-driven `font(Heading) * fontSizeMultiplier(HeadingN)`; add `fontScale` Q_PROPERTY + Ctrl+= / Ctrl+- / Ctrl+wheel; light/dark toggle action. Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.6. ~1 week. |
 | **E2.7** | `pending` (scope captured 2026-05-09) | TBW | TBW | **Speculative paths.** Open-delimiter (`**` → bold immediately) + code-fence (` ``` ` → code-block delegate immediately) speculation, retired-plan Tasks 8/9. Lower priority than E2.5/E2.6 — dogfood will tell us if the parser-cycle lag warrants the speculation machinery. Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.7. ~1 week. |
 | **E3** | `pending` | TBW | TBW | Wikilinks, embeds, tags, callouts (Obsidian affordances). |
@@ -61,6 +64,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-09 | `c2658da` | **E2.5 dogfood (2026-05-09) — 4 critical bugs found; tag blocked.** D1: Ctrl+S doesn't save (action registration silent failure). D2: Multi-block copy/cut affects only one block. D3: Arrow-key selection inert for clipboard (TextEdit selection not synced to LiveSelectionView). D4: No right-click context menu (QtQuick Menu doesn't show; must use native QMenu/Widget-bridge per original design). Also: D5 doc-wide undo absent (per-block only), D6 Shift+↓ skips anchor block, D7/D8 double/triple-click don't select. Full findings: `docs/handoff/2026-05-09-e2.5-dogfood-findings.md`. |
 | 2026-05-09 | `829413f` | **Phase I complete (E2.5 bulk-paste perf bench).** `tst_live_render_e2_5_perf_bulk_paste`: 1000-block clipboard paste via `LiveClipboardController::paste()` flat-fallback path measured at well under 200ms wall-clock. I2 (`beginBulkApply`/`endBulkApply`) skipped — not needed. 56/56 live-render tests green. |
 | 2026-05-09 | `9510ca3` | **Phase H complete (E2.5 empty-doc + cut-to-empty regression tests).** `tst_live_render_empty_doc_focus` (0-row invariant + edit-into-empty); `tst_live_render_empty_doc_kind_transition` (Equal-op heading detection via two `processEvents()` rounds); `tst_live_render_cut_to_empty` (selectAll+cut leaves 1 empty paragraph; debounced model update drained with processEvents). Amendment: H2 starts from `"Hello\n"` not `""` because kind-transition fires only on Equal ops (not Insert ops from new blocks). 55/55 live-render tests green. |
 | 2026-05-09 | `21f6551` | **Phase G complete (E2.5 markoff-live-app Session + save/dirty/title).** `markoff-live-app` gains `Session` binding via `doc->createSession()` + `ctxSession` QML property. `MainController` owns save slot (`QSaveFile` atomic write + `markSaved(captured)`) and reactive `title` Q_PROPERTY (`*` prefix when dirty, connected to `dirtyChanged`). `Main.qml` wires `actionController.saveRequested` → `ctxMain.save`. `doc->markSaved(d2EditSequence())` called at startup. 52/52 live-render tests green. |
