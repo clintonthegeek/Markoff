@@ -199,3 +199,10 @@ target_link_libraries(tst_live_render_e2_nav_arrows PRIVATE
 add_test(NAME tst_live_render_e2_nav_arrows
          COMMAND tst_live_render_e2_nav_arrows)
 
+qt_add_executable(tst_live_render_e2_nav_column_preservation
+    tst_live_render_e2_nav_column_preservation.cpp)
+target_link_libraries(tst_live_render_e2_nav_column_preservation
+    PRIVATE markoff_live Qt6::Test Qt6::Gui)
+add_test(NAME tst_live_render_e2_nav_column_preservation
+         COMMAND tst_live_render_e2_nav_column_preservation)
+
