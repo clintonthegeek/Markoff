@@ -6,6 +6,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/BlockSerializer.h>
+#include <markoff/core/BlockAttrsMap.h>
 
 using namespace Markoff;
 
@@ -37,6 +38,11 @@ private Q_SLOTS:
 
     // Task 8.6 — atomic write
     void saveToFile_atomicWrite_contentMatches();
+
+    // Task 2B — form-aware serializeHeading
+    void headingSerializer_atx_doesNotDoublePrefix();
+    void headingSerializer_setext_emitsBufferVerbatim();
+    void headingSerializer_setextH1_emitsBufferVerbatim();
 };
 
 // ── Task 8.1 ─────────────────────────────────────────────────────────────────
@@ -248,6 +254,48 @@ void TstD2Save::saveToFile_atomicWrite_contentMatches()
     QByteArray written = f.readAll();
     QCOMPARE(written, doc.serializeForSave());
     QCOMPARE(written, src);
+}
+
+// ── Task 2B ──────────────────────────────────────────────────────────────────
+
+void TstD2Save::headingSerializer_atx_doesNotDoublePrefix()
+{
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
+    auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::Heading);
+
+    QHash<AttrName, AttrValue> attrs;
+    attrs["level"] = AttrValue{2};
+
+    QCOMPARE(fn(BlockKind::Heading, attrs, "## Heading"),
+             QByteArray("## Heading"));
+    QCOMPARE(fn(BlockKind::Heading, attrs, "Heading"),
+             QByteArray("## Heading"));
+}
+
+void TstD2Save::headingSerializer_setext_emitsBufferVerbatim()
+{
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
+    auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::Heading);
+
+    QHash<AttrName, AttrValue> attrs;
+    attrs["level"] = AttrValue{2};
+    attrs["headingForm"] = AttrValue{QString("setext")};
+
+    QCOMPARE(fn(BlockKind::Heading, attrs, "Heading\n---"),
+             QByteArray("Heading\n---"));
+}
+
+void TstD2Save::headingSerializer_setextH1_emitsBufferVerbatim()
+{
+    BuiltinBlockSerializerRegistry::instance().registerBuiltins();
+    auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::Heading);
+
+    QHash<AttrName, AttrValue> attrs;
+    attrs["level"] = AttrValue{1};
+    attrs["headingForm"] = AttrValue{QString("setext")};
+
+    QCOMPARE(fn(BlockKind::Heading, attrs, "Title\n==="),
+             QByteArray("Title\n==="));
 }
 
 QTEST_GUILESS_MAIN(TstD2Save)
