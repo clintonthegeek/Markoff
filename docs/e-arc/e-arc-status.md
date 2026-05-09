@@ -2,10 +2,10 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-09 (E2.5 spec + plan landed; ready for fresh-agent execution).
+**Last updated:** 2026-05-09 (Phase E complete — `LiveFormatController` bold/italic/link with per-block wrapping; 52/52 live-render tests green; 183/183 full suite green).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **E2.5** — `plan-approved`. Spec `616797d`, plan `42f20ac`. Ready for fresh-agent execution via `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans`.
+**Active phase:** **E2.5** — `in-progress`. Phases A–E complete (commits `949bdc8`→`d91ecc8`). Phases F–J pending.
 
 ---
 
@@ -61,6 +61,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-09 | `d91ecc8` | **Phase E complete (E2.5 LiveFormatController: bold/italic/link with per-block wrapping).** `LiveFormatController` applies `toggleBold`/`toggleItalic`/`insertLink` per-block via `d2ApplyBufferEdit` (bypasses `applyFlatEdit` boundary-routing issues). All edits land in one `UndoLog::Transaction`. Idempotent toggle removes delimiters on second call. 5 new test files (E1 bold single-block 2 cases, E2 italic 2 cases, E3 link 2 cases, E4 idempotent round-trip 2 cases, E5 multi-block 2 cases). `LiveActionController::setFormatController` added, wires bold/italic/link QAction triggers. 52/52 live-render tests green. 183/183 full suite green. Plan amendment: `applyFlatEdit` skipped in favour of `d2ApplyBufferEdit` due to `oldStart <= blkEnd` boundary condition routing insertions at block-start positions to the wrong block. |
 | 2026-05-09 | `64e2fae` | **Phase D complete (E2.5 LiveActionController: 11 QActions + enabled-state + dispatch).** `LiveActionController` with Cut/Copy/Paste/SelectAll/Delete/Undo/Redo/Bold/Italic/Link/Save actions, correct shortcuts, connected to `LiveSelectionView`/`LiveClipboardController`. `updateEnabledStates()` public slot. 3 new test files (D2 enabled-state 4 cases, D3 dispatch 3 cases, D4 clipboard-change 1 case). 47/47 live-render tests green. |
 | 2026-05-09 | `0c19ab1` | **Phase C complete (E2.5 LiveClipboardController: copy/cut/paste with hybrid flat+structured path).** Cut/Copy/Paste with `application/x-markoff-blocks` MIME; flat fallback; foreign-Markoff-MIME new-IDs path; round-trip test. 44/44 live-render tests green. |
 | 2026-05-09 | `87d2786` | **Phase B complete (E2.5 LiveSelectionView extensions).** `selectAll`, `deleteSelection`, `Session` subscription (`primarySelectionChanged`) + edge-case tests. 39/39 live-render tests green; 10/10 markoff-core/parser tests green (no regressions). |
