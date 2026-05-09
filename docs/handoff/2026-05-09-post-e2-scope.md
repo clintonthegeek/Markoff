@@ -30,7 +30,7 @@ rebuild. Captured here so we don't lose the thread again.
 | Task 15 — Empty-doc focus + first-keystroke materialisation | **Untested.** Probably has edge cases. | Regression-prone area. |
 | Format toggles (Ctrl+B / Ctrl+I / Ctrl+K) | **Out of scope in old plan, still missing.** | Word-processor table-stakes for any markdown editor. |
 | Task 12 — IME composition handling | **Done.** `LiveEditBinding::composing` + `flushPendingComposition` is wired through delegates. | — |
-| Cross-mode selection (Source ↔ Live) | **N/A in this arc.** New foundation has Source as a separate widget, not a tab in Live. | — |
+| Cross-view session state (selection, scroll, folds) — Source ↔ Live | **Half-wired — corrected 2026-05-09 per user pushback.** `Markoff::Session` in core has the full shape: `primarySelection` (TextAnchor-typed, CRDT-stable), `secondarySelections`, `setTopVisible(anchor, fraction)` for scroll, `foldedRegions`, `primarySelectionChanged` signal. Source side **bidirectional** — `SourceTextDocumentBinding` reads + writes. Live side **unidirectional** — `LiveSelectionView::setSession` + `syncToSession` writes only; no subscription to `primarySelectionChanged`. No app harness creates a Session; `markoff-live-app` never instantiates one. Scroll/folds: Session supports them; no view pushes or pulls. | Dogfood-friction depends on whether anyone runs Source + Live concurrently. Folded into **E2.5** below — Live-side `primarySelectionChanged` subscription is small; the test-app harness work pairs naturally with save/dirty wiring. |
 
 ### 1.2 Theming — half-wired
 
@@ -98,6 +98,11 @@ others are table-stakes.
 - Save / dirty / window title for `markoff-live-app`:
   - `Ctrl+S` triggers save; passes through any host-provided save callback.
   - Window title shows `*` (or the platform-native modified marker) when `d2EditSequence()` differs from last-saved sequence.
+- Cross-view session state — Live side bidirectional:
+  - `LiveSelectionView` subscribes to `Session::primarySelectionChanged` and applies remote-changed selections (clamps to text length, projects per-block ranges via existing `rangeForBlock` machinery).
+  - `LiveListModelBinding::setSession()` exposed to QML so app code can hand a Session in. `markoff-live-app` instantiates a Session via `MarkoffDocument::createSession` and binds it.
+  - Smoke test: two `LiveListModelBinding`s on the same doc + same Session → selection in instance A is observable in instance B. (No real Source widget needed for this test; the contract is Session-driven, view-agnostic.)
+  - Scroll-position + folded-regions handoff explicitly **deferred** — folding isn't implemented in Live yet, and scroll-restore on view-swap isn't dogfood-blocking. Adds to §4 open questions if it bites in dogfood.
 - Empty-doc focus + first-keystroke materialisation: explicit test pass; fix any edge cases that surface.
 
 **Out of scope for E2.5 (deferred to E2.6 / E2.7):** theming, zoom, speculative paths.
