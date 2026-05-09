@@ -17,6 +17,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/CrdtProxies.h>
 #include <markoff/core/BlockAnchor.h>
+#include <markoff/core/UndoLog.h>
 
 using namespace Markoff::Live;
 
@@ -242,6 +243,8 @@ private Q_SLOTS:
         const QByteArray text = doc.blockText(block);
         QVERIFY(text.contains('\n'));  // newline was inserted at position 5
     }
+
+    void shiftEnter_thenDashes_promotesToSetextHeading();
 
     void requestTextCaretAtRow_implicitly_flushes_pending_d2_changed() {
         // Option A defense-in-depth: requestTextCaretAtRow drains any queued
@@ -639,6 +642,33 @@ private Q_SLOTS:
                     LiveBlockModel::KindRole).toString() != QStringLiteral("heading"));
     }
 };
+
+void TstLiveRenderStructural::shiftEnter_thenDashes_promotesToSetextHeading()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+    QVERIFY(waitForModelRows(binding, doc, "Heading", 1));
+
+    // Shift+Enter at end of "Heading" → buffer becomes "Heading\n".
+    binding.structuralKeyHandler()->tryHandle(
+        Qt::Key_Return, Qt::ShiftModifier, 0, 7, true,
+        QStringLiteral("Heading"));
+    QTest::qWait(50);
+
+    // Type "---" via direct buffer edit (position 8 = after "Heading\n").
+    auto id = binding.model()->recordAt(0).blockAnchor;
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2ApplyBufferEdit(id, 8, 0, QByteArray("---"), t);
+    }
+    QTest::qWait(100);
+
+    QCOMPARE(binding.model()->rowCount(), 1);
+    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
+    QCOMPARE(binding.model()->recordAt(0).headingLevel, 2);
+    QCOMPARE(binding.model()->recordAt(0).headingForm, QString("setext"));
+}
 
 QTEST_MAIN(TstLiveRenderStructural)
 #include "tst_live_render_structural.moc"
