@@ -19,11 +19,62 @@ LiveNavigationController::LiveNavigationController(
 {
 }
 
-int LiveNavigationController::tryHandle(int /*key*/, int /*modifiers*/,
-                                        int /*blockIndex*/, int /*qtPos*/,
-                                        QObject * /*editItem*/,
-                                        const QString & /*blockText*/) {
-    return NotHandled;  // Phase D stub. Phase E fills in arrow handlers.
+int LiveNavigationController::tryHandle(int key, int modifiers,
+                                        int blockIndex, int qtPos,
+                                        QObject *editItem,
+                                        const QString &blockText) {
+    if (modifiers != Qt::NoModifier) return NotHandled;
+
+    if (key == Qt::Key_Up) {
+        if (!isAtVisualTopLine(editItem)) return NotHandled;
+        qreal desiredX = m_cursorState->desiredVisualX();
+        if (desiredX < 0) {
+            const QVariant rectV = editItem ? editItem->property("cursorRectangle") : QVariant();
+            desiredX = rectV.canConvert<QRectF>() ? rectV.toRectF().x() : 0.0;
+            m_cursorState->setDesiredVisualX(desiredX);
+        }
+        const int targetRow = previousNavigableRow(blockIndex);
+        if (targetRow < 0) return Handled;
+        m_cursorState->requestTextCaretAtRowVisualX(
+            targetRow, LiveCursorState::VisualLineHint::LastLine);
+        return Handled;
+    }
+
+    if (key == Qt::Key_Down) {
+        if (!isAtVisualBottomLine(editItem)) return NotHandled;
+        qreal desiredX = m_cursorState->desiredVisualX();
+        if (desiredX < 0) {
+            const QVariant rectV = editItem ? editItem->property("cursorRectangle") : QVariant();
+            desiredX = rectV.canConvert<QRectF>() ? rectV.toRectF().x() : 0.0;
+            m_cursorState->setDesiredVisualX(desiredX);
+        }
+        const int targetRow = nextNavigableRow(blockIndex);
+        if (targetRow < 0) return Handled;
+        m_cursorState->requestTextCaretAtRowVisualX(
+            targetRow, LiveCursorState::VisualLineHint::FirstLine);
+        return Handled;
+    }
+
+    if (key == Qt::Key_Left) {
+        if (qtPos > 0) return NotHandled;
+        m_cursorState->clearDesiredVisualX();
+        const int targetRow = previousNavigableRow(blockIndex);
+        if (targetRow < 0) return Handled;
+        const int targetLen = m_model->recordAt(targetRow).text.length();
+        m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
+        return Handled;
+    }
+
+    if (key == Qt::Key_Right) {
+        if (qtPos < blockText.length()) return NotHandled;
+        m_cursorState->clearDesiredVisualX();
+        const int targetRow = nextNavigableRow(blockIndex);
+        if (targetRow < 0) return Handled;
+        m_cursorState->requestTextCaretAtRow(targetRow, 0);
+        return Handled;
+    }
+
+    return NotHandled;
 }
 
 int LiveNavigationController::previousNavigableRow(int currentRow) const {
