@@ -61,6 +61,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-09 | `0c19ab1` | **Phase C complete (E2.5 LiveClipboardController: copy/cut/paste with hybrid flat+structured path).** Cut/Copy/Paste with `application/x-markoff-blocks` MIME; flat fallback; foreign-Markoff-MIME new-IDs path; round-trip test. 44/44 live-render tests green. |
 | 2026-05-09 | `87d2786` | **Phase B complete (E2.5 LiveSelectionView extensions).** `selectAll`, `deleteSelection`, `Session` subscription (`primarySelectionChanged`) + edge-case tests. 39/39 live-render tests green; 10/10 markoff-core/parser tests green (no regressions). |
 | 2026-05-09 | `949bdc8` | **Phase A complete (E2.5 markoff-core primitives).** `MarkoffDocument` save-watermark API (`savedSequence/markSaved/dirty/dirtyChanged`), `PasteMeta` + recent-cuts cache (`RecentCutsCache`), `applyStructuredPaste`. 10/10 markoff-core/parser tests green; 33/33 live-render tests green (no regressions). |
 | 2026-05-09 | `42f20ac` | **E2.5 plan-approved.** 10 phases A–J (markoff-core API → LiveSelectionView extensions → three sibling controllers → QML wiring → markoff-live-app save/dirty → empty-doc verification → bulk-paste perf gate → dogfood + tag). Plan-time resolutions of spec §13 open questions captured at top of plan. Fresh-agent execution start: `docs/specs/2026-05-09-e2.5-SESSION-BRIEF.md`. |
