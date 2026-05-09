@@ -27,6 +27,7 @@ QHash<int, QByteArray> LiveBlockModel::roleNames() const
         { KindRole,         "kind" },
         { TextRole,         "text" },
         { HeadingLevelRole, "headingLevel" },
+        { HeadingFormRole,  "headingForm" },
         { CodeLanguageRole, "codeLanguage" },
         { BlockAnchorRole,  "blockAnchor" },
         { BlockAttrsRole,   "blockAttrs" },
@@ -48,6 +49,7 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
         case KindRole:          return r.kind;
         case TextRole:          return r.text;
         case HeadingLevelRole:  return r.headingLevel;
+        case HeadingFormRole:   return r.headingForm;
         case CodeLanguageRole:  return r.codeLanguage;
         case BlockAnchorRole:   return QVariant::fromValue(r.blockAnchor);
         case BlockAttrsRole: {

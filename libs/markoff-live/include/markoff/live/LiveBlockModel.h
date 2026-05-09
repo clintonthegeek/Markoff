@@ -32,6 +32,7 @@ public:
         KindRole         = Qt::UserRole + 1,
         TextRole,
         HeadingLevelRole,
+        HeadingFormRole,
         CodeLanguageRole,
         BlockAnchorRole,
         BlockAttrsRole,   // QVariantMap of block-kind attributes
