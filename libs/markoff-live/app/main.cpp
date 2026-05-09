@@ -13,24 +13,37 @@
 
 /// Test app for markoff-live. Loads a Markdown file and renders it via
 /// LiveListModelBinding + LiveView.
-/// Usage: markoff-live-app <markdown-file>
+/// Usage:
+///   markoff-live-app <markdown-file>      open existing file
+///   markoff-live-app --new <output-path>  start with an empty doc; save to <output-path>
 int main(int argc, char *argv[])
 {
     QQuickStyle::setStyle(QStringLiteral("Basic"));
     QApplication app(argc, argv);
 
-    if (argc < 2) {
-        qWarning("Usage: %s <markdown-file>", argv[0]);
+    bool isNew = false;
+    QString filePath;
+    if (argc == 3 && QString::fromLocal8Bit(argv[1]) == QStringLiteral("--new")) {
+        isNew = true;
+        filePath = QString::fromLocal8Bit(argv[2]);
+    } else if (argc == 2) {
+        filePath = QString::fromLocal8Bit(argv[1]);
+    } else {
+        qWarning("Usage:\n  %s <markdown-file>\n  %s --new <output-path>",
+                 argv[0], argv[0]);
         return 1;
     }
 
-    QFile file(argv[1]);
-    if (!file.open(QIODevice::ReadOnly)) {
-        qWarning("Cannot open '%s': %s", argv[1],
-                 qUtf8Printable(file.errorString()));
-        return 1;
+    QByteArray content;
+    if (!isNew) {
+        QFile file(filePath);
+        if (!file.open(QIODevice::ReadOnly)) {
+            qWarning("Cannot open '%s': %s", qUtf8Printable(filePath),
+                     qUtf8Printable(file.errorString()));
+            return 1;
+        }
+        content = file.readAll();
     }
-    const QByteArray content = file.readAll();
 
     const quint16 replicaId =
         static_cast<quint16>(QRandomGenerator::global()->generate() & 0xFFFF);
@@ -40,8 +53,7 @@ int main(int argc, char *argv[])
 
     Markoff::Session *session = doc->createSession();
 
-    auto ctrl = std::make_unique<MainController>(doc.get(),
-                                                 QString::fromLocal8Bit(argv[1]));
+    auto ctrl = std::make_unique<MainController>(doc.get(), filePath);
 
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(

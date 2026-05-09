@@ -21,6 +21,14 @@ Item {
     readonly property var selectionView:
         liveBinding ? liveBinding.selectionView : null
 
+    // True when this block is fully covered by a multi-block selection
+    // (range starts at 0 and reaches the end of the block's text). Used to
+    // paint the list marker as part of the selection so the bullet/number
+    // visibly belongs to the selected range. Recomputed via Connections
+    // on selectionView.selectionChanged because LiveSelectionView's range
+    // is read through a Q_INVOKABLE method, not a notifying Q_PROPERTY.
+    property bool _fullySelected: false
+
     readonly property int indentLevel: model.indentLevel || 0
     readonly property string markerStyle: model.markerStyle || ""
     readonly property int markerNumber: model.markerNumber || 0
@@ -47,6 +55,17 @@ Item {
         text: model.text
     }
 
+    // Selection-highlight backdrop for the marker. Painted only when the
+    // whole block is in a multi-block selection (D4 of the architectural
+    // pass): markdown markers are rendered separately from `model.text` so
+    // the TextEdit's native `select(...)` paint never touches them.
+    Rectangle {
+        anchors.fill: markerLabel
+        color: palette.highlight
+        visible: root._fullySelected
+        z: -1
+    }
+
     Text {
         id: markerLabel
         anchors {
@@ -58,7 +77,7 @@ Item {
         text: root.markerText
         font.family: "monospace"
         font.pixelSize: 14
-        color: palette.text
+        color: root._fullySelected ? palette.highlightedText : palette.text
 
         MouseArea {
             visible: root.markerStyle === "task"
@@ -68,6 +87,17 @@ Item {
                 if (!root.liveBinding || !root.liveBinding.document) return
                 root.liveBinding.document.toggleListItemChecked(model.blockAnchor)
             }
+        }
+    }
+
+    Connections {
+        target: root.selectionView
+        function onSelectionChanged() {
+            const sv = root.selectionView
+            if (!sv) { root._fullySelected = false; return }
+            const r = sv.rangeForBlock(root.modelIndex)
+            if (!r || r.x < 0) { root._fullySelected = false; return }
+            root._fullySelected = (r.x === 0 && r.y >= edit.length)
         }
     }
 
@@ -83,7 +113,7 @@ Item {
         wrapMode: TextEdit.Wrap
         font.pixelSize: 14
         color: palette.text
-        selectByMouse: true
+        selectByMouse: false
         persistentSelection: true
 
         InlineHighlighterAttached {
@@ -108,9 +138,8 @@ Item {
                                || k === Qt.Key_Tab)
             const isNav = (k === Qt.Key_Up || k === Qt.Key_Down
                         || k === Qt.Key_Left || k === Qt.Key_Right
+                        || k === Qt.Key_Home || k === Qt.Key_End
                         || k === Qt.Key_PageUp || k === Qt.Key_PageDown)
-            const isCtrlHomeEnd = ((k === Qt.Key_Home || k === Qt.Key_End)
-                                   && (mods & Qt.ControlModifier))
 
             if (isStructural) {
                 const sh = root.liveBinding.structuralKeyHandler
@@ -121,7 +150,7 @@ Item {
                                                model.text)
                 return
             }
-            if (isNav || isCtrlHomeEnd) {
+            if (isNav) {
                 const nh = root.liveBinding.navigationController
                 if (!nh) return
                 event.accepted = (nh.tryHandle(k, mods, root.modelIndex,
@@ -136,7 +165,21 @@ Item {
             if (!sv) { deselect(); return }
             const r = sv.rangeForBlock(model.index)
             if (!r || r.x < 0) { deselect(); return }
-            select(r.x, Math.min(r.y, length))
+            const blockLen = length
+            const start = Math.min(r.x, blockLen)
+            const end   = Math.min(r.y, blockLen)
+            if (start === end) {
+                cursorPosition = start
+                return
+            }
+            const myIdx = model.index
+            const cursorAtEnd = (myIdx === sv.activeBlock())
+                ? (sv.activeQtPos() === end)
+                : (sv.activeBlock() > myIdx)
+            const cursorPos = cursorAtEnd ? end   : start
+            const otherPos  = cursorAtEnd ? start : end
+            cursorPosition = otherPos
+            moveCursorSelection(cursorPos, TextEdit.SelectCharacters)
         }
 
         Connections {

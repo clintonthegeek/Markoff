@@ -182,6 +182,15 @@ public:
                               const QJsonArray &blocks,
                               const Markoff::PasteMeta &meta);
 
+    /// Serialise a clipboard JSON block payload (as produced by
+    /// LiveClipboardController) back to flat markdown text. Reconstructs the
+    /// kind-specific markdown prefix (heading `#`, list marker `-`/`1.`/etc.,
+    /// blockquote `>`, code-fence) from the per-block "kind" + "attrs" fields,
+    /// and joins blocks with `\n\n`. Used both by applyStructuredPaste (which
+    /// then calls applyFlatEdit) and by LiveClipboardController's plain-text
+    /// fallback so the markdown going to other apps round-trips correctly.
+    static QByteArray reconstructFlatMarkdown(const QJsonArray &blocks);
+
     /// Apply a structural operation (insert/remove/change-kind) to the
     /// IdList and related CRDTs. Recorded in the UndoLog.
     void applyStructural(const Markoff::StructuralOp &op);

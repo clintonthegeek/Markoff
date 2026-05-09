@@ -128,117 +128,144 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
         }
     }
 
-    // Shift+Arrow: extend selection across blocks.
-    if (modifiers == Qt::ShiftModifier) {
-        if (key == Qt::Key_Left) {
-            if (qtPos > 0) return NotHandled;  // TextEdit handles within-block shift
-            m_cursorState->clearDesiredVisualX();
-            const int targetRow = previousNavigableRow(blockIndex);
-            if (targetRow < 0) return Handled;
-            if (!m_model) return Handled;
-            const int targetLen = m_model->recordAt(targetRow).text.length();
-            if (m_selectionView) m_selectionView->extend(targetRow, targetLen);
-            m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
-            return Handled;
-        }
-        if (key == Qt::Key_Right) {
-            if (qtPos < blockText.length()) return NotHandled;  // TextEdit handles within-block shift
-            m_cursorState->clearDesiredVisualX();
-            const int targetRow = nextNavigableRow(blockIndex);
-            if (targetRow < 0) return Handled;
-            if (m_selectionView) m_selectionView->extend(targetRow, 0);
-            m_cursorState->requestTextCaretAtRow(targetRow, 0);
-            return Handled;
-        }
-        if (key == Qt::Key_Up) {
-            if (!isAtVisualTopLine(editItem)) return NotHandled;
-            qreal desiredX = m_cursorState->desiredVisualX();
-            if (desiredX < 0) {
-                const QVariant rectV = editItem ? editItem->property("cursorRectangle") : QVariant();
-                desiredX = rectV.canConvert<QRectF>() ? rectV.toRectF().x() : 0.0;
-                m_cursorState->setDesiredVisualX(desiredX);
-            }
-            const int targetRow = previousNavigableRow(blockIndex);
-            if (targetRow < 0) return Handled;
-            if (m_selectionView) {
-                // Use desiredVisualX position as an approximation; QML will refine.
-                m_selectionView->extend(targetRow, 0);
-            }
-            m_cursorState->requestTextCaretAtRowVisualX(
-                targetRow, LiveCursorState::VisualLineHint::LastLine);
-            return Handled;
-        }
-        if (key == Qt::Key_Down) {
-            if (!isAtVisualBottomLine(editItem)) return NotHandled;
-            qreal desiredX = m_cursorState->desiredVisualX();
-            if (desiredX < 0) {
-                const QVariant rectV = editItem ? editItem->property("cursorRectangle") : QVariant();
-                desiredX = rectV.canConvert<QRectF>() ? rectV.toRectF().x() : 0.0;
-                m_cursorState->setDesiredVisualX(desiredX);
-            }
-            const int targetRow = nextNavigableRow(blockIndex);
-            if (targetRow < 0) return Handled;
-            if (m_selectionView) {
-                // Use end of target block as position; QML will refine.
-                const int targetLen = m_model ? m_model->recordAt(targetRow).text.length() : 0;
-                m_selectionView->extend(targetRow, targetLen);
-            }
-            m_cursorState->requestTextCaretAtRowVisualX(
-                targetRow, LiveCursorState::VisualLineHint::FirstLine);
-            return Handled;
-        }
-    }
+    // ------------------------------------------------------------------------
+    // Option B (single source of truth): TextEdit's `selectByMouse` is false
+    // and we capture every plain or Shift-modified arrow / Home / End so
+    // LiveSelectionView is always authoritative. Within-block motion and
+    // selection are also driven through here — the delegate's applySelection()
+    // re-renders after each begin/extend, placing TextEdit's caret at the
+    // active end via moveCursorSelection (direction-preserving).
+    //
+    // Shift+arrow extends; plain arrow collapses to caret at target.
+    // ------------------------------------------------------------------------
+    const bool shift = (modifiers & Qt::ShiftModifier);
+    const bool extraNonShiftMods =
+        (modifiers & ~static_cast<int>(Qt::ShiftModifier)) != 0;
 
-    if (modifiers != Qt::NoModifier) return NotHandled;
+    if (extraNonShiftMods)
+        return NotHandled;  // Ctrl/Alt combos handled above or upstream.
 
-    if (key == Qt::Key_Up) {
-        if (!isAtVisualTopLine(editItem)) return NotHandled;
-        qreal desiredX = m_cursorState->desiredVisualX();
-        if (desiredX < 0) {
-            const QVariant rectV = editItem ? editItem->property("cursorRectangle") : QVariant();
-            desiredX = rectV.canConvert<QRectF>() ? rectV.toRectF().x() : 0.0;
-            m_cursorState->setDesiredVisualX(desiredX);
+    auto applyMotion = [&](int targetRow, int targetPos,
+                           LiveCursorState::VisualLineHint hint
+                               = LiveCursorState::VisualLineHint::None) -> int {
+        if (!m_selectionView) return Handled;
+        if (shift) {
+            // Anchor at start position if no selection exists yet (D6).
+            if (m_selectionView->anchorBlock() < 0)
+                m_selectionView->begin(blockIndex, qtPos);
+            m_selectionView->extend(targetRow, targetPos);
+        } else {
+            // Plain motion: collapse selection to caret at target.
+            m_selectionView->begin(targetRow, targetPos);
         }
-        const int targetRow = previousNavigableRow(blockIndex);
-        if (targetRow < 0) return Handled;
-        m_cursorState->requestTextCaretAtRowVisualX(
-            targetRow, LiveCursorState::VisualLineHint::LastLine);
+        // Cross-block always needs a focus + scroll request through the
+        // cursorState pipeline. Within-block: applySelection() handles the
+        // caret via moveCursorSelection — no cursorState request needed.
+        if (targetRow != blockIndex) {
+            if (hint == LiveCursorState::VisualLineHint::None)
+                m_cursorState->requestTextCaretAtRow(targetRow, targetPos);
+            else
+                m_cursorState->requestTextCaretAtRowVisualX(targetRow, hint);
+        }
         return Handled;
-    }
+    };
 
-    if (key == Qt::Key_Down) {
-        if (!isAtVisualBottomLine(editItem)) return NotHandled;
-        qreal desiredX = m_cursorState->desiredVisualX();
-        if (desiredX < 0) {
-            const QVariant rectV = editItem ? editItem->property("cursorRectangle") : QVariant();
-            desiredX = rectV.canConvert<QRectF>() ? rectV.toRectF().x() : 0.0;
-            m_cursorState->setDesiredVisualX(desiredX);
-        }
-        const int targetRow = nextNavigableRow(blockIndex);
-        if (targetRow < 0) return Handled;
-        m_cursorState->requestTextCaretAtRowVisualX(
-            targetRow, LiveCursorState::VisualLineHint::FirstLine);
-        return Handled;
-    }
+    auto positionAtVisual = [&](double x, double y) -> int {
+        if (!editItem) return -1;
+        // QML TextEdit's positionAt is `Q_INVOKABLE int positionAt(qreal, qreal)`;
+        // Q_RETURN_ARG(int, ...) is the correct match. Q_RETURN_ARG(QVariant, ...)
+        // silently fails for non-QVariant return types and yields 0.
+        int target = -1;
+        QMetaObject::invokeMethod(editItem, "positionAt",
+            Qt::DirectConnection, Q_RETURN_ARG(int, target),
+            Q_ARG(double, x), Q_ARG(double, y));
+        return target;
+    };
+
+    auto cursorRect = [&]() -> QRectF {
+        const QVariant rectV = editItem ? editItem->property("cursorRectangle")
+                                        : QVariant();
+        return rectV.canConvert<QRectF>() ? rectV.toRectF() : QRectF{};
+    };
 
     if (key == Qt::Key_Left) {
-        if (qtPos > 0) return NotHandled;
         m_cursorState->clearDesiredVisualX();
-        const int targetRow = previousNavigableRow(blockIndex);
-        if (targetRow < 0) return Handled;
-        if (!m_model) return Handled;
-        const int targetLen = m_model->recordAt(targetRow).text.length();
-        m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
-        return Handled;
+        if (qtPos > 0)
+            return applyMotion(blockIndex, qtPos - 1);
+        const int prev = previousNavigableRow(blockIndex);
+        if (prev < 0) return Handled;
+        const int prevLen = m_model->recordAt(prev).text.length();
+        return applyMotion(prev, prevLen);
     }
 
     if (key == Qt::Key_Right) {
-        if (qtPos < blockText.length()) return NotHandled;
         m_cursorState->clearDesiredVisualX();
-        const int targetRow = nextNavigableRow(blockIndex);
-        if (targetRow < 0) return Handled;
-        m_cursorState->requestTextCaretAtRow(targetRow, 0);
-        return Handled;
+        if (qtPos < blockText.length())
+            return applyMotion(blockIndex, qtPos + 1);
+        const int next = nextNavigableRow(blockIndex);
+        if (next < 0) return Handled;
+        return applyMotion(next, 0);
+    }
+
+    if (key == Qt::Key_Home) {
+        const QRectF cr = cursorRect();
+        if (cr.isEmpty()) return NotHandled;
+        m_cursorState->clearDesiredVisualX();
+        const int target = positionAtVisual(0.0, cr.y());
+        return applyMotion(blockIndex, target < 0 ? 0 : target);
+    }
+
+    if (key == Qt::Key_End) {
+        const QRectF cr = cursorRect();
+        if (cr.isEmpty()) return NotHandled;
+        m_cursorState->clearDesiredVisualX();
+        const qreal w = editItem->property("width").toReal();
+        const int target = positionAtVisual(w - 1.0, cr.y());
+        return applyMotion(blockIndex, target < 0 ? blockText.length() : target);
+    }
+
+    if (key == Qt::Key_Up) {
+        const QRectF cr = cursorRect();
+        if (cr.isEmpty()) return NotHandled;
+        qreal desiredX = m_cursorState->desiredVisualX();
+        if (desiredX < 0) {
+            desiredX = cr.x();
+            m_cursorState->setDesiredVisualX(desiredX);
+        }
+        // Try within-block visual-line up.
+        const qreal targetY = cr.y() - cr.height() * 0.5;
+        if (targetY >= 0) {
+            const int target = positionAtVisual(desiredX, targetY);
+            if (target >= 0 && target != qtPos)
+                return applyMotion(blockIndex, target);
+        }
+        // Already at top visual line → cross-block.
+        const int prev = previousNavigableRow(blockIndex);
+        if (prev < 0) return Handled;
+        return applyMotion(prev, 0,
+            LiveCursorState::VisualLineHint::LastLine);
+    }
+
+    if (key == Qt::Key_Down) {
+        const QRectF cr = cursorRect();
+        if (cr.isEmpty()) return NotHandled;
+        qreal desiredX = m_cursorState->desiredVisualX();
+        if (desiredX < 0) {
+            desiredX = cr.x();
+            m_cursorState->setDesiredVisualX(desiredX);
+        }
+        bool ok = false;
+        const qreal contentH = editItem->property("contentHeight").toReal(&ok);
+        const qreal targetY = cr.bottom() + cr.height() * 0.5;
+        if (ok && contentH > 0 && targetY < contentH) {
+            const int target = positionAtVisual(desiredX, targetY);
+            if (target >= 0 && target != qtPos)
+                return applyMotion(blockIndex, target);
+        }
+        const int next = nextNavigableRow(blockIndex);
+        if (next < 0) return Handled;
+        return applyMotion(next, 0,
+            LiveCursorState::VisualLineHint::FirstLine);
     }
 
     if (key == Qt::Key_PageUp || key == Qt::Key_PageDown) {

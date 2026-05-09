@@ -15,15 +15,26 @@
 using namespace Markoff::Live;
 
 // MockTextEdit: simulates a QML TextEdit's layout state (read via Qt property system)
+//
+// Option B (Phase B) adds within-block visual-line motion via positionAt(x, y).
+// The mock returns a deterministic position so within-block motion tests can
+// assert observable state without a real QTextDocument layout.
 class MockTextEdit : public QObject {
     Q_OBJECT
     Q_PROPERTY(QRectF cursorRectangle READ cursorRectangle CONSTANT)
     Q_PROPERTY(qreal contentHeight READ contentHeight CONSTANT)
+    Q_PROPERTY(qreal width READ width CONSTANT)
 public:
     QRectF m_cursorRect;
     qreal  m_contentHeight = 20.0;
+    qreal  m_width = 200.0;
+    int    m_positionAtReturn = 7;
     QRectF cursorRectangle() const { return m_cursorRect; }
     qreal  contentHeight()   const { return m_contentHeight; }
+    qreal  width()           const { return m_width; }
+    Q_INVOKABLE int positionAt(double /*x*/, double /*y*/) const {
+        return m_positionAtReturn;
+    }
 };
 
 // Helper: load markdown into a D2 document and wait for the model rows to
@@ -65,15 +76,13 @@ private Q_SLOTS:
 
         auto *nav = binding.navigationController();
         QVERIFY(nav != nullptr);
-        // Phase D stub checked Up/Down/Left/Right here, but Phase E fills those in.
-        // Verify a truly unrecognised key returns NotHandled.
+        // Truly unrecognised keys still fall through.
         QCOMPARE(nav->tryHandle(Qt::Key_A, 0, 0, 0, nullptr, QString()),
                  static_cast<int>(LiveNavigationController::NotHandled));
         QCOMPARE(nav->tryHandle(Qt::Key_Space, 0, 0, 0, nullptr, QString()),
                  static_cast<int>(LiveNavigationController::NotHandled));
-        // Arrow keys with a modifier return NotHandled (only bare arrows are handled).
-        QCOMPARE(nav->tryHandle(Qt::Key_Up, Qt::ShiftModifier, 0, 0, nullptr, QString()),
-                 static_cast<int>(LiveNavigationController::NotHandled));
+        // Ctrl+Down has no specific handler → NotHandled (reaches here only after
+        // Ctrl-prefixed paths above declined to claim it).
         QCOMPARE(nav->tryHandle(Qt::Key_Down, Qt::ControlModifier, 0, 0, nullptr, QString()),
                  static_cast<int>(LiveNavigationController::NotHandled));
     }
@@ -198,22 +207,30 @@ private Q_SLOTS:
         QCOMPARE(cs->focusedAnchorRow(), 0);
     }
 
-    void up_at_non_top_line_returns_not_handled() {
+    void up_at_non_top_line_moves_caret_within_block() {
+        // Option B contract: within-block visual-line Up is handled by the
+        // controller (no longer falls through to TextEdit's native nav).
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
+        doc.loadFromMarkdown("Beta multiline content");
+        QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        QVERIFY(nav);
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && sv);
 
         MockTextEdit mockEdit;
-        // cursorRect.y == 25 > height*0.5 == 10 → not at top line
-        mockEdit.m_cursorRect = QRectF(0, 25, 2, 20);
+        mockEdit.m_cursorRect = QRectF(0, 25, 2, 20);  // not at top
         mockEdit.m_contentHeight = 40.0;
+        mockEdit.m_positionAtReturn = 3;  // mock returns position 3 for any (x,y)
 
         const int result = nav->tryHandle(Qt::Key_Up, Qt::NoModifier,
-                                          1, 4, &mockEdit, QStringLiteral("Beta"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+                                          0, 4, &mockEdit, QStringLiteral("Beta"));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+        // Within-block motion: selection collapsed to (block 0, position 3).
+        QCOMPARE(sv->activeBlock(), 0);
+        QCOMPARE(sv->activeQtPos(), 3);
     }
 
     void up_at_row_zero_with_no_prev_returns_handled() {
@@ -315,17 +332,22 @@ private Q_SLOTS:
         QCOMPARE(cs->focusedQtPos(), 5);
     }
 
-    void left_at_nonzero_qtpos_returns_not_handled() {
+    void left_at_nonzero_qtpos_moves_caret_within_block() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
+        doc.loadFromMarkdown("Alpha\n\nBeta");
+        QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        QVERIFY(nav);
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && sv);
 
         const int result = nav->tryHandle(Qt::Key_Left, Qt::NoModifier,
                                           1, 3, nullptr, QStringLiteral("Beta"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+        QCOMPARE(sv->activeBlock(), 1);
+        QCOMPARE(sv->activeQtPos(), 2);  // 3 - 1
     }
 
     void left_at_row_0_qtpos_0_returns_handled_at_boundary() {
@@ -368,17 +390,22 @@ private Q_SLOTS:
         QCOMPARE(cs->focusedQtPos(), 0);  // beginning of next block
     }
 
-    void right_at_non_end_returns_not_handled() {
+    void right_at_non_end_moves_caret_within_block() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
+        doc.loadFromMarkdown("Alpha\n\nBeta");
+        QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        QVERIFY(nav);
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && sv);
 
         const int result = nav->tryHandle(Qt::Key_Right, Qt::NoModifier,
                                           0, 2, nullptr, QStringLiteral("Alpha"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+        QCOMPARE(sv->activeBlock(), 0);
+        QCOMPARE(sv->activeQtPos(), 3);  // 2 + 1
     }
 
     void right_at_last_row_end_returns_handled_at_boundary() {

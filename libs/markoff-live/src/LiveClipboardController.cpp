@@ -14,6 +14,7 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QJsonValue>
 #include <QMimeData>
 #include <QStringList>
 
@@ -31,8 +32,35 @@ void LiveClipboardController::setModel(const LiveBlockModel *model) { m_model = 
 
 namespace {
 
+/// Serialize a single block's `attrs` (QHash<AttrName, AttrValue>) to a
+/// JSON object. AttrValue is a `std::variant<int, QString, bool>` so the
+/// JSON keeps each attr's native type (heading level as int, marker style
+/// as QString, checkbox state as bool, etc.). The keys must match the
+/// `Markoff::AttrNames::*` constants exactly so `reconstructFlatMarkdown`
+/// in markoff-core can read them back.
+QJsonObject attrsToJson(const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs)
+{
+    QJsonObject out;
+    for (auto it = attrs.cbegin(); it != attrs.cend(); ++it) {
+        const QString key = QString::fromUtf8(it.key());
+        std::visit([&](const auto &val) {
+            using T = std::decay_t<decltype(val)>;
+            if constexpr (std::is_same_v<T, int>)
+                out[key] = val;
+            else if constexpr (std::is_same_v<T, QString>)
+                out[key] = val;
+            else if constexpr (std::is_same_v<T, bool>)
+                out[key] = val;
+        }, it.value());
+    }
+    return out;
+}
+
 /// Serialize the selected spans of each block to a JSON array.
-/// Each object has "kind" (QString) and "text" (the selected substring).
+/// Each object has "kind" (QString), "text" (selected substring), and
+/// "attrs" (per-block attrs JSON, when non-empty). The attrs are required
+/// so the structured-paste path can reconstruct kind-specific markdown
+/// prefixes (heading `#`, list-item marker, code-fence info string).
 QJsonArray serializeSelection(const LiveSelectionView &sel, const LiveBlockModel &model)
 {
     QJsonArray out;
@@ -48,18 +76,22 @@ QJsonArray serializeSelection(const LiveSelectionView &sel, const LiveBlockModel
         QJsonObject obj;
         obj["kind"] = rec.kind;
         obj["text"] = text;
+        const QJsonObject attrs = attrsToJson(rec.attrs);
+        if (!attrs.isEmpty()) obj["attrs"] = attrs;
         out.append(obj);
     }
     return out;
 }
 
-/// Join block texts with '\n' for the text/plain MIME type.
+/// Plain-text fallback for the clipboard. Reuses
+/// MarkoffDocument::reconstructFlatMarkdown so the markdown going to other
+/// apps round-trips through Markoff (and external markdown viewers) the same
+/// way the structured-paste path round-trips internally — list markers,
+/// heading prefixes, blockquote `>`, code fences are preserved.
 QString joinPlain(const QJsonArray &blocks)
 {
-    QStringList parts;
-    for (const auto &v : blocks)
-        parts << v.toObject().value("text").toString();
-    return parts.join('\n');
+    return QString::fromUtf8(
+        Markoff::MarkoffDocument::reconstructFlatMarkdown(blocks));
 }
 
 /// Compute the flat byte offset of (blockIndex, qtPos) by walking

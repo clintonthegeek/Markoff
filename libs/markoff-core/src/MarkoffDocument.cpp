@@ -1160,11 +1160,30 @@ std::vector<BlockId> MarkoffDocument::takeRecentCut(quint64 cutSeq)
     return {};
 }
 
-void MarkoffDocument::applyStructuredPaste(quint32 startByte, quint32 endByte,
-                                           const QJsonArray &blocks,
-                                           const Markoff::PasteMeta &meta)
+QByteArray MarkoffDocument::reconstructFlatMarkdown(const QJsonArray &blocks)
 {
-    // 1. Serialize the JSON block array to flat markdown text.
+    // Convention for the per-block "text" field, as produced by
+    // LiveClipboardController::serializeSelection (which copies model.text =
+    // doc->blockText(id) with the trailing '\n' trimmed):
+    //
+    //   * Heading buffers, blockquote buffers, code-block buffers, paragraph
+    //     buffers all hold the raw source range from the parser — `## ` for
+    //     headings, `> ` for blockquotes, ` ``` ` fences for code-blocks. We
+    //     emit those verbatim and let the receiving side's kind-transition
+    //     re-detect the kind from the prefix (Paragraph → Heading via
+    //     `## `, Paragraph → Blockquote via `> `, etc.). Adding another
+    //     prefix here was a bug: a copied "## TL;DR" came back as
+    //     "## ## TL;DR" because we doubled the hashes.
+    //
+    //   * ListItem is the one exception: tree-sitter's per-list_item parser
+    //     range starts after the marker, and `materializeBlocksFromParsedDoc`
+    //     stores buffer = content only (no marker, no leading indent). The
+    //     marker therefore must be reconstructed from `attrs.markerStyle` /
+    //     `markerNumber` / `checked` to round-trip a list selection.
+    //
+    // Kind strings are lowercase to match Markoff::Live::BlockKind constants
+    // (libs/markoff-live/src/BlockKind.cpp). Capitalised strings like
+    // "Heading"/"CodeBlock" don't appear in real clipboard payloads.
     QByteArray flat;
     bool first = true;
     for (const auto &v : blocks) {
@@ -1175,38 +1194,47 @@ void MarkoffDocument::applyStructuredPaste(quint32 startByte, quint32 endByte,
 
         const QString kind = obj.value(QStringLiteral("kind")).toString();
         const QString text = obj.value(QStringLiteral("text")).toString();
+        const QJsonObject attrs = obj.value(QStringLiteral("attrs")).toObject();
 
-        if (kind == QStringLiteral("Heading")) {
-            const int level =
-                obj.value(QStringLiteral("attrs")).toObject()
-                   .value(QStringLiteral("level")).toInt(1);
-            flat.append(QByteArray(std::max(level, 1), '#'));
+        if (kind == QStringLiteral("list-item")) {
+            const QString style =
+                attrs.value(QStringLiteral("markerStyle")).toString(QStringLiteral("minus"));
+            const int markerNumber =
+                attrs.value(QStringLiteral("markerNumber")).toInt(1);
+            const bool checked =
+                attrs.value(QStringLiteral("checked")).toBool();
+            QByteArray prefix;
+            if (style == QStringLiteral("dot"))
+                prefix = QByteArray::number(markerNumber) + ".";
+            else if (style == QStringLiteral("paren"))
+                prefix = QByteArray::number(markerNumber) + ")";
+            else if (style == QStringLiteral("plus"))
+                prefix = "+";
+            else if (style == QStringLiteral("star"))
+                prefix = "*";
+            else if (style == QStringLiteral("task"))
+                prefix = checked ? "- [x]" : "- [ ]";
+            else  // "minus" or unknown
+                prefix = "-";
+            flat.append(prefix);
             flat.append(' ');
-            flat.append(text.toUtf8());
-        } else if (kind == QStringLiteral("CodeBlock")) {
-            const QString lang =
-                obj.value(QStringLiteral("attrs")).toObject()
-                   .value(QStringLiteral("language")).toString();
-            flat.append("```");
-            flat.append(lang.toUtf8());
-            flat.append('\n');
-            flat.append(text.toUtf8());
-            flat.append("\n```");
-        } else if (kind == QStringLiteral("ListItem")) {
-            const QString marker =
-                obj.value(QStringLiteral("attrs")).toObject()
-                   .value(QStringLiteral("marker")).toString(QStringLiteral("-"));
-            flat.append(marker.toUtf8());
-            flat.append(' ');
-            flat.append(text.toUtf8());
-        } else if (kind == QStringLiteral("Blockquote")) {
-            flat.append("> ");
             flat.append(text.toUtf8());
         } else {
-            // Paragraph and any unknown kind: emit text verbatim.
+            // paragraph / heading / code-block / blockquote / math / image /
+            // hr / unknown: text already contains the source-faithful prefix
+            // (or nothing, for paragraph). Emit verbatim.
             flat.append(text.toUtf8());
         }
     }
+    return flat;
+}
+
+void MarkoffDocument::applyStructuredPaste(quint32 startByte, quint32 endByte,
+                                           const QJsonArray &blocks,
+                                           const Markoff::PasteMeta &meta)
+{
+    // 1. Serialise the JSON block array to flat markdown text.
+    const QByteArray flat = reconstructFlatMarkdown(blocks);
 
     // 2. Apply as a flat edit (clamp: lo ≤ hi).
     const quint32 lo = std::min(startByte, endByte);

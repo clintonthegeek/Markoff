@@ -12,6 +12,7 @@
 #include <markoff/live/LiveClipboardController.h>
 #include <markoff/live/LiveActionController.h>
 #include <markoff/live/LiveFormatController.h>
+#include <markoff/live/LiveContextMenuHandler.h>
 
 #include <QObject>
 #include <QAbstractListModel>
@@ -53,6 +54,8 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
                READ actionController CONSTANT)
     Q_PROPERTY(Markoff::Live::LiveFormatController *formatController
                READ formatController CONSTANT)
+    Q_PROPERTY(Markoff::Live::LiveContextMenuHandler *contextMenuHandler
+               READ contextMenuHandler CONSTANT)
 
 public:
     enum Capability {
@@ -90,6 +93,7 @@ public:
     LiveClipboardController *clipboardController() const;
     LiveActionController    *actionController()    const;
     LiveFormatController    *formatController()    const;
+    LiveContextMenuHandler  *contextMenuHandler()  const;
 
     const Markoff::Theme *theme() const noexcept;
     void setTheme(const Markoff::Theme *theme);

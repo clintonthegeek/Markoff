@@ -142,6 +142,7 @@ struct LiveListModelBinding::Private {
     LiveClipboardController   *clipboard        = nullptr;
     LiveActionController      *actions          = nullptr;
     LiveFormatController      *format           = nullptr;
+    LiveContextMenuHandler    *contextMenu      = nullptr;
     Capabilities               caps            = AllCapabilities;
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
@@ -181,6 +182,12 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
         d->actions->setSelectionView(d->selectionView);
         if (d->clipboard) d->actions->setClipboardController(d->clipboard);
         if (d->format)    d->actions->setFormatController(d->format);
+
+        // Native QMenu / Widget-bridge context menu. Owns a QMenu populated
+        // from the action controller's QActions; popup() is invoked from
+        // QML on right-click. Requires QGuiApplication for QMenu construction.
+        d->contextMenu = new LiveContextMenuHandler(this);
+        d->contextMenu->setActionController(d->actions);
     }
 }
 
@@ -226,9 +233,10 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->selectionView->setDocument(d->document);
         d->selectionView->setSession(nullptr);
 
-        if (d->clipboard) d->clipboard->setDocument(d->document);
-        if (d->format)    d->format->setDocument(d->document);
-        if (d->actions)   d->actions->setDocument(d->document);
+        if (d->clipboard)   d->clipboard->setDocument(d->document);
+        if (d->format)      d->format->setDocument(d->document);
+        if (d->actions)     d->actions->setDocument(d->document);
+        if (d->contextMenu) d->contextMenu->setDocument(d->document);
 
         d->structuralKeys = new LiveStructuralKeyHandler(
             d->document, d->model, d->cursorState, &d->registry, this);
@@ -236,9 +244,10 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->selectionView->setDocument(nullptr);
         d->selectionView->setSession(nullptr);
 
-        if (d->clipboard) d->clipboard->setDocument(nullptr);
-        if (d->format)    d->format->setDocument(nullptr);
-        if (d->actions)   d->actions->setDocument(nullptr);
+        if (d->clipboard)   d->clipboard->setDocument(nullptr);
+        if (d->format)      d->format->setDocument(nullptr);
+        if (d->actions)     d->actions->setDocument(nullptr);
+        if (d->contextMenu) d->contextMenu->setDocument(nullptr);
 
         d->lastKeys.clear();
     }
@@ -262,6 +271,7 @@ QAbstractListModel       *LiveListModelBinding::remoteCursorsModel()  const { re
 LiveClipboardController *LiveListModelBinding::clipboardController() const { return d->clipboard; }
 LiveActionController    *LiveListModelBinding::actionController()    const { return d->actions; }
 LiveFormatController    *LiveListModelBinding::formatController()    const { return d->format; }
+LiveContextMenuHandler  *LiveListModelBinding::contextMenuHandler()  const { return d->contextMenu; }
 
 bool LiveListModelBinding::applyingModelUpdate() const
 {

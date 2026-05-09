@@ -80,9 +80,11 @@ qt_add_qml_module(markoff_live
         # E2.5 Phase E: format controller
         include/markoff/live/LiveFormatController.h
         src/LiveFormatController.cpp
+        # E2.5 Phase J: native QMenu / Widget-bridge context menu
+        include/markoff/live/LiveContextMenuHandler.h
+        src/LiveContextMenuHandler.cpp
     QML_FILES
         qml/LiveView.qml
-        qml/LiveContextMenu.qml
         qml/delegates/ParagraphDelegate.qml
         qml/delegates/HeadingDelegate.qml
         qml/delegates/CodeBlockDelegate.qml

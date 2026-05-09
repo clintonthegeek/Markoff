@@ -38,7 +38,7 @@ Rectangle {
         font.family: "monospace"
         font.pixelSize: 13
         color: palette.text
-        selectByMouse: true
+        selectByMouse: false
         persistentSelection: true
 
         Keys.priority: Keys.BeforeItem
@@ -51,9 +51,8 @@ Rectangle {
                                || k === Qt.Key_Tab)
             const isNav = (k === Qt.Key_Up || k === Qt.Key_Down
                         || k === Qt.Key_Left || k === Qt.Key_Right
+                        || k === Qt.Key_Home || k === Qt.Key_End
                         || k === Qt.Key_PageUp || k === Qt.Key_PageDown)
-            const isCtrlHomeEnd = ((k === Qt.Key_Home || k === Qt.Key_End)
-                                   && (mods & Qt.ControlModifier))
 
             if (isStructural) {
                 const sh = root.liveBinding.structuralKeyHandler
@@ -64,7 +63,7 @@ Rectangle {
                                                model.text)
                 return
             }
-            if (isNav || isCtrlHomeEnd) {
+            if (isNav) {
                 const nh = root.liveBinding.navigationController
                 if (!nh) return
                 event.accepted = (nh.tryHandle(k, mods, root.modelIndex,
@@ -84,7 +83,21 @@ Rectangle {
             if (!sv) { deselect(); return }
             const r = sv.rangeForBlock(model.index)
             if (!r || r.x < 0) { deselect(); return }
-            select(r.x, Math.min(r.y, length))
+            const blockLen = length
+            const start = Math.min(r.x, blockLen)
+            const end   = Math.min(r.y, blockLen)
+            if (start === end) {
+                cursorPosition = start
+                return
+            }
+            const myIdx = model.index
+            const cursorAtEnd = (myIdx === sv.activeBlock())
+                ? (sv.activeQtPos() === end)
+                : (sv.activeBlock() > myIdx)
+            const cursorPos = cursorAtEnd ? end   : start
+            const otherPos  = cursorAtEnd ? start : end
+            cursorPosition = otherPos
+            moveCursorSelection(cursorPos, TextEdit.SelectCharacters)
         }
 
         Connections {

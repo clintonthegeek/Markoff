@@ -19,11 +19,18 @@ class MockTextEdit : public QObject {
     Q_OBJECT
     Q_PROPERTY(QRectF cursorRectangle READ cursorRectangle CONSTANT)
     Q_PROPERTY(qreal contentHeight READ contentHeight CONSTANT)
+    Q_PROPERTY(qreal width READ width CONSTANT)
 public:
     QRectF m_cursorRect;
     qreal  m_contentHeight = 20.0;
+    qreal  m_width = 200.0;
+    int    m_positionAtReturn = 7;
     QRectF cursorRectangle() const { return m_cursorRect; }
     qreal  contentHeight()   const { return m_contentHeight; }
+    qreal  width()           const { return m_width; }
+    Q_INVOKABLE int positionAt(double /*x*/, double /*y*/) const {
+        return m_positionAtReturn;
+    }
 };
 
 class TestE2NavShiftExtend : public QObject {
@@ -66,18 +73,27 @@ private Q_SLOTS:
         QCOMPARE(cs->desiredVisualX(), -1.0);
     }
 
-    void shift_left_at_nonzero_qtpos_returns_not_handled() {
+    void shift_left_at_nonzero_qtpos_extends_within_block() {
+        // Option B contract: within-block Shift+Left is handled by the
+        // controller and extends LiveSelectionView's active by one position.
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
+        doc.loadFromMarkdown("Alpha\n\nBeta");
+        QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        QVERIFY(nav);
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && sv);
 
-        // qtPos > 0: let TextEdit handle it natively
+        sv->begin(1, 3);
         const int result = nav->tryHandle(Qt::Key_Left, Qt::ShiftModifier,
                                           1, 3, nullptr, QStringLiteral("Beta"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+        QCOMPARE(sv->anchorBlock(), 1);
+        QCOMPARE(sv->anchorQtPos(), 3);
+        QCOMPARE(sv->activeBlock(), 1);
+        QCOMPARE(sv->activeQtPos(), 2);
     }
 
     void shift_left_at_boundary_row0_returns_handled_no_extend() {
@@ -139,18 +155,25 @@ private Q_SLOTS:
         QCOMPARE(cs->desiredVisualX(), -1.0);
     }
 
-    void shift_right_at_non_end_returns_not_handled() {
+    void shift_right_at_non_end_extends_within_block() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
+        doc.loadFromMarkdown("Alpha\n\nBeta");
+        QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        QVERIFY(nav);
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && sv);
 
-        // qtPos < length: let TextEdit handle it natively
+        sv->begin(0, 2);
         const int result = nav->tryHandle(Qt::Key_Right, Qt::ShiftModifier,
                                           0, 2, nullptr, QStringLiteral("Alpha"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+        QCOMPARE(sv->anchorBlock(), 0);
+        QCOMPARE(sv->anchorQtPos(), 2);
+        QCOMPARE(sv->activeBlock(), 0);
+        QCOMPARE(sv->activeQtPos(), 3);
     }
 
     void shift_right_at_last_row_end_returns_handled_no_extend() {
@@ -215,21 +238,30 @@ private Q_SLOTS:
         QCOMPARE(cs->desiredVisualX(), 42.0);
     }
 
-    void shift_up_at_non_top_line_returns_not_handled() {
+    void shift_up_at_non_top_line_extends_within_block() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
+        doc.loadFromMarkdown("Beta multiline content");
+        QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        QVERIFY(nav);
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && sv);
 
         MockTextEdit mockEdit;
-        mockEdit.m_cursorRect  = QRectF(0, 25, 2, 20);  // y=25 > height*0.5=10 → not top
+        mockEdit.m_cursorRect  = QRectF(0, 25, 2, 20);  // not at top
         mockEdit.m_contentHeight = 40.0;
+        mockEdit.m_positionAtReturn = 5;  // within-block visual-line up lands here
 
+        sv->begin(0, 8);  // anchor before Shift+Up
         const int result = nav->tryHandle(Qt::Key_Up, Qt::ShiftModifier,
-                                          1, 2, &mockEdit, QStringLiteral("Beta"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+                                          0, 8, &mockEdit, QStringLiteral("Beta multiline"));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+        QCOMPARE(sv->anchorBlock(), 0);
+        QCOMPARE(sv->anchorQtPos(), 8);
+        QCOMPARE(sv->activeBlock(), 0);
+        QCOMPARE(sv->activeQtPos(), 5);
     }
 
     // ---- G1: Shift+Down ----
@@ -272,21 +304,30 @@ private Q_SLOTS:
         QCOMPARE(cs->desiredVisualX(), 30.0);
     }
 
-    void shift_down_at_non_bottom_line_returns_not_handled() {
+    void shift_down_at_non_bottom_line_extends_within_block() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
+        doc.loadFromMarkdown("Alpha multiline content");
+        QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        QVERIFY(nav);
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && sv);
 
         MockTextEdit mockEdit;
-        mockEdit.m_cursorRect  = QRectF(0, 0, 2, 10);  // bottom = 10, contentH = 30 → not bottom
+        mockEdit.m_cursorRect  = QRectF(0, 0, 2, 10);  // not at bottom
         mockEdit.m_contentHeight = 30.0;
+        mockEdit.m_positionAtReturn = 9;
 
+        sv->begin(0, 2);
         const int result = nav->tryHandle(Qt::Key_Down, Qt::ShiftModifier,
-                                          0, 0, &mockEdit, QStringLiteral("Alpha"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+                                          0, 2, &mockEdit, QStringLiteral("Alpha multiline"));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+        QCOMPARE(sv->anchorBlock(), 0);
+        QCOMPARE(sv->anchorQtPos(), 2);
+        QCOMPARE(sv->activeBlock(), 0);
+        QCOMPARE(sv->activeQtPos(), 9);
     }
 
     // ---- G2: Ctrl+Shift+Left ----

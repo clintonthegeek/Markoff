@@ -36,17 +36,6 @@ ListView {
         DelegateChoice { roleValue: "math";       delegate: MathDelegate       {} }
     }
 
-    // ---- Context menu (lazy, right-click) ----
-    property var _contextMenu: null
-    function _getContextMenu() {
-        if (!root._contextMenu) {
-            const comp = Qt.createComponent("LiveContextMenu.qml")
-            if (comp.status !== Component.Ready) return null
-            root._contextMenu = comp.createObject(root, { binding: root.binding })
-        }
-        return root._contextMenu
-    }
-
     // ---- Hit-test (ported from .spike/cross-block-selection/Main.qml) ----
     // Returns {blockIndex, qtPos} or null on miss.
     // blockIndex is the delegate's modelIndex; qtPos is -1 for non-text blocks.
@@ -138,25 +127,38 @@ ListView {
     }
 
     // ---- Wire navigationController.setListView on startup; register window actions ----
+    //
+    // QActions must be installed on the QWindow so QKeySequence shortcuts (Ctrl+S,
+    // Ctrl+C/X/V, Ctrl+Z/Y, etc.) reach LiveActionController instead of falling
+    // through to the focused TextEdit's native handlers (which would copy only
+    // the focused delegate's text). `root.Window.window` may be null at
+    // Component.onCompleted time when LiveView is constructed before the
+    // ApplicationWindow is fully realized; in that case install on the next
+    // Window.onWindowChanged.
+    property bool _actionsInstalled: false
+    function _installActions() {
+        if (root._actionsInstalled) return
+        if (!binding || !binding.actionController) return
+        const w = root.Window.window
+        if (!w) return
+        const ac = binding.actionController
+        w.addAction(ac.cutAction)
+        w.addAction(ac.copyAction)
+        w.addAction(ac.pasteAction)
+        w.addAction(ac.selectAllAction)
+        w.addAction(ac.undoAction)
+        w.addAction(ac.redoAction)
+        w.addAction(ac.boldAction)
+        w.addAction(ac.italicAction)
+        w.addAction(ac.linkAction)
+        w.addAction(ac.saveAction)
+        root._actionsInstalled = true
+    }
+    Window.onWindowChanged: _installActions()
     Component.onCompleted: {
         if (binding && binding.navigationController)
             binding.navigationController.setListView(root)
-        if (binding && binding.actionController) {
-            const ac = binding.actionController
-            const w = root.Window.window
-            if (w) {
-                w.addAction(ac.cutAction)
-                w.addAction(ac.copyAction)
-                w.addAction(ac.pasteAction)
-                w.addAction(ac.selectAllAction)
-                w.addAction(ac.undoAction)
-                w.addAction(ac.redoAction)
-                w.addAction(ac.boldAction)
-                w.addAction(ac.italicAction)
-                w.addAction(ac.linkAction)
-                w.addAction(ac.saveAction)
-            }
-        }
+        _installActions()
     }
 
     // ---- Remote cursor overlays (D5, geometry stub) ----
@@ -179,18 +181,80 @@ ListView {
 
         property var _pressResult: null
 
+        // Triple-click tracking. Qt's MouseArea fires onClicked / onDoubleClicked
+        // for the first two clicks; triple-click is detected by counting clicks
+        // within multiClickResetTimer's interval on the same block.
+        property int _clickCount: 0
+        property int _clickBlock: -1
+        Timer {
+            id: multiClickResetTimer
+            interval: 500
+            onTriggered: { mouseArea._clickCount = 0; mouseArea._clickBlock = -1 }
+        }
+
         onClicked: (mouse) => {
             if (mouse.button === Qt.RightButton) {
+                const handler = binding ? binding.contextMenuHandler : null
+                if (!handler) return
                 const r = root.hit(mouse.x, mouse.y)
+                let anchor = null
                 if (r && r.blockIndex >= 0) {
                     const item = root.itemAtIndex(r.blockIndex)
-                    const anchor = item ? item.model.blockAnchor : null
-                    if (anchor) {
-                        const menu = root._getContextMenu()
-                        if (menu) menu.showForBlock(anchor, mapToGlobal(mouse.x, mouse.y))
-                    }
+                    if (item && item.model) anchor = item.model.blockAnchor
                 }
+                const gp = mapToGlobal(mouse.x, mouse.y)
+                handler.popup(gp.x, gp.y, anchor)
+                return
             }
+
+            if (mouse.button !== Qt.LeftButton) return
+            const r = root.hit(mouse.x, mouse.y)
+            if (!r || r.blockIndex < 0) {
+                mouseArea._clickCount = 0
+                mouseArea._clickBlock = -1
+                return
+            }
+            if (mouseArea._clickBlock !== r.blockIndex)
+                mouseArea._clickCount = 0
+            mouseArea._clickBlock = r.blockIndex
+            mouseArea._clickCount++
+            multiClickResetTimer.restart()
+
+            if (mouseArea._clickCount >= 3) {
+                // Triple-click: select whole block.
+                const item = root.itemAtIndex(r.blockIndex)
+                const text = (item && item.blockText !== undefined) ? item.blockText : ""
+                if (binding && binding.selectionView) {
+                    binding.selectionView.begin(r.blockIndex, 0)
+                    binding.selectionView.extend(r.blockIndex, text.length)
+                }
+                mouseArea._clickCount = 0
+                mouseArea._clickBlock = -1
+            }
+        }
+
+        onDoubleClicked: (mouse) => {
+            if (mouse.button !== Qt.LeftButton) return
+            const r = root.hit(mouse.x, mouse.y)
+            if (!r || r.blockIndex < 0 || r.qtPos < 0) return
+            const item = root.itemAtIndex(r.blockIndex)
+            if (!item || item.blockText === undefined) return
+            const text = item.blockText
+            // Word boundary at qtPos (Unicode word chars + underscore).
+            const wordRe = /[\p{L}\p{N}_]/u
+            let s = r.qtPos
+            let e = r.qtPos
+            while (s > 0 && wordRe.test(text.charAt(s - 1))) s--
+            while (e < text.length && wordRe.test(text.charAt(e))) e++
+            if (s === e) return  // not on a word
+            if (binding && binding.selectionView) {
+                binding.selectionView.begin(r.blockIndex, s)
+                binding.selectionView.extend(r.blockIndex, e)
+            }
+            // Pre-arm triple-click counter so a third quick click selects the block.
+            mouseArea._clickCount = 2
+            mouseArea._clickBlock = r.blockIndex
+            multiClickResetTimer.restart()
         }
 
         onPressed: (mouse) => {

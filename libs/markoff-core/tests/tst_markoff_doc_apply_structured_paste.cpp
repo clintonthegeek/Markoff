@@ -28,14 +28,20 @@ private slots:
         QJsonArray blocks;
         {
             QJsonObject b;
-            b["kind"] = "Paragraph";
+            b["kind"] = "paragraph";
             b["text"] = "Pasted para.";
             blocks.append(b);
         }
         {
+            // Heading buffers store the raw source range (with `## ` prefix)
+            // — LiveClipboardController copies `doc->blockText(id)` directly,
+            // so the clipboard payload for a heading already has `## ` in
+            // `text`. reconstructFlatMarkdown emits it verbatim and the
+            // receiving side's kind-transition re-detects Heading from the
+            // prefix.
             QJsonObject b;
-            b["kind"] = "Heading";
-            b["text"] = "Pasted Heading";
+            b["kind"] = "heading";
+            b["text"] = "## Pasted Heading";
             QJsonObject attrs;
             attrs["level"] = 2;
             b["attrs"] = attrs;
@@ -62,7 +68,7 @@ private slots:
 
         QJsonArray blocks;
         QJsonObject b;
-        b["kind"] = "Paragraph";
+        b["kind"] = "paragraph";
         b["text"] = "Y";
         blocks.append(b);
 
@@ -83,7 +89,7 @@ private slots:
 
         QJsonArray blocks;
         QJsonObject b;
-        b["kind"] = "Paragraph";
+        b["kind"] = "paragraph";
         b["text"] = "Y";
         blocks.append(b);
 
