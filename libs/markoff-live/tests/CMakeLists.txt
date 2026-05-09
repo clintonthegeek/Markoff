@@ -334,3 +334,11 @@ target_link_libraries(tst_live_render_clipboard_paste_foreign_markoff
 add_test(NAME tst_live_render_clipboard_paste_foreign_markoff
          COMMAND tst_live_render_clipboard_paste_foreign_markoff)
 
+# C6: Round-trip — cut/paste cycle preserves content.
+qt_add_executable(tst_live_render_clipboard_round_trip
+    tst_live_render_clipboard_round_trip.cpp)
+target_link_libraries(tst_live_render_clipboard_round_trip
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_clipboard_round_trip
+         COMMAND tst_live_render_clipboard_round_trip)
+
