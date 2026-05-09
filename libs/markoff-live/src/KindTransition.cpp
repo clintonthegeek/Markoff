@@ -15,6 +15,30 @@ int countLeadingHashes(const QString &text)
     return n;
 }
 
+int matchesSetextShape(const QString &text)
+{
+    const int lastNl = text.lastIndexOf(u'\n');
+    if (lastNl < 0) return 0;                         // single-line buffer, can't be setext
+
+    // Underline candidate = substring after the last newline.
+    const QString tail = text.mid(lastNl + 1);
+    static const QRegularExpression underlineRe(
+        QStringLiteral("^[ \\t]{0,3}(=+|-+)[ \\t]*$"));
+    auto m = underlineRe.match(tail);
+    if (!m.hasMatch()) return 0;
+    const QChar uchar = m.captured(1).at(0);
+    const int level = (uchar == u'=') ? 1 : 2;
+
+    // Find the line directly above the underline; it must be non-blank.
+    const int prevNl = text.lastIndexOf(u'\n', lastNl - 1);
+    const QString aboveLine = (prevNl < 0)
+        ? text.left(lastNl)
+        : text.mid(prevNl + 1, lastNl - prevNl - 1);
+    if (aboveLine.trimmed().isEmpty()) return 0;
+
+    return level;
+}
+
 QString inferBlockKind(const QString &text, bool *displayMode)
 {
     if (text.isEmpty())
