@@ -58,6 +58,30 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
                                         int blockIndex, int qtPos,
                                         QObject *editItem,
                                         const QString &blockText) {
+    // Ctrl+Shift+Left/Right: word-extend selection across blocks.
+    if (modifiers == (Qt::ControlModifier | Qt::ShiftModifier)) {
+        if (key == Qt::Key_Left) {
+            if (qtPos > 0) return NotHandled;  // native word-select within block
+            m_cursorState->clearDesiredVisualX();
+            const int targetRow = previousNavigableRow(blockIndex);
+            if (targetRow < 0) return Handled;
+            if (!m_model) return Handled;
+            const int targetLen = m_model->recordAt(targetRow).text.length();
+            if (m_selectionView) m_selectionView->extend(targetRow, targetLen);
+            m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
+            return Handled;
+        }
+        if (key == Qt::Key_Right) {
+            if (qtPos < blockText.length()) return NotHandled;  // native word-select within block
+            m_cursorState->clearDesiredVisualX();
+            const int targetRow = nextNavigableRow(blockIndex);
+            if (targetRow < 0) return Handled;
+            if (m_selectionView) m_selectionView->extend(targetRow, 0);
+            m_cursorState->requestTextCaretAtRow(targetRow, 0);
+            return Handled;
+        }
+    }
+
     // Ctrl+Home / Ctrl+End: jump to document start/end
     if (modifiers == Qt::ControlModifier) {
         if (key == Qt::Key_Home) {

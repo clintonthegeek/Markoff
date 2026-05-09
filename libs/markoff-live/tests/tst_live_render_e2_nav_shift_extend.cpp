@@ -289,6 +289,101 @@ private Q_SLOTS:
         QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
     }
 
+    // ---- G2: Ctrl+Shift+Left ----
+
+    void ctrl_shift_left_inside_block_returns_not_handled() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+
+        auto *nav = binding.navigationController();
+        QVERIFY(nav);
+
+        // qtPos > 0: native word-select handles within block
+        const int result = nav->tryHandle(Qt::Key_Left,
+                                          Qt::ControlModifier | Qt::ShiftModifier,
+                                          1, 5, nullptr, QStringLiteral("hello world"));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+    }
+
+    void ctrl_shift_left_at_block_start_extends_into_prev_block() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("Alpha\n\nBeta");
+        QTest::qWait(200);
+        QCOMPARE(binding.model()->rowCount(), 2);
+
+        auto *nav = binding.navigationController();
+        auto *cs  = binding.cursorState();
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && cs && sv);
+
+        // Establish anchor at block 1, pos 0
+        sv->begin(1, 0);
+        QSignalSpy spy(sv, &LiveSelectionView::selectionChanged);
+
+        const int result = nav->tryHandle(Qt::Key_Left,
+                                          Qt::ControlModifier | Qt::ShiftModifier,
+                                          /*blockIndex=*/1, /*qtPos=*/0,
+                                          nullptr, QStringLiteral("Beta"));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+
+        // extend was called
+        QVERIFY(spy.count() >= 1);
+        QVERIFY(sv->hasSelection());
+        // Cursor at end of "Alpha" (len=5)
+        QCOMPARE(cs->focusedQtPos(), 5);
+        QCOMPARE(cs->focusedAnchorRow(), 0);
+        QCOMPARE(cs->desiredVisualX(), -1.0);
+    }
+
+    void ctrl_shift_right_inside_block_returns_not_handled() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+
+        auto *nav = binding.navigationController();
+        QVERIFY(nav);
+
+        // qtPos < length: native word-select handles within block
+        const int result = nav->tryHandle(Qt::Key_Right,
+                                          Qt::ControlModifier | Qt::ShiftModifier,
+                                          0, 3, nullptr, QStringLiteral("hello world"));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+    }
+
+    void ctrl_shift_right_at_block_end_extends_into_next_block() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        doc.loadFromMarkdown("Alpha\n\nBeta");
+        QTest::qWait(200);
+        QCOMPARE(binding.model()->rowCount(), 2);
+
+        auto *nav = binding.navigationController();
+        auto *cs  = binding.cursorState();
+        auto *sv  = binding.selectionView();
+        QVERIFY(nav && cs && sv);
+
+        // Establish anchor at block 0, pos 5 (end of "Alpha")
+        sv->begin(0, 5);
+        QSignalSpy spy(sv, &LiveSelectionView::selectionChanged);
+
+        const int result = nav->tryHandle(Qt::Key_Right,
+                                          Qt::ControlModifier | Qt::ShiftModifier,
+                                          /*blockIndex=*/0, /*qtPos=*/5,
+                                          nullptr, QStringLiteral("Alpha"));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
+
+        // extend was called
+        QVERIFY(spy.count() >= 1);
+        QVERIFY(sv->hasSelection());
+        // Cursor at start of next block
+        QCOMPARE(cs->focusedQtPos(), 0);
+        QCOMPARE(cs->focusedAnchorRow(), 1);
+        QCOMPARE(cs->desiredVisualX(), -1.0);
+    }
 };
 
 QTEST_MAIN(TestE2NavShiftExtend)
