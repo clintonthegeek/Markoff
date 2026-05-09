@@ -66,6 +66,8 @@ Item {
                                || k === Qt.Key_Delete)
             const isNav = (k === Qt.Key_Up || k === Qt.Key_Down
                         || k === Qt.Key_Left || k === Qt.Key_Right)
+            const isCtrlHomeEnd = ((k === Qt.Key_Home || k === Qt.Key_End)
+                                   && (mods & Qt.ControlModifier))
 
             if (isStructural) {
                 const sh = root.liveBinding.structuralKeyHandler
@@ -76,7 +78,7 @@ Item {
                                                model.text)
                 return
             }
-            if (isNav) {
+            if (isNav || isCtrlHomeEnd) {
                 const nh = root.liveBinding.navigationController
                 if (!nh) return
                 event.accepted = (nh.tryHandle(k, mods, root.modelIndex,

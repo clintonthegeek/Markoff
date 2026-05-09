@@ -4,6 +4,8 @@
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/BlockKindRegistry.h>
+#include <markoff/live/BlockKindDescriptor.h>
+#include <markoff/live/BlockRecord.h>
 
 #include <QRectF>
 
@@ -19,10 +21,55 @@ LiveNavigationController::LiveNavigationController(
 {
 }
 
+bool LiveNavigationController::isTextBearing(int row) const {
+    if (!m_model || !m_registry) return false;
+    if (row < 0 || row >= m_model->rowCount()) return false;
+    const BlockRecord &rec = m_model->recordAt(row);
+    const BlockKindDescriptor *desc = m_registry->find(rec.kind);
+    if (!desc) return false;
+    return desc->supportedCursorVariants.contains(QStringLiteral("TextCaret"));
+}
+
+int LiveNavigationController::findFirstTextBearingRow() const {
+    if (!m_model) return -1;
+    for (int r = 0; r < m_model->rowCount(); ++r)
+        if (isTextBearing(r)) return r;
+    return -1;
+}
+
+int LiveNavigationController::findLastTextBearingRow() const {
+    if (!m_model) return -1;
+    for (int r = m_model->rowCount() - 1; r >= 0; --r)
+        if (isTextBearing(r)) return r;
+    return -1;
+}
+
 int LiveNavigationController::tryHandle(int key, int modifiers,
                                         int blockIndex, int qtPos,
                                         QObject *editItem,
                                         const QString &blockText) {
+    // Ctrl+Home / Ctrl+End: jump to document start/end
+    if (modifiers == Qt::ControlModifier) {
+        if (key == Qt::Key_Home) {
+            const int firstRow = findFirstTextBearingRow();
+            if (firstRow >= 0) {
+                m_cursorState->clearDesiredVisualX();
+                m_cursorState->requestTextCaretAtRow(firstRow, 0);
+            }
+            return Handled;
+        }
+        if (key == Qt::Key_End) {
+            if (!m_model) return Handled;
+            const int lastRow = findLastTextBearingRow();
+            if (lastRow >= 0) {
+                const int len = m_model->recordAt(lastRow).text.length();
+                m_cursorState->clearDesiredVisualX();
+                m_cursorState->requestTextCaretAtRow(lastRow, len);
+            }
+            return Handled;
+        }
+    }
+
     if (modifiers != Qt::NoModifier) return NotHandled;
 
     if (key == Qt::Key_Up) {

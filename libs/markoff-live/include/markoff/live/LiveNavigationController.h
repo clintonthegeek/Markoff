@@ -42,6 +42,9 @@ public:
 private:
     bool isAtVisualTopLine(QObject *editItem) const;
     bool isAtVisualBottomLine(QObject *editItem) const;
+    bool isTextBearing(int row) const;
+    int  findFirstTextBearingRow() const;
+    int  findLastTextBearingRow() const;
 
     const BlockKindRegistry *m_registry;
     LiveBlockModel          *m_model;
