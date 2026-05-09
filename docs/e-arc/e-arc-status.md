@@ -2,30 +2,33 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-09 (E2 complete + tagged `v0.7.0-e2`; CollabText O(replicaId) perf bug found + reported + fixed upstream + workaround retired all in one day).
+**Last updated:** 2026-05-09 (E2.5 spec + plan landed; ready for fresh-agent execution).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** none — **E2 closed**. Next: **E2.5** (editing-affordances pack) when user starts a fresh session for `superpowers:brainstorming` against [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.5.
+**Active phase:** **E2.5** — `plan-approved`. Spec `616797d`, plan `42f20ac`. Ready for fresh-agent execution via `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans`.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **E2 is complete. Tag `v0.7.0-e2` landed 2026-05-09.** 162/162 tests pass.
+> **E2.5 is plan-approved.** Spec at [`docs/specs/2026-05-09-e2.5-editing-affordances-design.md`](../specs/2026-05-09-e2.5-editing-affordances-design.md) (commit `616797d`). Plan at [`docs/plans/2026-05-09-e2.5-editing-affordances.md`](../plans/2026-05-09-e2.5-editing-affordances.md) (commit `42f20ac`). 10 phases A–J; ~50 tasks; ~3 weeks; tag `v0.7.0-e2.5` on completion.
 >
-> **What shipped today on top of the E2 plan-of-record:**
+> **Fresh-agent execution start:** read in this order
 >
-> - **Cursor placement after edits** (`b2c471c`): `pendingVisualLineHint` promoted from `Q_INVOKABLE` method to real `Q_PROPERTY`; `MarkoffDocument::flushPendingD2Changed` synchronous drain in typing path + soft-break + implicit in `requestTextCaretAtRow`.
-> - **Multi-line paragraph rendering + arrow-nav across HR** (`fe772f5`): `InlineHighlighter` now subtracts `currentBlock().position()` to get line-relative offsets; navigation skips non-text-bearing rows.
-> - **HR/Image kind-transition demotion** (`9b12123`): backspace at start of heading-after-HR now Obsidian-style merges and re-derives the kind.
-> - **Cross-block copy** (`94056f9`): `LiveSelectionView::copyToClipboard` reads block texts from the model, not realised delegates.
-> - **CollabText O(replicaId) perf bug** (found, reported, fixed upstream as `d02cca6`, workaround retired in `2464460`). `loadFromMarkdown` now flat at ~570 ms / 10 MB across the entire uint16 replica space — was 50–263 s / 1–2 GB on bad random draws.
+> 1. [`docs/specs/2026-05-09-e2.5-SESSION-BRIEF.md`](../specs/2026-05-09-e2.5-SESSION-BRIEF.md) — execution brief (this document tells you what context to load and what your first move is).
+> 2. [`docs/specs/2026-05-09-e2.5-editing-affordances-design.md`](../specs/2026-05-09-e2.5-editing-affordances-design.md) — substantive design.
+> 3. [`docs/plans/2026-05-09-e2.5-editing-affordances.md`](../plans/2026-05-09-e2.5-editing-affordances.md) — task-by-task implementation plan.
+> 4. [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.5 — scope capture (frozen reference).
 >
-> **Next phase: E2.5** (editing-affordances pack — Cut/Paste/QActions/context menu/format toggles/save+dirty/cross-view session subscription). Scope at [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.5. Start a **fresh session** with `superpowers:brainstorming` against that doc.
+> **What E2.5 ships:** Cut/Copy/Paste with hybrid flat / structure-aware paths; per-binding `QAction` surface (`LiveActionController`); right-click context menu wired from actions; format toggles (Ctrl+B/I/K, per-block independent application); save/dirty/title for `markoff-live-app` via new `MarkoffDocument` save-watermark API; Live-side `Session::primarySelectionChanged` subscription; empty-doc focus + first-keystroke verification.
+>
+> **Out of E2.5** (subsequent phases): theme wire-up + zoom (E2.6); speculative paths (E2.7).
+>
+> **Build cap:** `-j 8` everywhere; never bare `-j` or higher.
 >
 > **Background reading** (for first principles / constitutional context):
 >
-> 1. `docs/specs/2026-05-08-e-arc-framing.md` — **constitutional framing for E-arc.** Read §0.1 amendment first. §5.1 is E1's worked subtractability example.
+> 1. `docs/specs/2026-05-08-e-arc-framing.md` — **constitutional framing for E-arc.** Read §0.1 amendment first. §5 is the subtractability invariant E2.5 honors via the `Capabilities` flag.
 > 2. `docs/e-arc/2026-05-08-e-arc-roadmap.md` — orientation, phase summary, binding constraints.
 > 3. `docs/handoff/2026-05-08-defer-46-to-e-arc.md` — decision record for the §4.6 deferral / E-arc activation.
 > 4. `docs/handoff/2026-05-07-pivot-to-d5-first.md` — D-arc-era pivot doc (banner in §4.6 records the deferral; §4.7 banner notes E-arc begins).
@@ -40,7 +43,7 @@
 |---|---|---|---|---|
 | **E1** | `complete` (2026-05-08, tag `v0.7.0-e1`) | [E1 spec](../specs/2026-05-08-e1-inline-highlighter-design.md) | [E1 plan](../plans/2026-05-08-e1-inline-highlighter.md) | Inline-format highlighter in QML delegates. Reads `BlockRecord::inlineSpans` via `LiveBlockModel::spansAtRow(row)`. 143/143 tests pass. Dogfood signed off. Tag: `v0.7.0-e1`. |
 | **E2** | `complete` (2026-05-09, tag `v0.7.0-e2`) | [E2 spec](../specs/2026-05-08-e2-cursor-aware-view-design.md) | [E2 plan](../plans/2026-05-08-e2-cursor-aware-view.md) | Cursor-aware view: auto-hide markers (true zero-width collapse) + full-parity cross-block keyboard nav. 162/162 tests pass (incl. `tst_realistic` 70.8 s, `tst_benchmark` 338.7 s). Six dogfood-surfaced bugs fixed end-of-arc (cursor placement / multi-line render / HR nav / HR demotion / cross-block copy) plus a CollabText O(replicaId) perf bug found, reported, fixed upstream, and the workaround retired same day. Tag: `v0.7.0-e2`. |
-| **E2.5** | `pending` (scope captured 2026-05-09) | TBW | TBW | **Editing affordances pack.** Cut/Copy/Paste of Markdown source bytes; QAction surface; right-click menu Cut/Copy/Paste; format toggles (Ctrl+B/I/K); save/dirty/title for the test app; empty-doc edge cases. Dogfood-blocking. Scope captured in [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.5. ~3 weeks. |
+| **E2.5** | `plan-approved` (2026-05-09) | [E2.5 spec](../specs/2026-05-09-e2.5-editing-affordances-design.md) | [E2.5 plan](../plans/2026-05-09-e2.5-editing-affordances.md) | **Editing affordances pack.** Cut/Copy/Paste with hybrid path; `LiveActionController` (eleven QActions); context-menu wired from actions; per-block format toggles (Ctrl+B/I/K); save/dirty/title via new `MarkoffDocument::savedSequence/markSaved/dirty/dirtyChanged` API; Live-side `Session` subscription; empty-doc verification. Plan-approved 2026-05-09 (spec `616797d`, plan `42f20ac`). Fresh-agent execution start: [`docs/specs/2026-05-09-e2.5-SESSION-BRIEF.md`](../specs/2026-05-09-e2.5-SESSION-BRIEF.md). |
 | **E2.6** | `pending` (scope captured 2026-05-09) | TBW | TBW | **Theme wire-up + zoom.** Route every delegate's font.family/pixelSize/bold/italic through `Markoff::Theme`; replace HeadingDelegate's literal-pixel switch with theme-driven `font(Heading) * fontSizeMultiplier(HeadingN)`; add `fontScale` Q_PROPERTY + Ctrl+= / Ctrl+- / Ctrl+wheel; light/dark toggle action. Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.6. ~1 week. |
 | **E2.7** | `pending` (scope captured 2026-05-09) | TBW | TBW | **Speculative paths.** Open-delimiter (`**` → bold immediately) + code-fence (` ``` ` → code-block delegate immediately) speculation, retired-plan Tasks 8/9. Lower priority than E2.5/E2.6 — dogfood will tell us if the parser-cycle lag warrants the speculation machinery. Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.7. ~1 week. |
 | **E3** | `pending` | TBW | TBW | Wikilinks, embeds, tags, callouts (Obsidian affordances). |
@@ -58,6 +61,8 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-09 | `42f20ac` | **E2.5 plan-approved.** 10 phases A–J (markoff-core API → LiveSelectionView extensions → three sibling controllers → QML wiring → markoff-live-app save/dirty → empty-doc verification → bulk-paste perf gate → dogfood + tag). Plan-time resolutions of spec §13 open questions captured at top of plan. Fresh-agent execution start: `docs/specs/2026-05-09-e2.5-SESSION-BRIEF.md`. |
+| 2026-05-09 | `616797d` | **E2.5 spec landed.** Hybrid paste (applyFlatEdit default + structure-aware fast-path on `application/x-markoff-blocks` MIME from local cuts; recent-cuts cache for BlockId reuse). Per-binding `LiveActionController` (eleven QActions). Per-block independent format toggles (Ctrl+B/I/K) with two-stage link insert. New `MarkoffDocument` save-watermark API (`savedSequence/markSaved/dirty/dirtyChanged`). Live-side `Session::primarySelectionChanged` subscription. `Capabilities` flag on `LiveListModelBinding` for E6-friendly subtractability. |
 | 2026-05-09 | tag `v0.7.0-e2` | **E2 complete.** Phase board → `complete`. 162/162 tests pass (full suite incl. `tst_realistic` 70.8 s and `tst_benchmark` 338.7 s). Today landed: 6 dogfood-surfaced bug fixes (commits `b2c471c..94056f9`) + a CollabText O(replicaId) perf bug found, reported, fixed upstream (`d02cca6`), and the workaround retired (`2464460`). Markoff loads the 73 kB foundation-design.md in 1.3 s with 78 MB peak RSS regardless of replicaId. Next: **E2.5** (editing-affordances pack) per [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md). |
 | 2026-05-09 | `2464460` | **Workaround retired: replicaId=1 pin removed from `markoff-live-app`.** Upstream `CollabText` commit `d02cca6` rewrote `Crdt::Global` from a dense uint32_t array indexed by replica_id to a sparse (replica_id, value) layout. `perf_load_bench` sweep on the 73 kB doc post-bump: 567–571 ms with 10 MB RSS-delta across replicaId ∈ {1, 100, 1000, 10000, 30000, 60000} — flat. Markoff vendored collabtext is symlinked to /home/clinton/dev/collabtext, so the bump was a rebuild, no code import needed. |
 | 2026-05-09 | `d5f2f61` | **Bug report filed for collabtext devs.** Standalone reproducer (single .cpp, no Markoff dependency, ~50 lines) at `docs/handoff/2026-05-09-collabtext-bug-report-repro.cpp`; report at `docs/handoff/2026-05-09-collabtext-bug-report.md`. Reproducer demonstrates per-edit cost rising linearly from 0.138 ms at replica_id=1 to 27.785 ms at replica_id=60000 (200×). Upstream fix landed same day. |
