@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QQuickStyle>
+#include <QRandomGenerator>
 
 #include <markoff/core/MarkoffDocument.h>
 
@@ -29,15 +30,8 @@ int main(int argc, char *argv[])
     }
     const QByteArray content = file.readAll();
 
-    // PERF WORKAROUND (2026-05-09): pinned replicaId=1.
-    // CollabText::Crdt::Buffer's load path is O(replicaId) in both time and
-    // memory. Random uint16 replicaIds (the obvious "give every replica a
-    // fresh id" approach) yield 50 s+ loads and ~1 GB RSS for a 73 kB doc.
-    // replicaId=1 takes ~500 ms for the same doc.
-    // Findings + reproducer: docs/handoff/2026-05-09-collabtext-replica-id-perf.md
-    // Upstream fix needed before D5 (collab) ships — multi-user requires
-    // distinct replicaIds, so the workaround is single-user only.
-    const quint16 replicaId = 1;
+    const quint16 replicaId =
+        static_cast<quint16>(QRandomGenerator::global()->generate() & 0xFFFF);
     auto doc = std::make_unique<Markoff::MarkoffDocument>(replicaId);
     doc->loadFromMarkdown(content);
 
