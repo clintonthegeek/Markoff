@@ -342,3 +342,11 @@ target_link_libraries(tst_live_render_clipboard_round_trip
 add_test(NAME tst_live_render_clipboard_round_trip
          COMMAND tst_live_render_clipboard_round_trip)
 
+# D2: LiveActionController enabled-state: paste/cut/copy enable/disable correctly.
+qt_add_executable(tst_live_render_actions_enabled_state
+    tst_live_render_actions_enabled_state.cpp)
+target_link_libraries(tst_live_render_actions_enabled_state
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_actions_enabled_state
+         COMMAND tst_live_render_actions_enabled_state)
+
