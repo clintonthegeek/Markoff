@@ -135,3 +135,19 @@ target_link_libraries(tst_live_render_e2_autohide_caret_adjacent PRIVATE
 add_test(NAME tst_live_render_e2_autohide_caret_adjacent
          COMMAND tst_live_render_e2_autohide_caret_adjacent)
 
+qt_add_executable(tst_live_render_e2_autohide_link
+    tst_live_render_e2_autohide_link.cpp
+)
+target_link_libraries(tst_live_render_e2_autohide_link PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_e2_autohide_link
+         COMMAND tst_live_render_e2_autohide_link)
+
+qt_add_executable(tst_live_render_e2_autohide_wikilink
+    tst_live_render_e2_autohide_wikilink.cpp
+)
+target_link_libraries(tst_live_render_e2_autohide_wikilink PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_e2_autohide_wikilink
+         COMMAND tst_live_render_e2_autohide_wikilink)
+
