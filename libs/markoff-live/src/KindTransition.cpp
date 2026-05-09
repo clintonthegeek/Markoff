@@ -19,6 +19,7 @@ int matchesSetextShape(const QString &text)
 {
     const int lastNl = text.lastIndexOf(u'\n');
     if (lastNl < 0) return 0;                         // single-line buffer, can't be setext
+    if (lastNl == 0) return 0;                        // nothing before the newline; no content line
 
     // Underline candidate = substring after the last newline.
     const QString tail = text.mid(lastNl + 1);
@@ -30,7 +31,8 @@ int matchesSetextShape(const QString &text)
     const int level = (uchar == u'=') ? 1 : 2;
 
     // Find the line directly above the underline; it must be non-blank.
-    const int prevNl = text.lastIndexOf(u'\n', lastNl - 1);
+    // Search strictly before lastNl (from lastNl-1) to avoid finding lastNl itself.
+    const int prevNl = (lastNl >= 2) ? text.lastIndexOf(u'\n', lastNl - 1) : -1;
     const QString aboveLine = (prevNl < 0)
         ? text.left(lastNl)
         : text.mid(prevNl + 1, lastNl - prevNl - 1);
@@ -53,8 +55,15 @@ QString inferBlockKind(const QString &text, bool *displayMode)
         (text.startsWith(QStringLiteral("~~~")) && text.size() >= 3))
         return BlockKind::CodeBlock;
 
-    // HorizontalRule: trimmed is ---, ***, or ___
-    {
+    // Setext heading: text + \n + underline. Checked before bare-`---`-HR
+    // so `Heading\n---` wins over `---` alone.
+    if (matchesSetextShape(text) > 0)
+        return BlockKind::Heading;
+
+    // HorizontalRule: trimmed is ---, ***, or ___ (single-line only).
+    // We only apply this when the buffer has no newline, to avoid
+    // misclassifying `\n---` (blank-preceded underline) as HR.
+    if (!text.contains(u'\n')) {
         const QString trimmed = text.trimmed();
         if (trimmed == QStringLiteral("---") ||
             trimmed == QStringLiteral("***") ||
