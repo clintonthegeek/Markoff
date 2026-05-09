@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Window
 import Qt.labs.qmlmodels 1.0
 
 import "delegates"
 
 /// Live render view: scrollable list of read-only block delegates with
-/// mouse-driven cursor + selection, keyboard navigation, and Ctrl-C copy.
+/// mouse-driven cursor + selection, keyboard navigation, and action-controller shortcuts.
 ///
 /// Usage:
 ///   LiveListModelBinding { id: binding; document: ctxDocument }
@@ -136,28 +137,26 @@ ListView {
         }
     }
 
-    // ---- Wire navigationController.setListView on startup ----
+    // ---- Wire navigationController.setListView on startup; register window actions ----
     Component.onCompleted: {
         if (binding && binding.navigationController)
             binding.navigationController.setListView(root)
-    }
-
-    // ---- Keyboard: Ctrl-C copy ----
-    // copyToClipboard reads block texts from the bound model directly. Don't
-    // walk ListView delegates here: ListView only realises the visible window,
-    // and a cross-block selection that includes off-screen rows would lose
-    // those rows' contents.
-    Keys.onPressed: (event) => {
-        if (!binding) { event.accepted = false; return }
-        if ((event.modifiers & Qt.ControlModifier) && event.key === Qt.Key_C) {
-            const sv = binding.selectionView
-            if (sv && sv.hasSelection) {
-                sv.copyToClipboard()
-                event.accepted = true
-                return
+        if (binding && binding.actionController) {
+            const ac = binding.actionController
+            const w = root.Window.window
+            if (w) {
+                w.addAction(ac.cutAction)
+                w.addAction(ac.copyAction)
+                w.addAction(ac.pasteAction)
+                w.addAction(ac.selectAllAction)
+                w.addAction(ac.undoAction)
+                w.addAction(ac.redoAction)
+                w.addAction(ac.boldAction)
+                w.addAction(ac.italicAction)
+                w.addAction(ac.linkAction)
+                w.addAction(ac.saveAction)
             }
         }
-        event.accepted = false
     }
 
     // ---- Remote cursor overlays (D5, geometry stub) ----

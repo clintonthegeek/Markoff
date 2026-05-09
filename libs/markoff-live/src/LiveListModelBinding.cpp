@@ -19,6 +19,7 @@
 
 #include <QAbstractListModel>
 #include <QColor>
+#include <QGuiApplication>
 #include <QList>
 #include <QRegularExpression>
 #include <QScopeGuard>
@@ -173,7 +174,9 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
         d->format->setSelectionView(d->selectionView);
         d->format->setModel(d->model);
     }
-    if (caps & Actions) {
+    // LiveActionController creates QActions, which require QGuiApplication.
+    // Headless tests (QCoreApplication only) skip this sub-controller safely.
+    if ((caps & Actions) && qobject_cast<QGuiApplication *>(QCoreApplication::instance())) {
         d->actions = new LiveActionController(this);
         d->actions->setSelectionView(d->selectionView);
         if (d->clipboard) d->actions->setClipboardController(d->clipboard);
