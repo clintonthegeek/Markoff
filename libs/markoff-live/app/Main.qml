@@ -13,6 +13,9 @@ ApplicationWindow {
     LiveListModelBinding {
         id: modelBinding
         document: ctxDocument
+        Component.onCompleted: {
+            selectionView.setSession(ctxSession)
+        }
     }
 
     LiveView {

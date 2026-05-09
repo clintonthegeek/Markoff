@@ -8,6 +8,7 @@
 #include <QRandomGenerator>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Session.h>
 
 /// Test app for markoff-live. Loads a Markdown file and renders it via
 /// LiveListModelBinding + LiveView.
@@ -35,9 +36,13 @@ int main(int argc, char *argv[])
     auto doc = std::make_unique<Markoff::MarkoffDocument>(replicaId);
     doc->loadFromMarkdown(content);
 
+    Markoff::Session *session = doc->createSession();
+
     QQmlApplicationEngine engine;
     engine.rootContext()->setContextProperty(
         QStringLiteral("ctxDocument"), doc.get());
+    engine.rootContext()->setContextProperty(
+        QStringLiteral("ctxSession"), session);
     engine.rootContext()->setContextProperty(
         QStringLiteral("ctxTitle"),
         QFileInfo(argv[1]).fileName());
