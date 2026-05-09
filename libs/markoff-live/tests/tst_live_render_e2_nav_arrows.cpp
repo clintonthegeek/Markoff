@@ -7,6 +7,7 @@
 #include <markoff/live/LiveNavigationController.h>
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/BlockKind.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/CrdtProxies.h>
@@ -140,6 +141,28 @@ private Q_SLOTS:
         QVERIFY(nav != nullptr);
         QCOMPARE(nav->previousNavigableRow(0), -1);
         QCOMPARE(nav->nextNavigableRow(0), -1);
+    }
+
+    void navigable_row_skips_horizontal_rule() {
+        // Regression: HR is non-text-bearing (no TextCaret in
+        // supportedCursorVariants). previousNavigableRow / nextNavigableRow
+        // must skip it so cross-block Up/Down doesn't try to land a
+        // TextCaret on a row that can't host one — the caret request is
+        // rejected by validateVariant, leaving the cursor stranded on the
+        // source block. Effect: arrow keys appear to do nothing past an HR.
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        // Layout: paragraph (0), HR (1), paragraph (2).
+        QVERIFY(waitForModelRows(binding, doc, "alpha\n\n---\n\nbeta", 3));
+        QCOMPARE(binding.model()->recordAt(1).kind, BlockKind::HorizontalRule);
+
+        auto *nav = binding.navigationController();
+        QVERIFY(nav != nullptr);
+        // Forward from row 0: skip HR at 1, land on row 2.
+        QCOMPARE(nav->nextNavigableRow(0), 2);
+        // Backward from row 2: skip HR at 1, land on row 0.
+        QCOMPARE(nav->previousNavigableRow(2), 0);
     }
 
     // ---- E1 + E2: Up/Down with mock edit item ----

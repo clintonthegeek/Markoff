@@ -4,6 +4,7 @@
 #include <markoff/core/Theme.h>
 
 #include <QFontMetricsF>
+#include <QTextBlock>
 #include <algorithm>
 
 namespace Markoff::Live {
@@ -32,13 +33,26 @@ void InlineHighlighter::setTheme(const Markoff::Theme *theme)
 void InlineHighlighter::highlightBlock(const QString &text)
 {
     if (!m_theme) return;
+    // Span offsets are block-relative (across the whole markoff CRDT block,
+    // which can contain embedded `\n`s — a multi-line paragraph). But Qt
+    // splits the QTextDocument into one QTextBlock per `\n`, and
+    // QSyntaxHighlighter::highlightBlock is invoked once per QTextBlock with
+    // a `text` argument that is just *that* line. setFormat(i, ...) here
+    // takes line-relative indices. Translate by subtracting the line's
+    // document-start position; trim spans that don't intersect this line.
+    const int lineStart = currentBlock().position();
+    const int lineLen   = text.length();
     for (const Markoff::SourceSpan &span : std::as_const(m_spans)) {
         if (span.charLength <= 0) continue;
+        const int relStart = span.charOffset - lineStart;
+        const int relEnd   = relStart + span.charLength;
+        if (relEnd <= 0 || relStart >= lineLen) continue;  // span outside this line
+        const int from = std::max(0, relStart);
+        const int to   = std::min(lineLen, relEnd);
         const bool hide = delimiterShouldHide(span);
         if (hide) {
             // Apply per-char hidden format (negative letterSpacing tuned per glyph).
-            for (int i = span.charOffset; i < span.charOffset + span.charLength; ++i) {
-                if (i < 0 || i >= text.length()) continue;
+            for (int i = from; i < to; ++i) {
                 QTextCharFormat merged = format(i);
                 merged.merge(hiddenFormatForChar(text[i]));
                 setFormat(i, 1, merged);
@@ -49,8 +63,7 @@ void InlineHighlighter::highlightBlock(const QString &text)
         if (spanFmt == QTextCharFormat()) continue;
         // Merge span format into existing per-character formats so that
         // overlapping spans accumulate properties rather than replacing them.
-        for (int i = span.charOffset; i < span.charOffset + span.charLength; ++i) {
-            if (i < 0 || i >= text.length()) continue;
+        for (int i = from; i < to; ++i) {
             QTextCharFormat merged = format(i);
             merged.merge(spanFmt);
             setFormat(i, 1, merged);

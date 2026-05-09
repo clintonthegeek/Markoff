@@ -290,12 +290,16 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
 }
 
 int LiveNavigationController::previousNavigableRow(int currentRow) const {
-    return currentRow > 0 ? currentRow - 1 : -1;
+    for (int r = currentRow - 1; r >= 0; --r)
+        if (isTextBearing(r)) return r;
+    return -1;
 }
 
 int LiveNavigationController::nextNavigableRow(int currentRow) const {
     if (!m_model) return -1;
-    return currentRow + 1 < m_model->rowCount() ? currentRow + 1 : -1;
+    for (int r = currentRow + 1; r < m_model->rowCount(); ++r)
+        if (isTextBearing(r)) return r;
+    return -1;
 }
 
 bool LiveNavigationController::isAtVisualTopLine(QObject *editItem) const {

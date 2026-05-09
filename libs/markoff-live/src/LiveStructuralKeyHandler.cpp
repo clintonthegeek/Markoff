@@ -375,19 +375,24 @@ void LiveStructuralKeyHandler::registerBuiltins()
     };
 
     // HorizontalRule: Up/Down navigation, Delete/Backspace removes the block.
-    auto hrNavigate = [](const Ctx &c, int targetRow) -> HR {
-        if (targetRow < 0 || targetRow >= c.model->rowCount()) return HR::NotHandled;
+    // Up: land at end of previous block (natural continuation of "going up").
+    // Down: land at start of next block (natural continuation of "going down").
+    auto hrNavigateUp = [](const Ctx &c) -> HR {
+        const int targetRow = c.blockIndex - 1;
+        if (targetRow < 0) return HR::NotHandled;
         c.cursorState->requestTextCaretAtRow(targetRow,
-            (targetRow < c.model->rowCount()) ? c.model->recordAt(targetRow).text.length() : 0);
+            c.model->recordAt(targetRow).text.length());
+        return HR::Handled;
+    };
+    auto hrNavigateDown = [](const Ctx &c) -> HR {
+        const int targetRow = c.blockIndex + 1;
+        if (targetRow >= c.model->rowCount()) return HR::NotHandled;
+        c.cursorState->requestTextCaretAtRow(targetRow, 0);
         return HR::Handled;
     };
 
-    m_handlers[BlockKind::HorizontalRule][Qt::Key_Up] = [hrNavigate](const Ctx &c) {
-        return hrNavigate(c, c.blockIndex - 1);
-    };
-    m_handlers[BlockKind::HorizontalRule][Qt::Key_Down] = [hrNavigate](const Ctx &c) {
-        return hrNavigate(c, c.blockIndex + 1);
-    };
+    m_handlers[BlockKind::HorizontalRule][Qt::Key_Up]   = hrNavigateUp;
+    m_handlers[BlockKind::HorizontalRule][Qt::Key_Down] = hrNavigateDown;
 
     auto hrDelete = [](const Ctx &c) -> HR {
         const Markoff::BlockId id(c.blockAnchor);
