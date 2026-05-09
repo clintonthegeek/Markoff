@@ -325,3 +325,12 @@ target_link_libraries(tst_live_render_clipboard_paste_structured
 add_test(NAME tst_live_render_clipboard_paste_structured
          COMMAND tst_live_render_clipboard_paste_structured)
 
+# C5: Paste — foreign-Markoff-MIME paste routes through structured path
+#     without ID reuse.
+qt_add_executable(tst_live_render_clipboard_paste_foreign_markoff
+    tst_live_render_clipboard_paste_foreign_markoff.cpp)
+target_link_libraries(tst_live_render_clipboard_paste_foreign_markoff
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_clipboard_paste_foreign_markoff
+         COMMAND tst_live_render_clipboard_paste_foreign_markoff)
+
