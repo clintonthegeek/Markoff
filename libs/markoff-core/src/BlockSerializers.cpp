@@ -47,6 +47,19 @@ QByteArray serializeParagraph(BlockKind, const QHash<AttrName, AttrValue> &,
     return content;
 }
 
+// Drops up to 6 leading `#` characters and one optional space after them.
+// Returns the remainder. Used by serializeHeading to defend against the
+// case where the heading buffer already carries an ATX prefix (the load-
+// time convention) so re-serialisation doesn't double-prefix.
+QByteArray stripLeadingHashes(const QByteArray &content)
+{
+    int i = 0;
+    while (i < 6 && i < content.size() && content[i] == '#') ++i;
+    if (i == 0) return content;
+    if (i < content.size() && content[i] == ' ') ++i;
+    return content.mid(i);
+}
+
 QByteArray serializeHeading(BlockKind, const QHash<AttrName, AttrValue> &attrs,
                              const QByteArray &content)
 {
@@ -56,7 +69,22 @@ QByteArray serializeHeading(BlockKind, const QHash<AttrName, AttrValue> &attrs,
         if (const int *p = std::get_if<int>(&it.value()))
             level = *p;
     }
-    return QByteArray(level, '#') + " " + content;
+
+    // Setext form: buffer already contains `text\n<underline>`. Emit
+    // verbatim. Only valid for level 1 / 2 per CommonMark; fall through
+    // to ATX otherwise (defensive).
+    auto fmIt = attrs.constFind("headingForm");
+    if (fmIt != attrs.cend()) {
+        if (const QString *p = std::get_if<QString>(&fmIt.value())) {
+            if (*p == QStringLiteral("setext") && (level == 1 || level == 2))
+                return content;
+        }
+    }
+
+    // ATX form. Strip any leading `# ` markers from content first so a
+    // buffer like "## Heading" round-trips as "## Heading", not
+    // "## ## Heading".
+    return QByteArray(level, '#') + " " + stripLeadingHashes(content);
 }
 
 QByteArray serializeCodeBlock(BlockKind, const QHash<AttrName, AttrValue> &attrs,
