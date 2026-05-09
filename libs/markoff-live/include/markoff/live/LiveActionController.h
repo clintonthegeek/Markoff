@@ -10,6 +10,7 @@ namespace Markoff::Live {
 
 class LiveSelectionView;
 class LiveClipboardController;
+class LiveFormatController;
 
 class LiveActionController : public QObject {
     Q_OBJECT
@@ -32,7 +33,7 @@ public:
     void setDocument(Markoff::MarkoffDocument *doc);
     void setSelectionView(LiveSelectionView *sv);
     void setClipboardController(LiveClipboardController *cc);
-    // setFormatController wired in Phase E
+    void setFormatController(LiveFormatController *fc);
 
     QAction *cutAction()       const { return m_cut; }
     QAction *copyAction()      const { return m_copy; }
@@ -61,6 +62,7 @@ private:
     Markoff::MarkoffDocument  *m_document   = nullptr;
     LiveSelectionView         *m_selection  = nullptr;
     LiveClipboardController   *m_clipboard  = nullptr;
+    LiveFormatController      *m_format     = nullptr;
 
     QAction *m_cut       = nullptr;
     QAction *m_copy      = nullptr;

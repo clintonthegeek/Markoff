@@ -9,6 +9,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/LiveClipboardController.h>
+#include <markoff/live/LiveFormatController.h>
 
 namespace Markoff::Live {
 
@@ -67,7 +68,7 @@ void LiveActionController::setupActions() {
         if (m_document) m_document->redoD2();
     });
     // cut/copy/paste wired after setClipboardController.
-    // bold/italic/link wired in Phase E (setFormatController).
+    // bold/italic/link wired after setFormatController.
 }
 
 void LiveActionController::setDocument(Markoff::MarkoffDocument *doc) {
@@ -127,6 +128,15 @@ void LiveActionController::updateEnabledStates() {
     m_bold->setEnabled(hasSel && hasDoc);
     m_italic->setEnabled(hasSel && hasDoc);
     m_link->setEnabled(hasDoc);  // link allows empty selection (placeholder)
+}
+
+void LiveActionController::setFormatController(LiveFormatController *fc) {
+    m_format = fc;
+    if (fc) {
+        connect(m_bold,   &QAction::triggered, fc, &LiveFormatController::toggleBold);
+        connect(m_italic, &QAction::triggered, fc, &LiveFormatController::toggleItalic);
+        connect(m_link,   &QAction::triggered, fc, &LiveFormatController::insertLink);
+    }
 }
 
 void LiveActionController::onClipboardChanged() {
