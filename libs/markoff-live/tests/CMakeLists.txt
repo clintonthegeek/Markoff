@@ -151,3 +151,11 @@ target_link_libraries(tst_live_render_e2_autohide_wikilink PRIVATE
 add_test(NAME tst_live_render_e2_autohide_wikilink
          COMMAND tst_live_render_e2_autohide_wikilink)
 
+qt_add_executable(tst_live_render_e2_autohide_block_prefix
+    tst_live_render_e2_autohide_block_prefix.cpp
+)
+target_link_libraries(tst_live_render_e2_autohide_block_prefix PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_e2_autohide_block_prefix
+         COMMAND tst_live_render_e2_autohide_block_prefix)
+

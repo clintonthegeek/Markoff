@@ -134,6 +134,11 @@ bool InlineHighlighter::delimiterShouldHide(const Markoff::SourceSpan &span) con
     if (!span.isDelimiter) return false;
     if (span.parentCharStart < 0 || span.parentCharEnd < 0) return false;
 
+    // These kinds are always shown regardless of caret/selection.
+    if (span.isTag)              return false;  // tag # is visual identity (spec §4.1)
+    if (span.isListMarker)       return false;  // list bullets always shown (spec §4.2)
+    if (span.isBlockquoteMarker) return false;  // blockquote > always shown (spec §4.2)
+
     // Selection touches the parent range? Reveal.
     if (m_selStart >= 0 && m_selEnd >= 0) {
         const int lo = std::min(m_selStart, m_selEnd);

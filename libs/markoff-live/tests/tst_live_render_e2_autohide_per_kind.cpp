@@ -52,6 +52,23 @@ private slots:
         QTRY_VERIFY(!isHidden(formatAt(&doc, 12)));
     }
 
+    void tag_hash_always_shown_regardless_of_caret() {
+        QTextDocument doc;
+        doc.setPlainText("Filed under #research and more");
+        Theme theme;
+        InlineHighlighter h(&doc);
+        h.setTheme(&theme);
+        auto tag = [](SourceSpan &s){ s.isTag = true; };
+        h.setInlineSpans({
+            delimiterSpan(12, 1, 12, 20, tag),  // '#'
+            contentSpan  (13, 8,            tag),  // 'research'
+        });
+        h.setLocalCaretPosition(0);   // caret far away
+        QTRY_VERIFY(!isHidden(formatAt(&doc, 12)));  // '#' MUST stay visible
+        h.setLocalCaretPosition(-1);
+        QTRY_VERIFY(!isHidden(formatAt(&doc, 12)));
+    }
+
     void italic_strike_highlight_code_follow_same_predicate() {
         struct Case { const char *name; void (*setKind)(SourceSpan &); QString text; int markerLen; };
         const Case cases[] = {
