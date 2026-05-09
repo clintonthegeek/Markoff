@@ -366,3 +366,43 @@ target_link_libraries(tst_live_render_clipboard_changed_updates_paste
 add_test(NAME tst_live_render_clipboard_changed_updates_paste
          COMMAND tst_live_render_clipboard_changed_updates_paste)
 
+# E1: LiveFormatController — bold single-block wrapping.
+qt_add_executable(tst_live_render_format_bold_single_block
+    tst_live_render_format_bold_single_block.cpp)
+target_link_libraries(tst_live_render_format_bold_single_block
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_format_bold_single_block
+         COMMAND tst_live_render_format_bold_single_block)
+
+# E2: LiveFormatController — italic single-block wrapping.
+qt_add_executable(tst_live_render_format_italic_single_block
+    tst_live_render_format_italic_single_block.cpp)
+target_link_libraries(tst_live_render_format_italic_single_block
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_format_italic_single_block
+         COMMAND tst_live_render_format_italic_single_block)
+
+# E3: LiveFormatController — link insert (empty + nonempty selection).
+qt_add_executable(tst_live_render_format_link_single_block
+    tst_live_render_format_link_single_block.cpp)
+target_link_libraries(tst_live_render_format_link_single_block
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_format_link_single_block
+         COMMAND tst_live_render_format_link_single_block)
+
+# E4: LiveFormatController — idempotent toggle (bold/italic round-trip).
+qt_add_executable(tst_live_render_format_idempotent
+    tst_live_render_format_idempotent.cpp)
+target_link_libraries(tst_live_render_format_idempotent
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_format_idempotent
+         COMMAND tst_live_render_format_idempotent)
+
+# E5: LiveFormatController — multi-block independent wrapping.
+qt_add_executable(tst_live_render_format_multi_block
+    tst_live_render_format_multi_block.cpp)
+target_link_libraries(tst_live_render_format_multi_block
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_format_multi_block
+         COMMAND tst_live_render_format_multi_block)
+
