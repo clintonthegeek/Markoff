@@ -7,14 +7,21 @@
 > guide, and before any further perf or facade work. Operating
 > principle: one arc at a time, no side work, retirement is explicit.
 >
-> **2026-05-08 — E1 complete (tag `v0.7.0-e1`); E2 spec-approved.**
+> **2026-05-08 — E1 complete (tag `v0.7.0-e1`); E2 plan-approved.**
 > D5 + §4.5 audit landed 2026-05-08. E1 (inline-format highlighter)
 > shipped same day — 143/143 tests pass, dogfood signed off.
 > **E2 (cursor-aware view: auto-hide markers + cross-block keyboard
-> nav) is `spec-approved` as of 2026-05-08.** Spec:
-> `docs/specs/2026-05-08-e2-cursor-aware-view-design.md`. Plan TBW.
+> nav) is `plan-approved` as of 2026-05-08, ready for fresh-agent
+> execution.**
+>
+> - Spec: `docs/specs/2026-05-08-e2-cursor-aware-view-design.md`
+> - Plan: `docs/plans/2026-05-08-e2-cursor-aware-view.md` (~36 tasks
+>   across 9 phases — A pre-flight, B auto-hide impl, C delegate QML
+>   wiring, D nav-controller skeleton, E four-arrow nav, F extended
+>   nav, G shift-extend, H perf, I dogfood + tag).
+>
 > Scope expanded from framing-doc-named "delimiter visibility" to also
-> fold in arrow-key cross-block navigation (was a regression-of-omission
+> fold in arrow-key cross-block navigation (regression-of-omission
 > against `2026-04-30-live-editing-design.md`).
 >
 > **Fresh-agent execution start:** read `docs/e-arc/e-arc-status.md`
