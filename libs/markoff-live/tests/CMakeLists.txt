@@ -406,3 +406,27 @@ target_link_libraries(tst_live_render_format_multi_block
 add_test(NAME tst_live_render_format_multi_block
          COMMAND tst_live_render_format_multi_block)
 
+# H1: Empty-doc focus — one paragraph block on empty load; flat edit lands.
+qt_add_executable(tst_live_render_empty_doc_focus
+    tst_live_render_empty_doc_focus.cpp)
+target_link_libraries(tst_live_render_empty_doc_focus
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_empty_doc_focus
+         COMMAND tst_live_render_empty_doc_focus)
+
+# H2: Empty-doc kind-transition — "# Heading" edit promotes block kind.
+qt_add_executable(tst_live_render_empty_doc_kind_transition
+    tst_live_render_empty_doc_kind_transition.cpp)
+target_link_libraries(tst_live_render_empty_doc_kind_transition
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_empty_doc_kind_transition
+         COMMAND tst_live_render_empty_doc_kind_transition)
+
+# H3: Cut-to-empty — selectAll + cut leaves one empty paragraph.
+qt_add_executable(tst_live_render_cut_to_empty
+    tst_live_render_cut_to_empty.cpp)
+target_link_libraries(tst_live_render_cut_to_empty
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_cut_to_empty
+         COMMAND tst_live_render_cut_to_empty)
+
