@@ -29,6 +29,7 @@ struct MARKOFF_LIVE_EXPORT BlockRecord {
     QString              text;              ///< Source-faithful markdown for this block.
     int                  headingLevel = 0;  ///< 1–6 if kind=="heading"; else 0.
     QString              codeLanguage;      ///< Fence info-string if kind=="code-block".
+    QString              headingForm;       ///< "atx" / "setext" if kind=="heading"; else empty.
     Markoff::BlockAnchor blockAnchor;       ///< CRDT-stable identity (block's first byte).
     QList<Markoff::SourceSpan> inlineSpans; ///< Pre-baked inline spans (R1B). Used in R6.
     QHash<Markoff::AttrName, Markoff::AttrValue> attrs; ///< Block-kind attributes (e.g. level, infoString).
@@ -41,6 +42,7 @@ struct MARKOFF_LIVE_EXPORT BlockRecord {
         return kind == o.kind && text == o.text
             && headingLevel == o.headingLevel
             && codeLanguage == o.codeLanguage
+            && headingForm == o.headingForm
             && blockAnchor == o.blockAnchor
             && attrs == o.attrs;
     }

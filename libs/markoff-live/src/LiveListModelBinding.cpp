@@ -323,6 +323,12 @@ void LiveListModelBinding::onD2Changed()
                 if (const int *v = std::get_if<int>(&it.value()))
                     r.headingLevel = *v;
             }
+            auto fm = r.attrs.find(Markoff::AttrNames::HeadingForm);
+            if (fm != r.attrs.end()) {
+                if (const QString *p = std::get_if<QString>(&fm.value()))
+                    r.headingForm = *p;
+            }
+            if (r.headingForm.isEmpty()) r.headingForm = QStringLiteral("atx");
         } else if (r.kind == BlockKind::CodeBlock) {
             auto it = r.attrs.find(Markoff::AttrNames::InfoString);
             if (it != r.attrs.end()) {
