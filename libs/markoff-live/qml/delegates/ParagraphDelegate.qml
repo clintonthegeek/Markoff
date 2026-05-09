@@ -44,6 +44,11 @@ Item {
             target: edit.textDocument
             spans: model.inlineSpans
             theme: root.liveBinding ? root.liveBinding.theme : null
+            caretPosition: edit.activeFocus ? edit.cursorPosition : -1
+            selectionStart: (edit.activeFocus && edit.selectionStart !== edit.selectionEnd)
+                            ? edit.selectionStart : -1
+            selectionEnd: (edit.activeFocus && edit.selectionStart !== edit.selectionEnd)
+                          ? edit.selectionEnd : -1
         }
 
         // Forward structural keys (Return / Enter / Esc / Backspace / Delete)
