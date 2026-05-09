@@ -358,3 +358,11 @@ target_link_libraries(tst_live_render_actions_dispatch
 add_test(NAME tst_live_render_actions_dispatch
          COMMAND tst_live_render_actions_dispatch)
 
+# D4: Clipboard-changed signal enables paste action reactively.
+qt_add_executable(tst_live_render_clipboard_changed_updates_paste
+    tst_live_render_clipboard_changed_updates_paste.cpp)
+target_link_libraries(tst_live_render_clipboard_changed_updates_paste
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_clipboard_changed_updates_paste
+         COMMAND tst_live_render_clipboard_changed_updates_paste)
+
