@@ -43,15 +43,34 @@ Rectangle {
 
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
-            const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
-            if (!handler) { event.accepted = false; return }
+            if (!root.liveBinding) { event.accepted = false; return }
+
             const k = event.key
-            if (k !== Qt.Key_Backspace && k !== Qt.Key_Delete && k !== Qt.Key_Tab) {
+            const mods = event.modifiers
+            const isStructural = (k === Qt.Key_Backspace || k === Qt.Key_Delete
+                               || k === Qt.Key_Tab)
+            const isNav = (k === Qt.Key_Up || k === Qt.Key_Down
+                        || k === Qt.Key_Left || k === Qt.Key_Right
+                        || k === Qt.Key_Home || k === Qt.Key_End
+                        || k === Qt.Key_PageUp || k === Qt.Key_PageDown)
+
+            if (isStructural) {
+                const sh = root.liveBinding.structuralKeyHandler
+                if (!sh) return
+                event.accepted = sh.tryHandle(k, mods, root.modelIndex,
+                                               edit.cursorPosition,
+                                               edit.selectionStart === edit.selectionEnd,
+                                               model.text)
                 return
             }
-            const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,
-                edit.cursorPosition, edit.selectionStart === edit.selectionEnd, model.text)
-            event.accepted = handled
+            if (isNav) {
+                const nh = root.liveBinding.navigationController
+                if (!nh) return
+                event.accepted = (nh.tryHandle(k, mods, root.modelIndex,
+                                                edit.cursorPosition,
+                                                edit, model.text) === 1)
+                return
+            }
         }
 
         SyntaxHighlighter {
@@ -76,8 +95,13 @@ Rectangle {
             target: root.liveBinding ? root.liveBinding.cursorState : null
             function onCursorChanged() {
                 const cs = root.liveBinding ? root.liveBinding.cursorState : null
-                if (cs && cs.focusedAnchorRow === root.modelIndex && cs.focusedQtPos >= 0)
+                if (!cs || cs.focusedAnchorRow !== root.modelIndex || cs.focusedQtPos < 0)
+                    return
+                if (cs.pendingVisualLineHint !== 0 && cs.desiredVisualX >= 0) {
+                    root.focusEditAt(cs.focusedQtPos)
+                } else {
                     edit.cursorPosition = cs.focusedQtPos
+                }
             }
         }
     }
@@ -128,6 +152,20 @@ Rectangle {
 
     function focusEditAt(qtPos) {
         edit.forceActiveFocus()
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) {
+            const hint = cs.pendingVisualLineHint
+            const desiredX = cs.desiredVisualX
+            if (hint !== 0 && desiredX >= 0) {
+                const lineH = edit.font.pixelSize
+                const targetY = (hint === 1)
+                    ? lineH * 0.5
+                    : edit.contentHeight - lineH * 0.5
+                // CodeBlock TextEdit has 8px margin via anchors.margins
+                edit.cursorPosition = edit.positionAt(desiredX - 8, targetY)
+                return
+            }
+        }
         if (qtPos >= 0 && qtPos <= edit.length)
             edit.cursorPosition = qtPos
     }
