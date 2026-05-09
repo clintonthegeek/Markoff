@@ -368,6 +368,32 @@ private Q_SLOTS:
         QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
         QCOMPARE(spy[0][0].toInt(), 1);
     }
+
+    // ---- LiveCursorState: desiredVisualX column-preservation tests ----
+
+    void desired_visual_x_default_is_unset() {
+        BlockKindRegistry reg;
+        LiveBlockModel model;
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
+        QCOMPARE(cs.desiredVisualX(), -1.0);
+    }
+
+    void desired_visual_x_persists_across_set_and_get() {
+        BlockKindRegistry reg;
+        LiveBlockModel model;
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
+        cs.setDesiredVisualX(42.5);
+        QCOMPARE(cs.desiredVisualX(), 42.5);
+    }
+
+    void clear_desired_visual_x_resets_to_sentinel() {
+        BlockKindRegistry reg;
+        LiveBlockModel model;
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
+        cs.setDesiredVisualX(42.5);
+        cs.clearDesiredVisualX();
+        QCOMPARE(cs.desiredVisualX(), -1.0);
+    }
 };
 
 QTEST_GUILESS_MAIN(TstLiveRenderCursor)

@@ -217,6 +217,18 @@ void LiveCursorState::resolvePendingForRow(int row)
     request(tc);
 }
 
+void LiveCursorState::setDesiredVisualX(qreal x)
+{
+    if (qFuzzyCompare(m_desiredVisualX, x)) return;
+    m_desiredVisualX = x;
+    Q_EMIT desiredVisualXChanged();
+}
+
+void LiveCursorState::clearDesiredVisualX()
+{
+    setDesiredVisualX(-1.0);
+}
+
 bool LiveCursorState::validateVariant(const Cursor &c) const
 {
     if (std::holds_alternative<NoCursor>(c)) return true;

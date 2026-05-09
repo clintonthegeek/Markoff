@@ -45,6 +45,12 @@ class MARKOFF_LIVE_EXPORT LiveCursorState : public QObject {
     Q_PROPERTY(int focusedAnchorRow READ focusedAnchorRow NOTIFY cursorChanged)
     /// The qtPos of the active TextCaret, else -1.
     Q_PROPERTY(int focusedQtPos READ focusedQtPos NOTIFY cursorChanged)
+    /// Cross-block column-preservation state. Set by LiveNavigationController
+    /// before each Up/Down cross; cleared on Left/Right or any non-vertical
+    /// motion. -1.0 sentinel = unset. Spec §4.5 lifecycle rules.
+    Q_PROPERTY(qreal desiredVisualX READ desiredVisualX
+                                    WRITE setDesiredVisualX
+                                    NOTIFY desiredVisualXChanged)
 
 public:
     explicit LiveCursorState(const BlockKindRegistry *registry,
@@ -56,6 +62,10 @@ public:
     QString cursorKind() const;
     int focusedAnchorRow() const;
     int focusedQtPos() const;
+
+    qreal desiredVisualX() const noexcept { return m_desiredVisualX; }
+    void  setDesiredVisualX(qreal x);
+    Q_INVOKABLE void clearDesiredVisualX();
 
     void request(const Cursor &newCursor);
     void clear();
@@ -98,6 +108,7 @@ public:
 
 Q_SIGNALS:
     void cursorChanged();
+    void desiredVisualXChanged();
 
 private:
     bool validateVariant(const Cursor &c) const;
@@ -108,6 +119,7 @@ private:
     Cursor                   m_cursor;
     const BlockKindRegistry *m_registry;
     const LiveBlockModel    *m_model;
+    qreal                    m_desiredVisualX = -1.0;
 
     struct PendingRow {
         int row;
