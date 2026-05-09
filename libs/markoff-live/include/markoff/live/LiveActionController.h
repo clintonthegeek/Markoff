@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <markoff/live/MarkoffLiveExport.h>
 #include <QObject>
 #include <QAction>
 
@@ -12,7 +13,7 @@ class LiveSelectionView;
 class LiveClipboardController;
 class LiveFormatController;
 
-class LiveActionController : public QObject {
+class MARKOFF_LIVE_EXPORT LiveActionController : public QObject {
     Q_OBJECT
     // Q_PROPERTY for each action (CONSTANT since pointers don't change)
     Q_PROPERTY(QAction *cutAction       READ cutAction       CONSTANT)
