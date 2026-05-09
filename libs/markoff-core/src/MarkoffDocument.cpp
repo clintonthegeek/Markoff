@@ -930,11 +930,22 @@ void MarkoffDocument::scheduleD2Changed()
     if (!d->d2ChangePending) {
         d->d2ChangePending = true;
         QTimer::singleShot(0, this, [this]() {
+            // Guard against double-fire: flushPendingD2Changed() may have
+            // emitted synchronously before this lambda runs.
+            if (!d->d2ChangePending) return;
             d->d2ChangePending = false;
             Q_EMIT d2DocumentChanged();
             Q_EMIT documentChanged();
         });
     }
+}
+
+void MarkoffDocument::flushPendingD2Changed()
+{
+    if (!d->d2ChangePending) return;
+    d->d2ChangePending = false;
+    Q_EMIT d2DocumentChanged();
+    Q_EMIT documentChanged();
 }
 
 // ============================================================================

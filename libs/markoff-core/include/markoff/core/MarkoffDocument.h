@@ -304,6 +304,15 @@ public:
     /// Trigger GC manually (e.g. after save). Returns false if a transaction is open.
     bool triggerGc();
 
+    /// If a `d2DocumentChanged` is queued (via `scheduleD2Changed`), emit it
+    /// synchronously now and cancel the deferred fire. Used by the typing
+    /// path so the span-update cascade (model → delegate → highlighter) lands
+    /// inside the same `QTextDocument::contentsChange` emission chain — the
+    /// `QSyntaxHighlighter`'s own subscriber then runs `highlightBlock` with
+    /// fresh spans, avoiding a one-paint-frame flicker of inline delimiters
+    /// after the insertion point. No-op if nothing is pending.
+    void flushPendingD2Changed();
+
 Q_SIGNALS:
     void documentReloaded();
     void sessionCreated(Markoff::Session *);

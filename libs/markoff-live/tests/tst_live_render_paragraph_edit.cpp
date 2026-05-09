@@ -246,6 +246,54 @@ private Q_SLOTS:
         QVERIFY2(flagSeenDuringInsert,
                  "applyingModelUpdate should be true while rowsInserted fires");
     }
+
+    void typing_flushes_d2_changed_synchronously_before_paint() {
+        // Regression: when a char is typed mid-paragraph, the QSyntaxHighlighter
+        // subscribed to QTextDocument::contentsChange runs highlightBlock
+        // synchronously inside the same emission chain. If the model→delegate
+        // span-update cascade is still queued (debounced d2DocumentChanged via
+        // QTimer::singleShot(0)), the highlighter formats the post-edit text
+        // with the *pre-edit* span offsets — inline delimiters at offsets after
+        // the insertion point appear visible for one paint frame before the
+        // queued timer fires and corrects them. Visible as a flicker.
+        //
+        // The fix is in LiveEditBinding::onContentsChange, which calls
+        // MarkoffDocument::flushPendingD2Changed() after applying the buffer
+        // edit. This test asserts that d2DocumentChanged has fired before the
+        // QTextDocument::contentsChange emission chain returns.
+        Markoff::MarkoffDocument document(/*replicaId=*/1);
+
+        LiveListModelBinding binding;
+        binding.setDocument(&document);
+
+        QVERIFY(waitForModelRows(binding, document, "hello world", 1));
+
+        QTextEdit editor;
+        editor.setPlainText("hello world");
+        LiveEditBinding eb;
+        eb.setBinding(&binding);
+        eb.setModelIndex(0);
+        eb.setText("hello world");
+        eb.setRawTextDocument(editor.document());
+
+        QSignalSpy d2Spy(&document, &Markoff::MarkoffDocument::d2DocumentChanged);
+        d2Spy.clear();
+
+        // Insert one char — fires QTextDocument::contentsChange synchronously,
+        // which routes through LiveEditBinding::onContentsChange. By the time
+        // insertText() returns, d2DocumentChanged must already have fired
+        // (synchronously, via flushPendingD2Changed) so any QSyntaxHighlighter
+        // running next in the contentsChange emission chain sees fresh spans.
+        QTextCursor cur(editor.document());
+        cur.setPosition(5);
+        cur.insertText("X");
+
+        QVERIFY2(d2Spy.count() >= 1,
+                 "d2DocumentChanged must fire synchronously inside the "
+                 "contentsChange emission chain — otherwise QSyntaxHighlighter "
+                 "subscribers see stale inline spans, causing a one-frame "
+                 "flicker of inline-delimiter formatting after the edit point.");
+    }
 };
 
 QTEST_MAIN(TstLiveRenderParagraphEdit)

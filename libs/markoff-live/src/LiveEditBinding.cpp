@@ -160,6 +160,16 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     auto &undoLog = doc->d2UndoLog();
     UndoLog::Transaction t(undoLog);
     doc->d2ApplyBufferEdit(record.blockAnchor, byteOff, removedBytes, inserted, t);
+
+    // Flush the queued d2DocumentChanged synchronously so the span-update
+    // cascade (model → delegate.spans binding → InlineHighlighter::setInlineSpans
+    // → rehighlight) lands inside the QTextDocument::contentsChange emission
+    // chain, before the QSyntaxHighlighter subscriber's highlightBlock runs.
+    // Without this, the highlighter formats the post-edit text with the
+    // pre-edit span offsets — inline delimiters at offsets after the
+    // insertion point appear visible for one paint frame before the
+    // debounced d2-changed timer fires and corrects them.
+    doc->flushPendingD2Changed();
 }
 
 void LiveEditBinding::onFocusLost()

@@ -51,6 +51,14 @@ class MARKOFF_LIVE_EXPORT LiveCursorState : public QObject {
     Q_PROPERTY(qreal desiredVisualX READ desiredVisualX
                                     WRITE setDesiredVisualX
                                     NOTIFY desiredVisualXChanged)
+    /// Cross-block column-preservation visual-line hint. Set by
+    /// `LiveNavigationController` before each Up/Down cross to indicate
+    /// which visual line of the destination block the caret should land on
+    /// (FirstLine for Up, LastLine for Down). Cleared back to None inside
+    /// `resolvePendingForRow*` after the destination delegate has consumed
+    /// it. Read by QML delegates' focusEditAt + onCursorChanged paths.
+    Q_PROPERTY(VisualLineHint pendingVisualLineHint READ pendingVisualLineHint
+                                                    NOTIFY visualLineHintChanged)
 
 public:
     explicit LiveCursorState(const BlockKindRegistry *registry,
@@ -73,7 +81,7 @@ public:
     /// Like requestTextCaretAtRow, but qtPos is computed by the destination
     /// delegate from desiredVisualX projected onto the line indicated by hint.
     void requestTextCaretAtRowVisualX(int expectedRow, VisualLineHint hint);
-    Q_INVOKABLE VisualLineHint pendingVisualLineHint() const noexcept { return m_pendingVlhint; }
+    VisualLineHint pendingVisualLineHint() const noexcept { return m_pendingVlhint; }
 
     void request(const Cursor &newCursor);
     void clear();
@@ -128,6 +136,7 @@ private:
     Cursor                   m_cursor;
     const BlockKindRegistry *m_registry;
     const LiveBlockModel    *m_model;
+    LiveListModelBinding    *m_binding = nullptr;
     qreal                    m_desiredVisualX = -1.0;
     VisualLineHint           m_pendingVlhint  = VisualLineHint::None;
 

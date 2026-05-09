@@ -205,6 +205,83 @@ private Q_SLOTS:
         QVERIFY(text.contains('\n'));  // newline was inserted at position 5
     }
 
+    void requestTextCaretAtRow_implicitly_flushes_pending_d2_changed() {
+        // Option A defense-in-depth: requestTextCaretAtRow drains any queued
+        // d2DocumentChanged before resolving, so future structural-key paths
+        // that mutate a buffer in place + request a same-row cursor can't
+        // reproduce the soft-break race even if they forget to flush
+        // explicitly. Exercises the LiveCursorState path directly, bypassing
+        // any handler-level flush.
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "hello world", 1));
+
+        const Markoff::BlockId blk = binding.model()->recordAt(0).blockAnchor;
+
+        // Mutate the buffer directly (no flush; mimics any future handler
+        // that forgets the explicit flush call).
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2ApplyBufferEdit(blk, /*off=*/5, /*remove=*/0, "\n", t);
+        }
+
+        QSignalSpy d2Spy(&doc, &Markoff::MarkoffDocument::d2DocumentChanged);
+        d2Spy.clear();
+
+        // The buffer mutation queued d2DocumentChanged. Now request a cursor
+        // — the implicit flush should drain the queue before resolving.
+        binding.cursorState()->requestTextCaretAtRow(/*row=*/0, /*qtPos=*/6);
+
+        QVERIFY2(d2Spy.count() >= 1,
+                 "requestTextCaretAtRow must implicitly flush a pending "
+                 "d2DocumentChanged so the model + bound QTextDocument are on "
+                 "post-edit text before the cursor request resolves.");
+    }
+
+    void shift_enter_lands_cursor_after_inserted_newline_synchronously() {
+        // Regression: with the buffer edit and the cursor request both happening
+        // in the same paragraphEnter handler, requestTextCaretAtRow resolves
+        // *synchronously* (the row already exists; only its text changed) and
+        // fires cursorChanged before scheduleD2Changed's queued timer ever runs.
+        // Result: the QTextDocument inside the QML delegate is still on the
+        // pre-edit text when onCursorChanged fires; setPlainText (later, when
+        // pushTextToDocument finally runs) reflows the cursor and the soft
+        // break "lands" the caret at end-of-block instead of after the new \n.
+        //
+        // The fix is to flush d2DocumentChanged synchronously inside the
+        // structural-handler soft-break path, BEFORE the cursor request, so
+        // that pushTextToDocument has already updated the QTextDocument by the
+        // time onCursorChanged runs.
+        //
+        // We can't observe QTextDocument directly here (the structural handler
+        // is independent of any LiveEditBinding/QTextDocument in this test),
+        // but we can prove the timing contract: when tryHandle returns, the
+        // d2DocumentChanged signal must have fired exactly once already (no
+        // queued tick still pending).
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        QVERIFY(waitForModelRows(binding, doc, "hello world", 1));
+
+        QSignalSpy d2Spy(&doc, &Markoff::MarkoffDocument::d2DocumentChanged);
+        d2Spy.clear();
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::ShiftModifier,
+            /*blockIndex=*/0, /*qtPos=*/5,
+            /*selectionEmpty=*/true,
+            QStringLiteral("hello world"));
+        QVERIFY(consumed);
+
+        QVERIFY2(d2Spy.count() >= 1,
+                 "paragraph soft-break path must flush pending d2DocumentChanged "
+                 "synchronously before requesting the new cursor position — "
+                 "otherwise the QTextDocument is still on the pre-edit text when "
+                 "onCursorChanged fires and the caret lands at end-of-block "
+                 "after setPlainText reflows.");
+    }
+
     // ---------- LiveStructuralKeyHandler — paragraph Delete at row-end ----------
 
     void delete_at_end_of_paragraph_merges_with_next() {

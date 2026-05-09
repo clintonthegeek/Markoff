@@ -221,6 +221,17 @@ void LiveStructuralKeyHandler::registerBuiltins()
             const QByteArray prefixUtf8 = c.blockText.left(c.qtPos).toUtf8();
             const uint32_t byteOff = static_cast<uint32_t>(prefixUtf8.size());
             Markoff::Cmd::insertSoftBreak(*c.document, c.blockAnchor, byteOff);
+
+            // Flush the queued d2DocumentChanged synchronously so the model
+            // and the delegate's QTextDocument finish updating BEFORE we
+            // request the new caret position. requestTextCaretAtRow resolves
+            // synchronously when the target row already exists (which it
+            // does for soft-break — same row, only text changed). Without
+            // the flush, onCursorChanged fires against the pre-edit
+            // QTextDocument; the later pushTextToDocument's setPlainText
+            // reflows the cursor and lands the caret at end-of-block.
+            c.document->flushPendingD2Changed();
+
             c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 1);
             return HR::Handled;
         }
