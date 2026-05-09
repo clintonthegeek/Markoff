@@ -350,3 +350,11 @@ target_link_libraries(tst_live_render_actions_enabled_state
 add_test(NAME tst_live_render_actions_enabled_state
          COMMAND tst_live_render_actions_enabled_state)
 
+# D3: LiveActionController dispatch: trigger propagates to clipboard/selection/signals.
+qt_add_executable(tst_live_render_actions_dispatch
+    tst_live_render_actions_dispatch.cpp)
+target_link_libraries(tst_live_render_actions_dispatch
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_actions_dispatch
+         COMMAND tst_live_render_actions_dispatch)
+
