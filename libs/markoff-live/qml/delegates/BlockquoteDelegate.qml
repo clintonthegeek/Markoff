@@ -64,7 +64,8 @@ Item {
             const isStructural = (k === Qt.Key_Return || k === Qt.Key_Enter
                                || k === Qt.Key_Backspace || k === Qt.Key_Delete)
             const isNav = (k === Qt.Key_Up || k === Qt.Key_Down
-                        || k === Qt.Key_Left || k === Qt.Key_Right)
+                        || k === Qt.Key_Left || k === Qt.Key_Right
+                        || k === Qt.Key_PageUp || k === Qt.Key_PageDown)
             const isCtrlHomeEnd = ((k === Qt.Key_Home || k === Qt.Key_End)
                                    && (mods & Qt.ControlModifier))
 

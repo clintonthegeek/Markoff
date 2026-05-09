@@ -136,6 +136,12 @@ ListView {
         }
     }
 
+    // ---- Wire navigationController.setListView on startup ----
+    Component.onCompleted: {
+        if (binding && binding.navigationController)
+            binding.navigationController.setListView(root)
+    }
+
     // ---- Keyboard: Ctrl-C copy ----
     Keys.onPressed: (event) => {
         if (!binding) { event.accepted = false; return }

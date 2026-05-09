@@ -36,10 +36,13 @@ public:
                               QObject *editItem,
                               const QString &blockText);
 
+    Q_INVOKABLE void setListView(QObject *listView);
+
     int previousNavigableRow(int currentRow) const;
     int nextNavigableRow(int currentRow) const;
 
 private:
+    QObject *m_listView = nullptr;
     bool isAtVisualTopLine(QObject *editItem) const;
     bool isAtVisualBottomLine(QObject *editItem) const;
     bool isTextBearing(int row) const;

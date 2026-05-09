@@ -8,6 +8,9 @@
 #include <markoff/live/BlockRecord.h>
 
 #include <QRectF>
+#include <QVariant>
+
+#include <algorithm>
 
 namespace Markoff::Live {
 
@@ -19,6 +22,10 @@ LiveNavigationController::LiveNavigationController(
     , m_model(model)
     , m_cursorState(cursorState)
 {
+}
+
+void LiveNavigationController::setListView(QObject *listView) {
+    m_listView = listView;
 }
 
 bool LiveNavigationController::isTextBearing(int row) const {
@@ -143,6 +150,51 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
         const int targetRow = nextNavigableRow(blockIndex);
         if (targetRow < 0) return Handled;
         m_cursorState->requestTextCaretAtRow(targetRow, 0);
+        return Handled;
+    }
+
+    if (key == Qt::Key_PageUp || key == Qt::Key_PageDown) {
+        if (!m_listView || !editItem) return NotHandled;
+        const QVariant rectV = editItem->property("cursorRectangle");
+        if (!rectV.canConvert<QRectF>()) return NotHandled;
+        const QRectF cursorRect = rectV.toRectF();
+
+        const qreal viewH = m_listView->property("height").toReal();
+        if (viewH <= 0) return NotHandled;
+
+        // editItem is the TextEdit; its parent is the delegate Item root.
+        // The delegate Item's y is its position within the ListView content.
+        QObject *delegateItem = editItem->parent();
+        if (!delegateItem) return NotHandled;
+        const qreal delegateY = delegateItem->property("y").toReal();
+        const qreal cursorYInView = delegateY + cursorRect.y();
+        const qreal cursorXInView = delegateItem->property("x").toReal() + cursorRect.x();
+
+        const qreal targetY = (key == Qt::Key_PageDown)
+            ? cursorYInView + viewH
+            : cursorYInView - viewH;
+
+        QVariant hitResult;
+        QMetaObject::invokeMethod(m_listView, "hit",
+            Qt::DirectConnection,
+            Q_RETURN_ARG(QVariant, hitResult),
+            Q_ARG(double, cursorXInView),
+            Q_ARG(double, targetY));
+
+        if (!hitResult.canConvert<QVariantMap>()) return Handled;
+        const QVariantMap hitMap = hitResult.toMap();
+        const int hitRow = hitMap.value(QStringLiteral("blockIndex"), -1).toInt();
+        const int hitQtPos = hitMap.value(QStringLiteral("qtPos"), 0).toInt();
+        if (hitRow < 0) return Handled;
+
+        m_cursorState->clearDesiredVisualX();
+        if (isTextBearing(hitRow))
+            m_cursorState->requestTextCaretAtRow(hitRow, std::max(0, hitQtPos));
+        else {
+            const int textRow = findFirstTextBearingRow();
+            if (textRow >= 0)
+                m_cursorState->requestTextCaretAtRow(textRow, 0);
+        }
         return Handled;
     }
 
