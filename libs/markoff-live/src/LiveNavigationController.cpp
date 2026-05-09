@@ -68,6 +68,30 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
             }
             return Handled;
         }
+
+        // Ctrl+Left: word-boundary within block handled by TextEdit natively.
+        // Cross-block (at pos 0): go to end of prev block.
+        if (key == Qt::Key_Left) {
+            if (qtPos > 0) return NotHandled;
+            m_cursorState->clearDesiredVisualX();
+            const int targetRow = previousNavigableRow(blockIndex);
+            if (targetRow < 0) return Handled;
+            if (!m_model) return Handled;
+            const int targetLen = m_model->recordAt(targetRow).text.length();
+            m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
+            return Handled;
+        }
+
+        // Ctrl+Right: word-boundary within block handled by TextEdit natively.
+        // Cross-block (at end): go to start of next block.
+        if (key == Qt::Key_Right) {
+            if (qtPos < blockText.length()) return NotHandled;
+            m_cursorState->clearDesiredVisualX();
+            const int targetRow = nextNavigableRow(blockIndex);
+            if (targetRow < 0) return Handled;
+            m_cursorState->requestTextCaretAtRow(targetRow, 0);
+            return Handled;
+        }
     }
 
     if (modifiers != Qt::NoModifier) return NotHandled;

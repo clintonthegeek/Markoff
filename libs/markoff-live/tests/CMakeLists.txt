@@ -213,3 +213,10 @@ target_link_libraries(tst_live_render_e2_nav_home_end
 add_test(NAME tst_live_render_e2_nav_home_end
          COMMAND tst_live_render_e2_nav_home_end)
 
+qt_add_executable(tst_live_render_e2_nav_word
+    tst_live_render_e2_nav_word.cpp)
+target_link_libraries(tst_live_render_e2_nav_word
+    PRIVATE markoff_live Qt6::Test Qt6::Gui)
+add_test(NAME tst_live_render_e2_nav_word
+         COMMAND tst_live_render_e2_nav_word)
+
