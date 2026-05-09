@@ -4,13 +4,12 @@
 #include <QQmlContext>
 #include <QFile>
 #include <QFileInfo>
-#include <QRandomGenerator>
 #include <QQuickStyle>
 
 #include <markoff/core/MarkoffDocument.h>
 
-/// Test app for markoff-live R2. Loads a Markdown file and renders
-/// it read-only via LiveListModelBinding + LiveView. No editing.
+/// Test app for markoff-live. Loads a Markdown file and renders it via
+/// LiveListModelBinding + LiveView.
 /// Usage: markoff-live-app <markdown-file>
 int main(int argc, char *argv[])
 {
@@ -30,8 +29,15 @@ int main(int argc, char *argv[])
     }
     const QByteArray content = file.readAll();
 
-    const quint16 replicaId =
-        static_cast<quint16>(QRandomGenerator::global()->generate() & 0xFFFF);
+    // PERF WORKAROUND (2026-05-09): pinned replicaId=1.
+    // CollabText::Crdt::Buffer's load path is O(replicaId) in both time and
+    // memory. Random uint16 replicaIds (the obvious "give every replica a
+    // fresh id" approach) yield 50 s+ loads and ~1 GB RSS for a 73 kB doc.
+    // replicaId=1 takes ~500 ms for the same doc.
+    // Findings + reproducer: docs/handoff/2026-05-09-collabtext-replica-id-perf.md
+    // Upstream fix needed before D5 (collab) ships — multi-user requires
+    // distinct replicaIds, so the workaround is single-user only.
+    const quint16 replicaId = 1;
     auto doc = std::make_unique<Markoff::MarkoffDocument>(replicaId);
     doc->loadFromMarkdown(content);
 

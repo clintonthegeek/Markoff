@@ -142,3 +142,8 @@ set_tests_properties(tst_v10_targeted_block_signals PROPERTIES ENVIRONMENT "QT_Q
 
 add_subdirectory(d2)
 add_subdirectory(d5)
+
+# Ad-hoc load benchmark — not registered with ctest. Run manually:
+#   ./build-dev/bin/perf_load_bench <markdown-file>
+add_executable(perf_load_bench perf_load_bench.cpp)
+target_link_libraries(perf_load_bench PRIVATE Qt6::Widgets markoff_core)
