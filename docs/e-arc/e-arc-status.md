@@ -2,18 +2,27 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-08 (E2 implementation complete; pending dogfood pass for tag).
+**Last updated:** 2026-05-09 (E2 dogfood in progress — 2 bugs found, 1 fixed, 1 outstanding).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **E2** — cursor-aware view (auto-hide + cross-block nav). All 9 phases (A–I) implemented; dogfood pass (I1) required before tagging `v0.7.0-e2`.
+**Active phase:** **E2** — cursor-aware view (auto-hide + cross-block nav). All 9 phases (A–I) implemented; dogfood in progress (I1). One outstanding bug blocks tag.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **E2 is awaiting dogfood.** All 32 tests pass (32/32). Build `markoff-live-app` and exercise: typing in paragraphs/headings/lists, Up/Down across blocks preserving column, Left/Right at block boundaries, Ctrl+Home/End, Page-Up/Down, Shift+arrow selection, inline marker auto-hide on caret entry/exit.
+> **E2 dogfood in progress — one bug outstanding, blocks tag.** 32/32 tests pass.
 >
-> After dogfood sign-off: tag `v0.7.0-e2` and update phase board.
+> **Outstanding bug (click-position):** Clicks consistently land on the last line of the target block instead of the clicked visual line. Root cause: all 5 text-bearing delegates have `function positionAt(x, y) { return edit.positionAt(x - edit.leftPadding, y - edit.topPadding) }`. This double-subtracts padding because Qt's `QQuickTextEdit::positionAt(x, y)` already takes LOCAL TextEdit coordinates (i.e. the item's (0,0) origin, padding included) and internally subtracts `xoff = leftPadding` and `yoff = topPadding` before calling the text layout's `hitTest`. The delegate subtraction shifts the effective y upward by `topPadding` (4–8 px), pushing all clicks out of content-space — clicks near the bottom of a delegate exceed text content height and snap to the last character.
+>
+> **Fix (do first in next session):**
+> - In all 5 text-bearing delegates (`ParagraphDelegate.qml`, `HeadingDelegate.qml`, `ListItemDelegate.qml`, `BlockquoteDelegate.qml`, `CodeBlockDelegate.qml`) change `positionAt` to: `function positionAt(x, y) { return edit.positionAt(x, y) }`.
+> - In the same delegates, the `focusEditAt` hint path currently does `edit.positionAt(desiredX - edit.leftPadding, targetY)` where `targetY` is content-relative (0 = top of text). Both are wrong: `desiredVisualX` comes from `cursorRectangle.x()` (already TextEdit-local, i.e. includes leftPadding), and `targetY` needs topPadding added. Fix: `edit.positionAt(desiredX, targetY + edit.topPadding)`.
+> - Also `focusEditAt` in the `Connections { target: cursorState }` block uses the same `edit.positionAt` call — apply the same fix there.
+>
+> **Fixed bug (Down-arrow → last-line):** `LiveCursorState::pendingVisualLineHint()` was not `Q_INVOKABLE`. QML received `undefined`, causing `undefined !== 0` (true) to always trigger the hint path and `undefined === 1` (false) to always use LastLine formula. Added `Q_INVOKABLE`. Commit: `47612b0`. 32/32 tests still pass.
+>
+> After fixing the click bug: re-dogfood, then tag `v0.7.0-e2` and update phase board.
 >
 > **Next phase after E2:** E3 (Wikilinks, embeds, tags, callouts). Start with `superpowers:brainstorming` before drafting spec.
 >
@@ -33,7 +42,7 @@
 | Phase | Status | Spec | Plan | Notes |
 |---|---|---|---|---|
 | **E1** | `complete` (2026-05-08, tag `v0.7.0-e1`) | [E1 spec](../specs/2026-05-08-e1-inline-highlighter-design.md) | [E1 plan](../plans/2026-05-08-e1-inline-highlighter.md) | Inline-format highlighter in QML delegates. Reads `BlockRecord::inlineSpans` via `LiveBlockModel::spansAtRow(row)`. 143/143 tests pass. Dogfood signed off. Tag: `v0.7.0-e1`. |
-| **E2** | `dogfood` (2026-05-08) | [E2 spec](../specs/2026-05-08-e2-cursor-aware-view-design.md) | [E2 plan](../plans/2026-05-08-e2-cursor-aware-view.md) | Cursor-aware view: auto-hide markers (true zero-width collapse) + full-parity cross-block keyboard nav. 32/32 tests pass. New: `LiveNavigationController` (Up/Down/Left/Right column-preserve, Ctrl+Home/End, Ctrl+Left/Right word-boundary, Page-Up/Down via `LiveView.hit`, Shift+arrow + Ctrl+Shift extends `LiveSelectionView`); `LiveCursorState::VisualLineHint` + `requestTextCaretAtRowVisualX`; `InlineHighlighter` caret/selection auto-hide wiring in all 5 delegates; `Theme::Slot::HiddenMarker`. Perf: caret-move p99 0.012ms (gate <5ms); inline rehighlight p99 0.010ms (gate <33ms). Awaiting dogfood + tag `v0.7.0-e2`. |
+| **E2** | `dogfood` (2026-05-09) | [E2 spec](../specs/2026-05-08-e2-cursor-aware-view-design.md) | [E2 plan](../plans/2026-05-08-e2-cursor-aware-view.md) | Cursor-aware view: auto-hide markers (true zero-width collapse) + full-parity cross-block keyboard nav. 32/32 tests pass. Dogfood in progress: Down-arrow-to-last-line fixed (`47612b0`, `Q_INVOKABLE` on `pendingVisualLineHint`); click-position bug outstanding (double-padding subtraction in all 5 delegate `positionAt` functions — see TL;DR fix). |
 | **E3** | `pending` | TBW | TBW | Wikilinks, embeds, tags, callouts (Obsidian affordances). |
 | **E4** | `pending` | TBW | TBW | Tables, frontmatter, footnote rendering. |
 | **E5** | `pending` | TBW | TBW | Math / Mermaid Live-mode parity with Reading mode. |
@@ -49,6 +58,8 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-09 | — | **E2 dogfood bug: click-position double-padding (OUTSTANDING).** Clicks land on last line of block. All 5 text-bearing delegates call `edit.positionAt(x - leftPadding, y - topPadding)` but Qt's `QQuickTextEdit::positionAt` takes LOCAL item coords and subtracts padding internally — double-subtraction pushes effective y out of text range, snapping to last char. Fix: `positionAt(x, y) { return edit.positionAt(x, y) }` plus add `topPadding` to `targetY` in `focusEditAt` hint path (since `desiredVisualX` is already TextEdit-local from `cursorRectangle.x()`). |
+| 2026-05-09 | `47612b0` | **E2 dogfood bug fixed: Down-arrow always landed at last line.** `pendingVisualLineHint()` was not `Q_INVOKABLE`; QML got `undefined`, hint comparison `undefined !== 0` always true → always-LastLine. Added `Q_INVOKABLE`. 32/32 tests still pass. |
 | 2026-05-08 | `ad33c40` | **E2 H1+H2 landed:** caret-move benchmark (100-block doc, p50=0.008ms p99=0.012ms, gate <5ms pass); caret-inline rehighlight benchmark (10-span block, p50=0.007ms p99=0.010ms, gate <33ms pass); E1 typing-perf no regression (p99=0.003ms). 32/32 `tst_live_render_` tests green. |
 | 2026-05-08 | `b4b024c` | **E2 G1+G2 landed:** `LiveNavigationController` extended with `LiveSelectionView *` param; Shift+Up/Down/Left/Right extends selection; Ctrl+Shift+Left/Right word-extend across blocks. 14 new test cases in `tst_live_render_e2_nav_shift_extend`. 30/30 tests green. |
 | 2026-05-08 | `78c9bca` | **E2 F4 landed:** Page-Up/Down via `LiveView.hit(x, y)` QML invocation from C++; delegate `Keys.onPressed` catches Page keys; coordinate mapping through `editItem->parent()->property("y")` + cursor-rect. |
