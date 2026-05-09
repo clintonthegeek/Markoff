@@ -100,6 +100,66 @@ void LiveSelectionView::copyToClipboard() const
     QApplication::clipboard()->setText(text);
 }
 
+void LiveSelectionView::selectAll()
+{
+    if (!m_model) return;
+    const int rowCount = m_model->rowCount();
+    if (rowCount <= 0) return;
+    const int lastRow = rowCount - 1;
+    const QString lastText = m_model->recordAt(lastRow).text;
+
+    m_anchorBlock = 0;
+    m_anchorQtPos = 0;
+    m_activeBlock = lastRow;
+    m_activeQtPos = lastText.length();
+    syncToSession();
+    Q_EMIT selectionChanged();
+}
+
+void LiveSelectionView::deleteSelection()
+{
+    if (!hasSelection() || !m_model || !m_document) return;
+
+    int fb, fo, lb, lo;
+    normalized(fb, fo, lb, lo);
+
+    const int rowCount = m_model->rowCount();
+    if (fb < 0 || fb >= rowCount || lb < 0 || lb >= rowCount) return;
+
+    // Compute flat byte start/end by walking iterateBlocks().
+    // applyFlatEdit uses the same cumulative-blockText walk internally, so
+    // the byte offsets we produce here are in the same coordinate space.
+    const auto blocks = m_document->iterateBlocks();
+
+    uint32_t startByte = 0;
+    uint32_t endByte   = 0;
+    uint32_t cursor    = 0;
+    for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
+        const QByteArray rawText = m_document->blockText(blocks[i]);
+        const uint32_t blockSize = static_cast<uint32_t>(rawText.size());
+
+        if (i == fb) {
+            // Model text has the trailing '\n' stripped; qtPos is within
+            // the content portion. Use the model record for the conversion.
+            const QByteArray modelUtf8 = m_model->recordAt(fb).text.toUtf8();
+            startByte = cursor + static_cast<uint32_t>(
+                Coordinates::qtPosToByte(modelUtf8, fo));
+        }
+        if (i == lb) {
+            const QByteArray modelUtf8 = m_model->recordAt(lb).text.toUtf8();
+            endByte = cursor + static_cast<uint32_t>(
+                Coordinates::qtPosToByte(modelUtf8, lo));
+            break;
+        }
+        cursor += blockSize;
+    }
+
+    if (endByte <= startByte) return;
+
+    m_document->applyFlatEdit(startByte, endByte, QByteArray(), Markoff::Origin::UserEdit);
+    clear();
+}
+
 void LiveSelectionView::syncToSession()
 {
     if (!m_session || !m_document || !m_model) return;

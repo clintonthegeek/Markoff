@@ -255,3 +255,17 @@ target_link_libraries(tst_live_render_clipboard_copy
 add_test(NAME tst_live_render_clipboard_copy
          COMMAND tst_live_render_clipboard_copy)
 
+qt_add_executable(tst_live_render_selection_select_all
+    tst_live_render_selection_select_all.cpp)
+target_link_libraries(tst_live_render_selection_select_all
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_selection_select_all
+         COMMAND tst_live_render_selection_select_all)
+
+qt_add_executable(tst_live_render_selection_delete
+    tst_live_render_selection_delete.cpp)
+target_link_libraries(tst_live_render_selection_delete
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_selection_delete
+         COMMAND tst_live_render_selection_delete)
+

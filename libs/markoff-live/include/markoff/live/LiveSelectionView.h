@@ -47,6 +47,8 @@ public:
     Q_INVOKABLE void begin(int blockIndex, int qtPos);
     Q_INVOKABLE void extend(int blockIndex, int qtPos);
     Q_INVOKABLE void clear();
+    Q_INVOKABLE void selectAll();
+    Q_INVOKABLE void deleteSelection();
 
     /// Returns QPoint(start, end) for the block, or QPoint(-1,-1) if untouched.
     /// end may be INT32_MAX — consumers must clamp to textEdit.length.
