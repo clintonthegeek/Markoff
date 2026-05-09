@@ -182,6 +182,13 @@ void LiveCursorState::resolvePendingForAnchor()
         if (m_model->recordAt(r).blockAnchor == target) {
             const int qtPos = m_pendingRow->qtPos;
             m_pendingRow.reset();
+
+            // Clear the visual-line hint: it was consumed by this resolution.
+            if (m_pendingVlhint != VisualLineHint::None) {
+                m_pendingVlhint = VisualLineHint::None;
+                Q_EMIT visualLineHintChanged();
+            }
+
             TextCaret tc;
             tc.block            = target;
             tc.cachedByteOffset = static_cast<quint32>(qtPos);
@@ -209,6 +216,12 @@ void LiveCursorState::resolvePendingForRow(int row)
     // call requestTextCaretAtRow; reading a stale m_pendingRow during
     // that re-entrance would produce the wrong qtPos.
     m_pendingRow.reset();
+
+    // Clear the visual-line hint: it was consumed by this resolution.
+    if (m_pendingVlhint != VisualLineHint::None) {
+        m_pendingVlhint = VisualLineHint::None;
+        Q_EMIT visualLineHintChanged();
+    }
 
     TextCaret tc;
     tc.block            = anchor;

@@ -60,6 +60,7 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
         m_cursorState->clearDesiredVisualX();
         const int targetRow = previousNavigableRow(blockIndex);
         if (targetRow < 0) return Handled;
+        if (!m_model) return Handled;
         const int targetLen = m_model->recordAt(targetRow).text.length();
         m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
         return Handled;
