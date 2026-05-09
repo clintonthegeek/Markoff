@@ -9,6 +9,9 @@
 #include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/LiveStructuralKeyHandler.h>
 #include <markoff/live/LiveNavigationController.h>
+#include <markoff/live/LiveClipboardController.h>
+#include <markoff/live/LiveActionController.h>
+#include <markoff/live/LiveFormatController.h>
 
 #include <QObject>
 #include <QAbstractListModel>
@@ -44,8 +47,27 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
                READ remoteCursorsModel CONSTANT)
     Q_PROPERTY(const Markoff::Theme *theme READ theme WRITE setTheme NOTIFY themeChanged)
 
+    Q_PROPERTY(Markoff::Live::LiveClipboardController *clipboardController
+               READ clipboardController CONSTANT)
+    Q_PROPERTY(Markoff::Live::LiveActionController *actionController
+               READ actionController CONSTANT)
+    Q_PROPERTY(Markoff::Live::LiveFormatController *formatController
+               READ formatController CONSTANT)
+
 public:
+    enum Capability {
+        NoCapabilities  = 0,
+        Clipboard       = 1 << 0,
+        Format          = 1 << 1,
+        Actions         = 1 << 2,
+        Session         = 1 << 3,
+        AllCapabilities = Clipboard | Format | Actions | Session,
+    };
+    Q_DECLARE_FLAGS(Capabilities, Capability)
+    Q_FLAG(Capabilities)
+
     explicit LiveListModelBinding(QObject *parent = nullptr);
+    explicit LiveListModelBinding(Capabilities caps, QObject *parent = nullptr);
     ~LiveListModelBinding() override;
 
     Markoff::MarkoffDocument *document() const;
@@ -64,6 +86,10 @@ public:
     LiveNavigationController *navigationController() const;
     const BlockKindRegistry  *registry()            const;
     QAbstractListModel       *remoteCursorsModel()  const;
+
+    LiveClipboardController *clipboardController() const;
+    LiveActionController    *actionController()    const;
+    LiveFormatController    *formatController()    const;
 
     const Markoff::Theme *theme() const noexcept;
     void setTheme(const Markoff::Theme *theme);
@@ -94,3 +120,5 @@ private:
 };
 
 }  // namespace Markoff::Live
+
+Q_DECLARE_OPERATORS_FOR_FLAGS(Markoff::Live::LiveListModelBinding::Capabilities)

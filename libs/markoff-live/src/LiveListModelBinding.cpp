@@ -138,15 +138,23 @@ struct LiveListModelBinding::Private {
     LiveStructuralKeyHandler  *structuralKeys   = nullptr;
     LiveNavigationController  *navigationCtrl   = nullptr;
     RemoteCursorsListModel    *remoteCursors    = nullptr;
+    LiveClipboardController   *clipboard        = nullptr;
+    LiveActionController      *actions          = nullptr;
+    LiveFormatController      *format           = nullptr;
+    Capabilities               caps            = AllCapabilities;
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
     Markoff::Theme             theme            = Markoff::Theme::defaultLight();
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
+    : LiveListModelBinding(AllCapabilities, parent) {}
+
+LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>())
 {
+    d->caps            = caps;
     d->model           = new LiveBlockModel(this);
     d->cursorState     = new LiveCursorState(&d->registry, d->model, this, this);
     d->hitTester       = new BlockHitTester(this);
@@ -154,6 +162,23 @@ LiveListModelBinding::LiveListModelBinding(QObject *parent)
     d->selectionView->setModel(d->model);
     d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, d->selectionView, this);
     d->remoteCursors   = new RemoteCursorsListModel(this);
+
+    if (caps & Clipboard) {
+        d->clipboard = new LiveClipboardController(this);
+        d->clipboard->setSelectionView(d->selectionView);
+        d->clipboard->setModel(d->model);
+    }
+    if (caps & Format) {
+        d->format = new LiveFormatController(this);
+        d->format->setSelectionView(d->selectionView);
+        d->format->setModel(d->model);
+    }
+    if (caps & Actions) {
+        d->actions = new LiveActionController(this);
+        d->actions->setSelectionView(d->selectionView);
+        if (d->clipboard) d->actions->setClipboardController(d->clipboard);
+        if (d->format)    d->actions->setFormatController(d->format);
+    }
 }
 
 LiveListModelBinding::~LiveListModelBinding() = default;
@@ -198,11 +223,20 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->selectionView->setDocument(d->document);
         d->selectionView->setSession(nullptr);
 
+        if (d->clipboard) d->clipboard->setDocument(d->document);
+        if (d->format)    d->format->setDocument(d->document);
+        if (d->actions)   d->actions->setDocument(d->document);
+
         d->structuralKeys = new LiveStructuralKeyHandler(
             d->document, d->model, d->cursorState, &d->registry, this);
     } else {
         d->selectionView->setDocument(nullptr);
         d->selectionView->setSession(nullptr);
+
+        if (d->clipboard) d->clipboard->setDocument(nullptr);
+        if (d->format)    d->format->setDocument(nullptr);
+        if (d->actions)   d->actions->setDocument(nullptr);
+
         d->lastKeys.clear();
     }
     Q_EMIT documentChanged();
@@ -221,6 +255,10 @@ LiveStructuralKeyHandler *LiveListModelBinding::structuralKeyHandler() const { r
 LiveNavigationController *LiveListModelBinding::navigationController() const { return d->navigationCtrl; }
 const BlockKindRegistry  *LiveListModelBinding::registry()            const { return &d->registry; }
 QAbstractListModel       *LiveListModelBinding::remoteCursorsModel()  const { return d->remoteCursors; }
+
+LiveClipboardController *LiveListModelBinding::clipboardController() const { return d->clipboard; }
+LiveActionController    *LiveListModelBinding::actionController()    const { return d->actions; }
+LiveFormatController    *LiveListModelBinding::formatController()    const { return d->format; }
 
 bool LiveListModelBinding::applyingModelUpdate() const
 {
