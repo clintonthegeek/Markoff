@@ -1,5 +1,22 @@
 # Markoff TODO
 
+## 2026-05-09 — Post-E2 scope (E2.5 / E2.6 / E2.7) captured
+
+After E2 dogfood we surfaced three categories of work that no existing
+E-arc phase covers — editing affordances, theme wire-up + zoom, and
+speculative paths. Three new phases have been inserted between E2 and
+E3 to track them. **Scope is captured at
+[`docs/handoff/2026-05-09-post-e2-scope.md`](handoff/2026-05-09-post-e2-scope.md);
+no specs drafted yet.** Phase board updated in
+`docs/e-arc/e-arc-status.md` and `docs/e-arc/2026-05-08-e-arc-roadmap.md`.
+
+E2.5 = editing affordances (cut/paste/QActions/context menu/format
+toggles/save+dirty) — dogfood-blocking. E2.6 = theme wire-up + text-size
+zoom. E2.7 = speculative paths (open-delimiter + code-fence). Order:
+E2.5 → E2.6 → E2.7 → E3.
+
+---
+
 ## 2026-05-07 — ListItem Tab/Shift-Tab: no parent-existence guard
 
 **Fixed 2026-05-08 (§4.5 audit).** Guard implemented.
