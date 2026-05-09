@@ -394,6 +394,21 @@ private Q_SLOTS:
         cs.clearDesiredVisualX();
         QCOMPARE(cs.desiredVisualX(), -1.0);
     }
+
+    void request_text_caret_at_row_visual_x_records_hint() {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        LiveCursorState *cs = binding.cursorState();
+        QVERIFY(cs);
+        cs->setDesiredVisualX(123.0);
+        // Load a doc so row 0 exists
+        doc.loadFromMarkdown("hello");
+        QTest::qWait(200);
+        cs->requestTextCaretAtRowVisualX(0, LiveCursorState::VisualLineHint::LastLine);
+        QCOMPARE(cs->pendingVisualLineHint(), LiveCursorState::VisualLineHint::LastLine);
+        QCOMPARE(cs->desiredVisualX(), 123.0);
+    }
 };
 
 QTEST_GUILESS_MAIN(TstLiveRenderCursor)

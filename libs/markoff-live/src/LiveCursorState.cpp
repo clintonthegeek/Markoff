@@ -217,6 +217,13 @@ void LiveCursorState::resolvePendingForRow(int row)
     request(tc);
 }
 
+void LiveCursorState::requestTextCaretAtRowVisualX(int expectedRow, VisualLineHint hint)
+{
+    m_pendingVlhint = hint;
+    Q_EMIT visualLineHintChanged();
+    requestTextCaretAtRow(expectedRow, 0);  // qtPos=0 is overridden by delegate hint path
+}
+
 void LiveCursorState::setDesiredVisualX(qreal x)
 {
     if (qFuzzyCompare(m_desiredVisualX, x)) return;

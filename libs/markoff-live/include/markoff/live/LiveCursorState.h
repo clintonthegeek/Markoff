@@ -67,6 +67,14 @@ public:
     void  setDesiredVisualX(qreal x);
     Q_INVOKABLE void clearDesiredVisualX();
 
+    enum class VisualLineHint { None, FirstLine, LastLine };
+    Q_ENUM(VisualLineHint)
+
+    /// Like requestTextCaretAtRow, but qtPos is computed by the destination
+    /// delegate from desiredVisualX projected onto the line indicated by hint.
+    void requestTextCaretAtRowVisualX(int expectedRow, VisualLineHint hint);
+    VisualLineHint pendingVisualLineHint() const noexcept { return m_pendingVlhint; }
+
     void request(const Cursor &newCursor);
     void clear();
 
@@ -109,6 +117,7 @@ public:
 Q_SIGNALS:
     void cursorChanged();
     void desiredVisualXChanged();
+    void visualLineHintChanged();
 
 private:
     bool validateVariant(const Cursor &c) const;
@@ -120,6 +129,7 @@ private:
     const BlockKindRegistry *m_registry;
     const LiveBlockModel    *m_model;
     qreal                    m_desiredVisualX = -1.0;
+    VisualLineHint           m_pendingVlhint  = VisualLineHint::None;
 
     struct PendingRow {
         int row;
