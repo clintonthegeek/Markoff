@@ -2,6 +2,8 @@
 #include <QTest>
 #include "../src/KindTransition.h"
 #include <markoff/live/BlockKind.h>
+#include <markoff/live/LiveListModelBinding.h>
+#include <markoff/core/MarkoffDocument.h>
 
 using namespace Markoff::Live;
 
@@ -49,6 +51,10 @@ private Q_SLOTS:
     void inferBlockKind_setextWithLeadingWhitespace_returnsHeading();
     void inferBlockKind_setextWithTrailingWhitespace_returnsHeading();
     void inferBlockKind_mixedDashesAndEquals_returnsParagraph();
+
+    void atxHeading_allHashesDeleted_demotesToParagraph();
+    void setextHeading_underlineDeleted_demotesToParagraph();
+    void setextHeading_levelChangeDashesToEquals_updatesLevel();
 };
 
 void TstKindTransition::inferBlockKind_setextH2_returnsHeading()
@@ -101,6 +107,91 @@ void TstKindTransition::inferBlockKind_mixedDashesAndEquals_returnsParagraph()
     // Mixed underline chars are not valid setext.
     QCOMPARE(inferBlockKind(QStringLiteral("Heading\n=-=")),
              BlockKind::Paragraph);
+}
+
+// ── Task 3D: Form-aware demote ───────────────────────────────────────────────
+
+using Markoff::Live::LiveListModelBinding;
+
+// Helper: wait for the model to have the expected row count with the given markdown.
+// Returns true if successful within timeout.
+static bool waitForModelRows(LiveListModelBinding &binding,
+                              Markoff::MarkoffDocument &doc,
+                              const QByteArray &markdown, int expectedRows)
+{
+    doc.loadFromMarkdown(markdown);
+    for (int i = 0; i < 50; ++i) {
+        QTest::qWait(10);
+        if (binding.model()->rowCount() == expectedRows)
+            return true;
+    }
+    return binding.model()->rowCount() == expectedRows;
+}
+
+void TstKindTransition::atxHeading_allHashesDeleted_demotesToParagraph()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+    QVERIFY(waitForModelRows(binding, doc, "## Heading\n", 1));
+    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
+
+    // Simulate user deleting "## " (3 bytes).
+    auto id = binding.model()->recordAt(0).blockAnchor;
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2ApplyBufferEdit(id, 0, 3, QByteArray{}, t);
+    }
+    QTest::qWait(100);
+
+    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Paragraph);
+}
+
+void TstKindTransition::setextHeading_underlineDeleted_demotesToParagraph()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+    QVERIFY(waitForModelRows(binding, doc, "Heading\n---\n", 1));
+    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
+    QCOMPARE(binding.model()->recordAt(0).headingForm, QString("setext"));
+
+    // Delete "\n---" from the buffer (keeping just "Heading").
+    auto id = binding.model()->recordAt(0).blockAnchor;
+    const QByteArray cur = doc.blockText(id);
+    const int nlIdx = cur.indexOf('\n');
+    QVERIFY(nlIdx > 0);
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2ApplyBufferEdit(id, nlIdx,
+                              cur.size() - nlIdx, QByteArray{}, t);
+    }
+    QTest::qWait(100);
+
+    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Paragraph);
+}
+
+void TstKindTransition::setextHeading_levelChangeDashesToEquals_updatesLevel()
+{
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+    QVERIFY(waitForModelRows(binding, doc, "Heading\n---\n", 1));
+    QCOMPARE(binding.model()->recordAt(0).headingLevel, 2);
+
+    // Replace "---" with "===" in the buffer.
+    auto id = binding.model()->recordAt(0).blockAnchor;
+    const QByteArray cur = doc.blockText(id);
+    const int dashIdx = cur.indexOf('-');
+    QVERIFY(dashIdx > 0);
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2ApplyBufferEdit(id, dashIdx, 3, QByteArray("==="), t);
+    }
+    QTest::qWait(100);
+
+    QCOMPARE(binding.model()->recordAt(0).headingLevel, 1);
+    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
 }
 
 QTEST_MAIN(TstKindTransition)

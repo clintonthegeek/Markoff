@@ -363,7 +363,13 @@ void LiveListModelBinding::onD2Changed()
         if (inferred == rec.kind) {
             // Same kind — check if heading level changed.
             if (rec.kind == BlockKind::Heading) {
-                const int newLevel = countLeadingHashes(rec.text);
+                const QString form = rec.headingForm.isEmpty()
+                    ? QStringLiteral("atx") : rec.headingForm;
+                int newLevel = 0;
+                if (form == QStringLiteral("setext"))
+                    newLevel = matchesSetextShape(rec.text);
+                else
+                    newLevel = countLeadingHashes(rec.text);
                 if (newLevel > 0 && newLevel != rec.headingLevel) {
                     Markoff::Cmd::changeKind(*doc,
                                              Markoff::BlockId(rec.blockAnchor),
@@ -373,6 +379,24 @@ void LiveListModelBinding::onD2Changed()
                     return;
                 }
             }
+            continue;
+        }
+
+        // Form-aware Heading demote: if the buffer no longer matches the
+        // stored form's marker pattern, demote to Paragraph.
+        if (rec.kind == BlockKind::Heading) {
+            const QString form = rec.headingForm.isEmpty()
+                ? QStringLiteral("atx") : rec.headingForm;
+            const bool atxLost    = (form == QStringLiteral("atx")
+                                      && countLeadingHashes(rec.text) == 0);
+            const bool setextLost = (form == QStringLiteral("setext")
+                                      && matchesSetextShape(rec.text) == 0);
+            if (atxLost || setextLost) {
+                Markoff::Cmd::changeKind(*doc, Markoff::BlockId(rec.blockAnchor),
+                                         Markoff::BlockKind::Paragraph, {}, {});
+                return;
+            }
+            // Heading content doesn't match any demotion trigger — keep it.
             continue;
         }
 
