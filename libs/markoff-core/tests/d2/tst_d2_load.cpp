@@ -3,6 +3,7 @@
 #include <QSignalSpy>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/BlockKind.h>
+#include <markoff/core/AttrNames.h>
 
 using namespace Markoff;
 
@@ -34,6 +35,10 @@ private Q_SLOTS:
     void linkRefDef_populatesLinkRefMap_notIdList();
     // Task 7.6
     void afterLoad_eachCrdtRecordsLoadBaseline();
+    // Task 1D
+    void heading_setextH2_setsHeadingFormAttr();
+    void heading_setextH1_setsHeadingFormAttr();
+    void heading_atx_doesNotSetHeadingFormAttr();
 };
 
 void TstD2Load::emptyDoc_loadEmpty_zeroBlocks()
@@ -228,6 +233,43 @@ void TstD2Load::afterLoad_eachCrdtRecordsLoadBaseline()
     // After load, block edit sequences are reset to 0 (clean load baseline)
     for (const auto &id : doc.iterateBlocks())
         QCOMPARE(doc.blockEditSequence(id), quint64(0));
+}
+
+// ── Task 1D: setext headingForm ──────────────────────────────────────────────
+
+void TstD2Load::heading_setextH2_setsHeadingFormAttr()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("Heading\n---\n");
+    BlockId blk = doc.iterateBlocks().front();
+    QCOMPARE(doc.blockKind(blk), BlockKind::Heading);
+    auto attrs = doc.blockAttrs(blk);
+    QVERIFY(attrs.contains(AttrNames::HeadingForm));
+    QCOMPARE(std::get<QString>(attrs.value(AttrNames::HeadingForm)),
+             QString("setext"));
+    QCOMPARE(std::get<int>(attrs.value(AttrNames::Level)), 2);
+}
+
+void TstD2Load::heading_setextH1_setsHeadingFormAttr()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("Title\n===\n");
+    BlockId blk = doc.iterateBlocks().front();
+    QCOMPARE(doc.blockKind(blk), BlockKind::Heading);
+    auto attrs = doc.blockAttrs(blk);
+    QCOMPARE(std::get<QString>(attrs.value(AttrNames::HeadingForm)),
+             QString("setext"));
+    QCOMPARE(std::get<int>(attrs.value(AttrNames::Level)), 1);
+}
+
+void TstD2Load::heading_atx_doesNotSetHeadingFormAttr()
+{
+    // ATX headings get no explicit form attr — absent ≡ "atx".
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("## Heading\n");
+    BlockId blk = doc.iterateBlocks().front();
+    auto attrs = doc.blockAttrs(blk);
+    QVERIFY(!attrs.contains(AttrNames::HeadingForm));
 }
 
 QTEST_MAIN(TstD2Load)

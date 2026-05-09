@@ -1680,6 +1680,12 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
             d->blockAttrsMap.setWithNextStamp(
                 BlockAttrKey{newId, "level"}, AttrValue{tb.headingLevel});
         }
+        if (kind == BlockKind::Heading
+            && tb.kind == TLB::Kind::SetextHeading) {
+            d->blockAttrsMap.setWithNextStamp(
+                BlockAttrKey{newId, AttrNames::HeadingForm},
+                AttrValue{QString("setext")});
+        }
         if (kind == BlockKind::CodeBlock && !tb.codeLanguage.isEmpty()) {
             d->blockAttrsMap.setWithNextStamp(
                 BlockAttrKey{newId, "infoString"}, AttrValue{tb.codeLanguage});
