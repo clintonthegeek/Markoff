@@ -8,6 +8,8 @@
 #include <markoff/core/BlockSerializer.h>
 #include <markoff/core/AttrNames.h>
 
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QSaveFile>
 
 #include <markoff/parser/Document.h>
@@ -1156,6 +1158,70 @@ std::vector<BlockId> MarkoffDocument::takeRecentCut(quint64 cutSeq)
         }
     }
     return {};
+}
+
+void MarkoffDocument::applyStructuredPaste(quint32 startByte, quint32 endByte,
+                                           const QJsonArray &blocks,
+                                           const Markoff::PasteMeta &meta)
+{
+    // 1. Serialize the JSON block array to flat markdown text.
+    QByteArray flat;
+    bool first = true;
+    for (const auto &v : blocks) {
+        const QJsonObject obj = v.toObject();
+        if (!first)
+            flat.append("\n\n");
+        first = false;
+
+        const QString kind = obj.value(QStringLiteral("kind")).toString();
+        const QString text = obj.value(QStringLiteral("text")).toString();
+
+        if (kind == QStringLiteral("Heading")) {
+            const int level =
+                obj.value(QStringLiteral("attrs")).toObject()
+                   .value(QStringLiteral("level")).toInt(1);
+            flat.append(QByteArray(std::max(level, 1), '#'));
+            flat.append(' ');
+            flat.append(text.toUtf8());
+        } else if (kind == QStringLiteral("CodeBlock")) {
+            const QString lang =
+                obj.value(QStringLiteral("attrs")).toObject()
+                   .value(QStringLiteral("language")).toString();
+            flat.append("```");
+            flat.append(lang.toUtf8());
+            flat.append('\n');
+            flat.append(text.toUtf8());
+            flat.append("\n```");
+        } else if (kind == QStringLiteral("ListItem")) {
+            const QString marker =
+                obj.value(QStringLiteral("attrs")).toObject()
+                   .value(QStringLiteral("marker")).toString(QStringLiteral("-"));
+            flat.append(marker.toUtf8());
+            flat.append(' ');
+            flat.append(text.toUtf8());
+        } else if (kind == QStringLiteral("Blockquote")) {
+            flat.append("> ");
+            flat.append(text.toUtf8());
+        } else {
+            // Paragraph and any unknown kind: emit text verbatim.
+            flat.append(text.toUtf8());
+        }
+    }
+
+    // 2. Apply as a flat edit (clamp: lo ≤ hi).
+    const quint32 lo = std::min(startByte, endByte);
+    const quint32 hi = std::max(startByte, endByte);
+    applyFlatEdit(lo, hi, flat, Markoff::Origin::UserEdit);
+
+    // 3. BlockId reuse path: consume the cache entry if requested.
+    //    Full remap of newly-minted IDs to the cached IDs is a TODO (Phase C4).
+    //    The correctness guarantee is unaffected; only the CRDT identity of the
+    //    re-pasted blocks differs from the original cut blocks.
+    if (meta.reuseBlockIds) {
+        (void)takeRecentCut(meta.cutSeq);  // consume the entry even if no remap yet
+        // TODO(C4): walk iterateBlocks() post-edit and rename the inserted
+        // blocks to the cached IDs so cut→paste-back preserves CRDT identity.
+    }
 }
 
 QList<SourceSpan> MarkoffDocument::inlineSpansFor(BlockId id) const

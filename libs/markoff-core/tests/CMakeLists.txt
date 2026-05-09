@@ -145,6 +145,12 @@ add_test(NAME tst_markoff_doc_save_watermark COMMAND tst_markoff_doc_save_waterm
 target_link_libraries(tst_markoff_doc_save_watermark PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_markoff_doc_save_watermark PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# A3: applyStructuredPaste
+add_executable(tst_markoff_doc_apply_structured_paste tst_markoff_doc_apply_structured_paste.cpp)
+add_test(NAME tst_markoff_doc_apply_structured_paste COMMAND tst_markoff_doc_apply_structured_paste)
+target_link_libraries(tst_markoff_doc_apply_structured_paste PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_markoff_doc_apply_structured_paste PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_subdirectory(d2)
 add_subdirectory(d5)
 

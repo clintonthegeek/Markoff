@@ -3,6 +3,7 @@
 
 #include <QByteArray>
 #include <QColor>
+#include <QJsonArray>
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -27,6 +28,7 @@
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/CrdtProxies.h>
 #include <markoff/core/Origin.h>
+#include <markoff/core/PasteMeta.h>
 #include <markoff/core/StructuralOp.h>
 #include <markoff/core/TextAnchor.h>
 #include <markoff/core/MarkoffCoreExport.h>
@@ -168,6 +170,17 @@ public:
                        uint32_t oldEnd,
                        const QByteArray &newText,
                        Origin origin);
+
+    /// Structure-aware paste. Serializes `blocks` (a QJsonArray of block
+    /// objects with "kind", "text", and optional "attrs") to flat markdown
+    /// and calls applyFlatEdit on the byte range [startByte, endByte).
+    /// If meta.reuseBlockIds is true and meta.cutSeq matches a cached recent
+    /// cut, the cache entry is consumed (BlockId reuse is a TODO for a future
+    /// remap pass; correctness is unaffected). All work lands in one UndoLog
+    /// transaction; a single undoD2() reverses it.
+    void applyStructuredPaste(quint32 startByte, quint32 endByte,
+                              const QJsonArray &blocks,
+                              const Markoff::PasteMeta &meta);
 
     /// Apply a structural operation (insert/remove/change-kind) to the
     /// IdList and related CRDTs. Recorded in the UndoLog.
