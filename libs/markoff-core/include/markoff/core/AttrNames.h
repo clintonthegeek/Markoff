@@ -4,6 +4,7 @@
 
 namespace Markoff::AttrNames {
     inline const AttrName Level        = "level";        // Heading: int 1–6
+    inline const AttrName HeadingForm  = "headingForm";  // Heading: QString — "atx" or "setext"
     inline const AttrName InfoString   = "infoString";   // CodeBlock: QString
     inline const AttrName MarkerStyle  = "markerStyle";  // ListItem: QString (e.g. "-", "*", "1.")
     inline const AttrName MarkerNumber = "markerNumber"; // ListItem ordered: int 1+
