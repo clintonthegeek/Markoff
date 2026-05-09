@@ -318,7 +318,16 @@ void LiveListModelBinding::onD2Changed()
         // buffers — inferBlockKind on content-only text would always infer
         // "paragraph", wrongly demoting the block. Demotion is always via
         // explicit structural-key actions (Enter-on-empty, Backspace, etc.).
-        if (rec.kind != BlockKind::Paragraph) continue;
+        //
+        // Carve-out: HR and Image have NO content-only mode — their buffers
+        // always hold the source-literal pattern (e.g. "---", "![alt](url)").
+        // When text deviates from that pattern (e.g. backspace-merge appends
+        // following block's content into an HR block) we MUST demote, or the
+        // block ends up rendered as a structural kind that doesn't match its
+        // content and rejects cursor placement (HR has no TextCaret variant).
+        if (rec.kind != BlockKind::Paragraph
+            && rec.kind != BlockKind::HorizontalRule
+            && rec.kind != BlockKind::Image) continue;
 
         // Map inferred string to foundation BlockKind enum.
         Markoff::BlockKind fk = Markoff::BlockKind::Paragraph;

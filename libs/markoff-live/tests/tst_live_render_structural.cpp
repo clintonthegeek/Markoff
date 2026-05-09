@@ -166,6 +166,44 @@ private Q_SLOTS:
         QTRY_COMPARE(binding.model()->rowCount(), 1);
     }
 
+    void backspace_at_start_of_heading_after_hr_demotes_merged_block() {
+        // Regression: at start of heading "## 1. TL;DR" with previous block HR,
+        // backspace-merge appends heading text into the HR's buffer and removes
+        // the heading row. The HR's buffer is now "---## 1. TL;DR" — no longer
+        // a valid HR pattern. The kind-transition pipeline must demote it to
+        // Paragraph (Obsidian-style "predictable text editor" behaviour); if
+        // it stays HR, the cursor request to its anchor is rejected by
+        // validateVariant (HR doesn't support TextCaret) and the caret is
+        // stranded.
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        // Layout: HR (row 0), Heading (row 1).
+        QVERIFY(waitForModelRows(binding, doc, "---\n\n## 1. TL;DR", 2));
+        QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::HorizontalRule);
+        QCOMPARE(binding.model()->recordAt(1).kind, BlockKind::Heading);
+
+        const Markoff::BlockId hrId = binding.model()->recordAt(0).blockAnchor;
+
+        const bool consumed = binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Backspace, Qt::NoModifier,
+            /*blockIndex=*/1, /*qtPos=*/0,
+            /*selectionEmpty=*/true,
+            QStringLiteral("## 1. TL;DR"));
+        QVERIFY(consumed);
+
+        // Drain the queued d2DocumentChanged + the kind-transition's follow-up.
+        QTRY_COMPARE(binding.model()->rowCount(), 1);
+
+        // The single remaining block is the HR's anchor, demoted to Paragraph,
+        // with the merged text.
+        const auto &rec = binding.model()->recordAt(0);
+        QCOMPARE(rec.blockAnchor, hrId);
+        QCOMPARE(rec.kind, BlockKind::Paragraph);
+        QVERIFY(rec.text.contains(QStringLiteral("---")));
+        QVERIFY(rec.text.contains(QStringLiteral("## 1. TL;DR")));
+    }
+
     void backspace_at_start_of_first_block_is_not_consumed() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
