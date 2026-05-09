@@ -301,3 +301,11 @@ target_link_libraries(tst_live_render_session_orphaned_block
 add_test(NAME tst_live_render_session_orphaned_block
          COMMAND tst_live_render_session_orphaned_block)
 
+# C2: Cut — copy+delete with cutSequenceNumber + recent-cuts cache.
+qt_add_executable(tst_live_render_clipboard_cut
+    tst_live_render_clipboard_cut.cpp)
+target_link_libraries(tst_live_render_clipboard_cut
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_clipboard_cut
+         COMMAND tst_live_render_clipboard_cut)
+
