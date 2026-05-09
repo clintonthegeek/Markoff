@@ -183,3 +183,11 @@ target_link_libraries(tst_live_render_e2_autohide_peer_cursor PRIVATE
 add_test(NAME tst_live_render_e2_autohide_peer_cursor
          COMMAND tst_live_render_e2_autohide_peer_cursor)
 
+qt_add_executable(tst_live_render_e2_cross_delegate
+    tst_live_render_e2_cross_delegate.cpp
+)
+target_link_libraries(tst_live_render_e2_cross_delegate PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_e2_cross_delegate
+         COMMAND tst_live_render_e2_cross_delegate)
+
