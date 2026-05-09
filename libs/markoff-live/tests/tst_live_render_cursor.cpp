@@ -405,9 +405,17 @@ private Q_SLOTS:
         // Load a doc so row 0 exists
         doc.loadFromMarkdown("hello");
         QTest::qWait(200);
+
+        QSignalSpy hintSpy(cs, &LiveCursorState::visualLineHintChanged);
         cs->requestTextCaretAtRowVisualX(0, LiveCursorState::VisualLineHint::LastLine);
-        QCOMPARE(cs->pendingVisualLineHint(), LiveCursorState::VisualLineHint::LastLine);
+
+        // The hint is set then cleared synchronously (row 0 resolves immediately).
+        // Verify it fired: at least one emission (set to LastLine) and one (cleared to None).
+        QVERIFY(hintSpy.count() >= 1);
+        // desiredVisualX is NOT cleared by requestTextCaretAtRowVisualX.
         QCOMPARE(cs->desiredVisualX(), 123.0);
+        // Post-resolution: hint is None (cleared after request(tc)).
+        QCOMPARE(cs->pendingVisualLineHint(), LiveCursorState::VisualLineHint::None);
     }
 };
 

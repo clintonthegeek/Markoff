@@ -183,16 +183,17 @@ void LiveCursorState::resolvePendingForAnchor()
             const int qtPos = m_pendingRow->qtPos;
             m_pendingRow.reset();
 
-            // Clear the visual-line hint: it was consumed by this resolution.
+            TextCaret tc;
+            tc.block            = target;
+            tc.cachedByteOffset = static_cast<quint32>(qtPos);
+            request(tc);  // emits cursorChanged() — hint must still be set during this call
+
+            // Clear the visual-line hint AFTER request() so that cursorChanged
+            // handlers (e.g. QML's onCursorChanged → focusEditAt) can read it.
             if (m_pendingVlhint != VisualLineHint::None) {
                 m_pendingVlhint = VisualLineHint::None;
                 Q_EMIT visualLineHintChanged();
             }
-
-            TextCaret tc;
-            tc.block            = target;
-            tc.cachedByteOffset = static_cast<quint32>(qtPos);
-            request(tc);
             return;
         }
     }
@@ -217,17 +218,18 @@ void LiveCursorState::resolvePendingForRow(int row)
     // that re-entrance would produce the wrong qtPos.
     m_pendingRow.reset();
 
-    // Clear the visual-line hint: it was consumed by this resolution.
-    if (m_pendingVlhint != VisualLineHint::None) {
-        m_pendingVlhint = VisualLineHint::None;
-        Q_EMIT visualLineHintChanged();
-    }
-
     TextCaret tc;
     tc.block            = anchor;
     tc.cachedByteOffset = static_cast<quint32>(qtPos);
     // positionAnchor: left default — selection projection refreshes it.
-    request(tc);
+    request(tc);  // emits cursorChanged() — hint must still be set during this call
+
+    // Clear the visual-line hint AFTER request() so that cursorChanged
+    // handlers (e.g. QML's onCursorChanged → focusEditAt) can read it.
+    if (m_pendingVlhint != VisualLineHint::None) {
+        m_pendingVlhint = VisualLineHint::None;
+        Q_EMIT visualLineHintChanged();
+    }
 }
 
 void LiveCursorState::requestTextCaretAtRowVisualX(int expectedRow, VisualLineHint hint)

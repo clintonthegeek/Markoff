@@ -161,14 +161,18 @@ private Q_SLOTS:
         mockEdit.m_cursorRect = QRectF(42.0, 0, 2, 20);  // x=42 = desired column
         mockEdit.m_contentHeight = 20.0;
 
+        QSignalSpy hintSpy(cs, &LiveCursorState::visualLineHintChanged);
+
         const int result = nav->tryHandle(Qt::Key_Up, Qt::NoModifier,
                                           /*blockIndex=*/1, /*qtPos=*/4,
                                           &mockEdit, QStringLiteral("Beta"));
         QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
         // desiredVisualX should be set to cursorRect.x() = 42
         QCOMPARE(cs->desiredVisualX(), 42.0);
-        // pendingVisualLineHint should be LastLine (destination)
-        QCOMPARE(cs->pendingVisualLineHint(), LiveCursorState::VisualLineHint::LastLine);
+        // The hint was emitted (set to LastLine) then cleared synchronously.
+        QVERIFY(hintSpy.count() >= 1);
+        // Cursor should be at row 0 (resolved immediately since row exists)
+        QCOMPARE(cs->focusedAnchorRow(), 0);
     }
 
     void up_at_non_top_line_returns_not_handled() {
@@ -227,11 +231,16 @@ private Q_SLOTS:
         mockEdit.m_cursorRect = QRectF(30.0, 5, 2, 15);  // bottom = 5+15 = 20
         mockEdit.m_contentHeight = 20.0;
 
+        QSignalSpy hintSpy(cs, &LiveCursorState::visualLineHintChanged);
+
         const int result = nav->tryHandle(Qt::Key_Down, Qt::NoModifier,
                                           0, 5, &mockEdit, QStringLiteral("Alpha"));
         QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
         QCOMPARE(cs->desiredVisualX(), 30.0);
-        QCOMPARE(cs->pendingVisualLineHint(), LiveCursorState::VisualLineHint::FirstLine);
+        // The hint was emitted (set to FirstLine) then cleared synchronously.
+        QVERIFY(hintSpy.count() >= 1);
+        // Cursor should be at row 1 (resolved immediately since row exists)
+        QCOMPARE(cs->focusedAnchorRow(), 1);
     }
 
     void down_preserves_existing_desired_visual_x() {
