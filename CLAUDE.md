@@ -7,35 +7,52 @@
 > guide, and before any further perf or facade work. Operating
 > principle: one arc at a time, no side work, retirement is explicit.
 >
-> **2026-05-09 — E1 + E2 complete (tags `v0.7.0-e1`, `v0.7.0-e2`); E2.5 implemented,
-> dogfood surfaced bugs — debug phase active.**
-> D5 + §4.5 audit landed 2026-05-08. E1 shipped 2026-05-08. E2 shipped 2026-05-09
-> (162/162 tests). E2.5 phases A–I executed and tested (56/56 live-render tests
-> green) but dogfood on 2026-05-09 found 4 critical bugs blocking the
-> `v0.7.0-e2.5` tag.
+> **2026-05-09 — E2.5 dogfood + Option B selection architecture landed
+> (commit `c7da731`). Setext heading support is the next active piece;
+> spec + plan committed as `acdb647`, ready to execute.**
 >
-> **E2.5 is in debug phase. Tag `v0.7.0-e2.5` is blocked until D1–D4 are fixed.**
+> The E2.5 dogfood findings (D1 Ctrl+S, D2 multi-block clipboard, D3
+> arrow-key selection, D4 right-click context menu, D6 Shift+↓ anchor,
+> D7/D8 double/triple-click, D9 `--new` flag) are all resolved. D5
+> doc-wide undo deferred per the dogfood doc's recommendation. A
+> follow-up dogfood pass surfaced multi-line Shift+arrow wonkiness and
+> dual-selection-state bugs — addressed by **Option B**: TextEdit
+> reduced to renderer + cursor + IME, `LiveSelectionView` is the single
+> source of truth for selection, all keyboard nav routed through
+> `LiveNavigationController`, `selectByMouse: false` on every text-bearing
+> delegate. Same commit fixed the kind-string-mismatch and
+> heading-prefix-doubling bugs in the structured-paste path.
+> Re-dogfood found one further substantive gap → setext.
 >
-> Dogfood findings: `docs/handoff/2026-05-09-e2.5-dogfood-findings.md`
+> **The `v0.7.0-e2.5` tag is held until setext support lands** (and a
+> final re-dogfood pass confirms the editor handles Obsidian-style
+> setext-bearing notes correctly). E2.5 phases A–I + dogfood remediation
+> + Option B are all green at 185/185 fast tests.
 >
-> **Critical bugs (must fix before tag):**
-> - **D1** Ctrl+S does not save — QAction not registered on window at startup
-> - **D2** Multi-block copy/cut affects only one block (anchor or active)
-> - **D3** Arrow-key selection inert for clipboard — TextEdit selection not
->   synced to `LiveSelectionView`
-> - **D4** No right-click context menu — must use native `QMenu`/Widget-bridge
->   (see `docs/specs/2026-04-29-live-render-design.md` §Widget-window bridge),
->   not QtQuick `Menu`
+> **Fresh-agent start for setext (THE active work):**
 >
-> **Important (may defer to E2.5.x):**
-> - **D5** Doc-wide undo/redo absent (per-block CRDT limitation; plan-level fix)
-> - **D6** Shift+↓ from block-start skips anchor block
-> - **D7/D8** Double/triple click don't select word/block
+> 1. **Read the spec:** `docs/specs/2026-05-09-setext-heading-support-design.md`.
+>    §3 (storage) and §6 (kind-transition) are load-bearing for the design;
+>    §9 (edge cases) is the test-coverage list.
+> 2. **Read the plan:** `docs/plans/2026-05-09-setext-heading-support.md`.
+>    Six phases, TDD per task. Build cap: `-j 8` always. Test commands
+>    are at the top of the plan.
+> 3. **Execute** task by task. The plan is intended for either
+>    subagent-driven or executing-plans inline use; pick whichever you
+>    were dispatched for.
+> 4. **Re-dogfood** at end of Phase 5 against the
+>    `/tmp/setext-dogfood.md` fixture the plan creates. After Phase 6's
+>    activity-log entry, the `v0.7.0-e2.5` tag becomes a candidate.
 >
-> **Fresh-agent start for debugging:** read
-> `docs/handoff/2026-05-09-e2.5-dogfood-findings.md` first. It contains
-> root-cause hypotheses and fix directions for each bug. Then read
-> `docs/e-arc/e-arc-status.md` for the live status board.
+> Past-context references (read only if you need provenance for a
+> specific decision; not required for executing the plan):
+> - `docs/handoff/2026-05-09-e2.5-dogfood-findings.md` — dogfood
+>   findings + the resolution log (D1–D9 fixes documented).
+> - `docs/specs/2026-05-09-e2.5-editing-affordances-design.md` — E2.5
+>   spec (background).
+> - `docs/specs/2026-04-29-live-render-design.md` §Widget-window bridge
+>   — design pattern used for the native-`QMenu` context menu landed in
+>   `c7da731`.
 >
 > Decision record (§4.6 deferral): `docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
 > Live status: `docs/e-arc/e-arc-status.md`.
