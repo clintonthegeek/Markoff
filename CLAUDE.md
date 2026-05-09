@@ -7,19 +7,17 @@
 > guide, and before any further perf or facade work. Operating
 > principle: one arc at a time, no side work, retirement is explicit.
 >
-> **2026-05-08 — D-arc closed at §4.5; E-arc is the active arc; E1 is plan-approved and ready to execute.**
-> D5 + §4.5 audit landed 2026-05-08. **Pivot-doc §4.6 (public-API
-> freeze + Corbomite migration) is deferred until Corbomite is ready
-> to consume the freeze** — freezing without a ready consumer is
-> freezing in the dark. E-arc begins now in §4.6's slot. **E1
-> (inline-format highlighter in QML delegates) is the active phase.**
+> **2026-05-08 — E1 complete (tag `v0.7.0-e1`); E2 is the active phase.**
+> D5 + §4.5 audit landed 2026-05-08. E1 (inline-format highlighter)
+> shipped same day — 143/143 tests pass, dogfood signed off.
+> **E2 (cursor-aware delimiter visibility / auto-hide) is the active
+> phase.** Spec and plan TBW; brainstorm first per the E-arc framing.
 >
-> **Fresh-agent execution start:** read
-> `docs/specs/2026-05-08-e1-inline-highlighter-design.md` (§0.2
-> amendment first), then `docs/plans/2026-05-08-e1-inline-highlighter.md`,
-> then choose subagent-driven-development (recommended) or
-> executing-plans, then execute task-by-task with TDD discipline,
-> `-j 8` build cap, and per-task commits.
+> **Fresh-agent execution start:** read `docs/e-arc/e-arc-status.md`
+> (TL;DR + phase board), then `docs/specs/2026-05-08-e-arc-framing.md`
+> (constitutional framing), then `docs/e-arc/2026-05-08-e-arc-roadmap.md`
+> (phase summary). E2 spec does not yet exist — begin with
+> superpowers:brainstorming before writing spec or plan.
 >
 > Decision record (§4.6 deferral): `docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
 > Live status: `docs/e-arc/e-arc-status.md`.
