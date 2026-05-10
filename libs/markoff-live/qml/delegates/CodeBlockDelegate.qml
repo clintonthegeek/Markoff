@@ -41,6 +41,12 @@ Rectangle {
         selectByMouse: false
         persistentSelection: true
 
+        onCursorPositionChanged: {
+            const cs = root.liveBinding ? root.liveBinding.cursorState : null
+            if (cs && model.blockAnchor !== undefined)
+                cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
+        }
+
         Keys.priority: Keys.BeforeItem
         Keys.onPressed: (event) => {
             if (!root.liveBinding) { event.accepted = false; return }

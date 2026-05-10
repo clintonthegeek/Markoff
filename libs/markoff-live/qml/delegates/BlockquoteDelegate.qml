@@ -44,6 +44,12 @@ Item {
         selectByMouse: false
         persistentSelection: true
 
+        onCursorPositionChanged: {
+            const cs = root.liveBinding ? root.liveBinding.cursorState : null
+            if (cs && model.blockAnchor !== undefined)
+                cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
+        }
+
         InlineHighlighterAttached {
             target: edit.textDocument
             spans: model.inlineSpans

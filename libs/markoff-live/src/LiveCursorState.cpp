@@ -50,9 +50,22 @@ int LiveCursorState::focusedAnchorRow() const
 
 int LiveCursorState::focusedQtPos() const
 {
-    if (const auto *tc = std::get_if<TextCaret>(&m_cursor))
-        return static_cast<int>(tc->cachedByteOffset);
-    return -1;
+    const auto *tc = std::get_if<TextCaret>(&m_cursor);
+    if (!tc) return -1;
+    const int qtPos = static_cast<int>(tc->cachedByteOffset);
+    // Clamp to the current row's text length. m_cursor stores the
+    // user's faithful TextEdit position; after a kind transition that
+    // chops trailing newline (e.g. setext "Heading\n=" → demoted
+    // Paragraph "Heading"), the stored qtPos can exceed the new
+    // text length. Consumers (delegate Component.onCompleted, the
+    // onCursorChanged Connections, focusEditAt) need a value that
+    // fits inside the current text.
+    if (m_model) {
+        const int row = rowForBlock(tc->block);
+        if (row >= 0 && row < m_model->rowCount())
+            return std::min(qtPos, int(m_model->recordAt(row).text.size()));
+    }
+    return qtPos;
 }
 
 void LiveCursorState::request(const Cursor &newCursor)
@@ -134,6 +147,23 @@ void LiveCursorState::requestTextCaretAtNewRow(int expectedRow, int qtPos)
     // (the block that's about to be SHIFTED by the upcoming insertion).
     // Wait for the next structural signal whose range covers expectedRow.
     m_pendingRow = PendingRow{ expectedRow, qtPos, std::nullopt };
+}
+
+void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
+{
+    if (anchor == Markoff::BlockAnchor{}) return;
+    if (qtPos < 0) return;
+
+    TextCaret tc;
+    tc.block            = anchor;
+    tc.cachedByteOffset = static_cast<quint32>(qtPos);
+    Cursor newCursor    = tc;
+
+    if (m_cursor == newCursor) return;
+    if (!validateVariant(newCursor)) return;
+
+    m_cursor = newCursor;
+    Q_EMIT cursorChanged();
 }
 
 void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor,

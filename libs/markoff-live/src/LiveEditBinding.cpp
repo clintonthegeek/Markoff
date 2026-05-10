@@ -2,6 +2,7 @@
 #include <markoff/live/LiveEditBinding.h>
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/LiveCursorState.h>
 #include <markoff/live/Coordinates.h>
 
 #include <markoff/core/MarkoffDocument.h>
@@ -160,6 +161,14 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     auto &undoLog = doc->d2UndoLog();
     UndoLog::Transaction t(undoLog);
     doc->d2ApplyBufferEdit(record.blockAnchor, byteOff, removedBytes, inserted, t);
+
+    // Keep the canonical cursor in sync with the user's post-edit
+    // caret. Without this, m_cursor would still point at the user's
+    // last click position; any subsequent kind transition or
+    // structural diff would land the new delegate's caret at the
+    // stale qtPos (setext / ATX cursor-loss bugs S1/S2/S3).
+    if (auto *cs = m_binding->cursorState())
+        cs->syncFromTextEdit(record.blockAnchor, qtPos + charsAdded);
 
     // Flush the queued d2DocumentChanged synchronously so the span-update
     // cascade (model → delegate.spans binding → InlineHighlighter::setInlineSpans

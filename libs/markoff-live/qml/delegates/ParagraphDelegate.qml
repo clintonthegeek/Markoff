@@ -39,10 +39,18 @@ Item {
         color: palette.text
         // Option B: TextEdit is a renderer + cursor + IME only. All selection
         // is owned by LiveSelectionView and rendered via select()/deselect()
-        // from applySelection(). Native mouse selection and the previous
-        // cursorPositionChanged sync are gone.
+        // from applySelection(). Native mouse selection is gone.
         selectByMouse: false
         persistentSelection: true
+
+        // One-way sync: TextEdit's cursorPosition is the live caret;
+        // mirror it into LiveCursorState so m_cursor stays canonical
+        // through within-block typing and within-block arrow nav.
+        onCursorPositionChanged: {
+            const cs = root.liveBinding ? root.liveBinding.cursorState : null
+            if (cs && model.blockAnchor !== undefined)
+                cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
+        }
 
         InlineHighlighterAttached {
             target: edit.textDocument

@@ -3,6 +3,7 @@
 
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/LiveStructuralKeyHandler.h>
+#include <markoff/live/LiveCursorState.h>
 #include <markoff/live/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/AttrNames.h>
@@ -110,6 +111,117 @@ private Q_SLOTS:
         QCOMPARE(std::get<QString>(attrs2.value(Markoff::AttrNames::HeadingForm)),
                  QString("setext"));
         QCOMPARE(std::get<int>(attrs2.value(Markoff::AttrNames::Level)), 2);
+    }
+
+    // ------------------------------------------------------------------
+    // Regression tests for setext-dogfood findings S1, S2, S3
+    // (docs/handoff/2026-05-09-setext-dogfood-findings.md). Each
+    // verifies that a kind transition driven by a buffer edit
+    // re-anchors the caret on the new delegate via
+    // requestTextCaretAtAnchor — without the fix the cursor either
+    // disappears (S1/S2) or jumps to position 0 (S3).
+    // ------------------------------------------------------------------
+
+    void S1_setextDemote_lastUnderlineCharDeleted_keepsCursor()
+    {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        // Build the setext H1 the way a typing user does so the buffer
+        // state is unambiguous (no trailing-newline question from
+        // loadFromMarkdown).
+        QVERIFY(waitForModelRows(binding, doc, "Heading", 1));
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::ShiftModifier, 0, 7, true,
+            QStringLiteral("Heading"));
+        QTest::qWait(50);
+
+        const auto id = binding.model()->recordAt(0).blockAnchor;
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2ApplyBufferEdit(id, 8, 0, QByteArray("="), t);  // buffer: "Heading\n="
+        }
+        QTest::qWait(100);
+        QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
+        QCOMPARE(binding.model()->recordAt(0).headingForm, QString("setext"));
+
+        // User caret sat at qtPos=9 (after "="). Delete the "="
+        // → buffer "Heading\n" (8 bytes), post-edit cursor at qtPos=8.
+        binding.cursorState()->syncFromTextEdit(id,8);
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2ApplyBufferEdit(id, 8, 1, QByteArray(), t);  // delete "="
+        }
+        QTest::qWait(100);
+
+        const auto &rec = binding.model()->recordAt(0);
+        QCOMPARE(rec.kind, BlockKind::Paragraph);
+        // Buffer "Heading\n" → chop trailing \n → rec.text "Heading" (7 chars).
+        QCOMPARE(rec.text, QStringLiteral("Heading"));
+
+        // qtPos clamped to text length: min(8, 7) = 7.
+        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 0);
+        QCOMPARE(binding.cursorState()->focusedQtPos(), 7);
+    }
+
+    void S2_setextPromote_firstUnderlineCharTyped_keepsFocus()
+    {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        // Plain paragraph with a soft-break already in place: "abc\n".
+        // The user is about to type "-" at byte 4, triggering setext H2 promote.
+        QVERIFY(waitForModelRows(binding, doc, "abc\n", 1));
+        QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Paragraph);
+
+        const auto id = binding.model()->recordAt(0).blockAnchor;
+
+        // Type "-" at qtPos=4 → cursor lands at qtPos=5.
+        binding.cursorState()->syncFromTextEdit(id,5);
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2ApplyBufferEdit(id, 4, 0, QByteArray("-"), t);
+        }
+        QTest::qWait(100);
+
+        const auto &rec = binding.model()->recordAt(0);
+        QCOMPARE(rec.kind, BlockKind::Heading);
+        QCOMPARE(rec.headingForm, QString("setext"));
+        QCOMPARE(rec.headingLevel, 2);
+
+        // Cursor lands at qtPos=5 (end of "abc\n-").
+        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 0);
+        QCOMPARE(binding.cursorState()->focusedQtPos(), 5);
+    }
+
+    void S3_atxDemote_spaceAfterHashesDeleted_keepsCursorAtDeletionPoint()
+    {
+        Markoff::MarkoffDocument doc(/*replicaId=*/1);
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+        // ATX H2.
+        QVERIFY(waitForModelRows(binding, doc, "## My Heading\n", 1));
+        QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
+        QCOMPARE(binding.model()->recordAt(0).headingForm, QString("atx"));
+
+        const auto id = binding.model()->recordAt(0).blockAnchor;
+
+        // Caret was at qtPos=3 (after the space between "##" and "My").
+        // Delete the space at byte 2 → buffer "##My Heading", caret at qtPos=2.
+        binding.cursorState()->syncFromTextEdit(id,2);
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2ApplyBufferEdit(id, 2, 1, QByteArray(), t);
+        }
+        QTest::qWait(100);
+
+        const auto &rec = binding.model()->recordAt(0);
+        QCOMPARE(rec.kind, BlockKind::Paragraph);
+        QCOMPARE(rec.text, QStringLiteral("##My Heading"));
+
+        // Cursor stays at qtPos=2, NOT 0.
+        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 0);
+        QCOMPARE(binding.cursorState()->focusedQtPos(), 2);
     }
 
     void typeDashes_inPlainParagraph_producesHorizontalRule()

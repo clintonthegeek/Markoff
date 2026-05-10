@@ -109,6 +109,19 @@ public:
     /// requestTextCaretAtRow above.
     Q_INVOKABLE void requestTextCaretAtNewRow(int expectedRow, int qtPos);
 
+    /// One-way sync from QML `TextEdit::cursorPosition` → canonical
+    /// `m_cursor`. Called by each text-bearing delegate's
+    /// `onCursorPositionChanged` and by `LiveEditBinding::onContentsChange`
+    /// after each buffer edit. Without this hook, `m_cursor` desyncs as
+    /// the user types or moves within a block (because TextEdit handles
+    /// within-block arrows and IME natively), and any subsequent kind
+    /// transition or structural diff reads a stale qtPos and lands the
+    /// caret in the wrong place. Idempotent if the cursor is already at
+    /// `(anchor, qtPos)`. Deliberately does NOT reset `m_pendingRow` — a
+    /// pending structural-key request must survive incidental TextEdit
+    /// cursor moves until its structural signal arrives.
+    Q_INVOKABLE void syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos);
+
     /// Anchor-keyed pure-pending variant. Use when the structural edit
     /// shifts an existing block (whose `BlockAnchor` we already know)
     /// rather than creating a brand-new block. The pending request

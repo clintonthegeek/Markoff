@@ -392,6 +392,11 @@ void LiveListModelBinding::onD2Changed()
             const bool setextLost = (form == QStringLiteral("setext")
                                       && matchesSetextShape(rec.text) == 0);
             if (atxLost || setextLost) {
+                // Caret re-anchoring is handled implicitly: m_cursor is
+                // kept canonical via LiveCursorState::syncFromTextEdit
+                // (called from LiveEditBinding and each text-bearing
+                // delegate). When the new delegate is constructed,
+                // Component.onCompleted reads the already-current qtPos.
                 Markoff::Cmd::changeKind(*doc, Markoff::BlockId(rec.blockAnchor),
                                          Markoff::BlockKind::Paragraph, {}, {});
                 return;
