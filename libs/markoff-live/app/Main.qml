@@ -15,8 +15,10 @@ ApplicationWindow {
         document: ctxDocument
         Component.onCompleted: {
             selectionView.setSession(ctxSession)
-            if (actionController)
+            if (actionController) {
                 actionController.saveRequested.connect(ctxMain.save)
+                actionController.themeToggleRequested.connect(modelBinding.applyDefaultTheme)
+            }
         }
     }
 

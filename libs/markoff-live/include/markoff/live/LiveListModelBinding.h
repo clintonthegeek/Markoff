@@ -104,6 +104,7 @@ public:
 
     const Markoff::Theme *theme() const noexcept;
     void setTheme(const Markoff::Theme *theme);
+    Q_INVOKABLE void applyDefaultTheme(bool dark);
 
     qreal fontScale()     const noexcept;
     qreal fontScaleStep() const noexcept { return kFontScaleStep; }

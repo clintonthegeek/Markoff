@@ -181,6 +181,7 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
     if ((caps & Actions) && qobject_cast<QGuiApplication *>(QCoreApplication::instance())) {
         d->actions = new LiveActionController(this);
         d->actions->setSelectionView(d->selectionView);
+        d->actions->setBinding(this);
         if (d->clipboard) d->actions->setClipboardController(d->clipboard);
         if (d->format)    d->actions->setFormatController(d->format);
 
@@ -289,6 +290,13 @@ void LiveListModelBinding::setTheme(const Markoff::Theme *theme)
     if (!theme || theme == &d->theme) return;
     d->theme = *theme;
     Q_EMIT themeChanged();
+}
+
+void LiveListModelBinding::applyDefaultTheme(bool dark)
+{
+    Markoff::Theme t = dark ? Markoff::Theme::defaultDark()
+                            : Markoff::Theme::defaultLight();
+    setTheme(&t);
 }
 
 qreal LiveListModelBinding::fontScale() const noexcept
