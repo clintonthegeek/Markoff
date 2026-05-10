@@ -32,6 +32,13 @@
 > `v0.7.0-e2.6`; held until interactive dogfood signs off
 > (request: `docs/handoff/2026-05-10-e2.6-dogfood-request.md`).
 > 190/190 fast tests green.
+>
+> **2026-05-10 — Item #3 implemented.** Spec
+> `docs/specs/2026-05-10-qml-integration-test-harness-design.md`; plan
+> `docs/plans/2026-05-10-qml-integration-test-harness.md`. New target
+> `tst_live_render_qml_integration` runs offscreen; eight slots green
+> (two QEXPECT_FAIL guards for queue #4 chop-\n). Full ctest still
+> green.
 
 ---
 
@@ -185,60 +192,23 @@ interactive dogfood pass.
 
 ---
 
-## #3 — QML integration-test harness
+## #3 — QML integration-test harness ✅ IMPLEMENTED 2026-05-10
 
-**Effort:** ~2 days. **Status:** sketched (verbally), no plan.
+**Effort:** ~1 day. **Status:** implemented in
+`tst_live_render_qml_integration` (commit chain ending Task 11).
 
-The unit tests in `libs/markoff-live/tests/` bypass Qt's
-`contentsChange` / `cursorPositionChanged` pipeline and call
-`d2ApplyBufferEdit` directly — provably cannot catch the regression
-class that the typing-reverses-chars bug fell into. A fresh test target
-that loads `LiveView.qml` into a real `QQuickView`, drives it via
-`QTest::keyClick`, and asserts on cursor state + buffer state would
-have caught all four of yesterday's regressions.
+Eight slots cover the queue-listed regression class. The harness loads
+production Main.qml via the markoff-live-app-internal STATIC library
+and drives input through LiveRealisticInputHarness (now wired up for
+the first time since it was authored). Three-layer assertion
+convention enforced: every edit asserts on buffer/model/delegate so
+failures pinpoint the broken pipeline link.
 
-**Scope:**
-
-- New test target: `tst_live_render_qml_integration` (or similar) under
-  `libs/markoff-live/tests/`.
-- Harness fixture loads `LiveView.qml` against a fresh
-  `MarkoffDocument` + `LiveListModelBinding`, waits for delegate
-  realisation (`itemAtIndex(0) !== null`), forces focus.
-- First test cases (priority order): typing in empty paragraph keeps
-  insertion order; Shift+Enter creates a visible newline; Enter at end
-  of paragraph migrates focus to the new block; arrow-up moves
-  line-by-line within wrapped paragraph then crosses to previous
-  block; Ctrl+wheel zoom (after #1 lands).
-
-**Reading order for a fresh agent:**
-
-1. `libs/markoff-live/tests/CMakeLists.txt` — the existing test-target
-   pattern; copy and adapt.
-2. `libs/markoff-live/qml/LiveView.qml` — what needs to be loaded.
-3. `libs/markoff-live/app/main.cpp` (or `markoff-live-app`) — how the
-   real app wires `LiveListModelBinding` + `MarkoffDocument` + the
-   QQmlApplicationEngine; the harness should mirror this.
-4. `libs/markoff-live/qml/delegates/ParagraphDelegate.qml` — focus +
-   cursor handling that needs driving.
-5. Any existing Qt6 QML integration test in the codebase as a pattern
-   reference (search `QQuickView` / `QTest::keyClick` across the repo).
-
-**Open design questions to brainstorm:**
-
-- `QQuickView` requires a window manager. Can CTest run it headless via
-  `QT_QPA_PLATFORM=offscreen`? Does that support `QTest::keyClick`?
-- How does the harness wait for QML to settle (delegates to be
-  realised, signals to flush)? `QSignalSpy` on
-  `LiveBlockModel::dataChanged`? `QTRY_*` macros?
-- Should the harness expose helpers for "type a string" and "press
-  arrow N times" so individual tests stay readable?
-- Where do these tests sit in CI cost? A 2-second QML startup × 30
-  tests is a meaningful budget hit; consider whether to gate behind a
-  `WITH_QML_INTEGRATION_TESTS` option.
-
-**Definition of done:** Harness runs in CTest with offscreen platform.
-At least 5 tests covering the regression scenarios from the typing
-bug. CI cost documented in plan.
+Follow-ups:
+- queue.md #4 (chop-\n): surfaced and guarded by
+  `shift_enter_creates_visible_newline`'s two QEXPECT_FAIL markers.
+- Theme QML method registration in test env may limit pixelSize
+  assertions in `ctrl_wheel_zooms_font_scale` (graceful degradation).
 
 ---
 
