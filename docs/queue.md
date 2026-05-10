@@ -26,12 +26,19 @@
 > exactly queue #2 concern #11 and is **folded into #2** — when #2's
 > spec is written, treat that as one of the surface points to
 > consolidate. 186/186 fast tests pass post-fixes.
+>
+> **2026-05-10 — Item #1 implemented.** Spec
+> `docs/specs/2026-05-10-e2.6-theme-zoom-design.md`; plan
+> `docs/plans/2026-05-10-e2.6-theme-zoom.md`. Tag candidate
+> `v0.7.0-e2.6`; held until interactive dogfood signs off
+> (request: `docs/handoff/2026-05-10-e2.6-dogfood-request.md`).
+> 190/190 fast tests green.
 
 ---
 
-## #1 — E2.6: theme wire-up + zoom
+## #1 — E2.6: theme wire-up + zoom ✅ IMPLEMENTED 2026-05-10 (dogfood pending)
 
-**Effort:** ~1 week. **Status:** scope captured, no spec, no plan.
+**Effort:** ~1 week. **Status:** implemented; interactive dogfood pending.
 
 The `Markoff::Theme` infrastructure exists and ships
 `defaultLight()`/`defaultDark()`, per-slot fonts/colours, and a
