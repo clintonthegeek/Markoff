@@ -1,4 +1,4 @@
-# OBJECT library: shared between the production executable and the
+# STATIC library: shared between the production executable and the
 # tst_live_render_qml_integration test target. Owns MainController and
 # the org.markoff.live.app qml module so both consumers reach
 # `loadFromModule("org.markoff.live.app", "Main")` against the
