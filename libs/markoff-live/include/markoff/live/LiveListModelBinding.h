@@ -26,6 +26,11 @@
 
 namespace Markoff::Live {
 
+inline constexpr qreal kMinFontScale     = 0.5;
+inline constexpr qreal kMaxFontScale     = 3.0;
+inline constexpr qreal kFontScaleStep    = 1.10;
+inline constexpr qreal kDefaultFontScale = 1.0;
+
 class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -47,6 +52,8 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
     Q_PROPERTY(QAbstractListModel *remoteCursorsModel
                READ remoteCursorsModel CONSTANT)
     Q_PROPERTY(const Markoff::Theme *theme READ theme WRITE setTheme NOTIFY themeChanged)
+    Q_PROPERTY(qreal fontScale     READ fontScale     WRITE setFontScale NOTIFY fontScaleChanged)
+    Q_PROPERTY(qreal fontScaleStep READ fontScaleStep CONSTANT)
 
     Q_PROPERTY(Markoff::Live::LiveClipboardController *clipboardController
                READ clipboardController CONSTANT)
@@ -98,6 +105,10 @@ public:
     const Markoff::Theme *theme() const noexcept;
     void setTheme(const Markoff::Theme *theme);
 
+    qreal fontScale()     const noexcept;
+    qreal fontScaleStep() const noexcept { return kFontScaleStep; }
+    void  setFontScale(qreal s);
+
     /// True for the synchronous duration of `applyOps` while D2 CRDT change
     /// notification is mutating model rows. LiveEditBinding queries this
     /// inside its `contentsChange` slot to suppress the synchronous
@@ -107,6 +118,7 @@ public:
 Q_SIGNALS:
     void documentChanged();
     void themeChanged();
+    void fontScaleChanged();
 
     /// Emitted after applyOps when blocks were structurally inserted.
     /// `first` and `last` are the new model row indices (inclusive).

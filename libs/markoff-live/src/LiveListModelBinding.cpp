@@ -147,6 +147,7 @@ struct LiveListModelBinding::Private {
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
     Markoff::Theme             theme            = Markoff::Theme::defaultLight();
+    qreal                      fontScale        = kDefaultFontScale;
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
@@ -288,6 +289,19 @@ void LiveListModelBinding::setTheme(const Markoff::Theme *theme)
     if (!theme || theme == &d->theme) return;
     d->theme = *theme;
     Q_EMIT themeChanged();
+}
+
+qreal LiveListModelBinding::fontScale() const noexcept
+{
+    return d->fontScale;
+}
+
+void LiveListModelBinding::setFontScale(qreal s)
+{
+    qreal clamped = qBound(kMinFontScale, s, kMaxFontScale);
+    if (clamped == d->fontScale) return;
+    d->fontScale = clamped;
+    Q_EMIT fontScaleChanged();
 }
 
 void LiveListModelBinding::onD2Changed()

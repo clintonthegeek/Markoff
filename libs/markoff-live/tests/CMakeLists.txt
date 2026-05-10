@@ -447,3 +447,41 @@ target_link_libraries(tst_live_render_e2_5_perf_bulk_paste
 add_test(NAME tst_live_render_e2_5_perf_bulk_paste
          COMMAND tst_live_render_e2_5_perf_bulk_paste)
 
+# E2.6: fontScale property on LiveListModelBinding.
+qt_add_executable(tst_live_render_font_scale_property
+    tst_live_render_font_scale_property.cpp)
+target_link_libraries(tst_live_render_font_scale_property PRIVATE
+    Qt6::Core Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_font_scale_property
+         COMMAND tst_live_render_font_scale_property)
+
+# E2.6: zoom QActions on LiveActionController.
+qt_add_executable(tst_live_render_font_scale_actions
+    tst_live_render_font_scale_actions.cpp)
+target_link_libraries(tst_live_render_font_scale_actions PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_font_scale_actions
+         COMMAND tst_live_render_font_scale_actions)
+set_tests_properties(tst_live_render_font_scale_actions
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# E2.6: themeToggleRequested signal on LiveActionController.
+qt_add_executable(tst_live_render_theme_toggle_signal
+    tst_live_render_theme_toggle_signal.cpp)
+target_link_libraries(tst_live_render_theme_toggle_signal PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_theme_toggle_signal
+         COMMAND tst_live_render_theme_toggle_signal)
+set_tests_properties(tst_live_render_theme_toggle_signal
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# E2.6: fontScale propagation through InlineHighlighter.
+qt_add_executable(tst_live_render_inline_highlighter_font_scale
+    tst_live_render_inline_highlighter_font_scale.cpp)
+target_link_libraries(tst_live_render_inline_highlighter_font_scale PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_inline_highlighter_font_scale
+         COMMAND tst_live_render_inline_highlighter_font_scale)
+set_tests_properties(tst_live_render_inline_highlighter_font_scale
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
