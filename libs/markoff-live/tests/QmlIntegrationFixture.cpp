@@ -104,7 +104,10 @@ QQuickItem *QmlIntegrationFixture::listView() {
             break;
         }
     }
-    Q_ASSERT(m_listView != nullptr);
+    if (!m_listView) {
+        QTest::qFail("QQuickListView not found in window", __FILE__, __LINE__);
+        return nullptr;
+    }
     return m_listView;
 }
 
@@ -149,7 +152,10 @@ QString QmlIntegrationFixture::modelText(int row) {
             break;
         }
     }
-    Q_ASSERT(textRole != -1);
+    if (textRole == -1) {
+        QTest::qFail("\"text\" role not found in model's roleNames()", __FILE__, __LINE__);
+        return {};
+    }
     return m_model->data(m_model->index(row, 0), textRole).toString();
 }
 
