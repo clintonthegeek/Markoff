@@ -4,6 +4,7 @@
 #include <QCoreApplication>
 #include <QQuickWindow>
 #include <QTest>
+#include <QWheelEvent>
 
 namespace Markoff::Live::Test {
 
@@ -71,6 +72,28 @@ public:
 
     void idle(int durationMs) {
         QTest::qWait(durationMs);
+        QCoreApplication::processEvents();
+    }
+
+    /// Dispatch a Ctrl-modifier wheel event for zoom testing.
+    ///
+    /// QTest has no wheel-event convenience; construct QWheelEvent directly
+    /// and send via QCoreApplication. Wheel events on offscreen QPA are less
+    /// battle-tested than keys; if this proves flaky see spec §6.3.
+    void wheelEvent(QPoint posInWindow,
+                    int deltaY,
+                    Qt::KeyboardModifiers mods = Qt::NoModifier) {
+        QWheelEvent ev(
+            /*pos=*/QPointF(posInWindow),
+            /*globalPos=*/QPointF(m_window->mapToGlobal(posInWindow)),
+            /*pixelDelta=*/QPoint(0, 0),
+            /*angleDelta=*/QPoint(0, deltaY),
+            /*buttons=*/Qt::NoButton,
+            /*modifiers=*/mods,
+            /*phase=*/Qt::NoScrollPhase,
+            /*inverted=*/false);
+        QCoreApplication::sendEvent(m_window, &ev);
+        QTest::qWait(m_defaultGapMs);
         QCoreApplication::processEvents();
     }
 
