@@ -485,3 +485,22 @@ add_test(NAME tst_live_render_inline_highlighter_font_scale
 set_tests_properties(tst_live_render_inline_highlighter_font_scale
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# Queue #3: QML integration harness. Loads production Main.qml via the
+# markoff-live-app-internal STATIC library; runs offscreen.
+qt_add_executable(tst_live_render_qml_integration
+    tst_live_render_qml_integration.cpp
+    QmlIntegrationFixture.h
+    QmlIntegrationFixture.cpp
+)
+target_link_libraries(tst_live_render_qml_integration PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init)
+add_test(NAME tst_live_render_qml_integration
+         COMMAND tst_live_render_qml_integration)
+set_tests_properties(tst_live_render_qml_integration
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+

@@ -40,7 +40,7 @@ public:
     explicit LiveSelectionView(QObject *parent = nullptr);
 
     void setDocument(Markoff::MarkoffDocument *doc);
-    void setSession(Markoff::Session *session);
+    Q_INVOKABLE void setSession(Markoff::Session *session);
     void setModel(const LiveBlockModel *model);
 
     bool hasSelection() const;
