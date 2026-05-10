@@ -92,6 +92,28 @@ private Q_SLOTS:
         QCOMPARE(fix.delegateCursorPos(0), 8);
     }
 
+    /// Enter at paragraph-end creates a new block and migrates focus
+    /// to it. The "cursor lost on Enter" regression class (queue.md #2
+    /// concern #7) lives here.
+    void enter_at_paragraph_end_migrates_focus() {
+        QmlIntegrationFixture fix(/*markdown=*/"A", /*expectedRowCount=*/1);
+
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+        QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
+
+        fix.harness().keyClick(Qt::Key_End);
+        QCOMPARE(fix.delegateCursorPos(0), 1);
+
+        fix.harness().keyClick(Qt::Key_Return);
+
+        QVERIFY(fix.waitForRowCount(2, 2000));
+        QVERIFY(fix.waitForDelegateAt(1, 2000));
+
+        QTRY_COMPARE_WITH_TIMEOUT(fix.focusedDelegate(),
+                                  fix.delegateAt(1), 2000);
+        QCOMPARE(fix.delegateCursorPos(1), 0);
+    }
+
     /// Typing-reverses-chars regression killer. Type "abc" into an
     /// auto-focused empty paragraph; all three layers must agree
     /// on "abc" with cursor at position 3.
