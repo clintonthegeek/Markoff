@@ -33,6 +33,8 @@ qt_add_executable(markoff-live-app
 
 target_link_libraries(markoff-live-app PRIVATE
     markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init
 )
 
 # qt_import_qml_plugins removed: a holdover from pre-Qt-6.5 patterns.
