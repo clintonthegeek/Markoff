@@ -14,8 +14,7 @@
 >
 > **Current branch:** `exploration/new-foundation` (worktree at
 > `.worktrees/foundation-exploration/`).
-> **Tag held:** `v0.7.0-e2.5` — pending interactive re-dogfood of the
-> S1/S2/S3 cursor fixes (commits `463fc36..6c44a07`).
+> **Tags held:** `v0.7.0-e2.5` (S1/S2/S3 cursor fixes, commits `463fc36..6c44a07`) and `v0.7.0-e2.6` (theme + zoom, commits `9fff98d..b73c4ae`) — both pending interactive dogfood at user's local desktop. Dogfood checklists: e-arc-status.md TL;DR (E2.5) and `docs/handoff/2026-05-10-e2.6-dogfood-request.md` (E2.6).
 >
 > **2026-05-10 — Item #5 closed.** Code review of `463fc36..6c44a07`
 > ran clean (1 MED, 2 LOW). MED + 1 LOW fixed inline in this session

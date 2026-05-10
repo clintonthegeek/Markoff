@@ -2,26 +2,35 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-09 (setext dogfood pass: visual render ✅, save round-trip ✅; 3 cursor/focus bugs found — tag held pending fixes S1/S2/S3).
+**Last updated:** 2026-05-10 (E2.6 implementation complete; both `v0.7.0-e2.5` and `v0.7.0-e2.6` tags held pending interactive dogfood — user is remote/SSH).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **E2.5 bug-fix pass** (S1/S2/S3 cursor/focus after kind-transition). Next after fixes: tag `v0.7.0-e2.5`, then E2.6.
+**Active phase:** **dogfood pending** — E2.5 (S1/S2/S3 fixes) + E2.6 (theme + zoom) both implemented; tags held until user runs the interactive checklist. Next executable work: queue #2 (cursor architecture cleanup).
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **Setext dogfood passed visually** (render ✅, save round-trip ✅) but surfaced 3 cursor/focus bugs that block the `v0.7.0-e2.5` tag:
-> - **S1** — Setext demote (last underline char deleted): caret disappears, widget loses focus.
-> - **S2** — Setext creation (first underline char typed): focus lost; clicking back restores it.
-> - **S3** — ATX demote (space after `#` deleted): cursor jumps to line start instead of staying at deletion point.
-> Full findings: [`docs/handoff/2026-05-09-setext-dogfood-findings.md`](../handoff/2026-05-09-setext-dogfood-findings.md). Theme: `Cmd::changeKind` fires and pipeline `return`s without re-anchoring the caret. Fix S1/S2/S3, add regression tests, re-dogfood, then tag.
+> **2026-05-10 update — DOGFOOD NEEDED.** Both E2.5 (S1/S2/S3 cursor fixes, `463fc36..6c44a07`) and E2.6 (theme wire-up + zoom, `9fff98d..b73c4ae`) are implemented. **Both `v0.7.0-e2.5` and `v0.7.0-e2.6` tags are held pending an interactive dogfood pass that needs the user's local desktop.** When you are back at your machine:
 >
-> **Next work after fixes: E2.6 — theme wire-up + zoom.** Route delegate fonts through `Markoff::Theme`; add `fontScale` Q_PROPERTY + Ctrl+=/- zoom; light/dark toggle.
+> **E2.5 dogfood checklist** (setext cursor/focus):
+> - Setext demote (delete last underline char): caret must stay, focus must stay.
+> - Setext creation (type first underline char): focus must stay.
+> - ATX demote (delete space after `#`): cursor must stay at deletion point (not jump to line start).
 >
-> **Past work (do NOT redo):** E2.5 phases A–I, dogfood D1–D9 remediation, Option B selection rework (`c7da731`), and setext heading support (through commit `8e1adc4`). See findings log: [`docs/handoff/2026-05-09-e2.5-dogfood-findings.md`](../handoff/2026-05-09-e2.5-dogfood-findings.md).
+> **E2.6 dogfood checklist** (`docs/handoff/2026-05-10-e2.6-dogfood-request.md`):
+> - Ctrl+= / Ctrl+- / Ctrl+0 zoom; Ctrl+wheel zoom; all delegates scale uniformly.
+> - Ctrl+Shift+D light/dark toggle.
+> - Inline-code spans scale with zoom.
+> - Size deltas acknowledged (H1 28→25.2 px, etc. — see request doc for full table).
 >
-> **Out of E2.5** (subsequent phases): theme wire-up + zoom (E2.6); speculative paths (E2.7).
+> **If dogfood is unavailable:** work [`docs/queue.md`](../queue.md) — top executable item is now #2 (cursor architecture cleanup).
+
+> **Setext dogfood passed visually** (render ✅, save round-trip ✅) but surfaced 3 cursor/focus bugs (S1/S2/S3) that blocked `v0.7.0-e2.5`. Fix shipped 2026-05-10 (`6c44a07`). Full findings: [`docs/handoff/2026-05-09-setext-dogfood-findings.md`](../handoff/2026-05-09-setext-dogfood-findings.md).
+>
+> **Past work (do NOT redo):** E2.5 phases A–I + D1–D9 dogfood remediation + Option B selection rework (`c7da731`) + setext heading support (`8e1adc4`) + S1/S2/S3 cursor fixes (`6c44a07`) + E2.6 theme/zoom (`9fff98d..b73c4ae`).
+>
+> **Out of E2.5/E2.6** (subsequent phases): speculative paths E2.7; Obsidian affordances E3.
 >
 > **Build cap:** `-j 8` everywhere; never bare `-j` or higher.
 >
@@ -42,8 +51,8 @@
 |---|---|---|---|---|
 | **E1** | `complete` (2026-05-08, tag `v0.7.0-e1`) | [E1 spec](../specs/2026-05-08-e1-inline-highlighter-design.md) | [E1 plan](../plans/2026-05-08-e1-inline-highlighter.md) | Inline-format highlighter in QML delegates. Reads `BlockRecord::inlineSpans` via `LiveBlockModel::spansAtRow(row)`. 143/143 tests pass. Dogfood signed off. Tag: `v0.7.0-e1`. |
 | **E2** | `complete` (2026-05-09, tag `v0.7.0-e2`) | [E2 spec](../specs/2026-05-08-e2-cursor-aware-view-design.md) | [E2 plan](../plans/2026-05-08-e2-cursor-aware-view.md) | Cursor-aware view: auto-hide markers (true zero-width collapse) + full-parity cross-block keyboard nav. 162/162 tests pass (incl. `tst_realistic` 70.8 s, `tst_benchmark` 338.7 s). Six dogfood-surfaced bugs fixed end-of-arc (cursor placement / multi-line render / HR nav / HR demotion / cross-block copy) plus a CollabText O(replicaId) perf bug found, reported, fixed upstream, and the workaround retired same day. Tag: `v0.7.0-e2`. |
-| **E2.5** | `in-progress` (bug-fix S1/S2/S3) | [E2.5 spec](../specs/2026-05-09-e2.5-editing-affordances-design.md) + [setext spec](../specs/2026-05-09-setext-heading-support-design.md) | [E2.5 plan](../plans/2026-05-09-e2.5-editing-affordances.md) + [setext plan](../plans/2026-05-09-setext-heading-support.md) | **Editing affordances pack** (phases A–I complete) **+ dogfood remediation D1–D9 + Option B selection rework** (`c7da731`, 185/185 tests) **+ setext heading support** (through `8e1adc4`, 186/186 tests). Setext load + render + save + typing (Shift+Enter) + form-aware demote. ATX double-prefix save bug closed as a side-effect. 22 new test methods across 5 files + 1 new test target. Tag `v0.7.0-e2.5` pending manual dogfood pass. |
-| **E2.6** | `pending` (scope captured 2026-05-09) | TBW | TBW | **Theme wire-up + zoom.** Route every delegate's font.family/pixelSize/bold/italic through `Markoff::Theme`; replace HeadingDelegate's literal-pixel switch with theme-driven `font(Heading) * fontSizeMultiplier(HeadingN)`; add `fontScale` Q_PROPERTY + Ctrl+= / Ctrl+- / Ctrl+wheel; light/dark toggle action. Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.6. ~1 week. |
+| **E2.5** | `dogfood` (tag held — user remote) | [E2.5 spec](../specs/2026-05-09-e2.5-editing-affordances-design.md) + [setext spec](../specs/2026-05-09-setext-heading-support-design.md) | [E2.5 plan](../plans/2026-05-09-e2.5-editing-affordances.md) + [setext plan](../plans/2026-05-09-setext-heading-support.md) | **Editing affordances pack** (phases A–I complete) **+ dogfood remediation D1–D9 + Option B selection rework** (`c7da731`) **+ setext heading support** (`8e1adc4`) **+ S1/S2/S3 cursor fixes** (`6c44a07`). 190/190 fast tests green. Tag `v0.7.0-e2.5` held pending interactive dogfood (S1/S2/S3 re-verification). |
+| **E2.6** | `dogfood` (tag held — user remote) | [E2.6 spec](../specs/2026-05-10-e2.6-theme-zoom-design.md) | [E2.6 plan](../plans/2026-05-10-e2.6-theme-zoom.md) | **Theme wire-up + zoom.** All delegates route through `Markoff::Theme`; `fontScale` Q_PROPERTY on `LiveListModelBinding`; Ctrl+= / Ctrl+- / Ctrl+0 / Ctrl+wheel; Ctrl+Shift+D toggle; `applyDefaultTheme(bool dark)` Q_INVOKABLE. 190/190 tests green. Tag `v0.7.0-e2.6` held pending interactive dogfood. Checklist: [`docs/handoff/2026-05-10-e2.6-dogfood-request.md`](../handoff/2026-05-10-e2.6-dogfood-request.md). |
 | **E2.7** | `pending` (scope captured 2026-05-09) | TBW | TBW | **Speculative paths.** Open-delimiter (`**` → bold immediately) + code-fence (` ``` ` → code-block delegate immediately) speculation, retired-plan Tasks 8/9. Lower priority than E2.5/E2.6 — dogfood will tell us if the parser-cycle lag warrants the speculation machinery. Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.7. ~1 week. |
 | **E3** | `pending` | TBW | TBW | Wikilinks, embeds, tags, callouts (Obsidian affordances). |
 | **E4** | `pending` | TBW | TBW | Tables, frontmatter, footnote rendering. |
@@ -60,6 +69,15 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-10 | `b73c4ae` | **E2.6 dogfood request committed.** `docs/handoff/2026-05-10-e2.6-dogfood-request.md` — interactive checklist for zoom (Ctrl+=/−/0, Ctrl+wheel), Ctrl+Shift+D toggle, inline-code scaling, and size-delta acknowledgement (H1 28→25.2 px etc.). Queue #1 marked implemented. Both `v0.7.0-e2.5` and `v0.7.0-e2.6` tags held until user runs dogfood at local desktop. |
+| 2026-05-10 | `de05f90` | **E2.6 Phase 6 — `applyDefaultTheme` Q_INVOKABLE + self-wire + Main.qml signal connection.** `LiveListModelBinding` pimpl ctor calls `actions->setBinding(this)` so zoom QActions are live at construction. Adds `Q_INVOKABLE void applyDefaultTheme(bool dark)`. `Main.qml` wires `actionController.themeToggleRequested` → `modelBinding.applyDefaultTheme`. 190/190 tests green. |
+| 2026-05-10 | `f6d1f5b` | **E2.6 Phase 5 — all QML delegates wired through Theme + fontScale.** ParagraphDelegate, HeadingDelegate, BlockquoteDelegate, CodeBlockDelegate, ListItemDelegate, MathDelegate, ImageDelegate, RemoteCursorOverlay: font.pixelSize/family/bold/italic all routed through `theme.pixelSizeFor/familyFor/isBold/isItalic` × `fontScale`. HeadingDelegate's hardcoded literal-pixel switch replaced with theme-driven slot lookup. Ctrl+wheel `WheelHandler` added to `LiveView.qml`. Zoom + toggleDark QActions registered on window. 190/190 tests green. |
+| 2026-05-10 | `12ea2aa` | **E2.6 Phase 4B — `toggleDarkAction` + `themeToggleRequested` signal.** `LiveActionController` gains `toggleDarkAction` (Ctrl+Shift+D) that toggles `m_isDark` and emits `themeToggleRequested(bool dark)`. Library never owns the theme; host applies `defaultLight`/`defaultDark` in response. 3/3 new tests pass. |
+| 2026-05-10 | `9fff98d` | **E2.6 Phase 4A — zoom QActions on `LiveActionController`.** `zoomIn/zoomOut/zoomReset` QActions (Ctrl+=/−/0, incl. Ctrl+Plus/Ctrl+Shift+=). `setBinding(LiveListModelBinding*)` wires them to `fontScale`. 6/6 new tests pass. 190/190 total. |
+| 2026-05-10 | `0e587f9` | **E2.6 Phase 3 — fontScale threaded through InlineHighlighterAttached.** `InlineHighlighterAttached` gains `fontScale` Q_PROPERTY + NOTIFY; pushes to `InlineHighlighter::setFontScale` which calls `rehighlight()`. Inline-code spans scale with zoom. 3/3 new tests pass. |
+| 2026-05-10 | `7ecddf7` | **E2.6 Phase 2 — `LiveListModelBinding::fontScale` Q_PROPERTY.** Clamped [0.5, 3.0], step 1.10, default 1.0. Constants in header: `kMinFontScale`, `kMaxFontScale`, `kFontScaleStep`, `kDefaultFontScale`. 6/6 new tests pass. |
+| 2026-05-10 | `0654e43` | **E2.6 Phase 1 — Theme API: `pixelSizeFor(Slot)`, `familyFor(Slot)`, `defaultLight()` enriched.** `pixelSizeFor` computes pt×multiplier×(96/72) for logical pixels. `defaultLight()` now sets Heading3 bold, Quote italic, H4/H5/H6/Math/Quote multipliers, base point sizes (Body 10.5 pt, Monospace 9.75 pt). 18 new test methods across 3 suites. |
+| 2026-05-10 | `6c44a07` | **S1/S2/S3 cursor-fix pass shipped.** Re-entrance guard (`m_inKeyHandler`) + post-changeKind caret re-anchor in `LiveStructuralKeyHandler`. 190/190 tests green (up from 186). Code review ran clean (1 MED comment-doc fix + 1 LOW null-check alignment, applied inline). |
 | 2026-05-09 | — | **Setext dogfood pass: visual ✅, 3 cursor/focus bugs found (S1/S2/S3).** Render (H1/H2 typography) and save round-trip (setext form preserved) both correct. Bugs: S1 — last underline char backspaced → caret disappears, focus lost; S2 — first underline char typed → focus lost (click to restore); S3 — ATX space-after-hash deleted → cursor jumps to line start. All three are kind-transition post-demote/promote cursor re-anchoring failures. Tag `v0.7.0-e2.5` held. Full report: `docs/handoff/2026-05-09-setext-dogfood-findings.md`. |
 | 2026-05-09 | `8e1adc4` | **Setext heading support landed.** Spec: `docs/specs/2026-05-09-setext-heading-support-design.md`. Plan: `docs/plans/2026-05-09-setext-heading-support.md`. Delivered: (1) `AttrNames::HeadingForm` + `BlockRecord.headingForm` + `HeadingFormRole` — form attr threaded from CRDT through model to QML; (2) `materializeBlocksFromParsedDoc` sets `headingForm="setext"` for loaded setext blocks; (3) `stripLeadingHashes` helper + form-aware `serializeHeading` — setext buffers emit verbatim, ATX no longer double-prefixes content (latent bug closed); (4) `matchesSetextShape` helper + `inferBlockKind` setext branch — recognises `Heading\n---` / `Heading\n===` before the bare-HR check; (5) heading promotion emits `headingForm` attr (atx or setext); (6) form-aware demote — ATX: hash-deletion → Paragraph; setext: underline-deletion → Paragraph; setext level switch via `---`→`===` updates `headingLevel`; (7) Shift+Enter was already implemented (E2.5); setext-specific test added (`shiftEnter_thenDashes_promotesToSetextHeading`); (8) `tst_live_render_setext_e2e` — 4 end-to-end tests (type setext H1/H2, save round-trip, HR regression). 186/186 fast tests green (+1 test target, +22 test methods across 5 files). Tag `v0.7.0-e2.5` pending manual dogfood. |
 | 2026-05-09 | `acdb647` | **Setext heading support — spec + plan committed.** Spec: `docs/specs/2026-05-09-setext-heading-support-design.md`. Plan: `docs/plans/2026-05-09-setext-heading-support.md`. Asymmetric heading-buffer convention (ATX keeps `## ` prefix; setext keeps `Heading\n---` in buffer); new `attrs.headingForm` ∈ {`"atx"`, `"setext"`}; single-block kind-transition recognises setext shape via new `matchesSetextShape` helper; form-aware demote (ATX: hash-deletion → Paragraph; setext: underline-deletion → Paragraph); new `Shift+Enter` soft-newline path in `LiveStructuralKeyHandler` (general-purpose, not setext-specific); form-aware `serializeHeading` (incidentally closes the latent ATX double-prefix save bug). Six implementation phases, TDD per task. Ready for execution. |
