@@ -13,6 +13,7 @@ qt_add_library(markoff-live-app-internal STATIC
 qt_add_qml_module(markoff-live-app-internal
     URI org.markoff.live.app
     VERSION 1.0
+    OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/org/markoff/live/app"
     QML_FILES
         Main.qml
 )

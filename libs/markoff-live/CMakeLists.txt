@@ -7,6 +7,7 @@ set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS
     Core Gui Widgets Quick QuickControls2 Qml Test)
+find_package(KF6SyntaxHighlighting REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.5)
 
