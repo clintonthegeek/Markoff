@@ -70,6 +70,9 @@ public:
     qreal  fontSizeMultiplier(Slot) const;
     void   setFontSizeMultiplier(Slot, qreal);
 
+    qreal   pixelSizeFor(Slot) const;
+    QString familyFor(Slot) const;
+
     QColor colorForCodeToken(CodeTokenKind) const;
 
     static Theme defaultLight();

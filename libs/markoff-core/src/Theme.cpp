@@ -2,6 +2,22 @@
 #include <markoff/core/Theme.h>
 #include <markoff/core/CodeTokenKind.h>
 
+namespace {
+Markoff::Theme::FontRole roleFor(Markoff::Theme::Slot s) {
+    using S = Markoff::Theme::Slot;
+    using R = Markoff::Theme::FontRole;
+    switch (s) {
+        case S::Heading1: case S::Heading2: case S::Heading3:
+        case S::Heading4: case S::Heading5: case S::Heading6:
+            return R::Heading;
+        case S::CodeBlock: case S::InlineCode: case S::Math:
+            return R::Monospace;
+        default:
+            return R::Body;
+    }
+}
+}  // namespace
+
 namespace Markoff {
 
 QColor Theme::color(Slot s) const
@@ -36,6 +52,20 @@ qreal Theme::fontSizeMultiplier(Slot s) const
 void Theme::setFontSizeMultiplier(Slot s, qreal m)
 {
     m_sizeMul[static_cast<int>(s)] = m;
+}
+
+qreal Theme::pixelSizeFor(Slot s) const
+{
+    QFont f = font(roleFor(s));
+    qreal pt = f.pointSizeF() > 0 ? f.pointSizeF() : 11.0;
+    qreal mul = fontSizeMultiplier(s);
+    if (mul <= 0) mul = 1.0;
+    return pt * mul * (96.0 / 72.0);
+}
+
+QString Theme::familyFor(Slot s) const
+{
+    return font(roleFor(s)).family();
 }
 
 QTextCharFormat Theme::charFormat(Slot s) const
