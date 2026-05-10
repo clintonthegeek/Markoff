@@ -35,13 +35,24 @@ Item {
         readOnly: false
         textFormat: TextEdit.PlainText
         wrapMode: TextEdit.Wrap
-        font.pixelSize: {
+        readonly property var theme: root.liveBinding ? root.liveBinding.theme : null
+        readonly property real fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
+        readonly property int slotForLevel: {
+            // Slot enum order: TextDefault=0, Heading1=1...Heading6=6.
             switch (model.headingLevel) {
-                case 1: return 28; case 2: return 24; case 3: return 20
-                case 4: return 18; case 5: return 16; default: return 14
+                case 1: return 1   // Heading1
+                case 2: return 2   // Heading2
+                case 3: return 3   // Heading3
+                case 4: return 4   // Heading4
+                case 5: return 5   // Heading5
+                default: return 6  // Heading6
             }
         }
-        font.bold: model.headingLevel <= 3
+
+        font.pixelSize: theme ? theme.pixelSizeFor(slotForLevel) * fontScale : 14 * fontScale
+        font.family:    theme ? theme.familyFor(slotForLevel) : ""
+        font.bold:      theme ? theme.isBold(slotForLevel) : (model.headingLevel <= 3)
+        font.italic:    theme ? theme.isItalic(slotForLevel) : false
         color: palette.text
         selectByMouse: false
         persistentSelection: true
@@ -56,6 +67,7 @@ Item {
             target: edit.textDocument
             spans: model.inlineSpans
             theme: root.liveBinding ? root.liveBinding.theme : null
+            fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
             caretPosition: edit.activeFocus ? edit.cursorPosition : -1
             selectionStart: (edit.activeFocus && edit.selectionStart !== edit.selectionEnd)
                             ? edit.selectionStart : -1

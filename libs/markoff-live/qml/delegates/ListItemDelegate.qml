@@ -75,8 +75,12 @@ Item {
         leftPadding: root.indentPx
         topPadding: 2
         text: root.markerText
-        font.family: "monospace"
-        font.pixelSize: 14
+        font.family: (root.liveBinding && root.liveBinding.theme)
+                       ? root.liveBinding.theme.familyFor(8 /* Slot.CodeBlock → Monospace */) : "monospace"
+        font.pixelSize: (root.liveBinding && root.liveBinding.theme
+                          ? root.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                          : 14)
+                        * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
         color: root._fullySelected ? palette.highlightedText : palette.text
 
         MouseArea {
@@ -111,7 +115,14 @@ Item {
         readOnly: false
         textFormat: TextEdit.PlainText
         wrapMode: TextEdit.Wrap
-        font.pixelSize: 14
+        readonly property var theme: root.liveBinding ? root.liveBinding.theme : null
+        readonly property real fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
+        readonly property int  baseSlot: 0  // Theme.Slot.TextDefault
+
+        font.pixelSize: theme ? theme.pixelSizeFor(baseSlot) * fontScale : 14 * fontScale
+        font.family:    theme ? theme.familyFor(baseSlot) : ""
+        font.bold:      theme ? theme.isBold(baseSlot) : false
+        font.italic:    theme ? theme.isItalic(baseSlot) : false
         color: palette.text
         selectByMouse: false
         persistentSelection: true
@@ -126,6 +137,7 @@ Item {
             target: edit.textDocument
             spans: model.inlineSpans
             theme: root.liveBinding ? root.liveBinding.theme : null
+            fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
             caretPosition: edit.activeFocus ? edit.cursorPosition : -1
             selectionStart: (edit.activeFocus && edit.selectionStart !== edit.selectionEnd)
                             ? edit.selectionStart : -1

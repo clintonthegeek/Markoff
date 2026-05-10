@@ -35,8 +35,14 @@ Rectangle {
         readOnly: false
         textFormat: TextEdit.PlainText
         wrapMode: TextEdit.NoWrap
-        font.family: "monospace"
-        font.pixelSize: 13
+        readonly property var theme: root.liveBinding ? root.liveBinding.theme : null
+        readonly property real fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
+        readonly property int  baseSlot: 8  // Theme.Slot.CodeBlock
+
+        font.pixelSize: theme ? theme.pixelSizeFor(baseSlot) * fontScale : 13 * fontScale
+        font.family:    theme ? theme.familyFor(baseSlot) : "monospace"
+        font.bold:      theme ? theme.isBold(baseSlot) : false
+        font.italic:    theme ? theme.isItalic(baseSlot) : false
         color: palette.text
         selectByMouse: false
         persistentSelection: true
@@ -136,7 +142,10 @@ Rectangle {
         Text {
             visible: !langTagRow.editing && model.codeLanguage !== ""
             text: model.codeLanguage
-            font.pixelSize: 11
+            font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
+                              ? root.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                              : 14) * 0.8
+                            * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.mid
             MouseArea {
                 anchors.fill: parent
@@ -152,7 +161,10 @@ Rectangle {
             id: langInput
             visible: langTagRow.editing
             text: model.codeLanguage
-            font.pixelSize: 11
+            font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
+                              ? root.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                              : 14) * 0.8
+                            * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.text
             onActiveFocusChanged: if (!activeFocus) langTagRow.editing = false
             Keys.onReturnPressed: {

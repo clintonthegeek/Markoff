@@ -5,6 +5,7 @@ Rectangle {
     id: overlay
     required property color cursorColor
     required property string cursorLabel
+    property var liveBinding: null
     width: 2
     height: 16
     color: cursorColor
@@ -21,7 +22,11 @@ Rectangle {
             anchors.centerIn: parent
             text: overlay.cursorLabel
             color: "#ffffff"
-            font.pixelSize: 9
+            // Remote-cursor label: 0.65x of body size; chrome.
+            font.pixelSize: ((overlay.liveBinding && overlay.liveBinding.theme)
+                              ? overlay.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                              : 14) * 0.65
+                            * (overlay.liveBinding ? overlay.liveBinding.fontScale : 1.0)
         }
     }
 }

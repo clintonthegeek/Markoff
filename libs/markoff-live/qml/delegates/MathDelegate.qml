@@ -39,8 +39,12 @@ Item {
             width: parent.width - 16
             anchors.horizontalCenter: parent.horizontalCenter
             text: root.blockText
-            font.family: "monospace"
-            font.pixelSize: 13
+            // Math uses Slot.Math (id 12); falls through Slot→Monospace role.
+            font.family: (root.liveBinding && root.liveBinding.theme)
+                           ? root.liveBinding.theme.familyFor(12) : "monospace"
+            font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
+                              ? root.liveBinding.theme.pixelSizeFor(12) : 13)
+                            * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.mid
             wrapMode: Text.Wrap
         }
@@ -70,8 +74,12 @@ Item {
             readOnly: false
             textFormat: TextEdit.PlainText
             wrapMode: TextEdit.Wrap
-            font.family: "monospace"
-            font.pixelSize: 13
+            // Math uses Slot.Math (id 12); falls through Slot→Monospace role.
+            font.family: (root.liveBinding && root.liveBinding.theme)
+                           ? root.liveBinding.theme.familyFor(12) : "monospace"
+            font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
+                              ? root.liveBinding.theme.pixelSizeFor(12) : 13)
+                            * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.text
 
             Keys.priority: Keys.BeforeItem

@@ -152,6 +152,10 @@ ListView {
         w.addAction(ac.italicAction)
         w.addAction(ac.linkAction)
         w.addAction(ac.saveAction)
+        w.addAction(ac.zoomInAction)
+        w.addAction(ac.zoomOutAction)
+        w.addAction(ac.zoomResetAction)
+        w.addAction(ac.toggleDarkAction)
         root._actionsInstalled = true
     }
     Window.onWindowChanged: _installActions()
@@ -167,7 +171,22 @@ ListView {
         delegate: RemoteCursorOverlay {
             cursorColor: model.color
             cursorLabel: model.label
+            liveBinding: root.binding
             x: 0; y: 0
+        }
+    }
+
+    // ---- Ctrl+wheel zoom ----
+    WheelHandler {
+        target: null
+        acceptedModifiers: Qt.ControlModifier
+        onWheel: (event) => {
+            const steps = event.angleDelta.y / 120.0
+            if (steps === 0) return
+            const b = root.binding
+            if (!b) return
+            b.fontScale = b.fontScale * Math.pow(b.fontScaleStep, steps)
+            event.accepted = true
         }
     }
 
