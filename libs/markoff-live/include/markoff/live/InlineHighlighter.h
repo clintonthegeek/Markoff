@@ -38,6 +38,9 @@ public:
     int  selectionStart() const noexcept { return m_selStart; }
     int  selectionEnd()   const noexcept { return m_selEnd;   }
 
+    void  setFontScale(qreal s);
+    qreal fontScale() const noexcept { return m_fontScale; }
+
 protected:
     void highlightBlock(const QString &text) override;
 
@@ -48,9 +51,10 @@ private:
 
     QList<Markoff::SourceSpan> m_spans;
     const Markoff::Theme      *m_theme = nullptr;
-    int m_localCaretPos = -1;
-    int m_selStart      = -1;
-    int m_selEnd        = -1;
+    int   m_localCaretPos = -1;
+    int   m_selStart      = -1;
+    int   m_selEnd        = -1;
+    qreal m_fontScale     = 1.0;
 };
 
 }  // namespace Markoff::Live

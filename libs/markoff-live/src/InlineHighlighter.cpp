@@ -100,12 +100,10 @@ QTextCharFormat InlineHighlighter::formatFor(const Markoff::SourceSpan &span) co
         const QColor bg = m_theme->color(Markoff::Theme::Slot::CodeBlockBackground);
         if (fg.isValid()) fmt.setForeground(fg);
         if (bg.isValid()) fmt.setBackground(bg);
-        // Apply monospace font family without clobbering other font properties
-        // (e.g. strikethrough). Merge the monospace font via fontMerge so that
-        // only the family/size change; decoration flags set earlier are preserved.
         QFont mono = m_theme->font(Markoff::Theme::FontRole::Monospace);
         fmt.setFontFamilies(mono.families());
-        fmt.setFontPointSize(mono.pointSizeF() > 0 ? mono.pointSizeF() : fmt.fontPointSize());
+        const qreal basePt = mono.pointSizeF() > 0 ? mono.pointSizeF() : 11.0;
+        fmt.setFontPointSize(basePt * m_fontScale);
         any = true;
     }
 
@@ -131,6 +129,14 @@ void InlineHighlighter::setLocalCaretPosition(int qtPos)
 {
     if (m_localCaretPos == qtPos) return;
     m_localCaretPos = qtPos;
+    rehighlight();
+}
+
+void InlineHighlighter::setFontScale(qreal s)
+{
+    if (s <= 0) s = 1.0;
+    if (qFuzzyCompare(m_fontScale, s)) return;
+    m_fontScale = s;
     rehighlight();
 }
 
