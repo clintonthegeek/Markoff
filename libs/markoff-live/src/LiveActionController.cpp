@@ -10,6 +10,7 @@
 #include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/LiveClipboardController.h>
 #include <markoff/live/LiveFormatController.h>
+#include <markoff/live/LiveListModelBinding.h>
 
 namespace Markoff::Live {
 
@@ -33,6 +34,9 @@ void LiveActionController::setupActions() {
     m_italic    = new QAction(tr("Italic"),     this);
     m_link      = new QAction(tr("Link"),       this);
     m_save      = new QAction(tr("Save"),       this);
+    m_zoomIn    = new QAction(tr("Zoom In"),    this);
+    m_zoomOut   = new QAction(tr("Zoom Out"),   this);
+    m_zoomReset = new QAction(tr("Reset Zoom"), this);
 
     m_cut->setShortcut(QKeySequence::Cut);
     m_copy->setShortcut(QKeySequence::Copy);
@@ -45,10 +49,18 @@ void LiveActionController::setupActions() {
     m_link->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_K));
     m_save->setShortcut(QKeySequence::Save);
     m_delete->setShortcut(QKeySequence::Delete);
+    m_zoomIn->setShortcuts({
+        QKeySequence(Qt::CTRL | Qt::Key_Equal),
+        QKeySequence(Qt::CTRL | Qt::Key_Plus),
+        QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Equal),
+    });
+    m_zoomOut  ->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus));
+    m_zoomReset->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
 
     // Initial enabled state (all disabled until document+selection wired).
     for (auto *a : {m_cut, m_copy, m_paste, m_selectAll, m_delete,
-                    m_undo, m_redo, m_bold, m_italic, m_link, m_save})
+                    m_undo, m_redo, m_bold, m_italic, m_link, m_save,
+                    m_zoomIn, m_zoomOut, m_zoomReset})
         a->setEnabled(false);
 
     // Wire triggers.
@@ -66,6 +78,15 @@ void LiveActionController::setupActions() {
     });
     connect(m_redo, &QAction::triggered, this, [this] {
         if (m_document) m_document->redoD2();
+    });
+    connect(m_zoomIn, &QAction::triggered, this, [this]{
+        if (m_binding) m_binding->setFontScale(m_binding->fontScale() * kFontScaleStep);
+    });
+    connect(m_zoomOut, &QAction::triggered, this, [this]{
+        if (m_binding) m_binding->setFontScale(m_binding->fontScale() / kFontScaleStep);
+    });
+    connect(m_zoomReset, &QAction::triggered, this, [this]{
+        if (m_binding) m_binding->setFontScale(kDefaultFontScale);
     });
     // cut/copy/paste wired after setClipboardController.
     // bold/italic/link wired after setFormatController.
@@ -128,6 +149,16 @@ void LiveActionController::updateEnabledStates() {
     m_bold->setEnabled(hasSel && hasDoc);
     m_italic->setEnabled(hasSel && hasDoc);
     m_link->setEnabled(hasDoc);  // link allows empty selection (placeholder)
+
+    const bool hasBinding = m_binding != nullptr;
+    m_zoomIn   ->setEnabled(hasBinding);
+    m_zoomOut  ->setEnabled(hasBinding);
+    m_zoomReset->setEnabled(hasBinding);
+}
+
+void LiveActionController::setBinding(LiveListModelBinding *b) {
+    m_binding = b;
+    updateEnabledStates();
 }
 
 void LiveActionController::setFormatController(LiveFormatController *fc) {

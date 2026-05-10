@@ -12,6 +12,7 @@ namespace Markoff::Live {
 class LiveSelectionView;
 class LiveClipboardController;
 class LiveFormatController;
+class LiveListModelBinding;
 
 class MARKOFF_LIVE_EXPORT LiveActionController : public QObject {
     Q_OBJECT
@@ -27,6 +28,9 @@ class MARKOFF_LIVE_EXPORT LiveActionController : public QObject {
     Q_PROPERTY(QAction *italicAction    READ italicAction    CONSTANT)
     Q_PROPERTY(QAction *linkAction      READ linkAction      CONSTANT)
     Q_PROPERTY(QAction *saveAction      READ saveAction      CONSTANT)
+    Q_PROPERTY(QAction *zoomInAction    READ zoomInAction    CONSTANT)
+    Q_PROPERTY(QAction *zoomOutAction   READ zoomOutAction   CONSTANT)
+    Q_PROPERTY(QAction *zoomResetAction READ zoomResetAction CONSTANT)
 
 public:
     explicit LiveActionController(QObject *parent = nullptr);
@@ -35,6 +39,7 @@ public:
     void setSelectionView(LiveSelectionView *sv);
     void setClipboardController(LiveClipboardController *cc);
     void setFormatController(LiveFormatController *fc);
+    void setBinding(LiveListModelBinding *b);
 
     QAction *cutAction()       const { return m_cut; }
     QAction *copyAction()      const { return m_copy; }
@@ -47,6 +52,9 @@ public:
     QAction *italicAction()    const { return m_italic; }
     QAction *linkAction()      const { return m_link; }
     QAction *saveAction()      const { return m_save; }
+    QAction *zoomInAction()    const { return m_zoomIn; }
+    QAction *zoomOutAction()   const { return m_zoomOut; }
+    QAction *zoomResetAction() const { return m_zoomReset; }
 
 Q_SIGNALS:
     void saveRequested();
@@ -64,6 +72,7 @@ private:
     LiveSelectionView         *m_selection  = nullptr;
     LiveClipboardController   *m_clipboard  = nullptr;
     LiveFormatController      *m_format     = nullptr;
+    LiveListModelBinding      *m_binding    = nullptr;
 
     QAction *m_cut       = nullptr;
     QAction *m_copy      = nullptr;
@@ -76,6 +85,9 @@ private:
     QAction *m_italic    = nullptr;
     QAction *m_link      = nullptr;
     QAction *m_save      = nullptr;
+    QAction *m_zoomIn    = nullptr;
+    QAction *m_zoomOut   = nullptr;
+    QAction *m_zoomReset = nullptr;
 };
 
 }  // namespace Markoff::Live
