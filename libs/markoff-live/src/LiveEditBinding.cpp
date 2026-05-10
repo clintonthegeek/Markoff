@@ -167,6 +167,11 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     // onD2Changed reads m_cursor's qtPos to decide where to re-anchor
     // the caret on the about-to-be-swapped delegate; if we sync after
     // the flush, that read would see the user's STALE pre-edit qtPos.
+    //
+    // syncFromTextEdit emits cursorChanged when m_cursor moves. The
+    // delegate's onCursorChanged handler writes the same qtPos back
+    // into edit.cursorPosition — a no-op for the active TextEdit
+    // (Qt clamps writes to the current value). Safe.
     if (auto *cs = m_binding->cursorState())
         cs->syncFromTextEdit(record.blockAnchor, qtPos + charsAdded);
 

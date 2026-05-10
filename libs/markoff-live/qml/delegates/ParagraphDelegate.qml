@@ -48,7 +48,7 @@ Item {
         // through within-block typing and within-block arrow nav.
         onCursorPositionChanged: {
             const cs = root.liveBinding ? root.liveBinding.cursorState : null
-            if (cs && model.blockAnchor !== undefined)
+            if (model.blockAnchor !== undefined && cs)
                 cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
         }
 
