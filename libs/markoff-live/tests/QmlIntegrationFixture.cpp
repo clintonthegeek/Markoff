@@ -92,18 +92,35 @@ QmlIntegrationFixture::~QmlIntegrationFixture() = default;
 QObject *QmlIntegrationFixture::binding()           { return m_binding; }
 QAbstractItemModel *QmlIntegrationFixture::model()  { return m_model; }
 
+// Non-failing variant used by wait helpers that poll before the ListView
+// has necessarily been realised. Returns nullptr without asserting.
+//
+// LiveView.qml's root IS a ListView, but Qt 6.x QML compilation wraps it in
+// a generated type (e.g. "LiveView_QMLTYPE_3") so qstrcmp against
+// "QQuickListView" fails. Instead we walk the superclass chain via
+// metaObject()->inherits(), which traverses into the C++ base classes.
+// This identifies the LiveView item regardless of the generated type name.
+static QQuickItem *findListViewInWindow(QQuickWindow *window) {
+    for (QObject *child : window->findChildren<QObject *>()) {
+        auto *item = qobject_cast<QQuickItem *>(child);
+        if (!item) continue;
+        // Walk superclass chain: LiveView.qml is a subtype of QQuickListView
+        // but Qt 6.x QML compilation gives it a generated class name like
+        // "LiveView_QMLTYPE_N", so qstrcmp against "QQuickListView" misses it.
+        const QMetaObject *mo = item->metaObject();
+        while (mo) {
+            if (qstrcmp(mo->className(), "QQuickListView") == 0)
+                return item;
+            mo = mo->superClass();
+        }
+    }
+    return nullptr;
+}
+
 QQuickItem *QmlIntegrationFixture::listView() {
     if (m_listView)
         return m_listView;
-    // Walk visible children for a QQuickListView item.
-    for (QObject *child : m_window->findChildren<QObject *>()) {
-        auto *item = qobject_cast<QQuickItem *>(child);
-        if (!item) continue;
-        if (qstrcmp(item->metaObject()->className(), "QQuickListView") == 0) {
-            m_listView = item;
-            break;
-        }
-    }
+    m_listView = findListViewInWindow(m_window);
     if (!m_listView) {
         QTest::qFail("QQuickListView not found in window", __FILE__, __LINE__);
         return nullptr;
@@ -111,20 +128,47 @@ QQuickItem *QmlIntegrationFixture::listView() {
     return m_listView;
 }
 
+// Walk the ListView's contentItem children looking for the delegate
+// whose "modelIndex" Q_PROPERTY matches `row`. This avoids itemAtIndex
+// which requires the item to be inside the visible viewport geometry —
+// under the offscreen QPA that check can fail even for realised items.
+// The delegates (ParagraphDelegate etc.) expose `property int modelIndex`
+// so it is accessible as a QObject property.
+static QQuickItem *findDelegateByRow(QQuickItem *lv, int row) {
+    QVariant contentItemVar = lv->property("contentItem");
+    QQuickItem *contentItem = contentItemVar.value<QQuickItem *>();
+    if (!contentItem) return nullptr;
+    for (QQuickItem *child : contentItem->childItems()) {
+        QVariant indexProp = child->property("modelIndex");
+        if (indexProp.isValid() && indexProp.toInt() == row)
+            return child;
+    }
+    return nullptr;
+}
+
 QQuickItem *QmlIntegrationFixture::delegateAt(int row) {
     QQuickItem *lv = listView();
     if (!lv) return nullptr;
-    QQuickItem *item = nullptr;
-    QMetaObject::invokeMethod(lv, "itemAtIndex", Qt::DirectConnection,
-                              Q_RETURN_ARG(QQuickItem *, item),
-                              Q_ARG(int, row));
-    return item;
+    return findDelegateByRow(lv, row);
+}
+
+// Returns true if `item` is a QQuickTextEdit (or a QML subtype of it).
+// Qt 6.x QML compilation wraps QML components in generated types like
+// "QQuickTextEdit_QML_N", so we must walk the superclass chain.
+static bool isTextEditItem(QQuickItem *item) {
+    const QMetaObject *mo = item->metaObject();
+    while (mo) {
+        if (qstrcmp(mo->className(), "QQuickTextEdit") == 0)
+            return true;
+        mo = mo->superClass();
+    }
+    return false;
 }
 
 // Recursive descent: find the first QQuickTextEdit-typed descendant.
 static QQuickItem *findTextEditDescendant(QQuickItem *root) {
     if (!root) return nullptr;
-    if (qstrcmp(root->metaObject()->className(), "QQuickTextEdit") == 0)
+    if (isTextEditItem(root))
         return root;
     for (QQuickItem *child : root->childItems()) {
         if (auto *found = findTextEditDescendant(child))
@@ -167,6 +211,54 @@ QString QmlIntegrationFixture::delegateText(int row) {
 int QmlIntegrationFixture::delegateCursorPos(int row) {
     QQuickItem *te = delegateTextEdit(row);
     return te ? te->property("cursorPosition").toInt() : -1;
+}
+
+bool QmlIntegrationFixture::waitForRowCount(int expected, int timeoutMs) {
+    if (m_model->rowCount() == expected)
+        return true;
+    QSignalSpy insSpy(m_model, &QAbstractItemModel::rowsInserted);
+    QSignalSpy rmSpy(m_model, &QAbstractItemModel::rowsRemoved);
+    QElapsedTimer t; t.start();
+    while (m_model->rowCount() != expected && t.elapsed() < timeoutMs) {
+        insSpy.wait(100);
+        rmSpy.wait(50);
+        QCoreApplication::processEvents();
+    }
+    return m_model->rowCount() == expected;
+}
+
+bool QmlIntegrationFixture::waitForDelegateAt(int row, int timeoutMs) {
+    // Use the non-failing listView lookup so polling before the ListView
+    // is realised does not cascade QTest::qFail calls.
+    // Walk contentItem children directly rather than itemAtIndex — the latter
+    // requires viewport visibility which may not hold under offscreen QPA.
+    auto itemAt = [&]() -> QQuickItem * {
+        QQuickItem *lv = m_listView ? m_listView : findListViewInWindow(m_window);
+        if (!lv) return nullptr;
+        if (!m_listView) m_listView = lv; // cache once found
+        return findDelegateByRow(lv, row);
+    };
+    QElapsedTimer t; t.start();
+    while (t.elapsed() < timeoutMs) {
+        if (itemAt() != nullptr)
+            return true;
+        QTest::qWait(25);
+        QCoreApplication::processEvents();
+    }
+    return itemAt() != nullptr;
+}
+
+QQuickItem *QmlIntegrationFixture::focusedDelegate() {
+    for (int row = 0; row < m_model->rowCount(); ++row) {
+        QQuickItem *d = delegateAt(row);
+        if (!d) continue;
+        if (d->hasActiveFocus())
+            return d;
+        QQuickItem *te = findTextEditDescendant(d);
+        if (te && te->hasActiveFocus())
+            return d;
+    }
+    return nullptr;
 }
 
 } // namespace Markoff::Live::Test

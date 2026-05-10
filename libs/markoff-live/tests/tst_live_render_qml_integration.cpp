@@ -45,6 +45,19 @@ private Q_SLOTS:
         // realised — wait for it via the helper added in Task 5.
         // For now just verify buffer and model agree.
     }
+
+    /// Wait helpers smoke: loading a two-block doc, both delegates
+    /// become realised within timeout; focusedDelegate is non-null.
+    void wait_helpers_resolve_two_block_doc() {
+        QmlIntegrationFixture fix(/*markdown=*/"A\n\nB",
+                                  /*expectedRowCount=*/2);
+
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+        QVERIFY(fix.waitForDelegateAt(1, 2000));
+        // At least one delegate has focus (the production ListView focus
+        // policy auto-focuses the first row on load).
+        QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
+    }
 };
 
 QTEST_MAIN(TestLiveRenderQmlIntegration)

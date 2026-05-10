@@ -49,6 +49,15 @@ public:
     QObject            *binding();
     QAbstractItemModel *model();
 
+    // Wait helpers (return false on timeout; tests should QVERIFY).
+    bool waitForRowCount(int expected, int timeoutMs = 2000);
+    bool waitForDelegateAt(int row, int timeoutMs = 2000);
+
+    /// Returns the delegate (or null) that currently has activeFocus —
+    /// either it or one of its children. Used by Tasks 8+ to assert
+    /// focus migration after Enter / arrow keys.
+    QQuickItem *focusedDelegate();
+
     // Resolved QML objects (cached on first access)
     QQuickItem *listView();
     QQuickItem *delegateAt(int row);
