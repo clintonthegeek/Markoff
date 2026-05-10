@@ -162,14 +162,6 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     UndoLog::Transaction t(undoLog);
     doc->d2ApplyBufferEdit(record.blockAnchor, byteOff, removedBytes, inserted, t);
 
-    // Keep the canonical cursor in sync with the user's post-edit
-    // caret. Without this, m_cursor would still point at the user's
-    // last click position; any subsequent kind transition or
-    // structural diff would land the new delegate's caret at the
-    // stale qtPos (setext / ATX cursor-loss bugs S1/S2/S3).
-    if (auto *cs = m_binding->cursorState())
-        cs->syncFromTextEdit(record.blockAnchor, qtPos + charsAdded);
-
     // Flush the queued d2DocumentChanged synchronously so the span-update
     // cascade (model → delegate.spans binding → InlineHighlighter::setInlineSpans
     // → rehighlight) lands inside the QTextDocument::contentsChange emission
@@ -179,6 +171,23 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     // insertion point appear visible for one paint frame before the
     // debounced d2-changed timer fires and corrects them.
     doc->flushPendingD2Changed();
+
+    // Keep the canonical cursor in sync with the user's post-edit
+    // caret. Without this, m_cursor would still point at the user's
+    // last click position; any subsequent kind transition or
+    // structural diff would land the new delegate's caret at the
+    // stale qtPos (setext / ATX cursor-loss bugs S1/S2/S3).
+    //
+    // Order matters: this MUST run AFTER flushPendingD2Changed so the
+    // model is up-to-date when the cursorChanged emission propagates
+    // through the delegate's onCursorChanged. focusedQtPos's clamp
+    // reads model.text.size() — if the model is still stale (no
+    // applyOps yet), the clamp would return 0 and the delegate would
+    // write edit.cursorPosition = 0, overriding the framework's
+    // post-insert cursor advance. Symptom: typing reverses character
+    // order ("|abc" instead of "abc|").
+    if (auto *cs = m_binding->cursorState())
+        cs->syncFromTextEdit(record.blockAnchor, qtPos + charsAdded);
 }
 
 void LiveEditBinding::onFocusLost()

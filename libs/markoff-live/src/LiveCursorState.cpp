@@ -162,8 +162,22 @@ void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
     if (m_cursor == newCursor) return;
     if (!validateVariant(newCursor)) return;
 
+    // Detect block change (cross-block move would normally come via
+    // request(), not here, but be safe). qtPos-only changes within the
+    // same block are silent: the delegate's TextEdit ALREADY has its
+    // cursor at the new qtPos (that's why we're syncing). Emitting
+    // cursorChanged here would trigger the delegate's onCursorChanged
+    // to write edit.cursorPosition back from focusedQtPos — and if
+    // that read happens while the model is mid-update (focusedQtPos
+    // clamps to model.text.size()), the writeback can ratchet the
+    // cursor backwards over the freshly-typed character.
+    bool blockChanged = true;
+    if (const auto *oldTc = std::get_if<TextCaret>(&m_cursor))
+        blockChanged = (oldTc->block != tc.block);
+
     m_cursor = newCursor;
-    Q_EMIT cursorChanged();
+    if (blockChanged)
+        Q_EMIT cursorChanged();
 }
 
 void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor,
