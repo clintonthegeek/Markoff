@@ -50,6 +50,14 @@ void InlineHighlighterAttached::setTheme(const Markoff::Theme *theme)
     emit themeChanged();
 }
 
+void InlineHighlighterAttached::setFontScale(qreal s)
+{
+    if (qFuzzyCompare(m_fontScale, s)) return;
+    m_fontScale = s;
+    if (m_highlighter) m_highlighter->setFontScale(m_fontScale);
+    Q_EMIT fontScaleChanged();
+}
+
 void InlineHighlighterAttached::rebuildHighlighter()
 {
     if (m_highlighter) {
@@ -62,6 +70,7 @@ void InlineHighlighterAttached::rebuildHighlighter()
     m_highlighter = new InlineHighlighter(doc);
     m_highlighter->setParent(this);
     m_highlighter->setTheme(m_theme);
+    m_highlighter->setFontScale(m_fontScale);
     m_highlighter->setInlineSpans(m_spans);
     m_highlighter->setLocalCaretPosition(m_caretPos);
     m_highlighter->setSelectionRange(m_selStart, m_selEnd);
