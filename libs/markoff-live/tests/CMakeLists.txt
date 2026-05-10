@@ -50,6 +50,15 @@ target_link_libraries(tst_live_render_structural PRIVATE
     markoff_live markoff_core)
 add_test(NAME tst_live_render_structural COMMAND tst_live_render_structural)
 
+qt_add_executable(tst_live_render_setext_e2e
+    tst_live_render_setext_e2e.cpp
+)
+target_link_libraries(tst_live_render_setext_e2e PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::Widgets Qt6::Test
+    markoff_live markoff_core)
+add_test(NAME tst_live_render_setext_e2e
+         COMMAND tst_live_render_setext_e2e)
+
 qt_add_executable(tst_live_render_kind_transition
     tst_live_render_kind_transition.cpp
 )
