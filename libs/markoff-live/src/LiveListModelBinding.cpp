@@ -392,11 +392,22 @@ void LiveListModelBinding::onD2Changed()
             const bool setextLost = (form == QStringLiteral("setext")
                                       && matchesSetextShape(rec.text) == 0);
             if (atxLost || setextLost) {
-                // Caret re-anchoring is handled implicitly: m_cursor is
-                // kept canonical via LiveCursorState::syncFromTextEdit
-                // (called from LiveEditBinding and each text-bearing
-                // delegate). When the new delegate is constructed,
-                // Component.onCompleted reads the already-current qtPos.
+                // Re-anchor the caret on the about-to-be-swapped
+                // delegate. m_cursor's qtPos is current (kept canonical
+                // by syncFromTextEdit), but it can exceed the new
+                // (post-chop) text length — clamp before requesting.
+                // Bug S1 (setext demote loses focus) and S3 (ATX
+                // demote jumps caret to position 0) both trace here.
+                if (d->cursorState) {
+                    const Markoff::Cursor cur = d->cursorState->cursor();
+                    if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
+                        tc && tc->block == rec.blockAnchor) {
+                        const int qtPosClamped = std::min(
+                            int(tc->cachedByteOffset), int(rec.text.size()));
+                        d->cursorState->requestTextCaretAtAnchor(
+                            rec.blockAnchor, qtPosClamped);
+                    }
+                }
                 Markoff::Cmd::changeKind(*doc, Markoff::BlockId(rec.blockAnchor),
                                          Markoff::BlockKind::Paragraph, {}, {});
                 return;
@@ -500,6 +511,20 @@ void LiveListModelBinding::onD2Changed()
             attrVals  << displayMode;
         }
 
+        // Re-anchor caret on the about-to-be-swapped delegate. Bug S2
+        // (setext promote on first underline char loses focus) traces
+        // here. Buffer text is unchanged by changeKind, so the
+        // canonical m_cursor.qtPos remains valid in the new delegate.
+        if (d->cursorState) {
+            const Markoff::Cursor cur = d->cursorState->cursor();
+            if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
+                tc && tc->block == rec.blockAnchor) {
+                const int qtPosClamped = std::min(
+                    int(tc->cachedByteOffset), int(rec.text.size()));
+                d->cursorState->requestTextCaretAtAnchor(
+                    rec.blockAnchor, qtPosClamped);
+            }
+        }
         Markoff::Cmd::changeKind(*doc,
                                   Markoff::BlockId(rec.blockAnchor),
                                   fk, attrNames, attrVals);
