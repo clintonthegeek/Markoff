@@ -6,6 +6,8 @@
 #include <QString>
 #include <memory>
 
+#include <markoff/core/BlockId.h>
+
 #include "LiveRealisticInputHarness.h"
 
 class QAbstractItemModel;
@@ -47,6 +49,17 @@ public:
     QObject            *binding();
     QAbstractItemModel *model();
 
+    // Resolved QML objects (cached on first access)
+    QQuickItem *listView();
+    QQuickItem *delegateAt(int row);
+    QQuickItem *delegateTextEdit(int row); // recursive find of TextEdit child
+
+    // Three-layer state (per spec §5.1)
+    QByteArray bufferText(Markoff::BlockId id);
+    QString    modelText(int row);
+    QString    delegateText(int row);
+    int        delegateCursorPos(int row);
+
     LiveRealisticInputHarness &harness() { return *m_harness; }
 
 private:
@@ -59,6 +72,7 @@ private:
     QQuickWindow                             *m_window = nullptr;
     QObject                                  *m_binding = nullptr;
     QAbstractItemModel                       *m_model = nullptr;
+    QQuickItem                               *m_listView = nullptr;
     std::unique_ptr<LiveRealisticInputHarness> m_harness;
 };
 

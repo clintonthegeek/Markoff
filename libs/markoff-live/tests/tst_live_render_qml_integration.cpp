@@ -2,6 +2,8 @@
 #include <QTest>
 #include <QQuickWindow>
 
+#include <markoff/core/MarkoffDocument.h>
+
 #include "QmlIntegrationFixture.h"
 
 using namespace Markoff::Live::Test;
@@ -20,6 +22,28 @@ private Q_SLOTS:
         QVERIFY(fix.window()->isExposed() || fix.window()->isVisible());
         QVERIFY(fix.model() != nullptr);
         QCOMPARE(fix.model()->rowCount(), 0);
+    }
+
+    /// Three-layer convention smoke: after load, all three layers agree on
+    /// the empty-paragraph text. No edits driven; this guards the accessors.
+    void three_layer_accessors_agree_after_load() {
+        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/0);
+
+        const auto blockIds = fix.document()->iterateBlocks();
+        QCOMPARE(blockIds.size(), 0u);
+
+        // With 0 blocks there is nothing to assert on the three layers;
+        // switch to a one-block doc to exercise the accessors.
+        QmlIntegrationFixture fix2(/*markdown=*/"hello", /*expectedRowCount=*/1);
+
+        const auto blockIds2 = fix2.document()->iterateBlocks();
+        QCOMPARE(blockIds2.size(), 1u);
+
+        QCOMPARE(fix2.bufferText(blockIds2[0]), QByteArray("hello"));
+        QCOMPARE(fix2.modelText(0),             QString("hello"));
+        // delegateText and delegateCursorPos need the delegate to be
+        // realised — wait for it via the helper added in Task 5.
+        // For now just verify buffer and model agree.
     }
 };
 

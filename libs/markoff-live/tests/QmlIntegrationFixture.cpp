@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQuickItem>
 #include <QQuickWindow>
 #include <QRandomGenerator>
 #include <QSignalSpy>
@@ -90,5 +91,76 @@ QmlIntegrationFixture::~QmlIntegrationFixture() = default;
 
 QObject *QmlIntegrationFixture::binding()           { return m_binding; }
 QAbstractItemModel *QmlIntegrationFixture::model()  { return m_model; }
+
+QQuickItem *QmlIntegrationFixture::listView() {
+    if (m_listView)
+        return m_listView;
+    // Walk visible children for a QQuickListView item.
+    for (QObject *child : m_window->findChildren<QObject *>()) {
+        auto *item = qobject_cast<QQuickItem *>(child);
+        if (!item) continue;
+        if (qstrcmp(item->metaObject()->className(), "QQuickListView") == 0) {
+            m_listView = item;
+            break;
+        }
+    }
+    Q_ASSERT(m_listView != nullptr);
+    return m_listView;
+}
+
+QQuickItem *QmlIntegrationFixture::delegateAt(int row) {
+    QQuickItem *lv = listView();
+    if (!lv) return nullptr;
+    QQuickItem *item = nullptr;
+    QMetaObject::invokeMethod(lv, "itemAtIndex", Qt::DirectConnection,
+                              Q_RETURN_ARG(QQuickItem *, item),
+                              Q_ARG(int, row));
+    return item;
+}
+
+// Recursive descent: find the first QQuickTextEdit-typed descendant.
+static QQuickItem *findTextEditDescendant(QQuickItem *root) {
+    if (!root) return nullptr;
+    if (qstrcmp(root->metaObject()->className(), "QQuickTextEdit") == 0)
+        return root;
+    for (QQuickItem *child : root->childItems()) {
+        if (auto *found = findTextEditDescendant(child))
+            return found;
+    }
+    return nullptr;
+}
+
+QQuickItem *QmlIntegrationFixture::delegateTextEdit(int row) {
+    QQuickItem *d = delegateAt(row);
+    return d ? findTextEditDescendant(d) : nullptr;
+}
+
+QByteArray QmlIntegrationFixture::bufferText(Markoff::BlockId id) {
+    return m_doc->blockText(id);
+}
+
+QString QmlIntegrationFixture::modelText(int row) {
+    // Look up by role name to avoid hardcoded numeric drift.
+    const auto roles = m_model->roleNames();
+    int textRole = -1;
+    for (auto it = roles.cbegin(); it != roles.cend(); ++it) {
+        if (it.value() == QByteArray("text")) {
+            textRole = it.key();
+            break;
+        }
+    }
+    Q_ASSERT(textRole != -1);
+    return m_model->data(m_model->index(row, 0), textRole).toString();
+}
+
+QString QmlIntegrationFixture::delegateText(int row) {
+    QQuickItem *te = delegateTextEdit(row);
+    return te ? te->property("text").toString() : QString();
+}
+
+int QmlIntegrationFixture::delegateCursorPos(int row) {
+    QQuickItem *te = delegateTextEdit(row);
+    return te ? te->property("cursorPosition").toInt() : -1;
+}
 
 } // namespace Markoff::Live::Test
