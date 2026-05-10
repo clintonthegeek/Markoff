@@ -114,6 +114,45 @@ private Q_SLOTS:
         QCOMPARE(fix.delegateCursorPos(1), 0);
     }
 
+    /// Two single-line paragraphs. Cursor at end of row 1; arrow-up
+    /// crosses to row 0 (no within-block wrapping to walk).
+    void arrow_up_walks_then_crosses_blocks() {
+        QmlIntegrationFixture fix(
+            /*markdown=*/"first paragraph\n\nsecond paragraph",
+            /*expectedRowCount=*/2);
+
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+        QVERIFY(fix.waitForDelegateAt(1, 2000));
+
+        // Focus row 1 via the cursorState API if available, otherwise
+        // click at delegate center.
+        QObject *cursorState = fix.binding()->property("cursorState")
+                                             .value<QObject *>();
+        if (cursorState) {
+            QMetaObject::invokeMethod(cursorState, "requestTextCaretAtRow",
+                                      Qt::DirectConnection,
+                                      Q_ARG(int, 1),
+                                      Q_ARG(int, 16));
+        } else {
+            // Fallback: click center of row-1 delegate
+            QQuickItem *d1 = fix.delegateAt(1);
+            QVERIFY(d1 != nullptr);
+            QPoint center(static_cast<int>(d1->x() + d1->width() / 2),
+                          static_cast<int>(d1->y() + d1->height() / 2));
+            QTest::mouseClick(fix.window(), Qt::LeftButton, Qt::NoModifier, center);
+            QTest::qWait(100);
+        }
+
+        QTRY_COMPARE_WITH_TIMEOUT(fix.focusedDelegate(),
+                                  fix.delegateAt(1), 2000);
+
+        fix.harness().keyClick(Qt::Key_Up);
+
+        QTRY_COMPARE_WITH_TIMEOUT(fix.focusedDelegate(),
+                                  fix.delegateAt(0), 2000);
+        QVERIFY(fix.delegateCursorPos(0) <= 15);
+    }
+
     /// Typing-reverses-chars regression killer. Type "abc" into an
     /// auto-focused empty paragraph; all three layers must agree
     /// on "abc" with cursor at position 3.
