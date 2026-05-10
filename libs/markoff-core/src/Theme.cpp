@@ -134,14 +134,21 @@ Theme Theme::defaultLight()
     t.setColor(Slot::SearchActiveMatchBackground, QColor("#ffb050"));
     t.setBold(Slot::Heading1, true);
     t.setBold(Slot::Heading2, true);
+    t.setBold(Slot::Heading3, true);
     t.setBold(Slot::BoldEmphasis, true);
     t.setItalic(Slot::ItalicEmphasis, true);
+    t.setItalic(Slot::Quote, true);
     t.setFontSizeMultiplier(Slot::Heading1, 1.8);
     t.setFontSizeMultiplier(Slot::Heading2, 1.5);
     t.setFontSizeMultiplier(Slot::Heading3, 1.3);
-    t.setFont(FontRole::Body, QFont("sans-serif", 11));
-    t.setFont(FontRole::Monospace, QFont("monospace", 11));
-    t.setFont(FontRole::Heading, QFont("sans-serif", 11));
+    t.setFontSizeMultiplier(Slot::Heading4, 1.15);
+    t.setFontSizeMultiplier(Slot::Heading5, 1.05);
+    t.setFontSizeMultiplier(Slot::Heading6, 1.0);
+    t.setFontSizeMultiplier(Slot::Math,     1.0);
+    t.setFontSizeMultiplier(Slot::Quote,    1.0);
+    { QFont f("sans-serif"); f.setPointSizeF(10.5); t.setFont(FontRole::Body, f); }
+    { QFont f("monospace");  f.setPointSizeF(9.75); t.setFont(FontRole::Monospace, f); }
+    { QFont f("sans-serif"); f.setPointSizeF(10.5); t.setFont(FontRole::Heading, f); }
     return t;
 }
 
