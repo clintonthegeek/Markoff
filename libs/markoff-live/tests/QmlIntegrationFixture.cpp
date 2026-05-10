@@ -98,7 +98,7 @@ QAbstractItemModel *QmlIntegrationFixture::model()  { return m_model; }
 // LiveView.qml's root IS a ListView, but Qt 6.x QML compilation wraps it in
 // a generated type (e.g. "LiveView_QMLTYPE_3") so qstrcmp against
 // "QQuickListView" fails. Instead we walk the superclass chain via
-// metaObject()->inherits(), which traverses into the C++ base classes.
+// metaObject()->superClass() in a loop, which traverses into the C++ base classes.
 // This identifies the LiveView item regardless of the generated type name.
 static QQuickItem *findListViewInWindow(QQuickWindow *window) {
     for (QObject *child : window->findChildren<QObject *>()) {
