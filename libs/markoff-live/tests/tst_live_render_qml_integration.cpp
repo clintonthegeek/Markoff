@@ -1,4 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QFont>
+#include <QQuickItem>
 #include <QTest>
 #include <QQuickWindow>
 
@@ -57,6 +59,53 @@ private Q_SLOTS:
         // At least one delegate has focus (the production ListView focus
         // policy auto-focuses the first row on load).
         QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
+    }
+
+    /// Typing-reverses-chars regression killer. Type "abc" into an
+    /// auto-focused empty paragraph; all three layers must agree
+    /// on "abc" with cursor at position 3.
+    void typing_preserves_insertion_order() {
+        // Start from scratch with an empty doc (0 blocks). Insert one
+        // empty paragraph block programmatically before the QML runs —
+        // the production architecture requires a block to be present for
+        // typing to land. The regression being guarded is char-reversal
+        // during sequential keystroke processing, which can only manifest
+        // once a block exists and receives focus.
+        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/0);
+
+        // Insert a fresh empty paragraph block so the ListView has something
+        // to render and focus.
+        {
+            Markoff::UndoLog::Transaction t(fix.document()->d2UndoLog());
+            fix.document()->d2InsertBlock(Markoff::BlockId{},
+                                          Markoff::BlockKind::Paragraph, t);
+        }
+
+        QVERIFY(fix.waitForRowCount(1, 2000));
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+
+        // The programmatic d2InsertBlock doesn't set cursor focus the way the
+        // structural-key handler does. Click in the delegate center to focus it.
+        {
+            QQuickItem *d0 = fix.delegateAt(0);
+            QVERIFY(d0 != nullptr);
+            QPoint center(static_cast<int>(d0->x() + d0->width() / 2),
+                          static_cast<int>(d0->y() + d0->height() / 2));
+            QTest::mouseClick(fix.window(), Qt::LeftButton, Qt::NoModifier, center);
+            QTest::qWait(50);
+            QCoreApplication::processEvents();
+        }
+        QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
+
+        fix.harness().typeString("abc");
+
+        const auto blockIds = fix.document()->iterateBlocks();
+        QCOMPARE(blockIds.size(), 1u);
+
+        QCOMPARE(fix.bufferText(blockIds[0]), QByteArray("abc"));
+        QCOMPARE(fix.modelText(0),            QString("abc"));
+        QTRY_COMPARE_WITH_TIMEOUT(fix.delegateText(0), QString("abc"), 1000);
+        QCOMPARE(fix.delegateCursorPos(0),    3);
     }
 };
 
