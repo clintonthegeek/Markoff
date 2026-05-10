@@ -31,6 +31,7 @@ class MARKOFF_LIVE_EXPORT LiveActionController : public QObject {
     Q_PROPERTY(QAction *zoomInAction    READ zoomInAction    CONSTANT)
     Q_PROPERTY(QAction *zoomOutAction   READ zoomOutAction   CONSTANT)
     Q_PROPERTY(QAction *zoomResetAction READ zoomResetAction CONSTANT)
+    Q_PROPERTY(QAction *toggleDarkAction READ toggleDarkAction CONSTANT)
 
 public:
     explicit LiveActionController(QObject *parent = nullptr);
@@ -55,9 +56,11 @@ public:
     QAction *zoomInAction()    const { return m_zoomIn; }
     QAction *zoomOutAction()   const { return m_zoomOut; }
     QAction *zoomResetAction() const { return m_zoomReset; }
+    QAction *toggleDarkAction() const { return m_toggleDark; }
 
 Q_SIGNALS:
     void saveRequested();
+    void themeToggleRequested(bool dark);
 
 public Q_SLOTS:
     void updateEnabledStates();
@@ -88,6 +91,8 @@ private:
     QAction *m_zoomIn    = nullptr;
     QAction *m_zoomOut   = nullptr;
     QAction *m_zoomReset = nullptr;
+    QAction *m_toggleDark = nullptr;
+    bool     m_isDark     = false;
 };
 
 }  // namespace Markoff::Live

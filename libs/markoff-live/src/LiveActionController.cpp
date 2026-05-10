@@ -88,6 +88,14 @@ void LiveActionController::setupActions() {
     connect(m_zoomReset, &QAction::triggered, this, [this]{
         if (m_binding) m_binding->setFontScale(kDefaultFontScale);
     });
+
+    m_toggleDark = new QAction(tr("Toggle Dark Mode"), this);
+    m_toggleDark->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
+    m_toggleDark->setEnabled(true);
+    connect(m_toggleDark, &QAction::triggered, this, [this]{
+        m_isDark = !m_isDark;
+        Q_EMIT themeToggleRequested(m_isDark);
+    });
     // cut/copy/paste wired after setClipboardController.
     // bold/italic/link wired after setFormatController.
 }
