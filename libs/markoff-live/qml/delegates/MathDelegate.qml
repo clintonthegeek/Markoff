@@ -145,9 +145,19 @@ Item {
         onDoubleClicked: if (root.isSelected) root.enterEditMode()
     }
 
+    function takeFocus(qtPos) {
+        root.forceActiveFocus()
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
+    }
+
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs && cs.focusedAnchorRow === root.modelIndex)
-            Qt.callLater(function() { focusEditAt(-1) })
+        if (cs) cs.delegateAvailable(model.blockAnchor, model.kind, root)
+    }
+
+    Component.onDestruction: {
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) cs.delegateGoingAway(model.blockAnchor)
     }
 }

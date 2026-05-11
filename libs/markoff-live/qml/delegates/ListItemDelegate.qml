@@ -215,23 +215,6 @@ Item {
             target: root.selectionView
             function onSelectionChanged() { edit.applySelection() }
         }
-
-        Connections {
-            target: root.liveBinding ? root.liveBinding.cursorState : null
-            function onCursorChanged() {
-                const cs = root.liveBinding ? root.liveBinding.cursorState : null
-                if (!cs || cs.focusedAnchorRow !== root.modelIndex || cs.focusedQtPos < 0)
-                    return
-                if (cs.pendingVisualLineHint !== 0 && cs.desiredVisualX >= 0) {
-                    root.focusEditAt(cs.focusedQtPos)
-                } else if (edit.cursorPosition !== cs.focusedQtPos) {
-                    // See ParagraphDelegate for the rationale: this guard
-                    // prevents applySelection's cursorPosition echo from
-                    // collapsing the just-rendered selection.
-                    edit.cursorPosition = cs.focusedQtPos
-                }
-            }
-        }
     }
 
     function positionAt(x, y) {
@@ -258,9 +241,18 @@ Item {
             edit.cursorPosition = qtPos
     }
 
+    function takeFocus(qtPos) {
+        edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
+        edit.forceActiveFocus()
+    }
+
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs && cs.focusedAnchorRow === root.modelIndex)
-            Qt.callLater(function() { focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0) })
+        if (cs) cs.delegateAvailable(model.blockAnchor, model.kind, root)
+    }
+
+    Component.onDestruction: {
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) cs.delegateGoingAway(model.blockAnchor)
     }
 }
