@@ -142,9 +142,21 @@ Item {
     function positionAt(x, y) { return edit.positionAt(x - 12, y - edit.topPadding) }
 
     function takeFocus(qtPos) {
-        // INTENTIONALLY EMPTY — falsifiability proof per spec §8.3.
-        // Confirms the invariant tests fail when the chokepoint stops
-        // delivering focus.
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) {
+            const hint = cs.pendingVisualLineHint
+            const desiredX = cs.desiredVisualX
+            if (hint !== 0 && desiredX >= 0) {
+                const lineH = edit.font.pixelSize
+                const targetY = (hint === 1) ? lineH * 0.5 : edit.contentHeight - lineH * 0.5
+                // Blockquote has 12px left margin (not leftPadding property)
+                edit.cursorPosition = edit.positionAt(desiredX - 12, targetY)
+                edit.forceActiveFocus()
+                return
+            }
+        }
+        edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
+        edit.forceActiveFocus()
     }
 
     Component.onCompleted: {
