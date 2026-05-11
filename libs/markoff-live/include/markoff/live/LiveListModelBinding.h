@@ -106,6 +106,17 @@ public:
     void setTheme(const Markoff::Theme *theme);
     Q_INVOKABLE void applyDefaultTheme(bool dark);
 
+    // Theme accessors callable from QML. `Markoff::Theme` is a Q_GADGET; QML
+    // cannot dispatch methods through a `QVariant(const Theme*)` returned from
+    // the `theme` property, so delegates route theme lookups through these
+    // Q_INVOKABLE proxies on the Q_OBJECT binding instead. `slot` matches the
+    // integer value of `Markoff::Theme::Slot` (0 = TextDefault, 1..6 =
+    // Heading1..Heading6, etc.).
+    Q_INVOKABLE qreal   themePixelSizeFor(int slot) const;
+    Q_INVOKABLE QString themeFamilyFor(int slot) const;
+    Q_INVOKABLE bool    themeIsBold(int slot) const;
+    Q_INVOKABLE bool    themeIsItalic(int slot) const;
+
     qreal fontScale()     const noexcept;
     qreal fontScaleStep() const noexcept { return kFontScaleStep; }
     void  setFontScale(qreal s);

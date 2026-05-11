@@ -41,9 +41,9 @@ Item {
             text: root.blockText
             // Math uses Slot.Math (id 12); falls through Slot→Monospace role.
             font.family: (root.liveBinding && root.liveBinding.theme)
-                           ? root.liveBinding.theme.familyFor(12) : "monospace"
+                           ? root.liveBinding.themeFamilyFor(12) : "monospace"
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
-                              ? root.liveBinding.theme.pixelSizeFor(12) : 13)
+                              ? root.liveBinding.themePixelSizeFor(12) : 13)
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.mid
             wrapMode: Text.Wrap
@@ -76,9 +76,9 @@ Item {
             wrapMode: TextEdit.Wrap
             // Math uses Slot.Math (id 12); falls through Slot→Monospace role.
             font.family: (root.liveBinding && root.liveBinding.theme)
-                           ? root.liveBinding.theme.familyFor(12) : "monospace"
+                           ? root.liveBinding.themeFamilyFor(12) : "monospace"
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
-                              ? root.liveBinding.theme.pixelSizeFor(12) : 13)
+                              ? root.liveBinding.themePixelSizeFor(12) : 13)
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.text
 

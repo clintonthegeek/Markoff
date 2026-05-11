@@ -69,7 +69,7 @@ Item {
             color: palette.mid
             font.italic: true
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
-                              ? root.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                              ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                               : 14) * 0.85
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             visible: !root.isAltEditing && root.imgAlt !== ""
@@ -82,7 +82,7 @@ Item {
             anchors.margins: 8
             text: root.imgAlt
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
-                              ? root.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                              ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                               : 14) * 0.85
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             placeholderText: "Alt text…"

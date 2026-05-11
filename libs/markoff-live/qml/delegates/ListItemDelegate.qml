@@ -76,9 +76,9 @@ Item {
         topPadding: 2
         text: root.markerText
         font.family: (root.liveBinding && root.liveBinding.theme)
-                       ? root.liveBinding.theme.familyFor(8 /* Slot.CodeBlock → Monospace */) : "monospace"
+                       ? root.liveBinding.themeFamilyFor(8 /* Slot.CodeBlock → Monospace */) : "monospace"
         font.pixelSize: (root.liveBinding && root.liveBinding.theme
-                          ? root.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                          ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                           : 14)
                         * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
         color: root._fullySelected ? palette.highlightedText : palette.text
@@ -119,10 +119,10 @@ Item {
         readonly property real fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
         readonly property int  baseSlot: 0  // Theme.Slot.TextDefault
 
-        font.pixelSize: theme ? theme.pixelSizeFor(baseSlot) * fontScale : 14 * fontScale
-        font.family:    theme ? theme.familyFor(baseSlot) : ""
-        font.bold:      theme ? theme.isBold(baseSlot) : false
-        font.italic:    theme ? theme.isItalic(baseSlot) : false
+        font.pixelSize: theme ? root.liveBinding.themePixelSizeFor(baseSlot) * fontScale : 14 * fontScale
+        font.family:    theme ? root.liveBinding.themeFamilyFor(baseSlot) : ""
+        font.bold:      theme ? root.liveBinding.themeIsBold(baseSlot) : false
+        font.italic:    theme ? root.liveBinding.themeIsItalic(baseSlot) : false
         color: palette.text
         selectByMouse: false
         persistentSelection: true
@@ -213,7 +213,10 @@ Item {
                     return
                 if (cs.pendingVisualLineHint !== 0 && cs.desiredVisualX >= 0) {
                     root.focusEditAt(cs.focusedQtPos)
-                } else {
+                } else if (edit.cursorPosition !== cs.focusedQtPos) {
+                    // See ParagraphDelegate for the rationale: this guard
+                    // prevents applySelection's cursorPosition echo from
+                    // collapsing the just-rendered selection.
                     edit.cursorPosition = cs.focusedQtPos
                 }
             }
@@ -239,7 +242,8 @@ Item {
                 return
             }
         }
-        if (qtPos >= 0 && qtPos <= edit.length)
+        // See ParagraphDelegate.focusEditAt for the rationale on this guard.
+        if (qtPos >= 0 && qtPos <= edit.length && edit.cursorPosition !== qtPos)
             edit.cursorPosition = qtPos
     }
 

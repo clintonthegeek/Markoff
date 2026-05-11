@@ -39,10 +39,10 @@ Rectangle {
         readonly property real fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
         readonly property int  baseSlot: 8  // Theme.Slot.CodeBlock
 
-        font.pixelSize: theme ? theme.pixelSizeFor(baseSlot) * fontScale : 13 * fontScale
-        font.family:    theme ? theme.familyFor(baseSlot) : "monospace"
-        font.bold:      theme ? theme.isBold(baseSlot) : false
-        font.italic:    theme ? theme.isItalic(baseSlot) : false
+        font.pixelSize: theme ? root.liveBinding.themePixelSizeFor(baseSlot) * fontScale : 13 * fontScale
+        font.family:    theme ? root.liveBinding.themeFamilyFor(baseSlot) : "monospace"
+        font.bold:      theme ? root.liveBinding.themeIsBold(baseSlot) : false
+        font.italic:    theme ? root.liveBinding.themeIsItalic(baseSlot) : false
         color: palette.text
         selectByMouse: false
         persistentSelection: true
@@ -125,7 +125,10 @@ Rectangle {
                     return
                 if (cs.pendingVisualLineHint !== 0 && cs.desiredVisualX >= 0) {
                     root.focusEditAt(cs.focusedQtPos)
-                } else {
+                } else if (edit.cursorPosition !== cs.focusedQtPos) {
+                    // See ParagraphDelegate for the rationale: this guard
+                    // prevents applySelection's cursorPosition echo from
+                    // collapsing the just-rendered selection.
                     edit.cursorPosition = cs.focusedQtPos
                 }
             }
@@ -143,7 +146,7 @@ Rectangle {
             visible: !langTagRow.editing && model.codeLanguage !== ""
             text: model.codeLanguage
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
-                              ? root.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                              ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                               : 14) * 0.8
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.mid
@@ -162,7 +165,7 @@ Rectangle {
             visible: langTagRow.editing
             text: model.codeLanguage
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
-                              ? root.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                              ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                               : 14) * 0.8
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.text
@@ -198,7 +201,8 @@ Rectangle {
                 return
             }
         }
-        if (qtPos >= 0 && qtPos <= edit.length)
+        // See ParagraphDelegate.focusEditAt for the rationale on this guard.
+        if (qtPos >= 0 && qtPos <= edit.length && edit.cursorPosition !== qtPos)
             edit.cursorPosition = qtPos
     }
 

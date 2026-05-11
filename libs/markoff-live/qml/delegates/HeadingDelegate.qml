@@ -49,10 +49,10 @@ Item {
             }
         }
 
-        font.pixelSize: theme ? theme.pixelSizeFor(slotForLevel) * fontScale : 14 * fontScale
-        font.family:    theme ? theme.familyFor(slotForLevel) : ""
-        font.bold:      theme ? theme.isBold(slotForLevel) : (model.headingLevel <= 3)
-        font.italic:    theme ? theme.isItalic(slotForLevel) : false
+        font.pixelSize: theme ? root.liveBinding.themePixelSizeFor(slotForLevel) * fontScale : 14 * fontScale
+        font.family:    theme ? root.liveBinding.themeFamilyFor(slotForLevel) : ""
+        font.bold:      theme ? root.liveBinding.themeIsBold(slotForLevel) : (model.headingLevel <= 3)
+        font.italic:    theme ? root.liveBinding.themeIsItalic(slotForLevel) : false
         color: palette.text
         selectByMouse: false
         persistentSelection: true
@@ -145,7 +145,10 @@ Item {
                     return
                 if (cs.pendingVisualLineHint !== 0 && cs.desiredVisualX >= 0) {
                     root.focusEditAt(cs.focusedQtPos)
-                } else {
+                } else if (edit.cursorPosition !== cs.focusedQtPos) {
+                    // See ParagraphDelegate for the rationale: this guard
+                    // prevents applySelection's cursorPosition echo from
+                    // collapsing the just-rendered selection.
                     edit.cursorPosition = cs.focusedQtPos
                 }
             }
@@ -169,7 +172,8 @@ Item {
                 return
             }
         }
-        if (qtPos >= 0 && qtPos <= edit.length)
+        // See ParagraphDelegate.focusEditAt for the rationale on this guard.
+        if (qtPos >= 0 && qtPos <= edit.length && edit.cursorPosition !== qtPos)
             edit.cursorPosition = qtPos
     }
 

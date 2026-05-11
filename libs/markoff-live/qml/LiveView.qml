@@ -126,43 +126,42 @@ ListView {
         }
     }
 
-    // ---- Wire navigationController.setListView on startup; register window actions ----
-    //
-    // QActions must be installed on the QWindow so QKeySequence shortcuts (Ctrl+S,
-    // Ctrl+C/X/V, Ctrl+Z/Y, etc.) reach LiveActionController instead of falling
-    // through to the focused TextEdit's native handlers (which would copy only
-    // the focused delegate's text). `root.Window.window` may be null at
-    // Component.onCompleted time when LiveView is constructed before the
-    // ApplicationWindow is fully realized; in that case install on the next
-    // Window.onWindowChanged.
-    property bool _actionsInstalled: false
-    function _installActions() {
-        if (root._actionsInstalled) return
-        if (!binding || !binding.actionController) return
-        const w = root.Window.window
-        if (!w) return
-        const ac = binding.actionController
-        w.addAction(ac.cutAction)
-        w.addAction(ac.copyAction)
-        w.addAction(ac.pasteAction)
-        w.addAction(ac.selectAllAction)
-        w.addAction(ac.undoAction)
-        w.addAction(ac.redoAction)
-        w.addAction(ac.boldAction)
-        w.addAction(ac.italicAction)
-        w.addAction(ac.linkAction)
-        w.addAction(ac.saveAction)
-        w.addAction(ac.zoomInAction)
-        w.addAction(ac.zoomOutAction)
-        w.addAction(ac.zoomResetAction)
-        w.addAction(ac.toggleDarkAction)
-        root._actionsInstalled = true
-    }
-    Window.onWindowChanged: _installActions()
+    // ---- Wire navigationController.setListView on startup ----
     Component.onCompleted: {
         if (binding && binding.navigationController)
             binding.navigationController.setListView(root)
-        _installActions()
+    }
+
+    // ---- Zoom + theme shortcuts ----
+    //
+    // QQuickWindow has no addAction() method; QML Shortcut elements are the
+    // correct window-scoped binding for QKeySequence triggers. The wired
+    // QActions in LiveActionController carry the shortcut sequence (so a
+    // future menu/toolbar can present them) and their slots; here we just
+    // route the keystroke to action.trigger().
+    //
+    // Other QActions (cut/copy/paste/save/undo/redo/bold/italic/link) still
+    // need analogous Shortcut wiring — currently no-ops in the standalone
+    // test app; tracked separately.
+    Shortcut {
+        sequences: ["Ctrl+=", "Ctrl++", "Ctrl+Shift+="]
+        enabled: !!root.binding && !!root.binding.actionController
+        onActivated: root.binding.actionController.zoomInAction.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+-"
+        enabled: !!root.binding && !!root.binding.actionController
+        onActivated: root.binding.actionController.zoomOutAction.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+0"
+        enabled: !!root.binding && !!root.binding.actionController
+        onActivated: root.binding.actionController.zoomResetAction.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+D"
+        enabled: !!root.binding && !!root.binding.actionController
+        onActivated: root.binding.actionController.toggleDarkAction.trigger()
     }
 
     // ---- Remote cursor overlays (D5, geometry stub) ----
@@ -177,9 +176,17 @@ ListView {
     }
 
     // ---- Ctrl+wheel zoom ----
+    //
+    // ListView (Flickable) consumes wheel events for scrolling before
+    // PointerHandlers run, so WheelHandler must explicitly take grab from
+    // the flickable when the Ctrl modifier is held. `acceptedModifiers`
+    // gates the handler to only fire on Ctrl+wheel; plain wheel still
+    // scrolls the view normally.
     WheelHandler {
         target: null
         acceptedModifiers: Qt.ControlModifier
+        grabPermissions: PointerHandler.CanTakeOverFromAnything
+                       | PointerHandler.ApprovesTakeOverByItems
         onWheel: (event) => {
             const steps = event.angleDelta.y / 120.0
             if (steps === 0) return

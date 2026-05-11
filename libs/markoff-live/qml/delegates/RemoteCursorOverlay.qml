@@ -24,7 +24,7 @@ Rectangle {
             color: "#ffffff"
             // Remote-cursor label: 0.65x of body size; chrome.
             font.pixelSize: ((overlay.liveBinding && overlay.liveBinding.theme)
-                              ? overlay.liveBinding.theme.pixelSizeFor(0)  // TextDefault
+                              ? overlay.liveBinding.themePixelSizeFor(0)  // TextDefault
                               : 14) * 0.65
                             * (overlay.liveBinding ? overlay.liveBinding.fontScale : 1.0)
         }

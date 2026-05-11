@@ -39,10 +39,10 @@ Item {
         readonly property real fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
         readonly property int  baseSlot: 0  // Theme.Slot.TextDefault
 
-        font.pixelSize: theme ? theme.pixelSizeFor(baseSlot) * fontScale : 14 * fontScale
-        font.family:    theme ? theme.familyFor(baseSlot) : ""
-        font.bold:      theme ? theme.isBold(baseSlot) : false
-        font.italic:    theme ? theme.isItalic(baseSlot) : false
+        font.pixelSize: theme ? root.liveBinding.themePixelSizeFor(baseSlot) * fontScale : 14 * fontScale
+        font.family:    theme ? root.liveBinding.themeFamilyFor(baseSlot) : ""
+        font.bold:      theme ? root.liveBinding.themeIsBold(baseSlot) : false
+        font.italic:    theme ? root.liveBinding.themeIsItalic(baseSlot) : false
         color: palette.text
         // Option B: TextEdit is a renderer + cursor + IME only. All selection
         // is owned by LiveSelectionView and rendered via select()/deselect()
@@ -149,7 +149,12 @@ Item {
                 // column-preservation path (positionAt) is used.
                 if (cs.pendingVisualLineHint !== 0 && cs.desiredVisualX >= 0) {
                     root.focusEditAt(cs.focusedQtPos)
-                } else {
+                } else if (edit.cursorPosition !== cs.focusedQtPos) {
+                    // Skip the reassign when the cursor is already at the
+                    // target qtPos: `moveCursorSelection()` in applySelection()
+                    // triggers cursorPositionChanged → syncFromTextEdit →
+                    // cursorChanged, and re-setting cursorPosition to its
+                    // current value would collapse the freshly-made selection.
                     edit.cursorPosition = cs.focusedQtPos
                 }
             }
@@ -180,8 +185,14 @@ Item {
                 return
             }
         }
-        if (qtPos >= 0 && qtPos <= edit.length)
+        if (qtPos >= 0 && qtPos <= edit.length && edit.cursorPosition !== qtPos)
             edit.cursorPosition = qtPos
+        // NOTE: setting `edit.cursorPosition` collapses any active selection
+        // (Qt moves the cursor with MoveAnchor, which resets the anchor).
+        // The guard above is critical when this function is invoked from
+        // LiveView's onCursorChanged handler during applySelection's
+        // moveCursorSelection — the cursor is already at qtPos and any
+        // selection just rendered must not be clobbered.
     }
 
     /// When a new delegate appears, check if the cursor state is already

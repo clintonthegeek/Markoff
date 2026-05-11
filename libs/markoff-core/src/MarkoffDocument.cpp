@@ -1405,20 +1405,66 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
     uint32_t startWithin = 0;
     uint32_t endWithin   = 0;
 
+    // Boundary disambiguation for startIdx differs by edit shape:
+    //
+    //   * Cursor paste (oldStart == oldEnd): cursor sits at a single byte
+    //     position. A boundary between block N-1 and block N means the
+    //     cursor is at the START of block N — paste-start must land in
+    //     block N (otherwise the new content would be appended to N-1).
+    //
+    //   * Range edit (oldStart != oldEnd, e.g. selection delete): a range
+    //     that starts at the same boundary is conventionally read as
+    //     "starts at end of block N-1" so that a range like
+    //     [start-of-block-1, end-of-block-1] hits the cross-block-edit
+    //     branch and removes block 1 entirely. The legacy `<=` keeps that.
+    //
+    // endIdx always biases to the current block at boundaries — deletes
+    // shouldn't extend into the next block.
+    const bool isCursorEdit = (oldStart == oldEnd);
+
     for (size_t i = 0; i < blocks.size(); ++i) {
         const uint32_t sz     = static_cast<uint32_t>(blockText(blocks[i]).size());
         const uint32_t blkEnd = cursor + sz;
 
-        if (startIdx == -1 && oldStart <= blkEnd) {
-            startIdx    = static_cast<int>(i);
-            startWithin = oldStart - cursor;
+        if (startIdx == -1) {
+            if (isCursorEdit) {
+                // Cursor at start-of-block: bias to this block (paste lands
+                // inside it, not appended to the previous block).
+                if (cursor == oldStart) {
+                    startIdx    = static_cast<int>(i);
+                    startWithin = 0;
+                } else if (oldStart < blkEnd) {
+                    startIdx    = static_cast<int>(i);
+                    startWithin = oldStart - cursor;
+                }
+            } else if (oldStart <= blkEnd) {
+                // Range edit: legacy behavior (boundary biases to current
+                // block so cross-block deletes work).
+                startIdx    = static_cast<int>(i);
+                startWithin = oldStart - cursor;
+            }
         }
-        if (oldEnd <= blkEnd) {
+        // Cursor edits: endIdx == startIdx; computed after the loop.
+        // Range edits: find the block whose end-or-inside contains oldEnd.
+        if (!isCursorEdit && oldEnd <= blkEnd) {
             endIdx    = static_cast<int>(i);
             endWithin = oldEnd - cursor;
             break;
         }
         cursor = blkEnd;
+    }
+
+    // Cursor edits collapse endIdx onto startIdx.
+    if (isCursorEdit && startIdx >= 0) {
+        endIdx    = startIdx;
+        endWithin = startWithin;
+    }
+    // End-of-document append for a cursor edit past the last block.
+    if (isCursorEdit && startIdx == -1 && !blocks.empty()) {
+        startIdx    = static_cast<int>(blocks.size() - 1);
+        startWithin = static_cast<uint32_t>(blockText(blocks.back()).size());
+        endIdx      = startIdx;
+        endWithin   = startWithin;
     }
 
     // Handle empty-document edge case: both indices unset.

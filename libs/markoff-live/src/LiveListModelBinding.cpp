@@ -299,6 +299,26 @@ void LiveListModelBinding::applyDefaultTheme(bool dark)
     setTheme(&t);
 }
 
+qreal LiveListModelBinding::themePixelSizeFor(int slot) const
+{
+    return d->theme.pixelSizeFor(static_cast<Markoff::Theme::Slot>(slot));
+}
+
+QString LiveListModelBinding::themeFamilyFor(int slot) const
+{
+    return d->theme.familyFor(static_cast<Markoff::Theme::Slot>(slot));
+}
+
+bool LiveListModelBinding::themeIsBold(int slot) const
+{
+    return d->theme.isBold(static_cast<Markoff::Theme::Slot>(slot));
+}
+
+bool LiveListModelBinding::themeIsItalic(int slot) const
+{
+    return d->theme.isItalic(static_cast<Markoff::Theme::Slot>(slot));
+}
+
 qreal LiveListModelBinding::fontScale() const noexcept
 {
     return d->fontScale;
