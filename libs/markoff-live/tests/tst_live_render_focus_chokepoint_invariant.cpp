@@ -204,11 +204,11 @@ void TestFocusChokepointInvariant::click_to_focus_paragraph() {
     QVERIFY2(focused, "no focused delegate after click on paragraph");
     const int delegateRow = focused->property("modelIndex").toInt();
     const int cursorRow   = m_fixture->cursorStateCurrentRow();
-    // Bug C: late-firing Qt.callLater from CodeBlock's Component.onCompleted steals
-    // focus after the click (fires during qWait), but cannot update cursor state
-    // (pos out-of-bounds for the code block's short text). Focus and cursor diverge.
-    // Fixed by Tasks 8-9 retiring Qt.callLater from all delegates' onCompleted.
-    QEXPECT_FAIL("", "Bug C — see docs/specs/2026-05-11-focus-chokepoint-design.md §1.1", Abort);
+    // Bug C was the click bypassing the chokepoint because LiveView.qml accessed
+    // `item.model.blockAnchor` from outside the delegate — context properties don't
+    // propagate as root properties, so the call silently fell through to
+    // forceActiveFocus() on the ListView. Fixed by exposing `blockAnchor` as a
+    // root property on every delegate and typed-int parameter on takeFocus.
     QCOMPARE(delegateRow, cursorRow);
 }
 
@@ -218,8 +218,6 @@ void TestFocusChokepointInvariant::click_to_focus_heading() {
     QVERIFY2(focused, "no focused delegate after click on heading");
     const int delegateRow = focused->property("modelIndex").toInt();
     const int cursorRow   = m_fixture->cursorStateCurrentRow();
-    // Bug C: same late-firing Qt.callLater race as click_to_focus_paragraph.
-    QEXPECT_FAIL("", "Bug C — see docs/specs/2026-05-11-focus-chokepoint-design.md §1.1", Abort);
     QCOMPARE(delegateRow, cursorRow);
 }
 

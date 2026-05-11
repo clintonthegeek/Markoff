@@ -349,7 +349,28 @@ void LiveCursorState::endStructuralCascade() {
 void LiveCursorState::delegateAvailable(Markoff::BlockAnchor blockAnchor,
                                         const QString &kind,
                                         QQuickItem *delegateRoot) {
+    // Check BEFORE insert: a pre-existing entry means a kind-transition
+    // replacement (Component.onDestruction on a kind-changing delegate fires
+    // with model.blockAnchor undefined, so delegateGoingAway is never called
+    // and the old entry lingers). Fresh initial-load creations have no entry.
+    const bool wasRegistered = m_delegates.contains(blockAnchor);
     m_delegates.insert(blockAnchor, { kind, QPointer<QQuickItem>(delegateRoot) });
+
+    // Kind-transition re-focus: stage a pending focus so the new delegate
+    // inherits the caret. Works inside and outside the cascade — if we are
+    // inside, endStructuralCascade's tryResolvePending will pick it up.
+    if (wasRegistered && !m_pendingFocus) {
+        if (const auto *tc = std::get_if<TextCaret>(&m_cursor)) {
+            if (tc->block == blockAnchor) {
+                m_pendingFocus = PendingFocus{
+                    blockAnchor,
+                    static_cast<int>(tc->cachedByteOffset),
+                    QDateTime::currentMSecsSinceEpoch()
+                };
+            }
+        }
+    }
+
     if (!m_inStructuralCascade) {
         tryResolvePending();
     }
@@ -373,9 +394,22 @@ void LiveCursorState::tryResolvePending() {
     const QString currentKind = m_model ? m_model->kindFor(anchor) : QString();
     if (it->kind != currentKind) return;
 
-    QMetaObject::invokeMethod(it->root.data(), "takeFocus",
-                              Q_ARG(int, m_pendingFocus->qtPos));
+    const int qtPos = m_pendingFocus->qtPos;
     m_pendingFocus.reset();
+
+    // Update m_cursor before invoking takeFocus. If takeFocus's
+    // cursorPosition assignment is a no-op (cursor already at the target
+    // position — common for empty new paragraphs where pos=0), the
+    // delegate's onCursorPositionChanged won't fire and syncFromTextEdit
+    // won't be called. Without this pre-update, m_cursor would retain
+    // whatever stale anchor it held before the structural event.
+    TextCaret tc;
+    tc.block            = anchor;
+    tc.cachedByteOffset = static_cast<quint32>(qtPos);
+    request(tc);
+
+    QMetaObject::invokeMethod(it->root.data(), "takeFocus",
+                              Q_ARG(int, qtPos));
     // Clear visual-line hint AFTER takeFocus so the delegate can read it.
     if (m_pendingVlhint != VisualLineHint::None) {
         m_pendingVlhint = VisualLineHint::None;

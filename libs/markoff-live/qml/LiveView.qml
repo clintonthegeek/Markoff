@@ -197,7 +197,7 @@ ListView {
                 let anchor = null
                 if (r && r.blockIndex >= 0) {
                     const item = root.itemAtIndex(r.blockIndex)
-                    if (item && item.model) anchor = item.model.blockAnchor
+                    if (item && item.blockAnchor !== undefined) anchor = item.blockAnchor
                 }
                 const gp = mapToGlobal(mouse.x, mouse.y)
                 handler.popup(gp.x, gp.y, anchor)
@@ -267,8 +267,8 @@ ListView {
             binding.selectionView.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
             const cs = binding ? binding.cursorState : null
             const item = root.itemAtIndex(r.blockIndex)
-            if (cs && item && item.model)
-                cs.establishFocus(item.model.blockAnchor, r.qtPos >= 0 ? r.qtPos : 0)
+            if (cs && item && item.blockAnchor !== undefined)
+                cs.establishFocus(item.blockAnchor, r.qtPos >= 0 ? r.qtPos : 0)
             else
                 root.forceActiveFocus()
         }

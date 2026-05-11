@@ -15,6 +15,7 @@ Item {
 
     property int modelIndex: index
     readonly property string blockText: model.text
+    property var blockAnchor: undefined  // captured at Component.onCompleted; stays valid through onDestruction
 
     readonly property var liveBinding:
         ListView.view ? ListView.view.binding : null
@@ -221,7 +222,7 @@ Item {
         return edit.positionAt(x - edit.leftPadding, y - edit.topPadding)
     }
 
-    function takeFocus(qtPos) {
+    function takeFocus(qtPos: int) {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) {
             const hint = cs.pendingVisualLineHint
@@ -240,11 +241,12 @@ Item {
 
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs) cs.delegateAvailable(model.blockAnchor, model.kind, root)
+        blockAnchor = model.blockAnchor
+        if (cs) cs.delegateAvailable(blockAnchor, model.kind, root)
     }
 
     Component.onDestruction: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs) cs.delegateGoingAway(model.blockAnchor)
+        if (cs && blockAnchor !== undefined) cs.delegateGoingAway(blockAnchor)
     }
 }

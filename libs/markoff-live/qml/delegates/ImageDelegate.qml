@@ -10,6 +10,7 @@ Item {
 
     property int modelIndex: index
     readonly property string blockText: model.text
+    property var blockAnchor: undefined  // captured at Component.onCompleted; stays valid through onDestruction
 
     readonly property var liveBinding: ListView.view ? ListView.view.binding : null
     readonly property var cursorState: liveBinding ? liveBinding.cursorState : null
@@ -109,7 +110,7 @@ Item {
 
     function positionAt(x, y) { return -1 }
 
-    function takeFocus(qtPos) {
+    function takeFocus(qtPos: int) {
         root.forceActiveFocus()
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
@@ -153,11 +154,12 @@ Item {
 
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs) cs.delegateAvailable(model.blockAnchor, model.kind, root)
+        blockAnchor = model.blockAnchor
+        if (cs) cs.delegateAvailable(blockAnchor, model.kind, root)
     }
 
     Component.onDestruction: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs) cs.delegateGoingAway(model.blockAnchor)
+        if (cs && blockAnchor !== undefined) cs.delegateGoingAway(blockAnchor)
     }
 }
