@@ -6,6 +6,7 @@
 
 #include <markoff/core/MarkoffDocument.h>
 
+#include <QDateTime>
 #include <QLoggingCategory>
 
 Q_LOGGING_CATEGORY(lcCursor, "markoff.live.cursor", QtWarningMsg)
@@ -317,43 +318,72 @@ void LiveCursorState::attachModel(const LiveBlockModel *model) {
     m_model = model;
 }
 
-// --- §5.1 focus-chokepoint additions (tier-1 stubs; behaviour lands in Task 7) ---
+// --- §5.1 focus-chokepoint implementation ---
 
 void LiveCursorState::establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos) {
-    // TIER-1 STUB. Real implementation lands in Task 7.
-    Q_UNUSED(blockAnchor);
-    Q_UNUSED(qtPos);
+    // §7.3 — drop silently if the anchor isn't in the model AND has no
+    // registered delegate. If the model doesn't know about it, it can't
+    // receive focus in any meaningful way.
+    if (m_model && m_model->kindFor(blockAnchor).isEmpty()
+            && !m_delegates.contains(blockAnchor)) {
+        return;
+    }
+    m_pendingFocus = PendingFocus{
+        blockAnchor,
+        qtPos,
+        QDateTime::currentMSecsSinceEpoch()
+    };
+    if (!m_inStructuralCascade) {
+        tryResolvePending();
+    }
 }
 
 void LiveCursorState::beginStructuralCascade() {
-    // TIER-1 STUB. Real implementation lands in Task 7.
+    m_inStructuralCascade = true;
 }
 
 void LiveCursorState::endStructuralCascade() {
-    // TIER-1 STUB. Real implementation lands in Task 7.
+    m_inStructuralCascade = false;
+    tryResolvePending();
 }
 
 void LiveCursorState::delegateAvailable(Markoff::BlockAnchor blockAnchor,
                                         const QString &kind,
                                         QQuickItem *delegateRoot) {
-    // TIER-1 STUB. Real implementation lands in Task 7.
-    Q_UNUSED(blockAnchor);
-    Q_UNUSED(kind);
-    Q_UNUSED(delegateRoot);
+    m_delegates.insert(blockAnchor, { kind, QPointer<QQuickItem>(delegateRoot) });
+    if (!m_inStructuralCascade) {
+        tryResolvePending();
+    }
 }
 
 void LiveCursorState::delegateGoingAway(Markoff::BlockAnchor blockAnchor) {
-    // TIER-1 STUB. Real implementation lands in Task 7.
-    Q_UNUSED(blockAnchor);
+    m_delegates.remove(blockAnchor);
+    // Pending request NOT cleared — §7.2.
 }
 
 void LiveCursorState::tryResolvePending() {
-    // TIER-1 STUB. Real implementation lands in Task 7.
+    if (!m_pendingFocus) return;
+    expireIfTimedOut(*m_pendingFocus);
+    if (!m_pendingFocus) return;
+
+    const auto anchor = m_pendingFocus->target;
+    const auto it = m_delegates.find(anchor);
+    if (it == m_delegates.end() || !it->root) return;
+
+    // Stale-registration check — spec §5.1.1.
+    const QString currentKind = m_model ? m_model->kindFor(anchor) : QString();
+    if (it->kind != currentKind) return;
+
+    QMetaObject::invokeMethod(it->root.data(), "takeFocus",
+                              Q_ARG(int, m_pendingFocus->qtPos));
+    m_pendingFocus.reset();
 }
 
 void LiveCursorState::expireIfTimedOut(LiveCursorState::PendingFocus &p) {
-    // TIER-1 STUB. Real implementation lands in Task 7.
-    Q_UNUSED(p);
+    const auto now = QDateTime::currentMSecsSinceEpoch();
+    if ((now - p.enqueuedMs) > kPendingFocusTimeoutMs) {
+        m_pendingFocus.reset();
+    }
 }
 
 }  // namespace Markoff::Live
