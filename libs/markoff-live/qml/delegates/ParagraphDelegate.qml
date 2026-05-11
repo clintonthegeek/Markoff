@@ -155,27 +155,6 @@ Item {
             target: root.selectionView
             function onSelectionChanged() { edit.applySelection() }
         }
-
-        Connections {
-            target: root.liveBinding ? root.liveBinding.cursorState : null
-            function onCursorChanged() {
-                const cs = root.liveBinding ? root.liveBinding.cursorState : null
-                if (!cs || cs.focusedAnchorRow !== root.modelIndex || cs.focusedQtPos < 0)
-                    return
-                // If a VisualLineHint is pending, delegate to focusEditAt so the
-                // column-preservation path (positionAt) is used.
-                if (cs.pendingVisualLineHint !== 0 && cs.desiredVisualX >= 0) {
-                    root.focusEditAt(cs.focusedQtPos)
-                } else if (edit.cursorPosition !== cs.focusedQtPos) {
-                    // Skip the reassign when the cursor is already at the
-                    // target qtPos: `moveCursorSelection()` in applySelection()
-                    // triggers cursorPositionChanged → syncFromTextEdit →
-                    // cursorChanged, and re-setting cursorPosition to its
-                    // current value would collapse the freshly-made selection.
-                    edit.cursorPosition = cs.focusedQtPos
-                }
-            }
-        }
     }
 
     function positionAt(x, y) { return edit.positionAt(x - edit.leftPadding, y - edit.topPadding) }
@@ -186,8 +165,6 @@ Item {
     /// before they reach the TextEdit, so we must put focus there
     /// programmatically.
     function focusEditAt(qtPos) {
-        console.log("[dogfood] ParaDelegate.focusEditAt modelIndex=" + root.modelIndex
-            + " qtPos=" + qtPos + " editLen=" + edit.length)
         edit.forceActiveFocus()
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) {
@@ -212,25 +189,18 @@ Item {
         // selection just rendered must not be clobbered.
     }
 
-    /// When a new delegate appears, check if the cursor state is already
-    /// pointing at this row (set synchronously by the structural-key handler
-    /// during Enter / Backspace-merge / Delete-merge / marker insertion). If
-    /// so, focus immediately — the delegate just became live and the
-    /// LiveView's onCursorChanged handler couldn't reach us via itemAtIndex
-    /// earlier.
+    function takeFocus(qtPos) {
+        edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
+        edit.forceActiveFocus()
+    }
+
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (!cs) {
-            console.log("[dogfood] ParaDelegate.onCompleted modelIndex=" + root.modelIndex
-                + " NO cursorState")
-            return
-        }
-        const match = (cs.focusedAnchorRow === root.modelIndex)
-        console.log("[dogfood] ParaDelegate.onCompleted modelIndex=" + root.modelIndex
-            + " focusedAnchorRow=" + cs.focusedAnchorRow
-            + " match=" + match)
-        if (match) {
-            Qt.callLater(function() { focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0) })
-        }
+        if (cs) cs.delegateAvailable(model.blockAnchor, model.kind, root)
+    }
+
+    Component.onDestruction: {
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) cs.delegateGoingAway(model.blockAnchor)
     }
 }
