@@ -2,6 +2,8 @@
 #include "QmlIntegrationFixture.h"
 
 #include <QAbstractItemModel>
+#include <QApplication>
+#include <QClipboard>
 #include <QElapsedTimer>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
@@ -259,6 +261,71 @@ QQuickItem *QmlIntegrationFixture::focusedDelegate() {
             return d;
     }
     return nullptr;
+}
+
+int QmlIntegrationFixture::cursorStateCurrentRow() {
+    QObject *cs = m_binding ? m_binding->property("cursorState").value<QObject *>() : nullptr;
+    if (!cs) return -1;
+    return cs->property("focusedAnchorRow").toInt();
+}
+
+int QmlIntegrationFixture::cursorStateCurrentQtPos() {
+    QObject *cs = m_binding ? m_binding->property("cursorState").value<QObject *>() : nullptr;
+    if (!cs) return -1;
+    return cs->property("focusedQtPos").toInt();
+}
+
+void QmlIntegrationFixture::placeCursorAtPos(int row, int qtPos) {
+    QObject *cs = m_binding ? m_binding->property("cursorState").value<QObject *>() : nullptr;
+    QVERIFY2(cs, "no cursorState on binding");
+    QMetaObject::invokeMethod(cs, "requestTextCaretAtRow",
+                              Qt::DirectConnection,
+                              Q_ARG(int, row), Q_ARG(int, qtPos));
+    QTest::qWait(50);
+    QCoreApplication::processEvents();
+}
+
+void QmlIntegrationFixture::placeCursorAtEndOf(int row) {
+    placeCursorAtPos(row, modelText(row).length());
+}
+
+void QmlIntegrationFixture::pasteText(const QString &text) {
+    QApplication::clipboard()->setText(text);
+    QTest::qWait(20);
+    m_harness->keyClick(Qt::Key_V, Qt::ControlModifier);
+}
+
+void QmlIntegrationFixture::clickOnBlock(int row) {
+    QVERIFY2(waitForDelegateAt(row, 2000),
+             qPrintable(QString("delegate at row %1 not found").arg(row)));
+    QQuickItem *d = delegateAt(row);
+    if (!d) return;
+    QVariant contentItemVar = listView()->property("contentItem");
+    QQuickItem *contentItem = contentItemVar.value<QQuickItem *>();
+    const qreal offsetX = contentItem ? contentItem->x() : 0.0;
+    const qreal offsetY = contentItem ? contentItem->y() : 0.0;
+    const int cx = static_cast<int>(d->x() + d->width() / 2 + offsetX);
+    const int cy = static_cast<int>(d->y() + d->height() / 2 + offsetY);
+    QTest::mouseClick(m_window, Qt::LeftButton, Qt::NoModifier, QPoint(cx, cy));
+    QTest::qWait(50);
+    QCoreApplication::processEvents();
+}
+
+QString QmlIntegrationFixture::documentText() {
+    const auto roles = m_model->roleNames();
+    int textRole = -1;
+    for (auto it = roles.cbegin(); it != roles.cend(); ++it) {
+        if (it.value() == QByteArray("text")) { textRole = it.key(); break; }
+    }
+    if (textRole == -1) return {};
+    QString result;
+    for (int i = 0; i < m_model->rowCount(); ++i) {
+        if (i > 0) result += QLatin1Char('\n');
+        result += m_model->data(m_model->index(i, 0), textRole).toString();
+    }
+    if (!result.isEmpty() && !result.endsWith(QLatin1Char('\n')))
+        result += QLatin1Char('\n');
+    return result;
 }
 
 } // namespace Markoff::Live::Test

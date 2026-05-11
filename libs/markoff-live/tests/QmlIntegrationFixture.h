@@ -58,6 +58,31 @@ public:
     /// focus migration after Enter / arrow keys.
     QQuickItem *focusedDelegate();
 
+    // ---- Chokepoint-invariant helpers (Task 2+) ----
+
+    /// Returns the row index that LiveCursorState.focusedAnchorRow reports.
+    /// -1 means no focused anchor.
+    int cursorStateCurrentRow();
+
+    /// Returns LiveCursorState.focusedQtPos.
+    int cursorStateCurrentQtPos();
+
+    /// Place the cursor at (row, qtPos) via requestTextCaretAtRow and
+    /// waits for the delegate at that row to receive active focus.
+    void placeCursorAtPos(int row, int qtPos);
+
+    /// Place the cursor at the end of the text at `row`.
+    void placeCursorAtEndOf(int row);
+
+    /// Set clipboard to `text` and send Ctrl+V to the window.
+    void pasteText(const QString &text);
+
+    /// Simulate a mouse click at the centre of the delegate at `row`.
+    void clickOnBlock(int row);
+
+    /// Returns all model block texts joined by '\n' with a trailing '\n'.
+    QString documentText();
+
     // Resolved QML objects (cached on first access)
     QQuickItem *listView();
     QQuickItem *delegateAt(int row);

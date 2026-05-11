@@ -514,3 +514,20 @@ add_test(NAME tst_live_render_qml_integration
 set_tests_properties(tst_live_render_qml_integration
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(tst_live_render_focus_chokepoint_invariant
+    tst_live_render_focus_chokepoint_invariant.cpp
+    QmlIntegrationFixture.h
+    QmlIntegrationFixture.cpp
+)
+target_link_libraries(tst_live_render_focus_chokepoint_invariant PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init)
+add_test(NAME tst_live_render_focus_chokepoint_invariant
+         COMMAND tst_live_render_focus_chokepoint_invariant)
+set_tests_properties(tst_live_render_focus_chokepoint_invariant
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
