@@ -97,35 +97,6 @@ ListView {
         return null
     }
 
-    // ---- Cursor-state focus routing ----
-    // When a structural key (Enter mid-block, Backspace-merge, Delete-merge,
-    // marker insert, etc.) updates the cursor state, route keyboard focus
-    // into the target delegate's TextEdit so subsequent typing lands in the
-    // right place.
-    //
-    // If the target delegate is already realized, focusEditAt runs here; if
-    // not (newly-inserted row outside the realized window, or QML hasn't yet
-    // incubated the delegate), the delegate's Component.onCompleted does
-    // the same lookup and self-focuses when it appears.
-    Connections {
-        target: binding ? binding.cursorState : null
-        function onCursorChanged() {
-            if (!binding || !binding.cursorState) return
-            const cs = binding.cursorState
-
-            const innerRow = cs.focusedAnchorRow
-            if (innerRow < 0) {
-                console.log("[dogfood] LiveView.onCursorChanged NONE (no anchor)")
-                return
-            }
-            const item = root.itemAtIndex(innerRow)
-            console.log("[dogfood] LiveView.onCursorChanged ANCHOR innerRow=" + innerRow
-                + " itemFound=" + (item !== null)
-                + " qtPos=" + cs.focusedQtPos)
-            if (item && item.focusEditAt) item.focusEditAt(cs.focusedQtPos >= 0 ? cs.focusedQtPos : 0)
-        }
-    }
-
     // ---- Wire navigationController.setListView on startup ----
     Component.onCompleted: {
         if (binding && binding.navigationController)
@@ -294,13 +265,10 @@ ListView {
                 return
             }
             binding.selectionView.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
-            // Route keyboard focus into the matched delegate's TextEdit so
-            // typing reaches it (R4). The MouseArea has preventStealing:true
-            // and consumes the press, so the TextEdit's native click-to-focus
-            // path doesn't run; we focus it explicitly.
+            const cs = binding ? binding.cursorState : null
             const item = root.itemAtIndex(r.blockIndex)
-            if (item && item.focusEditAt)
-                item.focusEditAt(r.qtPos >= 0 ? r.qtPos : 0)
+            if (cs && item && item.model)
+                cs.establishFocus(item.model.blockAnchor, r.qtPos >= 0 ? r.qtPos : 0)
             else
                 root.forceActiveFocus()
         }
@@ -325,12 +293,6 @@ ListView {
             if (sameBlock && smallDrift) {
                 // Simple click: reset to caret (no drag selection).
                 binding.selectionView.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
-                // Re-confirm focus + caret position on the matched delegate
-                // (the press's focusEditAt may have been pre-empted by the
-                // MouseArea event chain on some platforms).
-                const item = root.itemAtIndex(r.blockIndex)
-                if (item && item.focusEditAt)
-                    item.focusEditAt(r.qtPos >= 0 ? r.qtPos : 0)
             }
         }
     }

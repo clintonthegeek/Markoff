@@ -105,12 +105,6 @@ Item {
 
     function positionAt(x, y) { return -1 }
 
-    function focusEditAt(qtPos) {
-        root.forceActiveFocus()
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
-    }
-
     function enterEditMode() {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) cs.request({ variant: "BlockInternalEdit",

@@ -159,37 +159,19 @@ Item {
 
     function positionAt(x, y) { return edit.positionAt(x - edit.leftPadding, y - edit.topPadding) }
 
-    /// Called by LiveView's MouseArea after a click resolves. Routes
-    /// keyboard focus into the TextEdit so the user can type. R4: the
-    /// LiveView MouseArea has preventStealing:true and consumes clicks
-    /// before they reach the TextEdit, so we must put focus there
-    /// programmatically.
-    function focusEditAt(qtPos) {
-        edit.forceActiveFocus()
+    function takeFocus(qtPos) {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) {
-            const hint = cs.pendingVisualLineHint  // 0=None, 1=FirstLine, 2=LastLine
+            const hint = cs.pendingVisualLineHint
             const desiredX = cs.desiredVisualX
             if (hint !== 0 && desiredX >= 0) {
                 const lineH = edit.font.pixelSize
-                const targetY = (hint === 1)
-                    ? lineH * 0.5
-                    : edit.contentHeight - lineH * 0.5
+                const targetY = (hint === 1) ? lineH * 0.5 : edit.contentHeight - lineH * 0.5
                 edit.cursorPosition = edit.positionAt(desiredX - edit.leftPadding, targetY)
+                edit.forceActiveFocus()
                 return
             }
         }
-        if (qtPos >= 0 && qtPos <= edit.length && edit.cursorPosition !== qtPos)
-            edit.cursorPosition = qtPos
-        // NOTE: setting `edit.cursorPosition` collapses any active selection
-        // (Qt moves the cursor with MoveAnchor, which resets the anchor).
-        // The guard above is critical when this function is invoked from
-        // LiveView's onCursorChanged handler during applySelection's
-        // moveCursorSelection — the cursor is already at qtPos and any
-        // selection just rendered must not be clobbered.
-    }
-
-    function takeFocus(qtPos) {
         edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
         edit.forceActiveFocus()
     }

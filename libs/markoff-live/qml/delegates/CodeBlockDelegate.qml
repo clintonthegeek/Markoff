@@ -179,28 +179,20 @@ Rectangle {
 
     function positionAt(x, y) { return edit.positionAt(x - 8, y - 8) }
 
-    function focusEditAt(qtPos) {
-        edit.forceActiveFocus()
+    function takeFocus(qtPos) {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) {
             const hint = cs.pendingVisualLineHint
             const desiredX = cs.desiredVisualX
             if (hint !== 0 && desiredX >= 0) {
                 const lineH = edit.font.pixelSize
-                const targetY = (hint === 1)
-                    ? lineH * 0.5
-                    : edit.contentHeight - lineH * 0.5
+                const targetY = (hint === 1) ? lineH * 0.5 : edit.contentHeight - lineH * 0.5
                 // CodeBlock TextEdit has 8px margin via anchors.margins
                 edit.cursorPosition = edit.positionAt(desiredX - 8, targetY)
+                edit.forceActiveFocus()
                 return
             }
         }
-        // See ParagraphDelegate.focusEditAt for the rationale on this guard.
-        if (qtPos >= 0 && qtPos <= edit.length && edit.cursorPosition !== qtPos)
-            edit.cursorPosition = qtPos
-    }
-
-    function takeFocus(qtPos) {
         edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
         edit.forceActiveFocus()
     }

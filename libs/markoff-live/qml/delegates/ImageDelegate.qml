@@ -109,7 +109,7 @@ Item {
 
     function positionAt(x, y) { return -1 }
 
-    function focusEditAt(qtPos) {
+    function takeFocus(qtPos) {
         root.forceActiveFocus()
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
@@ -153,7 +153,11 @@ Item {
 
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs && cs.focusedAnchorRow === root.modelIndex)
-            Qt.callLater(function() { focusEditAt(-1) })
+        if (cs) cs.delegateAvailable(model.blockAnchor, model.kind, root)
+    }
+
+    Component.onDestruction: {
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) cs.delegateGoingAway(model.blockAnchor)
     }
 }

@@ -102,25 +102,17 @@ int LiveCursorState::rowForBlock(const Markoff::BlockAnchor &block) const
 
 void LiveCursorState::requestTextCaretAtRow(int expectedRow, int qtPos)
 {
+    // Thin wrapper around establishFocus. Callers that have not yet been
+    // migrated (navigation controller) reach the chokepoint through here.
     if (!m_model) return;
-    if (expectedRow < 0) return;
-    // Drain any queued d2DocumentChanged before resolving. Required when this
-    // request comes immediately after an in-place buffer mutation on the same
-    // row (e.g. paragraph soft-break). resolvePendingForRow fires cursorChanged
-    // synchronously when the row already exists, but the QML delegate's
-    // QTextDocument hasn't been refreshed yet — onCursorChanged would set
-    // edit.cursorPosition against the stale text and a later setPlainText
-    // would reflow the caret. Flushing first ensures the model + bound
-    // QTextDocument are on the post-edit text before the cursor lands.
-    // No-op when nothing is pending. See Option A discussion for rationale.
+    if (expectedRow < 0 || expectedRow >= m_model->rowCount()) return;
+    // Flush queued D2 changes (no-op when nothing is pending) so the
+    // delegate's QTextDocument is on post-edit text before focus lands.
     if (m_binding && m_binding->document())
         m_binding->document()->flushPendingD2Changed();
-    qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtRow row=" << expectedRow
-                      << "qtPos=" << qtPos
-                      << "(model.rowCount=" << m_model->rowCount() << ")";
-    m_pendingRow = PendingRow{ expectedRow, qtPos, std::nullopt };
-    if (expectedRow < m_model->rowCount())
-        resolvePendingForRow(expectedRow);
+    const Markoff::BlockAnchor anchor = m_model->recordAt(expectedRow).blockAnchor;
+    if (anchor == Markoff::BlockAnchor{}) return;
+    establishFocus(anchor, qtPos);
 }
 
 void LiveCursorState::requestTextCaretAtNewRow(int expectedRow, int qtPos)
@@ -384,6 +376,11 @@ void LiveCursorState::tryResolvePending() {
     QMetaObject::invokeMethod(it->root.data(), "takeFocus",
                               Q_ARG(int, m_pendingFocus->qtPos));
     m_pendingFocus.reset();
+    // Clear visual-line hint AFTER takeFocus so the delegate can read it.
+    if (m_pendingVlhint != VisualLineHint::None) {
+        m_pendingVlhint = VisualLineHint::None;
+        Q_EMIT visualLineHintChanged();
+    }
 }
 
 void LiveCursorState::expireIfTimedOut(LiveCursorState::PendingFocus &p) {

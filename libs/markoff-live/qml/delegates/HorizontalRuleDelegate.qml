@@ -38,11 +38,10 @@ Item {
 
     function positionAt(x, y) { return -1 }
 
-    function focusEditAt(qtPos) {
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (!cs) return
+    function takeFocus(qtPos) {
         root.forceActiveFocus()
-        cs.request({ variant: "BlockSelected", block: model.blockAnchor })
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
     }
 
     Keys.priority: Keys.BeforeItem
@@ -62,7 +61,11 @@ Item {
 
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs && cs.focusedAnchorRow === root.modelIndex)
-            Qt.callLater(function() { focusEditAt(-1) })
+        if (cs) cs.delegateAvailable(model.blockAnchor, model.kind, root)
+    }
+
+    Component.onDestruction: {
+        const cs = root.liveBinding ? root.liveBinding.cursorState : null
+        if (cs) cs.delegateGoingAway(model.blockAnchor)
     }
 }
