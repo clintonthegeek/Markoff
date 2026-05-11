@@ -313,28 +313,13 @@ void LiveCursorState::attachModel(const LiveBlockModel *model) {
 // --- §5.1 focus-chokepoint implementation ---
 
 void LiveCursorState::establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos) {
-    // §7.3 — drop silently if the anchor is unknown to model, delegates,
-    // AND the underlying CRDT document. A block just created by enterAtEnd
-    // etc. is in the document but not yet in m_model (onD2Changed hasn't
-    // fired), so we check the document as a last resort before dropping.
-    if (m_model && m_model->kindFor(blockAnchor).isEmpty()
-            && !m_delegates.contains(blockAnchor)) {
-        bool inDoc = false;
-        if (m_binding && m_binding->document()) {
-            for (const auto &id : m_binding->document()->iterateBlocks()) {
-                if (Markoff::BlockAnchor(id) == blockAnchor) { inDoc = true; break; }
-            }
-        }
-        if (!inDoc) return;
-    }
-    m_pendingFocus = PendingFocus{
-        blockAnchor,
-        qtPos,
-        QDateTime::currentMSecsSinceEpoch()
-    };
-    if (!m_inStructuralCascade) {
-        tryResolvePending();
-    }
+    // FALSIFIABILITY PROOF — REVERTS NEXT COMMIT.
+    // Stub the chokepoint entry. If all focus-changing UI gestures
+    // (click, structural keys) genuinely route through establishFocus,
+    // the chokepoint test must go red when this is a no-op. Mirrors
+    // the Task 15 stub which proved takeFocus delivery is wired.
+    Q_UNUSED(blockAnchor);
+    Q_UNUSED(qtPos);
 }
 
 void LiveCursorState::beginStructuralCascade() {
