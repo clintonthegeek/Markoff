@@ -337,6 +337,11 @@ void LiveListModelBinding::onD2Changed()
     auto *doc = d->document;
     if (!doc) return;
 
+    d->cursorState->beginStructuralCascade();
+    auto cascadeGuard = qScopeGuard([this] {
+        d->cursorState->endStructuralCascade();
+    });
+
     // Build the new record list from D2 CRDT state.
     const auto blockIds = doc->iterateBlocks();
     QList<BlockRecord> records;
@@ -434,20 +439,16 @@ void LiveListModelBinding::onD2Changed()
             const bool setextLost = (form == QStringLiteral("setext")
                                       && matchesSetextShape(rec.text) == 0);
             if (atxLost || setextLost) {
-                // Re-anchor the caret on the about-to-be-swapped
-                // delegate. m_cursor's qtPos is current (kept canonical
-                // by syncFromTextEdit), but it can exceed the new
-                // (post-chop) text length — clamp before requesting.
-                // Bug S1 (setext demote loses focus) and S3 (ATX
-                // demote jumps caret to position 0) both trace here.
-                if (d->cursorState) {
+                // Re-anchor the caret on the about-to-be-swapped delegate.
+                // Bug S1 (setext demote loses focus) and S3 (ATX demote
+                // jumps caret to position 0) both trace here.
+                // Clamp lives inside takeFocus (Math.min(qtPos, edit.length)).
+                {
                     const Markoff::Cursor cur = d->cursorState->cursor();
                     if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
                         tc && tc->block == rec.blockAnchor) {
-                        const int qtPosClamped = std::min(
-                            int(tc->cachedByteOffset), int(rec.text.size()));
-                        d->cursorState->requestTextCaretAtAnchor(
-                            rec.blockAnchor, qtPosClamped);
+                        d->cursorState->establishFocus(
+                            rec.blockAnchor, static_cast<int>(tc->cachedByteOffset));
                     }
                 }
                 Markoff::Cmd::changeKind(*doc, Markoff::BlockId(rec.blockAnchor),
@@ -555,16 +556,13 @@ void LiveListModelBinding::onD2Changed()
 
         // Re-anchor caret on the about-to-be-swapped delegate. Bug S2
         // (setext promote on first underline char loses focus) traces
-        // here. Buffer text is unchanged by changeKind, so the
-        // canonical m_cursor.qtPos remains valid in the new delegate.
-        if (d->cursorState) {
+        // here. Clamp lives inside takeFocus (Math.min(qtPos, edit.length)).
+        {
             const Markoff::Cursor cur = d->cursorState->cursor();
             if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
                 tc && tc->block == rec.blockAnchor) {
-                const int qtPosClamped = std::min(
-                    int(tc->cachedByteOffset), int(rec.text.size()));
-                d->cursorState->requestTextCaretAtAnchor(
-                    rec.blockAnchor, qtPosClamped);
+                d->cursorState->establishFocus(
+                    rec.blockAnchor, static_cast<int>(tc->cachedByteOffset));
             }
         }
         Markoff::Cmd::changeKind(*doc,
