@@ -170,4 +170,11 @@ QList<Markoff::SourceSpan> LiveBlockModel::spansAtRow(int row) const
     return m_rows[row].inlineSpans;
 }
 
+QString LiveBlockModel::kindFor(Markoff::BlockAnchor anchor) const
+{
+    for (const auto &r : m_rows)
+        if (r.blockAnchor == anchor) return r.kind;
+    return {};
+}
+
 }  // namespace Markoff::Live

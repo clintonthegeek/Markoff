@@ -71,6 +71,11 @@ public:
 
     const BlockRecord &recordAt(int row) const { return m_rows.at(row); }
 
+    /// Spec 2026-05-11-focus-chokepoint-design.md §5.1.1. Returns the kind
+    /// of the block with the given anchor, or empty string if not found.
+    /// Used by LiveCursorState's stale-registration check.
+    QString kindFor(Markoff::BlockAnchor anchor) const;
+
     // ---- R4 freshness tracking (spec §4.2/§4.3). ----
     // Set by LiveEditBinding on each local keystroke. Read by
     // LiveListModelBinding::onParseUpdated for the parseFreshForRow check.
