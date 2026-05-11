@@ -123,6 +123,19 @@ toggle works; an interactive dogfood pass signs off.
 
 ## #2 — Cursor architecture cleanup
 
+> **2026-05-11 — Tier 1 (focus-chokepoint) implemented.** Concerns
+> **#1 (partial — structural side)**, **#7**, **#8**, **#11** are
+> resolved. See `docs/specs/2026-05-11-focus-chokepoint-design.md`,
+> `docs/plans/2026-05-11-focus-chokepoint.md`, and the dogfood
+> request at `docs/handoff/2026-05-11-focus-chokepoint-dogfood-request.md`.
+> Tag `v0.8.0-focus-chokepoint` held pending interactive sign-off.
+> Remaining concerns (#1 full, #2, #3, #4, #5, #6 full, #9, #10,
+> #12) tier into tier 2/3/4 per spec §10; no spec yet, gated on
+> tier-1 dogfood. Bug C (click-path chokepoint bypass) surfaced
+> only during the Task 16 revert and is also fixed; falsifiability
+> proof now covers both sides of the seam (`establishFocus` stub
+> `20dcaee` + `takeFocus` stub `2d609ba`).
+
 **Effort:** ~3 days. **Status:** critique captured (verbally during
 S1/S2/S3 pass), no spec, no plan.
 
