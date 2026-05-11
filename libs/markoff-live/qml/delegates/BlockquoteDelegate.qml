@@ -51,9 +51,20 @@ Item {
         persistentSelection: true
 
         onCursorPositionChanged: {
+            // See ParagraphDelegate for the rationale on this guard.
             const cs = root.liveBinding ? root.liveBinding.cursorState : null
-            if (model.blockAnchor !== undefined && cs)
+            if (model.blockAnchor !== undefined && cs) {
+                if (editBinding.isApplyingTextUpdate()
+                        && cs.focusedAnchorRow === root.modelIndex) {
+                    if (cs.focusedQtPos >= 0
+                            && cs.focusedQtPos <= edit.length
+                            && edit.cursorPosition !== cs.focusedQtPos) {
+                        edit.cursorPosition = cs.focusedQtPos
+                    }
+                    return
+                }
                 cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
+            }
         }
 
         InlineHighlighterAttached {

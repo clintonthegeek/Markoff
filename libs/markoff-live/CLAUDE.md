@@ -11,15 +11,43 @@ causal-LWW maps) is consumed here through `LiveListModelBinding` /
 - D3 (view-layer adaptation): implemented and dogfooded for non-ListItem
   block kinds. ListItem path is mid-correction — see the active spec.
 
+## Engineering discipline — this library is the seam
+
+This library is where the focus/caret/block-change regressions
+documented in the post-mortems live. The eight invariants in
+[`../../docs/INVARIANTS.md`](../../docs/INVARIANTS.md) apply
+directly to every file under `src/` and `qml/`. Read that file
+before any non-trivial change here. Of particular relevance:
+
+- **L4 is not yet decided in writing** (invariant 2). Until it is,
+  do not add a new path that asserts authority over block content
+  on either side — model or delegate. If you must, your spec
+  states which side wins. This is the precondition for any refactor
+  of `LiveCursorState`, `LiveEditBinding`, `LiveListModelBinding`,
+  or `Connections { onCursorChanged }` / `Component.onCompleted`
+  blocks in delegates.
+- **You will encounter `Qt.callLater` and re-entrance guards** in
+  this directory (current count: 11 `Qt.callLater` sites across 8
+  delegate files; `m_applyingTextUpdate` and `m_applyingSessionSelection`
+  in `LiveEditBinding` / `LiveSelectionView`). Each one is a vote
+  for the seam being unsettled. Log them as you encounter them
+  (invariant 8). Do not silently extend their lineage.
+- **The QML integration harness exists** as of commit `0c2e72d`
+  (`LiveRealisticInputHarness` wired into `tst_live_render_qml_integration`).
+  This is the fixture for invariant 4. Use it for any test that
+  must protect a QML-reached production path.
+
 ## Read before editing
 
 In order:
 
-1. `../../docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation
-2. `../../docs/d-arc/d-arc-status.md` — live status
-3. `../../docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — original
+1. [`../../docs/INVARIANTS.md`](../../docs/INVARIANTS.md) — engineering
+   discipline; the eight invariants apply to every file under this library
+2. `../../docs/d-arc/2026-05-04-d-arc-roadmap.md` — D-arc orientation
+3. `../../docs/d-arc/d-arc-status.md` — live status
+4. `../../docs/specs/2026-05-05-d3-view-layer-adaptation-design.md` — original
    D3 spec; non-ListItem sections still authoritative
-4. `../../docs/specs/2026-05-06-per-item-listitem-blocks-design.md` —
+5. `../../docs/specs/2026-05-06-per-item-listitem-blocks-design.md` —
    **active corrective spec for ListItem.** Do not patch
    `LiveStructuralKeyHandler.cpp`'s ListItem section without reading this
    first. Commits `cc62280`, `799eb94`, `21b2ce3` are over-fits to be

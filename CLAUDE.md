@@ -1,5 +1,16 @@
 # Markoff (exploration/new-foundation branch)
 
+> **2026-05-10 — If interactive dogfood is unavailable, work the queue.**
+> S1/S2/S3 cursor fixes shipped (commits `463fc36..6c44a07`); the
+> `v0.7.0-e2.5` tag is held pending an interactive re-dogfood that
+> requires the user's local desktop. **When the user is remote/SSH or
+> otherwise can't dogfood, the next work to pick up lives in
+> [`docs/queue.md`](docs/queue.md)** — five items ordered by descending
+> execution difficulty, each briefed enough that a fresh agent can
+> draft a spec/plan via `superpowers:brainstorming` +
+> `superpowers:writing-plans` and execute. Top item: E2.6 (theme +
+> zoom). Smallest item: code review of the cursor-fix commit chain.
+>
 > **2026-05-07 — Branch is on D5-first posture. v1.0 plan retired.**
 > Authoritative posture for the branch is
 > `docs/handoff/2026-05-07-pivot-to-d5-first.md`. Collab (D5) ships
@@ -111,6 +122,76 @@
 > widget.
 >
 > All other content below describes the project at large.
+
+---
+
+## Engineering discipline — read before any non-trivial change
+
+This branch has three serious post-mortems on file, each of which
+correctly named the failure pattern the **next** refactor went on
+to reproduce. The bottleneck is not awareness, it is discipline.
+The eight invariants below are how we break that cycle. Full text
+and citations in [`docs/INVARIANTS.md`](docs/INVARIANTS.md) — read
+it once, then it's yours.
+
+**You are responsible** for following these in your own work, **and
+for noticing when you see them violated in code you pass through —
+even if the violation is off-topic from your current task.** A
+smell you leave unmarked is a vote for it being normal. The
+Discipline Log (invariant 8 below; section at the top of
+`docs/queue.md`) is the cheap mechanism — log the smell, finish
+your task, move on.
+
+These rules scope to the **focus/caret/block-change seam** (see
+`docs/INVARIANTS.md` §"Scope and exceptions" for the file list).
+Outside the seam, normal engineering judgement applies.
+
+1. **Cite the developmental record before refactoring the seam.**
+   `docs/handoff/2026-05-07-live-binding-developmental-history.md`
+   is authoritative for *why this code looks like this*. Cite the
+   relevant section in your spec.
+
+2. **L4 (block-content authority) is decided in writing first.**
+   Model wins, or delegate wins — pick one in your spec, before
+   the plan, before the code. The current implicit decision is
+   the foundational fault (2026-05-02 audit).
+
+3. **A new authority retires the old one in the same plan.** Dual
+   sources of truth → pairwise reconciliation → race window →
+   focus loss. Every regression in this seam has come through this
+   mechanism. Name the retiring store in the spec; delete it as a
+   work-unit in the same plan, not a follow-up.
+
+4. **Falsifiable invariant tests come first.** On
+   `LiveRealisticInputHarness`. Prove falsifiable by breaking the
+   target seam in a throwaway stub — if the test doesn't fail,
+   the test is too lenient; fix the test before touching
+   production. (Prescribed by R5-holes post-mortem §6.2; never
+   enforced; queue #2 concern #6 names the specific invariant the
+   cursor seam needs.)
+
+5. **Tests exercise the production callsite, not a synonym.** A
+   C++ test that calls a slot directly does not protect that slot
+   if production reaches it through QML. See the
+   `pendingVisualLineHint` precedent.
+
+6. **`Qt.callLater` / `QTimer::singleShot(0, ...)` are smells.**
+   "I gave up on understanding the timing and brute-forced it."
+   When adding: justify in the commit. When seeing: log it.
+
+7. **Re-entrance guards (`m_applyingX`, `isApplyingY()`) are
+   smells.** Same rule.
+
+8. **Notice and note — the Discipline Log.** Append to
+   `docs/queue.md` § Discipline Log: one line, `file:line`,
+   invariant number, one phrase of context. No fix required in
+   the same session. The point is the smell becomes visible to
+   the next agent.
+
+If you are about to deliberately violate one of these and have a
+real reason: **write the reason in the spec**, cite the rule by
+number, and proceed. The rules exist to make deviations visible,
+not to forbid them.
 
 ---
 

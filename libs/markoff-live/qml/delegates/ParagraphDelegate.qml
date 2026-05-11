@@ -53,10 +53,27 @@ Item {
         // One-way sync: TextEdit's cursorPosition is the live caret;
         // mirror it into LiveCursorState so m_cursor stays canonical
         // through within-block typing and within-block arrow nav.
+        // Guard: when LiveEditBinding is mid-setPlainText AND m_cursor
+        // already targets this row, the cursor move is a side effect of
+        // the document reset (it always lands at end-of-text), not a
+        // user navigation. Suppress the echo AND restore the canonical
+        // position so the QTextEdit's visible cursor matches m_cursor.
+        // Initial load (m_cursor is NoCursor) bypasses this guard so
+        // the echo still seeds focused state.
         onCursorPositionChanged: {
             const cs = root.liveBinding ? root.liveBinding.cursorState : null
-            if (model.blockAnchor !== undefined && cs)
+            if (model.blockAnchor !== undefined && cs) {
+                if (editBinding.isApplyingTextUpdate()
+                        && cs.focusedAnchorRow === root.modelIndex) {
+                    if (cs.focusedQtPos >= 0
+                            && cs.focusedQtPos <= edit.length
+                            && edit.cursorPosition !== cs.focusedQtPos) {
+                        edit.cursorPosition = cs.focusedQtPos
+                    }
+                    return
+                }
                 cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
+            }
         }
 
         InlineHighlighterAttached {

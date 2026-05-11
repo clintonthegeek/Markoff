@@ -79,6 +79,20 @@ public:
     /// design is retired); the method is kept for QML API stability.
     Q_INVOKABLE void onFocusLost();
 
+    /// True while pushTextToDocument is running setPlainText on the
+    /// wired QTextDocument. Delegates use this in their TextEdit
+    /// `onCursorPositionChanged` handler to suppress the
+    /// `syncFromTextEdit` echo when m_cursor already targets this row:
+    /// setPlainText moves QQuickTextEdit's cursor to end-of-text as a
+    /// side effect of the document reset (not a user navigation), and
+    /// when the delegate is created asynchronously after a kind
+    /// transition's structural resolve has already short-circuited, the
+    /// echo would clobber m_cursor with the end position. Initial-load
+    /// auto-focus is unaffected because m_cursor is NoCursor there, so
+    /// the focusedAnchorRow === modelIndex guard in the delegate is
+    /// false and the echo still fires to seed m_cursor.
+    Q_INVOKABLE bool isApplyingTextUpdate() const { return m_applyingTextUpdate; }
+
 Q_SIGNALS:
     void bindingChanged();
     void modelIndexChanged();

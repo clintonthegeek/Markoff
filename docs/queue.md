@@ -42,6 +42,31 @@
 
 ---
 
+## Discipline Log
+
+> Append-only log of invariant violations encountered in passing.
+> One line per smell. **No fix required in the same session** — the
+> point is that the smell becomes visible to the next agent who
+> reads the queue. Mechanism prescribed by `docs/INVARIANTS.md`
+> invariant 8.
+>
+> Format: `- YYYY-MM-DD <file:line> — inv #N — <one phrase of context>`
+>
+> Closing an entry: prepend `~~` and append `→ fixed in <commit>` or
+> `→ folded into queue #N`. Do not delete entries; they become the
+> trail showing the seam settling over time.
+>
+> Bulk discovery is fine. If you find ten `Qt.callLater` sites in
+> one read, log them as ten entries; the next refactor that touches
+> the seam will use the count as evidence.
+
+(no entries yet — the audit of 2026-05-10 surfaced the existing
+inventory; that inventory is documented in `docs/INVARIANTS.md`
+and queue #2 rather than re-logged here. New violations from this
+date forward.)
+
+---
+
 ## #1 — E2.6: theme wire-up + zoom ✅ IMPLEMENTED 2026-05-10 (dogfood pending)
 
 **Effort:** ~1 week. **Status:** implemented; interactive dogfood pending.

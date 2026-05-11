@@ -1,3 +1,33 @@
+> **STATUS: FIXED upstream on 2026-05-09** — collabtext commit `d02cca6`
+> *(`fix(crdt): make Global sparse to remove O(replica_id) edit cost`)*.
+>
+> **Root cause:** `Crdt::Global` stored a dense `uint32_t` array indexed by
+> `replica_id`. `FragmentSummary` carried **three** Globals; the SumTree
+> copied and joined them up the tree on every edit. With `replica_id=60000`
+> that allocated and zeroed ~720 kB per fragment summary even though only
+> one replica had ever been observed — exactly the linear-in-`replica_id`
+> shape this report described.
+>
+> **Fix:** rewrote `Global` to a sorted, packed `(replica_id, value)` sparse
+> layout (`(replica_id << 32) | value` per `uint64_t`, 4-pair SBO).
+> Per-edit cost is now flat at ~0.14 ms across the entire `uint16_t`
+> replica space (verified with the reproducer in this commit).
+> No public-API or wire-format change; `size()`/`operator[]` keep their
+> dense-view semantics for the encoder, and `pair_count()`/`pair()` are
+> new sparse-iteration accessors. No `schema_version` bump.
+>
+> **Regression test:** `tst_clock` —
+> `buffer_apply_local_edit_cost_independent_of_replica_id` asserts that the
+> 400-edit append workload at `replica_id=60000` stays within 10× of the
+> same workload at `replica_id=1`.
+>
+> Markoff can drop the `replica_id=1` workaround once you bump the
+> vendored collabtext to or past `d02cca6`.
+>
+> — collabtext, 2026-05-09
+
+---
+
 # Bug report — `CollabText::Crdt::Buffer`: per-edit cost is O(replica_id)
 
 **Reporter:** Markoff project (consumer of `CollabText::Crdt::Buffer`).
