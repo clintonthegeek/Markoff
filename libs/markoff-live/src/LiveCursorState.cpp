@@ -313,6 +313,10 @@ bool LiveCursorState::validateVariant(const Cursor &c) const
     return desc->supportedCursorVariants.contains(variantName);
 }
 
+void LiveCursorState::attachModel(const LiveBlockModel *model) {
+    m_model = model;
+}
+
 // --- §5.1 focus-chokepoint additions (tier-1 stubs; behaviour lands in Task 7) ---
 
 void LiveCursorState::establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos) {

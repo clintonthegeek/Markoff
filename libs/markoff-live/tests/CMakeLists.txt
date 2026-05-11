@@ -565,3 +565,13 @@ add_test(NAME tst_live_render_focus_after_heading_demote_via_hash_deletion
 set_tests_properties(tst_live_render_focus_after_heading_demote_via_hash_deletion
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+qt_add_executable(tst_live_cursor_state_chokepoint
+    tst_live_cursor_state_chokepoint.cpp
+)
+target_link_libraries(tst_live_cursor_state_chokepoint
+    PRIVATE markoff_live Qt6::Test Qt6::Quick)
+add_test(NAME tst_live_cursor_state_chokepoint
+         COMMAND tst_live_cursor_state_chokepoint)
+set_tests_properties(tst_live_cursor_state_chokepoint
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+

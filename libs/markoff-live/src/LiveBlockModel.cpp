@@ -170,6 +170,18 @@ QList<Markoff::SourceSpan> LiveBlockModel::spansAtRow(int row) const
     return m_rows[row].inlineSpans;
 }
 
+void LiveBlockModel::insertTestRow(Markoff::BlockAnchor anchor,
+                                   const QString &kind,
+                                   const QString &text)
+{
+    BlockRecord r;
+    r.blockAnchor = anchor;
+    r.kind = kind;
+    r.text = text;
+    m_rows.append(r);
+    m_rowEditSequences.append(0);
+}
+
 QString LiveBlockModel::kindFor(Markoff::BlockAnchor anchor) const
 {
     for (const auto &r : m_rows)

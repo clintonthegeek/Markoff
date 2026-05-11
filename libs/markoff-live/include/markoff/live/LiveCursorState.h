@@ -166,6 +166,19 @@ public:
     /// Spec §5.1. Called from Component.onDestruction.
     Q_INVOKABLE void delegateGoingAway(Markoff::BlockAnchor blockAnchor);
 
+    // --- test-only helpers ---
+    /// Attaches (or replaces) the LiveBlockModel used for kindFor lookups.
+    /// Production path wires this in LiveListModelBinding; tests call directly.
+    void attachModel(const LiveBlockModel *model);
+
+    /// Returns true if a PendingFocus is currently stored. Test-only.
+    bool hasPendingFocus() const noexcept { return m_pendingFocus.has_value(); }
+
+    /// Returns true if the anchor has a record in m_delegates. Test-only.
+    bool isDelegateRegistered(Markoff::BlockAnchor anchor) const {
+        return m_delegates.contains(anchor);
+    }
+
 Q_SIGNALS:
     void cursorChanged();
     void desiredVisualXChanged();

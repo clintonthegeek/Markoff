@@ -76,6 +76,11 @@ public:
     /// Used by LiveCursorState's stale-registration check.
     QString kindFor(Markoff::BlockAnchor anchor) const;
 
+    /// Test-only helper: append a minimal row with the given anchor/kind/text.
+    /// Does not emit model signals. Only for unit tests that need to populate
+    /// the model without going through applyOps.
+    void insertTestRow(Markoff::BlockAnchor anchor, const QString &kind, const QString &text);
+
     // ---- R4 freshness tracking (spec §4.2/§4.3). ----
     // Set by LiveEditBinding on each local keystroke. Read by
     // LiveListModelBinding::onParseUpdated for the parseFreshForRow check.
