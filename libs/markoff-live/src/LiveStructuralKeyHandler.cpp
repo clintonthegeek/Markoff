@@ -232,7 +232,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             // reflows the cursor and lands the caret at end-of-block.
             c.document->flushPendingD2Changed();
 
-            c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 1);
+            c.cursorState->establishFocus(c.blockAnchor, c.qtPos + 1);
             return HR::Handled;
         }
 
@@ -243,9 +243,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             // EOB Enter: create a new paragraph block after the current one.
             // D2: use Cmd::enterAtEnd.
             Markoff::BlockId newBlock = Markoff::Cmd::enterAtEnd(*c.document, c.blockAnchor);
-            Q_UNUSED(newBlock)
-            // The new block will appear at blockIndex+1 once structureChanged fires.
-            c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
+            c.cursorState->establishFocus(Markoff::BlockAnchor(newBlock), 0);
             return HR::Handled;
         }
 
@@ -266,10 +264,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
                 newBlock = c.document->d2InsertBlock(Markoff::BlockId{},
                                                      Markoff::BlockKind::Paragraph, t);
             }
-            Q_UNUSED(newBlock)
-            // Cursor stays at the current visual row (blockIndex) — the new
-            // empty block occupies that row after the insert.
-            c.cursorState->requestTextCaretAtNewRow(c.blockIndex, 0);
+            c.cursorState->establishFocus(Markoff::BlockAnchor(newBlock), 0);
             return HR::Handled;
         }
 
@@ -298,8 +293,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             // 3. Set new block's text to suffix.
             c.document->d2ApplyBufferEdit(newBlock, 0, 0, suffixUtf8, t);
 
-            // Cursor goes to start of new block.
-            c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
+            c.cursorState->establishFocus(Markoff::BlockAnchor(newBlock), 0);
         }
         return HR::Handled;
     };
@@ -319,12 +313,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         auto result = Markoff::Cmd::backspaceMerge(*c.document, c.blockAnchor);
         if (result.mergedInto.isNull()) return HR::NotHandled;
 
-        // Use anchor-keyed pending so the cursor resolves in noteParseArrived,
-        // AFTER applyOps has updated the model text and QML has processed it.
-        // requestTextCaretAtRow resolves immediately (row exists), but the text
-        // update then resets QML's cursor to the end — anchor-keyed pending
-        // avoids that race.
-        c.cursorState->requestTextCaretAtAnchor(result.mergedInto, joinQtPos);
+        c.cursorState->establishFocus(result.mergedInto, joinQtPos);
 
         return HR::Handled;
     };
@@ -337,10 +326,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         // D2: use Cmd::deleteMerge (merges next block into current).
         Markoff::Cmd::deleteMerge(*c.document, c.blockAnchor);
 
-        // Same race as backspace: requestTextCaretAtRow resolves before the
-        // model text is updated, then QML resets the cursor. Use anchor-keyed
-        // pending so it resolves in noteParseArrived after the text is stable.
-        c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, c.qtPos);
+        c.cursorState->establishFocus(c.blockAnchor, c.qtPos);
 
         return HR::Handled;
     };
@@ -370,7 +356,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
                                        0,
                                        spaces,
                                        t);
-        c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos + 4);
+        c.cursorState->establishFocus(c.blockAnchor, c.qtPos + 4);
         return HR::Handled;
     };
 
@@ -380,14 +366,14 @@ void LiveStructuralKeyHandler::registerBuiltins()
     auto hrNavigateUp = [](const Ctx &c) -> HR {
         const int targetRow = c.blockIndex - 1;
         if (targetRow < 0) return HR::NotHandled;
-        c.cursorState->requestTextCaretAtRow(targetRow,
+        c.cursorState->establishFocus(c.model->recordAt(targetRow).blockAnchor,
             c.model->recordAt(targetRow).text.length());
         return HR::Handled;
     };
     auto hrNavigateDown = [](const Ctx &c) -> HR {
         const int targetRow = c.blockIndex + 1;
         if (targetRow >= c.model->rowCount()) return HR::NotHandled;
-        c.cursorState->requestTextCaretAtRow(targetRow, 0);
+        c.cursorState->establishFocus(c.model->recordAt(targetRow).blockAnchor, 0);
         return HR::Handled;
     };
 
@@ -399,11 +385,9 @@ void LiveStructuralKeyHandler::registerBuiltins()
         const int targetRow = std::max(0, c.blockIndex - 1);
         UndoLog::Transaction t(c.document->d2UndoLog());
         c.document->d2RemoveBlock(id, t);
-        // Resolve cursor AFTER delete — model will reflect removal after d2DocumentChanged fires.
-        // Use requestTextCaretAtRow; if targetRow was before the deleted row, its index is stable.
         if (c.model->rowCount() > 1) {
             const int resolveRow = std::min(targetRow, c.model->rowCount() - 1);
-            c.cursorState->requestTextCaretAtRow(resolveRow,
+            c.cursorState->establishFocus(c.model->recordAt(resolveRow).blockAnchor,
                 c.model->recordAt(resolveRow).text.length());
         }
         return HR::Handled;
@@ -433,7 +417,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
                                         indent - 1, t);
             Markoff::Cmd::renumberRunStartingAt(*c.document, id, t);
-            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+            c.cursorState->establishFocus(c.blockAnchor, 0);
             return HR::Handled;
         }
 
@@ -442,7 +426,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
             c.document->d2SetBlockAttr(id, Markoff::AttrNames::MarkerStyle,
                                         QString{}, t);
-            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+            c.cursorState->establishFocus(c.blockAnchor, 0);
             return HR::Handled;
         }
 
@@ -452,7 +436,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             const Markoff::BlockId newId = Markoff::Cmd::insertListItemBefore(*c.document, id, t);
             Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
             // Follow the original (content-bearing) item, now at blockIndex+1.
-            c.cursorState->requestTextCaretAtAnchor(id, 0);
+            c.cursorState->establishFocus(Markoff::BlockAnchor(id), 0);
             return HR::Handled;
         }
 
@@ -461,7 +445,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             Markoff::BlockId newId =
                 Markoff::Cmd::insertListItemAfter(*c.document, id, t);
             Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
-            c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
+            c.cursorState->establishFocus(Markoff::BlockAnchor(newId), 0);
             return HR::Handled;
         }
 
@@ -478,7 +462,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             Markoff::Cmd::insertListItemAfter(*c.document, id, t);
         c.document->d2ApplyBufferEdit(newId, 0, 0, suffixUtf8, t);
         Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
-        c.cursorState->requestTextCaretAtNewRow(c.blockIndex + 1, 0);
+        c.cursorState->establishFocus(Markoff::BlockAnchor(newId), 0);
         return HR::Handled;
     };
 
@@ -496,7 +480,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             c.document->d2SetBlockAttr(id, Markoff::AttrNames::IndentLevel,
                                         indent - 1, t);
             Markoff::Cmd::renumberRunStartingAt(*c.document, id, t);
-            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+            c.cursorState->establishFocus(c.blockAnchor, 0);
             return HR::Handled;
         }
 
@@ -512,7 +496,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             UndoLog::Transaction t(c.document->d2UndoLog());
             Markoff::Cmd::renumberRunStartingAt(*c.document, result.mergedInto, t);
         }
-        c.cursorState->requestTextCaretAtAnchor(result.mergedInto, joinQtPos);
+        c.cursorState->establishFocus(result.mergedInto, joinQtPos);
         return HR::Handled;
     };
 
@@ -527,7 +511,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             Markoff::Cmd::renumberRunStartingAt(*c.document,
                 Markoff::BlockId(c.blockAnchor), t);
         }
-        c.cursorState->requestTextCaretAtAnchor(c.blockAnchor, c.qtPos);
+        c.cursorState->establishFocus(c.blockAnchor, c.qtPos);
         return HR::Handled;
     };
 
@@ -569,7 +553,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
                 c.model->recordAt(c.blockIndex - 1).blockAnchor;
             Markoff::Cmd::renumberRunStartingAt(*c.document, prevId, t);
         }
-        c.cursorState->requestTextCaretAtRow(c.blockIndex, c.qtPos);
+        c.cursorState->establishFocus(c.blockAnchor, c.qtPos);
         return HR::Handled;
     };
 
@@ -584,15 +568,14 @@ void LiveStructuralKeyHandler::registerBuiltins()
             // Exit blockquote: demote to Paragraph
             UndoLog::Transaction t(c.document->d2UndoLog());
             c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
-            c.cursorState->requestTextCaretAtRow(c.blockIndex, 0);
+            c.cursorState->establishFocus(c.blockAnchor, 0);
             return HR::Handled;
         }
         // Insert new Blockquote after current
         UndoLog::Transaction t(c.document->d2UndoLog());
         const Markoff::BlockId newId =
             c.document->d2InsertBlock(id, Markoff::BlockKind::BlockQuote, t);
-        c.cursorState->requestTextCaretAtAnchor(
-            Markoff::BlockAnchor(newId), 0);
+        c.cursorState->establishFocus(Markoff::BlockAnchor(newId), 0);
         return HR::Handled;
     };
 
@@ -602,14 +585,14 @@ void LiveStructuralKeyHandler::registerBuiltins()
         const int joinQtPos = c.model->recordAt(c.blockIndex - 1).text.length();
         auto result = Markoff::Cmd::backspaceMerge(*c.document, c.blockAnchor);
         if (result.mergedInto.isNull()) return HR::NotHandled;
-        c.cursorState->requestTextCaretAtAnchor(result.mergedInto, joinQtPos);
+        c.cursorState->establishFocus(result.mergedInto, joinQtPos);
         return HR::Handled;
     };
 
     m_handlers[BlockKind::Blockquote][Qt::Key_Delete] = [](const Ctx &c) -> HR {
         if (c.qtPos < c.blockText.length()) return HR::NotHandled;
         Markoff::Cmd::deleteMerge(*c.document, c.blockAnchor);
-        c.cursorState->requestTextCaretAtAnchor(c.blockAnchor,
+        c.cursorState->establishFocus(c.blockAnchor,
             static_cast<int>(c.blockText.length()));
         return HR::Handled;
     };
@@ -622,7 +605,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         c.document->d2RemoveBlock(id, t);
         if (c.model->rowCount() > 1) {
             const int resolveRow = std::min(targetRow, c.model->rowCount() - 2);
-            c.cursorState->requestTextCaretAtRow(resolveRow,
+            c.cursorState->establishFocus(c.model->recordAt(resolveRow).blockAnchor,
                 c.model->recordAt(resolveRow).text.length());
         }
         return HandleResult::Handled;
@@ -638,7 +621,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         c.document->d2RemoveBlock(id, t);
         if (c.model->rowCount() > 1) {
             const int resolveRow = std::min(targetRow, c.model->rowCount() - 2);
-            c.cursorState->requestTextCaretAtRow(resolveRow,
+            c.cursorState->establishFocus(c.model->recordAt(resolveRow).blockAnchor,
                 c.model->recordAt(resolveRow).text.length());
         }
         return HR::Handled;
