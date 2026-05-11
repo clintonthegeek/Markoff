@@ -140,9 +140,9 @@ Item {
     }
 
     function takeFocus(qtPos) {
-        root.forceActiveFocus()
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
+        // INTENTIONALLY EMPTY — falsifiability proof per spec §8.3.
+        // Confirms the invariant tests fail when the chokepoint stops
+        // delivering focus.
     }
 
     Component.onCompleted: {
