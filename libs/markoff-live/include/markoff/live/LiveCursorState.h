@@ -4,7 +4,10 @@
 #include <markoff/live/MarkoffLiveExport.h>
 #include <markoff/live/Cursor.h>
 
+#include <QHash>
 #include <QObject>
+#include <QPointer>
+#include <QQuickItem>
 #include <QString>
 #include <optional>
 #include <qqmlintegration.h>
@@ -135,6 +138,34 @@ public:
     /// land the cursor on the user's content, not on the row after it.
     void requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor, int qtPos);
 
+    // --- §5.1 focus-chokepoint additions (tier 1) ---
+
+    /// Spec §5.1. Structural-event sites call this. Always stores as
+    /// pending; resolution attempted at safe points (after delegate
+    /// registration, at cascade end). Never dispatches synchronously
+    /// from this call — see spec §5.1.2.
+    Q_INVOKABLE void establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos);
+
+    /// Spec §5.1. Called by LiveListModelBinding at the top of
+    /// onD2Changed, before any structural mutation. Suppresses
+    /// resolution attempts during the cascade.
+    void beginStructuralCascade();
+
+    /// Spec §5.1. Called by LiveListModelBinding at the bottom of
+    /// onD2Changed, after applyOps. Triggers a pending-resolution
+    /// attempt with the now-current m_delegates.
+    void endStructuralCascade();
+
+    /// Spec §5.1. Each text-bearing delegate calls this from
+    /// Component.onCompleted. `kind` is validated against the model
+    /// on every resolution attempt (spec §5.1.1).
+    Q_INVOKABLE void delegateAvailable(Markoff::BlockAnchor blockAnchor,
+                                       const QString &kind,
+                                       QQuickItem *delegateRoot);
+
+    /// Spec §5.1. Called from Component.onDestruction.
+    Q_INVOKABLE void delegateGoingAway(Markoff::BlockAnchor blockAnchor);
+
 Q_SIGNALS:
     void cursorChanged();
     void desiredVisualXChanged();
@@ -166,6 +197,26 @@ private:
     };
     std::optional<PendingRow> m_pendingRow;
     void resolvePendingForAnchor();
+
+    // --- §5.1 focus-chokepoint additions ---
+    struct DelegateRecord {
+        QString kind;
+        QPointer<QQuickItem> root;
+    };
+    struct PendingFocus {
+        Markoff::BlockAnchor target;
+        int qtPos;
+        qint64 enqueuedMs;
+    };
+
+    void tryResolvePending();
+    void expireIfTimedOut(PendingFocus &p);  // body in Task 7
+
+    std::optional<PendingFocus>                 m_pendingFocus;
+    QHash<Markoff::BlockAnchor, DelegateRecord> m_delegates;
+    bool                                        m_inStructuralCascade = false;
+
+    static constexpr qint64 kPendingFocusTimeoutMs = 500;
 };
 
 }  // namespace Markoff::Live

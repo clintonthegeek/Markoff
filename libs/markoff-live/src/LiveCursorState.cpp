@@ -313,4 +313,43 @@ bool LiveCursorState::validateVariant(const Cursor &c) const
     return desc->supportedCursorVariants.contains(variantName);
 }
 
+// --- §5.1 focus-chokepoint additions (tier-1 stubs; behaviour lands in Task 7) ---
+
+void LiveCursorState::establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos) {
+    // TIER-1 STUB. Real implementation lands in Task 7.
+    Q_UNUSED(blockAnchor);
+    Q_UNUSED(qtPos);
+}
+
+void LiveCursorState::beginStructuralCascade() {
+    // TIER-1 STUB. Real implementation lands in Task 7.
+}
+
+void LiveCursorState::endStructuralCascade() {
+    // TIER-1 STUB. Real implementation lands in Task 7.
+}
+
+void LiveCursorState::delegateAvailable(Markoff::BlockAnchor blockAnchor,
+                                        const QString &kind,
+                                        QQuickItem *delegateRoot) {
+    // TIER-1 STUB. Real implementation lands in Task 7.
+    Q_UNUSED(blockAnchor);
+    Q_UNUSED(kind);
+    Q_UNUSED(delegateRoot);
+}
+
+void LiveCursorState::delegateGoingAway(Markoff::BlockAnchor blockAnchor) {
+    // TIER-1 STUB. Real implementation lands in Task 7.
+    Q_UNUSED(blockAnchor);
+}
+
+void LiveCursorState::tryResolvePending() {
+    // TIER-1 STUB. Real implementation lands in Task 7.
+}
+
+void LiveCursorState::expireIfTimedOut(LiveCursorState::PendingFocus &p) {
+    // TIER-1 STUB. Real implementation lands in Task 7.
+    Q_UNUSED(p);
+}
+
 }  // namespace Markoff::Live
