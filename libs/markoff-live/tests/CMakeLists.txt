@@ -575,3 +575,11 @@ add_test(NAME tst_live_cursor_state_chokepoint
 set_tests_properties(tst_live_cursor_state_chokepoint
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+
+# Spec §8.5 retirement-evidence shape tests (shell scripts, CI guards)
+add_test(NAME tst_live_render_no_qt_calllater_in_focus_path
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_no_qt_calllater_in_focus_path.sh
+                 ${CMAKE_SOURCE_DIR})
+add_test(NAME tst_live_render_focus_path_exits_through_chokepoint
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_focus_path_through_chokepoint.sh
+                 ${CMAKE_SOURCE_DIR})
