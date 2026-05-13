@@ -104,8 +104,91 @@ choice — what the user tested today):
    `TypeError` chatter in the terminal.
 
 Today's interactive sample (user, 2026-05-11): items 1–5 all
-verified working. Item 6 not specifically exercised. Items 7–9
-not exercised.
+verified working. Item 6 not specifically exercised. Items 7–8
+not exercised. **Item 9 surfaced two new findings (below).**
+
+## Findings from item 9 (2026-05-11)
+
+### D-fc-1 — Focus lost after typing `---` to create a horizontal rule
+
+**Repro:** On a new line, type `---` (or more dashes). The
+Paragraph→HorizontalRule kind transition fires, but focus is lost
+afterward — typing does not continue.
+
+**Hypothesis:** HR is a non-text block (no `TextEdit`). The
+chokepoint's `tryResolvePending` finds the new
+`HorizontalRuleDelegate`, kind matches, calls `takeFocus(qtPos)`
+on it — but HR's `takeFocus` can't plant a caret because there is
+no `TextEdit` to focus. The chokepoint correctly delivers focus
+to the registered delegate, but for non-text kinds that delivery
+is semantically meaningless. The kind-transition path needs to
+migrate the caret to the *next* block (or create a fresh empty
+paragraph after the HR) instead of trying to land it on the HR
+itself.
+
+**Likely site:** `LiveStructuralKeyHandler` HR-promotion path
+(wherever `Paragraph→HorizontalRule` is decided), and the
+`onD2Changed` kind-transition branch in `LiveListModelBinding`
+for HR.
+
+### D-fc-2 — Newly-created heading is impermeable to arrow keys
+
+**Repro:** Type `# ` at the start of a paragraph (promote to
+heading). Navigate caret away with arrow keys. Try to return —
+the new heading row is skipped over; the caret jumps past it as
+if the heading row doesn't exist for navigation purposes.
+Headings *loaded* with the document are navigable normally; only
+*newly-typed* headings exhibit this.
+
+**Hypothesis (revised after a brief read):** The navigation
+controller doesn't keep its own row→delegate map — it asks
+`m_model->recordAt(row).kind` live and consults
+`BlockKindRegistry` for whether a kind supports `TextCaret`
+(`LiveNavigationController.cpp:34-41`). So "is this row a
+navigation target?" should self-correct as soon as the model
+record's kind flips to `heading`. Yet the chokepoint test
+`paragraph_promote_via_hash_typing` already exercises the
+post-promotion focus-delivery path and passes — which means
+**focus does land** on a freshly-promoted heading via chokepoint.
+
+What likely differs is the *cross-block navigation* approach
+back into the heading from above/below. That path goes:
+delegate `Keys.onPressed` → `nh.tryHandle(Up/Down, ...)` →
+`previousNavigableRow` / `nextNavigableRow` → `cursorState->
+requestTextCaretAtRow(targetRow, …)` → `establishFocus` →
+`tryResolvePending` → `takeFocus`. Each step needs verification
+on a runtime-created heading; the most plausible failure modes
+are:
+
+1. The buffer text on a newly-promoted heading retains the `# `
+   prefix (kind transition stores content-only on parse, but
+   may store prefixed text on promotion — see the
+   "heading-prefix-doubling" fix referenced in
+   `CLAUDE.md` 2026-05-09 entry). If `model.text.length()`
+   counts the prefix but the delegate's `TextEdit` doesn't,
+   `requestTextCaretAtRow(row, model.text.length())` from
+   the up-arrow path could pass an out-of-range `qtPos` and
+   the takeFocus clamp lands on end-of-text — focus *does*
+   land, but the visible caret is at the wrong position. The
+   user might perceive this as "didn't enter the row."
+2. The new `HeadingDelegate` may not have finished `Component.
+   onCompleted` registration by the time navigation tries to
+   target it. `tryResolvePending`'s pending-focus timeout
+   would silently expire.
+
+**Investigate first:** print `model.text.length()` on a
+runtime-promoted heading vs. a load-time heading, and check the
+content-only/prefix-stored convention at L4 (`model.text`
+authority) for `Heading`.
+
+## What this implies for the tag
+
+Tier 1 was scoped to "structural-event focus delivery." Both
+findings are in that scope (HR creation = structural event;
+kind-transitioned heading = post-structural-event navigation
+target). The `v0.8.0-focus-chokepoint` tag should remain held
+until at least D-fc-1 and D-fc-2 are either fixed or
+deliberately deferred with rationale.
 
 ## Known follow-ups
 
