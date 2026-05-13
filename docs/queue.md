@@ -60,10 +60,8 @@
 > one read, log them as ten entries; the next refactor that touches
 > the seam will use the count as evidence.
 
-(no entries yet — the audit of 2026-05-10 surfaced the existing
-inventory; that inventory is documented in `docs/INVARIANTS.md`
-and queue #2 rather than re-logged here. New violations from this
-date forward.)
+- 2026-05-11 `libs/markoff-live/src/LiveBlockModel.cpp:106` — inv #7 — `applyOps` now detects a Delete+Insert-at-same-row kind-change pattern and synthesises `beginResetModel`/`endResetModel` because `DelegateChooser` won't swap delegate type on `dataChanged` and pool-reuses the old template under plain rowsRemoved+rowsInserted. Heavy hammer; works but is the kind of pattern-match workaround that papers over a deeper L1/L2 modelling question. Worth revisiting if the chooser ever gains explicit kind-swap support, or if we move to a single delegate that internally renders by kind.
+- 2026-05-11 `libs/markoff-live/src/LiveCursorState.cpp:419-440` — inv #7 — `tryResolvePending` now sets `m_cursor` directly (bypassing `request()`'s registry-based variant validation) before invoking `takeFocus`. Pre-update is needed because `takeFocus`'s `cursorPosition = qtPos` is sometimes a no-op (empty new paragraph at pos=0) and won't echo back via `syncFromTextEdit`. Bypassing `request` keeps unit-test fixtures (no registry) from segfaulting. Functional but smells: the chokepoint quietly maintains two ways of mutating `m_cursor`.
 
 ---
 
@@ -135,6 +133,15 @@ toggle works; an interactive dogfood pass signs off.
 > only during the Task 16 revert and is also fixed; falsifiability
 > proof now covers both sides of the seam (`establishFocus` stub
 > `20dcaee` + `takeFocus` stub `2d609ba`).
+>
+> **2026-05-11 (dogfood re-pass):** D-fc-1 (HR focus loss) and
+> D-fc-2 (new-heading impermeable to arrow keys) both fixed in
+> commit `4fb711f`. The deeper root cause for D-fc-2 was an
+> architectural one: `DelegateChooser` does not swap delegates on
+> `dataChanged`, and the pool reuses the wrong template under
+> remove+insert at the same row. `LiveBlockModel::applyOps` now
+> detects the kind-change pattern and emits a `beginResetModel`/
+> `endResetModel` for it. Chokepoint invariant suite 21/21.
 
 **Effort:** ~3 days. **Status:** critique captured (verbally during
 S1/S2/S3 pass), no spec, no plan.

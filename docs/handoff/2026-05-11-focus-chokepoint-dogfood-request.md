@@ -109,6 +109,11 @@ not exercised. **Item 9 surfaced two new findings (below).**
 
 ## Findings from item 9 (2026-05-11)
 
+Both findings below have been **resolved** in commit `4fb711f` —
+chokepoint invariant suite now 21/21, with two new regression tests
+added (`nav_into_runtime_promoted_heading`, `hr_promotion_lands_focus_on_text_block`).
+A re-dogfood pass is needed to confirm interactive behaviour matches.
+
 ### D-fc-1 — Focus lost after typing `---` to create a horizontal rule
 
 **Repro:** On a new line, type `---` (or more dashes). The
@@ -119,17 +124,28 @@ afterward — typing does not continue.
 chokepoint's `tryResolvePending` finds the new
 `HorizontalRuleDelegate`, kind matches, calls `takeFocus(qtPos)`
 on it — but HR's `takeFocus` can't plant a caret because there is
-no `TextEdit` to focus. The chokepoint correctly delivers focus
-to the registered delegate, but for non-text kinds that delivery
-is semantically meaningless. The kind-transition path needs to
-migrate the caret to the *next* block (or create a fresh empty
-paragraph after the HR) instead of trying to land it on the HR
-itself.
+no `TextEdit` to focus. The kind-transition path needs to migrate
+the caret to a real text block.
 
-**Likely site:** `LiveStructuralKeyHandler` HR-promotion path
-(wherever `Paragraph→HorizontalRule` is decided), and the
-`onD2Changed` kind-transition branch in `LiveListModelBinding`
-for HR.
+**Confirmed root causes:**
+1. The kind-transition branch in `LiveListModelBinding::onD2Changed`
+   indiscriminately called `establishFocus(rec.blockAnchor, qtPos)`
+   for every promotion, staging a `TextCaret` on a block that can't
+   accept it.
+2. The HR delegate's `takeFocus` itself called
+   `cs.request({variant: "BlockSelected", ...})`. `request` is not
+   `Q_INVOKABLE` — the call surfaced as a TypeError at runtime and
+   killed focus delivery entirely (we saw it in the test output:
+   `Property 'request' of object … is not a function`).
+
+**Fix (commit `4fb711f`):** When the promotion target is
+`HorizontalRule` or `Image`, append a fresh empty `Paragraph`
+after the new block (`Cmd::enterAtEnd`) and land the caret there.
+That's the natural authoring flow ("`---`<Enter> continue
+writing"). HR's `takeFocus` no longer poke-calls back through
+`request`; it just `forceActiveFocus()`s the delegate root so
+the HR's own arrow/Backspace/Delete handler can still run when
+the user later navigates into the HR via Up/Down arrows.
 
 ### D-fc-2 — Newly-created heading is impermeable to arrow keys
 
@@ -140,55 +156,71 @@ if the heading row doesn't exist for navigation purposes.
 Headings *loaded* with the document are navigable normally; only
 *newly-typed* headings exhibit this.
 
-**Hypothesis (revised after a brief read):** The navigation
-controller doesn't keep its own row→delegate map — it asks
-`m_model->recordAt(row).kind` live and consults
-`BlockKindRegistry` for whether a kind supports `TextCaret`
-(`LiveNavigationController.cpp:34-41`). So "is this row a
-navigation target?" should self-correct as soon as the model
-record's kind flips to `heading`. Yet the chokepoint test
-`paragraph_promote_via_hash_typing` already exercises the
-post-promotion focus-delivery path and passes — which means
-**focus does land** on a freshly-promoted heading via chokepoint.
+**Confirmed root causes (substantially different from initial
+hypothesis):**
 
-What likely differs is the *cross-block navigation* approach
-back into the heading from above/below. That path goes:
-delegate `Keys.onPressed` → `nh.tryHandle(Up/Down, ...)` →
-`previousNavigableRow` / `nextNavigableRow` → `cursorState->
-requestTextCaretAtRow(targetRow, …)` → `establishFocus` →
-`tryResolvePending` → `takeFocus`. Each step needs verification
-on a runtime-created heading; the most plausible failure modes
-are:
+1. **`DelegateChooser` does not swap delegates on `dataChanged`.**
+   The chooser binds delegate type once at row create-time. Even
+   `BlockKey=(kind, anchor)` producing a Delete+Insert diff at
+   the same row wasn't enough: ListView's delegate pool *reused*
+   the old `ParagraphDelegate` (binding it to a stale
+   `modelIndex=-1`) instead of instantiating a fresh
+   `HeadingDelegate` template from the chooser. So the "new
+   heading" was visually never a heading at all — it was a
+   ParagraphDelegate with `# Paragraph one.` text. Inline
+   highlighting on the `#` made it look heading-ish, masking
+   the architectural failure.
 
-1. The buffer text on a newly-promoted heading retains the `# `
-   prefix (kind transition stores content-only on parse, but
-   may store prefixed text on promotion — see the
-   "heading-prefix-doubling" fix referenced in
-   `CLAUDE.md` 2026-05-09 entry). If `model.text.length()`
-   counts the prefix but the delegate's `TextEdit` doesn't,
-   `requestTextCaretAtRow(row, model.text.length())` from
-   the up-arrow path could pass an out-of-range `qtPos` and
-   the takeFocus clamp lands on end-of-text — focus *does*
-   land, but the visible caret is at the wrong position. The
-   user might perceive this as "didn't enter the row."
-2. The new `HeadingDelegate` may not have finished `Component.
-   onCompleted` registration by the time navigation tries to
-   target it. `tryResolvePending`'s pending-focus timeout
-   would silently expire.
+2. **`tryResolvePending`'s stale-registration check was using the
+   model's kind, not the document's.** During a kind-transition
+   cascade, the model is one applyOps cycle behind: it still
+   says "paragraph" while the document has already been
+   `changeKind`'d to "heading". The check matched paragraph-
+   to-paragraph against the old delegate and resolved focus
+   there — or, after fix #1, would have refused to defer
+   resolution until the real swap.
 
-**Investigate first:** print `model.text.length()` on a
-runtime-promoted heading vs. a load-time heading, and check the
-content-only/prefix-stored convention at L4 (`model.text`
-authority) for `Heading`.
+**Fix (commit `4fb711f`):**
+
+1. `LiveBlockModel::applyOps` detects the kind-change pattern
+   (one Delete immediately followed by one Insert at the same
+   row, same `blockAnchor`, different `kind`) and triggers
+   `beginResetModel`/`endResetModel` instead of relying on
+   row-insert/remove signals. The chooser then creates the new
+   delegate type cleanly. (`tst_live_render_focus_after_heading_demote_via_hash_deletion`,
+   which had been failing standalone since the chokepoint plan
+   landed, passes now as a free side-effect.)
+2. `LiveCursorState::tryResolvePending` now queries
+   `m_binding->document()->blockKind(...)` for the stale check.
+   The model is a fallback used only when no binding is wired
+   (unit tests).
+
+**Side-effects:**
+- Test fixture activates the window (`requestActivate` +
+  `qWaitForWindowActive`) so `hasActiveFocus()` works in headless
+  QPA. Without this, several chokepoint tests had been passing
+  only via state leakage from earlier tests in the suite.
+- Pre-update of `m_cursor` in `tryResolvePending` no longer goes
+  through `request()`'s registry-based variant validation —
+  the variant is appropriate by construction at that point, and
+  bypassing `request` keeps the unit-test fixture (no registry)
+  from segfaulting.
 
 ## What this implies for the tag
 
-Tier 1 was scoped to "structural-event focus delivery." Both
-findings are in that scope (HR creation = structural event;
-kind-transitioned heading = post-structural-event navigation
-target). The `v0.8.0-focus-chokepoint` tag should remain held
-until at least D-fc-1 and D-fc-2 are either fixed or
-deliberately deferred with rationale.
+Both findings have been fixed in commit `4fb711f`. The
+`v0.8.0-focus-chokepoint` tag now waits only on a final
+interactive dogfood pass confirming:
+
+- Re-typing `---<Enter>` creates an HR and leaves the caret on a
+  fresh empty paragraph after, accepting subsequent typing
+  without re-clicking.
+- After typing `# Some text` to promote a paragraph to a heading,
+  navigating away with arrow keys and then back (Up or Down)
+  lands the caret on the new heading.
+- The interactive run shows no `QMetaObject::invokeMethod`,
+  `TypeError`, or `cursor request rejected` chatter in the
+  terminal during normal editing.
 
 ## Known follow-ups
 
