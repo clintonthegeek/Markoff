@@ -40,9 +40,16 @@ Item {
     function positionAt(x, y) { return -1 }
 
     function takeFocus(qtPos: int) {
+        // HR is non-text. When the kind-transition path lands focus here,
+        // forceActiveFocus on the delegate root so keyboard input reaches
+        // the HR's Keys.onPressed (which only handles arrow/Backspace/Delete
+        // for block-selection navigation). The previous implementation
+        // attempted to call `cs.request(...)`, but `request` is not a
+        // Q_INVOKABLE method, which surfaced as a TypeError at runtime and
+        // prevented even forceActiveFocus from completing properly.
+        // BlockSelected state, if needed, should be established by the
+        // caller via the chokepoint, not by the delegate poking back.
         root.forceActiveFocus()
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
     }
 
     Keys.priority: Keys.BeforeItem

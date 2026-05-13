@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live/LiveCursorState.h>
+#include <markoff/live/BlockKind.h>
 #include <markoff/live/BlockKindRegistry.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveListModelBinding.h>
@@ -390,8 +391,29 @@ void LiveCursorState::tryResolvePending() {
     const auto it = m_delegates.find(anchor);
     if (it == m_delegates.end() || !it->root) return;
 
-    // Stale-registration check — spec §5.1.1.
-    const QString currentKind = m_model ? m_model->kindFor(anchor) : QString();
+    // Stale-registration check — spec §5.1.1. Query the document directly:
+    // during a kind-transition cascade the model's kindFor is stale (applyOps
+    // for the new kind hasn't run yet), but the document already reflects the
+    // post-`changeKind` state. Using the document lets us correctly detect
+    // "old delegate is still registered against an outdated kind" and defer
+    // resolution until the new delegate arrives. Fall back to model when no
+    // document is wired (unit tests).
+    QString currentKind;
+    if (m_binding && m_binding->document()) {
+        using BK = ::Markoff::BlockKind;
+        switch (m_binding->document()->blockKind(::Markoff::BlockId(anchor))) {
+        case BK::Heading:        currentKind = ::Markoff::Live::BlockKind::Heading;        break;
+        case BK::CodeBlock:      currentKind = ::Markoff::Live::BlockKind::CodeBlock;      break;
+        case BK::HorizontalRule: currentKind = ::Markoff::Live::BlockKind::HorizontalRule; break;
+        case BK::Image:          currentKind = ::Markoff::Live::BlockKind::Image;          break;
+        case BK::ListItem:       currentKind = ::Markoff::Live::BlockKind::ListItem;       break;
+        case BK::BlockQuote:     currentKind = ::Markoff::Live::BlockKind::Blockquote;     break;
+        case BK::Math:           currentKind = ::Markoff::Live::BlockKind::Math;           break;
+        default:                 currentKind = ::Markoff::Live::BlockKind::Paragraph;      break;
+        }
+    } else if (m_model) {
+        currentKind = m_model->kindFor(anchor);
+    }
     if (it->kind != currentKind) return;
 
     const int qtPos = m_pendingFocus->qtPos;
@@ -403,10 +425,21 @@ void LiveCursorState::tryResolvePending() {
     // delegate's onCursorPositionChanged won't fire and syncFromTextEdit
     // won't be called. Without this pre-update, m_cursor would retain
     // whatever stale anchor it held before the structural event.
+    //
+    // Bypass `request()` (which validates variant via the registry) — we
+    // know the variant is appropriate by construction (the registered
+    // delegate kind matched in the stale-check above). Avoiding `request`
+    // also lets unit tests that construct `LiveCursorState` without a
+    // registry exercise the chokepoint.
     TextCaret tc;
     tc.block            = anchor;
     tc.cachedByteOffset = static_cast<quint32>(qtPos);
-    request(tc);
+    Cursor newCursor = tc;
+    if (!(m_cursor == newCursor)) {
+        m_pendingRow.reset();  // explicit request supersedes any pending row
+        m_cursor = newCursor;
+        Q_EMIT cursorChanged();
+    }
 
     QMetaObject::invokeMethod(it->root.data(), "takeFocus",
                               Q_ARG(int, qtPos));

@@ -56,6 +56,11 @@ QmlIntegrationFixture::QmlIntegrationFixture(const QByteArray &markdown,
 
     QVERIFY2(QTest::qWaitForWindowExposed(m_window, 5000),
              "window did not expose within 5s under offscreen QPA");
+    // Request activation so `hasActiveFocus()` works on focused TextEdits in
+    // headless test runs — without this, `forceActiveFocus()` is a no-op and
+    // `focusedDelegate()` always returns null on offscreen QPA.
+    m_window->requestActivate();
+    (void)QTest::qWaitForWindowActive(m_window, 2000);
 
     // Walk children looking for LiveListModelBinding: has fontScale, model,
     // and document properties.

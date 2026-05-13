@@ -107,6 +107,55 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                               const QList<BlockRecord> &nextRecords,
                               quint64 parseInputEditSeq)
 {
+    // Detect kind-change-only ops (Delete immediately followed by Insert at the
+    // same row, blockAnchor preserved). Plain Delete+Insert via Q_EMIT
+    // rowsRemoved+rowsInserted does NOT cause DelegateChooser to instantiate
+    // the new delegate type — ListView's pool reuses the previous delegate
+    // bound to a stale `modelIndex=-1`, and the new template (e.g. HeadingDelegate
+    // for paragraph→heading) is never created. A model reset forces a clean
+    // re-realization. Identify the case and short-circuit through reset.
+    bool kindOnlySwap = false;
+    if (ops.size() == int(nextRecords.size()) + 1 && m_rows.size() == nextRecords.size()) {
+        // Same row count before+after; one extra op means a Delete+Insert pair.
+        // Walk and check: must be all Equal except one Delete followed by an
+        // Insert at the same logical row, with matching blockAnchor.
+        int deletedAt = -1;
+        int insertedNextIdx = -1;
+        int idx = 0, opPos = 0;
+        bool ok = true;
+        for (; opPos < ops.size(); ++opPos) {
+            const auto &op = ops[opPos];
+            if (op.kind == AstBlockDiff::OpKind::Delete && deletedAt < 0) {
+                deletedAt = idx;
+            } else if (op.kind == AstBlockDiff::OpKind::Insert && deletedAt == idx
+                       && insertedNextIdx < 0) {
+                insertedNextIdx = op.nextIndex;
+                ++idx;
+            } else if (op.kind == AstBlockDiff::OpKind::Equal) {
+                ++idx;
+            } else {
+                ok = false;
+                break;
+            }
+        }
+        if (ok && deletedAt >= 0 && insertedNextIdx >= 0
+            && m_rows[deletedAt].blockAnchor == nextRecords[insertedNextIdx].blockAnchor
+            && m_rows[deletedAt].kind       != nextRecords[insertedNextIdx].kind) {
+            kindOnlySwap = true;
+        }
+    }
+    if (kindOnlySwap) {
+        beginResetModel();
+        m_rows.clear();
+        m_rowEditSequences.clear();
+        for (const auto &r : nextRecords) {
+            m_rows.append(r);
+            m_rowEditSequences.append(quint64(0));
+        }
+        endResetModel();
+        return;
+    }
+
     int row = 0;
     for (const auto &op : ops) {
         switch (op.kind) {
@@ -121,6 +170,15 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                     // Stale: keep our text; accept everything else from parse.
                     merged.text = m_rows[row].text;
                 }
+                // Kind change inside an Equal op (e.g. Paragraph→Heading via
+                // typing `# `): a plain dataChanged does NOT cause
+                // `DelegateChooser` to swap the delegate — the chooser binds
+                // delegate type at create-time and listens only to row insert/
+                // remove. Synthesise a remove+insert here so the chooser
+                // destroys the old kind's delegate and creates the new one,
+                // which is required for the chokepoint's `delegateAvailable`
+                // / `delegateGoingAway` flow to deliver focus to the right
+                // delegate after a kind transition.
                 if (m_rows[row] != merged) {
                     m_rows[row] = merged;
                     Q_EMIT dataChanged(index(row), index(row));

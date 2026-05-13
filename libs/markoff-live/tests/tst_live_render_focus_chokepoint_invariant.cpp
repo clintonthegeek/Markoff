@@ -38,6 +38,9 @@ private slots:
     void redo_after_undo();
     void click_to_focus_paragraph();
     void click_to_focus_heading();
+    // Dogfood findings 2026-05-11 (D-fc-1 / D-fc-2).
+    void nav_into_runtime_promoted_heading();
+    void hr_promotion_lands_focus_on_text_block();
 
 private:
     void assertChokepointInvariant(const QString &scenario);
@@ -219,6 +222,51 @@ void TestFocusChokepointInvariant::click_to_focus_heading() {
     const int delegateRow = focused->property("modelIndex").toInt();
     const int cursorRow   = m_fixture->cursorStateCurrentRow();
     QCOMPARE(delegateRow, cursorRow);
+}
+
+void TestFocusChokepointInvariant::nav_into_runtime_promoted_heading() {
+    // D-fc-2: promote a paragraph to heading via "# ", then navigate down
+    // and back up. The caret must land on the heading row, not skip past it.
+    //
+    // Repro setup uses the standard 5-row doc; rows 1 and 2 are both text-
+    // bearing (paragraph, blockquote). We promote row 1 → heading, then
+    // Down-arrow into row 2, then Up-arrow back: caret should be on row 1.
+    m_fixture->placeCursorAtPos(1, 0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.typeChar(QChar('#'));
+    h.typeChar(QChar(' '));
+    QTest::qWait(100);
+    // Row 1 is now a heading. Navigate down.
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(80);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+    // Now navigate back up — should land on row 1 (the new heading).
+    h.keyClick(Qt::Key_Up);
+    QTest::qWait(80);
+    assertChokepointInvariant("nav into runtime-promoted heading");
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::hr_promotion_lands_focus_on_text_block() {
+    // D-fc-1: typing "---" on its own row promotes to HorizontalRule.
+    // HR is non-text. After the structural event the caret must land on a
+    // text-bearing block, not on the HR. Heuristic: after promotion the
+    // model has one more block (a fresh paragraph after the HR) OR the
+    // caret has migrated to a neighboring text-bearing row.
+    m_fixture->placeCursorAtPos(1, 0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    // Clear the paragraph text so "---" alone is the row's content.
+    h.keyClick(Qt::Key_End);
+    for (int i = 0; i < 14; ++i) h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(50);
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    QTest::qWait(150);
+    // Whatever the resolution, the focused row must be text-bearing —
+    // assertChokepointInvariant requires a focused delegate, so a focusless
+    // outcome (HR has the row but no caret) fails the QVERIFY2 inside.
+    assertChokepointInvariant("HR promotion via '---'");
 }
 
 }  // namespace Markoff::Live::Test

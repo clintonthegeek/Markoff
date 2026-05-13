@@ -557,7 +557,15 @@ void LiveListModelBinding::onD2Changed()
         // Re-anchor caret on the about-to-be-swapped delegate. Bug S2
         // (setext promote on first underline char loses focus) traces
         // here. Clamp lives inside takeFocus (Math.min(qtPos, edit.length)).
-        {
+        //
+        // Promotion to a non-text-bearing kind (HorizontalRule, Image) is
+        // a special case: TextCaret on the new block would be an invalid
+        // variant, and the user expects typing to continue past the
+        // divider. After changeKind, append a fresh empty Paragraph and
+        // land the caret there. D-fc-1 (2026-05-11 dogfood).
+        const bool toNonText = (fk == Markoff::BlockKind::HorizontalRule
+                                || fk == Markoff::BlockKind::Image);
+        if (!toNonText) {
             const Markoff::Cursor cur = d->cursorState->cursor();
             if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
                 tc && tc->block == rec.blockAnchor) {
@@ -568,6 +576,13 @@ void LiveListModelBinding::onD2Changed()
         Markoff::Cmd::changeKind(*doc,
                                   Markoff::BlockId(rec.blockAnchor),
                                   fk, attrNames, attrVals);
+        if (toNonText) {
+            // Append a fresh paragraph after the new non-text block and
+            // land the caret there so typing continues.
+            Markoff::BlockId newPara = Markoff::Cmd::enterAtEnd(
+                *doc, Markoff::BlockId(rec.blockAnchor));
+            d->cursorState->establishFocus(Markoff::BlockAnchor(newPara), 0);
+        }
         // changeKind will schedule another d2DocumentChanged; return to let
         // the next spin re-run onD2Changed with the corrected kind.
         return;
