@@ -138,10 +138,19 @@ void LiveCursorState::requestTextCaretAtNewRow(int expectedRow, int qtPos)
 
 void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
 {
-    // FALSIFIABILITY PROOF (tier 2 spec §5.4). REVERTS in next commit.
-    Q_UNUSED(anchor);
-    Q_UNUSED(qtPos);
-    return;
+    if (anchor == Markoff::BlockAnchor{}) return;
+    if (qtPos < 0) return;
+
+    TextCaret tc;
+    tc.block            = anchor;
+    tc.cachedQtPos = static_cast<quint32>(qtPos);
+    Cursor newCursor    = tc;
+
+    if (m_cursor == newCursor) return;
+    if (!validateVariant(newCursor)) return;
+
+    m_cursor = newCursor;
+    Q_EMIT cursorChanged();
 }
 
 void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor,
