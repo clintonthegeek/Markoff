@@ -163,8 +163,14 @@ public:
                                        const QString &kind,
                                        QQuickItem *delegateRoot);
 
-    /// Spec §5.1. Called from Component.onDestruction.
-    Q_INVOKABLE void delegateGoingAway(Markoff::BlockAnchor blockAnchor);
+    /// Spec §5.1. Called from Component.onDestruction. `delegateRoot` is the
+    /// dying delegate's root; when a DelegateChooser kind-swap fires the new
+    /// delegate's onCompleted *before* the old's onDestruction, the entry
+    /// stored against `blockAnchor` already belongs to the replacement —
+    /// passing the root lets the chokepoint skip the stale remove. May be
+    /// `nullptr` from older callers (unconditional remove, legacy behaviour).
+    Q_INVOKABLE void delegateGoingAway(Markoff::BlockAnchor blockAnchor,
+                                       QQuickItem *delegateRoot = nullptr);
 
     // --- test-only helpers ---
     /// Attaches (or replaces) the LiveBlockModel used for kindFor lookups.

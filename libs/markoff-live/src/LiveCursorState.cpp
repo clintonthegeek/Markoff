@@ -357,9 +357,11 @@ void LiveCursorState::delegateAvailable(Markoff::BlockAnchor blockAnchor,
                                         const QString &kind,
                                         QQuickItem *delegateRoot) {
     // Check BEFORE insert: a pre-existing entry means a kind-transition
-    // replacement (Component.onDestruction on a kind-changing delegate fires
-    // with model.blockAnchor undefined, so delegateGoingAway is never called
-    // and the old entry lingers). Fresh initial-load creations have no entry.
+    // replacement. With the delegate-root caching in
+    // BlockOnlyDelegateBase/ParagraphDelegate/etc., the old delegate's
+    // Component.onDestruction can fire either before or after the new
+    // delegate's Component.onCompleted; either order is handled. See the
+    // companion comment in delegateGoingAway.
     const bool wasRegistered = m_delegates.contains(blockAnchor);
     m_delegates.insert(blockAnchor, { kind, QPointer<QQuickItem>(delegateRoot) });
 
@@ -383,8 +385,21 @@ void LiveCursorState::delegateAvailable(Markoff::BlockAnchor blockAnchor,
     }
 }
 
-void LiveCursorState::delegateGoingAway(Markoff::BlockAnchor blockAnchor) {
-    m_delegates.remove(blockAnchor);
+void LiveCursorState::delegateGoingAway(Markoff::BlockAnchor blockAnchor,
+                                        QQuickItem *delegateRoot) {
+    // Kind-transition replacement ordering: when DelegateChooser swaps the
+    // delegate for a row whose `kind` role changed (Paragraph → HR via typed
+    // `---`), the NEW delegate's Component.onCompleted (and thus
+    // delegateAvailable) fires BEFORE the OLD delegate's
+    // Component.onDestruction. A naive `m_delegates.remove(anchor)` here
+    // would then clobber the freshly-registered replacement, leaving the
+    // chokepoint with no delegate for the anchor and making the new HR
+    // unreachable by arrow nav, click, or any other establishFocus path.
+    // Only remove the entry if it still belongs to *this* dying delegate.
+    auto it = m_delegates.find(blockAnchor);
+    if (it == m_delegates.end()) return;
+    if (delegateRoot != nullptr && it->root.data() != delegateRoot) return;
+    m_delegates.erase(it);
     // Pending request NOT cleared — §7.2.
 }
 

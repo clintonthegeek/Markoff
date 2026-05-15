@@ -60,6 +60,10 @@ private slots:
     void typing_on_selected_hr_is_noop();
     void tripleclick_on_hr_lands_blockselected();
 
+    // 2026-05-15 dogfood — arrow / click on a just-TYPED HR (not loaded).
+    void arrow_up_from_new_para_after_typed_hr_lands_blockselected();
+    void click_on_typed_hr_lands_blockselected();
+
     // Block-only kinds — Image variants (spec §7)
     void arrow_down_lands_blockselected_on_image();
     void arrow_down_from_blockselected_image_lands_on_text();
@@ -933,6 +937,66 @@ void TestFocusChokepointInvariant::tripleclick_on_image_lands_blockselected() {
     QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
     QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// 2026-05-15 dogfood reproducers — typed HR (not loaded) is failing arrow nav
+// and click selection.
+// ---------------------------------------------------------------------------
+
+void TestFocusChokepointInvariant::arrow_up_from_new_para_after_typed_hr_lands_blockselected() {
+    // User types `---` in a blank line. HR is created; a new empty paragraph
+    // appears below; caret moves there. Pressing Up from the new paragraph
+    // must land BlockSelected on the typed HR — same as a loaded HR.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>("alpha\n", 1);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(120);
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    QTest::qWait(500);
+    // Layout: paragraph "alpha" (0), HR (1), empty paragraph (2). Caret row 2.
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    h.keyClick(Qt::Key_Up);
+    QTest::qWait(200);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::click_on_typed_hr_lands_blockselected() {
+    // User types `---` to create an HR, then clicks on the HR.
+    // Must land BlockSelected on it — same as clicking on a loaded HR.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>("alpha\n", 1);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(120);
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    QTest::qWait(200);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("hr"), 2000));
+
+    m_fixture->clickOnBlock(1);
+    QTest::qWait(200);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
 }
 
 }  // namespace Markoff::Live::Test

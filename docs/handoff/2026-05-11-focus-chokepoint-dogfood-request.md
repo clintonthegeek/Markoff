@@ -309,6 +309,109 @@ New behaviours to verify in the next dogfood pass:
 - Triple-click on HR/Image → BlockSelected (same as single click; no surrounding text selected).
 - Repeat all of the above for Image blocks using a `![alt](url)` reference.
 
+### D-fc-5 — Typed HR/Image unreachable by arrow nav and click — resolved 2026-05-15
+
+**Symptom (user, dogfood 2026-05-15):** After landing the block-only
+generalisation, selection of HR/Image blocks **loaded from the
+document** worked, but when the user typed `---` (or `![alt](url)`)
+in a blank line to create the block at runtime, arrow keys couldn't
+enter/select it and clicking on it did nothing. Visually the HR
+rendered and a fresh paragraph appeared below it (the D-fc-1 fix)
+with the caret in the new paragraph — only the *navigability* was
+broken.
+
+**Root cause:** Delegate-swap registration race in
+`LiveCursorState::delegateGoingAway`. When `DelegateChooser`
+swapped `ParagraphDelegate` → `HorizontalRuleDelegate` at the same
+`BlockAnchor`, the actual lifecycle ordering was:
+
+1. NEW `HorizontalRuleDelegate.Component.onCompleted` →
+   `delegateAvailable(anchor, "hr", R_hr)` — registers HR.
+2. OLD `ParagraphDelegate.Component.onDestruction` fires *after* →
+   `delegateGoingAway(anchor)` unconditionally removed the entry,
+   **clobbering the just-registered HR**.
+
+`tryResolvePending` then found no delegate at the anchor (or a
+stale `"paragraph"` entry from the kind-transition-replacement
+branch's wasRegistered=true path) and silently dropped every
+focus request. Loaded HRs worked because no swap occurs: the HR
+delegate registers once at load time with no preceding
+`delegateGoingAway` to race with. The merge-fence backspace path
+worked accidentally because it ran `establishFocus` early enough
+that the new HR delegate's onCompleted hadn't completed the race
+yet.
+
+**Fix:** `delegateGoingAway` now takes the dying delegate's
+`QQuickItem *root` and only removes the entry if `m_delegates[anchor].root`
+still equals that root. Stale destruction notifications after a
+kind-swap are skipped. All seven QML delegates updated to pass
+`root`. Signature change is backwards-compatible (default `nullptr`
+preserves the legacy unconditional-remove behaviour for any
+caller that doesn't have a root handle).
+
+**Verification:** Probe trace at `LiveCursorState::delegateAvailable`/
+`delegateGoingAway` showed the exact race in the typed-HR path.
+Two new reproducer tests in `tst_live_render_focus_chokepoint_invariant`:
+`arrow_up_from_new_para_after_typed_hr_lands_blockselected` and
+`click_on_typed_hr_lands_blockselected`. Interactive dogfood
+confirmed by user.
+
+**Files:** `libs/markoff-live/include/markoff/live/LiveCursorState.h`,
+`libs/markoff-live/src/LiveCursorState.cpp`,
+`libs/markoff-live/qml/delegates/{BlockOnlyDelegateBase,Paragraph,Heading,CodeBlock,Blockquote,ListItem,Math}Delegate.qml`,
+`libs/markoff-live/tests/tst_live_render_focus_chokepoint_invariant.cpp`.
+
+### D-fc-6 — Cross-kind paste inside code-block fences breaks the fence — open
+
+**Symptom (user, dogfood 2026-05-15, interactive):** Copy a
+cross-kind selection of blocks (e.g. paragraph + heading + list-item)
+from elsewhere in the document. Place the caret inside an existing
+fenced code block (between the opening and closing fences). Paste.
+
+Observed: the code block is **bisected**. The text before the caret
+remains a code block. Each pasted block retains its **original
+kind** (heading is still a heading, list-item still a list-item).
+The text after the caret — which was originally inside the fence —
+takes on the **kind of the last pasted block** rather than staying
+a code block.
+
+Expected: pasting inside a fenced code block must coerce all
+incoming content to **plaintext within the existing code block**.
+The fence is a one-kind region — no kind transitions, no block
+splits, no kind inheritance from the paste source. The result
+should be a single code block with the pasted text inlined at the
+caret position, fences unchanged.
+
+**Why this matters:** Code blocks are the prototypical "no markup
+applies here" region. Any path that lets foreign block kinds
+leak inside a fence violates the user's mental model and produces
+unrenderable markdown on save (because the surrounding fences no
+longer enclose the bisected region).
+
+**Likely seam:** The structured-paste path in
+`LiveListModelBinding`/`LiveStructuralKeyHandler` — it currently
+preserves the source block kinds via the clipboard's
+block-structured payload (per the E2.5 D2 multi-block clipboard
+fix). It needs a "destination is a code block" precondition that
+collapses the paste to flat text and routes through
+`applyFlatEdit` instead.
+
+**To investigate:** which clipboard format the paste path is
+consuming inside a code block (block-structured vs. plain-text),
+where the kind-preservation lives, and what the cleanest
+coerce-to-plaintext hook is. May share machinery with the
+yet-to-be-written "typing inside a code block is plaintext"
+invariant (which presumably already works — typing `# foo` in a
+fence doesn't promote, so the equivalent paste-side guard should
+exist somewhere to graft onto).
+
+**Test fixture sketch:** doc = `prefix\n\n` + ``` ` ``` `\nfoo\nbar\n```\n` + `suffix`.
+Clipboard preloaded with a heading + paragraph + list-item.
+Place caret between `foo` and `bar` inside the fence. Paste.
+Assert: model row count unchanged in count of code-block rows
+(still 1); single fence still encloses all the content; pasted
+text appears between `foo` and `bar` as plaintext.
+
 ## What's deferred (tier 2/3/4)
 
 Per spec §10 — typing-cursor authority (queue #2 #1 full / #2 / #6

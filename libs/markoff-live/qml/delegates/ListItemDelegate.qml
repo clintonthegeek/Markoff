@@ -247,6 +247,6 @@ Item {
 
     Component.onDestruction: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs && blockAnchor !== undefined) cs.delegateGoingAway(blockAnchor)
+        if (cs && blockAnchor !== undefined) cs.delegateGoingAway(blockAnchor, root)
     }
 }
