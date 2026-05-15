@@ -241,21 +241,21 @@ cmake --build build-dev -j 8
 
 ## Testing
 
-Qt tests spawn windows — always run via `xvfb-run` so they don't interrupt the user's display:
+Qt tests spawn windows — always run via `xvfb-run` so they don't interrupt the user's display.
+
+Install if missing (Manjaro/Arch): `sudo pacman -S xorg-server-xvfb`
 
 ```bash
 xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
   ctest --test-dir build-dev --output-on-failure -j 8
-```
 
-Direct test binary invocations likewise:
-
-```bash
 xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
   build-dev/bin/<test-binary> [test-name ...]
 ```
 
-Never run Qt window tests directly against `$DISPLAY`. Use `-E "tst_realistic|tst_benchmark"` for a fast inner loop (those tests don't need the window flag either).
+Fallback when `xvfb-run` is unavailable: `QT_QPA_PLATFORM=offscreen` (mouse events may be less reliable for QML integration tests).
+
+Never run Qt window tests directly against `$DISPLAY`. Use `-E "tst_realistic|tst_benchmark"` for a fast inner loop.
 
 ## Conventions
 
