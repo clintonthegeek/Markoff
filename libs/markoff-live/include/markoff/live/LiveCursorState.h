@@ -18,10 +18,14 @@ class BlockKindRegistry;
 class LiveBlockModel;
 class LiveListModelBinding;
 
-/// Owns the single canonical cursor value for the live view. Validates
-/// `request()` calls against the target block's `BlockKindDescriptor`
-/// (so BlockSelected is refused on a paragraph, etc.). Emits
-/// `cursorChanged()` only when the cursor actually changes. Spec §5.3.
+/// Owns the canonical cursor value for **structural events** (kind
+/// transitions, cross-block navigation, `BlockSelected`, `BlockInternalEdit`).
+/// For **in-block caret position during typing**, `QQuickTextEdit::cursorPosition`
+/// is canonical; `m_cursor` mirrors it via `syncFromTextEdit`, called from each
+/// text-bearing delegate's `onCursorPositionChanged` and from
+/// `LiveEditBinding::onContentsChange` after each buffer edit. The authority
+/// split is documented in `docs/specs/2026-05-15-tier-2-cursor-typing-authority-design.md`
+/// §3.
 ///
 /// `cursorKind` Q_PROPERTY exposes the active variant as a string for QML
 /// bindings that need to react to focus type (e.g. focus ring vs. caret).
