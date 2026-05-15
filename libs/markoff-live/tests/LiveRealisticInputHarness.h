@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QCoreApplication>
+#include <QKeyEvent>
 #include <QQuickWindow>
 #include <QTest>
 #include <QWheelEvent>
@@ -57,6 +58,30 @@ public:
 
     void typeString(const QString &text) {
         for (QChar c : text) typeChar(c);
+    }
+
+    /// Any Unicode QChar, including non-ASCII and surrogate-pair halves.
+    /// Delivers a QKeyEvent with `text()` set to the character. Use this
+    /// for CJK / emoji / accented input. ASCII letters and digits should
+    /// still go through `typeChar` (which uses QTest::keyClick's char
+    /// overload — battle-tested path).
+    void typeUnicode(QChar c) {
+        QKeyEvent press(QEvent::KeyPress, Qt::Key_unknown, Qt::NoModifier,
+                        QString(c));
+        QCoreApplication::sendEvent(m_window, &press);
+        QKeyEvent release(QEvent::KeyRelease, Qt::Key_unknown, Qt::NoModifier,
+                          QString(c));
+        QCoreApplication::sendEvent(m_window, &release);
+        QTest::qWait(m_defaultGapMs);
+        QCoreApplication::processEvents();
+    }
+
+    /// Like `typeString` but for arbitrary Unicode (including surrogate
+    /// pairs). Iterates by `QChar` so a code point outside the BMP is
+    /// delivered as two events — which is exactly how `cursorPosition`
+    /// (UTF-16 code units) will advance.
+    void typeUnicodeString(const QString &text) {
+        for (QChar c : text) typeUnicode(c);
     }
 
     /// Batches `chars.size()` keystrokes back-to-back with NO inter-
