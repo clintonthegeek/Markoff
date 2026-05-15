@@ -109,10 +109,13 @@ not exercised. **Item 9 surfaced two new findings (below).**
 
 ## Findings from item 9 (2026-05-11)
 
-Both findings below have been **resolved** in commit `4fb711f` —
-chokepoint invariant suite now 21/21, with two new regression tests
-added (`nav_into_runtime_promoted_heading`, `hr_promotion_lands_focus_on_text_block`).
-A re-dogfood pass is needed to confirm interactive behaviour matches.
+D-fc-1 and D-fc-2 resolved in commit `4fb711f`. The follow-on
+finding D-fc-3 ("arrow keys still won't move past already-existing
+HRs") surfaced a related generalisable issue and is fixed in
+commit `9b30d75`. All three resolved.
+
+A re-dogfood pass is needed to confirm interactive behaviour
+matches.
 
 ### D-fc-1 — Focus lost after typing `---` to create a horizontal rule
 
@@ -206,18 +209,63 @@ hypothesis):**
   bypassing `request` keeps the unit-test fixture (no registry)
   from segfaulting.
 
+### D-fc-3 — Arrow keys won't move the cursor past already-existing horizontal rules
+
+**Repro:** Open a document with HRs already in it (loaded from disk,
+not created in-session). Click in or near an HR. Press arrow keys.
+The cursor doesn't escape.
+
+**Root cause (the generalisable issue):** The chokepoint's
+`tryResolvePending` always staged a `TextCaret` cursor variant,
+regardless of the target block's registered capabilities. HR's
+`supportedCursorVariants` is `["BlockSelected"]` only. So clicking
+on or near an HR (the 20-pixel divider is easy to land on
+accidentally) left the cursor in an invalid state: `cursorKind`
+was "TextCaret" but the HR delegate's `isSelected` binding
+checked for "BlockSelected" and stayed false. The HR's
+`Keys.onPressed` guards against non-selected state and returned
+NotAccepted, so arrow keys fell through to ListView's default
+key handling — which moves `currentIndex` but doesn't touch
+`m_cursor`. Net: stuck cursor.
+
+**Fix (commit `9b30d75`):** Make the chokepoint *variant-aware*.
+In `tryResolvePending`, consult `BlockKindRegistry` for the target
+kind's `supportedCursorVariants` and pick:
+
+  - `TextCaret` if supported (Paragraph, Heading, CodeBlock,
+    ListItem, Blockquote — the common case);
+  - else `BlockSelected` (HorizontalRule, Image, Math).
+
+This is the **generalisable rule** the user asked about: the
+chokepoint never stages a variant the target delegate can't
+honour. Click on an HR now puts it in BlockSelected state; arrow
+Up/Down then escapes via the existing structural-key-handler
+`hrNavigateUp/Down` path. Image blocks gain the same affordance
+for free.
+
+Companion: `focusedAnchorRow()` was previously TextCaret-only,
+which meant the HR delegate's `isSelected` binding (compares
+`focusedAnchorRow` against `modelIndex`) saw -1 and stayed false
+even when the cursor *was* BlockSelected on the HR. Now resolves
+the row for any variant carrying a block anchor.
+
 ## What this implies for the tag
 
-Both findings have been fixed in commit `4fb711f`. The
-`v0.8.0-focus-chokepoint` tag now waits only on a final
-interactive dogfood pass confirming:
+All three findings (D-fc-1, D-fc-2, D-fc-3) fixed in commits
+`4fb711f` and `9b30d75`. The `v0.8.0-focus-chokepoint` tag now
+waits only on a final interactive dogfood pass confirming:
 
-- Re-typing `---<Enter>` creates an HR and leaves the caret on a
+- Typing `---<Enter>` creates an HR and leaves the caret on a
   fresh empty paragraph after, accepting subsequent typing
   without re-clicking.
 - After typing `# Some text` to promote a paragraph to a heading,
   navigating away with arrow keys and then back (Up or Down)
   lands the caret on the new heading.
+- In a document with pre-existing horizontal rules, arrow Up/Down
+  navigation cleanly crosses through them; click on an HR puts
+  it in a selected/highlighted state from which Up/Down escapes
+  to the neighbouring paragraph and Backspace/Delete removes
+  the rule.
 - The interactive run shows no `QMetaObject::invokeMethod`,
   `TypeError`, or `cursor request rejected` chatter in the
   terminal during normal editing.

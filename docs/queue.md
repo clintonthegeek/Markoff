@@ -61,7 +61,7 @@
 > the seam will use the count as evidence.
 
 - 2026-05-11 `libs/markoff-live/src/LiveBlockModel.cpp:106` — inv #7 — `applyOps` now detects a Delete+Insert-at-same-row kind-change pattern and synthesises `beginResetModel`/`endResetModel` because `DelegateChooser` won't swap delegate type on `dataChanged` and pool-reuses the old template under plain rowsRemoved+rowsInserted. Heavy hammer; works but is the kind of pattern-match workaround that papers over a deeper L1/L2 modelling question. Worth revisiting if the chooser ever gains explicit kind-swap support, or if we move to a single delegate that internally renders by kind.
-- 2026-05-11 `libs/markoff-live/src/LiveCursorState.cpp:419-440` — inv #7 — `tryResolvePending` now sets `m_cursor` directly (bypassing `request()`'s registry-based variant validation) before invoking `takeFocus`. Pre-update is needed because `takeFocus`'s `cursorPosition = qtPos` is sometimes a no-op (empty new paragraph at pos=0) and won't echo back via `syncFromTextEdit`. Bypassing `request` keeps unit-test fixtures (no registry) from segfaulting. Functional but smells: the chokepoint quietly maintains two ways of mutating `m_cursor`.
+- 2026-05-11 `libs/markoff-live/src/LiveCursorState.cpp:419-440` — inv #7 — `tryResolvePending` now sets `m_cursor` directly (bypassing `request()`'s registry-based variant validation) before invoking `takeFocus`. Pre-update is needed because `takeFocus`'s `cursorPosition = qtPos` is sometimes a no-op (empty new paragraph at pos=0) and won't echo back via `syncFromTextEdit`. Bypassing `request` keeps unit-test fixtures (no registry) from segfaulting. Functional but smells: the chokepoint quietly maintains two ways of mutating `m_cursor`. *(Expanded in commit `9b30d75` to also pick variant TextCaret-vs-BlockSelected via the registry — same code path, broader responsibility. Note for the next refactor: the chokepoint now duplicates a slice of `validateVariant`'s logic. Either merge them or document that `request()` is the legacy entry point and `tryResolvePending` is the new authoritative one.)*
 
 ---
 
@@ -142,6 +142,21 @@ toggle works; an interactive dogfood pass signs off.
 > remove+insert at the same row. `LiveBlockModel::applyOps` now
 > detects the kind-change pattern and emits a `beginResetModel`/
 > `endResetModel` for it. Chokepoint invariant suite 21/21.
+>
+> **2026-05-11 (D-fc-3):** Follow-on dogfood found arrows still
+> didn't move past *already-existing* HRs. Root cause was the
+> chokepoint always staging a `TextCaret` cursor variant —
+> invalid for non-text-bearing kinds (HR, Image). Clicking on or
+> near an HR left the cursor in an invalid TextCaret state that
+> the HR delegate's `isSelected` guard rejected, breaking arrow
+> navigation entirely. Fixed in commit `9b30d75` by making the
+> chokepoint *variant-aware* via the existing
+> `BlockKindRegistry.supportedCursorVariants` — the generalisable
+> rule is "the chokepoint never stages a variant the target
+> can't honour." `focusedAnchorRow()` extended to all variants
+> for the same reason. Image and Math gain the same affordance
+> for free. Chokepoint suite now 28 tests (was 21), with the new
+> tests pinning the rule.
 
 **Effort:** ~3 days. **Status:** critique captured (verbally during
 S1/S2/S3 pass), no spec, no plan.
