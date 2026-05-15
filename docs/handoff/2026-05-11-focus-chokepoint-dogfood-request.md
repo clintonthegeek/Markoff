@@ -291,6 +291,24 @@ waits only on a final interactive dogfood pass confirming:
 Reply on this document or in chat once dogfood completes. Tag
 `v0.8.0-focus-chokepoint` lands only after sign-off.
 
+### D-fc-4 + block-only generalisation — resolved 2026-05-13
+
+**Spec:** `docs/specs/2026-05-13-block-only-kinds-design.md`
+**Plan:** `docs/plans/2026-05-13-block-only-kinds.md`
+
+D-fc-4 (Backspace after HR orphans cursor at row=-1) is fixed by the merge fence
+in `LiveStructuralKeyHandler::tryHandle()` — Backspace at qtPos=0 adjacent to a
+block-only block now selects the block-only instead of running backspaceMerge.
+
+New behaviours to verify in the next dogfood pass:
+- Arrow Down from paragraph above HR/Image: first press → HR/Image selected (BlockSelected); second press → paragraph below.
+- Backspace at start of paragraph after HR/Image → HR/Image becomes selected. Second Backspace → HR/Image deleted.
+- Delete at end of paragraph before HR/Image → HR/Image becomes selected.
+- Enter on selected HR/Image → new empty paragraph inserted after, cursor in it.
+- Typing on selected HR/Image → no-op (block stays selected, keystroke discarded).
+- Triple-click on HR/Image → BlockSelected (same as single click; no surrounding text selected).
+- Repeat all of the above for Image blocks using a `![alt](url)` reference.
+
 ## What's deferred (tier 2/3/4)
 
 Per spec §10 — typing-cursor authority (queue #2 #1 full / #2 / #6

@@ -62,6 +62,7 @@
 
 - 2026-05-11 `libs/markoff-live/src/LiveBlockModel.cpp:106` — inv #7 — `applyOps` now detects a Delete+Insert-at-same-row kind-change pattern and synthesises `beginResetModel`/`endResetModel` because `DelegateChooser` won't swap delegate type on `dataChanged` and pool-reuses the old template under plain rowsRemoved+rowsInserted. Heavy hammer; works but is the kind of pattern-match workaround that papers over a deeper L1/L2 modelling question. Worth revisiting if the chooser ever gains explicit kind-swap support, or if we move to a single delegate that internally renders by kind.
 - 2026-05-11 `libs/markoff-live/src/LiveCursorState.cpp:419-440` — inv #7 — `tryResolvePending` now sets `m_cursor` directly (bypassing `request()`'s registry-based variant validation) before invoking `takeFocus`. Pre-update is needed because `takeFocus`'s `cursorPosition = qtPos` is sometimes a no-op (empty new paragraph at pos=0) and won't echo back via `syncFromTextEdit`. Bypassing `request` keeps unit-test fixtures (no registry) from segfaulting. Functional but smells: the chokepoint quietly maintains two ways of mutating `m_cursor`. *(Expanded in commit `9b30d75` to also pick variant TextCaret-vs-BlockSelected via the registry — same code path, broader responsibility. Note for the next refactor: the chokepoint now duplicates a slice of `validateVariant`'s logic. Either merge them or document that `request()` is the legacy entry point and `tryResolvePending` is the new authoritative one.)*
+- 2026-05-13 `libs/markoff-live/src/BlockKindRegistry.cpp:Math` — inv #8 — `isBlockOnly` is explicit-false for Math despite Math having no `TextCaret` in `supportedCursorVariants`. Transitional asymmetry; will be removed when Math becomes text-bearing in its own spec.
 
 ---
 
@@ -157,6 +158,18 @@ toggle works; an interactive dogfood pass signs off.
 > for the same reason. Image and Math gain the same affordance
 > for free. Chokepoint suite now 28 tests (was 21), with the new
 > tests pinning the rule.
+>
+> **2026-05-13 — Block-only kinds spec + plan landed.**
+> Spec: `docs/specs/2026-05-13-block-only-kinds-design.md`
+> Plan: `docs/plans/2026-05-13-block-only-kinds.md`
+> Work: 14-task chain on `exploration/new-foundation`. Delivers:
+> - `BlockKindDescriptor::isBlockOnly` explicit flag (HR + Image = true, Math = false)
+> - `BlockKindRegistry::isBlockOnly()` predicate — single decision point
+> - `BlockOnlyDelegateBase.qml` shared base (HR + Image inherit; Math unchanged)
+> - Navigation land-and-step (R-arrow-into/out): HR + Image are cursor stops
+> - Merge fence (R-backspace/delete-adjacent): fixes D-fc-4 orphaned cursor
+> - R-delete/enter/type/tripleclick: full block-only UX complete
+> - 16 new invariant tests (8 HR + 8 Image), falsifiability stub in history
 
 **Effort:** ~3 days. **Status:** critique captured (verbally during
 S1/S2/S3 pass), no spec, no plan.
