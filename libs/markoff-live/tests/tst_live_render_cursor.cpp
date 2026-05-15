@@ -72,7 +72,7 @@ private Q_SLOTS:
 
         TextCaret tc;
         tc.block = recs[0].blockAnchor;
-        tc.cachedByteOffset = 0;
+        tc.cachedQtPos = 0;
         cs.request(tc);
 
         QCOMPARE(spy.count(), 1);
@@ -124,7 +124,7 @@ private Q_SLOTS:
         LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         TextCaret tc;
         tc.block = recs[0].blockAnchor;
-        tc.cachedByteOffset = 0;
+        tc.cachedQtPos = 0;
         cs.request(tc);
 
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
@@ -152,7 +152,7 @@ private Q_SLOTS:
 
     void selection_collapsed_caret() {
         TextCaret tc;
-        tc.cachedByteOffset = 3;
+        tc.cachedQtPos = 3;
         LiveRenderSelection sel;
         sel.anchor = tc;
         sel.active = tc;
@@ -162,8 +162,8 @@ private Q_SLOTS:
 
     void selection_non_collapsed() {
         TextCaret a, b;
-        a.cachedByteOffset = 0;
-        b.cachedByteOffset = 5;
+        a.cachedQtPos = 0;
+        b.cachedQtPos = 5;
         LiveRenderSelection sel;
         sel.anchor = a;
         sel.active = b;
@@ -218,7 +218,7 @@ private Q_SLOTS:
         QCOMPARE(spy.count(), 1);
         const Cursor cur = cs.cursor();
         QVERIFY(std::holds_alternative<TextCaret>(cur));
-        QCOMPARE(std::get<TextCaret>(cur).cachedByteOffset, quint32(0));
+        QCOMPARE(std::get<TextCaret>(cur).cachedQtPos, quint32(0));
         QCOMPARE(std::get<TextCaret>(cur).block, recs[1].blockAnchor);
     }
 

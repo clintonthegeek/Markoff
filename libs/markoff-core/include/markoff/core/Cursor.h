@@ -20,11 +20,17 @@ using BlockId = Markoff::BlockAnchor;
 struct MARKOFF_CORE_EXPORT TextCaret {
     Markoff::BlockId    block;                   ///< CRDT-anchored parser block.
     Markoff::TextAnchor positionAnchor;          ///< CRDT anchor; survives remote edits.
-    quint32             cachedByteOffset = 0;    ///< Resolved byte offset; refreshed on use.
+    /// UTF-16 code-unit offset within the block, as reported by
+    /// `QQuickTextEdit::cursorPosition`.
+    /// Producer: TextEdit::cursorPositionChanged → LiveCursorState::syncFromTextEdit.
+    /// Consumer: focus dispatch (focusEditAt(qtPos)), focusedQtPos Q_PROPERTY.
+    /// NOT a byte offset — for conversion to CRDT byte space, see
+    /// `Coordinates::qtPosToByte` (LiveEditBinding.cpp:151).
+    quint32 cachedQtPos = 0;
 
     bool operator==(const TextCaret &o) const noexcept {
         return block == o.block && positionAnchor == o.positionAnchor
-            && cachedByteOffset == o.cachedByteOffset;
+            && cachedQtPos == o.cachedQtPos;
     }
 };
 

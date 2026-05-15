@@ -20,7 +20,7 @@ private slots:
         Markoff::TextCaret tc;
         tc.block = bid;
         tc.positionAnchor = doc.textAnchorAt(bid, 5, false);
-        tc.cachedByteOffset = 5;
+        tc.cachedQtPos = 5;
         doc.setRemoteCursor(quint16(2), Markoff::Cursor(tc),
                             QColor("#f00"), QStringLiteral("Bob"));
 
@@ -33,7 +33,7 @@ private slots:
         const Markoff::Cursor after = doc.remoteCursorOf(quint16(2));
         const auto *tc2 = std::get_if<Markoff::TextCaret>(&after);
         QVERIFY(tc2 != nullptr);
-        QCOMPARE(tc2->cachedByteOffset, quint32(8));
+        QCOMPARE(tc2->cachedQtPos, quint32(8));
     }
 
     void localDeleteBefore_remoteCursorShifts() {
@@ -46,7 +46,7 @@ private slots:
         Markoff::TextCaret tc;
         tc.block = bid;
         tc.positionAnchor = doc.textAnchorAt(bid, 7, false);
-        tc.cachedByteOffset = 7;
+        tc.cachedQtPos = 7;
         doc.setRemoteCursor(quint16(3), Markoff::Cursor(tc),
                             QColor("#0f0"), QStringLiteral("Carol"));
 
@@ -59,7 +59,7 @@ private slots:
         const Markoff::Cursor after = doc.remoteCursorOf(quint16(3));
         const auto *tc2 = std::get_if<Markoff::TextCaret>(&after);
         QVERIFY(tc2 != nullptr);
-        QCOMPARE(tc2->cachedByteOffset, quint32(4));
+        QCOMPARE(tc2->cachedQtPos, quint32(4));
     }
 };
 QTEST_MAIN(TstD5RemoteCursorSurvival)

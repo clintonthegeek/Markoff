@@ -448,7 +448,7 @@ void LiveListModelBinding::onD2Changed()
                     if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
                         tc && tc->block == rec.blockAnchor) {
                         d->cursorState->establishFocus(
-                            rec.blockAnchor, static_cast<int>(tc->cachedByteOffset));
+                            rec.blockAnchor, static_cast<int>(tc->cachedQtPos));
                     }
                 }
                 Markoff::Cmd::changeKind(*doc, Markoff::BlockId(rec.blockAnchor),
@@ -570,7 +570,7 @@ void LiveListModelBinding::onD2Changed()
             if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
                 tc && tc->block == rec.blockAnchor) {
                 d->cursorState->establishFocus(
-                    rec.blockAnchor, static_cast<int>(tc->cachedByteOffset));
+                    rec.blockAnchor, static_cast<int>(tc->cachedQtPos));
             }
         }
         Markoff::Cmd::changeKind(*doc,

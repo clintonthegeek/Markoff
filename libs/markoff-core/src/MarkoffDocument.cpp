@@ -1335,7 +1335,7 @@ void MarkoffDocument::d2ApplyBufferEdit(BlockId block, uint32_t offset,
                         const CollabText::Crdt::Anchor a =
                             Markoff::Detail::toCrdtAnchor(tc->positionAnchor);
                         const uint32_t localOff = bufIt->second->resolve_anchor(a);
-                        tc->cachedByteOffset = static_cast<quint32>(localOff);
+                        tc->cachedQtPos = static_cast<quint32>(localOff);
                         Q_EMIT remoteCursorChanged(replicaId, rec.cursor, rec.color, rec.label);
                     }
                 }

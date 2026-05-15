@@ -59,7 +59,7 @@ int LiveCursorState::focusedAnchorRow() const
 int LiveCursorState::focusedQtPos() const
 {
     if (const auto *tc = std::get_if<TextCaret>(&m_cursor))
-        return static_cast<int>(tc->cachedByteOffset);
+        return static_cast<int>(tc->cachedQtPos);
     return -1;
 }
 
@@ -82,7 +82,7 @@ void LiveCursorState::request(const Cursor &newCursor)
     if (auto *tc = std::get_if<TextCaret>(&newCursor)) {
         const int row = m_model ? rowForBlock(tc->block) : -1;
         desc = QStringLiteral("TextCaret(innerRow=%1, qtPos=%2)")
-                   .arg(row).arg(tc->cachedByteOffset);
+                   .arg(row).arg(tc->cachedQtPos);
     } else if (std::holds_alternative<NoCursor>(newCursor)) {
         desc = QStringLiteral("NoCursor");
     }
@@ -143,7 +143,7 @@ void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
 
     TextCaret tc;
     tc.block            = anchor;
-    tc.cachedByteOffset = static_cast<quint32>(qtPos);
+    tc.cachedQtPos = static_cast<quint32>(qtPos);
     Cursor newCursor    = tc;
 
     if (m_cursor == newCursor) return;
@@ -216,7 +216,7 @@ void LiveCursorState::resolvePendingForAnchor()
 
             TextCaret tc;
             tc.block            = target;
-            tc.cachedByteOffset = static_cast<quint32>(qtPos);
+            tc.cachedQtPos = static_cast<quint32>(qtPos);
             request(tc);  // emits cursorChanged() — hint must still be set during this call
 
             // Clear the visual-line hint AFTER request() so that cursorChanged
@@ -251,7 +251,7 @@ void LiveCursorState::resolvePendingForRow(int row)
 
     TextCaret tc;
     tc.block            = anchor;
-    tc.cachedByteOffset = static_cast<quint32>(qtPos);
+    tc.cachedQtPos = static_cast<quint32>(qtPos);
     // positionAnchor: left default — selection projection refreshes it.
     request(tc);  // emits cursorChanged() — hint must still be set during this call
 
@@ -373,7 +373,7 @@ void LiveCursorState::delegateAvailable(Markoff::BlockAnchor blockAnchor,
             if (tc->block == blockAnchor) {
                 m_pendingFocus = PendingFocus{
                     blockAnchor,
-                    static_cast<int>(tc->cachedByteOffset),
+                    static_cast<int>(tc->cachedQtPos),
                     QDateTime::currentMSecsSinceEpoch()
                 };
             }
@@ -474,7 +474,7 @@ void LiveCursorState::tryResolvePending() {
         if (supportsText) {
             TextCaret tc;
             tc.block            = anchor;
-            tc.cachedByteOffset = static_cast<quint32>(qtPos);
+            tc.cachedQtPos = static_cast<quint32>(qtPos);
             newCursor           = tc;
         } else if (supportsBlock) {
             BlockSelected bs;
