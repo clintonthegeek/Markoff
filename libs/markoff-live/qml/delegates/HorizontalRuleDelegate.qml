@@ -59,7 +59,8 @@ Item {
         if (!handler) { event.accepted = false; return }
         const k = event.key
         if (k !== Qt.Key_Delete && k !== Qt.Key_Backspace
-                && k !== Qt.Key_Up && k !== Qt.Key_Down) {
+                && k !== Qt.Key_Up && k !== Qt.Key_Down
+                && k !== Qt.Key_Return && k !== Qt.Key_Enter) {
             event.accepted = false; return
         }
         const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,

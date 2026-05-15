@@ -399,16 +399,45 @@ void LiveStructuralKeyHandler::registerBuiltins()
         return HR::Handled;
     };
 
-    // Register for every kind whose descriptor has isBlockOnly == true.
+    // Generic block-only delete: remove the block, land cursor on the block above
+    // (or the block below if this was the first block). Works for HR, Image, Math, …
+    auto blockOnlyDelete = [](const Ctx &c) -> HR {
+        const Markoff::BlockId id(c.blockAnchor);
+        const int targetRow = std::max(0, c.blockIndex - 1);
+        UndoLog::Transaction t(c.document->d2UndoLog());
+        c.document->d2RemoveBlock(id, t);
+        if (c.model->rowCount() > 0) {
+            const int resolveRow = std::min(targetRow, c.model->rowCount() - 1);
+            c.cursorState->establishFocus(c.model->recordAt(resolveRow).blockAnchor,
+                c.model->recordAt(resolveRow).text.length());
+        }
+        return HR::Handled;
+    };
+
+    // Generic block-only enter: insert an empty Paragraph after the current
+    // block-only block and land TextCaret on it at qtPos=0.
+    auto blockOnlyEnter = [](const Ctx &c) -> HR {
+        const Markoff::BlockId newBlock =
+            Markoff::Cmd::enterAtEnd(*c.document, c.blockAnchor);
+        c.cursorState->establishFocus(Markoff::BlockAnchor(newBlock), 0);
+        return HR::Handled;
+    };
+
+    // Register Up/Down, Delete/Backspace, and Return/Enter for every
+    // kind whose descriptor has isBlockOnly == true.
     for (const QString &kind : m_registry->kinds()) {
         if (!m_registry->isBlockOnly(kind)) continue;
-        m_handlers[kind][Qt::Key_Up]   = blockOnlyNavigateUp;
-        m_handlers[kind][Qt::Key_Down] = blockOnlyNavigateDown;
+        m_handlers[kind][Qt::Key_Up]        = blockOnlyNavigateUp;
+        m_handlers[kind][Qt::Key_Down]      = blockOnlyNavigateDown;
+        m_handlers[kind][Qt::Key_Delete]    = blockOnlyDelete;
+        m_handlers[kind][Qt::Key_Backspace] = blockOnlyDelete;
+        m_handlers[kind][Qt::Key_Return]    = blockOnlyEnter;
+        m_handlers[kind][Qt::Key_Enter]     = blockOnlyEnter;
     }
 
     // HorizontalRule-specific: Delete/Backspace removes the block.
-    // (Up/Down are handled generically above via blockOnlyNavigateUp/Down.)
-
+    // (Superseded by blockOnlyDelete above; kept for backward compatibility
+    // until Task 10 retires all per-kind block-only handlers.)
     auto hrDelete = [](const Ctx &c) -> HR {
         const Markoff::BlockId id(c.blockAnchor);
         const int targetRow = std::max(0, c.blockIndex - 1);

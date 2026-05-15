@@ -63,6 +63,7 @@ void BlockKindRegistry::registerBuiltins()
         d.consumedStructuralKeys = {
             Qt::Key_Delete, Qt::Key_Backspace,
             Qt::Key_Up, Qt::Key_Down,
+            Qt::Key_Return, Qt::Key_Enter,
         };
         d.delegateUrl = QStringLiteral(
             "qrc:/qt/qml/org/markoff/live/render/delegates/HorizontalRuleDelegate.qml");
