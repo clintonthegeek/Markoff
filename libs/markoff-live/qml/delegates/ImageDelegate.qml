@@ -3,23 +3,12 @@ import QtQuick
 import QtQuick.Controls
 import org.markoff.live 1.0
 
-Item {
+BlockOnlyDelegateBase {
     id: root
     width: ListView.view ? ListView.view.width : 600
     implicitHeight: imageArea.implicitHeight + 8
 
-    property int modelIndex: index
-    readonly property string blockText: model.text
-    property var blockAnchor: undefined  // captured at Component.onCompleted; stays valid through onDestruction
-
-    readonly property var liveBinding: ListView.view ? ListView.view.binding : null
-    readonly property var cursorState: liveBinding ? liveBinding.cursorState : null
-
-    readonly property bool isSelected:
-        cursorState !== null
-        && cursorState.cursorKind === "BlockSelected"
-        && cursorState.focusedAnchorRow === root.modelIndex
-
+    // --- Image-specific state ---
     readonly property bool isAltEditing:
         cursorState !== null
         && cursorState.cursorKind === "BlockInternalEdit"
@@ -34,6 +23,7 @@ Item {
         return a ? (a["alt"] || "") : ""
     }
 
+    // --- Content layer ---
     Item {
         id: imageArea
         width: parent.width
@@ -98,6 +88,7 @@ Item {
         }
     }
 
+    // Selection / alt-edit outline
     Rectangle {
         visible: root.isSelected || root.isAltEditing
         anchors.fill: parent
@@ -110,15 +101,7 @@ Item {
 
     function positionAt(x, y) { return -1 }
 
-    function takeFocus(qtPos: int) {
-        // Image is non-text. Mirror HorizontalRuleDelegate: just forceActiveFocus
-        // so keyboard input reaches Keys.onPressed. Do NOT call cs.request() —
-        // `request` is not a Q_INVOKABLE and silently fails with a TypeError.
-        // BlockSelected state is established by the chokepoint (LiveCursorState),
-        // not by the delegate.
-        root.forceActiveFocus()
-    }
-
+    // --- Alt-edit machinery ---
     function enterAltEdit() {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) cs.request({ variant: "BlockInternalEdit",
@@ -131,39 +114,9 @@ Item {
         if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
     }
 
-    Keys.priority: Keys.BeforeItem
-    Keys.onPressed: (event) => {
-        if (!root.isSelected) { event.accepted = false; return }
-        const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
-        if (!handler) { event.accepted = false; return }
-        const k = event.key
-        // Delete/Backspace/Up/Down are routed through the registry-driven structural
-        // key handler (blockOnlyDelete / blockOnlyNavigate).
-        // Return/Enter on BlockSelected Image inserts a paragraph after (blockOnlyEnter).
-        if (k !== Qt.Key_Delete && k !== Qt.Key_Backspace
-                && k !== Qt.Key_Up && k !== Qt.Key_Down
-                && k !== Qt.Key_Return && k !== Qt.Key_Enter) {
-            event.accepted = false; return
-        }
-        const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,
-            -1, true, model.text)
-        event.accepted = handled
-    }
-
     MouseArea {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton
         onDoubleClicked: if (root.isSelected) root.enterAltEdit()
-    }
-
-    Component.onCompleted: {
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        blockAnchor = model.blockAnchor
-        if (cs) cs.delegateAvailable(blockAnchor, model.kind, root)
-    }
-
-    Component.onDestruction: {
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs && blockAnchor !== undefined) cs.delegateGoingAway(blockAnchor)
     }
 }

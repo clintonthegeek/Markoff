@@ -1,20 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
-import QtQuick.Controls
-import org.markoff.live 1.0
 
-Item {
+BlockOnlyDelegateBase {
     id: root
     width: ListView.view ? ListView.view.width : 600
     implicitHeight: 20
 
-    property int modelIndex: index
-    readonly property string blockText: model.text
-    property var blockAnchor: undefined  // captured at Component.onCompleted; stays valid through onDestruction
-
-    readonly property var liveBinding: ListView.view ? ListView.view.binding : null
-    readonly property var cursorState: liveBinding ? liveBinding.cursorState : null
-
+    // Rule line
     Rectangle {
         anchors { left: parent.left; right: parent.right; verticalCenter: parent.verticalCenter }
         height: 2
@@ -22,11 +14,7 @@ Item {
         radius: 1
     }
 
-    readonly property bool isSelected:
-        cursorState !== null
-        && cursorState.cursorKind === "BlockSelected"
-        && cursorState.focusedAnchorRow === root.modelIndex
-
+    // Selection outline
     Rectangle {
         visible: root.isSelected
         anchors.fill: parent
@@ -38,44 +26,4 @@ Item {
     }
 
     function positionAt(x, y) { return -1 }
-
-    function takeFocus(qtPos: int) {
-        // HR is non-text. When the kind-transition path lands focus here,
-        // forceActiveFocus on the delegate root so keyboard input reaches
-        // the HR's Keys.onPressed (which only handles arrow/Backspace/Delete
-        // for block-selection navigation). The previous implementation
-        // attempted to call `cs.request(...)`, but `request` is not a
-        // Q_INVOKABLE method, which surfaced as a TypeError at runtime and
-        // prevented even forceActiveFocus from completing properly.
-        // BlockSelected state, if needed, should be established by the
-        // caller via the chokepoint, not by the delegate poking back.
-        root.forceActiveFocus()
-    }
-
-    Keys.priority: Keys.BeforeItem
-    Keys.onPressed: (event) => {
-        if (!root.isSelected) { event.accepted = false; return }
-        const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
-        if (!handler) { event.accepted = false; return }
-        const k = event.key
-        if (k !== Qt.Key_Delete && k !== Qt.Key_Backspace
-                && k !== Qt.Key_Up && k !== Qt.Key_Down
-                && k !== Qt.Key_Return && k !== Qt.Key_Enter) {
-            event.accepted = false; return
-        }
-        const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,
-            -1, true, model.text)
-        event.accepted = handled
-    }
-
-    Component.onCompleted: {
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        blockAnchor = model.blockAnchor
-        if (cs) cs.delegateAvailable(blockAnchor, model.kind, root)
-    }
-
-    Component.onDestruction: {
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs && blockAnchor !== undefined) cs.delegateGoingAway(blockAnchor)
-    }
 }

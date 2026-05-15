@@ -1,4 +1,5 @@
 module org.markoff.live
+BlockOnlyDelegateBase 1.0 BlockOnlyDelegateBase.qml
 ParagraphDelegate 1.0 ParagraphDelegate.qml
 HeadingDelegate 1.0 HeadingDelegate.qml
 HorizontalRuleDelegate 1.0 HorizontalRuleDelegate.qml
