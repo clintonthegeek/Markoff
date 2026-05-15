@@ -89,6 +89,7 @@ qt_add_qml_module(markoff_live
         qml/delegates/ParagraphDelegate.qml
         qml/delegates/HeadingDelegate.qml
         qml/delegates/CodeBlockDelegate.qml
+        qml/delegates/BlockOnlyDelegateBase.qml
         qml/delegates/HorizontalRuleDelegate.qml
         qml/delegates/ImageDelegate.qml
         qml/delegates/ListItemDelegate.qml
