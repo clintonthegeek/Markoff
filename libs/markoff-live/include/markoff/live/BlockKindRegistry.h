@@ -26,8 +26,14 @@ public:
     /// Returns true when the kind's descriptor has isBlockOnly set — i.e. the
     /// block can never host a text caret and UX is select-whole-block.
     bool isBlockOnly(const QString &kind) const {
-        const auto *d = find(kind);
-        return d && d->isBlockOnly;
+        // FALSIFIABILITY PROOF — REVERTS NEXT COMMIT.
+        // The block-only kind treatment lives entirely behind this predicate.
+        // Making it false should turn the chokepoint, navigation, and
+        // structural-key paths back into pre-spec behaviour and break every
+        // R-rule test. Mirrors commits 2d609ba (takeFocus stub) and 20dcaee
+        // (establishFocus stub) — see docs/specs/2026-05-13-block-only-kinds-design.md §7.
+        (void)kind;
+        return false;
     }
 
     // Markoff::BlockSerializerRegistry implementation
