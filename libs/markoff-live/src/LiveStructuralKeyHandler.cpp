@@ -161,6 +161,26 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
         return true;
     }
 
+    // Block-only fence (spec §4 R-backspace-at-text-start-adjacent /
+    // R-delete-at-text-end-adjacent): Backspace at qtPos=0 or Delete at
+    // qtPos=length, when the adjacent block is isBlockOnly, selects
+    // the adjacent block instead of running the cross-boundary merge.
+    // Fires for ANY text-bearing kind (Paragraph, Heading, ListItem, etc.)
+    // before per-kind dispatch, so no per-kind handler needs to guard this.
+    if ((key == Qt::Key_Backspace && qtPos == 0 && blockIndex > 0)
+            || (key == Qt::Key_Delete && qtPos == blockText.length()
+                && blockIndex < m_model->rowCount() - 1)) {
+        const int adjRow = (key == Qt::Key_Backspace)
+                               ? blockIndex - 1 : blockIndex + 1;
+        const BlockRecord &adjRec = m_model->recordAt(adjRow);
+        if (m_registry->isBlockOnly(adjRec.kind)) {
+            BlockSelected sel;
+            sel.block = adjRec.blockAnchor;
+            m_cursorState->request(sel);
+            return true;
+        }
+    }
+
     if (!desc->consumedStructuralKeys.contains(key)) return false;
 
     auto kindIt = m_handlers.constFind(rec.kind);
