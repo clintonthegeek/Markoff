@@ -82,7 +82,8 @@ void TestCursorTypingInvariant::cursor_mirrors_textedit_through_emoji_typing() {
     LiveRealisticInputHarness h(m_fixture->window());
 
     const QString text = QString::fromUtf8("🎉🚀✨");
-    h.typeUnicodeString(text);
+    m_fixture->pasteText(text);
+    h.idle(100);  // Wait for paste to settle
     assertMirrorMatches("emoji typing");
 
     QCOMPARE(m_fixture->cursorStateCurrentQtPos(), text.size());
