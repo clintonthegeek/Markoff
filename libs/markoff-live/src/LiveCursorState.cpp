@@ -44,9 +44,15 @@ QString LiveCursorState::cursorKind() const
 int LiveCursorState::focusedAnchorRow() const
 {
     if (!m_model) return -1;
-    if (const auto *tc = std::get_if<TextCaret>(&m_cursor)) {
+    // Resolve the row for whichever variant carries a block anchor.
+    // Required so non-text-bearing blocks (HR, Image) report their row
+    // when the cursor is in BlockSelected / BlockInternalEdit state.
+    if (const auto *tc = std::get_if<TextCaret>(&m_cursor))
         return rowForBlock(tc->block);
-    }
+    if (const auto *bs = std::get_if<BlockSelected>(&m_cursor))
+        return rowForBlock(bs->block);
+    if (const auto *bi = std::get_if<BlockInternalEdit>(&m_cursor))
+        return rowForBlock(bi->block);
     return -1;
 }
 
@@ -426,15 +432,45 @@ void LiveCursorState::tryResolvePending() {
     // won't be called. Without this pre-update, m_cursor would retain
     // whatever stale anchor it held before the structural event.
     //
-    // Bypass `request()` (which validates variant via the registry) — we
-    // know the variant is appropriate by construction (the registered
-    // delegate kind matched in the stale-check above). Avoiding `request`
-    // also lets unit tests that construct `LiveCursorState` without a
-    // registry exercise the chokepoint.
-    TextCaret tc;
-    tc.block            = anchor;
-    tc.cachedByteOffset = static_cast<quint32>(qtPos);
-    Cursor newCursor = tc;
+    // Variant selection respects the target kind's registered
+    // capabilities: `TextCaret` if supported (the common case), otherwise
+    // `BlockSelected` for non-text-bearing blocks (HR, Image). This is
+    // the generalizable rule that makes click+arrow navigation work for
+    // every kind: the chokepoint never stages a variant the target
+    // delegate can't honour, so the corresponding `Keys.onPressed`
+    // `isSelected`-style guards see the right state and route arrow
+    // keys through the structural key handler.
+    //
+    // Bypass `request()` directly — its `validateVariant` call would
+    // segfault on a null registry (unit tests) and would also reject
+    // some valid transient states during a structural cascade.
+    Cursor newCursor;
+    {
+        bool supportsText  = true;   // safe default if no registry
+        bool supportsBlock = false;
+        if (m_registry) {
+            if (const auto *desc = m_registry->find(currentKind)) {
+                supportsText  = desc->supportedCursorVariants.contains(
+                                    QStringLiteral("TextCaret"));
+                supportsBlock = desc->supportedCursorVariants.contains(
+                                    QStringLiteral("BlockSelected"));
+            }
+        }
+        if (supportsText) {
+            TextCaret tc;
+            tc.block            = anchor;
+            tc.cachedByteOffset = static_cast<quint32>(qtPos);
+            newCursor           = tc;
+        } else if (supportsBlock) {
+            BlockSelected bs;
+            bs.block = anchor;
+            newCursor = bs;
+        } else {
+            // No supported cursor variant — drop. Shouldn't happen for any
+            // currently-registered kind, but keeps the chokepoint total.
+            return;
+        }
+    }
     if (!(m_cursor == newCursor)) {
         m_pendingRow.reset();  // explicit request supersedes any pending row
         m_cursor = newCursor;
