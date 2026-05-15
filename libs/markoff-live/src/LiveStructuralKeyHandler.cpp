@@ -435,24 +435,6 @@ void LiveStructuralKeyHandler::registerBuiltins()
         m_handlers[kind][Qt::Key_Enter]     = blockOnlyEnter;
     }
 
-    // HorizontalRule-specific: Delete/Backspace removes the block.
-    // (Superseded by blockOnlyDelete above; kept for backward compatibility
-    // until Task 10 retires all per-kind block-only handlers.)
-    auto hrDelete = [](const Ctx &c) -> HR {
-        const Markoff::BlockId id(c.blockAnchor);
-        const int targetRow = std::max(0, c.blockIndex - 1);
-        UndoLog::Transaction t(c.document->d2UndoLog());
-        c.document->d2RemoveBlock(id, t);
-        if (c.model->rowCount() > 1) {
-            const int resolveRow = std::min(targetRow, c.model->rowCount() - 1);
-            c.cursorState->establishFocus(c.model->recordAt(resolveRow).blockAnchor,
-                c.model->recordAt(resolveRow).text.length());
-        }
-        return HR::Handled;
-    };
-    m_handlers[BlockKind::HorizontalRule][Qt::Key_Delete]    = hrDelete;
-    m_handlers[BlockKind::HorizontalRule][Qt::Key_Backspace] = hrDelete;
-
     // ---- ListItem handlers ----
     // Per-item block model: each ListItem is its own CRDT block.
     // blockText = content only (no marker prefix); marker/indent are attrs.
@@ -654,22 +636,6 @@ void LiveStructuralKeyHandler::registerBuiltins()
             static_cast<int>(c.blockText.length()));
         return HR::Handled;
     };
-
-    // Image: Backspace/Delete removes the block (same as HR).
-    auto imgDelete = [](const Ctx &c) -> HandleResult {
-        const Markoff::BlockId id(c.blockAnchor);
-        const int targetRow = std::max(0, c.blockIndex - 1);
-        UndoLog::Transaction t(c.document->d2UndoLog());
-        c.document->d2RemoveBlock(id, t);
-        if (c.model->rowCount() > 1) {
-            const int resolveRow = std::min(targetRow, c.model->rowCount() - 2);
-            c.cursorState->establishFocus(c.model->recordAt(resolveRow).blockAnchor,
-                c.model->recordAt(resolveRow).text.length());
-        }
-        return HandleResult::Handled;
-    };
-    m_handlers[BlockKind::Image][Qt::Key_Delete]    = imgDelete;
-    m_handlers[BlockKind::Image][Qt::Key_Backspace] = imgDelete;
 
     // Math: Backspace/Delete removes the block (same as HR/Image).
     auto mathDelete = [](const Ctx &c) -> HR {
