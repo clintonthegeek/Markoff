@@ -253,8 +253,6 @@ xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
   build-dev/bin/<test-binary> [test-name ...]
 ```
 
-Fallback when `xvfb-run` is unavailable: `QT_QPA_PLATFORM=offscreen` (mouse events may be less reliable for QML integration tests).
-
 Never run Qt window tests directly against `$DISPLAY`. Use `-E "tst_realistic|tst_benchmark"` for a fast inner loop.
 
 ## Conventions
