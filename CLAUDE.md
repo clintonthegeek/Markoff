@@ -236,12 +236,26 @@ foundation library + two canonical view leaves.
 
 ```bash
 cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
-cmake --build build-dev -j
-cd build-dev && ctest -j
+cmake --build build-dev -j 8
 ```
 
-141/141 fast tests pass at the tip of `exploration/new-foundation` (post-D3,
-mid-D4). Use `-E "tst_realistic|tst_benchmark"` for a fast inner loop.
+## Testing
+
+Qt tests spawn windows — always run via `xvfb-run` so they don't interrupt the user's display:
+
+```bash
+xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
+  ctest --test-dir build-dev --output-on-failure -j 8
+```
+
+Direct test binary invocations likewise:
+
+```bash
+xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
+  build-dev/bin/<test-binary> [test-name ...]
+```
+
+Never run Qt window tests directly against `$DISPLAY`. Use `-E "tst_realistic|tst_benchmark"` for a fast inner loop (those tests don't need the window flag either).
 
 ## Conventions
 
