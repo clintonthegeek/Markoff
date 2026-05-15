@@ -81,6 +81,7 @@ void BlockKindRegistry::registerBuiltins()
         d.internalEditModes = { QStringLiteral("alt-edit") };
         d.consumedStructuralKeys = {
             Qt::Key_Delete, Qt::Key_Backspace,
+            Qt::Key_Up, Qt::Key_Down,
         };
         d.delegateUrl = QStringLiteral(
             "qrc:/qt/qml/org/markoff/live/render/delegates/ImageDelegate.qml");

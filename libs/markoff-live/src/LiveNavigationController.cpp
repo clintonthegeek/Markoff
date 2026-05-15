@@ -317,15 +317,25 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
 }
 
 int LiveNavigationController::previousNavigableRow(int currentRow) const {
-    for (int r = currentRow - 1; r >= 0; --r)
+    for (int r = currentRow - 1; r >= 0; --r) {
         if (isTextBearing(r)) return r;
+        if (m_registry && m_model) {
+            const BlockRecord &rec = m_model->recordAt(r);
+            if (m_registry->isBlockOnly(rec.kind)) return r;
+        }
+    }
     return -1;
 }
 
 int LiveNavigationController::nextNavigableRow(int currentRow) const {
     if (!m_model) return -1;
-    for (int r = currentRow + 1; r < m_model->rowCount(); ++r)
+    for (int r = currentRow + 1; r < m_model->rowCount(); ++r) {
         if (isTextBearing(r)) return r;
+        if (m_registry) {
+            const BlockRecord &rec = m_model->recordAt(r);
+            if (m_registry->isBlockOnly(rec.kind)) return r;
+        }
+    }
     return -1;
 }
 

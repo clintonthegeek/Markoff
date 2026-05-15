@@ -266,14 +266,16 @@ void TestFocusChokepointInvariant::nav_into_runtime_promoted_heading() {
 }
 
 void TestFocusChokepointInvariant::arrow_down_traverses_existing_hr() {
-    // D-fc-3: arrow Down from a paragraph above an existing HR must land
-    // on the text-bearing row after the HR, not get stranded on the
-    // source row. Verified at the QML-integration level (the unit test
-    // navigable_row_skips_horizontal_rule only proves the row-skip math).
+    // New semantics (spec §4 R-arrow-into / R-arrow-out): arrow Down from a
+    // paragraph above an HR lands BlockSelected on the HR first (one press),
+    // then a second press lands TextCaret on the next text-bearing row.
+    // Two presses are needed to cross an HR; the cursor is never stranded
+    // on the source row.
     m_fixture.reset();
     m_fixture = std::make_unique<QmlIntegrationFixture>(
         "alpha\n\n---\n\nbeta\n", 3);
     QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
     QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
     QCOMPARE(m_fixture->modelText(0), QString("alpha"));
     QCOMPARE(m_fixture->modelText(2), QString("beta"));
@@ -282,36 +284,51 @@ void TestFocusChokepointInvariant::arrow_down_traverses_existing_hr() {
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
 
     LiveRealisticInputHarness h(m_fixture->window());
+    // First Down: lands BlockSelected on HR (row 1).
     h.keyClick(Qt::Key_Down);
     QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
 
+    // Second Down: lands TextCaret on beta (row 2).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
 }
 
 void TestFocusChokepointInvariant::arrow_up_traverses_existing_hr() {
+    // New semantics: Up from row 2 (beta) first lands BlockSelected on HR
+    // (row 1), then a second Up lands TextCaret on alpha (row 0).
     m_fixture.reset();
     m_fixture = std::make_unique<QmlIntegrationFixture>(
         "alpha\n\n---\n\nbeta\n", 3);
     QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
     QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
 
     m_fixture->placeCursorAtPos(2, 0);
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
 
     LiveRealisticInputHarness h(m_fixture->window());
+    // First Up: lands BlockSelected on HR (row 1).
     h.keyClick(Qt::Key_Up);
     QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
 
+    // Second Up: lands TextCaret on alpha (row 0).
+    h.keyClick(Qt::Key_Up);
+    QTest::qWait(150);
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
 }
 
 void TestFocusChokepointInvariant::arrow_after_click_skips_hr() {
     // The user's dogfood path: click into a paragraph (NOT placeCursorAtPos)
-    // and then press an arrow key. Reproduces the actual interactive flow.
+    // and then press an arrow key. New semantics: first Down from row 0 lands
+    // BlockSelected on HR (row 1); second Down lands on beta (row 2).
     m_fixture.reset();
     m_fixture = std::make_unique<QmlIntegrationFixture>(
         "alpha\n\n---\n\nbeta\n", 3);
     QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
     QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
 
     m_fixture->clickOnBlock(0);
@@ -319,6 +336,12 @@ void TestFocusChokepointInvariant::arrow_after_click_skips_hr() {
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
 
     LiveRealisticInputHarness h(m_fixture->window());
+    // First Down: lands BlockSelected on HR (row 1).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    // Second Down: lands TextCaret on beta (row 2).
     h.keyClick(Qt::Key_Down);
     QTest::qWait(150);
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
@@ -413,36 +436,57 @@ void TestFocusChokepointInvariant::backspace_after_typed_hr_lands_somewhere_sens
 
 void TestFocusChokepointInvariant::arrow_down_traverses_hr_between_headings() {
     // Variation: source is a heading rather than a paragraph, target is
-    // a heading rather than a paragraph. Same expected behaviour.
+    // a heading rather than a paragraph. New semantics: two presses needed
+    // to cross the HR — first lands BlockSelected on it, second lands on
+    // the far-side heading.
     m_fixture.reset();
     m_fixture = std::make_unique<QmlIntegrationFixture>(
         "# alpha\n\n---\n\n## beta\n", 3);
     QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
     QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
 
     m_fixture->placeCursorAtEndOf(0);
     LiveRealisticInputHarness h(m_fixture->window());
+    // First Down: lands BlockSelected on HR (row 1).
     h.keyClick(Qt::Key_Down);
     QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
 
+    // Second Down: lands TextCaret on ## beta (row 2).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
 }
 
 void TestFocusChokepointInvariant::arrow_down_traverses_consecutive_non_text_blocks() {
-    // Two non-text blocks adjacent (HR, then HR). Arrow Down must skip
-    // both, not get stuck on the first one. Tests the loop-skip rather
-    // than single-skip.
+    // Two adjacent block-only rows (HR at 1, HR at 2). New semantics: each
+    // Down press advances one step — landing BlockSelected on the first HR,
+    // then BlockSelected on the second HR, then TextCaret on beta. Three
+    // presses needed to reach the far-side text block.
     m_fixture.reset();
     m_fixture = std::make_unique<QmlIntegrationFixture>(
         "alpha\n\n---\n\n---\n\nbeta\n", 4);
     QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
     QVERIFY(m_fixture->waitForDelegateAt(3, 2000));
 
     m_fixture->placeCursorAtEndOf(0);
     LiveRealisticInputHarness h(m_fixture->window());
+    // First Down: lands BlockSelected on HR1 (row 1).
     h.keyClick(Qt::Key_Down);
     QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
 
+    // Second Down: lands BlockSelected on HR2 (row 2).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    // Third Down: lands TextCaret on beta (row 3).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 3);
 }
 

@@ -360,25 +360,34 @@ void LiveStructuralKeyHandler::registerBuiltins()
         return HR::Handled;
     };
 
-    // HorizontalRule: Up/Down navigation, Delete/Backspace removes the block.
-    // Up: land at end of previous block (natural continuation of "going up").
-    // Down: land at start of next block (natural continuation of "going down").
-    auto hrNavigateUp = [](const Ctx &c) -> HR {
+    // Block-only kinds (HR, Image, …): generic Up/Down navigation.
+    // One arrow press = one step: land on the adjacent row. The chokepoint
+    // (establishFocus → tryResolvePending) selects the correct cursor variant
+    // (TextCaret for text-bearing, BlockSelected for block-only) so the
+    // handler doesn't need to know the target kind.
+    auto blockOnlyNavigateUp = [](const Ctx &c) -> HR {
         const int targetRow = c.blockIndex - 1;
         if (targetRow < 0) return HR::NotHandled;
         c.cursorState->establishFocus(c.model->recordAt(targetRow).blockAnchor,
             c.model->recordAt(targetRow).text.length());
         return HR::Handled;
     };
-    auto hrNavigateDown = [](const Ctx &c) -> HR {
+    auto blockOnlyNavigateDown = [](const Ctx &c) -> HR {
         const int targetRow = c.blockIndex + 1;
         if (targetRow >= c.model->rowCount()) return HR::NotHandled;
         c.cursorState->establishFocus(c.model->recordAt(targetRow).blockAnchor, 0);
         return HR::Handled;
     };
 
-    m_handlers[BlockKind::HorizontalRule][Qt::Key_Up]   = hrNavigateUp;
-    m_handlers[BlockKind::HorizontalRule][Qt::Key_Down] = hrNavigateDown;
+    // Register for every kind whose descriptor has isBlockOnly == true.
+    for (const QString &kind : m_registry->kinds()) {
+        if (!m_registry->isBlockOnly(kind)) continue;
+        m_handlers[kind][Qt::Key_Up]   = blockOnlyNavigateUp;
+        m_handlers[kind][Qt::Key_Down] = blockOnlyNavigateDown;
+    }
+
+    // HorizontalRule-specific: Delete/Backspace removes the block.
+    // (Up/Down are handled generically above via blockOnlyNavigateUp/Down.)
 
     auto hrDelete = [](const Ctx &c) -> HR {
         const Markoff::BlockId id(c.blockAnchor);
