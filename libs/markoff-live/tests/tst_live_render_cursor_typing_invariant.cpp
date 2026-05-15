@@ -57,19 +57,58 @@ void TestCursorTypingInvariant::assertMirrorMatches(const QString &scenario) {
 
 // Slot bodies — added in Tasks 6–10.
 void TestCursorTypingInvariant::cursor_mirrors_textedit_through_ascii_typing() {
-    QSKIP("Implemented in Task 6");
+    LiveRealisticInputHarness h(m_fixture->window());
+
+    const QString text = QStringLiteral("Hello12");
+    for (int i = 0; i < text.size(); ++i) {
+        h.typeChar(text.at(i));
+        assertMirrorMatches(
+            QString("ASCII typing after char #%1 (%2)").arg(i + 1).arg(text.at(i)));
+    }
+    QCOMPARE(m_fixture->cursorStateCurrentQtPos(), text.size());
 }
 void TestCursorTypingInvariant::cursor_mirrors_textedit_through_cjk_typing() {
-    QSKIP("Implemented in Task 7");
+    LiveRealisticInputHarness h(m_fixture->window());
+
+    const QString text = QString::fromUtf8("これはテスト");
+    for (int i = 0; i < text.size(); ++i) {
+        h.typeUnicode(text.at(i));
+        assertMirrorMatches(
+            QString("CJK typing after char #%1").arg(i + 1));
+    }
+    QCOMPARE(m_fixture->cursorStateCurrentQtPos(), text.size());
 }
 void TestCursorTypingInvariant::cursor_mirrors_textedit_through_emoji_typing() {
-    QSKIP("Implemented in Task 8");
+    LiveRealisticInputHarness h(m_fixture->window());
+
+    const QString text = QString::fromUtf8("🎉🚀✨");
+    h.typeUnicodeString(text);
+    assertMirrorMatches("emoji typing");
+
+    QCOMPARE(m_fixture->cursorStateCurrentQtPos(), text.size());
 }
 void TestCursorTypingInvariant::cursor_mirrors_textedit_through_arrow_within_block() {
-    QSKIP("Implemented in Task 9");
+    LiveRealisticInputHarness h(m_fixture->window());
+
+    h.typeString(QStringLiteral("abcdef"));
+    assertMirrorMatches("after typing abcdef");
+
+    for (int i = 0; i < 3; ++i) {
+        h.keyClick(Qt::Key_Left);
+        assertMirrorMatches(QString("Left #%1 within block").arg(i + 1));
+    }
+    QCOMPARE(m_fixture->cursorStateCurrentQtPos(), 3);
 }
 void TestCursorTypingInvariant::cursor_mirrors_textedit_through_kind_transition() {
-    QSKIP("Implemented in Task 10");
+    LiveRealisticInputHarness h(m_fixture->window());
+
+    h.typeChar(QLatin1Char('#'));
+    assertMirrorMatches("after typing '#'");
+
+    h.keyClick(Qt::Key_Space);
+    QVERIFY(m_fixture->waitForKindAt(0, QStringLiteral("heading"), 2000));
+
+    assertMirrorMatches("after kind transition Paragraph → Heading");
 }
 
 }  // namespace Markoff::Live::Test
