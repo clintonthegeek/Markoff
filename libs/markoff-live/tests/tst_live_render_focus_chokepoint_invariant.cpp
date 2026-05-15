@@ -46,6 +46,7 @@ private slots:
     void arrow_after_click_skips_hr();
     void click_on_hr_then_arrow_navigates_out();
     void click_on_hr_sets_block_selected();
+    void backspace_after_typed_hr_lands_somewhere_sensible();
     void arrow_down_traverses_hr_between_headings();
     void arrow_down_traverses_consecutive_non_text_blocks();
 
@@ -354,6 +355,50 @@ void TestFocusChokepointInvariant::click_on_hr_then_arrow_navigates_out() {
     QTest::qWait(150);
 
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::backspace_after_typed_hr_lands_somewhere_sensible() {
+    // D-fc-4 (active design): user types `---` at end of an existing
+    // paragraph, HR is created and a fresh empty paragraph appears
+    // after (D-fc-1 fix). User then presses Backspace on the empty
+    // paragraph. Whatever the design decides happens next, the cursor
+    // must NOT vanish — `focusedAnchorRow()` must report a valid row,
+    // there must be either a focused delegate or an unambiguous
+    // `cursorKind` (BlockSelected on the HR is acceptable; "none" is
+    // not).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n", 1);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(120);
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    QTest::qWait(200);
+    // Layout now: paragraph "alpha" (0), HR (1), empty paragraph (2).
+    // Caret is on row 2 (per D-fc-1 fix).
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(200);
+
+    // Whatever the design decision: cursor must be on SOME row, with
+    // a non-"none" cursorKind. Specifically, ruling out the bug:
+    // focusedAnchorRow == -1 (cursor pointing at nothing).
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    const QString kind = cs->property("cursorKind").toString();
+    const int row      = m_fixture->cursorStateCurrentRow();
+    qInfo() << "DBG post-backspace: cursorKind=" << kind << " row=" << row
+            << " modelRowCount=" << m_fixture->model()->rowCount();
+    QVERIFY2(kind != QStringLiteral("none"),
+             qPrintable(QString("cursor was lost after Backspace; kind=%1").arg(kind)));
+    QVERIFY2(row >= 0,
+             qPrintable(QString("cursorRow=-1 after Backspace; kind=%1").arg(kind)));
 }
 
 void TestFocusChokepointInvariant::arrow_down_traverses_hr_between_headings() {
