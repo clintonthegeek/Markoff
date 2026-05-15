@@ -60,6 +60,16 @@ private slots:
     void typing_on_selected_hr_is_noop();
     void tripleclick_on_hr_lands_blockselected();
 
+    // Block-only kinds — Image variants (spec §7)
+    void arrow_down_lands_blockselected_on_image();
+    void arrow_down_from_blockselected_image_lands_on_text();
+    void backspace_at_para_start_after_image_selects_image();
+    void delete_at_para_end_before_image_selects_image();
+    void backspace_on_selected_image_removes_it();
+    void enter_on_selected_image_inserts_paragraph_after();
+    void typing_on_selected_image_is_noop();
+    void tripleclick_on_image_lands_blockselected();
+
 private:
     void assertChokepointInvariant(const QString &scenario);
     std::unique_ptr<QmlIntegrationFixture> m_fixture;
@@ -683,6 +693,224 @@ void TestFocusChokepointInvariant::tripleclick_on_hr_lands_blockselected() {
 
     QQuickItem *d = m_fixture->delegateAt(1);
     QVERIFY2(d != nullptr, "delegate at row 1 (HR) not found");
+    QVariant contentItemVar = m_fixture->listView()->property("contentItem");
+    QQuickItem *contentItem = contentItemVar.value<QQuickItem *>();
+    const qreal offsetX = contentItem ? contentItem->x() : 0.0;
+    const qreal offsetY = contentItem ? contentItem->y() : 0.0;
+    const QPoint clickPos(
+        static_cast<int>(d->x() + d->width() / 2 + offsetX),
+        static_cast<int>(d->y() + d->height() / 2 + offsetY));
+
+    // Send three rapid clicks within typical triple-click interval (~100 ms).
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(40);
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(40);
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(150);
+    QCoreApplication::processEvents();
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// Block-only kinds — Image variants (spec §7)
+//
+// These tests are structurally parallel to the HR variants above. The only
+// differences are:
+//   • Fixture uses "![alt](http://example.com/x.png)" instead of "---"
+//   • Expected kind string is "image" (BlockKind::Image == "image")
+//
+// All 8 tests are expected to pass without any production changes: the
+// registry-driven dispatch (isBlockOnly loop in BlockKindRegistry, plus
+// blockOnlyNavigate/Delete/Enter handlers in LiveStructuralKeyHandler)
+// covers Image as soon as its descriptor has isBlockOnly=true (set in
+// Task 2 of the block-only-kinds plan).
+// ---------------------------------------------------------------------------
+
+static const char *kImageFixture = "alpha\n\n![alt](http://example.com/x.png)\n\nbeta\n";
+
+void TestFocusChokepointInvariant::arrow_down_lands_blockselected_on_image() {
+    // R-arrow-into: Down from text-bearing row 0 lands BlockSelected on Image
+    // (row 1), not skip-past to row 2.
+    // NOTE: Image blocks load as Paragraph initially and transition to "image"
+    // kind via inferBlockKind in onD2Changed. Wait for the kind transition to
+    // complete before acting, otherwise navigation targets a Paragraph.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::arrow_down_from_blockselected_image_lands_on_text() {
+    // R-arrow-out: Down from BlockSelected Image (row 1) lands TextCaret on row 2.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->clickOnBlock(1);  // click Image → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::backspace_at_para_start_after_image_selects_image() {
+    // R-backspace-at-text-start-adjacent: Backspace at qtPos=0 on row 2 (beta)
+    // when row 1 is an Image → BlockSelected on Image (row 1), model unchanged
+    // (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->placeCursorAtPos(2, 0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::delete_at_para_end_before_image_selects_image() {
+    // R-delete-at-text-end-adjacent: Delete at end of row 0 (alpha) when row 1
+    // is an Image → BlockSelected on Image (row 1), model unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Delete);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::backspace_on_selected_image_removes_it() {
+    // R-delete-blockonly: Backspace on BlockSelected Image removes it; cursor lands
+    // TextCaret on the previous block (row 0 = alpha, now the only neighbour above).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click Image → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(200);
+
+    // Image removed → 2 rows left (alpha=0, beta=1)
+    QCOMPARE(m_fixture->model()->rowCount(), 2);
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+}
+
+void TestFocusChokepointInvariant::enter_on_selected_image_inserts_paragraph_after() {
+    // R-enter-blockonly: Enter on BlockSelected Image inserts empty paragraph after
+    // the Image and lands TextCaret on it (row 2 in the 4-row result).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click Image → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(200);
+
+    // New empty paragraph inserted after Image → 4 rows: alpha(0), Image(1), empty(2), beta(3)
+    QCOMPARE(m_fixture->model()->rowCount(), 4);
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::typing_on_selected_image_is_noop() {
+    // R-type-blockonly: Typing a printable character on BlockSelected Image is a
+    // no-op — cursor stays BlockSelected on row 1, model unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click Image → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.typeChar(QChar('x'));
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::tripleclick_on_image_lands_blockselected() {
+    // R-tripleclick-blockonly: Three rapid clicks on an Image land BlockSelected
+    // (same as single click). Triple-click counter resets cleanly; model
+    // unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    QQuickItem *d = m_fixture->delegateAt(1);
+    QVERIFY2(d != nullptr, "delegate at row 1 (Image) not found");
     QVariant contentItemVar = m_fixture->listView()->property("contentItem");
     QQuickItem *contentItem = contentItemVar.value<QQuickItem *>();
     const qreal offsetX = contentItem ? contentItem->x() : 0.0;

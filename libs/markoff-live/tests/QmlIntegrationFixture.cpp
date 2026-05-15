@@ -210,6 +210,38 @@ QString QmlIntegrationFixture::modelText(int row) {
     return m_model->data(m_model->index(row, 0), textRole).toString();
 }
 
+QString QmlIntegrationFixture::modelKind(int row) {
+    const auto roles = m_model->roleNames();
+    int kindRole = -1;
+    for (auto it = roles.cbegin(); it != roles.cend(); ++it) {
+        if (it.value() == QByteArray("kind")) {
+            kindRole = it.key();
+            break;
+        }
+    }
+    if (kindRole == -1) return {};
+    return m_model->data(m_model->index(row, 0), kindRole).toString();
+}
+
+bool QmlIntegrationFixture::waitForKindAt(int row, const QString &kind, int timeoutMs) {
+    if (modelKind(row) == kind) return true;
+    // Kind transitions may arrive via dataChanged OR modelReset (kind-only swap
+    // path in LiveBlockModel uses beginResetModel/endResetModel). Use time-
+    // based polling with QTest::qWait to catch both.
+    QElapsedTimer t; t.start();
+    while (modelKind(row) != kind && t.elapsed() < timeoutMs) {
+        QTest::qWait(25);
+        QCoreApplication::processEvents();
+    }
+    const QString actual = modelKind(row);
+    if (actual != kind) {
+        qWarning() << "[waitForKindAt] timeout: row=" << row
+                   << "expected=" << kind << "actual=" << actual
+                   << "rowCount=" << m_model->rowCount();
+    }
+    return actual == kind;
+}
+
 QString QmlIntegrationFixture::delegateText(int row) {
     QQuickItem *te = delegateTextEdit(row);
     return te ? te->property("text").toString() : QString();

@@ -588,6 +588,41 @@ void LiveListModelBinding::onD2Changed()
         return;
     }
 
+    // Kind-transition detection for newly-inserted blocks (Insert ops): handles
+    // the initial-load case where all blocks arrive as Insert ops (d->lastKeys is
+    // empty). Only Image and HorizontalRule need this path — their buffers always
+    // hold the source-literal pattern (e.g. "![alt](url)", "---"), unlike other
+    // structural kinds (Heading, CodeBlock, …) whose kinds are set correctly by
+    // mapTopLevelKind in loadFromMarkdown. Without this pass, Image and HR blocks
+    // loaded from markdown never get reclassified because the Equal-op loop above
+    // never sees them.
+    for (const auto &op : ops) {
+        if (op.kind != AstBlockDiff::OpKind::Insert) continue;
+        const int idx = op.nextIndex;
+        if (idx < 0 || idx >= records.size()) continue;
+        const auto &rec = records[idx];
+
+        // Only promote Paragraph blocks that look like Image or HR.
+        if (rec.kind != BlockKind::Paragraph) continue;
+
+        bool displayMode = false;
+        const QString inferred = inferBlockKind(rec.text, &displayMode);
+        if (inferred != BlockKind::Image && inferred != BlockKind::HorizontalRule)
+            continue;
+
+        const Markoff::BlockKind fk = (inferred == BlockKind::Image)
+            ? Markoff::BlockKind::Image
+            : Markoff::BlockKind::HorizontalRule;
+
+        Markoff::Cmd::changeKind(*doc, Markoff::BlockId(rec.blockAnchor), fk, {}, {});
+        // No enterAtEnd here — Insert-op promotion happens at load time when all
+        // sibling blocks are also being inserted. The cursor is not yet placed
+        // (requestTextCaretAtRow hasn't been called), so there is no active
+        // TextCaret to migrate. The next onD2Changed spin (triggered by the
+        // changeKind above) will see a clean Equal-op block with the correct kind.
+        return;
+    }
+
     d->applyingModelUpdate = true;
     auto _ = qScopeGuard([this]{ d->applyingModelUpdate = false; });
     d->model->applyOps(ops, records);

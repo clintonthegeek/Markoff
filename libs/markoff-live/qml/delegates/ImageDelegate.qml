@@ -111,9 +111,12 @@ Item {
     function positionAt(x, y) { return -1 }
 
     function takeFocus(qtPos: int) {
+        // Image is non-text. Mirror HorizontalRuleDelegate: just forceActiveFocus
+        // so keyboard input reaches Keys.onPressed. Do NOT call cs.request() —
+        // `request` is not a Q_INVOKABLE and silently fails with a TypeError.
+        // BlockSelected state is established by the chokepoint (LiveCursorState),
+        // not by the delegate.
         root.forceActiveFocus()
-        const cs = root.liveBinding ? root.liveBinding.cursorState : null
-        if (cs) cs.request({ variant: "BlockSelected", block: model.blockAnchor })
     }
 
     function enterAltEdit() {
@@ -130,20 +133,21 @@ Item {
 
     Keys.priority: Keys.BeforeItem
     Keys.onPressed: (event) => {
-        if (root.isSelected && (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)) {
-            root.enterAltEdit()
-            event.accepted = true
-            return
+        if (!root.isSelected) { event.accepted = false; return }
+        const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
+        if (!handler) { event.accepted = false; return }
+        const k = event.key
+        // Delete/Backspace/Up/Down are routed through the registry-driven structural
+        // key handler (blockOnlyDelete / blockOnlyNavigate).
+        // Return/Enter on BlockSelected Image inserts a paragraph after (blockOnlyEnter).
+        if (k !== Qt.Key_Delete && k !== Qt.Key_Backspace
+                && k !== Qt.Key_Up && k !== Qt.Key_Down
+                && k !== Qt.Key_Return && k !== Qt.Key_Enter) {
+            event.accepted = false; return
         }
-        if (root.isSelected && (event.key === Qt.Key_Delete || event.key === Qt.Key_Backspace)) {
-            const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
-            if (handler) {
-                event.accepted = handler.tryHandle(event.key, event.modifiers,
-                    root.modelIndex, -1, true, model.text)
-            }
-            return
-        }
-        event.accepted = false
+        const handled = handler.tryHandle(k, event.modifiers, root.modelIndex,
+            -1, true, model.text)
+        event.accepted = handled
     }
 
     MouseArea {

@@ -91,6 +91,8 @@ public:
     // Three-layer state (per spec §5.1)
     QByteArray bufferText(Markoff::BlockId id);
     QString    modelText(int row);
+    QString    modelKind(int row);
+    bool       waitForKindAt(int row, const QString &kind, int timeoutMs = 2000);
     QString    delegateText(int row);
     int        delegateCursorPos(int row);
 
