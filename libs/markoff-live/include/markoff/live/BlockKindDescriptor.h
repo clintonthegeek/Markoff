@@ -38,6 +38,20 @@ struct MARKOFF_LIVE_EXPORT BlockKindDescriptor {
     /// False for hr, image.
     bool acceptsTextRoleUpdates = false;
 
+    /// True when the block kind can never host a text caret and its UX is
+    /// "select the whole block, then act on it" — i.e. the cursor lands on
+    /// this block as BlockSelected, never as TextCaret.
+    ///
+    /// Currently true for HorizontalRule and Image.
+    ///
+    /// This flag is explicit rather than derived from supportedCursorVariants
+    /// so that Math — which also lacks TextCaret today but is heading toward
+    /// text-bearing in a separate spec — can be excluded cleanly without
+    /// kind-name special-cases at every call site.
+    ///
+    /// Refs spec §3 of docs/specs/2026-05-13-block-only-kinds-design.md
+    bool isBlockOnly = false;
+
     /// Context-menu actions registered for this kind. R9.
     QStringList contextMenuActions;
 

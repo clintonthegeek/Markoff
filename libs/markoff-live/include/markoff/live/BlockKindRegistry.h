@@ -23,6 +23,13 @@ public:
     const BlockKindDescriptor *find(const QString &id) const;
     QStringList kinds() const;
 
+    /// Returns true when the kind's descriptor has isBlockOnly set — i.e. the
+    /// block can never host a text caret and UX is select-whole-block.
+    bool isBlockOnly(const QString &kind) const {
+        const auto *d = find(kind);
+        return d && d->isBlockOnly;
+    }
+
     // Markoff::BlockSerializerRegistry implementation
     QByteArray serialize(Markoff::BlockKind kind,
                          const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs,

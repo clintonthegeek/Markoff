@@ -53,11 +53,12 @@ void BlockKindRegistry::registerBuiltins()
             "qrc:/qt/qml/org/markoff/live/render/delegates/CodeBlockDelegate.qml");
         m_descriptors.insert(d.id, d);
     }
-    // HorizontalRule: non-text, BlockSelected only.
+    // HorizontalRule: non-text, BlockSelected only. block-only (no TextCaret ever).
     {
         BlockKindDescriptor d;
         d.id = BlockKind::HorizontalRule;
         d.acceptsTextRoleUpdates = false;
+        d.isBlockOnly = true;
         d.supportedCursorVariants = { QStringLiteral("BlockSelected") };
         d.consumedStructuralKeys = {
             Qt::Key_Delete, Qt::Key_Backspace,
@@ -67,11 +68,12 @@ void BlockKindRegistry::registerBuiltins()
             "qrc:/qt/qml/org/markoff/live/render/delegates/HorizontalRuleDelegate.qml");
         m_descriptors.insert(d.id, d);
     }
-    // Image: non-text, BlockSelected (default) + optional alt-edit.
+    // Image: non-text, BlockSelected (default) + optional alt-edit. block-only.
     {
         BlockKindDescriptor d;
         d.id = BlockKind::Image;
         d.acceptsTextRoleUpdates = false;
+        d.isBlockOnly = true;
         d.supportedCursorVariants = {
             QStringLiteral("BlockSelected"),
             QStringLiteral("BlockInternalEdit"),
