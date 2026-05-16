@@ -201,6 +201,12 @@ Markoff::MarkoffDocument *LiveListModelBinding::document() const
     return d->document;
 }
 
+void LiveListModelBinding::flushPendingDocumentChanges()
+{
+    if (d->document)
+        d->document->flushPendingD2Changed();
+}
+
 void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
 {
     if (d->document == doc) return;

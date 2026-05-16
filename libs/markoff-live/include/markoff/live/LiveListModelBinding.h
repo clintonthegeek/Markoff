@@ -83,6 +83,15 @@ public:
     Markoff::MarkoffDocument *document() const;
     void setDocument(Markoff::MarkoffDocument *doc);
 
+    /// Flushes any queued `d2DocumentChanged` signal synchronously so the
+    /// model reflects all pending CRDT edits before the caller proceeds.
+    /// No-op when nothing is pending. Use from focus-resolution paths
+    /// (cursor request + delegate registration) that need the model to be
+    /// current. Queue #2 concern #5 — gives `LiveCursorState` a binding-
+    /// level entry instead of reaching into `document()->flushPendingD2Changed()`
+    /// directly.
+    void flushPendingDocumentChanges();
+
     /// Bind a Session so that Session::primarySelectionChanged propagates into
     /// the SelectionView. Pass nullptr to detach. The binding does NOT take
     /// ownership of the session (it is owned by the MarkoffDocument).

@@ -115,10 +115,12 @@ void LiveCursorState::requestTextCaretAtRow(int expectedRow, int qtPos)
     // migrated (navigation controller) reach the chokepoint through here.
     if (!m_model) return;
     if (expectedRow < 0 || expectedRow >= m_model->rowCount()) return;
-    // Flush queued D2 changes (no-op when nothing is pending) so the
-    // delegate's QTextDocument is on post-edit text before focus lands.
-    if (m_binding && m_binding->document())
-        m_binding->document()->flushPendingD2Changed();
+    // Ensure the model reflects all pending CRDT edits before we resolve
+    // the row → anchor mapping. The binding owns the doc and exposes this
+    // as a single entry point; cursor state stays out of doc internals
+    // (queue #2 concern #5).
+    if (m_binding)
+        m_binding->flushPendingDocumentChanges();
     const Markoff::BlockAnchor anchor = m_model->recordAt(expectedRow).blockAnchor;
     if (anchor == Markoff::BlockAnchor{}) return;
     establishFocus(anchor, qtPos);
