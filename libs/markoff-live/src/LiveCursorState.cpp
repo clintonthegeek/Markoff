@@ -2,6 +2,7 @@
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/BlockKind.h>
 #include <markoff/live/BlockKindRegistry.h>
+#include <markoff/live/Coordinates.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveListModelBinding.h>
 
@@ -9,8 +10,11 @@
 
 #include "KindDispatch.h"
 
+#include <QApplication>
+#include <QClipboard>
 #include <QDateTime>
 #include <QLoggingCategory>
+#include <climits>
 
 Q_LOGGING_CATEGORY(lcCursor, "markoff.live.cursor", QtWarningMsg)
 
@@ -453,6 +457,144 @@ void LiveCursorState::expireIfTimedOut(LiveCursorState::PendingFocus &p) {
     if ((now - p.enqueuedMs) > kPendingFocusTimeoutMs) {
         m_pendingFocus.reset();
     }
+}
+
+// ---------------------------------------------------------------------------
+// Tier 4c — selection operations (Phase A shadow copies)
+// ---------------------------------------------------------------------------
+
+namespace {
+struct SelectionCorners {
+    int anchorRow, anchorQtPos, activeRow, activeQtPos;
+    bool valid;
+};
+} // namespace
+
+static SelectionCorners cornersFromCanonical(const LiveCursorState *cs,
+                                             const LiveBlockModel *model)
+{
+    SelectionCorners c{-1, -1, -1, -1, false};
+    if (!model) return c;
+    const auto anchor = cs->selectionAnchor();
+    const auto active = cs->currentTextCaret();
+    if (!anchor || !active) return c;
+    const int aRow = cs->rowForBlock(anchor->block);
+    const int xRow = cs->rowForBlock(active->block);
+    if (aRow < 0 || xRow < 0) return c;
+    c.anchorRow   = aRow;
+    c.anchorQtPos = static_cast<int>(anchor->qtPos);
+    c.activeRow   = xRow;
+    c.activeQtPos = static_cast<int>(active->cachedQtPos);
+    c.valid = true;
+    return c;
+}
+
+static void normalizeCorners(const SelectionCorners &c, int &fb, int &fo, int &lb, int &lo)
+{
+    if (c.anchorRow < c.activeRow
+        || (c.anchorRow == c.activeRow && c.anchorQtPos <= c.activeQtPos)) {
+        fb = c.anchorRow; fo = c.anchorQtPos;
+        lb = c.activeRow; lo = c.activeQtPos;
+    } else {
+        fb = c.activeRow; fo = c.activeQtPos;
+        lb = c.anchorRow; lo = c.anchorQtPos;
+    }
+}
+
+QPoint LiveCursorState::selectionRangeForBlock(int row) const
+{
+    const auto c = cornersFromCanonical(this, m_model);
+    if (!c.valid) return QPoint(-1, -1);
+
+    int fb, fo, lb, lo;
+    normalizeCorners(c, fb, fo, lb, lo);
+
+    if (row < fb || row > lb)         return QPoint(-1, -1);
+    if (fb == lb)                     return QPoint(qMin(fo, lo), qMax(fo, lo));
+    if (row == fb)                    return QPoint(fo, INT_MAX);
+    if (row == lb)                    return QPoint(0, lo);
+    return QPoint(0, INT_MAX);
+}
+
+void LiveCursorState::copySelectionToClipboard() const
+{
+    if (!hasSelection() || !m_model) return;
+
+    const auto c = cornersFromCanonical(this, m_model);
+    if (!c.valid) return;
+    int fb, fo, lb, lo;
+    normalizeCorners(c, fb, fo, lb, lo);
+
+    const int rowCount = m_model->rowCount();
+    QString text;
+    for (int i = fb; i <= lb && i < rowCount; ++i) {
+        const QString bt = m_model->recordAt(i).text;
+        const int start = (i == fb) ? fo : 0;
+        const int end   = qMin((i == lb) ? lo : bt.length(), bt.length());
+        if (start > end) continue;
+        if (!text.isEmpty()) text += QLatin1Char('\n');
+        text += bt.mid(start, end - start);
+    }
+
+    QApplication::clipboard()->setText(text);
+}
+
+void LiveCursorState::selectAllBlocks()
+{
+    if (!m_model) return;
+    const int rowCount = m_model->rowCount();
+    if (rowCount <= 0) return;
+
+    const auto firstAnchor = m_model->recordAt(0).blockAnchor;
+    const auto lastRow     = rowCount - 1;
+    const auto lastAnchor  = m_model->recordAt(lastRow).blockAnchor;
+    const auto lastText    = m_model->recordAt(lastRow).text;
+
+    // Active end at the end of the last block.
+    syncFromTextEdit(lastAnchor, lastText.length());
+    // Anchor at the start of the first block.
+    setSelectionAnchor({firstAnchor, /*qtPos=*/0});
+}
+
+void LiveCursorState::deleteSelectionRange()
+{
+    if (!hasSelection() || !m_model || !m_binding || !m_binding->document())
+        return;
+
+    auto *doc = m_binding->document();
+    const auto c = cornersFromCanonical(this, m_model);
+    if (!c.valid) return;
+    int fb, fo, lb, lo;
+    normalizeCorners(c, fb, fo, lb, lo);
+
+    const int rowCount = m_model->rowCount();
+    if (fb < 0 || fb >= rowCount || lb < 0 || lb >= rowCount) return;
+
+    // Compute flat byte start/end by walking iterateBlocks().
+    const auto blocks = doc->iterateBlocks();
+    uint32_t startByte = 0, endByte = 0, cursor = 0;
+    for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
+        const QByteArray rawText = doc->blockText(blocks[i]);
+        const uint32_t blockSize = static_cast<uint32_t>(rawText.size());
+
+        if (i == fb) {
+            const QByteArray modelUtf8 = m_model->recordAt(fb).text.toUtf8();
+            startByte = cursor + static_cast<uint32_t>(
+                Coordinates::qtPosToByte(modelUtf8, fo));
+        }
+        if (i == lb) {
+            const QByteArray modelUtf8 = m_model->recordAt(lb).text.toUtf8();
+            endByte = cursor + static_cast<uint32_t>(
+                Coordinates::qtPosToByte(modelUtf8, lo));
+            break;
+        }
+        cursor += blockSize;
+    }
+
+    if (endByte <= startByte) return;
+
+    doc->applyFlatEdit(startByte, endByte, QByteArray(), Markoff::Origin::UserEdit);
+    clearSelectionAnchor();
 }
 
 }  // namespace Markoff::Live

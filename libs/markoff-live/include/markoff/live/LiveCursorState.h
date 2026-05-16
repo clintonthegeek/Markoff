@@ -218,6 +218,28 @@ public:
     /// mutate `m_cursor`. Emits `selectionChanged` if the slot was set.
     void clearSelectionAnchor() noexcept;
 
+    /// Selection range for `row`, or `QPoint(-1, -1)` if untouched. The
+    /// `end` component may be `INT_MAX` ("to end of block") — consumers
+    /// must clamp via `Math.min(r.y, textEdit.length)` before calling
+    /// `TextEdit.select`. Mirror of `LiveSelectionView::rangeForBlock`
+    /// during Phase A; will replace it in Phase C.
+    QPoint selectionRangeForBlock(int row) const;
+
+    /// Copy the current selection to the system clipboard. Reads block
+    /// texts from `m_model`. Mirror of `LiveSelectionView::copyToClipboard`
+    /// during Phase A.
+    void copySelectionToClipboard() const;
+
+    /// Select all text in the document. Mutates both cursor active end
+    /// (places at end of last block) and selection anchor (places at
+    /// start of first block). Mirror of `LiveSelectionView::selectAll`
+    /// during Phase A.
+    void selectAllBlocks();
+
+    /// Delete the currently-selected range and clear the selection.
+    /// Mirror of `LiveSelectionView::deleteSelection` during Phase A.
+    void deleteSelectionRange();
+
 Q_SIGNALS:
     void cursorChanged();
     void desiredVisualXChanged();
