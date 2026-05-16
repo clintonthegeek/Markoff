@@ -5,11 +5,13 @@ namespace Markoff::Live {
 
 QString delegateClassFor(const QString &kind)
 {
-    // FALSIFIABILITY PROOF — REVERTS NEXT.
-    // Each kind in its own bucket means the diff treats kind changes as
-    // class changes, i.e. Delete+Insert. The §6.1 invariant test must
-    // FAIL under this stub (TextEdit pointer changes again).
-    return kind.isEmpty() ? QStringLiteral("text-inline") : kind;
+    if (kind == QStringLiteral("code-block")) return QStringLiteral("code-block");
+    if (kind == QStringLiteral("math"))       return QStringLiteral("math");
+    if (kind == QStringLiteral("hr"))         return QStringLiteral("hr");
+    if (kind == QStringLiteral("image"))      return QStringLiteral("image");
+    // paragraph, heading, blockquote, list-item, and unknown (future plugin
+    // kinds) fall into the text-inline bucket.
+    return QStringLiteral("text-inline");
 }
 
 }  // namespace Markoff::Live
