@@ -191,6 +191,12 @@ public:
     /// its own m_model pointer.
     const LiveBlockModel *model() const noexcept { return m_model; }
 
+    /// Synchronous document-based block anchor lookup. Unlike the model
+    /// (which is populated via debounced onD2Changed), MarkoffDocument::blockAnchorAt
+    /// is available immediately after loadFromMarkdown. Returns a null
+    /// BlockAnchor if the document is unavailable or blockIndex is out of range.
+    Markoff::BlockAnchor blockAnchorAt(int blockIndex) const;
+
     // --- test-only helpers ---
     /// Attaches (or replaces) the LiveBlockModel used for kindFor lookups.
     /// Production path wires this in LiveListModelBinding; tests call directly.
@@ -269,6 +275,12 @@ Q_SIGNALS:
     void desiredVisualXChanged();
     void visualLineHintChanged();
     void selectionChanged();
+    /// Emitted only when the selection changes due to an incoming session
+    /// signal (i.e. from `onSessionPrimarySelectionChanged`). Used by
+    /// `LiveListModelBinding` to forward session-originated selection
+    /// changes to `LiveSelectionView::selectionChanged` without creating
+    /// a double-emit for locally-driven changes.
+    void selectionChangedFromSession();
 
 private:
     bool validateVariant(const Cursor &c) const;

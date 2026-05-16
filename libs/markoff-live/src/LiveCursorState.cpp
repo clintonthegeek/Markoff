@@ -188,6 +188,15 @@ void LiveCursorState::clearDesiredVisualX()
     setDesiredVisualX(-1.0);
 }
 
+Markoff::BlockAnchor LiveCursorState::blockAnchorAt(int blockIndex) const
+{
+    if (!m_binding || !m_binding->document()) return {};
+    if (blockIndex < 0) return {};
+    const auto ids = m_binding->document()->iterateBlocks();
+    if (blockIndex >= static_cast<int>(ids.size())) return {};
+    return ids[static_cast<std::size_t>(blockIndex)];
+}
+
 bool LiveCursorState::validateVariant(const Cursor &c) const
 {
     if (std::holds_alternative<NoCursor>(c)) return true;
@@ -619,7 +628,10 @@ void LiveCursorState::setSession(Markoff::Session *session)
 void LiveCursorState::syncSelectionToSession()
 {
     if (!m_session || !m_binding || !m_binding->document() || !m_model) return;
-    if (!hasSelection()) return;
+    // Do NOT gate on hasSelection() — collapsed selections (begin without extend,
+    // i.e. anchor == active) are still valid cursor positions to propagate for
+    // remote presence. The original LiveSelectionView::syncToSession() had no
+    // hasSelection() check; that behaviour is preserved here.
     const auto anchor = m_selectionAnchor;
     const auto active = currentTextCaret();
     if (!anchor || !active) return;
@@ -693,6 +705,11 @@ void LiveCursorState::onSessionPrimarySelectionChanged(const Markoff::Selection 
     if (!sameAnchor) {
         setSelectionAnchor(*resolvedAnchor);
     }
+    // Notify the facade that an externally-originated session change landed.
+    // This signal is only emitted here (not from local begin/extend/clear
+    // paths) so the facade can forward it to its own selectionChanged without
+    // double-counting local emissions.
+    Q_EMIT selectionChangedFromSession();
 }
 
 }  // namespace Markoff::Live

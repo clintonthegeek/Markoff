@@ -164,6 +164,13 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
     d->hitTester       = new BlockHitTester(this);
     d->selectionView   = new LiveSelectionView(this);
     d->selectionView->setCursorState(d->cursorState);
+    // Forward session-originated selection changes from LiveCursorState to the
+    // LiveSelectionView facade signal. Using selectionChangedFromSession (not
+    // selectionChanged) avoids double-emitting for locally-driven changes where
+    // LiveSelectionView already emits its own selectionChanged at the end of
+    // begin()/extend()/clear()/etc.
+    QObject::connect(d->cursorState, &LiveCursorState::selectionChangedFromSession,
+                     d->selectionView, &LiveSelectionView::selectionChanged);
     d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, d->selectionView, this);
     d->remoteCursors   = new RemoteCursorsListModel(this);
 
