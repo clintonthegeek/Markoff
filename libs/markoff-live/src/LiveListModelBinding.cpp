@@ -5,6 +5,7 @@
 #include <markoff/live/LiveNavigationController.h>
 #include <markoff/live/BlockKind.h>
 
+#include "KindDispatch.h"
 #include "KindTransition.h"
 
 #include <markoff/core/MarkoffDocument.h>
@@ -350,6 +351,7 @@ void LiveListModelBinding::onD2Changed()
         BlockRecord r;
         r.blockAnchor = id;   // BlockAnchor == BlockId
         r.kind        = blockKindToString(doc->blockKind(id));
+        r.delegateClass = Markoff::Live::delegateClassFor(r.kind);
 
         QByteArray raw = doc->blockText(id);
         // Trim trailing newline. Per-item ListItem blocks have content-only
