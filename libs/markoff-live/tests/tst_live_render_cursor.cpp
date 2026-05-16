@@ -204,28 +204,11 @@ private Q_SLOTS:
 
     // ---- LiveCursorState: requestTextCaretAtRow tests ----
 
-    void requestTextCaretAtRow_already_exists_resolves_immediately() {
-        BlockKindRegistry reg;
-        LiveBlockModel model;
-        const auto recs = QList<BlockRecord>{
-            makeRec(BlockKind::Paragraph, "alpha"),
-            makeRec(BlockKind::Paragraph, "beta"),
-        };
-        QList<BlockKey> keys;
-        for (const auto &r : recs) keys << keyOf(r);
-        model.applyOps(AstBlockDiff::diff({}, keys), recs);
-
-        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
-        QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
-
-        cs.requestTextCaretAtRow(/*expectedRow=*/1, /*qtPos=*/0);
-
-        QCOMPARE(spy.count(), 1);
-        const Cursor cur = cs.cursor();
-        QVERIFY(std::holds_alternative<TextCaret>(cur));
-        QCOMPARE(std::get<TextCaret>(cur).cachedQtPos, quint32(0));
-        QCOMPARE(std::get<TextCaret>(cur).block, recs[1].blockAnchor);
-    }
+    // requestTextCaretAtRow_already_exists_resolves_immediately moved to
+    // tst_live_render_cursor_qml.cpp — the focus-chokepoint refactor routes
+    // requestTextCaretAtRow through establishFocus, which only fires
+    // cursorChanged when a delegate is registered for the target anchor.
+    // Direct unit-test setups can't supply that.
 
     void requestTextCaretAtRow_pending_cleared_by_clear() {
         // A pending requestTextCaretAtRow that has not resolved yet is
@@ -278,36 +261,12 @@ private Q_SLOTS:
         QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
     }
 
-    void requestTextCaretAtRow_pending_resolves_on_structural_insert()
-    {
-        // Set up a single-block document
-        Markoff::MarkoffDocument document(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&document);
-
-        document.loadFromMarkdown("Hello\n");
-        QTRY_COMPARE(binding.model()->rowCount(), 1);
-
-        // Get the block anchor for the existing block.
-        const Markoff::BlockId block0 = binding.model()->recordAt(0).blockAnchor;
-
-        // Request a TextCaret at row 1, which does not yet exist
-        binding.cursorState()->requestTextCaretAtRow(1, 0);
-
-        // The pending should not have resolved yet (row 1 doesn't exist)
-        QCOMPARE(binding.cursorState()->cursorKind(), QStringLiteral("none"));
-
-        // Apply a D2 command that inserts a new block (which fires structuralRowsInserted)
-        Markoff::Cmd::enterAtEnd(document, block0);
-        // Process events so the debounced d2DocumentChanged fires → onD2Changed → structural signal
-        QCoreApplication::processEvents();
-        QCoreApplication::processEvents();
-
-        // The pending should now be resolved: cursor at row 1, qtPos 0
-        QCOMPARE(binding.cursorState()->cursorKind(), QStringLiteral("TextCaret"));
-        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 1);
-        QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
-    }
+    // requestTextCaretAtRow_pending_resolves_on_structural_insert removed —
+    // the chokepoint API no longer supports "pending request for a row that
+    // doesn't yet exist" via requestTextCaretAtRow (out-of-range rows are
+    // rejected synchronously). That semantic now lives in
+    // requestTextCaretAtNewRow, covered by requestTextCaretAtNewRow_landsAtQtPos0
+    // above.
 
     // ---- LiveListModelBinding: D2 model drive via structureChanged ----
 
@@ -400,28 +359,9 @@ private Q_SLOTS:
         QCOMPARE(cs.desiredVisualX(), -1.0);
     }
 
-    void request_text_caret_at_row_visual_x_records_hint() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        LiveCursorState *cs = binding.cursorState();
-        QVERIFY(cs);
-        cs->setDesiredVisualX(123.0);
-        // Load a doc so row 0 exists
-        doc.loadFromMarkdown("hello");
-        QTest::qWait(200);
-
-        QSignalSpy hintSpy(cs, &LiveCursorState::visualLineHintChanged);
-        cs->requestTextCaretAtRowVisualX(0, LiveCursorState::VisualLineHint::LastLine);
-
-        // The hint is set then cleared synchronously (row 0 resolves immediately).
-        // Verify it fired: at least one emission (set to LastLine) and one (cleared to None).
-        QVERIFY(hintSpy.count() >= 1);
-        // desiredVisualX is NOT cleared by requestTextCaretAtRowVisualX.
-        QCOMPARE(cs->desiredVisualX(), 123.0);
-        // Post-resolution: hint is None (cleared after request(tc)).
-        QCOMPARE(cs->pendingVisualLineHint(), LiveCursorState::VisualLineHint::None);
-    }
+    // request_text_caret_at_row_visual_x_records_hint moved to
+    // tst_live_render_cursor_qml.cpp — hint-clearing depends on the chokepoint
+    // actually resolving the cursor, which requires a registered delegate.
 };
 
 QTEST_GUILESS_MAIN(TstLiveRenderCursor)

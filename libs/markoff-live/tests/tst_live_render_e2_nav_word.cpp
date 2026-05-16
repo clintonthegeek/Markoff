@@ -24,28 +24,8 @@ private Q_SLOTS:
                  static_cast<int>(LiveNavigationController::NotHandled));
     }
 
-    void ctrl_left_at_block_start_crosses_to_prev_block_end() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("Alpha\n\nBeta");
-        QTest::qWait(200);
-        QCOMPARE(binding.model()->rowCount(), 2);
-
-        auto *nav = binding.navigationController();
-        auto *cs  = binding.cursorState();
-        QVERIFY(nav && cs);
-
-        cs->setDesiredVisualX(77.0);  // should be cleared
-
-        const int result = nav->tryHandle(Qt::Key_Left, Qt::ControlModifier,
-                                          1, 0, nullptr, QStringLiteral("Beta"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
-        QCOMPARE(cs->desiredVisualX(), -1.0);  // cleared
-        // Cursor at end of "Alpha" (len=5)
-        QCOMPARE(cs->focusedQtPos(), 5);
-        QCOMPARE(cs->focusedAnchorRow(), 0);
-    }
+    // ctrl_left_at_block_start_crosses_to_prev_block_end moved to
+    // tst_live_render_e2_nav_word_qml.cpp (chokepoint).
 
     void ctrl_left_at_first_block_returns_handled_at_boundary() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
@@ -73,27 +53,8 @@ private Q_SLOTS:
                  static_cast<int>(LiveNavigationController::NotHandled));
     }
 
-    void ctrl_right_at_block_end_crosses_to_next_block_start() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("Alpha\n\nBeta");
-        QTest::qWait(200);
-        QCOMPARE(binding.model()->rowCount(), 2);
-
-        auto *nav = binding.navigationController();
-        auto *cs  = binding.cursorState();
-        QVERIFY(nav && cs);
-
-        cs->setDesiredVisualX(77.0);  // should be cleared
-
-        const int result = nav->tryHandle(Qt::Key_Right, Qt::ControlModifier,
-                                          0, 5, nullptr, QStringLiteral("Alpha"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
-        QCOMPARE(cs->desiredVisualX(), -1.0);
-        QCOMPARE(cs->focusedQtPos(), 0);
-        QCOMPARE(cs->focusedAnchorRow(), 1);
-    }
+    // ctrl_right_at_block_end_crosses_to_next_block_start moved to
+    // tst_live_render_e2_nav_word_qml.cpp (chokepoint).
 
     void ctrl_right_at_last_block_end_returns_handled_at_boundary() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);

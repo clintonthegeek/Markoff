@@ -46,93 +46,15 @@ private Q_SLOTS:
 
     // ---------- LiveStructuralKeyHandler — paragraph Enter (all positions) ----------
 
-    void enter_at_end_of_paragraph_creates_new_block() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        QVERIFY(waitForModelRows(binding, doc, "hello world", 1));
-
-        const auto *handler = binding.structuralKeyHandler();
-        QVERIFY(handler);
-
-        const int blocksBefore = static_cast<int>(doc.iterateBlocks().size());
-
-        const bool consumed = const_cast<LiveStructuralKeyHandler*>(handler)->tryHandle(
-            Qt::Key_Return, Qt::NoModifier,
-            /*blockIndex=*/0, /*qtPos=*/11,   // end of "hello world"
-            /*selectionEmpty=*/true,
-            QStringLiteral("hello world"));
-        QVERIFY(consumed);
-
-        // A new block should be born.
-        QCOMPARE(static_cast<int>(doc.iterateBlocks().size()), blocksBefore + 1);
-
-        // Wait for model update and verify cursor.
-        QTRY_COMPARE(binding.model()->rowCount(), 2);
-        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 1);
-        QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
-    }
-
-    void enter_in_middle_of_paragraph_splits_block() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        QVERIFY(waitForModelRows(binding, doc, "hello world", 1));
-
-        const Markoff::BlockId origBlock = binding.model()->recordAt(0).blockAnchor;
-
-        const bool consumed = binding.structuralKeyHandler()->tryHandle(
-            Qt::Key_Return, Qt::NoModifier,
-            /*blockIndex=*/0, /*qtPos=*/5,
-            /*selectionEmpty=*/true,
-            QStringLiteral("hello world"));
-        QVERIFY(consumed);
-
-        // Two blocks should now exist.
-        QCOMPARE(static_cast<int>(doc.iterateBlocks().size()), 2);
-
-        // Original block text should be "hello", new block " world".
-        QCOMPARE(doc.blockText(origBlock), QByteArrayLiteral("hello"));
-
-        const auto ids = doc.iterateBlocks();
-        QCOMPARE(doc.blockText(ids[1]), QByteArrayLiteral(" world"));
-
-        // Cursor should land in the new block (row 1).
-        QTRY_COMPARE(binding.model()->rowCount(), 2);
-        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 1);
-        QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
-    }
-
-    void enter_at_start_of_paragraph_inserts_block_before() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        QVERIFY(waitForModelRows(binding, doc, "hello world", 1));
-
-        const Markoff::BlockId origBlock = binding.model()->recordAt(0).blockAnchor;
-
-        const bool consumed = binding.structuralKeyHandler()->tryHandle(
-            Qt::Key_Return, Qt::NoModifier,
-            /*blockIndex=*/0, /*qtPos=*/0,
-            /*selectionEmpty=*/true,
-            QStringLiteral("hello world"));
-        QVERIFY(consumed);
-
-        // Two blocks: new empty block first, original "hello world" second.
-        QCOMPARE(static_cast<int>(doc.iterateBlocks().size()), 2);
-
-        // Original block content must be preserved.
-        QCOMPARE(doc.blockText(origBlock), QByteArrayLiteral("hello world"));
-
-        // Cursor stays at the new empty block (same visual row), not the
-        // shifted content. origBlock is now at row 1.
-        QTRY_COMPARE(binding.model()->rowCount(), 2);
-        QTRY_VERIFY(binding.cursorState()->focusedAnchorRow() >= 0);
-        const int row = binding.cursorState()->focusedAnchorRow();
-        // Row 0 is the new empty block; row 1 is "hello world".
-        QCOMPARE(row, 0);
-        QVERIFY(binding.model()->recordAt(row).blockAnchor != origBlock);
-    }
+    // enter_at_end_of_paragraph_creates_new_block,
+    // enter_in_middle_of_paragraph_splits_block, and
+    // enter_at_start_of_paragraph_inserts_block_before moved to
+    // tst_live_render_structural_qml.cpp — verifying the cursor lands on
+    // the newborn block requires the focus chokepoint to actually resolve,
+    // which needs a registered delegate. The model-half (rowCount,
+    // blockText) of those assertions can still be observed at unit level,
+    // but is fully covered by the QML companion's modelText/modelKind
+    // checks, so we don't keep a shadow unit version.
 
     // ---------- LiveStructuralKeyHandler — paragraph Backspace at row-start ----------
 

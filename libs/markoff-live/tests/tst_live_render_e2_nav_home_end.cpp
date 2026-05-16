@@ -42,45 +42,11 @@ private Q_SLOTS:
                  static_cast<int>(LiveNavigationController::NotHandled));
     }
 
-    void ctrl_home_lands_at_first_block_qtpos_0() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("Alpha\n\nBeta\n\nGamma");
-        QTest::qWait(200);
-        QCOMPARE(binding.model()->rowCount(), 3);
-
-        auto *nav = binding.navigationController();
-        auto *cs  = binding.cursorState();
-        QVERIFY(nav && cs);
-
-        // From block 2, Ctrl+Home → block 0 at pos 0
-        const int result = nav->tryHandle(Qt::Key_Home, Qt::ControlModifier,
-                                          2, 3, nullptr, QStringLiteral("Gamma"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
-        QCOMPARE(cs->focusedQtPos(), 0);
-        QCOMPARE(cs->focusedAnchorRow(), 0);
-    }
-
-    void ctrl_end_lands_at_last_block_end() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("Alpha\n\nBeta\n\nGamma");
-        QTest::qWait(200);
-        QCOMPARE(binding.model()->rowCount(), 3);
-
-        auto *nav = binding.navigationController();
-        auto *cs  = binding.cursorState();
-        QVERIFY(nav && cs);
-
-        // From block 0, Ctrl+End → block 2 at end ("Gamma" len=5)
-        const int result = nav->tryHandle(Qt::Key_End, Qt::ControlModifier,
-                                          0, 0, nullptr, QStringLiteral("Alpha"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
-        QCOMPARE(cs->focusedQtPos(), 5);
-        QCOMPARE(cs->focusedAnchorRow(), 2);
-    }
+    // ctrl_home_lands_at_first_block_qtpos_0 and ctrl_end_lands_at_last_block_end
+    // moved to tst_live_render_e2_nav_home_end_qml.cpp — the focus-chokepoint
+    // refactor (LiveCursorState::establishFocus) gates cursor resolution on a
+    // registered delegate, which a direct unit-test setup cannot provide. The
+    // navigation controller's tryHandle return value remains testable here.
 
     void ctrl_home_returns_handled_on_empty_doc() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);

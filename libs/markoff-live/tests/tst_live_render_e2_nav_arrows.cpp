@@ -179,36 +179,9 @@ private Q_SLOTS:
 
     // ---- E1 + E2: Up/Down with mock edit item ----
 
-    void up_at_visual_top_line_crosses_to_prev_block_column_preserved() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("Alpha\n\nBeta");
-        QTest::qWait(200);
-        QCOMPARE(binding.model()->rowCount(), 2);
-
-        auto *nav = binding.navigationController();
-        auto *cs  = binding.cursorState();
-        QVERIFY(nav && cs);
-
-        // Mock edit for block 1 at visual top (cursorRect.y == 0 < height*0.5 == 10)
-        MockTextEdit mockEdit;
-        mockEdit.m_cursorRect = QRectF(42.0, 0, 2, 20);  // x=42 = desired column
-        mockEdit.m_contentHeight = 20.0;
-
-        QSignalSpy hintSpy(cs, &LiveCursorState::visualLineHintChanged);
-
-        const int result = nav->tryHandle(Qt::Key_Up, Qt::NoModifier,
-                                          /*blockIndex=*/1, /*qtPos=*/4,
-                                          &mockEdit, QStringLiteral("Beta"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
-        // desiredVisualX should be set to cursorRect.x() = 42
-        QCOMPARE(cs->desiredVisualX(), 42.0);
-        // The hint was emitted (set to LastLine) then cleared synchronously.
-        QVERIFY(hintSpy.count() >= 1);
-        // Cursor should be at row 0 (resolved immediately since row exists)
-        QCOMPARE(cs->focusedAnchorRow(), 0);
-    }
+    // up_at_visual_top_line_crosses_to_prev_block_column_preserved moved
+    // to tst_live_render_e2_nav_arrows_qml.cpp — see header comment there
+    // for the chokepoint rationale.
 
     void up_at_non_top_line_moves_caret_within_block() {
         // Option B contract: within-block visual-line Up is handled by the
@@ -256,35 +229,8 @@ private Q_SLOTS:
         QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
     }
 
-    void down_at_visual_bottom_line_crosses_to_next_block() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("Alpha\n\nBeta");
-        QTest::qWait(200);
-        QCOMPARE(binding.model()->rowCount(), 2);
-
-        auto *nav = binding.navigationController();
-        auto *cs  = binding.cursorState();
-        QVERIFY(nav && cs);
-
-        // Mock edit for block 0 at visual bottom:
-        // contentHeight=20, cursorRect.bottom() = 20 > 20 - 10 = 10 → at bottom
-        MockTextEdit mockEdit;
-        mockEdit.m_cursorRect = QRectF(30.0, 5, 2, 15);  // bottom = 5+15 = 20
-        mockEdit.m_contentHeight = 20.0;
-
-        QSignalSpy hintSpy(cs, &LiveCursorState::visualLineHintChanged);
-
-        const int result = nav->tryHandle(Qt::Key_Down, Qt::NoModifier,
-                                          0, 5, &mockEdit, QStringLiteral("Alpha"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
-        QCOMPARE(cs->desiredVisualX(), 30.0);
-        // The hint was emitted (set to FirstLine) then cleared synchronously.
-        QVERIFY(hintSpy.count() >= 1);
-        // Cursor should be at row 1 (resolved immediately since row exists)
-        QCOMPARE(cs->focusedAnchorRow(), 1);
-    }
+    // down_at_visual_bottom_line_crosses_to_next_block moved to
+    // tst_live_render_e2_nav_arrows_qml.cpp (chokepoint).
 
     void down_preserves_existing_desired_visual_x() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
@@ -311,29 +257,8 @@ private Q_SLOTS:
 
     // ---- E3: Left at qtPos 0 ----
 
-    void left_at_qtpos_0_crosses_to_prev_block_end_clears_visual_x() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("Alpha\n\nBeta");
-        QTest::qWait(200);
-        QCOMPARE(binding.model()->rowCount(), 2);
-
-        auto *nav = binding.navigationController();
-        auto *cs  = binding.cursorState();
-        QVERIFY(nav && cs);
-
-        // Set desiredVisualX to something non-zero; Left should clear it
-        cs->setDesiredVisualX(55.0);
-
-        const int result = nav->tryHandle(Qt::Key_Left, Qt::NoModifier,
-                                          /*blockIndex=*/1, /*qtPos=*/0,
-                                          nullptr, QStringLiteral("Beta"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
-        QCOMPARE(cs->desiredVisualX(), -1.0);  // cleared
-        // Cursor should be set to end of block 0 ("Alpha" len=5)
-        QCOMPARE(cs->focusedQtPos(), 5);
-    }
+    // left_at_qtpos_0_crosses_to_prev_block_end_clears_visual_x moved to
+    // tst_live_render_e2_nav_arrows_qml.cpp (chokepoint).
 
     void left_at_nonzero_qtpos_moves_caret_within_block() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
@@ -371,27 +296,8 @@ private Q_SLOTS:
 
     // ---- E4: Right at end ----
 
-    void right_at_end_crosses_to_next_block_start_clears_visual_x() {
-        Markoff::MarkoffDocument doc(/*replicaId=*/1);
-        LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("Alpha\n\nBeta");
-        QTest::qWait(200);
-        QCOMPARE(binding.model()->rowCount(), 2);
-
-        auto *nav = binding.navigationController();
-        auto *cs  = binding.cursorState();
-        QVERIFY(nav && cs);
-
-        cs->setDesiredVisualX(77.0);
-
-        const int result = nav->tryHandle(Qt::Key_Right, Qt::NoModifier,
-                                          /*blockIndex=*/0, /*qtPos=*/5,  // len("Alpha")=5
-                                          nullptr, QStringLiteral("Alpha"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
-        QCOMPARE(cs->desiredVisualX(), -1.0);  // cleared
-        QCOMPARE(cs->focusedQtPos(), 0);  // beginning of next block
-    }
+    // right_at_end_crosses_to_next_block_start_clears_visual_x moved to
+    // tst_live_render_e2_nav_arrows_qml.cpp (chokepoint).
 
     void right_at_non_end_moves_caret_within_block() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);

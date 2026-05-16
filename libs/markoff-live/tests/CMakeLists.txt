@@ -234,6 +234,26 @@ target_link_libraries(tst_live_render_e2_nav_home_end
 add_test(NAME tst_live_render_e2_nav_home_end
          COMMAND tst_live_render_e2_nav_home_end)
 
+# QML-integration companion: ctrl_home/ctrl_end lands-cursor assertions
+# require a registered delegate (focus-chokepoint refactor). See header
+# comment in the .cpp for the rationale.
+qt_add_executable(tst_live_render_e2_nav_home_end_qml
+    tst_live_render_e2_nav_home_end_qml.cpp
+    QmlIntegrationFixture.h
+    QmlIntegrationFixture.cpp
+)
+target_link_libraries(tst_live_render_e2_nav_home_end_qml PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init)
+add_test(NAME tst_live_render_e2_nav_home_end_qml
+         COMMAND tst_live_render_e2_nav_home_end_qml)
+set_tests_properties(tst_live_render_e2_nav_home_end_qml
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(tst_live_render_e2_nav_word
     tst_live_render_e2_nav_word.cpp)
 target_link_libraries(tst_live_render_e2_nav_word
@@ -593,6 +613,35 @@ add_test(NAME tst_live_render_focus_after_heading_demote_via_hash_deletion
          COMMAND tst_live_render_focus_after_heading_demote_via_hash_deletion)
 set_tests_properties(tst_live_render_focus_after_heading_demote_via_hash_deletion
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# ---- QML-integration companions for chokepoint-affected sub-tests ----
+# These five files were spun out of their respective unit test files when
+# the focus-chokepoint refactor (LiveCursorState::establishFocus) made
+# direct-call cursor assertions infeasible. The originals retain
+# return-value / descriptor-data assertions; cursor-landing assertions
+# live here, exercised through the real QML window.
+
+foreach(_qmlcompanion
+    tst_live_render_cursor_qml
+    tst_live_render_structural_qml
+    tst_live_render_e2_nav_arrows_qml
+    tst_live_render_e2_nav_word_qml
+    tst_live_render_e2_nav_shift_extend_qml)
+    qt_add_executable(${_qmlcompanion}
+        ${_qmlcompanion}.cpp
+        QmlIntegrationFixture.h
+        QmlIntegrationFixture.cpp)
+    target_link_libraries(${_qmlcompanion} PRIVATE
+        Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+        Qt6::Widgets Qt6::Test
+        markoff_live markoff_core
+        markoff-live-app-internal
+        markoff-live-app-internalplugin
+        markoff-live-app-internalplugin_init)
+    add_test(NAME ${_qmlcompanion} COMMAND ${_qmlcompanion})
+    set_tests_properties(${_qmlcompanion}
+        PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endforeach()
 
 qt_add_executable(tst_live_cursor_state_chokepoint
     tst_live_cursor_state_chokepoint.cpp
