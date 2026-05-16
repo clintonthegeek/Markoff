@@ -1753,6 +1753,16 @@ scripts/run-tests.sh -E 'realistic|benchmark' 2>&1 \
 
 Expected: all slots pass + empty diff.
 
+> **Falsifiability Proof B — PASSED (2026-05-16).** Stub commit: `dc31eab`.
+> Revert commit: `d0cc3d8`. Stub: `g_shadowAnchorQtPos = qtPos + 100` in
+> `begin()`; `anchorQtPos()` reads shadow instead of canonical store.
+> Result: 3 of 7 slots failed —
+> `click_then_shift_click_keeps_anchor_at_first` (got 103, expected 3),
+> `double_click_selects_word_via_facade` (got 106, expected 6),
+> `session_round_trip_no_echo` (got 100, expected 0). After revert: 9/9
+> pass. Tests correctly detect canonical-store regression — they are not
+> inert.
+
 ---
 
 ### Task 14: Full-suite regression check
