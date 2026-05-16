@@ -118,8 +118,10 @@ private Q_SLOTS:
     // (docs/handoff/2026-05-09-setext-dogfood-findings.md). Each
     // verifies that a kind transition driven by a buffer edit
     // re-anchors the caret on the new delegate via
-    // requestTextCaretAtAnchor — without the fix the cursor either
-    // disappears (S1/S2) or jumps to position 0 (S3).
+    // establishFocus (chokepoint) — the chokepoint stages a pending
+    // anchor request and resolves it when the incoming delegate
+    // registers. Without the fix the cursor either disappears
+    // (S1/S2) or jumps to position 0 (S3).
     // ------------------------------------------------------------------
 
     void S1_setextDemote_lastUnderlineCharDeleted_keepsCursor()

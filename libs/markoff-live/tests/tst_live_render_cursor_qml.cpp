@@ -12,8 +12,8 @@
 // `requestTextCaretAtRow_pending_resolves_on_structural_insert` was deleted
 // rather than ported: the chokepoint API no longer supports "pending request
 // for a row that doesn't yet exist" via requestTextCaretAtRow (that semantic
-// belongs to requestTextCaretAtNewRow, already covered by
-// requestTextCaretAtNewRow_landsAtQtPos0 in the unit file).
+// belongs to establishFocus, already covered by
+// enterAtEnd_landsFocusOnNewRowViaChokepoint in the unit file).
 
 #include "QmlIntegrationFixture.h"
 

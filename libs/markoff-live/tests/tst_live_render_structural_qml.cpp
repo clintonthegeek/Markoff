@@ -4,7 +4,7 @@
 //
 // The three paragraph-Enter assertions verify that pressing Return splits
 // the block AND lands the cursor at the new position. The cursor-landing
-// half goes through LiveCursorState::requestTextCaretAtNewRow → chokepoint,
+// half goes through LiveCursorState::establishFocus (chokepoint),
 // which only fires cursorChanged when a delegate is registered for the
 // newborn block's anchor. Direct unit-test setups can verify the model
 // half (rowCount, blockText) but not the cursor half — those landings live
