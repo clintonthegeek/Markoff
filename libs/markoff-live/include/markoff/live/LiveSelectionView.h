@@ -17,6 +17,7 @@ class Session;
 namespace Markoff::Live {
 
 class LiveBlockModel;
+class LiveCursorState;
 
 /// Cross-block selection for the live render view.
 ///
@@ -42,6 +43,10 @@ public:
     void setDocument(Markoff::MarkoffDocument *doc);
     Q_INVOKABLE void setSession(Markoff::Session *session);
     void setModel(const LiveBlockModel *model);
+
+    /// Tier-4c: wire the canonical store so dual-write keeps both in sync.
+    /// Phase D removes the dual-write entirely (cursor state becomes sole).
+    void setCursorState(LiveCursorState *cs) { m_cursorState = cs; }
 
     bool hasSelection() const;
 
@@ -85,9 +90,10 @@ private:
     int m_anchorBlock = -1, m_anchorQtPos = -1;
     int m_activeBlock = -1, m_activeQtPos = -1;
 
-    Markoff::MarkoffDocument *m_document = nullptr;
-    Markoff::Session         *m_session  = nullptr;
-    const LiveBlockModel     *m_model    = nullptr;
+    Markoff::MarkoffDocument *m_document    = nullptr;
+    Markoff::Session         *m_session     = nullptr;
+    const LiveBlockModel     *m_model       = nullptr;
+    LiveCursorState          *m_cursorState = nullptr;
 };
 
 }  // namespace Markoff::Live

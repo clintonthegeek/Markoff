@@ -2,6 +2,7 @@
 #include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/Coordinates.h>
 #include <markoff/live/LiveBlockModel.h>
+#include <markoff/live/LiveCursorState.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Selection.h>
@@ -41,6 +42,15 @@ void LiveSelectionView::begin(int blockIndex, int qtPos)
 {
     m_anchorBlock = blockIndex; m_anchorQtPos = qtPos;
     m_activeBlock = blockIndex; m_activeQtPos = qtPos;
+
+    // Tier 4c: mirror to canonical store. Identity is BlockAnchor.
+    if (m_cursorState && m_model
+        && blockIndex >= 0 && blockIndex < m_model->rowCount()) {
+        const auto anchor = m_model->recordAt(blockIndex).blockAnchor;
+        m_cursorState->establishFocus(anchor, qtPos);
+        m_cursorState->setSelectionAnchor({anchor, static_cast<quint32>(qtPos)});
+    }
+
     syncToSession();
     Q_EMIT selectionChanged();
 }
@@ -49,6 +59,15 @@ void LiveSelectionView::extend(int blockIndex, int qtPos)
 {
     m_activeBlock = blockIndex;
     m_activeQtPos = qtPos;
+
+    // Tier 4c: mirror active-end change to canonical store.
+    // Anchor stays where begin() parked it.
+    if (m_cursorState && m_model
+        && blockIndex >= 0 && blockIndex < m_model->rowCount()) {
+        const auto anchor = m_model->recordAt(blockIndex).blockAnchor;
+        m_cursorState->establishFocus(anchor, qtPos);
+    }
+
     syncToSession();
     Q_EMIT selectionChanged();
 }
@@ -57,6 +76,10 @@ void LiveSelectionView::clear()
 {
     if (m_anchorBlock < 0) return;
     m_anchorBlock = m_anchorQtPos = m_activeBlock = m_activeQtPos = -1;
+
+    // Tier 4c: clear canonical anchor (active end unchanged).
+    if (m_cursorState) m_cursorState->clearSelectionAnchor();
+
     Q_EMIT selectionChanged();
 }
 

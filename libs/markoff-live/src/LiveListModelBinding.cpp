@@ -164,6 +164,7 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
     d->hitTester       = new BlockHitTester(this);
     d->selectionView   = new LiveSelectionView(this);
     d->selectionView->setModel(d->model);
+    d->selectionView->setCursorState(d->cursorState);
     d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, d->selectionView, this);
     d->remoteCursors   = new RemoteCursorsListModel(this);
 
