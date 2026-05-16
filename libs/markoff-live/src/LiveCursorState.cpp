@@ -7,6 +7,8 @@
 #include <markoff/live/LiveListModelBinding.h>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Session.h>
+#include <markoff/core/Selection.h>
 
 #include "KindDispatch.h"
 
@@ -596,6 +598,98 @@ void LiveCursorState::deleteSelectionRange()
                        static_cast<uint32_t>(endByte),
                        QByteArray(), Markoff::Origin::UserEdit);
     clearSelectionAnchor();
+}
+
+// ---------------------------------------------------------------------------
+// Session bridge (tier 4c Phase A)
+// ---------------------------------------------------------------------------
+
+void LiveCursorState::setSession(Markoff::Session *session)
+{
+    if (m_session == session) return;
+    if (m_session)
+        QObject::disconnect(m_session, &Markoff::Session::primarySelectionChanged,
+                            this, &LiveCursorState::onSessionPrimarySelectionChanged);
+    m_session = session;
+    if (m_session)
+        QObject::connect(m_session, &Markoff::Session::primarySelectionChanged,
+                         this, &LiveCursorState::onSessionPrimarySelectionChanged);
+}
+
+void LiveCursorState::syncSelectionToSession()
+{
+    if (!m_session || !m_binding || !m_binding->document() || !m_model) return;
+    if (!hasSelection()) return;
+    const auto anchor = m_selectionAnchor;
+    const auto active = currentTextCaret();
+    if (!anchor || !active) return;
+    const int aRow = rowForBlock(anchor->block);
+    const int xRow = rowForBlock(active->block);
+    if (aRow < 0 || xRow < 0) return;
+
+    auto *doc = m_binding->document();
+    const auto makeAnchor = [&](Markoff::BlockAnchor block, int qtPos)
+                                  -> Markoff::TextAnchor {
+        const int row = rowForBlock(block);
+        if (row < 0) return Markoff::TextAnchor{};
+        const auto utf8 = m_model->recordAt(row).text.toUtf8();
+        const int byteOff = static_cast<int>(
+            Coordinates::qtPosToByte(utf8, qMax(0, qtPos)));
+        return doc->textAnchorAt(block, byteOff, /*rightBias=*/true);
+    };
+
+    Markoff::Selection sel;
+    sel.kind   = Markoff::Selection::Kind::Primary;
+    sel.anchor = makeAnchor(anchor->block, static_cast<int>(anchor->qtPos));
+    sel.active = makeAnchor(active->block, static_cast<int>(active->cachedQtPos));
+    m_session->setPrimarySelection(sel);
+    // No m_applying re-entrance guard — onSessionPrimarySelectionChanged
+    // short-circuits on equality when the round-trip fires back.
+}
+
+void LiveCursorState::onSessionPrimarySelectionChanged(const Markoff::Selection &sel)
+{
+    if (!m_binding || !m_binding->document() || !m_model) return;
+
+    auto *doc = m_binding->document();
+    const auto resolveAnchor = [&](const Markoff::TextAnchor &ta)
+                                      -> std::optional<SelectionAnchor> {
+        if (ta.isNull()) return std::nullopt;
+        const Markoff::BlockAnchor ba = ta.block();
+        if (rowForBlock(ba) < 0) return std::nullopt;  // not in model
+        const int byteOff = doc->offsetInBlock(ba, ta);
+        const int row = rowForBlock(ba);
+        const auto utf8 = m_model->recordAt(row).text.toUtf8();
+        const int clamped = qBound(0, byteOff, static_cast<int>(utf8.size()));
+        const int qtPos = static_cast<int>(Coordinates::byteToQtPos(utf8, clamped));
+        return SelectionAnchor{ba, static_cast<quint32>(qtPos)};
+    };
+
+    const auto resolvedAnchor = resolveAnchor(sel.anchor);
+    const auto resolvedActive = resolveAnchor(sel.active);
+
+    if (!resolvedAnchor || !resolvedActive) {
+        // Orphaned anchor → clear selection. Active end stays put.
+        clearSelectionAnchor();
+        return;
+    }
+
+    // Equality short-circuit (supersedes the m_applyingSessionSelection guard).
+    const auto currentActive = currentTextCaret();
+    const bool sameActive = currentActive
+        && currentActive->block == resolvedActive->block
+        && currentActive->cachedQtPos == resolvedActive->qtPos;
+    const bool sameAnchor = m_selectionAnchor
+        && *m_selectionAnchor == *resolvedAnchor;
+    if (sameActive && sameAnchor) return;
+
+    if (!sameActive) {
+        // Active end mutates via the typing-authority hook (idempotent).
+        syncFromTextEdit(resolvedActive->block, static_cast<int>(resolvedActive->qtPos));
+    }
+    if (!sameAnchor) {
+        setSelectionAnchor(*resolvedAnchor);
+    }
 }
 
 }  // namespace Markoff::Live

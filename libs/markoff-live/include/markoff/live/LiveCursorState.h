@@ -12,6 +12,13 @@
 #include <optional>
 #include <qqmlintegration.h>
 
+// Session bridge (tier 4c Phase A): full Selection definition needed for slot signature.
+#include <markoff/core/Selection.h>
+
+namespace Markoff {
+class Session;
+}  // namespace Markoff
+
 namespace Markoff::Live {
 
 class BlockKindRegistry;
@@ -240,6 +247,18 @@ public:
     /// Mirror of `LiveSelectionView::deleteSelection` during Phase A.
     void deleteSelectionRange();
 
+    /// Wires up the Session for primary-selection round-trips. Idempotent.
+    /// On change, disconnects from the prior session before reconnecting.
+    /// During Phase A this is added alongside the existing path in
+    /// `LiveSelectionView::setSession`; the binding wires both. In Phase D
+    /// the LiveSelectionView path is removed.
+    void setSession(Markoff::Session *session);
+
+    /// Outgoing: pushes the canonical selection state to
+    /// `m_session->setPrimarySelection`. No-op if no session or no model.
+    /// Mirror of `LiveSelectionView::syncToSession` during Phase A.
+    void syncSelectionToSession();
+
 Q_SIGNALS:
     void cursorChanged();
     void desiredVisualXChanged();
@@ -278,6 +297,12 @@ private:
 
     // Tier 4c — selection anchor (canonical store; the active end is m_cursor).
     std::optional<SelectionAnchor> m_selectionAnchor;
+
+    // Session bridge (tier 4c Phase A).
+    Markoff::Session *m_session = nullptr;
+
+private Q_SLOTS:
+    void onSessionPrimarySelectionChanged(const Markoff::Selection &sel);
 };
 
 }  // namespace Markoff::Live
