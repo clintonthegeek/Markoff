@@ -186,6 +186,11 @@ public:
     Q_INVOKABLE void delegateGoingAway(Markoff::BlockAnchor blockAnchor,
                                        QQuickItem *delegateRoot = nullptr);
 
+    /// Returns the bound model (may be null before wiring). Used by
+    /// LiveSelectionView facade to validate block indices without keeping
+    /// its own m_model pointer.
+    const LiveBlockModel *model() const noexcept { return m_model; }
+
     // --- test-only helpers ---
     /// Attaches (or replaces) the LiveBlockModel used for kindFor lookups.
     /// Production path wires this in LiveListModelBinding; tests call directly.

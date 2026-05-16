@@ -163,7 +163,6 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
     d->cursorState     = new LiveCursorState(&d->registry, d->model, this, this);
     d->hitTester       = new BlockHitTester(this);
     d->selectionView   = new LiveSelectionView(this);
-    d->selectionView->setModel(d->model);
     d->selectionView->setCursorState(d->cursorState);
     d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, d->selectionView, this);
     d->remoteCursors   = new RemoteCursorsListModel(this);
@@ -240,9 +239,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         QObject::connect(d->document, &Markoff::MarkoffDocument::remoteCursorCleared,
                          d->remoteCursors, &RemoteCursorsListModel::onRemoteCursorCleared);
 
-        d->selectionView->setDocument(d->document);
-        d->selectionView->setSession(nullptr);
-        d->cursorState->setSession(nullptr);  // tier-4c
+        d->cursorState->setSession(nullptr);
 
         if (d->clipboard)   d->clipboard->setDocument(d->document);
         if (d->format)      d->format->setDocument(d->document);
@@ -252,9 +249,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         d->structuralKeys = new LiveStructuralKeyHandler(
             d->document, d->model, d->cursorState, &d->registry, this);
     } else {
-        d->selectionView->setDocument(nullptr);
-        d->selectionView->setSession(nullptr);
-        d->cursorState->setSession(nullptr);  // tier-4c
+        d->cursorState->setSession(nullptr);
 
         if (d->clipboard)   d->clipboard->setDocument(nullptr);
         if (d->format)      d->format->setDocument(nullptr);
@@ -268,8 +263,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
 
 void LiveListModelBinding::setSession(Markoff::Session *session)
 {
-    d->selectionView->setSession(session);
-    d->cursorState->setSession(session);  // tier-4c: canonical session bridge
+    d->cursorState->setSession(session);
 }
 
 LiveBlockModel           *LiveListModelBinding::model()               const { return d->model; }
