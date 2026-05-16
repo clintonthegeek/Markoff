@@ -675,6 +675,9 @@ void LiveCursorState::onSessionPrimarySelectionChanged(const Markoff::Selection 
     }
 
     // Equality short-circuit (supersedes the m_applyingSessionSelection guard).
+    // Compares derived (BlockAnchor, qtPos) pairs — intentionally looser than
+    // TextAnchor identity, per spec §4.3 / §11. Stable across CRDT edits that
+    // preserve visual position.
     const auto currentActive = currentTextCaret();
     const bool sameActive = currentActive
         && currentActive->block == resolvedActive->block
