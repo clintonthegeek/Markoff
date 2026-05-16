@@ -605,9 +605,16 @@ void LiveStructuralKeyHandler::registerBuiltins()
         const bool isEmpty = (c.blockText.trimmed() == QStringLiteral(">")
                            || c.blockText.trimmed() == QStringLiteral("> "));
         if (isEmpty) {
-            // Exit blockquote: demote to Paragraph
+            // Exit blockquote: demote to Paragraph AND clear the buffer.
+            // Demoting alone is insufficient — KindTransition::inferBlockKind
+            // re-promotes any block whose buffer starts with "> " on the
+            // next onD2Changed pass, undoing the demote. Clearing the buffer
+            // removes the prefix that drives the inference.
             UndoLog::Transaction t(c.document->d2UndoLog());
             c.document->d2SetBlockKind(id, Markoff::BlockKind::Paragraph, t);
+            const auto bufLen = static_cast<uint32_t>(c.document->blockText(id).size());
+            if (bufLen > 0)
+                c.document->d2ApplyBufferEdit(id, 0, bufLen, QByteArray{}, t);
             c.cursorState->establishFocus(c.blockAnchor, 0);
             return HR::Handled;
         }

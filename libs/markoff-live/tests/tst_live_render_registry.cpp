@@ -104,15 +104,17 @@ private Q_SLOTS:
         QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Delete));
     }
 
-    void image_descriptor_consumes_delete_and_backspace() {
-        // Task 16 (ImageDelegate): Image now consumes Delete/Backspace to remove the block.
+    void image_descriptor_consumes_block_only_keys() {
+        // Image is isBlockOnly. Since commit a7d7efe generalised
+        // blockOnlyEnter (inserts paragraph after) across every block-only
+        // kind, Image now consumes Return/Enter alongside Delete/Backspace.
         BlockKindRegistry r;
         const auto *d = r.find(BlockKind::Image);
         QVERIFY(d);
         QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Delete));
         QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Backspace));
-        QVERIFY(!d->consumedStructuralKeys.contains(Qt::Key_Return));
-        QVERIFY(!d->consumedStructuralKeys.contains(Qt::Key_Enter));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Return));
+        QVERIFY(d->consumedStructuralKeys.contains(Qt::Key_Enter));
     }
 
     void hr_descriptor_consumes_structural_keys() {
