@@ -572,20 +572,19 @@ void LiveCursorState::deleteSelectionRange()
 
     // Compute flat byte start/end by walking iterateBlocks().
     const auto blocks = doc->iterateBlocks();
-    uint32_t startByte = 0, endByte = 0, cursor = 0;
+    if (static_cast<int>(blocks.size()) != rowCount) return;
+    qsizetype startByte = 0, endByte = 0, cursor = 0;
     for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
         const QByteArray rawText = doc->blockText(blocks[i]);
-        const uint32_t blockSize = static_cast<uint32_t>(rawText.size());
+        const qsizetype blockSize = rawText.size();
 
         if (i == fb) {
             const QByteArray modelUtf8 = m_model->recordAt(fb).text.toUtf8();
-            startByte = cursor + static_cast<uint32_t>(
-                Coordinates::qtPosToByte(modelUtf8, fo));
+            startByte = cursor + Coordinates::qtPosToByte(modelUtf8, fo);
         }
         if (i == lb) {
             const QByteArray modelUtf8 = m_model->recordAt(lb).text.toUtf8();
-            endByte = cursor + static_cast<uint32_t>(
-                Coordinates::qtPosToByte(modelUtf8, lo));
+            endByte = cursor + Coordinates::qtPosToByte(modelUtf8, lo);
             break;
         }
         cursor += blockSize;
@@ -593,7 +592,9 @@ void LiveCursorState::deleteSelectionRange()
 
     if (endByte <= startByte) return;
 
-    doc->applyFlatEdit(startByte, endByte, QByteArray(), Markoff::Origin::UserEdit);
+    doc->applyFlatEdit(static_cast<uint32_t>(startByte),
+                       static_cast<uint32_t>(endByte),
+                       QByteArray(), Markoff::Origin::UserEdit);
     clearSelectionAnchor();
 }
 
