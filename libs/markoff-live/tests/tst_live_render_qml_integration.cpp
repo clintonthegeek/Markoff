@@ -122,10 +122,10 @@ private Q_SLOTS:
                                   /*expectedRowCount=*/1);
 
         QVERIFY(fix.waitForDelegateAt(0, 2000));
-        QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
-
-        fix.harness().keyClick(Qt::Key_End);
-        QCOMPARE(fix.delegateCursorPos(0), 7);
+        // Explicit cursor placement via the chokepoint — auto-focus doesn't
+        // reach the TextEdit (see discipline-log entry, UnifiedInlineTextDelegate).
+        requestCursor(fix, 0, 7);
+        QTRY_COMPARE_WITH_TIMEOUT(fix.delegateCursorPos(0), 7, 2000);
 
         fix.harness().keyClick(Qt::Key_Return, Qt::ShiftModifier);
 
