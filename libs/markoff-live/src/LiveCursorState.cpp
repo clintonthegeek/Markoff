@@ -71,12 +71,16 @@ void LiveCursorState::request(const Cursor &newCursor)
         qCWarning(lcCursor) << "cursor request rejected: invalid variant for kind";
         return;
     }
-    // Explicit request supersedes any pending structural delivery. Without
-    // this, a later structural signal could resolve a stale pending and clobber
-    // the cursor we are trying to set right now (e.g. Enter-on-hole-at-EOB
+    // Explicit request supersedes any pending chokepoint delivery. Without
+    // this, a later delegate-registration could resolve a stale pending and
+    // clobber the cursor being set right now (e.g. Enter-on-hole-at-EOB
     // commits the old hole AND opens a new one in immediate succession; the
-    // commit's pending must not overwrite the new-hole request).
-    m_pendingRow.reset();
+    // commit's pending must not overwrite the new-hole request). Note: when
+    // tryResolvePending calls request() it has ALREADY reset m_pendingFocus
+    // at that point, so this is a no-op for the resolution path; the line
+    // exists for direct request() callers (LiveStructuralKeyHandler's
+    // BlockInternalEdit/BlockSelected entries).
+    m_pendingFocus.reset();
     if (m_cursor == newCursor) return;
     m_cursor = newCursor;
 
