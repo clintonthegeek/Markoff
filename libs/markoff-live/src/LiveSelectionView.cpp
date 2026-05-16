@@ -138,30 +138,27 @@ void LiveSelectionView::normalized(int &fb, int &fo, int &lb, int &lo) const
 
 QPoint LiveSelectionView::rangeForBlock(int blockIndex) const
 {
-    if (m_anchorBlock < 0 || m_activeBlock < 0)
-        return QPoint(-1, -1);
+    if (m_cursorState) return m_cursorState->selectionRangeForBlock(blockIndex);
 
+    // Legacy fallback (unwired cursorState — should not happen in production).
+    if (m_anchorBlock < 0 || m_activeBlock < 0) return QPoint(-1, -1);
     int fb, fo, lb, lo;
     normalized(fb, fo, lb, lo);
-
-    if (blockIndex < fb || blockIndex > lb)
-        return QPoint(-1, -1);
-
-    if (fb == lb)
-        return QPoint(qMin(fo, lo), qMax(fo, lo));
-
+    if (blockIndex < fb || blockIndex > lb) return QPoint(-1, -1);
+    if (fb == lb) return QPoint(qMin(fo, lo), qMax(fo, lo));
     if (blockIndex == fb) return QPoint(fo, INT_MAX);
     if (blockIndex == lb) return QPoint(0, lo);
-    return QPoint(0, INT_MAX);  // intermediate: whole block
+    return QPoint(0, INT_MAX);
 }
 
 void LiveSelectionView::copyToClipboard() const
 {
-    if (!hasSelection() || !m_model) return;
+    if (m_cursorState) { m_cursorState->copySelectionToClipboard(); return; }
 
+    // Legacy fallback (unwired cursorState — should not happen in production).
+    if (!hasSelection() || !m_model) return;
     int fb, fo, lb, lo;
     normalized(fb, fo, lb, lo);
-
     const int rowCount = m_model->rowCount();
     QString text;
     for (int i = fb; i <= lb && i < rowCount; ++i) {
@@ -172,26 +169,36 @@ void LiveSelectionView::copyToClipboard() const
         if (!text.isEmpty()) text += QLatin1Char('\n');
         text += bt.mid(start, end - start);
     }
-
     QApplication::clipboard()->setText(text);
 }
 
 void LiveSelectionView::selectAll()
 {
+    if (m_cursorState) {
+        m_cursorState->selectAllBlocks();
+        // Mirror back to local state so anchorBlock() etc. still report
+        // correctly during the dual-store window. Phase D drops these.
+        if (m_model && m_model->rowCount() > 0) {
+            m_anchorBlock = 0;
+            m_anchorQtPos = 0;
+            m_activeBlock = m_model->rowCount() - 1;
+            m_activeQtPos = m_model->recordAt(m_activeBlock).text.length();
+        }
+        syncToSession();
+        Q_EMIT selectionChanged();
+        return;
+    }
+
+    // Legacy fallback (unwired cursorState — should not happen in production).
     if (!m_model) return;
     const int rowCount = m_model->rowCount();
     if (rowCount <= 0) return;
     const int lastRow = rowCount - 1;
     const QString lastText = m_model->recordAt(lastRow).text;
-
     m_anchorBlock = 0;
     m_anchorQtPos = 0;
     m_activeBlock = lastRow;
     m_activeQtPos = lastText.length();
-
-    // Tier 4c: mirror to canonical store.
-    if (m_cursorState) m_cursorState->selectAllBlocks();
-
     syncToSession();
     Q_EMIT selectionChanged();
 }
