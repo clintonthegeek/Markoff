@@ -231,42 +231,49 @@ private Q_SLOTS:
         QVERIFY(std::holds_alternative<NoCursor>(cs.cursor()));
     }
 
-    void requestTextCaretAtNewRow_landsAtQtPos0() {
-        // D2 version: use loadFromMarkdown + structureChanged to get model rows.
-        // Then use Cmd::enterAtEnd to create a new block and verify the pending
-        // cursor request resolves at the new row.
+    void enterAtEnd_landsFocusOnNewRowViaChokepoint() {
+        // Production path: structural-key handler calls Cmd::enterAtEnd, then
+        // calls LiveCursorState::establishFocus on the newly-created BlockAnchor.
+        // The chokepoint stages the pending and tryResolvePending picks the
+        // correct delegate once it registers. Pre-tier-4b this lived under
+        // requestTextCaretAtNewRow, which had its own pending slot (m_pendingRow)
+        // resolved against binding-side structural signals; that path was deleted
+        // in tier 4b. See docs/specs/2026-05-16-tier-4b-pending-slot-consolidation-design.md.
         Markoff::MarkoffDocument document(/*replicaId=*/1);
 
         LiveListModelBinding binding;
         binding.setDocument(&document);
 
         document.loadFromMarkdown("alpha");
-        // loadFromMarkdown fires structureChanged synchronously → model rows are
-        // already populated. Use QTRY_COMPARE as a safety net.
         QTRY_COMPARE(binding.model()->rowCount(), 1);
 
-        // Get the block anchor.
         const Markoff::BlockId block0 = binding.model()->recordAt(0).blockAnchor;
 
-        // Schedule a pending request for "the row that's about to be born".
-        binding.cursorState()->requestTextCaretAtNewRow(/*expectedRow=*/1, /*qtPos=*/0);
-
-        // Create a new block after block0 using D2 API.
+        // Create the new block first (structural edit completes).
         Markoff::Cmd::enterAtEnd(document, block0);
-
-        // The new row should arrive via structureChanged → onD2Changed → rowsInserted.
-        // The pending cursor request resolves on rowsInserted.
         QTRY_COMPARE(binding.model()->rowCount(), 2);
-        QCOMPARE(binding.cursorState()->focusedAnchorRow(), 1);
-        QCOMPARE(binding.cursorState()->focusedQtPos(), 0);
+
+        // Resolve the new row's BlockAnchor and stage focus through the chokepoint.
+        const Markoff::BlockId block1 = binding.model()->recordAt(1).blockAnchor;
+        binding.cursorState()->establishFocus(block1, /*qtPos=*/0);
+
+        // No delegate is registered in this unit-test fixture (no QML view), so
+        // the chokepoint holds the pending. The cursor state observable here is
+        // the pending slot's contents — not the resolved cursor. To assert the
+        // pending-side observable: hasPendingFocus() returns true.
+        //
+        // For the resolved-side assertion (focusedAnchorRow == 1), see
+        // tst_live_render_focus_chokepoint_invariant — that file uses the QML
+        // integration fixture which DOES register delegates. This unit-test slot
+        // covers the chokepoint-staging step only.
+        QVERIFY(binding.cursorState()->hasPendingFocus());
     }
 
     // requestTextCaretAtRow_pending_resolves_on_structural_insert removed —
     // the chokepoint API no longer supports "pending request for a row that
     // doesn't yet exist" via requestTextCaretAtRow (out-of-range rows are
-    // rejected synchronously). That semantic now lives in
-    // requestTextCaretAtNewRow, covered by requestTextCaretAtNewRow_landsAtQtPos0
-    // above.
+    // rejected synchronously). That semantic now lives under the chokepoint,
+    // covered by enterAtEnd_landsFocusOnNewRowViaChokepoint above.
 
     // ---- LiveListModelBinding: D2 model drive via structureChanged ----
 
