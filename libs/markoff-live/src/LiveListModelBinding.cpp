@@ -641,16 +641,6 @@ void LiveListModelBinding::onD2Changed()
     d->model->applyOps(ops, records);
     d->lastKeys = std::move(nextKeys);
 
-    // Emit structural signals so LiveCursorState can resolve pending cursors
-    // without going through the parse-cycle path.
-    for (const auto &op : ops) {
-        if (op.kind == AstBlockDiff::OpKind::Insert) {
-            Q_EMIT structuralRowsInserted(op.nextIndex, op.nextIndex);
-        } else if (op.kind == AstBlockDiff::OpKind::Delete) {
-            Q_EMIT structuralRowRemoved(op.prevIndex);
-        }
-    }
-
 }
 
 }  // namespace Markoff::Live

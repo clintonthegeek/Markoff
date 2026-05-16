@@ -141,13 +141,6 @@ Q_SIGNALS:
     void themeChanged();
     void fontScaleChanged();
 
-    /// Emitted after applyOps when blocks were structurally inserted.
-    /// `first` and `last` are the new model row indices (inclusive).
-    void structuralRowsInserted(int first, int last);
-
-    /// Emitted after applyOps when a block was structurally removed.
-    /// `row` is the row index that was removed.
-    void structuralRowRemoved(int row);
 
 private:
     void onD2Changed();
