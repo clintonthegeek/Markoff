@@ -490,8 +490,8 @@ private Q_SLOTS:
 
     /// `## 1. foo` (Heading L2 with content "1. foo") → backspace the
     /// second `#` → `# 1. foo` (Heading L1) → backspace the remaining
-    /// `#` → ` 1. foo` (still 1 leading space) → promote to ListItem
-    /// (content "foo", indent 0, ordered marker style).
+    /// `#` → ` 1. foo` (heading→paragraph demote) → same-cascade Equal-op
+    /// inference promotes paragraph→list-item, marker stripped → "foo".
     void heading_to_listitem_via_chained_backspaces() {
         QmlIntegrationFixture fix(/*markdown=*/"## 1. foo\n",
                                   /*expectedRowCount=*/1);
@@ -511,16 +511,16 @@ private Q_SLOTS:
 
         // Now cursor at qtPos=1 again (between `#` and space). Backspace
         // deletes the `#`. After: " 1. foo" — heading→paragraph demote
-        // (atxLost). Note: the second-step promote (paragraph→listitem)
-        // does NOT fire automatically — kind-transition only runs on
-        // Equal ops, and after the demote the next iteration sees a
-        // Delete+Insert (kind change), not Equal. Tracked separately;
-        // for now this test asserts the demote endpoint.
+        // (atxLost). Then on the same cascade the Equal-op kind-transition
+        // pass sees `inferBlockKind(" 1. foo") == "list-item"` (the marker
+        // regex tolerates up to 3 leading spaces) and promotes
+        // paragraph→list-item, stripping the marker to content "foo".
+        // The full demote→promote chain runs in one keystroke.
         requestCursor(fix, 0, 1);
         fix.harness().keyClick(Qt::Key_Backspace);
         QTRY_COMPARE_WITH_TIMEOUT(blockKindAt(fix, 0),
-                                  QString("paragraph"), 2000);
-        QCOMPARE(fix.modelText(0), QString(" 1. foo"));
+                                  QString("list-item"), 2000);
+        QCOMPARE(fix.modelText(0), QString("foo"));
         QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
     }
 
