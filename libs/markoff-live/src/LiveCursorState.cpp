@@ -296,13 +296,43 @@ bool LiveCursorState::validateVariant(const Cursor &c) const
     else if (auto *bi = std::get_if<BlockInternalEdit>(&c))  blockIdPtr = &bi->block;
     if (!blockIdPtr) return false;
 
-    const int row = rowForBlock(*blockIdPtr);
-    if (row < 0) {
-        qCWarning(lcCursor) << "cursor request for unknown block";
-        return false;
+    // Registry-less paths (unit tests with no QML) cannot enforce variant
+    // capability — accept the request. Queue #2 concern #9: previously the
+    // chokepoint had to bypass this entire path to avoid the null deref.
+    if (!m_registry) return true;
+
+    // Look up the current kind. Prefer the document over the model so we
+    // accept transient states during a structural cascade where the doc
+    // has already applied a `changeKind` but `applyOps` hasn't re-emitted
+    // the model rows yet — model.kind and doc.kind disagree for that
+    // window. The chokepoint and its callers already operate against
+    // doc state; validateVariant follows. Falls back to the model when no
+    // binding/document is wired.
+    QString kind;
+    if (m_binding && m_binding->document()) {
+        using BK = ::Markoff::BlockKind;
+        switch (m_binding->document()->blockKind(::Markoff::BlockId(*blockIdPtr))) {
+        case BK::Heading:        kind = ::Markoff::Live::BlockKind::Heading;        break;
+        case BK::CodeBlock:      kind = ::Markoff::Live::BlockKind::CodeBlock;      break;
+        case BK::HorizontalRule: kind = ::Markoff::Live::BlockKind::HorizontalRule; break;
+        case BK::Image:          kind = ::Markoff::Live::BlockKind::Image;          break;
+        case BK::ListItem:       kind = ::Markoff::Live::BlockKind::ListItem;       break;
+        case BK::BlockQuote:     kind = ::Markoff::Live::BlockKind::Blockquote;     break;
+        case BK::Math:           kind = ::Markoff::Live::BlockKind::Math;           break;
+        default:                 kind = ::Markoff::Live::BlockKind::Paragraph;      break;
+        }
+    } else if (m_model) {
+        const int row = rowForBlock(*blockIdPtr);
+        if (row < 0) {
+            qCWarning(lcCursor) << "cursor request for unknown block";
+            return false;
+        }
+        kind = m_model->recordAt(row).kind;
+    } else {
+        // No model AND no doc — can't validate. Accept.
+        return true;
     }
 
-    const QString kind = m_model->recordAt(row).kind;
     const auto *desc = m_registry->find(kind);
     if (!desc) {
         qCWarning(lcCursor) << "cursor request for unregistered kind" << kind;
@@ -478,9 +508,12 @@ void LiveCursorState::tryResolvePending() {
     // `isSelected`-style guards see the right state and route arrow
     // keys through the structural key handler.
     //
-    // Bypass `request()` directly — its `validateVariant` call would
-    // segfault on a null registry (unit tests) and would also reject
-    // some valid transient states during a structural cascade.
+    // Queue #2 concern #9: previously this constructed `newCursor` directly
+    // and assigned `m_cursor`, bypassing `request()` because
+    // `validateVariant` could segfault on a null registry and reject
+    // valid transient states. validateVariant is now null-safe and queries
+    // the document instead of the model, so this can route through
+    // `request()` like every other mutator.
     Cursor newCursor;
     {
         bool supportsText  = true;   // safe default if no registry
@@ -508,11 +541,7 @@ void LiveCursorState::tryResolvePending() {
             return;
         }
     }
-    if (!(m_cursor == newCursor)) {
-        m_pendingRow.reset();  // explicit request supersedes any pending row
-        m_cursor = newCursor;
-        Q_EMIT cursorChanged();
-    }
+    request(newCursor);
 
     QMetaObject::invokeMethod(it->root.data(), "takeFocus",
                               Q_ARG(int, qtPos));
