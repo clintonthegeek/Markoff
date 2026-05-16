@@ -64,7 +64,7 @@
 - 2026-05-11 `libs/markoff-live/src/LiveCursorState.cpp:419-440` — inv #7 — `tryResolvePending` now sets `m_cursor` directly (bypassing `request()`'s registry-based variant validation) before invoking `takeFocus`. Pre-update is needed because `takeFocus`'s `cursorPosition = qtPos` is sometimes a no-op (empty new paragraph at pos=0) and won't echo back via `syncFromTextEdit`. Bypassing `request` keeps unit-test fixtures (no registry) from segfaulting. Functional but smells: the chokepoint quietly maintains two ways of mutating `m_cursor`. *(Expanded in commit `9b30d75` to also pick variant TextCaret-vs-BlockSelected via the registry — same code path, broader responsibility. Note for the next refactor: the chokepoint now duplicates a slice of `validateVariant`'s logic. Either merge them or document that `request()` is the legacy entry point and `tryResolvePending` is the new authoritative one.)*
 - 2026-05-13 `libs/markoff-live/src/BlockKindRegistry.cpp:Math` — inv #8 — `isBlockOnly` is explicit-false for Math despite Math having no `TextCaret` in `supportedCursorVariants`. Transitional asymmetry; will be removed when Math becomes text-bearing in its own spec.
 - ~~2026-05-15 `libs/markoff-live/src/LiveCursorState.cpp:459-487` — inv #2 — `tryResolvePending` bypasses `request()`'s `validateVariant`~~ → fixed in tier-4 (queue #2 concern #9 closeout). `validateVariant` is now (a) null-registry safe and (b) queries the document instead of the model for the current kind, eliminating the "valid transient states during a structural cascade" rejection. `tryResolvePending` routes through `request()` like every other mutator. The transient was specifically the doc/model kind disagreement window during a cascade — model still has the pre-`changeKind` kind, doc already has the new one. Doc-keyed lookup resolves it.
-- 2026-05-16 `libs/markoff-live/qml/delegates/UnifiedInlineTextDelegate.qml` — inv #1 — `ListView.focus = true` puts the unified delegate's root Item in the focus chain (`d->hasActiveFocus()` returns true) but the TextEdit child does NOT gain `activeFocus` — keys delivered to the window go to the delegate root, which has no `Keys.onPressed` handler, so structural/nav routing is bypassed entirely. Production papers over this because every realistic interaction (click, programmatic `requestTextCaretAtRow`) goes through the chokepoint's `takeFocus` → `edit.forceActiveFocus()`. Two `tst_live_render_qml_integration` slots (`enter_at_paragraph_end_migrates_focus`, `delete_at_row_end_merges_next`) implicitly relied on auto-focus reaching the TextEdit and broke; both updated to use `requestCursor` (the explicit chokepoint path). The underlying gap — auto-focus doesn't deliver focus to a text-bearing descendant — is worth a follow-up: either the delegate sets `focus: true` on the TextEdit conditionally, the ListView delegate is wrapped in a FocusScope, or the production startup path explicitly seeds focus on row 0.
+- ~~2026-05-16 `libs/markoff-live/qml/delegates/UnifiedInlineTextDelegate.qml` — inv #1 — `ListView.focus = true` puts the unified delegate's root Item in the focus chain (`d->hasActiveFocus()` returns true) but the TextEdit child does NOT gain `activeFocus` — keys delivered to the window go to the delegate root, which has no `Keys.onPressed` handler, so structural/nav routing is bypassed entirely. Production papers over this because every realistic interaction (click, programmatic `requestTextCaretAtRow`) goes through the chokepoint's `takeFocus` → `edit.forceActiveFocus()`. Two `tst_live_render_qml_integration` slots (`enter_at_paragraph_end_migrates_focus`, `delete_at_row_end_merges_next`) implicitly relied on auto-focus reaching the TextEdit and broke; both updated to use `requestCursor` (the explicit chokepoint path). The underlying gap — auto-focus doesn't deliver focus to a text-bearing descendant — is worth a follow-up: either the delegate sets `focus: true` on the TextEdit conditionally, the ListView delegate is wrapped in a FocusScope, or the production startup path explicitly seeds focus on row 0.~~ → fixed in dde6413 (tier-4b). Initial focus now routed through LiveView.qml's onCountChanged → cursorState.requestTextCaretAtRow(0, 0). The two test slots that previously migrated from auto-focus to requestCursor stay that way — explicit chokepoint routing is the new normal.
 - ~~2026-05-11 `libs/markoff-live/src/LiveBlockModel.cpp:106` — inv #7 — `applyOps` now detects a Delete+Insert-at-same-row kind-change pattern and synthesises `beginResetModel`/`endResetModel`~~ → fixed in d60f896. The kindOnlySwap detector + beginResetModel branch retired in tier 3 (commit d60f896). Block kind now flows through `delegateClass` bucketing per spec `docs/specs/2026-05-15-tier-3-kind-transition-delegate-architecture-design.md`. Within-class kind transitions (paragraph↔heading, paragraph↔list-item, etc.) are dataChanged events on the same delegate; cross-class transitions still produce Delete+Insert.
 
 ---
@@ -125,6 +125,28 @@ toggle works; an interactive dogfood pass signs off.
 
 ## #2 — Cursor architecture cleanup
 
+> **2026-05-16 — Tier 4b implemented.** Concerns **#3** (three
+> overlapping `requestTextCaretAt*` APIs — two unused variants
+> `requestTextCaretAtNewRow` and `requestTextCaretAtAnchor` deleted;
+> `requestTextCaretAtRow` retained as row-keyed convenience over
+> `establishFocus`) and **#4** (the second pending slot `m_pendingRow`
+> and its resolvers / slot handlers / signal connections deleted)
+> both closed. Spec
+> `docs/specs/2026-05-16-tier-4b-pending-slot-consolidation-design.md`;
+> plan `docs/plans/2026-05-16-tier-4b-pending-slot-consolidation.md`.
+> Falsifiability proofs A (m_pendingRow inert; full suite still
+> green) and B (initial-focus seed disabled; new
+> `initial_focus_lands_on_textedit_not_delegate_root` slot fails) both
+> committed and reverted in-history. Initial-focus seam closed via
+> `LiveView.qml`'s `onCountChanged` calling
+> `cursorState.requestTextCaretAtRow(0, 0)` once on first model
+> population (spec §4.4 prescribed `Component.onCompleted`; the
+> implementation moved to `onCountChanged` because `onCompleted` fires
+> before the debounced model load completes — see commit `dde6413`
+> message). Remaining concern: **#10**
+> (`LiveSelectionView` / `LiveCursorState` dual canonical stores) →
+> tier 4c.
+>
 > **2026-05-16 — Tier 4 (partial) implemented.** Concerns **#5**
 > (cursor API poking doc flush — now routed through
 > `LiveListModelBinding::flushPendingDocumentChanges`), **#9**
