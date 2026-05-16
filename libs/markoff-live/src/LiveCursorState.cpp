@@ -26,13 +26,6 @@ LiveCursorState::LiveCursorState(const BlockKindRegistry *registry,
     , m_model(model)
     , m_binding(binding)
 {
-    if (binding) {
-        connect(binding, &LiveListModelBinding::structuralRowsInserted,
-                this, &LiveCursorState::onStructuralRowsInserted);
-        connect(binding, &LiveListModelBinding::structuralRowRemoved,
-                this, &LiveCursorState::onStructuralRowRemoved);
-    }
-
 }
 
 QString LiveCursorState::cursorKind() const
