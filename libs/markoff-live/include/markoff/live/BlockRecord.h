@@ -50,14 +50,16 @@ struct MARKOFF_LIVE_EXPORT BlockRecord {
     bool operator!=(const BlockRecord &o) const noexcept { return !(*this == o); }
 };
 
-/// Diff identity key. Two blocks with the same kind+anchor are "the same
-/// block" across parses: content edits keep delegates alive; kind-changes
-/// and structural edits (splits/merges) produce Delete+Insert pairs.
+/// Diff identity key. Two blocks with the same delegateClass+anchor are
+/// "the same row" across parses: within-class kind changes (paragraph→
+/// heading) keep the row alive (delegate persists, TextEdit persists)
+/// and propagate via dataChanged role hints. Cross-class kind changes
+/// (paragraph→hr) produce Delete+Insert. See Markoff::Live::delegateClassFor.
 struct MARKOFF_LIVE_EXPORT BlockKey {
-    QString              kind;
+    QString              delegateClass;
     Markoff::BlockAnchor anchor;
     bool operator==(const BlockKey &o) const noexcept {
-        return kind == o.kind && anchor == o.anchor;
+        return delegateClass == o.delegateClass && anchor == o.anchor;
     }
     bool operator!=(const BlockKey &o) const noexcept { return !(*this == o); }
 };

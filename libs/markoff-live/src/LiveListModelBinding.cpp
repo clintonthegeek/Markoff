@@ -392,7 +392,7 @@ void LiveListModelBinding::onD2Changed()
     QList<BlockKey> nextKeys;
     nextKeys.reserve(records.size());
     for (const auto &r : records)
-        nextKeys.append(BlockKey{ r.kind, r.blockAnchor });
+        nextKeys.append(BlockKey{ r.delegateClass, r.blockAnchor });
 
     const QList<AstBlockDiff::Op> ops = AstBlockDiff::diff(d->lastKeys, nextKeys);
 

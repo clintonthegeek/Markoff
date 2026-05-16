@@ -36,6 +36,7 @@ qt_add_executable(tst_live_render_block_model
 )
 target_link_libraries(tst_live_render_block_model PRIVATE
     Qt6::Core Qt6::Test markoff_live markoff_core)
+target_include_directories(tst_live_render_block_model PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 add_test(NAME tst_live_render_block_model COMMAND tst_live_render_block_model)
 
 qt_add_executable(tst_live_render_cursor
@@ -43,6 +44,7 @@ qt_add_executable(tst_live_render_cursor
 )
 target_link_libraries(tst_live_render_cursor PRIVATE
     Qt6::Core Qt6::Test markoff_live markoff_core)
+target_include_directories(tst_live_render_cursor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 add_test(NAME tst_live_render_cursor COMMAND tst_live_render_cursor)
 
 qt_add_executable(tst_live_render_paragraph_edit

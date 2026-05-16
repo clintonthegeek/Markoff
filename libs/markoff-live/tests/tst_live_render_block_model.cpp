@@ -7,6 +7,8 @@
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/BlockKind.h>
 
+#include "KindDispatch.h"
+
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/parser/SourceSpan.h>
 
@@ -27,7 +29,10 @@ static BlockRecord makeRecord(const QString &kind, const QString &text,
 // Helper: derive BlockKey from a record.
 static BlockKey keyOf(const BlockRecord &r)
 {
-    return BlockKey{ r.kind, r.blockAnchor };
+    const QString cls = r.delegateClass.isEmpty()
+        ? Markoff::Live::delegateClassFor(r.kind)
+        : r.delegateClass;
+    return BlockKey{ cls, r.blockAnchor };
 }
 
 class TstLiveRenderBlockModel : public QObject {
