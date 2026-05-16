@@ -88,14 +88,10 @@ qt_add_qml_module(markoff_live
         src/LiveContextMenuHandler.cpp
     QML_FILES
         qml/LiveView.qml
-        qml/delegates/ParagraphDelegate.qml
-        qml/delegates/HeadingDelegate.qml
         qml/delegates/CodeBlockDelegate.qml
         qml/delegates/BlockOnlyDelegateBase.qml
         qml/delegates/HorizontalRuleDelegate.qml
         qml/delegates/ImageDelegate.qml
-        qml/delegates/ListItemDelegate.qml
-        qml/delegates/BlockquoteDelegate.qml
         qml/delegates/MathDelegate.qml
         qml/delegates/RemoteCursorOverlay.qml
         qml/delegates/UnifiedInlineTextDelegate.qml
