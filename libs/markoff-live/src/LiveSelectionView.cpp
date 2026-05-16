@@ -5,6 +5,11 @@
 
 namespace Markoff::Live {
 
+namespace {
+// FALSIFIABILITY PROOF, REVERTS NEXT — shadow state to force divergence.
+int g_shadowAnchorQtPos = -1;
+}  // namespace
+
 LiveSelectionView::LiveSelectionView(QObject *parent) : QObject(parent) {}
 
 bool LiveSelectionView::hasSelection() const
@@ -19,6 +24,10 @@ void LiveSelectionView::begin(int blockIndex, int qtPos)
     if (anchor.isNull()) return;
     m_cursorState->syncFromTextEdit(anchor, qtPos);
     m_cursorState->setSelectionAnchor({anchor, static_cast<quint32>(qtPos)});
+
+    // STUB: shadow diverges from canonical.
+    g_shadowAnchorQtPos = qtPos + 100;  // deliberately wrong
+
     m_cursorState->syncSelectionToSession();
     Q_EMIT selectionChanged();
 }
@@ -77,6 +86,8 @@ int LiveSelectionView::anchorBlock() const
 
 int LiveSelectionView::anchorQtPos() const
 {
+    // STUB: read from shadow, not canonical.
+    if (g_shadowAnchorQtPos >= 0) return g_shadowAnchorQtPos;
     if (!m_cursorState) return -1;
     const auto a = m_cursorState->selectionAnchor();
     if (!a) return -1;
