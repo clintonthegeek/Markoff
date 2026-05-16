@@ -126,10 +126,18 @@ void LiveCursorState::requestTextCaretAtRow(int expectedRow, int qtPos)
     establishFocus(anchor, qtPos);
 }
 
-void LiveCursorState::requestTextCaretAtNewRow(int /*expectedRow*/, int /*qtPos*/)
+void LiveCursorState::requestTextCaretAtNewRow(int expectedRow, int qtPos)
 {
-    // FALSIFIABILITY PROOF, REVERTS NEXT — m_pendingRow inert
-    return;
+    if (!m_model) return;
+    if (expectedRow < 0) return;
+    qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtNewRow row=" << expectedRow
+                      << "qtPos=" << qtPos
+                      << "(model.rowCount=" << m_model->rowCount() << ")";
+    // Pure-pending: do NOT resolve against the current row at this index —
+    // that would land the cursor on whatever block currently sits there
+    // (the block that's about to be SHIFTED by the upcoming insertion).
+    // Wait for the next structural signal whose range covers expectedRow.
+    m_pendingRow = PendingRow{ expectedRow, qtPos, std::nullopt };
 }
 
 void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
@@ -149,11 +157,22 @@ void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
     Q_EMIT cursorChanged();
 }
 
-void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor /*expectedAnchor*/,
-                                               int /*qtPos*/)
+void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor,
+                                               int qtPos)
 {
-    // FALSIFIABILITY PROOF, REVERTS NEXT — m_pendingRow inert
-    return;
+    if (!m_model) return;
+    qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtAnchor qtPos=" << qtPos
+                      << "(model.rowCount=" << m_model->rowCount() << ")";
+    // Anchor-keyed pure-pending. Do NOT resolve immediately — the model
+    // currently still reflects the PRE-edit state (the anchor sits at its
+    // OLD row, which is about to be displaced by the upcoming insertion).
+    // Wait for a structural signal to fire during parse-back applyOps; at that
+    // point the anchor's CURRENT row is the right cursor target.
+    PendingRow p;
+    p.row = -1;
+    p.qtPos = qtPos;
+    p.anchor = expectedAnchor;
+    m_pendingRow = std::move(p);
 }
 
 void LiveCursorState::onStructuralRowsInserted(int first, int last)
