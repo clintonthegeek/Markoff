@@ -17,6 +17,10 @@ ListView {
 
     required property var binding   // LiveListModelBinding *
 
+    // Set to true after the first initial-focus seed fires, so onCountChanged
+    // does not re-fire the seed on subsequent structural changes (enter, paste, etc.).
+    property bool _initialFocusSeeded: false
+
     model: binding ? binding.model : null
     clip: true
     spacing: 2
@@ -98,6 +102,30 @@ ListView {
     Component.onCompleted: {
         if (binding && binding.navigationController)
             binding.navigationController.setListView(root)
+    }
+
+    // ---- Seed initial focus through the chokepoint on first model population ----
+    //
+    // Without this, ListView.focus = true delivers focus to the delegate root
+    // but not the text-bearing TextEdit descendant — the path every other
+    // event recovers via establishFocus/takeFocus, but startup didn't.
+    // Discipline-log entry 2026-05-16 (closed by tier-4b).
+    //
+    // Why not Component.onCompleted: at that point the model is empty
+    // (documentLoaded fired before the binding was wired), so
+    // requestTextCaretAtRow(0, 0) early-returns.
+    //
+    // Why not guard on cursorKind === "none": the TextEdit's
+    // onCursorPositionChanged fires during delegate creation and calls
+    // syncFromTextEdit, which sets cursorKind to TextCaret before the
+    // actual window focus lands on the TextEdit. The _initialFocusSeeded
+    // flag guards against re-firing on subsequent structural changes
+    // (enter, paste, etc.) while ensuring we fire exactly once on load.
+    onCountChanged: {
+        if (!root._initialFocusSeeded && count > 0 && binding && binding.cursorState) {
+            root._initialFocusSeeded = true
+            binding.cursorState.requestTextCaretAtRow(0, 0)
+        }
     }
 
     // ---- Zoom + theme shortcuts ----

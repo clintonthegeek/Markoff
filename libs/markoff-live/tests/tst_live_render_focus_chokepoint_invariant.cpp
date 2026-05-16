@@ -74,6 +74,9 @@ private slots:
     void typing_on_selected_image_is_noop();
     void tripleclick_on_image_lands_blockselected();
 
+    // Tier-4b: initial focus must reach the TextEdit, not just the delegate root.
+    void initial_focus_lands_on_textedit_not_delegate_root();
+
 private:
     void assertChokepointInvariant(const QString &scenario);
     std::unique_ptr<QmlIntegrationFixture> m_fixture;
@@ -997,6 +1000,27 @@ void TestFocusChokepointInvariant::click_on_typed_hr_lands_blockselected() {
     QVERIFY(cs != nullptr);
     QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
     QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::initial_focus_lands_on_textedit_not_delegate_root()
+{
+    // Spec: tier-4b §4.4 auto-focus gap close-out. After the production
+    // QML view finishes Component.onCompleted with a non-empty model, the
+    // focused QQuickItem must be the TextEdit descendant of the first
+    // text-bearing delegate, NOT the delegate root.
+    //
+    // Without the explicit `establishFocus` seed in LiveView.qml's
+    // Component.onCompleted, this test fails: ListView.focus = true
+    // delivers focus to the delegate root (which has no Keys.onPressed)
+    // and the TextEdit child never gains activeFocus. See discipline-log
+    // entry 2026-05-16 (closed by tier-4b).
+    QmlIntegrationFixture fx(QByteArrayLiteral("alpha\n\nbeta"), /*expectedRowCount=*/2);
+
+    QQuickItem *expectedTextEdit = fx.delegateTextEdit(0);
+    QVERIFY2(expectedTextEdit != nullptr, "delegateTextEdit(0) returned null");
+
+    // The focused item should be the TextEdit of row 0.
+    QTRY_COMPARE(fx.window()->activeFocusItem(), expectedTextEdit);
 }
 
 }  // namespace Markoff::Live::Test
