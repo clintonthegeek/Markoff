@@ -84,13 +84,14 @@ void LiveSelectionView::begin(int blockIndex, int qtPos)
     m_anchorBlock = blockIndex; m_anchorQtPos = qtPos;
     m_activeBlock = blockIndex; m_activeQtPos = qtPos;
 
-    // Tier 4c: mirror to canonical store. Identity is BlockAnchor.
-    if (m_cursorState && m_model
-        && blockIndex >= 0 && blockIndex < m_model->rowCount()) {
-        const auto anchor = m_model->recordAt(blockIndex).blockAnchor;
-        m_cursorState->establishFocus(anchor, qtPos);
-        m_cursorState->setSelectionAnchor({anchor, static_cast<quint32>(qtPos)});
-    }
+    // FALSIFIABILITY PROOF, REVERTS NEXT — skip the canonical store write.
+    // The shadow + canonical states will diverge; tests that consume the
+    // canonical path should fail.
+    // if (m_cursorState && m_model && blockIndex >= 0 && blockIndex < m_model->rowCount()) {
+    //     const auto anchor = m_model->recordAt(blockIndex).blockAnchor;
+    //     m_cursorState->establishFocus(anchor, qtPos);
+    //     m_cursorState->setSelectionAnchor({anchor, static_cast<quint32>(qtPos)});
+    // }
 
     syncToSession();
     Q_EMIT selectionChanged();
