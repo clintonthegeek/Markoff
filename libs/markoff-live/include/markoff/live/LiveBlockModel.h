@@ -42,6 +42,7 @@ public:
         CheckedRole,
         LooseRunRole,
         InlineSpansRole,
+        DelegateClassRole,  // new: see Markoff::Live::delegateClassFor.
     };
 
     explicit LiveBlockModel(QObject *parent = nullptr);

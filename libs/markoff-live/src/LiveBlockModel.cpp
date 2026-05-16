@@ -37,6 +37,7 @@ QHash<int, QByteArray> LiveBlockModel::roleNames() const
         { CheckedRole,      "checked" },
         { LooseRunRole,     "looseRun" },
         { InlineSpansRole,  "inlineSpans" },
+        { DelegateClassRole, "delegateClass" },
     };
 }
 
@@ -99,6 +100,7 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
             return false;
         }
         case InlineSpansRole:   return QVariant::fromValue(r.inlineSpans);
+        case DelegateClassRole: return r.delegateClass;
         default:                return {};
     }
 }

@@ -26,6 +26,7 @@ namespace Markoff::Live {
 /// `LiveListModelBinding::onD2Changed` during each parse update.
 struct MARKOFF_LIVE_EXPORT BlockRecord {
     QString              kind;
+    QString              delegateClass;     ///< derived from kind; see Markoff::Live::delegateClassFor.
     QString              text;              ///< Source-faithful markdown for this block.
     int                  headingLevel = 0;  ///< 1–6 if kind=="heading"; else 0.
     QString              codeLanguage;      ///< Fence info-string if kind=="code-block".
