@@ -122,10 +122,11 @@ ListView {
     // flag guards against re-firing on subsequent structural changes
     // (enter, paste, etc.) while ensuring we fire exactly once on load.
     onCountChanged: {
-        if (!root._initialFocusSeeded && count > 0 && binding && binding.cursorState) {
-            root._initialFocusSeeded = true
-            binding.cursorState.requestTextCaretAtRow(0, 0)
-        }
+        // FALSIFIABILITY PROOF, REVERTS NEXT — seed disabled
+        // if (!root._initialFocusSeeded && count > 0 && binding && binding.cursorState) {
+        //     root._initialFocusSeeded = true
+        //     binding.cursorState.requestTextCaretAtRow(0, 0)
+        // }
     }
 
     // ---- Zoom + theme shortcuts ----
