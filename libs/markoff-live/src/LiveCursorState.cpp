@@ -130,20 +130,6 @@ void LiveCursorState::requestTextCaretAtRow(int expectedRow, int qtPos)
     establishFocus(anchor, qtPos);
 }
 
-void LiveCursorState::requestTextCaretAtNewRow(int expectedRow, int qtPos)
-{
-    if (!m_model) return;
-    if (expectedRow < 0) return;
-    qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtNewRow row=" << expectedRow
-                      << "qtPos=" << qtPos
-                      << "(model.rowCount=" << m_model->rowCount() << ")";
-    // Pure-pending: do NOT resolve against the current row at this index —
-    // that would land the cursor on whatever block currently sits there
-    // (the block that's about to be SHIFTED by the upcoming insertion).
-    // Wait for the next structural signal whose range covers expectedRow.
-    m_pendingRow = PendingRow{ expectedRow, qtPos, std::nullopt };
-}
-
 void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
 {
     if (anchor == Markoff::BlockAnchor{}) return;

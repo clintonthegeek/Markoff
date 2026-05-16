@@ -116,15 +116,6 @@ public:
     /// If a request is already pending, it is replaced (latest-request-wins).
     Q_INVOKABLE void requestTextCaretAtRow(int expectedRow, int qtPos);
 
-    /// Pure-pending variant: never resolves immediately even when
-    /// `expectedRow` already exists. Use when the structural edit will
-    /// INSERT a new row at this index (mid-block split, hole commit). The
-    /// pending request resolves on the next `rowsInserted` whose range
-    /// covers `expectedRow`. Distinguishes "row will be born here" from
-    /// "row already exists, just move the cursor" — the latter must use
-    /// requestTextCaretAtRow above.
-    Q_INVOKABLE void requestTextCaretAtNewRow(int expectedRow, int qtPos);
-
     /// One-way sync from QML `TextEdit::cursorPosition` → canonical
     /// `m_cursor`. Called by each text-bearing delegate's
     /// `onCursorPositionChanged` and by `LiveEditBinding::onContentsChange`
