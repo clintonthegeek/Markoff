@@ -242,6 +242,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
 
         d->selectionView->setDocument(d->document);
         d->selectionView->setSession(nullptr);
+        d->cursorState->setSession(nullptr);  // tier-4c
 
         if (d->clipboard)   d->clipboard->setDocument(d->document);
         if (d->format)      d->format->setDocument(d->document);
@@ -253,6 +254,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
     } else {
         d->selectionView->setDocument(nullptr);
         d->selectionView->setSession(nullptr);
+        d->cursorState->setSession(nullptr);  // tier-4c
 
         if (d->clipboard)   d->clipboard->setDocument(nullptr);
         if (d->format)      d->format->setDocument(nullptr);
@@ -267,6 +269,7 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
 void LiveListModelBinding::setSession(Markoff::Session *session)
 {
     d->selectionView->setSession(session);
+    d->cursorState->setSession(session);  // tier-4c: canonical session bridge
 }
 
 LiveBlockModel           *LiveListModelBinding::model()               const { return d->model; }
