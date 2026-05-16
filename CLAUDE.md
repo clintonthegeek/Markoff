@@ -241,19 +241,35 @@ cmake --build build-dev -j 8
 
 ## Testing
 
-Qt tests spawn windows — always run via `xvfb-run` so they don't interrupt the user's display.
-
-Install if missing (Manjaro/Arch): `sudo pacman -S xorg-server-xvfb`
+Run all tests via `scripts/run-tests.sh`. It defaults to
+`QT_QPA_PLATFORM=offscreen` so Qt renders to memory buffers — no windows
+appear, no focus is stolen, no virtual X server needed.
 
 ```bash
-xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
-  ctest --test-dir build-dev --output-on-failure -j 8
-
-xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
-  build-dev/bin/<test-binary> [test-name ...]
+scripts/run-tests.sh                     # full suite
+scripts/run-tests.sh -R 'cursor'         # ctest pattern
+scripts/run-tests.sh --bin tst_block_id  # one test binary
+scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'  # fast inner loop
 ```
 
-Never run Qt window tests directly against `$DISPLAY`. Use `-E "tst_realistic|tst_benchmark"` for a fast inner loop.
+Three modes:
+
+- **offscreen** (default) — no window server interaction. Use for everything.
+- **nested** (`--nested`) — spawns a nested Weston compositor in a single
+  window on your desktop; tests run inside it. Use when you need to *see*
+  rendering without it stealing focus from your main session.
+- **direct** (`--direct`, requires `MARKOFF_ALLOW_DIRECT=1`) — runs against
+  your real Wayland/X11 session. Expect focus interruptions. Reserved for
+  cases where you explicitly want windows on your screen.
+
+**Agents must default to offscreen.** Never invoke `--direct` without
+explicit per-task user permission. Even `--nested` should be reserved for
+visual verification work; the offscreen path is the daily driver.
+
+A handful of tests currently fail under offscreen (~11 of 201, mostly in
+`tst_live_render_*` — focus/cursor tests that depend on real window-manager
+behaviour). Triaging them is open work; until then, exclude with
+`-E '<pattern>'` when running a clean baseline.
 
 ## Conventions
 
