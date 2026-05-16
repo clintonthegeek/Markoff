@@ -24,50 +24,6 @@ ListView {
 
     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
-    // LiveBlockModel routes kind-only swaps (paragraph→heading on `# `)
-    // through beginResetModel()/endResetModel() so DelegateChooser correctly
-    // re-evaluates the row's delegate template. Side effect: QQuickListView
-    // resets contentY to 0 — the user-visible "view jumps to top when
-    // typing `#`" regression. Snapshot contentY before the reset and restore
-    // it after, so the scroll position survives the delegate rebuild.
-    //
-    // Each reset captures and restores its OWN snapshot via closure; using a
-    // shared property here causes chaos when multiple resets fire in quick
-    // succession (each fires modelAboutToBeReset before any restore runs, so
-    // the shared property holds whatever the last one captured — typically
-    // 0, the value left by an earlier reset's synchronous clobber).
-    property int _modelResetCount: 0       // diagnostic: read from tests
-
-    Connections {
-        target: root.model
-        ignoreUnknownSignals: true
-
-        property real pendingContentY: -1
-
-        function onModelAboutToBeReset() {
-            pendingContentY = root.contentY
-        }
-
-        function onModelReset() {
-            const saved = pendingContentY
-            pendingContentY = -1
-            if (saved < 0) return
-
-            // Two-phase restore. The synchronous restore minimises the
-            // one-frame "scroll up then back" flash users perceive: it lands
-            // before any frame can render the contentY=0 intermediate state.
-            // The deferred restore catches the case where ListView's polish
-            // runs *after* this slot and re-clobbers contentY back to 0.
-            // Documented Qt.callLater per libs/markoff-live/CLAUDE.md
-            // invariant 8 (seam guidance: was 11 sites, now 12).
-            root.contentY = saved
-            Qt.callLater(function() {
-                root.contentY = saved
-                root._modelResetCount += 1
-            })
-        }
-    }
-
     delegate: DelegateChooser {
         role: "delegateClass"
         DelegateChoice { roleValue: "text-inline"; delegate: UnifiedInlineTextDelegate {} }
