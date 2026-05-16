@@ -2,16 +2,18 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-10 (E2.6 implementation complete; both `v0.7.0-e2.5` and `v0.7.0-e2.6` tags held pending interactive dogfood — user is remote/SSH).
+**Last updated:** 2026-05-16 (tier-3 kind-transition delegate architecture complete; `v0.7.0-e2.5` and `v0.7.0-e2.6` tags still held pending interactive dogfood).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** **dogfood pending** — E2.5 (S1/S2/S3 fixes) + E2.6 (theme + zoom) both implemented; tags held until user runs the interactive checklist. Next executable work: queue #2 (cursor architecture cleanup).
+**Active phase:** **dogfood pending** — E2.5 (S1/S2/S3 fixes) + E2.6 (theme + zoom) both implemented; tags held until user runs the interactive checklist. Next executable work (if dogfood unavailable): queue #2 remaining concerns (#3, #4, #5, #10, #12) or E2.7/E3 depending on user priority.
 
 ---
 
 ## TL;DR — what to do *right now*
 
-> **2026-05-10 update — DOGFOOD NEEDED.** Both E2.5 (S1/S2/S3 cursor fixes, `463fc36..6c44a07`) and E2.6 (theme wire-up + zoom, `9fff98d..b73c4ae`) are implemented. **Both `v0.7.0-e2.5` and `v0.7.0-e2.6` tags are held pending an interactive dogfood pass that needs the user's local desktop.** When you are back at your machine:
+> **2026-05-16 update.** Tier-3 (kind-transition delegate architecture, commits `e55e517..ef357ea`) is complete: `kindOnlySwap`/`beginResetModel` workaround retired, `UnifiedInlineTextDelegate` replaces 4 kind-specific delegates, jump-scroll and paste-styling dogfood regressions fixed at root. 203 tests, 12 failures (all pre-existing). Cursor concern #9 (`tryResolvePending` unspecified transients) is still open — discipline-log entry at `docs/queue.md:65` names it.
+>
+> **2026-05-10 update — DOGFOOD STILL NEEDED.** Both E2.5 (S1/S2/S3 cursor fixes, `463fc36..6c44a07`) and E2.6 (theme wire-up + zoom, `9fff98d..b73c4ae`) are implemented. **Both `v0.7.0-e2.5` and `v0.7.0-e2.6` tags are held pending an interactive dogfood pass that needs the user's local desktop.** When you are back at your machine:
 >
 > **E2.5 dogfood checklist** (setext cursor/focus):
 > - Setext demote (delete last underline char): caret must stay, focus must stay.
@@ -69,6 +71,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-15/16 | `e55e517..ef357ea` | **Tier-3 kind-transition delegate architecture.** `delegateClassFor()` buckets 8 kinds into 5 classes; `BlockKey` carries `delegateClass`; `UnifiedInlineTextDelegate` replaces `ParagraphDelegate`/`HeadingDelegate`/`BlockquoteDelegate`/`ListItemDelegate`; `kindOnlySwap`+`beginResetModel` retired; contentY bandaid deleted; Qt.callLater count 2→1. Fixes dogfood jump-scroll on `#`/`-` and cross-block paste header-styling loss. Invariant test `tst_live_render_kind_transition_invariant` (4 slots, falsifiability proof in history). 203/203 total tests; 12 pre-existing failures unchanged. |
 | 2026-05-10 | `b73c4ae` | **E2.6 dogfood request committed.** `docs/handoff/2026-05-10-e2.6-dogfood-request.md` — interactive checklist for zoom (Ctrl+=/−/0, Ctrl+wheel), Ctrl+Shift+D toggle, inline-code scaling, and size-delta acknowledgement (H1 28→25.2 px etc.). Queue #1 marked implemented. Both `v0.7.0-e2.5` and `v0.7.0-e2.6` tags held until user runs dogfood at local desktop. |
 | 2026-05-10 | `de05f90` | **E2.6 Phase 6 — `applyDefaultTheme` Q_INVOKABLE + self-wire + Main.qml signal connection.** `LiveListModelBinding` pimpl ctor calls `actions->setBinding(this)` so zoom QActions are live at construction. Adds `Q_INVOKABLE void applyDefaultTheme(bool dark)`. `Main.qml` wires `actionController.themeToggleRequested` → `modelBinding.applyDefaultTheme`. 190/190 tests green. |
 | 2026-05-10 | `f6d1f5b` | **E2.6 Phase 5 — all QML delegates wired through Theme + fontScale.** ParagraphDelegate, HeadingDelegate, BlockquoteDelegate, CodeBlockDelegate, ListItemDelegate, MathDelegate, ImageDelegate, RemoteCursorOverlay: font.pixelSize/family/bold/italic all routed through `theme.pixelSizeFor/familyFor/isBold/isItalic` × `fontScale`. HeadingDelegate's hardcoded literal-pixel switch replaced with theme-driven slot lookup. Ctrl+wheel `WheelHandler` added to `LiveView.qml`. Zoom + toggleDark QActions registered on window. 190/190 tests green. |

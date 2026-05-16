@@ -124,6 +124,14 @@ toggle works; an interactive dogfood pass signs off.
 
 ## #2 — Cursor architecture cleanup
 
+> **2026-05-15/16 — Tier 3 (kind-transition delegate architecture) implemented.** Spec
+> `docs/specs/2026-05-15-tier-3-kind-transition-delegate-architecture-design.md`;
+> plan `docs/plans/2026-05-15-tier-3-kind-transition-delegate-architecture.md`.
+> Addressed the `kindOnlySwap`/`beginResetModel` workaround (discipline-log entry
+> 2026-05-11, now closed at d60f896). Cursor concern **#9** (`tryResolvePending`
+> unspecified transients) remains open — logged at discipline-log line 65 as the
+> explicit next concern for a tier-4 cursor pass.
+>
 > **2026-05-15 — Tier 2 implemented.** Spec
 > `docs/specs/2026-05-15-tier-2-cursor-typing-authority-design.md`;
 > plan `docs/plans/2026-05-15-tier-2-cursor-typing-authority.md`.
