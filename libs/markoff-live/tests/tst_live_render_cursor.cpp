@@ -294,9 +294,9 @@ private Q_SLOTS:
         QCOMPARE(binding.model()->recordAt(1).text, QStringLiteral("second"));
     }
 
-    // ---- LiveListModelBinding: structural signals ----
+    // ---- LiveBlockModel: row-mutation signals ----
 
-    void structural_rows_inserted_emitted_on_new_block()
+    void blockModel_emits_rowsInserted_on_new_block()
     {
         Markoff::MarkoffDocument doc(1);
         LiveListModelBinding binding;
@@ -304,7 +304,7 @@ private Q_SLOTS:
         doc.loadFromMarkdown("hello");
         QTRY_COMPARE(binding.model()->rowCount(), 1);
 
-        QSignalSpy spy(&binding, &LiveListModelBinding::structuralRowsInserted);
+        QSignalSpy spy(binding.model(), &QAbstractItemModel::rowsInserted);
 
         // Insert a new block (Transaction commits on scope exit)
         auto ids = doc.iterateBlocks();
@@ -315,11 +315,12 @@ private Q_SLOTS:
         }
 
         QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
-        // row index for the inserted block
-        QCOMPARE(spy[0][0].toInt(), 1);
+        // QAbstractItemModel::rowsInserted signature: (parent, first, last)
+        QCOMPARE(spy[0][1].toInt(), 1);  // first
+        QCOMPARE(spy[0][2].toInt(), 1);  // last
     }
 
-    void structural_row_removed_emitted_on_block_removal()
+    void blockModel_emits_rowsRemoved_on_block_removal()
     {
         Markoff::MarkoffDocument doc(1);
         LiveListModelBinding binding;
@@ -327,7 +328,7 @@ private Q_SLOTS:
         doc.loadFromMarkdown("hello\n\nworld");
         QTRY_COMPARE(binding.model()->rowCount(), 2);
 
-        QSignalSpy spy(&binding, &LiveListModelBinding::structuralRowRemoved);
+        QSignalSpy spy(binding.model(), &QAbstractItemModel::rowsRemoved);
 
         auto ids = doc.iterateBlocks();
         QVERIFY(ids.size() >= 2);
@@ -337,7 +338,8 @@ private Q_SLOTS:
         }
 
         QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 1, 2000);
-        QCOMPARE(spy[0][0].toInt(), 1);
+        QCOMPARE(spy[0][1].toInt(), 1);  // first
+        QCOMPARE(spy[0][2].toInt(), 1);  // last
     }
 
     // ---- LiveCursorState: desiredVisualX column-preservation tests ----
