@@ -147,24 +147,6 @@ void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
     Q_EMIT cursorChanged();
 }
 
-void LiveCursorState::requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor,
-                                               int qtPos)
-{
-    if (!m_model) return;
-    qInfo().noquote() << "[dogfood] CursorState: requestTextCaretAtAnchor qtPos=" << qtPos
-                      << "(model.rowCount=" << m_model->rowCount() << ")";
-    // Anchor-keyed pure-pending. Do NOT resolve immediately — the model
-    // currently still reflects the PRE-edit state (the anchor sits at its
-    // OLD row, which is about to be displaced by the upcoming insertion).
-    // Wait for a structural signal to fire during parse-back applyOps; at that
-    // point the anchor's CURRENT row is the right cursor target.
-    PendingRow p;
-    p.row = -1;
-    p.qtPos = qtPos;
-    p.anchor = expectedAnchor;
-    m_pendingRow = std::move(p);
-}
-
 void LiveCursorState::onStructuralRowsInserted(int first, int last)
 {
     if (!m_pendingRow) return;

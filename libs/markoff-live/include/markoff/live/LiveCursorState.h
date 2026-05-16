@@ -36,9 +36,10 @@ class LiveListModelBinding;
 /// it resolves immediately; when a structural edit has not yet propagated
 /// through the CRDT→model pipeline the request is held until
 /// `rowsInserted` fires. Legitimate use requires that the row's TEXT is
-/// already stable at the time of the call — do not use immediately after
-/// a d2ApplyBufferEdit that changes the row content (use
-/// requestTextCaretAtAnchor instead). Spec §5.3 step 6.
+/// already stable at the time of the call — do not use immediately
+/// after a d2ApplyBufferEdit that changes the row content (resolve
+/// the BlockAnchor explicitly and call `establishFocus` instead).
+/// Spec §5.3 step 6.
 class MARKOFF_LIVE_EXPORT LiveCursorState : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -124,23 +125,10 @@ public:
     /// within-block arrows and IME natively), and any subsequent kind
     /// transition or structural diff reads a stale qtPos and lands the
     /// caret in the wrong place. Idempotent if the cursor is already at
-    /// `(anchor, qtPos)`. Deliberately does NOT reset `m_pendingRow` — a
-    /// pending structural-key request must survive incidental TextEdit
-    /// cursor moves until its structural signal arrives.
+    /// `(anchor, qtPos)`. Deliberately does NOT reset `m_pendingFocus` — a
+    /// pending chokepoint request must survive incidental TextEdit cursor
+    /// moves until its delegate-registration event arrives.
     Q_INVOKABLE void syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos);
-
-    /// Anchor-keyed pure-pending variant. Use when the structural edit
-    /// shifts an existing block (whose `BlockAnchor` we already know)
-    /// rather than creating a brand-new block. The pending request
-    /// resolves on the next `rowsInserted` event by searching the model
-    /// for `expectedAnchor`'s row, NOT by indexing a row position.
-    /// This is robust to any number of intervening Insert/Delete/Equal
-    /// ops in the parse-back diff: the user's content's row index can
-    /// shift unpredictably (anchor renumbering, multi-row diffs), but
-    /// its BlockAnchor identity is stable. Bug 3 fix (Task 18 dogfood
-    /// pass 2): start-of-paragraph Enter in mid-document context must
-    /// land the cursor on the user's content, not on the row after it.
-    void requestTextCaretAtAnchor(Markoff::BlockAnchor expectedAnchor, int qtPos);
 
     // --- §5.1 focus-chokepoint additions (tier 1) ---
 
