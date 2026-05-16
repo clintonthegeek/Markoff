@@ -1,5 +1,15 @@
 # R1C: skeleton. R2: coords, registry, block_model. R3: cursor.
 
+qt_add_executable(tst_kind_dispatch
+    tst_kind_dispatch.cpp
+)
+target_include_directories(tst_kind_dispatch PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+target_link_libraries(tst_kind_dispatch PRIVATE
+    Qt6::Core Qt6::Test markoff_live)
+add_test(NAME tst_kind_dispatch COMMAND tst_kind_dispatch)
+
 qt_add_executable(tst_live_render_skeleton
     tst_live_render_skeleton.cpp
 )

@@ -45,6 +45,8 @@ qt_add_qml_module(markoff_live
         src/AstBlockDiff.cpp
         src/KindTransition.h
         src/KindTransition.cpp
+        src/KindDispatch.h
+        src/KindDispatch.cpp
         src/LiveBlockModel.cpp
         src/LiveListModelBinding.cpp
         # R3: cursor + selection
