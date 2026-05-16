@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff/core/BlockId.h>
+#include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffCoreExport.h>
 #include <markoff/parser/SourceSpan.h>
 
@@ -37,6 +38,7 @@ private:
     struct Entry {
         QList<SourceSpan> spans;
         quint64 cachedAtSeq = 0;
+        BlockKind cachedKind = BlockKind::Paragraph;
     };
 
     MarkoffDocument &m_doc;
