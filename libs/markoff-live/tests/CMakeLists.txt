@@ -342,6 +342,15 @@ target_link_libraries(tst_live_render_session_orphaned_block
 add_test(NAME tst_live_render_session_orphaned_block
          COMMAND tst_live_render_session_orphaned_block)
 
+# Phase E tier-4c: 7-slot invariant gate — LiveCursorState canonical store for
+# cursor position and selection anchor (spec §5.6).
+qt_add_executable(tst_live_render_selection_cursor_unification
+    tst_live_render_selection_cursor_unification.cpp)
+target_link_libraries(tst_live_render_selection_cursor_unification
+    PRIVATE markoff_live markoff_core Qt6::Core Qt6::Test)
+add_test(NAME tst_live_render_selection_cursor_unification
+         COMMAND tst_live_render_selection_cursor_unification)
+
 # C2: Cut — copy+delete with cutSequenceNumber + recent-cuts cache.
 qt_add_executable(tst_live_render_clipboard_cut
     tst_live_render_clipboard_cut.cpp)
