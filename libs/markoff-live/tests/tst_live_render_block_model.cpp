@@ -184,7 +184,7 @@ private Q_SLOTS:
             makeRecord(BlockKind::Paragraph, "world"),            // fresh (no local edit)
         };
         QList<BlockKey> secondKeys; for (const auto &r : secondRecs) secondKeys << keyOf(r);
-        // BlockKey only includes (kind, anchor); for this synthesised test
+        // BlockKey only includes (delegateClass, anchor); for this synthesised test
         // anchors are default-constructed and equal across both lists -> Equal ops.
         const auto ops = AstBlockDiff::diff(firstKeys, secondKeys);
 
@@ -254,7 +254,7 @@ private Q_SLOTS:
         span.charOffset = 0; span.charLength = 5; span.bold = true;
         rec.inlineSpans = {span};
 
-        QList<BlockKey> nextKeys = { BlockKey{ rec.kind, rec.blockAnchor } };
+        QList<BlockKey> nextKeys = { keyOf(rec) };
         m.applyOps(AstBlockDiff::diff({}, nextKeys), {rec});
 
         QCOMPARE(m.rowCount(), 1);
@@ -312,7 +312,7 @@ private Q_SLOTS:
         rec1.text = "hello";
         rec1.blockAnchor = Markoff::BlockAnchor{};
         rec1.inlineSpans = {};
-        QList<BlockKey> keys1 = { BlockKey{ rec1.kind, rec1.blockAnchor } };
+        QList<BlockKey> keys1 = { keyOf(rec1) };
         m.applyOps(AstBlockDiff::diff({}, keys1), {rec1});
         QCOMPARE(m.rowCount(), 1);
 
@@ -323,7 +323,7 @@ private Q_SLOTS:
         rec2.inlineSpans = {span};
 
         // rec2 has same key as rec1, so diff produces a single Equal op.
-        QList<BlockKey> keys2 = { BlockKey{ rec2.kind, rec2.blockAnchor } };
+        QList<BlockKey> keys2 = { keyOf(rec2) };
 
         QSignalSpy spy(&m, &QAbstractItemModel::dataChanged);
         m.applyOps(AstBlockDiff::diff(keys1, keys2), {rec2});
