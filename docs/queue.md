@@ -66,6 +66,7 @@
 - ~~2026-05-15 `libs/markoff-live/src/LiveCursorState.cpp:459-487` — inv #2 — `tryResolvePending` bypasses `request()`'s `validateVariant`~~ → fixed in tier-4 (queue #2 concern #9 closeout). `validateVariant` is now (a) null-registry safe and (b) queries the document instead of the model for the current kind, eliminating the "valid transient states during a structural cascade" rejection. `tryResolvePending` routes through `request()` like every other mutator. The transient was specifically the doc/model kind disagreement window during a cascade — model still has the pre-`changeKind` kind, doc already has the new one. Doc-keyed lookup resolves it.
 - ~~2026-05-16 `libs/markoff-live/qml/delegates/UnifiedInlineTextDelegate.qml` — inv #1 — `ListView.focus = true` puts the unified delegate's root Item in the focus chain (`d->hasActiveFocus()` returns true) but the TextEdit child does NOT gain `activeFocus` — keys delivered to the window go to the delegate root, which has no `Keys.onPressed` handler, so structural/nav routing is bypassed entirely. Production papers over this because every realistic interaction (click, programmatic `requestTextCaretAtRow`) goes through the chokepoint's `takeFocus` → `edit.forceActiveFocus()`. Two `tst_live_render_qml_integration` slots (`enter_at_paragraph_end_migrates_focus`, `delete_at_row_end_merges_next`) implicitly relied on auto-focus reaching the TextEdit and broke; both updated to use `requestCursor` (the explicit chokepoint path). The underlying gap — auto-focus doesn't deliver focus to a text-bearing descendant — is worth a follow-up: either the delegate sets `focus: true` on the TextEdit conditionally, the ListView delegate is wrapped in a FocusScope, or the production startup path explicitly seeds focus on row 0.~~ → fixed in dde6413 (tier-4b). Initial focus now routed through LiveView.qml's onCountChanged → cursorState.requestTextCaretAtRow(0, 0). The two test slots that previously migrated from auto-focus to requestCursor stay that way — explicit chokepoint routing is the new normal.
 - ~~2026-05-11 `libs/markoff-live/src/LiveBlockModel.cpp:106` — inv #7 — `applyOps` now detects a Delete+Insert-at-same-row kind-change pattern and synthesises `beginResetModel`/`endResetModel`~~ → fixed in d60f896. The kindOnlySwap detector + beginResetModel branch retired in tier 3 (commit d60f896). Block kind now flows through `delegateClass` bucketing per spec `docs/specs/2026-05-15-tier-3-kind-transition-delegate-architecture-design.md`. Within-class kind transitions (paragraph↔heading, paragraph↔list-item, etc.) are dataChanged events on the same delegate; cross-class transitions still produce Delete+Insert.
+- ~~prior `m_applyingSessionSelection` re-entrance guard in `LiveSelectionView`~~ → retired in tier 4c (`docs/specs/2026-05-16-tier-4c-selection-cursor-unification-design.md` §4.3). Equality short-circuit on the resolved `(BlockAnchor, qtPos)` pair supersedes the guard. Invariant 7 cleared at this site.
 
 ---
 
@@ -125,6 +126,25 @@ toggle works; an interactive dogfood pass signs off.
 
 ## #2 — Cursor architecture cleanup
 
+> **2026-05-16 — Tier 4c implemented.** Last queue #2 concern
+> closed: **#10** (`LiveSelectionView` / `LiveCursorState` dual
+> canonical stores). `LiveSelectionView` is now a stateless Q_OBJECT
+> facade preserving the QML-exposed API; `m_selectionAnchor` (new)
+> + `m_cursor` (existing) on `LiveCursorState` are the sole canonical
+> store, keyed by `BlockAnchor`. Session bridge (`syncSelectionToSession`,
+> `onSessionPrimarySelectionChanged`) moved with the state. The
+> `m_applyingSessionSelection` re-entrance guard is retired via the
+> equality short-circuit on the resolved (BlockAnchor, qtPos) pair
+> (invariant 7 cleared at this site). Spec
+> `docs/specs/2026-05-16-tier-4c-selection-cursor-unification-design.md`;
+> plan `docs/plans/2026-05-16-tier-4c-selection-cursor-unification.md`.
+> Two falsifiability proofs in history (stub-then-revert pairs). New
+> invariant binary `tst_live_render_selection_cursor_unification`
+> with 7 slots covering click-then-shift-click, cross-block shift-arrow,
+> double-click, clear-via-arrow, session round-trip no-echo,
+> selection-survives-structural-edit-above, and orphaned-anchor cleanup.
+> Queue #2 now has no remaining concerns.
+>
 > **2026-05-16 — Tier 4b implemented.** Concerns **#3** (three
 > overlapping `requestTextCaretAt*` APIs — two unused variants
 > `requestTextCaretAtNewRow` and `requestTextCaretAtAnchor` deleted;
