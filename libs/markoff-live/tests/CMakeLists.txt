@@ -603,6 +603,27 @@ set_tests_properties(tst_live_cursor_state_chokepoint
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 
+# Tier-3 §6.1 invariant: TextEdit QQuickItem identity preserved across
+# within-class kind transitions (paragraph↔heading, paragraph→list-item).
+# Lands RED — turns green once Task 7 switches BlockKey to delegateClass.
+qt_add_executable(tst_live_render_kind_transition_invariant
+    tst_live_render_kind_transition_invariant.cpp
+    QmlIntegrationFixture.h
+    QmlIntegrationFixture.cpp
+    LiveRealisticInputHarness.h
+)
+target_link_libraries(tst_live_render_kind_transition_invariant PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init)
+add_test(NAME tst_live_render_kind_transition_invariant
+         COMMAND tst_live_render_kind_transition_invariant)
+set_tests_properties(tst_live_render_kind_transition_invariant
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # Spec §8.5 retirement-evidence shape tests (shell scripts, CI guards)
 add_test(NAME tst_live_render_no_qt_calllater_in_focus_path
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_no_qt_calllater_in_focus_path.sh
