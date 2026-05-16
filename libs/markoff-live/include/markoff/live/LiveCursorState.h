@@ -74,6 +74,15 @@ public:
                              QObject                 *parent = nullptr);
 
     Cursor cursor() const { return m_cursor; }
+    /// Typed accessor for the TextCaret variant — returns `nullopt` when
+    /// the cursor is in any other state (`NoCursor`, `BlockSelected`,
+    /// `BlockInternalEdit`). Use this in place of `cursor()` followed by
+    /// `std::get_if<TextCaret>(&...)` on a local copy. Queue #2 concern #12.
+    std::optional<TextCaret> currentTextCaret() const {
+        if (const auto *tc = std::get_if<TextCaret>(&m_cursor))
+            return *tc;
+        return std::nullopt;
+    }
     QString cursorKind() const;
     int focusedAnchorRow() const;
     int focusedQtPos() const;

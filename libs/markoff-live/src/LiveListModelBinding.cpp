@@ -454,13 +454,10 @@ void LiveListModelBinding::onD2Changed()
                 // Bug S1 (setext demote loses focus) and S3 (ATX demote
                 // jumps caret to position 0) both trace here.
                 // Clamp lives inside takeFocus (Math.min(qtPos, edit.length)).
-                {
-                    const Markoff::Cursor cur = d->cursorState->cursor();
-                    if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
-                        tc && tc->block == rec.blockAnchor) {
-                        d->cursorState->establishFocus(
-                            rec.blockAnchor, static_cast<int>(tc->cachedQtPos));
-                    }
+                if (const auto tc = d->cursorState->currentTextCaret();
+                    tc && tc->block == rec.blockAnchor) {
+                    d->cursorState->establishFocus(
+                        rec.blockAnchor, static_cast<int>(tc->cachedQtPos));
                 }
                 Markoff::Cmd::changeKind(*doc, Markoff::BlockId(rec.blockAnchor),
                                          Markoff::BlockKind::Paragraph, {}, {});
@@ -577,8 +574,7 @@ void LiveListModelBinding::onD2Changed()
         const bool toNonText = (fk == Markoff::BlockKind::HorizontalRule
                                 || fk == Markoff::BlockKind::Image);
         if (!toNonText) {
-            const Markoff::Cursor cur = d->cursorState->cursor();
-            if (auto *tc = std::get_if<Markoff::TextCaret>(&cur);
+            if (const auto tc = d->cursorState->currentTextCaret();
                 tc && tc->block == rec.blockAnchor) {
                 d->cursorState->establishFocus(
                     rec.blockAnchor, static_cast<int>(tc->cachedQtPos));
