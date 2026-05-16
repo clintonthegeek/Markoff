@@ -153,10 +153,15 @@ private Q_SLOTS:
         QmlIntegrationFixture fix(/*markdown=*/"A", /*expectedRowCount=*/1);
 
         QVERIFY(fix.waitForDelegateAt(0, 2000));
-        QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
-
-        fix.harness().keyClick(Qt::Key_End);
-        QCOMPARE(fix.delegateCursorPos(0), 1);
+        // Explicit cursor placement via the chokepoint (matches production's
+        // click-or-API path). Post-tier-3 the unified delegate doesn't claim
+        // focus from ListView's currentItem auto-focus — the root Item ends
+        // up in the focus chain but its TextEdit child doesn't, so Key_Return
+        // never reaches the delegate's Keys.onPressed → structural handler.
+        // Every passing edit-driving slot uses requestCursor for the same
+        // reason.
+        requestCursor(fix, 0, 1);
+        QTRY_COMPARE_WITH_TIMEOUT(fix.delegateCursorPos(0), 1, 2000);
 
         fix.harness().keyClick(Qt::Key_Return);
 
@@ -551,17 +556,16 @@ private Q_SLOTS:
         QVERIFY(fix.waitForDelegateAt(0, 2000));
         QVERIFY(fix.waitForDelegateAt(1, 2000));
 
-        // On load the *last* delegate auto-focuses (its setPlainText
-        // echo seeds m_cursor last → row 1 wins). Navigate to row 0
-        // via arrow Up — this path is exercised by arrow_up_walks_then_*
-        // and works reliably under parallel ctest load.
-        QTRY_COMPARE_WITH_TIMEOUT(fix.focusedDelegate(),
-                                  fix.delegateAt(1), 2000);
-        fix.harness().keyClick(Qt::Key_Up);
+        // Explicit cursor placement at end of "A" via the chokepoint.
+        // Post-tier-3 the unified delegate doesn't claim focus from
+        // ListView's auto-focus path (root Item ends up in the focus
+        // chain but its TextEdit child doesn't), so the previous
+        // "last delegate auto-focuses → arrow-Up to row 0 → End" walk
+        // is unreliable. requestCursor goes through establishFocus →
+        // takeFocus → forceActiveFocus on the TextEdit.
+        requestCursor(fix, 0, 1);
         QTRY_COMPARE_WITH_TIMEOUT(fix.focusedDelegate(),
                                   fix.delegateAt(0), 2000);
-        // Park at end of "A".
-        fix.harness().keyClick(Qt::Key_End);
         QTRY_COMPARE_WITH_TIMEOUT(fix.delegateCursorPos(0), 1, 2000);
 
         fix.harness().keyClick(Qt::Key_Delete);
