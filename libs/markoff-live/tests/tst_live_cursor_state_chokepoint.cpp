@@ -74,8 +74,11 @@ void TestLiveCursorStateChokepoint::pending_survives_delegate_destruction() {
     const auto a = Markoff::BlockAnchor::fromRaw(1);
 
     auto *dOld = new MockDelegate;
-    // Register with kind "heading" while model has no row → kindFor returns "" →
-    // stale check suppresses dispatch even if establishFocus is called after.
+    // Register while model has no row → kindFor returns "" → the
+    // empty-currentKind guard in tryResolvePending suppresses dispatch even
+    // though m_delegates contains the anchor. (Pre-tier-3 this also relied on
+    // the literal-kind mismatch; tier-3 narrowed staleness to delegateClass,
+    // so the empty-kind guard is the explicit "no basis to dispatch" rail.)
     m_state->delegateAvailable(a, "heading", dOld);
     m_state->establishFocus(a, 3);
 
@@ -123,19 +126,26 @@ void TestLiveCursorStateChokepoint::delegate_arrives_without_pending() {
 }
 
 void TestLiveCursorStateChokepoint::stale_registration_holds_pending() {
-    // §5.1.1 — delegate registered with kind "heading"; model now
-    // reports "paragraph"; establishFocus should NOT dispatch.
+    // §5.1.1 — delegate registered with a kind whose `delegateClass` no
+    // longer matches the model's current kind for the same anchor. Tier-3
+    // narrowed staleness to *cross-class* mismatches: the within-class
+    // transitions (paragraph ↔ heading ↔ blockquote ↔ list-item) reuse
+    // the same UnifiedInlineTextDelegate, so dispatch on a "stale" entry
+    // in that class is correct. Use code-block (its own delegateClass)
+    // to exercise the genuine stale-cross-class path.
     const auto a = Markoff::BlockAnchor::fromRaw(1);
 
-    // Register stale delegate (kind "heading") before the row exists.
+    // Register stale delegate with cross-class kind ("code-block") before
+    // the row exists.
     MockDelegate dStale;
-    m_state->delegateAvailable(a, "heading", &dStale);
+    m_state->delegateAvailable(a, "code-block", &dStale);
 
-    // Now model knows the block as "paragraph".
+    // Now model knows the block as "paragraph" (different delegateClass).
     m_model->insertTestRow(a, "paragraph", "p text");
 
     m_state->establishFocus(a, 5);
-    // Stale delegate must NOT receive takeFocus.
+    // Stale delegate must NOT receive takeFocus — cross-class transition
+    // means a new delegate is incoming.
     QCOMPARE(dStale.takeFocusCalls(), QList<int>{});
 
     // After the stale delegate goes away and a matching one arrives → dispatch.

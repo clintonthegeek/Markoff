@@ -322,6 +322,23 @@ existing chokepoint machinery.
 The `tryResolvePending` validation bypass for "valid transient states"
 (queue.md:64) remains an open thread.
 
+> **2026-05-16 amendment (queue #6 closeout).** The "no changes"
+> claim was wrong: `tryResolvePending`'s stale-registration check
+> still compared **literal kind strings** rather than the new
+> `delegateClass` identity, so any **subsequent** cross-block focus
+> request targeting a row that had undergone a within-class kind
+> transition would falsely bail. `m_delegates[anchor].kind` is
+> frozen at the kind that was current when `Component.onCompleted`
+> fired (e.g. `"paragraph"`); after a paragraph→heading transition
+> the doc reports `"heading"`, the literal-kind comparison
+> mismatches, and the request never resolves. The fix is a one-line
+> swap to `delegateClassFor(it->kind) != delegateClassFor(currentKind)`
+> plus an explicit empty-`currentKind` guard and a self-heal write of
+> the registered kind once a class match is confirmed. See queue.md
+> §#6 for the trace; bug surfaced via
+> `tst_live_render_focus_chokepoint_invariant::nav_into_runtime_promoted_heading`,
+> which was already in-tree as the falsifiable test.
+
 ## 6. Testing — supporting work
 
 Per **invariant 4**: write the falsifiable invariant test first.

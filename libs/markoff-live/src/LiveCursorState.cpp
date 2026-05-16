@@ -7,6 +7,8 @@
 
 #include <markoff/core/MarkoffDocument.h>
 
+#include "KindDispatch.h"
+
 #include <QDateTime>
 #include <QLoggingCategory>
 
@@ -435,7 +437,25 @@ void LiveCursorState::tryResolvePending() {
     } else if (m_model) {
         currentKind = m_model->kindFor(anchor);
     }
-    if (it->kind != currentKind) return;
+    // Unknown block: no row in model AND no binding (or binding's doc agrees
+    // it's gone). Without a known kind we have no basis to dispatch — hold
+    // the pending until either expiry or the structural signal that adds
+    // the row.
+    if (currentKind.isEmpty()) return;
+
+    // Compare delegate *classes*, not literal kinds. Cross-class transitions
+    // (paragraph → code-block, paragraph → hr, …) destroy the old delegate
+    // and create a new one — bail and wait for the new delegate's
+    // delegateAvailable callback to retry. Within-class transitions
+    // (paragraph ↔ heading ↔ blockquote ↔ list-item, all in the
+    // `text-inline` delegateClass introduced by tier-3) keep the same
+    // QQuickItem; `m_delegates[anchor].kind` never gets refreshed
+    // because Component.onCompleted doesn't re-fire, so a literal-kind
+    // comparison would falsely bail and the cursor request would never
+    // resolve. Self-heal the entry once we've confirmed the class matches.
+    // Regression: queue.md #6 (`nav_into_runtime_promoted_heading`).
+    if (delegateClassFor(it->kind) != delegateClassFor(currentKind)) return;
+    if (it->kind != currentKind) it->kind = currentKind;
 
     const int qtPos = m_pendingFocus->qtPos;
     m_pendingFocus.reset();

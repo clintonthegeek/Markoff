@@ -2,7 +2,7 @@
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
-**Last updated:** 2026-05-16 (tier-3 kind-transition delegate architecture complete; `v0.7.0-e2.5` and `v0.7.0-e2.6` tags still held pending interactive dogfood).
+**Last updated:** 2026-05-16 (queue #6 closed — tier-3 stale-registration check now compares delegate classes; `v0.7.0-e2.5` and `v0.7.0-e2.6` tags still held pending interactive dogfood).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
 **Active phase:** **dogfood pending** — E2.5 (S1/S2/S3 fixes) + E2.6 (theme + zoom) both implemented; tags held until user runs the interactive checklist. Next executable work (if dogfood unavailable): queue #2 remaining concerns (#3, #4, #5, #10, #12) or E2.7/E3 depending on user priority.
@@ -71,6 +71,7 @@ Append-only chronological record. Each entry: date, commit short SHA (when commi
 
 | Date | Commit | Summary |
 |---|---|---|
+| 2026-05-16 | (pending) | **Queue #6 closed — within-class kind-transition focus dispatch.** `LiveCursorState::tryResolvePending`'s stale-registration check now compares `delegateClassFor(it->kind) != delegateClassFor(currentKind)` instead of literal `it->kind != currentKind`. Within-class transitions (paragraph ↔ heading, all in `text-inline`) reuse the same `UnifiedInlineTextDelegate`, so the literal-kind comparison was a false bail under tier-3. Adds an explicit empty-`currentKind` guard for unknown blocks and self-heals the stored kind on success. Fixes `tst_live_render_focus_chokepoint_invariant::nav_into_runtime_promoted_heading` and recovers `stress_walk_paragraph_heading_listitem_chain` + `stress_walk_enter_then_backspace_merge` (3 tests fixed, 0 regressed). Two `tst_live_cursor_state_chokepoint` unit tests updated to exercise cross-class staleness (the post-tier-3 contract). |
 | 2026-05-15/16 | `e55e517..ef357ea` | **Tier-3 kind-transition delegate architecture.** `delegateClassFor()` buckets 8 kinds into 5 classes; `BlockKey` carries `delegateClass`; `UnifiedInlineTextDelegate` replaces `ParagraphDelegate`/`HeadingDelegate`/`BlockquoteDelegate`/`ListItemDelegate`; `kindOnlySwap`+`beginResetModel` retired; contentY bandaid deleted; Qt.callLater count 2→1. Fixes dogfood jump-scroll on `#`/`-` and cross-block paste header-styling loss. Invariant test `tst_live_render_kind_transition_invariant` (4 slots, falsifiability proof in history). 203/203 total tests; 12 pre-existing failures unchanged. |
 | 2026-05-10 | `b73c4ae` | **E2.6 dogfood request committed.** `docs/handoff/2026-05-10-e2.6-dogfood-request.md` — interactive checklist for zoom (Ctrl+=/−/0, Ctrl+wheel), Ctrl+Shift+D toggle, inline-code scaling, and size-delta acknowledgement (H1 28→25.2 px etc.). Queue #1 marked implemented. Both `v0.7.0-e2.5` and `v0.7.0-e2.6` tags held until user runs dogfood at local desktop. |
 | 2026-05-10 | `de05f90` | **E2.6 Phase 6 — `applyDefaultTheme` Q_INVOKABLE + self-wire + Main.qml signal connection.** `LiveListModelBinding` pimpl ctor calls `actions->setBinding(this)` so zoom QActions are live at construction. Adds `Q_INVOKABLE void applyDefaultTheme(bool dark)`. `Main.qml` wires `actionController.themeToggleRequested` → `modelBinding.applyDefaultTheme`. 190/190 tests green. |

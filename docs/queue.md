@@ -415,6 +415,101 @@ before the next dogfood.
 
 ---
 
+## #6 — `nav_into_runtime_promoted_heading` regression (tier-3 fallout) ✅ CLOSED 2026-05-16
+
+**Effort:** ~1 hour. **Status:** fixed — `LiveCursorState::tryResolvePending`'s
+stale-registration check now compares **delegate classes** rather than
+literal kind strings. Within-class transitions (paragraph ↔ heading,
+all in the `text-inline` `delegateClass`) no longer falsely bail.
+Cross-class staleness is preserved via the existing `delegateClassFor`
+mismatch path; an explicit empty-currentKind guard handles unknown
+blocks. Self-heals the registered kind once a class match is
+confirmed. Two `tst_live_cursor_state_chokepoint` unit tests updated
+to exercise post-tier-3 (cross-class) staleness — the pre-tier-3
+literal-kind staleness check is no longer the contract. Side benefit:
+the same fix recovers two pre-existing `tst_live_render_qml_integration`
+stress-test failures (`stress_walk_paragraph_heading_listitem_chain`,
+`stress_walk_enter_then_backspace_merge`). Falsifiability already
+in-tree: the test failed prior to the fix and passes after.
+
+(Historical investigation notes preserved below for context.)
+
+`tst_live_render_focus_chokepoint_invariant::nav_into_runtime_promoted_heading`
+fails on `exploration/new-foundation` post-tier-3 with the chokepoint
+invariant violated:
+
+```
+delegateRow: 2
+cursorRow  : 1
+```
+
+i.e. after the test promotes row 1 from paragraph to heading via typing
+`# `, then walks Down→Up, `LiveCursorState::focusedAnchorRow()` reports
+row 1 but `focusedDelegate()->property("modelIndex")` is row 2. Cursor
+state and delegate focus disagree — exactly the class of bug the
+chokepoint invariant suite was built to catch.
+
+The originating regression D-fc-2 ("new heading impermeable to arrow
+keys") was fixed in commit `4fb711f` (see
+`docs/handoff/2026-05-11-focus-chokepoint-dogfood-request.md:153` for
+the original symptom and §D-fc-2 disposition note in queue.md banner
+near line 160). That fix relied on `LiveBlockModel::applyOps` synthesising
+`beginResetModel`/`endResetModel` for the kind-change Delete+Insert
+pattern — a heavy hammer logged as an invariant-7 smell at the top of
+the Discipline Log.
+
+**The tier-3 work (commits `4a7d63a..30891eb`) retired that heavy
+hammer:** within-class kind transitions (paragraph↔heading,
+paragraph↔list-item, etc.) are now `dataChanged` on a single
+`UnifiedInlineTextDelegate` row rather than Delete+Insert. The
+Discipline Log entry that previously logged the hammer is now closed
+with `~~...~~ → fixed in d60f896`. The hammer is gone, but the chokepoint
+invariant test for the exact scenario it was protecting (arrow nav into
+a runtime-promoted heading) regressed at the same time.
+
+**Hypothesis to test first:** `LiveListModelBinding` updates the
+delegate-class on `dataChanged`, but `LiveCursorState::m_delegates`
+caches the *old* `(kind, root)` pair under the BlockAnchor. After the
+within-class kind transition, the new `Up` press resolves the pending
+focus against the stale `m_delegates` entry → focus lands on whatever
+delegate happens to claim activeFocus next (row 2's). Look for the
+delegate-going-away / delegate-available registration ordering during
+a within-class transition in
+`LiveCursorState::{delegateAvailable, delegateGoingAway}` (lines 356–
+404).
+
+**Reading order:**
+
+1. `tst_live_render_focus_chokepoint_invariant.cpp:259` — the test.
+2. `docs/specs/2026-05-15-tier-3-kind-transition-delegate-architecture-design.md`
+   — §5 (delegateClass authority) and §6 (kind-transition flow) describe
+   the new within-class transition mechanism.
+3. `libs/markoff-live/src/LiveCursorState.cpp:356–404` — delegate
+   registration and the chokepoint invariant logic. Especially the
+   `wasRegistered` re-stage at lines 371–381: that branch assumes the
+   delegate-root POINTER survived the kind transition, which under tier-3
+   it does (same UnifiedInlineTextDelegate). Does that path correctly
+   route the pending focus to the same delegate after `kind` changed?
+4. `libs/markoff-live/src/LiveBlockModel.cpp` — the retired
+   `kindOnlySwap` path (Discipline Log entry, line 63 `~~...~~`); the
+   D-fc-2 fix was the synthetic `beginResetModel`/`endResetModel` there.
+5. `docs/handoff/2026-05-11-focus-chokepoint-dogfood-request.md:153`
+   — the original D-fc-2 symptom; the test was written FOR this scenario.
+
+**Definition of done:** test green, with at least one paragraph in the
+commit message explaining why the tier-3 delegate-identity-preservation
+doesn't conflict with the chokepoint invariant for runtime-promoted
+headings. If the fix requires re-introducing a kind-transition-aware
+hammer, log a fresh invariant-7 entry in the Discipline Log explaining
+why the tier-3 retirement wasn't sufficient — the smell trail matters.
+
+**Open question:** are any of the other 5 baseline failing tests in
+`tst_live_render_qml_integration` (per tier-3 spec §117-119) actually
+the same regression? Worth running them after the fix lands to see if
+the count drops.
+
+---
+
 ## When this queue is empty / superseded
 
 Delete the file or move it to `docs/archive/`. The CLAUDE.md banner
