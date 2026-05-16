@@ -34,8 +34,49 @@ void LiveSelectionView::setModel(const LiveBlockModel *model)       { m_model   
 
 bool LiveSelectionView::hasSelection() const
 {
+    if (m_cursorState) return m_cursorState->hasSelection();
     return m_anchorBlock >= 0 && m_activeBlock >= 0
         && !(m_anchorBlock == m_activeBlock && m_anchorQtPos == m_activeQtPos);
+}
+
+int LiveSelectionView::anchorBlock() const
+{
+    if (m_cursorState) {
+        const auto a = m_cursorState->selectionAnchor();
+        if (!a) return -1;
+        return m_cursorState->rowForBlock(a->block);
+    }
+    return m_anchorBlock;
+}
+
+int LiveSelectionView::anchorQtPos() const
+{
+    if (m_cursorState) {
+        const auto a = m_cursorState->selectionAnchor();
+        if (!a) return -1;
+        return static_cast<int>(a->qtPos);
+    }
+    return m_anchorQtPos;
+}
+
+int LiveSelectionView::activeBlock() const
+{
+    if (m_cursorState) {
+        const auto tc = m_cursorState->currentTextCaret();
+        if (!tc) return -1;
+        return m_cursorState->rowForBlock(tc->block);
+    }
+    return m_activeBlock;
+}
+
+int LiveSelectionView::activeQtPos() const
+{
+    if (m_cursorState) {
+        const auto tc = m_cursorState->currentTextCaret();
+        if (!tc) return -1;
+        return static_cast<int>(tc->cachedQtPos);
+    }
+    return m_activeQtPos;
 }
 
 void LiveSelectionView::begin(int blockIndex, int qtPos)

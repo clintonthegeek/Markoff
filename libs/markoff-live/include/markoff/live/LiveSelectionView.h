@@ -70,10 +70,10 @@ public:
     // Accessors used by LiveClipboardController to compute paste byte offsets,
     // by LiveNavigationController to detect cross-block extension start, and
     // by QML delegates' selection-sync path.
-    Q_INVOKABLE int anchorBlock() const { return m_anchorBlock; }
-    Q_INVOKABLE int anchorQtPos() const { return m_anchorQtPos; }
-    Q_INVOKABLE int activeBlock() const { return m_activeBlock; }
-    Q_INVOKABLE int activeQtPos() const { return m_activeQtPos; }
+    Q_INVOKABLE int anchorBlock() const;
+    Q_INVOKABLE int anchorQtPos() const;
+    Q_INVOKABLE int activeBlock() const;
+    Q_INVOKABLE int activeQtPos() const;
 
 Q_SIGNALS:
     void selectionChanged();
