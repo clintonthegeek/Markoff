@@ -309,8 +309,126 @@ Follow-ups:
 
 ## #4 — Chop-trailing-`\n` investigation + fix
 
-**Effort:** 0.5–2 days depending on what investigation finds.
-**Status:** suspicion captured, no plan.
+**Effort:** ~1 day (refactor + fan-out fixes).
+**Status:** 2026-05-16 — investigation complete; chop's premise *is*
+wrong but the fix has substantial blast radius. Two safe-now changes
+landed (matchesSetextShape trailing-`\n` tolerance + clarifying
+comment on the chop pointing at this entry). The full fix is a
+buffer-convention refactor, written up below as the plan.
+
+### Investigation findings (2026-05-16)
+
+`materializeBlocksFromParsedDoc` in `libs/markoff-core/src/MarkoffDocument.cpp:1690`
+stores `bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart)` as the
+CRDT buffer for each block. Tree-sitter's byte range **does include**
+a trailing `\n` when the source has one (e.g. `"first\n\nsecond"` →
+block 0 buffer = `"first\n"`); it doesn't when the source doesn't
+(`"Heading"` standalone → buffer `"Heading"`). So the load convention
+is "buffer is whatever bytes tree-sitter delimited, including or
+excluding a trailing `\n`".
+
+The chop normalises that to "no trailing `\n` ever" at the display
+edge. **But** the same storage representation collides with
+user-typed soft breaks: after Shift+Enter at end of `"Heading"`,
+`insertSoftBreak` produces buffer `"Heading\n"` — indistinguishable
+from a loaded block whose source line ended with `\n`. The chop
+strips both. Loaded blocks: correct. Soft-broken blocks: bug
+(cursor can't park at pos 8, soft break invisible).
+
+`isBlockTouched()` exists but doesn't help disambiguate — any edit
+flips it (even unrelated character insertions), and a touched block
+might still have a load-time `\n` mixed with user edits elsewhere.
+
+The four downstream consumer categories of `BlockRecord.text`:
+
+  * **Kind-transition inference** (`inferBlockKind`, `countLeadingHashes`,
+    `matchesSetextShape`, `kPromoteMarker`): a few are sensitive to a
+    trailing `\n`. `matchesSetextShape` is the most fragile — it
+    `lastIndexOf('\n')` and treats the tail as the underline; with a
+    trailing `\n` the tail is empty and the match fails. Fixed
+    defensively in 2026-05-16 commit (trim trailing newlines first).
+  * **Navigation length** (`LiveNavigationController`, `LiveStructuralKeyHandler`):
+    use `text.length()` as "end of block". A chopped text gives a
+    shorter length than the buffer — consistent with the delegate's
+    `TextEdit.length` (which is also the chopped text), so today
+    these are internally consistent.
+  * **Clipboard / selection** (`LiveSelectionView`, `LiveClipboardController`):
+    serialize chopped text to the clipboard. Correct for delimiter `\n`
+    (user doesn't want it); wrong for soft-break `\n` (user expects
+    the line break preserved).
+  * **QML delegates** (`UnifiedInlineTextDelegate`, `CodeBlockDelegate`,
+    `MathDelegate`): bind `TextEdit.text` to `model.text`. The chopped
+    value is what renders. Soft breaks therefore can't be visible at
+    all under the current convention.
+
+### Attempted fix and its blast radius (2026-05-16)
+
+Tried Option B-pure (strip trailing `\n` in
+`materializeBlocksFromParsedDoc`, remove the chop in
+`LiveListModelBinding`): **12 test binaries failed**, including two
+subprocess aborts (`tst_markoff_doc_apply_structured_paste`,
+`tst_d4_apply_flat_edit`). The convention "buffer carries its
+delimiter `\n`" is load-bearing for `applyFlatEdit`'s text-as-flat
+reconstruction, the merge cmds (`backspaceMerge`, `deleteMerge`)
+both have explicit `stripsTrailingNewlineAtBoundary` tests, and
+several round-trip serializers assume it.
+
+Option A (kind-aware chop) doesn't separate the two cases either —
+a paragraph that was Shift+Entered at end has the same buffer shape
+as a paragraph that was loaded from `"text\n"`. Per-block "load-time
+delimiter" tracking is the only way to distinguish, and that's a
+substantial new piece of state.
+
+Option C (no chop + audit) has the same blast radius as Option B
+because the downstream consumers expect chopped text.
+
+### Plan for the proper fix
+
+1. **Pick a single buffer invariant.** Either
+   * **B1**: buffer is *always* terminator-free; load strips, the
+     serializer reconstructs the inter-block separator from
+     `interBlockSeparator()` for every block (not just touched ones);
+     `applyFlatEdit` and the merge cmds and `blockLoadTimeBytes` all
+     stop carrying the trailing `\n`. — or —
+   * **A1**: buffer always carries a single trailing `\n` (loaded
+     blocks already do; load adds `\n` for sources that don't end
+     with one; runtime adds `\n` on `d2InsertBlock` for new blocks).
+     Soft-break inserts `\n` *before* the terminator. The chop
+     becomes a strip of exactly the terminator; the soft-break `\n`
+     survives because it's not the *last* `\n`.
+
+   B1 is cleaner conceptually but touches more files. A1 is more
+   surgical but introduces a buffer-storage detail callers must
+   honour.
+
+2. **Audit and update** the consumer surface enumerated above. Each
+   consumer either gains an explicit "is the trailing `\n` part of
+   content?" check or accepts the new invariant verbatim.
+
+3. **Regression-test the soft-break case end-to-end.** The existing
+   `shift_enter_creates_visible_newline` test already has two
+   `QEXPECT_FAIL` markers ready to remove. Add a peer test that
+   types Shift+Enter+`-` and asserts the buffer is `"Heading\n-"`
+   not `"Heading-\n"` (the original symptom queue.md #4 was
+   chasing).
+
+4. **Round-trip verification.** Load a setext-heavy document, no
+   edits, save, diff against source — must be byte-identical for
+   untouched blocks. Then edit one paragraph (Shift+Enter at end),
+   save, diff — the new `\n` should appear in the right place.
+
+### Defense-in-depth fix (landed 2026-05-16)
+
+`matchesSetextShape` no longer fails when the buffer has a trailing
+`\n` — it strips trailing newlines before looking for the underline
+line. Pure additive change; no other tests affected. Without this,
+typing Shift+Enter inside a setext heading buffer (which can produce
+`"Heading\n=\n"`) would fall out of the setext path and demote to
+paragraph spuriously.
+
+### Original investigation notes (preserved)
+
+
 
 While debugging the cursor regressions, the chop in
 `LiveListModelBinding::onD2Changed:311–312` turned up as suspicious:

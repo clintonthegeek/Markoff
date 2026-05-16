@@ -357,6 +357,15 @@ void LiveListModelBinding::onD2Changed()
         // Trim trailing newline. Per-item ListItem blocks have content-only
         // buffers (the parser strips all trailing newlines from the per-item
         // content). The single trailing '\n' is the block-delimiter convention.
+        //
+        // Caveat (queue.md #4 — open): when the user presses Shift+Enter at
+        // end-of-block, the buffer transitions e.g. "Heading" → "Heading\n".
+        // This chop strips that '\n' under the same delimiter premise as for
+        // loaded blocks, so the TextEdit can't display the soft break and the
+        // cursor can't park at pos 8. The convention-level fix requires
+        // separating "load-time block-terminator" from "user-typed soft break"
+        // throughout the buffer / serializer / save path — see the queue #4
+        // plan note for the audit surface.
         if (raw.endsWith('\n'))
             raw.chop(1);
         r.text = QString::fromUtf8(raw);

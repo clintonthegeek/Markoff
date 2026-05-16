@@ -17,12 +17,23 @@ int countLeadingHashes(const QString &text)
 
 int matchesSetextShape(const QString &text)
 {
-    const int lastNl = text.lastIndexOf(u'\n');
+    // Strip any trailing newlines first. The post-queue-#4 buffer convention
+    // is "the buffer is exactly what was typed, no auto-appended terminator",
+    // so a soft-break-then-underline-then-soft-break sequence produces
+    // e.g. "Heading\n=\n". Without trimming, lastIndexOf('\n') would point
+    // at the trailing newline and the tail would be empty, missing the
+    // underline. Trim only the trailing run of newlines so internal
+    // structure (the leading content line(s) and the underline) is preserved.
+    int endIdx = text.size();
+    while (endIdx > 0 && text[endIdx - 1] == u'\n') --endIdx;
+    const QString trimmed = text.left(endIdx);
+
+    const int lastNl = trimmed.lastIndexOf(u'\n');
     if (lastNl < 0) return 0;                         // single-line buffer, can't be setext
     if (lastNl == 0) return 0;                        // nothing before the newline; no content line
 
     // Underline candidate = substring after the last newline.
-    const QString tail = text.mid(lastNl + 1);
+    const QString tail = trimmed.mid(lastNl + 1);
     static const QRegularExpression underlineRe(
         QStringLiteral("^[ \\t]{0,3}(=+|-+)[ \\t]*$"));
     auto m = underlineRe.match(tail);
@@ -32,10 +43,10 @@ int matchesSetextShape(const QString &text)
 
     // Find the line directly above the underline; it must be non-blank.
     // Search strictly before lastNl (from lastNl-1) to avoid finding lastNl itself.
-    const int prevNl = (lastNl >= 2) ? text.lastIndexOf(u'\n', lastNl - 1) : -1;
+    const int prevNl = (lastNl >= 2) ? trimmed.lastIndexOf(u'\n', lastNl - 1) : -1;
     const QString aboveLine = (prevNl < 0)
-        ? text.left(lastNl)
-        : text.mid(prevNl + 1, lastNl - prevNl - 1);
+        ? trimmed.left(lastNl)
+        : trimmed.mid(prevNl + 1, lastNl - prevNl - 1);
     if (aboveLine.trimmed().isEmpty()) return 0;
 
     return level;
