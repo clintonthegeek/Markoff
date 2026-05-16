@@ -107,6 +107,42 @@ private Q_SLOTS:
         QVERIFY(textEditAfter);
         QCOMPARE(textEditAfter, textEditBefore.data());
     }
+
+    /// Spec §6.2: cross-class kind transitions DO swap the delegate.
+    /// Sanity check: paragraph→hr is a delegateClass change (text-inline
+    /// → hr), so the standard Delete+Insert path runs and produces a
+    /// different delegate.
+    void paragraph_to_hr_swaps_delegate() {
+        QmlIntegrationFixture fix("x", /*expectedRowCount=*/1);
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+        QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
+
+        fix.placeCursorAtPos(0, 0);
+        QTest::keyClick(fix.window(), Qt::Key_Delete);  // clear "x"
+        QTest::qWait(30);
+        QCoreApplication::processEvents();
+
+        QQuickItem *delegateBefore = fix.delegateAt(0);
+        QVERIFY(delegateBefore);
+        const QByteArray classBefore = delegateBefore->metaObject()->className();
+
+        // Type "---" to trigger paragraph→hr transition
+        typeAscii(fix, '-');
+        typeAscii(fix, '-');
+        typeAscii(fix, '-');
+        QVERIFY(fix.waitForKindAt(0, QStringLiteral("hr"), 2000));
+
+        // After paragraph→hr, the delegate must be a DIFFERENT instance.
+        QQuickItem *delegateAfter = fix.delegateAt(0);
+        QVERIFY(delegateAfter);
+        QVERIFY2(delegateAfter != delegateBefore,
+                 "expected cross-class transition to swap delegate");
+        const QByteArray classAfter = delegateAfter->metaObject()->className();
+        QVERIFY2(classAfter.contains("HorizontalRule"),
+                 qPrintable(QString("expected HorizontalRule delegate, got %1")
+                            .arg(QString::fromUtf8(classAfter))));
+        QVERIFY(classAfter != classBefore);
+    }
 };
 
 QTEST_MAIN(TestLiveRenderKindTransitionInvariant)
