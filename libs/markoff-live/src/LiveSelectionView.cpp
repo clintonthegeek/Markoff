@@ -147,6 +147,10 @@ void LiveSelectionView::selectAll()
     m_anchorQtPos = 0;
     m_activeBlock = lastRow;
     m_activeQtPos = lastText.length();
+
+    // Tier 4c: mirror to canonical store.
+    if (m_cursorState) m_cursorState->selectAllBlocks();
+
     syncToSession();
     Q_EMIT selectionChanged();
 }
@@ -155,27 +159,30 @@ void LiveSelectionView::deleteSelection()
 {
     if (!hasSelection() || !m_model || !m_document) return;
 
+    // Tier 4c: delegate to canonical store. The two stores are in
+    // sync at this point (begin/extend/clear all dual-write); the
+    // canonical-store implementation performs the same flat-edit.
+    if (m_cursorState) {
+        m_cursorState->deleteSelectionRange();
+        // The canonical store's clearSelectionAnchor was called inside
+        // deleteSelectionRange. Mirror back to local state.
+        m_anchorBlock = m_anchorQtPos = m_activeBlock = m_activeQtPos = -1;
+        Q_EMIT selectionChanged();
+        return;
+    }
+
+    // Fallback: legacy path (no cursorState wired — should not happen
+    // in production after the binding pimpl wires setCursorState).
     int fb, fo, lb, lo;
     normalized(fb, fo, lb, lo);
-
     const int rowCount = m_model->rowCount();
     if (fb < 0 || fb >= rowCount || lb < 0 || lb >= rowCount) return;
-
-    // Compute flat byte start/end by walking iterateBlocks().
-    // applyFlatEdit uses the same cumulative-blockText walk internally, so
-    // the byte offsets we produce here are in the same coordinate space.
     const auto blocks = m_document->iterateBlocks();
-
-    uint32_t startByte = 0;
-    uint32_t endByte   = 0;
-    uint32_t cursor    = 0;
+    uint32_t startByte = 0, endByte = 0, cursor = 0;
     for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
         const QByteArray rawText = m_document->blockText(blocks[i]);
         const uint32_t blockSize = static_cast<uint32_t>(rawText.size());
-
         if (i == fb) {
-            // Model text has the trailing '\n' stripped; qtPos is within
-            // the content portion. Use the model record for the conversion.
             const QByteArray modelUtf8 = m_model->recordAt(fb).text.toUtf8();
             startByte = cursor + static_cast<uint32_t>(
                 Coordinates::qtPosToByte(modelUtf8, fo));
@@ -188,9 +195,7 @@ void LiveSelectionView::deleteSelection()
         }
         cursor += blockSize;
     }
-
     if (endByte <= startByte) return;
-
     m_document->applyFlatEdit(startByte, endByte, QByteArray(), Markoff::Origin::UserEdit);
     clear();
 }
