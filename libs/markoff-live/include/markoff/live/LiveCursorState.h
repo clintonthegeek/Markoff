@@ -18,6 +18,20 @@ class BlockKindRegistry;
 class LiveBlockModel;
 class LiveListModelBinding;
 
+/// Selection anchor — the "other end" of a text selection. The active
+/// end is `m_cursor` (variant: TextCaret). When a selection is active,
+/// `m_selectionAnchor` holds the BlockAnchor + qtPos where the selection
+/// started (anchored by Click, Shift+Click `begin`, or session-incoming).
+/// Identity is by `BlockAnchor` (stable across structural edits); the
+/// inner-row index is derived on demand. Tier 4c canonical store.
+struct SelectionAnchor {
+    Markoff::BlockAnchor block;
+    quint32              qtPos;
+    bool operator==(const SelectionAnchor &other) const noexcept {
+        return block == other.block && qtPos == other.qtPos;
+    }
+};
+
 /// Owns the canonical cursor value for **structural events** (kind
 /// transitions, cross-block navigation, `BlockSelected`, `BlockInternalEdit`).
 /// For **in-block caret position during typing**, `QQuickTextEdit::cursorPosition`
@@ -178,10 +192,37 @@ public:
         return m_delegates.contains(anchor);
     }
 
+    // ---- Selection state (tier 4c) ----
+
+    /// True when a selection is active — i.e., `m_selectionAnchor` is set
+    /// AND it points to a different (block, qtPos) than the cursor's
+    /// active end. Collapsed selections (anchor == active) report false.
+    bool hasSelection() const noexcept;
+
+    /// The anchor end of an active text selection, or nullopt if no
+    /// selection is active. The active end is read from `cursor()` /
+    /// `currentTextCaret()`.
+    std::optional<SelectionAnchor> selectionAnchor() const noexcept {
+        return m_selectionAnchor;
+    }
+
+    /// Sets the selection anchor. Used by `LiveSelectionView::begin` (and
+    /// equivalent paths) to park the anchor at the click-time position.
+    /// Does NOT mutate `m_cursor` — caller is responsible for moving the
+    /// active end via `establishFocus` or `syncFromTextEdit`. Emits
+    /// `selectionChanged` if the value changes.
+    void setSelectionAnchor(SelectionAnchor anchor);
+
+    /// Clears the selection anchor. Used by `LiveSelectionView::clear`
+    /// and the orphaned-anchor branch in session-incoming. Does NOT
+    /// mutate `m_cursor`. Emits `selectionChanged` if the slot was set.
+    void clearSelectionAnchor() noexcept;
+
 Q_SIGNALS:
     void cursorChanged();
     void desiredVisualXChanged();
     void visualLineHintChanged();
+    void selectionChanged();
 
 private:
     bool validateVariant(const Cursor &c) const;
@@ -212,6 +253,9 @@ private:
     bool                                        m_inStructuralCascade = false;
 
     static constexpr qint64 kPendingFocusTimeoutMs = 500;
+
+    // Tier 4c — selection anchor (canonical store; the active end is m_cursor).
+    std::optional<SelectionAnchor> m_selectionAnchor;
 };
 
 }  // namespace Markoff::Live

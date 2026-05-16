@@ -97,6 +97,29 @@ void LiveCursorState::clear()
     Q_EMIT cursorChanged();
 }
 
+bool LiveCursorState::hasSelection() const noexcept
+{
+    if (!m_selectionAnchor) return false;
+    const auto tc = currentTextCaret();
+    if (!tc) return false;  // selection only meaningful when active end is TextCaret
+    return !(m_selectionAnchor->block == tc->block
+             && m_selectionAnchor->qtPos == tc->cachedQtPos);
+}
+
+void LiveCursorState::setSelectionAnchor(SelectionAnchor anchor)
+{
+    if (m_selectionAnchor && *m_selectionAnchor == anchor) return;
+    m_selectionAnchor = anchor;
+    Q_EMIT selectionChanged();
+}
+
+void LiveCursorState::clearSelectionAnchor() noexcept
+{
+    if (!m_selectionAnchor) return;
+    m_selectionAnchor.reset();
+    Q_EMIT selectionChanged();
+}
+
 int LiveCursorState::rowForBlock(const Markoff::BlockAnchor &block) const
 {
     for (int i = 0; i < m_model->rowCount(); ++i) {
