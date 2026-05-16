@@ -31,15 +31,15 @@ class LiveListModelBinding;
 /// bindings that need to react to focus type (e.g. focus ring vs. caret).
 /// Values: "none", "TextCaret", "BlockSelected", "BlockInternalEdit".
 ///
-/// `requestTextCaretAtRow` is the deterministic-pending variant used by
-/// the structural-key handler. When the row already exists in the model
-/// it resolves immediately; when a structural edit has not yet propagated
-/// through the CRDT→model pipeline the request is held until
-/// `rowsInserted` fires. Legitimate use requires that the row's TEXT is
-/// already stable at the time of the call — do not use immediately
-/// after a d2ApplyBufferEdit that changes the row content (resolve
-/// the BlockAnchor explicitly and call `establishFocus` instead).
-/// Spec §5.3 step 6.
+/// `requestTextCaretAtRow` is a row-keyed convenience wrapper over
+/// `establishFocus`: it flushes any pending document changes (via
+/// `LiveListModelBinding::flushPendingDocumentChanges`), resolves the
+/// row to a `BlockAnchor` via `recordAt(row).blockAnchor`, and stages
+/// the chokepoint pending. Out-of-range rows are rejected synchronously.
+/// `establishFocus` is the canonical entry for callers that already
+/// hold a `BlockAnchor` (e.g. `LiveStructuralKeyHandler` consuming
+/// `Cmd::*` return values). Spec
+/// `docs/specs/2026-05-16-tier-4b-pending-slot-consolidation-design.md` §3.
 class MARKOFF_LIVE_EXPORT LiveCursorState : public QObject {
     Q_OBJECT
     QML_ELEMENT
@@ -63,8 +63,9 @@ class MARKOFF_LIVE_EXPORT LiveCursorState : public QObject {
     /// `LiveNavigationController` before each Up/Down cross to indicate
     /// which visual line of the destination block the caret should land on
     /// (FirstLine for Up, LastLine for Down). Cleared back to None inside
-    /// `resolvePendingForRow*` after the destination delegate has consumed
-    /// it. Read by QML delegates' focusEditAt + onCursorChanged paths.
+    /// `tryResolvePending` after `takeFocus` returns (the destination
+    /// delegate has consumed the hint by that point). Read by QML
+    /// delegates' focusEditAt + onCursorChanged paths.
     Q_PROPERTY(VisualLineHint pendingVisualLineHint READ pendingVisualLineHint
                                                     NOTIFY visualLineHintChanged)
 

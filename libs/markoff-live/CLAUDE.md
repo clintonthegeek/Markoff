@@ -75,11 +75,15 @@ L0  Coordinate primitives
 BlockInternalEdit`) — see `markoff/live-render/Cursor.h` and the C-spec
 section §3 carry-forward in the D3 spec.
 
-**Cursor delivery.** `LiveListModelBinding` emits
-`structuralRowsInserted(int first, int last)` and `structuralRowRemoved(int
-row)` from `onD2Changed` after `applyOps`. `LiveCursorState` resolves
-pending row-keyed and anchor-keyed cursor requests on these signals. The
-parse-cycle path is gone.
+**Cursor delivery.** `LiveCursorState::establishFocus(anchor, qtPos)` is
+the chokepoint for all structural-event cursor placement. Pending
+requests resolve when the target delegate registers via
+`delegateAvailable` (typically at the end of the `onD2Changed`
+cascade, signalled via `endStructuralCascade`). The earlier
+binding-side `structuralRowsInserted` / `structuralRowRemoved` signal
+path + `m_pendingRow` slot were retired in tier 4b
+(`docs/specs/2026-05-16-tier-4b-pending-slot-consolidation-design.md`).
+The parse-cycle path is gone.
 
 **Kind transition.** View-driven, in `KindTransition.cpp`'s
 `inferBlockKind`. Runs against each Equal-op block's text in
