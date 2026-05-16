@@ -114,6 +114,11 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
     // bound to a stale `modelIndex=-1`, and the new template (e.g. HeadingDelegate
     // for paragraph→heading) is never created. A model reset forces a clean
     // re-realization. Identify the case and short-circuit through reset.
+    //
+    // Note: model reset would normally also reset QQuickListView's contentY to
+    // 0 (visible as "view jumps to top when typing `#`"). LiveView.qml's
+    // Connections on this model's modelAboutToBeReset/modelReset signals
+    // snapshots and restores contentY around the reset to suppress the jump.
     bool kindOnlySwap = false;
     if (ops.size() == int(nextRecords.size()) + 1 && m_rows.size() == nextRecords.size()) {
         // Same row count before+after; one extra op means a Delete+Insert pair.

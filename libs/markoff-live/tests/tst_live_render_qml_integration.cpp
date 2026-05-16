@@ -687,6 +687,70 @@ private Q_SLOTS:
         QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
         QCOMPARE(fix.delegateCursorPos(0), 3);  // end of "# A"
     }
+
+    /// Dogfood 2026-05-15: typing `#` (or `-`) at the start of a paragraph
+    /// triggers a paragraph→heading (or →list-item) kind transition. The
+    /// ListView must preserve its vertical scroll position across that
+    /// transition; the user's complaint is that the view jump-scrolls to
+    /// the top as though Ctrl+Home was pressed.
+    ///
+    /// Root cause: LiveBlockModel::applyOps detects "kind-only swap" Delete+
+    /// Insert pairs and routes them through beginResetModel()/endResetModel(),
+    /// which causes QQuickListView to reset contentY to 0.
+    void typing_hash_preserves_scroll_position() {
+        // 50 short paragraphs guarantees the ListView's content height
+        // exceeds the integration window, so scrolling is real.
+        QByteArray md;
+        for (int i = 0; i < 50; ++i) {
+            md += "Paragraph " + QByteArray::number(i);
+            if (i < 49) md += "\n\n";
+        }
+        QmlIntegrationFixture fix(md, /*expectedRowCount=*/50);
+
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+        QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
+
+        QQuickItem *lv = fix.listView();
+        QVERIFY(lv);
+
+        // Scroll so that row 20 is at the top of the viewport. After this,
+        // row 0's delegate is recycled and row 20 is visible & realized.
+        QMetaObject::invokeMethod(lv, "positionViewAtIndex",
+                                  Q_ARG(int, 20),
+                                  Q_ARG(int, /*ListView.Beginning=*/0));
+        QTest::qWait(100);
+        QCoreApplication::processEvents();
+
+        // Focus row 20 with cursor at column 0 (required for heading prefix
+        // detection — clickOnBlock alone would land the cursor mid-text).
+        fix.placeCursorAtPos(20, 0);
+        QTRY_COMPARE_WITH_TIMEOUT(fix.focusedDelegate(),
+                                  fix.delegateAt(20), 2000);
+        QCOMPARE(fix.delegateCursorPos(20), 0);
+
+        const qreal contentYBefore = lv->property("contentY").toReal();
+        QVERIFY2(contentYBefore > 100.0,
+                 qPrintable(QString("test setup failed; expected scrolled state, "
+                                    "contentY=%1").arg(contentYBefore)));
+
+        // Type `# ` at column 0 — promotes paragraph to heading
+        // (inferBlockKind requires `#` followed by space or `#` alone).
+        typeAscii(fix, '#');
+        typeAscii(fix, ' ');
+        QVERIFY(fix.waitForKindAt(20, QStringLiteral("heading"), 2000));
+
+        const qreal contentYAfter = lv->property("contentY").toReal();
+        const qreal drift = qAbs(contentYAfter - contentYBefore);
+        // Tolerance: paragraph and heading delegates differ in height by
+        // ~10-20px, so the view may shift slightly to keep the focused row
+        // visible. A jump to top would show drift ~= contentYBefore (>100px).
+        QVERIFY2(drift < 50.0,
+                 qPrintable(QString("contentY snapped after kind transition: "
+                                    "before=%1 after=%2 drift=%3 — "
+                                    "view jumped (likely beginResetModel "
+                                    "in LiveBlockModel::applyOps)")
+                            .arg(contentYBefore).arg(contentYAfter).arg(drift)));
+    }
 };
 
 QTEST_MAIN(TestLiveRenderQmlIntegration)

@@ -24,6 +24,38 @@ ListView {
 
     ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
 
+    // LiveBlockModel routes kind-only swaps (paragraph→heading on `# `)
+    // through beginResetModel()/endResetModel() so DelegateChooser correctly
+    // re-evaluates the row's delegate template. Side effect: QQuickListView
+    // resets contentY to 0 — the user-visible "view jumps to top when
+    // typing `#`" regression. Snapshot contentY before the reset and restore
+    // it after, so the scroll position survives the delegate rebuild.
+    property real _lastSavedContentY: -1   // diagnostic: read from tests
+    property int  _modelResetCount: 0      // diagnostic: read from tests
+
+    Connections {
+        target: root.model
+        ignoreUnknownSignals: true
+
+        function onModelAboutToBeReset() {
+            root._lastSavedContentY = root.contentY
+        }
+
+        function onModelReset() {
+            // ListView processes the reset asynchronously via polish() which
+            // runs on the next layout pass — by the time our synchronous
+            // restore lands, ListView's setContentY(0) hasn't run yet, so
+            // ListView wins. Defer the restore past the polish cycle.
+            // This is a documented Qt.callLater per the seam guidance in
+            // libs/markoff-live/CLAUDE.md (current count: was 11, now 12).
+            Qt.callLater(function() {
+                if (root._lastSavedContentY >= 0)
+                    root.contentY = root._lastSavedContentY
+                root._modelResetCount += 1
+            })
+        }
+    }
+
     delegate: DelegateChooser {
         role: "kind"
         DelegateChoice { roleValue: "paragraph";  delegate: ParagraphDelegate  {} }
