@@ -17,7 +17,7 @@ void LiveSelectionView::begin(int blockIndex, int qtPos)
     if (!m_cursorState || !m_cursorState->model()) return;
     if (blockIndex < 0 || blockIndex >= m_cursorState->model()->rowCount()) return;
     const auto anchor = m_cursorState->model()->recordAt(blockIndex).blockAnchor;
-    m_cursorState->establishFocus(anchor, qtPos);
+    m_cursorState->syncFromTextEdit(anchor, qtPos);
     m_cursorState->setSelectionAnchor({anchor, static_cast<quint32>(qtPos)});
     m_cursorState->syncSelectionToSession();
     Q_EMIT selectionChanged();
@@ -28,7 +28,7 @@ void LiveSelectionView::extend(int blockIndex, int qtPos)
     if (!m_cursorState || !m_cursorState->model()) return;
     if (blockIndex < 0 || blockIndex >= m_cursorState->model()->rowCount()) return;
     const auto anchor = m_cursorState->model()->recordAt(blockIndex).blockAnchor;
-    m_cursorState->establishFocus(anchor, qtPos);
+    m_cursorState->syncFromTextEdit(anchor, qtPos);
     m_cursorState->syncSelectionToSession();
     Q_EMIT selectionChanged();
 }
