@@ -184,9 +184,6 @@ Q_SIGNALS:
 
 private:
     bool validateVariant(const Cursor &c) const;
-    void onStructuralRowsInserted(int first, int last);
-    void onStructuralRowRemoved(int row);
-    void resolvePendingForRow(int row);
 
     Cursor                   m_cursor;
     const BlockKindRegistry *m_registry;
@@ -194,20 +191,6 @@ private:
     LiveListModelBinding    *m_binding = nullptr;
     qreal                    m_desiredVisualX = -1.0;
     VisualLineHint           m_pendingVlhint  = VisualLineHint::None;
-
-    struct PendingRow {
-        int row;
-        int qtPos;
-        // If set, treat this pending request as anchor-keyed: ignore the
-        // `row` field and resolve by searching the model for this
-        // BlockAnchor on every structural signal event. Used by start-of-
-        // paragraph Enter (marker insert before an existing block) where
-        // the user's content's row index is not stable across the diff
-        // but its BlockAnchor identity is.
-        std::optional<Markoff::BlockAnchor> anchor;
-    };
-    std::optional<PendingRow> m_pendingRow;
-    void resolvePendingForAnchor();
 
     // --- §5.1 focus-chokepoint additions ---
     struct DelegateRecord {
