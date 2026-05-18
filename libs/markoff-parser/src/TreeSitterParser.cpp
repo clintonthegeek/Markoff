@@ -1228,8 +1228,25 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
 
 QList<SourceSpan> inlineSpansFor(const QByteArray &blockContent)
 {
+    // Tree-sitter's markdown block grammar only wraps a leaf marker
+    // (atx_h*_marker, fenced delimiter, …) in its parent block node when the
+    // construct is line-terminated. User-typed per-block content arrives here
+    // without a trailing newline (LiveListModelBinding strips one if present),
+    // so the parent block node is never produced, collectHeadingRanges /
+    // collectBlockQuoteRanges return empty, and buildSpanMap's post-processing
+    // leaves parentCharStart/parentCharEnd at -1 on the marker span — which
+    // InlineHighlighter::delimiterShouldHide interprets as "always show".
+    // The visible symptom: typing `# word` then pressing Enter leaves the `#`
+    // marker permanently rendered in the heading delegate.
+    //
+    // Append a synthetic newline when missing. The extra span the parser
+    // emits at offset == content length is filtered by the highlighter's
+    // `relStart >= lineLen` bounds check.
+    QByteArray terminated = blockContent;
+    if (!terminated.endsWith('\n'))
+        terminated.append('\n');
     TreeSitterParser parser;
-    parser.parse(QString::fromUtf8(blockContent));
+    parser.parse(QString::fromUtf8(terminated));
     return parser.buildSpanMap();
 }
 

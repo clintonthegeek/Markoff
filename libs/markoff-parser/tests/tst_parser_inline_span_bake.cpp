@@ -133,6 +133,35 @@ private Q_SLOTS:
         }
         QVERIFY2(foundBold, "inlineSpansFor should return at least one bold non-delimiter span");
     }
+
+    // Per-block content typed live arrives at the parser without a trailing
+    // newline (the model strips one if present). Tree-sitter's block grammar
+    // needs that terminator to wrap leaf marker nodes (atx_h*_marker, fenced
+    // delimiter, …) in their parent block node. Without it, the parent block
+    // is never recognised and the post-processing step that propagates a
+    // parent range onto delimiter spans never runs — leaving
+    // parentCharStart/parentCharEnd at -1, which the autohide path
+    // (InlineHighlighter::delimiterShouldHide) treats as "always show".
+    //
+    // Regression guard for the "type `# word` then press Enter, hash stays
+    // visible after focus leaves the heading" bug.
+    void heading_marker_has_parent_range_without_trailing_newline() {
+        QList<SourceSpan> spans = inlineSpansFor(QByteArray("# word"));
+        bool foundMarker = false;
+        for (const SourceSpan &s : spans) {
+            if (s.isDelimiter && s.isHeading && s.headingLevel == 1) {
+                foundMarker = true;
+                QVERIFY2(s.parentCharStart >= 0,
+                         "heading marker must carry parentCharStart for autohide");
+                QVERIFY2(s.parentCharEnd   >= 0,
+                         "heading marker must carry parentCharEnd for autohide");
+                QVERIFY(s.parentCharStart <= s.charOffset);
+                QVERIFY(s.parentCharEnd   >= s.charOffset + s.charLength);
+            }
+        }
+        QVERIFY2(foundMarker,
+                 "inlineSpansFor(\"# word\") must emit an isHeading delimiter span");
+    }
 };
 
 QTEST_MAIN(TstParserInlineSpanBake)
