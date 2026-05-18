@@ -1,62 +1,42 @@
 # Markoff (exploration/new-foundation branch)
 
-> **2026-05-10 — If interactive dogfood is unavailable, work the queue.**
-> S1/S2/S3 cursor fixes shipped (commits `463fc36..6c44a07`); the
-> `v0.7.0-e2.5` tag is held pending an interactive re-dogfood that
-> requires the user's local desktop. **When the user is remote/SSH or
-> otherwise can't dogfood, the next work to pick up lives in
-> [`docs/queue.md`](docs/queue.md)** — five items ordered by descending
-> execution difficulty, each briefed enough that a fresh agent can
-> draft a spec/plan via `superpowers:brainstorming` +
-> `superpowers:writing-plans` and execute. Top item: E2.6 (theme +
-> zoom). Smallest item: code review of the cursor-fix commit chain.
+> **2026-05-18 — Queue exhausted. Next work is the user's call.**
+>
+> All five queue items are closed:
+> - **#1 E2.6** (theme/zoom/colour): ✅ tagged `v0.7.0-e2.6` at `e8514eb`. Dogfood confirmed.
+> - **#2 Cursor architecture**: ✅ all 12 concerns closed across tier 1–4c.
+> - **#3 QML integration test harness**: ✅ closed.
+> - **#4 B1 buffer convention**: ✅ just landed (`a4df009..0f7de6c`). Block buffers
+>   are now content-only; serializer owns structural newlines.
+>   `tst_block_buffer_invariant` + `tst_block_buffer_interactive` pin the contract.
+>   Closes the `shift_enter_creates_visible_newline` 5-day regression.
+> - **#5 Code review**: ✅ closed.
+>
+> **Tags:** `v0.7.0-e2.5` (dogfood confirmed 2026-05-17) and `v0.7.0-e2.6`
+> (dogfood confirmed 2026-05-18) are both released.
+>
+> **Test baseline (2026-05-18 HEAD `c91165d`):** 208/211 fast tests pass.
+> Three pre-existing failures:
+> - `tst_live_render_setext_e2e::S1_setextDemote_lastUnderlineCharDeleted_keepsCursor`
+>   — cursor off-by-one after setext H2 demote (unrelated to B1).
+> - `tst_markoff_doc_apply_structured_paste` — SIGABRT in structured-paste path.
+> - `tst_v10_source_editor_view_contract::cursor_position_round_trips` — off-by-one.
+>
+> **Next executable items** (user decides priority):
+> - **E2.7** (speculative paths — open-delimiter/code-fence speculation): `pending`,
+>   no spec yet. Scope: `docs/handoff/2026-05-09-post-e2-scope.md` §2.E2.7.
+> - **Fix pre-existing failures** above (smallest: setext S1 cursor off-by-one).
+> - **E3** (Obsidian affordances): `pending`, no spec yet.
+>
+> **For any of the above:** use `superpowers:brainstorming` then
+> `superpowers:writing-plans` to produce a spec/plan before executing.
+>
+> ---
 >
 > **2026-05-07 — Branch is on D5-first posture. v1.0 plan retired.**
-> Authoritative posture for the branch is
-> `docs/handoff/2026-05-07-pivot-to-d5-first.md`. Collab (D5) ships
-> before any public-API freeze, before any Corbomite-facing migration
-> guide, and before any further perf or facade work. Operating
-> principle: one arc at a time, no side work, retirement is explicit.
+> Authoritative posture is `docs/handoff/2026-05-07-pivot-to-d5-first.md`.
 >
-> **2026-05-09 — E2.5 dogfood + Option B selection architecture landed
-> (commit `c7da731`). Setext heading support is the next active piece;
-> spec + plan committed as `acdb647`, ready to execute.**
->
-> The E2.5 dogfood findings (D1 Ctrl+S, D2 multi-block clipboard, D3
-> arrow-key selection, D4 right-click context menu, D6 Shift+↓ anchor,
-> D7/D8 double/triple-click, D9 `--new` flag) are all resolved. D5
-> doc-wide undo deferred per the dogfood doc's recommendation. A
-> follow-up dogfood pass surfaced multi-line Shift+arrow wonkiness and
-> dual-selection-state bugs — addressed by **Option B**: TextEdit
-> reduced to renderer + cursor + IME, `LiveSelectionView` is the single
-> source of truth for selection, all keyboard nav routed through
-> `LiveNavigationController`, `selectByMouse: false` on every text-bearing
-> delegate. Same commit fixed the kind-string-mismatch and
-> heading-prefix-doubling bugs in the structured-paste path.
-> Re-dogfood found one further substantive gap → setext.
->
-> **The `v0.7.0-e2.5` tag is held until setext support lands** (and a
-> final re-dogfood pass confirms the editor handles Obsidian-style
-> setext-bearing notes correctly). E2.5 phases A–I + dogfood remediation
-> + Option B are all green at 185/185 fast tests.
->
-> **Fresh-agent start for setext (THE active work):**
->
-> 1. **Read the spec:** `docs/specs/2026-05-09-setext-heading-support-design.md`.
->    §3 (storage) and §6 (kind-transition) are load-bearing for the design;
->    §9 (edge cases) is the test-coverage list.
-> 2. **Read the plan:** `docs/plans/2026-05-09-setext-heading-support.md`.
->    Six phases, TDD per task. Build cap: `-j 8` always. Test commands
->    are at the top of the plan.
-> 3. **Execute** task by task. The plan is intended for either
->    subagent-driven or executing-plans inline use; pick whichever you
->    were dispatched for.
-> 4. **Re-dogfood** at end of Phase 5 against the
->    `/tmp/setext-dogfood.md` fixture the plan creates. After Phase 6's
->    activity-log entry, the `v0.7.0-e2.5` tag becomes a candidate.
->
-> Past-context references (read only if you need provenance for a
-> specific decision; not required for executing the plan):
+> Past-context references (for provenance only; not required for new work):
 > - `docs/handoff/2026-05-09-e2.5-dogfood-findings.md` — dogfood
 >   findings + the resolution log (D1–D9 fixes documented).
 > - `docs/specs/2026-05-09-e2.5-editing-affordances-design.md` — E2.5
