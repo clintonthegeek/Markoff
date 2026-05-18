@@ -158,12 +158,15 @@ private Q_SLOTS:
 
         const auto &rec = binding.model()->recordAt(0);
         QCOMPARE(rec.kind, BlockKind::Paragraph);
-        // Buffer "Heading\n" → chop trailing \n → rec.text "Heading" (7 chars).
-        QCOMPARE(rec.text, QStringLiteral("Heading"));
+        // Post-B1 (commits a4df009..0f7de6c): buffers are content-only and
+        // the chop is retired. The user-authored soft-break '\n' is preserved
+        // in the buffer and surfaces as part of rec.text.
+        QCOMPARE(rec.text, QStringLiteral("Heading\n"));
 
-        // qtPos clamped to text length: min(8, 7) = 7.
+        // qtPos sat at 9 (after "="); delete-back → 8. Buffer length is 8,
+        // so qtPos=8 is end-of-buffer, no clamp needed.
         QCOMPARE(binding.cursorState()->focusedAnchorRow(), 0);
-        QCOMPARE(binding.cursorState()->focusedQtPos(), 7);
+        QCOMPARE(binding.cursorState()->focusedQtPos(), 8);
     }
 
     void S2_setextPromote_firstUnderlineCharTyped_keepsFocus()
