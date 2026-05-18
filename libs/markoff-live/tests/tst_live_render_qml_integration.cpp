@@ -970,6 +970,29 @@ private Q_SLOTS:
                  D.color(Slot::CodeBlock));
     }
 
+    /// ImageDelegate placeholder surface + muted accents bind via Theme.
+    void dark_toggle_changes_image_placeholder_colors() {
+        QmlIntegrationFixture fix("![missing](nonexistent.png)\n",
+                                  /*expectedRowCount=*/1);
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+
+        QQuickItem *delegate = fix.delegateAt(0);
+        QQuickItem *placeholder =
+            delegate->findChild<QQuickItem*>("imagePlaceholder");
+        QVERIFY(placeholder);
+
+        using Slot = Markoff::Theme::Slot;
+        QCOMPARE(placeholder->property("color").value<QColor>(),
+                 Markoff::Theme::defaultLight().color(Slot::CodeBlockBackground));
+
+        QMetaObject::invokeMethod(fix.binding(), "applyDefaultTheme",
+                                  Q_ARG(bool, true));
+        QCoreApplication::processEvents();
+
+        QCOMPARE(placeholder->property("color").value<QColor>(),
+                 Markoff::Theme::defaultDark().color(Slot::CodeBlockBackground));
+    }
+
     /// Dogfood regression — user-reported: type `#` + space + word at the
     /// start of an empty paragraph (block promotes to heading); press Enter
     /// to leave the heading line. The `#` marker must collapse to zero

@@ -39,16 +39,23 @@ BlockOnlyDelegateBase {
         }
 
         Rectangle {
+            objectName: "imagePlaceholder"
             visible: imgDisplay.status !== Image.Ready && !root.isAltEditing
             width: parent.width - 16
             height: 80
             anchors.horizontalCenter: parent.horizontalCenter
-            color: palette.alternateBase
-            border.color: palette.mid
+            color: (root.liveBinding && root.liveBinding.theme)
+                   ? root.liveBinding.themeColorFor(Theme.CodeBlockBackground)
+                   : "#f4f4f4"
+            border.color: (root.liveBinding && root.liveBinding.theme)
+                          ? root.liveBinding.themeColorFor(Theme.Quote)
+                          : "#666666"
             Text {
                 anchors.centerIn: parent
                 text: root.imgSrc === "" ? "[image: no src]" : "[image: " + root.imgSrc + "]"
-                color: palette.mid
+                color: (root.liveBinding && root.liveBinding.theme)
+                       ? root.liveBinding.themeColorFor(Theme.Quote)
+                       : "#666666"
             }
         }
 
@@ -57,7 +64,9 @@ BlockOnlyDelegateBase {
             anchors { top: imgDisplay.bottom; left: parent.left; right: parent.right }
             anchors.margins: 8
             text: root.imgAlt
-            color: palette.mid
+            color: (root.liveBinding && root.liveBinding.theme)
+                   ? root.liveBinding.themeColorFor(Theme.Quote)
+                   : "#666666"
             font.italic: true
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
                               ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
@@ -93,7 +102,9 @@ BlockOnlyDelegateBase {
         visible: root.isSelected || root.isAltEditing
         anchors.fill: parent
         anchors.margins: -2
-        border.color: palette.highlight
+        border.color: (root.liveBinding && root.liveBinding.theme)
+                      ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
+                      : "#b0d0ff"
         border.width: 2
         color: "transparent"
         radius: 3
