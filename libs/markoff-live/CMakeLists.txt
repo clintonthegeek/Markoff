@@ -87,6 +87,9 @@ qt_add_qml_module(markoff_live
         # E2.5 Phase J: native QMenu / Widget-bridge context menu
         include/markoff/live/LiveContextMenuHandler.h
         src/LiveContextMenuHandler.cpp
+        # E3a: link hit-test + activation-builder helpers
+        src/LiveListModelBinding_links.h
+        src/LiveListModelBinding_links.cpp
     QML_FILES
         qml/LiveView.qml
         qml/delegates/CodeBlockDelegate.qml
