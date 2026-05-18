@@ -41,6 +41,15 @@ qt_add_executable(tst_d2_cmd_decomposition tst_d2_cmd_decomposition.cpp)
 target_link_libraries(tst_d2_cmd_decomposition PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_cmd_decomposition COMMAND tst_d2_cmd_decomposition)
 
+qt_add_executable(tst_block_buffer_invariant
+    tst_block_buffer_invariant.cpp)
+target_link_libraries(tst_block_buffer_invariant PRIVATE
+    Qt6::Core Qt6::Test markoff_core)
+add_test(NAME tst_block_buffer_invariant
+         COMMAND tst_block_buffer_invariant)
+set_tests_properties(tst_block_buffer_invariant
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(tst_d2_load tst_d2_load.cpp)
 target_link_libraries(tst_d2_load PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_load COMMAND tst_d2_load)
