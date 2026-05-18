@@ -993,6 +993,29 @@ private Q_SLOTS:
                  Markoff::Theme::defaultDark().color(Slot::CodeBlockBackground));
     }
 
+    /// HR rule line + selection border bind via Theme.
+    void dark_toggle_changes_hr_colors() {
+        QmlIntegrationFixture fix("para\n\n---\n\nmore\n",
+                                  /*expectedRowCount=*/3);
+        QVERIFY(fix.waitForDelegateAt(2, 2000));
+
+        QQuickItem *hr = fix.delegateAt(1);
+        QQuickItem *rule = hr->findChild<QQuickItem*>("hrRule");
+        QVERIFY(rule);
+
+        QCOMPARE(rule->property("color").value<QColor>(),
+                 Markoff::Theme::defaultLight().color(
+                     Markoff::Theme::Slot::Quote));
+
+        QMetaObject::invokeMethod(fix.binding(), "applyDefaultTheme",
+                                  Q_ARG(bool, true));
+        QCoreApplication::processEvents();
+
+        QCOMPARE(rule->property("color").value<QColor>(),
+                 Markoff::Theme::defaultDark().color(
+                     Markoff::Theme::Slot::Quote));
+    }
+
     /// Dogfood regression — user-reported: type `#` + space + word at the
     /// start of an empty paragraph (block promotes to heading); press Enter
     /// to leave the heading line. The `#` marker must collapse to zero
