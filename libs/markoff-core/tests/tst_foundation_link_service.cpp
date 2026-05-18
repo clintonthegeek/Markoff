@@ -45,6 +45,21 @@ private Q_SLOTS:
         s.activate(a);
         QCOMPARE(spy.count(), 1);
     }
+
+    void activation_carries_structured_fields() {
+        Markoff::LinkActivation a;
+        a.rawText = QStringLiteral("[[Page|Alias]]");
+        a.kind = Markoff::LinkKind::WikiLink;
+        a.page = QStringLiteral("Page");
+        a.alias = QStringLiteral("Alias");
+        a.modifiers = Qt::ControlModifier;
+
+        QVariant v = QVariant::fromValue(a);
+        auto round = v.value<Markoff::LinkActivation>();
+        QCOMPARE(round.page, QStringLiteral("Page"));
+        QCOMPARE(round.alias, QStringLiteral("Alias"));
+        QCOMPARE(int(round.modifiers), int(Qt::ControlModifier));
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationLinkService)

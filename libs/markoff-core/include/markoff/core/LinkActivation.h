@@ -3,6 +3,7 @@
 
 #include <QString>
 #include <QUrl>
+#include <QtCore/qnamespace.h>
 
 #include <markoff/core/LinkKind.h>
 #include <markoff/core/MarkoffCoreExport.h>
@@ -15,6 +16,13 @@ struct MARKOFF_CORE_EXPORT LinkActivation {
     LinkKind kind = LinkKind::Unknown;
     QString  anchorHint;
     QString  fromContext;
+
+    // E3a additions: structured wikilink fields + click modifiers.
+    QString  page;
+    QString  section;
+    QString  blockRef;
+    QString  alias;
+    Qt::KeyboardModifiers modifiers = Qt::NoModifier;
 };
 
 }  // namespace Markoff
