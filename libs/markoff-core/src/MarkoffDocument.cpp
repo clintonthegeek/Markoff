@@ -1766,9 +1766,8 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         // strips trailing whitespace from the byte range, so this chop is
         // idempotent for ListItem.
         QByteArray content = bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart);
-        // FALSIFIABILITY PROOF: B1 load-strip disabled
-        // if (content.endsWith('\n'))
-        //     content.chop(1);
+        if (content.endsWith('\n'))
+            content.chop(1);
 
         auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);
         if (!content.isEmpty())
