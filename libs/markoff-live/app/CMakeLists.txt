@@ -8,6 +8,8 @@
 qt_add_library(markoff-live-app-internal STATIC
     MainController.h
     MainController.cpp
+    MarkdownLinkService.h
+    MarkdownLinkService.cpp
 )
 
 qt_add_qml_module(markoff-live-app-internal
