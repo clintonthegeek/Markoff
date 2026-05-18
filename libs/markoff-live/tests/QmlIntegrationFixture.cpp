@@ -17,6 +17,7 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
+#include <markoff/parser/SourceSpan.h>
 
 #include "MainController.h"  // from markoff-live-app-internal STATIC lib
 
@@ -434,6 +435,68 @@ QString QmlIntegrationFixture::documentText() {
     if (!result.isEmpty() && !result.endsWith(QLatin1Char('\n')))
         result += QLatin1Char('\n');
     return result;
+}
+
+QPoint QmlIntegrationFixture::scenePointAtFirstWikilink()
+{
+    // Step 1: find the best wikilink span to click in row 0's block.
+    // Prefer a non-delimiter wikilink span (the content text, e.g. "Page"),
+    // which will have a wider rendered width and a clear charLength > 0.
+    // Fall back to the first wikilink span (even a 1-char delimiter) if no
+    // non-delimiter span is found.
+    const auto blockIds = m_doc->iterateBlocks();
+    if (blockIds.empty())
+        return {};
+    const Markoff::BlockId bid = blockIds[0];
+    const QList<Markoff::SourceSpan> spans = m_doc->inlineSpansFor(bid);
+
+    int spanOffset = -1;
+    int spanLen    = 0;
+    for (const auto &s : spans) {
+        if (!s.isWikilink) continue;
+        if (!s.isDelimiter && s.charLength > 0) {
+            // Prefer non-delimiter (content) span — its characters are always
+            // visible (not zero-width), giving a reliable click target.
+            spanOffset = s.charOffset;
+            spanLen    = s.charLength;
+            break;
+        }
+        if (spanOffset < 0) {
+            // First wikilink span seen — save as fallback.
+            spanOffset = s.charOffset;
+            spanLen    = s.charLength;
+        }
+    }
+    if (spanOffset < 0)
+        return {};
+
+    // Step 2: get the TextEdit item for row 0.
+    QQuickItem *te = delegateTextEdit(0);
+    if (!te)
+        return {};
+
+    // Step 3: use positionToRectangle for the mid-point of the chosen span to
+    // get a rect in TextEdit-local space that is inside the wikilink's visible
+    // text area.
+    const int charPos = spanOffset + spanLen / 2;
+    QRectF localRect;
+    const bool ok = QMetaObject::invokeMethod(
+        te, "positionToRectangle",
+        Qt::DirectConnection,
+        Q_RETURN_ARG(QRectF, localRect),
+        Q_ARG(int, charPos));
+    if (!ok)
+        return {};
+
+    // Step 4: Map TextEdit-local centre → scene (= window) coordinates.
+    // Note: the LiveView.qml hit() path calls delegate.positionAt(x, y)
+    // which subtracts leftPadding before calling edit.positionAt — the
+    // double-accounting cancels because positionToRectangle already encodes
+    // the padding offset in its return value, and mapToScene includes the
+    // TextEdit's position (which starts at the delegate origin for paragraph
+    // delegates with no leftMargin).
+    const QPointF scenePt = te->mapToScene(localRect.center());
+    return scenePt.toPoint();
 }
 
 } // namespace Markoff::Live::Test

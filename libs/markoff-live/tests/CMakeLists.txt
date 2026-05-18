@@ -742,6 +742,27 @@ target_link_libraries(tst_live_link_hover PRIVATE
 add_test(NAME tst_live_link_hover
          COMMAND tst_live_link_hover)
 
+# D1: QML-integration test for Ctrl+click TapHandler in
+# UnifiedInlineTextDelegate. Exercises the production callsite
+# (QML → activateLinkAt) per INVARIANTS.md #4 and #5.
+qt_add_executable(tst_live_link_qml_integration
+    tst_live_link_qml_integration.cpp
+    QmlIntegrationFixture.h
+    QmlIntegrationFixture.cpp
+    RecordingLinkService.cpp
+)
+target_link_libraries(tst_live_link_qml_integration PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init)
+add_test(NAME tst_live_link_qml_integration
+         COMMAND tst_live_link_qml_integration)
+set_tests_properties(tst_live_link_qml_integration
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # Spec §8.5 retirement-evidence shape tests (shell scripts, CI guards)
 add_test(NAME tst_live_render_no_qt_calllater_in_focus_path
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_no_qt_calllater_in_focus_path.sh

@@ -236,6 +236,19 @@ ListView {
             }
 
             if (mouse.button !== Qt.LeftButton) return
+
+            // Ctrl+click: activate link at the clicked position.
+            if ((mouse.modifiers & Qt.ControlModifier) && binding) {
+                const r = root.hit(mouse.x, mouse.y)
+                if (r && r.blockIndex >= 0 && r.qtPos >= 0) {
+                    const item = root.itemAtIndex(r.blockIndex)
+                    if (item && item.blockAnchor !== undefined)
+                        binding.activateLinkAt(item.blockAnchor, r.qtPos,
+                                               mouse.modifiers)
+                }
+                return
+            }
+
             const r = root.hit(mouse.x, mouse.y)
             if (!r || r.blockIndex < 0) {
                 mouseArea._clickCount = 0

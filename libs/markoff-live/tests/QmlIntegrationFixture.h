@@ -98,6 +98,11 @@ public:
 
     LiveRealisticInputHarness &harness() { return *m_harness; }
 
+    /// Returns the window-coordinate centre of the first wikilink span in
+    /// the block at row 0. Returns a null QPoint if no wikilink is found or
+    /// the delegate is not yet realised.
+    QPoint scenePointAtFirstWikilink();
+
 private:
     quint16 m_replicaId = 0;
     std::unique_ptr<QTemporaryFile>           m_tmpFile;
