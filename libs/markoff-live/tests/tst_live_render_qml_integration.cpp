@@ -872,6 +872,41 @@ private Q_SLOTS:
                             .arg(paragraphPx).arg(headingPx)));
     }
 
+    /// Per-kind TextEdit colour reads from the correct theme slot.
+    /// Doc has paragraph, H1, blockquote, list-item — each delegate's
+    /// TextEdit colour matches the kind's theme slot, and changes on toggle.
+    void dark_toggle_changes_textedit_color_per_kind() {
+        const QByteArray md = "Paragraph text\n\n"
+                              "# Heading One\n\n"
+                              "> A quote\n\n"
+                              "- list item\n";
+        QmlIntegrationFixture fix(md, /*expectedRowCount=*/4);
+        QVERIFY(fix.waitForDelegateAt(3, 2000));
+
+        auto colorAt = [&](int row) -> QColor {
+            QQuickItem *te = fix.delegateTextEdit(row);
+            Q_ASSERT(te);
+            return te->property("color").value<QColor>();
+        };
+
+        using Slot = Markoff::Theme::Slot;
+        const auto L = Markoff::Theme::defaultLight();
+        QCOMPARE(colorAt(0), L.color(Slot::TextDefault));
+        QCOMPARE(colorAt(1), L.color(Slot::Heading1));
+        QCOMPARE(colorAt(2), L.color(Slot::Quote));
+        QCOMPARE(colorAt(3), L.color(Slot::TextDefault));
+
+        QMetaObject::invokeMethod(fix.binding(), "applyDefaultTheme",
+                                  Q_ARG(bool, true));
+        QCoreApplication::processEvents();
+
+        const auto D = Markoff::Theme::defaultDark();
+        QCOMPARE(colorAt(0), D.color(Slot::TextDefault));
+        QCOMPARE(colorAt(1), D.color(Slot::Heading1));
+        QCOMPARE(colorAt(2), D.color(Slot::Quote));
+        QCOMPARE(colorAt(3), D.color(Slot::TextDefault));
+    }
+
     /// Dogfood regression — user-reported: type `#` + space + word at the
     /// start of an empty paragraph (block promotes to heading); press Enter
     /// to leave the heading line. The `#` marker must collapse to zero

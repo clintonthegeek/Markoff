@@ -172,7 +172,9 @@ Item {
         font.italic: theme
             ? root.liveBinding.themeIsItalic(root.themeSlot)
             : (root.kind === "blockquote")
-        color: palette.text
+        color: (root.liveBinding && root.liveBinding.theme)
+               ? root.liveBinding.themeColorFor(root.themeSlot)
+               : "#222222"
         selectByMouse: false
         persistentSelection: true
         selectionColor: (root.liveBinding && root.liveBinding.theme)
