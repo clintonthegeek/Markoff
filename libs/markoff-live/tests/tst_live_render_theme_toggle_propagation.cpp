@@ -17,6 +17,8 @@
 #include <QTest>
 #include <QGuiApplication>
 #include <QSignalSpy>
+#include <QQmlEngine>
+#include <QQmlComponent>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
@@ -109,6 +111,23 @@ private slots:
     void themeColorFor_invalid_slot_returns_invalid_qcolor() {
         LiveListModelBinding b(LiveListModelBinding::AllCapabilities);
         QVERIFY(!b.themeColorFor(99999).isValid());
+    }
+
+    void theme_slot_enum_resolves_from_qml() {
+        QQmlEngine engine;
+        QQmlComponent c(&engine);
+        c.setData(R"(
+            import QtQml
+            import org.markoff.live 1.0
+            QtObject {
+                property int slot: Theme.EditorBackground
+            }
+        )", QUrl());
+        QScopedPointer<QObject> obj(c.create());
+        if (!obj) qWarning() << c.errorString();
+        QVERIFY(obj);
+        QCOMPARE(obj->property("slot").toInt(),
+                 static_cast<int>(Markoff::Theme::Slot::EditorBackground));
     }
 };
 

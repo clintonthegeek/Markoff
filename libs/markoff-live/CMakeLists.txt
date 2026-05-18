@@ -35,6 +35,7 @@ qt_add_qml_module(markoff_live
         include/markoff/live/BlockKind.h
         include/markoff/live/BlockKindDescriptor.h
         include/markoff/live/BlockKindRegistry.h
+        include/markoff/live/ThemeForeign.h
         include/markoff/live/Coordinates.h
         include/markoff/live/AstBlockDiff.h
         include/markoff/live/LiveBlockModel.h

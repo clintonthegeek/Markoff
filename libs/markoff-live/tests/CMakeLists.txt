@@ -544,7 +544,8 @@ set_tests_properties(tst_live_render_inline_highlighter_font_scale
 qt_add_executable(tst_live_render_theme_toggle_propagation
     tst_live_render_theme_toggle_propagation.cpp)
 target_link_libraries(tst_live_render_theme_toggle_propagation PRIVATE
-    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+    Qt6::Core Qt6::Gui Qt6::Qml Qt6::Test markoff_live markoff_core
+    markoff_liveplugin markoff_liveplugin_init)
 add_test(NAME tst_live_render_theme_toggle_propagation
          COMMAND tst_live_render_theme_toggle_propagation)
 set_tests_properties(tst_live_render_theme_toggle_propagation
