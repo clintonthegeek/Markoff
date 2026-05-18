@@ -140,10 +140,10 @@ public:
     bool applyingModelUpdate() const;
 
     Markoff::LinkService *linkService() const;
-    void setLinkService(Markoff::LinkService *service);
+    Q_INVOKABLE void setLinkService(Markoff::LinkService *service);
 
     QString fromContext() const;
-    void setFromContext(const QString &);
+    Q_INVOKABLE void setFromContext(const QString &);
 
     /// Activate the link span (if any) that covers `qtPos` in the block
     /// identified by `blockId`. `modifiers` is the raw Qt::KeyboardModifiers
