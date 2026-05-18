@@ -173,23 +173,29 @@ ListView {
 
     // ---- Ctrl+wheel zoom ----
     //
-    // ListView (Flickable) consumes wheel events for scrolling before
-    // PointerHandlers run, so WheelHandler must explicitly take grab from
-    // the flickable when the Ctrl modifier is held. `acceptedModifiers`
-    // gates the handler to only fire on Ctrl+wheel; plain wheel still
-    // scrolls the view normally.
-    WheelHandler {
-        target: null
-        acceptedModifiers: Qt.ControlModifier
-        grabPermissions: PointerHandler.CanTakeOverFromAnything
-                       | PointerHandler.ApprovesTakeOverByItems
-        onWheel: (event) => {
-            const steps = event.angleDelta.y / 120.0
-            if (steps === 0) return
+    // ListView (Flickable) consumes wheel events for scrolling. WheelHandler
+    // with `target: null` + `grabPermissions: CanTakeOverFromAnything` does
+    // not reliably win the grab against Flickable's built-in wheelEvent on
+    // Linux (Wayland in particular). A MouseArea with `acceptedButtons:
+    // Qt.NoButton` + explicit `wheel.accepted = (modifiers & Control)` is the
+    // proven pattern: it sees the wheel first, consumes it on Ctrl+wheel, and
+    // forwards plain wheels back to the Flickable for scrolling.
+    MouseArea {
+        anchors.fill: parent
+        acceptedButtons: Qt.NoButton
+        propagateComposedEvents: true
+        z: 10
+        onWheel: (wheel) => {
+            if (!(wheel.modifiers & Qt.ControlModifier)) {
+                wheel.accepted = false
+                return
+            }
+            const steps = wheel.angleDelta.y / 120.0
+            if (steps === 0) { wheel.accepted = true; return }
             const b = root.binding
-            if (!b) return
+            if (!b) { wheel.accepted = false; return }
             b.fontScale = b.fontScale * Math.pow(b.fontScaleStep, steps)
-            event.accepted = true
+            wheel.accepted = true
         }
     }
 
