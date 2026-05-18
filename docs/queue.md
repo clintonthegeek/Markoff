@@ -80,6 +80,7 @@
 - ~~2026-05-11 `libs/markoff-live/src/LiveBlockModel.cpp:106` — inv #7 — `applyOps` now detects a Delete+Insert-at-same-row kind-change pattern and synthesises `beginResetModel`/`endResetModel`~~ → fixed in d60f896. The kindOnlySwap detector + beginResetModel branch retired in tier 3 (commit d60f896). Block kind now flows through `delegateClass` bucketing per spec `docs/specs/2026-05-15-tier-3-kind-transition-delegate-architecture-design.md`. Within-class kind transitions (paragraph↔heading, paragraph↔list-item, etc.) are dataChanged events on the same delegate; cross-class transitions still produce Delete+Insert.
 - ~~prior `m_applyingSessionSelection` re-entrance guard in `LiveSelectionView`~~ → retired in tier 4c (`docs/specs/2026-05-16-tier-4c-selection-cursor-unification-design.md` §4.3). Equality short-circuit on the resolved `(BlockAnchor, qtPos)` pair supersedes the guard. Invariant 7 cleared at this site.
 - 2026-05-18 `libs/markoff-live/app/Main.qml:20` — inv #5 — `selectionView.setSession(ctxSession)` threw a TypeError silently (method retired in commit `36bbbb9` two days earlier as part of *retire LiveSelectionView shadow state*; the QML callsite was not updated in the same commit, violating invariant 3 in spirit too). The throw aborted `Component.onCompleted` before the `themeToggleRequested.connect(applyDefaultTheme)` line — every test stayed green because QML signal handlers log JS exceptions as `qWarning` rather than failing. Dogfood found it: Ctrl+Shift+D never toggled, even after the E2.6 colour-wiring work landed correctly end-to-end. `tst_live_render_theme_toggle_propagation` was a synonym test (calls `applyDefaultTheme` directly, never sends the key). → fixed in same session: `setSession` made `Q_INVOKABLE` on `LiveListModelBinding`; `Main.qml` updated to call `modelBinding.setSession(ctxSession)`; `QmlIntegrationFixture` now installs a `QtMessageHandler` that fails any test on `TypeError|ReferenceError|SyntaxError|is not a function|is not a signal` qWarnings, so this entire drift class is caught at runtime going forward. Invariant #5 broadened in `docs/INVARIANTS.md` to apply project-wide, not just to the cursor seam.
+- 2026-05-18 `libs/markoff-core/src/MarkoffDocument.cpp:1763` + chain — inv #3 — the trailing-`\n` convention was never invariant (load was variable, `d2InsertBlock` produced unterminated buffers, `applyFlatEdit` synthesized terminators post-hoc, merge cmds and the chop guarded conditionally). Three commits across 2026-05-04..2026-05-05 each made a local decision that fit the local code; collectively they produced a non-convention that took six dogfood passes to write down and one B1 spec to retire. → fixed by spec `docs/specs/2026-05-18-b1-buffer-convention-design.md` + plan `docs/plans/2026-05-18-b1-buffer-convention.md` in commits `a4df009..0f7de6c`.
 
 ---
 
@@ -377,7 +378,9 @@ Follow-ups:
 
 ---
 
-## #4 — Chop-trailing-`\n` investigation + fix
+## ~~#4 — Chop-trailing-`\n` investigation + fix~~ ✅ COMPLETE 2026-05-18 (B1 spec)
+
+**Status:** complete. Landed in commits `a4df009` (markoff-core: B1 buffer convention) + `0f7de6c` (markoff-live: retire onD2Changed chop). Spec: `docs/specs/2026-05-18-b1-buffer-convention-design.md`. Plan: `docs/plans/2026-05-18-b1-buffer-convention.md`. Closes the long-standing soft-break regression in `shift_enter_creates_visible_newline`.
 
 **Effort:** ~1 day (refactor + fan-out fixes).
 **Status:** 2026-05-16 — investigation complete; chop's premise *is*

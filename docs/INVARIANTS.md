@@ -209,3 +209,34 @@ The procedure:
 4. If the new invariant retires an older one, mark the older one
    retired here in place; do not delete it (so historic commit
    references remain interpretable).
+
+## Project-wide invariants beyond the seam
+
+### Block buffer convention (2026-05-18, B1)
+
+Block buffers in `MarkoffDocument` hold **content only**. They carry
+no trailing structural delimiter. `blockText(id).endsWith('\n')` is
+legitimate only when the user has authored a soft break or pasted
+content containing one — in that case the `\n` is content, not a
+protocol bit.
+
+Structural newlines (block separators, document terminator) are the
+serializer's responsibility:
+
+  * `interBlockSeparator()` returns `"\n\n"` — the full gap between
+    two block bodies.
+  * `finalDocumentTerminator()` returns `"\n"` — appended after the
+    block loop in `serializeForSave`.
+
+Save normalizes runs of 2+ blank lines to one and ensures a single
+trailing `\n`.
+
+Spec: `docs/specs/2026-05-18-b1-buffer-convention-design.md`.
+
+Falsifiable test: `tst_block_buffer_invariant` (markoff-core) +
+`tst_block_buffer_interactive` (markoff-live). Falsifiability proofs
+landed and reverted in the commit chain for the B1 implementation.
+
+This invariant applies to every `BlockKind`. ListItem was the first to
+comply (per `37661b5`, 2026-05-06); paragraph/heading/blockquote/code-
+block/HR/image/math joined under the B1 spec.

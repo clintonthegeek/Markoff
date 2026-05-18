@@ -93,6 +93,14 @@ The CRDT internals (`Markoff::Cmd::*`, `BlockId`, `IdList`, `UndoLog`, `applyFla
   `qRegisterMetaType<QList<Markoff::BlockAnchor>>()` are wired in
   `MarkoffDocument`'s constructor for cross-thread queued connections.
 
+### Block buffer convention
+
+Per `docs/INVARIANTS.md` "Block buffer convention" + spec
+`docs/specs/2026-05-18-b1-buffer-convention-design.md`: block buffers
+hold content only. No trailing structural `\n`. Separators are the
+serializer's responsibility (`interBlockSeparator() == "\n\n"`,
+`finalDocumentTerminator() == "\n"`).
+
 ## See also
 
 - Spec: `docs/specs/2026-04-30-block-anchor-foundation-design.md`
