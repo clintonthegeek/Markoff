@@ -8,6 +8,9 @@ ApplicationWindow {
     width: 900
     height: 700
     visible: true
+    color: (modelBinding.theme)
+           ? modelBinding.themeColorFor(Theme.EditorBackground)
+           : "#ffffff"
     title: ctxMain.title
 
     LiveListModelBinding {

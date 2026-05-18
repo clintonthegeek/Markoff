@@ -10,6 +10,7 @@
 #include <QTextLayout>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Theme.h>
 
 #include "QmlIntegrationFixture.h"
 
@@ -261,6 +262,34 @@ private Q_SLOTS:
                      qPrintable(QString("expected pixelSize increase: before=%1 after=%2")
                                 .arg(pixelSizeBefore).arg(pixelSizeAfter)));
         }
+    }
+
+    /// Toggling dark mode inverts the ApplicationWindow background colour.
+    /// Pins the EditorBackground slot binding wired in Main.qml.
+    void dark_toggle_inverts_window_background() {
+        QmlIntegrationFixture fix(/*markdown=*/"sample",
+                                  /*expectedRowCount=*/1);
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+
+        const QColor lightBg = fix.window()->property("color").value<QColor>();
+        QCOMPARE(lightBg,
+                 Markoff::Theme::defaultLight().color(
+                     Markoff::Theme::Slot::EditorBackground));
+
+        QMetaObject::invokeMethod(fix.binding(), "applyDefaultTheme",
+                                  Q_ARG(bool, true));
+        QCoreApplication::processEvents();
+
+        const QColor darkBg = fix.window()->property("color").value<QColor>();
+        QCOMPARE(darkBg,
+                 Markoff::Theme::defaultDark().color(
+                     Markoff::Theme::Slot::EditorBackground));
+
+        // Round-trip back to light.
+        QMetaObject::invokeMethod(fix.binding(), "applyDefaultTheme",
+                                  Q_ARG(bool, false));
+        QCoreApplication::processEvents();
+        QCOMPARE(fix.window()->property("color").value<QColor>(), lightBg);
     }
 
     /// Typing-reverses-chars regression killer. Type "abc" into an
