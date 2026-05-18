@@ -7,7 +7,6 @@
 using Markoff::Document;
 using Markoff::LinkTarget;
 using Markoff::SourceSpan;
-using Markoff::TopLevelBlock;
 
 namespace {
 
