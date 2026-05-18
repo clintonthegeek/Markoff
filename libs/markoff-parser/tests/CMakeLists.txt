@@ -58,3 +58,11 @@ add_executable(tst_parser_list_items tst_parser_list_items.cpp)
 add_test(NAME tst_parser_list_items COMMAND tst_parser_list_items)
 target_link_libraries(tst_parser_list_items PRIVATE Qt6::Test markoff-parser)
 set_tests_properties(tst_parser_list_items PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_link_target_decomposition tst_link_target_decomposition.cpp)
+add_test(NAME tst_link_target_decomposition COMMAND tst_link_target_decomposition)
+target_link_libraries(tst_link_target_decomposition PRIVATE Qt6::Test markoff-parser)
+target_include_directories(tst_link_target_decomposition PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+set_tests_properties(tst_link_target_decomposition PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

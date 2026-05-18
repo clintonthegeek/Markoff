@@ -38,6 +38,7 @@ add_library(markoff-parser STATIC
     src/Document.cpp
     src/LinkTextParser.cpp
     src/YamlValue.cpp
+    src/WikilinkDecomposition.cpp
 )
 set_target_properties(markoff-parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 add_library(Markoff::Parser ALIAS markoff-parser)
