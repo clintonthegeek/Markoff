@@ -83,9 +83,9 @@
 
 ---
 
-## #1 — E2.6: theme wire-up + zoom + color wiring ✅ EXTENDED 2026-05-18 (re-dogfood pending)
+## #1 — E2.6: theme wire-up + zoom + color wiring ✅ COMPLETE 2026-05-18 (tag `v0.7.0-e2.6`)
 
-**Effort:** ~1 week. **Status:** implemented; interactive dogfood pending.
+**Effort:** ~1 week. **Status:** complete and tagged `v0.7.0-e2.6` at `e8514eb`. Dogfood confirmed Ctrl+Shift+D inverts colours, Ctrl+wheel zooms, keyboard zoom works.
 
 The `Markoff::Theme` infrastructure exists and ships
 `defaultLight()`/`defaultDark()`, per-slot fonts/colours, and a
