@@ -140,14 +140,11 @@ private Q_SLOTS:
         QCOMPARE(fix.bufferText(blockIds[0]), QByteArray("Heading\n"));
 
         const QString dt = fix.delegateText(0);
-        QEXPECT_FAIL("", "queue.md #4 chop-\\n bug — fix lands in a follow-up plan", Continue);
         QVERIFY2(dt.contains(QLatin1Char('\n')),
                  qPrintable(QString("delegate text missing \\n: %1").arg(dt)));
 
-        // Cursor at position 8 also fails while queue.md #4 is open: the model
-        // text is "Heading" (7 chars, chop strips the \n) so TextEdit can only
-        // park the cursor at 7, not 8.
-        QEXPECT_FAIL("", "queue.md #4 chop-\\n bug — cursor cannot reach pos 8 when text is chopped", Continue);
+        // Cursor at position 8 succeeds under B1: the model text is "Heading\n"
+        // (8 chars), TextEdit can park the cursor at pos 8.
         QCOMPARE(fix.delegateCursorPos(0), 8);
     }
 
