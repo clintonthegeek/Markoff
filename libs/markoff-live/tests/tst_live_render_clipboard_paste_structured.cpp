@@ -89,14 +89,14 @@ private slots:
 
         QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("hell"));
 
-        // After cut: block should be "o\n"
+        // After cut: block should be "o" (B1: content-only, no trailing '\n')
         {
             const auto ids = doc.iterateBlocks();
             QVERIFY(!ids.empty());
-            QCOMPARE(doc.blockText(ids[0]), QByteArray("o\n"));
+            QCOMPARE(doc.blockText(ids[0]), QByteArray("o"));
         }
 
-        // Paste back at end of "o" (qtPos=1 in the model, which maps to byte 1 in "o\n").
+        // Paste back at end of "o" (qtPos=1 in the model, which maps to byte 1 in "o").
         sv->begin(0, 1);
         sv->extend(0, 1);
         cc.paste();

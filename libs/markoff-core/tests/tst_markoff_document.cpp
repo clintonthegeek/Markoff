@@ -44,15 +44,15 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         doc.loadFromMarkdown("hello\n");
         doc.applyFlatEdit(5, 5, "!", Origin::UserEdit);
-        QCOMPARE(fullText(doc), QByteArray("hello!\n"));
+        QCOMPARE(fullText(doc), QByteArray("hello!"));
     }
 
     void applyFlatEdit_replaces_range() {
         MarkoffDocument doc(1);
         doc.loadFromMarkdown("hello world\n");
-        // "world" = bytes 6..11, trailing \n at byte 11
+        // "world" = bytes 6..11 (no trailing \n in B1 buffers)
         doc.applyFlatEdit(6, 11, "there", Origin::UserEdit);
-        QCOMPARE(fullText(doc), QByteArray("hello there\n"));
+        QCOMPARE(fullText(doc), QByteArray("hello there"));
     }
 
     void applyFlatEdit_deletes_range() {
@@ -60,7 +60,7 @@ private Q_SLOTS:
         doc.loadFromMarkdown("abcdef\n");
         // Delete "cd" at bytes 2..4
         doc.applyFlatEdit(2, 4, "", Origin::UserEdit);
-        QCOMPARE(fullText(doc), QByteArray("abef\n"));
+        QCOMPARE(fullText(doc), QByteArray("abef"));
     }
 
     void applyFlatEdit_emits_d2DocumentChanged() {
@@ -76,9 +76,9 @@ private Q_SLOTS:
         MarkoffDocument doc(1);
         doc.loadFromMarkdown("ab\n");
         doc.applyFlatEdit(2, 2, "c", Origin::UserEdit);
-        QCOMPARE(fullText(doc), QByteArray("abc\n"));
+        QCOMPARE(fullText(doc), QByteArray("abc"));
         doc.undoD2();
-        QCOMPARE(fullText(doc), QByteArray("ab\n"));
+        QCOMPARE(fullText(doc), QByteArray("ab"));
     }
 
     void redoD2_reapplies_undone_applyFlatEdit() {
@@ -86,9 +86,9 @@ private Q_SLOTS:
         doc.loadFromMarkdown("ab\n");
         doc.applyFlatEdit(2, 2, "c", Origin::UserEdit);
         doc.undoD2();
-        QCOMPARE(fullText(doc), QByteArray("ab\n"));
+        QCOMPARE(fullText(doc), QByteArray("ab"));
         doc.redoD2();
-        QCOMPARE(fullText(doc), QByteArray("abc\n"));
+        QCOMPARE(fullText(doc), QByteArray("abc"));
     }
 
     void legacy_undo_with_no_history_returns_nullopt() {

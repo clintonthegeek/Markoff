@@ -16,9 +16,9 @@ private slots:
         sv->begin(0, 5);   // before " world"
         sv->extend(0, 11); // after "world"
         sv->deleteSelection();
-        // Document should now contain "hello" (blockText includes block delimiter '\n')
+        // Document should now contain "hello" (B1: blockText is content-only, no trailing '\n')
         const QByteArray flat = doc.blockText(doc.iterateBlocks()[0]);
-        QCOMPARE(flat, QByteArray("hello\n"));
+        QCOMPARE(flat, QByteArray("hello"));
         QVERIFY(!sv->hasSelection());
     }
 

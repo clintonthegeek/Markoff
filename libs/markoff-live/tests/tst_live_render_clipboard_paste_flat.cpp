@@ -33,8 +33,8 @@ private slots:
 
         const auto ids = doc.iterateBlocks();
         QVERIFY(!ids.empty());
-        // blockText includes trailing '\n'
-        QCOMPARE(doc.blockText(ids[0]), QByteArray("XY\n"));
+        // B1 convention: blockText is content-only, no trailing '\n'.
+        QCOMPARE(doc.blockText(ids[0]), QByteArray("XY"));
     }
 
     void paste_replaces_selection() {
@@ -59,7 +59,8 @@ private slots:
 
         const auto ids = doc.iterateBlocks();
         QVERIFY(!ids.empty());
-        QCOMPARE(doc.blockText(ids[0]), QByteArray("bye world\n"));
+        // B1 convention: blockText is content-only, no trailing '\n'.
+        QCOMPARE(doc.blockText(ids[0]), QByteArray("bye world"));
     }
 };
 

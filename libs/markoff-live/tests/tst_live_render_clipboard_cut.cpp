@@ -31,8 +31,8 @@ private slots:
         // After cut: block text should be "world"
         const auto ids = doc.iterateBlocks();
         QVERIFY(!ids.empty());
-        // blockText includes the trailing '\n' stored in the CRDT buffer.
-        QCOMPARE(doc.blockText(ids[0]), QByteArray("world\n"));
+        // B1 convention: blockText is content-only, no trailing '\n'.
+        QCOMPARE(doc.blockText(ids[0]), QByteArray("world"));
 
         // Clipboard plain text should be what was cut.
         QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("hello "));

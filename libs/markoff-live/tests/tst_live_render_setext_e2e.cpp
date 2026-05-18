@@ -171,12 +171,20 @@ private Q_SLOTS:
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
-        // Plain paragraph with a soft-break already in place: "abc\n".
-        // The user is about to type "-" at byte 4, triggering setext H2 promote.
-        QVERIFY(waitForModelRows(binding, doc, "abc\n", 1));
+        // Plain paragraph "abc" (3 bytes under B1 — no trailing '\n' in buffer).
+        // Use Shift+Enter to insert a user-authored '\n' at byte 3, giving
+        // buffer "abc\n" (4 bytes).  Then type "-" at byte 4 to trigger setext H2.
+        QVERIFY(waitForModelRows(binding, doc, "abc", 1));
         QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Paragraph);
 
+        // Shift+Enter at end of "abc" inserts '\n' into the buffer.
+        binding.structuralKeyHandler()->tryHandle(
+            Qt::Key_Return, Qt::ShiftModifier, 0, 3, true,
+            QStringLiteral("abc"));
+        QTest::qWait(50);
+
         const auto id = binding.model()->recordAt(0).blockAnchor;
+        // Buffer is now "abc\n" (4 bytes).
 
         // Type "-" at qtPos=4 → cursor lands at qtPos=5.
         binding.cursorState()->syncFromTextEdit(id,5);

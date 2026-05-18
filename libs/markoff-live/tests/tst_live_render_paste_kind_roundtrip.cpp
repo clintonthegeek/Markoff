@@ -198,12 +198,12 @@ private Q_SLOTS:
         settle(&binding);
 
         // With the off-by-one fix, the "X" lands in block 1's buffer
-        // (now "XQ\n"), not appended to block 0 (which would have been
-        // "P\nX" pre-fix).
+        // (now "XQ"), not appended to block 0 (which would have been "PX" pre-fix).
+        // B1: blockText is content-only; no trailing '\n'.
         const auto idsAfter = doc.iterateBlocks();
         QCOMPARE(idsAfter.size(), static_cast<size_t>(2));
-        QCOMPARE(doc.blockText(idsAfter[0]), QByteArrayLiteral("P\n"));
-        QCOMPARE(doc.blockText(idsAfter[1]), QByteArrayLiteral("XQ\n"));
+        QCOMPARE(doc.blockText(idsAfter[0]), QByteArrayLiteral("P"));
+        QCOMPARE(doc.blockText(idsAfter[1]), QByteArrayLiteral("XQ"));
     }
 
     /// D. User-reported repro: foundation-design.md style header + body.

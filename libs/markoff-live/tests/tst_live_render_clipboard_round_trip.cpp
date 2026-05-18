@@ -36,11 +36,11 @@ private slots:
         QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("world"));
         QVERIFY(!sv->hasSelection());
 
-        // After cut: block is "hello \n" (6 chars + '\n').
+        // After cut: block is "hello " (6 chars; B1: content-only, no trailing '\n').
         {
             const auto ids = doc.iterateBlocks();
             QVERIFY(!ids.empty());
-            QCOMPARE(doc.blockText(ids[0]), QByteArray("hello \n"));
+            QCOMPARE(doc.blockText(ids[0]), QByteArray("hello "));
         }
 
         // Paste at position 0 (start of the block).
@@ -76,11 +76,11 @@ private slots:
 
         QCOMPARE(QApplication::clipboard()->text(), QStringLiteral("ab"));
 
-        // Source unchanged.
+        // Source unchanged (B1: content-only, no trailing '\n').
         {
             const auto ids = doc.iterateBlocks();
             QVERIFY(!ids.empty());
-            QCOMPARE(doc.blockText(ids[0]), QByteArray("abc\n"));
+            QCOMPARE(doc.blockText(ids[0]), QByteArray("abc"));
         }
 
         // Paste at end of "abc" (qtPos=3).
@@ -91,7 +91,7 @@ private slots:
         // "abc" still present; "ab" inserted at end → "abcab".
         const auto ids = doc.iterateBlocks();
         QVERIFY(!ids.empty());
-        QCOMPARE(doc.blockText(ids[0]), QByteArray("abcab\n"));
+        QCOMPARE(doc.blockText(ids[0]), QByteArray("abcab"));
     }
 };
 
