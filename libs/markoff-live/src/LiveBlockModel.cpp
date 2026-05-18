@@ -123,6 +123,17 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                     // Stale: keep our text; accept everything else from parse.
                     merged.text = m_rows[row].text;
                 }
+                // BlockRecord::operator== excludes inlineSpans (diff identity
+                // is (kind, anchor)); compare them separately so the role list
+                // includes InlineSpansRole whenever spans actually changed.
+                // Without this, kind / text / attrs transitions that *also*
+                // refresh spans (e.g. paragraph→heading on `# ` promotion)
+                // would update m_rows[row].inlineSpans silently — the QML
+                // binding `spans: model.inlineSpans` only re-evaluates when
+                // its role is in the dataChanged signal's role list, so the
+                // InlineHighlighter would keep stale spans and the heading
+                // marker autohide would never see the delimiter span.
+                const bool spansDiffer = (m_rows[row].inlineSpans != merged.inlineSpans);
                 if (m_rows[row] != merged) {
                     QList<int> roles;
                     if (m_rows[row].kind          != merged.kind)          roles << KindRole;
@@ -137,9 +148,10 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
                                                                                  << IndentLevelRole
                                                                                  << CheckedRole
                                                                                  << LooseRunRole;
+                    if (spansDiffer)                                       roles << InlineSpansRole;
                     m_rows[row] = merged;
                     Q_EMIT dataChanged(index(row), index(row), roles);
-                } else if (m_rows[row].inlineSpans != merged.inlineSpans) {
+                } else if (spansDiffer) {
                     // Non-span fields are identical; only spans changed.
                     m_rows[row].inlineSpans = merged.inlineSpans;
                     Q_EMIT dataChanged(index(row), index(row), {InlineSpansRole});

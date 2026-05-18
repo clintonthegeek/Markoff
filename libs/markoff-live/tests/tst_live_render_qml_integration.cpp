@@ -2,8 +2,12 @@
 #include <QCoreApplication>
 #include <QFont>
 #include <QQuickItem>
+#include <QQuickTextDocument>
 #include <QTest>
 #include <QQuickWindow>
+#include <QTextBlock>
+#include <QTextDocument>
+#include <QTextLayout>
 
 #include <markoff/core/MarkoffDocument.h>
 
@@ -813,6 +817,85 @@ private Q_SLOTS:
                  qPrintable(QString("expected heading pixelSize > paragraph; "
                                     "paragraph=%1 heading=%2")
                             .arg(paragraphPx).arg(headingPx)));
+    }
+
+    /// Dogfood regression — user-reported: type `#` + space + word at the
+    /// start of an empty paragraph (block promotes to heading); press Enter
+    /// to leave the heading line. The `#` marker must collapse to zero
+    /// width (negative letter-spacing on the HiddenMarker char format) once
+    /// the caret has left the heading. Before the fix the marker stayed
+    /// visible forever, because `inlineSpansFor` was emitting the heading
+    /// marker span with `parentCharStart = -1` and the autohide path bails
+    /// the moment it sees a missing parent range.
+    void hash_marker_hides_after_enter_leaves_heading() {
+        QmlIntegrationFixture fix(/*markdown=*/"a", /*expectedRowCount=*/1);
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+        QTRY_VERIFY_WITH_TIMEOUT(fix.focusedDelegate() != nullptr, 2000);
+
+        // Start from an empty paragraph: delete the 'a'.
+        requestCursor(fix, 0, 0);
+        fix.harness().keyClick(Qt::Key_Delete);
+        QTRY_COMPARE_WITH_TIMEOUT(fix.modelText(0), QString(""), 2000);
+
+        // Promote to heading by typing `# word`.
+        typeAscii(fix, '#');
+        QTRY_COMPARE_WITH_TIMEOUT(blockKindAt(fix, 0),
+                                  QString("heading"), 2000);
+        typeAscii(fix, ' ');
+        typeAsciiString(fix, "word");
+        QTRY_COMPARE_WITH_TIMEOUT(fix.modelText(0), QString("# word"), 2000);
+
+        // Press Enter at end of heading → new paragraph below, focus moves.
+        fix.harness().keyClick(Qt::Key_Return);
+        QTRY_COMPARE_WITH_TIMEOUT(fix.document()->iterateBlocks().size(),
+                                  std::size_t{2}, 2000);
+
+        // Wait for focus to actually leave the heading row. The marker can
+        // only hide once the heading's TextEdit reports activeFocus == false
+        // (the QML binding sets InlineHighlighterAttached.caretPosition to
+        // -1 in that case).
+        QQuickItem *headingTextEdit = fix.delegateTextEdit(0);
+        QVERIFY(headingTextEdit != nullptr);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            !headingTextEdit->property("activeFocus").toBool(),
+            2000);
+
+        // Inspect the QTextDocument of the heading's TextEdit. The marker
+        // sits at characters [0, 2) of "# word" ("# ", extended by the
+        // parser to include the trailing space).
+        auto *qquickDoc = headingTextEdit->property("textDocument")
+                              .value<QQuickTextDocument *>();
+        QVERIFY(qquickDoc != nullptr);
+        QTextDocument *doc = qquickDoc->textDocument();
+        QVERIFY(doc != nullptr);
+
+        auto formatAt = [doc](int charPos) -> QTextCharFormat {
+            QTextBlock block = doc->firstBlock();
+            while (block.isValid() && (charPos < block.position() ||
+                   charPos >= block.position() + block.length())) {
+                const QTextBlock next = block.next();
+                if (!next.isValid()) break;
+                block = next;
+            }
+            auto *layout = block.layout();
+            for (const QTextLayout::FormatRange &fr : layout->formats()) {
+                const int rel = charPos - block.position();
+                if (rel >= fr.start && rel < fr.start + fr.length)
+                    return fr.format;
+            }
+            return QTextCharFormat();
+        };
+        auto isHidden = [](const QTextCharFormat &fmt) {
+            return fmt.font().letterSpacingType() == QFont::AbsoluteSpacing
+                && fmt.font().letterSpacing() < 0.0;
+        };
+
+        // The marker span gets the HiddenMarker format applied per-char
+        // (negative letter-spacing == "collapsed to zero width").
+        // Use QTRY_VERIFY so async highlighter updates after the focus
+        // change have a window to settle.
+        QTRY_VERIFY_WITH_TIMEOUT(isHidden(formatAt(0)), 2000);
+        QTRY_VERIFY_WITH_TIMEOUT(isHidden(formatAt(1)), 2000);
     }
 };
 
