@@ -145,6 +145,12 @@ public:
     QString fromContext() const;
     void setFromContext(const QString &);
 
+    /// Activate the link span (if any) that covers `qtPos` in the block
+    /// identified by `blockId`. `modifiers` is the raw Qt::KeyboardModifiers
+    /// int (passes cleanly through QML Q_INVOKABLE calls). No-op if no link
+    /// span covers qtPos. Images are not activated in E3a.
+    Q_INVOKABLE void activateLinkAt(Markoff::BlockId blockId, int qtPos, int modifiers);
+
 Q_SIGNALS:
     void documentChanged();
     void themeChanged();

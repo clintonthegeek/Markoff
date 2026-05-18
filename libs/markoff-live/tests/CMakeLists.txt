@@ -720,6 +720,17 @@ add_test(NAME tst_live_render_kind_transition_invariant
 set_tests_properties(tst_live_render_kind_transition_invariant
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# C4: activateLinkAt Q_INVOKABLE — wikilink/external/noop/image dispatch.
+qt_add_executable(tst_live_link_activation
+    tst_live_link_activation.cpp
+    RecordingLinkService.cpp
+)
+target_link_libraries(tst_live_link_activation PRIVATE
+    Qt6::Core Qt6::Test
+    markoff_live markoff_core)
+add_test(NAME tst_live_link_activation
+         COMMAND tst_live_link_activation)
+
 # Spec §8.5 retirement-evidence shape tests (shell scripts, CI guards)
 add_test(NAME tst_live_render_no_qt_calllater_in_focus_path
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_no_qt_calllater_in_focus_path.sh

@@ -7,6 +7,7 @@
 
 #include "KindDispatch.h"
 #include "KindTransition.h"
+#include "LiveListModelBinding_links.h"
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/BlockAnchor.h>
@@ -678,6 +679,15 @@ void LiveListModelBinding::onD2Changed()
     d->model->applyOps(ops, records);
     d->lastKeys = std::move(nextKeys);
 
+}
+
+void LiveListModelBinding::activateLinkAt(Markoff::BlockId blockId, int qtPos, int modifiers)
+{
+    const auto hit = Markoff::LiveInternal::findLinkSpanAt(document(), blockId, qtPos);
+    if (!hit.found) return;
+    const auto a = Markoff::LiveInternal::buildActivation(
+        hit.span, Qt::KeyboardModifiers(modifiers), m_fromContext, m_linkService);
+    if (m_linkService) m_linkService->activate(a);
 }
 
 }  // namespace Markoff::Live
