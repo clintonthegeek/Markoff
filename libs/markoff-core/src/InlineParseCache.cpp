@@ -11,13 +11,12 @@ InlineParseCache::InlineParseCache(MarkoffDocument &doc)
 
 QList<SourceSpan> InlineParseCache::spansFor(BlockId id) const
 {
-    auto curSeq  = m_doc.blockEditSequence(id);
-    auto curKind = m_doc.blockKind(id);
+    auto curSeq = m_doc.blockEditSequence(id);
     auto it = m_cache.find(id);
-    if (it != m_cache.end() && it->cachedAtSeq == curSeq && it->cachedKind == curKind)
+    if (it != m_cache.end() && it->cachedAtSeq == curSeq)
         return it->spans;
     auto spans = inlineSpansFor(m_doc.blockText(id));
-    m_cache.insert(id, Entry{spans, curSeq, curKind});
+    m_cache.insert(id, Entry{spans, curSeq});
     return spans;
 }
 
