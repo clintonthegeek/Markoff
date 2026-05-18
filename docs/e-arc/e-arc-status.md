@@ -5,7 +5,7 @@
 **Last updated:** 2026-05-18 (B1 buffer convention landed — block buffers are content; serializer owns structural newlines. Closes queue.md §#4 and the 5-day-old soft-break regression in `shift_enter_creates_visible_newline`).
 **Working tree:** `.worktrees/foundation-exploration/`
 **Branch:** `exploration/new-foundation`
-**Active phase:** queue.md is now down to the in-flight cursor concerns (queue #2 remaining items) and E2.7 (speculative paths). E2.5, E2.6, and B1 all tagged or closed. Pick next item from `docs/queue.md` per the user's call.
+**Active phase:** all enumerated `docs/queue.md` items closed (#1 E2.6, #2 cursor cleanup tier-4c, #3 QML harness, #4 buffer-`\n`/B1, #5 code review, #6 promoted-heading nav). E3a wikilinks landed and awaits dogfood. **User priority (2026-05-18): finalize the public API for consumers** so `Corbomite` can adopt the widget; E2.7 (speculative paths) explicitly de-prioritized. E3b (tags) pending if dogfood time exists. Open discipline-log entries reduced to one transitional (Math `isBlockOnly`).
 
 ---
 
