@@ -82,6 +82,12 @@ Item {
                               ? root.liveBinding.themePixelSizeFor(12) : 13)
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
             color: palette.text
+            selectionColor: (root.liveBinding && root.liveBinding.theme)
+                            ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
+                            : "#b0d0ff"
+            selectedTextColor: (root.liveBinding && root.liveBinding.theme)
+                               ? root.liveBinding.themeColorFor(Theme.EditorBackground)
+                               : "#ffffff"
 
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: (event) => {

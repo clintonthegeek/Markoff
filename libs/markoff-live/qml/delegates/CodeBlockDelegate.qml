@@ -47,6 +47,12 @@ Rectangle {
         color: palette.text
         selectByMouse: false
         persistentSelection: true
+        selectionColor: (root.liveBinding && root.liveBinding.theme)
+                        ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
+                        : "#b0d0ff"
+        selectedTextColor: (root.liveBinding && root.liveBinding.theme)
+                           ? root.liveBinding.themeColorFor(Theme.EditorBackground)
+                           : "#ffffff"
 
         onCursorPositionChanged: {
             // See ParagraphDelegate for the rationale on this guard.

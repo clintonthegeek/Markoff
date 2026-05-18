@@ -292,6 +292,30 @@ private Q_SLOTS:
         QCOMPARE(fix.window()->property("color").value<QColor>(), lightBg);
     }
 
+    /// Toggling dark mode changes TextEdit selectionColor on the first
+    /// realized text-bearing delegate.
+    void dark_toggle_changes_textedit_selection_color() {
+        QmlIntegrationFixture fix(/*markdown=*/"sample text",
+                                  /*expectedRowCount=*/1);
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+        QQuickItem *te = fix.delegateTextEdit(0);
+        QVERIFY(te != nullptr);
+
+        const QColor lightSel = te->property("selectionColor").value<QColor>();
+        QCOMPARE(lightSel,
+                 Markoff::Theme::defaultLight().color(
+                     Markoff::Theme::Slot::SelectionBackground));
+
+        QMetaObject::invokeMethod(fix.binding(), "applyDefaultTheme",
+                                  Q_ARG(bool, true));
+        QCoreApplication::processEvents();
+
+        const QColor darkSel = te->property("selectionColor").value<QColor>();
+        QCOMPARE(darkSel,
+                 Markoff::Theme::defaultDark().color(
+                     Markoff::Theme::Slot::SelectionBackground));
+    }
+
     /// Typing-reverses-chars regression killer. Type "abc" into an
     /// auto-focused empty paragraph; all three layers must agree
     /// on "abc" with cursor at position 3.
