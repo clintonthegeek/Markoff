@@ -5,6 +5,7 @@
 #include <QList>
 #include <QMetaType>
 #include <QString>
+#include <markoff/parser/LinkTarget.h>
 
 namespace Markoff {
 
@@ -59,6 +60,10 @@ struct SourceSpan {
     int parentCharStart = -1;
     int parentCharEnd = -1;
 
+    // Structured link payload — populated when isLink or isWikilink.
+    // Empty (default-constructed) for all other spans. See LinkTarget.h.
+    LinkTarget linkTarget;
+
     bool operator==(const SourceSpan &o) const noexcept {
         return utf8Offset == o.utf8Offset && utf8Length == o.utf8Length
             && charOffset == o.charOffset && charLength == o.charLength
@@ -82,7 +87,8 @@ struct SourceSpan {
             && isTaskMarker == o.isTaskMarker
             && isDelimiter == o.isDelimiter
             && parentCharStart == o.parentCharStart
-            && parentCharEnd == o.parentCharEnd;
+            && parentCharEnd == o.parentCharEnd
+            && linkTarget == o.linkTarget;
     }
     bool operator!=(const SourceSpan &o) const noexcept { return !(*this == o); }
 };
