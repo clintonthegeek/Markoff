@@ -26,6 +26,7 @@ class TestLiveLinkQmlIntegration : public QObject {
 private Q_SLOTS:
     void ctrl_click_on_wikilink_dispatches_activation();
     void plain_click_on_wikilink_does_not_activate();
+    void ctrl_hover_emits_hover_and_flips_cursor();
 };
 
 // Helper: cast the fixture's QObject* binding to the concrete type.
@@ -70,6 +71,25 @@ void TestLiveLinkQmlIntegration::plain_click_on_wikilink_does_not_activate()
     QTest::qWait(100);
     QCoreApplication::processEvents();
     QCOMPARE(svc.activations.size(), 0);
+}
+
+void TestLiveLinkQmlIntegration::ctrl_hover_emits_hover_and_flips_cursor()
+{
+    // "See [[Page]] now." — one paragraph block.
+    QmlIntegrationFixture fx("See [[Page]] now.", /*expectedRowCount=*/1);
+    QVERIFY(fx.waitForDelegateAt(0, 2000));
+
+    Markoff::LiveTest::RecordingLinkService svc;
+    Markoff::Live::LiveListModelBinding *lb = liveBinding(fx);
+    QVERIFY2(lb, "binding() is not a LiveListModelBinding");
+    lb->setLinkService(&svc);
+
+    const QPoint pt = fx.scenePointAtFirstWikilink();
+    QVERIFY2(!pt.isNull(), "could not compute scene point for first wikilink");
+
+    fx.simulateCtrlHoverAt(pt);
+    QTRY_COMPARE_WITH_TIMEOUT(svc.hovers.size(), 1, 2000);
+    QCOMPARE(svc.hovers.first().page, QStringLiteral("Page"));
 }
 
 QTEST_MAIN(TestLiveLinkQmlIntegration)

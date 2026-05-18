@@ -15,6 +15,7 @@
 #include <QTest>
 #include <QtGlobal>
 
+
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/parser/SourceSpan.h>
@@ -497,6 +498,36 @@ QPoint QmlIntegrationFixture::scenePointAtFirstWikilink()
     // delegates with no leftMargin).
     const QPointF scenePt = te->mapToScene(localRect.center());
     return scenePt.toPoint();
+}
+
+void QmlIntegrationFixture::simulateCtrlHoverAt(const QPoint &windowPos)
+{
+    QVERIFY2(m_window, "window is null");
+    // Strategy: qt_handleMouseEvent with MouseMove + ControlModifier does not
+    // reliably reach MouseArea.onPositionChanged under offscreen QPA (pure hover
+    // events are not delivered without a prior cursor grab). However, Qt Quick
+    // DOES deliver hover position to MouseArea.onPositionChanged with pressed=false
+    // just before processing a MouseButtonPress at the new position — using the
+    // same implicit-hover delivery that makes the Ctrl+click test exercise the
+    // hover path.
+    //
+    // Qt Quick tracks a single global cursor position across all windows. If the
+    // cursor is already at windowPos when mouseClick fires (e.g. because a prior
+    // test's click left it there), the "implicit hover at new position" step is
+    // skipped and onPositionChanged never fires at windowPos. We work around this
+    // by first moving the cursor to a far-away corner (0, 0) — guaranteed to be
+    // different from any wikilink position — so the subsequent Ctrl+click always
+    // has a non-zero delta and generates the implicit hover at windowPos.
+    //
+    // The click also fires onClicked (activateLinkAt), but hover tests only assert
+    // on svc.hovers, not svc.activations.
+    const QPoint corner(1, 1);  // far from any typical wikilink position
+    QTest::mouseMove(m_window, corner);
+    QCoreApplication::processEvents();
+    QTest::mouseClick(m_window, Qt::LeftButton, Qt::ControlModifier, windowPos);
+    QCoreApplication::processEvents();
+    QTest::qWait(50);
+    QCoreApplication::processEvents();
 }
 
 } // namespace Markoff::Live::Test

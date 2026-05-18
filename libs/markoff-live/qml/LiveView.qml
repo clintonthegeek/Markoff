@@ -205,6 +205,7 @@ ListView {
         anchors.fill: parent
         acceptedButtons: Qt.LeftButton | Qt.RightButton
         cursorShape: Qt.IBeamCursor
+        hoverEnabled: true
         preventStealing: true
 
         property var _pressResult: null
@@ -319,10 +320,44 @@ ListView {
 
         onPositionChanged: (mouse) => {
             if (mouse.button === Qt.RightButton) return
+
+            // Ctrl-hover: update cursor shape and notify link service.
+            if (!pressed && binding && (mouse.modifiers & Qt.ControlModifier)) {
+                const r = root.hit(mouse.x, mouse.y)
+                if (r && r.blockIndex >= 0 && r.qtPos >= 0) {
+                    const item = root.itemAtIndex(r.blockIndex)
+                    if (item && item.blockAnchor !== undefined) {
+                        const gp = mapToGlobal(mouse.x, mouse.y)
+                        const hit = binding.hoverLinkAt(item.blockAnchor, r.qtPos,
+                                                        mouse.modifiers,
+                                                        Qt.point(gp.x, gp.y))
+                        mouseArea.cursorShape = hit ? Qt.PointingHandCursor : Qt.IBeamCursor
+                        return
+                    }
+                }
+                // Ctrl held but no link under cursor — clear hover.
+                binding.clearLinkHover()
+                mouseArea.cursorShape = Qt.IBeamCursor
+                return
+            }
+
+            // Non-Ctrl hover: clear any stale link hover and reset cursor.
+            if (!pressed && binding) {
+                binding.clearLinkHover()
+                mouseArea.cursorShape = Qt.IBeamCursor
+                return
+            }
+
             if (!pressed || !binding || !binding.selectionView) return
             const r = root.hit(mouse.x, mouse.y)
             if (r && r.blockIndex >= 0)
                 binding.selectionView.extend(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
+        }
+
+        onExited: {
+            if (binding)
+                binding.clearLinkHover()
+            mouseArea.cursorShape = Qt.IBeamCursor
         }
 
         onReleased: (mouse) => {

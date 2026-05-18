@@ -103,6 +103,10 @@ public:
     /// the delegate is not yet realised.
     QPoint scenePointAtFirstWikilink();
 
+    /// Synthesize a Ctrl+MouseMove event at `windowPos` and pump the event
+    /// loop so QML `onPositionChanged` handlers can fire.
+    void simulateCtrlHoverAt(const QPoint &windowPos);
+
 private:
     quint16 m_replicaId = 0;
     std::unique_ptr<QTemporaryFile>           m_tmpFile;
