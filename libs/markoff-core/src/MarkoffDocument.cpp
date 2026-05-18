@@ -1895,8 +1895,11 @@ QByteArray serializeFrontmatter(const Markoff::FrontmatterMap &fm)
 
 QByteArray interBlockSeparator()
 {
-    // FALSIFIABILITY PROOF: B1 separator reverted to "\n"
-    return "\n";
+    // Per B1 (spec 2026-05-18-b1-buffer-convention-design.md §1):
+    // block buffers are content; the separator carries the full gap
+    // between two block bodies — a line break ending the previous
+    // block plus the blank line opening the next.
+    return "\n\n";
 }
 
 QByteArray finalDocumentTerminator()
