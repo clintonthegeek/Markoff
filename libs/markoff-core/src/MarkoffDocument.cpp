@@ -1514,7 +1514,8 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
         // B1: block buffers are content. parts[0] is the new content for the
         // portion of the current block before the split; the serializer
         // reconstructs separators.
-        QByteArray firstReplacement = parts.front();
+        // FALSIFIABILITY PROOF: B1 applyFlatEdit "+ \n" restored
+        QByteArray firstReplacement = parts.front() + QByteArray("\n");
         d2ApplyBufferEdit(blocks[startIdx], startWithin,
                           removeLen + static_cast<uint32_t>(tail.size()),
                           firstReplacement, t);
