@@ -13,6 +13,7 @@
 #include <QSignalSpy>
 #include <QTemporaryFile>
 #include <QTest>
+#include <QtGlobal>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
@@ -21,9 +22,76 @@
 
 namespace Markoff::Live::Test {
 
+// ---- QML-exception trap ----
+//
+// QML signal handlers (Component.onCompleted, onActivated, onTriggered, etc.)
+// catch JS exceptions and log them as qWarning before aborting the rest of
+// the handler block. Without a trap, an API drift like commit 36bbbb9
+// (removed `LiveSelectionView::setSession`) silently severs every action
+// connection in Main.qml's onCompleted while the test suite stays green.
+//
+// This handler fires QFAIL on any qWarning whose message matches a
+// known-fatal JS-exception shape. It is installed at fixture construction
+// and restored at destruction; tests that don't go through the fixture
+// see the default handler.
+namespace {
+
+QtMessageHandler g_prevHandler = nullptr;
+bool             g_handlerInstalled = false;
+
+bool isFatalQmlException(const QString &msg)
+{
+    // Cheap substring match — JS engine formats these consistently.
+    return msg.contains(QLatin1String("TypeError:"))
+        || msg.contains(QLatin1String("ReferenceError:"))
+        || msg.contains(QLatin1String("SyntaxError:"))
+        || msg.contains(QLatin1String("is not a function"))
+        || msg.contains(QLatin1String("is not a signal"));
+}
+
+void qmlExceptionTrap(QtMsgType type,
+                      const QMessageLogContext &ctx,
+                      const QString &msg)
+{
+    if (type == QtWarningMsg && isFatalQmlException(msg)) {
+        const QByteArray reason = QStringLiteral(
+            "QML JS exception escaped a signal handler — production callsite "
+            "is silently severed.\n  %1\n  at %2:%3")
+            .arg(msg)
+            .arg(QString::fromUtf8(ctx.file ? ctx.file : "(unknown)"))
+            .arg(ctx.line)
+            .toUtf8();
+        // Forward first so the message still shows up in the log, then fail.
+        if (g_prevHandler) g_prevHandler(type, ctx, msg);
+        QTest::qFail(reason.constData(), ctx.file ? ctx.file : __FILE__,
+                     ctx.line ? ctx.line : __LINE__);
+        return;
+    }
+    if (g_prevHandler) g_prevHandler(type, ctx, msg);
+}
+
+void installTrap()
+{
+    if (g_handlerInstalled) return;
+    g_prevHandler = qInstallMessageHandler(&qmlExceptionTrap);
+    g_handlerInstalled = true;
+}
+
+void removeTrap()
+{
+    if (!g_handlerInstalled) return;
+    qInstallMessageHandler(g_prevHandler);
+    g_prevHandler = nullptr;
+    g_handlerInstalled = false;
+}
+
+} // namespace
+
 QmlIntegrationFixture::QmlIntegrationFixture(const QByteArray &markdown,
                                              int expectedRowCount)
 {
+    installTrap();
+
     m_replicaId =
         static_cast<quint16>(QRandomGenerator::global()->generate() & 0xFFFF);
 
@@ -94,7 +162,10 @@ QmlIntegrationFixture::QmlIntegrationFixture(const QByteArray &markdown,
     m_harness = std::make_unique<LiveRealisticInputHarness>(m_window);
 }
 
-QmlIntegrationFixture::~QmlIntegrationFixture() = default;
+QmlIntegrationFixture::~QmlIntegrationFixture()
+{
+    removeTrap();
+}
 
 QObject *QmlIntegrationFixture::binding()           { return m_binding; }
 QAbstractItemModel *QmlIntegrationFixture::model()  { return m_model; }

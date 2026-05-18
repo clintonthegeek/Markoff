@@ -95,7 +95,7 @@ public:
     /// Bind a Session so that Session::primarySelectionChanged propagates into
     /// the SelectionView. Pass nullptr to detach. The binding does NOT take
     /// ownership of the session (it is owned by the MarkoffDocument).
-    void setSession(Markoff::Session *session);
+    Q_INVOKABLE void setSession(Markoff::Session *session);
 
     LiveBlockModel           *model()               const;
     LiveCursorState          *cursorState()         const;

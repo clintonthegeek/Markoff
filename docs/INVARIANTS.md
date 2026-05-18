@@ -101,6 +101,26 @@ Before declaring a slot covered: confirm the test invokes it through
 the same surface production uses. For QML-facing slots, that means
 a QML test, not a C++ test that calls the slot directly.
 
+**Scope note (2026-05-18):** this invariant applies *project-wide*,
+not just to the cursor seam. The dark-toggle regression of
+2026-05-18 is the canonical case: `tst_live_render_theme_toggle_*`
+called `binding.applyDefaultTheme(true)` directly while production
+reached it through a QML `Shortcut` → `QAction::trigger()` →
+signal → `Component.onCompleted` connection chain. When commit
+`36bbbb9` removed `LiveSelectionView::setSession` (its synonym
+target), the production chain silently severed because the
+`onCompleted` block threw a TypeError before reaching the
+`connect()`. Every test stayed green; the dogfood found it.
+
+**Mechanical mitigation in place:** `QmlIntegrationFixture`
+installs a `QtMessageHandler` that fails any test on a qWarning
+matching `TypeError|ReferenceError|SyntaxError|is not a
+function|is not a signal`. This catches the *runtime* drift class
+(C++ API removed, QML callsite stale) automatically. It does
+**not** replace the discipline of writing a QML-driven test for
+QML-reached slots — it only catches the case where the chain
+already exists and a refactor breaks it.
+
 ### 6. `Qt.callLater` and `QTimer::singleShot(0, ...)` are smells, not solutions
 
 They mean: *"I gave up on understanding the timing and brute-forced
@@ -139,8 +159,10 @@ know to look.
 ## Scope and exceptions
 
 These rules scope to the **focus/caret/block-change seam** and to
-seam-touching refactors specifically. The seam includes (but is not
-limited to):
+seam-touching refactors specifically, **with one exception:
+invariant #5 (production-callsite tests) applies project-wide.**
+Any C++ slot reached from QML inherits #5, regardless of which
+library it lives in. The seam includes (but is not limited to):
 
 - `libs/markoff-live/src/LiveCursorState.{h,cpp}`
 - `libs/markoff-live/src/LiveEditBinding.{h,cpp}`

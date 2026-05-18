@@ -17,7 +17,7 @@ ApplicationWindow {
         id: modelBinding
         document: ctxDocument
         Component.onCompleted: {
-            selectionView.setSession(ctxSession)
+            modelBinding.setSession(ctxSession)
             if (actionController) {
                 actionController.saveRequested.connect(ctxMain.save)
                 actionController.themeToggleRequested.connect(modelBinding.applyDefaultTheme)
