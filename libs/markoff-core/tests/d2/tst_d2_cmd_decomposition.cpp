@@ -87,9 +87,10 @@ void TstD2Cmd::backspaceMerge_appendsContentToPrev()
 
 void TstD2Cmd::backspaceMerge_stripsTrailingNewlineAtBoundary()
 {
-    // Blocks loaded from markdown carry a trailing '\n' as a structural delimiter.
-    // backspaceMerge must replace that '\n' (not append after it) so the merged
-    // text has no mid-block newline and the cursor lands at the join point.
+    // Renamed-in-spirit: B1 (spec 2026-05-18-b1-buffer-convention-
+    // design.md) eliminates the "trailing '\n' as delimiter" condition.
+    // After loadFromMarkdown, block buffers are content-only; merge
+    // appends cleanly.
     MarkoffDocument doc(1);
     doc.loadFromMarkdown("hello\n\nworld\n");
     auto blocks = doc.iterateBlocks();
@@ -97,15 +98,14 @@ void TstD2Cmd::backspaceMerge_stripsTrailingNewlineAtBoundary()
     BlockId blkA = blocks[0];
     BlockId blkB = blocks[1];
 
-    // Verify the trailing-newline precondition (the fix is a no-op without it).
-    QVERIFY(doc.blockText(blkA).endsWith('\n'));
+    // B1 precondition: buffer does not end with '\n'.
+    QVERIFY(!doc.blockText(blkA).endsWith('\n'));
 
     auto result = Cmd::backspaceMerge(doc, blkB);
     QCOMPARE(result.mergedInto, blkA);
-    // Cursor at join point — after "hello", before "world".
     QCOMPARE(result.cursorByteOffset, 5u);
-    // No mid-block '\n': merged text is "helloworld\n", not "hello\nworld\n".
-    QCOMPARE(doc.blockText(blkA), QByteArray("helloworld\n"));
+    // Merged result is content-only.
+    QCOMPARE(doc.blockText(blkA), QByteArray("helloworld"));
     QCOMPARE(doc.iterateBlocks().size(), 1u);
 }
 
@@ -137,10 +137,10 @@ void TstD2Cmd::deleteMerge_stripsTrailingNewlineAtBoundary()
     QCOMPARE(blocks.size(), 2u);
     BlockId blkA = blocks[0];
 
-    QVERIFY(doc.blockText(blkA).endsWith('\n'));
+    QVERIFY(!doc.blockText(blkA).endsWith('\n'));
 
     Cmd::deleteMerge(doc, blkA);
-    QCOMPARE(doc.blockText(blkA), QByteArray("helloworld\n"));
+    QCOMPARE(doc.blockText(blkA), QByteArray("helloworld"));
     QCOMPARE(doc.iterateBlocks().size(), 1u);
 }
 

@@ -1511,8 +1511,10 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
         Q_ASSERT(parts.size() >= 1);
 
         // Replace the removed range + tail in the current block with the first part.
-        // First block ends with '\n' as its delimiter.
-        QByteArray firstReplacement = parts.front() + QByteArray("\n");
+        // B1: block buffers are content. parts[0] is the new content for the
+        // portion of the current block before the split; the serializer
+        // reconstructs separators.
+        QByteArray firstReplacement = parts.front();
         d2ApplyBufferEdit(blocks[startIdx], startWithin,
                           removeLen + static_cast<uint32_t>(tail.size()),
                           firstReplacement, t);
@@ -1525,9 +1527,8 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
             QByteArray seed = parts[i];
             if (isLast) {
                 seed += tail;  // restore tail into last new block
-            } else {
-                seed += QByteArray("\n");  // delimiter for non-last blocks
             }
+            // (No delimiter append: B1 buffers are content-only.)
             if (!seed.isEmpty()) {
                 d2ApplyBufferEdit(newBlk, 0, 0, seed, t);
             }
@@ -1574,7 +1575,8 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
     } else {
         // newText has embedded "\n\n": append first part to start block,
         // then insert new blocks for the rest.
-        QByteArray firstReplacement = parts.front() + QByteArray("\n");
+        // B1: block buffers are content; no synthetic delimiter.
+        QByteArray firstReplacement = parts.front();
         d2ApplyBufferEdit(blocks[startIdx], startWithin, 0, firstReplacement, t);
 
         BlockId after = blocks[startIdx];
@@ -1584,9 +1586,8 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
             QByteArray seed = parts[i];
             if (isLast) {
                 seed += endTail;
-            } else {
-                seed += QByteArray("\n");
             }
+            // (No delimiter append: B1 buffers are content-only.)
             if (!seed.isEmpty()) {
                 d2ApplyBufferEdit(newBlk, 0, 0, seed, t);
             }
@@ -1754,13 +1755,19 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
                 BlockAttrKey{newId, AttrNames::LooseRun}, AttrValue{tb.looseRun});
         }
 
-        // Buffer content: full source range in UTF-8 bytes
-        // For FencedCodeBlock, full source is stored (fences preserved for round-trip).
-        // For ListItem (one per parser list_item node), the buffer holds the
-        // item's content only — no marker, no leading indent whitespace, no
-        // trailing newlines. Marker and indent are reconstructed from attrs at
-        // serialize time.
+        // Buffer content: full source range in UTF-8 bytes, then strip the
+        // trailing block-terminator '\n' if present. Per B1 (spec
+        // 2026-05-18-b1-buffer-convention-design.md §1), block buffers hold
+        // content only — the structural '\n' separator belongs to the
+        // serializer.
+        //
+        // For FencedCodeBlock, full source is stored (fences preserved for
+        // round-trip). For ListItem, the parser's harvestListItem already
+        // strips trailing whitespace from the byte range, so this chop is
+        // idempotent for ListItem.
         QByteArray content = bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart);
+        if (content.endsWith('\n'))
+            content.chop(1);
 
         auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);
         if (!content.isEmpty())
@@ -1888,11 +1895,17 @@ QByteArray serializeFrontmatter(const Markoff::FrontmatterMap &fm)
 
 QByteArray interBlockSeparator()
 {
-    // Each block's load-time bytes already end with '\n'. Adding one more '\n'
-    // produces the blank line that separates top-level blocks in standard Markdown.
-    // This matches the tree-sitter parser's block byte ranges: for
-    // "Para one\n\nPara two\n", block 0 = "Para one\n" and block 1 = "Para two\n"
-    // — the blank line ('\n' at offset 9) is not included in either block's range.
+    // Per B1 (spec 2026-05-18-b1-buffer-convention-design.md §1):
+    // block buffers are content; the separator carries the full gap
+    // between two block bodies — a line break ending the previous
+    // block plus the blank line opening the next.
+    return "\n\n";
+}
+
+QByteArray finalDocumentTerminator()
+{
+    // CommonMark-conventional: documents end with a single newline.
+    // Emitted by serializeForSave after the block loop.
     return "\n";
 }
 
@@ -1942,23 +1955,28 @@ QByteArray MarkoffDocument::serializeForSave() const
             const QByteArray marker = markerForListItem(attrs);
             const QByteArray content = blockText(id);
 
-            // Emit: <indent><marker> <content>\n
-            out += indentBytes + marker + " " + content + "\n";
+            // Emit: <indent><marker> <content>  (separator is added below)
+            out += indentBytes + marker + " " + content;
 
-            // For loose runs, insert a blank line after the item — but only
-            // if there is a following block (no trailing blank line after the last item).
-            if (looseRun && (i + 1 < blocks.size())) {
-                out += "\n";
-            }
+            // Per B1 §3: the serializer owns inter-block separators. Loose runs
+            // emit a blank line between consecutive items; tight runs emit just
+            // the line break.
+            if (i + 1 < blocks.size())
+                out += looseRun ? QByteArray("\n\n") : QByteArray("\n");
             continue;
         }
 
         QByteArray bytes;
         if (!isBlockTouched(id)) {
-            // Untouched: use original load-time bytes for byte-identical round-trip
+            // Untouched: use original load-time bytes for byte-identical
+            // content round-trip. Strip the load-time terminator so the
+            // serializer owns separator placement (B1 §3).
             bytes = d->blockLoadTimeBytes.value(id);
+            if (bytes.endsWith('\n'))
+                bytes.chop(1);
         } else {
-            // Touched: re-serialize from CRDT state
+            // Touched: re-serialize from CRDT state. Per-kind serializer is
+            // contracted to emit body only — no terminator (B1 §4).
             auto fn = reg.get(kind);
             bytes = fn(kind, blockAttrs(id), blockText(id));
         }
@@ -1966,6 +1984,10 @@ QByteArray MarkoffDocument::serializeForSave() const
         if (i + 1 < blocks.size())
             out += interBlockSeparator();
     }
+
+    // B1: serializer owns the document-final '\n'. CommonMark convention.
+    if (!blocks.empty())
+        out += finalDocumentTerminator();
 
     // 3. Link refs (v1: skip — stored with naive key, proper extraction is Phase 9+)
     // out += serializeLinkRefs(d->linkRefMap);

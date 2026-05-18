@@ -69,15 +69,11 @@ BackspaceMergeResult backspaceMerge(MarkoffDocument &doc, BlockId currentBlock)
     BlockId prev = *(curIt - 1);
     QByteArray prevText = doc.blockText(prev);
 
-    // A trailing '\n' in a block buffer is the structural inter-block delimiter.
-    // When a merge destroys the boundary, that delimiter goes with it — replace
-    // it with the next block's content rather than appending after it.
+    // B1: block buffers are content. Any trailing '\n' in prevText is
+    // user-authored (e.g. a soft break) and must be preserved as
+    // content of the merged block. Append cleanly.
     uint32_t joinOffset = static_cast<uint32_t>(prevText.size());
     uint32_t removeLen  = 0;
-    if (prevText.endsWith('\n')) {
-        --joinOffset;
-        removeLen = 1;
-    }
 
     UndoLog::Transaction t(doc.d2UndoLog());
     doc.d2ApplyBufferEdit(prev, joinOffset, removeLen, doc.blockText(currentBlock), t);
@@ -97,13 +93,9 @@ void deleteMerge(MarkoffDocument &doc, BlockId currentBlock)
     BlockId next = *nextIt;
     QByteArray curText = doc.blockText(currentBlock);
 
-    // Same as backspaceMerge: the trailing '\n' is structural; replace it.
+    // B1: see backspaceMerge — buffers are content; append cleanly.
     uint32_t joinOffset = static_cast<uint32_t>(curText.size());
     uint32_t removeLen  = 0;
-    if (curText.endsWith('\n')) {
-        --joinOffset;
-        removeLen = 1;
-    }
 
     UndoLog::Transaction t(doc.d2UndoLog());
     doc.d2ApplyBufferEdit(currentBlock, joinOffset, removeLen, doc.blockText(next), t);
