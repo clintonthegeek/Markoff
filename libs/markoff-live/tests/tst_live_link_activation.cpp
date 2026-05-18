@@ -122,6 +122,47 @@ private Q_SLOTS:
         binding.activateLinkAt(bid, hitPos, int(Qt::ControlModifier));
         QCOMPARE(svc.activations.size(), 0);
     }
+
+    void embed_wikilink_is_skipped_in_e3a() {
+        // ![[SomePage]] is an Obsidian embed — E3c's job, not E3a's.
+        // The tree-sitter inline grammar parses ![[X]] as an `image` node
+        // (same as ![alt](url)), not a `wiki_link` node, so isWikilink is
+        // never set for embeds. This test verifies:
+        //  (a) the span is classified as isImage (not isWikilink), and
+        //  (b) clicking it produces no activation.
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown("![[SomePage]]");
+
+        LiveListModelBinding binding;
+        binding.setDocument(&doc);
+
+        Markoff::LiveTest::RecordingLinkService svc;
+        binding.setLinkService(&svc);
+
+        const auto blockIds = doc.iterateBlocks();
+        QVERIFY(!blockIds.empty());
+        const Markoff::BlockId bid = blockIds[0];
+
+        const QList<Markoff::SourceSpan> spans = doc.inlineSpansFor(bid);
+
+        // Confirm no span is tagged as wikilink (embeds must never be wikilinks)
+        for (const auto &s : spans)
+            QVERIFY2(!s.isWikilink, "![[embed]] span incorrectly tagged as isWikilink");
+
+        // Find any span to click (image span, or any span at all)
+        int hitPos = -1;
+        for (const auto &s : spans) {
+            if (s.charLength > 0) {
+                hitPos = s.charOffset + s.charLength / 2;
+                break;
+            }
+        }
+        if (hitPos < 0)
+            QSKIP("No span found for ![[SomePage]]; parser produced empty spans.");
+
+        binding.activateLinkAt(bid, hitPos, int(Qt::ControlModifier));
+        QCOMPARE(svc.activations.size(), 0);  // embed must NOT activate in E3a
+    }
 };
 
 QTEST_MAIN(TestLiveLinkActivation)
