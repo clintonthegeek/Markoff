@@ -387,11 +387,9 @@ void LiveListModelBinding::onD2Changed()
         r.kind        = blockKindToString(doc->blockKind(id));
         r.delegateClass = Markoff::Live::delegateClassFor(r.kind);
 
-        // FALSIFIABILITY PROOF: B1 chop restored
-        QByteArray raw = doc->blockText(id);
-        if (raw.endsWith('\n'))
-            raw.chop(1);
-        r.text = QString::fromUtf8(raw);
+        // B1 (spec 2026-05-18-b1-buffer-convention-design.md): buffers are
+        // content; no chop needed.
+        r.text = QString::fromUtf8(doc->blockText(id));
 
         // Populate inline spans and block attrs from the foundation CRDT.
         r.inlineSpans = doc->inlineSpansFor(id);
