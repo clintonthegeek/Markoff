@@ -49,8 +49,9 @@ private slots:
         }
 
         Markoff::PasteMeta meta;  // reuseBlockIds = false
-        // Replace the full block content. Block 0 flat range = [0, 6).
-        doc.applyStructuredPaste(0, 6, blocks, meta);
+        // Replace the full block content. Post-B1, the block buffer for
+        // "Body.\n" is content-only — "Body." (5 bytes) — so flat range = [0, 5).
+        doc.applyStructuredPaste(0, 5, blocks, meta);
 
         const QByteArray flat = flatText(doc);
         QVERIFY2(flat.contains("Pasted para."), flat.constData());
@@ -61,8 +62,9 @@ private slots:
     }
 
     void single_block_paste_replaces_content() {
-        // Replace entire block content "X\n" (2 bytes, flat [0,2)) with "Y".
-        // "Y" has no embedded newlines → intra-block edit, existing block kept.
+        // Replace entire block content. Post-B1, "X\n" loads to buffer "X"
+        // (1 byte, flat [0,1)). "Y" has no embedded newlines → intra-block
+        // edit, existing block kept.
         Markoff::MarkoffDocument doc(quint16(42));
         doc.loadFromMarkdown("X\n");
 
@@ -73,7 +75,7 @@ private slots:
         blocks.append(b);
 
         Markoff::PasteMeta meta;  // reuseBlockIds = false (default)
-        doc.applyStructuredPaste(0, 2, blocks, meta);
+        doc.applyStructuredPaste(0, 1, blocks, meta);
 
         const QByteArray flat = flatText(doc);
         QVERIFY2(flat.contains("Y"), flat.constData());
@@ -96,7 +98,8 @@ private slots:
         Markoff::PasteMeta meta;
         meta.reuseBlockIds = true;
         meta.cutSeq        = 99999;  // not in cache
-        doc.applyStructuredPaste(0, 2, blocks, meta);
+        // Post-B1: "X\n" → buffer "X" (1 byte, flat [0,1)).
+        doc.applyStructuredPaste(0, 1, blocks, meta);
 
         // No crash; document is in a valid state with expected content.
         const QByteArray flat = flatText(doc);

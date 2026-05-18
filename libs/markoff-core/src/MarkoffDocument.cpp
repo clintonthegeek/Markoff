@@ -1398,6 +1398,19 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
 
     const auto blocks = iterateBlocks();
 
+    // Clamp [oldStart, oldEnd) to the document's flat extent. Pre-B1 callers
+    // could pass ranges that included the now-retired trailing '\n' per block;
+    // a post-B1 caller doing the same arithmetic would walk off the end and
+    // dereference blocks[-1]. Defensive clamp: a malformed range becomes a
+    // truncated edit rather than UB, and well-formed callers are unaffected.
+    {
+        uint32_t totalBytes = 0;
+        for (BlockId id : blocks)
+            totalBytes += static_cast<uint32_t>(blockText(id).size());
+        if (oldEnd > totalBytes)   oldEnd   = totalBytes;
+        if (oldStart > totalBytes) oldStart = totalBytes;
+    }
+
     // Walk blocks to find which block(s) the [oldStart, oldEnd) range touches.
     uint32_t cursor = 0;
     int startIdx = -1;
