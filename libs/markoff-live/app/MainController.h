@@ -14,7 +14,7 @@ class MainController : public QObject {
     Q_PROPERTY(QString title READ title NOTIFY titleChanged)
     Q_PROPERTY(MarkdownLinkService* linkService READ linkService CONSTANT)
     Q_PROPERTY(QString statusMessage READ statusMessage NOTIFY statusMessageChanged)
-    Q_PROPERTY(QString filePath READ filePath CONSTANT)
+    Q_PROPERTY(QString filePath READ filePath NOTIFY filePathChanged)
 public:
     explicit MainController(Markoff::MarkoffDocument *doc,
                             QString filePath,
@@ -27,10 +27,16 @@ public:
 
 public Q_SLOTS:
     void save();
+    /// Reload the document from a new file path (wikilink navigation).
+    void loadDocumentFromPath(const QString &path);
 
 Q_SIGNALS:
     void titleChanged();
     void statusMessageChanged();
+    void filePathChanged();
+    /// Emitted after loadDocumentFromPath succeeds so QML can update
+    /// modelBinding.fromContext.
+    void fromContextChanged(const QString &path);
 
 private:
     void updateTitle();

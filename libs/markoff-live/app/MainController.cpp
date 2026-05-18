@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "MainController.h"
 
+#include <QFile>
 #include <QFileInfo>
 #include <QSaveFile>
 
@@ -59,6 +60,24 @@ void MainController::save()
     }
 
     m_doc->markSaved(seq);
+}
+
+void MainController::loadDocumentFromPath(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        qWarning("MainController::loadDocumentFromPath: cannot open '%s': %s",
+                 qUtf8Printable(path),
+                 qUtf8Printable(file.errorString()));
+        return;
+    }
+    const QByteArray content = file.readAll();
+    m_doc->loadFromMarkdown(content);
+    m_doc->markSaved(m_doc->d2EditSequence());
+    m_filePath = path;
+    Q_EMIT filePathChanged();
+    Q_EMIT fromContextChanged(path);
+    updateTitle();
 }
 
 void MainController::updateTitle()

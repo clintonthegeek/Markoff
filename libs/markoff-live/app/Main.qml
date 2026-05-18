@@ -28,6 +28,26 @@ ApplicationWindow {
         }
     }
 
+    // Update fromContext whenever the controller loads a new document.
+    Connections {
+        target: ctxMain
+        function onFromContextChanged(path) {
+            modelBinding.setFromContext(path)
+        }
+    }
+
+    // Wire openRequested to in-place document load.
+    Connections {
+        target: ctxMain.linkService
+        function onOpenRequested(path, section, blockRef) {
+            ctxMain.loadDocumentFromPath(path)
+            if (section !== "")
+                console.log("[link] navigate to section:", section)
+            if (blockRef !== "")
+                console.log("[link] navigate to block:", blockRef)
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
