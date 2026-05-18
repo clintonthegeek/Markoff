@@ -907,6 +907,40 @@ private Q_SLOTS:
         QCOMPARE(colorAt(3), D.color(Slot::TextDefault));
     }
 
+    /// Blockquote left-bar colour and list-item marker colour both bind to
+    /// theme slots and react to dark toggle.
+    void dark_toggle_changes_blockquote_bar_and_list_marker() {
+        QmlIntegrationFixture fix("> Quote\n\n- item\n", /*expectedRowCount=*/2);
+        QVERIFY(fix.waitForDelegateAt(1, 2000));
+
+        // Locate the blockquote bar Rectangle by objectName.
+        QQuickItem *quoteDelegate = fix.delegateAt(0);
+        QQuickItem *bar = quoteDelegate->findChild<QQuickItem*>("blockquoteBar");
+        QVERIFY(bar);
+        QCOMPARE(bar->property("color").value<QColor>(),
+                 Markoff::Theme::defaultLight().color(
+                     Markoff::Theme::Slot::Quote));
+
+        // Marker label.
+        QQuickItem *itemDelegate = fix.delegateAt(1);
+        QQuickItem *marker = itemDelegate->findChild<QQuickItem*>("listMarkerLabel");
+        QVERIFY(marker);
+        QCOMPARE(marker->property("color").value<QColor>(),
+                 Markoff::Theme::defaultLight().color(
+                     Markoff::Theme::Slot::TextDefault));
+
+        QMetaObject::invokeMethod(fix.binding(), "applyDefaultTheme",
+                                  Q_ARG(bool, true));
+        QCoreApplication::processEvents();
+
+        QCOMPARE(bar->property("color").value<QColor>(),
+                 Markoff::Theme::defaultDark().color(
+                     Markoff::Theme::Slot::Quote));
+        QCOMPARE(marker->property("color").value<QColor>(),
+                 Markoff::Theme::defaultDark().color(
+                     Markoff::Theme::Slot::TextDefault));
+    }
+
     /// Dogfood regression — user-reported: type `#` + space + word at the
     /// start of an empty paragraph (block promotes to heading); press Enter
     /// to leave the heading line. The `#` marker must collapse to zero

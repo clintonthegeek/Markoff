@@ -79,6 +79,7 @@ Item {
     // -------- Blockquote left bar (conditional) --------
     Rectangle {
         id: blockquoteBar
+        objectName: "blockquoteBar"
         visible: root.kind === "blockquote"
         anchors {
             left: parent.left
@@ -86,7 +87,9 @@ Item {
             bottom: parent.bottom
         }
         width: 3
-        color: palette.highlight
+        color: (root.liveBinding && root.liveBinding.theme)
+               ? root.liveBinding.themeColorFor(Theme.Quote)
+               : "#666666"
         opacity: 0.6
     }
 
@@ -94,13 +97,16 @@ Item {
     Rectangle {
         anchors.fill: markerLabel
         visible: root.kind === "list-item" && root._fullySelected
-        color: palette.highlight
+        color: (root.liveBinding && root.liveBinding.theme)
+               ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
+               : "#b0d0ff"
         z: -1
     }
 
     // -------- List-item marker (conditional) --------
     Text {
         id: markerLabel
+        objectName: "listMarkerLabel"
         visible: root.kind === "list-item"
         anchors {
             left: parent.left
@@ -115,7 +121,13 @@ Item {
                           ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                           : 14)
                         * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
-        color: root._fullySelected ? palette.highlightedText : palette.text
+        color: root._fullySelected
+               ? ((root.liveBinding && root.liveBinding.theme)
+                  ? root.liveBinding.themeColorFor(Theme.EditorBackground)
+                  : "#ffffff")
+               : ((root.liveBinding && root.liveBinding.theme)
+                  ? root.liveBinding.themeColorFor(root.markerSlot)
+                  : "#222222")
 
         MouseArea {
             visible: root.markerStyle === "task"
