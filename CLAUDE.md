@@ -1,32 +1,35 @@
 # Markoff (exploration/new-foundation branch)
 
-> **2026-05-18 — Queue exhausted. Next work is the user's call.**
+> **2026-05-18 — E3a landed. Awaiting dogfood.**
 >
-> All five queue items are closed:
-> - **#1 E2.6** (theme/zoom/colour): ✅ tagged `v0.7.0-e2.6` at `e8514eb`. Dogfood confirmed.
-> - **#2 Cursor architecture**: ✅ all 12 concerns closed across tier 1–4c.
-> - **#3 QML integration test harness**: ✅ closed.
-> - **#4 B1 buffer convention**: ✅ just landed (`a4df009..0f7de6c`). Block buffers
->   are now content-only; serializer owns structural newlines.
->   `tst_block_buffer_invariant` + `tst_block_buffer_interactive` pin the contract.
->   Closes the `shift_enter_creates_visible_newline` 5-day regression.
-> - **#5 Code review**: ✅ closed.
+> - **E3a** (wikilinks + navigation): ✅ implemented at `109d3d3`. Dogfood request at
+>   `docs/handoff/2026-05-18-e3a-dogfood-request.md`. Tag `v0.7.0-e3a` held pending
+>   dogfood signoff.
 >
-> **Tags:** `v0.7.0-e2.5` (dogfood confirmed 2026-05-17) and `v0.7.0-e2.6`
-> (dogfood confirmed 2026-05-18) are both released.
+> Prior closed items: E2.6 tagged `v0.7.0-e2.6` (dogfood confirmed 2026-05-18),
+> cursor architecture (tiers 1–4c), QML integration harness, B1 buffer convention,
+> code review pass.
 >
-> **Test baseline (2026-05-18 HEAD `c91165d`):** 208/211 fast tests pass.
-> Three pre-existing failures:
+> **Test baseline (2026-05-18 HEAD `109d3d3`):** 213/216 fast tests pass.
+> Three pre-existing failures (unchanged):
 > - `tst_live_render_setext_e2e::S1_setextDemote_lastUnderlineCharDeleted_keepsCursor`
->   — cursor off-by-one after setext H2 demote (unrelated to B1).
 > - `tst_markoff_doc_apply_structured_paste` — SIGABRT in structured-paste path.
-> - `tst_v10_source_editor_view_contract::cursor_position_round_trips` — off-by-one.
+> - `tst_v10_source_editor_view_contract::cursor_position_round_trips`
+>
+> **E3a implementation notes (for fresh agents):**
+> - `activateLinkAt` / `hoverLinkAt` take `Markoff::BlockId` (not `QString` — no
+>   string form exists). QML passes `model.blockAnchor`.
+> - Ctrl+click and Ctrl-hover are wired in `LiveView.qml`'s `MouseArea::onClicked`
+>   and `onPositionChanged` (not a TapHandler inside the delegate — `preventStealing`
+>   blocks inner handlers).
+> - Embeds (`![[...]]`) produce `isImage=true` (not `isWikilink`), so they are
+>   already excluded from activation without an explicit guard.
 >
 > **Next executable items** (user decides priority):
-> - **E2.7** (speculative paths — open-delimiter/code-fence speculation): `pending`,
->   no spec yet. Scope: `docs/handoff/2026-05-09-post-e2-scope.md` §2.E2.7.
-> - **Fix pre-existing failures** above (smallest: setext S1 cursor off-by-one).
-> - **E3** (Obsidian affordances): `pending`, no spec yet.
+> - **Dogfood E3a** → tag `v0.7.0-e3a` on pass.
+> - **E3b** (tag navigation): `pending`, no spec yet.
+> - **E2.7** (speculative paths): `pending`, no spec yet.
+> - **Fix pre-existing failures** (smallest: setext S1 cursor off-by-one).
 >
 > **For any of the above:** use `superpowers:brainstorming` then
 > `superpowers:writing-plans` to produce a spec/plan before executing.
