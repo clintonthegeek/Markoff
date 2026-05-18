@@ -151,6 +151,18 @@ public:
     /// span covers qtPos. Images are not activated in E3a.
     Q_INVOKABLE void activateLinkAt(Markoff::BlockId blockId, int qtPos, int modifiers);
 
+    /// Notify the link service that the cursor is hovering over the link span
+    /// (if any) that covers `qtPos` in `blockId`. Emits notifyHover on entry
+    /// and notifyHoverLeft on span transition. Returns true if a link was hit.
+    /// Idempotent within the same span — repeated calls while the cursor stays
+    /// on the same rawText do not re-emit notifyHover.
+    Q_INVOKABLE bool hoverLinkAt(Markoff::BlockId blockId, int qtPos, int modifiers,
+                                 const QPoint &globalPos);
+
+    /// Notify the link service that hover has left the current span (if any).
+    /// No-op when no span is currently hovered. Idempotent.
+    Q_INVOKABLE void clearLinkHover();
+
 Q_SIGNALS:
     void documentChanged();
     void themeChanged();
@@ -168,6 +180,7 @@ private:
     std::unique_ptr<Markoff::DefaultLinkService> m_defaultLinkService;
     Markoff::LinkService *m_linkService = nullptr;
     QString m_fromContext;
+    QString m_currentHoveredRawText;
 };
 
 }  // namespace Markoff::Live

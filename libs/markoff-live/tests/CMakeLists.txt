@@ -731,6 +731,17 @@ target_link_libraries(tst_live_link_activation PRIVATE
 add_test(NAME tst_live_link_activation
          COMMAND tst_live_link_activation)
 
+# C5: hoverLinkAt / clearLinkHover — enter/same-span/cross-link/clear transitions.
+qt_add_executable(tst_live_link_hover
+    tst_live_link_hover.cpp
+    RecordingLinkService.cpp
+)
+target_link_libraries(tst_live_link_hover PRIVATE
+    Qt6::Core Qt6::Test
+    markoff_live markoff_core)
+add_test(NAME tst_live_link_hover
+         COMMAND tst_live_link_hover)
+
 # Spec §8.5 retirement-evidence shape tests (shell scripts, CI guards)
 add_test(NAME tst_live_render_no_qt_calllater_in_focus_path
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_no_qt_calllater_in_focus_path.sh

@@ -690,6 +690,29 @@ void LiveListModelBinding::activateLinkAt(Markoff::BlockId blockId, int qtPos, i
     if (m_linkService) m_linkService->activate(a);
 }
 
+bool LiveListModelBinding::hoverLinkAt(Markoff::BlockId blockId, int qtPos, int modifiers,
+                                       const QPoint &globalPos)
+{
+    const auto hit = Markoff::LiveInternal::findLinkSpanAt(document(), blockId, qtPos);
+    if (!hit.found) { clearLinkHover(); return false; }
+    const auto a = Markoff::LiveInternal::buildActivation(
+        hit.span, Qt::KeyboardModifiers(modifiers), m_fromContext, m_linkService);
+    if (a.rawText != m_currentHoveredRawText) {
+        if (!m_currentHoveredRawText.isEmpty() && m_linkService)
+            m_linkService->notifyHoverLeft(m_currentHoveredRawText);
+        if (m_linkService) m_linkService->notifyHover(a, globalPos);
+        m_currentHoveredRawText = a.rawText;
+    }
+    return true;
+}
+
+void LiveListModelBinding::clearLinkHover()
+{
+    if (m_currentHoveredRawText.isEmpty()) return;
+    if (m_linkService) m_linkService->notifyHoverLeft(m_currentHoveredRawText);
+    m_currentHoveredRawText.clear();
+}
+
 }  // namespace Markoff::Live
 
 #include "LiveListModelBinding.moc"
