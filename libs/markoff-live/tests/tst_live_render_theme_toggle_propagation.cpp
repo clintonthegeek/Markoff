@@ -87,6 +87,29 @@ private slots:
         QCOMPARE(b.themePixelSizeFor(0),
                  activeLight->pixelSizeFor(Theme::Slot::TextDefault));
     }
+
+    void themeColorFor_reflects_active_buffer() {
+        LiveListModelBinding b(LiveListModelBinding::AllCapabilities);
+        const int kEditorBackground =
+            static_cast<int>(Theme::Slot::EditorBackground);
+
+        // Initial buffer = defaultLight.
+        QCOMPARE(b.themeColorFor(kEditorBackground),
+                 Theme::defaultLight().color(Theme::Slot::EditorBackground));
+
+        b.applyDefaultTheme(/*dark=*/true);
+        QCOMPARE(b.themeColorFor(kEditorBackground),
+                 Theme::defaultDark().color(Theme::Slot::EditorBackground));
+
+        b.applyDefaultTheme(/*dark=*/false);
+        QCOMPARE(b.themeColorFor(kEditorBackground),
+                 Theme::defaultLight().color(Theme::Slot::EditorBackground));
+    }
+
+    void themeColorFor_invalid_slot_returns_invalid_qcolor() {
+        LiveListModelBinding b(LiveListModelBinding::AllCapabilities);
+        QVERIFY(!b.themeColorFor(99999).isValid());
+    }
 };
 
 QTEST_MAIN(TstThemeTogglePropagation)

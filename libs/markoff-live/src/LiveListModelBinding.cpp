@@ -346,6 +346,14 @@ bool LiveListModelBinding::themeIsItalic(int slot) const
         .isItalic(static_cast<Markoff::Theme::Slot>(slot));
 }
 
+QColor LiveListModelBinding::themeColorFor(int slot) const
+{
+    if (slot < 0 || slot > static_cast<int>(Markoff::Theme::Slot::ScrollbarThumb))
+        return QColor();
+    return d->themeBuffers[d->activeThemeIdx]
+        .color(static_cast<Markoff::Theme::Slot>(slot));
+}
+
 qreal LiveListModelBinding::fontScale() const noexcept
 {
     return d->fontScale;

@@ -125,6 +125,7 @@ public:
     Q_INVOKABLE QString themeFamilyFor(int slot) const;
     Q_INVOKABLE bool    themeIsBold(int slot) const;
     Q_INVOKABLE bool    themeIsItalic(int slot) const;
+    Q_INVOKABLE QColor  themeColorFor(int slot) const;
 
     qreal fontScale()     const noexcept;
     qreal fontScaleStep() const noexcept { return kFontScaleStep; }
