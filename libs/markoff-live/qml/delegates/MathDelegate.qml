@@ -46,7 +46,9 @@ Item {
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
                               ? root.liveBinding.themePixelSizeFor(12) : 13)
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
-            color: palette.mid
+            color: (root.liveBinding && root.liveBinding.theme)
+                   ? root.liveBinding.themeColorFor(Theme.Quote)
+                   : "#666666"
             wrapMode: Text.Wrap
         }
     }
@@ -81,7 +83,9 @@ Item {
             font.pixelSize: ((root.liveBinding && root.liveBinding.theme)
                               ? root.liveBinding.themePixelSizeFor(12) : 13)
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
-            color: palette.text
+            color: (root.liveBinding && root.liveBinding.theme)
+                   ? root.liveBinding.themeColorFor(Theme.TextDefault)
+                   : "#222222"
             selectionColor: (root.liveBinding && root.liveBinding.theme)
                             ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
                             : "#b0d0ff"
@@ -104,7 +108,9 @@ Item {
         visible: root.isSelected || root.isEditing
         anchors.fill: parent
         anchors.margins: -2
-        border.color: palette.highlight
+        border.color: (root.liveBinding && root.liveBinding.theme)
+                      ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
+                      : "#b0d0ff"
         border.width: 2
         color: "transparent"
         radius: 3

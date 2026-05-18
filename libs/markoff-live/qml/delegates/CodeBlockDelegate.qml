@@ -8,8 +8,8 @@ Rectangle {
     id: root
     width: ListView.view ? ListView.view.width : 600
     implicitHeight: edit.implicitHeight + 16
-    color: (liveBinding && liveBinding.theme)
-           ? liveBinding.themeColorFor(Theme.CodeBlockBackground)
+    color: (root.liveBinding && root.liveBinding.theme)
+           ? root.liveBinding.themeColorFor(Theme.CodeBlockBackground)
            : "#f4f4f4"
     radius: 4
 
