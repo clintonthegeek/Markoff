@@ -8,7 +8,9 @@ Rectangle {
     id: root
     width: ListView.view ? ListView.view.width : 600
     implicitHeight: edit.implicitHeight + 16
-    color: Qt.rgba(0, 0, 0, 0.05)
+    color: (liveBinding && liveBinding.theme)
+           ? liveBinding.themeColorFor(Theme.CodeBlockBackground)
+           : "#f4f4f4"
     radius: 4
 
     property int modelIndex: index
@@ -44,7 +46,9 @@ Rectangle {
         font.family:    theme ? root.liveBinding.themeFamilyFor(baseSlot) : "monospace"
         font.bold:      theme ? root.liveBinding.themeIsBold(baseSlot) : false
         font.italic:    theme ? root.liveBinding.themeIsItalic(baseSlot) : false
-        color: palette.text
+        color: (root.liveBinding && root.liveBinding.theme)
+               ? root.liveBinding.themeColorFor(Theme.CodeBlock)
+               : "#222222"
         selectByMouse: false
         persistentSelection: true
         selectionColor: (root.liveBinding && root.liveBinding.theme)
@@ -150,7 +154,9 @@ Rectangle {
                               ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                               : 14) * 0.8
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
-            color: palette.mid
+            color: (root.liveBinding && root.liveBinding.theme)
+                   ? root.liveBinding.themeColorFor(Theme.Quote)
+                   : "#666666"
             MouseArea {
                 anchors.fill: parent
                 cursorShape: Qt.PointingHandCursor
@@ -169,7 +175,9 @@ Rectangle {
                               ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                               : 14) * 0.8
                             * (root.liveBinding ? root.liveBinding.fontScale : 1.0)
-            color: palette.text
+            color: (root.liveBinding && root.liveBinding.theme)
+                   ? root.liveBinding.themeColorFor(Theme.CodeBlock)
+                   : "#222222"
             onActiveFocusChanged: if (!activeFocus) langTagRow.editing = false
             Keys.onReturnPressed: {
                 const handler = root.liveBinding ? root.liveBinding.structuralKeyHandler : null

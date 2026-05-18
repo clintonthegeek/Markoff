@@ -941,6 +941,35 @@ private Q_SLOTS:
                      Markoff::Theme::Slot::TextDefault));
     }
 
+    /// CodeBlock root background + body text + language label all bind
+    /// through Theme. Dark toggle visibly inverts all three.
+    void dark_toggle_changes_codeblock_colors() {
+        QmlIntegrationFixture fix("```cpp\nint main() { return 0; }\n```\n",
+                                  /*expectedRowCount=*/1);
+        QVERIFY(fix.waitForDelegateAt(0, 2000));
+
+        QQuickItem *root = fix.delegateAt(0);
+        QQuickItem *body = fix.delegateTextEdit(0);
+        QVERIFY(root && body);
+
+        using Slot = Markoff::Theme::Slot;
+        const auto L = Markoff::Theme::defaultLight();
+        QCOMPARE(root->property("color").value<QColor>(),
+                 L.color(Slot::CodeBlockBackground));
+        QCOMPARE(body->property("color").value<QColor>(),
+                 L.color(Slot::CodeBlock));
+
+        QMetaObject::invokeMethod(fix.binding(), "applyDefaultTheme",
+                                  Q_ARG(bool, true));
+        QCoreApplication::processEvents();
+
+        const auto D = Markoff::Theme::defaultDark();
+        QCOMPARE(root->property("color").value<QColor>(),
+                 D.color(Slot::CodeBlockBackground));
+        QCOMPARE(body->property("color").value<QColor>(),
+                 D.color(Slot::CodeBlock));
+    }
+
     /// Dogfood regression — user-reported: type `#` + space + word at the
     /// start of an empty paragraph (block promotes to heading); press Enter
     /// to leave the heading line. The `#` marker must collapse to zero
