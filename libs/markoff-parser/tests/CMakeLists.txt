@@ -66,3 +66,8 @@ target_include_directories(tst_link_target_decomposition PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/../src
 )
 set_tests_properties(tst_link_target_decomposition PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_inline_spans_link_target tst_inline_spans_link_target.cpp)
+add_test(NAME tst_inline_spans_link_target COMMAND tst_inline_spans_link_target)
+target_link_libraries(tst_inline_spans_link_target PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_inline_spans_link_target PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

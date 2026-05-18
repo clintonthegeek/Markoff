@@ -2,6 +2,7 @@
 #include <markoff/parser/TreeSitterParser.h>
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/parser/Document.h>
+#include "WikilinkDecomposition.h"
 
 #include <tree_sitter/api.h>
 #include <tree-sitter/tree-sitter-markdown.h>
@@ -657,6 +658,86 @@ QList<SourceSpan> TreeSitterParser::buildSpanMap() const
                 // Find the ^ span and the number span
                 s.isFootnoteRef = true;
                 s.isLink = false; // don't style as link
+            }
+        }
+    }
+
+    // Post-process 4: populate linkTarget on wikilink and standard-link spans.
+    // Walk inline trees to find link container nodes, extract the structured
+    // target, then stamp it onto every span within that node's byte range.
+    if (!m_inlineTrees.isEmpty()) {
+        // Collect (startByte, endByte, LinkTarget) tuples for each link node.
+        struct LinkRange {
+            int startByte;
+            int endByte;
+            LinkTarget target;
+        };
+        QList<LinkRange> linkRanges;
+
+        // Recursive lambda via std::function to walk the inline tree.
+        std::function<void(TSNode)> collectLinkRanges = [&](TSNode node) {
+            const char *type = ts_node_type(node);
+            int startB = static_cast<int>(ts_node_start_byte(node));
+            int endB   = static_cast<int>(ts_node_end_byte(node));
+
+            if (strcmp(type, "wiki_link") == 0) {
+                // Extract the raw text, strip [[ and ]] (or ![[  and ]]),
+                // and decompose the inner content.
+                QString raw = QString::fromUtf8(m_utf8.mid(startB, endB - startB));
+                QString inner;
+                if (raw.startsWith(QStringLiteral("![[")) && raw.endsWith(QStringLiteral("]]")))
+                    inner = raw.mid(3, raw.size() - 5);
+                else if (raw.startsWith(QStringLiteral("[[")) && raw.endsWith(QStringLiteral("]]")))
+                    inner = raw.mid(2, raw.size() - 4);
+                else
+                    inner = raw;  // malformed; pass through as-is
+                LinkRange lr;
+                lr.startByte = startB;
+                lr.endByte   = endB;
+                lr.target    = Markoff::Detail::decomposeWikilinkInner(QStringView{inner});
+                linkRanges.append(lr);
+                return;  // don't recurse into wiki_link children
+            }
+            if (strcmp(type, "inline_link") == 0 ||
+                strcmp(type, "full_reference_link") == 0 ||
+                strcmp(type, "collapsed_reference_link") == 0) {
+                // Extract the link_destination child for the URL.
+                LinkRange lr;
+                lr.startByte = startB;
+                lr.endByte   = endB;
+                uint32_t count = ts_node_child_count(node);
+                for (uint32_t i = 0; i < count; ++i) {
+                    TSNode child = ts_node_child(node, i);
+                    if (strcmp(ts_node_type(child), "link_destination") == 0) {
+                        int cs = static_cast<int>(ts_node_start_byte(child));
+                        int ce = static_cast<int>(ts_node_end_byte(child));
+                        lr.target.url = QString::fromUtf8(m_utf8.mid(cs, ce - cs));
+                        break;
+                    }
+                }
+                linkRanges.append(lr);
+                return;  // don't recurse into link children
+            }
+
+            uint32_t count = ts_node_child_count(node);
+            for (uint32_t i = 0; i < count; ++i)
+                collectLinkRanges(ts_node_child(node, i));
+        };
+
+        for (TSTree *tree : m_inlineTrees)
+            collectLinkRanges(ts_tree_root_node(tree));
+
+        // Stamp linkTarget onto each span whose byte range falls within a
+        // link node's range. A span may only belong to one link node —
+        // wikilinks/links are not nestable — so first-match wins.
+        for (auto &s : spans) {
+            if (!s.isLink && !s.isWikilink) continue;
+            for (const auto &lr : linkRanges) {
+                if (s.utf8Offset >= lr.startByte
+                    && (s.utf8Offset + s.utf8Length) <= lr.endByte) {
+                    s.linkTarget = lr.target;
+                    break;
+                }
             }
         }
     }
