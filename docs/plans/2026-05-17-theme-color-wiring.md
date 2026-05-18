@@ -164,7 +164,7 @@ namespace Markoff::Live {
 /// QML_FOREIGN shim exposing Markoff::Theme (a Q_GADGET in markoff-core)
 /// as the QML type `Theme` in the org.markoff.live module. Theme is value-
 /// only — QML cannot construct one. The `Q_ENUM(Slot)` on Markoff::Theme
-/// is reachable as `Theme.Slot.<name>` in QML.
+/// is reachable as `Theme.<name>` in QML.
 struct ThemeForeign {
     Q_GADGET
     QML_FOREIGN(Markoff::Theme)
@@ -186,7 +186,7 @@ Expected: clean build. AUTOMOC picks up the new header.
 
 - [ ] **Step 4: Smoke-test the QML access path.**
 
-Add a temporary scratch test to confirm `Theme.Slot.EditorBackground` resolves from QML. The fastest path: add a new `void theme_slot_enum_resolves_from_qml()` slot in `tst_live_render_theme_toggle_propagation.cpp` using `QQmlComponent` to load a tiny inline QML:
+Add a temporary scratch test to confirm `Theme.EditorBackground` resolves from QML. The fastest path: add a new `void theme_slot_enum_resolves_from_qml()` slot in `tst_live_render_theme_toggle_propagation.cpp` using `QQmlComponent` to load a tiny inline QML:
 
 ```cpp
 void theme_slot_enum_resolves_from_qml() {
@@ -196,7 +196,7 @@ void theme_slot_enum_resolves_from_qml() {
         import QtQml
         import org.markoff.live 1.0
         QtObject {
-            property int slot: Theme.Slot.EditorBackground
+            property int slot: Theme.EditorBackground
         }
     )", QUrl());
     QScopedPointer<QObject> obj(c.create());
@@ -214,7 +214,7 @@ Add `#include <QQmlEngine>` and `#include <QQmlComponent>` at the top of the tes
 Run: `cmake --build build-dev --target tst_live_render_theme_toggle_propagation -j 8 && scripts/run-tests.sh --bin tst_live_render_theme_toggle_propagation`
 Expected: 6/6 PASS.
 
-If the QML can't resolve `Theme.Slot.EditorBackground`, the registration form is wrong. Fallback: try `QML_NAMED_ELEMENT(Theme) + QML_FOREIGN_NAMESPACE` patterns from Qt docs, or move the registration to a non-foreign Q_OBJECT wrapper. Update the spec's §"Risks" R3 with what you found.
+If the QML can't resolve `Theme.EditorBackground`, the registration form is wrong. Fallback: try `QML_NAMED_ELEMENT(Theme) + QML_FOREIGN_NAMESPACE` patterns from Qt docs, or move the registration to a non-foreign Q_OBJECT wrapper. Update the spec's §"Risks" R3 with what you found.
 
 - [ ] **Step 6: Falsifiability proof.**
 
@@ -232,7 +232,7 @@ git commit -m "feat(live): expose Markoff::Theme to QML via QML_FOREIGN shim
 P1 task 2 of theme-color-wiring spec. ThemeForeign.h is a thin
 markoff-live header that registers Markoff::Theme (a Q_GADGET in
 markoff-core) as the org.markoff.live QML type 'Theme'. The Q_ENUM(Slot)
-becomes reachable as Theme.Slot.<name>, letting delegate bindings spell
+becomes reachable as Theme.<name>, letting delegate bindings spell
 slot names symbolically instead of with numeric literals.
 
 Smoke test theme_slot_enum_resolves_from_qml pins the resolution path."
@@ -300,7 +300,7 @@ ApplicationWindow {
     height: 700
     visible: true
     color: (modelBinding.theme)
-           ? modelBinding.themeColorFor(Theme.Slot.EditorBackground)
+           ? modelBinding.themeColorFor(Theme.EditorBackground)
            : "#ffffff"
     title: ctxMain.title
 
@@ -360,10 +360,10 @@ For each TextEdit found, the bindings to add are:
 
 ```qml
 selectionColor: (root.liveBinding && root.liveBinding.theme)
-                ? root.liveBinding.themeColorFor(Theme.Slot.SelectionBackground)
+                ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
                 : "#b0d0ff"
 selectedTextColor: (root.liveBinding && root.liveBinding.theme)
-                   ? root.liveBinding.themeColorFor(Theme.Slot.EditorBackground)
+                   ? root.liveBinding.themeColorFor(Theme.EditorBackground)
                    : "#ffffff"
 ```
 
@@ -606,7 +606,7 @@ Rectangle {
     anchors { left: parent.left; top: parent.top; bottom: parent.bottom }
     width: 3
     color: (root.liveBinding && root.liveBinding.theme)
-           ? root.liveBinding.themeColorFor(Theme.Slot.Quote)
+           ? root.liveBinding.themeColorFor(Theme.Quote)
            : "#666666"
     opacity: 0.6
 }
@@ -619,7 +619,7 @@ Rectangle {
     anchors.fill: markerLabel
     visible: root.kind === "list-item" && root._fullySelected
     color: (root.liveBinding && root.liveBinding.theme)
-           ? root.liveBinding.themeColorFor(Theme.Slot.SelectionBackground)
+           ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
            : "#b0d0ff"
     z: -1
 }
@@ -634,7 +634,7 @@ Text {
     // ... existing properties ...
     color: root._fullySelected
            ? ((root.liveBinding && root.liveBinding.theme)
-              ? root.liveBinding.themeColorFor(Theme.Slot.EditorBackground)
+              ? root.liveBinding.themeColorFor(Theme.EditorBackground)
               : "#ffffff")
            : ((root.liveBinding && root.liveBinding.theme)
               ? root.liveBinding.themeColorFor(root.markerSlot)
@@ -727,7 +727,7 @@ Replace site at line 11 (root Rectangle `color: Qt.rgba(0, 0, 0, 0.05)`):
 
 ```qml
 color: (root.liveBinding && root.liveBinding.theme)
-       ? root.liveBinding.themeColorFor(Theme.Slot.CodeBlockBackground)
+       ? root.liveBinding.themeColorFor(Theme.CodeBlockBackground)
        : "#f4f4f4"
 ```
 
@@ -735,7 +735,7 @@ Replace TextEdit `color: palette.text` at line 47:
 
 ```qml
 color: (root.liveBinding && root.liveBinding.theme)
-       ? root.liveBinding.themeColorFor(Theme.Slot.CodeBlock)
+       ? root.liveBinding.themeColorFor(Theme.CodeBlock)
        : "#222222"
 ```
 
@@ -743,7 +743,7 @@ Replace language label `color: palette.mid` at line 147:
 
 ```qml
 color: (root.liveBinding && root.liveBinding.theme)
-       ? root.liveBinding.themeColorFor(Theme.Slot.Quote)
+       ? root.liveBinding.themeColorFor(Theme.Quote)
        : "#666666"
 ```
 
@@ -751,7 +751,7 @@ Replace the second `color: palette.text` at line 166:
 
 ```qml
 color: (root.liveBinding && root.liveBinding.theme)
-       ? root.liveBinding.themeColorFor(Theme.Slot.CodeBlock)
+       ? root.liveBinding.themeColorFor(Theme.CodeBlock)
        : "#222222"
 ```
 
@@ -836,15 +836,15 @@ Rectangle {
     objectName: "imagePlaceholder"
     // existing properties
     color: (root.liveBinding && root.liveBinding.theme)
-           ? root.liveBinding.themeColorFor(Theme.Slot.CodeBlockBackground)
+           ? root.liveBinding.themeColorFor(Theme.CodeBlockBackground)
            : "#f4f4f4"
     border.color: (root.liveBinding && root.liveBinding.theme)
-                  ? root.liveBinding.themeColorFor(Theme.Slot.Quote)
+                  ? root.liveBinding.themeColorFor(Theme.Quote)
                   : "#666666"
 ```
 
-- Line 51, 60 (`color: palette.mid`): replace with the `Theme.Slot.Quote` binding (with `"#666666"` fallback).
-- Line 96 (`border.color: palette.highlight`): replace with `Theme.Slot.SelectionBackground` (fallback `"#b0d0ff"`).
+- Line 51, 60 (`color: palette.mid`): replace with the `Theme.Quote` binding (with `"#666666"` fallback).
+- Line 96 (`border.color: palette.highlight`): replace with `Theme.SelectionBackground` (fallback `"#b0d0ff"`).
 
 - [ ] **Step 4: Run — expect pass.**
 
@@ -923,15 +923,15 @@ Rectangle {
     // existing properties
     color: root.isSelected
            ? ((root.liveBinding && root.liveBinding.theme)
-              ? root.liveBinding.themeColorFor(Theme.Slot.SelectionBackground)
+              ? root.liveBinding.themeColorFor(Theme.SelectionBackground)
               : "#b0d0ff")
            : ((root.liveBinding && root.liveBinding.theme)
-              ? root.liveBinding.themeColorFor(Theme.Slot.Quote)
+              ? root.liveBinding.themeColorFor(Theme.Quote)
               : "#666666")
 }
 ```
 
-For the selection border at line 22 (`border.color: palette.highlight`), replace with the `Theme.Slot.SelectionBackground` binding.
+For the selection border at line 22 (`border.color: palette.highlight`), replace with the `Theme.SelectionBackground` binding.
 
 - [ ] **Step 4: Run — expect pass.**
 
@@ -972,9 +972,9 @@ targeting."
 Math is uncovered by an integration test (math rendering uses jkqtmathtext, not a QML-introspectable color property), so this task is structural-only — bindings updated, full suite must remain green.
 
 For each site:
-- Line 49 (`color: palette.mid`): replace with `Theme.Slot.Quote` binding (fallback `"#666666"`).
-- Line 84 (`color: palette.text`): replace with `Theme.Slot.TextDefault` binding (fallback `"#222222"`).
-- Line 101 (`border.color: palette.highlight`): replace with `Theme.Slot.SelectionBackground` binding (fallback `"#b0d0ff"`).
+- Line 49 (`color: palette.mid`): replace with `Theme.Quote` binding (fallback `"#666666"`).
+- Line 84 (`color: palette.text`): replace with `Theme.TextDefault` binding (fallback `"#222222"`).
+- Line 101 (`border.color: palette.highlight`): replace with `Theme.SelectionBackground` binding (fallback `"#b0d0ff"`).
 
 - [ ] **Step 2: Build + full suite.**
 
@@ -1062,7 +1062,7 @@ Every visible color in a delegate reads from `Markoff::Theme` via
 
 \`\`\`qml
 color: (root.liveBinding && root.liveBinding.theme)
-       ? root.liveBinding.themeColorFor(Theme.Slot.TextDefault)
+       ? root.liveBinding.themeColorFor(Theme.TextDefault)
        : "#222222"
 \`\`\`
 
@@ -1072,7 +1072,7 @@ color: (root.liveBinding && root.liveBinding.theme)
 - The `:" #xxxxxx"` fallback is the corresponding `defaultLight()`
   color, applied during the transient construction state before
   `liveBinding` is wired.
-- Slot names spell symbolically via `Theme.Slot.<Name>` — the
+- Slot names spell symbolically via `Theme.<Name>` — the
   `Markoff::Theme` Q_GADGET is exposed via `QML_FOREIGN` in
   `ThemeForeign.h`.
 
@@ -1125,7 +1125,7 @@ In `docs/e-arc/e-arc-status.md`, replace the "2026-05-17 update" TL;DR entry (to
 Add to the recent-changes log table (the first data row, right under the header):
 
 ```markdown
-| 2026-05-17 | (theme-color-wiring) | **E2.6 extension — full Theme color wiring.** Spec `docs/specs/2026-05-17-theme-color-wiring-design.md`; plan `docs/plans/2026-05-17-theme-color-wiring.md`. Added `themeColorFor(int)` Q_INVOKABLE and `ThemeForeign.h` (`QML_FOREIGN` for `Markoff::Theme`); migrated 19 color sites across Main.qml + 5 delegates from `palette.*`/hardcoded hex to `themeColorFor(Theme.Slot.X)` bindings. Tag `v0.7.0-e2.6` held pending re-dogfood. |
+| 2026-05-17 | (theme-color-wiring) | **E2.6 extension — full Theme color wiring.** Spec `docs/specs/2026-05-17-theme-color-wiring-design.md`; plan `docs/plans/2026-05-17-theme-color-wiring.md`. Added `themeColorFor(int)` Q_INVOKABLE and `ThemeForeign.h` (`QML_FOREIGN` for `Markoff::Theme`); migrated 19 color sites across Main.qml + 5 delegates from `palette.*`/hardcoded hex to `themeColorFor(Theme.X)` bindings. Tag `v0.7.0-e2.6` held pending re-dogfood. |
 ```
 
 - [ ] **Step 3: Update E2.6 row in the phase board.**

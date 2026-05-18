@@ -14,7 +14,7 @@
 >
 > **Current branch:** `exploration/new-foundation` (worktree at
 > `.worktrees/foundation-exploration/`).
-> **Tags held:** `v0.7.0-e2.5` (S1/S2/S3 cursor fixes, commits `463fc36..6c44a07`) and `v0.7.0-e2.6` (theme + zoom, commits `9fff98d..b73c4ae`) — both pending interactive dogfood at user's local desktop. Dogfood checklists: e-arc-status.md TL;DR (E2.5) and `docs/handoff/2026-05-10-e2.6-dogfood-request.md` (E2.6).
+> **Tags held:** `v0.7.0-e2.5` (S1/S2/S3 cursor fixes, commits `463fc36..6c44a07`) and `v0.7.0-e2.6` (theme + zoom + color wiring, commits `9fff98d..ab6bf47`) — both pending interactive dogfood at user's local desktop. Dogfood checklists: e-arc-status.md TL;DR (E2.5) and `docs/specs/2026-05-17-theme-color-wiring-design.md` §"Definition of done" (E2.6 re-dogfood: Ctrl+Shift+D must visibly invert the editor).
 >
 > **2026-05-10 — Item #5 closed.** Code review of `463fc36..6c44a07`
 > ran clean (1 MED, 2 LOW). MED + 1 LOW fixed inline in this session
@@ -25,6 +25,18 @@
 > exactly queue #2 concern #11 and is **folded into #2** — when #2's
 > spec is written, treat that as one of the surface points to
 > consolidate. 186/186 fast tests pass post-fixes.
+>
+> **2026-05-18 — Item #1 extended: theme color wiring (E2.6 extension).** The
+> 2026-05-10 font/zoom implementation left all color properties reading from
+> `palette.*` or hardcoded hex. Color wiring landed in 13 commits
+> (`8ddaa93..ab6bf47`): `themeColorFor` Q_INVOKABLE proxy, `QML_FOREIGN` shim
+> exposing `Theme.*` enum to QML, all 19 color sites from the spec's slot
+> mapping table, 7 new QML integration tests. Zero `palette.*` references
+> remain in `libs/markoff-live/qml/`. Tag `v0.7.0-e2.6` now covers this
+> extension and is held until re-dogfood confirms Ctrl+Shift+D visibly inverts
+> the editor. Spec: `docs/specs/2026-05-17-theme-color-wiring-design.md`;
+> plan: `docs/plans/2026-05-17-theme-color-wiring.md`. 76/77 tests green
+> (1 pre-existing `tst_live_render_setext_e2e` failure).
 >
 > **2026-05-10 — Item #1 implemented.** Spec
 > `docs/specs/2026-05-10-e2.6-theme-zoom-design.md`; plan
@@ -70,7 +82,7 @@
 
 ---
 
-## #1 — E2.6: theme wire-up + zoom ✅ IMPLEMENTED 2026-05-10 (dogfood pending)
+## #1 — E2.6: theme wire-up + zoom + color wiring ✅ EXTENDED 2026-05-18 (re-dogfood pending)
 
 **Effort:** ~1 week. **Status:** implemented; interactive dogfood pending.
 
