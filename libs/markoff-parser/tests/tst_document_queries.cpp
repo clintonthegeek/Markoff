@@ -16,6 +16,8 @@ private Q_SLOTS:
     void testWordCount();
     void testCharacterCount();
     void testFootnotes();
+    void wiki_links_carry_structured_target();
+    void standard_links_carry_url_in_structured();
 };
 
 void TestDocumentQueries::testHeadings()
@@ -98,6 +100,32 @@ void TestDocumentQueries::testFootnotes()
     QCOMPARE(footnotes[0].number, 1);
     QCOMPARE(footnotes[0].label, QStringLiteral("1"));
     QVERIFY(footnotes[0].content.contains(QStringLiteral("footnote content")));
+}
+
+void TestDocumentQueries::wiki_links_carry_structured_target()
+{
+    auto doc = Markoff::Document::fromMarkdown(QStringLiteral("[[Page|Alias]] and [[Other#Sec]]"));
+    const auto wls = doc->wikiLinks();
+    QCOMPARE(wls.size(), 2);
+
+    // Order is source-order; first is [[Page|Alias]].
+    QCOMPARE(wls[0].structured.page,  QStringLiteral("Page"));
+    QCOMPARE(wls[0].structured.alias, QStringLiteral("Alias"));
+    QCOMPARE(wls[1].structured.page,    QStringLiteral("Other"));
+    QCOMPARE(wls[1].structured.section, QStringLiteral("Sec"));
+}
+
+void TestDocumentQueries::standard_links_carry_url_in_structured()
+{
+    auto doc = Markoff::Document::fromMarkdown(QStringLiteral("[t](https://x.y)"));
+    const auto links = doc->links();
+    bool found = false;
+    for (const auto &l : links) {
+        if (l.type == Markoff::LinkInfo::Standard && l.structured.url == QStringLiteral("https://x.y")) {
+            found = true; break;
+        }
+    }
+    QVERIFY(found);
 }
 
 QTEST_MAIN(TestDocumentQueries)

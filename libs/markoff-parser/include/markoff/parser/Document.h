@@ -8,6 +8,7 @@
 #include <QString>
 #include <QList>
 #include <QVariant>
+#include <markoff/parser/LinkTarget.h>
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/parser/YamlValue.h>
 
@@ -25,6 +26,7 @@ struct LinkInfo {
     Type type;
     QString target;
     QString displayText;
+    LinkTarget structured;  ///< Pre-decomposed target: same decomposition as SourceSpan::linkTarget.
     int sourceOffset;
     int sourceLength = 0;  ///< UTF-8 bytes covered by the link node.
 };

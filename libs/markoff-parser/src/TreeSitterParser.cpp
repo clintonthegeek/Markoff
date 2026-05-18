@@ -872,6 +872,7 @@ bool extractLinkFromNode(TSNode node, const QByteArray &utf8, LinkInfo &out)
             out.target = inner;
             out.displayText = inner;
         }
+        out.structured = Markoff::Detail::decomposeWikilinkInner(QStringView{inner});
         return true;
     }
     if (strcmp(type, "inline_link") == 0 ||
@@ -900,6 +901,7 @@ bool extractLinkFromNode(TSNode node, const QByteArray &utf8, LinkInfo &out)
         }
         if (out.target.isEmpty() && !out.displayText.isEmpty())
             out.target = out.displayText;
+        out.structured.url = out.target;
         return true;
     }
     if (strcmp(type, "image") == 0) {
@@ -920,6 +922,7 @@ bool extractLinkFromNode(TSNode node, const QByteArray &utf8, LinkInfo &out)
                 out.target = QString::fromUtf8(utf8.mid(cs, ce - cs));
             }
         }
+        out.structured.url = out.target;
         return true;
     }
     return false;
