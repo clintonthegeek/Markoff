@@ -155,6 +155,43 @@ Known edge case: tight-list + fenced code block (no surrounding blank
 lines) — parser misclassifies fence content as list-item text; tracked
 for a future parser fix.
 
+## Color binding convention (E2.6)
+
+Every visible color in a delegate reads from `Markoff::Theme` via
+`LiveListModelBinding`'s Q_INVOKABLE proxies. The pattern:
+
+```qml
+color: (root.liveBinding && root.liveBinding.theme)
+       ? root.liveBinding.themeColorFor(Theme.TextDefault)
+       : "#222222"
+```
+
+- The `root.liveBinding.theme` LHS read gives QML a NOTIFY dependency
+  on the Theme Q_PROPERTY. Without this anchor, `themeColorFor` calls
+  would not re-evaluate on dark toggle.
+- The `"#xxxxxx"` fallback is the corresponding `defaultLight()`
+  color, applied during the transient construction state before
+  `liveBinding` is wired.
+- Slot names spell symbolically via `Theme.<Name>` — the
+  `Markoff::Theme` Q_GADGET is exposed via `QML_FOREIGN` in
+  `ThemeForeign.h`.
+
+Do **not** use `palette.text` / `palette.highlight` / `palette.mid` /
+`palette.alternateBase` for editor colors. The QtQuick Controls palette
+is OS-driven and won't follow our Theme. The only intentional surviving
+palette usage in delegates is documented inline with
+`// palette intentional — <reason>`.
+
+Two slots are deliberately reused as multi-purpose accents:
+
+- **`Quote`** — blockquote text + HR + placeholder borders + muted
+  secondary accent. If E3+ callout coloring needs separation, the slot
+  splits in its own spec.
+- **`CodeBlockBackground`** — code-block surface + image-placeholder
+  surface.
+
+Spec: `docs/specs/2026-05-17-theme-color-wiring-design.md`.
+
 ## Conventions
 
 - C++20, Qt 6.8+.
