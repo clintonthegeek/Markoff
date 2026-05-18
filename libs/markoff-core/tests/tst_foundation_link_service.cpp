@@ -60,6 +60,26 @@ private Q_SLOTS:
         QCOMPARE(round.alias, QStringLiteral("Alias"));
         QCOMPARE(int(round.modifiers), int(Qt::ControlModifier));
     }
+
+    void classify_recognises_wikilink_shape() {
+        DefaultLinkService svc;
+        QCOMPARE(svc.classify(QStringLiteral("[[Page]]")), LinkKind::WikiLink);
+        QCOMPARE(svc.classify(QStringLiteral("[[Page|Alias]]")), LinkKind::WikiLink);
+        QCOMPARE(svc.classify(QStringLiteral("[[Page#Section]]")), LinkKind::WikiLink);
+    }
+
+    void classify_recognises_tag_shape_dormant() {
+        DefaultLinkService svc;
+        // Dormant for E3a — E3b will wire the click path.
+        QCOMPARE(svc.classify(QStringLiteral("#tag")), LinkKind::Tag);
+    }
+
+    void classify_existing_external_kinds_unchanged() {
+        DefaultLinkService svc;
+        QCOMPARE(svc.classify(QStringLiteral("https://x.y")), LinkKind::External);
+        QCOMPARE(svc.classify(QStringLiteral("mailto:x@y")), LinkKind::External);
+        QCOMPARE(svc.classify(QStringLiteral("nope")), LinkKind::Unknown);
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationLinkService)
