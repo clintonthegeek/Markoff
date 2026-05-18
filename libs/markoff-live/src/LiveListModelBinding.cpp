@@ -167,6 +167,9 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
     : QObject(parent)
     , d(std::make_unique<Private>())
 {
+    m_defaultLinkService = std::make_unique<Markoff::DefaultLinkService>();
+    m_linkService = m_defaultLinkService.get();
+
     d->caps            = caps;
     d->model           = new LiveBlockModel(this);
     d->cursorState     = new LiveCursorState(&d->registry, d->model, this, this);
@@ -299,6 +302,25 @@ LiveContextMenuHandler  *LiveListModelBinding::contextMenuHandler()  const { ret
 bool LiveListModelBinding::applyingModelUpdate() const
 {
     return d->applyingModelUpdate;
+}
+
+Markoff::LinkService *LiveListModelBinding::linkService() const { return m_linkService; }
+
+void LiveListModelBinding::setLinkService(Markoff::LinkService *s)
+{
+    Markoff::LinkService *target = s ? s : m_defaultLinkService.get();
+    if (target == m_linkService) return;
+    m_linkService = target;
+    Q_EMIT linkServiceChanged();
+}
+
+QString LiveListModelBinding::fromContext() const { return m_fromContext; }
+
+void LiveListModelBinding::setFromContext(const QString &v)
+{
+    if (m_fromContext == v) return;
+    m_fromContext = v;
+    Q_EMIT fromContextChanged();
 }
 
 const Markoff::Theme *LiveListModelBinding::theme() const noexcept

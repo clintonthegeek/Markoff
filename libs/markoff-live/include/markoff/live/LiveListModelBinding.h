@@ -23,6 +23,8 @@
 #include <markoff/core/BlockAnchor.h>
 #include <markoff/core/Session.h>
 #include <markoff/core/Theme.h>
+#include <markoff/core/LinkService.h>
+#include <markoff/core/DefaultLinkService.h>
 
 namespace Markoff::Live {
 
@@ -137,10 +139,18 @@ public:
     /// QML-binding echo.
     bool applyingModelUpdate() const;
 
+    Markoff::LinkService *linkService() const;
+    void setLinkService(Markoff::LinkService *service);
+
+    QString fromContext() const;
+    void setFromContext(const QString &);
+
 Q_SIGNALS:
     void documentChanged();
     void themeChanged();
     void fontScaleChanged();
+    void linkServiceChanged();
+    void fromContextChanged();
 
 
 private:
@@ -148,6 +158,10 @@ private:
 
     struct Private;
     std::unique_ptr<Private> d;
+
+    std::unique_ptr<Markoff::DefaultLinkService> m_defaultLinkService;
+    Markoff::LinkService *m_linkService = nullptr;
+    QString m_fromContext;
 };
 
 }  // namespace Markoff::Live
