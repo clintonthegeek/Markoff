@@ -300,13 +300,48 @@ void SourceTextDocumentBinding::rewireQtDocument()
     syncQtDocumentFromMarkoff();
 }
 
+// Translate a byte offset in the separator-bearing flat-view space (what
+// `MarkoffDocument::flatView()` returns) to the equivalent offset in the
+// no-separator concatenation space used by `applyFlatEdit`. Offsets that
+// land inside a separator span are clamped to the no-separator boundary
+// between the surrounding blocks.
+//
+// Known gap (TODO): edits that delete separator bytes (e.g. backspace at
+// the start of a block, removing the `\n\n` between two blocks) currently
+// translate to a zero-length cursor edit in no-separator space, so the
+// model retains both blocks while the QTextDocument has them merged. The
+// subsequent `onD2DocumentChanged` then reverts the user's edit. Source
+// widget consumers should be aware that separator-zone deletes do not
+// merge blocks yet — needs a follow-on for full structural editing parity.
+static quint32 sepViewToNoSepByte(const Markoff::MarkoffDocument *doc, quint32 sepOff)
+{
+    const auto blocks = doc->iterateBlocks();
+    constexpr quint32 SEP_LEN = 2;   // "\n\n"
+    quint32 sepCursor   = 0;
+    quint32 noSepCursor = 0;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        const quint32 blkSize = static_cast<quint32>(doc->blockText(blocks[i]).size());
+        const quint32 blkEnd  = sepCursor + blkSize;
+        if (sepOff <= blkEnd) return noSepCursor + (sepOff - sepCursor);
+        sepCursor   = blkEnd;
+        noSepCursor += blkSize;
+        if (i + 1 < blocks.size()) {
+            const quint32 sepEnd = sepCursor + SEP_LEN;
+            if (sepOff < sepEnd) return noSepCursor;  // inside separator → clamp
+            sepCursor = sepEnd;
+        }
+    }
+    return noSepCursor;
+}
+
 void SourceTextDocumentBinding::syncQtDocumentFromMarkoff()
 {
     if (!m_subscribedDoc || !m_textDocument) return;
-    QByteArray utf8;
-    for (Markoff::BlockId id : m_subscribedDoc->iterateBlocks())
-        utf8 += m_subscribedDoc->blockText(id);
-    const QString text = QString::fromUtf8(utf8);
+    // Use the separator-bearing flat view so the inner QTextDocument is a
+    // 1:1 mirror of the saved markdown — line/column positions match the
+    // file. `applyFlatEdit`'s coordinate space (no-separator) is translated
+    // in `onQtContentsChange`.
+    const QString text = QString::fromUtf8(m_subscribedDoc->flatView());
     if (m_textDocument->toPlainText() == text) return;  // already in sync
     m_applyingRemoteEdit = true;
     m_textDocument->setPlainText(text);
@@ -322,15 +357,16 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
 
     Markoff::MarkoffDocument *doc = m_markoffDocument;
 
-    // Compute byte offsets against the PRE-CHANGE document state.
-    // Derive from block-buffer flat text (D2 convention): concatenation of
-    // blockText(id) for each block in iterateBlocks() order.
-    QByteArray preBytes;
-    for (Markoff::BlockId id : doc->iterateBlocks())
-        preBytes += doc->blockText(id);
-    const QString preText = QString::fromUtf8(preBytes);
-    const quint32 oldStart = qtPosToByteOffset(preText, qtPos);
-    const quint32 oldEnd   = qtPosToByteOffset(preText, qtPos + charsRemoved);
+    // Compute byte offsets against the PRE-CHANGE document state in the
+    // separator-bearing flat view (what the QTextDocument holds).
+    const QByteArray preBytesSep = doc->flatView();
+    const QString    preTextSep  = QString::fromUtf8(preBytesSep);
+    const quint32 oldStartSep = qtPosToByteOffset(preTextSep, qtPos);
+    const quint32 oldEndSep   = qtPosToByteOffset(preTextSep, qtPos + charsRemoved);
+
+    // Translate to no-separator coordinates for applyFlatEdit.
+    const quint32 oldStart = sepViewToNoSepByte(doc, oldStartSep);
+    const quint32 oldEnd   = sepViewToNoSepByte(doc, oldEndSep);
 
     // Extract the inserted text from the POST-CHANGE QTextDocument.
     const QString postPlain = m_textDocument->toPlainText();
@@ -352,10 +388,7 @@ void SourceTextDocumentBinding::onD2DocumentChanged()
     if (!m_textDocument) return;
     if (!m_subscribedDoc) return;
 
-    QByteArray expected;
-    for (Markoff::BlockId id : m_subscribedDoc->iterateBlocks())
-        expected += m_subscribedDoc->blockText(id);
-    const QString expectedStr = QString::fromUtf8(expected);
+    const QString expectedStr = QString::fromUtf8(m_subscribedDoc->flatView());
     // After a forward edit the QTextDocument already holds the new text;
     // this equality check prevents the unnecessary setPlainText re-application.
     if (m_textDocument->toPlainText() == expectedStr) return;

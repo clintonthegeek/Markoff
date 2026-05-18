@@ -2011,6 +2011,22 @@ QByteArray MarkoffDocument::serializeForSave() const
     return out;
 }
 
+QByteArray MarkoffDocument::flatView() const
+{
+    QByteArray out;
+    const auto blocks = iterateBlocks();
+    if (blocks.empty()) return out;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        out += blockText(blocks[i]);
+        if (i + 1 < blocks.size())
+            out += interBlockSeparator();
+    }
+    // Intentional: no `finalDocumentTerminator()`. A source view should not
+    // render a phantom empty line at the end; the trailing `\n` belongs to
+    // `serializeForSave()`'s file-on-disk shape, not the live editor view.
+    return out;
+}
+
 bool MarkoffDocument::save(const QString &path)
 {
     QSaveFile f(path);

@@ -166,10 +166,23 @@ public:
     /// transaction and decomposes the edit into per-block d2ApplyBufferEdit
     /// calls + structural ops (d2InsertBlock, d2RemoveBlock). The entire
     /// edit lands in one transaction so a single undoD2() reverses it.
+    /// Coordinate space: no-separator concatenation of `blockText(id)` for
+    /// each block in `iterateBlocks()` order. See `flatView()` for the
+    /// separator-bearing source-markdown representation.
     void applyFlatEdit(uint32_t oldStart,
                        uint32_t oldEnd,
                        const QByteArray &newText,
                        Origin origin);
+
+    /// Source-view representation of the document: per-block content joined
+    /// by `interBlockSeparator()` (`"\n\n"`). No final document terminator —
+    /// a source widget should not render a phantom empty line at the end;
+    /// the trailing `"\n"` is `serializeForSave()`'s file-on-disk concern.
+    /// This is the representation a source-view widget should display so
+    /// that line/column positions correspond to logical lines in the saved
+    /// file. The `applyFlatEdit` coordinate space (no-separator) is a
+    /// different view; consumers translate between the two as needed.
+    QByteArray flatView() const;
 
     /// Structure-aware paste. Serializes `blocks` (a QJsonArray of block
     /// objects with "kind", "text", and optional "attrs") to flat markdown
