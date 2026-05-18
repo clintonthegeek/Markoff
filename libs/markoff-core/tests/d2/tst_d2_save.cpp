@@ -153,10 +153,13 @@ void TstD2Save::untouchedBlock_savesLoadTimeBytes()
     doc.loadFromMarkdown("Hello world\n");
     BlockId blk = doc.iterateBlocks().front();
     QVERIFY(!doc.isBlockTouched(blk));
-    // Untouched block → serializeForSave uses the original load-time bytes
+    // Untouched block → serializeForSave emits load-time bytes.
+    // Under B1, blockLoadTimeBytes() is content-only ("Hello world");
+    // serializeForSave() appends the document-final '\n', so the
+    // full output is blockLoadTimeBytes() + "\n".
     QByteArray serialized = doc.serializeForSave();
     QVERIFY(serialized.contains("Hello world"));
-    QCOMPARE(serialized, doc.blockLoadTimeBytes(blk));
+    QCOMPARE(serialized, doc.blockLoadTimeBytes(blk) + "\n");
 }
 
 void TstD2Save::editedBlock_savesCanonical()
