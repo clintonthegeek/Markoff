@@ -147,7 +147,16 @@ struct LiveListModelBinding::Private {
     Capabilities               caps            = AllCapabilities;
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
-    Markoff::Theme             theme            = Markoff::Theme::defaultLight();
+    // Theme is held in a two-buffer rotation so every `setTheme` swaps the
+    // active pointer. QML's binding system skips downstream writes when a
+    // binding's evaluated value equals the previous value; without the swap,
+    // `theme()` would always return `&themeBuffers[0]` and
+    // `InlineHighlighterAttached::setTheme(samePointer)` would never be called
+    // — colours never refresh on dark-mode toggle.
+    Markoff::Theme             themeBuffers[2] {
+        Markoff::Theme::defaultLight(), Markoff::Theme::defaultLight()
+    };
+    int                        activeThemeIdx   = 0;
     qreal                      fontScale        = kDefaultFontScale;
 };
 
@@ -294,13 +303,15 @@ bool LiveListModelBinding::applyingModelUpdate() const
 
 const Markoff::Theme *LiveListModelBinding::theme() const noexcept
 {
-    return &d->theme;
+    return &d->themeBuffers[d->activeThemeIdx];
 }
 
 void LiveListModelBinding::setTheme(const Markoff::Theme *theme)
 {
-    if (!theme || theme == &d->theme) return;
-    d->theme = *theme;
+    if (!theme) return;
+    const int next = 1 - d->activeThemeIdx;
+    d->themeBuffers[next] = *theme;
+    d->activeThemeIdx = next;
     Q_EMIT themeChanged();
 }
 
@@ -313,22 +324,26 @@ void LiveListModelBinding::applyDefaultTheme(bool dark)
 
 qreal LiveListModelBinding::themePixelSizeFor(int slot) const
 {
-    return d->theme.pixelSizeFor(static_cast<Markoff::Theme::Slot>(slot));
+    return d->themeBuffers[d->activeThemeIdx]
+        .pixelSizeFor(static_cast<Markoff::Theme::Slot>(slot));
 }
 
 QString LiveListModelBinding::themeFamilyFor(int slot) const
 {
-    return d->theme.familyFor(static_cast<Markoff::Theme::Slot>(slot));
+    return d->themeBuffers[d->activeThemeIdx]
+        .familyFor(static_cast<Markoff::Theme::Slot>(slot));
 }
 
 bool LiveListModelBinding::themeIsBold(int slot) const
 {
-    return d->theme.isBold(static_cast<Markoff::Theme::Slot>(slot));
+    return d->themeBuffers[d->activeThemeIdx]
+        .isBold(static_cast<Markoff::Theme::Slot>(slot));
 }
 
 bool LiveListModelBinding::themeIsItalic(int slot) const
 {
-    return d->theme.isItalic(static_cast<Markoff::Theme::Slot>(slot));
+    return d->themeBuffers[d->activeThemeIdx]
+        .isItalic(static_cast<Markoff::Theme::Slot>(slot));
 }
 
 qreal LiveListModelBinding::fontScale() const noexcept

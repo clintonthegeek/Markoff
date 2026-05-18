@@ -536,6 +536,20 @@ add_test(NAME tst_live_render_inline_highlighter_font_scale
 set_tests_properties(tst_live_render_inline_highlighter_font_scale
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# E2.6 dogfood remediation: dark-toggle propagation. Pins that
+# `LiveListModelBinding::setTheme` swaps internal buffers so the
+# `theme()` pointer changes on every set — necessary for QML's binding
+# system to re-write downstream `InlineHighlighterAttached.theme` and
+# trigger a rehighlight on Ctrl+Shift+D.
+qt_add_executable(tst_live_render_theme_toggle_propagation
+    tst_live_render_theme_toggle_propagation.cpp)
+target_link_libraries(tst_live_render_theme_toggle_propagation PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_render_theme_toggle_propagation
+         COMMAND tst_live_render_theme_toggle_propagation)
+set_tests_properties(tst_live_render_theme_toggle_propagation
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # Queue #3: QML integration harness. Loads production Main.qml via the
 # markoff-live-app-internal STATIC library; runs offscreen.
 qt_add_executable(tst_live_render_qml_integration
