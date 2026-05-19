@@ -25,7 +25,12 @@ namespace Markoff::Live {
 /// Spec §5.1.
 struct MARKOFF_LIVE_EXPORT BlockKindDescriptor {
     QString     id;          ///< "paragraph", "heading", etc.
-    QString     delegateUrl; ///< qrc: URL of the QML delegate (R3+ dispatch).
+    /// qrc: URL of the QML delegate. Populated for built-in kinds as
+    /// a queryable annotation (debuggers, DevTools, future plugin-kind
+    /// machinery); NOT consumed by LiveView.qml's DelegateChooser, which
+    /// dispatches on `delegateClass`. Plugin-kind dynamic dispatch is a
+    /// future spec that would wire this through a Loader-based selector.
+    QString delegateUrl;
 
     /// Which Cursor variants this kind admits: "TextCaret", "BlockSelected",
     /// "BlockInternalEdit". Validated by LiveCursorState in R3.
@@ -38,18 +43,10 @@ struct MARKOFF_LIVE_EXPORT BlockKindDescriptor {
     /// False for hr, image.
     bool acceptsTextRoleUpdates = false;
 
-    /// True when the block kind can never host a text caret and its UX is
-    /// "select the whole block, then act on it" — i.e. the cursor lands on
-    /// this block as BlockSelected, never as TextCaret.
-    ///
-    /// Currently true for HorizontalRule and Image.
-    ///
-    /// This flag is explicit rather than derived from supportedCursorVariants
-    /// so that Math — which also lacks TextCaret today but is heading toward
-    /// text-bearing in a separate spec — can be excluded cleanly without
-    /// kind-name special-cases at every call site.
-    ///
-    /// Refs spec §3 of docs/specs/2026-05-13-block-only-kinds-design.md
+    /// Whether this kind cannot host a text caret. Derived from
+    /// `supportedCursorVariants` in practice — except for transitional
+    /// kinds (currently Math) where the explicit flag retains current
+    /// behaviour pending the kind's text-bearing redesign (E5 for Math).
     bool isBlockOnly = false;
 
     /// Context-menu actions registered for this kind. R9.

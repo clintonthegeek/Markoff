@@ -70,8 +70,14 @@ void LiveEditBinding::pushTextToDocument()
 {
     if (!m_listenedDoc) return;
     if (m_listenedDoc->toPlainText() == m_text) return;
-    // Setting the document text fires contentsChange synchronously; the
-    // applyingTextUpdate guard makes onContentsChange skip it.
+    // Re-entrance guard for the pushTextToDocument ↔ onContentsChange
+    // echo loop. Accepted invariant-7 smell at freeze (2026-05-19); see
+    // docs/queue.md Discipline Log. Future redesign tracked as the
+    // edit-pipeline echo-suppression spec (TBW). Two production QML
+    // delegates (CodeBlockDelegate.qml:65, UnifiedInlineTextDelegate.qml:202)
+    // read the public isApplyingTextUpdate() accessor to suppress reactions
+    // during the apply window — that is the load-bearing reason this
+    // accessor stays in the frozen public API.
     m_applyingTextUpdate = true;
     auto _ = qScopeGuard([this]{ m_applyingTextUpdate = false; });
     m_listenedDoc->setPlainText(m_text);

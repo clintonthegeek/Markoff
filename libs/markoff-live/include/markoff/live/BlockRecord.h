@@ -32,7 +32,10 @@ struct MARKOFF_LIVE_EXPORT BlockRecord {
     QString              codeLanguage;      ///< Fence info-string if kind=="code-block".
     QString              headingForm;       ///< "atx" / "setext" if kind=="heading"; else empty.
     Markoff::BlockAnchor blockAnchor;       ///< CRDT-stable identity (block's first byte).
-    QList<Markoff::SourceSpan> inlineSpans; ///< Pre-baked inline spans (R1B). Used in R6.
+    /// Per-block inline-format spans (bold/italic/code/link/wikilink/tag/
+    /// strikethrough/highlight) populated from the parsed AST and consumed
+    /// by `InlineHighlighter` (E1). Load-bearing — do not strip.
+    QList<Markoff::SourceSpan> inlineSpans;
     QHash<Markoff::AttrName, Markoff::AttrValue> attrs; ///< Block-kind attributes (e.g. level, infoString).
 
     bool operator==(const BlockRecord &o) const noexcept {

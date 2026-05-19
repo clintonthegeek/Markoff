@@ -122,6 +122,12 @@ Item {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         if (cs) cs.request({ variant: "BlockInternalEdit",
                               block: model.blockAnchor, mode: "editing-latex" })
+        // Deferral: forceActiveFocus needs to run after the
+        // BlockInternalEdit cursor variant change propagates through QML
+        // bindings (latexEdit's visibility / focus chain). Accepted
+        // invariant-6 smell at freeze (2026-05-19); see docs/queue.md
+        // Discipline Log. E5 (math live-mode parity) will redesign this
+        // with a chokepoint-routed focus signal.
         Qt.callLater(function() { latexEdit.forceActiveFocus() })
     }
 
