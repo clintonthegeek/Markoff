@@ -4,7 +4,7 @@
 
 #include <markoff/live/Coordinates.h>
 
-using namespace Markoff::Live::Coordinates;
+using namespace Markoff::Live::Detail::Coordinates;
 
 class TstLiveRenderCoords : public QObject {
     Q_OBJECT

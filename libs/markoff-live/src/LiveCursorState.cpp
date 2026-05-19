@@ -22,6 +22,8 @@ Q_LOGGING_CATEGORY(lcCursor, "markoff.live.cursor", QtWarningMsg)
 
 namespace Markoff::Live {
 
+namespace coords = Detail::Coordinates;
+
 LiveCursorState::LiveCursorState(const BlockKindRegistry *registry,
                                  const LiveBlockModel    *model,
                                  LiveListModelBinding    *binding,
@@ -591,11 +593,11 @@ void LiveCursorState::deleteSelectionRange()
 
         if (i == fb) {
             const QByteArray modelUtf8 = m_model->recordAt(fb).text.toUtf8();
-            startByte = cursor + Coordinates::qtPosToByte(modelUtf8, fo);
+            startByte = cursor + coords::qtPosToByte(modelUtf8, fo);
         }
         if (i == lb) {
             const QByteArray modelUtf8 = m_model->recordAt(lb).text.toUtf8();
-            endByte = cursor + Coordinates::qtPosToByte(modelUtf8, lo);
+            endByte = cursor + coords::qtPosToByte(modelUtf8, lo);
             break;
         }
         cursor += blockSize;
@@ -646,7 +648,7 @@ void LiveCursorState::syncSelectionToSession()
         if (row < 0) return Markoff::TextAnchor{};
         const auto utf8 = m_model->recordAt(row).text.toUtf8();
         const int byteOff = static_cast<int>(
-            Coordinates::qtPosToByte(utf8, qMax(0, qtPos)));
+            coords::qtPosToByte(utf8, qMax(0, qtPos)));
         return doc->textAnchorAt(block, byteOff, /*rightBias=*/true);
     };
 
@@ -673,7 +675,7 @@ void LiveCursorState::onSessionPrimarySelectionChanged(const Markoff::Selection 
         const int row = rowForBlock(ba);
         const auto utf8 = m_model->recordAt(row).text.toUtf8();
         const int clamped = qBound(0, byteOff, static_cast<int>(utf8.size()));
-        const int qtPos = static_cast<int>(Coordinates::byteToQtPos(utf8, clamped));
+        const int qtPos = static_cast<int>(coords::byteToQtPos(utf8, clamped));
         return SelectionAnchor{ba, static_cast<quint32>(qtPos)};
     };
 

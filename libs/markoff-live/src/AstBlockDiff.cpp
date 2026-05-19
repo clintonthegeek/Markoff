@@ -3,7 +3,7 @@
 
 #include <vector>
 
-namespace Markoff::Live {
+namespace Markoff::Live::Detail {
 
 QList<AstBlockDiff::Op> AstBlockDiff::diff(const QList<BlockKey> &prev,
                                             const QList<BlockKey> &next)
@@ -53,4 +53,4 @@ QList<AstBlockDiff::Op> AstBlockDiff::diff(const QList<BlockKey> &prev,
     return ops;
 }
 
-}  // namespace Markoff::Live
+} // namespace Markoff::Live::Detail

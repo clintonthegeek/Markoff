@@ -20,6 +20,8 @@
 
 namespace Markoff::Live {
 
+namespace coords = Detail::Coordinates;
+
 LiveClipboardController::LiveClipboardController(QObject *parent) : QObject(parent) {}
 
 void LiveClipboardController::setDocument(Markoff::MarkoffDocument *doc) { m_document = doc; }
@@ -110,7 +112,7 @@ uint32_t flatByteOffset(const LiveBlockModel &model,
             const QByteArray modelUtf8 = model.recordAt(blockIndex).text.toUtf8();
             const int clamped = qBound(0, qtPos, static_cast<int>(modelUtf8.size()));
             return cursor + static_cast<uint32_t>(
-                Coordinates::qtPosToByte(modelUtf8, clamped));
+                coords::qtPosToByte(modelUtf8, clamped));
         }
         cursor += static_cast<uint32_t>(rawText.size());
     }

@@ -28,6 +28,8 @@
 
 namespace Markoff::Live {
 
+using Detail::AstBlockDiff;
+
 namespace {
 
 // ============================================================================

@@ -14,6 +14,8 @@
 
 namespace Markoff::Live {
 
+using Detail::AstBlockDiff;  // internal diff helper; consumers see it through this alias
+
 /// `QAbstractListModel` over a list of `BlockRecord`s driven by
 /// `LiveListModelBinding::applyOps`. Roles: kind, text, headingLevel,
 /// codeLanguage, blockAnchor. Per-row edit-sequence tracking for the R4

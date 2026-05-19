@@ -12,6 +12,8 @@
 
 namespace Markoff::Live {
 
+namespace coords = Detail::Coordinates;
+
 LiveFormatController::LiveFormatController(QObject *parent) : QObject(parent) {}
 
 void LiveFormatController::setDocument(Markoff::MarkoffDocument *doc) { m_document = doc; }
@@ -59,8 +61,8 @@ void LiveFormatController::wrapPerBlock(const QByteArray &openDelim, const QByte
 
         // Byte offsets within model text (excludes trailing '\n').
         // These are directly usable with d2ApplyBufferEdit (per-block offsets).
-        const quint32 bLo = static_cast<quint32>(Coordinates::qtPosToByte(modelUtf8, qLo));
-        const quint32 bHi = static_cast<quint32>(Coordinates::qtPosToByte(modelUtf8, qHi));
+        const quint32 bLo = static_cast<quint32>(coords::qtPosToByte(modelUtf8, qLo));
+        const quint32 bHi = static_cast<quint32>(coords::qtPosToByte(modelUtf8, qHi));
         if (bHi <= bLo) continue;
 
         // Wrap detection: check if bytes just OUTSIDE [bLo, bHi) in rawBlock
@@ -108,7 +110,7 @@ void LiveFormatController::insertLink()
     const auto byteInBlock = [&](int row, int qtPos) -> quint32 {
         if (row < 0 || row >= rowCount) return 0;
         const QByteArray modelUtf8 = m_model->recordAt(row).text.toUtf8();
-        return static_cast<quint32>(Coordinates::qtPosToByte(modelUtf8, qtPos));
+        return static_cast<quint32>(coords::qtPosToByte(modelUtf8, qtPos));
     };
 
     Markoff::UndoLog::Transaction t(m_document->d2UndoLog());

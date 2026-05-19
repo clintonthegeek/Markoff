@@ -5,7 +5,7 @@
 #include <QByteArray>
 #include <QtGlobal>
 
-namespace Markoff::Live::Coordinates {
+namespace Markoff::Live::Detail::Coordinates {
 
 /// Number of Qt UTF-16 code units (QChars) spanned by the first
 /// `byteOffset` UTF-8 bytes in `utf8`. Returns the total QChar count
@@ -20,4 +20,4 @@ qsizetype byteToQtPos(const QByteArray &utf8, qsizetype byteOffset);
 MARKOFF_LIVE_EXPORT
 qsizetype qtPosToByte(const QByteArray &utf8, qsizetype qtPos);
 
-}  // namespace Markoff::Live::Coordinates
+} // namespace Markoff::Live::Detail::Coordinates

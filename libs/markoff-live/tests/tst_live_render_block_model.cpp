@@ -13,6 +13,7 @@
 #include <markoff/parser/SourceSpan.h>
 
 using namespace Markoff::Live;
+using Markoff::Live::Detail::AstBlockDiff;
 
 // Helper: build a minimal BlockRecord for testing.
 static BlockRecord makeRecord(const QString &kind, const QString &text,

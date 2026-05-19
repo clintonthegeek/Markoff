@@ -9,6 +9,8 @@
 
 namespace Markoff::Live {
 
+using Detail::AstBlockDiff;
+
 LiveBlockModel::LiveBlockModel(QObject *parent) : QAbstractListModel(parent)
 {
     qRegisterMetaType<Markoff::SourceSpan>("Markoff::SourceSpan");

@@ -20,6 +20,7 @@
 #include <markoff/core/UndoLog.h>
 
 using namespace Markoff::Live;
+using Markoff::Live::Detail::AstBlockDiff;
 
 // ---- helpers ----
 

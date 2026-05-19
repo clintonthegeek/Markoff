@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live/Coordinates.h>
 
-namespace Markoff::Live::Coordinates {
+namespace Markoff::Live::Detail::Coordinates {
 
 qsizetype byteToQtPos(const QByteArray &utf8, qsizetype byteOffset)
 {
@@ -42,4 +42,4 @@ qsizetype qtPosToByte(const QByteArray &utf8, qsizetype qtPos)
     return byteCursor;
 }
 
-}  // namespace Markoff::Live::Coordinates
+} // namespace Markoff::Live::Detail::Coordinates

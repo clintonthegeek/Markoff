@@ -5,7 +5,7 @@
 #include <markoff/live/BlockRecord.h>
 #include <QList>
 
-namespace Markoff::Live {
+namespace Markoff::Live::Detail {
 
 /// Pure C++ Myers/LCS diff over BlockKey sequences. Output is a list of
 /// edit operations referencing indices in `prev` and `next`. Used by
@@ -25,4 +25,4 @@ public:
                           const QList<BlockKey> &next);
 };
 
-}  // namespace Markoff::Live
+} // namespace Markoff::Live::Detail

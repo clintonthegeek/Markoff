@@ -18,6 +18,8 @@ Q_LOGGING_CATEGORY(lcEdit, "markoff.live.edit", QtWarningMsg)
 
 namespace Markoff::Live {
 
+namespace coords = Detail::Coordinates;
+
 LiveEditBinding::LiveEditBinding(QObject *parent) : QObject(parent) {}
 LiveEditBinding::~LiveEditBinding() = default;
 
@@ -149,9 +151,9 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
     // is the only coordinate needed — no absolute document offset required.
     const QByteArray preUtf8 = m_previousText.toUtf8();
     const uint32_t byteOff = static_cast<uint32_t>(
-        Coordinates::qtPosToByte(preUtf8, qtPos));
+        coords::qtPosToByte(preUtf8, qtPos));
     const uint32_t removedBytes = static_cast<uint32_t>(
-        Coordinates::qtPosToByte(preUtf8, qtPos + charsRemoved)) - byteOff;
+        coords::qtPosToByte(preUtf8, qtPos + charsRemoved)) - byteOff;
 
     QByteArray inserted;
     if (charsAdded > 0)
