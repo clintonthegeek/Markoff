@@ -27,8 +27,8 @@ private Q_SLOTS:
         Markoff::Source::FindBar bar(&e);
         bar.activate();
         bar.findChild<QLineEdit *>()->setText(QStringLiteral("quick"));
-        QTRY_VERIFY(!e.extraSelections().isEmpty());
-        QCOMPARE(e.extraSelections().size(), 2);
+        QTRY_VERIFY(!e.plainTextEdit()->extraSelections().isEmpty());
+        QCOMPARE(e.plainTextEdit()->extraSelections().size(), 2);
         delete doc;
     }
 
@@ -40,13 +40,13 @@ private Q_SLOTS:
         Markoff::Source::FindBar bar(&e);
         bar.activate();
         bar.findChild<QLineEdit *>()->setText(QStringLiteral("aaa"));
-        QTRY_COMPARE(e.extraSelections().size(), 3);
+        QTRY_COMPARE(e.plainTextEdit()->extraSelections().size(), 3);
         // Cursor sits on first match initially.
-        const int firstPos = e.textCursor().position();
+        const int firstPos = e.plainTextEdit()->textCursor().position();
         QMetaObject::invokeMethod(&bar, "next");
-        QVERIFY(e.textCursor().position() != firstPos);
+        QVERIFY(e.plainTextEdit()->textCursor().position() != firstPos);
         QMetaObject::invokeMethod(&bar, "prev");
-        QCOMPARE(e.textCursor().position(), firstPos);
+        QCOMPARE(e.plainTextEdit()->textCursor().position(), firstPos);
         delete doc;
     }
 
@@ -58,9 +58,9 @@ private Q_SLOTS:
         Markoff::Source::FindBar bar(&e);
         bar.activate();
         bar.findChild<QLineEdit *>()->setText(QStringLiteral("hello"));
-        QTRY_VERIFY(!e.extraSelections().isEmpty());
+        QTRY_VERIFY(!e.plainTextEdit()->extraSelections().isEmpty());
         bar.deactivate();
-        QVERIFY(e.extraSelections().isEmpty());
+        QVERIFY(e.plainTextEdit()->extraSelections().isEmpty());
         delete doc;
     }
 };

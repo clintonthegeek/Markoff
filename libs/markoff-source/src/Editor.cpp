@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/source/Editor.h>
+#include <markoff/source/FindBar.h>
 #include "Gutter.h"
 #include "InnerEditor.h"
 
@@ -129,9 +130,37 @@ void Editor::setReadOnly(bool ro) {
 
 bool Editor::isReadOnly() const { return m_editor->isReadOnly(); }
 
-void Editor::showFindBar()    { /* find bar integration: v1.1 */ }
-void Editor::showReplaceBar() { /* replace bar integration: v1.1 */ }
-void Editor::hideFindBar()    { /* find bar integration: v1.1 */ }
+void Editor::showFindBar()
+{
+    if (!m_findBar) {
+        m_findBar = new FindBar(this, this);
+        // The Editor's QVBoxLayout was set up in the constructor; append the
+        // FindBar after the inner editor. When hidden, the layout collapses
+        // the bar's space; when shown, the inner editor shrinks to make room.
+        if (auto *l = qobject_cast<QVBoxLayout *>(layout())) {
+            l->addWidget(m_findBar);
+        }
+        connect(m_findBar, &FindBar::closed, this, &Editor::hideFindBar);
+        m_findBar->hide();  // start hidden; activate() below shows it.
+    }
+    m_findBar->activate();
+}
+
+void Editor::showReplaceBar()
+{
+    // v1: no-op. Reserved for a future ReplaceBar widget (see
+    // docs/specs/2026-05-18-markoff-source-freeze-shape-design.md §"Out of scope").
+}
+
+void Editor::hideFindBar()
+{
+    // Idempotent: deactivate() hides the bar and emits closed() synchronously,
+    // which re-enters this method via the connection installed in showFindBar.
+    // The isVisible() check makes the re-entered call a no-op, so the
+    // recursion terminates after one extra stack frame.
+    if (!m_findBar || !m_findBar->isVisible()) return;
+    m_findBar->deactivate();
+}
 
 Markoff::Theme Editor::theme() const { return m_theme; }
 

@@ -60,7 +60,7 @@ void FindBar::deactivate() {
     hide();
     m_matches.clear();
     m_currentIndex = -1;
-    if (m_editor) m_editor->setExtraSelections({});
+    if (m_editor) m_editor->plainTextEdit()->setExtraSelections({});
     emit closed();
 }
 
@@ -91,14 +91,14 @@ void FindBar::recomputeMatches() {
 }
 
 void FindBar::highlightAll() {
-    if (m_editor) m_editor->setExtraSelections(m_matches);
+    if (m_editor) m_editor->plainTextEdit()->setExtraSelections(m_matches);
 }
 
 void FindBar::seekTo(int matchIndex) {
     if (!m_editor) return;
     if (matchIndex < 0 || matchIndex >= m_matches.size()) return;
-    m_editor->setTextCursor(m_matches[matchIndex].cursor);
-    m_editor->ensureCursorVisible();
+    m_editor->plainTextEdit()->setTextCursor(m_matches[matchIndex].cursor);
+    m_editor->plainTextEdit()->ensureCursorVisible();
 }
 
 void FindBar::next() {
