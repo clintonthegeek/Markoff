@@ -13,7 +13,7 @@
 
 namespace Markoff::Source {
 
-class Gutter;
+namespace Detail { class Gutter; }
 
 class Editor : public Markoff::MarkdownView {
     Q_OBJECT
@@ -67,10 +67,10 @@ private:
     QPointer<Markoff::Session>              m_session;
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
     KSyntaxHighlighting::SyntaxHighlighter *m_highlighter  = nullptr;
-    Gutter                                 *m_gutter        = nullptr;
+    Detail::Gutter                         *m_gutter        = nullptr;
     Markoff::Theme                          m_theme;
 
-    friend class Gutter;
+    friend class Markoff::Source::Detail::Gutter;
 };
 
 } // namespace Markoff::Source

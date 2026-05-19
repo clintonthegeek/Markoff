@@ -4,8 +4,8 @@
 #include <QWidget>
 
 namespace Markoff::Source {
-
 class Editor;
+namespace Detail {
 
 class Gutter : public QWidget {
     Q_OBJECT
@@ -20,4 +20,5 @@ private:
     Editor *m_editor = nullptr;
 };
 
+} // namespace Detail
 } // namespace Markoff::Source

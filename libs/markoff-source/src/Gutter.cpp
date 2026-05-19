@@ -7,9 +7,9 @@
 #include <QPaintEvent>
 #include <QTextBlock>
 
-namespace Markoff::Source {
+namespace Markoff::Source::Detail {
 
-Gutter::Gutter(Editor *editor) : QWidget(editor), m_editor(editor) {}
+Gutter::Gutter(Source::Editor *editor) : QWidget(editor), m_editor(editor) {}
 
 QSize Gutter::sizeHint() const { return QSize(m_editor->gutterWidth(), 0); }
 
@@ -56,4 +56,4 @@ void Gutter::paintEvent(QPaintEvent *event) {
     }
 }
 
-} // namespace Markoff::Source
+} // namespace Markoff::Source::Detail

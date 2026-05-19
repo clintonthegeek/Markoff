@@ -19,6 +19,9 @@
 
 namespace Markoff::Source {
 
+using Detail::Gutter;
+using Detail::InnerEditor;
+
 namespace {
 KSyntaxHighlighting::Repository &repo() {
     static KSyntaxHighlighting::Repository r;
