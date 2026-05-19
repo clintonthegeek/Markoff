@@ -3,7 +3,7 @@
 
 #include <QWidget>
 
-namespace Markoff::Source::Widget {
+namespace Markoff::Source {
 
 class Editor;
 
@@ -20,4 +20,4 @@ private:
     Editor *m_editor = nullptr;
 };
 
-} // namespace
+} // namespace Markoff::Source

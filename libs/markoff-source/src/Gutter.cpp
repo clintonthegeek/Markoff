@@ -7,7 +7,7 @@
 #include <QPaintEvent>
 #include <QTextBlock>
 
-namespace Markoff::Source::Widget {
+namespace Markoff::Source {
 
 Gutter::Gutter(Editor *editor) : QWidget(editor), m_editor(editor) {}
 
@@ -56,4 +56,4 @@ void Gutter::paintEvent(QPaintEvent *event) {
     }
 }
 
-} // namespace
+} // namespace Markoff::Source

@@ -24,7 +24,7 @@ class TstSourceWidgetBindingRoundtrip : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void typing_propagates_to_markoff_document() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);
         // D2: document must have at least one block before edits can land.
         doc.loadFromMarkdown(QByteArray());
@@ -36,7 +36,7 @@ private Q_SLOTS:
     }
 
     void external_doc_edit_propagates_to_editor() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);
         // D2: document must have at least one block before edits can land.
         doc.loadFromMarkdown(QByteArray());
@@ -57,7 +57,7 @@ private Q_SLOTS:
         // three keystrokes need three Ctrl+Z presses to fully revert.
         // Auto-coalescing of adjacent inserts is a foundation concern (not
         // yet implemented), not a widget concern.
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);
         // D2: document must have at least one block before edits can land.
         doc.loadFromMarkdown(QByteArray());

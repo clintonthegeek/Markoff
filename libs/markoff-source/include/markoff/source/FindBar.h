@@ -9,7 +9,7 @@ class QLabel;
 class QLineEdit;
 class QToolButton;
 
-namespace Markoff::Source::Widget {
+namespace Markoff::Source {
 
 class Editor;
 
@@ -46,4 +46,4 @@ private:
     int          m_currentIndex = -1;
 };
 
-} // namespace Markoff::Source::Widget
+} // namespace Markoff::Source

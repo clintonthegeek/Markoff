@@ -9,23 +9,23 @@ class TestSourceEditorViewContract : public QObject {
     Q_OBJECT
 private slots:
     void inherits_markdown_view() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         auto* asView = qobject_cast<Markoff::MarkdownView*>(&e);
         QVERIFY(asView != nullptr);
     }
     void hasCursor_true_hasEditing_when_writable() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         QCOMPARE(e.hasCursor(), true);
         QCOMPARE(e.hasEditing(), true);
     }
     void readonly_disables_hasEditing() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         e.setReadOnly(true);
         QCOMPARE(e.hasCursor(), true);
         QCOMPARE(e.hasEditing(), false);
     }
     void setDocument_emits_documentChanged() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);
         QSignalSpy spy(&e, &Markoff::MarkdownView::documentChanged);
         e.setDocument(&doc);
@@ -33,7 +33,7 @@ private slots:
         QCOMPARE(spy.count(), 1);
     }
     void cursor_position_round_trips() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("# A\n\n# B\n\n# C\n"));
         e.setDocument(&doc);

@@ -17,7 +17,7 @@
 #include <QScrollBar>
 #include <QVBoxLayout>
 
-namespace Markoff::Source::Widget {
+namespace Markoff::Source {
 
 namespace {
 KSyntaxHighlighting::Repository &repo() {
@@ -189,4 +189,4 @@ void Editor::recomputeGutterWidth() {
     static_cast<InnerEditor *>(m_editor)->setViewportMargins(gutterWidth(), 0, 0, 0);
 }
 
-} // namespace
+} // namespace Markoff::Source

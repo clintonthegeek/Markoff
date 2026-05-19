@@ -11,7 +11,7 @@
 #include <markoff/core/SourceTextDocumentBinding.h>
 #include <markoff/core/Theme.h>
 
-namespace Markoff::Source::Widget {
+namespace Markoff::Source {
 
 class Gutter;
 
@@ -73,4 +73,4 @@ private:
     friend class Gutter;
 };
 
-} // namespace Markoff::Source::Widget
+} // namespace Markoff::Source

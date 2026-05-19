@@ -29,9 +29,9 @@ int main(int argc, char **argv) {
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
 
-    auto *editor = new Markoff::Source::Widget::Editor;
+    auto *editor = new Markoff::Source::Editor;
     editor->setDocument(&doc);
-    auto *findbar = new Markoff::Source::Widget::FindBar(editor);
+    auto *findbar = new Markoff::Source::FindBar(editor);
 
     layout->addWidget(editor, 1);
     layout->addWidget(findbar);
@@ -42,7 +42,7 @@ int main(int argc, char **argv) {
 
     auto *findShortcut = new QShortcut(QKeySequence::Find, &win);
     QObject::connect(findShortcut, &QShortcut::activated, findbar,
-                     &Markoff::Source::Widget::FindBar::activate);
+                     &Markoff::Source::FindBar::activate);
 
     win.show();
     return app.exec();

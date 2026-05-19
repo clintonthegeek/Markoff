@@ -10,12 +10,12 @@ class TstSourceWidgetEditor : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void editor_constructs() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         QVERIFY(e.document() == nullptr);
     }
 
     void setDocument_attaches_and_seed_text_appears() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);
         // D2: loadFromMarkdown populates the per-block structure the binding
         // reads; resetContent writes only to the legacy flat buffer.
@@ -29,7 +29,7 @@ private Q_SLOTS:
     }
 
     void setTheme_updates_palette_base_color() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         Markoff::Theme t = Markoff::Theme::defaultLight();
         const QColor sentinel("#abcdef");
         t.setColor(Markoff::Theme::Slot::EditorBackground, sentinel);

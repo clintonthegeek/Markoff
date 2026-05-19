@@ -9,7 +9,7 @@
 #include <QTextDocument>
 #include <QToolButton>
 
-namespace Markoff::Source::Widget {
+namespace Markoff::Source {
 
 FindBar::FindBar(Editor *editor, QWidget *parent)
     : QWidget(parent), m_editor(editor)
@@ -124,4 +124,4 @@ void FindBar::updateCountLabel() {
         .arg(m_currentIndex + 1).arg(m_matches.size()));
 }
 
-} // namespace Markoff::Source::Widget
+} // namespace Markoff::Source

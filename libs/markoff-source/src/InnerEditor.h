@@ -3,7 +3,7 @@
 
 #include <QPlainTextEdit>
 
-namespace Markoff::Source::Widget {
+namespace Markoff::Source {
 
 /// Thin QPlainTextEdit subclass that promotes protected geometry accessors
 /// to public so Gutter can call them without being a QPlainTextEdit subclass.
@@ -20,4 +20,4 @@ public:
     using QAbstractScrollArea::setViewportMargins;
 };
 
-} // namespace Markoff::Source::Widget
+} // namespace Markoff::Source

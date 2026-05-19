@@ -20,11 +20,11 @@ private:
 
 private Q_SLOTS:
     void findbar_finds_first_match() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         auto *doc = makeDoc(QByteArrayLiteral("the quick brown fox quick"));
         e.setDocument(doc);
         e.show();
-        Markoff::Source::Widget::FindBar bar(&e);
+        Markoff::Source::FindBar bar(&e);
         bar.activate();
         bar.findChild<QLineEdit *>()->setText(QStringLiteral("quick"));
         QTRY_VERIFY(!e.extraSelections().isEmpty());
@@ -33,11 +33,11 @@ private Q_SLOTS:
     }
 
     void findbar_next_prev_navigation() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         auto *doc = makeDoc(QByteArrayLiteral("aaa bbb aaa ccc aaa"));
         e.setDocument(doc);
         e.show();
-        Markoff::Source::Widget::FindBar bar(&e);
+        Markoff::Source::FindBar bar(&e);
         bar.activate();
         bar.findChild<QLineEdit *>()->setText(QStringLiteral("aaa"));
         QTRY_COMPARE(e.extraSelections().size(), 3);
@@ -51,11 +51,11 @@ private Q_SLOTS:
     }
 
     void findbar_close_clears_highlights() {
-        Markoff::Source::Widget::Editor e;
+        Markoff::Source::Editor e;
         auto *doc = makeDoc(QByteArrayLiteral("hello hello"));
         e.setDocument(doc);
         e.show();
-        Markoff::Source::Widget::FindBar bar(&e);
+        Markoff::Source::FindBar bar(&e);
         bar.activate();
         bar.findChild<QLineEdit *>()->setText(QStringLiteral("hello"));
         QTRY_VERIFY(!e.extraSelections().isEmpty());

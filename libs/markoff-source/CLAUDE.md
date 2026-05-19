@@ -3,8 +3,8 @@
 Fully-owned QtWidgets Source view on `markoff-core`. Replaces the Qutepart-based legacy source view over time.
 
 ## Public surface
-- `Markoff::Source::Widget::Editor` — `QPlainTextEdit` subclass; main public widget.
-- `Markoff::Source::Widget::FindBar` — standalone find UI.
+- `Markoff::Source::Editor` — `QPlainTextEdit` subclass; main public widget.
+- `Markoff::Source::FindBar` — standalone find UI.
 
 ## Internal
 - `Markoff::Source::Widget::Gutter` — line-number gutter, child of the editor. Single-column at v0; polymorphic-column shape (per legacy `markoff-live::FoldGutter`) when fold arrows arrive.
