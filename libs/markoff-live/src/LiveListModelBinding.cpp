@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/AstBlockDiff.h>
+#include <markoff/live/LiveFindController.h>
 #include <markoff/live/LiveStructuralKeyHandler.h>
 #include <markoff/live/LiveNavigationController.h>
 #include <markoff/live/BlockKind.h>
@@ -146,6 +147,7 @@ struct LiveListModelBinding::Private {
     LiveActionController      *actions          = nullptr;
     LiveFormatController      *format           = nullptr;
     LiveContextMenuHandler    *contextMenu      = nullptr;
+    LiveFindController        *findController   = nullptr;
     Capabilities               caps            = AllCapabilities;
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
@@ -204,6 +206,11 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
         d->contextMenu = new LiveContextMenuHandler(this);
         d->contextMenu->setActionController(d->actions);
     }
+
+    // D9: find bar controller — always created (no capability gate needed).
+    d->findController = new LiveFindController(this);
+    d->findController->setBlockModel(d->model);
+    d->findController->setCursorState(d->cursorState);
 }
 
 LiveListModelBinding::~LiveListModelBinding() = default;
@@ -290,6 +297,10 @@ LiveClipboardController *LiveListModelBinding::clipboardController() const { ret
 LiveActionController    *LiveListModelBinding::actionController()    const { return d->actions; }
 LiveFormatController    *LiveListModelBinding::formatController()    const { return d->format; }
 LiveContextMenuHandler  *LiveListModelBinding::contextMenuHandler()  const { return d->contextMenu; }
+LiveFindController      *LiveListModelBinding::findController()      const { return d->findController; }
+
+void LiveListModelBinding::showFindBar() { if (d->findController) d->findController->activate(); }
+void LiveListModelBinding::hideFindBar() { if (d->findController) d->findController->deactivate(); }
 
 bool LiveListModelBinding::applyingModelUpdate() const
 {

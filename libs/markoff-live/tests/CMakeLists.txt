@@ -47,6 +47,13 @@ target_link_libraries(tst_live_render_cursor PRIVATE
 target_include_directories(tst_live_render_cursor PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
 add_test(NAME tst_live_render_cursor COMMAND tst_live_render_cursor)
 
+qt_add_executable(tst_live_find_controller
+    tst_live_find_controller.cpp
+)
+target_link_libraries(tst_live_find_controller PRIVATE
+    Qt6::Core Qt6::Test markoff_live markoff_core)
+add_test(NAME tst_live_find_controller COMMAND tst_live_find_controller)
+
 qt_add_executable(tst_live_render_paragraph_edit
     tst_live_render_paragraph_edit.cpp
 )
