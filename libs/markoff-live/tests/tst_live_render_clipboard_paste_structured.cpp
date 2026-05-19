@@ -28,7 +28,7 @@ private slots:
         doc.loadFromMarkdown("X\n");
         QCOMPARE(binding.model()->rowCount(), 1);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         // Caret at position 1 (end of "X").
         sv->begin(0, 1);
         sv->extend(0, 1);
@@ -76,7 +76,7 @@ private slots:
         doc.loadFromMarkdown("hello\n");
         QCOMPARE(binding.model()->rowCount(), 1);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
         cc.setSelectionView(sv);

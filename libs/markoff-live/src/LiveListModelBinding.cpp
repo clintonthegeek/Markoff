@@ -139,7 +139,6 @@ struct LiveListModelBinding::Private {
     BlockKindRegistry          registry;
     LiveCursorState           *cursorState      = nullptr;
     BlockHitTester            *hitTester        = nullptr;
-    LiveSelectionView         *selectionView    = nullptr;
     LiveStructuralKeyHandler  *structuralKeys   = nullptr;
     LiveNavigationController  *navigationCtrl   = nullptr;
     RemoteCursorsListModel    *remoteCursors    = nullptr;
@@ -177,33 +176,24 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
     d->model           = new LiveBlockModel(this);
     d->cursorState     = new LiveCursorState(&d->registry, d->model, this, this);
     d->hitTester       = new BlockHitTester(this);
-    d->selectionView   = new LiveSelectionView(this);
-    d->selectionView->setCursorState(d->cursorState);
-    // Forward session-originated selection changes from LiveCursorState to the
-    // LiveSelectionView facade signal. Using selectionChangedFromSession (not
-    // selectionChanged) avoids double-emitting for locally-driven changes where
-    // LiveSelectionView already emits its own selectionChanged at the end of
-    // begin()/extend()/clear()/etc.
-    QObject::connect(d->cursorState, &LiveCursorState::selectionChangedFromSession,
-                     d->selectionView, &LiveSelectionView::selectionChanged);
-    d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, d->selectionView, this);
+    d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, this);
     d->remoteCursors   = new RemoteCursorsListModel(this);
 
     if (caps & Clipboard) {
         d->clipboard = new LiveClipboardController(this);
-        d->clipboard->setSelectionView(d->selectionView);
+        d->clipboard->setSelectionView(d->cursorState);
         d->clipboard->setModel(d->model);
     }
     if (caps & Format) {
         d->format = new LiveFormatController(this);
-        d->format->setSelectionView(d->selectionView);
+        d->format->setSelectionView(d->cursorState);
         d->format->setModel(d->model);
     }
     // LiveActionController creates QActions, which require QGuiApplication.
     // Headless tests (QCoreApplication only) skip this sub-controller safely.
     if ((caps & Actions) && qobject_cast<QGuiApplication *>(QCoreApplication::instance())) {
         d->actions = new LiveActionController(this);
-        d->actions->setSelectionView(d->selectionView);
+        d->actions->setSelectionView(d->cursorState);
         d->actions->setBinding(this);
         if (d->clipboard) d->actions->setClipboardController(d->clipboard);
         if (d->format)    d->actions->setFormatController(d->format);
@@ -291,7 +281,6 @@ void LiveListModelBinding::setSession(Markoff::Session *session)
 LiveBlockModel           *LiveListModelBinding::model()               const { return d->model; }
 LiveCursorState          *LiveListModelBinding::cursorState()         const { return d->cursorState; }
 BlockHitTester           *LiveListModelBinding::hitTester()           const { return d->hitTester; }
-LiveSelectionView        *LiveListModelBinding::selectionView()       const { return d->selectionView; }
 LiveStructuralKeyHandler *LiveListModelBinding::structuralKeyHandler() const { return d->structuralKeys; }
 LiveNavigationController *LiveListModelBinding::navigationController() const { return d->navigationCtrl; }
 const BlockKindRegistry  *LiveListModelBinding::registry()            const { return &d->registry; }

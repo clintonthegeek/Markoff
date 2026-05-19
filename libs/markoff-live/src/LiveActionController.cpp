@@ -7,7 +7,7 @@
 #include <QMimeData>
 
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveClipboardController.h>
 #include <markoff/live/LiveFormatController.h>
 #include <markoff/live/LiveListModelBinding.h>
@@ -112,13 +112,13 @@ void LiveActionController::setDocument(Markoff::MarkoffDocument *doc) {
     updateEnabledStates();
 }
 
-void LiveActionController::setSelectionView(LiveSelectionView *sv) {
+void LiveActionController::setSelectionView(LiveCursorState *sv) {
     if (m_selection) {
         disconnect(m_selection, nullptr, this, nullptr);
     }
     m_selection = sv;
     if (m_selection) {
-        connect(m_selection, &LiveSelectionView::selectionChanged,
+        connect(m_selection, &LiveCursorState::selectionChanged,
                 this, &LiveActionController::updateEnabledStates);
     }
     updateEnabledStates();

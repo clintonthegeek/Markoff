@@ -7,7 +7,7 @@
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/LiveActionController.h>
 #include <markoff/live/LiveClipboardController.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 
 class TestActionsEnabledState : public QObject {
     Q_OBJECT
@@ -21,12 +21,12 @@ private slots:
 
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
         Markoff::Live::LiveActionController ac;
         ac.setDocument(&doc);
-        ac.setSelectionView(binding.selectionView());
+        ac.setSelectionView(binding.cursorState());
         ac.setClipboardController(&cc);
 
         QVERIFY(!ac.pasteAction()->isEnabled());
@@ -39,17 +39,17 @@ private slots:
         binding.setDocument(&doc);
         doc.loadFromMarkdown("hello\n");
         QCOMPARE(binding.model()->rowCount(), 1);
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(0, 5);
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(0, 5);
 
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
         Markoff::Live::LiveActionController ac;
         ac.setDocument(&doc);
-        ac.setSelectionView(binding.selectionView());
+        ac.setSelectionView(binding.cursorState());
         ac.setClipboardController(&cc);
 
         cc.copy();
@@ -68,7 +68,7 @@ private slots:
 
         Markoff::Live::LiveActionController ac;
         ac.setDocument(&doc);
-        ac.setSelectionView(binding.selectionView());
+        ac.setSelectionView(binding.cursorState());
 
         QVERIFY(!ac.cutAction()->isEnabled());
         QVERIFY(!ac.copyAction()->isEnabled());
@@ -79,12 +79,12 @@ private slots:
         doc.loadFromMarkdown("hello\n");
         Markoff::Live::LiveListModelBinding binding;
         binding.setDocument(&doc);
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(0, 3);
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(0, 3);
 
         Markoff::Live::LiveActionController ac;
         ac.setDocument(&doc);
-        ac.setSelectionView(binding.selectionView());
+        ac.setSelectionView(binding.cursorState());
 
         QVERIFY(ac.cutAction()->isEnabled());
         QVERIFY(ac.copyAction()->isEnabled());

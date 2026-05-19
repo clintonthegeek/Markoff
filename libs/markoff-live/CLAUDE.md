@@ -29,10 +29,9 @@ before any non-trivial change here. Of particular relevance:
 - **You will encounter `Qt.callLater` and re-entrance guards** in
   this directory (current count: 1 `Qt.callLater` site —
   `MathDelegate.qml:113`, focus deferral during BlockInternalEdit;
-  re-entrance guards `m_applyingTextUpdate` in `LiveEditBinding` and
-  `m_applyingSessionSelection` in `LiveSelectionView`). Each one is a vote
-  for the seam being unsettled. Log them as you encounter them
-  (invariant 8). Do not silently extend their lineage.
+  re-entrance guard `m_applyingTextUpdate` in `LiveEditBinding`). Each
+  one is a vote for the seam being unsettled. Log them as you encounter
+  them (invariant 8). Do not silently extend their lineage.
 - **The QML integration harness exists** as of commit `0c2e72d`
   (`LiveRealisticInputHarness` wired into `tst_live_render_qml_integration`).
   This is the fixture for invariant 4. Use it for any test that
@@ -65,7 +64,7 @@ L7  Structured text      (ListItem, Blockquote)
 L6  Other text blocks    (Heading, CodeBlock, HR, Image)
 L5  Structural keys      (LiveStructuralKeyHandler dispatch)
 L4  Block editing        (LiveEditBinding)
-L3  Cursor + selection   (Shape 1 discriminated cursor)
+L3  Cursor + selection   (Shape 1 discriminated cursor; unified in LiveCursorState, D2 2026-05-19)
 L2  Diff-driven model    (Myers over (kind, BlockId))
 L1  Read-only render     (ListView + delegates)
 L0  Coordinate primitives

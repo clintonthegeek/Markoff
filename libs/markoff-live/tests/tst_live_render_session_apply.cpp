@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// B3: LiveSelectionView subscribes to Session::primarySelectionChanged.
+// B3: LiveCursorState subscribes to Session::primarySelectionChanged.
 // When an external caller sets the session's primary selection, the view
 // must reflect the new anchor+active positions.
 
@@ -11,7 +11,7 @@
 #include <markoff/core/Session.h>
 #include <markoff/core/Selection.h>
 #include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 
 class TestSessionApply : public QObject {
     Q_OBJECT
@@ -27,10 +27,10 @@ private slots:
         Markoff::Session *session = doc.createSession();
         binding.setSession(session);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         QVERIFY(!sv->hasSelection());
 
-        QSignalSpy spy(sv, &Markoff::Live::LiveSelectionView::selectionChanged);
+        QSignalSpy spy(sv, &Markoff::Live::LiveCursorState::selectionChanged);
 
         // Build a selection from byte 0 (anchor) to byte 5 (active, before " world").
         // "hello" is 5 UTF-8 bytes.
@@ -60,8 +60,8 @@ private slots:
         Markoff::Session *session = doc.createSession();
         binding.setSession(session);
 
-        auto *sv = binding.selectionView();
-        QSignalSpy spy(sv, &Markoff::Live::LiveSelectionView::selectionChanged);
+        auto *sv = binding.cursorState();
+        QSignalSpy spy(sv, &Markoff::Live::LiveCursorState::selectionChanged);
 
         // begin() calls syncToSession() which calls setPrimarySelection()
         // which emits primarySelectionChanged. The guard must stop the echo.
@@ -83,12 +83,12 @@ private slots:
         Markoff::Session *session = doc.createSession();
         binding.setSession(session);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
 
         // Detach.
         binding.setSession(nullptr);
 
-        QSignalSpy spy(sv, &Markoff::Live::LiveSelectionView::selectionChanged);
+        QSignalSpy spy(sv, &Markoff::Live::LiveCursorState::selectionChanged);
 
         Markoff::Selection sel;
         sel.kind   = Markoff::Selection::Kind::Primary;

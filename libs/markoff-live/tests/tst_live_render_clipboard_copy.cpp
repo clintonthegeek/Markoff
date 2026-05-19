@@ -17,7 +17,7 @@
 #include <QMimeData>
 
 #include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveClipboardController.h>
 
@@ -42,7 +42,7 @@ private Q_SLOTS:
             "alpha\n\nbeta\n\ngamma\n\ndelta\n\nepsilon");
         QCOMPARE(binding.model()->rowCount(), 5);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         QVERIFY(sv);
 
         // Selection covers the full extent of all five blocks.
@@ -67,7 +67,7 @@ private Q_SLOTS:
         doc.loadFromMarkdown("alphabet\n\nbravado\n\ncharlie");
         QCOMPARE(binding.model()->rowCount(), 3);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         QVERIFY(sv);
 
         // Select from "abet" of "alphabet" (qtPos 4) through "char" (qtPos 4 of charlie).
@@ -92,7 +92,7 @@ private Q_SLOTS:
         doc.loadFromMarkdown("hello world\n");
         QCOMPARE(binding.model()->rowCount(), 1);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         sv->begin(0, 0);
         sv->extend(0, 5);  // select "hello"
 

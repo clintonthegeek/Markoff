@@ -19,7 +19,7 @@ private slots:
 
         Markoff::Live::LiveActionController ac;
         ac.setDocument(&doc);
-        ac.setSelectionView(binding.selectionView());
+        ac.setSelectionView(binding.cursorState());
 
         QSignalSpy spy(&ac, &Markoff::Live::LiveActionController::saveRequested);
         ac.saveAction()->trigger();
@@ -35,11 +35,11 @@ private slots:
 
         Markoff::Live::LiveActionController ac;
         ac.setDocument(&doc);
-        ac.setSelectionView(binding.selectionView());
+        ac.setSelectionView(binding.cursorState());
 
-        QVERIFY(!binding.selectionView()->hasSelection());
+        QVERIFY(!binding.cursorState()->hasSelection());
         ac.selectAllAction()->trigger();
-        QVERIFY(binding.selectionView()->hasSelection());
+        QVERIFY(binding.cursorState()->hasSelection());
     }
 
     void copy_action_writes_clipboard() {
@@ -48,17 +48,17 @@ private slots:
         binding.setDocument(&doc);
         doc.loadFromMarkdown("hello\n");
         QCOMPARE(binding.model()->rowCount(), 1);
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(0, 5);
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(0, 5);
 
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
         Markoff::Live::LiveActionController ac;
         ac.setDocument(&doc);
-        ac.setSelectionView(binding.selectionView());
+        ac.setSelectionView(binding.cursorState());
         ac.setClipboardController(&cc);
 
         QApplication::clipboard()->clear();

@@ -17,12 +17,12 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
         // Select all three blocks fully.
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(2, 5);  // "third" is 5 chars
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(2, 5);  // "third" is 5 chars
         fc.toggleBold();
 
         const auto ids = doc.iterateBlocks();
@@ -50,13 +50,13 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
         // Select from qtPos 2 on block 0 to qtPos 3 on block 2.
         // block 0: "cde" (pos 2..5), block 1: full "fghij", block 2: "klm" (pos 0..3).
-        binding.selectionView()->begin(0, 2);
-        binding.selectionView()->extend(2, 3);
+        binding.cursorState()->begin(0, 2);
+        binding.cursorState()->extend(2, 3);
         fc.toggleItalic();
 
         const auto ids = doc.iterateBlocks();

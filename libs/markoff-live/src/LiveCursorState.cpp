@@ -714,4 +714,80 @@ void LiveCursorState::onSessionPrimarySelectionChanged(const Markoff::Selection 
     Q_EMIT selectionChangedFromSession();
 }
 
+// ---------------------------------------------------------------------------
+// Selection operations (migrated from LiveSelectionView, 2026-05-19)
+// ---------------------------------------------------------------------------
+
+void LiveCursorState::begin(int blockIndex, int qtPos)
+{
+    const auto anchor = blockAnchorAt(blockIndex);
+    if (anchor.isNull()) return;
+    syncFromTextEdit(anchor, qtPos);
+    setSelectionAnchor({anchor, static_cast<quint32>(qtPos)});  // emits selectionChanged()
+    syncSelectionToSession();
+}
+
+void LiveCursorState::extend(int blockIndex, int qtPos)
+{
+    const auto anchor = blockAnchorAt(blockIndex);
+    if (anchor.isNull()) return;
+    syncFromTextEdit(anchor, qtPos);
+    syncSelectionToSession();
+    Q_EMIT selectionChanged();
+}
+
+void LiveCursorState::clearSelection()
+{
+    clearSelectionAnchor();  // emits selectionChanged()
+}
+
+void LiveCursorState::selectAll()
+{
+    selectAllBlocks();  // calls setSelectionAnchor() → emits selectionChanged()
+    syncSelectionToSession();
+}
+
+void LiveCursorState::deleteSelection()
+{
+    deleteSelectionRange();  // calls clearSelectionAnchor() → emits selectionChanged()
+}
+
+QPoint LiveCursorState::rangeForBlock(int blockIndex) const
+{
+    return selectionRangeForBlock(blockIndex);
+}
+
+void LiveCursorState::copyToClipboard() const
+{
+    copySelectionToClipboard();
+}
+
+int LiveCursorState::anchorBlock() const
+{
+    const auto a = selectionAnchor();
+    if (!a) return -1;
+    return rowForBlock(a->block);
+}
+
+int LiveCursorState::anchorQtPos() const
+{
+    const auto a = selectionAnchor();
+    if (!a) return -1;
+    return static_cast<int>(a->qtPos);
+}
+
+int LiveCursorState::activeBlock() const
+{
+    const auto tc = currentTextCaret();
+    if (!tc) return -1;
+    return rowForBlock(tc->block);
+}
+
+int LiveCursorState::activeQtPos() const
+{
+    const auto tc = currentTextCaret();
+    if (!tc) return -1;
+    return static_cast<int>(tc->cachedQtPos);
+}
+
 }  // namespace Markoff::Live

@@ -16,12 +16,12 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
         // First bold: select "world" at qtPos 6–11 → produces "hello **world**\n".
-        binding.selectionView()->begin(0, 6);
-        binding.selectionView()->extend(0, 11);
+        binding.cursorState()->begin(0, 6);
+        binding.cursorState()->extend(0, 11);
         fc.toggleBold();
 
         const QByteArray afterFirst = doc.blockText(doc.iterateBlocks()[0]);
@@ -35,8 +35,8 @@ private slots:
         // Model text is now "hello **world**" (no '\n').
         // "world" is at qtPos 8–13 (shifted by 2 for leading "**").
         // Selecting qtPos 8..13 and calling toggleBold should UNWRAP.
-        binding.selectionView()->begin(0, 8);
-        binding.selectionView()->extend(0, 13);
+        binding.cursorState()->begin(0, 8);
+        binding.cursorState()->extend(0, 13);
         fc.toggleBold();
 
         const QByteArray result = doc.blockText(doc.iterateBlocks()[0]);
@@ -55,12 +55,12 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
         // First italic: select "foo" at qtPos 0–3 → produces "_foo_\n".
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(0, 3);
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(0, 3);
         fc.toggleItalic();
 
         const QByteArray afterFirst = doc.blockText(doc.iterateBlocks()[0]);
@@ -71,8 +71,8 @@ private slots:
         QCoreApplication::processEvents();
 
         // Model text is now "_foo_"; "foo" is at qtPos 1–4 (shifted by 1).
-        binding.selectionView()->begin(0, 1);
-        binding.selectionView()->extend(0, 4);
+        binding.cursorState()->begin(0, 1);
+        binding.cursorState()->extend(0, 4);
         fc.toggleItalic();
 
         const QByteArray result = doc.blockText(doc.iterateBlocks()[0]);

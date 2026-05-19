@@ -29,7 +29,7 @@
 #include <markoff/live/BlockKind.h>
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/LiveClipboardController.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveBlockModel.h>
 
 namespace BlockKind = Markoff::Live::BlockKind;
@@ -80,12 +80,12 @@ private Q_SLOTS:
 
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
         // Select all: from block 0 pos 0 to block 1 pos end.
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(1, textAtRow(&binding, 1).length());
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(1, textAtRow(&binding, 1).length());
 
         cc.copy();
         QVERIFY(QApplication::clipboard()->mimeData()->hasFormat(
@@ -94,8 +94,8 @@ private Q_SLOTS:
         // Collapse selection to end of last block.
         const int lastRow = binding.model()->rowCount() - 1;
         const int lastPos = textAtRow(&binding, lastRow).length();
-        binding.selectionView()->begin(lastRow, lastPos);
-        binding.selectionView()->extend(lastRow, lastPos);
+        binding.cursorState()->begin(lastRow, lastPos);
+        binding.cursorState()->extend(lastRow, lastPos);
 
         cc.paste();
         settle(&binding);
@@ -155,12 +155,12 @@ private Q_SLOTS:
 
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
         // Collapse selection to end of "Paragraph".
-        binding.selectionView()->begin(0, textAtRow(&binding, 0).length());
-        binding.selectionView()->extend(0, textAtRow(&binding, 0).length());
+        binding.cursorState()->begin(0, textAtRow(&binding, 0).length());
+        binding.cursorState()->extend(0, textAtRow(&binding, 0).length());
 
         cc.paste();
         settle(&binding);
@@ -237,12 +237,12 @@ private Q_SLOTS:
 
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
         // Select from start of heading to end of paragraph.
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(1, textAtRow(&binding, 1).length());
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(1, textAtRow(&binding, 1).length());
         cc.copy();
         qInfo().noquote() << "Clipboard payload:"
                           << QApplication::clipboard()->mimeData()->data(
@@ -250,8 +250,8 @@ private Q_SLOTS:
 
         // Paste at end of paragraph.
         const int paraEnd = textAtRow(&binding, 1).length();
-        binding.selectionView()->begin(1, paraEnd);
-        binding.selectionView()->extend(1, paraEnd);
+        binding.cursorState()->begin(1, paraEnd);
+        binding.cursorState()->extend(1, paraEnd);
         cc.paste();
         settle(&binding);
 
@@ -284,12 +284,12 @@ private Q_SLOTS:
 
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
         // Select "Heading One" inside the heading (skip "# ").
-        binding.selectionView()->begin(0, 2);
-        binding.selectionView()->extend(0, textAtRow(&binding, 0).length());
+        binding.cursorState()->begin(0, 2);
+        binding.cursorState()->extend(0, textAtRow(&binding, 0).length());
 
         cc.copy();
         const QByteArray payloadBytes =
@@ -300,8 +300,8 @@ private Q_SLOTS:
         // Paste at end of paragraph (row 1).
         const int paraRow = 1;
         const int paraEnd = textAtRow(&binding, paraRow).length();
-        binding.selectionView()->begin(paraRow, paraEnd);
-        binding.selectionView()->extend(paraRow, paraEnd);
+        binding.cursorState()->begin(paraRow, paraEnd);
+        binding.cursorState()->extend(paraRow, paraEnd);
         cc.paste();
         settle(&binding);
 

@@ -6,6 +6,7 @@
 
 #include <QHash>
 #include <QObject>
+#include <QPoint>
 #include <QPointer>
 #include <QQuickItem>
 #include <QString>
@@ -269,6 +270,31 @@ public:
     /// `m_session->setPrimarySelection`. No-op if no session or no model.
     /// Mirror of `LiveSelectionView::syncToSession` during Phase A.
     void syncSelectionToSession();
+
+    // Selection operations (migrated from LiveSelectionView, 2026-05-19)
+    Q_INVOKABLE void begin(int blockIndex, int qtPos);
+    Q_INVOKABLE void extend(int blockIndex, int qtPos);
+    /// Clear the current selection anchor. Does NOT reset the cursor active end
+    /// (contrast with clear() which resets the cursor variant to NoCursor).
+    Q_INVOKABLE void clearSelection();
+    Q_INVOKABLE void selectAll();
+    Q_INVOKABLE void deleteSelection();
+
+    /// Returns QPoint(start, end) for the block, or QPoint(-1,-1) if
+    /// untouched. `end` may be INT32_MAX ("to end of block") — consumers
+    /// must clamp via Math.min(r.y, textEdit.length) before calling
+    /// TextEdit.select.
+    Q_INVOKABLE QPoint rangeForBlock(int blockIndex) const;
+
+    /// Copy the current selection to the system clipboard. Reads block
+    /// texts directly from the bound LiveBlockModel.
+    Q_INVOKABLE void copyToClipboard() const;
+
+    // Accessors used by clipboard / navigation / delegate sync paths.
+    Q_INVOKABLE int anchorBlock() const;
+    Q_INVOKABLE int anchorQtPos() const;
+    Q_INVOKABLE int activeBlock() const;
+    Q_INVOKABLE int activeQtPos() const;
 
 Q_SIGNALS:
     void cursorChanged();

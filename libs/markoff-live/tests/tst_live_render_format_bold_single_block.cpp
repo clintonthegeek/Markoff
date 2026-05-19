@@ -15,12 +15,12 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
         // Select "world" (qtPos 6–11 in "hello world").
-        binding.selectionView()->begin(0, 6);
-        binding.selectionView()->extend(0, 11);
+        binding.cursorState()->begin(0, 6);
+        binding.cursorState()->extend(0, 11);
         fc.toggleBold();
 
         // blockText includes trailing '\n'; content should be "hello **world**\n".
@@ -38,11 +38,11 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(0, 3);  // "foo"
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(0, 3);  // "foo"
         fc.toggleBold();
 
         const QByteArray blockUtf8 = doc.blockText(doc.iterateBlocks()[0]);

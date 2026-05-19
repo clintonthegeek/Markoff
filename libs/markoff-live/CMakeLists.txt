@@ -54,10 +54,8 @@ qt_add_qml_module(markoff_live
         include/markoff/live/Cursor.h
         include/markoff/live/LiveCursorState.h
         include/markoff/live/BlockHitTester.h
-        include/markoff/live/LiveSelectionView.h
         src/LiveCursorState.cpp
         src/BlockHitTester.cpp
-        src/LiveSelectionView.cpp
         # R4: per-delegate edit binding
         include/markoff/live/LiveEditBinding.h
         src/LiveEditBinding.cpp

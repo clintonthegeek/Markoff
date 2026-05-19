@@ -8,7 +8,7 @@ namespace Markoff { class MarkoffDocument; }
 
 namespace Markoff::Live {
 
-class LiveSelectionView;
+class LiveCursorState;
 class LiveBlockModel;
 
 /// Per-block inline format controller: bold/italic/link toggles.
@@ -23,7 +23,7 @@ public:
     explicit LiveFormatController(QObject *parent = nullptr);
 
     void setDocument(Markoff::MarkoffDocument *doc);
-    void setSelectionView(LiveSelectionView *sv);
+    void setSelectionView(LiveCursorState *sv);
     void setModel(const LiveBlockModel *model);
 
     Q_INVOKABLE void toggleBold();
@@ -34,7 +34,7 @@ private:
     void wrapPerBlock(const QByteArray &openDelim, const QByteArray &closeDelim);
 
     Markoff::MarkoffDocument *m_document  = nullptr;
-    LiveSelectionView        *m_selection = nullptr;
+    LiveCursorState          *m_selection = nullptr;
     const LiveBlockModel     *m_model     = nullptr;
 };
 

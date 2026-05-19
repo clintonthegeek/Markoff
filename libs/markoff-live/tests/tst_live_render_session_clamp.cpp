@@ -10,7 +10,7 @@
 #include <markoff/core/Session.h>
 #include <markoff/core/Selection.h>
 #include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 
 class TestSessionClamp : public QObject {
     Q_OBJECT
@@ -27,7 +27,7 @@ private slots:
         Markoff::Session *session = doc.createSession();
         binding.setSession(session);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
 
         // textAnchorAt byte 2 = end of "hi" content (just before the '\n' separator).
         // This is a valid in-range byte; resolve should give qtPos == 2.
@@ -57,7 +57,7 @@ private slots:
         Markoff::Session *session = doc.createSession();
         binding.setSession(session);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
 
         // anchor == active at byte 0 → collapsed selection → hasSelection() false.
         Markoff::Selection sel;

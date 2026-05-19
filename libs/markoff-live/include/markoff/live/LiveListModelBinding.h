@@ -6,7 +6,6 @@
 #include <markoff/live/BlockKindRegistry.h>
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/BlockHitTester.h>
-#include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/LiveStructuralKeyHandler.h>
 #include <markoff/live/LiveNavigationController.h>
 #include <markoff/live/LiveClipboardController.h>
@@ -45,8 +44,6 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
                READ cursorState CONSTANT)
     Q_PROPERTY(Markoff::Live::BlockHitTester *hitTester
                READ hitTester CONSTANT)
-    Q_PROPERTY(Markoff::Live::LiveSelectionView *selectionView
-               READ selectionView CONSTANT)
     Q_PROPERTY(Markoff::Live::LiveStructuralKeyHandler *structuralKeyHandler
                READ structuralKeyHandler CONSTANT)
     Q_PROPERTY(Markoff::Live::LiveNavigationController *navigationController
@@ -102,7 +99,6 @@ public:
     LiveBlockModel           *model()               const;
     LiveCursorState          *cursorState()         const;
     BlockHitTester           *hitTester()           const;
-    LiveSelectionView        *selectionView()       const;
     LiveStructuralKeyHandler *structuralKeyHandler() const;
     LiveNavigationController *navigationController() const;
     const BlockKindRegistry  *registry()            const;

@@ -6,13 +6,12 @@
 // boundaries, Shift+Up/Down across visual lines, Ctrl+Shift+Left/Right
 // at boundaries). All depend on the focus chokepoint resolving the
 // cross-block cursor jump via a registered delegate, plus
-// LiveSelectionView observing the extended selection range.
+// LiveCursorState observing the extended selection range.
 
 #include "LiveRealisticInputHarness.h"
 #include "QmlIntegrationFixture.h"
 
 #include <markoff/live/LiveCursorState.h>
-#include <markoff/live/LiveSelectionView.h>
 
 #include <QtTest/QtTest>
 
@@ -25,9 +24,9 @@ class TestE2NavShiftExtendQml : public QObject {
         return qobject_cast<LiveCursorState *>(
             fx.binding()->property("cursorState").value<QObject *>());
     }
-    LiveSelectionView *selectionViewOf(QmlIntegrationFixture &fx) {
-        return qobject_cast<LiveSelectionView *>(
-            fx.binding()->property("selectionView").value<QObject *>());
+    // selectionViewOf is now cursorStateOf — LiveSelectionView retired 2026-05-19.
+    LiveCursorState *selectionViewOf(QmlIntegrationFixture &fx) {
+        return cursorStateOf(fx);
     }
 
 private slots:

@@ -193,7 +193,7 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         MockTextEdit mockEdit;
@@ -268,7 +268,7 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         const int result = nav->tryHandle(Qt::Key_Left, Qt::NoModifier,
@@ -307,7 +307,7 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         const int result = nav->tryHandle(Qt::Key_Right, Qt::NoModifier,

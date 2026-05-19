@@ -2,7 +2,7 @@
 #include <markoff/live/LiveClipboardController.h>
 
 #include <markoff/live/LiveBlockModel.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 #include <markoff/live/Coordinates.h>
 
 #include <markoff/core/MarkoffDocument.h>
@@ -25,7 +25,7 @@ namespace coords = Detail::Coordinates;
 LiveClipboardController::LiveClipboardController(QObject *parent) : QObject(parent) {}
 
 void LiveClipboardController::setDocument(Markoff::MarkoffDocument *doc) { m_document = doc; }
-void LiveClipboardController::setSelectionView(LiveSelectionView *sv) { m_selection = sv; }
+void LiveClipboardController::setSelectionView(LiveCursorState *sv) { m_selection = sv; }
 void LiveClipboardController::setModel(const LiveBlockModel *model) { m_model = model; }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ QJsonObject attrsToJson(const QHash<Markoff::AttrName, Markoff::AttrValue> &attr
 /// "attrs" (per-block attrs JSON, when non-empty). The attrs are required
 /// so the structured-paste path can reconstruct kind-specific markdown
 /// prefixes (heading `#`, list-item marker, code-fence info string).
-QJsonArray serializeSelection(const LiveSelectionView &sel, const LiveBlockModel &model)
+QJsonArray serializeSelection(const LiveCursorState &sel, const LiveBlockModel &model)
 {
     QJsonArray out;
     if (!sel.hasSelection()) return out;
@@ -98,7 +98,7 @@ QString joinPlain(const QJsonArray &blocks)
 
 /// Compute the flat byte offset of (blockIndex, qtPos) by walking
 /// the document's iterateBlocks() list.  Uses the same model-text-UTF8
-/// approach as LiveSelectionView::deleteSelection().
+/// approach as LiveCursorState::deleteSelectionRange().
 /// Returns UINT32_MAX if blockIndex is out of range.
 uint32_t flatByteOffset(const LiveBlockModel &model,
                         Markoff::MarkoffDocument &doc,
@@ -192,8 +192,8 @@ void LiveClipboardController::paste()
     if (!mime || (!mime->hasText() && !mime->hasFormat(kBlocksMime))) return;
 
     // We need anchor positions to compute start/end byte offsets.
-    // Use the private members through the public accessors we added to
-    // LiveSelectionView (anchorBlock/anchorQtPos/activeBlock/activeQtPos).
+    // Use the Q_INVOKABLE accessors on LiveCursorState
+    // (anchorBlock/anchorQtPos/activeBlock/activeQtPos).
     const int ab = m_selection->anchorBlock();
     const int ap = m_selection->anchorQtPos();
     const int xb = m_selection->activeBlock();
@@ -231,7 +231,7 @@ void LiveClipboardController::paste()
                     obj.value("cutSequenceNumber").toDouble());
             }
             m_document->applyStructuredPaste(startByte, endByte, bArr, meta);
-            m_selection->clear();
+            m_selection->clearSelection();
             return;
         }
     }
@@ -241,7 +241,7 @@ void LiveClipboardController::paste()
         const QByteArray inserted = mime->text().toUtf8();
         m_document->applyFlatEdit(startByte, endByte, inserted,
                                   Markoff::Origin::UserEdit);
-        m_selection->clear();
+        m_selection->clearSelection();
     }
 }
 

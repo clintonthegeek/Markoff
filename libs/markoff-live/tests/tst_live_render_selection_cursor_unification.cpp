@@ -29,7 +29,6 @@
 #include <markoff/core/Cmd/D2.h>
 #include <markoff/core/UndoLog.h>
 #include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveBlockModel.h>
 
@@ -49,7 +48,7 @@ private slots:
     void shift_arrow_cross_block_extends_active();
 
     // C. Production double-click goes through the QML MouseArea → begin/extend
-    //    on LiveSelectionView. Simulate the begin/extend the QML side produces,
+    //    on LiveCursorState. Simulate the begin/extend the QML side produces,
     //    then verify rangeForBlock returns the correct word range.
     void double_click_selects_word_via_facade();
 
@@ -97,7 +96,7 @@ void TestSelectionCursorUnification::click_then_shift_click_keeps_anchor_at_firs
     doc.loadFromMarkdown("alpha alpha\n\nbeta beta\n\ngamma gamma\n");
     waitForModel(binding, 3);
 
-    auto *sv = binding.selectionView();
+    auto *sv = binding.cursorState();
     auto *cs = binding.cursorState();
     QVERIFY(sv);
     QVERIFY(cs);
@@ -140,7 +139,7 @@ void TestSelectionCursorUnification::shift_arrow_cross_block_extends_active()
     doc.loadFromMarkdown("alpha\n\nbeta\n");
     waitForModel(binding, 2);
 
-    auto *sv = binding.selectionView();
+    auto *sv = binding.cursorState();
     auto *cs = binding.cursorState();
 
     // Park anchor at end of row 0.
@@ -170,7 +169,7 @@ void TestSelectionCursorUnification::shift_arrow_cross_block_extends_active()
 
 void TestSelectionCursorUnification::double_click_selects_word_via_facade()
 {
-    // Production double-click goes through QML MouseArea → selectionView.
+    // Production double-click goes through QML MouseArea → cursorState.
     // Simulate the begin/extend the QML side would produce for "bravo".
     Markoff::MarkoffDocument doc(quint16(42));
     Markoff::Live::LiveListModelBinding binding;
@@ -178,7 +177,7 @@ void TestSelectionCursorUnification::double_click_selects_word_via_facade()
     doc.loadFromMarkdown("alpha bravo charlie\n");
     waitForModel(binding, 1);
 
-    auto *sv = binding.selectionView();
+    auto *sv = binding.cursorState();
     auto *cs = binding.cursorState();
 
     // "bravo" starts at column 6 (after "alpha "), ends at 11.
@@ -211,7 +210,7 @@ void TestSelectionCursorUnification::clear_via_left_arrow_collapses_to_active()
     doc.loadFromMarkdown("alpha bravo\n");
     waitForModel(binding, 1);
 
-    auto *sv = binding.selectionView();
+    auto *sv = binding.cursorState();
     auto *cs = binding.cursorState();
 
     sv->begin(0, 0);
@@ -223,7 +222,7 @@ void TestSelectionCursorUnification::clear_via_left_arrow_collapses_to_active()
     QVERIFY(tc.has_value());
     const auto activeBefore = tc->cachedQtPos;
 
-    sv->clear();
+    sv->clearSelection();
 
     // Anchor must be gone.
     QVERIFY(!cs->selectionAnchor().has_value());
@@ -256,7 +255,7 @@ void TestSelectionCursorUnification::session_round_trip_no_echo()
     Markoff::Session *session = doc.createSession();
     binding.setSession(session);
 
-    auto *sv = binding.selectionView();
+    auto *sv = binding.cursorState();
     auto *cs = binding.cursorState();
 
     // Set a selection.
@@ -275,7 +274,7 @@ void TestSelectionCursorUnification::session_round_trip_no_echo()
     const Markoff::Selection currentSel = session->primarySelection();
 
     // Watch for spurious selectionChanged from the view.
-    QSignalSpy selSpy(sv, &Markoff::Live::LiveSelectionView::selectionChanged);
+    QSignalSpy selSpy(sv, &Markoff::Live::LiveCursorState::selectionChanged);
 
     // Push an identical selection via syncSelectionToSession. This triggers
     // the round-trip path: session receives it, fires primarySelectionChanged,
@@ -318,7 +317,7 @@ void TestSelectionCursorUnification::selection_survives_structural_edit_above()
     doc.loadFromMarkdown("first\n\nsecond\n\nthird\n\nfourth\n");
     waitForModel(binding, 4);
 
-    auto *sv = binding.selectionView();
+    auto *sv = binding.cursorState();
     auto *cs = binding.cursorState();
 
     // Select from row 2 to row 3.
@@ -368,7 +367,7 @@ void TestSelectionCursorUnification::selection_cleared_on_orphaned_anchor()
     Markoff::Session *session = doc.createSession();
     binding.setSession(session);
 
-    auto *sv = binding.selectionView();
+    auto *sv = binding.cursorState();
     auto *cs = binding.cursorState();
 
     // Select text in row 1.
@@ -382,7 +381,7 @@ void TestSelectionCursorUnification::selection_cleared_on_orphaned_anchor()
     const Markoff::Selection savedSel = session->primarySelection();
 
     // Clear the view so it's in a clean state.
-    sv->clear();
+    sv->clearSelection();
     QVERIFY(!sv->hasSelection());
 
     // Delete the selected block via the D2 API.

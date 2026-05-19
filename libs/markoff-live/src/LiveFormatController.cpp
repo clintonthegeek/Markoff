@@ -3,7 +3,7 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/UndoLog.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/Coordinates.h>
 
@@ -17,7 +17,7 @@ namespace coords = Detail::Coordinates;
 LiveFormatController::LiveFormatController(QObject *parent) : QObject(parent) {}
 
 void LiveFormatController::setDocument(Markoff::MarkoffDocument *doc) { m_document = doc; }
-void LiveFormatController::setSelectionView(LiveSelectionView *sv)    { m_selection = sv; }
+void LiveFormatController::setSelectionView(LiveCursorState *sv)      { m_selection = sv; }
 void LiveFormatController::setModel(const LiveBlockModel *m)          { m_model = m; }
 
 void LiveFormatController::wrapPerBlock(const QByteArray &openDelim, const QByteArray &closeDelim)

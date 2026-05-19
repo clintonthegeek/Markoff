@@ -10,7 +10,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 
 class TestTwoBindings : public QObject {
     Q_OBJECT
@@ -30,10 +30,10 @@ private slots:
         bindingA.setSession(session);
         bindingB.setSession(session);
 
-        auto *svA = bindingA.selectionView();
-        auto *svB = bindingB.selectionView();
+        auto *svA = bindingA.cursorState();
+        auto *svB = bindingB.cursorState();
 
-        QSignalSpy spyB(svB, &Markoff::Live::LiveSelectionView::selectionChanged);
+        QSignalSpy spyB(svB, &Markoff::Live::LiveCursorState::selectionChanged);
 
         // Binding A sets a selection on block 0, qtPos 0..5 ("hello").
         svA->begin(0, 0);
@@ -62,11 +62,11 @@ private slots:
         bindingA.setSession(session);
         bindingB.setSession(session);
 
-        auto *svA = bindingA.selectionView();
-        auto *svB = bindingB.selectionView();
+        auto *svA = bindingA.cursorState();
+        auto *svB = bindingB.cursorState();
 
-        QSignalSpy spyA(svA, &Markoff::Live::LiveSelectionView::selectionChanged);
-        QSignalSpy spyB(svB, &Markoff::Live::LiveSelectionView::selectionChanged);
+        QSignalSpy spyA(svA, &Markoff::Live::LiveCursorState::selectionChanged);
+        QSignalSpy spyB(svB, &Markoff::Live::LiveCursorState::selectionChanged);
 
         // One begin on A (→ syncToSession → primarySelectionChanged → B updates once).
         svA->begin(0, 2);

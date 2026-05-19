@@ -15,11 +15,11 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(0, 5);  // "hello"
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(0, 5);  // "hello"
         fc.toggleItalic();
 
         const QByteArray blockUtf8 = doc.blockText(doc.iterateBlocks()[0]);
@@ -36,11 +36,11 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
-        binding.selectionView()->begin(0, 6);
-        binding.selectionView()->extend(0, 11);  // "world"
+        binding.cursorState()->begin(0, 6);
+        binding.cursorState()->extend(0, 11);  // "world"
         fc.toggleItalic();
 
         const QByteArray blockUtf8 = doc.blockText(doc.iterateBlocks()[0]);

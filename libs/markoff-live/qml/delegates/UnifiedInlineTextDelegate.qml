@@ -26,8 +26,8 @@ Item {
 
     readonly property var liveBinding:
         ListView.view ? ListView.view.binding : null
-    readonly property var selectionView:
-        liveBinding ? liveBinding.selectionView : null
+    readonly property var cursorState:
+        liveBinding ? liveBinding.cursorState : null
 
     // True when this block is fully covered by a multi-block selection.
     // Drives marker-background paint (list-item only).
@@ -141,10 +141,10 @@ Item {
     }
 
     Connections {
-        target: root.selectionView
+        target: root.cursorState
         function onSelectionChanged() {
             if (root.kind !== "list-item") { root._fullySelected = false; return }
-            const sv = root.selectionView
+            const sv = root.cursorState
             if (!sv) { root._fullySelected = false; return }
             const r = sv.rangeForBlock(root.modelIndex)
             if (!r || r.x < 0) { root._fullySelected = false; return }
@@ -265,7 +265,7 @@ Item {
         }
 
         function applySelection() {
-            const sv = root.selectionView
+            const sv = root.cursorState
             if (!sv) { deselect(); return }
             const r = sv.rangeForBlock(model.index)
             if (!r || r.x < 0) { deselect(); return }
@@ -287,7 +287,7 @@ Item {
         }
 
         Connections {
-            target: root.selectionView
+            target: root.cursorState
             function onSelectionChanged() { edit.applySelection() }
         }
     }

@@ -15,10 +15,10 @@ private slots:
         doc.loadFromMarkdown("para A\n\npara B\n");
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
-        binding.selectionView()->selectAll();
+        binding.cursorState()->selectAll();
         cc.cut();
         // The deleteSelection() path schedules a debounced d2DocumentChanged;
         // drain the event loop so the model update fires before asserting.

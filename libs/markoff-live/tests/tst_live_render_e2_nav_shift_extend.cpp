@@ -6,7 +6,6 @@
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/LiveNavigationController.h>
 #include <markoff/live/LiveCursorState.h>
-#include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/LiveBlockModel.h>
 
 #include <markoff/core/MarkoffDocument.h>
@@ -45,7 +44,7 @@ private Q_SLOTS:
 
     void shift_left_at_nonzero_qtpos_extends_within_block() {
         // Option B contract: within-block Shift+Left is handled by the
-        // controller and extends LiveSelectionView's active by one position.
+        // controller and extends LiveCursorState's active by one position.
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
@@ -53,7 +52,7 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         sv->begin(1, 3);
@@ -74,11 +73,11 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         sv->begin(0, 0);
-        QSignalSpy spy(sv, &LiveSelectionView::selectionChanged);
+        QSignalSpy spy(sv, &LiveCursorState::selectionChanged);
 
         // At row 0, pos 0: no previous block → Handled, no extend
         const int result = nav->tryHandle(Qt::Key_Left, Qt::ShiftModifier,
@@ -103,7 +102,7 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         sv->begin(0, 2);
@@ -124,11 +123,11 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         sv->begin(0, 9);  // end of "OnlyBlock"
-        QSignalSpy spy(sv, &LiveSelectionView::selectionChanged);
+        QSignalSpy spy(sv, &LiveCursorState::selectionChanged);
 
         // At last block's end: Handled, no extend (no next block)
         const int result = nav->tryHandle(Qt::Key_Right, Qt::ShiftModifier,
@@ -151,7 +150,7 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         MockTextEdit mockEdit;
@@ -182,7 +181,7 @@ private Q_SLOTS:
         QTest::qWait(200);
 
         auto *nav = binding.navigationController();
-        auto *sv  = binding.selectionView();
+        auto *sv  = binding.cursorState();
         QVERIFY(nav && sv);
 
         MockTextEdit mockEdit;

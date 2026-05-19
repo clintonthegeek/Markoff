@@ -19,8 +19,8 @@ Rectangle {
 
     readonly property var liveBinding:
         ListView.view ? ListView.view.binding : null
-    readonly property var selectionView:
-        liveBinding ? liveBinding.selectionView : null
+    readonly property var cursorState:
+        liveBinding ? liveBinding.cursorState : null
 
     LiveEditBinding {
         id: editBinding
@@ -113,7 +113,7 @@ Rectangle {
         }
 
         function applySelection() {
-            const sv = root.selectionView
+            const sv = root.cursorState
             if (!sv) { deselect(); return }
             const r = sv.rangeForBlock(model.index)
             if (!r || r.x < 0) { deselect(); return }
@@ -135,7 +135,7 @@ Rectangle {
         }
 
         Connections {
-            target: root.selectionView
+            target: root.cursorState
             function onSelectionChanged() { edit.applySelection() }
         }
     }

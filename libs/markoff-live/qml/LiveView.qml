@@ -266,9 +266,9 @@ ListView {
                 // Triple-click: select whole block.
                 const item = root.itemAtIndex(r.blockIndex)
                 const text = (item && item.blockText !== undefined) ? item.blockText : ""
-                if (binding && binding.selectionView) {
-                    binding.selectionView.begin(r.blockIndex, 0)
-                    binding.selectionView.extend(r.blockIndex, text.length)
+                if (binding && binding.cursorState) {
+                    binding.cursorState.begin(r.blockIndex, 0)
+                    binding.cursorState.extend(r.blockIndex, text.length)
                 }
                 mouseArea._clickCount = 0
                 mouseArea._clickBlock = -1
@@ -289,9 +289,9 @@ ListView {
             while (s > 0 && wordRe.test(text.charAt(s - 1))) s--
             while (e < text.length && wordRe.test(text.charAt(e))) e++
             if (s === e) return  // not on a word
-            if (binding && binding.selectionView) {
-                binding.selectionView.begin(r.blockIndex, s)
-                binding.selectionView.extend(r.blockIndex, e)
+            if (binding && binding.cursorState) {
+                binding.cursorState.begin(r.blockIndex, s)
+                binding.cursorState.extend(r.blockIndex, e)
             }
             // Pre-arm triple-click counter so a third quick click selects the block.
             mouseArea._clickCount = 2
@@ -301,15 +301,15 @@ ListView {
 
         onPressed: (mouse) => {
             if (mouse.button === Qt.RightButton) return
-            if (!binding || !binding.selectionView) return
+            if (!binding || !binding.cursorState) return
             const r = root.hit(mouse.x, mouse.y)
             mouseArea._pressResult = r
             if (!r || r.blockIndex < 0) {
                 root.forceActiveFocus()
-                binding.selectionView.clear()
+                binding.cursorState.clearSelection()
                 return
             }
-            binding.selectionView.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
+            binding.cursorState.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
             const cs = binding ? binding.cursorState : null
             const item = root.itemAtIndex(r.blockIndex)
             if (cs && item && item.blockAnchor !== undefined)
@@ -348,10 +348,10 @@ ListView {
                 return
             }
 
-            if (!pressed || !binding || !binding.selectionView) return
+            if (!pressed || !binding || !binding.cursorState) return
             const r = root.hit(mouse.x, mouse.y)
             if (r && r.blockIndex >= 0)
-                binding.selectionView.extend(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
+                binding.cursorState.extend(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
         }
 
         onExited: {
@@ -364,14 +364,14 @@ ListView {
             if (mouse.button === Qt.RightButton) return
             const press = mouseArea._pressResult
             mouseArea._pressResult = null
-            if (!press || press.blockIndex < 0 || !binding || !binding.selectionView) return
+            if (!press || press.blockIndex < 0 || !binding || !binding.cursorState) return
             const r = root.hit(mouse.x, mouse.y)
             if (!r || r.blockIndex < 0) return
             const sameBlock = (r.blockIndex === press.blockIndex)
             const smallDrift = Math.abs((r.qtPos || 0) - (press.qtPos || 0)) <= 2
             if (sameBlock && smallDrift) {
                 // Simple click: reset to caret (no drag selection).
-                binding.selectionView.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
+                binding.cursorState.begin(r.blockIndex, r.qtPos >= 0 ? r.qtPos : 0)
             }
         }
     }

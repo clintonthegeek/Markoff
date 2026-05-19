@@ -30,10 +30,10 @@ private slots:
         binding.setDocument(&doc);
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
-        binding.selectionView()->begin(0, 0);
-        binding.selectionView()->extend(0, 0);
+        binding.cursorState()->begin(0, 0);
+        binding.cursorState()->extend(0, 0);
 
         QElapsedTimer t; t.start();
         cc.paste();

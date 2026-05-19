@@ -9,7 +9,7 @@ namespace Markoff { class MarkoffDocument; }
 
 namespace Markoff::Live {
 
-class LiveSelectionView;
+class LiveCursorState;
 class LiveClipboardController;
 class LiveFormatController;
 class LiveListModelBinding;
@@ -37,7 +37,7 @@ public:
     explicit LiveActionController(QObject *parent = nullptr);
 
     void setDocument(Markoff::MarkoffDocument *doc);
-    void setSelectionView(LiveSelectionView *sv);
+    void setSelectionView(LiveCursorState *sv);
     void setClipboardController(LiveClipboardController *cc);
     void setFormatController(LiveFormatController *fc);
     void setBinding(LiveListModelBinding *b);
@@ -72,7 +72,7 @@ private:
     void setupActions();
 
     Markoff::MarkoffDocument  *m_document   = nullptr;
-    LiveSelectionView         *m_selection  = nullptr;
+    LiveCursorState           *m_selection  = nullptr;
     LiveClipboardController   *m_clipboard  = nullptr;
     LiveFormatController      *m_format     = nullptr;
     LiveListModelBinding      *m_binding    = nullptr;

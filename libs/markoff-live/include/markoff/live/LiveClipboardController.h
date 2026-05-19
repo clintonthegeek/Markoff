@@ -11,12 +11,12 @@ class MarkoffDocument;
 
 namespace Markoff::Live {
 
-class LiveSelectionView;
+class LiveCursorState;
 class LiveBlockModel;
 
 /// Cut/Copy/Paste controller for the live-preview editor.
 ///
-/// Holds weak references to a MarkoffDocument, LiveSelectionView, and
+/// Holds weak references to a MarkoffDocument, LiveCursorState, and
 /// LiveBlockModel. All three must be set before calling copy/cut/paste.
 ///
 /// Copy writes two MIME types:
@@ -34,7 +34,7 @@ public:
     explicit LiveClipboardController(QObject *parent = nullptr);
 
     void setDocument(Markoff::MarkoffDocument *doc);
-    void setSelectionView(LiveSelectionView *sv);
+    void setSelectionView(LiveCursorState *sv);
     void setModel(const LiveBlockModel *model);
 
     Q_INVOKABLE void copy();
@@ -45,7 +45,7 @@ public:
 
 private:
     Markoff::MarkoffDocument *m_document  = nullptr;
-    LiveSelectionView        *m_selection = nullptr;
+    LiveCursorState          *m_selection = nullptr;
     const LiveBlockModel     *m_model     = nullptr;
 };
 

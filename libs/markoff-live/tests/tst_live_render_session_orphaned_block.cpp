@@ -16,7 +16,7 @@
 #include <markoff/core/Session.h>
 #include <markoff/core/Selection.h>
 #include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 
 class TestSessionOrphanedBlock : public QObject {
     Q_OBJECT
@@ -31,7 +31,7 @@ private slots:
         Markoff::Session *session = doc.createSession();
         binding.setSession(session);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
 
         // selectAll() sets anchor at block 0/qtPos 0, active at the last block/end.
         sv->selectAll();
@@ -42,7 +42,7 @@ private slots:
         const Markoff::Selection savedSel = session->primarySelection();
 
         // Clear the view.
-        sv->clear();
+        sv->clearSelection();
         QVERIFY(!sv->hasSelection());
 
         // Compute the actual byte size of the document so applyFlatEdit doesn't

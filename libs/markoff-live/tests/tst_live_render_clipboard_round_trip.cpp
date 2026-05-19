@@ -22,7 +22,7 @@ private slots:
         doc.loadFromMarkdown("hello world\n");
         QCOMPARE(binding.model()->rowCount(), 1);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
         cc.setSelectionView(sv);
@@ -63,7 +63,7 @@ private slots:
         doc.loadFromMarkdown("abc\n");
         QCOMPARE(binding.model()->rowCount(), 1);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
         cc.setSelectionView(sv);

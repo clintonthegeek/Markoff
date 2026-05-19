@@ -13,7 +13,6 @@ namespace Markoff::Live {
 
 class LiveBlockModel;
 class LiveCursorState;
-class LiveSelectionView;
 class BlockKindRegistry;
 
 /// Cross-block keyboard navigation. Sibling to LiveStructuralKeyHandler.
@@ -30,7 +29,6 @@ public:
     explicit LiveNavigationController(const BlockKindRegistry *registry,
                                       LiveBlockModel          *model,
                                       LiveCursorState         *cursorState,
-                                      LiveSelectionView       *selectionView = nullptr,
                                       QObject                 *parent = nullptr);
 
     Q_INVOKABLE int tryHandle(int key, int modifiers,
@@ -54,7 +52,6 @@ private:
     const BlockKindRegistry *m_registry;
     LiveBlockModel          *m_model;
     LiveCursorState         *m_cursorState;
-    LiveSelectionView       *m_selectionView;
 };
 
 }  // namespace Markoff::Live

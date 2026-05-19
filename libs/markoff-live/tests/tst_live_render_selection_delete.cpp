@@ -2,7 +2,7 @@
 #include <QTest>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 
 class TestSelectionDelete : public QObject {
     Q_OBJECT
@@ -12,7 +12,7 @@ private slots:
         Markoff::Live::LiveListModelBinding binding;
         binding.setDocument(&doc);
         doc.loadFromMarkdown("hello world\n");
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         sv->begin(0, 5);   // before " world"
         sv->extend(0, 11); // after "world"
         sv->deleteSelection();
@@ -28,7 +28,7 @@ private slots:
         binding.setDocument(&doc);
         doc.loadFromMarkdown("x\n");
         const quint64 seqBefore = doc.d2EditSequence();
-        binding.selectionView()->deleteSelection();
+        binding.cursorState()->deleteSelection();
         QCOMPARE(doc.d2EditSequence(), seqBefore);
     }
 };

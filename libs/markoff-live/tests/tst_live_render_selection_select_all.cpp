@@ -2,7 +2,7 @@
 #include <QTest>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveSelectionView.h>
+#include <markoff/live/LiveCursorState.h>
 
 class TestSelectionSelectAll : public QObject {
     Q_OBJECT
@@ -13,7 +13,7 @@ private slots:
         binding.setDocument(&doc);
         doc.loadFromMarkdown("para A\n\npara B\n");
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         QVERIFY(!sv->hasSelection());
         sv->selectAll();
         QVERIFY(sv->hasSelection());
@@ -34,8 +34,8 @@ private slots:
         Markoff::Live::LiveListModelBinding binding;
         binding.setDocument(&doc);
         doc.loadFromMarkdown("");
-        binding.selectionView()->selectAll();
-        QVERIFY(!binding.selectionView()->hasSelection());
+        binding.cursorState()->selectAll();
+        QVERIFY(!binding.cursorState()->hasSelection());
     }
 };
 

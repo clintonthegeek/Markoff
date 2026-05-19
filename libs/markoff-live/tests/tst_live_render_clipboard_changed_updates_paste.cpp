@@ -26,12 +26,12 @@ private slots:
 
         Markoff::Live::LiveClipboardController cc;
         cc.setDocument(&doc);
-        cc.setSelectionView(binding.selectionView());
+        cc.setSelectionView(binding.cursorState());
         cc.setModel(binding.model());
 
         Markoff::Live::LiveActionController ac;
         ac.setDocument(&doc);
-        ac.setSelectionView(binding.selectionView());
+        ac.setSelectionView(binding.cursorState());
         ac.setClipboardController(&cc);
 
         QVERIFY(!ac.pasteAction()->isEnabled());

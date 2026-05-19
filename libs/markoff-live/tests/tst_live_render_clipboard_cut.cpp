@@ -18,7 +18,7 @@ private slots:
         doc.loadFromMarkdown("hello world\n");
         QCOMPARE(binding.model()->rowCount(), 1);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         sv->begin(0, 0);
         sv->extend(0, 6);  // "hello "
 
@@ -49,7 +49,7 @@ private slots:
         doc.loadFromMarkdown("alpha\n\nbeta\n");
         QCOMPARE(binding.model()->rowCount(), 2);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         sv->begin(1, 0);
         sv->extend(1, 4);  // "beta"
 

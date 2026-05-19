@@ -3,7 +3,6 @@
 
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveCursorState.h>
-#include <markoff/live/LiveSelectionView.h>
 #include <markoff/live/BlockKindRegistry.h>
 #include <markoff/live/BlockKindDescriptor.h>
 #include <markoff/live/BlockRecord.h>
@@ -17,13 +16,11 @@ namespace Markoff::Live {
 
 LiveNavigationController::LiveNavigationController(
     const BlockKindRegistry *registry, LiveBlockModel *model,
-    LiveCursorState *cursorState, LiveSelectionView *selectionView,
-    QObject *parent)
+    LiveCursorState *cursorState, QObject *parent)
     : QObject(parent)
     , m_registry(registry)
     , m_model(model)
     , m_cursorState(cursorState)
-    , m_selectionView(selectionView)
 {
 }
 
@@ -67,7 +64,7 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
             if (targetRow < 0) return Handled;
             if (!m_model) return Handled;
             const int targetLen = m_model->recordAt(targetRow).text.length();
-            if (m_selectionView) m_selectionView->extend(targetRow, targetLen);
+            if (m_cursorState) m_cursorState->extend(targetRow, targetLen);
             m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
             return Handled;
         }
@@ -76,7 +73,7 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
             m_cursorState->clearDesiredVisualX();
             const int targetRow = nextNavigableRow(blockIndex);
             if (targetRow < 0) return Handled;
-            if (m_selectionView) m_selectionView->extend(targetRow, 0);
+            if (m_cursorState) m_cursorState->extend(targetRow, 0);
             m_cursorState->requestTextCaretAtRow(targetRow, 0);
             return Handled;
         }
@@ -131,7 +128,7 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
     // ------------------------------------------------------------------------
     // Option B (single source of truth): TextEdit's `selectByMouse` is false
     // and we capture every plain or Shift-modified arrow / Home / End so
-    // LiveSelectionView is always authoritative. Within-block motion and
+    // LiveCursorState is always authoritative. Within-block motion and
     // selection are also driven through here — the delegate's applySelection()
     // re-renders after each begin/extend, placing TextEdit's caret at the
     // active end via moveCursorSelection (direction-preserving).
@@ -148,15 +145,15 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
     auto applyMotion = [&](int targetRow, int targetPos,
                            LiveCursorState::VisualLineHint hint
                                = LiveCursorState::VisualLineHint::None) -> int {
-        if (!m_selectionView) return Handled;
+        if (!m_cursorState) return Handled;
         if (shift) {
             // Anchor at start position if no selection exists yet (D6).
-            if (m_selectionView->anchorBlock() < 0)
-                m_selectionView->begin(blockIndex, qtPos);
-            m_selectionView->extend(targetRow, targetPos);
+            if (m_cursorState->anchorBlock() < 0)
+                m_cursorState->begin(blockIndex, qtPos);
+            m_cursorState->extend(targetRow, targetPos);
         } else {
             // Plain motion: collapse selection to caret at target.
-            m_selectionView->begin(targetRow, targetPos);
+            m_cursorState->begin(targetRow, targetPos);
         }
         // Cross-block always needs a focus + scroll request through the
         // cursorState pipeline. Within-block: applySelection() handles the

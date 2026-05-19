@@ -15,11 +15,11 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
-        binding.selectionView()->begin(0, 4);
-        binding.selectionView()->extend(0, 8);  // "here"
+        binding.cursorState()->begin(0, 4);
+        binding.cursorState()->extend(0, 8);  // "here"
         fc.insertLink();
 
         const QByteArray blockUtf8 = doc.blockText(doc.iterateBlocks()[0]);
@@ -36,12 +36,12 @@ private slots:
 
         Markoff::Live::LiveFormatController fc;
         fc.setDocument(&doc);
-        fc.setSelectionView(binding.selectionView());
+        fc.setSelectionView(binding.cursorState());
         fc.setModel(binding.model());
 
         // Caret at position 1 (after "X"), no selection.
-        binding.selectionView()->begin(0, 1);
-        binding.selectionView()->extend(0, 1);
+        binding.cursorState()->begin(0, 1);
+        binding.cursorState()->extend(0, 1);
         fc.insertLink();
 
         const QByteArray blockUtf8 = doc.blockText(doc.iterateBlocks()[0]);

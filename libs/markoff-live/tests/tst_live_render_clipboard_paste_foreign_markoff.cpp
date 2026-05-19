@@ -29,7 +29,7 @@ private slots:
         doc.loadFromMarkdown("X\n");
         QCOMPARE(binding.model()->rowCount(), 1);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         sv->begin(0, 1);
         sv->extend(0, 1);  // caret at end of "X"
 
@@ -72,7 +72,7 @@ private slots:
         doc.loadFromMarkdown("A\n");
         QCOMPARE(binding.model()->rowCount(), 1);
 
-        auto *sv = binding.selectionView();
+        auto *sv = binding.cursorState();
         sv->begin(0, 1);
         sv->extend(0, 1);
 
