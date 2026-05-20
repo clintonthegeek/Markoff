@@ -2,12 +2,10 @@
 #include <QApplication>
 #include <QFile>
 #include <QMainWindow>
-#include <QShortcut>
 #include <QVBoxLayout>
 #include <QWidget>
 
 #include <markoff/source/Editor.h>
-#include <markoff/source/FindBar.h>
 #include <markoff/core/MarkoffDocument.h>
 
 int main(int argc, char **argv) {
@@ -31,18 +29,12 @@ int main(int argc, char **argv) {
 
     auto *editor = new Markoff::Source::Editor;
     editor->setDocument(&doc);
-    auto *findbar = new Markoff::Source::FindBar(editor);
 
     layout->addWidget(editor, 1);
-    layout->addWidget(findbar);
 
     win.setCentralWidget(central);
     win.resize(900, 700);
     win.setWindowTitle(QObject::tr("markoff-source"));
-
-    auto *findShortcut = new QShortcut(QKeySequence::Find, &win);
-    QObject::connect(findShortcut, &QShortcut::activated, findbar,
-                     &Markoff::Source::FindBar::activate);
 
     win.show();
     return app.exec();

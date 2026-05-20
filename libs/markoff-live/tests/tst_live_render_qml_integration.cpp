@@ -11,8 +11,6 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
-#include <markoff/live/LiveListModelBinding.h>
-#include <markoff/live/LiveFindController.h>
 
 #include "QmlIntegrationFixture.h"
 
@@ -1092,39 +1090,6 @@ private Q_SLOTS:
         // change have a window to settle.
         QTRY_VERIFY_WITH_TIMEOUT(isHidden(formatAt(0)), 2000);
         QTRY_VERIFY_WITH_TIMEOUT(isHidden(formatAt(1)), 2000);
-    }
-
-    // D9: FindBar end-to-end — showFindBar activates the find controller,
-    // needle search finds matches across blocks, findNext navigates,
-    // hideFindBar deactivates and clears matches.
-    void find_bar_typing_highlights_and_navigation() {
-        QmlIntegrationFixture fix(QByteArrayLiteral(
-            "Alpha block.\n\n"
-            "Beta has alpha inside.\n\n"
-            "Gamma alpha alpha.\n"
-        ), 3);
-
-        auto *liveBinding = qobject_cast<Markoff::Live::LiveListModelBinding *>(fix.binding());
-        QVERIFY(liveBinding != nullptr);
-
-        auto *fc = liveBinding->findController();
-        QVERIFY(fc != nullptr);
-
-        liveBinding->showFindBar();
-        QVERIFY(fc->isActive());
-
-        fc->setNeedle(QStringLiteral("alpha"));
-        // "Alpha block." (row 0, case-insensitive), "alpha inside." (row 1),
-        // "alpha" (row 2, first), "alpha" (row 2, second) = 4 matches.
-        QCOMPARE(fc->matchCount(), 4);
-        QCOMPARE(fc->currentMatchIndex(), 0);
-
-        fc->findNext();
-        QCOMPARE(fc->currentMatchIndex(), 1);
-
-        liveBinding->hideFindBar();
-        QVERIFY(!fc->isActive());
-        QCOMPARE(fc->matchCount(), 0);
     }
 };
 

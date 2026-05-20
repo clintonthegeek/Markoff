@@ -39,13 +39,6 @@ private slots:
         QCOMPARE(v.document(), &doc);
         QCOMPARE(spy.count(), 1);
     }
-    void findbar_virtuals_are_callable_default_noop() {
-        StubView v;
-        v.showFindBar();
-        v.showReplaceBar();
-        v.hideFindBar();
-        QVERIFY(true);
-    }
 };
 QTEST_MAIN(TestMarkdownViewBase)
 #include "tst_v10_markdown_view_base.moc"

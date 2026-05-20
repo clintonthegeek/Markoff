@@ -12,7 +12,6 @@
 #include <markoff/live/LiveActionController.h>
 #include <markoff/live/LiveFormatController.h>
 #include <markoff/live/LiveContextMenuHandler.h>
-#include <markoff/live/LiveFindController.h>
 
 #include <QObject>
 #include <QAbstractListModel>
@@ -63,8 +62,6 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
                READ formatController CONSTANT)
     Q_PROPERTY(Markoff::Live::LiveContextMenuHandler *contextMenuHandler
                READ contextMenuHandler CONSTANT)
-    Q_PROPERTY(Markoff::Live::LiveFindController *findController
-               READ findController CONSTANT)
 
 public:
     enum Capability {
@@ -111,10 +108,6 @@ public:
     LiveActionController    *actionController()    const;
     LiveFormatController    *formatController()    const;
     LiveContextMenuHandler  *contextMenuHandler()  const;
-    LiveFindController      *findController()      const;
-
-    Q_INVOKABLE void showFindBar();
-    Q_INVOKABLE void hideFindBar();
 
     const Markoff::Theme *theme() const noexcept;
     void setTheme(const Markoff::Theme *theme);

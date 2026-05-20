@@ -28,10 +28,6 @@ public:
     virtual bool hasCursor()  const { return false; }
     virtual bool hasEditing() const { return false; }
 
-    virtual void showFindBar();
-    virtual void showReplaceBar();
-    virtual void hideFindBar();
-
 signals:
     void documentChanged(Markoff::MarkoffDocument *doc);
     void cursorPositionChanged(int line, int column);

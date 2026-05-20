@@ -82,9 +82,6 @@ qt_add_qml_module(markoff_live
         # E2.5 Phase E: format controller
         include/markoff/live/LiveFormatController.h
         src/LiveFormatController.cpp
-        # D9: find bar controller
-        include/markoff/live/LiveFindController.h
-        src/LiveFindController.cpp
         # E2.5 Phase J: native QMenu / Widget-bridge context menu
         include/markoff/live/LiveContextMenuHandler.h
         src/LiveContextMenuHandler.cpp
@@ -92,7 +89,6 @@ qt_add_qml_module(markoff_live
         src/LiveListModelBinding_links.h
         src/LiveListModelBinding_links.cpp
     QML_FILES
-        qml/FindBar.qml
         qml/LiveView.qml
         qml/delegates/CodeBlockDelegate.qml
         qml/delegates/BlockOnlyDelegateBase.qml

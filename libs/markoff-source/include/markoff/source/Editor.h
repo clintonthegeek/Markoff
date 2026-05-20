@@ -14,7 +14,6 @@
 namespace Markoff::Source {
 
 namespace Detail { class Gutter; }
-class FindBar;
 
 class Editor : public Markoff::MarkdownView {
     Q_OBJECT
@@ -34,20 +33,21 @@ public:
     bool isReadOnly() const override;
     bool hasCursor()  const override { return true; }
     bool hasEditing() const override { return !isReadOnly(); }
-    void showFindBar()    override;
-    void showReplaceBar() override;
-    void hideFindBar()    override;
 
     // Theme (source-specific)
     Markoff::Theme theme() const;
     void setTheme(const Markoff::Theme &);
 
-    // Escape hatch for raw QPlainTextEdit access. Consumers may use any
-    // method on the returned pointer EXCEPT setPlainText, setDocument, or
-    // other mutators that bypass SourceTextDocumentBinding. The polymorphic
-    // MarkdownView contract (setDocument, cursorPosition, etc.) is the
-    // curated, safe surface.
+    // Accessor to the inner QPlainTextEdit (for Gutter, find adapter, and tests)
     QPlainTextEdit *plainTextEdit() const { return m_editor; }
+
+    // Forwarding methods for QPlainTextEdit API used by Gutter, find adapter, tests
+    QString toPlainText() const { return m_editor->toPlainText(); }
+    QList<QTextEdit::ExtraSelection> extraSelections() const { return m_editor->extraSelections(); }
+    void setExtraSelections(const QList<QTextEdit::ExtraSelection> &sels) { m_editor->setExtraSelections(sels); }
+    QTextCursor textCursor() const { return m_editor->textCursor(); }
+    void setTextCursor(const QTextCursor &c) { m_editor->setTextCursor(c); }
+    void ensureCursorVisible() { m_editor->ensureCursorVisible(); }
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
@@ -65,7 +65,6 @@ private:
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
     KSyntaxHighlighting::SyntaxHighlighter *m_highlighter  = nullptr;
     Detail::Gutter                         *m_gutter        = nullptr;
-    FindBar                                *m_findBar       = nullptr;
     Markoff::Theme                          m_theme;
 
     friend class Markoff::Source::Detail::Gutter;

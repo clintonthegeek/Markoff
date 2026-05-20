@@ -45,7 +45,7 @@ private Q_SLOTS:
         doc.applyFlatEdit(0, 0, QByteArray("hello"), Markoff::Origin::UserEdit);
         // d2DocumentChanged is deferred (QTimer::singleShot(0)); let it settle.
         QCoreApplication::processEvents();
-        QTRY_COMPARE(e.plainTextEdit()->toPlainText(), QStringLiteral("hello"));
+        QTRY_COMPARE(e.toPlainText(), QStringLiteral("hello"));
     }
 
     void crdt_undo_via_ctrl_z() {

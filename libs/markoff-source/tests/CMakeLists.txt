@@ -14,11 +14,6 @@ add_test(NAME tst_source_widget_binding_roundtrip COMMAND tst_source_widget_bind
 target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
 set_tests_properties(tst_source_widget_binding_roundtrip PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-add_executable(tst_source_widget_findbar tst_source_widget_findbar.cpp)
-add_test(NAME tst_source_widget_findbar COMMAND tst_source_widget_findbar)
-target_link_libraries(tst_source_widget_findbar PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
-set_tests_properties(tst_source_widget_findbar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
-
 add_executable(tst_v10_source_editor_view_contract tst_v10_source_editor_view_contract.cpp)
 target_link_libraries(tst_v10_source_editor_view_contract PRIVATE markoff_source markoff_core Qt6::Test Qt6::Widgets)
 add_test(NAME tst_v10_source_editor_view_contract COMMAND tst_v10_source_editor_view_contract)

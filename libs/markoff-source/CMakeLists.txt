@@ -10,10 +10,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 add_library(markoff_source STATIC
     src/Editor.cpp
-    src/FindBar.cpp
     src/Gutter.cpp
     include/markoff/source/Editor.h
-    include/markoff/source/FindBar.h
     src/Gutter.h
     src/InnerEditor.h
 )

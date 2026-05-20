@@ -23,8 +23,4 @@ void  MarkdownView::setScrollPositionVisualLine(float) {}
 void MarkdownView::setReadOnly(bool ro) { m_readOnly = ro; }
 bool MarkdownView::isReadOnly() const   { return m_readOnly; }
 
-void MarkdownView::showFindBar()    {}
-void MarkdownView::showReplaceBar() {}
-void MarkdownView::hideFindBar()    {}
-
 } // namespace Markoff
