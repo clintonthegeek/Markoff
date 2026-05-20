@@ -62,7 +62,21 @@ if(NOT TARGET jkqtmathtext)
 endif()
 add_subdirectory(libs/markoff-live)
 add_subdirectory(libs/markoff-source)
-add_subdirectory(apps)
+
+# Apps (markoff-collab-testapp, future scene-demo) are demo binaries that link
+# Qt::QuickWidgets and other extra components. Default-ON for standalone builds,
+# default-OFF when consumed as a subdirectory so parent projects don't have to
+# pull QuickWidgets just to satisfy the demo app's link line.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_MARKOFF_BUILD_APPS_DEFAULT ON)
+else()
+    set(_MARKOFF_BUILD_APPS_DEFAULT OFF)
+endif()
+option(MARKOFF_BUILD_APPS "Build Markoff demo apps (markoff-collab-testapp, etc.)" ${_MARKOFF_BUILD_APPS_DEFAULT})
+if(MARKOFF_BUILD_APPS)
+    add_subdirectory(apps)
+endif()
+unset(_MARKOFF_BUILD_APPS_DEFAULT)
 
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
 if(MARKOFF_BUILD_TESTS)
