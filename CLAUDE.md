@@ -1,5 +1,7 @@
 # Markoff
 
+> **Active branch context (until further notice).** Until the `foundation-exploration` branch is merged, all conversation is assumed to be about the new foundation-exploration code, which will replace the code currently on `master`. Default the working tree to `.worktrees/foundation-exploration/` for reads, builds, profiling, specs, and plans. Treat the master-side description below as the *outgoing* shape — accurate for `master` but not the active subject of work. If a request is genuinely about master (e.g. a hotfix), the user will say so explicitly.
+
 Qt6/C++ markdown editor family. Four peer libraries + one shared core:
 
 - `libs/markoff-core` (`Markoff::Core`) — shared primitives: `MarkdownView` abstract base, `MarkoffDocument`, `SearchController`/`ReplaceController`, `SearchBar`.
@@ -43,9 +45,19 @@ Test app:
 
 ## Testing
 
+Qt tests spawn windows — always run via `xvfb-run` so they don't interrupt the user's display.
+
+Install if missing (Manjaro/Arch): `sudo pacman -S xorg-server-xvfb`
+
 ```bash
-cd build-dev && ctest --output-on-failure -j
+xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
+  ctest --test-dir build-dev --output-on-failure -j 8
+
+xvfb-run --auto-servernum --server-args="-screen 0 1280x800x24" \
+  build-dev/bin/<test-binary> [test-name ...]
 ```
+
+Never run Qt window tests directly against `$DISPLAY`.
 
 At `v0.2.0`: 70 tests across `markoff-core`, `markoff-live`, `markoff-source`, `markoff-reading`, `markoff-parser`, plus the cross-leaf smoke test at `tests/markoff/tst_tri_view_smoke`.
 
