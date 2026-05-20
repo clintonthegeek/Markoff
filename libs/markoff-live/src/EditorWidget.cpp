@@ -31,7 +31,7 @@ EditorWidget::EditorWidget(LiveListModelBinding::Capabilities caps,
     d->quickWidget->rootContext()->setContextProperty(
         QStringLiteral("modelBinding"), d->binding);
     d->quickWidget->setSource(QUrl(QStringLiteral(
-        "qrc:/qt/qml/org/markoff/live/EditorContent.qml")));
+        "qrc:/qt/qml/org/markoff/live/qml/EditorContent.qml")));
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
