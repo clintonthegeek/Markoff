@@ -46,6 +46,16 @@ public:
         m_factories.insert(ext.toLower(), std::move(factory));
     }
 
+    virtual void unregisterExtension(const QString &ext)
+    {
+        m_factories.remove(ext.toLower());
+    }
+
+    virtual bool hasExtension(const QString &ext) const
+    {
+        return m_factories.contains(ext.toLower());
+    }
+
     virtual std::unique_ptr<MarkdownRenderChild>
     dispatch(const EmbedRequest &req) const
     {
