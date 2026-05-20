@@ -2,8 +2,17 @@
 
 **Date:** 2026-05-18
 **Branch:** `exploration/new-foundation`
-**Status:** input for §4.6 (Public API freeze + Corbomite migration).
-**Companion docs:** `docs/handoff/2026-05-07-pivot-to-d5-first.md` §4.6, `docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
+**Status:** input audit — questions enumerated, **awaiting port evidence**.
+
+A 2026-05-20 attempt to write a sweeping `markoff-core` freeze spec answering every question here was re-statused as draft reference (`docs/specs/2026-05-20-markoff-core-freeze-shape-design.md`) after the user pushed back: writing a 19-decision contract before Corbomite reintegration begins is the *spec-review-between-two-agents* antipattern. The path forward is port-first — each API gap that surfaces during reintegration becomes a one-decision micro-spec, and the audit's questions get answered as evidence accumulates.
+
+Two narrow follow-ons did land on 2026-05-20 against real bugs, not against this audit:
+- `docs/specs/2026-05-20-find-session-scope-design.md` — find boundary, three commits (`634266b..30c4f57`).
+- `docs/specs/2026-05-18-markoff-source-freeze-shape-design.md` and `docs/specs/2026-05-19-markoff-live-freeze-shape-design.md` — leaf freezes drafted pre-pivot; landed D-rows are real, remaining D-rows are accepted-smell decisions.
+
+This audit document is retained for the per-symbol partition tables — a snapshot of the surface at audit time. Diff against live headers as the port progresses to see what moved.
+
+**Companion docs:** `docs/handoff/2026-04-20-phase-c-ownership-handoff.md` (port-first rationale), `docs/handoff/2026-05-07-pivot-to-d5-first.md` §4.6, `docs/handoff/2026-05-08-defer-46-to-e-arc.md`.
 
 ## Purpose
 
@@ -229,8 +238,8 @@ Distinct from the per-leaf shape questions, these touch multiple leaves and need
 
 | Audit | Status |
 |---|---|
-| Audit A — view leaves CRDT-free | ✅ pass (2026-05-18 same session) |
-| Audit C — naming/shape (this doc) | ✅ enumerated; shape questions surfaced |
-| Audit B — wrapper coverage | scoped (Session scroll + FoldRef are the gaps) |
-| §4.6 freeze spec | not yet written; awaits shape-question resolution |
-| Corbomite migration guide | not yet written; awaits freeze spec |
+| Audit A — view leaves CRDT-free | ✅ pass (2026-05-18) |
+| Audit C — naming/shape (this doc) | enumerated 2026-05-18; awaiting port evidence per gap |
+| Audit B — wrapper coverage | scoped (Session scroll + FoldRef are the gaps); resolve when a real consumer pulls |
+| Per-leaf freeze specs | source/live pre-pivot drafts (D-rows partially landed); find shipped 2026-05-20; core spec re-statused as draft reference |
+| Corbomite migration guide | deferred until ~10 port-driven micro-specs accumulate |

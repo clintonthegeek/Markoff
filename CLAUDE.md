@@ -1,38 +1,52 @@
 # Markoff (exploration/new-foundation branch)
 
-> **2026-05-18 — E3a landed. Awaiting dogfood.**
+> **2026-05-20 — Port-first pivot. Reintegration begins against HEAD; gaps drive micro-specs.**
 >
-> - **E3a** (wikilinks + navigation): ✅ implemented at `109d3d3`. Dogfood request at
->   `docs/handoff/2026-05-18-e3a-dogfood-request.md`. Tag `v0.7.0-e3a` held pending
->   dogfood signoff.
+> Earlier today a 19-decision `markoff-core` freeze spec was drafted to answer the
+> 2026-05-18 public-API audit's open questions. It was withdrawn within hours
+> after user pushback: drafting a sweeping freeze contract before any Corbomite
+> reintegration begins is the *spec-review-between-two-agents* antipattern
+> explicitly warned against in `docs/handoff/2026-04-20-phase-c-ownership-handoff.md`
+> §"Why". The withdrawn spec is preserved at
+> `docs/specs/2026-05-20-markoff-core-freeze-shape-design.md` as **draft reference,
+> NOT action plan**. Decisions D1/D2/D3/D10 (type-identity, Detail:: namespace
+> policy) may survive a future evidence-driven freeze; the rest awaits real port
+> pressure. Live-freeze D11/D12 amendments (Editable, EditorWidget) also withdrawn.
 >
-> Prior closed items: E2.6 tagged `v0.7.0-e2.6` (dogfood confirmed 2026-05-18),
-> cursor architecture (tiers 1–4c), QML integration harness, B1 buffer convention,
-> code review pass.
+> **Path forward:**
 >
-> **Test baseline (2026-05-18 HEAD `109d3d3`):** 213/216 fast tests pass.
-> Three pre-existing failures (unchanged):
+> 1. Begin Corbomite reintegration against `exploration/new-foundation` HEAD as it
+>    stands today.
+> 2. Each API gap that surfaces → one-decision micro-spec → one-commit fix
+>    (the rhythm that worked for `docs/specs/2026-05-20-find-session-scope-design.md`).
+> 3. After ~10 such gaps land, draft a smaller evidence-driven freeze spec.
+> 4. Tag at that point.
+>
+> **First port-target proposed:** wire Corbomite's existing find UI against
+> `Markoff::FindController` (the freshest API, smallest possible scope, exercises
+> `attachFindController` + the no-focus-steal invariant under a real consumer).
+>
+> **What landed on 2026-05-20 against real bugs (NOT speculative):**
+> - Find session-scope (`634266b..30c4f57`) — three commits; reverts per-leaf find,
+>   adds `Markoff::FindController` in core, internal adapters under `Detail::`,
+>   falsifiable focus-steal test.
+>
+> **Pre-existing freeze drafts still on disk** (`source-2026-05-18`, `live-2026-05-19`):
+> mostly landed D-rows are real; remaining D-rows are accepted-smell decisions.
+> Treat as completed work, not pending work.
+>
+> **Test baseline (2026-05-20 HEAD `30c4f57`):** 215/218 fast tests pass.
+> Three pre-existing failures (unchanged from 2026-05-18):
 > - `tst_live_render_setext_e2e::S1_setextDemote_lastUnderlineCharDeleted_keepsCursor`
 > - `tst_markoff_doc_apply_structured_paste` — SIGABRT in structured-paste path.
 > - `tst_v10_source_editor_view_contract::cursor_position_round_trips`
 >
-> **E3a implementation notes (for fresh agents):**
-> - `activateLinkAt` / `hoverLinkAt` take `Markoff::BlockId` (not `QString` — no
->   string form exists). QML passes `model.blockAnchor`.
-> - Ctrl+click and Ctrl-hover are wired in `LiveView.qml`'s `MouseArea::onClicked`
->   and `onPositionChanged` (not a TapHandler inside the delegate — `preventStealing`
->   blocks inner handlers).
-> - Embeds (`![[...]]`) produce `isImage=true` (not `isWikilink`), so they are
->   already excluded from activation without an explicit guard.
+> **Prior closed items:** E2.6 tagged `v0.7.0-e2.6`, cursor architecture (tiers 1–4c),
+> QML integration harness, B1 buffer convention, code review pass, E3a wikilinks
+> (`109d3d3`; dogfood pending — tag `v0.7.0-e3a` held).
 >
-> **Next executable items** (user decides priority):
-> - **Dogfood E3a** → tag `v0.7.0-e3a` on pass.
-> - **E3b** (tag navigation): `pending`, no spec yet.
-> - **E2.7** (speculative paths): `pending`, no spec yet.
-> - **Fix pre-existing failures** (smallest: setext S1 cursor off-by-one).
->
-> **For any of the above:** use `superpowers:brainstorming` then
-> `superpowers:writing-plans` to produce a spec/plan before executing.
+> **For any new spec work:** use `superpowers:brainstorming` first, especially given
+> the recent lesson on premature freeze.
 >
 > ---
 >

@@ -2,8 +2,13 @@
 
 **Date:** 2026-05-19
 **Branch:** `exploration/new-foundation`
-**Status:** design approved 2026-05-19; implementation plan pending.
-**Companions:** `docs/2026-05-18-public-api-surface-audit.md` §markoff-live, `docs/specs/2026-05-18-markoff-source-freeze-shape-design.md`, `docs/handoff/2026-05-07-pivot-to-d5-first.md` §4.6.
+**Status:** design pre-dates 2026-05-20 port-first pivot. Most D-rows landed (D1-D8, D10); D9 superseded by find-session-scope. Remaining unlanded items are accepted-smell decisions, not future work. **No further amendments** without port-evidence pressure.
+**Companions:** `docs/2026-05-18-public-api-surface-audit.md` §markoff-live, `docs/specs/2026-05-18-markoff-source-freeze-shape-design.md`, `docs/specs/2026-05-20-find-session-scope-design.md`, `docs/handoff/2026-05-07-pivot-to-d5-first.md` §4.6.
+
+## Amendment log
+
+- **2026-05-20 — D9 superseded.** The QML FindBar / `LiveFindController` Q_INVOKABLE / `LiveView.qml` Item-wrapper introduced in D9 were reverted by the find-session-scope spec; find UI is now consumer-owned, find adapter is internal under `Detail::`. D9 is retained below for provenance but does not reflect the post-2026-05-20 shape.
+- **2026-05-20 — D11/D12 proposed and withdrawn same day.** A brief amendment added D11 (`Capabilities::Editable`) and D12 (`Markoff::Live::EditorWidget`) as cross-leaf items pulled out of a `markoff-core` freeze draft. Both were withdrawn within hours when the user pivoted to port-first: read-only Live and the QQuickWidget wrapper will get micro-specs when an actual Corbomite use case pulls on them (HoverPopover, `NoteEditorWidget::activeLeaf()`), not before. The withdrawal is recorded here in case the items return.
 
 ## Purpose
 
