@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS
-    Core Gui Widgets Quick QuickControls2 Qml Test)
+    Core Gui Widgets Quick QuickControls2 QuickWidgets Qml Test)
 find_package(KF6SyntaxHighlighting REQUIRED)
 
 qt_standard_project_setup(REQUIRES 6.5)
@@ -91,7 +91,11 @@ qt_add_qml_module(markoff_live
         # E3a: link hit-test + activation-builder helpers
         src/LiveListModelBinding_links.h
         src/LiveListModelBinding_links.cpp
+        # 2026-05-20: QQuickWidget wrapper for QWidget hosts (Corbomite-driven).
+        include/markoff/live/EditorWidget.h
+        src/EditorWidget.cpp
     QML_FILES
+        qml/EditorContent.qml
         qml/LiveView.qml
         qml/delegates/CodeBlockDelegate.qml
         qml/delegates/BlockOnlyDelegateBase.qml
@@ -114,6 +118,7 @@ target_link_libraries(markoff_live PUBLIC
     Qt6::Widgets
     Qt6::Quick
     Qt6::QuickControls2
+    Qt6::QuickWidgets
     markoff_core
     jkqtmathtext
 )
