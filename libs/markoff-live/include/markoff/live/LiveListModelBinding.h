@@ -24,6 +24,7 @@
 #include <markoff/core/Theme.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/DefaultLinkService.h>
+#include <markoff/core/FindController.h>
 
 namespace Markoff::Live {
 
@@ -158,6 +159,13 @@ public:
     /// Notify the link service that hover has left the current span (if any).
     /// No-op when no span is currently hovered. Idempotent.
     Q_INVOKABLE void clearLinkHover();
+
+    /// Attaches a Markoff::FindController so the live leaf renders its
+    /// matches and responds to navigation. The controller is owned by
+    /// the consumer; the binding does not take ownership. Pass nullptr
+    /// or call detachFindController() to disconnect.
+    Q_INVOKABLE void attachFindController(Markoff::FindController *fc);
+    Q_INVOKABLE void detachFindController();
 
 Q_SIGNALS:
     void documentChanged();

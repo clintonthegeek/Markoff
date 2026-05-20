@@ -3,12 +3,14 @@
 #include <QFont>
 #include <QQuickItem>
 #include <QQuickTextDocument>
+#include <QSignalSpy>
 #include <QTest>
 #include <QQuickWindow>
 #include <QTextBlock>
 #include <QTextDocument>
 #include <QTextLayout>
 
+#include <markoff/core/FindController.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
 
@@ -1090,6 +1092,60 @@ private Q_SLOTS:
         // change have a window to settle.
         QTRY_VERIFY_WITH_TIMEOUT(isHidden(formatAt(0)), 2000);
         QTRY_VERIFY_WITH_TIMEOUT(isHidden(formatAt(1)), 2000);
+    }
+
+    /// Spec D7 — falsifiable invariant. Pins the no-focus-steal-on-typing
+    /// rule at the contract level:
+    ///   - FindController::setNeedle (typing) must not emit
+    ///     navigationRequested.
+    ///   - The attached LiveFindAdapter, in turn, must not move the
+    ///     canonical cursor or mutate the document.
+    /// This is the falsifiable form of the bug that hijacked focus on
+    /// every keystroke in commit 4d0e7c3. Reintroducing a
+    /// navigationRequested emission inside setNeedle, or wiring the
+    /// adapter to currentMatchChanged with a caret-move side effect,
+    /// must make this test fail.
+    void find_typing_does_not_steal_focus_or_mutate_document() {
+        QmlIntegrationFixture fix(/*markdown=*/"# My Header\n\nParagraph one.\n",
+                                  /*expectedRowCount=*/2);
+
+        const auto idsBefore = fix.document()->iterateBlocks();
+        QCOMPARE(idsBefore.size(), 2u);
+        const QByteArray seedHeader    = fix.document()->blockText(idsBefore[0]);
+        const QByteArray seedParagraph = fix.document()->blockText(idsBefore[1]);
+
+        // Wire a controller and attach it via the consumer-owned hook.
+        Markoff::FindController fc(fix.document());
+        QObject *binding = fix.binding();
+        QMetaObject::invokeMethod(binding, "attachFindController",
+                                  Qt::DirectConnection,
+                                  Q_ARG(Markoff::FindController *, &fc));
+        fc.activate();
+
+        QObject *cursorState = fix.binding()->property("cursorState")
+                                             .value<QObject *>();
+        QVERIFY(cursorState);
+        QSignalSpy cursorSpy(cursorState, SIGNAL(cursorChanged()));
+        QSignalSpy navSpy(&fc, &Markoff::FindController::navigationRequested);
+
+        // Type "Hello" — the original bug typed "Hello" and the document
+        // ended up containing "# My elloHeader" with the first H stolen.
+        fc.setNeedle("H");
+        fc.setNeedle("He");
+        fc.setNeedle("Hel");
+        fc.setNeedle("Hell");
+        fc.setNeedle("Hello");
+        QCoreApplication::processEvents();
+
+        // Contract 1: typing is never navigation.
+        QCOMPARE(navSpy.count(), 0);
+        // Contract 2: canonical cursor did not move.
+        QCOMPARE(cursorSpy.count(), 0);
+        // Contract 3: document content is unchanged.
+        const auto idsAfter = fix.document()->iterateBlocks();
+        QCOMPARE(idsAfter.size(), 2u);
+        QCOMPARE(fix.document()->blockText(idsAfter[0]), seedHeader);
+        QCOMPARE(fix.document()->blockText(idsAfter[1]), seedParagraph);
     }
 };
 

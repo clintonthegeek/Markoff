@@ -153,6 +153,16 @@ public:
     /// moves until its delegate-registration event arrives.
     Q_INVOKABLE void syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos);
 
+    /// Sets the canonical cursor state to a TextCaret at the given
+    /// block + qtPos. Does NOT take focus and does NOT notify the matched
+    /// delegate. For callers (find adapter, future programmatic seek)
+    /// that need to move the caret without disturbing whichever widget
+    /// currently holds focus.
+    ///
+    /// L4 authority: model wins on canonical cursor state (m_cursor);
+    /// delegate is not notified. See docs/INVARIANTS.md invariant 2.
+    Q_INVOKABLE void setCaretWithoutFocus(Markoff::BlockAnchor block, int qtPos);
+
     // --- §5.1 focus-chokepoint additions (tier 1) ---
 
     /// Spec §5.1. Structural-event sites call this. Always stores as

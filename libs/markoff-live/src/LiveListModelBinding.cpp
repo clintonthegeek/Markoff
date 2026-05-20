@@ -5,6 +5,8 @@
 #include <markoff/live/LiveNavigationController.h>
 #include <markoff/live/BlockKind.h>
 
+#include "Detail/LiveFindAdapter.h"
+
 #include "KindDispatch.h"
 #include "KindTransition.h"
 #include "LiveListModelBinding_links.h"
@@ -146,6 +148,7 @@ struct LiveListModelBinding::Private {
     LiveActionController      *actions          = nullptr;
     LiveFormatController      *format           = nullptr;
     LiveContextMenuHandler    *contextMenu      = nullptr;
+    Detail::LiveFindAdapter   *findAdapter      = nullptr;
     Capabilities               caps            = AllCapabilities;
     QList<BlockKey>            lastKeys;
     bool                       applyingModelUpdate = false;
@@ -178,6 +181,7 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
     d->hitTester       = new BlockHitTester(this);
     d->navigationCtrl  = new LiveNavigationController(&d->registry, d->model, d->cursorState, this);
     d->remoteCursors   = new RemoteCursorsListModel(this);
+    d->findAdapter     = new Detail::LiveFindAdapter(d->model, d->cursorState, this);
 
     if (caps & Clipboard) {
         d->clipboard = new LiveClipboardController(this);
@@ -702,6 +706,16 @@ void LiveListModelBinding::clearLinkHover()
     if (m_currentHoveredRawText.isEmpty()) return;
     if (m_linkService) m_linkService->notifyHoverLeft(m_currentHoveredRawText);
     m_currentHoveredRawText.clear();
+}
+
+void LiveListModelBinding::attachFindController(Markoff::FindController *fc)
+{
+    if (d->findAdapter) d->findAdapter->attach(fc);
+}
+
+void LiveListModelBinding::detachFindController()
+{
+    if (d->findAdapter) d->findAdapter->detach();
 }
 
 }  // namespace Markoff::Live

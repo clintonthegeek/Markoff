@@ -171,6 +171,23 @@ void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
     Q_EMIT cursorChanged();
 }
 
+void LiveCursorState::setCaretWithoutFocus(Markoff::BlockAnchor block, int qtPos)
+{
+    if (block == Markoff::BlockAnchor{}) return;
+    if (qtPos < 0) qtPos = 0;
+
+    TextCaret tc;
+    tc.block       = block;
+    tc.cachedQtPos = static_cast<quint32>(qtPos);
+    Cursor newCursor = tc;
+
+    if (m_cursor == newCursor) return;
+    if (!validateVariant(newCursor)) return;
+
+    m_cursor = newCursor;
+    Q_EMIT cursorChanged();
+}
+
 void LiveCursorState::requestTextCaretAtRowVisualX(int expectedRow, VisualLineHint hint)
 {
     m_pendingVlhint = hint;

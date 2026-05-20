@@ -86,6 +86,42 @@ private Q_SLOTS:
         QCOMPARE(cs.cursorKind(), QStringLiteral("TextCaret"));
     }
 
+    void setCaretWithoutFocus_updates_canonical_cursor() {
+        // The find-adapter chokepoint: updates canonical cursor state but
+        // does NOT invoke any delegate handover path. See spec D6.
+        BlockKindRegistry reg;
+        LiveBlockModel model;
+        const auto recs = QList<BlockRecord>{
+            makeRec(BlockKind::Paragraph, "first"),
+            makeRec(BlockKind::Paragraph, "second"),
+        };
+        model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]), keyOf(recs[1]) }), recs);
+
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
+        QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
+
+        cs.setCaretWithoutFocus(recs[1].blockAnchor, 3);
+
+        QCOMPARE(spy.count(), 1);
+        QVERIFY(std::holds_alternative<TextCaret>(cs.cursor()));
+        const auto &tc = std::get<TextCaret>(cs.cursor());
+        QCOMPARE(tc.block, recs[1].blockAnchor);
+        QCOMPARE(static_cast<int>(tc.cachedQtPos), 3);
+    }
+
+    void setCaretWithoutFocus_idempotent() {
+        BlockKindRegistry reg;
+        LiveBlockModel model;
+        const auto recs = QList<BlockRecord>{ makeRec(BlockKind::Paragraph, "first") };
+        model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]) }), recs);
+
+        LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
+        cs.setCaretWithoutFocus(recs[0].blockAnchor, 2);
+        QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
+        cs.setCaretWithoutFocus(recs[0].blockAnchor, 2);
+        QCOMPARE(spy.count(), 0);  // no redundant emission
+    }
+
     void request_block_selected_for_hr() {
         BlockKindRegistry reg;
         LiveBlockModel model;

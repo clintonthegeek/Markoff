@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/source/Editor.h>
+#include "Detail/SourceFindAdapter.h"
 #include "Gutter.h"
 #include "InnerEditor.h"
 
@@ -55,6 +56,7 @@ Editor::Editor(QWidget *parent)
     m_editor->setLineWrapMode(QPlainTextEdit::WidgetWidth);
 
     m_gutter = new Gutter(this);
+    m_findAdapter = new Detail::SourceFindAdapter(this, this);
     connect(m_editor, &QPlainTextEdit::blockCountChanged,
             this, [this]() { recomputeGutterWidth(); });
     connect(m_editor, &QPlainTextEdit::updateRequest,
@@ -128,6 +130,16 @@ void Editor::setReadOnly(bool ro) {
 }
 
 bool Editor::isReadOnly() const { return m_editor->isReadOnly(); }
+
+void Editor::attachFindController(Markoff::FindController *fc)
+{
+    if (m_findAdapter) m_findAdapter->attach(fc);
+}
+
+void Editor::detachFindController()
+{
+    if (m_findAdapter) m_findAdapter->detach();
+}
 
 Markoff::Theme Editor::theme() const { return m_theme; }
 

@@ -82,6 +82,9 @@ qt_add_qml_module(markoff_live
         # E2.5 Phase E: format controller
         include/markoff/live/LiveFormatController.h
         src/LiveFormatController.cpp
+        # Find adapter (internal)
+        src/Detail/LiveFindAdapter.h
+        src/Detail/LiveFindAdapter.cpp
         # E2.5 Phase J: native QMenu / Widget-bridge context menu
         include/markoff/live/LiveContextMenuHandler.h
         src/LiveContextMenuHandler.cpp

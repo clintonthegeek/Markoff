@@ -11,9 +11,11 @@
 #include <markoff/core/SourceTextDocumentBinding.h>
 #include <markoff/core/Theme.h>
 
+namespace Markoff { class FindController; }
+
 namespace Markoff::Source {
 
-namespace Detail { class Gutter; }
+namespace Detail { class Gutter; class SourceFindAdapter; }
 
 class Editor : public Markoff::MarkdownView {
     Q_OBJECT
@@ -49,6 +51,14 @@ public:
     void setTextCursor(const QTextCursor &c) { m_editor->setTextCursor(c); }
     void ensureCursorVisible() { m_editor->ensureCursorVisible(); }
 
+    /// Attaches a Markoff::FindController. The Editor renders its matches
+    /// as ExtraSelections on the inner QPlainTextEdit and seeks to them
+    /// on navigation; focus stays with whatever widget currently has it
+    /// (the consumer's find input). Owned by the consumer; pass nullptr
+    /// to detach.
+    void attachFindController(Markoff::FindController *fc);
+    void detachFindController();
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void resizeEvent(QResizeEvent *e) override;
@@ -65,6 +75,7 @@ private:
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
     KSyntaxHighlighting::SyntaxHighlighter *m_highlighter  = nullptr;
     Detail::Gutter                         *m_gutter        = nullptr;
+    Detail::SourceFindAdapter              *m_findAdapter   = nullptr;
     Markoff::Theme                          m_theme;
 
     friend class Markoff::Source::Detail::Gutter;
