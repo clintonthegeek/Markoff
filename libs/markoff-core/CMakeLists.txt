@@ -42,6 +42,7 @@ add_library(markoff_core STATIC
     include/markoff/core/EmojiCompletionProvider.h
     include/markoff/core/SourceTextDocumentBinding.h
     include/markoff/core/SearchEngine.h
+    include/markoff/core/FindController.h
     include/markoff/core/MarkoffServices.h
     # --- Cmd/ (public) ---
     # Cmd aggregate
@@ -64,6 +65,7 @@ add_library(markoff_core STATIC
     src/Kf6SyntaxHighlightService.cpp
     src/SourceTextDocumentBinding.cpp
     src/SearchEngine.cpp
+    src/FindController.cpp
     src/CodeBlockProcessorRegistry.cpp
     src/CompletionDetector.cpp
     src/CompletionProvider.cpp
