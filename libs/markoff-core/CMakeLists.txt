@@ -18,6 +18,12 @@ add_library(markoff_core STATIC
     include/markoff/core/Selection.h
     include/markoff/core/FoldRef.h
     include/markoff/core/MarkoffDocument.h
+    # Restored 2026-05-20 driven by Corbomite port pull on EmbedRegistry.
+    include/markoff/core/MarkdownRenderChild.h
+    include/markoff/core/EmbedDepthGuard.h
+    include/markoff/core/EmbedRegistry.h
+    include/markoff/core/vault/ResourceProvider.h
+    src/MarkdownRenderChild.cpp
     include/markoff/core/SessionParams.h
     include/markoff/core/Session.h
     include/markoff/core/Theme.h
