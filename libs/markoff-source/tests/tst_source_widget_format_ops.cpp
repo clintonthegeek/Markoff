@@ -162,6 +162,34 @@ private Q_SLOTS:
         QCOMPARE(e.toPlainText(), QStringLiteral("Hello"));
     }
 
+    void setHeadingLevel_twice_does_not_merge_with_previous_block() {
+        // Regression for the 2026-05-21 dogfood report: a second toggle of
+        // setHeadingLevel on a heading block preceded by another block was
+        // merging the heading into the previous block via applyFlatEdit's
+        // cross-block-edit branch (the Qt range edit started at the
+        // markoff-block boundary; sep→no-sep translation lost direction).
+        Markoff::Source::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArray("para text\n\nHello"));
+        e.setDocument(&doc);
+        QTest::qWait(50);
+
+        placeCursor(e, 14);  // inside "Hello"
+        e.setHeadingLevel(2);
+        QCOMPARE(e.toPlainText(),
+                 QStringLiteral("para text\n\n## Hello"));
+
+        // Second invocation must not merge with the previous block.
+        e.setHeadingLevel(3);
+        QCOMPARE(e.toPlainText(),
+                 QStringLiteral("para text\n\n### Hello"));
+
+        // And again — strip path also operates at the block boundary.
+        e.setHeadingLevel(0);
+        QCOMPARE(e.toPlainText(),
+                 QStringLiteral("para text\n\nHello"));
+    }
+
     void setHeadingLevel_only_affects_current_line() {
         Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);

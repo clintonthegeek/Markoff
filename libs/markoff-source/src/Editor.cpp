@@ -305,40 +305,99 @@ void Editor::insertLink() {
 }
 
 void Editor::setHeadingLevel(int level) {
-    if (!m_editor) return;
+    if (!m_editor || !m_binding) return;
     if (level < 0 || level > 6) return;
+    auto *doc = m_binding->markoffDocument();
+    if (!doc) return;
 
-    QTextCursor c = m_editor->textCursor();
-    c.beginEditBlock();
-    c.movePosition(QTextCursor::StartOfBlock);
-    const int lineStart = c.position();
-    const QString line = c.block().text();
+    // Editing the heading prefix via QTextCursor on the inner QPlainTextEdit
+    // and letting it route through SourceTextDocumentBinding::onQtContentsChange
+    // would issue a range edit whose start sits exactly at a markoff block
+    // boundary whenever the heading is the first line of a non-first block.
+    // The sep-view→no-sep-view translation loses the boundary direction, and
+    // applyFlatEdit's range-edit boundary bias ("<= blkEnd") then routes the
+    // edit through the cross-block-edit branch, removing the heading block
+    // and merging its tail into the previous block. Bypass the lossy
+    // coordinate translation by mutating the target block's buffer directly,
+    // the same way LiveFormatController::setHeadingLevel does.
 
-    int existing = 0;
-    while (existing < 6 && existing < line.length()
-           && line.at(existing) == QLatin1Char('#')) {
-        ++existing;
+    const QTextCursor c = m_editor->textCursor();
+    const int origQtPos = c.position();
+    const QTextBlock qtb = c.block();
+    const int lineStartQt = qtb.position();
+    const QString text = m_editor->toPlainText();
+    const quint32 lineStartSep =
+        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(text, lineStartQt);
+
+    const auto blocks = doc->iterateBlocks();
+    if (blocks.empty()) return;
+    constexpr quint32 SEP_LEN = 2;  // "\n\n"
+    quint32 sepCursor = 0;
+    Markoff::BlockId targetBlock;
+    quint32 byteInBlock = 0;
+    bool found = false;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        const quint32 sz = static_cast<quint32>(doc->blockText(blocks[i]).size());
+        const quint32 blkEnd = sepCursor + sz;
+        if (lineStartSep <= blkEnd) {
+            targetBlock  = blocks[i];
+            byteInBlock  = lineStartSep - sepCursor;
+            found = true;
+            break;
+        }
+        sepCursor = blkEnd;
+        if (i + 1 < blocks.size()) sepCursor += SEP_LEN;
     }
-    int existingTotal = existing;
-    if (existingTotal > 0 && existingTotal < line.length()
-        && line.at(existingTotal) == QLatin1Char(' ')) {
-        ++existingTotal;
+    if (!found) return;
+
+    const QByteArray content = doc->blockText(targetBlock);
+    const int blockSize = content.size();
+    int oldBytes = 0;
+    while (oldBytes < 6
+           && static_cast<int>(byteInBlock) + oldBytes < blockSize
+           && content[static_cast<int>(byteInBlock) + oldBytes] == '#') {
+        ++oldBytes;
+    }
+    if (oldBytes > 0
+        && static_cast<int>(byteInBlock) + oldBytes < blockSize
+        && content[static_cast<int>(byteInBlock) + oldBytes] == ' ') {
+        ++oldBytes;
+    } else if (oldBytes > 0
+               && static_cast<int>(byteInBlock) + oldBytes != blockSize) {
+        // "##" with non-space follower — not an ATX prefix; leave alone.
+        oldBytes = 0;
     }
 
-    const QString newPrefix = (level == 0)
-        ? QString()
-        : QString(level, QLatin1Char('#')) + QLatin1Char(' ');
+    const QByteArray newPrefix = (level == 0)
+        ? QByteArray()
+        : QByteArray(level, '#') + ' ';
 
-    if (existingTotal == newPrefix.length()
-        && line.left(existingTotal) == newPrefix) {
-        c.endEditBlock();
+    if (newPrefix.size() == oldBytes
+        && content.mid(static_cast<int>(byteInBlock), oldBytes) == newPrefix)
         return;
+
+    {
+        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+        doc->d2ApplyBufferEdit(targetBlock, byteInBlock,
+                               static_cast<quint32>(oldBytes),
+                               newPrefix, t);
     }
-    c.setPosition(lineStart);
-    c.setPosition(lineStart + existingTotal, QTextCursor::KeepAnchor);
-    c.insertText(newPrefix);
-    c.endEditBlock();
-    m_editor->setTextCursor(c);
+
+    // Flush the debounced d2DocumentChanged so the binding syncs the
+    // QTextDocument synchronously. Users expect immediate visual feedback;
+    // tests expect toPlainText() to reflect the change without spinning the
+    // event loop.
+    doc->flushPendingD2Changed();
+
+    // Restore cursor: prefixes are ASCII so byte-count == UTF-16-unit count.
+    const int delta = static_cast<int>(newPrefix.size()) - oldBytes;
+    int newPos = origQtPos + delta;
+    if (newPos < lineStartQt) newPos = lineStartQt;
+    const int docLen = m_editor->document()->characterCount() - 1;
+    if (newPos > docLen) newPos = docLen;
+    QTextCursor c2 = m_editor->textCursor();
+    c2.setPosition(newPos);
+    m_editor->setTextCursor(c2);
 }
 
 } // namespace Markoff::Source
