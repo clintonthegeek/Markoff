@@ -1991,11 +1991,20 @@ QByteArray MarkoffDocument::serializeForSave() const
             // Emit: <indent><marker> <content>  (separator is added below)
             out += indentBytes + marker + " " + content;
 
-            // Per B1 §3: the serializer owns inter-block separators. Loose runs
-            // emit a blank line between consecutive items; tight runs emit just
-            // the line break.
-            if (i + 1 < blocks.size())
-                out += looseRun ? QByteArray("\n\n") : QByteArray("\n");
+            // Per B1 §3: the serializer owns inter-block separators.
+            //   - Between two ListItems in the same run: loose -> "\n\n",
+            //     tight -> "\n".
+            //   - Between a ListItem and a non-ListItem block: always the
+            //     block separator "\n\n" (otherwise list-then-paragraph
+            //     round-trips lose the blank line — surfaced 2026-05-21
+            //     by Corbomite dogfood).
+            if (i + 1 < blocks.size()) {
+                const BlockKind nextKind = blockKind(blocks[i + 1]);
+                if (nextKind == BlockKind::ListItem)
+                    out += looseRun ? QByteArray("\n\n") : QByteArray("\n");
+                else
+                    out += interBlockSeparator();
+            }
             continue;
         }
 

@@ -72,6 +72,34 @@ private Q_SLOTS:
         doc.loadFromMarkdown(src);
         QCOMPARE(doc.serializeForSave(), src);
     }
+
+    void roundtrip_tight_list_then_paragraph_keeps_blank_line() {
+        // Dogfood regression 2026-05-21 (Corbomite Vault round-2):
+        // tight list followed by blank line + paragraph was losing the
+        // separator on save (`- last\nparagraph` instead of
+        // `- last\n\nparagraph`).
+        MarkoffDocument doc(/*replicaId=*/1);
+        const QByteArray src =
+            "- one\n"
+            "- two\n"
+            "\n"
+            "next paragraph\n";
+        doc.loadFromMarkdown(src);
+        QCOMPARE(doc.serializeForSave(), src);
+    }
+
+    void roundtrip_tight_ordered_list_then_heading() {
+        // Same regression, numbered-list variant matching the dogfood
+        // diff in Mike's Obsidian-Based Writing Workflow.md.
+        MarkoffDocument doc(/*replicaId=*/1);
+        const QByteArray src =
+            "1. one\n"
+            "2. two\n"
+            "\n"
+            "## next heading\n";
+        doc.loadFromMarkdown(src);
+        QCOMPARE(doc.serializeForSave(), src);
+    }
 };
 
 QTEST_GUILESS_MAIN(TstD2ListRoundtrip)
