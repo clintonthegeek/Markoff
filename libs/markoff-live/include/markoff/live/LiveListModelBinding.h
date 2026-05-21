@@ -90,7 +90,7 @@ public:
     /// current. Queue #2 concern #5 — gives `LiveCursorState` a binding-
     /// level entry instead of reaching into `document()->flushPendingD2Changed()`
     /// directly.
-    void flushPendingDocumentChanges();
+    Q_INVOKABLE void flushPendingDocumentChanges();
 
     /// Bind a Session so that Session::primarySelectionChanged propagates into
     /// the SelectionView. Pass nullptr to detach. The binding does NOT take
