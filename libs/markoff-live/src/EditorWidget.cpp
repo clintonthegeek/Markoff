@@ -3,6 +3,8 @@
 
 #include <markoff/live/EditorWidget.h>
 
+#include <QDebug>
+#include <QLoggingCategory>
 #include <QPointer>
 #include <QQmlContext>
 #include <QQmlEngine>
@@ -12,6 +14,8 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
+
+Q_LOGGING_CATEGORY(markoffLiveEditorWidget, "markoff.live.editorwidget")
 
 namespace Markoff::Live {
 
@@ -33,6 +37,15 @@ EditorWidget::EditorWidget(LiveListModelBinding::Capabilities caps,
     d->quickWidget->setSource(QUrl(QStringLiteral(
         "qrc:/qt/qml/org/markoff/live/qml/EditorContent.qml")));
 
+    qCInfo(markoffLiveEditorWidget)
+        << "EditorWidget ctor: caps=" << int(caps)
+        << "binding=" << d->binding
+        << "qquickWidget=" << d->quickWidget
+        << "setSource status=" << d->quickWidget->status();
+    for (const auto &err : d->quickWidget->errors()) {
+        qCWarning(markoffLiveEditorWidget) << "QML error:" << err.toString();
+    }
+
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
@@ -52,6 +65,11 @@ EditorWidget::~EditorWidget()
 
 void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
 {
+    qCInfo(markoffLiveEditorWidget)
+        << "setDocument doc=" << doc
+        << " prev=" << document()
+        << " visibleLength=" << (doc ? doc->visibleLength() : 0u);
+
     if (document() == doc) return;
 
     // Tear down old session.
@@ -66,6 +84,8 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     if (doc) {
         d->session = doc->createSession();
         d->binding->setSession(d->session);
+        qCInfo(markoffLiveEditorWidget)
+            << "  → binding has doc, session=" << d->session;
     }
 }
 
