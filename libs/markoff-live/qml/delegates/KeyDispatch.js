@@ -98,6 +98,10 @@ function tryDispatchCtrlChord(event, ctx) {
 //   accepted — true if event.accepted has been set and the caller should
 //              return immediately
 function collapseSelectionIfMutating(event, ctx) {
+    // FALSIFIABILITY STUB — should cause all 4 slots of
+    // tst_live_render_cross_block_mutating_key to fail. Reverted by the
+    // next commit. Per invariant 4.
+    return { handled: false, accepted: false }
     const binding = ctx.binding
     if (!binding) return { handled: false, accepted: false }
     const cs = binding.cursorState
