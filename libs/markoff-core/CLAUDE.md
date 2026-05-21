@@ -43,6 +43,37 @@ entry point for source-widget-style edits (see below).
   `blockAt(TextAnchor)`, `offsetInBlock(BlockAnchor, TextAnchor)`,
   `textAnchorAt(BlockAnchor, int offset, bool rightBias)`.
 
+## Canonical text egress — use `serializeForSave()`, not `toMarkdown()`
+
+`toMarkdown()` / `toMarkdownUtf8()` read the legacy `d->buffer` text store.
+`loadFromMarkdown()` and all D2 edits do NOT update that store, so on a
+D2-loaded document these accessors return stale-or-empty content. Used
+as a save source they silently write empty files
+(surfaced 2026-05-21 by Corbomite Vault; see
+`docs/handoff/2026-05-21-save-path-data-loss.md`). Both methods carry
+`[[deprecated]]` annotations since `bb2e5c0`'s successor.
+
+For any consumer that wants "the document's current canonical bytes"
+(save, export, diff-against-disk, copy whole doc to clipboard, etc.)
+use:
+
+```cpp
+QByteArray bytes = doc->serializeForSave();
+```
+
+This walks `iterateBlocks()`, uses per-kind serializers, applies the B1
+inter-block separator convention, handles frontmatter and listitem
+markers, and uses `blockLoadTimeBytes` for byte-identical round-trip on
+untouched blocks.
+
+The legacy buffer remains a real store (`resetContent()` populates it,
+legacy `undo()`/`redo()` mutate it, `version()` reads it) but it is no
+longer the source of truth for the document's text content. Internal
+callers still using `toMarkdownUtf8`/`toMarkdown` (notably
+`SourceTextDocumentBinding`'s legacy fallback at
+`SourceTextDocumentBinding.cpp:205`, `SearchController.cpp:55`, and a
+handful of tests) are tracked for migration as a follow-up.
+
 ## `applyFlatEdit` — flat-text entry point (D4)
 
 ```cpp

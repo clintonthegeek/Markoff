@@ -67,8 +67,20 @@ public:
     const Markoff::BlockSerializerRegistry *serializerRegistry() const;
 
     // ===== Reads =====
-    QByteArray toMarkdownUtf8() const;        ///< Buffer::text() as QByteArray
-    QString    toMarkdown() const;            ///< UTF-8 -> QString convenience
+    /// \deprecated Reads the legacy `d->buffer` text store. `loadFromMarkdown()`
+    /// and all D2 edits (`d2ApplyBufferEdit`, `applyFlatEdit`, block-level
+    /// commands) do **not** update this store, so on a D2-loaded document
+    /// these accessors return stale-or-empty content. Used as a save source
+    /// they silently write empty files (surfaced 2026-05-21 by Corbomite Vault;
+    /// see `docs/handoff/2026-05-21-save-path-data-loss.md`). For canonical
+    /// disk bytes use `serializeForSave()`. The legacy buffer remains a real
+    /// store for now — `resetContent()` populates it, `undo()`/`redo()` mutate
+    /// it, `version()` reads it — but it is no longer the source of truth for
+    /// the document's text content.
+    [[deprecated("Use serializeForSave() — toMarkdownUtf8() reads the legacy buffer which D2 edits do not update")]]
+    QByteArray toMarkdownUtf8() const;
+    [[deprecated("Use serializeForSave() — toMarkdown() reads the legacy buffer which D2 edits do not update")]]
+    QString    toMarkdown() const;
     quint32    visibleLength() const;         ///< UTF-8 byte length
 
     /// Returns the most-recently parsed Document (from markoff-parser),
