@@ -23,6 +23,7 @@ private Q_SLOTS:
     void d2EditSequence_incrementsOnStructural();
     void idListProxy_firesOnD2InsertBlock();
     void idListProxy_firesOnD2RemoveBlock();
+    void flushPendingD2Changed_fires_even_when_not_pending();
 };
 
 void TstD2Signals::d2DocumentChanged_firesOnApplyBlockEdit()
@@ -135,6 +136,37 @@ void TstD2Signals::idListProxy_firesOnD2RemoveBlock()
 
     QCOMPARE(idSpy.count(), 1);
     QCOMPARE(kindSpy.count(), 1);
+}
+
+void TstD2Signals::flushPendingD2Changed_fires_even_when_not_pending()
+{
+    // Dogfood regression 2026-05-21 (Corbomite session-restore round-2):
+    // restored tabs rendered empty because EditorWidget::setDocument calls
+    // flushPendingD2Changed() to populate the binding, but by the time
+    // setDocument runs the QTimer::singleShot(0) from the earlier
+    // loadFromMarkdown's scheduleD2Changed() has already fired (and was
+    // consumed with nothing connected). flushPendingD2Changed then
+    // early-exited because d2ChangePending was false, so the binding
+    // never received a signal and stayed empty.
+    //
+    // Same shape: close-and-reopen the same file (doc cached in
+    // Vault::m_docs, no pending change since load) — new EditorWidget
+    // attaches, flushPendingD2Changed is a no-op, view stays empty.
+    //
+    // Contract: flushPendingD2Changed must emit unconditionally so a
+    // consumer attaching after load can repopulate from current state.
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown(QByteArrayLiteral("hello\n"));
+    // Let the QTimer::singleShot(0) from loadFromMarkdown's
+    // scheduleD2Changed fire so d2ChangePending becomes false.
+    QSignalSpy initialSpy(&doc, &MarkoffDocument::d2DocumentChanged);
+    QVERIFY(initialSpy.wait(100));
+    QVERIFY(initialSpy.count() >= 1);
+
+    // Now simulate session-restore EditorWidget::setDocument attach:
+    QSignalSpy lateSpy(&doc, &MarkoffDocument::d2DocumentChanged);
+    doc.flushPendingD2Changed();
+    QCOMPARE(lateSpy.count(), 1);  // <-- fails before fix; passes after
 }
 
 QTEST_MAIN(TstD2Signals)  // needs event loop for QTimer::singleShot

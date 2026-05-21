@@ -964,7 +964,15 @@ void MarkoffDocument::scheduleD2Changed()
 
 void MarkoffDocument::flushPendingD2Changed()
 {
-    if (!d->d2ChangePending) return;
+    // Emit unconditionally — used by view-attach paths (EditorWidget::setDocument
+    // and friends) to repopulate from the document's current state when a new
+    // binding/view comes online after load. The "pending" flag is cleared either
+    // way; the QTimer::singleShot(0) lambda guards on it and becomes a no-op if
+    // it fires later. Surfaced 2026-05-21 by Corbomite session-restore dogfood:
+    // restored tabs rendered empty because the QTimer-driven d2DocumentChanged
+    // fired during session restore (with nothing connected) and the later
+    // setDocument's flush early-exited on pending==false, leaving the binding
+    // unpopulated. Same shape for close-and-reopen of an already-cached doc.
     d->d2ChangePending = false;
     Q_EMIT d2DocumentChanged();
     Q_EMIT documentChanged();
