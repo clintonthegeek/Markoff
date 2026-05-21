@@ -58,9 +58,6 @@ void LiveFindAdapter::onCurrentMatchChanged()
 
 void LiveFindAdapter::rebuildAndPushSpans()
 {
-    // FALSIFIABILITY STUB — should cause tst_live_find_adapter to fail.
-    // Reverted by the next commit. Per invariant 4.
-    return;
     if (!m_model) return;
     QHash<Markoff::BlockAnchor, QList<Markoff::Live::FindSpan>> nextByBlock;
     if (m_controller) {
