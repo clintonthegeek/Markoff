@@ -1045,13 +1045,47 @@ static TopLevelBlock::Kind classifyTopLevelKind(const char *type)
 
 // Returns true if the list node contains a blank line between items
 // (i.e., the list is "loose" in CommonMark terms).
+//
+// The scan range is bounded by the LAST list_item child's end byte, not
+// the list node's overall end byte. Tree-sitter's list node range can
+// extend past the last item to include trailing blank lines that belong
+// to the document separator before the next block — those blank lines are
+// not evidence of loose-ness and were the cause of a tight-to-loose
+// serializer round-trip drift surfaced 2026-05-21 by Corbomite dogfood
+// (Mike's Obsidian-Based Writing Workflow.md became loose on save).
 static bool isListLoose(TSNode listNode, const QByteArray &utf8)
 {
-    const uint32_t start = ts_node_start_byte(listNode);
-    const uint32_t end   = ts_node_end_byte(listNode);
-    if (end <= start + 1 || static_cast<uint32_t>(utf8.size()) < end) return false;
-    for (uint32_t i = start; i + 1 < end; ++i) {
-        if (utf8[i] == '\n' && utf8[i + 1] == '\n') return true;
+    // Tree-sitter includes trailing blank lines in list_item byte ranges:
+    //   - In a loose list, every non-last item ends with "\n\n" (the
+    //     inter-item separator is absorbed into the item's range).
+    //   - In a tight list followed by another block, the LAST item ends
+    //     with "\n\n" (the document separator before the next block is
+    //     absorbed). Non-last items end with a single "\n".
+    // So scanning every byte of the list node — or every byte up to the
+    // last item's end — finds the trailing blank line in the tight case
+    // and misclassifies it as loose (surfaced 2026-05-21 by Corbomite
+    // dogfood: tight lists became loose on save round-trip). The correct
+    // signal is `\n\n` inside any NON-LAST list_item.
+    const uint32_t childCount = ts_node_named_child_count(listNode);
+    // Find index of the last list_item child.
+    int lastItemIdx = -1;
+    for (uint32_t i = 0; i < childCount; ++i) {
+        TSNode child = ts_node_named_child(listNode, i);
+        if (strcmp(ts_node_type(child), "list_item") == 0)
+            lastItemIdx = static_cast<int>(i);
+    }
+    if (lastItemIdx < 0) return false;
+    // Scan non-last list_item children for `\n\n`.
+    for (uint32_t i = 0; i < childCount; ++i) {
+        if (static_cast<int>(i) == lastItemIdx) continue;
+        TSNode child = ts_node_named_child(listNode, i);
+        if (strcmp(ts_node_type(child), "list_item") != 0) continue;
+        const uint32_t cs = ts_node_start_byte(child);
+        const uint32_t ce = ts_node_end_byte(child);
+        if (ce <= cs + 1 || static_cast<uint32_t>(utf8.size()) < ce) continue;
+        for (uint32_t j = cs; j + 1 < ce; ++j) {
+            if (utf8[j] == '\n' && utf8[j + 1] == '\n') return true;
+        }
     }
     return false;
 }

@@ -70,6 +70,46 @@ private Q_SLOTS:
         QCOMPARE(blocks[1].checked, true);
     }
 
+    void tight_list_followed_by_another_block_stays_tight() {
+        // Dogfood regression 2026-05-21 (Corbomite Vault smoke test):
+        // tight lists followed by a blank line + next block were being
+        // re-emitted as loose lists on save. Root cause: isListLoose
+        // scanned the list node's byte range for any "\n\n" sequence,
+        // which catches the blank line that separates the list from the
+        // following block — not blank lines between items inside the list.
+        const QString src = QStringLiteral(
+            "- one\n"
+            "- two\n"
+            "\n"
+            "next paragraph\n");
+        auto doc = Markoff::Document::fromMarkdown(src);
+        QVERIFY(doc);
+        const auto blocks = doc->topLevelBlocks();
+        QCOMPARE(blocks.size(), 3);
+        QCOMPARE(blocks[0].kind, TLB::Kind::ListItem);
+        QCOMPARE(blocks[1].kind, TLB::Kind::ListItem);
+        QCOMPARE(blocks[0].looseRun, false);
+        QCOMPARE(blocks[1].looseRun, false);
+    }
+
+    void tight_ordered_list_followed_by_another_block_stays_tight() {
+        // Same regression, numbered-list variant matching the dogfood diff
+        // in Mike's Obsidian-Based Writing Workflow.md.
+        const QString src = QStringLiteral(
+            "1. one\n"
+            "2. two\n"
+            "\n"
+            "## next heading\n");
+        auto doc = Markoff::Document::fromMarkdown(src);
+        QVERIFY(doc);
+        const auto blocks = doc->topLevelBlocks();
+        QCOMPARE(blocks.size(), 3);
+        QCOMPARE(blocks[0].kind, TLB::Kind::ListItem);
+        QCOMPARE(blocks[1].kind, TLB::Kind::ListItem);
+        QCOMPARE(blocks[0].looseRun, false);
+        QCOMPARE(blocks[1].looseRun, false);
+    }
+
     void loose_list_marks_all_items_loose() {
         const QString src = QStringLiteral(
             "1. one\n"
