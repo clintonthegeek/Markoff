@@ -23,6 +23,13 @@ void InlineHighlighter::setInlineSpans(const QList<Markoff::SourceSpan> &spans)
     rehighlight();
 }
 
+void InlineHighlighter::setFindSpans(const QList<FindSpan> &spans)
+{
+    if (m_findSpans == spans) return;
+    m_findSpans = spans;
+    rehighlight();
+}
+
 void InlineHighlighter::setTheme(const Markoff::Theme *theme)
 {
     if (m_theme == theme) return;
@@ -67,6 +74,42 @@ void InlineHighlighter::highlightBlock(const QString &text)
             QTextCharFormat merged = format(i);
             merged.merge(spanFmt);
             setFormat(i, 1, merged);
+        }
+    }
+
+    // Find-pass — paints search-match background on top of any existing
+    // inline-pass formats. FindSpan byte offsets are block-document-relative
+    // (UTF-8); convert to QChar (UTF-16) positions, then to line-relative
+    // via lineStart (same translation pattern as the inline-pass above).
+    // Backgrounds-only; foreground/weight/style untouched. The find pass
+    // wins over Highlight when both apply to the same range — intentional
+    // per the find-highlighting spec.
+    if (!m_findSpans.isEmpty()) {
+        const QString docText = document()->toPlainText();
+        const QByteArray docUtf8 = docText.toUtf8();
+        auto byteToQt = [&](quint32 byteOff) -> int {
+            if (static_cast<int>(byteOff) >= docUtf8.size())
+                return docText.size();
+            return QString::fromUtf8(docUtf8.left(static_cast<int>(byteOff))).size();
+        };
+        for (const FindSpan &fs : std::as_const(m_findSpans)) {
+            if (fs.byteLength == 0) continue;
+            const int qStart = byteToQt(fs.byteOffset);
+            const int qEnd   = byteToQt(fs.byteOffset + fs.byteLength);
+            const int relStart = qStart - lineStart;
+            const int relEnd   = qEnd   - lineStart;
+            if (relEnd <= 0 || relStart >= lineLen) continue;
+            const int from = std::max(0, relStart);
+            const int to   = std::min(lineLen, relEnd);
+            const QColor bg = fs.isCurrent
+                ? m_theme->color(Markoff::Theme::Slot::SearchActiveMatchBackground)
+                : m_theme->color(Markoff::Theme::Slot::SearchMatchBackground);
+            if (!bg.isValid()) continue;
+            for (int i = from; i < to; ++i) {
+                QTextCharFormat merged = format(i);
+                merged.setBackground(bg);  // overpaint — find pass wins over Highlight
+                setFormat(i, 1, merged);
+            }
         }
     }
 }

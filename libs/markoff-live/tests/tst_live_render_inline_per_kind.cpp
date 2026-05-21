@@ -8,6 +8,7 @@
 #include <QTextLayout>
 
 #include <markoff/core/Theme.h>
+#include <markoff/live/FindSpan.h>
 #include <markoff/live/InlineHighlighter.h>
 #include <markoff/live/InlineHighlighterAttached.h>
 #include <markoff/parser/SourceSpan.h>
@@ -276,6 +277,46 @@ private Q_SLOTS:
         h.setSelectionRange(-1, -1);  // no-selection sentinel
         QCOMPARE(h.selectionStart(), -1);
         QCOMPARE(h.selectionEnd(), -1);
+    }
+
+    void findSpan_paintsSearchMatchBackground_onMatchedRange() {
+        QTextDocument doc;
+        doc.setPlainText(QStringLiteral("the quick brown fox"));
+
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        Markoff::Live::InlineHighlighter h(&doc);
+        h.setTheme(&theme);
+
+        QList<Markoff::Live::FindSpan> spans;
+        spans.append({ /*byteOffset*/ 4u, /*byteLength*/ 5u, /*isCurrent*/ false });
+        h.setFindSpans(spans);
+
+        const QColor expected = theme.color(Markoff::Theme::Slot::SearchMatchBackground);
+        auto range = findFormatRange(doc, [&](const QTextCharFormat &f){
+            return f.background().color() == expected;
+        });
+        QCOMPARE(range.first, 4);
+        QCOMPARE(range.second, 5);
+    }
+
+    void findSpan_currentMatch_usesActiveSlot() {
+        QTextDocument doc;
+        doc.setPlainText(QStringLiteral("the quick brown fox"));
+
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        Markoff::Live::InlineHighlighter h(&doc);
+        h.setTheme(&theme);
+
+        QList<Markoff::Live::FindSpan> spans;
+        spans.append({ /*byteOffset*/ 4u, /*byteLength*/ 5u, /*isCurrent*/ true });
+        h.setFindSpans(spans);
+
+        const QColor expected = theme.color(Markoff::Theme::Slot::SearchActiveMatchBackground);
+        auto range = findFormatRange(doc, [&](const QTextCharFormat &f){
+            return f.background().color() == expected;
+        });
+        QCOMPARE(range.first, 4);
+        QCOMPARE(range.second, 5);
     }
 
     void attached_shim_c_plus_plus_surface_works() {

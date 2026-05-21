@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/live/FindSpan.h>
 #include <markoff/parser/SourceSpan.h>
 
 #include <QList>
@@ -24,6 +25,12 @@ public:
 
     void setInlineSpans(const QList<Markoff::SourceSpan> &spans);
     const QList<Markoff::SourceSpan> &inlineSpans() const noexcept { return m_spans; }
+
+    /// Set find-match ranges to paint with `Theme::SearchMatchBackground`
+    /// (non-current) or `Theme::SearchActiveMatchBackground` (current).
+    /// Triggers `rehighlight()`. Empty list clears highlights.
+    void setFindSpans(const QList<FindSpan> &spans);
+    const QList<FindSpan> &findSpans() const noexcept { return m_findSpans; }
 
     void setTheme(const Markoff::Theme *theme);
     const Markoff::Theme *theme() const noexcept { return m_theme; }
@@ -50,6 +57,7 @@ private:
     QTextCharFormat hiddenFormatForChar(QChar ch) const;
 
     QList<Markoff::SourceSpan> m_spans;
+    QList<FindSpan>            m_findSpans;
     const Markoff::Theme      *m_theme = nullptr;
     int   m_localCaretPos = -1;
     int   m_selStart      = -1;
