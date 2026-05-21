@@ -12,7 +12,7 @@
 //
 // USAGE in a delegate's Keys.onPressed:
 //
-//   import "KeyDispatch.mjs" as KeyDispatch
+//   import "KeyDispatch.js" as KeyDispatch
 //   ...
 //   Keys.onPressed: (event) => {
 //       if (KeyDispatch.tryDispatchCtrlChord(event, { binding: root.liveBinding })) return
