@@ -115,7 +115,7 @@ void LiveFormatController::setHeadingLevel(int level)
     const int rowCount = m_model->rowCount();
 
     // Collect target rows: every block touched by the selection, or just the
-    // anchor block if no selection.
+    // focused block if no selection.
     QList<int> targetRows;
     if (m_selection->hasSelection()) {
         for (int i = 0; i < rowCount && i < static_cast<int>(allIds.size()); ++i) {
@@ -123,7 +123,15 @@ void LiveFormatController::setHeadingLevel(int level)
             if (r.x() >= 0) targetRows.append(i);
         }
     } else {
-        const int row = m_selection->anchorBlock();
+        // No selection — use the focused block (TextCaret variant) directly.
+        // anchorBlock() returns -1 when there's no selection anchor, so we
+        // can't use it here; activeBlock() reads from currentTextCaret().
+        int row = m_selection->activeBlock();
+        if (row < 0) {
+            // Fallback: focused-anchor-row (covers cursor variants that don't
+            // have a TextCaret, e.g. BlockSelected on an HR/Image).
+            row = m_selection->focusedAnchorRow();
+        }
         if (row >= 0 && row < rowCount) targetRows.append(row);
     }
     if (targetRows.isEmpty()) return;

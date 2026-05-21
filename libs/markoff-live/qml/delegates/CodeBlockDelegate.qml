@@ -91,6 +91,7 @@ Rectangle {
                     && !(mods & Qt.AltModifier)) {
                 const clip = root.liveBinding.clipboardController
                 const cs   = root.liveBinding.cursorState
+                const ac   = root.liveBinding.actionController
                 if (k === Qt.Key_C) {
                     if (clip) clip.copy()
                     event.accepted = true
@@ -111,6 +112,23 @@ Rectangle {
                     event.accepted = true
                     return
                 }
+                if (k === Qt.Key_Z) {
+                    if (ac && ac.undoAction) ac.undoAction.trigger()
+                    event.accepted = true
+                    return
+                }
+                if (k === Qt.Key_Y) {
+                    if (ac && ac.redoAction) ac.redoAction.trigger()
+                    event.accepted = true
+                    return
+                }
+            }
+            if ((mods & Qt.ControlModifier) && (mods & Qt.ShiftModifier)
+                    && !(mods & Qt.AltModifier) && k === Qt.Key_Z) {
+                const ac = root.liveBinding.actionController
+                if (ac && ac.redoAction) ac.redoAction.trigger()
+                event.accepted = true
+                return
             }
             const isStructural = (k === Qt.Key_Backspace || k === Qt.Key_Delete
                                || k === Qt.Key_Tab)

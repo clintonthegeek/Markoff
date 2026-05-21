@@ -246,6 +246,7 @@ Item {
                     && !(mods & Qt.AltModifier)) {
                 const clip = root.liveBinding.clipboardController
                 const cs   = root.liveBinding.cursorState
+                const ac   = root.liveBinding.actionController
                 if (k === Qt.Key_C) {
                     if (clip) clip.copy()
                     event.accepted = true
@@ -266,6 +267,27 @@ Item {
                     event.accepted = true
                     return
                 }
+                // Undo/Redo: TextEdit has built-in Ctrl+Z/Y per-block undo
+                // which clashes with the document-level d2UndoLog. Route to
+                // the action controller's undo/redo QActions instead.
+                if (k === Qt.Key_Z) {
+                    if (ac && ac.undoAction) ac.undoAction.trigger()
+                    event.accepted = true
+                    return
+                }
+                if (k === Qt.Key_Y) {
+                    if (ac && ac.redoAction) ac.redoAction.trigger()
+                    event.accepted = true
+                    return
+                }
+            }
+            // Ctrl+Shift+Z: also redo (common alternative chord).
+            if ((mods & Qt.ControlModifier) && (mods & Qt.ShiftModifier)
+                    && !(mods & Qt.AltModifier) && k === Qt.Key_Z) {
+                const ac = root.liveBinding.actionController
+                if (ac && ac.redoAction) ac.redoAction.trigger()
+                event.accepted = true
+                return
             }
             // Heading level-change: Ctrl+Shift+0..6 is structural for headings.
             const isLevelChange = root.kind === "heading"
