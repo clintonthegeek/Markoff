@@ -633,10 +633,26 @@ void LiveCursorState::deleteSelectionRange()
 
     if (endByte <= startByte) return;
 
+    // Remember the collapse target before applyFlatEdit — the surviving
+    // block is the first-corner block (fb) and the cursor lands at the
+    // first-corner offset (fo) inside it.
+    const Markoff::BlockAnchor collapseAnchor = m_model->recordAt(fb).blockAnchor;
+    const int collapseQtPos = fo;
+
     doc->applyFlatEdit(static_cast<uint32_t>(startByte),
                        static_cast<uint32_t>(endByte),
                        QByteArray(), Markoff::Origin::UserEdit);
     clearSelectionAnchor();
+
+    // Position the cursor at the collapse point so subsequent mutating
+    // keys (text entry, Return) act there. Without this the cursor
+    // remains at the now-stale active-end block which the model rebuild
+    // may have removed. Required by the L1 fix in KeyDispatch.js
+    // (docs/specs/2026-05-21-textedit-interface-audit.md).
+    TextCaret tc;
+    tc.block = collapseAnchor;
+    tc.cachedQtPos = static_cast<quint32>(collapseQtPos);
+    request(tc);
 }
 
 // ---------------------------------------------------------------------------

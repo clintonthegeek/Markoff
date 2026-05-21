@@ -101,7 +101,8 @@ function collapseSelectionIfMutating(event, ctx) {
     const binding = ctx.binding
     if (!binding) return { handled: false, accepted: false }
     const cs = binding.cursorState
-    if (!cs || !cs.hasSelection) return { handled: false, accepted: false }
+    if (!cs || !cs.hasSelection || !cs.hasSelection())
+        return { handled: false, accepted: false }
 
     const k    = event.key
     const mods = event.modifiers
@@ -126,8 +127,8 @@ function collapseSelectionIfMutating(event, ctx) {
     }
 
     cs.deleteSelection()
-    // Force the model to reflect the collapse synchronously so the
-    // residual handlers see a single-block state.
+    // Force the model to reflect the collapse synchronously so the residual
+    // handlers see a single-block state.
     if (binding.flushPendingDocumentChanges) binding.flushPendingDocumentChanges()
 
     if (isBackspaceOrDelete) {
@@ -135,8 +136,16 @@ function collapseSelectionIfMutating(event, ctx) {
         event.accepted = true
         return { handled: true, accepted: true }
     }
-    // For Return/Enter or printable char: let normal handling resume. The
-    // selection is now collapsed; the structural-key handler (Return) or
-    // TextEdit (printable char) will act on the collapsed cursor.
+
+    // For Return/Enter or printable char we want the residual action to
+    // land on the collapsed cursor. After deleteSelection + model rebuild,
+    // the TextEdit's local cursorPosition may have been clamped to the
+    // new text bounds (typically end-of-text); directly position it at the
+    // collapse point so TextEdit's residual handler (printable insert)
+    // or the structural-key handler (Return-splits) acts there.
+    if (ctx.textEdit && cs.activeBlock && cs.activeQtPos) {
+        const qtPos = cs.activeQtPos()
+        if (qtPos >= 0) ctx.textEdit.cursorPosition = qtPos
+    }
     return { handled: true, accepted: false }
 }

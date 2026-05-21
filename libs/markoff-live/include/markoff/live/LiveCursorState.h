@@ -226,7 +226,7 @@ public:
     /// True when a selection is active — i.e., `m_selectionAnchor` is set
     /// AND it points to a different (block, qtPos) than the cursor's
     /// active end. Collapsed selections (anchor == active) report false.
-    bool hasSelection() const noexcept;
+    Q_INVOKABLE bool hasSelection() const noexcept;
 
     /// The anchor end of an active text selection, or nullopt if no
     /// selection is active. The active end is read from `cursor()` /

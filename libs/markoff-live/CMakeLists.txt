@@ -104,6 +104,13 @@ qt_add_qml_module(markoff_live
         qml/delegates/MathDelegate.qml
         qml/delegates/RemoteCursorOverlay.qml
         qml/delegates/UnifiedInlineTextDelegate.qml
+    RESOURCES
+        # KeyDispatch.js — JS-only helper module used by the text-bearing
+        # delegates. Placed in RESOURCES (not QML_FILES) because QML_FILES
+        # would register it as a 1.0 QML type and the resulting nested
+        # qmldir auto-generation breaks module URI resolution (the
+        # `import "KeyDispatch.js" as KeyDispatch` callers reach it
+        # relatively via the resource path).
         qml/delegates/KeyDispatch.js
 )
 

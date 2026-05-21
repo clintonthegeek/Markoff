@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import org.markoff.live 1.0
+import "KeyDispatch.js" as KeyDispatch
 
 /// Unified delegate for the four text-inline block kinds: paragraph,
 /// heading, blockquote, list-item. The `TextEdit` is persistent across
@@ -236,59 +237,25 @@ Item {
         Keys.onPressed: (event) => {
             if (!root.liveBinding) { event.accepted = false; return }
 
+            // Ctrl-modifier chord intercepts (clipboard + undo/redo + select-all)
+            // before TextEdit's built-in handlers see them. See
+            // docs/specs/2026-05-21-textedit-interface-audit.md and
+            // qml/delegates/KeyDispatch.js.
+            if (KeyDispatch.tryDispatchCtrlChord(event, { binding: root.liveBinding }))
+                return
+
+            // L1 — cross-block-selection-aware mutating keys. When a
+            // cross-block selection is active and the key would mutate text,
+            // collapse the selection first via the document layer. For
+            // Backspace/Delete the collapse IS the action; for Return /
+            // printable char we fall through so the structural handler /
+            // TextEdit acts on the collapsed cursor.
+            const _collapse = KeyDispatch.collapseSelectionIfMutating(
+                event, { binding: root.liveBinding, textEdit: edit })
+            if (_collapse.accepted) return
+
             const k = event.key
             const mods = event.modifiers
-            // Clipboard shortcuts intercepted BEFORE TextEdit's built-in
-            // handlers — without this, a focused TextEdit eats Ctrl+C / X / V /
-            // A and operates on its own within-block selection, breaking
-            // cross-block copy/cut/paste/selectAll. queue.md 2026-05-21.
-            if ((mods & Qt.ControlModifier) && !(mods & Qt.ShiftModifier)
-                    && !(mods & Qt.AltModifier)) {
-                const clip = root.liveBinding.clipboardController
-                const cs   = root.liveBinding.cursorState
-                const ac   = root.liveBinding.actionController
-                if (k === Qt.Key_C) {
-                    if (clip) clip.copy()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_X) {
-                    if (clip) clip.cut()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_V) {
-                    if (clip) clip.paste()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_A) {
-                    if (cs) cs.selectAll()
-                    event.accepted = true
-                    return
-                }
-                // Undo/Redo: TextEdit has built-in Ctrl+Z/Y per-block undo
-                // which clashes with the document-level d2UndoLog. Route to
-                // the action controller's undo/redo QActions instead.
-                if (k === Qt.Key_Z) {
-                    if (ac && ac.undoAction) ac.undoAction.trigger()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_Y) {
-                    if (ac && ac.redoAction) ac.redoAction.trigger()
-                    event.accepted = true
-                    return
-                }
-            }
-            // Ctrl+Shift+Z: also redo (common alternative chord).
-            if ((mods & Qt.ControlModifier) && (mods & Qt.ShiftModifier)
-                    && !(mods & Qt.AltModifier) && k === Qt.Key_Z) {
-                const ac = root.liveBinding.actionController
-                if (ac && ac.redoAction) ac.redoAction.trigger()
-                event.accepted = true
-                return
-            }
             // Heading level-change: Ctrl+Shift+0..6 is structural for headings.
             const isLevelChange = root.kind === "heading"
                 && (mods & Qt.ControlModifier) && (mods & Qt.ShiftModifier)
