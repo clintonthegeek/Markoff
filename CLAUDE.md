@@ -1,41 +1,64 @@
 # Markoff (exploration/new-foundation branch)
 
-> **2026-05-20 — Port-first pivot. Reintegration begins against HEAD; gaps drive micro-specs.**
+> **2026-05-20 — Port-first phase ACTIVE. Corbomite renders foundation-exploration content (milestone hit late session).**
 >
-> Earlier today a 19-decision `markoff-core` freeze spec was drafted to answer the
-> 2026-05-18 public-API audit's open questions. It was withdrawn within hours
-> after user pushback: drafting a sweeping freeze contract before any Corbomite
-> reintegration begins is the *spec-review-between-two-agents* antipattern
-> explicitly warned against in `docs/handoff/2026-04-20-phase-c-ownership-handoff.md`
-> §"Why". The withdrawn spec is preserved at
-> `docs/specs/2026-05-20-markoff-core-freeze-shape-design.md` as **draft reference,
-> NOT action plan**. Decisions D1/D2/D3/D10 (type-identity, Detail:: namespace
-> policy) may survive a future evidence-driven freeze; the rest awaits real port
-> pressure. Live-freeze D11/D12 amendments (Editable, EditorWidget) also withdrawn.
+> Corbomite's `port/foundation-exploration` branch successfully builds + launches +
+> renders documents against this branch's HEAD. The port-first rhythm
+> (port-driven micro-specs land in Markoff as gaps surface in Corbomite) is
+> producing real fixes against real consumer pressure. Full session recap:
+> [`docs/handoff/2026-05-20-port-first-session-recap.md`](docs/handoff/2026-05-20-port-first-session-recap.md).
 >
-> **Path forward:**
+> **Branch story across both repos:**
 >
-> 1. Begin Corbomite reintegration against `exploration/new-foundation` HEAD as it
->    stands today.
-> 2. Each API gap that surfaces → one-decision micro-spec → one-commit fix
->    (the rhythm that worked for `docs/specs/2026-05-20-find-session-scope-design.md`).
-> 3. After ~10 such gaps land, draft a smaller evidence-driven freeze spec.
-> 4. Tag at that point.
+> | Repo | Branch | State |
+> |------|--------|-------|
+> | Markoff (this repo) | `master` | v0.6.x line. Frozen — `exploration/new-foundation` will eventually merge HERE. |
+> | Markoff (this repo) | `exploration/new-foundation` | **Active development branch.** D-arc + E-arc rebuild. ~1000 commits ahead of master. Tag held: `v0.7.0-e3a` (dogfood pending). |
+> | Corbomite | `master` | Pinned to Markoff `master` tip (`2b7b3e7`). Stable, no port work. |
+> | Corbomite | `port/foundation-exploration` | **Active port branch.** Pinned to Markoff `exploration/new-foundation` HEAD. Compiles + launches + renders docs (degraded). |
 >
-> **First port-target proposed:** wire Corbomite's existing find UI against
-> `Markoff::FindController` (the freshest API, smallest possible scope, exercises
-> `attachFindController` + the no-focus-steal invariant under a real consumer).
+> **Eventual merge plan (decided 2026-05-20):**
 >
-> **What landed on 2026-05-20 against real bugs (NOT speculative):**
-> - Find session-scope (`634266b..30c4f57`) — three commits; reverts per-leaf find,
->   adds `Markoff::FindController` in core, internal adapters under `Detail::`,
->   falsifiable focus-steal test.
+> 1. Complete Corbomite port on `port/foundation-exploration` — port features one
+>    at a time as evidence-driven micro-specs against this branch.
+> 2. When Corbomite port is functionally complete (find, source, embeds/tags/
+>    callouts, table editor minimum), draft a small evidence-driven `markoff-core`
+>    freeze spec based on actual port pressure (NOT the speculative draft below).
+> 3. Tag Markoff at that point (probably `v0.7.0-freeze`).
+> 4. Merge Markoff `exploration/new-foundation` → Markoff `master` (large merge —
+>    retires old leaves wholesale; new layout becomes canonical).
+> 5. Merge Corbomite `port/foundation-exploration` → Corbomite `master`. Submodule
+>    pin tracks the new Markoff master tip.
 >
-> **Pre-existing freeze drafts still on disk** (`source-2026-05-18`, `live-2026-05-19`):
-> mostly landed D-rows are real; remaining D-rows are accepted-smell decisions.
-> Treat as completed work, not pending work.
+> The order matters: Markoff merges first so Corbomite master's submodule pin
+> always points at a valid Markoff commit. Reversing the order would leave
+> Corbomite master with a Markoff pin nobody else can resolve.
 >
-> **Test baseline (2026-05-20 HEAD `30c4f57`):** 215/218 fast tests pass.
+> **Port-driven Markoff commits this session (2026-05-20, all on this branch):**
+>
+> | Commit | What |
+> |--------|------|
+> | `af45aa5` | `MARKOFF_BUILD_APPS` option — submodule consumers can skip the demo app |
+> | `47f62c4` | Restore `EmbedRegistry` + `MarkdownRenderChild` + `EmbedDepthGuard` + `Vault::ResourceProvider` (port pull) |
+> | `e8986f8` | `EmbedRegistry::hasExtension/unregisterExtension` (port pull) |
+> | `bc8216d` | New `Markoff::Live::EditorWidget` — QQuickWidget wrapper for QWidget hosts |
+> | `d4b117a` | Fix EditorContent.qml resource path (Qt preserves source-side `/qml/` prefix) |
+> | `d5d210e` | EditorWidget flushes pending d2 changes after setDocument (initial model population) |
+> | `7dae201`/`2291c99` | Debug instrumentation added then removed once data path confirmed |
+>
+> Three earlier commits from same session were docs-only (freeze-spec withdrawal, port-first pivot).
+>
+> **Speculative `markoff-core` freeze draft preserved at**
+> [`docs/specs/2026-05-20-markoff-core-freeze-shape-design.md`](docs/specs/2026-05-20-markoff-core-freeze-shape-design.md).
+> Banner at top of that file marks it draft-reference-not-action-plan. Type-identity
+> decisions D1/D2/D3/D10 may survive a future evidence-driven freeze; the rest awaits
+> real port pressure.
+>
+> **Withdrawn live-freeze amendments** (Capabilities::Editable, EditorWidget) — the
+> EditorWidget got built anyway in `bc8216d` because Corbomite actually pulled on it.
+> Recorded as proposed-and-built in [`docs/specs/2026-05-19-markoff-live-freeze-shape-design.md`](docs/specs/2026-05-19-markoff-live-freeze-shape-design.md).
+>
+> **Test baseline (2026-05-20 HEAD `2291c99`):** 215/218 fast tests pass.
 > Three pre-existing failures (unchanged from 2026-05-18):
 > - `tst_live_render_setext_e2e::S1_setextDemote_lastUnderlineCharDeleted_keepsCursor`
 > - `tst_markoff_doc_apply_structured_paste` — SIGABRT in structured-paste path.
@@ -45,8 +68,23 @@
 > QML integration harness, B1 buffer convention, code review pass, E3a wikilinks
 > (`109d3d3`; dogfood pending — tag `v0.7.0-e3a` held).
 >
-> **For any new spec work:** use `superpowers:brainstorming` first, especially given
-> the recent lesson on premature freeze.
+> **Open work surfaced by the port (in priority order for next session):**
+> 1. **Wire Corbomite's find UI against `Markoff::FindController`** — the original
+>    port-first target. Now actually possible since Corbomite renders.
+> 2. **Doc-sharing doubling in NoteEditorWidget** — multiple `LiveListModelBindings`
+>    share one `MarkoffDocument` across tabs; editing causes content repetition.
+>    Corbomite-side architecture issue. Needs micro-spec.
+> 3. **Source mode renders empty** — `SourceTextDocumentBinding` needs its own
+>    population path; the `loadFromMarkdown` fix on Vault populated D2 blocks but
+>    Source widget's binding isn't seeing them.
+> 4. **`MarkoffDocument::resetContent` doesn't build D2 blocks** — surfaced during
+>    the port. The legacy `resetContent` path only updates `d->buffer`; D2 per-block
+>    state requires `loadFromMarkdown`. Either `resetContent` should also build D2
+>    (likely the right fix on the Markoff side) or it should be documented as
+>    legacy-buffer-only. Vault now uses `loadFromMarkdown` as a workaround.
+>
+> **For any new spec work:** use `superpowers:brainstorming` first. Don't draft
+> speculative freeze specs — wait for port evidence.
 >
 > ---
 >
