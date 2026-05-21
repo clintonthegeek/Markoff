@@ -84,8 +84,15 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     if (doc) {
         d->session = doc->createSession();
         d->binding->setSession(d->session);
+        // Force initial model population: setDocument only connects to
+        // documentLoaded/d2DocumentChanged signals, but loadFromMarkdown
+        // typically ran BEFORE this widget was constructed (the host
+        // populates the document then hands it over). Without this nudge
+        // the LiveBlockModel stays empty until the next user edit.
+        doc->flushPendingD2Changed();
         qCInfo(markoffLiveEditorWidget)
-            << "  → binding has doc, session=" << d->session;
+            << "  → binding has doc, session=" << d->session
+            << " flushed pending d2 changes";
     }
 }
 
