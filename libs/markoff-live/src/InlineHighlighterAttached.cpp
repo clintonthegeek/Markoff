@@ -42,6 +42,28 @@ void InlineHighlighterAttached::setSpans(const QVariantList &v)
     emit spansChanged();
 }
 
+QVariantList InlineHighlighterAttached::findSpans() const
+{
+    QVariantList out;
+    out.reserve(m_findSpans.size());
+    for (const auto &s : m_findSpans) out.append(QVariant::fromValue(s));
+    return out;
+}
+
+void InlineHighlighterAttached::setFindSpans(const QVariantList &v)
+{
+    QList<Markoff::Live::FindSpan> next;
+    next.reserve(v.size());
+    for (const QVariant &item : v) {
+        if (item.canConvert<Markoff::Live::FindSpan>())
+            next.append(item.value<Markoff::Live::FindSpan>());
+    }
+    if (next == m_findSpans) return;
+    m_findSpans = next;
+    if (m_highlighter) m_highlighter->setFindSpans(m_findSpans);
+    Q_EMIT findSpansChanged();
+}
+
 void InlineHighlighterAttached::setTheme(const Markoff::Theme *theme)
 {
     if (m_theme == theme) return;
@@ -72,6 +94,7 @@ void InlineHighlighterAttached::rebuildHighlighter()
     m_highlighter->setTheme(m_theme);
     m_highlighter->setFontScale(m_fontScale);
     m_highlighter->setInlineSpans(m_spans);
+    m_highlighter->setFindSpans(m_findSpans);
     m_highlighter->setLocalCaretPosition(m_caretPos);
     m_highlighter->setSelectionRange(m_selStart, m_selEnd);
 }

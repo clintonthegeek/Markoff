@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/live/FindSpan.h>
 #include <markoff/core/Theme.h>
 #include <markoff/parser/SourceSpan.h>
 
@@ -31,6 +32,7 @@ class MARKOFF_LIVE_EXPORT InlineHighlighterAttached : public QObject {
     QML_ELEMENT
     Q_PROPERTY(QQuickTextDocument *target READ target WRITE setTarget NOTIFY targetChanged)
     Q_PROPERTY(QVariantList spans          READ spans  WRITE setSpans  NOTIFY spansChanged)
+    Q_PROPERTY(QVariantList findSpans      READ findSpans WRITE setFindSpans NOTIFY findSpansChanged)
     Q_PROPERTY(const Markoff::Theme *theme READ theme  WRITE setTheme  NOTIFY themeChanged)
     Q_PROPERTY(qreal fontScale     READ fontScale     WRITE setFontScale     NOTIFY fontScaleChanged)
     Q_PROPERTY(int caretPosition   READ caretPosition   WRITE setCaretPosition   NOTIFY caretPositionChanged)
@@ -45,6 +47,9 @@ public:
 
     QVariantList spans() const;
     void setSpans(const QVariantList &v);
+
+    QVariantList findSpans() const;
+    void setFindSpans(const QVariantList &v);
 
     const Markoff::Theme *theme() const noexcept { return m_theme; }
     void setTheme(const Markoff::Theme *theme);
@@ -63,6 +68,7 @@ public:
 Q_SIGNALS:
     void targetChanged();
     void spansChanged();
+    void findSpansChanged();
     void themeChanged();
     void fontScaleChanged();
     void caretPositionChanged();
@@ -75,6 +81,7 @@ private:
     QPointer<QQuickTextDocument> m_target;
     InlineHighlighter           *m_highlighter = nullptr;
     QList<Markoff::SourceSpan>   m_spans;
+    QList<Markoff::Live::FindSpan> m_findSpans;
     const Markoff::Theme        *m_theme = nullptr;
     qreal m_fontScale = 1.0;
     int   m_caretPos  = -1;
