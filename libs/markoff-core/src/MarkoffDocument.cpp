@@ -973,6 +973,10 @@ void MarkoffDocument::flushPendingD2Changed()
     // fired during session restore (with nothing connected) and the later
     // setDocument's flush early-exited on pending==false, leaving the binding
     // unpopulated. Same shape for close-and-reopen of an already-cached doc.
+    // Falsifiability-tested 2026-05-21: reverting this does NOT fix
+    // cross-block downward-drag selection (that regression is pre-existing
+    // upstream of this commit). The unconditional emit IS load-bearing for
+    // session-restore and click-to-realize of deferred leaves.
     d->d2ChangePending = false;
     Q_EMIT d2DocumentChanged();
     Q_EMIT documentChanged();
