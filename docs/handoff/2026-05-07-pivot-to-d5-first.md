@@ -2,7 +2,15 @@
 
 **Date:** 2026-05-07
 **Branch:** `exploration/new-foundation`
-**Status:** authoritative posture for the branch.
+**Status:** D5-first remains the **product** posture (collab-first
+architecture, single-user as a Capabilities subtraction). **Execution**
+posture pivoted 2026-05-20 to **port-first** — Corbomite reintegration
+drives evidence-based API micro-specs; the speculative `markoff-core`
+freeze was withdrawn. Both stances coexist: D5-first describes *what*
+the architecture is; port-first describes *how* the remaining API
+surface gets finalized. For the current execution narrative read
+[`2026-05-20-port-first-session-recap.md`](2026-05-20-port-first-session-recap.md)
+first; this doc remains authoritative for the underlying design calls.
 **Supersedes:**
 
 - `docs/plans/2026-05-07-markoff-v1.0-overview.md` and Parts 1–5 (the

@@ -21,14 +21,23 @@ E-arc completes the QML live-render view as the **maximalist Markoff prototype**
 | Phase | Status | Deliverable | Companion |
 |---|---|---|---|
 | **E1** | `complete` (2026-05-08) | Inline-format highlighter in QML delegates (bold/italic/strike/inline-code/highlight/link/wikilink/tag) reading `BlockRecord::inlineSpans`. 8 kinds, 143/143 tests pass, dogfood signed off. Tag: `v0.7.0-e1`. | Spec: [`2026-05-08-e1-inline-highlighter-design.md`](../specs/2026-05-08-e1-inline-highlighter-design.md). Plan: [`2026-05-08-e1-inline-highlighter.md`](../plans/2026-05-08-e1-inline-highlighter.md). Tag: `v0.7.0-e1`. |
-| **E2** | `dogfood` (2026-05-09) | Cursor-aware delimiter visibility — markers hide unless caret enters the span — plus full-parity cross-block keyboard navigation (regression-of-omission folded in). | Spec: [`2026-05-08-e2-cursor-aware-view-design.md`](../specs/2026-05-08-e2-cursor-aware-view-design.md). Plan: [`2026-05-08-e2-cursor-aware-view.md`](../plans/2026-05-08-e2-cursor-aware-view.md). Tag (pending): `v0.7.0-e2`. |
-| **E2.5** | `pending` (scope captured 2026-05-09) | Editing affordances pack — Cut/Copy/Paste of Markdown source; QAction surface; right-click menu; format toggles (Ctrl+B/I/K); save/dirty/title; empty-doc edge cases. Dogfood-blocking. | Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.5. Spec/plan TBW. |
-| **E2.6** | `pending` (scope captured 2026-05-09) | Theme wire-up + zoom — route delegate fonts through `Markoff::Theme`; replace `HeadingDelegate`'s literal-pixel switch with theme-driven sizing; add `fontScale` + Ctrl+= / Ctrl+- / Ctrl+wheel; light/dark toggle. | Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.6. Spec/plan TBW. |
-| **E2.7** | `pending` (scope captured 2026-05-09) | Speculative paths — open-delimiter (`**` → bold immediately) + code-fence (` ``` ` → code-block delegate immediately). Lower priority than E2.5/E2.6. | Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.7. Spec/plan TBW. |
-| **E3** | `pending` | Wikilinks, embeds, tags, callouts — Obsidian-flavoured affordances | `docs/specs/2026-XX-XX-e3-obsidian-affordances-design.md` (TBW) |
+| **E2** | `complete` (2026-05-09) | Cursor-aware delimiter visibility — markers hide unless caret enters the span — plus full-parity cross-block keyboard navigation (regression-of-omission folded in). Tag: `v0.7.0-e2`. | Spec: [`2026-05-08-e2-cursor-aware-view-design.md`](../specs/2026-05-08-e2-cursor-aware-view-design.md). Plan: [`2026-05-08-e2-cursor-aware-view.md`](../plans/2026-05-08-e2-cursor-aware-view.md). |
+| **E2.5** | `complete` (2026-05-15) | Editing affordances pack — Cut/Copy/Paste of Markdown source; QAction surface; right-click menu; format toggles; save/dirty/title; empty-doc edge cases; S1/S2/S3 cursor fixes. Tag: `v0.7.0-e2.5` (held pending interactive sign-off). | Spec: [`2026-05-09-e2.5-editing-affordances-design.md`](../specs/2026-05-09-e2.5-editing-affordances-design.md). Plan: [`2026-05-09-e2.5-editing-affordances.md`](../plans/2026-05-09-e2.5-editing-affordances.md). |
+| **E2.6** | `complete` (2026-05-18) | Theme wire-up + zoom — delegate fonts through `Markoff::Theme`; theme-driven heading sizing; `fontScale` + Ctrl+= / Ctrl+- / Ctrl+wheel; light/dark toggle. Extended 2026-05-17/18 with full color wiring (every delegate reads colours from Theme via `themeColorFor`). Tag: `v0.7.0-e2.6` (held pending re-dogfood). | Specs: [`2026-05-10-e2.6-theme-zoom-design.md`](../specs/2026-05-10-e2.6-theme-zoom-design.md) + [`2026-05-17-theme-color-wiring-design.md`](../specs/2026-05-17-theme-color-wiring-design.md). |
+| **E2.7** | `deferred` | Speculative paths — open-delimiter (`**` → bold immediately) + code-fence (` ``` ` → code-block delegate immediately). Lower priority. **De-prioritized 2026-05-18** in favor of API finalization + port-first reintegration with Corbomite. | Scope: [`docs/handoff/2026-05-09-post-e2-scope.md`](../handoff/2026-05-09-post-e2-scope.md) §2.E2.7. |
+| **E3a** | `dogfood` (2026-05-18) | Wikilinks + link navigation. Tag `v0.7.0-e3a` held pending interactive sign-off. | Spec: [`2026-05-18-e3a-wikilinks-navigation-design.md`](../specs/2026-05-18-e3a-wikilinks-navigation-design.md). Dogfood request: [`2026-05-18-e3a-dogfood-request.md`](../handoff/2026-05-18-e3a-dogfood-request.md). |
+| **E3b+** | `pending` | Embeds, tags, callouts — remaining Obsidian-flavoured affordances. | TBW. |
 | **E4** | `pending` | Tables, frontmatter, footnote rendering | `docs/specs/2026-XX-XX-e4-tables-frontmatter-footnotes-design.md` (TBW) |
 | **E5** | `pending` | Math / Mermaid Live-mode parity with Reading mode | `docs/specs/2026-XX-XX-e5-math-mermaid-parity-design.md` (TBW) |
 | **E6** | `pending` | Distillation — extract the foolproof view-construction recipe | `docs/recipe/` (TBW) |
+
+> **2026-05-20 amendment — port-first execution.** Speculative
+> work on remaining E-phases is paused. Markoff is being reintegrated
+> with the Corbomite host app on Corbomite's `port/foundation-exploration`
+> branch; gaps surfaced by that consumer drive evidence-based micro-specs
+> here. Subsequent E-phases resume after the Markoff freeze tag
+> (`v0.7.0-freeze`) lands and Markoff merges to master. See
+> [`../handoff/2026-05-20-port-first-session-recap.md`](../handoff/2026-05-20-port-first-session-recap.md).
 
 Status legend: `pending` (not yet started) · `spec-in-brainstorm` · `spec-approved` · `plan-approved` · `in-progress` · `dogfood` · `complete`.
 
