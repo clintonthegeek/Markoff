@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff/live/MarkoffLiveExport.h>
+#include <markoff/live/FindSpan.h>
 #include <markoff/core/BlockAnchor.h>
 #include <markoff/core/BlockAttrsMap.h>
 #include <markoff/parser/SourceSpan.h>
@@ -36,6 +37,11 @@ struct MARKOFF_LIVE_EXPORT BlockRecord {
     /// strikethrough/highlight) populated from the parsed AST and consumed
     /// by `InlineHighlighter` (E1). Load-bearing — do not strip.
     QList<Markoff::SourceSpan> inlineSpans;
+    /// Find-match ranges for an active find session. Written by
+    /// `LiveFindAdapter` via `LiveBlockModel::setFindSpans`. Excluded from
+    /// `operator==` so adapter writes don't cascade into `applyOps`
+    /// equality short-circuits. Empty list = no matches in this block.
+    QList<Markoff::Live::FindSpan> findSpans;
     QHash<Markoff::AttrName, Markoff::AttrValue> attrs; ///< Block-kind attributes (e.g. level, infoString).
 
     bool operator==(const BlockRecord &o) const noexcept {
