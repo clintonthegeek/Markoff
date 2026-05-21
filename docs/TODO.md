@@ -1,5 +1,20 @@
 # Markoff TODO
 
+## 2026-05-21 — Source-view cleanup follow-ups
+
+Heading and wrap toggles ported to block-aware `d2ApplyBufferEdit`
+(`0b133b9`, `9a2c282`). Four related items remain, scoped and sequenced
+in [`docs/specs/2026-05-21-source-view-cleanup-followups.md`](specs/2026-05-21-source-view-cleanup-followups.md):
+
+1. `Editor::insertLink` block-aware port (latent same-class bug; mechanical).
+2. `SourceTextDocumentBinding::syncFromSession` — remove dead `toMarkdownUtf8()` fallback.
+3. Cursor/selection translation rewrite via block-aware intermediate (largest; own spec+plan).
+4. Separator-delete merge gap — needs a structural-edit-from-source policy decision.
+
+Pull in opportunistically when next touching the source view.
+
+---
+
 ## 2026-05-09 — Post-E2 scope (E2.5 / E2.6 / E2.7) captured
 
 After E2 dogfood we surfaced three categories of work that no existing
