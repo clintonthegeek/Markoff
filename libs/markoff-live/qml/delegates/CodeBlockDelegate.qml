@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import org.kde.syntaxhighlighting
 import org.markoff.live 1.0
+import "KeyDispatch.js" as KeyDispatch
 
 Rectangle {
     id: root
@@ -83,53 +84,19 @@ Rectangle {
         Keys.onPressed: (event) => {
             if (!root.liveBinding) { event.accepted = false; return }
 
+            // Ctrl-modifier chord intercepts (clipboard + undo/redo + select-all)
+            // before TextEdit's built-in handlers see them. Shared dispatcher,
+            // see qml/delegates/KeyDispatch.js + the 2026-05-21 audit.
+            if (KeyDispatch.tryDispatchCtrlChord(event, { binding: root.liveBinding }))
+                return
+
+            // L1 — cross-block-selection collapse on mutating keys.
+            const _collapse = KeyDispatch.collapseSelectionIfMutating(
+                event, { binding: root.liveBinding, textEdit: edit })
+            if (_collapse.accepted) return
+
             const k = event.key
             const mods = event.modifiers
-            // Clipboard shortcuts intercepted BEFORE TextEdit's built-in
-            // handlers — see UnifiedInlineTextDelegate.qml. queue.md 2026-05-21.
-            if ((mods & Qt.ControlModifier) && !(mods & Qt.ShiftModifier)
-                    && !(mods & Qt.AltModifier)) {
-                const clip = root.liveBinding.clipboardController
-                const cs   = root.liveBinding.cursorState
-                const ac   = root.liveBinding.actionController
-                if (k === Qt.Key_C) {
-                    if (clip) clip.copy()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_X) {
-                    if (clip) clip.cut()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_V) {
-                    if (clip) clip.paste()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_A) {
-                    if (cs) cs.selectAll()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_Z) {
-                    if (ac && ac.undoAction) ac.undoAction.trigger()
-                    event.accepted = true
-                    return
-                }
-                if (k === Qt.Key_Y) {
-                    if (ac && ac.redoAction) ac.redoAction.trigger()
-                    event.accepted = true
-                    return
-                }
-            }
-            if ((mods & Qt.ControlModifier) && (mods & Qt.ShiftModifier)
-                    && !(mods & Qt.AltModifier) && k === Qt.Key_Z) {
-                const ac = root.liveBinding.actionController
-                if (ac && ac.redoAction) ac.redoAction.trigger()
-                event.accepted = true
-                return
-            }
             const isStructural = (k === Qt.Key_Backspace || k === Qt.Key_Delete
                                || k === Qt.Key_Tab)
             const isNav = (k === Qt.Key_Up || k === Qt.Key_Down

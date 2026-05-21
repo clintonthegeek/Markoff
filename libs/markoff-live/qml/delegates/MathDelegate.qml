@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Controls
 import org.markoff.live 1.0
+import "KeyDispatch.js" as KeyDispatch
 
 Item {
     id: root
@@ -95,6 +96,15 @@ Item {
 
             Keys.priority: Keys.BeforeItem
             Keys.onPressed: (event) => {
+                // Clipboard + undo/redo + select-all chord intercepts.
+                // Closes L5 (Ctrl+Z bypassing d2UndoLog) and L6 (clipboard
+                // bypassing LiveClipboardController) from the 2026-05-21
+                // TextEdit interface audit. Explicit decision: math-source
+                // editing routes through the document layer for consistency
+                // with surrounding paragraphs.
+                if (root.liveBinding && KeyDispatch.tryDispatchCtrlChord(
+                        event, { binding: root.liveBinding })) return
+
                 if (event.key === Qt.Key_Escape) {
                     root.exitEditMode()
                     event.accepted = true
