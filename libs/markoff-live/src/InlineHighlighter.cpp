@@ -77,14 +77,9 @@ void InlineHighlighter::highlightBlock(const QString &text)
         }
     }
 
-    // Find-pass — paints search-match background on top of any existing
-    // inline-pass formats. FindSpan byte offsets are block-document-relative
-    // (UTF-8); convert to QChar (UTF-16) positions, then to line-relative
-    // via lineStart (same translation pattern as the inline-pass above).
-    // Backgrounds-only; foreground/weight/style untouched. The find pass
-    // wins over Highlight when both apply to the same range — intentional
-    // per the find-highlighting spec.
-    if (!m_findSpans.isEmpty()) {
+    // FALSIFIABILITY STUB — should cause tst_live_render_qml_integration
+    // find slots to fail. Reverted by the next commit. Per invariant 4.
+    if (false && !m_findSpans.isEmpty()) {
         const QString docText = document()->toPlainText();
         const QByteArray docUtf8 = docText.toUtf8();
         auto byteToQt = [&](quint32 byteOff) -> int {
