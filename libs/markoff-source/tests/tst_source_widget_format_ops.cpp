@@ -84,6 +84,33 @@ private Q_SLOTS:
         QCOMPARE(e.toPlainText(), QStringLiteral("~~hello~~"));
     }
 
+    void toggleBold_at_block_boundary_does_not_merge_blocks() {
+        // Companion regression to setHeadingLevel_twice_does_not_merge:
+        // wrapping a selection whose start sits exactly at a markoff block
+        // boundary used to trip applyFlatEdit's cross-block branch via the
+        // QTextCursor-mediated path. Now block-aware.
+        Markoff::Source::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArray("para text\n\nhello world"));
+        e.setDocument(&doc);
+        QTest::qWait(50);
+
+        // Select "hello" which is the first 5 bytes of block 2 — its start
+        // (qt-pos 11) is exactly at the block boundary in sep-view.
+        selectRange(e, 11, 16);
+        e.toggleBold();
+        QCOMPARE(e.toPlainText(),
+                 QStringLiteral("para text\n\n**hello** world"));
+
+        // Unwrap a selection whose start sits one byte INTO the block —
+        // markers sit BEFORE selection, at the boundary. Surrounded-outside
+        // detection must still see them.
+        selectRange(e, 13, 18);  // "hello" inside "**hello**"
+        e.toggleBold();
+        QCOMPARE(e.toPlainText(),
+                 QStringLiteral("para text\n\nhello world"));
+    }
+
     void toggleInlineCode_wraps_with_backticks() {
         Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);

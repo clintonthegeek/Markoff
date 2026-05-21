@@ -18,6 +18,8 @@
 #include <QScrollBar>
 #include <QVBoxLayout>
 
+#include <optional>
+
 namespace Markoff::Source {
 
 using Detail::Gutter;
@@ -202,82 +204,242 @@ void Editor::recomputeGutterWidth() {
 
 // --- Markdown format operations -------------------------------------------
 //
-// All operate via QTextCursor on the inner QPlainTextEdit. Changes flow
-// through SourceTextDocumentBinding to MarkoffDocument::applyFlatEdit, so
-// the live view sees them on the next d2DocumentChanged tick.
+// All operate by resolving the cursor's qt-position to a markoff block and
+// applying the edit via d2ApplyBufferEdit, bypassing the lossy sep→no-sep
+// translation in SourceTextDocumentBinding (which sends range edits through
+// MarkoffDocument::applyFlatEdit). The translation drops boundary direction
+// and would route boundary-touching edits through applyFlatEdit's
+// cross-block branch, merging blocks. See setHeadingLevel below and the
+// 2026-05-21 source-view dogfood fix for the root-cause writeup.
 
 namespace {
 
-// Wrap or unwrap the selection with `delim` on both sides. Strategy mirrors
-// LiveFormatController::wrapPerBlock: check whether the surrounding bytes
-// (or selection inside) already match the delimiter, unwrap if so;
-// otherwise wrap.
-void wrapToggle(QPlainTextEdit *te, const QString &delim) {
-    if (!te) return;
-    QTextCursor c = te->textCursor();
-    const int n = delim.length();
+struct BlockHit {
+    Markoff::BlockId blockId;
+    quint32 byteInBlock;
+    int blockIndex;
+};
 
+// Resolve a sep-view byte offset to (blockId, byteInBlock). When sepOff
+// lands at a block boundary, biasForward picks the next block (start) vs
+// the previous (end).
+std::optional<BlockHit> findBlockAtSepByte(const Markoff::MarkoffDocument *doc,
+                                           quint32 sepOff,
+                                           bool biasForward) {
+    const auto blocks = doc->iterateBlocks();
+    if (blocks.empty()) return std::nullopt;
+    constexpr quint32 SEP_LEN = 2;
+    quint32 sepCursor = 0;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        const quint32 sz = static_cast<quint32>(doc->blockText(blocks[i]).size());
+        const quint32 blkEnd = sepCursor + sz;
+        if (sepOff < blkEnd) {
+            return BlockHit{blocks[i], sepOff - sepCursor, static_cast<int>(i)};
+        }
+        if (sepOff == blkEnd) {
+            if (!biasForward || i + 1 == blocks.size()) {
+                return BlockHit{blocks[i], sz, static_cast<int>(i)};
+            }
+            const size_t next = i + 1;
+            return BlockHit{blocks[next], 0, static_cast<int>(next)};
+        }
+        sepCursor = blkEnd;
+        if (i + 1 < blocks.size()) sepCursor += SEP_LEN;
+    }
+    return std::nullopt;
+}
+
+struct BlockSlice {
+    Markoff::BlockId blockId;
+    quint32 byteLo;   // start byte in block (inclusive)
+    quint32 byteHi;   // end byte in block (exclusive)
+};
+
+// Slice a sep-view byte range [sepLo, sepHi) into per-block sub-ranges.
+// Empty ranges (sepLo == sepHi) yield no slices; the cursor case uses
+// findBlockAtSepByte instead.
+QList<BlockSlice> sliceByBlocks(const Markoff::MarkoffDocument *doc,
+                                quint32 sepLo, quint32 sepHi) {
+    QList<BlockSlice> out;
+    if (sepLo >= sepHi) return out;
+    const auto blocks = doc->iterateBlocks();
+    constexpr quint32 SEP_LEN = 2;
+    quint32 sepCursor = 0;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        const quint32 sz = static_cast<quint32>(doc->blockText(blocks[i]).size());
+        const quint32 blkEnd = sepCursor + sz;
+        const quint32 sLo = std::max(sepLo, sepCursor);
+        const quint32 sHi = std::min(sepHi, blkEnd);
+        if (sLo < sHi) {
+            out.append({blocks[i], sLo - sepCursor, sHi - sepCursor});
+        }
+        sepCursor = blkEnd;
+        if (i + 1 < blocks.size()) sepCursor += SEP_LEN;
+        if (sepCursor >= sepHi) break;
+    }
+    return out;
+}
+
+// Toggle `delim` wrap around the QPlainTextEdit's selection (or insert an
+// empty pair at the cursor), mediated through the block-aware d2 API.
+//
+// Detection (per slice, matching the legacy QTextCursor impl):
+//   * surroundedOutside — bytes outside the selection in the same block are
+//     already `delim`. Unwrap by removing both.
+//   * insideMarkers     — selection itself starts and ends with `delim`.
+//     Unwrap by stripping the inner markers.
+//   * otherwise         — wrap by inserting `delim` at both ends.
+//
+// Multi-block selections: each block's slice is handled independently
+// (matching LiveFormatController::wrapPerBlock).
+void wrapToggle(QPlainTextEdit *te,
+                Markoff::SourceTextDocumentBinding *binding,
+                const QByteArray &delim) {
+    if (!te || !binding) return;
+    Markoff::MarkoffDocument *doc = binding->markoffDocument();
+    if (!doc) return;
+
+    QTextCursor c = te->textCursor();
+    const QString docText = te->toPlainText();
+    const int delimLen = delim.size();  // ASCII delims: bytes == UTF-16 units
+
+    // --- No selection: insert delim+delim, park cursor between. -----------
     if (!c.hasSelection()) {
-        // No selection: insert delim+delim, park cursor in the middle.
-        const int pos = c.position();
-        c.beginEditBlock();
-        c.insertText(delim + delim);
-        c.setPosition(pos + n);
-        c.endEditBlock();
-        te->setTextCursor(c);
+        const int qtPos = c.position();
+        const quint32 sepByte =
+            Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtPos);
+        auto hit = findBlockAtSepByte(doc, sepByte, /*biasForward=*/true);
+        if (!hit) {
+            // Empty document: applyFlatEdit auto-creates a paragraph block.
+            doc->applyFlatEdit(0, 0, delim + delim, Markoff::Origin::UserEdit);
+        } else {
+            Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+            doc->d2ApplyBufferEdit(hit->blockId, hit->byteInBlock, 0,
+                                   delim + delim, t);
+        }
+        doc->flushPendingD2Changed();
+        QTextCursor c2 = te->textCursor();
+        c2.setPosition(qtPos + delimLen);
+        te->setTextCursor(c2);
         return;
     }
 
-    int start = c.selectionStart();
-    int end   = c.selectionEnd();
-    const QString docText = te->toPlainText();
+    // --- Selection: per-block toggle. ------------------------------------
+    const int qtStart = c.selectionStart();
+    const int qtEnd   = c.selectionEnd();
+    const quint32 sepStart =
+        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtStart);
+    const quint32 sepEnd =
+        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtEnd);
+    const QList<BlockSlice> slices = sliceByBlocks(doc, sepStart, sepEnd);
+    if (slices.isEmpty()) return;
 
-    const bool surroundedOutside =
-        start >= n && end + n <= docText.length()
-        && docText.mid(start - n, n) == delim
-        && docText.mid(end, n) == delim;
-    const bool insideMarkers =
-        end - start >= 2 * n
-        && docText.mid(start, n) == delim
-        && docText.mid(end - n, n) == delim;
+    enum class Mode { SurroundedOutside, InsideMarkers, Wrap };
 
-    c.beginEditBlock();
-    if (surroundedOutside) {
-        c.setPosition(end);
-        c.setPosition(end + n, QTextCursor::KeepAnchor);
-        c.removeSelectedText();
-        c.setPosition(start - n);
-        c.setPosition(start, QTextCursor::KeepAnchor);
-        c.removeSelectedText();
-        c.setPosition(start - n);
-        c.setPosition(end - n, QTextCursor::KeepAnchor);
-    } else if (insideMarkers) {
-        c.setPosition(end - n);
-        c.setPosition(end, QTextCursor::KeepAnchor);
-        c.removeSelectedText();
-        c.setPosition(start);
-        c.setPosition(start + n, QTextCursor::KeepAnchor);
-        c.removeSelectedText();
-        c.setPosition(start);
-        c.setPosition(end - 2 * n, QTextCursor::KeepAnchor);
-    } else {
-        c.setPosition(end);
-        c.insertText(delim);
-        c.setPosition(start);
-        c.insertText(delim);
-        c.setPosition(start + n);
-        c.setPosition(end + n, QTextCursor::KeepAnchor);
+    // Determine per-slice mode and compute the post-edit selection
+    // restoration for the SINGLE-slice common case. For multi-slice we
+    // collapse the cursor to the end after all edits.
+    Mode firstMode = Mode::Wrap;
+
+    {
+        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+
+        // Process slices in reverse so later block edits don't shift earlier
+        // ones' bytes (each slice is intra-block, so this matters only in
+        // case of multi-block selection).
+        for (int n = slices.size() - 1; n >= 0; --n) {
+            const BlockSlice &s = slices[n];
+            const QByteArray content = doc->blockText(s.blockId);
+            const int blockSize = content.size();
+            const int loInt = static_cast<int>(s.byteLo);
+            const int hiInt = static_cast<int>(s.byteHi);
+
+            const bool surroundedOutside =
+                loInt >= delimLen
+                && hiInt + delimLen <= blockSize
+                && content.mid(loInt - delimLen, delimLen) == delim
+                && content.mid(hiInt, delimLen) == delim;
+            const bool insideMarkers =
+                !surroundedOutside
+                && (hiInt - loInt) >= 2 * delimLen
+                && content.mid(loInt, delimLen) == delim
+                && content.mid(hiInt - delimLen, delimLen) == delim;
+
+            Mode mode = Mode::Wrap;
+            if (surroundedOutside)    mode = Mode::SurroundedOutside;
+            else if (insideMarkers)   mode = Mode::InsideMarkers;
+            if (n == 0) firstMode = mode;
+
+            switch (mode) {
+            case Mode::SurroundedOutside:
+                // Remove trailing delim (higher byte) first, then leading.
+                doc->d2ApplyBufferEdit(s.blockId, s.byteHi,
+                                       static_cast<quint32>(delimLen),
+                                       QByteArray(), t);
+                doc->d2ApplyBufferEdit(s.blockId, s.byteLo - delimLen,
+                                       static_cast<quint32>(delimLen),
+                                       QByteArray(), t);
+                break;
+            case Mode::InsideMarkers:
+                doc->d2ApplyBufferEdit(s.blockId, s.byteHi - delimLen,
+                                       static_cast<quint32>(delimLen),
+                                       QByteArray(), t);
+                doc->d2ApplyBufferEdit(s.blockId, s.byteLo,
+                                       static_cast<quint32>(delimLen),
+                                       QByteArray(), t);
+                break;
+            case Mode::Wrap:
+                // Insert trailing delim first (higher byte), then leading.
+                doc->d2ApplyBufferEdit(s.blockId, s.byteHi, 0, delim, t);
+                doc->d2ApplyBufferEdit(s.blockId, s.byteLo, 0, delim, t);
+                break;
+            }
+        }
     }
-    c.endEditBlock();
-    te->setTextCursor(c);
+
+    doc->flushPendingD2Changed();
+
+    // Restore selection. For a single-slice (intra-block) edit we know the
+    // exact range that survived. For multi-slice, collapse to the trailing
+    // edge — multi-block format toggles are an edge case and per-slice
+    // modes may differ, making exact restoration ambiguous.
+    QTextCursor c2 = te->textCursor();
+    if (slices.size() == 1) {
+        int newStart = qtStart;
+        int newEnd   = qtEnd;
+        switch (firstMode) {
+        case Mode::SurroundedOutside:
+            newStart -= delimLen;
+            newEnd   -= delimLen;
+            break;
+        case Mode::InsideMarkers:
+            newEnd -= 2 * delimLen;
+            break;
+        case Mode::Wrap:
+            newStart += delimLen;
+            newEnd   += delimLen;
+            break;
+        }
+        c2.setPosition(newStart);
+        c2.setPosition(newEnd, QTextCursor::KeepAnchor);
+    } else {
+        // Multi-slice: park cursor near the trailing end without a
+        // restored selection.
+        const int docLen = te->document()->characterCount() - 1;
+        int newPos = qtEnd;
+        if (newPos > docLen) newPos = docLen;
+        if (newPos < 0)      newPos = 0;
+        c2.setPosition(newPos);
+    }
+    te->setTextCursor(c2);
 }
 
 } // namespace
 
-void Editor::toggleBold()          { wrapToggle(m_editor, QStringLiteral("**")); }
-void Editor::toggleItalic()        { wrapToggle(m_editor, QStringLiteral("_"));  }
-void Editor::toggleStrikethrough() { wrapToggle(m_editor, QStringLiteral("~~")); }
-void Editor::toggleInlineCode()    { wrapToggle(m_editor, QStringLiteral("`"));  }
+void Editor::toggleBold()          { wrapToggle(m_editor, m_binding, "**"); }
+void Editor::toggleItalic()        { wrapToggle(m_editor, m_binding, "_");  }
+void Editor::toggleStrikethrough() { wrapToggle(m_editor, m_binding, "~~"); }
+void Editor::toggleInlineCode()    { wrapToggle(m_editor, m_binding, "`");  }
 
 void Editor::insertLink() {
     if (!m_editor) return;
