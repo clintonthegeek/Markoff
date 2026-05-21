@@ -28,6 +28,80 @@ ApplicationWindow {
         }
     }
 
+    // ---- Standalone-app editor shortcuts ----
+    //
+    // These bind the LiveActionController QActions to keyboard chords at
+    // window scope, so the standalone markoff-live-app responds to
+    // Bold/Italic/Heading/etc. without the host needing to wire them.
+    // Consumer hosts (e.g. Corbomite) register their own KActions with
+    // these chords and consume the events at the application level,
+    // which is why these Shortcuts live in the app (not in LiveView.qml
+    // inside the library) — embedding the library inside a consumer host
+    // would otherwise create chord ambiguity.
+
+    function _ac() { return modelBinding ? modelBinding.actionController : null }
+
+    Shortcut {
+        sequence: StandardKey.Bold
+        enabled: !!_ac()
+        onActivated: _ac().boldAction.trigger()
+    }
+    Shortcut {
+        sequence: StandardKey.Italic
+        enabled: !!_ac()
+        onActivated: _ac().italicAction.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+Shift+X"
+        enabled: !!_ac()
+        onActivated: _ac().strikeAction.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+E"
+        enabled: !!_ac()
+        onActivated: _ac().inlineCodeAction.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+K"
+        enabled: !!_ac()
+        onActivated: _ac().linkAction.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+1"
+        enabled: !!_ac()
+        onActivated: _ac().heading1Action.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+2"
+        enabled: !!_ac()
+        onActivated: _ac().heading2Action.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+3"
+        enabled: !!_ac()
+        onActivated: _ac().heading3Action.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+4"
+        enabled: !!_ac()
+        onActivated: _ac().heading4Action.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+5"
+        enabled: !!_ac()
+        onActivated: _ac().heading5Action.trigger()
+    }
+    Shortcut {
+        sequence: "Ctrl+6"
+        enabled: !!_ac()
+        onActivated: _ac().heading6Action.trigger()
+    }
+    Shortcut {
+        sequence: StandardKey.Save
+        enabled: !!_ac()
+        onActivated: _ac().saveAction.trigger()
+    }
+
     // Update fromContext whenever the controller loads a new document.
     Connections {
         target: ctxMain

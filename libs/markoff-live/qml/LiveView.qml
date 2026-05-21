@@ -128,23 +128,18 @@ ListView {
         }
     }
 
-    // ---- Window-level Shortcut bindings ----
+    // ---- Window-level Shortcut bindings (zoom + theme only) ----
     //
     // QQuickWindow has no addAction(); QML Shortcut elements are the
-    // correct window-scoped binding for QKeySequence triggers. The wired
-    // QActions in LiveActionController carry the shortcut sequence (so a
-    // future menu/toolbar can present them) and their slots; here we just
-    // route the keystroke to action.trigger(). Closes audit L8.
+    // correct window-scoped binding for QKeySequence triggers.
     //
-    // Note: clipboard chords (Ctrl+C/X/V/A) and undo/redo (Ctrl+Z/Y) ALSO
-    // have window-level Shortcuts here so they work even when no TextEdit
-    // is focused. When a TextEdit IS focused, the delegate's
-    // Keys.onPressed → KeyDispatch.tryDispatchCtrlChord intercept fires
-    // first and routes the same way; the Shortcut is the fallback.
-    //
-    // Ctrl+0 deliberately maps to zoom-reset (established) rather than
-    // heading0Action (paragraph). Heading-to-paragraph is via the
-    // host-application menu / context menu in the standalone app.
+    // Only zoom + dark-toggle live here in the library — these are
+    // editor-internal viewport concerns the host has no opinion about.
+    // The standalone markoff-live-app wires editor-action shortcuts
+    // (Bold/Italic/Heading/...) in its own Main.qml; consumer hosts like
+    // Corbomite register them as KActions in their own action collection.
+    // Putting those Shortcuts here would create ambiguity with consumer
+    // host bindings.
 
     Shortcut {
         sequences: ["Ctrl+=", "Ctrl++", "Ctrl+Shift+="]
@@ -165,73 +160,6 @@ ListView {
         sequence: "Ctrl+Shift+D"
         enabled: !!root.binding && !!root.binding.actionController
         onActivated: root.binding.actionController.toggleDarkAction.trigger()
-    }
-
-    // Inline format
-    Shortcut {
-        sequence: StandardKey.Bold
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.boldAction.trigger()
-    }
-    Shortcut {
-        sequence: StandardKey.Italic
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.italicAction.trigger()
-    }
-    Shortcut {
-        sequence: "Ctrl+Shift+X"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.strikeAction.trigger()
-    }
-    Shortcut {
-        sequence: "Ctrl+E"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.inlineCodeAction.trigger()
-    }
-    Shortcut {
-        sequence: "Ctrl+K"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.linkAction.trigger()
-    }
-
-    // Headings 1..6 (Ctrl+1..Ctrl+6). Ctrl+0 reserved for zoom-reset; the
-    // paragraph-demote action is reached via the standalone host's menu.
-    Shortcut {
-        sequence: "Ctrl+1"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.heading1Action.trigger()
-    }
-    Shortcut {
-        sequence: "Ctrl+2"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.heading2Action.trigger()
-    }
-    Shortcut {
-        sequence: "Ctrl+3"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.heading3Action.trigger()
-    }
-    Shortcut {
-        sequence: "Ctrl+4"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.heading4Action.trigger()
-    }
-    Shortcut {
-        sequence: "Ctrl+5"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.heading5Action.trigger()
-    }
-    Shortcut {
-        sequence: "Ctrl+6"
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.heading6Action.trigger()
-    }
-
-    // Save (the binding has a saveRequested() signal; the consumer wires it).
-    Shortcut {
-        sequence: StandardKey.Save
-        enabled: !!root.binding && !!root.binding.actionController
-        onActivated: root.binding.actionController.saveAction.trigger()
     }
 
     // ---- Remote cursor overlays (D5, geometry stub) ----

@@ -33,8 +33,11 @@ private slots:
         const int *p = std::get_if<int>(&level.value());
         QVERIFY(p);
         QCOMPARE(*p, 1);
-        // Buffer content is content-only ("Hello world" without `# `).
-        QCOMPARE(doc.blockText(id), QByteArray("Hello world"));
+        // Buffer carries the "# " ATX prefix per the load convention so
+        // onD2Changed's auto-inference (countLeadingHashes == level) doesn't
+        // demote the block. Serializer's stripLeadingHashes makes save
+        // round-trip "# Hello world" -> "# Hello world".
+        QCOMPARE(doc.blockText(id), QByteArray("# Hello world"));
     }
 
     void paragraph_with_atx_prefix_strips_markers_on_promote() {
@@ -92,7 +95,6 @@ private slots:
 
         const Markoff::BlockId id = doc.iterateBlocks()[0];
         QCOMPARE(doc.blockKind(id), Markoff::BlockKind::Heading);
-        const QByteArray bufferBefore = doc.blockText(id);
 
         binding.cursorState()->begin(0, 0);
         fc.setHeadingLevel(4);
@@ -102,10 +104,10 @@ private slots:
         const auto level = attrs.constFind(Markoff::AttrNames::Level);
         const int *p = std::get_if<int>(&level.value());
         QCOMPARE(*p, 4);
-        // Heading→Heading is attr-only; buffer untouched. Serializer
-        // re-emits "#### Hello" on save by stripping the load-time
-        // markers and re-adding `level` markers.
-        QCOMPARE(doc.blockText(id), bufferBefore);
+        // Heading→Heading rewrites the ATX prefix in the buffer so the
+        // onD2Changed auto-inference sees consistent (level, marker-count)
+        // state and doesn't fight the change.
+        QCOMPARE(doc.blockText(id), QByteArray("#### Hello"));
     }
 
     void heading_demotes_to_paragraph_at_level_zero() {

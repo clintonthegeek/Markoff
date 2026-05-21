@@ -468,6 +468,17 @@ target_link_libraries(tst_live_render_format_heading_level
 add_test(NAME tst_live_render_format_heading_level
          COMMAND tst_live_render_format_heading_level)
 
+# Heading action-trigger path (2026-05-21 dogfood). Distinguishes the
+# direct C++ call from the consumer-driven QAction::trigger path.
+qt_add_executable(tst_live_render_heading_action_trigger
+    tst_live_render_heading_action_trigger.cpp)
+target_link_libraries(tst_live_render_heading_action_trigger
+    PRIVATE markoff_live markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_live_render_heading_action_trigger
+         COMMAND tst_live_render_heading_action_trigger)
+set_tests_properties(tst_live_render_heading_action_trigger
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # E3: LiveFormatController — link insert (empty + nonempty selection).
 qt_add_executable(tst_live_render_format_link_single_block
     tst_live_render_format_link_single_block.cpp)

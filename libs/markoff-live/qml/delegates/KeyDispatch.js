@@ -104,6 +104,20 @@ function collapseSelectionIfMutating(event, ctx) {
     if (!cs || !cs.hasSelection || !cs.hasSelection())
         return { handled: false, accepted: false }
 
+    // CRITICAL: only act on *cross-block* selections. Within-block
+    // selections are TextEdit's native responsibility; intercepting them
+    // here would also fire on the "phantom" anchor left behind after
+    // click-then-type (the click sets an anchor at the click position
+    // while subsequent typing advances the active end without clearing
+    // the anchor — making hasSelection() return true even though the
+    // user hasn't drag-selected). The cross-block guard sidesteps this
+    // entire problem since within-block typing-after-click has anchor
+    // and active in the same block.
+    if (cs.anchorBlock && cs.activeBlock
+        && cs.anchorBlock() === cs.activeBlock()) {
+        return { handled: false, accepted: false }
+    }
+
     const k    = event.key
     const mods = event.modifiers
 

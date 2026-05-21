@@ -139,23 +139,36 @@ void LiveFormatController::setHeadingLevel(int level)
     // Single outer transaction bundles all edits into one undo entry.
     Markoff::UndoLog::Transaction t(m_document->d2UndoLog());
 
-    // Helper: strip leading ATX markers (up to 6 `#` + optional space) from
-    // a block's buffer. Mirrors BlockSerializers::stripLeadingHashes byte
-    // semantics. Used when transitioning out of an ATX-form heading to keep
-    // the resulting buffer content-only.
-    auto stripAtxMarkers = [&](const Markoff::BlockId &blockId,
-                               const QByteArray &content) {
-        int hashCount = 0;
-        while (hashCount < 6 && hashCount < content.size()
-               && content[hashCount] == '#') {
-            ++hashCount;
+    // Helper: count the existing leading ATX-marker bytes (`#`...`######`
+    // optionally followed by one space). Mirrors BlockSerializers::
+    // stripLeadingHashes / KindTransition::countLeadingHashes byte semantics.
+    auto countLeadingMarkerBytes = [](const QByteArray &content) -> int {
+        int hashes = 0;
+        while (hashes < 6 && hashes < content.size()
+               && content[hashes] == '#') {
+            ++hashes;
         }
-        if (hashCount == 0) return;
-        int total = hashCount;
+        if (hashes == 0) return 0;
+        int total = hashes;
         if (total < content.size() && content[total] == ' ') ++total;
+        return total;
+    };
+
+    // Helper: replace the leading ATX marker bytes of a block's buffer with
+    // `level` hashes + a space (or strip them when level == 0). Drives the
+    // onD2Changed auto-inference (countLeadingHashes vs stored level) so
+    // the kind transition holds across the model rebuild.
+    auto setAtxMarkers = [&](const Markoff::BlockId &blockId,
+                             const QByteArray &content, int level) {
+        const int oldBytes = countLeadingMarkerBytes(content);
+        const QByteArray newPrefix = (level == 0)
+            ? QByteArray()
+            : QByteArray(level, '#') + ' ';
+        if (oldBytes == 0 && newPrefix.isEmpty()) return;
+        if (oldBytes > 0 && newPrefix == content.left(oldBytes)) return;
         m_document->d2ApplyBufferEdit(blockId, 0,
-                                      static_cast<quint32>(total),
-                                      QByteArray(), t);
+                                      static_cast<quint32>(oldBytes),
+                                      newPrefix, t);
     };
 
     // Process in reverse so byte-offset shifts within one block don't affect
@@ -170,40 +183,33 @@ void LiveFormatController::setHeadingLevel(int level)
             // Demote to Paragraph. No-op if already paragraph.
             if (rec.kind == Markoff::Live::BlockKind::Paragraph) continue;
             // ATX headings carry "# " markers in their buffer per the load
-            // convention; strip them so the paragraph buffer is content-only
-            // and doesn't auto-re-promote on the next parse cycle.
+            // convention; strip them so the paragraph buffer is content-only.
             if (rec.kind == Markoff::Live::BlockKind::Heading) {
-                stripAtxMarkers(blockId, rec.text.toUtf8());
+                setAtxMarkers(blockId, rec.text.toUtf8(), 0);
             }
             Markoff::Cmd::changeKind(*m_document, blockId,
                                      Markoff::BlockKind::Paragraph);
             continue;
         }
 
-        // Promote/change to Heading at `level`.
-        if (rec.kind == Markoff::Live::BlockKind::Heading) {
-            // Existing heading: just update the level attr. The ATX-marker
-            // count in the buffer can lag the level attr — the serializer
-            // strips and re-adds based on the level attr, so save round-trip
-            // stays correct. The auto-inference in onD2Changed
-            // (countLeadingHashes vs headingLevel) MAY trigger a follow-up
-            // changeKind to reconcile if the user later edits.
-            Markoff::Cmd::changeKind(*m_document, blockId,
-                                     Markoff::BlockKind::Heading,
-                                     {Markoff::AttrNames::Level},
-                                     {Markoff::AttrValue(level)});
-        } else if (rec.kind == Markoff::Live::BlockKind::Paragraph) {
-            // Promote paragraph. Strip any leading ATX markers in the buffer
-            // (user may have typed them) so the heading content is clean.
-            stripAtxMarkers(blockId, rec.text.toUtf8());
+        // Promote/change to Heading at `level`. Crucially, BOTH the kind+attr
+        // AND the buffer's ATX prefix must be set, otherwise the onD2Changed
+        // auto-inference (which compares countLeadingHashes(buffer) against
+        // the stored level) will revert the kind change on the next event-
+        // loop tick: a Heading with no `# ` in its buffer trips the
+        // `atxLost` demote-to-Paragraph path. setAtxMarkers keeps the buffer
+        // and attr in lockstep.
+        if (rec.kind == Markoff::Live::BlockKind::Heading
+                || rec.kind == Markoff::Live::BlockKind::Paragraph) {
+            setAtxMarkers(blockId, rec.text.toUtf8(), level);
             Markoff::Cmd::changeKind(*m_document, blockId,
                                      Markoff::BlockKind::Heading,
                                      {Markoff::AttrNames::Level},
                                      {Markoff::AttrValue(level)});
         } else {
-            // Other kinds (CodeBlock, ListItem, Blockquote, etc.): change kind
-            // only. Per-kind content-strip is out of MVP scope; the user can
-            // demote to paragraph first if needed.
+            // Other kinds (CodeBlock, ListItem, Blockquote, etc.): change
+            // kind without buffer rewrite. Per-kind content-strip is out of
+            // MVP scope; the user can demote to paragraph first if needed.
             Markoff::Cmd::changeKind(*m_document, blockId,
                                      Markoff::BlockKind::Heading,
                                      {Markoff::AttrNames::Level},
