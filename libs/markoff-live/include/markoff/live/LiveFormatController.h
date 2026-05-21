@@ -28,6 +28,8 @@ public:
 
     Q_INVOKABLE void toggleBold();
     Q_INVOKABLE void toggleItalic();
+    Q_INVOKABLE void toggleStrikethrough();
+    Q_INVOKABLE void toggleInlineCode();
     Q_INVOKABLE void insertLink();
 
 private:

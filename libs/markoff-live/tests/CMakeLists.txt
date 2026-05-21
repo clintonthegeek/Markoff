@@ -452,6 +452,14 @@ target_link_libraries(tst_live_render_format_italic_single_block
 add_test(NAME tst_live_render_format_italic_single_block
          COMMAND tst_live_render_format_italic_single_block)
 
+# Strikethrough + inline-code togglers (2026-05-21 toolbar restoration).
+qt_add_executable(tst_live_render_format_strike_inline_code
+    tst_live_render_format_strike_inline_code.cpp)
+target_link_libraries(tst_live_render_format_strike_inline_code
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_format_strike_inline_code
+         COMMAND tst_live_render_format_strike_inline_code)
+
 # E3: LiveFormatController — link insert (empty + nonempty selection).
 qt_add_executable(tst_live_render_format_link_single_block
     tst_live_render_format_link_single_block.cpp)

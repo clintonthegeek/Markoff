@@ -97,8 +97,10 @@ void LiveFormatController::wrapPerBlock(const QByteArray &openDelim, const QByte
     }
 }
 
-void LiveFormatController::toggleBold()   { wrapPerBlock("**", "**"); }
-void LiveFormatController::toggleItalic() { wrapPerBlock("_",  "_");  }
+void LiveFormatController::toggleBold()          { wrapPerBlock("**", "**"); }
+void LiveFormatController::toggleItalic()        { wrapPerBlock("_",  "_");  }
+void LiveFormatController::toggleStrikethrough() { wrapPerBlock("~~", "~~"); }
+void LiveFormatController::toggleInlineCode()    { wrapPerBlock("`",  "`");  }
 
 void LiveFormatController::insertLink()
 {

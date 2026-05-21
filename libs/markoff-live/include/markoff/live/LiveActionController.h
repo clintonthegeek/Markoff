@@ -24,9 +24,11 @@ class MARKOFF_LIVE_EXPORT LiveActionController : public QObject {
     Q_PROPERTY(QAction *deleteAction    READ deleteAction    CONSTANT)
     Q_PROPERTY(QAction *undoAction      READ undoAction      CONSTANT)
     Q_PROPERTY(QAction *redoAction      READ redoAction      CONSTANT)
-    Q_PROPERTY(QAction *boldAction      READ boldAction      CONSTANT)
-    Q_PROPERTY(QAction *italicAction    READ italicAction    CONSTANT)
-    Q_PROPERTY(QAction *linkAction      READ linkAction      CONSTANT)
+    Q_PROPERTY(QAction *boldAction          READ boldAction          CONSTANT)
+    Q_PROPERTY(QAction *italicAction        READ italicAction        CONSTANT)
+    Q_PROPERTY(QAction *strikeAction        READ strikeAction        CONSTANT)
+    Q_PROPERTY(QAction *inlineCodeAction    READ inlineCodeAction    CONSTANT)
+    Q_PROPERTY(QAction *linkAction          READ linkAction          CONSTANT)
     Q_PROPERTY(QAction *saveAction      READ saveAction      CONSTANT)
     Q_PROPERTY(QAction *zoomInAction    READ zoomInAction    CONSTANT)
     Q_PROPERTY(QAction *zoomOutAction   READ zoomOutAction   CONSTANT)
@@ -49,9 +51,11 @@ public:
     QAction *deleteAction()    const { return m_delete; }
     QAction *undoAction()      const { return m_undo; }
     QAction *redoAction()      const { return m_redo; }
-    QAction *boldAction()      const { return m_bold; }
-    QAction *italicAction()    const { return m_italic; }
-    QAction *linkAction()      const { return m_link; }
+    QAction *boldAction()          const { return m_bold; }
+    QAction *italicAction()        const { return m_italic; }
+    QAction *strikeAction()        const { return m_strike; }
+    QAction *inlineCodeAction()    const { return m_inlineCode; }
+    QAction *linkAction()          const { return m_link; }
     QAction *saveAction()      const { return m_save; }
     QAction *zoomInAction()    const { return m_zoomIn; }
     QAction *zoomOutAction()   const { return m_zoomOut; }
@@ -84,9 +88,11 @@ private:
     QAction *m_delete    = nullptr;
     QAction *m_undo      = nullptr;
     QAction *m_redo      = nullptr;
-    QAction *m_bold      = nullptr;
-    QAction *m_italic    = nullptr;
-    QAction *m_link      = nullptr;
+    QAction *m_bold       = nullptr;
+    QAction *m_italic     = nullptr;
+    QAction *m_strike     = nullptr;
+    QAction *m_inlineCode = nullptr;
+    QAction *m_link       = nullptr;
     QAction *m_save      = nullptr;
     QAction *m_zoomIn    = nullptr;
     QAction *m_zoomOut   = nullptr;

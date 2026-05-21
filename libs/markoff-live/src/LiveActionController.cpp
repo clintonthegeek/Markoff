@@ -30,9 +30,11 @@ void LiveActionController::setupActions() {
     m_delete    = new QAction(tr("Delete"),     this);
     m_undo      = new QAction(tr("Undo"),       this);
     m_redo      = new QAction(tr("Redo"),       this);
-    m_bold      = new QAction(tr("Bold"),       this);
-    m_italic    = new QAction(tr("Italic"),     this);
-    m_link      = new QAction(tr("Link"),       this);
+    m_bold       = new QAction(tr("Bold"),         this);
+    m_italic     = new QAction(tr("Italic"),       this);
+    m_strike     = new QAction(tr("Strikethrough"), this);
+    m_inlineCode = new QAction(tr("Inline Code"),  this);
+    m_link       = new QAction(tr("Link"),         this);
     m_save      = new QAction(tr("Save"),       this);
     m_zoomIn    = new QAction(tr("Zoom In"),    this);
     m_zoomOut   = new QAction(tr("Zoom Out"),   this);
@@ -46,6 +48,10 @@ void LiveActionController::setupActions() {
     m_redo->setShortcut(QKeySequence::Redo);
     m_bold->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
     m_italic->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
+    m_strike->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_X));
+    // Ctrl+E is a common choice for inline code (used by Discord, Slack); no
+    // standard Qt::QKeySequence::InlineCode binding exists.
+    m_inlineCode->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     m_link->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_K));
     m_save->setShortcut(QKeySequence::Save);
     m_delete->setShortcut(QKeySequence::Delete);
@@ -59,8 +65,8 @@ void LiveActionController::setupActions() {
 
     // Initial enabled state (all disabled until document+selection wired).
     for (auto *a : {m_cut, m_copy, m_paste, m_selectAll, m_delete,
-                    m_undo, m_redo, m_bold, m_italic, m_link, m_save,
-                    m_zoomIn, m_zoomOut, m_zoomReset})
+                    m_undo, m_redo, m_bold, m_italic, m_strike, m_inlineCode,
+                    m_link, m_save, m_zoomIn, m_zoomOut, m_zoomReset})
         a->setEnabled(false);
 
     // Wire triggers.
@@ -153,10 +159,13 @@ void LiveActionController::updateEnabledStates() {
     m_undo->setEnabled(hasDoc);
     m_redo->setEnabled(hasDoc);
 
-    // Bold/italic/link: enabled when selection exists (format controller not wired yet).
+    // Bold/italic/strike/inlineCode/link: enabled when selection exists
+    // (format controller not wired yet). Link allows empty selection.
     m_bold->setEnabled(hasSel && hasDoc);
     m_italic->setEnabled(hasSel && hasDoc);
-    m_link->setEnabled(hasDoc);  // link allows empty selection (placeholder)
+    m_strike->setEnabled(hasSel && hasDoc);
+    m_inlineCode->setEnabled(hasSel && hasDoc);
+    m_link->setEnabled(hasDoc);
 
     const bool hasBinding = m_binding != nullptr;
     m_zoomIn   ->setEnabled(hasBinding);
@@ -172,9 +181,11 @@ void LiveActionController::setBinding(LiveListModelBinding *b) {
 void LiveActionController::setFormatController(LiveFormatController *fc) {
     m_format = fc;
     if (fc) {
-        connect(m_bold,   &QAction::triggered, fc, &LiveFormatController::toggleBold);
-        connect(m_italic, &QAction::triggered, fc, &LiveFormatController::toggleItalic);
-        connect(m_link,   &QAction::triggered, fc, &LiveFormatController::insertLink);
+        connect(m_bold,       &QAction::triggered, fc, &LiveFormatController::toggleBold);
+        connect(m_italic,     &QAction::triggered, fc, &LiveFormatController::toggleItalic);
+        connect(m_strike,     &QAction::triggered, fc, &LiveFormatController::toggleStrikethrough);
+        connect(m_inlineCode, &QAction::triggered, fc, &LiveFormatController::toggleInlineCode);
+        connect(m_link,       &QAction::triggered, fc, &LiveFormatController::insertLink);
     }
 }
 
