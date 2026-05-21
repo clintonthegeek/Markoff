@@ -104,6 +104,7 @@ qt_add_qml_module(markoff_live
         qml/delegates/MathDelegate.qml
         qml/delegates/RemoteCursorOverlay.qml
         qml/delegates/UnifiedInlineTextDelegate.qml
+        qml/delegates/KeyDispatch.js
 )
 
 target_include_directories(markoff_live
