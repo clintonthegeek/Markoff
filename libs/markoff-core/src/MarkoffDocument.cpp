@@ -731,8 +731,24 @@ void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
         Q_UNREACHABLE();
         break;
     }
+    // Build D2 per-block state from the new content so view bindings see the
+    // blocks. Without this, iterateBlocks() returns empty after a reset and
+    // any live view bound to this document renders nothing. Surfaced 2026-05-20
+    // by Corbomite Vault's first-open path; see
+    // docs/handoff/2026-05-20-port-first-session-recap.md §"Open Markoff-side
+    // issues" #1 and tst_d2_reset_content.
+    //
+    // Scope: this populates D2 on top of any pre-existing D2 state without
+    // clearing first. Correct for fresh-document origins (FirstOpen,
+    // TestFixture). For the wholesale-replace origins (ExternalReload*,
+    // UserRevertToSaved) on a non-fresh document, the right behavior is a
+    // full D2 wipe before rebuild; that requires IdList clear semantics the
+    // CRDT doesn't yet expose. Tracked as a follow-up.
+    buildD2FromBytes(newContent);
+
     Q_EMIT documentReloaded();
     Q_EMIT documentChanged();
+    scheduleD2Changed();
 }
 
 CollabText::Crdt::Anchor
@@ -1791,7 +1807,7 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
     }
 }
 
-void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
+void MarkoffDocument::buildD2FromBytes(const QByteArray &src)
 {
     // 1. Convert and extract frontmatter / footnotes
     const QString srcStr = QString::fromUtf8(src);
@@ -1818,8 +1834,12 @@ void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
     d->structuralEditSequence = 0;
     d->touchedSinceLoad.clear();
     if (d->inlineCache) d->inlineCache->clear();
+}
 
-    // 6. Notify
+void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
+{
+    buildD2FromBytes(src);
+
     // documentChanged() fires synchronously here so connected views can update
     // their state in the same call stack as loadFromMarkdown(). d2DocumentChanged()
     // from scheduleD2Changed() is deferred one event-loop iteration (QTimer::singleShot(0));

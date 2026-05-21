@@ -470,6 +470,14 @@ private:
     void onSaveComplete();
     void materializeBlocksFromParsedDoc(const Markoff::Document &parsed,
                                         const QString &body);
+    /// Extract frontmatter + footnotes from `src`, parse the body, and
+    /// materialize D2 per-block state. Resets load-baseline trackers
+    /// (`blockEditSequences`, `structuralEditSequence`, `touchedSinceLoad`,
+    /// `inlineCache`). Does NOT emit signals — callers do that. Does NOT
+    /// touch the legacy `d->buffer`. Does NOT wipe pre-existing D2 state;
+    /// safe only when called on a fresh document or after an external
+    /// reload semantic where prior blocks have already been disposed of.
+    void buildD2FromBytes(const QByteArray &src);
     BlockId allocateD2BlockId() noexcept;
     void applyRemoteBufferOp(Markoff::BlockId blockId, const QByteArray &payload);
     void applyRemoteIdListOp(const QByteArray &payload);
