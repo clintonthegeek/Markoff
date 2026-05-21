@@ -460,6 +460,14 @@ target_link_libraries(tst_live_render_format_strike_inline_code
 add_test(NAME tst_live_render_format_strike_inline_code
          COMMAND tst_live_render_format_strike_inline_code)
 
+# Heading-level dispatch (2026-05-21 Phase B).
+qt_add_executable(tst_live_render_format_heading_level
+    tst_live_render_format_heading_level.cpp)
+target_link_libraries(tst_live_render_format_heading_level
+    PRIVATE markoff_live markoff_core Qt6::Test)
+add_test(NAME tst_live_render_format_heading_level
+         COMMAND tst_live_render_format_heading_level)
+
 # E3: LiveFormatController — link insert (empty + nonempty selection).
 qt_add_executable(tst_live_render_format_link_single_block
     tst_live_render_format_link_single_block.cpp)

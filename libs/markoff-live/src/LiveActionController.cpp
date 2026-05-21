@@ -35,6 +35,13 @@ void LiveActionController::setupActions() {
     m_strike     = new QAction(tr("Strikethrough"), this);
     m_inlineCode = new QAction(tr("Inline Code"),  this);
     m_link       = new QAction(tr("Link"),         this);
+    m_heading[0] = new QAction(tr("Paragraph"),    this);
+    m_heading[1] = new QAction(tr("Heading 1"),    this);
+    m_heading[2] = new QAction(tr("Heading 2"),    this);
+    m_heading[3] = new QAction(tr("Heading 3"),    this);
+    m_heading[4] = new QAction(tr("Heading 4"),    this);
+    m_heading[5] = new QAction(tr("Heading 5"),    this);
+    m_heading[6] = new QAction(tr("Heading 6"),    this);
     m_save      = new QAction(tr("Save"),       this);
     m_zoomIn    = new QAction(tr("Zoom In"),    this);
     m_zoomOut   = new QAction(tr("Zoom Out"),   this);
@@ -53,6 +60,11 @@ void LiveActionController::setupActions() {
     // standard Qt::QKeySequence::InlineCode binding exists.
     m_inlineCode->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
     m_link->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_K));
+    // Heading shortcuts: Ctrl+0 → paragraph, Ctrl+1..Ctrl+6 → headings.
+    for (int lvl = 0; lvl <= 6; ++lvl) {
+        m_heading[lvl]->setShortcut(
+            QKeySequence(Qt::CTRL | static_cast<Qt::Key>(Qt::Key_0 + lvl)));
+    }
     m_save->setShortcut(QKeySequence::Save);
     m_delete->setShortcut(QKeySequence::Delete);
     m_zoomIn->setShortcuts({
@@ -68,6 +80,7 @@ void LiveActionController::setupActions() {
                     m_undo, m_redo, m_bold, m_italic, m_strike, m_inlineCode,
                     m_link, m_save, m_zoomIn, m_zoomOut, m_zoomReset})
         a->setEnabled(false);
+    for (int lvl = 0; lvl <= 6; ++lvl) m_heading[lvl]->setEnabled(false);
 
     // Wire triggers.
     connect(m_selectAll, &QAction::triggered, this, [this] {
@@ -166,6 +179,9 @@ void LiveActionController::updateEnabledStates() {
     m_strike->setEnabled(hasSel && hasDoc);
     m_inlineCode->setEnabled(hasSel && hasDoc);
     m_link->setEnabled(hasDoc);
+    // Heading actions: enabled whenever a document is wired (acts on the
+    // focused block; selection optional but allowed for multi-block changes).
+    for (int lvl = 0; lvl <= 6; ++lvl) m_heading[lvl]->setEnabled(hasDoc);
 
     const bool hasBinding = m_binding != nullptr;
     m_zoomIn   ->setEnabled(hasBinding);
@@ -186,6 +202,10 @@ void LiveActionController::setFormatController(LiveFormatController *fc) {
         connect(m_strike,     &QAction::triggered, fc, &LiveFormatController::toggleStrikethrough);
         connect(m_inlineCode, &QAction::triggered, fc, &LiveFormatController::toggleInlineCode);
         connect(m_link,       &QAction::triggered, fc, &LiveFormatController::insertLink);
+        for (int lvl = 0; lvl <= 6; ++lvl) {
+            connect(m_heading[lvl], &QAction::triggered, fc,
+                    [fc, lvl]{ fc->setHeadingLevel(lvl); });
+        }
     }
 }
 

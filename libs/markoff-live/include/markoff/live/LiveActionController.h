@@ -29,6 +29,13 @@ class MARKOFF_LIVE_EXPORT LiveActionController : public QObject {
     Q_PROPERTY(QAction *strikeAction        READ strikeAction        CONSTANT)
     Q_PROPERTY(QAction *inlineCodeAction    READ inlineCodeAction    CONSTANT)
     Q_PROPERTY(QAction *linkAction          READ linkAction          CONSTANT)
+    Q_PROPERTY(QAction *heading0Action      READ heading0Action      CONSTANT)
+    Q_PROPERTY(QAction *heading1Action      READ heading1Action      CONSTANT)
+    Q_PROPERTY(QAction *heading2Action      READ heading2Action      CONSTANT)
+    Q_PROPERTY(QAction *heading3Action      READ heading3Action      CONSTANT)
+    Q_PROPERTY(QAction *heading4Action      READ heading4Action      CONSTANT)
+    Q_PROPERTY(QAction *heading5Action      READ heading5Action      CONSTANT)
+    Q_PROPERTY(QAction *heading6Action      READ heading6Action      CONSTANT)
     Q_PROPERTY(QAction *saveAction      READ saveAction      CONSTANT)
     Q_PROPERTY(QAction *zoomInAction    READ zoomInAction    CONSTANT)
     Q_PROPERTY(QAction *zoomOutAction   READ zoomOutAction   CONSTANT)
@@ -56,6 +63,13 @@ public:
     QAction *strikeAction()        const { return m_strike; }
     QAction *inlineCodeAction()    const { return m_inlineCode; }
     QAction *linkAction()          const { return m_link; }
+    QAction *heading0Action()      const { return m_heading[0]; }
+    QAction *heading1Action()      const { return m_heading[1]; }
+    QAction *heading2Action()      const { return m_heading[2]; }
+    QAction *heading3Action()      const { return m_heading[3]; }
+    QAction *heading4Action()      const { return m_heading[4]; }
+    QAction *heading5Action()      const { return m_heading[5]; }
+    QAction *heading6Action()      const { return m_heading[6]; }
     QAction *saveAction()      const { return m_save; }
     QAction *zoomInAction()    const { return m_zoomIn; }
     QAction *zoomOutAction()   const { return m_zoomOut; }
@@ -93,6 +107,7 @@ private:
     QAction *m_strike     = nullptr;
     QAction *m_inlineCode = nullptr;
     QAction *m_link       = nullptr;
+    QAction *m_heading[7] = {nullptr};  // index = level (0 = paragraph, 1..6 = heading)
     QAction *m_save      = nullptr;
     QAction *m_zoomIn    = nullptr;
     QAction *m_zoomOut   = nullptr;

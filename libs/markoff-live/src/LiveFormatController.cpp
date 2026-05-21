@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live/LiveFormatController.h>
 
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/Cmd/D2.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/UndoLog.h>
+#include <markoff/live/BlockKind.h>
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/Coordinates.h>
@@ -101,6 +105,104 @@ void LiveFormatController::toggleBold()          { wrapPerBlock("**", "**"); }
 void LiveFormatController::toggleItalic()        { wrapPerBlock("_",  "_");  }
 void LiveFormatController::toggleStrikethrough() { wrapPerBlock("~~", "~~"); }
 void LiveFormatController::toggleInlineCode()    { wrapPerBlock("`",  "`");  }
+
+void LiveFormatController::setHeadingLevel(int level)
+{
+    if (!m_document || !m_model || !m_selection) return;
+    if (level < 0 || level > 6) return;
+
+    const auto allIds  = m_document->iterateBlocks();
+    const int rowCount = m_model->rowCount();
+
+    // Collect target rows: every block touched by the selection, or just the
+    // anchor block if no selection.
+    QList<int> targetRows;
+    if (m_selection->hasSelection()) {
+        for (int i = 0; i < rowCount && i < static_cast<int>(allIds.size()); ++i) {
+            const QPoint r = m_selection->rangeForBlock(i);
+            if (r.x() >= 0) targetRows.append(i);
+        }
+    } else {
+        const int row = m_selection->anchorBlock();
+        if (row >= 0 && row < rowCount) targetRows.append(row);
+    }
+    if (targetRows.isEmpty()) return;
+
+    // Single outer transaction bundles all edits into one undo entry.
+    Markoff::UndoLog::Transaction t(m_document->d2UndoLog());
+
+    // Helper: strip leading ATX markers (up to 6 `#` + optional space) from
+    // a block's buffer. Mirrors BlockSerializers::stripLeadingHashes byte
+    // semantics. Used when transitioning out of an ATX-form heading to keep
+    // the resulting buffer content-only.
+    auto stripAtxMarkers = [&](const Markoff::BlockId &blockId,
+                               const QByteArray &content) {
+        int hashCount = 0;
+        while (hashCount < 6 && hashCount < content.size()
+               && content[hashCount] == '#') {
+            ++hashCount;
+        }
+        if (hashCount == 0) return;
+        int total = hashCount;
+        if (total < content.size() && content[total] == ' ') ++total;
+        m_document->d2ApplyBufferEdit(blockId, 0,
+                                      static_cast<quint32>(total),
+                                      QByteArray(), t);
+    };
+
+    // Process in reverse so byte-offset shifts within one block don't affect
+    // others (though kind changes here don't shift cross-block offsets, this
+    // keeps the pattern consistent with wrapPerBlock).
+    for (int n = targetRows.size() - 1; n >= 0; --n) {
+        const int i = targetRows[n];
+        const Markoff::BlockId blockId = allIds[i];
+        const auto &rec = m_model->recordAt(i);
+
+        if (level == 0) {
+            // Demote to Paragraph. No-op if already paragraph.
+            if (rec.kind == Markoff::Live::BlockKind::Paragraph) continue;
+            // ATX headings carry "# " markers in their buffer per the load
+            // convention; strip them so the paragraph buffer is content-only
+            // and doesn't auto-re-promote on the next parse cycle.
+            if (rec.kind == Markoff::Live::BlockKind::Heading) {
+                stripAtxMarkers(blockId, rec.text.toUtf8());
+            }
+            Markoff::Cmd::changeKind(*m_document, blockId,
+                                     Markoff::BlockKind::Paragraph);
+            continue;
+        }
+
+        // Promote/change to Heading at `level`.
+        if (rec.kind == Markoff::Live::BlockKind::Heading) {
+            // Existing heading: just update the level attr. The ATX-marker
+            // count in the buffer can lag the level attr — the serializer
+            // strips and re-adds based on the level attr, so save round-trip
+            // stays correct. The auto-inference in onD2Changed
+            // (countLeadingHashes vs headingLevel) MAY trigger a follow-up
+            // changeKind to reconcile if the user later edits.
+            Markoff::Cmd::changeKind(*m_document, blockId,
+                                     Markoff::BlockKind::Heading,
+                                     {Markoff::AttrNames::Level},
+                                     {Markoff::AttrValue(level)});
+        } else if (rec.kind == Markoff::Live::BlockKind::Paragraph) {
+            // Promote paragraph. Strip any leading ATX markers in the buffer
+            // (user may have typed them) so the heading content is clean.
+            stripAtxMarkers(blockId, rec.text.toUtf8());
+            Markoff::Cmd::changeKind(*m_document, blockId,
+                                     Markoff::BlockKind::Heading,
+                                     {Markoff::AttrNames::Level},
+                                     {Markoff::AttrValue(level)});
+        } else {
+            // Other kinds (CodeBlock, ListItem, Blockquote, etc.): change kind
+            // only. Per-kind content-strip is out of MVP scope; the user can
+            // demote to paragraph first if needed.
+            Markoff::Cmd::changeKind(*m_document, blockId,
+                                     Markoff::BlockKind::Heading,
+                                     {Markoff::AttrNames::Level},
+                                     {Markoff::AttrValue(level)});
+        }
+    }
+}
 
 void LiveFormatController::insertLink()
 {

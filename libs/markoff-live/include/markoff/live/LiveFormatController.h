@@ -32,6 +32,13 @@ public:
     Q_INVOKABLE void toggleInlineCode();
     Q_INVOKABLE void insertLink();
 
+    /// Set the kind of the focused (or selection-spanned) block(s).
+    /// `level` 0 → Paragraph; `level` 1..6 → Heading with that level.
+    /// For Paragraph→Heading, leading ATX markers (`#`..`######` followed by
+    /// space) are stripped from the buffer first to keep content-only after.
+    /// All edits bundle into one undo entry via a single outer Transaction.
+    Q_INVOKABLE void setHeadingLevel(int level);
+
 private:
     void wrapPerBlock(const QByteArray &openDelim, const QByteArray &closeDelim);
 
