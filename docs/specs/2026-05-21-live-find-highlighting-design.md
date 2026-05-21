@@ -100,23 +100,16 @@ No text. `model.findSpans` is irrelevant. Their delegates don't consume it.
 
 ### Theme slots
 
-`Markoff::Theme::Slot` gains two new entries appended to the enum:
+**Reuse existing slots** — `Markoff::Theme::Slot` already defines:
 
 ```cpp
-FindMatch,         // background for all matches except current
-FindMatchCurrent,  // background for the focused match
+SearchMatchBackground,         // #ffe080  (set in defaultLight)
+SearchActiveMatchBackground,   // #ffb050  (set in defaultLight)
 ```
 
-Default colors (chosen amber to stay distinct from the existing `Highlight` slot's yellow `#fff176` used for `==…==` marks):
+These were added during the older `SearchEngine` work (which publishes `Selection::Kind::SearchMatch` into `Session.secondarySelections`). The slots are populated in `Theme::defaultLight()` but no Live-leaf consumer renders against them yet. We adopt them verbatim. No new Theme work needed — `Theme::defaultDark()` already inherits the defaults from `defaultLight()` per its existing implementation.
 
-| Slot                 | Light default | Dark default |
-|----------------------|--------------|--------------|
-| `FindMatch`          | `#FFD54F`    | `#5C4A1A`    |
-| `FindMatchCurrent`   | `#FF8F00`    | `#B36E00`    |
-
-`themeColorFor(FindMatch)` / `themeColorFor(FindMatchCurrent)` are accessible from QML via the existing `LiveListModelBinding::themeColorFor` proxy. No new QML-foreign work — the slots are added to the existing enum and pick up the existing QML_FOREIGN exposure automatically.
-
-The amber hues are deliberately distinct from `Theme::Highlight` (`#fff176` yellow, which renders `==…==` mark spans) so that an `==foo==` block containing a "foo" match shows both formats — the mark background fills first via the inline-pass, then the find-pass overpaints the find-match background on top. Two concurrent backgrounds aren't supported by `QTextCharFormat`; the find pass wins because it runs after. This is intentional — when searching for "foo" in a `==foo==`, the user wants the find highlight to dominate.
+The existing yellow/orange palette stays clear of `Theme::Highlight` (`#fff176`, used for `==…==` mark spans) — when searching "foo" inside `==foo==`, the find pass runs after the inline pass and overpaints the find-match background. Two concurrent backgrounds aren't supported by `QTextCharFormat`; the find pass wins by ordering. This is intentional — the find highlight should dominate during an active find session.
 
 ## Data flow worked example
 
@@ -205,9 +198,11 @@ Modified:
 - `libs/markoff-live/src/InlineHighlighter.cpp`
 - `libs/markoff-live/qml/delegates/UnifiedInlineTextDelegate.qml` (pass `model.findSpans` to attached highlighter)
 - `libs/markoff-live/qml/delegates/CodeBlockDelegate.qml` (same)
-- `libs/markoff-core/include/markoff/core/Theme.h` (+`FindMatch`, `FindMatchCurrent` slots)
-- `libs/markoff-core/src/Theme.cpp` (`defaultLight()` / `defaultDark()` defaults)
 - `libs/markoff-live/tests/tst_live_render_qml_integration.cpp` (4 new slots above)
+
+Unchanged (the existing slots are reused):
+- `libs/markoff-core/include/markoff/core/Theme.h`
+- `libs/markoff-core/src/Theme.cpp`
 
 Unchanged (callouts for clarity):
 - `libs/markoff-core/include/markoff/core/FindController.h` — no new API.
