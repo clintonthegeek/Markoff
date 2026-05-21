@@ -200,4 +200,145 @@ void Editor::recomputeGutterWidth() {
     static_cast<InnerEditor *>(m_editor)->setViewportMargins(gutterWidth(), 0, 0, 0);
 }
 
+// --- Markdown format operations -------------------------------------------
+//
+// All operate via QTextCursor on the inner QPlainTextEdit. Changes flow
+// through SourceTextDocumentBinding to MarkoffDocument::applyFlatEdit, so
+// the live view sees them on the next d2DocumentChanged tick.
+
+namespace {
+
+// Wrap or unwrap the selection with `delim` on both sides. Strategy mirrors
+// LiveFormatController::wrapPerBlock: check whether the surrounding bytes
+// (or selection inside) already match the delimiter, unwrap if so;
+// otherwise wrap.
+void wrapToggle(QPlainTextEdit *te, const QString &delim) {
+    if (!te) return;
+    QTextCursor c = te->textCursor();
+    const int n = delim.length();
+
+    if (!c.hasSelection()) {
+        // No selection: insert delim+delim, park cursor in the middle.
+        const int pos = c.position();
+        c.beginEditBlock();
+        c.insertText(delim + delim);
+        c.setPosition(pos + n);
+        c.endEditBlock();
+        te->setTextCursor(c);
+        return;
+    }
+
+    int start = c.selectionStart();
+    int end   = c.selectionEnd();
+    const QString docText = te->toPlainText();
+
+    const bool surroundedOutside =
+        start >= n && end + n <= docText.length()
+        && docText.mid(start - n, n) == delim
+        && docText.mid(end, n) == delim;
+    const bool insideMarkers =
+        end - start >= 2 * n
+        && docText.mid(start, n) == delim
+        && docText.mid(end - n, n) == delim;
+
+    c.beginEditBlock();
+    if (surroundedOutside) {
+        c.setPosition(end);
+        c.setPosition(end + n, QTextCursor::KeepAnchor);
+        c.removeSelectedText();
+        c.setPosition(start - n);
+        c.setPosition(start, QTextCursor::KeepAnchor);
+        c.removeSelectedText();
+        c.setPosition(start - n);
+        c.setPosition(end - n, QTextCursor::KeepAnchor);
+    } else if (insideMarkers) {
+        c.setPosition(end - n);
+        c.setPosition(end, QTextCursor::KeepAnchor);
+        c.removeSelectedText();
+        c.setPosition(start);
+        c.setPosition(start + n, QTextCursor::KeepAnchor);
+        c.removeSelectedText();
+        c.setPosition(start);
+        c.setPosition(end - 2 * n, QTextCursor::KeepAnchor);
+    } else {
+        c.setPosition(end);
+        c.insertText(delim);
+        c.setPosition(start);
+        c.insertText(delim);
+        c.setPosition(start + n);
+        c.setPosition(end + n, QTextCursor::KeepAnchor);
+    }
+    c.endEditBlock();
+    te->setTextCursor(c);
+}
+
+} // namespace
+
+void Editor::toggleBold()          { wrapToggle(m_editor, QStringLiteral("**")); }
+void Editor::toggleItalic()        { wrapToggle(m_editor, QStringLiteral("_"));  }
+void Editor::toggleStrikethrough() { wrapToggle(m_editor, QStringLiteral("~~")); }
+void Editor::toggleInlineCode()    { wrapToggle(m_editor, QStringLiteral("`"));  }
+
+void Editor::insertLink() {
+    if (!m_editor) return;
+    QTextCursor c = m_editor->textCursor();
+    c.beginEditBlock();
+    if (c.hasSelection()) {
+        const int start = c.selectionStart();
+        const int end   = c.selectionEnd();
+        c.setPosition(end);
+        c.insertText(QStringLiteral("](url)"));
+        c.setPosition(start);
+        c.insertText(QStringLiteral("["));
+        // Park cursor over the `url` placeholder for easy replacement.
+        // After both inserts: layout is `[selection](url)` starting at start.
+        // selection is at [start+1, end+1); url at end+3..end+6.
+        c.setPosition(end + 3);
+        c.setPosition(end + 6, QTextCursor::KeepAnchor);
+    } else {
+        const int pos = c.position();
+        c.insertText(QStringLiteral("[](url)"));
+        c.setPosition(pos + 1);
+    }
+    c.endEditBlock();
+    m_editor->setTextCursor(c);
+}
+
+void Editor::setHeadingLevel(int level) {
+    if (!m_editor) return;
+    if (level < 0 || level > 6) return;
+
+    QTextCursor c = m_editor->textCursor();
+    c.beginEditBlock();
+    c.movePosition(QTextCursor::StartOfBlock);
+    const int lineStart = c.position();
+    const QString line = c.block().text();
+
+    int existing = 0;
+    while (existing < 6 && existing < line.length()
+           && line.at(existing) == QLatin1Char('#')) {
+        ++existing;
+    }
+    int existingTotal = existing;
+    if (existingTotal > 0 && existingTotal < line.length()
+        && line.at(existingTotal) == QLatin1Char(' ')) {
+        ++existingTotal;
+    }
+
+    const QString newPrefix = (level == 0)
+        ? QString()
+        : QString(level, QLatin1Char('#')) + QLatin1Char(' ');
+
+    if (existingTotal == newPrefix.length()
+        && line.left(existingTotal) == newPrefix) {
+        c.endEditBlock();
+        return;
+    }
+    c.setPosition(lineStart);
+    c.setPosition(lineStart + existingTotal, QTextCursor::KeepAnchor);
+    c.insertText(newPrefix);
+    c.endEditBlock();
+    m_editor->setTextCursor(c);
+}
+
 } // namespace Markoff::Source

@@ -59,6 +59,30 @@ public:
     void attachFindController(Markoff::FindController *fc);
     void detachFindController();
 
+    // ---- Markdown format operations (parity with Live's LiveFormatController)
+    //
+    // All operate via the inner QPlainTextEdit's QTextCursor; edits flow
+    // through SourceTextDocumentBinding to the document's applyFlatEdit path.
+    // Wrap-style ops toggle: if the selection (or cursor's enclosing run) is
+    // already wrapped with the delimiters, they're unwrapped; otherwise
+    // wrapped. Empty selection inserts the delimiter pair and parks the
+    // cursor between them.
+
+    /// Wrap selection with `**...**` (or unwrap if already wrapped).
+    Q_INVOKABLE void toggleBold();
+    /// Wrap selection with `_..._`.
+    Q_INVOKABLE void toggleItalic();
+    /// Wrap selection with `~~...~~`.
+    Q_INVOKABLE void toggleStrikethrough();
+    /// Wrap selection with single backticks.
+    Q_INVOKABLE void toggleInlineCode();
+    /// Insert `[](url)` at cursor or wrap selection as `[selection](url)`.
+    Q_INVOKABLE void insertLink();
+    /// Set the current line's heading level. `level == 0` strips any
+    /// leading ATX markers; `level` 1..6 replaces them with that many
+    /// hashes + a space. Operates on the line containing the cursor.
+    Q_INVOKABLE void setHeadingLevel(int level);
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void resizeEvent(QResizeEvent *e) override;

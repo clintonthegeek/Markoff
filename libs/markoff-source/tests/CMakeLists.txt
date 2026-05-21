@@ -9,6 +9,11 @@ add_test(NAME tst_source_widget_editor COMMAND tst_source_widget_editor)
 target_link_libraries(tst_source_widget_editor PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
 set_tests_properties(tst_source_widget_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_source_widget_format_ops tst_source_widget_format_ops.cpp)
+add_test(NAME tst_source_widget_format_ops COMMAND tst_source_widget_format_ops)
+target_link_libraries(tst_source_widget_format_ops PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
+set_tests_properties(tst_source_widget_format_ops PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_source_widget_binding_roundtrip tst_source_widget_binding_roundtrip.cpp)
 add_test(NAME tst_source_widget_binding_roundtrip COMMAND tst_source_widget_binding_roundtrip)
 target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
