@@ -58,30 +58,42 @@
 > EditorWidget got built anyway in `bc8216d` because Corbomite actually pulled on it.
 > Recorded as proposed-and-built in [`docs/specs/2026-05-19-markoff-live-freeze-shape-design.md`](docs/specs/2026-05-19-markoff-live-freeze-shape-design.md).
 >
-> **Test baseline (2026-05-20 HEAD `2291c99`):** 215/218 fast tests pass.
-> Three pre-existing failures (unchanged from 2026-05-18):
-> - `tst_live_render_setext_e2e::S1_setextDemote_lastUnderlineCharDeleted_keepsCursor`
-> - `tst_markoff_doc_apply_structured_paste` — SIGABRT in structured-paste path.
-> - `tst_v10_source_editor_view_contract::cursor_position_round_trips`
+> **Test baseline (2026-05-21):** 224/226 pass. Test count grew from 218
+> (2026-05-20) as the structured-paste and v10 cursor-round-trip tests
+> were repaired in passing by `861196c` (resetContent populates D2) and
+> the source-widget binding evolution. The 2 remaining failures are
+> separate from the originally-named three:
+> - `tst_live_render_focus_chokepoint_invariant` (undo/redo edge cases)
+> - `tst_live_render_cursor_typing_invariant` (emoji-typing mirror)
 >
-> **Prior closed items:** E2.6 tagged `v0.7.0-e2.6`, cursor architecture (tiers 1–4c),
-> QML integration harness, B1 buffer convention, code review pass, E3a wikilinks
-> (`109d3d3`; dogfood pending — tag `v0.7.0-e3a` held).
+> Both are non-blocking for ongoing port work; both pre-date this session.
 >
-> **Open work surfaced by the port (in priority order for next session):**
-> 1. **Wire Corbomite's find UI against `Markoff::FindController`** — the original
->    port-first target. Now actually possible since Corbomite renders.
-> 2. **Doc-sharing doubling in NoteEditorWidget** — multiple `LiveListModelBindings`
->    share one `MarkoffDocument` across tabs; editing causes content repetition.
->    Corbomite-side architecture issue. Needs micro-spec.
-> 3. **Source mode renders empty** — `SourceTextDocumentBinding` needs its own
->    population path; the `loadFromMarkdown` fix on Vault populated D2 blocks but
->    Source widget's binding isn't seeing them.
-> 4. **`MarkoffDocument::resetContent` doesn't build D2 blocks** — surfaced during
->    the port. The legacy `resetContent` path only updates `d->buffer`; D2 per-block
->    state requires `loadFromMarkdown`. Either `resetContent` should also build D2
->    (likely the right fix on the Markoff side) or it should be documented as
->    legacy-buffer-only. Vault now uses `loadFromMarkdown` as a workaround.
+> **Prior closed items:** E2.6 tagged `v0.7.0-e2.6`, cursor architecture
+> (tiers 1–4c), QML integration harness, B1 buffer convention, code review
+> pass, E3a wikilinks (`109d3d3`; dogfood pending — tag `v0.7.0-e3a` held).
+>
+> **Port-driven items closed since 2026-05-20 (all four open items resolved):**
+> 1. ✅ **Find UI wiring** — Corbomite `fa72b4ee..7f975120` executed the
+>    10-task port plan (`docs/superpowers/specs/...` Corbomite-side); Markoff
+>    `FindController` is the source of truth, FindBar drives it, view-mode
+>    swap rewires.
+> 2. ✅ **Doc-sharing doubling** — confirmed not recurring during ongoing
+>    dogfood (2026-05-21); most likely subsumed by `c3316f9`
+>    (`flushPendingD2Changed` unconditional emit) + the `EditorWidget`
+>    wiring evolution.
+> 3. ✅ **Source mode renders empty** — `f16f894` rebuilt the source-widget
+>    binding around `flatView` + separator-bearing QTextDocument.
+> 4. ✅ **`MarkoffDocument::resetContent` doesn't build D2 blocks** —
+>    `861196c` factored a `buildD2FromBytes()` helper and calls it from
+>    `resetContent` after legacy-buffer-of-origin handling. Caveat: wholesale-
+>    replace origins on a non-fresh doc still need a D2 wipe pass before
+>    rebuild (the IdList CRDT lacks `clear()` semantics yet); tracked in the
+>    test docstring + `resetContent` comment.
+>
+> **Currently open port-driven work:** none surfaced. Next port pressure
+> drives the next micro-spec — until then, opportunistic cleanup from the
+> follow-ups doc ([`docs/specs/2026-05-21-source-view-cleanup-followups.md`](docs/specs/2026-05-21-source-view-cleanup-followups.md))
+> or the `docs/queue.md` backlog.
 >
 > **For any new spec work:** use `superpowers:brainstorming` first. Don't draft
 > speculative freeze specs — wait for port evidence.

@@ -196,13 +196,15 @@ void SourceTextDocumentBinding::syncFromSession()
     const Markoff::Selection sel = m_session->primarySelection();
     const quint32 anchorByte = m_markoffDocument->resolveTextAnchor(sel.anchor);
     const quint32 activeByte = m_markoffDocument->resolveTextAnchor(sel.active);
-    // Use D2 block-buffer concatenation for the UTF-8 text (matches what the
-    // QTextDocument holds after forward edits via applyFlatEdit).
+    // D2 per-block concatenation in no-separator coordinates (the space
+    // `resolveTextAnchor` returns, and the same space `applyFlatEdit`
+    // operates in). The legacy `toMarkdownUtf8()` fallback was removed once
+    // resetContent started populating D2 blocks (Markoff `861196c`) —
+    // iterateBlocks() is now empty only on a genuinely empty document, where
+    // the legacy buffer would also be empty.
     QByteArray utf8;
     for (Markoff::BlockId id : m_markoffDocument->iterateBlocks())
         utf8 += m_markoffDocument->blockText(id);
-    if (utf8.isEmpty())
-        utf8 = m_markoffDocument->toMarkdownUtf8();  // legacy fallback
     const int newStart = byteOffsetToQtPos(utf8, anchorByte);
     const int newEnd   = byteOffsetToQtPos(utf8, activeByte);
 

@@ -61,7 +61,11 @@ returns silently.
 consistency, even though it's not currently buggy. Low-priority; the bug
 class is latent, not active.
 
-### 2. `SourceTextDocumentBinding::syncFromSession` legacy fallback
+### 2. `SourceTextDocumentBinding::syncFromSession` legacy fallback — ✅ done
+
+> Closed (this session, immediately after this doc was written). The
+> fallback was dead code post-`861196c` (resetContent now populates D2
+> blocks); removed in the same session. See commit history.
 
 **File:** `libs/markoff-core/src/SourceTextDocumentBinding.cpp:205`.
 
@@ -158,8 +162,7 @@ plan.
 
 When we come back to this:
 
-1. **#2 (toMarkdownUtf8 fallback removal)** — pure cleanup, no behavior
-   change, ~10 lines. Pull in opportunistically.
+1. ✅ **#2 (toMarkdownUtf8 fallback removal)** — done, same session.
 2. **#1 (insertLink block-aware port)** — small, mechanical, gets the
    format-op family fully consistent.
 3. **#4 (cursor translation rewrite)** — its own spec + plan; expect to
