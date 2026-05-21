@@ -222,6 +222,7 @@ Item {
         InlineHighlighterAttached {
             target: edit.textDocument
             spans: model.inlineSpans
+            findSpans: model.findSpans
             theme: root.liveBinding ? root.liveBinding.theme : null
             fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
             caretPosition: edit.activeFocus ? edit.cursorPosition : -1
