@@ -1,5 +1,15 @@
 # 2026-05-21 — Find UI port dogfood findings
 
+> **2026-05-21 — RESOLVED.** Live-mode visible highlighting now lands via
+> the chain described in §"Recommendation". Implementation:
+> - Spec: [`docs/specs/2026-05-21-live-find-highlighting-design.md`](../specs/2026-05-21-live-find-highlighting-design.md)
+> - Plan: [`docs/plans/2026-05-21-live-find-highlighting.md`](../plans/2026-05-21-live-find-highlighting.md)
+> - Theme work: reused existing `SearchMatchBackground` + `SearchActiveMatchBackground` slots (no new slots needed — they were already populated in `defaultLight()`).
+> - Tag candidate `v0.7.0-find-highlights` held pending interactive
+>   dogfood from Corbomite `port/foundation-exploration` after the next
+>   submodule re-bump.
+
+
 **Tester:** user (manual dogfood on Corbomite `port/foundation-exploration` + Markoff `exploration/new-foundation`).
 **Build SHAs:** Corbomite `a00389d0` (post-test-gating cleanup); Markoff `c34e291` (the docs commit; submodule pin is `7ee6ee7`, before the `resetContent` D2-build fix at `861196c`).
 
