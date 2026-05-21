@@ -14,6 +14,7 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
+#include <markoff/live/LiveBlockModel.h>
 
 Q_LOGGING_CATEGORY(markoffLiveEditorWidget, "markoff.live.editorwidget")
 
@@ -90,9 +91,13 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
         // populates the document then hands it over). Without this nudge
         // the LiveBlockModel stays empty until the next user edit.
         doc->flushPendingD2Changed();
+        const int modelRows = d->binding->model() ? d->binding->model()->rowCount() : -1;
         qCInfo(markoffLiveEditorWidget)
             << "  → binding has doc, session=" << d->session
-            << " flushed pending d2 changes";
+            << " flushed; modelRows=" << modelRows
+            << " quickWidget size=" << d->quickWidget->size()
+            << " visible=" << d->quickWidget->isVisible()
+            << " rootObject=" << d->quickWidget->rootObject();
     }
 }
 
