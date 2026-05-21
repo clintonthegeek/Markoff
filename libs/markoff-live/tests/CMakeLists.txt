@@ -596,6 +596,25 @@ add_test(NAME tst_live_render_qml_integration
 set_tests_properties(tst_live_render_qml_integration
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# L1 from `docs/specs/2026-05-21-textedit-interface-audit.md` — cross-block
+# selection collapse on mutating keys.
+qt_add_executable(tst_live_render_cross_block_mutating_key
+    tst_live_render_cross_block_mutating_key.cpp
+    QmlIntegrationFixture.h
+    QmlIntegrationFixture.cpp
+)
+target_link_libraries(tst_live_render_cross_block_mutating_key PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init)
+add_test(NAME tst_live_render_cross_block_mutating_key
+         COMMAND tst_live_render_cross_block_mutating_key)
+set_tests_properties(tst_live_render_cross_block_mutating_key
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # B1 buffer convention: interactive contract tests driven through the
 # realistic-input harness. Verifies that soft-break '\n' survives split+merge
 # as content, and that multi-block paste produces no trailing terminators.
