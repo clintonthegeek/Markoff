@@ -8,6 +8,18 @@
 > - Tag candidate `v0.7.0-find-highlights` held pending interactive
 >   dogfood from Corbomite `port/foundation-exploration` after the next
 >   submodule re-bump.
+>
+> **Dogfood follow-up (2026-05-21):** Highlighting confirmed working in
+> Corbomite. One open behaviour gap: **scroll-into-view does not follow
+> the current match** when Next/Prev moves it off-screen. The hook
+> exists (`LiveFindAdapter::onNavigationRequested` already places a
+> non-focusing caret via `setCaretWithoutFocus`), and Qt's
+> `ListView::positionViewAtIndex(row, ListView.Contain)` is the
+> straightforward fix. Deferred per user direction — bundled with the
+> broader unresolved Live-mode scroll-physics work (the QML
+> Flickable's velocity/inertia behaviour fights programmatic scroll
+> in ways that need their own pass). Tag `v0.7.0-find-highlights`
+> proceeds without it.
 
 
 **Tester:** user (manual dogfood on Corbomite `port/foundation-exploration` + Markoff `exploration/new-foundation`).
