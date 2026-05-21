@@ -10,6 +10,16 @@ target_link_libraries(tst_kind_dispatch PRIVATE
     Qt6::Core Qt6::Test markoff_live)
 add_test(NAME tst_kind_dispatch COMMAND tst_kind_dispatch)
 
+qt_add_executable(tst_live_find_adapter
+    tst_live_find_adapter.cpp
+)
+target_include_directories(tst_live_find_adapter PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+target_link_libraries(tst_live_find_adapter PRIVATE
+    Qt6::Core Qt6::Test markoff_live)
+add_test(NAME tst_live_find_adapter COMMAND tst_live_find_adapter)
+
 qt_add_executable(tst_live_render_skeleton
     tst_live_render_skeleton.cpp
 )

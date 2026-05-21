@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QHash>
 #include <QObject>
 #include <QPointer>
 
 #include <markoff/core/FindController.h>
+#include <markoff/live/FindSpan.h>
 
 namespace Markoff::Live {
 
@@ -37,13 +39,17 @@ public:
 
 private slots:
     void onNavigationRequested(Markoff::FindController::Match);
+    void onMatchesChanged();
+    void onCurrentMatchChanged();
 
 private:
     int  resolveByteToQtPos(const Markoff::BlockAnchor &block, quint32 byteOffset) const;
+    void rebuildAndPushSpans();
 
     LiveBlockModel                       *m_model       = nullptr;
     LiveCursorState                      *m_cursorState = nullptr;
     QPointer<Markoff::FindController>     m_controller;
+    QHash<Markoff::BlockAnchor, QList<Markoff::Live::FindSpan>> m_lastPushed;
 };
 
 }  // namespace Detail
