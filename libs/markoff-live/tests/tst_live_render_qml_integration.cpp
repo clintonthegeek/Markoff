@@ -1105,6 +1105,130 @@ private Q_SLOTS:
     /// navigationRequested emission inside setNeedle, or wiring the
     /// adapter to currentMatchChanged with a caret-move side effect,
     /// must make this test fail.
+    /// Inspect the QSyntaxHighlighter-painted background for a given
+    /// QChar position in the TextEdit's QTextDocument. Highlighter
+    /// formats live in QTextBlock::layout()->formats(), not on
+    /// QTextCursor::charFormat(), so we walk the format ranges.
+    QColor backgroundAtPos(QQuickItem *textEdit, int qtPos) {
+        QQuickTextDocument *qtd = qvariant_cast<QQuickTextDocument*>(
+            textEdit->property("textDocument"));
+        if (!qtd || !qtd->textDocument()) return QColor();
+        QTextDocument *doc = qtd->textDocument();
+        QTextBlock block = doc->firstBlock();
+        while (block.isValid()) {
+            const int blockPos = block.position();
+            if (qtPos >= blockPos && qtPos < blockPos + block.length()) {
+                const int rel = qtPos - blockPos;
+                for (const QTextLayout::FormatRange &fr : block.layout()->formats()) {
+                    if (rel >= fr.start && rel < fr.start + fr.length) {
+                        // Format ranges may overlap; the last one wins.
+                        // QSyntaxHighlighter emits them in setFormat order,
+                        // so this is the find-pass result (last to run).
+                        // Returning last-matched ensures we observe the
+                        // final composed background.
+                    }
+                }
+                // Walk all ranges containing rel, prefer the last.
+                QColor result;
+                for (const QTextLayout::FormatRange &fr : block.layout()->formats()) {
+                    if (rel >= fr.start && rel < fr.start + fr.length) {
+                        if (fr.format.background().style() != Qt::NoBrush)
+                            result = fr.format.background().color();
+                    }
+                }
+                return result;
+            }
+            block = block.next();
+        }
+        return QColor();
+    }
+
+    /// Helper: wire a FindController against the fixture's binding.
+    void attachFindController(QmlIntegrationFixture &fix, Markoff::FindController *fc) {
+        QMetaObject::invokeMethod(fix.binding(), "attachFindController",
+                                  Qt::DirectConnection,
+                                  Q_ARG(Markoff::FindController *, fc));
+    }
+
+    void find_matches_render_highlights_in_live_mode() {
+        QmlIntegrationFixture fix(/*markdown=*/"the quick\n\nbrown fox\n\nthe lazy dog",
+                                  /*expectedRowCount=*/3);
+
+        Markoff::FindController fc(fix.document());
+        attachFindController(fix, &fc);
+        fc.activate();
+        fc.setNeedle("the");
+        QTest::qWait(30);
+        QCoreApplication::processEvents();
+
+        QQuickItem *t0 = fix.delegateTextEdit(0);
+        QQuickItem *t2 = fix.delegateTextEdit(2);
+        QVERIFY(t0);
+        QVERIFY(t2);
+
+        const Markoff::Theme theme = Markoff::Theme::defaultLight();
+        const QColor expectedMatch  = theme.color(Markoff::Theme::Slot::SearchMatchBackground);
+        const QColor expectedActive = theme.color(Markoff::Theme::Slot::SearchActiveMatchBackground);
+
+        // Block 0's "the" is at qtPos 0..3 and is current (matchCount > 0 → idx 0).
+        QCOMPARE(backgroundAtPos(t0, 1), expectedActive);
+        // Block 2's "the" is at qtPos 0..3 and is non-current.
+        QCOMPARE(backgroundAtPos(t2, 1), expectedMatch);
+    }
+
+    void current_match_renders_with_distinct_color() {
+        QmlIntegrationFixture fix(/*markdown=*/"the quick\n\nthe lazy",
+                                  /*expectedRowCount=*/2);
+
+        Markoff::FindController fc(fix.document());
+        attachFindController(fix, &fc);
+        fc.activate();
+        fc.setNeedle("the");
+        QTest::qWait(30);
+        QCoreApplication::processEvents();
+
+        QQuickItem *t0 = fix.delegateTextEdit(0);
+        QQuickItem *t1 = fix.delegateTextEdit(1);
+
+        const Markoff::Theme theme = Markoff::Theme::defaultLight();
+        const QColor mc = theme.color(Markoff::Theme::Slot::SearchMatchBackground);
+        const QColor ac = theme.color(Markoff::Theme::Slot::SearchActiveMatchBackground);
+
+        QCOMPARE(backgroundAtPos(t0, 1), ac);
+        QCOMPARE(backgroundAtPos(t1, 1), mc);
+
+        fc.findNext();
+        QTest::qWait(30);
+        QCoreApplication::processEvents();
+
+        QCOMPARE(backgroundAtPos(t0, 1), mc);
+        QCOMPARE(backgroundAtPos(t1, 1), ac);
+    }
+
+    void find_highlights_clear_on_needle_empty() {
+        QmlIntegrationFixture fix(/*markdown=*/"the cat",
+                                  /*expectedRowCount=*/1);
+
+        Markoff::FindController fc(fix.document());
+        attachFindController(fix, &fc);
+        fc.activate();
+        fc.setNeedle("the");
+        QTest::qWait(30);
+        QCoreApplication::processEvents();
+
+        QQuickItem *t0 = fix.delegateTextEdit(0);
+        const Markoff::Theme theme = Markoff::Theme::defaultLight();
+        QCOMPARE(backgroundAtPos(t0, 1),
+                 theme.color(Markoff::Theme::Slot::SearchActiveMatchBackground));
+
+        fc.setNeedle("");
+        QTest::qWait(30);
+        QCoreApplication::processEvents();
+        // Background cleared — should be the un-set (invalid) QColor since
+        // no other format owns position 1.
+        QCOMPARE(backgroundAtPos(t0, 1), QColor());
+    }
+
     void find_typing_does_not_steal_focus_or_mutate_document() {
         QmlIntegrationFixture fix(/*markdown=*/"# My Header\n\nParagraph one.\n",
                                   /*expectedRowCount=*/2);
