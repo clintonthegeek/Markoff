@@ -45,6 +45,7 @@ public:
         LooseRunRole,
         InlineSpansRole,
         DelegateClassRole,  // new: see Markoff::Live::delegateClassFor.
+        FindSpansRole,      // QList<Markoff::Live::FindSpan>; written by LiveFindAdapter.
     };
 
     explicit LiveBlockModel(QObject *parent = nullptr);
@@ -73,6 +74,14 @@ public:
                   quint64 parseInputEditSeq = std::numeric_limits<quint64>::max());
 
     const BlockRecord &recordAt(int row) const { return m_rows.at(row); }
+
+    /// Replace this block's find-match list. Emits a single `dataChanged`
+    /// with roles == {FindSpansRole} so consumers can react minimally.
+    /// No-op (no signal) if the block is unknown or the list is identical
+    /// to the current value. Empty list clears any prior matches and
+    /// emits dataChanged so renderers can vanish highlights.
+    void setFindSpans(const Markoff::BlockAnchor &anchor,
+                      const QList<FindSpan> &spans);
 
     /// Spec 2026-05-11-focus-chokepoint-design.md §5.1.1. Returns the kind
     /// of the block with the given anchor, or empty string if not found.

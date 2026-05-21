@@ -40,6 +40,7 @@ QHash<int, QByteArray> LiveBlockModel::roleNames() const
         { LooseRunRole,     "looseRun" },
         { InlineSpansRole,  "inlineSpans" },
         { DelegateClassRole, "delegateClass" },
+        { FindSpansRole,    "findSpans" },
     };
 }
 
@@ -103,6 +104,7 @@ QVariant LiveBlockModel::data(const QModelIndex &index, int role) const
         }
         case InlineSpansRole:   return QVariant::fromValue(r.inlineSpans);
         case DelegateClassRole: return r.delegateClass;
+        case FindSpansRole:     return QVariant::fromValue(r.findSpans);
         default:                return {};
     }
 }
@@ -216,6 +218,21 @@ QString LiveBlockModel::kindFor(Markoff::BlockAnchor anchor) const
     for (const auto &r : m_rows)
         if (r.blockAnchor == anchor) return r.kind;
     return {};
+}
+
+void LiveBlockModel::setFindSpans(const Markoff::BlockAnchor &anchor,
+                                  const QList<FindSpan> &spans)
+{
+    for (int row = 0; row < m_rows.size(); ++row) {
+        if (m_rows[row].blockAnchor != anchor) continue;
+        if (m_rows[row].findSpans == spans) return;
+        m_rows[row].findSpans = spans;
+        const QModelIndex ix = index(row, 0);
+        Q_EMIT dataChanged(ix, ix, {FindSpansRole});
+        return;
+    }
+    // Unknown anchor — no-op. Adapter writes can race with row removal;
+    // dropping silently is the contract.
 }
 
 }  // namespace Markoff::Live

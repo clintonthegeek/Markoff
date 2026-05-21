@@ -347,6 +347,39 @@ private Q_SLOTS:
         QVERIFY(m.spansAtRow(0)[0].bold);
     }
 
+    void setFindSpans_emitsDataChangedForRoleOnly() {
+        LiveBlockModel m;
+        Markoff::BlockAnchor a = Markoff::BlockAnchor::fromRaw(42);
+        m.insertTestRow(a, "paragraph", "the quick brown fox");
+
+        QSignalSpy spy(&m, &QAbstractItemModel::dataChanged);
+
+        QList<Markoff::Live::FindSpan> spans;
+        spans.append({ /*byteOffset*/ 4u,  /*byteLength*/ 5u, /*isCurrent*/ false });
+        spans.append({ /*byteOffset*/ 10u, /*byteLength*/ 5u, /*isCurrent*/ true  });
+        m.setFindSpans(a, spans);
+
+        QCOMPARE(spy.count(), 1);
+        const auto args = spy.takeFirst();
+        const auto roles = args.at(2).value<QList<int>>();
+        QCOMPARE(roles.size(), 1);
+        QCOMPARE(roles.first(), int(LiveBlockModel::FindSpansRole));
+
+        const QVariant got = m.data(m.index(0, 0), LiveBlockModel::FindSpansRole);
+        const auto returned = got.value<QList<Markoff::Live::FindSpan>>();
+        QCOMPARE(returned.size(), 2);
+        QCOMPARE(returned[0].byteOffset, quint32(4));
+        QCOMPARE(returned[1].isCurrent, true);
+
+        // Setting identical spans again is a no-op (no signal).
+        m.setFindSpans(a, spans);
+        QCOMPARE(spy.count(), 0);
+
+        // Setting empty clears + emits.
+        m.setFindSpans(a, {});
+        QCOMPARE(spy.count(), 1);
+    }
+
     void source_span_equality_and_metatype_round_trip() {
         Markoff::SourceSpan a{};
         a.charOffset = 0; a.charLength = 4; a.bold = true;
