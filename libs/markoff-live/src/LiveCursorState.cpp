@@ -118,14 +118,25 @@ void LiveCursorState::setSelectionAnchor(SelectionAnchor anchor)
 {
     if (m_selectionAnchor && *m_selectionAnchor == anchor) return;
     m_selectionAnchor = anchor;
-    Q_EMIT selectionChanged();
+    emitSelectionChanged();
 }
 
 void LiveCursorState::clearSelectionAnchor() noexcept
 {
     if (!m_selectionAnchor) return;
     m_selectionAnchor.reset();
+    emitSelectionChanged();
+}
+
+void LiveCursorState::emitSelectionChanged()
+{
+    // Hold the flag for the synchronous dispatch window so each delegate's
+    // applySelection() round-trip through QML TextEdit.cursorPosition does
+    // NOT fire syncFromTextEdit() and overwrite m_cursor. See header
+    // doc for isApplyingSelection() and queue.md 2026-05-21 entry.
+    m_applyingSelectionEmit = true;
     Q_EMIT selectionChanged();
+    m_applyingSelectionEmit = false;
 }
 
 int LiveCursorState::rowForBlock(const Markoff::BlockAnchor &block) const
@@ -750,7 +761,7 @@ void LiveCursorState::extend(int blockIndex, int qtPos)
     if (anchor.isNull()) return;
     syncFromTextEdit(anchor, qtPos);
     syncSelectionToSession();
-    Q_EMIT selectionChanged();
+    emitSelectionChanged();
 }
 
 void LiveCursorState::clearSelection()

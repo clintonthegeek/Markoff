@@ -61,6 +61,10 @@ Rectangle {
         onCursorPositionChanged: {
             // See ParagraphDelegate for the rationale on this guard.
             const cs = root.liveBinding ? root.liveBinding.cursorState : null
+            // Suppress sync during applySelection's programmatic cursorPosition
+            // moves — see LiveCursorState::isApplyingSelection() doc and
+            // queue.md 2026-05-21 entry.
+            if (cs && cs.isApplyingSelection()) return
             if (model.blockAnchor !== undefined && cs) {
                 if (editBinding.isApplyingTextUpdate()
                         && cs.focusedAnchorRow === root.modelIndex) {
@@ -81,6 +85,33 @@ Rectangle {
 
             const k = event.key
             const mods = event.modifiers
+            // Clipboard shortcuts intercepted BEFORE TextEdit's built-in
+            // handlers — see UnifiedInlineTextDelegate.qml. queue.md 2026-05-21.
+            if ((mods & Qt.ControlModifier) && !(mods & Qt.ShiftModifier)
+                    && !(mods & Qt.AltModifier)) {
+                const clip = root.liveBinding.clipboardController
+                const cs   = root.liveBinding.cursorState
+                if (k === Qt.Key_C) {
+                    if (clip) clip.copy()
+                    event.accepted = true
+                    return
+                }
+                if (k === Qt.Key_X) {
+                    if (clip) clip.cut()
+                    event.accepted = true
+                    return
+                }
+                if (k === Qt.Key_V) {
+                    if (clip) clip.paste()
+                    event.accepted = true
+                    return
+                }
+                if (k === Qt.Key_A) {
+                    if (cs) cs.selectAll()
+                    event.accepted = true
+                    return
+                }
+            }
             const isStructural = (k === Qt.Key_Backspace || k === Qt.Key_Delete
                                || k === Qt.Key_Tab)
             const isNav = (k === Qt.Key_Up || k === Qt.Key_Down

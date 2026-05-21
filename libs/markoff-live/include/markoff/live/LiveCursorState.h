@@ -306,6 +306,20 @@ public:
     Q_INVOKABLE int activeBlock() const;
     Q_INVOKABLE int activeQtPos() const;
 
+    /// True for the synchronous window during which `selectionChanged` is
+    /// being dispatched and connected delegates are running `applySelection`.
+    /// Read by `UnifiedInlineTextDelegate`/`CodeBlockDelegate`
+    /// `onCursorPositionChanged` to suppress the round-trip
+    /// `syncFromTextEdit` callback that would otherwise clobber `m_cursor`
+    /// back to the delegate that just had its programmatic `cursorPosition`
+    /// moved by `moveCursorSelection`. Without this guard, cross-block
+    /// drag selection / Shift+arrow extension leave `m_cursor` at whichever
+    /// delegate's `applySelection` ran last instead of at the drag target —
+    /// the regression logged in `docs/queue.md` Discipline Log 2026-05-21.
+    /// Invariant 7 (re-entrance guards) consciously violated; see commit
+    /// message for rationale and `docs/queue.md`.
+    Q_INVOKABLE bool isApplyingSelection() const noexcept { return m_applyingSelectionEmit; }
+
 Q_SIGNALS:
     void cursorChanged();
     void desiredVisualXChanged();
@@ -320,8 +334,12 @@ Q_SIGNALS:
 
 private:
     bool validateVariant(const Cursor &c) const;
+    /// Sets `m_applyingSelectionEmit` to true, emits `selectionChanged`
+    /// synchronously, and clears the flag. See `isApplyingSelection`.
+    void emitSelectionChanged();
 
     Cursor                   m_cursor;
+    bool                     m_applyingSelectionEmit = false;
     const BlockKindRegistry *m_registry;
     const LiveBlockModel    *m_model;
     LiveListModelBinding    *m_binding = nullptr;

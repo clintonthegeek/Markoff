@@ -198,6 +198,13 @@ Item {
 
         onCursorPositionChanged: {
             const cs = root.liveBinding ? root.liveBinding.cursorState : null
+            // Suppress sync during applySelection's programmatic cursorPosition
+            // moves — see LiveCursorState::isApplyingSelection() doc and
+            // queue.md 2026-05-21 entry. Without this, each delegate's
+            // moveCursorSelection round-trips through syncFromTextEdit and
+            // clobbers m_cursor back to whichever delegate ran last, breaking
+            // cross-block selection.
+            if (cs && cs.isApplyingSelection()) return
             if (model.blockAnchor !== undefined && cs) {
                 if (editBinding.isApplyingTextUpdate()
                         && cs.focusedAnchorRow === root.modelIndex) {
@@ -230,6 +237,35 @@ Item {
 
             const k = event.key
             const mods = event.modifiers
+            // Clipboard shortcuts intercepted BEFORE TextEdit's built-in
+            // handlers — without this, a focused TextEdit eats Ctrl+C / X / V /
+            // A and operates on its own within-block selection, breaking
+            // cross-block copy/cut/paste/selectAll. queue.md 2026-05-21.
+            if ((mods & Qt.ControlModifier) && !(mods & Qt.ShiftModifier)
+                    && !(mods & Qt.AltModifier)) {
+                const clip = root.liveBinding.clipboardController
+                const cs   = root.liveBinding.cursorState
+                if (k === Qt.Key_C) {
+                    if (clip) clip.copy()
+                    event.accepted = true
+                    return
+                }
+                if (k === Qt.Key_X) {
+                    if (clip) clip.cut()
+                    event.accepted = true
+                    return
+                }
+                if (k === Qt.Key_V) {
+                    if (clip) clip.paste()
+                    event.accepted = true
+                    return
+                }
+                if (k === Qt.Key_A) {
+                    if (cs) cs.selectAll()
+                    event.accepted = true
+                    return
+                }
+            }
             // Heading level-change: Ctrl+Shift+0..6 is structural for headings.
             const isLevelChange = root.kind === "heading"
                 && (mods & Qt.ControlModifier) && (mods & Qt.ShiftModifier)

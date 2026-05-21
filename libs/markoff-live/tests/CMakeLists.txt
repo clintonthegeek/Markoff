@@ -671,7 +671,8 @@ foreach(_qmlcompanion
     tst_live_render_structural_qml
     tst_live_render_e2_nav_arrows_qml
     tst_live_render_e2_nav_word_qml
-    tst_live_render_e2_nav_shift_extend_qml)
+    tst_live_render_e2_nav_shift_extend_qml
+    tst_live_render_cross_block_drag_selection_qml)
     qt_add_executable(${_qmlcompanion}
         ${_qmlcompanion}.cpp
         QmlIntegrationFixture.h
