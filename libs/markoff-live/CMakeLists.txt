@@ -59,6 +59,9 @@ qt_add_qml_module(markoff_live
         # R4: per-delegate edit binding
         include/markoff/live/LiveEditBinding.h
         src/LiveEditBinding.cpp
+        # E4 C1: per-delegate edit binding for TableDelegate
+        include/markoff/live/TableEditBinding.h
+        src/TableEditBinding.cpp
         # R5: structural keys
         include/markoff/live/LiveStructuralKeyHandler.h
         src/LiveStructuralKeyHandler.cpp
