@@ -460,51 +460,59 @@ Rectangle {
                         // TextEdit's default tab-insertion handling.
                         // Out-of-bounds at the table edges exits to the
                         // previous / next block via the chokepoint.
-                        // D1: Tab / Shift+Tab move between cells. The
-                        // BeforeItem priority intercepts the key before
-                        // TextEdit's default tab-insertion handling.
-                        // Out-of-bounds at the table edges exits to the
-                        // previous / next block via the chokepoint.
+                        // D1: Tab / Shift+Tab move between cells.
+                        // D2: Arrow keys handle cell-edge crossings
+                        // (Left/Right) and cross-row motion (Up/Down).
+                        // The BeforeItem priority intercepts the key
+                        // before TextEdit's default cursor handling.
                         Keys.priority: Keys.BeforeItem
                         Keys.onPressed: (event) => {
-                            if (event.key !== Qt.Key_Tab
-                                && event.key !== Qt.Key_Backtab) return
                             if (!root.parsedTable || !root.parsedTable.parseOk) return
                             if (!root.cursorState || root.blockAnchor === undefined) return
 
-                            const isBacktab =
-                                event.key === Qt.Key_Backtab
-                                || (event.modifiers & Qt.ShiftModifier) !== 0
-                            const cols      = root.parsedTable.headers.length
-                            const totalRows = root.parsedTable.body.length + 1
-
-                            let nextR = cellRect.r
-                            let nextC = cellRect.c
-                            if (isBacktab) {
-                                nextC -= 1
-                                if (nextC < 0) { nextC = cols - 1; nextR -= 1 }
-                            } else {
-                                nextC += 1
-                                if (nextC >= cols) { nextC = 0; nextR += 1 }
+                            // ---- D1: Tab / Shift+Tab ----
+                            if (event.key === Qt.Key_Tab
+                                || event.key === Qt.Key_Backtab) {
+                                const isBacktab =
+                                    event.key === Qt.Key_Backtab
+                                    || (event.modifiers & Qt.ShiftModifier) !== 0
+                                const cols      = root.parsedTable.headers.length
+                                const totalRows = root.parsedTable.body.length + 1
+                                let nextR = cellRect.r
+                                let nextC = cellRect.c
+                                if (isBacktab) {
+                                    nextC -= 1
+                                    if (nextC < 0) { nextC = cols - 1; nextR -= 1 }
+                                } else {
+                                    nextC += 1
+                                    if (nextC >= cols) { nextC = 0; nextR += 1 }
+                                }
+                                if (nextR < 0) {
+                                    root.cursorState.requestTextCaretAtRow(
+                                        root.modelIndex - 1, 0)
+                                } else if (nextR >= totalRows) {
+                                    root.cursorState.requestTextCaretAtRow(
+                                        root.modelIndex + 1, 0)
+                                } else {
+                                    const ranges = root.parsedTable.cellCharRanges
+                                    if (nextR >= ranges.length) return
+                                    if (nextC >= ranges[nextR].length) return
+                                    const range = ranges[nextR][nextC]
+                                    root.cursorState.establishFocus(
+                                        root.blockAnchor, range.start)
+                                }
+                                event.accepted = true
+                                return
                             }
 
-                            if (nextR < 0) {
-                                // Exit upward to the previous block.
-                                root.cursorState.requestTextCaretAtRow(
-                                    root.modelIndex - 1, 0)
-                            } else if (nextR >= totalRows) {
-                                // Exit downward to the next block.
-                                root.cursorState.requestTextCaretAtRow(
-                                    root.modelIndex + 1, 0)
-                            } else {
-                                const ranges = root.parsedTable.cellCharRanges
-                                if (nextR >= ranges.length) return
-                                if (nextC >= ranges[nextR].length) return
-                                const range = ranges[nextR][nextC]
-                                root.cursorState.establishFocus(
-                                    root.blockAnchor, range.start)
+                            // ---- D2 STUB: arrow keys accepted but no-op ----
+                            if (event.key === Qt.Key_Left
+                                || event.key === Qt.Key_Right
+                                || event.key === Qt.Key_Up
+                                || event.key === Qt.Key_Down) {
+                                event.accepted = true
+                                return
                             }
-                            event.accepted = true
                         }
 
                         // B4: round-trip cell-relative cursor moves back to

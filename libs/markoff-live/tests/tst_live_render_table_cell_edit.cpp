@@ -82,6 +82,15 @@ private slots:
     void tab_at_last_cell_exits_table_to_next_block();
     void shift_tab_moves_focus_to_previous_cell();
     void shift_tab_at_first_cell_exits_table_to_previous_block();
+    // E4 D2 — Arrow keys at cell edges + cross-row Up/Down.
+    void left_at_qtpos_zero_moves_to_prev_cell_end();
+    void left_at_qtpos_nonzero_stays_within_cell();
+    void right_at_cell_end_moves_to_next_cell_start();
+    void up_from_body_row_moves_to_header_same_column();
+    void down_from_header_moves_to_body_same_column();
+    void up_from_header_exits_table_to_previous_block();
+    void down_from_last_body_row_exits_table_to_next_block();
+    void left_at_first_cell_qtpos_zero_exits_table();
 };
 
 void TestTableCellEdit
@@ -360,6 +369,166 @@ void TestTableCellEdit::shift_tab_at_first_cell_exits_table_to_previous_block()
     s.fx->harness().keyClick(Qt::Key_Backtab, Qt::ShiftModifier);
 
     // Caret should land on the previous block — "para before" at row 0.
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 0, 2000);
+}
+
+// ---- D2 ----
+
+void TestTableCellEdit::left_at_qtpos_zero_moves_to_prev_cell_end()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 1) != nullptr);
+
+    QQuickItem *cell01 = cellTextEditAt(s.table, 0, 1);
+    QVERIFY(cell01);
+    cell01->setProperty("cursorPosition", 0);
+    cell01->forceActiveFocus();
+    QTRY_VERIFY(cell01->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Left);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    QTRY_VERIFY_WITH_TIMEOUT(cell00->hasActiveFocus(), 2000);
+    QCOMPARE(cell00->property("cursorPosition").toInt(),
+             cell00->property("length").toInt());
+}
+
+void TestTableCellEdit::left_at_qtpos_nonzero_stays_within_cell()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->setProperty("cursorPosition", 2);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Left);
+
+    // Still in the same cell, cursor moved one position left.
+    QVERIFY(cell00->hasActiveFocus());
+    QCOMPARE(cell00->property("cursorPosition").toInt(), 1);
+}
+
+void TestTableCellEdit::right_at_cell_end_moves_to_next_cell_start()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    const int cell00Len = cell00->property("length").toInt();
+    cell00->setProperty("cursorPosition", cell00Len);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Right);
+
+    QQuickItem *cell01 = cellTextEditAt(s.table, 0, 1);
+    QVERIFY(cell01);
+    QTRY_VERIFY_WITH_TIMEOUT(cell01->hasActiveFocus(), 2000);
+    QCOMPARE(cell01->property("cursorPosition").toInt(), 0);
+}
+
+void TestTableCellEdit::up_from_body_row_moves_to_header_same_column()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 1, 1) != nullptr);
+
+    QQuickItem *cell11 = cellTextEditAt(s.table, 1, 1);
+    QVERIFY(cell11);
+    cell11->setProperty("cursorPosition", 1);
+    cell11->forceActiveFocus();
+    QTRY_VERIFY(cell11->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Up);
+
+    QQuickItem *cell01 = cellTextEditAt(s.table, 0, 1);
+    QVERIFY(cell01);
+    QTRY_VERIFY_WITH_TIMEOUT(cell01->hasActiveFocus(), 2000);
+    // Same-column-x proxy: cursorPosition carries over (cells share font).
+    QCOMPARE(cell01->property("cursorPosition").toInt(), 1);
+}
+
+void TestTableCellEdit::down_from_header_moves_to_body_same_column()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->setProperty("cursorPosition", 2);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Down);
+
+    QQuickItem *cell10 = cellTextEditAt(s.table, 1, 0);
+    QVERIFY(cell10);
+    QTRY_VERIFY_WITH_TIMEOUT(cell10->hasActiveFocus(), 2000);
+    QCOMPARE(cell10->property("cursorPosition").toInt(), 2);
+}
+
+void TestTableCellEdit::up_from_header_exits_table_to_previous_block()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    // Seed cursor on the table (row 1) so the post-Up assertion isn't
+    // satisfied vacuously by the fixture's initial-focus state.
+    s.fx->placeCursorAtPos(/*row=*/1, /*qtPos=*/0);
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 1, 2000);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Up);
+
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 0, 2000);
+}
+
+void TestTableCellEdit::down_from_last_body_row_exits_table_to_next_block()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 1, 1) != nullptr);
+
+    QQuickItem *cell11 = cellTextEditAt(s.table, 1, 1);
+    QVERIFY(cell11);
+    cell11->forceActiveFocus();
+    QTRY_VERIFY(cell11->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Down);
+
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 2, 2000);
+}
+
+void TestTableCellEdit::left_at_first_cell_qtpos_zero_exits_table()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    // Seed cursor on the table so the post-Left assertion isn't vacuous.
+    s.fx->placeCursorAtPos(/*row=*/1, /*qtPos=*/0);
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 1, 2000);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->setProperty("cursorPosition", 0);
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Left);
+
     QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 0, 2000);
 }
 
