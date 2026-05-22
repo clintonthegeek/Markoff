@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import QtQuick
+import QtQuick.Layouts
 import org.markoff.live 1.0
 
 // E4: TableDelegate — first multi-cell interactive atomic block (L8).
@@ -186,36 +187,100 @@ Rectangle {
         }
     }
 
-    // Skeleton body. Phase B2 replaces this with the actual grid.
+    // Body. Phase B2: N×M GridLayout of read-only TextEdit cells. The
+    // header row (r === 0) is bold and uses the CodeBlockBackground
+    // accent; body rows use the EditorBackground. Grid lines are 1-px
+    // Rectangle borders coloured by Theme.Quote (per E2.6 slot-reuse
+    // convention; future split into a dedicated grid-line slot if a
+    // dogfood pass calls for it).
+    //
+    // When parseTable fails, we fall back to a diagnostic Text so the
+    // failure mode is visible during dogfood rather than swallowed by a
+    // zero-size grid.
     Column {
         id: bodyColumn
         anchors { left: parent.left; right: parent.right
                   top: parent.top; margins: 8 }
         spacing: 2
 
+        GridLayout {
+            id: cellGrid
+            visible: root.parsedTable && root.parsedTable.parseOk
+            anchors { left: parent.left; right: parent.right }
+            columns: visible ? root.parsedTable.headers.length : 1
+            rowSpacing: 0
+            columnSpacing: 0
+
+            Repeater {
+                model: cellGrid.visible
+                       ? (root.parsedTable.body.length + 1)
+                         * root.parsedTable.headers.length
+                       : 0
+
+                delegate: Rectangle {
+                    id: cellRect
+                    readonly property int cols: root.parsedTable.headers.length
+                    readonly property int r: Math.floor(index / cols)   // 0 = header row
+                    readonly property int c: index % cols
+                    readonly property bool isHeader: r === 0
+                    readonly property string cellText:
+                        isHeader ? root.parsedTable.headers[c]
+                                 : root.parsedTable.body[r - 1][c]
+
+                    Layout.fillWidth: true
+                    Layout.minimumWidth: 60
+                    implicitHeight: cellEdit.implicitHeight + 8
+
+                    color: (root.liveBinding && root.liveBinding.theme)
+                           ? root.liveBinding.themeColorFor(
+                               isHeader ? Theme.CodeBlockBackground
+                                        : Theme.EditorBackground)
+                           : (isHeader ? "#f0f0f0" : "#ffffff")
+                    border.color: (root.liveBinding && root.liveBinding.theme)
+                                  ? root.liveBinding.themeColorFor(Theme.Quote)
+                                  : "#888888"
+                    border.width: 1
+
+                    TextEdit {
+                        id: cellEdit
+                        anchors.fill: parent
+                        anchors.margins: 4
+                        text: cellRect.cellText
+                        readOnly: true
+                        wrapMode: TextEdit.NoWrap
+                        textFormat: TextEdit.PlainText
+                        horizontalAlignment: root.parsedTable.alignments[cellRect.c]
+
+                        readonly property var theme:
+                            root.liveBinding ? root.liveBinding.theme : null
+                        readonly property real fontScale:
+                            root.liveBinding ? root.liveBinding.fontScale : 1.0
+
+                        font.pixelSize: theme
+                            ? root.liveBinding.themePixelSizeFor(Theme.TextDefault) * fontScale
+                            : 14 * fontScale
+                        font.family: theme
+                            ? root.liveBinding.themeFamilyFor(Theme.TextDefault)
+                            : ""
+                        font.bold: cellRect.isHeader
+                        color: (root.liveBinding && root.liveBinding.theme)
+                               ? root.liveBinding.themeColorFor(Theme.TextDefault)
+                               : "#222222"
+                        selectByMouse: false
+                    }
+                }
+            }
+        }
+
         Text {
-            text: root.parsedTable && root.parsedTable.parseOk
-                  ? ("[E4 TableDelegate — parseOk, "
-                     + root.parsedTable.headers.length + " cols × "
-                     + root.parsedTable.body.length + " body rows]")
-                  : ("[E4 TableDelegate — parseError: "
-                     + (root.parsedTable ? root.parsedTable.parseError : "null") + "]")
+            visible: !(root.parsedTable && root.parsedTable.parseOk)
+            text: "[E4 TableDelegate — parseError: "
+                  + (root.parsedTable ? root.parsedTable.parseError : "null") + "]"
             font.family: "monospace"
             font.pixelSize: 12
             color: (root.liveBinding && root.liveBinding.theme)
                    ? root.liveBinding.themeColorFor(Theme.Quote)
                    : "#888888"
-        }
-
-        Text {
-            text: root.blockText
-            font.family: "monospace"
-            font.pixelSize: 13
-            textFormat: Text.PlainText
-            wrapMode: Text.NoWrap
-            color: (root.liveBinding && root.liveBinding.theme)
-                   ? root.liveBinding.themeColorFor(Theme.CodeBlock)
-                   : "#222222"
         }
     }
 
