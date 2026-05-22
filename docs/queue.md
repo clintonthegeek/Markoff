@@ -103,7 +103,9 @@
 
 - ~~Audit L8 (LiveActionController QActions with setShortcut() but no QML Shortcut element binding)~~ → fixed. `LiveView.qml` now binds window-level Shortcuts for Bold/Italic/Strike/InlineCode/Link/Heading1..6/Save in addition to the pre-existing zoom/dark-toggle bindings. Ctrl+0 deliberately stays bound to zoom-reset; the paragraph-demote action is reached via host menus / context menus.
 
-- Audit L3, L7 deferred — not bug-already-in-prod; each needs its own design pass. See audit §5 for symptoms.
+- Audit L7 deferred — not bug-already-in-prod; needs its own design pass. See audit §5 for symptoms.
+
+- ~~Audit L3 (drag-drop of external text)~~ → closed by `docs/specs/2026-05-21-audit-L3-drag-and-drop-text.md`. `LiveView.qml` now has a top-level `DropArea` (z above the MouseArea) that intercepts text drops before TextEdit's native handler sees them. Drop-at-point semantics: hit-test the drop position, move cursor there (collapsing any cross-block selection), insert via new `LiveClipboardController::pasteText`. Scope is text/plain only; structured paste from drag-drop (our own `application/x-markoff-blocks` MIME) deferred until dogfooded. `tst_live_render_drop_text_qml` (3 slots, all green). Bonus: factored `resolveSelectionByteRange` helper out of `pasteFrom` so `pasteText` shares the anchor-resolution path.
 
 - ~~Audit L2 (middle-click PRIMARY-selection paste)~~ → closed by `docs/specs/2026-05-21-audit-L2-middle-click-primary-paste.md`. `LiveClipboardController::pastePrimary()` reads from `QClipboard::Selection` and routes through the same structured/flat paste machinery as `paste()`. `LiveView.qml`'s MouseArea now accepts `Qt.MiddleButton`: on middle-press, hit-test → move cursor to click → `pastePrimary()`. Paste-at-click, not paste-at-focus. `tst_live_render_middle_click_paste_qml` (3 slots, 2 skipped on offscreen QPA where `supportsSelection()` is false; the no-op safety test runs everywhere). Real-desktop dogfood pass needed to confirm the active-PRIMARY path end-to-end.
 

@@ -201,6 +201,40 @@ ListView {
         }
     }
 
+    // ---- Drag-and-drop text intercept ----
+    //
+    // External text dropped into a TextEdit is, by default, handled by
+    // Qt's native TextEdit drop logic — single-block insert into the
+    // focused TextEdit at the drop point, bypassing
+    // LiveClipboardController. A top-level DropArea above the ListView
+    // captures the drop first, hit-tests it like the MouseArea, and
+    // routes the text through clipboardController.pasteText so the
+    // document layer drives the insert. See audit L3 spec.
+    DropArea {
+        anchors.fill: parent
+        z: 11
+        onEntered: (drag) => {
+            if (drag.hasText) drag.accept(Qt.CopyAction)
+        }
+        onDropped: (drop) => {
+            if (!drop.hasText) { drop.accepted = false; return }
+            if (!binding || !binding.cursorState
+                || !binding.clipboardController) {
+                drop.accepted = false; return
+            }
+            const r = root.hit(drop.x, drop.y)
+            if (!r || r.blockIndex < 0) { drop.accepted = false; return }
+            binding.cursorState.begin(r.blockIndex,
+                                      r.qtPos >= 0 ? r.qtPos : 0)
+            const item = root.itemAtIndex(r.blockIndex)
+            if (item && item.blockAnchor !== undefined)
+                binding.cursorState.establishFocus(
+                    item.blockAnchor, r.qtPos >= 0 ? r.qtPos : 0)
+            binding.clipboardController.pasteText(drop.text)
+            drop.acceptProposedAction()
+        }
+    }
+
     // ---- Mouse input ----
     MouseArea {
         id: mouseArea

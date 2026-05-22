@@ -732,7 +732,8 @@ foreach(_qmlcompanion
     tst_live_render_hit_test_qml
     tst_live_render_ctrl_backspace_boundary_qml
     tst_live_render_ctrl_shift_word_extend_qml
-    tst_live_render_middle_click_paste_qml)
+    tst_live_render_middle_click_paste_qml
+    tst_live_render_drop_text_qml)
     qt_add_executable(${_qmlcompanion}
         ${_qmlcompanion}.cpp
         QmlIntegrationFixture.h

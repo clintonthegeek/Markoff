@@ -201,24 +201,17 @@ void LiveClipboardController::pastePrimary()
     pasteFrom(static_cast<int>(QClipboard::Selection));
 }
 
-void LiveClipboardController::pasteFrom(int clipboardMode)
+bool LiveClipboardController::resolveSelectionByteRange(
+    uint32_t &startByte, uint32_t &endByte) const
 {
-    if (!m_selection || !m_document || !m_model) return;
-    const auto mode = static_cast<QClipboard::Mode>(clipboardMode);
-    const QMimeData *mime = QApplication::clipboard()->mimeData(mode);
-    if (!mime || (!mime->hasText() && !mime->hasFormat(kBlocksMime))) return;
+    if (!m_selection || !m_document || !m_model) return false;
 
-    // We need anchor positions to compute start/end byte offsets.
-    // Use the Q_INVOKABLE accessors on LiveCursorState
-    // (anchorBlock/anchorQtPos/activeBlock/activeQtPos).
     const int ab = m_selection->anchorBlock();
     const int ap = m_selection->anchorQtPos();
     const int xb = m_selection->activeBlock();
     const int xp = m_selection->activeQtPos();
+    if (ab < 0 || xb < 0) return false;
 
-    if (ab < 0 || xb < 0) return;
-
-    // Sort anchor/active so first ≤ last.
     int fb, fo, lb, lo;
     if (ab < xb || (ab == xb && ap <= xp)) {
         fb = ab; fo = ap; lb = xb; lo = xp;
@@ -226,9 +219,20 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
         fb = xb; fo = xp; lb = ab; lo = ap;
     }
 
-    const uint32_t startByte = flatByteOffset(*m_model, *m_document, fb, fo);
-    const uint32_t endByte   = flatByteOffset(*m_model, *m_document, lb, lo);
-    if (startByte == UINT32_MAX || endByte == UINT32_MAX) return;
+    startByte = flatByteOffset(*m_model, *m_document, fb, fo);
+    endByte   = flatByteOffset(*m_model, *m_document, lb, lo);
+    return startByte != UINT32_MAX && endByte != UINT32_MAX;
+}
+
+void LiveClipboardController::pasteFrom(int clipboardMode)
+{
+    if (!m_selection || !m_document || !m_model) return;
+    const auto mode = static_cast<QClipboard::Mode>(clipboardMode);
+    const QMimeData *mime = QApplication::clipboard()->mimeData(mode);
+    if (!mime || (!mime->hasText() && !mime->hasFormat(kBlocksMime))) return;
+
+    uint32_t startByte = 0, endByte = 0;
+    if (!resolveSelectionByteRange(startByte, endByte)) return;
 
     // Try the structured fast-path.
     if (mime->hasFormat(kBlocksMime)) {
@@ -260,6 +264,19 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
                                   Markoff::Origin::UserEdit);
         m_selection->clearSelection();
     }
+}
+
+void LiveClipboardController::pasteText(const QString &text)
+{
+    if (text.isEmpty()) return;
+    if (!m_selection || !m_document || !m_model) return;
+
+    uint32_t startByte = 0, endByte = 0;
+    if (!resolveSelectionByteRange(startByte, endByte)) return;
+
+    m_document->applyFlatEdit(startByte, endByte, text.toUtf8(),
+                              Markoff::Origin::UserEdit);
+    m_selection->clearSelection();
 }
 
 }  // namespace Markoff::Live

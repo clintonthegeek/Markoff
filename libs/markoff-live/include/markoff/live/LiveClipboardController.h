@@ -46,12 +46,19 @@ public:
     /// selection buffer. See audit L2 spec.
     Q_INVOKABLE void pastePrimary();
 
+    /// Insert the given text at the current cursor position (or replace
+    /// the current selection's range with it). Used by the drag-drop
+    /// path (audit L3) where the text comes from a QDropEvent's
+    /// QMimeData rather than the system clipboard.
+    Q_INVOKABLE void pasteText(const QString &text);
+
     static constexpr const char *kBlocksMime = "application/x-markoff-blocks";
 
 private:
     void pasteFrom(int clipboardMode);  // QClipboard::Mode as int to
                                         // avoid leaking the include
                                         // into the public header.
+    bool resolveSelectionByteRange(uint32_t &startByte, uint32_t &endByte) const;
 
     Markoff::MarkoffDocument *m_document  = nullptr;
     LiveCursorState          *m_selection = nullptr;
