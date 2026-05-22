@@ -10,6 +10,16 @@ target_link_libraries(tst_kind_dispatch PRIVATE
     Qt6::Core Qt6::Test markoff_live)
 add_test(NAME tst_kind_dispatch COMMAND tst_kind_dispatch)
 
+# E4 A5: Table descriptor in BlockKindRegistry
+qt_add_executable(tst_block_kind_registry_table
+    tst_block_kind_registry_table.cpp
+)
+target_link_libraries(tst_block_kind_registry_table PRIVATE
+    Qt6::Core Qt6::Test markoff_live)
+add_test(NAME tst_block_kind_registry_table COMMAND tst_block_kind_registry_table)
+set_tests_properties(tst_block_kind_registry_table PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(tst_live_find_adapter
     tst_live_find_adapter.cpp
 )

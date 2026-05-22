@@ -149,6 +149,35 @@ void BlockKindRegistry::registerBuiltins()
         };
         m_descriptors.insert(d.id, d);
     }
+    // Table: first multi-cell interactive atomic block. BlockSelected for
+    // whole-block selection/delete; BlockInternalEdit for in-cell editing.
+    // Buffer IS the pipe-table markdown source (passthrough serializer).
+    // Spec: docs/specs/2026-05-22-e4-tables-design.md §5.1.
+    {
+        BlockKindDescriptor d;
+        d.id = BlockKind::Table;
+        d.acceptsTextRoleUpdates = true;
+        d.isBlockOnly = false;
+        d.supportedCursorVariants = {
+            QStringLiteral("BlockSelected"),
+            QStringLiteral("BlockInternalEdit"),
+        };
+        d.internalEditModes = { QStringLiteral("editing-cell") };
+        d.consumedStructuralKeys = {
+            Qt::Key_Delete, Qt::Key_Backspace,
+            Qt::Key_Up, Qt::Key_Down,
+            Qt::Key_Return, Qt::Key_Enter,
+            Qt::Key_Tab, Qt::Key_Backtab,
+            Qt::Key_Escape,
+        };
+        d.delegateUrl = QStringLiteral(
+            "qrc:/qt/qml/org/markoff/live/render/delegates/TableDelegate.qml");
+        d.serializer = [](const QByteArray &text,
+                          const QHash<Markoff::AttrName, Markoff::AttrValue> &) {
+            return text;
+        };
+        m_descriptors.insert(d.id, d);
+    }
 }
 
 void BlockKindRegistry::register_(BlockKindDescriptor descriptor)
