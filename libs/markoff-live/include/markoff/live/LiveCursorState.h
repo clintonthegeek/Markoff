@@ -123,7 +123,13 @@ public:
     void requestTextCaretAtRowVisualX(int expectedRow, VisualLineHint hint);
     VisualLineHint pendingVisualLineHint() const noexcept { return m_pendingVlhint; }
 
-    void request(const Cursor &newCursor);
+    /// Chokepoint cursor-mutation entry. The cross-block clear of
+    /// `m_selectionAnchor` is the default — any move that changes the
+    /// active block must abandon any anchor placed by a prior unrelated
+    /// click (per 2026-05-22-cursor-authority-decision.md §5.4).
+    /// `preserveSelectionAnchor=true` is reserved for `extend()` /
+    /// drag-extend paths that need the anchor to stay put.
+    void request(const Cursor &newCursor, bool preserveSelectionAnchor = false);
     void clear();
 
     int rowForBlock(const Markoff::BlockAnchor &block) const;
@@ -368,6 +374,16 @@ private:
 
     // Tier 4c — selection anchor (canonical store; the active end is m_cursor).
     std::optional<SelectionAnchor> m_selectionAnchor;
+
+    // 2026-05-22 cursor-authority decision §5.5: distinguishes a click-set
+    // anchor (false — no real selection yet) from a drag-/Shift-extended
+    // anchor (true — real selection). `extend()` sets it true; any anchor
+    // assignment via `setSelectionAnchor()` or clearing via
+    // `clearSelectionAnchor()` resets it to false. `hasSelection()` returns
+    // true only when this flag is set AND anchor != active. Closes the
+    // within-block phantom case that the cross-block guard in
+    // KeyDispatch.js was working around.
+    bool m_selectionExtended = false;
 
     // Session bridge (tier 4c Phase A).
     Markoff::Session *m_session = nullptr;

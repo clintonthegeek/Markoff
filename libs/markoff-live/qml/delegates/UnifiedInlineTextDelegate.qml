@@ -206,18 +206,28 @@ Item {
             // clobbers m_cursor back to whichever delegate ran last, breaking
             // cross-block selection.
             if (cs && cs.isApplyingSelection()) return
-            if (model.blockAnchor !== undefined && cs) {
-                if (editBinding.isApplyingTextUpdate()
-                        && cs.focusedAnchorRow === root.modelIndex) {
-                    if (cs.focusedQtPos >= 0
-                            && cs.focusedQtPos <= edit.length
-                            && edit.cursorPosition !== cs.focusedQtPos) {
-                        edit.cursorPosition = cs.focusedQtPos
-                    }
-                    return
+            if (model.blockAnchor === undefined || !cs) return
+
+            // 2026-05-22 cursor-authority decision §5.3 — drop the
+            // focused-row conjunction. When pushTextToDocument is
+            // running (text binding refresh from model rebuild), ALL
+            // delegates suppress syncFromTextEdit. For the focused row,
+            // also restore the cursor (setPlainText reset it to end).
+            if (editBinding.isApplyingTextUpdate()) {
+                if (cs.focusedAnchorRow === root.modelIndex
+                        && cs.focusedQtPos >= 0
+                        && cs.focusedQtPos <= edit.length
+                        && edit.cursorPosition !== cs.focusedQtPos) {
+                    edit.cursorPosition = cs.focusedQtPos
                 }
-                cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
+                return
             }
+            // Defense in depth: only the focused delegate's cursor
+            // moves are user-initiated. The C++ chokepoint also
+            // rejects cross-block syncs (§5.1); this short-circuit
+            // saves a meta-object-call round trip.
+            if (!edit.activeFocus) return
+            cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
         }
 
         InlineHighlighterAttached {

@@ -60,24 +60,23 @@ Rectangle {
                            : "#ffffff"
 
         onCursorPositionChanged: {
-            // See ParagraphDelegate for the rationale on this guard.
+            // 2026-05-22 cursor-authority decision §5.3 — same structure
+            // as UnifiedInlineTextDelegate; non-focused-row syncs are
+            // dropped at the chokepoint (§5.1).
             const cs = root.liveBinding ? root.liveBinding.cursorState : null
-            // Suppress sync during applySelection's programmatic cursorPosition
-            // moves — see LiveCursorState::isApplyingSelection() doc and
-            // queue.md 2026-05-21 entry.
             if (cs && cs.isApplyingSelection()) return
-            if (model.blockAnchor !== undefined && cs) {
-                if (editBinding.isApplyingTextUpdate()
-                        && cs.focusedAnchorRow === root.modelIndex) {
-                    if (cs.focusedQtPos >= 0
-                            && cs.focusedQtPos <= edit.length
-                            && edit.cursorPosition !== cs.focusedQtPos) {
-                        edit.cursorPosition = cs.focusedQtPos
-                    }
-                    return
+            if (model.blockAnchor === undefined || !cs) return
+            if (editBinding.isApplyingTextUpdate()) {
+                if (cs.focusedAnchorRow === root.modelIndex
+                        && cs.focusedQtPos >= 0
+                        && cs.focusedQtPos <= edit.length
+                        && edit.cursorPosition !== cs.focusedQtPos) {
+                    edit.cursorPosition = cs.focusedQtPos
                 }
-                cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
+                return
             }
+            if (!edit.activeFocus) return
+            cs.syncFromTextEdit(model.blockAnchor, edit.cursorPosition)
         }
 
         Keys.priority: Keys.BeforeItem

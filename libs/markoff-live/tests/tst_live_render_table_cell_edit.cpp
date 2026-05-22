@@ -91,6 +91,10 @@ private slots:
     void up_from_header_exits_table_to_previous_block();
     void down_from_last_body_row_exits_table_to_next_block();
     void left_at_first_cell_qtpos_zero_exits_table();
+
+    // E2E regression for the 2026-05-22 data-loss bug. See spec
+    // docs/specs/2026-05-22-cursor-authority-decision.md §6.3.
+    void delete_then_enter_at_paragraph_before_table_preserves_block_count();
 };
 
 void TestTableCellEdit
@@ -530,6 +534,96 @@ void TestTableCellEdit::left_at_first_cell_qtpos_zero_exits_table()
     s.fx->harness().keyClick(Qt::Key_Left);
 
     QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 0, 2000);
+}
+
+void TestTableCellEdit::delete_then_enter_at_paragraph_before_table_preserves_block_count()
+{
+    // E2E regression for the 2026-05-22 dogfood data-loss bug.
+    //
+    // Reproduction: caret at end of a paragraph adjacent to a table,
+    // press Delete (merges paragraph + table via Cmd::deleteMerge),
+    // press Enter (splits the merged paragraph via paragraphEnter).
+    // Expected: rowCount goes initial → initial-1 (Delete) → initial
+    // (Enter). All blocks after the table are preserved.
+    //
+    // Pre-fix (without docs/specs/2026-05-22-cursor-authority-decision.md
+    // §5.1): the model-rebuild echo after deleteMerge caused
+    // non-focused delegates to fire spurious syncFromTextEdit calls,
+    // moving m_cursor onto a block far below the user's clicked row.
+    // The Enter that followed saw a phantom cross-block selection
+    // from (clicked-row, qtPos) to (random-row, qtPos) and routed
+    // through KeyDispatch.collapseSelectionIfMutating → deleteSelection,
+    // which deleted ~20 blocks of intermediate content.
+    // Large fixture: ListView's delegate recycling kicks in only with
+    // enough blocks to fill the viewport multiple times. The user's
+    // production repro had 167 blocks; we synthesise ~30 to keep the
+    // test fast while still triggering rebind echoes.
+    QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n";
+    // Append 30 trailing blocks of varied kinds. The bug deletes
+    // everything between the user's clicked block and whichever block
+    // a non-focused-delegate echo clobbers m_cursor onto.
+    for (int i = 0; i < 30; ++i) {
+        if (i % 5 == 0) md.append("\n## Heading " + QByteArray::number(i) + "\n");
+        else if (i % 3 == 0) md.append("\n- list item " + QByteArray::number(i) + "\n");
+        else md.append("\nparagraph " + QByteArray::number(i)
+                       + " filler text to provide many chars per block\n");
+    }
+
+    // Block layout: row 0 = paragraph, row 1 = table, rows 2..N = the rest.
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/-1);  // any
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    QAbstractItemModel *m = fx.model();
+    const int initialRows = m->rowCount();
+    QVERIFY2(initialRows > 20, "fixture should produce >20 blocks");
+
+    // Simulate the user's click at end of "para before". The
+    // production path is MouseArea.onPressed → cursorState.begin(),
+    // which sets BOTH m_cursor AND m_selectionAnchor. placeCursorAt*
+    // uses requestTextCaretAtRow (no anchor set), which doesn't
+    // reproduce the bug because the data-loss requires the anchor
+    // to be present when Enter fires.
+    const int eolPos = fx.modelText(0).length();
+    QObject *cs = fx.binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QMetaObject::invokeMethod(cs, "begin", Qt::DirectConnection,
+                              Q_ARG(int, 0), Q_ARG(int, eolPos));
+    QTest::qWait(100);
+    QTRY_COMPARE_WITH_TIMEOUT(fx.cursorStateCurrentRow(), 0, 2000);
+
+    fx.harness().keyClick(Qt::Key_Delete);
+    QTest::qWait(300);
+
+    QTRY_COMPARE_WITH_TIMEOUT(m->rowCount(), initialRows - 1, 2000);
+
+    fx.harness().keyClick(Qt::Key_Return);
+    QTest::qWait(300);
+
+    // Crucial: rowCount returns to initial. Without the §5.1 fix, this
+    // assertion sees rowCount ~= initial - 20 because the Enter's
+    // KeyDispatch.collapseSelectionIfMutating fires a phantom
+    // deleteSelection that wipes the blocks between the clicked row
+    // and the post-merge non-focused-delegate-clobbered active row.
+    QTRY_COMPARE_WITH_TIMEOUT(m->rowCount(), initialRows, 2000);
+
+    // Defense in depth: count list-items + headings. With the
+    // data-loss bug, ~20 blocks vanished between the user's clicked
+    // row and the phantom active row — that range includes most of
+    // the list-items and headings in the fixture.
+    int listsHeadingsAfter = 0;
+    for (int r = 0; r < m->rowCount(); ++r) {
+        const QString k = fx.modelKind(r);
+        if (k == QStringLiteral("list-item") || k == QStringLiteral("heading"))
+            ++listsHeadingsAfter;
+    }
+    QVERIFY2(listsHeadingsAfter >= 10,
+             qPrintable(QStringLiteral("expected ≥10 lists+headings to survive; got %1")
+                            .arg(listsHeadingsAfter)));
 }
 
 }  // namespace Markoff::Live::Test

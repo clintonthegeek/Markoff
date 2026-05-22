@@ -34,6 +34,11 @@ private slots:
     void delegate_arrives_without_pending();       // §7.5
     void stale_registration_holds_pending();       // §5.1.1
 
+    // 2026-05-22 cursor-authority decision (docs/specs/...).
+    void syncFromTextEdit_rejects_crossblock();    // §6.1
+    void syncFromTextEdit_accepts_sameblock();     // §6.1 — companion
+    void anchor_clears_on_crossblock_request();    // §6.2
+
 private:
     std::unique_ptr<LiveBlockModel>  m_model;
     std::unique_ptr<LiveCursorState> m_state;
@@ -153,6 +158,93 @@ void TestLiveCursorStateChokepoint::stale_registration_holds_pending() {
     MockDelegate dFresh;
     m_state->delegateAvailable(a, "paragraph", &dFresh);
     QCOMPARE(dFresh.takeFocusCalls(), QList<int>{5});
+}
+
+// ---------------------------------------------------------------------------
+// 2026-05-22 cursor-authority decision (docs/specs/2026-05-22-cursor-authority-decision.md)
+// ---------------------------------------------------------------------------
+
+void TestLiveCursorStateChokepoint::syncFromTextEdit_rejects_crossblock()
+{
+    // §6.1 — cross-block syncFromTextEdit calls are echoes (binding
+    // refresh, ListView rebind, setPlainText cursor reset) and must
+    // not move m_cursor. Cross-block moves go through request() /
+    // begin() / establishFocus() — paths the chokepoint initiates.
+    const auto a = Markoff::BlockAnchor::fromRaw(1);
+    const auto b = Markoff::BlockAnchor::fromRaw(2);
+    m_model->insertTestRow(a, "paragraph", "text a");
+    m_model->insertTestRow(b, "paragraph", "text b");
+
+    // Focus on block A at qtPos 3.
+    MockDelegate dA;
+    m_state->delegateAvailable(a, "paragraph", &dA);
+    m_state->establishFocus(a, 3);
+    QCOMPARE(m_state->focusedAnchorRow(), 0);
+    QCOMPARE(m_state->focusedQtPos(), 3);
+
+    // A non-focused delegate (block B) reports a cursor change to
+    // qtPos 7. This is what a ListView rebind would do — pushTextToDocument's
+    // setPlainText sets cursorPosition to end-of-text, fires
+    // cursorPositionChanged, the delegate's handler calls syncFromTextEdit.
+    m_state->syncFromTextEdit(b, 7);
+
+    // m_cursor must not have moved.
+    QCOMPARE(m_state->focusedAnchorRow(), 0);   // still block A
+    QCOMPARE(m_state->focusedQtPos(), 3);       // unchanged
+}
+
+void TestLiveCursorStateChokepoint::syncFromTextEdit_accepts_sameblock()
+{
+    // §6.1 companion — same-block syncFromTextEdit DOES update qtPos.
+    // This is the legitimate path (user keyboard arrow within the
+    // focused TextEdit).
+    const auto a = Markoff::BlockAnchor::fromRaw(1);
+    m_model->insertTestRow(a, "paragraph", "text a");
+
+    MockDelegate dA;
+    m_state->delegateAvailable(a, "paragraph", &dA);
+    m_state->establishFocus(a, 3);
+
+    // Same-block report: user moved cursor within block A from 3 to 5.
+    m_state->syncFromTextEdit(a, 5);
+
+    QCOMPARE(m_state->focusedAnchorRow(), 0);
+    QCOMPARE(m_state->focusedQtPos(), 5);
+}
+
+void TestLiveCursorStateChokepoint::anchor_clears_on_crossblock_request()
+{
+    // §6.2 — request() that crosses blocks clears m_selectionAnchor
+    // (unless invoked via extend, which sets m_selectionExtended). This
+    // closes the phantom-anchor failure mode: any non-extend cursor move
+    // across blocks must abandon any prior anchor placed by an
+    // unrelated click.
+    //
+    // The unit-test harness has no document, so begin() (which uses
+    // blockAnchorAt → iterateBlocks) can't be used. Set the anchor + cursor
+    // directly via the public APIs.
+    const auto a = Markoff::BlockAnchor::fromRaw(1);
+    const auto b = Markoff::BlockAnchor::fromRaw(2);
+    m_model->insertTestRow(a, "paragraph", "text a");
+    m_model->insertTestRow(b, "paragraph", "text b");
+
+    // Simulate a click at block A, qtPos 3 — cursor + anchor co-located.
+    MockDelegate dA;
+    m_state->delegateAvailable(a, "paragraph", &dA);
+    m_state->establishFocus(a, 3);
+    m_state->setSelectionAnchor({a, 3});
+    QVERIFY(m_state->selectionAnchor().has_value());
+    QCOMPARE(m_state->selectionAnchor()->block, a);
+
+    // Programmatic cross-block cursor move (e.g. requestTextCaretAtRow
+    // from a cross-block down-arrow). This is NOT an extend — the user
+    // never indicated a selection extension. The anchor must clear.
+    MockDelegate dB;
+    m_state->delegateAvailable(b, "paragraph", &dB);
+    m_state->establishFocus(b, 2);
+
+    QVERIFY2(!m_state->selectionAnchor().has_value(),
+             "cross-block establishFocus must clear stale selection anchor");
 }
 
 }  // namespace Markoff::Live::Test

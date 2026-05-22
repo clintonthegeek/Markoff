@@ -150,16 +150,28 @@ QmlIntegrationFixture::QmlIntegrationFixture(const QByteArray &markdown,
     QVERIFY2(m_model != nullptr, "binding.model is not a QAbstractItemModel");
 
     // Wait for the expected row count (load may have parsed async).
-    if (m_model->rowCount() != expectedRowCount) {
-        QSignalSpy spy(m_model, &QAbstractItemModel::rowsInserted);
-        const int deadline = 2000;
-        QElapsedTimer t; t.start();
-        while (m_model->rowCount() != expectedRowCount && t.elapsed() < deadline) {
-            spy.wait(100);
-            QCoreApplication::processEvents();
+    // expectedRowCount == -1 means "any count" — the caller doesn't
+    // know exactly how many blocks the doc parses to and will assert
+    // its own bounds. Wait for at least one row to ensure the model
+    // has populated.
+    if (expectedRowCount == -1) {
+        if (m_model->rowCount() == 0) {
+            QSignalSpy spy(m_model, &QAbstractItemModel::rowsInserted);
+            spy.wait(2000);
         }
+        QVERIFY(m_model->rowCount() > 0);
+    } else {
+        if (m_model->rowCount() != expectedRowCount) {
+            QSignalSpy spy(m_model, &QAbstractItemModel::rowsInserted);
+            const int deadline = 2000;
+            QElapsedTimer t; t.start();
+            while (m_model->rowCount() != expectedRowCount && t.elapsed() < deadline) {
+                spy.wait(100);
+                QCoreApplication::processEvents();
+            }
+        }
+        QCOMPARE(m_model->rowCount(), expectedRowCount);
     }
-    QCOMPARE(m_model->rowCount(), expectedRowCount);
 
     m_harness = std::make_unique<LiveRealisticInputHarness>(m_window);
 }

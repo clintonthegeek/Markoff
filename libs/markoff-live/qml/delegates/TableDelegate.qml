@@ -609,6 +609,13 @@ Rectangle {
                                     cursorPosition: cellEdit.cursorPosition,
                                 }
                             }
+                            // 2026-05-22 cursor-authority decision §5.3:
+                            // only the focused cell reports cursor moves.
+                            // Non-focused cells' onCursorPositionChanged
+                            // fires on text-binding refreshes (after
+                            // parsedTable re-tokenizes) and must not
+                            // pollute the chokepoint.
+                            if (!cellEdit.activeFocus) return
                             if (!root.liveBinding || !root.liveBinding.cursorState) return
                             if (!root.parsedTable || !root.parsedTable.parseOk) return
                             const ccr = root.parsedTable.cellCharRanges
