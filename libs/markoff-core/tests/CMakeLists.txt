@@ -156,6 +156,12 @@ add_test(NAME tst_markoff_doc_apply_structured_paste COMMAND tst_markoff_doc_app
 target_link_libraries(tst_markoff_doc_apply_structured_paste PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_markoff_doc_apply_structured_paste PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# E4 A1: verify pipe-table loading produces BlockKind::Table blocks
+add_executable(tst_table_block_loading tst_table_block_loading.cpp)
+add_test(NAME tst_table_block_loading COMMAND tst_table_block_loading)
+target_link_libraries(tst_table_block_loading PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_table_block_loading PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_subdirectory(d2)
 add_subdirectory(d5)
 
