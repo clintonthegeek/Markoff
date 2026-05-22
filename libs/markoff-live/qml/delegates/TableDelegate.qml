@@ -460,16 +460,51 @@ Rectangle {
                         // TextEdit's default tab-insertion handling.
                         // Out-of-bounds at the table edges exits to the
                         // previous / next block via the chokepoint.
-                        // FALSIFIABILITY STUB — reverted by companion commit.
-                        // Accepts Tab/Backtab to suppress Qt's default
-                        // focus-traversal fallback so the test isolates
-                        // the table-cell navigation contract.
+                        // D1: Tab / Shift+Tab move between cells. The
+                        // BeforeItem priority intercepts the key before
+                        // TextEdit's default tab-insertion handling.
+                        // Out-of-bounds at the table edges exits to the
+                        // previous / next block via the chokepoint.
                         Keys.priority: Keys.BeforeItem
                         Keys.onPressed: (event) => {
-                            if (event.key === Qt.Key_Tab
-                                || event.key === Qt.Key_Backtab) {
-                                event.accepted = true
+                            if (event.key !== Qt.Key_Tab
+                                && event.key !== Qt.Key_Backtab) return
+                            if (!root.parsedTable || !root.parsedTable.parseOk) return
+                            if (!root.cursorState || root.blockAnchor === undefined) return
+
+                            const isBacktab =
+                                event.key === Qt.Key_Backtab
+                                || (event.modifiers & Qt.ShiftModifier) !== 0
+                            const cols      = root.parsedTable.headers.length
+                            const totalRows = root.parsedTable.body.length + 1
+
+                            let nextR = cellRect.r
+                            let nextC = cellRect.c
+                            if (isBacktab) {
+                                nextC -= 1
+                                if (nextC < 0) { nextC = cols - 1; nextR -= 1 }
+                            } else {
+                                nextC += 1
+                                if (nextC >= cols) { nextC = 0; nextR += 1 }
                             }
+
+                            if (nextR < 0) {
+                                // Exit upward to the previous block.
+                                root.cursorState.requestTextCaretAtRow(
+                                    root.modelIndex - 1, 0)
+                            } else if (nextR >= totalRows) {
+                                // Exit downward to the next block.
+                                root.cursorState.requestTextCaretAtRow(
+                                    root.modelIndex + 1, 0)
+                            } else {
+                                const ranges = root.parsedTable.cellCharRanges
+                                if (nextR >= ranges.length) return
+                                if (nextC >= ranges[nextR].length) return
+                                const range = ranges[nextR][nextC]
+                                root.cursorState.establishFocus(
+                                    root.blockAnchor, range.start)
+                            }
+                            event.accepted = true
                         }
 
                         // B4: round-trip cell-relative cursor moves back to
