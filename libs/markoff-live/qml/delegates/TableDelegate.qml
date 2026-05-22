@@ -510,6 +510,24 @@ Rectangle {
                                 return
                             }
 
+                            // ---- E2: Delete at last cell, cellQtPos == cellLen ----
+                            // Symmetric to E1: at the bottom-right cell's
+                            // trailing edge, Delete promotes to
+                            // BlockSelected{table}. Other cells: Delete
+                            // at cellLen is inert.
+                            if (event.key === Qt.Key_Delete
+                                && cellEdit.cursorPosition === cellEdit.length) {
+                                const lastBodyR = root.parsedTable.body.length
+                                const lastC     = root.parsedTable.headers.length - 1
+                                if (cellRect.r === lastBodyR
+                                    && cellRect.c === lastC) {
+                                    root.cursorState.requestBlockSelected(
+                                        root.blockAnchor)
+                                }
+                                event.accepted = true
+                                return
+                            }
+
                             // ---- D1: Tab / Shift+Tab ----
                             if (event.key === Qt.Key_Tab
                                 || event.key === Qt.Key_Backtab) {

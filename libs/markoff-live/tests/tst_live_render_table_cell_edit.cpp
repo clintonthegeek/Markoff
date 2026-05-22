@@ -105,6 +105,11 @@ private slots:
     void backspace_on_block_selected_deletes_table();
     void backspace_at_other_cell_first_qtpos_is_inert();
     void backspace_at_start_of_paragraph_after_table_selects_table();
+
+    // E4 E2 — Delete cascade (symmetric to E1).
+    void delete_at_last_cell_end_promotes_to_block_selected();
+    void delete_at_other_cell_end_is_inert();
+    void delete_at_end_of_paragraph_before_table_selects_table();
 };
 
 void TestTableCellEdit
@@ -794,6 +799,84 @@ void TestTableCellEdit::backspace_at_start_of_paragraph_after_table_selects_tabl
     QTest::qWait(200);
 
     // Expected: cursor is now BlockSelected on the table (row 1).
+    QObject *cs = fx.binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                              QStringLiteral("BlockSelected"), 2000);
+    QCOMPARE(cs->property("focusedAnchorRow").toInt(), 1);
+}
+
+// ---- E2 ----
+
+void TestTableCellEdit::delete_at_last_cell_end_promotes_to_block_selected()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 1, 1) != nullptr);
+
+    QQuickItem *cell11 = cellTextEditAt(s.table, 1, 1);
+    QVERIFY(cell11);
+    const int cellLen = cell11->property("length").toInt();
+    cell11->setProperty("cursorPosition", cellLen);
+    cell11->forceActiveFocus();
+    QTRY_VERIFY(cell11->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Delete);
+    QTest::qWait(100);
+
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                              QStringLiteral("BlockSelected"), 2000);
+    QCOMPARE(cs->property("focusedAnchorRow").toInt(), 1);
+}
+
+void TestTableCellEdit::delete_at_other_cell_end_is_inert()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    const QString preBuffer = s.fx->modelText(1);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    const int cellLen = cell00->property("length").toInt();
+    cell00->setProperty("cursorPosition", cellLen);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Delete);
+    QTest::qWait(100);
+
+    QCOMPARE(s.fx->modelText(1), preBuffer);
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+}
+
+void TestTableCellEdit::delete_at_end_of_paragraph_before_table_selects_table()
+{
+    // User dogfood report #2 — adjacent-block path, symmetric to E1's
+    // Backspace case. Caret at end of the paragraph PRECEDING the
+    // table; Delete should select the table.
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n"
+        "\n"
+        "para after\n";
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(0, 2000));
+
+    fx.placeCursorAtEndOf(0);
+    QTRY_COMPARE_WITH_TIMEOUT(fx.cursorStateCurrentRow(), 0, 2000);
+
+    fx.harness().keyClick(Qt::Key_Delete);
+    QTest::qWait(200);
+
     QObject *cs = fx.binding()->property("cursorState").value<QObject *>();
     QVERIFY(cs);
     QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
