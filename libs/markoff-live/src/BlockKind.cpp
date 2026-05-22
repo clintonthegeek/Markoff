@@ -11,5 +11,6 @@ const QString Image          = QStringLiteral("image");
 const QString ListItem       = QStringLiteral("list-item");
 const QString Blockquote     = QStringLiteral("blockquote");
 const QString Math           = QStringLiteral("math");
+const QString Table          = QStringLiteral("table");
 
 }  // namespace Markoff::Live::BlockKind

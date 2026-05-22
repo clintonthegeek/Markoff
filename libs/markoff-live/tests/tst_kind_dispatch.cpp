@@ -26,6 +26,8 @@ private Q_SLOTS:
                  QStringLiteral("hr"));
         QCOMPARE(Markoff::Live::delegateClassFor("image"),
                  QStringLiteral("image"));
+        QCOMPARE(Markoff::Live::delegateClassFor("table"),
+                 QStringLiteral("table"));
     }
 
     void unknown_kind_falls_back_to_text_inline() {

@@ -126,6 +126,7 @@ QString blockKindToString(Markoff::BlockKind k)
     case BK::ListItem:       return BlockKind::ListItem;
     case BK::BlockQuote:     return BlockKind::Blockquote;
     case BK::Math:           return BlockKind::Math;
+    case BK::Table:          return BlockKind::Table;
     // Paragraph and all other kinds map to Paragraph in the current LiveRender
     // model — same as BlockWalker's catch-all. Additional kinds gain their own
     // strings in future phases.

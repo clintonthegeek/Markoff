@@ -18,6 +18,7 @@ namespace BlockKind {
     MARKOFF_LIVE_EXPORT extern const QString ListItem;        // "list-item"
     MARKOFF_LIVE_EXPORT extern const QString Blockquote;      // "blockquote"
     MARKOFF_LIVE_EXPORT extern const QString Math;            // "math"
+    MARKOFF_LIVE_EXPORT extern const QString Table;           // "table"
 }
 
 }  // namespace Markoff::Live
