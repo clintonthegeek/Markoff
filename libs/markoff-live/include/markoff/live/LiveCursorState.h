@@ -177,6 +177,13 @@ public:
     /// from this call — see spec §5.1.2.
     Q_INVOKABLE void establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos);
 
+    /// Promote the cursor to `BlockSelected{anchor}` — the block-as-a-unit
+    /// state. Used by delegates that want to leave their internal text
+    /// editing mode and become focusable as a whole (e.g. Table's Esc-out
+    /// of cell-editing). The target block's descriptor must include
+    /// `"BlockSelected"` in `supportedCursorVariants`. No-op otherwise.
+    Q_INVOKABLE void requestBlockSelected(Markoff::BlockAnchor blockAnchor);
+
     /// Spec §5.1. Called by LiveListModelBinding at the top of
     /// onD2Changed, before any structural mutation. Suppresses
     /// resolution attempts during the cascade.

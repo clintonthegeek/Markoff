@@ -470,6 +470,8 @@ Rectangle {
                             if (!root.parsedTable || !root.parsedTable.parseOk) return
                             if (!root.cursorState || root.blockAnchor === undefined) return
 
+                            // ---- D3 STUB ----
+
                             // ---- D1: Tab / Shift+Tab ----
                             if (event.key === Qt.Key_Tab
                                 || event.key === Qt.Key_Backtab) {

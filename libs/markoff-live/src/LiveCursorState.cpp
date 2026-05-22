@@ -224,6 +224,14 @@ void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
     Q_EMIT cursorChanged();
 }
 
+void LiveCursorState::requestBlockSelected(Markoff::BlockAnchor blockAnchor)
+{
+    if (blockAnchor == Markoff::BlockAnchor{}) return;
+    BlockSelected sel;
+    sel.block = blockAnchor;
+    request(sel);
+}
+
 void LiveCursorState::setCaretWithoutFocus(Markoff::BlockAnchor block, int qtPos)
 {
     if (block == Markoff::BlockAnchor{}) return;

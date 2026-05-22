@@ -95,6 +95,10 @@ private slots:
     // E2E regression for the 2026-05-22 data-loss bug. See spec
     // docs/specs/2026-05-22-cursor-authority-decision.md §6.3.
     void delete_then_enter_at_paragraph_before_table_preserves_block_count();
+
+    // E4 D3 — Enter inert, Esc → BlockSelected.
+    void enter_inside_cell_is_inert();
+    void escape_inside_cell_promotes_to_block_selected();
 };
 
 void TestTableCellEdit
@@ -624,6 +628,57 @@ void TestTableCellEdit::delete_then_enter_at_paragraph_before_table_preserves_bl
     QVERIFY2(listsHeadingsAfter >= 10,
              qPrintable(QStringLiteral("expected ≥10 lists+headings to survive; got %1")
                             .arg(listsHeadingsAfter)));
+}
+
+// ---- D3 ----
+
+void TestTableCellEdit::enter_inside_cell_is_inert()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    const QString preBuffer = s.fx->modelText(1);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->setProperty("cursorPosition", 2);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Return);
+    QTest::qWait(100);
+
+    // Buffer unchanged — Enter did not insert a `\n`.
+    QCOMPARE(s.fx->modelText(1), preBuffer);
+    // Focus stays in the same cell.
+    QVERIFY(cell00->hasActiveFocus());
+}
+
+void TestTableCellEdit::escape_inside_cell_promotes_to_block_selected()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    // Pre-Esc: cursor should be a TextCaret on the table block.
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                              QStringLiteral("TextCaret"), 2000);
+
+    s.fx->harness().keyClick(Qt::Key_Escape);
+    QTest::qWait(100);
+
+    // Post-Esc: BlockSelected on the table's row.
+    QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                              QStringLiteral("BlockSelected"), 2000);
+    QCOMPARE(cs->property("focusedAnchorRow").toInt(), 1);  // table row
 }
 
 }  // namespace Markoff::Live::Test
