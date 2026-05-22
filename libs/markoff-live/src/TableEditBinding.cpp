@@ -44,12 +44,6 @@ void TableEditBinding::applyCellEdit(int cellStartCharPos,
                                      int removed,
                                      const QString &added)
 {
-    // FALSIFIABILITY STUB — reverted by the companion commit. Proves
-    // tst_live_render_table_cell_edit fails when the cell edit doesn't
-    // reach d2ApplyBufferEdit.
-    (void)cellStartCharPos; (void)cellQtPos; (void)removed; (void)added;
-    return;
-
     if (!m_binding || !m_binding->document() || !m_binding->model()) return;
     if (m_modelIndex < 0) return;
     if (m_modelIndex >= m_binding->model()->rowCount()) return;
