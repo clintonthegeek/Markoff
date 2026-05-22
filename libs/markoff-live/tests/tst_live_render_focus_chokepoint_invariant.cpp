@@ -2,6 +2,9 @@
 #include "LiveRealisticInputHarness.h"
 #include "QmlIntegrationFixture.h"
 
+#include <markoff/core/BlockAnchor.h>
+#include <markoff/live/LiveCursorState.h>
+
 #include <QQuickItem>
 #include <QtTest/QtTest>
 
@@ -76,6 +79,12 @@ private slots:
 
     // Tier-4b: initial focus must reach the TextEdit, not just the delegate root.
     void initial_focus_lands_on_textedit_not_delegate_root();
+
+    // E4 B3 — TableDelegate registers itself with LiveCursorState on
+    // Component.onCompleted (same chokepoint discipline as every other
+    // delegate). De-registration on destruction is exercised by the
+    // fixture's teardown path.
+    void table_delegate_registers_with_cursor_state();
 
 private:
     void assertChokepointInvariant(const QString &scenario);
@@ -1021,6 +1030,47 @@ void TestFocusChokepointInvariant::initial_focus_lands_on_textedit_not_delegate_
 
     // The focused item should be the TextEdit of row 0.
     QTRY_COMPARE(fx.window()->activeFocusItem(), expectedTextEdit);
+}
+
+void TestFocusChokepointInvariant::table_delegate_registers_with_cursor_state()
+{
+    // Per plan §B3: the TableDelegate must register itself with
+    // LiveCursorState in Component.onCompleted (`delegateAvailable`) so
+    // that establishFocus / tryResolvePending can deliver focus to the
+    // table block via takeFocus(qtPos). Without registration, the
+    // chokepoint silently drops focus requests directed at the table.
+    //
+    // Falsifiability proof: removing the `delegateAvailable` line in
+    // TableDelegate.qml's Component.onCompleted makes this slot fail
+    // (verified in-history; see commit message).
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n"
+        "\n"
+        "para after\n";
+
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    QQuickItem *table = fx.delegateAt(1);
+    QVERIFY2(table, "no delegate at row 1");
+    const QString className = QString::fromUtf8(table->metaObject()->className());
+    QVERIFY2(className.contains("TableDelegate"),
+             qPrintable("delegate at row 1 is not TableDelegate: " + className));
+
+    const QVariant anchorVar = table->property("blockAnchor");
+    QVERIFY2(anchorVar.isValid() && anchorVar.canConvert<Markoff::BlockAnchor>(),
+             "TableDelegate.blockAnchor not set after Component.onCompleted");
+    const Markoff::BlockAnchor anchor = anchorVar.value<Markoff::BlockAnchor>();
+
+    QObject *csObj = fx.binding()->property("cursorState").value<QObject *>();
+    auto *cs = qobject_cast<LiveCursorState *>(csObj);
+    QVERIFY2(cs, "binding.cursorState is not a LiveCursorState");
+    QVERIFY2(cs->isDelegateRegistered(anchor),
+             "TableDelegate did not register itself with cursorState");
 }
 
 }  // namespace Markoff::Live::Test
