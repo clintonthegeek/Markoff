@@ -84,8 +84,15 @@ void TstBlockKindRegistryTable::table_is_not_block_only()
     BlockKindRegistry reg;
     const BlockKindDescriptor *d = reg.find(BK::Table);
     QVERIFY(d);
-    // Unlike HR/Image, Table has internal text-bearing cells.
-    QCOMPARE(d->isBlockOnly, false);
+    // Updated 2026-05-22 (E4 §E): Table is now block-only for the
+    // structural-handler adjacency fence + generic delete cascade,
+    // even though it has internal text-bearing cells. The cell-level
+    // text editing is handled by TableDelegate's per-cell TextEdits
+    // and TableEditBinding; the block-only flag only affects the
+    // adjacency fence and the BlockSelected{table} key handlers.
+    // Test name kept for blame trail; the renamed-to-fit slot lives
+    // in tst_live_render_table_cell_edit (E1/E2 coverage).
+    QCOMPARE(d->isBlockOnly, true);
 }
 
 void TstBlockKindRegistryTable::table_delegate_url_points_to_TableDelegate_qml()

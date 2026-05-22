@@ -85,11 +85,20 @@ void LiveCursorState::request(const Cursor &newCursor, bool preserveSelectionAnc
     if (m_cursor == newCursor) return;
 
     // §5.4 — cross-block move clears stale selection anchor unless the
-    // caller is extend()/drag-extend (which passes preserveSelectionAnchor).
-    // Phantom-anchor failure mode: a click sets the anchor; subsequent
-    // cross-block navigation must abandon it, otherwise hasSelection()
-    // reports a phantom range from the abandoned anchor to the new active.
-    if (!preserveSelectionAnchor && m_selectionAnchor) {
+    // caller is extend()/drag-extend (which passes preserveSelectionAnchor)
+    // OR a real extension is already in flight (m_selectionExtended=true,
+    // set by a prior extend() call). The latter case matters for
+    // multi-step nav like LiveNavigationController's Shift+Arrow: extend()
+    // sets the anchor and m_selectionExtended; the immediately-following
+    // requestTextCaretAtRow → establishFocus → tryResolvePending → request
+    // does NOT carry preserveSelectionAnchor=true, but the extension is
+    // genuine and the anchor must survive.
+    //
+    // Phantom-anchor failure mode (which §5.4 was added to close): a
+    // click sets the anchor but never extends. Subsequent cross-block
+    // navigation goes through request() without preserve=true and with
+    // m_selectionExtended=false → anchor clears. Correct.
+    if (!preserveSelectionAnchor && m_selectionAnchor && !m_selectionExtended) {
         if (auto *tc = std::get_if<TextCaret>(&newCursor)) {
             if (tc->block != m_selectionAnchor->block) {
                 clearSelectionAnchor();
@@ -201,18 +210,27 @@ void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
     // L3 cursor-authority invariant — same-block contract.
     // Per docs/specs/2026-05-22-cursor-authority-decision.md §5.1:
     // this API receives within-focused-block cursor moves from the
-    // QML side. Cross-block updates ARE NOT user intent reaching the
-    // chokepoint — they are echoes from non-user events:
+    // QML side. Cross-block updates between TextCaret-on-block-A and
+    // TextCaret-on-block-B ARE NOT user intent reaching the chokepoint
+    // — they are echoes from non-user events:
     //   * setPlainText cursor-reset after pushTextToDocument
     //   * ListView delegate rebinding to a different block's content
     //     after a structural edit shifts row indices
     //   * QQuickTextEdit's load-time cursorPosition initialisation
     // Cross-block intent goes through request() / begin() /
     // establishFocus() / requestTextCaretAtRow — paths the chokepoint
-    // initiates. Reject cross-block syncs here.
+    // initiates. Reject cross-block TextCaret→TextCaret syncs here.
+    //
+    // The check is intentionally "is currentTextCaret on a DIFFERENT
+    // block?" rather than "is m_cursor a TextCaret on this block?".
+    // This admits initial cursor placement (m_cursor was NoCursor /
+    // BlockSelected / BlockInternalEdit — no focused TextCaret) as a
+    // legitimate sync, since the user must be able to FIRST place a
+    // text caret via this API. The bug-blocker is the cross-TextCaret
+    // case, which is what the rebind echoes look like.
     auto curCaret = currentTextCaret();
-    if (!curCaret || curCaret->block != anchor) return;
-    if (curCaret->cachedQtPos == static_cast<quint32>(qtPos)) return;
+    if (curCaret && curCaret->block != anchor) return;
+    if (curCaret && curCaret->cachedQtPos == static_cast<quint32>(qtPos)) return;
 
     TextCaret tc;
     tc.block       = anchor;
@@ -653,10 +671,16 @@ void LiveCursorState::selectAllBlocks()
     const auto lastAnchor  = m_model->recordAt(lastRow).blockAnchor;
     const auto lastText    = m_model->recordAt(lastRow).text;
 
-    // Active end at the end of the last block.
-    syncFromTextEdit(lastAnchor, lastText.length());
-    // Anchor at the start of the first block.
+    // Anchor at start of first block first; then move active end to
+    // end of last block via request(preserve=true) so §5.4 doesn't
+    // clobber the anchor we just set. Flag this as a real extension
+    // (§5.5) so hasSelection() recognises it.
     setSelectionAnchor({firstAnchor, /*qtPos=*/0});
+    TextCaret tc;
+    tc.block       = lastAnchor;
+    tc.cachedQtPos = static_cast<quint32>(lastText.length());
+    request(tc, /*preserveSelectionAnchor=*/true);
+    m_selectionExtended = true;
 }
 
 void LiveCursorState::deleteSelectionRange()
@@ -806,12 +830,26 @@ void LiveCursorState::onSessionPrimarySelectionChanged(const Markoff::Selection 
         && *m_selectionAnchor == *resolvedAnchor;
     if (sameActive && sameAnchor) return;
 
-    if (!sameActive) {
-        // Active end mutates via the typing-authority hook (idempotent).
-        syncFromTextEdit(resolvedActive->block, static_cast<int>(resolvedActive->qtPos));
-    }
+    // Set anchor first so request() (called next for the active end)
+    // sees the new anchor's block and preserves it across the
+    // cross-block move via preserveSelectionAnchor=true.
     if (!sameAnchor) {
         setSelectionAnchor(*resolvedAnchor);
+    }
+    if (!sameActive) {
+        // Cross-block-capable move via the chokepoint (syncFromTextEdit
+        // is within-block-only since 2026-05-22-cursor-authority-decision.md
+        // §5.1). Session-driven selection is real, not phantom — mark
+        // extended.
+        TextCaret tc;
+        tc.block       = resolvedActive->block;
+        tc.cachedQtPos = resolvedActive->qtPos;
+        request(tc, /*preserveSelectionAnchor=*/true);
+        if (m_selectionAnchor && *m_selectionAnchor != SelectionAnchor{
+                                       resolvedActive->block,
+                                       resolvedActive->qtPos}) {
+            m_selectionExtended = true;
+        }
     }
     // Notify the facade that an externally-originated session change landed.
     // This signal is only emitted here (not from local begin/extend/clear

@@ -174,9 +174,14 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
                                ? blockIndex - 1 : blockIndex + 1;
         const BlockRecord &adjRec = m_model->recordAt(adjRow);
         if (m_registry->isBlockOnly(adjRec.kind)) {
-            BlockSelected sel;
-            sel.block = adjRec.blockAnchor;
-            m_cursorState->request(sel);
+            // Use requestBlockSelected (not raw request) so focus is
+            // delivered to the block-only delegate's root via takeFocus.
+            // Without this, subsequent Backspace/Delete keeps firing
+            // through the (now-focused) adjacent paragraph delegate,
+            // which routes back through this same fence — the
+            // user sees "BlockSelected promoted, but second key does
+            // nothing" as a result.
+            m_cursorState->requestBlockSelected(adjRec.blockAnchor);
             return true;
         }
     }
