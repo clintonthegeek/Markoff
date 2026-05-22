@@ -85,6 +85,25 @@ QJsonArray serializeSelection(const LiveCursorState &sel, const LiveBlockModel &
     return out;
 }
 
+/// Serialize a single block at `row` as the same JSON shape produced by
+/// `serializeSelection` — used when the cursor is `BlockSelected` (no
+/// text-range selection), e.g. after Backspace on a paragraph adjacent
+/// to a Table / HR / Image promotes the block to BlockSelected and the
+/// user presses Ctrl+C to copy the block as a unit.
+QJsonArray serializeBlockSelected(const LiveBlockModel &model, int row)
+{
+    QJsonArray out;
+    if (row < 0 || row >= model.rowCount()) return out;
+    const auto &rec = model.recordAt(row);
+    QJsonObject obj;
+    obj["kind"] = rec.kind;
+    obj["text"] = rec.text;            // whole block content; no range subset
+    const QJsonObject attrs = attrsToJson(rec.attrs);
+    if (!attrs.isEmpty()) obj["attrs"] = attrs;
+    out.append(obj);
+    return out;
+}
+
 /// Plain-text fallback for the clipboard. Reuses
 /// MarkoffDocument::reconstructFlatMarkdown so the markdown going to other
 /// apps round-trips through Markoff (and external markdown viewers) the same
@@ -128,9 +147,17 @@ uint32_t flatByteOffset(const LiveBlockModel &model,
 void LiveClipboardController::copy()
 {
     if (!m_selection || !m_model || !m_document) return;
-    if (!m_selection->hasSelection()) return;
 
-    const QJsonArray blocks = serializeSelection(*m_selection, *m_model);
+    // Two cursor shapes can produce a copy:
+    //   (a) cross-block text-range selection (anchor != active, extended)
+    //   (b) BlockSelected{block} — the block is selected as a unit
+    QJsonArray blocks;
+    if (m_selection->hasSelection()) {
+        blocks = serializeSelection(*m_selection, *m_model);
+    } else if (m_selection->cursorKind() == QStringLiteral("BlockSelected")) {
+        const int row = m_selection->focusedAnchorRow();
+        blocks = serializeBlockSelected(*m_model, row);
+    }
     if (blocks.isEmpty()) return;
 
     QJsonObject payload;

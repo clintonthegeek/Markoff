@@ -13,6 +13,12 @@
 
 #include <markoff/core/MarkoffDocument.h>
 
+#include <QApplication>
+#include <QClipboard>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QMimeData>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QVariantList>
@@ -110,6 +116,9 @@ private slots:
     void delete_at_last_cell_end_promotes_to_block_selected();
     void delete_at_other_cell_end_is_inert();
     void delete_at_end_of_paragraph_before_table_selects_table();
+
+    // E4 follow-up — Ctrl+C on BlockSelected{table} copies the markdown.
+    void ctrl_c_on_block_selected_table_copies_markdown();
 };
 
 void TestTableCellEdit
@@ -882,6 +891,59 @@ void TestTableCellEdit::delete_at_end_of_paragraph_before_table_selects_table()
     QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
                               QStringLiteral("BlockSelected"), 2000);
     QCOMPARE(cs->property("focusedAnchorRow").toInt(), 1);
+}
+
+// ---- Ctrl+C on BlockSelected{table} ----
+
+void TestTableCellEdit::ctrl_c_on_block_selected_table_copies_markdown()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    // Place caret in cell (0, 0) then Backspace at qtPos=0 to promote
+    // the table to BlockSelected{table} (E1 path).
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    cell00->setProperty("cursorPosition", 0);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+    s.fx->harness().keyClick(Qt::Key_Backspace);
+    QTest::qWait(100);
+
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                              QStringLiteral("BlockSelected"), 2000);
+
+    // Capture the table's raw buffer for comparison.
+    const QString tableBuffer = s.fx->modelText(1);
+    QVERIFY(tableBuffer.contains(QStringLiteral("|")));
+
+    // Copy via clipboardController directly (skips QML KeyDispatch routing
+    // which we already exercise via separate Ctrl+C tests). Tests the
+    // BlockSelected branch added in LiveClipboardController::copy().
+    QObject *clip = s.fx->binding()->property("clipboardController").value<QObject *>();
+    QVERIFY(clip);
+    QApplication::clipboard()->clear();
+    QMetaObject::invokeMethod(clip, "copy", Qt::DirectConnection);
+    QTest::qWait(50);
+
+    // Plain-text branch — the table buffer should be in the clipboard.
+    const QString clipText = QApplication::clipboard()->text();
+    QVERIFY2(clipText.contains(QStringLiteral("|")),
+             qPrintable(QStringLiteral("clipboard text missing table content: %1")
+                            .arg(clipText)));
+
+    // Structured branch — application/x-markoff-blocks payload.
+    const QByteArray blob =
+        QApplication::clipboard()->mimeData()->data("application/x-markoff-blocks");
+    QVERIFY(!blob.isEmpty());
+    const QJsonObject payload = QJsonDocument::fromJson(blob).object();
+    const QJsonArray blocks   = payload["blocks"].toArray();
+    QCOMPARE(blocks.size(), 1);
+    const QJsonObject first = blocks[0].toObject();
+    QCOMPARE(first["kind"].toString(), QStringLiteral("table"));
+    QCOMPARE(first["text"].toString(), tableBuffer);
 }
 
 }  // namespace Markoff::Live::Test

@@ -2,6 +2,7 @@
 import QtQuick
 import QtQuick.Layouts
 import org.markoff.live 1.0
+import "KeyDispatch.js" as KeyDispatch
 
 // E4: TableDelegate — first multi-cell interactive atomic block (L8).
 //
@@ -864,6 +865,16 @@ Rectangle {
     Keys.priority: Keys.BeforeItem
     Keys.onPressed: (event) => {
         if (!root.isSelected) { event.accepted = false; return }
+
+        // Ctrl-modifier chords first (Ctrl+C / Ctrl+X / Ctrl+V / Ctrl+A
+        // / Ctrl+Z / Ctrl+Y). When the table is BlockSelected, Ctrl+C
+        // copies the table's markdown via LiveClipboardController's
+        // BlockSelected branch. Ctrl+X cuts (copies + deletes via
+        // blockOnlyDelete on the next key tick — currently not wired
+        // for BlockSelected; cut acts as copy only).
+        if (KeyDispatch.tryDispatchCtrlChord(event, { binding: root.liveBinding }))
+            return
+
         const sh = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
         if (!sh) { event.accepted = false; return }
         const k = event.key
