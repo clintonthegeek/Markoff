@@ -103,6 +103,7 @@ qt_add_qml_module(markoff_live
         qml/delegates/ImageDelegate.qml
         qml/delegates/MathDelegate.qml
         qml/delegates/RemoteCursorOverlay.qml
+        qml/delegates/TableDelegate.qml
         qml/delegates/UnifiedInlineTextDelegate.qml
     RESOURCES
         # KeyDispatch.js — JS-only helper module used by the text-bearing

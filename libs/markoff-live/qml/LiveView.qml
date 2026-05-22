@@ -35,6 +35,7 @@ ListView {
         DelegateChoice { roleValue: "math";        delegate: MathDelegate              {} }
         DelegateChoice { roleValue: "hr";          delegate: HorizontalRuleDelegate    {} }
         DelegateChoice { roleValue: "image";       delegate: ImageDelegate             {} }
+        DelegateChoice { roleValue: "table";       delegate: TableDelegate             {} }
     }
 
     // ---- Hit-test (ported from .spike/cross-block-selection/Main.qml) ----
