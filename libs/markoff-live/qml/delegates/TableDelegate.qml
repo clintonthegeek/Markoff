@@ -470,7 +470,28 @@ Rectangle {
                             if (!root.parsedTable || !root.parsedTable.parseOk) return
                             if (!root.cursorState || root.blockAnchor === undefined) return
 
-                            // ---- D3 STUB ----
+                            // ---- D3: Enter (inert) / Esc (BlockSelected) ----
+                            // Enter inside a cell would otherwise insert a
+                            // literal `\n` into the block buffer and break
+                            // the pipe-table parse. Swallow it. Multi-line
+                            // cell content is a future-phase concern; for
+                            // now cells are single-line.
+                            if (event.key === Qt.Key_Return
+                                || event.key === Qt.Key_Enter) {
+                                event.accepted = true
+                                return
+                            }
+                            // Esc transitions the cursor from cell-edit
+                            // (TextCaret on the table block) to the
+                            // block-as-a-unit selection state. Subsequent
+                            // Backspace/Delete on the BlockSelected table
+                            // deletes it via the existing block-only
+                            // delete path (plan §E).
+                            if (event.key === Qt.Key_Escape) {
+                                root.cursorState.requestBlockSelected(root.blockAnchor)
+                                event.accepted = true
+                                return
+                            }
 
                             // ---- D1: Tab / Shift+Tab ----
                             if (event.key === Qt.Key_Tab
