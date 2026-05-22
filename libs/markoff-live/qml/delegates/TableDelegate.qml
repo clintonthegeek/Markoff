@@ -269,6 +269,17 @@ Rectangle {
                                ? root.liveBinding.themeColorFor(Theme.TextDefault)
                                : "#222222"
                         selectByMouse: false
+
+                        // B4: round-trip cell-relative cursor moves back to
+                        // the chokepoint as block-buffer flatQtPos. The
+                        // chokepoint is doc-keyed and unconditionally drops
+                        // re-entrant equal-state updates, so the
+                        // takeFocus → forceActiveFocus → here → syncFromTextEdit
+                        // cycle settles in one round.
+                        // FALSIFIABILITY STUB — syncFromTextEdit disabled.
+                        onCursorPositionChanged: {
+                            // (stub)
+                        }
                     }
                 }
             }
@@ -299,8 +310,37 @@ Rectangle {
         radius: 5
     }
 
-    // Hit-test stub. Phase B4 replaces with cell-aware translation.
-    function positionAt(x, y) { return -1 }
+    // B4 hit-test: translate (delegate-local x, y) → flat block-buffer
+    // qtPos by walking cell geometry until we find the (r, c) whose
+    // bounding box contains the point, then asking the cell's TextEdit
+    // for the intra-cell qtPos at the cell-relative (x, y). Returns
+    // flatQtPos = cellCharRanges[r][c].start + cellQtPos. Returns -1
+    // when the parse failed or the point falls outside every cell — in
+    // which case LiveView's hit() degrades gracefully (focus on the
+    // delegate root without cursor placement).
+    function positionAt(x, y) {
+        if (!root.parsedTable || !root.parsedTable.parseOk) return -1
+        const totalRows = root.parsedTable.body.length + 1
+        const cols      = root.parsedTable.headers.length
+        for (let r = 0; r < totalRows; ++r) {
+            for (let c = 0; c < cols; ++c) {
+                const cell = _cellAt(r, c)
+                if (!cell) continue
+                const cellLocalX = x - cell.x
+                const cellLocalY = y - cell.y
+                if (cellLocalX < 0 || cellLocalX > cell.width)  continue
+                if (cellLocalY < 0 || cellLocalY > cell.height) continue
+                // 4-px inset matches the TextEdit's anchors.margins.
+                const cellQtPos = cell.edit.positionAt(
+                    cellLocalX - 4, cellLocalY - 4)
+                const range = root.parsedTable.cellCharRanges[r][c]
+                const cellLen = cell.edit.length
+                const clamped = Math.min(Math.max(cellQtPos, 0), cellLen)
+                return range.start + clamped
+            }
+        }
+        return -1
+    }
 
     // Total cell count = (header row + body rows) × columns. parseOk
     // ensures both halves of parsedTable are populated.

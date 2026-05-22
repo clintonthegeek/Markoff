@@ -86,6 +86,15 @@ private slots:
     // fixture's teardown path.
     void table_delegate_registers_with_cursor_state();
 
+    // E4 B4 — clicking inside a table cell must produce a flat block-
+    // buffer qtPos via TableDelegate::positionAt(x, y), and the cell's
+    // onCursorPositionChanged must round-trip that qtPos back through
+    // cursorState.syncFromTextEdit, leaving (focusedAnchorRow,
+    // focusedQtPos) pointing at the table block at the click-derived
+    // flat position. Spec §5.4 Decision: m_cursor is TextCaret with
+    // buffer-byte qtPos for cells (no separate TableCellCaret variant).
+    void click_into_table_cell_syncs_qtpos_to_cursor_state();
+
 private:
     void assertChokepointInvariant(const QString &scenario);
     std::unique_ptr<QmlIntegrationFixture> m_fixture;
@@ -1071,6 +1080,80 @@ void TestFocusChokepointInvariant::table_delegate_registers_with_cursor_state()
     QVERIFY2(cs, "binding.cursorState is not a LiveCursorState");
     QVERIFY2(cs->isDelegateRegistered(anchor),
              "TableDelegate did not register itself with cursorState");
+}
+
+void TestFocusChokepointInvariant::click_into_table_cell_syncs_qtpos_to_cursor_state()
+{
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n"
+        "\n"
+        "para after\n";
+
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    // Click the centre of the table delegate. LiveView.MouseArea.onPressed
+    // hits → table.positionAt(localX, localY) → flatQtPos →
+    // cursorState.begin + establishFocus → takeFocus → cell.cursorPosition →
+    // cell.onCursorPositionChanged → cursorState.syncFromTextEdit. After the
+    // chain settles, focusedAnchorRow must be the table's row and the
+    // flat qtPos must fall inside one of the parsed cell char-ranges.
+    fx.clickOnBlock(1);
+
+    // Chokepoint reached the table.
+    QCOMPARE(fx.cursorStateCurrentRow(), 1);
+    const int focusedQtPos = fx.cursorStateCurrentQtPos();
+    QVERIFY2(focusedQtPos >= 0,
+             "cursorState.focusedQtPos < 0 after click into table");
+
+    // takeFocus delivered focus into a specific cell's TextEdit.
+    QQuickItem *activeFocus = fx.window()->activeFocusItem();
+    QVERIFY2(activeFocus, "no active focus item after click into table");
+    const QString focusClass =
+        QString::fromUtf8(activeFocus->metaObject()->className());
+    QVERIFY2(focusClass.contains("TextEdit"),
+             qPrintable("active focus is not a TextEdit: " + focusClass));
+
+    // Round-trip identity (the new B4 contract): the cell's intra-cell
+    // cursorPosition combined with its parsed range start must equal the
+    // chokepoint's focusedQtPos. Falsifying syncFromTextEdit breaks this
+    // assertion — m_cursor stays at the establishFocus seed while the
+    // cell's TextEdit moved to a different intra-cell position.
+    QQuickItem *cellRect = activeFocus->parentItem();
+    QVERIFY2(cellRect, "active focus has no parent item (cellRect)");
+
+    const int cellCursor = activeFocus->property("cursorPosition").toInt();
+    const int cellR      = cellRect->property("r").toInt();
+    const int cellC      = cellRect->property("c").toInt();
+
+    QQuickItem *table = fx.delegateAt(1);
+    QVERIFY2(table, "no delegate at row 1");
+    const QVariantMap pt = table->property("parsedTable").toMap();
+    QVERIFY2(pt.value("parseOk").toBool(),
+             qPrintable("parseError=" + pt.value("parseError").toString()));
+
+    const QVariantList allRanges = pt.value("cellCharRanges").toList();
+    QVERIFY(cellR >= 0 && cellR < allRanges.size());
+    const QVariantList rowRanges = allRanges[cellR].toList();
+    QVERIFY(cellC >= 0 && cellC < rowRanges.size());
+    const int rangeStart = rowRanges[cellC].toMap().value("start").toInt();
+
+    QCOMPARE(focusedQtPos, rangeStart + cellCursor);
+
+    // B4 step 2 isolation: tryResolvePending's pre-takeFocus seed leaves the
+    // post-click identity holding via the decode-is-inverse path even
+    // without onCursorPositionChanged. To verify that piece on its own,
+    // move the active cell's cursor *programmatically* (not through
+    // establishFocus) and assert the chokepoint follows. This is the path
+    // future cell-internal arrow keys / typing will exercise.
+    const int probePos = (cellCursor + 1 <= activeFocus->property("length").toInt())
+                             ? cellCursor + 1 : 0;
+    activeFocus->setProperty("cursorPosition", probePos);
+    QTRY_COMPARE(fx.cursorStateCurrentQtPos(), rangeStart + probePos);
 }
 
 }  // namespace Markoff::Live::Test

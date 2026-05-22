@@ -149,16 +149,21 @@ void BlockKindRegistry::registerBuiltins()
         };
         m_descriptors.insert(d.id, d);
     }
-    // Table: first multi-cell interactive atomic block. BlockSelected for
-    // whole-block selection/delete; BlockInternalEdit for in-cell editing.
-    // Buffer IS the pipe-table markdown source (passthrough serializer).
-    // Spec: docs/specs/2026-05-22-e4-tables-design.md §5.1.
+    // Table: first multi-cell interactive atomic block. TextCaret with
+    // buffer-byte qtPos when a cell is focused (cell-relative position
+    // translated to block-buffer position at the chokepoint, per spec
+    // §5.4 Decision); BlockSelected for whole-block selection/delete;
+    // BlockInternalEdit reserved for future "table-is-being-edited as
+    // a unit" semantics that don't carry cursor position. Buffer IS
+    // the pipe-table markdown source (passthrough serializer).
+    // Spec: docs/specs/2026-05-22-e4-tables-design.md §5.1 + §5.4.
     {
         BlockKindDescriptor d;
         d.id = BlockKind::Table;
         d.acceptsTextRoleUpdates = true;
         d.isBlockOnly = false;
         d.supportedCursorVariants = {
+            QStringLiteral("TextCaret"),
             QStringLiteral("BlockSelected"),
             QStringLiteral("BlockInternalEdit"),
         };

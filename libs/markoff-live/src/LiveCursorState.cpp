@@ -260,6 +260,7 @@ bool LiveCursorState::validateVariant(const Cursor &c) const
         case BK::ListItem:       kind = ::Markoff::Live::BlockKind::ListItem;       break;
         case BK::BlockQuote:     kind = ::Markoff::Live::BlockKind::Blockquote;     break;
         case BK::Math:           kind = ::Markoff::Live::BlockKind::Math;           break;
+        case BK::Table:          kind = ::Markoff::Live::BlockKind::Table;          break;
         default:                 kind = ::Markoff::Live::BlockKind::Paragraph;      break;
         }
     } else if (m_model) {
@@ -405,6 +406,7 @@ void LiveCursorState::tryResolvePending() {
         case BK::ListItem:       currentKind = ::Markoff::Live::BlockKind::ListItem;       break;
         case BK::BlockQuote:     currentKind = ::Markoff::Live::BlockKind::Blockquote;     break;
         case BK::Math:           currentKind = ::Markoff::Live::BlockKind::Math;           break;
+        case BK::Table:          currentKind = ::Markoff::Live::BlockKind::Table;          break;
         default:                 currentKind = ::Markoff::Live::BlockKind::Paragraph;      break;
         }
     } else if (m_model) {
