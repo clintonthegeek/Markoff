@@ -8,11 +8,49 @@
 #include <markoff/live/BlockRecord.h>
 
 #include <QRectF>
+#include <QTextBoundaryFinder>
 #include <QVariant>
 
 #include <algorithm>
 
 namespace Markoff::Live {
+
+namespace {
+
+// Qt-equivalent of QTextCursor::WordLeft from `from`. Returns the qtPos
+// at the start of the previous word (or 0 if at start). Matches Qt's
+// own Word-boundary semantics so the document-layer cursor agrees with
+// TextEdit's native rendering at the same position.
+int previousWordBoundary(const QString &text, int from) {
+    if (from <= 0) return 0;
+    QTextBoundaryFinder bf(QTextBoundaryFinder::Word, text);
+    bf.setPosition(from);
+    while (true) {
+        const int p = bf.toPreviousBoundary();
+        if (p < 0) return 0;
+        if (bf.boundaryReasons() & QTextBoundaryFinder::StartOfItem) return p;
+        if (p == 0) return 0;
+    }
+}
+
+// Qt-equivalent of QTextCursor::WordRight from `from`. Returns the qtPos
+// at the end of the next word (Qt's WordRight stops at end-of-word, not
+// start of the following word — trailing whitespace counts as part of
+// the word).
+int nextWordBoundary(const QString &text, int from) {
+    const int len = text.length();
+    if (from >= len) return len;
+    QTextBoundaryFinder bf(QTextBoundaryFinder::Word, text);
+    bf.setPosition(from);
+    while (true) {
+        const int p = bf.toNextBoundary();
+        if (p < 0) return len;
+        if (bf.boundaryReasons() & QTextBoundaryFinder::EndOfItem) return p;
+        if (p == len) return len;
+    }
+}
+
+} // anon namespace
 
 LiveNavigationController::LiveNavigationController(
     const BlockKindRegistry *registry, LiveBlockModel *model,
@@ -55,27 +93,40 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
                                         int blockIndex, int qtPos,
                                         QObject *editItem,
                                         const QString &blockText) {
-    // Ctrl+Shift+Left/Right: word-extend selection across blocks.
+    // Ctrl+Shift+Left/Right: word-extend selection. Within a block we
+    // compute the word boundary in C++ (matching Qt's WordLeft/WordRight)
+    // and route through cursorState->begin/extend so the document-layer
+    // anchor is authoritative; otherwise TextEdit's native handler would
+    // build a visible selection while m_selectionAnchor stayed empty,
+    // and Ctrl+C would copy nothing. See audit L4 spec
+    // `docs/specs/2026-05-21-audit-L4-ctrl-shift-word-extend.md`.
     if (modifiers == (Qt::ControlModifier | Qt::ShiftModifier)) {
-        if (key == Qt::Key_Left) {
-            if (qtPos > 0) return NotHandled;  // native word-select within block
+        auto wordExtend = [&](int targetRow, int targetPos) -> int {
+            if (!m_cursorState) return Handled;
             m_cursorState->clearDesiredVisualX();
-            const int targetRow = previousNavigableRow(blockIndex);
-            if (targetRow < 0) return Handled;
-            if (!m_model) return Handled;
-            const int targetLen = m_model->recordAt(targetRow).text.length();
-            if (m_cursorState) m_cursorState->extend(targetRow, targetLen);
-            m_cursorState->requestTextCaretAtRow(targetRow, targetLen);
+            if (m_cursorState->anchorBlock() < 0)
+                m_cursorState->begin(blockIndex, qtPos);
+            m_cursorState->extend(targetRow, targetPos);
+            if (targetRow != blockIndex)
+                m_cursorState->requestTextCaretAtRow(targetRow, targetPos);
             return Handled;
+        };
+        if (key == Qt::Key_Left) {
+            if (qtPos > 0)
+                return wordExtend(blockIndex,
+                                  previousWordBoundary(blockText, qtPos));
+            const int targetRow = previousNavigableRow(blockIndex);
+            if (targetRow < 0 || !m_model) return Handled;
+            const int targetLen = m_model->recordAt(targetRow).text.length();
+            return wordExtend(targetRow, targetLen);
         }
         if (key == Qt::Key_Right) {
-            if (qtPos < blockText.length()) return NotHandled;  // native word-select within block
-            m_cursorState->clearDesiredVisualX();
+            if (qtPos < blockText.length())
+                return wordExtend(blockIndex,
+                                  nextWordBoundary(blockText, qtPos));
             const int targetRow = nextNavigableRow(blockIndex);
             if (targetRow < 0) return Handled;
-            if (m_cursorState) m_cursorState->extend(targetRow, 0);
-            m_cursorState->requestTextCaretAtRow(targetRow, 0);
-            return Handled;
+            return wordExtend(targetRow, 0);
         }
     }
 

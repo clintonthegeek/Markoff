@@ -103,9 +103,11 @@
 
 - ~~Audit L8 (LiveActionController QActions with setShortcut() but no QML Shortcut element binding)~~ → fixed. `LiveView.qml` now binds window-level Shortcuts for Bold/Italic/Strike/InlineCode/Link/Heading1..6/Save in addition to the pre-existing zoom/dark-toggle bindings. Ctrl+0 deliberately stays bound to zoom-reset; the paragraph-demote action is reached via host menus / context menus.
 
-- Audit L2, L3, L4, L7 deferred — not bug-already-in-prod; each needs its own design pass. See audit §5 for symptoms.
+- Audit L2, L3, L7 deferred — not bug-already-in-prod; each needs its own design pass. See audit §5 for symptoms.
 
 - ~~Audit L9 (Ctrl+Backspace/Delete at block boundary)~~ → closed by `docs/specs/2026-05-21-audit-L9-ctrl-backspace-boundary.md`. Decision: Ctrl modifier is ignored at the boundary (qtPos=0 for Backspace, qtPos=length for Delete); behaviour collapses to plain block-merge. Matches Qt's own document-boundary handling. No production code change — already the behaviour today; ratified explicitly. Pinned by `tst_live_render_ctrl_backspace_boundary_qml` (3 slots: in-block word-delete works, boundary Backspace merges, boundary Delete merges).
+
+- ~~Audit L4 (Ctrl+Shift+Left/Right within-block word-extend)~~ → closed by `docs/specs/2026-05-21-audit-L4-ctrl-shift-word-extend.md`. Decision: `LiveNavigationController::tryHandle` now claims Ctrl+Shift+Left/Right within a block, computes the word boundary via `QTextBoundaryFinder` (matching Qt's WordLeft/WordRight semantics), and routes through `cursorState->begin (lazy) + extend` so the document-layer anchor is canonical. Resolves the divergence where TextEdit drew a within-block selection while `m_selectionAnchor` stayed empty, breaking Ctrl+C. Bonus fix: the cross-block fallthrough also needed the lazy-begin (anchor wasn't being set for at-qtPos=0 case either). Pinned by `tst_live_render_ctrl_shift_word_extend_qml` (5 slots).
 
 ---
 
