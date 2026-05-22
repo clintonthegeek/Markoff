@@ -67,6 +67,56 @@ Rectangle {
         modelIndex: root.modelIndex
     }
 
+    // C3: last-known focused cell. Set whenever a cell's TextEdit
+    // gains active focus; consulted by _restoreCellFocus to re-anchor
+    // after `parsedTable` re-evaluates (driven by `model.text` —
+    // e.g. Source-mode edits, remote D5 ops, or our own cell edits
+    // that get a buffer-roundtrip).
+    //
+    // Shape: { r: int, c: int, cursorPosition: int } or null.
+    property var _focusedCellMemo: null
+
+    // C3: on every `parsedTable` change defer focus restoration
+    // until after the binding cascade settles. Qt.callLater is
+    // load-bearing here — when count changes, the Repeater destroys
+    // and recreates cell delegates, and restoring focus before that
+    // settles would either fail (target doesn't exist yet) or land
+    // on a delegate scheduled for destruction. Defer one tick.
+    // Per INVARIANTS.md #6: justified at landing.
+    onParsedTableChanged: {
+        if (_focusedCellMemo === null) return
+        if (!root.parsedTable || !root.parsedTable.parseOk) return
+        Qt.callLater(_restoreCellFocus)
+    }
+
+    function _restoreCellFocus() {
+        if (!_focusedCellMemo) return
+        if (!root.parsedTable || !root.parsedTable.parseOk) return
+        if (!root.cursorState || root.blockAnchor === undefined) return
+
+        const totalRows = root.parsedTable.body.length + 1
+        const cols      = root.parsedTable.headers.length
+        if (totalRows < 1 || cols < 1) return
+        const r = Math.min(Math.max(_focusedCellMemo.r, 0), totalRows - 1)
+        const c = Math.min(Math.max(_focusedCellMemo.c, 0), cols - 1)
+
+        const ranges = root.parsedTable.cellCharRanges
+        if (r < 0 || r >= ranges.length) return
+        if (c < 0 || c >= ranges[r].length) return
+        const range = ranges[r][c]
+        const cellLen = range.end - range.start
+        const cellQtPos = Math.min(
+            Math.max(_focusedCellMemo.cursorPosition, 0), cellLen)
+        const flatQtPos = range.start + cellQtPos
+
+        // Route through the chokepoint rather than lifting focus on
+        // the cell directly — establishFocus → tryResolvePending →
+        // takeFocus places the cell caret and acquires focus inside
+        // takeFocus's body, which is the only delegate-side path the
+        // focus-path discipline check permits.
+        root.cursorState.establishFocus(root.blockAnchor, flatQtPos)
+    }
+
     // C2 helper: compute a prefix/suffix diff between two cell text
     // snapshots. QML's TextEdit doesn't expose QTextDocument's
     // (qtPos, removed, added) contentsChange signal natively, so we
@@ -263,9 +313,29 @@ Rectangle {
                     readonly property int r: Math.floor(index / cols)   // 0 = header row
                     readonly property int c: index % cols
                     readonly property bool isHeader: r === 0
-                    readonly property string cellText:
-                        isHeader ? root.parsedTable.headers[c]
-                                 : root.parsedTable.body[r - 1][c]
+                    // Bounds-safe lookup — during a structural change
+                    // (column-count or row-count shrink) the Repeater
+                    // destroys delegates whose indices fall outside the
+                    // new dimensions, but their bindings re-evaluate
+                    // one final time with stale (r, c) before tear-down.
+                    // Without guards, body[r-1][c] / headers[c] would
+                    // hit undefined[index] and crash QML's binding
+                    // evaluator. Returning "" lets the destroying cell
+                    // settle cleanly.
+                    readonly property string cellText: {
+                        if (!root.parsedTable || !root.parsedTable.parseOk) return ""
+                        if (cellRect.isHeader) {
+                            const hs = root.parsedTable.headers
+                            return (cellRect.c >= 0 && cellRect.c < hs.length)
+                                ? hs[cellRect.c] : ""
+                        }
+                        const bi = cellRect.r - 1
+                        const body = root.parsedTable.body
+                        if (bi < 0 || bi >= body.length) return ""
+                        const row = body[bi]
+                        return (cellRect.c >= 0 && cellRect.c < row.length)
+                            ? row[cellRect.c] : ""
+                    }
 
                     Layout.fillWidth: true
                     Layout.minimumWidth: 60
@@ -289,7 +359,15 @@ Rectangle {
                         readOnly: false   // C2: cells become editable
                         wrapMode: TextEdit.NoWrap
                         textFormat: TextEdit.PlainText
-                        horizontalAlignment: root.parsedTable.alignments[cellRect.c]
+                        horizontalAlignment: {
+                            // Bounds-safe during structural transitions:
+                            // see cellText for the rationale.
+                            const al = root.parsedTable
+                                       ? (root.parsedTable.alignments || [])
+                                       : []
+                            return (cellRect.c >= 0 && cellRect.c < al.length)
+                                ? al[cellRect.c] : Qt.AlignLeft
+                        }
 
                         // C2: previous-text snapshot for diff-based delta
                         // computation. Initialised in Component.onCompleted
@@ -301,6 +379,13 @@ Rectangle {
 
                         Component.onCompleted: {
                             cellEdit._previousText = cellEdit.text
+                        }
+
+                        // FALSIFIABILITY STUB — reverted by the
+                        // companion commit. Proves the memo-capture
+                        // assertion catches a missing focus tracker.
+                        onActiveFocusChanged: {
+                            // (stub: no memo capture)
                         }
 
                         onTextChanged: {
@@ -325,9 +410,10 @@ Rectangle {
                                 return
                             }
                             if (!root.parsedTable || !root.parsedTable.parseOk) return
-                            if (cellRect.r < 0
-                                || cellRect.r >= root.parsedTable.cellCharRanges.length) return
-                            const rowRanges = root.parsedTable.cellCharRanges[cellRect.r]
+                            const ccr2 = root.parsedTable.cellCharRanges
+                            if (cellRect.r < 0 || cellRect.r >= ccr2.length) return
+                            const rowRanges = ccr2[cellRect.r]
+                            if (!rowRanges) return
                             if (cellRect.c < 0 || cellRect.c >= rowRanges.length) return
                             const range = rowRanges[cellRect.c]
                             const diff = root._diffEdit(cellEdit._previousText,
@@ -374,11 +460,24 @@ Rectangle {
                         // alone (its decode is the inverse), but cursor
                         // moves that bypass establishFocus need this path.
                         onCursorPositionChanged: {
+                            // C3: keep _focusedCellMemo current so that a
+                            // re-tokenize triggered by the imminent cell
+                            // edit (or any subsequent buffer change)
+                            // restores the post-move position, not the
+                            // focus-acquisition value.
+                            if (cellEdit.activeFocus) {
+                                root._focusedCellMemo = {
+                                    r: cellRect.r,
+                                    c: cellRect.c,
+                                    cursorPosition: cellEdit.cursorPosition,
+                                }
+                            }
                             if (!root.liveBinding || !root.liveBinding.cursorState) return
                             if (!root.parsedTable || !root.parsedTable.parseOk) return
-                            if (cellRect.r < 0
-                                || cellRect.r >= root.parsedTable.cellCharRanges.length) return
-                            const rowRanges = root.parsedTable.cellCharRanges[cellRect.r]
+                            const ccr = root.parsedTable.cellCharRanges
+                            if (cellRect.r < 0 || cellRect.r >= ccr.length) return
+                            const rowRanges = ccr[cellRect.r]
+                            if (!rowRanges) return
                             if (cellRect.c < 0 || cellRect.c >= rowRanges.length) return
                             const range = rowRanges[cellRect.c]
                             const cellLen = cellEdit.length

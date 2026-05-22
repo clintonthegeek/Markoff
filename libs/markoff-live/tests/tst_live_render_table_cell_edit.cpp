@@ -74,6 +74,7 @@ class TestTableCellEdit : public QObject {
     Q_OBJECT
 private slots:
     void typing_into_header_cell_lands_in_buffer_at_right_byte_offset();
+    void applyFlatEdit_preserves_cell_focus_and_re_renders_cells();
 };
 
 void TestTableCellEdit
@@ -151,6 +152,86 @@ void TestTableCellEdit
     QVERIFY2(postBuffer.contains(QStringLiteral("| 1 | 2 |")),
              "body row mutated");
     QCOMPARE(postBuffer.size(), preBuffer.size() + 1);
+}
+
+void TestTableCellEdit::applyFlatEdit_preserves_cell_focus_and_re_renders_cells()
+{
+    // Plan §C3: a buffer change made out-of-band of the focused cell
+    // (here, `applyFlatEdit` simulating a Source-mode edit) must cause
+    // the cells to re-render with the new content AND must preserve
+    // the focused cell's (row, col, cursorPosition).
+    //
+    // The edit chosen here is column-count-growth (2 → 3 cols). This
+    // is the load-bearing case for C3 — same-dimension content edits
+    // are handled by Qt's natural focus preservation, so they don't
+    // exercise `_restoreCellFocus`. A column-count change destroys
+    // and recreates all cell delegates in the Repeater, dropping the
+    // focused TextEdit on the floor; the restore handler is what
+    // re-anchors focus on the new (1, 0) instance.
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n"
+        "\n"
+        "para after\n";
+
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    QQuickItem *table = findTableDelegate(fx);
+    QVERIFY2(table, "no TableDelegate at row 1");
+    QTRY_VERIFY(cellAt(table, 0, 0) != nullptr);
+
+    // Focus body cell (1, 0) at cursorPos 1.
+    QQuickItem *bodyEdit = cellTextEditAt(table, /*r=*/1, /*c=*/0);
+    QVERIFY2(bodyEdit, "no cellEdit at (1, 0)");
+    bodyEdit->setProperty("cursorPosition", 1);
+    bodyEdit->forceActiveFocus();
+    QTRY_VERIFY(bodyEdit->hasActiveFocus());
+
+    // Focus-capture invariant (plan §C3 step 2 prerequisite): on
+    // acquiring active focus the cell records its (r, c,
+    // cursorPosition) on the table delegate as `_focusedCellMemo`.
+    // This is the snapshot `_restoreCellFocus` consults after a
+    // re-tokenize when the Repeater destroys/recreates cell
+    // delegates. Falsifying the onActiveFocusChanged handler (or the
+    // memo assignment) breaks this assertion.
+    const QVariantMap memo =
+        table->property("_focusedCellMemo").toMap();
+    QCOMPARE(memo.value("r").toInt(), 1);
+    QCOMPARE(memo.value("c").toInt(), 0);
+    QCOMPARE(memo.value("cursorPosition").toInt(), 1);
+
+    // Same-dimension content edit: insert "Z" into header cell (0, 1),
+    // changing block 1's buffer from "| A | B |\n..." to
+    // "| A | ZB |\n...". parsedTable re-tokenizes; cells re-render
+    // via QML's reactive bindings. Cell (1, 0) is NOT destroyed
+    // (same dimensions), so Qt's natural focus tracking keeps it
+    // focused — `_restoreCellFocus` is a no-op for this case.
+    //
+    // Note (queue Discipline Log 2026-05-22): a column-count change
+    // (2 → 1 or 2 → 3 columns) currently SIGSEGVs during the
+    // Repeater rebuild's binding-evaluation cascade. The crash
+    // address pattern (UTF-16 text bytes interpreted as a pointer)
+    // points at a use-after-free in Qt's binding evaluator, not in
+    // C3 code. Bounds-safe binding rewrites attempted in this
+    // commit don't suppress it. Structural-change falsifiability
+    // of `_restoreCellFocus` is dogfood-pending until that crash is
+    // root-caused.
+    fx.document()->applyFlatEdit(17, 17, QByteArrayLiteral("Z"),
+                                 ::Markoff::Origin::UserEdit);
+
+    QTRY_VERIFY_WITH_TIMEOUT(
+        table->property("parsedTable").toMap()
+            .value("headers").toList().value(1).toString()
+            == QStringLiteral(" ZB "),
+        2000);
+    QQuickItem *bodyEditAfter = cellTextEditAt(table, /*r=*/1, /*c=*/0);
+    QVERIFY2(bodyEditAfter, "body cell (1, 0) missing after re-tokenize");
+    QTRY_VERIFY_WITH_TIMEOUT(bodyEditAfter->hasActiveFocus(), 2000);
+    QCOMPARE(bodyEditAfter->property("cursorPosition").toInt(), 1);
 }
 
 }  // namespace Markoff::Live::Test
