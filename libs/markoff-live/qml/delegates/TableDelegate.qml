@@ -276,9 +276,30 @@ Rectangle {
                         // re-entrant equal-state updates, so the
                         // takeFocus → forceActiveFocus → here → syncFromTextEdit
                         // cycle settles in one round.
-                        // FALSIFIABILITY STUB — syncFromTextEdit disabled.
+                        // B4: round-trip cell-relative cursor moves back to
+                        // the chokepoint as block-buffer flatQtPos. The
+                        // chokepoint is doc-keyed and unconditionally drops
+                        // re-entrant equal-state updates, so the
+                        // takeFocus → forceActiveFocus → here → syncFromTextEdit
+                        // cycle settles in one round. This handler is what
+                        // makes future cell-internal arrow keys, typing,
+                        // and selection moves visible to the chokepoint —
+                        // for fresh clicks the identity holds via takeFocus
+                        // alone (its decode is the inverse), but cursor
+                        // moves that bypass establishFocus need this path.
                         onCursorPositionChanged: {
-                            // (stub)
+                            if (!root.liveBinding || !root.liveBinding.cursorState) return
+                            if (!root.parsedTable || !root.parsedTable.parseOk) return
+                            if (cellRect.r < 0
+                                || cellRect.r >= root.parsedTable.cellCharRanges.length) return
+                            const rowRanges = root.parsedTable.cellCharRanges[cellRect.r]
+                            if (cellRect.c < 0 || cellRect.c >= rowRanges.length) return
+                            const range = rowRanges[cellRect.c]
+                            const cellLen = cellEdit.length
+                            const clamped = Math.min(Math.max(cellEdit.cursorPosition, 0), cellLen)
+                            const flatQtPos = range.start + clamped
+                            root.liveBinding.cursorState.syncFromTextEdit(
+                                root.blockAnchor, flatQtPos)
                         }
                     }
                 }
