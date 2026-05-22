@@ -187,8 +187,25 @@ void LiveClipboardController::cut()
 
 void LiveClipboardController::paste()
 {
+    pasteFrom(static_cast<int>(QClipboard::Clipboard));
+}
+
+void LiveClipboardController::pastePrimary()
+{
+    // PRIMARY selection only exists on platforms that report it
+    // (X11/XWayland, wayland-primary-selection). On platforms without
+    // it (offscreen QPA on a default setup, native Windows/macOS) the
+    // clipboard's selection-mode mimeData() returns null and the
+    // pasteFrom helper short-circuits cleanly.
+    if (!QApplication::clipboard()->supportsSelection()) return;
+    pasteFrom(static_cast<int>(QClipboard::Selection));
+}
+
+void LiveClipboardController::pasteFrom(int clipboardMode)
+{
     if (!m_selection || !m_document || !m_model) return;
-    const QMimeData *mime = QApplication::clipboard()->mimeData();
+    const auto mode = static_cast<QClipboard::Mode>(clipboardMode);
+    const QMimeData *mime = QApplication::clipboard()->mimeData(mode);
     if (!mime || (!mime->hasText() && !mime->hasFormat(kBlocksMime))) return;
 
     // We need anchor positions to compute start/end byte offsets.

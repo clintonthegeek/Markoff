@@ -205,7 +205,7 @@ ListView {
     MouseArea {
         id: mouseArea
         anchors.fill: parent
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
         cursorShape: Qt.IBeamCursor
         hoverEnabled: true
         preventStealing: true
@@ -304,6 +304,26 @@ ListView {
         onPressed: (mouse) => {
             if (mouse.button === Qt.RightButton) return
             if (!binding || !binding.cursorState) return
+
+            // Middle-click: X11/Wayland PRIMARY-selection paste. Position
+            // the caret at the click point (paste-at-click, not
+            // paste-at-focus) and route through LiveClipboardController so
+            // the structured-paste path is honoured. See audit L2 spec.
+            if (mouse.button === Qt.MiddleButton) {
+                const r = root.hit(mouse.x, mouse.y)
+                if (!r || r.blockIndex < 0) return
+                binding.cursorState.begin(r.blockIndex,
+                                          r.qtPos >= 0 ? r.qtPos : 0)
+                const item = root.itemAtIndex(r.blockIndex)
+                if (item && item.blockAnchor !== undefined)
+                    binding.cursorState.establishFocus(
+                        item.blockAnchor, r.qtPos >= 0 ? r.qtPos : 0)
+                if (binding.clipboardController)
+                    binding.clipboardController.pastePrimary()
+                mouse.accepted = true
+                return
+            }
+
             const r = root.hit(mouse.x, mouse.y)
             mouseArea._pressResult = r
             if (!r || r.blockIndex < 0) {
