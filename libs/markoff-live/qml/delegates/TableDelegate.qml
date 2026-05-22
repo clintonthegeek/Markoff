@@ -471,6 +471,21 @@ Rectangle {
                             if (!root.parsedTable || !root.parsedTable.parseOk) return
                             if (!root.cursorState || root.blockAnchor === undefined) return
 
+                            // ---- Ctrl-chords (Ctrl+C / X / V / A / Z / Y) ----
+                            // Route through KeyDispatch so Ctrl+C inside a
+                            // cell reaches LiveClipboardController.copy()
+                            // instead of falling through to TextEdit's
+                            // built-in (which only copies the within-cell
+                            // selection and so produces nothing when the
+                            // cross-block highlight is the visible range
+                            // but the focused cell's TextEdit selection
+                            // is empty / wrong). User dogfood 2026-05-22:
+                            // "Shift+Down ends in a cell; Ctrl+C does
+                            // nothing. Right-click → Copy works".
+                            if (KeyDispatch.tryDispatchCtrlChord(event,
+                                    { binding: root.liveBinding }))
+                                return
+
                             // ---- D3: Enter (inert) / Esc (BlockSelected) ----
                             // Enter inside a cell would otherwise insert a
                             // literal `\n` into the block buffer and break

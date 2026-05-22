@@ -122,6 +122,9 @@ private slots:
 
     // E4 follow-up — cross-block range highlight reaches the cells.
     void cross_block_selection_highlights_cells();
+
+    // E4 follow-up — Ctrl+C with focus inside a cell reaches the clipboard.
+    void ctrl_c_with_focus_in_cell_and_cross_block_selection_copies();
 };
 
 void TestTableCellEdit
@@ -986,6 +989,61 @@ void TestTableCellEdit::cross_block_selection_highlights_cells()
     QVERIFY(cellSelectionLen(0, 1) > 0);
     QVERIFY(cellSelectionLen(1, 0) > 0);
     QVERIFY(cellSelectionLen(1, 1) > 0);
+}
+
+// ---- Ctrl+C with focus in a cell reaches the clipboard ----
+
+void TestTableCellEdit::ctrl_c_with_focus_in_cell_and_cross_block_selection_copies()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    // Create a cross-block selection from row 0 → cell (0, 0) — active
+    // end inside a table cell. Then Ctrl+C with the cell focused must
+    // reach LiveClipboardController.copy() (via the KeyDispatch chord
+    // routing on the cell's Keys.onPressed). Without the routing, the
+    // event falls through to TextEdit's built-in copy, which acts on
+    // the within-cell selection (empty for the focused cell when the
+    // cross-block highlight is the visible range), producing nothing
+    // on the clipboard.
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QMetaObject::invokeMethod(cs, "begin", Qt::DirectConnection,
+                              Q_ARG(int, 0), Q_ARG(int, 0));
+
+    // Compute the flat qtPos for cell (0, 0) start. cellCharRanges[0][0].start
+    // is exposed via the parsedTable structure.
+    QVariant parsedV = s.table->property("parsedTable");
+    QVERIFY(parsedV.isValid());
+    QVariantMap parsed = parsedV.toMap();
+    QVariantList ccr   = parsed["cellCharRanges"].toList();
+    QVERIFY(ccr.size() >= 1);
+    QVariantList rowRanges = ccr[0].toList();
+    QVERIFY(rowRanges.size() >= 1);
+    QVariantMap cell00Range = rowRanges[0].toMap();
+    const int cellStart    = cell00Range["start"].toInt();
+
+    QMetaObject::invokeMethod(cs, "extend", Qt::DirectConnection,
+                              Q_ARG(int, 1), Q_ARG(int, cellStart + 2));
+    QTest::qWait(150);
+
+    // Focus the cell — interactive equivalent of clicking into it after
+    // the Shift+arrow lands.
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    QApplication::clipboard()->clear();
+    s.fx->harness().keyClick(Qt::Key_C, Qt::ControlModifier);
+    QTest::qWait(100);
+
+    // Plain-text branch must have content.
+    const QString clipText = QApplication::clipboard()->text();
+    QVERIFY2(!clipText.isEmpty(),
+             qPrintable(QStringLiteral("expected non-empty clipboard; got %1")
+                            .arg(clipText)));
 }
 
 }  // namespace Markoff::Live::Test
