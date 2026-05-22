@@ -150,6 +150,32 @@ private Q_SLOTS:
         QCOMPARE(e.toPlainText(), QStringLiteral("see [hello](url) world"));
     }
 
+    void insertLink_at_block_boundary_stays_in_target_block() {
+        // Companion regression to toggleBold_at_block_boundary_does_not_merge
+        // and setHeadingLevel_twice_does_not_merge_with_previous_block.
+        // insertLink was the last QTextCursor-mediated format op; the latent
+        // bug class would surface if a future variant grew a removeSelectedText
+        // step (cursor-insert forward-bias hid it today). Block-aware port
+        // matches the heading + wrap pattern.
+        Markoff::Source::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArray("para text\n\nhello world"));
+        e.setDocument(&doc);
+        QTest::qWait(50);
+
+        // Cursor at qt-pos 11 — exactly at the start of block 2 in sep-view.
+        placeCursor(e, 11);
+        e.insertLink();
+        QCOMPARE(e.toPlainText(),
+                 QStringLiteral("para text\n\n[](url)hello world"));
+
+        // Selection whose start sits at the block boundary.
+        selectRange(e, 18, 23);  // "hello" in the new layout
+        e.insertLink();
+        QCOMPARE(e.toPlainText(),
+                 QStringLiteral("para text\n\n[](url)[hello](url) world"));
+    }
+
     void setHeadingLevel_promotes_paragraph_line() {
         Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);

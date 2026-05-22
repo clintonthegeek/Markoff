@@ -442,28 +442,75 @@ void Editor::toggleStrikethrough() { wrapToggle(m_editor, m_binding, "~~"); }
 void Editor::toggleInlineCode()    { wrapToggle(m_editor, m_binding, "`");  }
 
 void Editor::insertLink() {
-    if (!m_editor) return;
+    if (!m_editor || !m_binding) return;
+    Markoff::MarkoffDocument *doc = m_binding->markoffDocument();
+    if (!doc) return;
+
     QTextCursor c = m_editor->textCursor();
-    c.beginEditBlock();
-    if (c.hasSelection()) {
-        const int start = c.selectionStart();
-        const int end   = c.selectionEnd();
-        c.setPosition(end);
-        c.insertText(QStringLiteral("](url)"));
-        c.setPosition(start);
-        c.insertText(QStringLiteral("["));
-        // Park cursor over the `url` placeholder for easy replacement.
-        // After both inserts: layout is `[selection](url)` starting at start.
-        // selection is at [start+1, end+1); url at end+3..end+6.
-        c.setPosition(end + 3);
-        c.setPosition(end + 6, QTextCursor::KeepAnchor);
-    } else {
-        const int pos = c.position();
-        c.insertText(QStringLiteral("[](url)"));
-        c.setPosition(pos + 1);
+    const QString docText = m_editor->toPlainText();
+
+    // --- No selection: insert `[](url)` template, park cursor between `[]`. -
+    if (!c.hasSelection()) {
+        const int qtPos = c.position();
+        const quint32 sepByte =
+            Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtPos);
+        auto hit = findBlockAtSepByte(doc, sepByte, /*biasForward=*/true);
+        const QByteArray payload = QByteArrayLiteral("[](url)");
+        if (!hit) {
+            doc->applyFlatEdit(0, 0, payload, Markoff::Origin::UserEdit);
+        } else {
+            Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+            doc->d2ApplyBufferEdit(hit->blockId, hit->byteInBlock, 0,
+                                   payload, t);
+        }
+        doc->flushPendingD2Changed();
+        QTextCursor c2 = m_editor->textCursor();
+        c2.setPosition(qtPos + 1);
+        m_editor->setTextCursor(c2);
+        return;
     }
-    c.endEditBlock();
-    m_editor->setTextCursor(c);
+
+    // --- Selection: wrap `[selection](url)` per block slice. ---------------
+    const int qtStart = c.selectionStart();
+    const int qtEnd   = c.selectionEnd();
+    const quint32 sepStart =
+        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtStart);
+    const quint32 sepEnd =
+        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtEnd);
+    const QList<BlockSlice> slices = sliceByBlocks(doc, sepStart, sepEnd);
+    if (slices.isEmpty()) return;
+
+    {
+        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+        // Reverse order: later block edits don't shift earlier ones' bytes.
+        // Within a slice: insert trailing `](url)` first (higher byte), then
+        // leading `[` — same higher-then-lower pattern as wrapToggle.
+        for (int n = slices.size() - 1; n >= 0; --n) {
+            const BlockSlice &s = slices[n];
+            doc->d2ApplyBufferEdit(s.blockId, s.byteHi, 0,
+                                   QByteArrayLiteral("](url)"), t);
+            doc->d2ApplyBufferEdit(s.blockId, s.byteLo, 0,
+                                   QByteArrayLiteral("["), t);
+        }
+    }
+
+    doc->flushPendingD2Changed();
+
+    QTextCursor c2 = m_editor->textCursor();
+    if (slices.size() == 1) {
+        // Single-block selection: park selection over `url` for easy replace.
+        // Layout: `[selection](url)` starting at qtStart; url at qtEnd+3..qtEnd+6.
+        c2.setPosition(qtEnd + 3);
+        c2.setPosition(qtEnd + 6, QTextCursor::KeepAnchor);
+    } else {
+        // Multi-slice: collapse near the trailing end (matches wrapToggle).
+        const int docLen = m_editor->document()->characterCount() - 1;
+        int newPos = qtEnd;
+        if (newPos > docLen) newPos = docLen;
+        if (newPos < 0)      newPos = 0;
+        c2.setPosition(newPos);
+    }
+    m_editor->setTextCursor(c2);
 }
 
 void Editor::setHeadingLevel(int level) {
