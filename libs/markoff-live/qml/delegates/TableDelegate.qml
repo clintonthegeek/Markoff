@@ -57,6 +57,44 @@ Rectangle {
     // bytewise, cell content includes leading/trailing whitespace).
     property var parsedTable: parseTable(root.blockText)
 
+    // C2: per-delegate edit binding. Cells dispatch their user edits
+    // through tableEditBinding.applyCellEdit; the binding does the
+    // cell-relative → block-buffer translation in C++ (see
+    // src/TableEditBinding.cpp) and calls d2ApplyBufferEdit.
+    TableEditBinding {
+        id: tableEditBinding
+        binding: root.liveBinding
+        modelIndex: root.modelIndex
+    }
+
+    // C2 helper: compute a prefix/suffix diff between two cell text
+    // snapshots. QML's TextEdit doesn't expose QTextDocument's
+    // (qtPos, removed, added) contentsChange signal natively, so we
+    // reconstruct the delta from onTextChanged + a stored
+    // _previousText snapshot per cell. The prefix/suffix scan is
+    // exact for any contiguous edit (typing, deletion, paste at a
+    // single point); for non-contiguous edits the result is still a
+    // valid final-state-equivalent op, which is what d2ApplyBufferEdit
+    // accepts.
+    function _diffEdit(oldStr, newStr) {
+        let prefixLen = 0
+        const minLen = Math.min(oldStr.length, newStr.length)
+        while (prefixLen < minLen
+               && oldStr.charAt(prefixLen) === newStr.charAt(prefixLen))
+            ++prefixLen
+        let suffixLen = 0
+        while (suffixLen < (minLen - prefixLen)
+               && oldStr.charAt(oldStr.length - 1 - suffixLen)
+                  === newStr.charAt(newStr.length - 1 - suffixLen))
+            ++suffixLen
+        return {
+            qtPos: prefixLen,
+            removed: oldStr.length - prefixLen - suffixLen,
+            added: newStr.length - prefixLen - suffixLen,
+            addedText: newStr.substring(prefixLen, newStr.length - suffixLen),
+        }
+    }
+
     function parseTable(src) {
         const empty = { headers: [], alignments: [], body: [],
                         cellCharRanges: [],
@@ -248,10 +286,63 @@ Rectangle {
                         anchors.fill: parent
                         anchors.margins: 4
                         text: cellRect.cellText
-                        readOnly: true
+                        readOnly: false   // C2: cells become editable
                         wrapMode: TextEdit.NoWrap
                         textFormat: TextEdit.PlainText
                         horizontalAlignment: root.parsedTable.alignments[cellRect.c]
+
+                        // C2: previous-text snapshot for diff-based delta
+                        // computation. Initialised in Component.onCompleted
+                        // (the initial text-binding fire seeds it). After
+                        // each dispatch we snap forward before the
+                        // d2ApplyBufferEdit cascade in case the parsedTable
+                        // refresh re-binds cell.text on the way back.
+                        property string _previousText: ""
+
+                        Component.onCompleted: {
+                            cellEdit._previousText = cellEdit.text
+                        }
+
+                        onTextChanged: {
+                            // Re-entrance guard. C1 always returns false;
+                            // future C-phase work may flip it during
+                            // model-driven refreshes that bypass
+                            // QQuickTextEdit's same-string short-circuit.
+                            if (tableEditBinding.isApplyingTextUpdate()) {
+                                cellEdit._previousText = cellEdit.text
+                                return
+                            }
+                            // Binding-driven update: cell.text was just
+                            // refreshed to match parsedTable. In the
+                            // common local-edit case QQuickTextEdit's
+                            // same-string short-circuit means this branch
+                            // never runs; on a future D5 remote edit it
+                            // fires and we MUST skip (otherwise the
+                            // remote op would be re-applied locally).
+                            if (cellEdit.text === cellRect.cellText
+                                && cellEdit._previousText !== cellEdit.text) {
+                                cellEdit._previousText = cellEdit.text
+                                return
+                            }
+                            if (!root.parsedTable || !root.parsedTable.parseOk) return
+                            if (cellRect.r < 0
+                                || cellRect.r >= root.parsedTable.cellCharRanges.length) return
+                            const rowRanges = root.parsedTable.cellCharRanges[cellRect.r]
+                            if (cellRect.c < 0 || cellRect.c >= rowRanges.length) return
+                            const range = rowRanges[cellRect.c]
+                            const diff = root._diffEdit(cellEdit._previousText,
+                                                        cellEdit.text)
+                            // Snap forward BEFORE dispatch so the
+                            // d2ApplyBufferEdit-driven binding re-eval
+                            // (which may set cell.text back to the same
+                            // value — a no-op — or differ slightly if
+                            // parsedTable tokenisation normalises) doesn't
+                            // re-enter the diff branch with a stale prev.
+                            cellEdit._previousText = cellEdit.text
+                            tableEditBinding.applyCellEdit(
+                                range.start, diff.qtPos, diff.removed,
+                                diff.addedText)
+                        }
 
                         readonly property var theme:
                             root.liveBinding ? root.liveBinding.theme : null

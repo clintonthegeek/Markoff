@@ -745,7 +745,8 @@ foreach(_qmlcompanion
     tst_live_render_middle_click_paste_qml
     tst_live_render_drop_text_qml
     tst_live_render_ime_composition_qml
-    tst_live_render_table_parsing)
+    tst_live_render_table_parsing
+    tst_live_render_table_cell_edit)
     qt_add_executable(${_qmlcompanion}
         ${_qmlcompanion}.cpp
         QmlIntegrationFixture.h
