@@ -308,11 +308,7 @@ Rectangle {
     Component.onCompleted: {
         const cs = root.liveBinding ? root.liveBinding.cursorState : null
         blockAnchor = model.blockAnchor
-        // FALSIFIABILITY STUB — registration disabled. Revert with the
-        // companion commit before merging. Proves
-        // tst_live_render_focus_chokepoint_invariant ::
-        // table_delegate_registers_with_cursor_state isn't lenient.
-        // if (cs) cs.delegateAvailable(blockAnchor, model.kind, root)
+        if (cs) cs.delegateAvailable(blockAnchor, model.kind, root)
     }
 
     Component.onDestruction: {
