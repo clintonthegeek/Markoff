@@ -75,6 +75,13 @@ class TestTableCellEdit : public QObject {
 private slots:
     void typing_into_header_cell_lands_in_buffer_at_right_byte_offset();
     void applyFlatEdit_preserves_cell_focus_and_re_renders_cells();
+    // E4 D1 — Tab / Shift+Tab navigation between cells, plus exit at
+    // the table edges.
+    void tab_moves_focus_to_next_cell_within_row();
+    void tab_at_end_of_row_wraps_to_next_row_first_cell();
+    void tab_at_last_cell_exits_table_to_next_block();
+    void shift_tab_moves_focus_to_previous_cell();
+    void shift_tab_at_first_cell_exits_table_to_previous_block();
 };
 
 void TestTableCellEdit
@@ -232,6 +239,128 @@ void TestTableCellEdit::applyFlatEdit_preserves_cell_focus_and_re_renders_cells(
     QVERIFY2(bodyEditAfter, "body cell (1, 0) missing after re-tokenize");
     QTRY_VERIFY_WITH_TIMEOUT(bodyEditAfter->hasActiveFocus(), 2000);
     QCOMPARE(bodyEditAfter->property("cursorPosition").toInt(), 1);
+}
+
+namespace {
+
+// Common setup for the D1 Tab-navigation slots. Loads a 2×(1 header + 1
+// body) fixture and returns the populated fixture + the table delegate.
+struct NavSetup {
+    std::unique_ptr<QmlIntegrationFixture> fx;
+    QQuickItem *table = nullptr;
+};
+
+NavSetup setupNav()
+{
+    NavSetup s;
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n"
+        "\n"
+        "para after\n";
+    s.fx = std::make_unique<QmlIntegrationFixture>(md, /*expectedRowCount=*/3);
+    if (!s.fx->waitForDelegateAt(1, 2000)) return s;
+    s.table = findTableDelegate(*s.fx);
+    return s;
+}
+
+}  // namespace
+
+void TestTableCellEdit::tab_moves_focus_to_next_cell_within_row()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Tab);
+
+    QQuickItem *cell01 = cellTextEditAt(s.table, 0, 1);
+    QVERIFY(cell01);
+    QTRY_VERIFY_WITH_TIMEOUT(cell01->hasActiveFocus(), 2000);
+}
+
+void TestTableCellEdit::tab_at_end_of_row_wraps_to_next_row_first_cell()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 1) != nullptr);
+
+    QQuickItem *cell01 = cellTextEditAt(s.table, 0, 1);
+    QVERIFY(cell01);
+    cell01->forceActiveFocus();
+    QTRY_VERIFY(cell01->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Tab);
+
+    QQuickItem *cell10 = cellTextEditAt(s.table, 1, 0);
+    QVERIFY(cell10);
+    QTRY_VERIFY_WITH_TIMEOUT(cell10->hasActiveFocus(), 2000);
+}
+
+void TestTableCellEdit::tab_at_last_cell_exits_table_to_next_block()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 1, 1) != nullptr);
+
+    QQuickItem *cell11 = cellTextEditAt(s.table, 1, 1);
+    QVERIFY(cell11);
+    cell11->forceActiveFocus();
+    QTRY_VERIFY(cell11->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Tab);
+
+    // Caret should land on the next block — "para after" is at row 2.
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 2, 2000);
+}
+
+void TestTableCellEdit::shift_tab_moves_focus_to_previous_cell()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 1, 0) != nullptr);
+
+    QQuickItem *cell10 = cellTextEditAt(s.table, 1, 0);
+    QVERIFY(cell10);
+    cell10->forceActiveFocus();
+    QTRY_VERIFY(cell10->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Backtab, Qt::ShiftModifier);
+
+    QQuickItem *cell01 = cellTextEditAt(s.table, 0, 1);
+    QVERIFY(cell01);
+    QTRY_VERIFY_WITH_TIMEOUT(cell01->hasActiveFocus(), 2000);
+}
+
+void TestTableCellEdit::shift_tab_at_first_cell_exits_table_to_previous_block()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    // Place caret via chokepoint so cursorStateCurrentRow == 1 (the
+    // table) BEFORE the Shift+Backtab — otherwise the assertion below
+    // can be satisfied vacuously by the fixture's initial-focus seed
+    // (which leaves the cursor at row 0 / "para before").
+    s.fx->placeCursorAtPos(/*row=*/1, /*qtPos=*/0);
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 1, 2000);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Backtab, Qt::ShiftModifier);
+
+    // Caret should land on the previous block — "para before" at row 0.
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 0, 2000);
 }
 
 }  // namespace Markoff::Live::Test

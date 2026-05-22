@@ -455,6 +455,23 @@ Rectangle {
                                : "#222222"
                         selectByMouse: false
 
+                        // D1: Tab / Shift+Tab move between cells. The
+                        // BeforeItem priority intercepts the key before
+                        // TextEdit's default tab-insertion handling.
+                        // Out-of-bounds at the table edges exits to the
+                        // previous / next block via the chokepoint.
+                        // FALSIFIABILITY STUB — reverted by companion commit.
+                        // Accepts Tab/Backtab to suppress Qt's default
+                        // focus-traversal fallback so the test isolates
+                        // the table-cell navigation contract.
+                        Keys.priority: Keys.BeforeItem
+                        Keys.onPressed: (event) => {
+                            if (event.key === Qt.Key_Tab
+                                || event.key === Qt.Key_Backtab) {
+                                event.accepted = true
+                            }
+                        }
+
                         // B4: round-trip cell-relative cursor moves back to
                         // the chokepoint as block-buffer flatQtPos. The
                         // chokepoint is doc-keyed and unconditionally drops
