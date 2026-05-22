@@ -381,11 +381,19 @@ Rectangle {
                             cellEdit._previousText = cellEdit.text
                         }
 
-                        // FALSIFIABILITY STUB — reverted by the
-                        // companion commit. Proves the memo-capture
-                        // assertion catches a missing focus tracker.
+                        // C3: track the last focused cell so that a
+                        // post-tokenize binding cascade (Source-mode
+                        // edit, remote D5 op, our own buffer roundtrip)
+                        // can re-anchor focus on the same (r, c) /
+                        // cursor position.
                         onActiveFocusChanged: {
-                            // (stub: no memo capture)
+                            if (cellEdit.activeFocus) {
+                                root._focusedCellMemo = {
+                                    r: cellRect.r,
+                                    c: cellRect.c,
+                                    cursorPosition: cellEdit.cursorPosition,
+                                }
+                            }
                         }
 
                         onTextChanged: {
