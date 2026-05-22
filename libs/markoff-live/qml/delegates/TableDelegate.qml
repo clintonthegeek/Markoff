@@ -759,6 +759,66 @@ Rectangle {
                * root.parsedTable.headers.length
     }
 
+    // Cross-block range highlight (cursor-authority follow-up, 2026-05-22).
+    // When a cross-block selection passes through or into a table, each cell
+    // renders the highlight on its portion of the block-flat range. Mirrors
+    // UnifiedInlineTextDelegate's applySelection() but per-cell.
+    //
+    // Called from the Connections block on cursorState.selectionChanged.
+    function _applyCrossBlockSelection() {
+        if (!root.parsedTable || !root.parsedTable.parseOk) return
+        const cs = root.cursorState
+        if (!cs) return
+        const ccr = root.parsedTable.cellCharRanges
+        const range = cs.rangeForBlock(root.modelIndex)
+
+        // No selection covers this block — clear all cell selections.
+        const blockHasNoRange = (!range || range.x < 0)
+
+        for (let r = 0; r < ccr.length; ++r) {
+            const rowRanges = ccr[r]
+            for (let c = 0; c < rowRanges.length; ++c) {
+                const cell = _cellAt(r, c)
+                if (!cell || !cell.edit) continue
+                const ed = cell.edit
+                if (blockHasNoRange) {
+                    if (ed.selectionStart !== ed.selectionEnd)
+                        ed.deselect()
+                    continue
+                }
+                const cellRange = rowRanges[c]
+                if (!cellRange) continue
+                const blockStart = range.x
+                const blockEnd   = range.y
+                // cellRange { start, end } in block-relative QString chars.
+                if (blockEnd <= cellRange.start || blockStart >= cellRange.end) {
+                    // Cell entirely outside selection.
+                    if (ed.selectionStart !== ed.selectionEnd)
+                        ed.deselect()
+                    continue
+                }
+                // Overlap exists. Translate to cell-relative.
+                const overlapStart = Math.max(blockStart, cellRange.start)
+                                     - cellRange.start
+                const overlapEnd   = Math.min(blockEnd, cellRange.end)
+                                     - cellRange.start
+                if (overlapStart === overlapEnd) {
+                    if (ed.selectionStart !== ed.selectionEnd)
+                        ed.deselect()
+                    continue
+                }
+                // Q_INVOKABLE select(start, end) on QQuickTextEdit.
+                ed.select(overlapStart, overlapEnd)
+            }
+        }
+    }
+
+    Connections {
+        target: root.cursorState
+        function onSelectionChanged() { root._applyCrossBlockSelection() }
+        function onCursorChanged()    { root._applyCrossBlockSelection() }
+    }
+
     function _cellAt(r, c) {
         const cols = root.parsedTable.headers.length
         const idx  = r * cols + c

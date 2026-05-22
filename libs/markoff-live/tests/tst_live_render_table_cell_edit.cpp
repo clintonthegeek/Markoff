@@ -119,6 +119,9 @@ private slots:
 
     // E4 follow-up — Ctrl+C on BlockSelected{table} copies the markdown.
     void ctrl_c_on_block_selected_table_copies_markdown();
+
+    // E4 follow-up — cross-block range highlight reaches the cells.
+    void cross_block_selection_highlights_cells();
 };
 
 void TestTableCellEdit
@@ -944,6 +947,45 @@ void TestTableCellEdit::ctrl_c_on_block_selected_table_copies_markdown()
     const QJsonObject first = blocks[0].toObject();
     QCOMPARE(first["kind"].toString(), QStringLiteral("table"));
     QCOMPARE(first["text"].toString(), tableBuffer);
+}
+
+// ---- Cross-block range highlight reaches table cells ----
+
+void TestTableCellEdit::cross_block_selection_highlights_cells()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+    QTRY_VERIFY(cellAt(s.table, 1, 1) != nullptr);
+
+    // Three-block fixture (setupNav loads paragraph / table / paragraph).
+    // Create a cross-block selection from row 0 → row 2 via begin + extend.
+    // extend() marks m_selectionExtended=true; §5.4's anchor-clear is
+    // suppressed; the active end can cross blocks and the anchor survives.
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QMetaObject::invokeMethod(cs, "begin", Qt::DirectConnection,
+                              Q_ARG(int, 0), Q_ARG(int, 0));
+    QMetaObject::invokeMethod(cs, "extend", Qt::DirectConnection,
+                              Q_ARG(int, 2), Q_ARG(int, 0));
+    QTest::qWait(150);
+    QVERIFY(cs->property("cursorKind").toString() == QStringLiteral("TextCaret"));
+
+    // Each cell should now show its full-content selection (since the
+    // selection range covers byte 0 → row 2 byte 0, which spans the whole
+    // table block).
+    auto cellSelectionLen = [&](int r, int c) -> int {
+        QQuickItem *ed = cellTextEditAt(s.table, r, c);
+        if (!ed) return -1;
+        return ed->property("selectionEnd").toInt()
+               - ed->property("selectionStart").toInt();
+    };
+
+    // Wait briefly for the QML Connections to fire applySelection.
+    QTRY_VERIFY_WITH_TIMEOUT(cellSelectionLen(0, 0) > 0, 2000);
+    QVERIFY(cellSelectionLen(0, 1) > 0);
+    QVERIFY(cellSelectionLen(1, 0) > 0);
+    QVERIFY(cellSelectionLen(1, 1) > 0);
 }
 
 }  // namespace Markoff::Live::Test
