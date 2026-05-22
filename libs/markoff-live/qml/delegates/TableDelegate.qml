@@ -493,6 +493,23 @@ Rectangle {
                                 return
                             }
 
+                            // ---- E1: Backspace at first cell, cellQtPos 0 ----
+                            // → BlockSelected{table}. From the user's POV
+                            // this means: "I'm at the very start of the
+                            // table; one Backspace selects the table; the
+                            // next Backspace deletes it." Other cells:
+                            // Backspace at cellQtPos 0 is inert (don't
+                            // delete the closing `|`).
+                            if (event.key === Qt.Key_Backspace
+                                && cellEdit.cursorPosition === 0) {
+                                if (cellRect.r === 0 && cellRect.c === 0) {
+                                    root.cursorState.requestBlockSelected(
+                                        root.blockAnchor)
+                                }
+                                event.accepted = true
+                                return
+                            }
+
                             // ---- D1: Tab / Shift+Tab ----
                             if (event.key === Qt.Key_Tab
                                 || event.key === Qt.Key_Backtab) {
@@ -756,6 +773,16 @@ Rectangle {
     //   LastLine  → last body row (r = N)     at column nearest desiredVisualX
     // Falls back to cell (0, 0) qtPos 0 if qtPos doesn't land in any cell.
     function takeFocus(qtPos: int) {
+        // E4 E1: when the cursor is BlockSelected (table-as-a-unit),
+        // focus lives on the delegate root rather than any cell. The
+        // delegate root's Keys.onPressed handler (below) routes
+        // structural keys through structuralKeyHandler so the
+        // generic block-only Delete/Backspace/Enter/Up/Down behavior
+        // applies.
+        if (root.isSelected) {
+            root.forceActiveFocus()
+            return
+        }
         if (!root.parsedTable || !root.parsedTable.parseOk) {
             root.forceActiveFocus()
             return
@@ -808,6 +835,29 @@ Rectangle {
         } else {
             root.forceActiveFocus()
         }
+    }
+
+    // E4 E1: root-level Keys handler for the BlockSelected state.
+    // When the cursor is BlockSelected{table}, takeFocus puts focus
+    // on the delegate root (not a cell). Structural keys are routed
+    // to LiveStructuralKeyHandler, where Table's `isBlockOnly = true`
+    // registers blockOnlyDelete/Enter/NavigateUp/NavigateDown for
+    // each. Same pattern as `BlockOnlyDelegateBase.qml:29-42`.
+    Keys.priority: Keys.BeforeItem
+    Keys.onPressed: (event) => {
+        if (!root.isSelected) { event.accepted = false; return }
+        const sh = root.liveBinding ? root.liveBinding.structuralKeyHandler : null
+        if (!sh) { event.accepted = false; return }
+        const k = event.key
+        if (k !== Qt.Key_Delete && k !== Qt.Key_Backspace
+                && k !== Qt.Key_Up && k !== Qt.Key_Down
+                && k !== Qt.Key_Return && k !== Qt.Key_Enter) {
+            event.accepted = false
+            return
+        }
+        const handled = sh.tryHandle(k, event.modifiers, root.modelIndex,
+            /*qtPos=*/-1, /*selectionEmpty=*/true, root.blockText)
+        event.accepted = handled
     }
 
     Component.onCompleted: {

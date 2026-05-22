@@ -99,6 +99,12 @@ private slots:
     // E4 D3 — Enter inert, Esc → BlockSelected.
     void enter_inside_cell_is_inert();
     void escape_inside_cell_promotes_to_block_selected();
+
+    // E4 E1 — block-level delete cascade.
+    void backspace_at_first_cell_first_qtpos_promotes_to_block_selected();
+    void backspace_on_block_selected_deletes_table();
+    void backspace_at_other_cell_first_qtpos_is_inert();
+    void backspace_at_start_of_paragraph_after_table_selects_table();
 };
 
 void TestTableCellEdit
@@ -600,25 +606,26 @@ void TestTableCellEdit::delete_then_enter_at_paragraph_before_table_preserves_bl
     QTest::qWait(100);
     QTRY_COMPARE_WITH_TIMEOUT(fx.cursorStateCurrentRow(), 0, 2000);
 
+    // Post-E1 behavior: Delete at end-of-paragraph-adjacent-to-table
+    // now triggers the adjacency fence (Table::isBlockOnly=true), so
+    // the table becomes BlockSelected instead of merging. Block count
+    // stays the same after Delete.
     fx.harness().keyClick(Qt::Key_Delete);
     QTest::qWait(300);
-
-    QTRY_COMPARE_WITH_TIMEOUT(m->rowCount(), initialRows - 1, 2000);
-
-    fx.harness().keyClick(Qt::Key_Return);
-    QTest::qWait(300);
-
-    // Crucial: rowCount returns to initial. Without the §5.1 fix, this
-    // assertion sees rowCount ~= initial - 20 because the Enter's
-    // KeyDispatch.collapseSelectionIfMutating fires a phantom
-    // deleteSelection that wipes the blocks between the clicked row
-    // and the post-merge non-focused-delegate-clobbered active row.
     QTRY_COMPARE_WITH_TIMEOUT(m->rowCount(), initialRows, 2000);
 
-    // Defense in depth: count list-items + headings. With the
-    // data-loss bug, ~20 blocks vanished between the user's clicked
-    // row and the phantom active row — that range includes most of
-    // the list-items and headings in the fixture.
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+
+    // Enter on BlockSelected{table}: blockOnlyEnter handler inserts an
+    // empty paragraph after the table. blockCount = initialRows + 1.
+    fx.harness().keyClick(Qt::Key_Return);
+    QTest::qWait(300);
+    QTRY_COMPARE_WITH_TIMEOUT(m->rowCount(), initialRows + 1, 2000);
+
+    // The cursor-authority fix's load-bearing invariant: ALL of the
+    // following blocks survive. Without §5.1, ~20 blocks would have
+    // disappeared via phantom deleteSelection. Count lists+headings
+    // remaining — should match the fixture's original.
     int listsHeadingsAfter = 0;
     for (int r = 0; r < m->rowCount(); ++r) {
         const QString k = fx.modelKind(r);
@@ -679,6 +686,119 @@ void TestTableCellEdit::escape_inside_cell_promotes_to_block_selected()
     QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
                               QStringLiteral("BlockSelected"), 2000);
     QCOMPARE(cs->property("focusedAnchorRow").toInt(), 1);  // table row
+}
+
+// ---- E1 ----
+
+void TestTableCellEdit::backspace_at_first_cell_first_qtpos_promotes_to_block_selected()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->setProperty("cursorPosition", 0);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Backspace);
+    QTest::qWait(100);
+
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                              QStringLiteral("BlockSelected"), 2000);
+    QCOMPARE(cs->property("focusedAnchorRow").toInt(), 1);  // table row
+}
+
+void TestTableCellEdit::backspace_on_block_selected_deletes_table()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QAbstractItemModel *m = s.fx->model();
+    const int initialRows = m->rowCount();
+
+    // First: promote to BlockSelected by Backspace at cell (0, 0).
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    cell00->setProperty("cursorPosition", 0);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+    s.fx->harness().keyClick(Qt::Key_Backspace);
+    QTest::qWait(100);
+
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                              QStringLiteral("BlockSelected"), 2000);
+
+    // Second Backspace: blockOnlyDelete fires via structuralKeyHandler.
+    s.fx->harness().keyClick(Qt::Key_Backspace);
+    QTest::qWait(200);
+
+    QTRY_COMPARE_WITH_TIMEOUT(m->rowCount(), initialRows - 1, 2000);
+    // Verify no remaining row is a table.
+    for (int r = 0; r < m->rowCount(); ++r)
+        QVERIFY(s.fx->modelKind(r) != QStringLiteral("table"));
+}
+
+void TestTableCellEdit::backspace_at_other_cell_first_qtpos_is_inert()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 1) != nullptr);
+
+    const QString preBuffer = s.fx->modelText(1);
+
+    QQuickItem *cell01 = cellTextEditAt(s.table, 0, 1);
+    QVERIFY(cell01);
+    cell01->setProperty("cursorPosition", 0);
+    cell01->forceActiveFocus();
+    QTRY_VERIFY(cell01->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Backspace);
+    QTest::qWait(100);
+
+    // Buffer unchanged. cursor still TextCaret (not promoted to BlockSelected).
+    QCOMPARE(s.fx->modelText(1), preBuffer);
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+}
+
+void TestTableCellEdit::backspace_at_start_of_paragraph_after_table_selects_table()
+{
+    // User dogfood report #1 — adjacent-block path. Caret at qtPos 0
+    // of the paragraph FOLLOWING the table. Backspace should select
+    // the table (via LiveStructuralKeyHandler's adjacency fence at
+    // line 170, now that Table::isBlockOnly=true).
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n"
+        "\n"
+        "para after\n";
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(2, 2000));
+
+    // Place caret at start of "para after" (row 2) via the chokepoint
+    // — placeCursorAtPos goes through requestTextCaretAtRow which
+    // delivers focus via establishFocus → takeFocus.
+    fx.placeCursorAtPos(/*row=*/2, /*qtPos=*/0);
+    QTRY_COMPARE_WITH_TIMEOUT(fx.cursorStateCurrentRow(), 2, 2000);
+
+    fx.harness().keyClick(Qt::Key_Backspace);
+    QTest::qWait(200);
+
+    // Expected: cursor is now BlockSelected on the table (row 1).
+    QObject *cs = fx.binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                              QStringLiteral("BlockSelected"), 2000);
+    QCOMPARE(cs->property("focusedAnchorRow").toInt(), 1);
 }
 
 }  // namespace Markoff::Live::Test

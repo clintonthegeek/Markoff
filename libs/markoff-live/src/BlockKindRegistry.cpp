@@ -156,12 +156,22 @@ void BlockKindRegistry::registerBuiltins()
     // BlockInternalEdit reserved for future "table-is-being-edited as
     // a unit" semantics that don't carry cursor position. Buffer IS
     // the pipe-table markdown source (passthrough serializer).
-    // Spec: docs/specs/2026-05-22-e4-tables-design.md §5.1 + §5.4.
+    //
+    // isBlockOnly = true (plan §E): adjacent-block Backspace/Delete
+    // routes through LiveStructuralKeyHandler's adjacency fence
+    // (LiveStructuralKeyHandler.cpp:170) and selects the Table as
+    // a block instead of cross-boundary-merging (which would corrupt
+    // the pipe-table buffer). The generic block-only handlers also
+    // get registered, giving BlockSelected{table} sensible behavior
+    // for Backspace/Delete (delete the block), Enter (insert empty
+    // paragraph after), and Up/Down (navigate to adjacent block).
+    // Spec: docs/specs/2026-05-22-e4-tables-design.md §5.1 + §5.4
+    // and plan §E.
     {
         BlockKindDescriptor d;
         d.id = BlockKind::Table;
         d.acceptsTextRoleUpdates = true;
-        d.isBlockOnly = false;
+        d.isBlockOnly = true;
         d.supportedCursorVariants = {
             QStringLiteral("TextCaret"),
             QStringLiteral("BlockSelected"),

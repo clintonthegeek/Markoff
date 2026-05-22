@@ -230,6 +230,16 @@ void LiveCursorState::requestBlockSelected(Markoff::BlockAnchor blockAnchor)
     BlockSelected sel;
     sel.block = blockAnchor;
     request(sel);
+    // Deliver focus to the delegate root. Matches the BlockSelected
+    // semantics (block-as-a-unit, not in a cell). Without this,
+    // subsequent keypresses keep going to whichever cell had focus —
+    // and the cell's Keys.onPressed intercepts them before the root's
+    // BlockSelected handler can run.
+    auto it = m_delegates.find(blockAnchor);
+    if (it != m_delegates.end() && it->root) {
+        QMetaObject::invokeMethod(it->root.data(), "takeFocus",
+                                  Q_ARG(int, -1));
+    }
 }
 
 void LiveCursorState::setCaretWithoutFocus(Markoff::BlockAnchor block, int qtPos)
