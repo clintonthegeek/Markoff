@@ -273,15 +273,10 @@ Rectangle {
                         // B4: round-trip cell-relative cursor moves back to
                         // the chokepoint as block-buffer flatQtPos. The
                         // chokepoint is doc-keyed and unconditionally drops
-                        // re-entrant equal-state updates, so the
-                        // takeFocus → forceActiveFocus → here → syncFromTextEdit
-                        // cycle settles in one round.
-                        // B4: round-trip cell-relative cursor moves back to
-                        // the chokepoint as block-buffer flatQtPos. The
-                        // chokepoint is doc-keyed and unconditionally drops
-                        // re-entrant equal-state updates, so the
-                        // takeFocus → forceActiveFocus → here → syncFromTextEdit
-                        // cycle settles in one round. This handler is what
+                        // re-entrant equal-state updates, so the cycle
+                        // (takeFocus places the cell caret, this slot
+                        // syncs the position back to LiveCursorState)
+                        // settles in one round. This handler is what
                         // makes future cell-internal arrow keys, typing,
                         // and selection moves visible to the chokepoint —
                         // for fresh clicks the identity holds via takeFocus
