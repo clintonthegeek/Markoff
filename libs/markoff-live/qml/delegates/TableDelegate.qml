@@ -505,11 +505,80 @@ Rectangle {
                                 return
                             }
 
-                            // ---- D2 STUB: arrow keys accepted but no-op ----
+                            // ---- D2: Left / Right at cell edges ----
                             if (event.key === Qt.Key_Left
-                                || event.key === Qt.Key_Right
-                                || event.key === Qt.Key_Up
+                                || event.key === Qt.Key_Right) {
+                                const isLeft = event.key === Qt.Key_Left
+                                const atEdge = isLeft
+                                    ? cellEdit.cursorPosition === 0
+                                    : cellEdit.cursorPosition === cellEdit.length
+                                if (!atEdge) return  // within-cell — pass to TextEdit
+
+                                const cols      = root.parsedTable.headers.length
+                                const totalRows = root.parsedTable.body.length + 1
+                                let nextR = cellRect.r
+                                let nextC = cellRect.c
+                                if (isLeft) {
+                                    nextC -= 1
+                                    if (nextC < 0) { nextC = cols - 1; nextR -= 1 }
+                                } else {
+                                    nextC += 1
+                                    if (nextC >= cols) { nextC = 0; nextR += 1 }
+                                }
+                                if (nextR < 0) {
+                                    root.cursorState.requestTextCaretAtRow(
+                                        root.modelIndex - 1, 0)
+                                } else if (nextR >= totalRows) {
+                                    root.cursorState.requestTextCaretAtRow(
+                                        root.modelIndex + 1, 0)
+                                } else {
+                                    const ranges = root.parsedTable.cellCharRanges
+                                    if (nextR >= ranges.length) return
+                                    if (nextC >= ranges[nextR].length) return
+                                    const range = ranges[nextR][nextC]
+                                    const cellLen = range.end - range.start
+                                    // Land at end-of-prev (Left) or start-of-next (Right).
+                                    const cellQtPos = isLeft ? cellLen : 0
+                                    root.cursorState.establishFocus(
+                                        root.blockAnchor, range.start + cellQtPos)
+                                }
+                                event.accepted = true
+                                return
+                            }
+
+                            // ---- D2: Up / Down cross-row ----
+                            if (event.key === Qt.Key_Up
                                 || event.key === Qt.Key_Down) {
+                                // Cells are NoWrap single-line, so any
+                                // Up/Down crosses the cell-row boundary —
+                                // no within-cell vertical motion to honour.
+                                const isUp = event.key === Qt.Key_Up
+                                const totalRows = root.parsedTable.body.length + 1
+                                const nextR = isUp ? cellRect.r - 1
+                                                   : cellRect.r + 1
+                                if (nextR < 0) {
+                                    root.cursorState.requestTextCaretAtRow(
+                                        root.modelIndex - 1, 0)
+                                } else if (nextR >= totalRows) {
+                                    root.cursorState.requestTextCaretAtRow(
+                                        root.modelIndex + 1, 0)
+                                } else {
+                                    const ranges = root.parsedTable.cellCharRanges
+                                    if (nextR >= ranges.length) return
+                                    if (cellRect.c >= ranges[nextR].length) return
+                                    const range = ranges[nextR][cellRect.c]
+                                    const cellLen = range.end - range.start
+                                    // Use the source cell's cursorPosition
+                                    // as a same-column-x proxy — all cells
+                                    // share the table's body font, so the
+                                    // character-index match yields the
+                                    // closest visual-x without explicit
+                                    // pixel computation.
+                                    const target = Math.min(
+                                        cellEdit.cursorPosition, cellLen)
+                                    root.cursorState.establishFocus(
+                                        root.blockAnchor, range.start + target)
+                                }
                                 event.accepted = true
                                 return
                             }
