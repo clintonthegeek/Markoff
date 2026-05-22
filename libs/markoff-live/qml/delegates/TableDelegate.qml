@@ -764,16 +764,41 @@ Rectangle {
     // renders the highlight on its portion of the block-flat range. Mirrors
     // UnifiedInlineTextDelegate's applySelection() but per-cell.
     //
-    // Called from the Connections block on cursorState.selectionChanged.
+    // PERF: only listens to selectionChanged (NOT cursorChanged). Every
+    // extend() call emits selectionChanged via emitSelectionChanged(), so
+    // drag-extend through the table re-applies. Subscribing to cursorChanged
+    // additionally would fire on every within-block keystroke, redundantly
+    // re-running this loop even when the table's range is unchanged — and
+    // would create a feedback cascade because ed.select() drives the cell's
+    // onCursorPositionChanged → syncFromTextEdit → cursorChanged → re-fire.
+    //
+    // Memoisation: track the last applied (rangeStart, rangeEnd) and bail
+    // when unchanged. Drag-select fires selectionChanged ~60 Hz; many of
+    // those report the same range for this block (e.g. dragging within the
+    // post-table paragraph keeps the table fully selected).
+    property var _lastAppliedRange: null
     function _applyCrossBlockSelection() {
         if (!root.parsedTable || !root.parsedTable.parseOk) return
         const cs = root.cursorState
         if (!cs) return
-        const ccr = root.parsedTable.cellCharRanges
-        const range = cs.rangeForBlock(root.modelIndex)
 
-        // No selection covers this block — clear all cell selections.
-        const blockHasNoRange = (!range || range.x < 0)
+        const range = cs.rangeForBlock(root.modelIndex)
+        const blockStart = (range && range.x >= 0) ? range.x : -1
+        const blockEnd   = (range && range.x >= 0) ? range.y : -1
+
+        // Bail if nothing changed for THIS block — drag-select inside an
+        // adjacent block fires selectionChanged repeatedly with the same
+        // (or no-range) result here.
+        const last = root._lastAppliedRange
+        if (last
+                && last.start === blockStart
+                && last.end   === blockEnd) {
+            return
+        }
+        root._lastAppliedRange = { start: blockStart, end: blockEnd }
+
+        const ccr = root.parsedTable.cellCharRanges
+        const blockHasNoRange = (blockStart < 0)
 
         for (let r = 0; r < ccr.length; ++r) {
             const rowRanges = ccr[r]
@@ -788,16 +813,11 @@ Rectangle {
                 }
                 const cellRange = rowRanges[c]
                 if (!cellRange) continue
-                const blockStart = range.x
-                const blockEnd   = range.y
-                // cellRange { start, end } in block-relative QString chars.
                 if (blockEnd <= cellRange.start || blockStart >= cellRange.end) {
-                    // Cell entirely outside selection.
                     if (ed.selectionStart !== ed.selectionEnd)
                         ed.deselect()
                     continue
                 }
-                // Overlap exists. Translate to cell-relative.
                 const overlapStart = Math.max(blockStart, cellRange.start)
                                      - cellRange.start
                 const overlapEnd   = Math.min(blockEnd, cellRange.end)
@@ -807,8 +827,17 @@ Rectangle {
                         ed.deselect()
                     continue
                 }
-                // Q_INVOKABLE select(start, end) on QQuickTextEdit.
-                ed.select(overlapStart, overlapEnd)
+                // Suppress the focused cell's syncFromTextEdit echo while
+                // we're driving cursorPosition programmatically. Without
+                // this, ed.select() fires the cell's onCursorPositionChanged,
+                // which routes through syncFromTextEdit → cursorChanged →
+                // re-fires this loop. The chokepoint's same-block sync
+                // accepts the position write because activeFocus is true
+                // for the focused cell.
+                if (!ed.selectionStart || ed.selectionStart !== overlapStart
+                        || ed.selectionEnd !== overlapEnd) {
+                    ed.select(overlapStart, overlapEnd)
+                }
             }
         }
     }
@@ -816,7 +845,6 @@ Rectangle {
     Connections {
         target: root.cursorState
         function onSelectionChanged() { root._applyCrossBlockSelection() }
-        function onCursorChanged()    { root._applyCrossBlockSelection() }
     }
 
     function _cellAt(r, c) {
