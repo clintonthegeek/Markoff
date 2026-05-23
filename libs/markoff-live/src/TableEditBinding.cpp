@@ -221,18 +221,45 @@ qreal TableEditBinding::cellMaxWidth(const QString &text,
     return fm.horizontalAdvance(text) + 2 * padding;
 }
 
-// --- E4 follow-up: A2-proof stub (DELIBERATELY BROKEN) ----------
+// --- E4 follow-up: distributeColumnsAuto (Penelope port, A2) -----
 //
-// Falsifiability proof per INVARIANTS.md invariant 4. Returns
-// minimum widths only — drops the proportional and surplus branches.
-// Expectation: A2 distribution tests fail; A1 tests stay green.
-// Replaced by the real port in the immediately-following commit.
+// Verbatim port of distributeColumnsAuto from
+// ~/dev/Penelope/src/engine.cpp. Three branches: totalMax≤avail
+// (everything fits — split surplus evenly), totalMin≥avail (cannot
+// fit even with aggressive wrap — scale mins proportionally), else
+// proportional distribution between min and max via W/D.
 QList<qreal> TableEditBinding::distributeColumnsAuto(
-    const QList<ColumnMetrics> &metrics, qreal /*availWidth*/)
+    const QList<ColumnMetrics> &metrics, qreal availWidth)
 {
-    QList<qreal> widths(metrics.size());
-    for (int i = 0; i < metrics.size(); ++i)
-        widths[i] = metrics[i].minWidth;
+    const int n = metrics.size();
+    QList<qreal> widths(n);
+    if (n == 0) return widths;
+
+    qreal totalMin = 0, totalMax = 0;
+    for (const auto &m : metrics) {
+        totalMin += m.minWidth;
+        totalMax += m.maxWidth;
+    }
+
+    if (totalMax <= availWidth) {
+        // All content fits without wrapping — use max widths,
+        // distribute surplus.
+        const qreal surplus = availWidth - totalMax;
+        for (int i = 0; i < n; ++i)
+            widths[i] = metrics[i].maxWidth + surplus / n;
+    } else if (totalMin >= availWidth) {
+        // Can't avoid wrapping; can't even honor mins. Scale mins
+        // proportionally so the result still sums to availWidth.
+        for (int i = 0; i < n; ++i)
+            widths[i] = metrics[i].minWidth * (availWidth / totalMin);
+    } else {
+        // Proportional distribution between min and max.
+        const qreal W = availWidth - totalMin;
+        const qreal D = totalMax - totalMin;
+        for (int i = 0; i < n; ++i)
+            widths[i] = metrics[i].minWidth
+                      + (metrics[i].maxWidth - metrics[i].minWidth) * W / D;
+    }
     return widths;
 }
 
