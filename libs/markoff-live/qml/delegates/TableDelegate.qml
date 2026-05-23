@@ -439,6 +439,16 @@ Rectangle {
                                             && cellRect.c < root.columnWidths.length)
                                            ? root.columnWidths[cellRect.c]
                                            : 60   // TableEditBinding::kMinColumnWidth
+                    // E4 wrap dogfood fix (2026-05-23): without fillHeight,
+                    // GridLayout sizes each cell Rectangle to its own
+                    // implicitHeight, then vertically centres the shorter
+                    // cells inside the row's max height — exposing the
+                    // GridLayout's background above and below short cells
+                    // in rows where a sibling wraps. fillHeight stretches
+                    // every cell Rectangle to the row's full height; the
+                    // TextEdit inside stays anchored.fill to track the new
+                    // height (text stays top-aligned within the cell).
+                    Layout.fillHeight: true
                     implicitHeight: cellEdit.implicitHeight + 8
 
                     color: (root.liveBinding && root.liveBinding.theme)
