@@ -4,10 +4,14 @@
 #include <markoff/live/Coordinates.h>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Theme.h>
 #include <markoff/core/UndoLog.h>
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/parser/PerfProbe.h>
 
+#include <QFontMetricsF>
+#include <QGuiApplication>
+#include <QRegularExpression>
 #include <QScopeGuard>
 
 namespace Markoff::Live {
@@ -185,6 +189,36 @@ void TableEditBinding::perfTime(const QString &name, double ms) const
 void TableEditBinding::perfNote(const QString &name) const
 {
     Markoff::Perf::Probe::instance().note(name);
+}
+
+// --- E4 follow-up: column-width metric helpers (A1) ----------------
+
+qreal TableEditBinding::cellMinWidth(const QString &text,
+                                     const QFont &font,
+                                     qreal padding)
+{
+    const QFontMetricsF fm(font);
+    qreal widest = 0;
+    // Split on whitespace; the longest token is the "unbreakable run"
+    // that the wrap engine cannot shrink past. Matches the spirit of
+    // WrapAtWordBoundaryOrAnywhere falling back to mid-word breaks only
+    // as a last resort: we size to keep word boundaries breakable, and
+    // accept that a single hyper-long unbreakable run sets the floor.
+    const auto tokens = text.split(QRegularExpression(QStringLiteral("\\s+")),
+                                   Qt::SkipEmptyParts);
+    for (const auto &tok : tokens) {
+        const qreal w = fm.horizontalAdvance(tok);
+        if (w > widest) widest = w;
+    }
+    return std::max(widest + 2 * padding, kMinColumnWidth);
+}
+
+qreal TableEditBinding::cellMaxWidth(const QString &text,
+                                     const QFont &font,
+                                     qreal padding)
+{
+    const QFontMetricsF fm(font);
+    return fm.horizontalAdvance(text) + 2 * padding;
 }
 
 }  // namespace Markoff::Live

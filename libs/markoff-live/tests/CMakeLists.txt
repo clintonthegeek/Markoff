@@ -20,6 +20,19 @@ add_test(NAME tst_block_kind_registry_table COMMAND tst_block_kind_registry_tabl
 set_tests_properties(tst_block_kind_registry_table PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# E4 wrap+column-width follow-up: pure C++ metric & distribution unit
+# tests. No QML; uses QGuiApplication's default font so the algorithm is
+# what's exercised, not specific pixel values.
+qt_add_executable(tst_live_render_table_layout_metrics
+    tst_live_render_table_layout_metrics.cpp
+)
+target_link_libraries(tst_live_render_table_layout_metrics PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Test markoff_live)
+add_test(NAME tst_live_render_table_layout_metrics
+         COMMAND tst_live_render_table_layout_metrics)
+set_tests_properties(tst_live_render_table_layout_metrics PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 qt_add_executable(tst_live_find_adapter
     tst_live_find_adapter.cpp
 )

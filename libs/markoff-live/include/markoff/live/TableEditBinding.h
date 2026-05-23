@@ -5,6 +5,7 @@
 
 #include <markoff/live/LiveListModelBinding.h>
 
+#include <QFont>
 #include <QObject>
 #include <QPointer>
 #include <QString>
@@ -105,6 +106,40 @@ public:
     /// dispatched through `Markoff::Perf::Probe` (header-only singleton).
     Q_INVOKABLE void perfTime(const QString &name, double ms) const;
     Q_INVOKABLE void perfNote(const QString &name) const;
+
+    // --- E4 follow-up: column-width metrics (A1) --------------------
+    //
+    // Spec: docs/specs/2026-05-23-e4-cell-wrap-and-column-width-design.md §3.1
+    // Public-static rather than anonymous-namespace so the unit test can
+    // drive the pure-function helpers directly without a friend
+    // declaration or test-only Q_INVOKABLE shim. Still no separate
+    // header, still no second consumer — refinement of the plan-time
+    // resolution, not a deviation.
+
+    /// Floor applied at the per-cell `cellMinWidth` and at column
+    /// aggregation. Preserves the 60px first-pass minimum from E4 B2.
+    static constexpr qreal kMinColumnWidth = 60.0;
+
+    /// Padding applied symmetrically inside each cell. Returned as a
+    /// scalar (not a Theme-keyed accessor) so the C++ side can compute
+    /// metrics without bouncing through QML. Matches the QML side's
+    /// `anchors.margins: 4` in TableDelegate's per-cell Rectangle.
+    static qreal cellPadding() { return 4.0; }
+
+    /// Widest unbreakable run in `text` (split on whitespace), measured
+    /// in `font`, with `2*padding` added. Floored at `kMinColumnWidth`
+    /// so empty / very-short cells still occupy a readable slot.
+    static qreal cellMinWidth(const QString &text,
+                              const QFont &font,
+                              qreal padding);
+
+    /// Full single-line width of `text` measured in `font`, with
+    /// `2*padding` added. Not floored — the column aggregation step
+    /// applies the floor via `max(metrics[c].minWidth, kMinColumnWidth)`
+    /// and `max(metrics[c].maxWidth, metrics[c].minWidth)`.
+    static qreal cellMaxWidth(const QString &text,
+                              const QFont &font,
+                              qreal padding);
 
 Q_SIGNALS:
     void bindingChanged();
