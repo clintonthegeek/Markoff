@@ -141,6 +141,26 @@ public:
                               const QFont &font,
                               qreal padding);
 
+    /// Per-column min/max width metrics, aggregated across rows by `max`.
+    /// Public so the unit test can construct fixtures directly.
+    struct ColumnMetrics {
+        qreal minWidth = 0;
+        qreal maxWidth = 0;
+    };
+
+    /// Verbatim port of Penelope's `distributeColumnsAuto`. Three
+    /// branches: totalMax≤avail → distribute surplus evenly above maxes;
+    /// totalMin≥avail → scale mins proportionally; else → proportional
+    /// between min and max via W=avail-totalMin / D=totalMax-totalMin.
+    ///
+    /// In every branch `sum(widths)` equals `availWidth` (modulo FP
+    /// rounding). Empty `metrics` returns an empty list; the caller is
+    /// responsible for the "no columns" guard.
+    ///
+    /// Spec: docs/specs/2026-05-23-e4-cell-wrap-and-column-width-design.md §3.3.
+    static QList<qreal> distributeColumnsAuto(const QList<ColumnMetrics> &metrics,
+                                              qreal availWidth);
+
 Q_SIGNALS:
     void bindingChanged();
     void modelIndexChanged();

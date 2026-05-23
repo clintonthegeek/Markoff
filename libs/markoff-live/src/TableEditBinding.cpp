@@ -221,4 +221,19 @@ qreal TableEditBinding::cellMaxWidth(const QString &text,
     return fm.horizontalAdvance(text) + 2 * padding;
 }
 
+// --- E4 follow-up: A2-proof stub (DELIBERATELY BROKEN) ----------
+//
+// Falsifiability proof per INVARIANTS.md invariant 4. Returns
+// minimum widths only — drops the proportional and surplus branches.
+// Expectation: A2 distribution tests fail; A1 tests stay green.
+// Replaced by the real port in the immediately-following commit.
+QList<qreal> TableEditBinding::distributeColumnsAuto(
+    const QList<ColumnMetrics> &metrics, qreal /*availWidth*/)
+{
+    QList<qreal> widths(metrics.size());
+    for (int i = 0; i < metrics.size(); ++i)
+        widths[i] = metrics[i].minWidth;
+    return widths;
+}
+
 }  // namespace Markoff::Live
