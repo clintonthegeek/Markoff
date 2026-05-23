@@ -413,8 +413,20 @@ Rectangle {
                             ? row[cellRect.c] : ""
                     }
 
-                    Layout.fillWidth: true
-                    Layout.minimumWidth: 60
+                    // E4 wrap B2: consume the C++ side's content-aware
+                    // column widths. fillWidth: false lets preferredWidth
+                    // be respected (GridLayout's default stretches the
+                    // last column to absorb FP rounding — spec §7 risk 3,
+                    // acceptable). The 60px floor used to live here as
+                    // Layout.minimumWidth; it's now applied inside
+                    // computeColumnWidths' per-column metric aggregation
+                    // so empty/very-short cells still occupy a readable
+                    // slot.
+                    Layout.fillWidth: false
+                    Layout.preferredWidth: (cellRect.c >= 0
+                                            && cellRect.c < root.columnWidths.length)
+                                           ? root.columnWidths[cellRect.c]
+                                           : 60   // TableEditBinding::kMinColumnWidth
                     implicitHeight: cellEdit.implicitHeight + 8
 
                     color: (root.liveBinding && root.liveBinding.theme)
@@ -433,7 +445,12 @@ Rectangle {
                         anchors.margins: 4
                         text: cellRect.cellText
                         readOnly: false   // C2: cells become editable
-                        wrapMode: TextEdit.NoWrap
+                        // E4 wrap B2: WordBoundary preferred; mid-word
+                        // break only as a last resort (for hyper-long
+                        // unbreakable runs — URLs, long identifiers).
+                        // Cell width comes from the parent Rectangle's
+                        // Layout.preferredWidth driven by columnWidths.
+                        wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
                         textFormat: TextEdit.PlainText
                         horizontalAlignment: {
                             // Bounds-safe during structural transitions:
