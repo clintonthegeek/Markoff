@@ -8,6 +8,8 @@
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/parser/PerfProbe.h>
 
+#include <QScopeGuard>
+
 namespace Markoff::Live {
 
 namespace coords = ::Markoff::Live::Detail::Coordinates;
@@ -85,6 +87,20 @@ void TableEditBinding::applyCellEdit(int cellStartCharPos,
     const uint32_t removedBytes = static_cast<uint32_t>(
         coords::qtPosToByte(preUtf8, absoluteCharPos + removed)) - byteOff;
     const QByteArray addedBytes = added.toUtf8();
+
+    // Re-entrance guard (mirrors `LiveEditBinding::m_applyingTextUpdate`
+    // and the dormant getter exposed at TableEditBinding.h:80). Set
+    // before `flushPendingD2Changed` so the synchronous
+    // onD2Changed → buildRecords → cellText binding refresh →
+    // cellEdit.text re-push → cell `onTextChanged` cascade sees a true
+    // flag and skips. Without this, the cells re-fire `applyCellEdit`
+    // with no-op deltas; the previous commit catches them at the entry
+    // point, but they still consume `cellText.eval` +
+    // `inlineSpansForCell` + `setInlineSpans+rehighlight` work. Setting
+    // this here lets the QML cell-level `onTextChanged` handler exit
+    // early before any of that — N cells become 1.
+    m_applyingTextUpdate = true;
+    auto resetGuard = qScopeGuard([this] { m_applyingTextUpdate = false; });
 
     auto &undoLog = doc->d2UndoLog();
     UndoLog::Transaction t(undoLog);
