@@ -58,14 +58,11 @@
 > EditorWidget got built anyway in `bc8216d` because Corbomite actually pulled on it.
 > Recorded as proposed-and-built in [`docs/specs/2026-05-19-markoff-live-freeze-shape-design.md`](docs/specs/2026-05-19-markoff-live-freeze-shape-design.md).
 >
-> **Test baseline (2026-05-23):** 232/235 pass. Test count grew from
-> 226 (2026-05-21) via E4 tables work — Phase A test added (`tst_live_render_table_block_loading`),
-> Phase B parsing test (`tst_live_render_table_parsing`),
-> Phase C–E cell-edit + nav + delete-cascade test (`tst_live_render_table_cell_edit`),
-> Phase F1+F2 inline-formatting + link-click test
-> (`tst_live_render_table_inline_formatting`), and Phase G adds one slot
-> to `tst_live_render_qml_integration`. Three pre-existing failures
-> (all unrelated to E4; all pre-date this session):
+> **Test baseline (2026-05-23, late session):** 235/238 pass. Test count
+> 235 → 238 from the E4 wrap+width follow-up — added
+> `tst_live_render_table_layout_metrics` (15 slots, C++ unit) and
+> `tst_live_render_table_layout` (5 slots, QML-reach integration). Three
+> pre-existing failures (all unrelated to E4; all pre-date this session):
 > - `tst_live_render_e2_nav_shift_extend` (slot from `0cbdf48`'s within-block word-extend rework)
 > - `tst_live_render_focus_chokepoint_invariant` (undo/redo edge cases)
 > - `tst_live_render_cursor_typing_invariant` (emoji-typing mirror)
@@ -100,16 +97,27 @@
 > follow-ups doc ([`docs/specs/2026-05-21-source-view-cleanup-followups.md`](docs/specs/2026-05-21-source-view-cleanup-followups.md))
 > or the `docs/queue.md` backlog.
 >
-> **Active workfront (as of 2026-05-23) — E4 tables, phases A–G shipped.**
+> **Active workfront (as of 2026-05-23, late session) — E4 tables, phases A–G shipped + wrap/width follow-up + dogfood-confirmed.**
 > The E-arc roadmap's `E4` sub-phase has been worked end-to-end this
 > week: spec [`docs/specs/2026-05-22-e4-tables-design.md`](docs/specs/2026-05-22-e4-tables-design.md),
 > plan [`docs/plans/2026-05-22-e4-tables.md`](docs/plans/2026-05-22-e4-tables.md),
-> status [`docs/e-arc/e-arc-status.md`](docs/e-arc/e-arc-status.md).
-> Remaining within E4: Phase H — dogfood + tag `v0.7.0-e4`. The user
-> has begun dogfooding (2026-05-23) and surfaced two issues that landed
-> same-day (`5c67777` typing-perf, `9d5235f` Shift+arrow cross-cell);
-> further dogfood iteration is queued. Architectural side-quest from
-> the E4 work: [`docs/specs/2026-05-22-cursor-authority-decision.md`](docs/specs/2026-05-22-cursor-authority-decision.md)
+> status [`docs/e-arc/e-arc-status.md`](docs/e-arc/e-arc-status.md). The
+> wrap + smart column-width follow-up landed end-to-end in this session:
+> spec [`docs/specs/2026-05-23-e4-cell-wrap-and-column-width-design.md`](docs/specs/2026-05-23-e4-cell-wrap-and-column-width-design.md),
+> plan [`docs/plans/2026-05-23-e4-cell-wrap-and-column-width.md`](docs/plans/2026-05-23-e4-cell-wrap-and-column-width.md),
+> implementation `65b6a35..6a0865a` (Penelope's `distributeColumnsAuto`
+> ported to `TableEditBinding::computeColumnWidths`; `TableDelegate.qml`
+> consumes via per-cell `Layout.preferredWidth` + `WrapAtWordBoundaryOrAnywhere`;
+> post-land dogfood revealed a `Layout.fillHeight` gap that exposed
+> horizontal seams, fixed in `6a0865a`). **User dogfood-confirmed the wrap
+> behaviour: "the table seems quite usable, as it were."** Remaining
+> within E4: tag `v0.7.0-e4` after the broader Phase H checklist passes
+> (Source-mode round-trip, real-doc Tab nav, BlockSelected delete, link
+> clicks in cells, etc. — see [`docs/handoff/2026-05-22-e4-dogfood-request.md`](docs/handoff/2026-05-22-e4-dogfood-request.md)).
+> Same-day dogfood iterations from the morning session: `5c67777`
+> typing-perf, `9d5235f` Shift+arrow cross-cell.
+> Architectural side-quest from the E4 work:
+> [`docs/specs/2026-05-22-cursor-authority-decision.md`](docs/specs/2026-05-22-cursor-authority-decision.md)
 > captures the L3 cursor-authority decision the codebase had left
 > implicit (chokepoint `syncFromTextEdit` same-block contract, anchor
 > preservation via `m_selectionExtended`); the doc + corresponding
