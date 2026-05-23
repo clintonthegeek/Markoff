@@ -58,15 +58,20 @@
 > EditorWidget got built anyway in `bc8216d` because Corbomite actually pulled on it.
 > Recorded as proposed-and-built in [`docs/specs/2026-05-19-markoff-live-freeze-shape-design.md`](docs/specs/2026-05-19-markoff-live-freeze-shape-design.md).
 >
-> **Test baseline (2026-05-21):** 224/226 pass. Test count grew from 218
-> (2026-05-20) as the structured-paste and v10 cursor-round-trip tests
-> were repaired in passing by `861196c` (resetContent populates D2) and
-> the source-widget binding evolution. The 2 remaining failures are
-> separate from the originally-named three:
+> **Test baseline (2026-05-23):** 232/235 pass. Test count grew from
+> 226 (2026-05-21) via E4 tables work — Phase A test added (`tst_live_render_table_block_loading`),
+> Phase B parsing test (`tst_live_render_table_parsing`),
+> Phase C–E cell-edit + nav + delete-cascade test (`tst_live_render_table_cell_edit`),
+> Phase F1+F2 inline-formatting + link-click test
+> (`tst_live_render_table_inline_formatting`), and Phase G adds one slot
+> to `tst_live_render_qml_integration`. Three pre-existing failures
+> (all unrelated to E4; all pre-date this session):
+> - `tst_live_render_e2_nav_shift_extend` (slot from `0cbdf48`'s within-block word-extend rework)
 > - `tst_live_render_focus_chokepoint_invariant` (undo/redo edge cases)
 > - `tst_live_render_cursor_typing_invariant` (emoji-typing mirror)
 >
-> Both are non-blocking for ongoing port work; both pre-date this session.
+> Run the full suite via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
+> for the fast inner loop. None of the failures block ongoing work.
 >
 > **Prior closed items:** E2.6 tagged `v0.7.0-e2.6`, cursor architecture
 > (tiers 1–4c), QML integration harness, B1 buffer convention, code review
@@ -94,6 +99,22 @@
 > drives the next micro-spec — until then, opportunistic cleanup from the
 > follow-ups doc ([`docs/specs/2026-05-21-source-view-cleanup-followups.md`](docs/specs/2026-05-21-source-view-cleanup-followups.md))
 > or the `docs/queue.md` backlog.
+>
+> **Active workfront (as of 2026-05-23) — E4 tables, phases A–G shipped.**
+> The E-arc roadmap's `E4` sub-phase has been worked end-to-end this
+> week: spec [`docs/specs/2026-05-22-e4-tables-design.md`](docs/specs/2026-05-22-e4-tables-design.md),
+> plan [`docs/plans/2026-05-22-e4-tables.md`](docs/plans/2026-05-22-e4-tables.md),
+> status [`docs/e-arc/e-arc-status.md`](docs/e-arc/e-arc-status.md).
+> Remaining within E4: Phase H — dogfood + tag `v0.7.0-e4`. The user
+> has begun dogfooding (2026-05-23) and surfaced two issues that landed
+> same-day (`5c67777` typing-perf, `9d5235f` Shift+arrow cross-cell);
+> further dogfood iteration is queued. Architectural side-quest from
+> the E4 work: [`docs/specs/2026-05-22-cursor-authority-decision.md`](docs/specs/2026-05-22-cursor-authority-decision.md)
+> captures the L3 cursor-authority decision the codebase had left
+> implicit (chokepoint `syncFromTextEdit` same-block contract, anchor
+> preservation via `m_selectionExtended`); the doc + corresponding
+> regression tests are the authoritative reference for any
+> focus/caret/cross-block work going forward.
 >
 > **For any new spec work:** use `superpowers:brainstorming` first. Don't draft
 > speculative freeze specs — wait for port evidence.
