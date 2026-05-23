@@ -142,6 +142,24 @@ QVariantList TableEditBinding::inlineSpansForCell(
         // strict check is defensive against future grammar changes.
         if (spanStart < cellStartChar || spanEnd > cellEndChar) continue;
         s.charOffset = spanStart - cellStartChar;
+        // Zero out the UTF-8 byte fields. They're absolute block-buffer
+        // byte offsets that shift any time bytes elsewhere in the table
+        // grow or shrink — so unchanged cells receive spans that compare
+        // unequal under `SourceSpan::operator==` purely because of
+        // sibling-cell typing. That defeats `InlineHighlighterAttached`'s
+        // setSpans equality short-circuit. Cell-level highlighting
+        // (highlightBlock) does NOT consume these fields — it works
+        // exclusively from charOffset/charLength. The find-pass adapter
+        // uses utf8Offset/utf8Length, but find spans flow through a
+        // separate pipeline that never touches inlineSpansForCell.
+        // Zeroing here is safe and is the precondition for cell-identity
+        // stability across keystrokes that don't change the cell's
+        // content. (Bench doesn't show an improvement here because some
+        // other SourceSpan field — likely parent ranges in delimiter
+        // spans, or span ordering from tree-sitter — still varies for
+        // unchanged cells; future work.)
+        s.utf8Offset = 0;
+        s.utf8Length = 0;
         if (s.parentCharStart >= 0) {
             s.parentCharStart -= cellStartChar;
             s.parentCharEnd   -= cellStartChar;
