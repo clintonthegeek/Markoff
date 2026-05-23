@@ -125,6 +125,12 @@ private slots:
 
     // E4 follow-up — Ctrl+C with focus inside a cell reaches the clipboard.
     void ctrl_c_with_focus_in_cell_and_cross_block_selection_copies();
+
+    // E4 dogfood follow-up (2026-05-23) — Shift+arrow extends the
+    // cross-cell / cross-block selection from inside a table cell.
+    void shift_right_at_cell_end_extends_into_next_cell();
+    void shift_left_at_first_cell_qtpos_zero_extends_into_previous_block();
+    void shift_down_from_body_row_extends_to_next_row_same_column();
 };
 
 void TestTableCellEdit
@@ -1044,6 +1050,121 @@ void TestTableCellEdit::ctrl_c_with_focus_in_cell_and_cross_block_selection_copi
     QVERIFY2(!clipText.isEmpty(),
              qPrintable(QStringLiteral("expected non-empty clipboard; got %1")
                             .arg(clipText)));
+}
+
+// ---- Shift+arrow cross-cell / cross-block extension ----
+
+void TestTableCellEdit::shift_right_at_cell_end_extends_into_next_cell()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    const int cell00Len = cell00->property("length").toInt();
+    cell00->setProperty("cursorPosition", cell00Len);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    // Shift+Right at end of (0, 0) sets an anchor on the table row and
+    // moves the active end into cell (0, 1)'s starting flat qtPos (= the
+    // first char of cell01's range). The single-char selection that
+    // results covers only the inter-cell pipe (which lives outside any
+    // cellCharRange), so neither cell shows a visible per-cell highlight
+    // yet — that arrives once a second Shift+Right extends inside cell01.
+    s.fx->harness().keyClick(Qt::Key_Right, Qt::ShiftModifier);
+    QTest::qWait(150);
+
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    int anchorBlock = -1;
+    QMetaObject::invokeMethod(cs, "anchorBlock", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, anchorBlock));
+    QCOMPARE(anchorBlock, 1);                        // anchor on table row
+    QCOMPARE(s.fx->cursorStateCurrentRow(), 1);      // active end on table row
+    QCOMPARE(cs->property("cursorKind").toString(),
+             QStringLiteral("TextCaret"));
+
+    // A second Shift+Right grows the selection into cell01's first
+    // content char; cell01 then reports a non-empty selection through
+    // the per-cell highlight pipeline (_applyCrossBlockSelection).
+    s.fx->harness().keyClick(Qt::Key_Right, Qt::ShiftModifier);
+    QTest::qWait(150);
+    QQuickItem *cell01 = cellTextEditAt(s.table, 0, 1);
+    QVERIFY(cell01);
+    QTRY_VERIFY_WITH_TIMEOUT(
+        cell01->property("selectionEnd").toInt()
+            > cell01->property("selectionStart").toInt(),
+        2000);
+}
+
+void TestTableCellEdit
+    ::shift_left_at_first_cell_qtpos_zero_extends_into_previous_block()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    // Place focus at cell (0, 0) qtPos 0 — the table's leading edge.
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->setProperty("cursorPosition", 0);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    // Shift+Left exits the table. Selection anchor stays on the table
+    // (row 1) and the active end moves to row 0 (the preceding paragraph).
+    s.fx->harness().keyClick(Qt::Key_Left, Qt::ShiftModifier);
+    QTest::qWait(150);
+
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    int anchorBlock = -1;
+    QMetaObject::invokeMethod(cs, "anchorBlock", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, anchorBlock));
+    QCOMPARE(anchorBlock, 1);  // anchor stays on table row
+    QTRY_COMPARE_WITH_TIMEOUT(s.fx->cursorStateCurrentRow(), 0, 2000);
+    // hasSelection true.
+    QCOMPARE(cs->property("cursorKind").toString(),
+             QStringLiteral("TextCaret"));
+}
+
+void TestTableCellEdit
+    ::shift_down_from_body_row_extends_to_next_row_same_column()
+{
+    NavSetup s = setupNav();
+    QVERIFY(s.table);
+    // Need at least header + 1 body row; setupNav loads 1+1.
+    // Shift+Down from (0, 0) — header to body — should extend selection
+    // across cell rows within the same block.
+    QTRY_VERIFY(cellAt(s.table, 0, 0) != nullptr);
+
+    QQuickItem *cell00 = cellTextEditAt(s.table, 0, 0);
+    QVERIFY(cell00);
+    cell00->setProperty("cursorPosition", 1);
+    cell00->forceActiveFocus();
+    QTRY_VERIFY(cell00->hasActiveFocus());
+
+    s.fx->harness().keyClick(Qt::Key_Down, Qt::ShiftModifier);
+    QTest::qWait(150);
+
+    QObject *cs = s.fx->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs);
+    int anchorBlock = -1;
+    QMetaObject::invokeMethod(cs, "anchorBlock", Qt::DirectConnection,
+                              Q_RETURN_ARG(int, anchorBlock));
+    QCOMPARE(anchorBlock, 1);  // anchor on table
+
+    // Cells (0, 0) and (1, 0) both within the selection range.
+    QQuickItem *cell10 = cellTextEditAt(s.table, 1, 0);
+    QVERIFY(cell10);
+    QTRY_VERIFY_WITH_TIMEOUT(
+        cell00->property("selectionEnd").toInt()
+            > cell00->property("selectionStart").toInt()
+        || cell10->property("selectionEnd").toInt()
+            > cell10->property("selectionStart").toInt(),
+        2000);
 }
 
 }  // namespace Markoff::Live::Test

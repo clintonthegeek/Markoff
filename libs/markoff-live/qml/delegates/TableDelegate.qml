@@ -124,6 +124,48 @@ Rectangle {
         root.cursorState.establishFocus(root.blockAnchor, flatQtPos)
     }
 
+    // Shift+arrow extension. Used by D2 Left/Right cell-edge crossings,
+    // Up/Down cross-row, and Tab/Shift+Tab when the user holds Shift.
+    // Mirrors `LiveNavigationController::applyMotion` for paragraph
+    // delegates: shift → extend (begin first if no anchor yet); plain
+    // → existing motion path (establishFocus same-block / requestTextCaret
+    // cross-block). For cross-block extends, also requestTextCaretAtRow
+    // so focus follows the active end — `extend()` flips
+    // `m_selectionExtended=true`, so `request()`'s anchor-clear is gated
+    // off (cursor-authority decision §5.4) and the selection survives the
+    // focus move.
+    function _arrowMove(event, shift, isCrossBlock,
+                        targetRow, targetFlatQtPos,
+                        currentFlatQtPos) {
+        if (!root.cursorState || root.blockAnchor === undefined) {
+            event.accepted = true
+            return
+        }
+        if (shift) {
+            if (root.cursorState.anchorBlock() < 0)
+                root.cursorState.begin(root.modelIndex, currentFlatQtPos)
+            root.cursorState.extend(targetRow, targetFlatQtPos)
+            // Move focus to the target cell (even for same-block) so
+            // subsequent shift+arrow keys are received by THAT cell's
+            // TextEdit — without this, focus stays on the originating
+            // cell, its cursorPosition doesn't change, and the next
+            // key recomputes the same target → extend short-circuits
+            // (request() returns early when m_cursor == newCursor).
+            // For cross-block exits this also brings the target block
+            // into focus; `extend()` flipped m_selectionExtended=true
+            // so §5.4's anchor-clear is gated off.
+            root.cursorState.requestTextCaretAtRow(
+                targetRow, targetFlatQtPos)
+        } else if (isCrossBlock) {
+            root.cursorState.requestTextCaretAtRow(
+                targetRow, targetFlatQtPos)
+        } else {
+            root.cursorState.establishFocus(
+                root.blockAnchor, targetFlatQtPos)
+        }
+        event.accepted = true
+    }
+
     // C2 helper: compute a prefix/suffix diff between two cell text
     // snapshots. QML's TextEdit doesn't expose QTextDocument's
     // (qtPos, removed, added) contentsChange signal natively, so we
@@ -461,6 +503,13 @@ Rectangle {
                                ? root.liveBinding.themeColorFor(Theme.TextDefault)
                                : "#222222"
                         selectByMouse: false
+                        // Cross-cell selections survive focus moves between
+                        // cells. Without this, takeFocus on a target cell
+                        // during shift+arrow extension clears the source
+                        // cell's per-cell highlight that
+                        // `_applyCrossBlockSelection` just set. Matches
+                        // UnifiedInlineTextDelegate's setting.
+                        persistentSelection: true
 
                         // F1: per-cell inline highlighter. Spans come from
                         // the block's `model.inlineSpans` (parser-side fix
@@ -635,6 +684,11 @@ Rectangle {
                             }
 
                             // ---- D2: Left / Right at cell edges ----
+                            // Shift+Left/Right inside a cell (not at edge) is
+                            // handled by TextEdit's built-in shift-extend; we
+                            // only intervene at the cell boundary, where the
+                            // extend needs to cross into the previous/next
+                            // cell or out of the table block entirely.
                             if (event.key === Qt.Key_Left
                                 || event.key === Qt.Key_Right) {
                                 const isLeft = event.key === Qt.Key_Left
@@ -642,6 +696,16 @@ Rectangle {
                                     ? cellEdit.cursorPosition === 0
                                     : cellEdit.cursorPosition === cellEdit.length
                                 if (!atEdge) return  // within-cell — pass to TextEdit
+                                const shiftHeld =
+                                    (event.modifiers & Qt.ShiftModifier) !== 0
+                                const currentRanges =
+                                    root.parsedTable.cellCharRanges
+                                if (cellRect.r >= currentRanges.length) return
+                                const curRowRanges = currentRanges[cellRect.r]
+                                if (cellRect.c >= curRowRanges.length) return
+                                const curRange = curRowRanges[cellRect.c]
+                                const currentFlatQtPos =
+                                    curRange.start + cellEdit.cursorPosition
 
                                 const cols      = root.parsedTable.headers.length
                                 const totalRows = root.parsedTable.body.length + 1
@@ -655,23 +719,28 @@ Rectangle {
                                     if (nextC >= cols) { nextC = 0; nextR += 1 }
                                 }
                                 if (nextR < 0) {
-                                    root.cursorState.requestTextCaretAtRow(
-                                        root.modelIndex - 1, 0)
+                                    root._arrowMove(event, shiftHeld,
+                                        /*isCrossBlock=*/true,
+                                        root.modelIndex - 1, 0,
+                                        currentFlatQtPos)
                                 } else if (nextR >= totalRows) {
-                                    root.cursorState.requestTextCaretAtRow(
-                                        root.modelIndex + 1, 0)
+                                    root._arrowMove(event, shiftHeld,
+                                        /*isCrossBlock=*/true,
+                                        root.modelIndex + 1, 0,
+                                        currentFlatQtPos)
                                 } else {
-                                    const ranges = root.parsedTable.cellCharRanges
-                                    if (nextR >= ranges.length) return
-                                    if (nextC >= ranges[nextR].length) return
-                                    const range = ranges[nextR][nextC]
+                                    if (nextR >= currentRanges.length) return
+                                    if (nextC >= currentRanges[nextR].length) return
+                                    const range = currentRanges[nextR][nextC]
                                     const cellLen = range.end - range.start
                                     // Land at end-of-prev (Left) or start-of-next (Right).
                                     const cellQtPos = isLeft ? cellLen : 0
-                                    root.cursorState.establishFocus(
-                                        root.blockAnchor, range.start + cellQtPos)
+                                    root._arrowMove(event, shiftHeld,
+                                        /*isCrossBlock=*/false,
+                                        root.modelIndex,
+                                        range.start + cellQtPos,
+                                        currentFlatQtPos)
                                 }
-                                event.accepted = true
                                 return
                             }
 
@@ -682,33 +751,47 @@ Rectangle {
                                 // Up/Down crosses the cell-row boundary —
                                 // no within-cell vertical motion to honour.
                                 const isUp = event.key === Qt.Key_Up
+                                const shiftHeld =
+                                    (event.modifiers & Qt.ShiftModifier) !== 0
+                                const currentRanges =
+                                    root.parsedTable.cellCharRanges
+                                if (cellRect.r >= currentRanges.length) return
+                                const curRowRanges = currentRanges[cellRect.r]
+                                if (cellRect.c >= curRowRanges.length) return
+                                const curRange = curRowRanges[cellRect.c]
+                                const currentFlatQtPos =
+                                    curRange.start + cellEdit.cursorPosition
+
                                 const totalRows = root.parsedTable.body.length + 1
                                 const nextR = isUp ? cellRect.r - 1
                                                    : cellRect.r + 1
                                 if (nextR < 0) {
-                                    root.cursorState.requestTextCaretAtRow(
-                                        root.modelIndex - 1, 0)
+                                    root._arrowMove(event, shiftHeld,
+                                        /*isCrossBlock=*/true,
+                                        root.modelIndex - 1, 0,
+                                        currentFlatQtPos)
                                 } else if (nextR >= totalRows) {
-                                    root.cursorState.requestTextCaretAtRow(
-                                        root.modelIndex + 1, 0)
+                                    root._arrowMove(event, shiftHeld,
+                                        /*isCrossBlock=*/true,
+                                        root.modelIndex + 1, 0,
+                                        currentFlatQtPos)
                                 } else {
-                                    const ranges = root.parsedTable.cellCharRanges
-                                    if (nextR >= ranges.length) return
-                                    if (cellRect.c >= ranges[nextR].length) return
-                                    const range = ranges[nextR][cellRect.c]
+                                    if (nextR >= currentRanges.length) return
+                                    if (cellRect.c >= currentRanges[nextR].length) return
+                                    const range = currentRanges[nextR][cellRect.c]
                                     const cellLen = range.end - range.start
-                                    // Use the source cell's cursorPosition
-                                    // as a same-column-x proxy — all cells
-                                    // share the table's body font, so the
-                                    // character-index match yields the
-                                    // closest visual-x without explicit
-                                    // pixel computation.
+                                    // Same-column-x proxy: carry the source
+                                    // cell's cursorPosition (all cells share
+                                    // the table's body font, so the char-index
+                                    // match yields the closest visual-x).
                                     const target = Math.min(
                                         cellEdit.cursorPosition, cellLen)
-                                    root.cursorState.establishFocus(
-                                        root.blockAnchor, range.start + target)
+                                    root._arrowMove(event, shiftHeld,
+                                        /*isCrossBlock=*/false,
+                                        root.modelIndex,
+                                        range.start + target,
+                                        currentFlatQtPos)
                                 }
-                                event.accepted = true
                                 return
                             }
                         }
