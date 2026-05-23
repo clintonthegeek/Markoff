@@ -73,21 +73,33 @@ Rectangle {
         return _r
     }
 
-    // E4 follow-up B1: content-aware per-column widths.
+    // E4 follow-up B1/B3: content-aware per-column widths.
     // QList<qreal> from TableEditBinding::computeColumnWidths via
-    // Penelope's distributeColumnsAuto. Re-evaluates when parsedTable
-    // changes (cell content / row+col shape shift) or when cellGrid.width
-    // changes (delegate width tracks the ListView resizing). Empty list
-    // when there's nothing to render or when cellGrid.width hasn't been
-    // computed yet (binding's second fire is the source of truth).
-    property var columnWidths: (tableEditBinding
-                                && root.parsedTable
-                                && root.parsedTable.parseOk
-                                && cellGrid.width > 0)
-        ? tableEditBinding.computeColumnWidths(root.parsedTable.headers,
-                                               root.parsedTable.body,
-                                               cellGrid.width)
-        : []
+    // Penelope's distributeColumnsAuto. Re-evaluates when:
+    //   - parsedTable changes (cell content / row+col shape shifts)
+    //   - cellGrid.width changes (delegate width tracks ListView resize)
+    //   - the theme swaps (dark/light toggle changes the font slot)
+    //   - liveBinding.fontScale changes (user-driven zoom)
+    //
+    // The last two are explicit `void` dependency anchors — QML's binding
+    // tracker can't see the theme/fontScale reads that happen inside
+    // computeColumnWidths' C++ body, so without these the binding misses
+    // font-driven metric changes and widths go stale. Empty list when
+    // there's nothing to render or cellGrid.width hasn't been computed
+    // yet (binding's second fire after construction is the source of
+    // truth per spec §7 risk 3).
+    property var columnWidths: {
+        // B3 dependency anchors (spec §3.4).
+        if (root.liveBinding) {
+            void root.liveBinding.theme
+            void root.liveBinding.fontScale
+        }
+        if (!tableEditBinding || !root.parsedTable
+            || !root.parsedTable.parseOk || cellGrid.width <= 0) return []
+        return tableEditBinding.computeColumnWidths(root.parsedTable.headers,
+                                                     root.parsedTable.body,
+                                                     cellGrid.width)
+    }
 
     // C2: per-delegate edit binding. Cells dispatch their user edits
     // through tableEditBinding.applyCellEdit; the binding does the
