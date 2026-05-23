@@ -27,6 +27,12 @@ Rectangle {
 
     property int modelIndex: index
     readonly property string blockText: model ? model.text : ""
+    // F1: capture model.inlineSpans on root so cells reach it through
+    // `root.blockInlineSpans` instead of `model.inlineSpans` — inside
+    // the Repeater delegate, the `model` identifier shadows to the
+    // Repeater's per-item context (a number), not the ListView delegate's
+    // row data. Same shadow pattern as `blockText` above.
+    readonly property var blockInlineSpans: model ? model.inlineSpans : null
     property var blockAnchor: undefined
 
     readonly property var liveBinding:
@@ -455,6 +461,55 @@ Rectangle {
                                ? root.liveBinding.themeColorFor(Theme.TextDefault)
                                : "#222222"
                         selectByMouse: false
+
+                        // F1: per-cell inline highlighter. Spans come from
+                        // the block's `model.inlineSpans` (parser-side fix
+                        // landed in the same change: pipe_table_cell ranges
+                        // now go through the inline grammar, so cells get
+                        // real bold/italic/code/wikilink spans). The C++
+                        // helper filters spans to those whose char ranges
+                        // fall within the cell's char range and re-projects
+                        // `charOffset` (and `parentCharStart/End`) into the
+                        // cell's local frame. `InlineHighlighterAttached`'s
+                        // target is the cell's QQuickTextDocument, so the
+                        // highlighter paints inside the cell document, not
+                        // the block buffer.
+                        //
+                        // The bounds-safe `_cellCharRange` lookup mirrors
+                        // `cellText`'s defensive pattern: during Repeater
+                        // tear-down or initial construction, `parsedTable`
+                        // may not yet contain entries for our (r, c).
+                        readonly property var _cellCharRange: {
+                            if (!root.parsedTable || !root.parsedTable.parseOk)
+                                return null
+                            const ccr = root.parsedTable.cellCharRanges
+                            if (cellRect.r < 0 || cellRect.r >= ccr.length)
+                                return null
+                            const rr = ccr[cellRect.r]
+                            if (!rr || cellRect.c < 0 || cellRect.c >= rr.length)
+                                return null
+                            return rr[cellRect.c]
+                        }
+
+                        InlineHighlighterAttached {
+                            target: cellEdit.textDocument
+                            spans: cellEdit._cellCharRange
+                                ? tableEditBinding.inlineSpansForCell(
+                                      root.blockInlineSpans,
+                                      cellEdit._cellCharRange.start,
+                                      cellEdit._cellCharRange.end)
+                                : []
+                            theme: root.liveBinding ? root.liveBinding.theme : null
+                            fontScale: root.liveBinding ? root.liveBinding.fontScale : 1.0
+                            caretPosition: cellEdit.activeFocus
+                                           ? cellEdit.cursorPosition : -1
+                            selectionStart: (cellEdit.activeFocus
+                                             && cellEdit.selectionStart !== cellEdit.selectionEnd)
+                                            ? cellEdit.selectionStart : -1
+                            selectionEnd: (cellEdit.activeFocus
+                                           && cellEdit.selectionStart !== cellEdit.selectionEnd)
+                                          ? cellEdit.selectionEnd : -1
+                        }
 
                         // D1: Tab / Shift+Tab move between cells. The
                         // BeforeItem priority intercepts the key before

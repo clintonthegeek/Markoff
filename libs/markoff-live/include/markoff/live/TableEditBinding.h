@@ -8,7 +8,10 @@
 #include <QObject>
 #include <QPointer>
 #include <QString>
+#include <QVariantList>
 #include <qqmlintegration.h>
+
+#include <markoff/parser/SourceSpan.h>
 
 namespace Markoff::Live {
 
@@ -79,6 +82,22 @@ public:
     /// wires the setter when parsedTable-driven cell.text refreshes
     /// start firing onContentsChange echoes that must be filtered out.
     Q_INVOKABLE bool isApplyingTextUpdate() const { return m_applyingTextUpdate; }
+
+    /// F1: take a block-level inlineSpans QVariantList (`Markoff::SourceSpan`
+    /// wrapped in QVariant per-element) and return the subset whose
+    /// `[charOffset, charOffset+charLength)` falls inside
+    /// `[cellStartChar, cellEndChar)`. Returned spans have `charOffset` and
+    /// `parentCharStart`/`parentCharEnd` re-projected into the cell's local
+    /// frame (block-offset - cellStartChar). `utf8Offset`/`utf8Length` are
+    /// not consumed by `InlineHighlighter::highlightBlock` (only the find-
+    /// pass uses them, and find spans flow through a separate adapter); we
+    /// leave them at their block-relative values rather than introduce a
+    /// byte-projection dependency in QML. Used by `TableDelegate`'s per-cell
+    /// `InlineHighlighterAttached`.
+    Q_INVOKABLE QVariantList inlineSpansForCell(
+        const QVariant &blockSpans,
+        int cellStartChar,
+        int cellEndChar) const;
 
 Q_SIGNALS:
     void bindingChanged();

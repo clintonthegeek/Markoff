@@ -120,7 +120,18 @@ static void collectInlineRanges(TSNode node, std::vector<TSRange> &ranges)
 
     // "inline" nodes contain the inline text content of paragraphs,
     // headings, etc. These are the regions the inline parser should parse.
-    if (strcmp(type, "inline") == 0) {
+    //
+    // `pipe_table_cell` nodes hold table-cell text. The block grammar
+    // treats them as leaf-ish sequences of word/whitespace/punctuation
+    // tokens (no `inline` wrapper), which would leave `**bold**`,
+    // `[[wikilink]]`, etc. inside cells un-highlighted. Feeding the
+    // cell byte range to the inline parser produces real bold/italic/
+    // code/link spans whose offsets are document-absolute (set_included_ranges
+    // preserves source byte coordinates). The block-walker's anonymous
+    // child spans inside this range are then filtered out by the same
+    // `inlineRegions` overlap check that handles paragraph content.
+    if (strcmp(type, "inline") == 0
+            || strcmp(type, "pipe_table_cell") == 0) {
         TSRange range;
         range.start_point = ts_node_start_point(node);
         range.end_point = ts_node_end_point(node);
