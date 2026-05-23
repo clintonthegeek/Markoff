@@ -114,24 +114,47 @@ static void collectBlockQuoteRanges(TSNode node, std::vector<BlockQuoteRange> &q
         collectBlockQuoteRanges(ts_node_child(node, i), quotes, depth);
 }
 
-static void collectInlineRanges(TSNode node, std::vector<TSRange> &ranges)
+// True if the byte range [start, end) contains any character that could
+// be the start of an inline-markdown construct: `*` `_` `` ` `` `[` `~`
+// `=` `$` `#`. Used as a fast-path skip for `pipe_table_cell` ranges —
+// every cell in a table would otherwise trigger its own inline-parser
+// invocation per block reparse (24+ for a 5×4 table), making cell typing
+// O(cells) in tree-sitter setup cost. Cells with no inline syntax just
+// don't need to be parsed; the block walker's anonymous spans inside
+// them are still filtered out by the inlineRegions overlap check.
+//
+// False positives are acceptable (cell gets parsed, just slower). False
+// negatives would lose inline formatting in cells, so the trigger set
+// covers every inline construct the inline grammar recognizes.
+static bool rangeContainsInlineTrigger(const QByteArray &utf8,
+                                       int startByte, int endByte)
+{
+    if (startByte < 0 || endByte > utf8.size() || startByte >= endByte)
+        return false;
+    const char *p = utf8.constData() + startByte;
+    const int n = endByte - startByte;
+    for (int i = 0; i < n; ++i) {
+        const char c = p[i];
+        switch (c) {
+        case '*': case '_': case '`': case '[':
+        case '~': case '=': case '$': case '#':
+        case '\\':  // backslash escapes
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+
+static void collectInlineRanges(TSNode node, std::vector<TSRange> &ranges,
+                                const QByteArray &utf8)
 {
     const char *type = ts_node_type(node);
 
     // "inline" nodes contain the inline text content of paragraphs,
     // headings, etc. These are the regions the inline parser should parse.
-    //
-    // `pipe_table_cell` nodes hold table-cell text. The block grammar
-    // treats them as leaf-ish sequences of word/whitespace/punctuation
-    // tokens (no `inline` wrapper), which would leave `**bold**`,
-    // `[[wikilink]]`, etc. inside cells un-highlighted. Feeding the
-    // cell byte range to the inline parser produces real bold/italic/
-    // code/link spans whose offsets are document-absolute (set_included_ranges
-    // preserves source byte coordinates). The block-walker's anonymous
-    // child spans inside this range are then filtered out by the same
-    // `inlineRegions` overlap check that handles paragraph content.
-    if (strcmp(type, "inline") == 0
-            || strcmp(type, "pipe_table_cell") == 0) {
+    if (strcmp(type, "inline") == 0) {
         TSRange range;
         range.start_point = ts_node_start_point(node);
         range.end_point = ts_node_end_point(node);
@@ -141,9 +164,36 @@ static void collectInlineRanges(TSNode node, std::vector<TSRange> &ranges)
         return; // don't recurse into inline nodes
     }
 
+    // `pipe_table_cell` nodes hold table-cell text. The block grammar
+    // treats them as leaf-ish sequences of word/whitespace/punctuation
+    // tokens (no `inline` wrapper), which would leave `**bold**`,
+    // `[[wikilink]]`, etc. inside cells un-highlighted. Feeding the
+    // cell byte range to the inline parser produces real bold/italic/
+    // code/link spans whose offsets are document-absolute (set_included_ranges
+    // preserves source byte coordinates). The block-walker's anonymous
+    // child spans inside this range are then filtered out by the same
+    // `inlineRegions` overlap check that handles paragraph content.
+    //
+    // Fast-path: skip cells with no inline-trigger characters. Each emitted
+    // range costs one full ts_parser_parse_string call; for a 5×4 table
+    // most cells are plain text and don't need to be parsed at all.
+    if (strcmp(type, "pipe_table_cell") == 0) {
+        const int s = ts_node_start_byte(node);
+        const int e = ts_node_end_byte(node);
+        if (rangeContainsInlineTrigger(utf8, s, e)) {
+            TSRange range;
+            range.start_point = ts_node_start_point(node);
+            range.end_point = ts_node_end_point(node);
+            range.start_byte = s;
+            range.end_byte = e;
+            ranges.push_back(range);
+        }
+        return;  // don't recurse into pipe_table_cell either way
+    }
+
     uint32_t count = ts_node_child_count(node);
     for (uint32_t i = 0; i < count; ++i)
-        collectInlineRanges(ts_node_child(node, i), ranges);
+        collectInlineRanges(ts_node_child(node, i), ranges, utf8);
 }
 
 // ---------------------------------------------------------------------------
@@ -217,7 +267,7 @@ bool TreeSitterParser::parse(const QString &text)
 
     TSNode root = ts_tree_root_node(m_blockTree);
     std::vector<TSRange> inlineRanges;
-    collectInlineRanges(root, inlineRanges);
+    collectInlineRanges(root, inlineRanges, m_utf8);
     m_inlineRanges.reserve(inlineRanges.size());
 
     for (const TSRange &range : inlineRanges) {
@@ -556,7 +606,7 @@ QList<SourceSpan> TreeSitterParser::buildSpanMap() const
     QList<QPair<int,int>> inlineRegions;
     {
         std::vector<TSRange> ranges;
-        collectInlineRanges(ts_tree_root_node(m_blockTree), ranges);
+        collectInlineRanges(ts_tree_root_node(m_blockTree), ranges, m_utf8);
         for (const auto &r : ranges)
             inlineRegions.append({static_cast<int>(r.start_byte),
                                   static_cast<int>(r.end_byte)});
