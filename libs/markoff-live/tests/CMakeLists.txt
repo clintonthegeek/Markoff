@@ -798,6 +798,27 @@ add_test(NAME tst_live_render_table_typing_perf
 set_tests_properties(tst_live_render_table_typing_perf
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# E4 wrap+column-width follow-up: integration test verifying the spec §5
+# invariants reach the QML layer through production property bindings.
+# Needs MARKOFF_LIVE_TESTS_DIR to load the `tables_wrap.md` fixture.
+qt_add_executable(tst_live_render_table_layout
+    tst_live_render_table_layout.cpp
+    QmlIntegrationFixture.h
+    QmlIntegrationFixture.cpp)
+target_link_libraries(tst_live_render_table_layout PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init)
+target_compile_definitions(tst_live_render_table_layout PRIVATE
+    MARKOFF_LIVE_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
+add_test(NAME tst_live_render_table_layout
+         COMMAND tst_live_render_table_layout)
+set_tests_properties(tst_live_render_table_layout PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # tst_live_render_table_inline_formatting needs RecordingLinkService for the
 # F2 Ctrl+click slots (see tst_live_link_qml_integration for the same pattern).
 qt_add_executable(tst_live_render_table_inline_formatting

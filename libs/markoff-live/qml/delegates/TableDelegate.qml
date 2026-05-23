@@ -88,17 +88,15 @@ Rectangle {
     // there's nothing to render or cellGrid.width hasn't been computed
     // yet (binding's second fire after construction is the source of
     // truth per spec §7 risk 3).
+    // C2-proof STUB: equal widths. Should break narrow_widget_wraps_prose_column.
     property var columnWidths: {
-        // B3 dependency anchors (spec §3.4).
-        if (root.liveBinding) {
-            void root.liveBinding.theme
-            void root.liveBinding.fontScale
-        }
-        if (!tableEditBinding || !root.parsedTable
-            || !root.parsedTable.parseOk || cellGrid.width <= 0) return []
-        return tableEditBinding.computeColumnWidths(root.parsedTable.headers,
-                                                     root.parsedTable.body,
-                                                     cellGrid.width)
+        if (!root.parsedTable || !root.parsedTable.parseOk
+            || cellGrid.width <= 0) return []
+        const n = root.parsedTable.headers.length
+        const per = cellGrid.width / n
+        const out = []
+        for (let i = 0; i < n; ++i) out.push(per)
+        return out
     }
 
     // C2: per-delegate edit binding. Cells dispatch their user edits
@@ -457,12 +455,8 @@ Rectangle {
                         anchors.margins: 4
                         text: cellRect.cellText
                         readOnly: false   // C2: cells become editable
-                        // E4 wrap B2: WordBoundary preferred; mid-word
-                        // break only as a last resort (for hyper-long
-                        // unbreakable runs — URLs, long identifiers).
-                        // Cell width comes from the parent Rectangle's
-                        // Layout.preferredWidth driven by columnWidths.
-                        wrapMode: TextEdit.WrapAtWordBoundaryOrAnywhere
+                        // C2-proof STUB: NoWrap. Should break narrow_widget_wraps_prose_column.
+                        wrapMode: TextEdit.NoWrap
                         textFormat: TextEdit.PlainText
                         horizontalAlignment: {
                             // Bounds-safe during structural transitions:
