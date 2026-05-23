@@ -73,6 +73,22 @@ Rectangle {
         return _r
     }
 
+    // E4 follow-up B1: content-aware per-column widths.
+    // QList<qreal> from TableEditBinding::computeColumnWidths via
+    // Penelope's distributeColumnsAuto. Re-evaluates when parsedTable
+    // changes (cell content / row+col shape shift) or when cellGrid.width
+    // changes (delegate width tracks the ListView resizing). Empty list
+    // when there's nothing to render or when cellGrid.width hasn't been
+    // computed yet (binding's second fire is the source of truth).
+    property var columnWidths: (tableEditBinding
+                                && root.parsedTable
+                                && root.parsedTable.parseOk
+                                && cellGrid.width > 0)
+        ? tableEditBinding.computeColumnWidths(root.parsedTable.headers,
+                                               root.parsedTable.body,
+                                               cellGrid.width)
+        : []
+
     // C2: per-delegate edit binding. Cells dispatch their user edits
     // through tableEditBinding.applyCellEdit; the binding does the
     // cell-relative → block-buffer translation in C++ (see
