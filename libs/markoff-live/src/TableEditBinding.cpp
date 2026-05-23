@@ -221,6 +221,78 @@ qreal TableEditBinding::cellMaxWidth(const QString &text,
     return fm.horizontalAdvance(text) + 2 * padding;
 }
 
+// --- E4 follow-up: computeColumnWidths Q_INVOKABLE (A3) ----------
+
+QVariantList TableEditBinding::computeColumnWidths(
+    const QVariantList &headers,
+    const QVariantList &body,
+    qreal availWidth) const
+{
+    MARKOFF_PERF_SCOPE("live.TableEditBinding::computeColumnWidths");
+    QVariantList out;
+
+    const int n = headers.size();
+    if (n == 0 || availWidth <= 0) return out;
+
+    // Resolve fonts. Theme-aware when wired; QGuiApplication fallback
+    // when the binding hasn't been hooked up yet (test path, init
+    // transient). Header gets the body font with setBold(true); we do
+    // not chase a separate FontRole::Heading because pipe-table headers
+    // aren't document-level headings, just visually-bold body cells.
+    QFont bodyFont;
+    if (m_binding && m_binding->theme()) {
+        const Markoff::Theme *t = m_binding->theme();
+        bodyFont = t->font(Markoff::Theme::FontRole::Body);
+        const qreal px = t->pixelSizeFor(Markoff::Theme::Slot::TextDefault);
+        const qreal scale = m_binding->fontScale();
+        if (px > 0 && scale > 0)
+            bodyFont.setPixelSize(static_cast<int>(px * scale));
+    } else {
+        bodyFont = QGuiApplication::font();
+    }
+    QFont headerFont = bodyFont;
+    headerFont.setBold(true);
+
+    const qreal pad = cellPadding();
+
+    // Aggregate per-column metrics. Header row uses headerFont; body
+    // rows use bodyFont. The column-aggregate floor (max with kMin
+    // and the maxWidth-not-below-minWidth invariant) is applied
+    // after the row sweep.
+    QList<ColumnMetrics> metrics(n);
+
+    for (int c = 0; c < n; ++c) {
+        const QString h = headers.at(c).toString();
+        metrics[c].minWidth = std::max(metrics[c].minWidth,
+                                       cellMinWidth(h, headerFont, pad));
+        metrics[c].maxWidth = std::max(metrics[c].maxWidth,
+                                       cellMaxWidth(h, headerFont, pad));
+    }
+
+    for (const QVariant &rowVar : body) {
+        const QVariantList row = rowVar.toList();
+        const int rn = qMin(row.size(), n);
+        for (int c = 0; c < rn; ++c) {
+            const QString cellText = row.at(c).toString();
+            metrics[c].minWidth = std::max(metrics[c].minWidth,
+                                           cellMinWidth(cellText, bodyFont, pad));
+            metrics[c].maxWidth = std::max(metrics[c].maxWidth,
+                                           cellMaxWidth(cellText, bodyFont, pad));
+        }
+    }
+
+    // Floor + invariant.
+    for (int c = 0; c < n; ++c) {
+        metrics[c].minWidth = std::max(metrics[c].minWidth, kMinColumnWidth);
+        metrics[c].maxWidth = std::max(metrics[c].maxWidth, metrics[c].minWidth);
+    }
+
+    const auto widths = distributeColumnsAuto(metrics, availWidth);
+    out.reserve(widths.size());
+    for (qreal w : widths) out.append(QVariant::fromValue(w));
+    return out;
+}
+
 // --- E4 follow-up: distributeColumnsAuto (Penelope port, A2) -----
 //
 // Verbatim port of distributeColumnsAuto from

@@ -165,6 +165,75 @@ private Q_SLOTS:
         const auto widths = TableEditBinding::distributeColumnsAuto({}, 400.0);
         QCOMPARE(widths.size(), 0);
     }
+
+    // ---- A3: computeColumnWidths Q_INVOKABLE ----------------------
+    //
+    // End-to-end metric-aggregation + distribution via the public API.
+    // Uses QGuiApplication's default font (no Theme dependency in this
+    // test — the test exercises the algorithm shape, not theme wiring).
+    // The theme-wiring path is exercised by the QML integration test
+    // in C2.
+
+    void computeColumnWidths_emptyHeaders_returnsEmptyList()
+    {
+        TableEditBinding teb;
+        const auto out = teb.computeColumnWidths(QVariantList(),
+                                                 QVariantList(), 400.0);
+        QCOMPARE(out.size(), 0);
+    }
+
+    void computeColumnWidths_nonPositiveAvail_returnsEmptyList()
+    {
+        TableEditBinding teb;
+        QVariantList headers { QStringLiteral("a"), QStringLiteral("b") };
+        QVariantList body;
+        QCOMPARE(teb.computeColumnWidths(headers, body,  0.0).size(), 0);
+        QCOMPARE(teb.computeColumnWidths(headers, body, -1.0).size(), 0);
+    }
+
+    void computeColumnWidths_aggregatesMaxAcrossRows()
+    {
+        // Headers: short labels. Body has a long string in column 0,
+        // short in column 1. Expect col 0 width to dominate col 1.
+        TableEditBinding teb;
+        QVariantList headers { QStringLiteral("a"), QStringLiteral("b") };
+        QVariantList row0 {
+            QStringLiteral("Lorem ipsum dolor sit amet consectetur"),
+            QStringLiteral("x")
+        };
+        QVariantList body { QVariant::fromValue(row0) };
+        const auto out = teb.computeColumnWidths(headers, body, 800.0);
+        QCOMPARE(out.size(), 2);
+        QVERIFY(out[0].toReal() > out[1].toReal());
+    }
+
+    void computeColumnWidths_sumsToAvailWidth()
+    {
+        TableEditBinding teb;
+        QVariantList headers { QStringLiteral("Short"),
+                               QStringLiteral("Description"),
+                               QStringLiteral("Code") };
+        QVariantList row0 { QStringLiteral("x"),
+                            QStringLiteral("Lorem ipsum dolor sit amet"),
+                            QStringLiteral("y") };
+        QVariantList row1 { QStringLiteral("z"),
+                            QStringLiteral("consectetur adipiscing elit"),
+                            QStringLiteral("w") };
+        QVariantList body {
+            QVariant::fromValue(row0),
+            QVariant::fromValue(row1)
+        };
+        // Sweep three widths spanning the three branches.
+        for (qreal avail : { 200.0, 500.0, 2000.0 }) {
+            const auto out = teb.computeColumnWidths(headers, body, avail);
+            QCOMPARE(out.size(), 3);
+            qreal sum = 0;
+            for (const QVariant &v : out) sum += v.toReal();
+            QVERIFY2(qFabs(sum - avail) < 1e-3,
+                     qPrintable(QStringLiteral("avail=%1 sum=%2")
+                                .arg(avail).arg(sum)));
+        }
+    }
 };
 
 QTEST_MAIN(TstLiveRenderTableLayoutMetrics)

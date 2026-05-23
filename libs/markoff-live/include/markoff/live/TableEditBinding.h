@@ -161,6 +161,24 @@ public:
     static QList<qreal> distributeColumnsAuto(const QList<ColumnMetrics> &metrics,
                                               qreal availWidth);
 
+    /// QML-facing column-width computer (A3). `headers` is a JS array
+    /// of strings (one per column); `body` is a JS array of arrays of
+    /// strings (one row per outer entry, one cell per inner entry).
+    /// `availWidth` is the layout-available width in pixels (typically
+    /// the GridLayout's `width`).
+    ///
+    /// Returns a `QVariantList<qreal>` of length `headers.size()`. The
+    /// cell-default font is read from `binding()->theme()` via the
+    /// `TextDefault` slot (header cells get `setBold(true)`); falls
+    /// back to `QGuiApplication::font()` when no theme is wired.
+    ///
+    /// Empty headers or `availWidth <= 0` → empty list (spec §7 risks
+    /// 3 and 4 — the binding's second fire after construction is the
+    /// source of truth).
+    Q_INVOKABLE QVariantList computeColumnWidths(const QVariantList &headers,
+                                                 const QVariantList &body,
+                                                 qreal availWidth) const;
+
 Q_SIGNALS:
     void bindingChanged();
     void modelIndexChanged();
