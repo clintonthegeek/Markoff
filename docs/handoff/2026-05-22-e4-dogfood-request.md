@@ -28,6 +28,7 @@ row containing `**bold**`, `*italic*`, `[[Page]]`, and
 - [ ] Header row is visually distinct (bold + background slot).
 - [ ] Cells with `**bold**` render bold; `*italic*` renders italic.
 - [ ] Cells with `[[Page]]` render styled as a wikilink; `[text](url)` styled as a link.
+- [ ] Cells with long content wrap; column widths reflect content (short-label columns stay narrow; prose columns take the remaining width; no horizontal overflow).
 
 ### Cell editing
 
@@ -79,8 +80,8 @@ row containing `**bold**`, `*italic*`, `[[Page]]`, and
 |------|---------|------------|
 | 2026-05-23 | Typing in a cell laggy (~hundreds of ms) after F1's parser fix | `5c67777` — parser inline-trigger fast-path |
 | 2026-05-23 | Shift+arrow at cell edges didn't extend into adjacent cells | `9d5235f` — cross-cell Shift+arrow wired |
-| 2026-05-23 | Open: cells don't line-wrap (`wrapMode: NoWrap` from B2); long cells overflow visually | Pending — plan §Risks #5 styling follow-up |
-| 2026-05-23 | Open: column widths don't adapt to content sensibly; ragged sizing | Pending — plan §Risks #5 styling follow-up |
+| 2026-05-23 | Cells don't line-wrap (`wrapMode: NoWrap` from B2); long cells overflow visually | `acc76c6` — TableDelegate `wrapMode: WrapAtWordBoundaryOrAnywhere`; plan `docs/plans/2026-05-23-e4-cell-wrap-and-column-width.md` |
+| 2026-05-23 | Column widths don't adapt to content sensibly; ragged sizing | `acc76c6` — `TableEditBinding::computeColumnWidths` ports Penelope's `distributeColumnsAuto`; spec `docs/specs/2026-05-23-e4-cell-wrap-and-column-width-design.md` |
 
 ## Out of scope for E4 (do not regress; do not test)
 
