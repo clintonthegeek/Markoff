@@ -52,6 +52,22 @@ void TableEditBinding::applyCellEdit(int cellStartCharPos,
     if (m_modelIndex >= m_binding->model()->rowCount()) return;
     if (cellStartCharPos < 0 || cellQtPos < 0 || removed < 0) return;
 
+    // No-op short-circuit. Cell `onTextChanged` fires every time the
+    // `parsedTable → cellText → cellEdit.text` rebind cascade pushes a
+    // (frequently unchanged) string back into the cell's TextEdit. Each
+    // such echo reaches here with removed==0 and added empty — applying
+    // it bumps the block edit sequence anyway (invalidating the inline
+    // parse cache), triggers `flushPendingD2Changed`, which re-enters
+    // onD2Changed, rebinds every cell again, and we cascade. Measured
+    // pre-fix: 20+ applyCellEdit calls per user keystroke for a 3×4
+    // table, 34+ for a 4×6 table. Drop the call; everything downstream
+    // is wasted work for a no-op delta.
+    if (removed == 0 && added.isEmpty()) {
+        Markoff::Perf::Probe::instance().note(
+            QStringLiteral("live.TableEditBinding::applyCellEdit.noop_skip"));
+        return;
+    }
+
     auto *doc   = m_binding->document();
     auto *model = m_binding->model();
     const auto &record = model->recordAt(m_modelIndex);
