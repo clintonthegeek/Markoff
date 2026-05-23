@@ -612,6 +612,8 @@ target_link_libraries(tst_live_render_qml_integration PRIVATE
     markoff-live-app-internal
     markoff-live-app-internalplugin
     markoff-live-app-internalplugin_init)
+target_compile_definitions(tst_live_render_qml_integration PRIVATE
+    MARKOFF_LIVE_TESTS_DIR="${CMAKE_CURRENT_SOURCE_DIR}")
 add_test(NAME tst_live_render_qml_integration
          COMMAND tst_live_render_qml_integration)
 set_tests_properties(tst_live_render_qml_integration

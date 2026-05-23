@@ -1,18 +1,26 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QCoreApplication>
+#include <QClipboard>
+#include <QFile>
 #include <QFont>
+#include <QGuiApplication>
+#include <QPointF>
 #include <QQuickItem>
 #include <QQuickTextDocument>
+#include <QRectF>
 #include <QSignalSpy>
 #include <QTest>
 #include <QQuickWindow>
 #include <QTextBlock>
 #include <QTextDocument>
 #include <QTextLayout>
+#include <QVariantList>
+#include <QVariantMap>
 
 #include <markoff/core/FindController.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
+#include <markoff/parser/SourceSpan.h>
 
 #include "QmlIntegrationFixture.h"
 
@@ -1270,6 +1278,228 @@ private Q_SLOTS:
         QCOMPARE(idsAfter.size(), 2u);
         QCOMPARE(fix.document()->blockText(idsAfter[0]), seedHeader);
         QCOMPARE(fix.document()->blockText(idsAfter[1]), seedParagraph);
+    }
+
+    // E4 G2 — realistic-input harness slot for the seven E4 invariants per
+    // spec §9.1. Loads `tests/fixtures/tables_basic.md` (the canonical
+    // E4 fixture: two tables surrounded by paragraphs, with **bold**,
+    // *italic*, [[Page]] cells in the larger table). This slot is the
+    // regression net for E4 going forward — every later change that
+    // breaks an invariant gets caught here. Each section's falsifiability
+    // proof is already in history per the Phase B–F task pairs.
+    void e4_table_invariants_against_tables_basic_fixture() {
+        QFile f(QString::fromLatin1(MARKOFF_LIVE_TESTS_DIR)
+                    + QStringLiteral("/fixtures/tables_basic.md"));
+        QVERIFY2(f.open(QIODevice::ReadOnly),
+                 qPrintable(QStringLiteral("could not open fixture: %1")
+                                .arg(f.fileName())));
+        const QByteArray md = f.readAll();
+        f.close();
+
+        // Fixture has 5 top-level blocks:
+        //   row 0: "para before"
+        //   row 1: 3-col table (header + 3 body rows; mixed alignment)
+        //   row 2: "para between"
+        //   row 3: 4-col table (header + 5 body rows; **bold**, [[Page]], *italic*)
+        //   row 4: "para after with a [link](https://example.com) and **bold**."
+        QmlIntegrationFixture fx(md, /*expectedRowCount=*/5);
+        QVERIFY(fx.waitForDelegateAt(1, 2000));
+        QVERIFY(fx.waitForDelegateAt(3, 2000));
+
+        // ===== Invariant 1: block creation =====
+        // Two table blocks at the expected rows; paragraphs surround them.
+        QCOMPARE(fx.model()->rowCount(), 5);
+        QCOMPARE(fx.modelKind(0), QStringLiteral("paragraph"));
+        QCOMPARE(fx.modelKind(1), QStringLiteral("table"));
+        QCOMPARE(fx.modelKind(2), QStringLiteral("paragraph"));
+        QCOMPARE(fx.modelKind(3), QStringLiteral("table"));
+        QCOMPARE(fx.modelKind(4), QStringLiteral("paragraph"));
+
+        // Helper: find the table delegate at the given row. The QML class
+        // name contains "TableDelegate"; matched via metaObject ascending
+        // because QML wraps the QQuickItem in a generated subclass.
+        auto findTableAtRow = [&](int row) -> QQuickItem * {
+            QQuickItem *d = fx.delegateAt(row);
+            if (!d) return nullptr;
+            return QString::fromUtf8(d->metaObject()->className())
+                       .contains("TableDelegate") ? d : nullptr;
+        };
+        QQuickItem *smallTable = findTableAtRow(1);
+        QQuickItem *largeTable = findTableAtRow(3);
+        QVERIFY(smallTable);
+        QVERIFY(largeTable);
+
+        // Helper: walk a TableDelegate's Repeater for cell (r, c) → cell
+        // root Rectangle. `edit` property on the cell root is the TextEdit.
+        auto cellAt = [](QQuickItem *table, int r, int c) -> QQuickItem * {
+            if (!table) return nullptr;
+            QQuickItem *repeater = nullptr;
+            for (QQuickItem *k : table->findChildren<QQuickItem *>()) {
+                if (QString::fromUtf8(k->metaObject()->className())
+                        .contains("Repeater")) { repeater = k; break; }
+            }
+            if (!repeater) return nullptr;
+            const int cols = table->property("parsedTable").toMap()
+                                 .value("headers").toList().size();
+            if (cols < 1) return nullptr;
+            QQuickItem *cell = nullptr;
+            QMetaObject::invokeMethod(repeater, "itemAt",
+                                      Q_RETURN_ARG(QQuickItem *, cell),
+                                      Q_ARG(int, r * cols + c));
+            return cell;
+        };
+        auto cellEditAt = [&](QQuickItem *table, int r, int c) {
+            QQuickItem *cell = cellAt(table, r, c);
+            return cell ? cell->property("edit").value<QQuickItem *>() : nullptr;
+        };
+
+        QTRY_VERIFY(cellAt(smallTable, 1, 0) != nullptr);
+        QTRY_VERIFY(cellAt(largeTable, 1, 0) != nullptr);
+
+        // ===== Invariant 6: inline formatting in cells =====
+        // The larger table's row 2 cell 0 is `**bold cell**`. Highlighter
+        // should paint a bold layout-format range inside the cell document.
+        QQuickItem *boldCellEdit = cellEditAt(largeTable, /*r=*/2, /*c=*/0);
+        QVERIFY(boldCellEdit);
+        QQuickTextDocument *boldQtd =
+            boldCellEdit->property("textDocument").value<QQuickTextDocument *>();
+        QVERIFY(boldQtd);
+        QTextDocument *boldDoc = boldQtd->textDocument();
+        QVERIFY(boldDoc);
+        auto findBoldRange = [&](QTextDocument *doc) -> QPair<int,int> {
+            int start = -1, end = -1;
+            QTextBlock b = doc->firstBlock();
+            while (b.isValid()) {
+                const int bp = b.position();
+                for (const auto &fr : b.layout()->formats()) {
+                    if (fr.format.fontWeight() == QFont::Bold) {
+                        if (start < 0) start = bp + fr.start;
+                        end = bp + fr.start + fr.length;
+                    }
+                }
+                b = b.next();
+            }
+            if (start < 0) return {-1, 0};
+            return {start, end - start};
+        };
+        QPair<int,int> boldRange{-1, 0};
+        QTRY_VERIFY_WITH_TIMEOUT(([&]() {
+            boldRange = findBoldRange(boldDoc);
+            return boldRange.first >= 0;
+        }()), 2000);
+
+        // ===== Invariant 7: hit-test inside a table =====
+        // Pick a flat block-buffer qtPos inside cell (3, 1) of the larger
+        // table. TableDelegate.positionAt(x, y) should round-trip the
+        // cell-local centre of that cell back to the same flat qtPos
+        // (within ±1 char tolerance — cell.positionAt rounds to grapheme).
+        {
+            const QVariantMap parsed =
+                largeTable->property("parsedTable").toMap();
+            const QVariantList ccr = parsed["cellCharRanges"].toList();
+            QVERIFY(ccr.size() > 3);
+            const QVariantList row3 = ccr[3].toList();
+            QVERIFY(row3.size() > 1);
+            const QVariantMap cell31 = row3[1].toMap();
+            const int cellStart = cell31["start"].toInt();
+            const int cellEnd   = cell31["end"].toInt();
+            const int targetFlat = cellStart + (cellEnd - cellStart) / 2;
+
+            QQuickItem *cell = cellAt(largeTable, 3, 1);
+            QQuickItem *cellEdit = cellEditAt(largeTable, 3, 1);
+            QVERIFY(cell);
+            QVERIFY(cellEdit);
+            // Map cell centre → delegate-local (x, y) and ask
+            // TableDelegate.positionAt for the flat qtPos.
+            QPointF cellCentre(cell->width() / 2.0, cell->height() / 2.0);
+            QPointF delegateLocal = cell->mapToItem(largeTable, cellCentre);
+            // QML positionAt(x, y) takes numbers and returns int. Invoke
+            // via QVariant-returning form because the QML registration
+            // erases the parameter types — Q_RETURN_ARG(int) + Q_ARG(double)
+            // fails to find a match. Read the return value as int.
+            QVariant flatPosVar;
+            QMetaObject::invokeMethod(largeTable, "positionAt",
+                                      Q_RETURN_ARG(QVariant, flatPosVar),
+                                      Q_ARG(QVariant, QVariant(delegateLocal.x())),
+                                      Q_ARG(QVariant, QVariant(delegateLocal.y())));
+            const int flatPos = flatPosVar.toInt();
+            QVERIFY2(flatPos >= cellStart && flatPos <= cellEnd,
+                     qPrintable(QStringLiteral("hit-test landed at %1, "
+                                               "outside [%2, %3)")
+                                    .arg(flatPos).arg(cellStart).arg(cellEnd)));
+            // Centre of cell content (cell text " crossref ", 10 chars) is
+            // around qtPos 5; the centre-of-pixel target should be near
+            // there. Loose tolerance to absorb font-metric variation.
+            QVERIFY2(qAbs(flatPos - targetFlat) <= (cellEnd - cellStart) / 2,
+                     qPrintable(QStringLiteral("hit-test off by more than "
+                                               "half cell width: got %1, "
+                                               "target ~%2")
+                                    .arg(flatPos).arg(targetFlat)));
+        }
+
+        // ===== Invariant 4: cross-cell navigation =====
+        // Tab from (0, 0) → (0, 1) in the small table.
+        {
+            QQuickItem *cell00 = cellEditAt(smallTable, 0, 0);
+            QQuickItem *cell01 = cellEditAt(smallTable, 0, 1);
+            QVERIFY(cell00);
+            QVERIFY(cell01);
+            cell00->forceActiveFocus();
+            QTRY_VERIFY(cell00->hasActiveFocus());
+            fx.harness().keyClick(Qt::Key_Tab);
+            QTRY_VERIFY_WITH_TIMEOUT(cell01->hasActiveFocus(), 2000);
+        }
+
+        // ===== Invariant 3: cell-buffer round-trip =====
+        // Type 'X' into cell (1, 0) (" cell 1   ") at cell-relative qtPos 1.
+        // Verify the small table's buffer reflects the insert at the right
+        // block-relative offset, and that no OTHER cell's content changed.
+        {
+            QQuickItem *cell10 = cellEditAt(smallTable, 1, 0);
+            QVERIFY(cell10);
+            const QString preBuffer = fx.modelText(1);
+            const QString preCell12 = cellEditAt(smallTable, 1, 2)
+                                          ->property("text").toString();
+            cell10->setProperty("cursorPosition", 1);
+            cell10->forceActiveFocus();
+            QTRY_VERIFY(cell10->hasActiveFocus());
+            fx.harness().typeChar(QLatin1Char('X'));
+            QTest::qWait(100);
+
+            const QString postBuffer = fx.modelText(1);
+            QCOMPARE(postBuffer.size(), preBuffer.size() + 1);
+            QVERIFY2(postBuffer.contains(QStringLiteral(" Xcell 1   "))
+                         || postBuffer.contains(QStringLiteral("|X cell 1")),
+                     qPrintable(QStringLiteral("buffer after type: %1")
+                                    .arg(postBuffer.left(80))));
+
+            // ===== Invariant 2: no-revert =====
+            // Block kind is still table after the edit.
+            QCOMPARE(fx.modelKind(1), QStringLiteral("table"));
+            // Sibling cell content unchanged (no-revert for siblings).
+            const QString postCell12 = cellEditAt(smallTable, 1, 2)
+                                           ->property("text").toString();
+            QCOMPARE(postCell12, preCell12);
+        }
+
+        // ===== Invariant 5: block-level delete cascade =====
+        // Backspace at cell (0, 0) qtPos 0 of the small table → BlockSelected.
+        {
+            QQuickItem *cell00 = cellEditAt(smallTable, 0, 0);
+            QVERIFY(cell00);
+            cell00->setProperty("cursorPosition", 0);
+            cell00->forceActiveFocus();
+            QTRY_VERIFY(cell00->hasActiveFocus());
+            fx.harness().keyClick(Qt::Key_Backspace);
+            QTest::qWait(100);
+
+            QObject *cs = fx.binding()->property("cursorState")
+                                       .value<QObject *>();
+            QVERIFY(cs);
+            QTRY_COMPARE_WITH_TIMEOUT(cs->property("cursorKind").toString(),
+                                      QStringLiteral("BlockSelected"), 2000);
+            QCOMPARE(cs->property("focusedAnchorRow").toInt(), 1);
+        }
     }
 };
 
