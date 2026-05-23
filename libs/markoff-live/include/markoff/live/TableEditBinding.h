@@ -99,6 +99,13 @@ public:
         int cellStartChar,
         int cellEndChar) const;
 
+    /// Perf instrumentation hooks for QML/JS sites that the C++ scoped
+    /// probe can't reach. `perfTime` records caller-measured milliseconds
+    /// against `name`; `perfNote` just increments a call count. Both are
+    /// dispatched through `Markoff::Perf::Probe` (header-only singleton).
+    Q_INVOKABLE void perfTime(const QString &name, double ms) const;
+    Q_INVOKABLE void perfNote(const QString &name) const;
+
 Q_SIGNALS:
     void bindingChanged();
     void modelIndexChanged();

@@ -2,6 +2,7 @@
 #include <markoff/parser/TreeSitterParser.h>
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/parser/Document.h>
+#include <markoff/parser/PerfProbe.h>
 #include "WikilinkDecomposition.h"
 
 #include <tree_sitter/api.h>
@@ -245,14 +246,18 @@ TreeSitterParser::~TreeSitterParser()
 
 bool TreeSitterParser::parse(const QString &text)
 {
+    MARKOFF_PERF_SCOPE("parser.TreeSitterParser::parse");
     m_utf8 = text.toUtf8();
     m_byteToChar = buildByteToCharMap(m_utf8);
 
     // Phase 1: parse block structure
     if (m_blockTree) ts_tree_delete(m_blockTree);
-    m_blockTree = ts_parser_parse_string(m_blockParser, nullptr,
-                                          m_utf8.constData(),
-                                          static_cast<uint32_t>(m_utf8.size()));
+    {
+        MARKOFF_PERF_SCOPE("parser.block_grammar");
+        m_blockTree = ts_parser_parse_string(m_blockParser, nullptr,
+                                              m_utf8.constData(),
+                                              static_cast<uint32_t>(m_utf8.size()));
+    }
     if (!m_blockTree)
         return false;
 
@@ -271,6 +276,7 @@ bool TreeSitterParser::parse(const QString &text)
     m_inlineRanges.reserve(inlineRanges.size());
 
     for (const TSRange &range : inlineRanges) {
+        MARKOFF_PERF_SCOPE("parser.inline_grammar_one_range");
         ts_parser_set_included_ranges(m_inlineParser, &range, 1);
         TSTree *tree = ts_parser_parse_string(m_inlineParser, nullptr,
                                                m_utf8.constData(),
@@ -597,6 +603,7 @@ void TreeSitterParser::walkNode(TSNode node, QList<SourceSpan> &spans) const
 
 QList<SourceSpan> TreeSitterParser::buildSpanMap() const
 {
+    MARKOFF_PERF_SCOPE("parser.buildSpanMap");
     QList<SourceSpan> spans;
 
     if (!m_blockTree)
@@ -1407,6 +1414,7 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
 
 QList<SourceSpan> inlineSpansFor(const QByteArray &blockContent)
 {
+    MARKOFF_PERF_SCOPE("parser.inlineSpansFor(QByteArray)");
     // Tree-sitter's markdown block grammar only wraps a leaf marker
     // (atx_h*_marker, fenced delimiter, …) in its parent block node when the
     // construct is line-terminated. User-typed per-block content arrives here

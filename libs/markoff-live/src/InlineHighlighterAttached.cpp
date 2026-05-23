@@ -2,6 +2,8 @@
 #include <markoff/live/InlineHighlighterAttached.h>
 #include <markoff/live/InlineHighlighter.h>
 
+#include <markoff/parser/PerfProbe.h>
+
 #include <QQuickTextDocument>
 #include <QTextDocument>
 
@@ -30,13 +32,18 @@ QVariantList InlineHighlighterAttached::spans() const
 
 void InlineHighlighterAttached::setSpans(const QVariantList &v)
 {
+    MARKOFF_PERF_SCOPE("live.InlineHighlighterAttached::setSpans");
     QList<Markoff::SourceSpan> next;
     next.reserve(v.size());
     for (const QVariant &item : v) {
         if (item.canConvert<Markoff::SourceSpan>())
             next.append(item.value<Markoff::SourceSpan>());
     }
-    if (next == m_spans) return;
+    if (next == m_spans) {
+        Markoff::Perf::Probe::instance().note(
+            QStringLiteral("live.InlineHighlighterAttached::setSpans.noop"));
+        return;
+    }
     m_spans = next;
     if (m_highlighter) m_highlighter->setInlineSpans(m_spans);
     emit spansChanged();

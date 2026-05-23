@@ -4,6 +4,7 @@
 #include <markoff/live/LiveStructuralKeyHandler.h>
 #include <markoff/live/LiveNavigationController.h>
 #include <markoff/live/BlockKind.h>
+#include <markoff/parser/PerfProbe.h>
 
 #include "Detail/LiveFindAdapter.h"
 
@@ -388,6 +389,7 @@ void LiveListModelBinding::setFontScale(qreal s)
 
 void LiveListModelBinding::onD2Changed()
 {
+    MARKOFF_PERF_SCOPE("live.LiveListModelBinding::onD2Changed");
     auto *doc = d->document;
     if (!doc) return;
 
@@ -411,7 +413,10 @@ void LiveListModelBinding::onD2Changed()
         r.text = QString::fromUtf8(doc->blockText(id));
 
         // Populate inline spans and block attrs from the foundation CRDT.
-        r.inlineSpans = doc->inlineSpansFor(id);
+        {
+            MARKOFF_PERF_SCOPE("live.buildRecords.inlineSpansFor");
+            r.inlineSpans = doc->inlineSpansFor(id);
+        }
         r.attrs       = doc->blockAttrs(id);
 
         // Populate kind-specific extras from attrs map.

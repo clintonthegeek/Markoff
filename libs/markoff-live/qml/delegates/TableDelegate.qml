@@ -62,7 +62,16 @@ Rectangle {
     //
     // Spec §4.2; tokenizer rules per §6.3 (p1 — padding preserved
     // bytewise, cell content includes leading/trailing whitespace).
-    property var parsedTable: parseTable(root.blockText)
+    property var parsedTable: {
+        // Perf instrumentation — see PerfProbe.h. The JS Date.now()
+        // resolution is 1ms; sub-ms parseTable runs round to 0, which is
+        // itself a useful signal (means it's not the bottleneck).
+        const _t0 = Date.now()
+        const _r = parseTable(root.blockText)
+        if (tableEditBinding)
+            tableEditBinding.perfTime("qml.TableDelegate.parseTable", Date.now() - _t0)
+        return _r
+    }
 
     // C2: per-delegate edit binding. Cells dispatch their user edits
     // through tableEditBinding.applyCellEdit; the binding does the
@@ -372,6 +381,8 @@ Rectangle {
                     // evaluator. Returning "" lets the destroying cell
                     // settle cleanly.
                     readonly property string cellText: {
+                        if (tableEditBinding)
+                            tableEditBinding.perfNote("qml.TableDelegate.cellText.eval")
                         if (!root.parsedTable || !root.parsedTable.parseOk) return ""
                         if (cellRect.isHeader) {
                             const hs = root.parsedTable.headers

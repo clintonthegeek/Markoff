@@ -6,6 +6,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/UndoLog.h>
 #include <markoff/parser/SourceSpan.h>
+#include <markoff/parser/PerfProbe.h>
 
 namespace Markoff::Live {
 
@@ -45,6 +46,7 @@ void TableEditBinding::applyCellEdit(int cellStartCharPos,
                                      int removed,
                                      const QString &added)
 {
+    MARKOFF_PERF_SCOPE("live.TableEditBinding::applyCellEdit");
     if (!m_binding || !m_binding->document() || !m_binding->model()) return;
     if (m_modelIndex < 0) return;
     if (m_modelIndex >= m_binding->model()->rowCount()) return;
@@ -82,6 +84,7 @@ QVariantList TableEditBinding::inlineSpansForCell(
     const QVariant &blockSpans,
     int cellStartChar, int cellEndChar) const
 {
+    MARKOFF_PERF_SCOPE("live.TableEditBinding::inlineSpansForCell");
     QVariantList out;
     if (cellEndChar <= cellStartChar) return out;
     // QML hands the model role through as either a typed
@@ -122,6 +125,16 @@ QVariantList TableEditBinding::inlineSpansForCell(
         out.append(QVariant::fromValue(s));
     }
     return out;
+}
+
+void TableEditBinding::perfTime(const QString &name, double ms) const
+{
+    Markoff::Perf::Probe::instance().recordMs(name, ms);
+}
+
+void TableEditBinding::perfNote(const QString &name) const
+{
+    Markoff::Perf::Probe::instance().note(name);
 }
 
 }  // namespace Markoff::Live

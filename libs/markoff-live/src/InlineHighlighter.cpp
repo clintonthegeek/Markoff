@@ -2,6 +2,7 @@
 #include <markoff/live/InlineHighlighter.h>
 
 #include <markoff/core/Theme.h>
+#include <markoff/parser/PerfProbe.h>
 
 #include <QFontMetricsF>
 #include <QTextBlock>
@@ -18,7 +19,11 @@ InlineHighlighter::~InlineHighlighter() = default;
 
 void InlineHighlighter::setInlineSpans(const QList<Markoff::SourceSpan> &spans)
 {
-    if (m_spans == spans) return;
+    if (m_spans == spans) {
+        Markoff::Perf::Probe::instance().note(QStringLiteral("live.InlineHighlighter.setInlineSpans.noop"));
+        return;
+    }
+    MARKOFF_PERF_SCOPE("live.InlineHighlighter::setInlineSpans+rehighlight");
     m_spans = spans;
     rehighlight();
 }
@@ -39,6 +44,7 @@ void InlineHighlighter::setTheme(const Markoff::Theme *theme)
 
 void InlineHighlighter::highlightBlock(const QString &text)
 {
+    MARKOFF_PERF_SCOPE("live.InlineHighlighter::highlightBlock");
     if (!m_theme) return;
     // Span offsets are block-relative (across the whole markoff CRDT block,
     // which can contain embedded `\n`s — a multi-line paragraph). But Qt
