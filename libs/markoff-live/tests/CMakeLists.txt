@@ -746,8 +746,7 @@ foreach(_qmlcompanion
     tst_live_render_drop_text_qml
     tst_live_render_ime_composition_qml
     tst_live_render_table_parsing
-    tst_live_render_table_cell_edit
-    tst_live_render_table_inline_formatting)
+    tst_live_render_table_cell_edit)
     qt_add_executable(${_qmlcompanion}
         ${_qmlcompanion}.cpp
         QmlIntegrationFixture.h
@@ -763,6 +762,26 @@ foreach(_qmlcompanion
     set_tests_properties(${_qmlcompanion}
         PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 endforeach()
+
+# tst_live_render_table_inline_formatting needs RecordingLinkService for the
+# F2 Ctrl+click slots (see tst_live_link_qml_integration for the same pattern).
+qt_add_executable(tst_live_render_table_inline_formatting
+    tst_live_render_table_inline_formatting.cpp
+    QmlIntegrationFixture.h
+    QmlIntegrationFixture.cpp
+    RecordingLinkService.h
+    RecordingLinkService.cpp)
+target_link_libraries(tst_live_render_table_inline_formatting PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::Qml
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff-live-app-internal
+    markoff-live-app-internalplugin
+    markoff-live-app-internalplugin_init)
+add_test(NAME tst_live_render_table_inline_formatting
+         COMMAND tst_live_render_table_inline_formatting)
+set_tests_properties(tst_live_render_table_inline_formatting
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 qt_add_executable(tst_live_cursor_state_chokepoint
     tst_live_cursor_state_chokepoint.cpp

@@ -17,13 +17,18 @@
 // Plan: docs/plans/2026-05-22-e4-tables.md Phase F Task F1.
 
 #include "QmlIntegrationFixture.h"
+#include "RecordingLinkService.h"
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/live/LiveListModelBinding.h>
 #include <markoff/parser/SourceSpan.h>
 
+#include <QCoreApplication>
 #include <QFont>
+#include <QPointF>
 #include <QQuickItem>
 #include <QQuickTextDocument>
+#include <QRectF>
 #include <QTextBlock>
 #include <QTextDocument>
 #include <QTextLayout>
@@ -102,6 +107,12 @@ class TestTableInlineFormatting : public QObject {
 private slots:
     void bold_in_body_cell_paints_bold_at_cell_relative_offset();
     void span_outside_cell_does_not_paint_inside_other_cell();
+
+    // F2 — wikilink + standard-link Ctrl+click + Ctrl+hover inside cells.
+    void ctrl_click_on_wikilink_in_cell_dispatches_activation();
+    void plain_click_on_wikilink_in_cell_does_not_activate();
+    void ctrl_click_on_standard_link_in_cell_dispatches_activation();
+    void ctrl_hover_on_wikilink_in_cell_emits_hover_and_flips_cursor();
 };
 
 void TestTableInlineFormatting
@@ -262,6 +273,228 @@ void TestTableInlineFormatting
             return f.fontWeight() == QFont::Bold;
         });
     QCOMPARE(plainRange.first, -1);
+}
+
+// ============================================================================
+// F2 — Ctrl+click + Ctrl+hover on links inside cells
+// ============================================================================
+
+namespace {
+
+// Helper: compute a scene-coordinate point inside the visible text of the
+// first inline span matching `pred` within the cell at (r, c). Mirrors the
+// row-0 paragraph helper in QmlIntegrationFixture but addresses a specific
+// cell's TextEdit. Returns a null point if no match.
+template <class Pred>
+QPoint scenePointAtCellSpan(QmlIntegrationFixture &fx, int blockRow,
+                            int r, int c, Pred pred)
+{
+    QQuickItem *table = findTableDelegate(fx);
+    if (!table) return {};
+    QQuickItem *cellEdit = cellEditAt(table, r, c);
+    if (!cellEdit) return {};
+
+    const auto blockIds = fx.document()->iterateBlocks();
+    if (blockRow >= static_cast<int>(blockIds.size())) return {};
+    const Markoff::BlockId bid = blockIds[blockRow];
+    const QList<Markoff::SourceSpan> spans = fx.document()->inlineSpansFor(bid);
+
+    const QVariantMap parsed = table->property("parsedTable").toMap();
+    const QVariantList ccr   = parsed["cellCharRanges"].toList();
+    if (ccr.size() <= r) return {};
+    const QVariantList row   = ccr[r].toList();
+    if (row.size() <= c) return {};
+    const QVariantMap cellRange = row[c].toMap();
+    const int cellStart = cellRange["start"].toInt();
+    const int cellEnd   = cellRange["end"].toInt();
+
+    int spanOffset = -1;
+    int spanLen    = 0;
+    // Prefer non-delimiter content spans; fall back to delimiters.
+    for (const auto &s : spans) {
+        if (!pred(s) || s.charLength <= 0) continue;
+        const int spanStart = s.charOffset;
+        const int spanEndCh = s.charOffset + s.charLength;
+        if (spanStart < cellStart || spanEndCh > cellEnd) continue;
+        if (!s.isDelimiter) {
+            spanOffset = spanStart - cellStart;
+            spanLen    = s.charLength;
+            break;
+        }
+        if (spanOffset < 0) {
+            spanOffset = spanStart - cellStart;
+            spanLen    = s.charLength;
+        }
+    }
+    if (spanOffset < 0) return {};
+
+    const int charPos = spanOffset + spanLen / 2;
+    QRectF localRect;
+    if (!QMetaObject::invokeMethod(cellEdit, "positionToRectangle",
+                                   Qt::DirectConnection,
+                                   Q_RETURN_ARG(QRectF, localRect),
+                                   Q_ARG(int, charPos)))
+        return {};
+    const QPointF scenePt = cellEdit->mapToScene(localRect.center());
+    return scenePt.toPoint();
+}
+
+}  // namespace
+
+void TestTableInlineFormatting
+    ::ctrl_click_on_wikilink_in_cell_dispatches_activation()
+{
+    // `[[Page]]` lives in cell (1, 0). LiveView's outer MouseArea Ctrl+click
+    // routes through `root.hit(x, y)` → `TableDelegate.positionAt(x, y)` →
+    // flat block-buffer qtPos → `binding.activateLinkAt(blockAnchor,
+    // flatQtPos, mods)`. The wikilink span (added to the block by the F1
+    // parser-side fix routing `pipe_table_cell` content through the inline
+    // grammar) is found at the flat qtPos and dispatched to LinkService.
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| H |\n"
+        "|---|\n"
+        "| [[Page]] |\n"
+        "\n"
+        "para after\n";
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    Markoff::LiveTest::RecordingLinkService svc;
+    auto *lb = qobject_cast<Markoff::Live::LiveListModelBinding *>(fx.binding());
+    QVERIFY(lb);
+    lb->setLinkService(&svc);
+
+    QQuickItem *table = findTableDelegate(fx);
+    QVERIFY(table);
+    QTRY_VERIFY(cellAt(table, 1, 0) != nullptr);
+
+    const QPoint clickPt = scenePointAtCellSpan(fx, /*blockRow=*/1,
+                                                /*r=*/1, /*c=*/0,
+        [](const Markoff::SourceSpan &s) { return s.isWikilink; });
+    QVERIFY2(!clickPt.isNull(), "could not compute scene point for cell wikilink");
+
+    QTest::mouseClick(fx.window(), Qt::LeftButton, Qt::ControlModifier, clickPt);
+    QTRY_COMPARE_WITH_TIMEOUT(svc.activations.size(), 1, 2000);
+    QCOMPARE(svc.activations.first().page, QStringLiteral("Page"));
+}
+
+void TestTableInlineFormatting
+    ::plain_click_on_wikilink_in_cell_does_not_activate()
+{
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| H |\n"
+        "|---|\n"
+        "| [[Page]] |\n"
+        "\n"
+        "para after\n";
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    Markoff::LiveTest::RecordingLinkService svc;
+    auto *lb = qobject_cast<Markoff::Live::LiveListModelBinding *>(fx.binding());
+    QVERIFY(lb);
+    lb->setLinkService(&svc);
+
+    QQuickItem *table = findTableDelegate(fx);
+    QVERIFY(table);
+    QTRY_VERIFY(cellAt(table, 1, 0) != nullptr);
+
+    const QPoint clickPt = scenePointAtCellSpan(fx, /*blockRow=*/1,
+                                                /*r=*/1, /*c=*/0,
+        [](const Markoff::SourceSpan &s) { return s.isWikilink; });
+    QVERIFY(!clickPt.isNull());
+
+    QTest::mouseClick(fx.window(), Qt::LeftButton, Qt::NoModifier, clickPt);
+    QTest::qWait(100);
+    QCoreApplication::processEvents();
+    QCOMPARE(svc.activations.size(), 0);
+}
+
+void TestTableInlineFormatting
+    ::ctrl_click_on_standard_link_in_cell_dispatches_activation()
+{
+    // Standard markdown link `[text](https://example.com)` in cell (1, 0).
+    // The path is identical to wikilinks — `binding.activateLinkAt` reads
+    // span.linkTarget from the spans cache, classifies (External in this
+    // case), and dispatches.
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| H |\n"
+        "|---|\n"
+        "| [click](https://example.com) |\n"
+        "\n"
+        "para after\n";
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    Markoff::LiveTest::RecordingLinkService svc;
+    auto *lb = qobject_cast<Markoff::Live::LiveListModelBinding *>(fx.binding());
+    QVERIFY(lb);
+    lb->setLinkService(&svc);
+
+    QQuickItem *table = findTableDelegate(fx);
+    QVERIFY(table);
+    QTRY_VERIFY(cellAt(table, 1, 0) != nullptr);
+
+    const QPoint clickPt = scenePointAtCellSpan(fx, /*blockRow=*/1,
+                                                /*r=*/1, /*c=*/0,
+        [](const Markoff::SourceSpan &s) {
+            return s.isLink && !s.isWikilink;
+        });
+    QVERIFY2(!clickPt.isNull(), "could not compute scene point for cell link");
+
+    QTest::mouseClick(fx.window(), Qt::LeftButton, Qt::ControlModifier, clickPt);
+    QTRY_COMPARE_WITH_TIMEOUT(svc.activations.size(), 1, 2000);
+    const Markoff::LinkActivation &act = svc.activations.first();
+    QVERIFY2(act.resolvedTarget.toString().contains(QStringLiteral("example.com"))
+                 || act.rawText.contains(QStringLiteral("example.com")),
+             qPrintable(QStringLiteral("link payload missing example.com; "
+                                       "rawText=%1 resolvedTarget=%2")
+                            .arg(act.rawText, act.resolvedTarget.toString())));
+}
+
+void TestTableInlineFormatting
+    ::ctrl_hover_on_wikilink_in_cell_emits_hover_and_flips_cursor()
+{
+    // Mirror tst_live_link_qml_integration::ctrl_hover_emits_hover but
+    // address a cell-resident wikilink. The outer MouseArea's
+    // onPositionChanged with ControlModifier calls
+    // `binding.hoverLinkAt(blockAnchor, flatQtPos, mods, scenePoint)` —
+    // since hit-test routes through TableDelegate.positionAt, the path is
+    // the same as for paragraph blocks.
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| H |\n"
+        "|---|\n"
+        "| [[Page]] |\n"
+        "\n"
+        "para after\n";
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    Markoff::LiveTest::RecordingLinkService svc;
+    auto *lb = qobject_cast<Markoff::Live::LiveListModelBinding *>(fx.binding());
+    QVERIFY(lb);
+    lb->setLinkService(&svc);
+
+    QQuickItem *table = findTableDelegate(fx);
+    QVERIFY(table);
+    QTRY_VERIFY(cellAt(table, 1, 0) != nullptr);
+
+    const QPoint pt = scenePointAtCellSpan(fx, /*blockRow=*/1,
+                                           /*r=*/1, /*c=*/0,
+        [](const Markoff::SourceSpan &s) { return s.isWikilink; });
+    QVERIFY(!pt.isNull());
+
+    fx.simulateCtrlHoverAt(pt);
+    QTRY_COMPARE_WITH_TIMEOUT(svc.hovers.size(), 1, 2000);
+    QCOMPARE(svc.hovers.first().page, QStringLiteral("Page"));
 }
 
 }  // namespace Markoff::Live::Test
