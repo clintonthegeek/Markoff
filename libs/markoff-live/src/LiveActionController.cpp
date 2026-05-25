@@ -1,0 +1,216 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include <markoff/live/LiveActionController.h>
+
+#include <QApplication>
+#include <QClipboard>
+#include <QKeySequence>
+#include <QMimeData>
+
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/live/LiveCursorState.h>
+#include <markoff/live/LiveClipboardController.h>
+#include <markoff/live/LiveFormatController.h>
+#include <markoff/live/LiveListModelBinding.h>
+
+namespace Markoff::Live {
+
+LiveActionController::LiveActionController(QObject *parent)
+    : QObject(parent)
+{
+    setupActions();
+    connect(QApplication::clipboard(), &QClipboard::changed,
+            this, &LiveActionController::onClipboardChanged);
+}
+
+void LiveActionController::setupActions() {
+    m_cut       = new QAction(tr("Cut"),        this);
+    m_copy      = new QAction(tr("Copy"),       this);
+    m_paste     = new QAction(tr("Paste"),      this);
+    m_selectAll = new QAction(tr("Select All"), this);
+    m_delete    = new QAction(tr("Delete"),     this);
+    m_undo      = new QAction(tr("Undo"),       this);
+    m_redo      = new QAction(tr("Redo"),       this);
+    m_bold       = new QAction(tr("Bold"),         this);
+    m_italic     = new QAction(tr("Italic"),       this);
+    m_strike     = new QAction(tr("Strikethrough"), this);
+    m_inlineCode = new QAction(tr("Inline Code"),  this);
+    m_link       = new QAction(tr("Link"),         this);
+    m_heading[0] = new QAction(tr("Paragraph"),    this);
+    m_heading[1] = new QAction(tr("Heading 1"),    this);
+    m_heading[2] = new QAction(tr("Heading 2"),    this);
+    m_heading[3] = new QAction(tr("Heading 3"),    this);
+    m_heading[4] = new QAction(tr("Heading 4"),    this);
+    m_heading[5] = new QAction(tr("Heading 5"),    this);
+    m_heading[6] = new QAction(tr("Heading 6"),    this);
+    m_save      = new QAction(tr("Save"),       this);
+    m_zoomIn    = new QAction(tr("Zoom In"),    this);
+    m_zoomOut   = new QAction(tr("Zoom Out"),   this);
+    m_zoomReset = new QAction(tr("Reset Zoom"), this);
+
+    m_cut->setShortcut(QKeySequence::Cut);
+    m_copy->setShortcut(QKeySequence::Copy);
+    m_paste->setShortcut(QKeySequence::Paste);
+    m_selectAll->setShortcut(QKeySequence::SelectAll);
+    m_undo->setShortcut(QKeySequence::Undo);
+    m_redo->setShortcut(QKeySequence::Redo);
+    m_bold->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_B));
+    m_italic->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_I));
+    m_strike->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_X));
+    // Ctrl+E is a common choice for inline code (used by Discord, Slack); no
+    // standard Qt::QKeySequence::InlineCode binding exists.
+    m_inlineCode->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_E));
+    m_link->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_K));
+    // Heading shortcuts: Ctrl+0 → paragraph, Ctrl+1..Ctrl+6 → headings.
+    for (int lvl = 0; lvl <= 6; ++lvl) {
+        m_heading[lvl]->setShortcut(
+            QKeySequence(Qt::CTRL | static_cast<Qt::Key>(Qt::Key_0 + lvl)));
+    }
+    m_save->setShortcut(QKeySequence::Save);
+    m_delete->setShortcut(QKeySequence::Delete);
+    m_zoomIn->setShortcuts({
+        QKeySequence(Qt::CTRL | Qt::Key_Equal),
+        QKeySequence(Qt::CTRL | Qt::Key_Plus),
+        QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_Equal),
+    });
+    m_zoomOut  ->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_Minus));
+    m_zoomReset->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_0));
+
+    // Initial enabled state (all disabled until document+selection wired).
+    for (auto *a : {m_cut, m_copy, m_paste, m_selectAll, m_delete,
+                    m_undo, m_redo, m_bold, m_italic, m_strike, m_inlineCode,
+                    m_link, m_save, m_zoomIn, m_zoomOut, m_zoomReset})
+        a->setEnabled(false);
+    for (int lvl = 0; lvl <= 6; ++lvl) m_heading[lvl]->setEnabled(false);
+
+    // Wire triggers.
+    connect(m_selectAll, &QAction::triggered, this, [this] {
+        if (m_selection) m_selection->selectAll();
+    });
+    connect(m_delete, &QAction::triggered, this, [this] {
+        if (m_selection) m_selection->deleteSelection();
+    });
+    connect(m_save, &QAction::triggered, this, [this] {
+        Q_EMIT saveRequested();
+    });
+    connect(m_undo, &QAction::triggered, this, [this] {
+        if (m_document) m_document->undoD2();
+    });
+    connect(m_redo, &QAction::triggered, this, [this] {
+        if (m_document) m_document->redoD2();
+    });
+    connect(m_zoomIn, &QAction::triggered, this, [this]{
+        if (m_binding) m_binding->setFontScale(m_binding->fontScale() * kFontScaleStep);
+    });
+    connect(m_zoomOut, &QAction::triggered, this, [this]{
+        if (m_binding) m_binding->setFontScale(m_binding->fontScale() / kFontScaleStep);
+    });
+    connect(m_zoomReset, &QAction::triggered, this, [this]{
+        if (m_binding) m_binding->setFontScale(kDefaultFontScale);
+    });
+
+    m_toggleDark = new QAction(tr("Toggle Dark Mode"), this);
+    m_toggleDark->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_D));
+    m_toggleDark->setEnabled(true);
+    connect(m_toggleDark, &QAction::triggered, this, [this]{
+        m_isDark = !m_isDark;
+        Q_EMIT themeToggleRequested(m_isDark);
+    });
+    // cut/copy/paste wired after setClipboardController.
+    // bold/italic/link wired after setFormatController.
+}
+
+void LiveActionController::setDocument(Markoff::MarkoffDocument *doc) {
+    if (m_document) {
+        disconnect(m_document, nullptr, this, nullptr);
+    }
+    m_document = doc;
+    if (m_document) {
+        connect(m_document, &Markoff::MarkoffDocument::d2DocumentChanged,
+                this, &LiveActionController::updateEnabledStates);
+    }
+    updateEnabledStates();
+}
+
+void LiveActionController::setSelectionView(LiveCursorState *sv) {
+    if (m_selection) {
+        disconnect(m_selection, nullptr, this, nullptr);
+    }
+    m_selection = sv;
+    if (m_selection) {
+        connect(m_selection, &LiveCursorState::selectionChanged,
+                this, &LiveActionController::updateEnabledStates);
+    }
+    updateEnabledStates();
+}
+
+void LiveActionController::setClipboardController(LiveClipboardController *cc) {
+    m_clipboard = cc;
+    if (cc) {
+        connect(m_cut,   &QAction::triggered, cc, &LiveClipboardController::cut);
+        connect(m_copy,  &QAction::triggered, cc, &LiveClipboardController::copy);
+        connect(m_paste, &QAction::triggered, cc, &LiveClipboardController::paste);
+    }
+    updateEnabledStates();
+}
+
+void LiveActionController::updateEnabledStates() {
+    const bool hasSel = m_selection && m_selection->hasSelection();
+    const bool hasDoc = m_document != nullptr;
+    const bool hasClip = QApplication::clipboard()->mimeData() &&
+                         (QApplication::clipboard()->mimeData()->hasText() ||
+                          QApplication::clipboard()->mimeData()->hasFormat(
+                              LiveClipboardController::kBlocksMime));
+
+    m_cut->setEnabled(hasSel && hasDoc);
+    m_copy->setEnabled(hasSel && hasDoc);
+    m_paste->setEnabled(hasDoc && hasClip);
+    m_selectAll->setEnabled(hasDoc);
+    m_delete->setEnabled(hasSel && hasDoc);
+    m_save->setEnabled(hasDoc);
+
+    // Undo/redo: enabled whenever a document is wired; no per-D2 depth query.
+    m_undo->setEnabled(hasDoc);
+    m_redo->setEnabled(hasDoc);
+
+    // Bold/italic/strike/inlineCode/link: enabled when selection exists
+    // (format controller not wired yet). Link allows empty selection.
+    m_bold->setEnabled(hasSel && hasDoc);
+    m_italic->setEnabled(hasSel && hasDoc);
+    m_strike->setEnabled(hasSel && hasDoc);
+    m_inlineCode->setEnabled(hasSel && hasDoc);
+    m_link->setEnabled(hasDoc);
+    // Heading actions: enabled whenever a document is wired (acts on the
+    // focused block; selection optional but allowed for multi-block changes).
+    for (int lvl = 0; lvl <= 6; ++lvl) m_heading[lvl]->setEnabled(hasDoc);
+
+    const bool hasBinding = m_binding != nullptr;
+    m_zoomIn   ->setEnabled(hasBinding);
+    m_zoomOut  ->setEnabled(hasBinding);
+    m_zoomReset->setEnabled(hasBinding);
+}
+
+void LiveActionController::setBinding(LiveListModelBinding *b) {
+    m_binding = b;
+    updateEnabledStates();
+}
+
+void LiveActionController::setFormatController(LiveFormatController *fc) {
+    m_format = fc;
+    if (fc) {
+        connect(m_bold,       &QAction::triggered, fc, &LiveFormatController::toggleBold);
+        connect(m_italic,     &QAction::triggered, fc, &LiveFormatController::toggleItalic);
+        connect(m_strike,     &QAction::triggered, fc, &LiveFormatController::toggleStrikethrough);
+        connect(m_inlineCode, &QAction::triggered, fc, &LiveFormatController::toggleInlineCode);
+        connect(m_link,       &QAction::triggered, fc, &LiveFormatController::insertLink);
+        for (int lvl = 0; lvl <= 6; ++lvl) {
+            connect(m_heading[lvl], &QAction::triggered, fc,
+                    [fc, lvl]{ fc->setHeadingLevel(lvl); });
+        }
+    }
+}
+
+void LiveActionController::onClipboardChanged() {
+    updateEnabledStates();
+}
+
+}  // namespace Markoff::Live

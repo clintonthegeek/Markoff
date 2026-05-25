@@ -1,50 +1,25 @@
-# SPDX-License-Identifier: GPL-3.0-or-later
-#
-# Phase 1 tests for qutepart-corbomite. Only the smoke test ships right now;
-# more tests are added in later phases as the library is shaped.
+cmake_minimum_required(VERSION 3.19)
+find_package(Qt6 REQUIRED COMPONENTS Test Widgets)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Widgets Test)
+add_executable(tst_source_widget_editor tst_source_widget_editor.cpp)
+add_test(NAME tst_source_widget_editor COMMAND tst_source_widget_editor)
+target_link_libraries(tst_source_widget_editor PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
+set_tests_properties(tst_source_widget_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-qt_add_executable(tst_qutepart_smoke tst_qutepart_smoke.cpp)
+add_executable(tst_source_widget_format_ops tst_source_widget_format_ops.cpp)
+add_test(NAME tst_source_widget_format_ops COMMAND tst_source_widget_format_ops)
+target_link_libraries(tst_source_widget_format_ops PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
+set_tests_properties(tst_source_widget_format_ops PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-target_link_libraries(tst_qutepart_smoke
-    PRIVATE
-        Qt6::Core
-        Qt6::Widgets
-        Qt6::Test
-        markoff_source
-)
+add_executable(tst_source_widget_binding_roundtrip tst_source_widget_binding_roundtrip.cpp)
+add_test(NAME tst_source_widget_binding_roundtrip COMMAND tst_source_widget_binding_roundtrip)
+target_link_libraries(tst_source_widget_binding_roundtrip PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
+set_tests_properties(tst_source_widget_binding_roundtrip PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-add_test(NAME tst_qutepart_smoke COMMAND tst_qutepart_smoke)
-
-# Headless run via offscreen QPA, so ctest works in environments without a
-# display server (CI, container, orchestrator shell).
-set_tests_properties(tst_qutepart_smoke PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-)
-
-# Tri-view MarkdownView wrapper test (Phase A Task 12).
-qt_add_executable(tst_markoff_source_markdown_view tst_source_markdown_view.cpp)
-target_link_libraries(tst_markoff_source_markdown_view
-    PRIVATE
-        Qt6::Test
-        Qt6::Widgets
-        markoff_source
-)
-add_test(NAME tst_markoff_source_markdown_view COMMAND tst_markoff_source_markdown_view)
-set_tests_properties(tst_markoff_source_markdown_view PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-)
-
-# Phase C3 Task 10: SourceEditor canonical attach / inbound delta / reload.
-qt_add_executable(tst_source_canonical_attach tst_source_canonical_attach.cpp)
-target_link_libraries(tst_source_canonical_attach
-    PRIVATE
-        Qt6::Test
-        Qt6::Widgets
-        markoff_source
-)
-add_test(NAME tst_source_canonical_attach COMMAND tst_source_canonical_attach)
-set_tests_properties(tst_source_canonical_attach PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-)
+add_executable(tst_v10_source_editor_view_contract tst_v10_source_editor_view_contract.cpp)
+target_link_libraries(tst_v10_source_editor_view_contract PRIVATE markoff_source markoff_core Qt6::Test Qt6::Widgets)
+add_test(NAME tst_v10_source_editor_view_contract COMMAND tst_v10_source_editor_view_contract)
+set_tests_properties(tst_v10_source_editor_view_contract PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

@@ -43,3 +43,31 @@ add_executable(tst_markoff_parser_splitter_table_passthrough tst_splitter_table_
 add_test(NAME tst_markoff_parser_splitter_table_passthrough COMMAND tst_markoff_parser_splitter_table_passthrough)
 target_link_libraries(tst_markoff_parser_splitter_table_passthrough PRIVATE Qt6::Test markoff-parser)
 set_tests_properties(tst_markoff_parser_splitter_table_passthrough PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_markoff_parser_document_top_level_blocks tst_document_top_level_blocks.cpp)
+add_test(NAME tst_markoff_parser_document_top_level_blocks COMMAND tst_markoff_parser_document_top_level_blocks)
+target_link_libraries(tst_markoff_parser_document_top_level_blocks PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_markoff_parser_document_top_level_blocks PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_parser_inline_span_bake tst_parser_inline_span_bake.cpp)
+add_test(NAME tst_parser_inline_span_bake COMMAND tst_parser_inline_span_bake)
+target_link_libraries(tst_parser_inline_span_bake PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_parser_inline_span_bake PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_parser_list_items tst_parser_list_items.cpp)
+add_test(NAME tst_parser_list_items COMMAND tst_parser_list_items)
+target_link_libraries(tst_parser_list_items PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_parser_list_items PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_link_target_decomposition tst_link_target_decomposition.cpp)
+add_test(NAME tst_link_target_decomposition COMMAND tst_link_target_decomposition)
+target_link_libraries(tst_link_target_decomposition PRIVATE Qt6::Test markoff-parser)
+target_include_directories(tst_link_target_decomposition PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src
+)
+set_tests_properties(tst_link_target_decomposition PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_inline_spans_link_target tst_inline_spans_link_target.cpp)
+add_test(NAME tst_inline_spans_link_target COMMAND tst_inline_spans_link_target)
+target_link_libraries(tst_inline_spans_link_target PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_inline_spans_link_target PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

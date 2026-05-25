@@ -1,0 +1,1162 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#include "LiveRealisticInputHarness.h"
+#include "QmlIntegrationFixture.h"
+
+#include <markoff/core/BlockAnchor.h>
+#include <markoff/live/LiveCursorState.h>
+
+#include <QQuickItem>
+#include <QtTest/QtTest>
+
+namespace Markoff::Live::Test {
+
+// Test document block layout (5 rows):
+//   Row 0: heading    "# Heading"
+//   Row 1: paragraph  "Paragraph one."
+//   Row 2: blockquote "> Quote"
+//   Row 3: list-item  "list item" (marker stripped)
+//   Row 4: code-block "code\n"   (fence stripped)
+
+class TestFocusChokepointInvariant : public QObject {
+    Q_OBJECT
+
+private slots:
+    void init();
+    void cleanup();
+
+    void enter_at_paragraph_end();
+    void enter_at_paragraph_middle();
+    void enter_at_paragraph_start();
+    void backspace_at_paragraph_start();
+    void heading_demote_via_hash_deletion();
+    void paragraph_promote_via_hash_typing();
+    void blockquote_demote();
+    void blockquote_promote();
+    void codeblock_kind_transition();
+    void listitem_kind_transition();
+    void paste_at_block_start();
+    void paste_at_block_middle();
+    void paste_at_block_end();
+    void undo_after_enter();
+    void redo_after_undo();
+    void click_to_focus_paragraph();
+    void click_to_focus_heading();
+    // Dogfood findings 2026-05-11 (D-fc-1 / D-fc-2 / D-fc-3).
+    void nav_into_runtime_promoted_heading();
+    void hr_promotion_lands_focus_on_text_block();
+    void arrow_down_traverses_existing_hr();
+    void arrow_up_traverses_existing_hr();
+    void arrow_after_click_skips_hr();
+    void click_on_hr_then_arrow_navigates_out();
+    void click_on_hr_sets_block_selected();
+    void backspace_after_typed_hr_selects_hr_blockonly();
+    void arrow_down_traverses_hr_between_headings();
+    void arrow_down_traverses_consecutive_non_text_blocks();
+
+    // Block-only kinds (spec §4 rules)
+    void arrow_down_lands_blockselected_on_hr();
+    void arrow_down_from_blockselected_hr_lands_on_text();
+    void backspace_at_para_start_after_hr_selects_hr();
+    void delete_at_para_end_before_hr_selects_hr();
+    void backspace_on_selected_hr_removes_it();
+    void enter_on_selected_hr_inserts_paragraph_after();
+    void typing_on_selected_hr_is_noop();
+    void tripleclick_on_hr_lands_blockselected();
+
+    // 2026-05-15 dogfood — arrow / click on a just-TYPED HR (not loaded).
+    void arrow_up_from_new_para_after_typed_hr_lands_blockselected();
+    void click_on_typed_hr_lands_blockselected();
+
+    // Block-only kinds — Image variants (spec §7)
+    void arrow_down_lands_blockselected_on_image();
+    void arrow_down_from_blockselected_image_lands_on_text();
+    void backspace_at_para_start_after_image_selects_image();
+    void delete_at_para_end_before_image_selects_image();
+    void backspace_on_selected_image_removes_it();
+    void enter_on_selected_image_inserts_paragraph_after();
+    void typing_on_selected_image_is_noop();
+    void tripleclick_on_image_lands_blockselected();
+
+    // Tier-4b: initial focus must reach the TextEdit, not just the delegate root.
+    void initial_focus_lands_on_textedit_not_delegate_root();
+
+    // E4 B3 — TableDelegate registers itself with LiveCursorState on
+    // Component.onCompleted (same chokepoint discipline as every other
+    // delegate). De-registration on destruction is exercised by the
+    // fixture's teardown path.
+    void table_delegate_registers_with_cursor_state();
+
+    // E4 B4 — clicking inside a table cell must produce a flat block-
+    // buffer qtPos via TableDelegate::positionAt(x, y), and the cell's
+    // onCursorPositionChanged must round-trip that qtPos back through
+    // cursorState.syncFromTextEdit, leaving (focusedAnchorRow,
+    // focusedQtPos) pointing at the table block at the click-derived
+    // flat position. Spec §5.4 Decision: m_cursor is TextCaret with
+    // buffer-byte qtPos for cells (no separate TableCellCaret variant).
+    void click_into_table_cell_syncs_qtpos_to_cursor_state();
+
+private:
+    void assertChokepointInvariant(const QString &scenario);
+    std::unique_ptr<QmlIntegrationFixture> m_fixture;
+};
+
+void TestFocusChokepointInvariant::init() {
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "# Heading\n\nParagraph one.\n\n> Quote\n\n- list item\n\n```\ncode\n```\n",
+        5);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+}
+
+void TestFocusChokepointInvariant::cleanup() {
+    m_fixture.reset();
+}
+
+void TestFocusChokepointInvariant::assertChokepointInvariant(const QString &scenario) {
+    // Spec §8.1 — after every structural event:
+    //   focusedDelegate.modelIndex == cursorState.focusedAnchorRow
+    //   focusedDelegate's TextEdit.cursorPosition == cursorState.focusedQtPos
+    auto *focused = m_fixture->focusedDelegate();
+    QVERIFY2(focused, qPrintable(QString("no focused delegate after %1").arg(scenario)));
+
+    const int delegateRow = focused->property("modelIndex").toInt();
+    const int cursorRow   = m_fixture->cursorStateCurrentRow();
+    QCOMPARE(delegateRow, cursorRow);
+
+    const int delegateCursorPos = m_fixture->delegateCursorPos(delegateRow);
+    const int stateCursorPos    = m_fixture->cursorStateCurrentQtPos();
+    QCOMPARE(delegateCursorPos, stateCursorPos);
+}
+
+void TestFocusChokepointInvariant::enter_at_paragraph_end() {
+    m_fixture->placeCursorAtEndOf(1);  // paragraph row
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(200);
+    assertChokepointInvariant("Enter at paragraph end");
+}
+
+void TestFocusChokepointInvariant::heading_demote_via_hash_deletion() {
+    m_fixture->placeCursorAtPos(0, 1);  // inside heading, after first '#'
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);  // deletes the '#' → heading→paragraph transition
+    QTest::qWait(200);
+    assertChokepointInvariant("Heading→Paragraph kind transition");
+}
+
+void TestFocusChokepointInvariant::enter_at_paragraph_middle() {
+    m_fixture->placeCursorAtPos(1, 5);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(100);
+    assertChokepointInvariant("Enter at paragraph middle");
+}
+
+void TestFocusChokepointInvariant::enter_at_paragraph_start() {
+    m_fixture->placeCursorAtPos(1, 0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(100);
+    assertChokepointInvariant("Enter at paragraph start");
+}
+
+void TestFocusChokepointInvariant::backspace_at_paragraph_start() {
+    m_fixture->placeCursorAtPos(1, 0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(100);
+    assertChokepointInvariant("Backspace at paragraph start (block merge)");
+}
+
+void TestFocusChokepointInvariant::paragraph_promote_via_hash_typing() {
+    m_fixture->placeCursorAtPos(1, 0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.typeChar(QChar('#'));
+    h.typeChar(QChar(' '));
+    QTest::qWait(100);
+    assertChokepointInvariant("Paragraph→Heading kind transition");
+}
+
+void TestFocusChokepointInvariant::blockquote_demote() {
+    // Cursor after '>' in "> Quote"; Backspace deletes '>' → kind demotes.
+    m_fixture->placeCursorAtPos(2, 1);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(100);
+    assertChokepointInvariant("Blockquote→Paragraph");
+}
+
+void TestFocusChokepointInvariant::blockquote_promote() {
+    m_fixture->placeCursorAtPos(1, 0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.typeChar(QChar('>'));
+    h.typeChar(QChar(' '));
+    QTest::qWait(100);
+    assertChokepointInvariant("Paragraph→Blockquote");
+}
+
+void TestFocusChokepointInvariant::codeblock_kind_transition() {
+    m_fixture->placeCursorAtEndOf(4);  // inside code block
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(100);
+    assertChokepointInvariant("CodeBlock Enter");
+}
+
+void TestFocusChokepointInvariant::listitem_kind_transition() {
+    m_fixture->placeCursorAtEndOf(3);  // list item
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(100);
+    assertChokepointInvariant("ListItem Enter");
+}
+
+void TestFocusChokepointInvariant::paste_at_block_start() {
+    m_fixture->placeCursorAtPos(1, 0);
+    m_fixture->pasteText("inserted ");
+    QTest::qWait(100);
+    assertChokepointInvariant("Paste at block start");
+}
+
+void TestFocusChokepointInvariant::paste_at_block_middle() {
+    m_fixture->placeCursorAtPos(1, 5);
+    m_fixture->pasteText("inserted ");
+    QTest::qWait(100);
+    assertChokepointInvariant("Paste at block middle");
+}
+
+void TestFocusChokepointInvariant::paste_at_block_end() {
+    m_fixture->placeCursorAtEndOf(1);
+    m_fixture->pasteText("inserted ");
+    QTest::qWait(100);
+    assertChokepointInvariant("Paste at block end");
+}
+
+void TestFocusChokepointInvariant::undo_after_enter() {
+    m_fixture->placeCursorAtEndOf(1);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(50);
+    h.keyClick(Qt::Key_Z, Qt::ControlModifier);
+    QTest::qWait(100);
+    assertChokepointInvariant("Undo after Enter");
+}
+
+void TestFocusChokepointInvariant::redo_after_undo() {
+    m_fixture->placeCursorAtEndOf(1);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(50);
+    h.keyClick(Qt::Key_Z, Qt::ControlModifier);
+    QTest::qWait(50);
+    h.keyClick(Qt::Key_Z, Qt::ControlModifier | Qt::ShiftModifier);
+    QTest::qWait(100);
+    assertChokepointInvariant("Redo after undo");
+}
+
+void TestFocusChokepointInvariant::click_to_focus_paragraph() {
+    m_fixture->clickOnBlock(1);
+    auto *focused = m_fixture->focusedDelegate();
+    QVERIFY2(focused, "no focused delegate after click on paragraph");
+    const int delegateRow = focused->property("modelIndex").toInt();
+    const int cursorRow   = m_fixture->cursorStateCurrentRow();
+    // Bug C was the click bypassing the chokepoint because LiveView.qml accessed
+    // `item.model.blockAnchor` from outside the delegate — context properties don't
+    // propagate as root properties, so the call silently fell through to
+    // forceActiveFocus() on the ListView. Fixed by exposing `blockAnchor` as a
+    // root property on every delegate and typed-int parameter on takeFocus.
+    QCOMPARE(delegateRow, cursorRow);
+}
+
+void TestFocusChokepointInvariant::click_to_focus_heading() {
+    m_fixture->clickOnBlock(0);
+    auto *focused = m_fixture->focusedDelegate();
+    QVERIFY2(focused, "no focused delegate after click on heading");
+    const int delegateRow = focused->property("modelIndex").toInt();
+    const int cursorRow   = m_fixture->cursorStateCurrentRow();
+    QCOMPARE(delegateRow, cursorRow);
+}
+
+void TestFocusChokepointInvariant::nav_into_runtime_promoted_heading() {
+    // D-fc-2: promote a paragraph to heading via "# ", then navigate down
+    // and back up. The caret must land on the heading row, not skip past it.
+    //
+    // Repro setup uses the standard 5-row doc; rows 1 and 2 are both text-
+    // bearing (paragraph, blockquote). We promote row 1 → heading, then
+    // Down-arrow into row 2, then Up-arrow back: caret should be on row 1.
+    m_fixture->placeCursorAtPos(1, 0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.typeChar(QChar('#'));
+    h.typeChar(QChar(' '));
+    QTest::qWait(100);
+    // Row 1 is now a heading. Navigate down.
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(80);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+    // Now navigate back up — should land on row 1 (the new heading).
+    h.keyClick(Qt::Key_Up);
+    QTest::qWait(80);
+    assertChokepointInvariant("nav into runtime-promoted heading");
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::arrow_down_traverses_existing_hr() {
+    // New semantics (spec §4 R-arrow-into / R-arrow-out): arrow Down from a
+    // paragraph above an HR lands BlockSelected on the HR first (one press),
+    // then a second press lands TextCaret on the next text-bearing row.
+    // Two presses are needed to cross an HR; the cursor is never stranded
+    // on the source row.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+    QCOMPARE(m_fixture->modelText(0), QString("alpha"));
+    QCOMPARE(m_fixture->modelText(2), QString("beta"));
+
+    m_fixture->placeCursorAtEndOf(0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    // First Down: lands BlockSelected on HR (row 1).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    // Second Down: lands TextCaret on beta (row 2).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::arrow_up_traverses_existing_hr() {
+    // New semantics: Up from row 2 (beta) first lands BlockSelected on HR
+    // (row 1), then a second Up lands TextCaret on alpha (row 0).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->placeCursorAtPos(2, 0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    // First Up: lands BlockSelected on HR (row 1).
+    h.keyClick(Qt::Key_Up);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    // Second Up: lands TextCaret on alpha (row 0).
+    h.keyClick(Qt::Key_Up);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+}
+
+void TestFocusChokepointInvariant::arrow_after_click_skips_hr() {
+    // The user's dogfood path: click into a paragraph (NOT placeCursorAtPos)
+    // and then press an arrow key. New semantics: first Down from row 0 lands
+    // BlockSelected on HR (row 1); second Down lands on beta (row 2).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->clickOnBlock(0);
+    QTest::qWait(100);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    // First Down: lands BlockSelected on HR (row 1).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    // Second Down: lands TextCaret on beta (row 2).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::click_on_hr_sets_block_selected() {
+    // D-fc-4 generalizable rule: clicking on a non-text-bearing block
+    // (HR / Image) must establish a `BlockSelected` cursor variant —
+    // never `TextCaret`, since TextCaret is invalid for these kinds.
+    // The chokepoint must be variant-aware via the registry rather
+    // than always staging a TextCaret.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click on HR row
+    QTest::qWait(120);
+
+    // After click on HR, the cursor's kind must be BlockSelected, not
+    // TextCaret (which would be a silently-invalid variant for HR).
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::click_on_hr_then_arrow_navigates_out() {
+    // D-fc-4: after clicking on the HR and entering BlockSelected state,
+    // arrow Down must escape to the next text-bearing row (via the
+    // HR-specific structural key handler), not stay stuck on the HR.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->clickOnBlock(1);
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::backspace_after_typed_hr_selects_hr_blockonly() {
+    // D-fc-4 (tightened): user types `---` at end of an existing paragraph,
+    // HR is created and a fresh empty paragraph appears after (D-fc-1 fix).
+    // User then presses Backspace on the empty paragraph at qtPos=0.
+    // The merge fence (spec §4 R-backspace-at-text-start-adjacent) must
+    // select the HR (BlockSelected, row 1) and leave the model unchanged
+    // (3 rows). Fixes: cursor was previously lost (cursorRow=-1) due to
+    // backspaceMerge attempting to merge text into HR's buffer.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n", 1);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(120);
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    QTest::qWait(200);
+    // Layout now: paragraph "alpha" (0), HR (1), empty paragraph (2).
+    // Caret is on row 2 (per D-fc-1 fix).
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(200);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);  // HR row
+    QCOMPARE(m_fixture->model()->rowCount(), 3);     // model unchanged
+}
+
+void TestFocusChokepointInvariant::arrow_down_traverses_hr_between_headings() {
+    // Variation: source is a heading rather than a paragraph, target is
+    // a heading rather than a paragraph. New semantics: two presses needed
+    // to cross the HR — first lands BlockSelected on it, second lands on
+    // the far-side heading.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "# alpha\n\n---\n\n## beta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    // First Down: lands BlockSelected on HR (row 1).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    // Second Down: lands TextCaret on ## beta (row 2).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::arrow_down_traverses_consecutive_non_text_blocks() {
+    // Two adjacent block-only rows (HR at 1, HR at 2). New semantics: each
+    // Down press advances one step — landing BlockSelected on the first HR,
+    // then BlockSelected on the second HR, then TextCaret on beta. Three
+    // presses needed to reach the far-side text block.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\n---\n\nbeta\n", 4);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(3, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    // First Down: lands BlockSelected on HR1 (row 1).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    // Second Down: lands BlockSelected on HR2 (row 2).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    // Third Down: lands TextCaret on beta (row 3).
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 3);
+}
+
+void TestFocusChokepointInvariant::hr_promotion_lands_focus_on_text_block() {
+    // D-fc-1: typing "---" on its own row promotes to HorizontalRule.
+    // HR is non-text. After the structural event the caret must land on a
+    // text-bearing block, not on the HR. Heuristic: after promotion the
+    // model has one more block (a fresh paragraph after the HR) OR the
+    // caret has migrated to a neighboring text-bearing row.
+    m_fixture->placeCursorAtPos(1, 0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    // Clear the paragraph text so "---" alone is the row's content.
+    h.keyClick(Qt::Key_End);
+    for (int i = 0; i < 14; ++i) h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(50);
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    QTest::qWait(150);
+    // Whatever the resolution, the focused row must be text-bearing —
+    // assertChokepointInvariant requires a focused delegate, so a focusless
+    // outcome (HR has the row but no caret) fails the QVERIFY2 inside.
+    assertChokepointInvariant("HR promotion via '---'");
+}
+
+// ---------------------------------------------------------------------------
+// Block-only kinds (spec §4 rules) — TDD red phase; production code pending
+// ---------------------------------------------------------------------------
+
+void TestFocusChokepointInvariant::arrow_down_lands_blockselected_on_hr() {
+    // R-arrow-into: Down from text-bearing row 0 lands BlockSelected on HR (row 1),
+    // not skip-past to row 2.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::arrow_down_from_blockselected_hr_lands_on_text() {
+    // R-arrow-out: Down from BlockSelected HR (row 1) lands TextCaret on row 2.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->clickOnBlock(1);  // click HR → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::backspace_at_para_start_after_hr_selects_hr() {
+    // R-backspace-at-text-start-adjacent: Backspace at qtPos=0 on row 2 (beta)
+    // when row 1 is an HR → BlockSelected on HR (row 1), model unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->placeCursorAtPos(2, 0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::delete_at_para_end_before_hr_selects_hr() {
+    // R-delete-at-text-end-adjacent: Delete at end of row 0 (alpha) when row 1 is
+    // an HR → BlockSelected on HR (row 1), model unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Delete);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::backspace_on_selected_hr_removes_it() {
+    // R-delete-blockonly: Backspace on BlockSelected HR removes it; cursor lands
+    // TextCaret on the previous block (row 0 = alpha, now the only neighbour above).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click HR → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(200);
+
+    // HR removed → 2 rows left (alpha=0, beta=1)
+    QCOMPARE(m_fixture->model()->rowCount(), 2);
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+}
+
+void TestFocusChokepointInvariant::enter_on_selected_hr_inserts_paragraph_after() {
+    // R-enter-blockonly: Enter on BlockSelected HR inserts empty paragraph after the
+    // HR and lands TextCaret on it (row 2 in the 4-row result).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click HR → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(200);
+
+    // New empty paragraph inserted after HR → 4 rows: alpha(0), HR(1), empty(2), beta(3)
+    QCOMPARE(m_fixture->model()->rowCount(), 4);
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::typing_on_selected_hr_is_noop() {
+    // R-type-blockonly: Typing a printable character on BlockSelected HR is a no-op —
+    // cursor stays BlockSelected on row 1, model unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click HR → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.typeChar(QChar('x'));
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::tripleclick_on_hr_lands_blockselected() {
+    // R-tripleclick-blockonly: Three rapid clicks on an HR land BlockSelected (same as
+    // single click). Triple-click counter in the MouseArea resets cleanly; model
+    // unchanged (3 rows).
+    // NOTE: No dedicated triple-click helper exists; we send 3 rapid QTest::mouseClick
+    // calls at the same position with minimal delay between them, mimicking the OS
+    // triple-click interval.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(
+        "alpha\n\n---\n\nbeta\n", 3);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    QQuickItem *d = m_fixture->delegateAt(1);
+    QVERIFY2(d != nullptr, "delegate at row 1 (HR) not found");
+    QVariant contentItemVar = m_fixture->listView()->property("contentItem");
+    QQuickItem *contentItem = contentItemVar.value<QQuickItem *>();
+    const qreal offsetX = contentItem ? contentItem->x() : 0.0;
+    const qreal offsetY = contentItem ? contentItem->y() : 0.0;
+    const QPoint clickPos(
+        static_cast<int>(d->x() + d->width() / 2 + offsetX),
+        static_cast<int>(d->y() + d->height() / 2 + offsetY));
+
+    // Send three rapid clicks within typical triple-click interval (~100 ms).
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(40);
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(40);
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(150);
+    QCoreApplication::processEvents();
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// Block-only kinds — Image variants (spec §7)
+//
+// These tests are structurally parallel to the HR variants above. The only
+// differences are:
+//   • Fixture uses "![alt](http://example.com/x.png)" instead of "---"
+//   • Expected kind string is "image" (BlockKind::Image == "image")
+//
+// All 8 tests are expected to pass without any production changes: the
+// registry-driven dispatch (isBlockOnly loop in BlockKindRegistry, plus
+// blockOnlyNavigate/Delete/Enter handlers in LiveStructuralKeyHandler)
+// covers Image as soon as its descriptor has isBlockOnly=true (set in
+// Task 2 of the block-only-kinds plan).
+// ---------------------------------------------------------------------------
+
+static const char *kImageFixture = "alpha\n\n![alt](http://example.com/x.png)\n\nbeta\n";
+
+void TestFocusChokepointInvariant::arrow_down_lands_blockselected_on_image() {
+    // R-arrow-into: Down from text-bearing row 0 lands BlockSelected on Image
+    // (row 1), not skip-past to row 2.
+    // NOTE: Image blocks load as Paragraph initially and transition to "image"
+    // kind via inferBlockKind in onD2Changed. Wait for the kind transition to
+    // complete before acting, otherwise navigation targets a Paragraph.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::arrow_down_from_blockselected_image_lands_on_text() {
+    // R-arrow-out: Down from BlockSelected Image (row 1) lands TextCaret on row 2.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->clickOnBlock(1);  // click Image → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Down);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::backspace_at_para_start_after_image_selects_image() {
+    // R-backspace-at-text-start-adjacent: Backspace at qtPos=0 on row 2 (beta)
+    // when row 1 is an Image → BlockSelected on Image (row 1), model unchanged
+    // (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(2, 2000));
+
+    m_fixture->placeCursorAtPos(2, 0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::delete_at_para_end_before_image_selects_image() {
+    // R-delete-at-text-end-adjacent: Delete at end of row 0 (alpha) when row 1
+    // is an Image → BlockSelected on Image (row 1), model unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Delete);
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::backspace_on_selected_image_removes_it() {
+    // R-delete-blockonly: Backspace on BlockSelected Image removes it; cursor lands
+    // TextCaret on the previous block (row 0 = alpha, now the only neighbour above).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click Image → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Backspace);
+    QTest::qWait(200);
+
+    // Image removed → 2 rows left (alpha=0, beta=1)
+    QCOMPARE(m_fixture->model()->rowCount(), 2);
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 0);
+}
+
+void TestFocusChokepointInvariant::enter_on_selected_image_inserts_paragraph_after() {
+    // R-enter-blockonly: Enter on BlockSelected Image inserts empty paragraph after
+    // the Image and lands TextCaret on it (row 2 in the 4-row result).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click Image → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(200);
+
+    // New empty paragraph inserted after Image → 4 rows: alpha(0), Image(1), empty(2), beta(3)
+    QCOMPARE(m_fixture->model()->rowCount(), 4);
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("TextCaret"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+}
+
+void TestFocusChokepointInvariant::typing_on_selected_image_is_noop() {
+    // R-type-blockonly: Typing a printable character on BlockSelected Image is a
+    // no-op — cursor stays BlockSelected on row 1, model unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    m_fixture->clickOnBlock(1);  // click Image → BlockSelected row 1
+    QTest::qWait(120);
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.typeChar(QChar('x'));
+    QTest::qWait(150);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+void TestFocusChokepointInvariant::tripleclick_on_image_lands_blockselected() {
+    // R-tripleclick-blockonly: Three rapid clicks on an Image land BlockSelected
+    // (same as single click). Triple-click counter resets cleanly; model
+    // unchanged (3 rows).
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>(kImageFixture, 3);
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("image"), 2000));
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+
+    QQuickItem *d = m_fixture->delegateAt(1);
+    QVERIFY2(d != nullptr, "delegate at row 1 (Image) not found");
+    QVariant contentItemVar = m_fixture->listView()->property("contentItem");
+    QQuickItem *contentItem = contentItemVar.value<QQuickItem *>();
+    const qreal offsetX = contentItem ? contentItem->x() : 0.0;
+    const qreal offsetY = contentItem ? contentItem->y() : 0.0;
+    const QPoint clickPos(
+        static_cast<int>(d->x() + d->width() / 2 + offsetX),
+        static_cast<int>(d->y() + d->height() / 2 + offsetY));
+
+    // Send three rapid clicks within typical triple-click interval (~100 ms).
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(40);
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(40);
+    QTest::mouseClick(m_fixture->window(), Qt::LeftButton, Qt::NoModifier, clickPos);
+    QTest::qWait(150);
+    QCoreApplication::processEvents();
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+    QCOMPARE(m_fixture->model()->rowCount(), 3);
+}
+
+// ---------------------------------------------------------------------------
+// 2026-05-15 dogfood reproducers — typed HR (not loaded) is failing arrow nav
+// and click selection.
+// ---------------------------------------------------------------------------
+
+void TestFocusChokepointInvariant::arrow_up_from_new_para_after_typed_hr_lands_blockselected() {
+    // User types `---` in a blank line. HR is created; a new empty paragraph
+    // appears below; caret moves there. Pressing Up from the new paragraph
+    // must land BlockSelected on the typed HR — same as a loaded HR.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>("alpha\n", 1);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(120);
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    QTest::qWait(500);
+    // Layout: paragraph "alpha" (0), HR (1), empty paragraph (2). Caret row 2.
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 2);
+
+    h.keyClick(Qt::Key_Up);
+    QTest::qWait(200);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::click_on_typed_hr_lands_blockselected() {
+    // User types `---` to create an HR, then clicks on the HR.
+    // Must land BlockSelected on it — same as clicking on a loaded HR.
+    m_fixture.reset();
+    m_fixture = std::make_unique<QmlIntegrationFixture>("alpha\n", 1);
+    QVERIFY(m_fixture->waitForDelegateAt(0, 2000));
+
+    m_fixture->placeCursorAtEndOf(0);
+    LiveRealisticInputHarness h(m_fixture->window());
+    h.keyClick(Qt::Key_Return);
+    QTest::qWait(120);
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    h.typeChar(QChar('-'));
+    QTest::qWait(200);
+    QVERIFY(m_fixture->waitForDelegateAt(1, 2000));
+    QVERIFY(m_fixture->waitForKindAt(1, QStringLiteral("hr"), 2000));
+
+    m_fixture->clickOnBlock(1);
+    QTest::qWait(200);
+
+    QObject *cs = m_fixture->binding()->property("cursorState").value<QObject *>();
+    QVERIFY(cs != nullptr);
+    QCOMPARE(cs->property("cursorKind").toString(), QStringLiteral("BlockSelected"));
+    QCOMPARE(m_fixture->cursorStateCurrentRow(), 1);
+}
+
+void TestFocusChokepointInvariant::initial_focus_lands_on_textedit_not_delegate_root()
+{
+    // Spec: tier-4b §4.4 auto-focus gap close-out. After the production
+    // QML view finishes Component.onCompleted with a non-empty model, the
+    // focused QQuickItem must be the TextEdit descendant of the first
+    // text-bearing delegate, NOT the delegate root.
+    //
+    // Without the explicit `establishFocus` seed in LiveView.qml's
+    // Component.onCompleted, this test fails: ListView.focus = true
+    // delivers focus to the delegate root (which has no Keys.onPressed)
+    // and the TextEdit child never gains activeFocus. See discipline-log
+    // entry 2026-05-16 (closed by tier-4b).
+    QmlIntegrationFixture fx(QByteArrayLiteral("alpha\n\nbeta"), /*expectedRowCount=*/2);
+
+    QQuickItem *expectedTextEdit = fx.delegateTextEdit(0);
+    QVERIFY2(expectedTextEdit != nullptr, "delegateTextEdit(0) returned null");
+
+    // The focused item should be the TextEdit of row 0.
+    QTRY_COMPARE(fx.window()->activeFocusItem(), expectedTextEdit);
+}
+
+void TestFocusChokepointInvariant::table_delegate_registers_with_cursor_state()
+{
+    // Per plan §B3: the TableDelegate must register itself with
+    // LiveCursorState in Component.onCompleted (`delegateAvailable`) so
+    // that establishFocus / tryResolvePending can deliver focus to the
+    // table block via takeFocus(qtPos). Without registration, the
+    // chokepoint silently drops focus requests directed at the table.
+    //
+    // Falsifiability proof: removing the `delegateAvailable` line in
+    // TableDelegate.qml's Component.onCompleted makes this slot fail
+    // (verified in-history; see commit message).
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n"
+        "\n"
+        "para after\n";
+
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    QQuickItem *table = fx.delegateAt(1);
+    QVERIFY2(table, "no delegate at row 1");
+    const QString className = QString::fromUtf8(table->metaObject()->className());
+    QVERIFY2(className.contains("TableDelegate"),
+             qPrintable("delegate at row 1 is not TableDelegate: " + className));
+
+    const QVariant anchorVar = table->property("blockAnchor");
+    QVERIFY2(anchorVar.isValid() && anchorVar.canConvert<Markoff::BlockAnchor>(),
+             "TableDelegate.blockAnchor not set after Component.onCompleted");
+    const Markoff::BlockAnchor anchor = anchorVar.value<Markoff::BlockAnchor>();
+
+    QObject *csObj = fx.binding()->property("cursorState").value<QObject *>();
+    auto *cs = qobject_cast<LiveCursorState *>(csObj);
+    QVERIFY2(cs, "binding.cursorState is not a LiveCursorState");
+    QVERIFY2(cs->isDelegateRegistered(anchor),
+             "TableDelegate did not register itself with cursorState");
+}
+
+void TestFocusChokepointInvariant::click_into_table_cell_syncs_qtpos_to_cursor_state()
+{
+    const QByteArray md =
+        "para before\n"
+        "\n"
+        "| A | B |\n"
+        "|---|---|\n"
+        "| 1 | 2 |\n"
+        "\n"
+        "para after\n";
+
+    QmlIntegrationFixture fx(md, /*expectedRowCount=*/3);
+    QVERIFY(fx.waitForDelegateAt(1, 2000));
+
+    // Click the centre of the table delegate. LiveView.MouseArea.onPressed
+    // hits → table.positionAt(localX, localY) → flatQtPos →
+    // cursorState.begin + establishFocus → takeFocus → cell.cursorPosition →
+    // cell.onCursorPositionChanged → cursorState.syncFromTextEdit. After the
+    // chain settles, focusedAnchorRow must be the table's row and the
+    // flat qtPos must fall inside one of the parsed cell char-ranges.
+    fx.clickOnBlock(1);
+
+    // Chokepoint reached the table.
+    QCOMPARE(fx.cursorStateCurrentRow(), 1);
+    const int focusedQtPos = fx.cursorStateCurrentQtPos();
+    QVERIFY2(focusedQtPos >= 0,
+             "cursorState.focusedQtPos < 0 after click into table");
+
+    // takeFocus delivered focus into a specific cell's TextEdit.
+    QQuickItem *activeFocus = fx.window()->activeFocusItem();
+    QVERIFY2(activeFocus, "no active focus item after click into table");
+    const QString focusClass =
+        QString::fromUtf8(activeFocus->metaObject()->className());
+    QVERIFY2(focusClass.contains("TextEdit"),
+             qPrintable("active focus is not a TextEdit: " + focusClass));
+
+    // Round-trip identity (the new B4 contract): the cell's intra-cell
+    // cursorPosition combined with its parsed range start must equal the
+    // chokepoint's focusedQtPos. Falsifying syncFromTextEdit breaks this
+    // assertion — m_cursor stays at the establishFocus seed while the
+    // cell's TextEdit moved to a different intra-cell position.
+    QQuickItem *cellRect = activeFocus->parentItem();
+    QVERIFY2(cellRect, "active focus has no parent item (cellRect)");
+
+    const int cellCursor = activeFocus->property("cursorPosition").toInt();
+    const int cellR      = cellRect->property("r").toInt();
+    const int cellC      = cellRect->property("c").toInt();
+
+    QQuickItem *table = fx.delegateAt(1);
+    QVERIFY2(table, "no delegate at row 1");
+    const QVariantMap pt = table->property("parsedTable").toMap();
+    QVERIFY2(pt.value("parseOk").toBool(),
+             qPrintable("parseError=" + pt.value("parseError").toString()));
+
+    const QVariantList allRanges = pt.value("cellCharRanges").toList();
+    QVERIFY(cellR >= 0 && cellR < allRanges.size());
+    const QVariantList rowRanges = allRanges[cellR].toList();
+    QVERIFY(cellC >= 0 && cellC < rowRanges.size());
+    const int rangeStart = rowRanges[cellC].toMap().value("start").toInt();
+
+    QCOMPARE(focusedQtPos, rangeStart + cellCursor);
+
+    // B4 step 2 isolation: tryResolvePending's pre-takeFocus seed leaves the
+    // post-click identity holding via the decode-is-inverse path even
+    // without onCursorPositionChanged. To verify that piece on its own,
+    // move the active cell's cursor *programmatically* (not through
+    // establishFocus) and assert the chokepoint follows. This is the path
+    // future cell-internal arrow keys / typing will exercise.
+    const int probePos = (cellCursor + 1 <= activeFocus->property("length").toInt())
+                             ? cellCursor + 1 : 0;
+    activeFocus->setProperty("cursorPosition", probePos);
+    QTRY_COMPARE(fx.cursorStateCurrentQtPos(), rangeStart + probePos);
+}
+
+}  // namespace Markoff::Live::Test
+
+QTEST_MAIN(Markoff::Live::Test::TestFocusChokepointInvariant)
+#include "tst_live_render_focus_chokepoint_invariant.moc"

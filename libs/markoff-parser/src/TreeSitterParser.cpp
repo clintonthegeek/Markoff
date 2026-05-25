@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-parser/TreeSitterParser.h>
-#include <markoff-parser/SourceSpan.h>
-#include <markoff-parser/Document.h>
+#include <markoff/parser/TreeSitterParser.h>
+#include <markoff/parser/SourceSpan.h>
+#include <markoff/parser/Document.h>
+#include <markoff/parser/PerfProbe.h>
+#include "WikilinkDecomposition.h"
 
 #include <tree_sitter/api.h>
 #include <tree-sitter/tree-sitter-markdown.h>
@@ -113,7 +115,41 @@ static void collectBlockQuoteRanges(TSNode node, std::vector<BlockQuoteRange> &q
         collectBlockQuoteRanges(ts_node_child(node, i), quotes, depth);
 }
 
-static void collectInlineRanges(TSNode node, std::vector<TSRange> &ranges)
+// True if the byte range [start, end) contains any character that could
+// be the start of an inline-markdown construct: `*` `_` `` ` `` `[` `~`
+// `=` `$` `#`. Used as a fast-path skip for `pipe_table_cell` ranges —
+// every cell in a table would otherwise trigger its own inline-parser
+// invocation per block reparse (24+ for a 5×4 table), making cell typing
+// O(cells) in tree-sitter setup cost. Cells with no inline syntax just
+// don't need to be parsed; the block walker's anonymous spans inside
+// them are still filtered out by the inlineRegions overlap check.
+//
+// False positives are acceptable (cell gets parsed, just slower). False
+// negatives would lose inline formatting in cells, so the trigger set
+// covers every inline construct the inline grammar recognizes.
+static bool rangeContainsInlineTrigger(const QByteArray &utf8,
+                                       int startByte, int endByte)
+{
+    if (startByte < 0 || endByte > utf8.size() || startByte >= endByte)
+        return false;
+    const char *p = utf8.constData() + startByte;
+    const int n = endByte - startByte;
+    for (int i = 0; i < n; ++i) {
+        const char c = p[i];
+        switch (c) {
+        case '*': case '_': case '`': case '[':
+        case '~': case '=': case '$': case '#':
+        case '\\':  // backslash escapes
+            return true;
+        default:
+            break;
+        }
+    }
+    return false;
+}
+
+static void collectInlineRanges(TSNode node, std::vector<TSRange> &ranges,
+                                const QByteArray &utf8)
 {
     const char *type = ts_node_type(node);
 
@@ -129,9 +165,36 @@ static void collectInlineRanges(TSNode node, std::vector<TSRange> &ranges)
         return; // don't recurse into inline nodes
     }
 
+    // `pipe_table_cell` nodes hold table-cell text. The block grammar
+    // treats them as leaf-ish sequences of word/whitespace/punctuation
+    // tokens (no `inline` wrapper), which would leave `**bold**`,
+    // `[[wikilink]]`, etc. inside cells un-highlighted. Feeding the
+    // cell byte range to the inline parser produces real bold/italic/
+    // code/link spans whose offsets are document-absolute (set_included_ranges
+    // preserves source byte coordinates). The block-walker's anonymous
+    // child spans inside this range are then filtered out by the same
+    // `inlineRegions` overlap check that handles paragraph content.
+    //
+    // Fast-path: skip cells with no inline-trigger characters. Each emitted
+    // range costs one full ts_parser_parse_string call; for a 5×4 table
+    // most cells are plain text and don't need to be parsed at all.
+    if (strcmp(type, "pipe_table_cell") == 0) {
+        const int s = ts_node_start_byte(node);
+        const int e = ts_node_end_byte(node);
+        if (rangeContainsInlineTrigger(utf8, s, e)) {
+            TSRange range;
+            range.start_point = ts_node_start_point(node);
+            range.end_point = ts_node_end_point(node);
+            range.start_byte = s;
+            range.end_byte = e;
+            ranges.push_back(range);
+        }
+        return;  // don't recurse into pipe_table_cell either way
+    }
+
     uint32_t count = ts_node_child_count(node);
     for (uint32_t i = 0; i < count; ++i)
-        collectInlineRanges(ts_node_child(node, i), ranges);
+        collectInlineRanges(ts_node_child(node, i), ranges, utf8);
 }
 
 // ---------------------------------------------------------------------------
@@ -183,14 +246,18 @@ TreeSitterParser::~TreeSitterParser()
 
 bool TreeSitterParser::parse(const QString &text)
 {
+    MARKOFF_PERF_SCOPE("parser.TreeSitterParser::parse");
     m_utf8 = text.toUtf8();
     m_byteToChar = buildByteToCharMap(m_utf8);
 
     // Phase 1: parse block structure
     if (m_blockTree) ts_tree_delete(m_blockTree);
-    m_blockTree = ts_parser_parse_string(m_blockParser, nullptr,
-                                          m_utf8.constData(),
-                                          static_cast<uint32_t>(m_utf8.size()));
+    {
+        MARKOFF_PERF_SCOPE("parser.block_grammar");
+        m_blockTree = ts_parser_parse_string(m_blockParser, nullptr,
+                                              m_utf8.constData(),
+                                              static_cast<uint32_t>(m_utf8.size()));
+    }
     if (!m_blockTree)
         return false;
 
@@ -201,18 +268,23 @@ bool TreeSitterParser::parse(const QString &text)
     // ranges produces gap spans that span across heading/paragraph boundaries.
     for (TSTree *t : m_inlineTrees) ts_tree_delete(t);
     m_inlineTrees.clear();
+    m_inlineRanges.clear();
 
     TSNode root = ts_tree_root_node(m_blockTree);
     std::vector<TSRange> inlineRanges;
-    collectInlineRanges(root, inlineRanges);
+    collectInlineRanges(root, inlineRanges, m_utf8);
+    m_inlineRanges.reserve(inlineRanges.size());
 
     for (const TSRange &range : inlineRanges) {
+        MARKOFF_PERF_SCOPE("parser.inline_grammar_one_range");
         ts_parser_set_included_ranges(m_inlineParser, &range, 1);
         TSTree *tree = ts_parser_parse_string(m_inlineParser, nullptr,
                                                m_utf8.constData(),
                                                static_cast<uint32_t>(m_utf8.size()));
-        if (tree)
+        if (tree) {
             m_inlineTrees.append(tree);
+            m_inlineRanges.push_back(ByteRange{range.start_byte, range.end_byte});
+        }
         ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
     }
 
@@ -531,6 +603,7 @@ void TreeSitterParser::walkNode(TSNode node, QList<SourceSpan> &spans) const
 
 QList<SourceSpan> TreeSitterParser::buildSpanMap() const
 {
+    MARKOFF_PERF_SCOPE("parser.buildSpanMap");
     QList<SourceSpan> spans;
 
     if (!m_blockTree)
@@ -540,7 +613,7 @@ QList<SourceSpan> TreeSitterParser::buildSpanMap() const
     QList<QPair<int,int>> inlineRegions;
     {
         std::vector<TSRange> ranges;
-        collectInlineRanges(ts_tree_root_node(m_blockTree), ranges);
+        collectInlineRanges(ts_tree_root_node(m_blockTree), ranges, m_utf8);
         for (const auto &r : ranges)
             inlineRegions.append({static_cast<int>(r.start_byte),
                                   static_cast<int>(r.end_byte)});
@@ -657,6 +730,86 @@ QList<SourceSpan> TreeSitterParser::buildSpanMap() const
         }
     }
 
+    // Post-process 4: populate linkTarget on wikilink and standard-link spans.
+    // Walk inline trees to find link container nodes, extract the structured
+    // target, then stamp it onto every span within that node's byte range.
+    if (!m_inlineTrees.isEmpty()) {
+        // Collect (startByte, endByte, LinkTarget) tuples for each link node.
+        struct LinkRange {
+            int startByte;
+            int endByte;
+            LinkTarget target;
+        };
+        QList<LinkRange> linkRanges;
+
+        // Recursive lambda via std::function to walk the inline tree.
+        std::function<void(TSNode)> collectLinkRanges = [&](TSNode node) {
+            const char *type = ts_node_type(node);
+            int startB = static_cast<int>(ts_node_start_byte(node));
+            int endB   = static_cast<int>(ts_node_end_byte(node));
+
+            if (strcmp(type, "wiki_link") == 0) {
+                // Extract the raw text, strip [[ and ]] (or ![[  and ]]),
+                // and decompose the inner content.
+                QString raw = QString::fromUtf8(m_utf8.mid(startB, endB - startB));
+                QString inner;
+                if (raw.startsWith(QStringLiteral("![[")) && raw.endsWith(QStringLiteral("]]")))
+                    inner = raw.mid(3, raw.size() - 5);
+                else if (raw.startsWith(QStringLiteral("[[")) && raw.endsWith(QStringLiteral("]]")))
+                    inner = raw.mid(2, raw.size() - 4);
+                else
+                    inner = raw;  // malformed; pass through as-is
+                LinkRange lr;
+                lr.startByte = startB;
+                lr.endByte   = endB;
+                lr.target    = Markoff::Detail::decomposeWikilinkInner(QStringView{inner});
+                linkRanges.append(lr);
+                return;  // don't recurse into wiki_link children
+            }
+            if (strcmp(type, "inline_link") == 0 ||
+                strcmp(type, "full_reference_link") == 0 ||
+                strcmp(type, "collapsed_reference_link") == 0) {
+                // Extract the link_destination child for the URL.
+                LinkRange lr;
+                lr.startByte = startB;
+                lr.endByte   = endB;
+                uint32_t count = ts_node_child_count(node);
+                for (uint32_t i = 0; i < count; ++i) {
+                    TSNode child = ts_node_child(node, i);
+                    if (strcmp(ts_node_type(child), "link_destination") == 0) {
+                        int cs = static_cast<int>(ts_node_start_byte(child));
+                        int ce = static_cast<int>(ts_node_end_byte(child));
+                        lr.target.url = QString::fromUtf8(m_utf8.mid(cs, ce - cs));
+                        break;
+                    }
+                }
+                linkRanges.append(lr);
+                return;  // don't recurse into link children
+            }
+
+            uint32_t count = ts_node_child_count(node);
+            for (uint32_t i = 0; i < count; ++i)
+                collectLinkRanges(ts_node_child(node, i));
+        };
+
+        for (TSTree *tree : m_inlineTrees)
+            collectLinkRanges(ts_tree_root_node(tree));
+
+        // Stamp linkTarget onto each span whose byte range falls within a
+        // link node's range. A span may only belong to one link node —
+        // wikilinks/links are not nestable — so first-match wins.
+        for (auto &s : spans) {
+            if (!s.isLink && !s.isWikilink) continue;
+            for (const auto &lr : linkRanges) {
+                if (s.utf8Offset >= lr.startByte
+                    && (s.utf8Offset + s.utf8Length) <= lr.endByte) {
+                    s.linkTarget = lr.target;
+                    break;
+                }
+            }
+        }
+    }
+
     // Sort by offset
     std::sort(spans.begin(), spans.end(),
               [](const SourceSpan &a, const SourceSpan &b) {
@@ -738,157 +891,492 @@ QList<TreeSitterParser::BlockBoundary> TreeSitterParser::findBlockBoundaries() c
 
 namespace {
 
-/// Recursively walk block tree for atx_heading nodes
-void collectHeadingsForQuery(TSNode node, const QByteArray &utf8,
-                             QList<HeadingInfo> &headings)
+// Pure node-to-Info extractors. Return true if the node matched the expected
+// shape. Used by both the full walk and the pruned-by-changed-ranges walk.
+
+bool extractHeadingFromNode(TSNode node, const QByteArray &utf8, HeadingInfo &out)
+{
+    if (strcmp(ts_node_type(node), "atx_heading") != 0) return false;
+    out.level = 1;
+    const int sb = static_cast<int>(ts_node_start_byte(node));
+    const int eb = static_cast<int>(ts_node_end_byte(node));
+    out.sourceOffset = sb;
+    out.sourceLength = eb - sb;
+    QString text;
+    uint32_t count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < count; ++i) {
+        TSNode child = ts_node_child(node, i);
+        const char *ct = ts_node_type(child);
+        if (strncmp(ct, "atx_h", 5) == 0 && strstr(ct, "_marker")) {
+            out.level = ct[5] - '0';
+        } else if (strcmp(ct, "inline") == 0) {
+            int csb = static_cast<int>(ts_node_start_byte(child));
+            int ceb = static_cast<int>(ts_node_end_byte(child));
+            text = QString::fromUtf8(utf8.mid(csb, ceb - csb));
+        }
+    }
+    out.text = text.trimmed();
+    return true;
+}
+
+bool extractLinkFromNode(TSNode node, const QByteArray &utf8, LinkInfo &out)
 {
     const char *type = ts_node_type(node);
-
-    if (strcmp(type, "atx_heading") == 0) {
-        HeadingInfo h;
-        h.level = 1;
-        h.sourceOffset = static_cast<int>(ts_node_start_byte(node));
-        QString text;
-
+    if (strcmp(type, "wiki_link") == 0) {
+        int sb = static_cast<int>(ts_node_start_byte(node));
+        int eb = static_cast<int>(ts_node_end_byte(node));
+        QString raw = QString::fromUtf8(utf8.mid(sb, eb - sb));
+        out.sourceOffset = sb;
+        out.sourceLength = eb - sb;
+        const bool isEmbed = raw.startsWith(QStringLiteral("![["));
+        out.type = isEmbed ? LinkInfo::Embed : LinkInfo::Wiki;
+        QString inner = isEmbed ? raw.mid(3, raw.size() - 5)
+                                : raw.mid(2, raw.size() - 4);
+        const int pipeIdx = inner.indexOf(QLatin1Char('|'));
+        if (pipeIdx >= 0) {
+            out.target = inner.left(pipeIdx);
+            out.displayText = inner.mid(pipeIdx + 1);
+        } else {
+            out.target = inner;
+            out.displayText = inner;
+        }
+        out.structured = Markoff::Detail::decomposeWikilinkInner(QStringView{inner});
+        return true;
+    }
+    if (strcmp(type, "inline_link") == 0 ||
+        strcmp(type, "shortcut_link") == 0 ||
+        strcmp(type, "full_reference_link") == 0 ||
+        strcmp(type, "collapsed_reference_link") == 0) {
+        out.type = LinkInfo::Standard;
+        out.sourceOffset = static_cast<int>(ts_node_start_byte(node));
+        out.sourceLength = static_cast<int>(ts_node_end_byte(node)) - out.sourceOffset;
+        out.target.clear();
+        out.displayText.clear();
         uint32_t count = ts_node_child_count(node);
         for (uint32_t i = 0; i < count; ++i) {
             TSNode child = ts_node_child(node, i);
             const char *ct = ts_node_type(child);
-
-            if (strncmp(ct, "atx_h", 5) == 0 && strstr(ct, "_marker")) {
-                h.level = ct[5] - '0';
-            } else if (strcmp(ct, "inline") == 0) {
-                int startByte = static_cast<int>(ts_node_start_byte(child));
-                int endByte = static_cast<int>(ts_node_end_byte(child));
-                text = QString::fromUtf8(utf8.mid(startByte, endByte - startByte));
+            int cs = static_cast<int>(ts_node_start_byte(child));
+            int ce = static_cast<int>(ts_node_end_byte(child));
+            if (strcmp(ct, "link_text") == 0) {
+                QString raw = QString::fromUtf8(utf8.mid(cs, ce - cs));
+                if (raw.startsWith(QLatin1Char('[')) && raw.endsWith(QLatin1Char(']')))
+                    raw = raw.mid(1, raw.size() - 2);
+                out.displayText = raw;
+            } else if (strcmp(ct, "link_destination") == 0) {
+                out.target = QString::fromUtf8(utf8.mid(cs, ce - cs));
             }
         }
-
-        h.text = text.trimmed();
-        headings.append(h);
-        return; // don't recurse into children of atx_heading
+        if (out.target.isEmpty() && !out.displayText.isEmpty())
+            out.target = out.displayText;
+        out.structured.url = out.target;
+        return true;
     }
+    if (strcmp(type, "image") == 0) {
+        out.type = LinkInfo::Image;
+        out.sourceOffset = static_cast<int>(ts_node_start_byte(node));
+        out.sourceLength = static_cast<int>(ts_node_end_byte(node)) - out.sourceOffset;
+        out.target.clear();
+        out.displayText.clear();
+        uint32_t count = ts_node_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_child(node, i);
+            const char *ct = ts_node_type(child);
+            int cs = static_cast<int>(ts_node_start_byte(child));
+            int ce = static_cast<int>(ts_node_end_byte(child));
+            if (strcmp(ct, "image_description") == 0 || strcmp(ct, "link_text") == 0) {
+                out.displayText = QString::fromUtf8(utf8.mid(cs, ce - cs));
+            } else if (strcmp(ct, "link_destination") == 0) {
+                out.target = QString::fromUtf8(utf8.mid(cs, ce - cs));
+            }
+        }
+        out.structured.url = out.target;
+        return true;
+    }
+    return false;
+}
 
+bool extractTagFromNode(TSNode node, const QByteArray &utf8, TagInfo &out)
+{
+    if (strcmp(ts_node_type(node), "tag") != 0) return false;
+    int sb = static_cast<int>(ts_node_start_byte(node));
+    int eb = static_cast<int>(ts_node_end_byte(node));
+    QString raw = QString::fromUtf8(utf8.mid(sb, eb - sb));
+    out.sourceOffset = sb;
+    out.sourceLength = eb - sb;
+    out.name = raw.startsWith(QLatin1Char('#')) ? raw.mid(1) : raw;
+    return true;
+}
+
+// ---------- full walks (used by buildDocumentQueries() no-arg) -------------
+
+void collectHeadingsForQuery(TSNode node, const QByteArray &utf8,
+                             QList<HeadingInfo> &headings)
+{
+    HeadingInfo h;
+    if (extractHeadingFromNode(node, utf8, h)) {
+        headings.append(h);
+        return;  // don't recurse into atx_heading children
+    }
     uint32_t count = ts_node_child_count(node);
     for (uint32_t i = 0; i < count; ++i)
         collectHeadingsForQuery(ts_node_child(node, i), utf8, headings);
 }
 
-/// Recursively walk an inline tree for links, wikilinks, images, and tags
 void collectInlineQueries(TSNode node, const QByteArray &utf8,
                           QList<LinkInfo> &links, QList<TagInfo> &tags)
 {
-    const char *type = ts_node_type(node);
-
-    if (strcmp(type, "wiki_link") == 0) {
-        // Wiki link: [[target]] or [[target|display]] or ![[embed]]
-        int startByte = static_cast<int>(ts_node_start_byte(node));
-        int endByte = static_cast<int>(ts_node_end_byte(node));
-        QString raw = QString::fromUtf8(utf8.mid(startByte, endByte - startByte));
-
-        LinkInfo li;
-        li.sourceOffset = startByte;
-
-        // Check for embed prefix
-        bool isEmbed = raw.startsWith(QStringLiteral("![["));
-        li.type = isEmbed ? LinkInfo::Embed : LinkInfo::Wiki;
-
-        // Strip delimiters: ![[...]] or [[...]]
-        QString inner;
-        if (isEmbed)
-            inner = raw.mid(3, raw.size() - 5); // strip "![[" and "]]"
-        else
-            inner = raw.mid(2, raw.size() - 4); // strip "[[" and "]]"
-
-        // Split on | for display text
-        int pipeIdx = inner.indexOf(QLatin1Char('|'));
-        if (pipeIdx >= 0) {
-            li.target = inner.left(pipeIdx);
-            li.displayText = inner.mid(pipeIdx + 1);
-        } else {
-            li.target = inner;
-            li.displayText = inner;
-        }
-
-        links.append(li);
-        return; // don't recurse into wiki_link children
-    }
-
-    if (strcmp(type, "inline_link") == 0 ||
-        strcmp(type, "shortcut_link") == 0 ||
-        strcmp(type, "full_reference_link") == 0 ||
-        strcmp(type, "collapsed_reference_link") == 0) {
-
-        LinkInfo li;
-        li.type = LinkInfo::Standard;
-        li.sourceOffset = static_cast<int>(ts_node_start_byte(node));
-
-        uint32_t count = ts_node_child_count(node);
-        for (uint32_t i = 0; i < count; ++i) {
-            TSNode child = ts_node_child(node, i);
-            const char *ct = ts_node_type(child);
-            int cStart = static_cast<int>(ts_node_start_byte(child));
-            int cEnd = static_cast<int>(ts_node_end_byte(child));
-
-            if (strcmp(ct, "link_text") == 0) {
-                // link_text includes brackets, so strip them
-                QString raw = QString::fromUtf8(utf8.mid(cStart, cEnd - cStart));
-                if (raw.startsWith(QLatin1Char('[')) && raw.endsWith(QLatin1Char(']')))
-                    raw = raw.mid(1, raw.size() - 2);
-                li.displayText = raw;
-            } else if (strcmp(ct, "link_destination") == 0) {
-                li.target = QString::fromUtf8(utf8.mid(cStart, cEnd - cStart));
-            }
-        }
-
-        // For shortcut_link: target = displayText (no separate destination)
-        if (li.target.isEmpty() && !li.displayText.isEmpty())
-            li.target = li.displayText;
-
+    LinkInfo li;
+    if (extractLinkFromNode(node, utf8, li)) {
         links.append(li);
         return;
     }
-
-    if (strcmp(type, "image") == 0) {
-        LinkInfo li;
-        li.type = LinkInfo::Image;
-        li.sourceOffset = static_cast<int>(ts_node_start_byte(node));
-
-        uint32_t count = ts_node_child_count(node);
-        for (uint32_t i = 0; i < count; ++i) {
-            TSNode child = ts_node_child(node, i);
-            const char *ct = ts_node_type(child);
-            int cStart = static_cast<int>(ts_node_start_byte(child));
-            int cEnd = static_cast<int>(ts_node_end_byte(child));
-
-            if (strcmp(ct, "image_description") == 0 || strcmp(ct, "link_text") == 0) {
-                li.displayText = QString::fromUtf8(utf8.mid(cStart, cEnd - cStart));
-            } else if (strcmp(ct, "link_destination") == 0) {
-                li.target = QString::fromUtf8(utf8.mid(cStart, cEnd - cStart));
-            }
-        }
-
-        links.append(li);
-        return;
-    }
-
-    if (strcmp(type, "tag") == 0) {
-        int startByte = static_cast<int>(ts_node_start_byte(node));
-        int endByte = static_cast<int>(ts_node_end_byte(node));
-        QString raw = QString::fromUtf8(utf8.mid(startByte, endByte - startByte));
-
-        TagInfo ti;
-        ti.sourceOffset = startByte;
-        // Strip leading #
-        ti.name = raw.startsWith(QLatin1Char('#')) ? raw.mid(1) : raw;
+    TagInfo ti;
+    if (extractTagFromNode(node, utf8, ti)) {
         tags.append(ti);
         return;
     }
-
-    // Recurse into children
     uint32_t count = ts_node_child_count(node);
     for (uint32_t i = 0; i < count; ++i)
         collectInlineQueries(ts_node_child(node, i), utf8, links, tags);
+}
+
+// ---------- top-level block walker (used by buildDocumentQueries) ----------
+
+static int setextHeadingLevelFromNode(TSNode node)
+{
+    uint32_t count = ts_node_child_count(node);
+    for (uint32_t i = 0; i < count; ++i) {
+        TSNode child = ts_node_child(node, i);
+        const char *type = ts_node_type(child);
+        if (strcmp(type, "setext_h1_underline") == 0) return 1;
+        if (strcmp(type, "setext_h2_underline") == 0) return 2;
+    }
+    return 1;
+}
+
+static void fillFencedCodeFields(TSNode node, const QByteArray &utf8,
+                                 TopLevelBlock &b)
+{
+    uint32_t count = ts_node_child_count(node);
+    QByteArray collectedBody;
+    bool firstContent = true;
+    for (uint32_t i = 0; i < count; ++i) {
+        TSNode child = ts_node_child(node, i);
+        const char *ct = ts_node_type(child);
+        if (strcmp(ct, "info_string") == 0) {
+            // Prefer the `language` named child of info_string. If
+            // not present, fall back to the trimmed info_string text.
+            uint32_t ic = ts_node_child_count(child);
+            QString lang;
+            for (uint32_t j = 0; j < ic; ++j) {
+                TSNode ic_child = ts_node_child(child, j);
+                if (strcmp(ts_node_type(ic_child), "language") == 0) {
+                    int s = static_cast<int>(ts_node_start_byte(ic_child));
+                    int e = static_cast<int>(ts_node_end_byte(ic_child));
+                    lang = QString::fromUtf8(utf8.mid(s, e - s));
+                    break;
+                }
+            }
+            if (lang.isEmpty()) {
+                int s = static_cast<int>(ts_node_start_byte(child));
+                int e = static_cast<int>(ts_node_end_byte(child));
+                lang = QString::fromUtf8(utf8.mid(s, e - s)).trimmed();
+            }
+            b.codeLanguage = lang;
+        } else if (strcmp(ct, "code_fence_content") == 0) {
+            int s = static_cast<int>(ts_node_start_byte(child));
+            int e = static_cast<int>(ts_node_end_byte(child));
+            if (!firstContent) collectedBody.append('\n');
+            collectedBody.append(utf8.mid(s, e - s));
+            firstContent = false;
+        }
+    }
+    b.codeText = QString::fromUtf8(collectedBody);
+}
+
+static TopLevelBlock::Kind classifyTopLevelKind(const char *type)
+{
+    if (strcmp(type, "paragraph") == 0)                 return TopLevelBlock::Kind::Paragraph;
+    if (strcmp(type, "atx_heading") == 0)               return TopLevelBlock::Kind::AtxHeading;
+    if (strcmp(type, "setext_heading") == 0)            return TopLevelBlock::Kind::SetextHeading;
+    if (strcmp(type, "fenced_code_block") == 0)         return TopLevelBlock::Kind::FencedCodeBlock;
+    if (strcmp(type, "indented_code_block") == 0)       return TopLevelBlock::Kind::IndentedCodeBlock;
+    if (strcmp(type, "block_quote") == 0)               return TopLevelBlock::Kind::BlockQuote;
+    if (strcmp(type, "list_item") == 0)                 return TopLevelBlock::Kind::ListItem;
+    if (strcmp(type, "thematic_break") == 0)            return TopLevelBlock::Kind::ThematicBreak;
+    if (strcmp(type, "html_block") == 0)                return TopLevelBlock::Kind::HtmlBlock;
+    if (strcmp(type, "link_reference_definition") == 0) return TopLevelBlock::Kind::LinkReferenceDefinition;
+    if (strcmp(type, "pipe_table") == 0)                return TopLevelBlock::Kind::Table;
+    return TopLevelBlock::Kind::Other;
+}
+
+// Returns true if the list node contains a blank line between items
+// (i.e., the list is "loose" in CommonMark terms).
+//
+// The scan range is bounded by the LAST list_item child's end byte, not
+// the list node's overall end byte. Tree-sitter's list node range can
+// extend past the last item to include trailing blank lines that belong
+// to the document separator before the next block — those blank lines are
+// not evidence of loose-ness and were the cause of a tight-to-loose
+// serializer round-trip drift surfaced 2026-05-21 by Corbomite dogfood
+// (Mike's Obsidian-Based Writing Workflow.md became loose on save).
+static bool isListLoose(TSNode listNode, const QByteArray &utf8)
+{
+    // Tree-sitter includes trailing blank lines in list_item byte ranges:
+    //   - In a loose list, every non-last item ends with "\n\n" (the
+    //     inter-item separator is absorbed into the item's range).
+    //   - In a tight list followed by another block, the LAST item ends
+    //     with "\n\n" (the document separator before the next block is
+    //     absorbed). Non-last items end with a single "\n".
+    // So scanning every byte of the list node — or every byte up to the
+    // last item's end — finds the trailing blank line in the tight case
+    // and misclassifies it as loose (surfaced 2026-05-21 by Corbomite
+    // dogfood: tight lists became loose on save round-trip). The correct
+    // signal is `\n\n` inside any NON-LAST list_item.
+    const uint32_t childCount = ts_node_named_child_count(listNode);
+    // Find index of the last list_item child.
+    int lastItemIdx = -1;
+    for (uint32_t i = 0; i < childCount; ++i) {
+        TSNode child = ts_node_named_child(listNode, i);
+        if (strcmp(ts_node_type(child), "list_item") == 0)
+            lastItemIdx = static_cast<int>(i);
+    }
+    if (lastItemIdx < 0) return false;
+    // Scan non-last list_item children for `\n\n`.
+    for (uint32_t i = 0; i < childCount; ++i) {
+        if (static_cast<int>(i) == lastItemIdx) continue;
+        TSNode child = ts_node_named_child(listNode, i);
+        if (strcmp(ts_node_type(child), "list_item") != 0) continue;
+        const uint32_t cs = ts_node_start_byte(child);
+        const uint32_t ce = ts_node_end_byte(child);
+        if (ce <= cs + 1 || static_cast<uint32_t>(utf8.size()) < ce) continue;
+        for (uint32_t j = cs; j + 1 < ce; ++j) {
+            if (utf8[j] == '\n' && utf8[j + 1] == '\n') return true;
+        }
+    }
+    return false;
+}
+
+// Harvest marker style/number, checked state, and content byte range
+// from a list_item node into the TopLevelBlock b.
+static void harvestListItem(TSNode item, const QByteArray &utf8,
+                            TopLevelBlock &b)
+{
+    const uint32_t n = ts_node_named_child_count(item);
+    int contentStart = -1;
+    int contentEnd   = -1;
+
+    for (uint32_t i = 0; i < n; ++i) {
+        TSNode child = ts_node_named_child(item, i);
+        const char *ctype = ts_node_type(child);
+
+        bool isMarker = false;
+
+        if (strcmp(ctype, "list_marker_dot") == 0) {
+            b.markerStyle = QStringLiteral("dot"); isMarker = true;
+        } else if (strcmp(ctype, "list_marker_parenthesis") == 0) {
+            b.markerStyle = QStringLiteral("paren"); isMarker = true;
+        } else if (strcmp(ctype, "list_marker_minus") == 0) {
+            b.markerStyle = QStringLiteral("minus"); isMarker = true;
+        } else if (strcmp(ctype, "list_marker_plus") == 0) {
+            b.markerStyle = QStringLiteral("plus"); isMarker = true;
+        } else if (strcmp(ctype, "list_marker_star") == 0) {
+            b.markerStyle = QStringLiteral("star"); isMarker = true;
+        } else if (strcmp(ctype, "task_list_marker_unchecked") == 0) {
+            b.markerStyle = QStringLiteral("task");
+            b.checked = false;
+            isMarker = true;
+        } else if (strcmp(ctype, "task_list_marker_checked") == 0) {
+            b.markerStyle = QStringLiteral("task");
+            b.checked = true;
+            isMarker = true;
+        } else if (strcmp(ctype, "list") == 0
+                || strcmp(ctype, "block_continuation") == 0) {
+            // nested list or continuation — not this item's direct content
+        } else {
+            // Real content child (paragraph, fenced_code_block, etc.)
+            const int s = static_cast<int>(ts_node_start_byte(child));
+            const int e = static_cast<int>(ts_node_end_byte(child));
+            if (contentStart < 0) contentStart = s;
+            contentEnd = e;
+        }
+
+        // Extract markerNumber from ordered marker text
+        if (isMarker && (b.markerStyle == QStringLiteral("dot")
+                      || b.markerStyle == QStringLiteral("paren"))) {
+            const int ms = static_cast<int>(ts_node_start_byte(child));
+            const int me = static_cast<int>(ts_node_end_byte(child));
+            if (ms >= 0 && me > ms && me <= static_cast<int>(utf8.size())) {
+                QByteArray digits;
+                for (int j = ms; j < me; ++j) {
+                    const char c = utf8[j];
+                    if (c >= '0' && c <= '9') digits += c;
+                    else break;
+                }
+                if (!digits.isEmpty())
+                    b.markerNumber = digits.toInt();
+            }
+        }
+    }
+
+    if (contentStart < 0) {
+        // Empty item — point both ends at the item's end byte
+        b.byteStart = b.byteEnd = static_cast<int>(ts_node_end_byte(item));
+    } else {
+        // Strip trailing whitespace (newlines + spaces/tabs that tree-sitter
+        // may include in the paragraph node as continuation-indent bytes of
+        // the following sibling item).
+        while (contentEnd > contentStart
+               && static_cast<uint32_t>(contentEnd - 1) < static_cast<uint32_t>(utf8.size())
+               && (utf8[contentEnd - 1] == '\n'
+                   || utf8[contentEnd - 1] == '\r'
+                   || utf8[contentEnd - 1] == ' '
+                   || utf8[contentEnd - 1] == '\t')) {
+            --contentEnd;
+        }
+        b.byteStart = contentStart;
+        b.byteEnd   = contentEnd;
+    }
+}
+
+// Walk container nodes (`document`, `section`) recursively, emitting a
+// TopLevelBlock for every block-level child. Sections themselves are
+// containers — their child heading and following blocks are flattened
+// into the linear output sequence.
+// currentIndent: nesting depth from enclosing list ancestors (0 = top-level).
+// currentLooseRun: true iff the nearest enclosing list was loose.
+static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
+                                  QList<TopLevelBlock> &out,
+                                  int currentIndent = 0,
+                                  bool currentLooseRun = false)
+{
+    const char *type = ts_node_type(node);
+
+    // Containers: descend into named children, do not emit.
+    if (strcmp(type, "document") == 0 || strcmp(type, "section") == 0) {
+        uint32_t count = ts_node_named_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_named_child(node, i);
+            collectTopLevelBlocks(child, utf8, out, currentIndent, currentLooseRun);
+        }
+        return;
+    }
+
+    // List: recurse into list_item children (one TLB per item).
+    if (strcmp(type, "list") == 0) {
+        const bool loose = isListLoose(node, utf8);
+        const uint32_t count = ts_node_named_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_named_child(node, i);
+            collectTopLevelBlocks(child, utf8, out, currentIndent, loose);
+        }
+        return;
+    }
+
+    // List item: emit one TLB, then recurse into any nested list children.
+    if (strcmp(type, "list_item") == 0) {
+        TopLevelBlock b;
+        b.kind = TopLevelBlock::Kind::ListItem;
+        b.indentDepth = currentIndent;
+        b.looseRun = currentLooseRun;
+        harvestListItem(node, utf8, b);
+        out.append(b);
+        // Recurse into nested list children at increased indent depth
+        const uint32_t count = ts_node_named_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_named_child(node, i);
+            if (strcmp(ts_node_type(child), "list") == 0) {
+                collectTopLevelBlocks(child, utf8, out, currentIndent + 1, currentLooseRun);
+            }
+        }
+        return;
+    }
+
+    // Skip frontmatter metadata blocks if they ever appear (the parse
+    // pipeline strips frontmatter before tree-sitter sees the body, so
+    // this is defensive).
+    if (strcmp(type, "minus_metadata") == 0 ||
+        strcmp(type, "plus_metadata") == 0) {
+        return;
+    }
+
+    // Block-level node — emit one TopLevelBlock.
+    TopLevelBlock b;
+    b.kind      = classifyTopLevelKind(type);
+    b.byteStart = static_cast<int>(ts_node_start_byte(node));
+    b.byteEnd   = static_cast<int>(ts_node_end_byte(node));
+
+    switch (b.kind) {
+    case TopLevelBlock::Kind::AtxHeading:
+        b.headingLevel = headingLevelFromNode(node);
+        break;
+    case TopLevelBlock::Kind::SetextHeading:
+        b.headingLevel = setextHeadingLevelFromNode(node);
+        break;
+    case TopLevelBlock::Kind::FencedCodeBlock:
+        fillFencedCodeFields(node, utf8, b);
+        break;
+    case TopLevelBlock::Kind::IndentedCodeBlock:
+        // v1: surface raw block source. Consumers de-indent if needed.
+        b.codeText = QString::fromUtf8(utf8.mid(b.byteStart, b.byteEnd - b.byteStart));
+        break;
+    default:
+        break;
+    }
+
+    out.append(b);
+}
+
+/// Bucket spans into top-level blocks by byte-range containment, translating
+/// each span's offsets from document-absolute to block-relative.
+///
+/// Pre: spans are in document-absolute coordinates (output of buildSpanMap()).
+/// Pre: blocks[i].byteStart/byteEnd are document-absolute UTF-8 byte ranges,
+///      blocks ordered ascending.
+/// Post: each block.inlineSpans contains spans whose utf8Offset is in
+///       [block.byteStart, block.byteEnd), with offsets translated to
+///       block-relative coordinates.
+void bakeInlineSpansIntoBlocks(QList<SourceSpan> spans,
+                               QList<TopLevelBlock> &blocks,
+                               const QByteArray &utf8)
+{
+    if (blocks.isEmpty() || spans.isEmpty()) return;
+
+    const QList<int> u8ToChar = buildUtf8ToCharMap(utf8);
+
+    std::sort(spans.begin(), spans.end(),
+              [](const SourceSpan &a, const SourceSpan &b) {
+                  return a.utf8Offset < b.utf8Offset;
+              });
+
+    auto charOffsetAtByte = [&](int byte) -> int {
+        if (byte < 0) return 0;
+        if (byte >= u8ToChar.size()) return u8ToChar.isEmpty() ? 0 : u8ToChar.last();
+        return u8ToChar[byte];
+    };
+
+    qsizetype spanIdx = 0;
+    for (TopLevelBlock &block : blocks) {
+        const int blockCharStart = charOffsetAtByte(block.byteStart);
+
+        while (spanIdx < spans.size()
+               && spans[spanIdx].utf8Offset < block.byteStart) {
+            ++spanIdx;
+        }
+
+        for (qsizetype i = spanIdx; i < spans.size(); ++i) {
+            const SourceSpan &s = spans[i];
+            if (s.utf8Offset >= block.byteEnd) break;
+
+            SourceSpan rel = s;
+            rel.utf8Offset = s.utf8Offset - block.byteStart;
+            rel.charOffset = s.charOffset - blockCharStart;
+            if (s.parentCharStart >= 0) rel.parentCharStart = s.parentCharStart - blockCharStart;
+            if (s.parentCharEnd   >= 0) rel.parentCharEnd   = s.parentCharEnd   - blockCharStart;
+            block.inlineSpans.append(rel);
+        }
+    }
 }
 
 } // anonymous namespace
@@ -904,13 +1392,49 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
     TSNode blockRoot = ts_tree_root_node(m_blockTree);
     collectHeadingsForQuery(blockRoot, m_utf8, result.headings);
 
+    // Walk block tree for top-level blocks (linearised, in document order)
+    collectTopLevelBlocks(blockRoot, m_utf8, result.topLevelBlocks);
+
     // Walk inline trees for links and tags
     for (TSTree *tree : m_inlineTrees) {
         TSNode inlineRoot = ts_tree_root_node(tree);
         collectInlineQueries(inlineRoot, m_utf8, result.links, result.tags);
     }
 
+    // Bake per-block inline spans (R1B). buildSpanMap is O(N) over inline
+    // trees; bucketing is O(spans + blocks) on top.
+    bakeInlineSpansIntoBlocks(buildSpanMap(), result.topLevelBlocks, m_utf8);
+
     return result;
+}
+
+// ---------------------------------------------------------------------------
+// inlineSpansFor — standalone per-block inline parse entry point (Phase 10)
+// ---------------------------------------------------------------------------
+
+QList<SourceSpan> inlineSpansFor(const QByteArray &blockContent)
+{
+    MARKOFF_PERF_SCOPE("parser.inlineSpansFor(QByteArray)");
+    // Tree-sitter's markdown block grammar only wraps a leaf marker
+    // (atx_h*_marker, fenced delimiter, …) in its parent block node when the
+    // construct is line-terminated. User-typed per-block content arrives here
+    // without a trailing newline (LiveListModelBinding strips one if present),
+    // so the parent block node is never produced, collectHeadingRanges /
+    // collectBlockQuoteRanges return empty, and buildSpanMap's post-processing
+    // leaves parentCharStart/parentCharEnd at -1 on the marker span — which
+    // InlineHighlighter::delimiterShouldHide interprets as "always show".
+    // The visible symptom: typing `# word` then pressing Enter leaves the `#`
+    // marker permanently rendered in the heading delegate.
+    //
+    // Append a synthetic newline when missing. The extra span the parser
+    // emits at offset == content length is filtered by the highlighter's
+    // `relStart >= lineLen` bounds check.
+    QByteArray terminated = blockContent;
+    if (!terminated.endsWith('\n'))
+        terminated.append('\n');
+    TreeSitterParser parser;
+    parser.parse(QString::fromUtf8(terminated));
+    return parser.buildSpanMap();
 }
 
 } // namespace Markoff

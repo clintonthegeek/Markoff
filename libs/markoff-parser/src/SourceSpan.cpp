@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include <markoff-parser/SourceSpan.h>
+#include <markoff/parser/SourceSpan.h>
 
 namespace Markoff {
 

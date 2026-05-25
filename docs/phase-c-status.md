@@ -1,5 +1,19 @@
 # Phase C Status
 
+> **HISTORICAL — do not update.** This board tracks the master-side
+> Phase C narrative (C1–C7 work-units against the four-leaves
+> architecture). That architecture was retired on
+> `exploration/new-foundation` by the D-arc + E-arc rebuild. Phase C is
+> not the active sequence on this branch.
+>
+> Authoritative posture for this branch:
+> [`handoff/2026-05-20-port-first-session-recap.md`](handoff/2026-05-20-port-first-session-recap.md).
+> Live status: [`e-arc/e-arc-status.md`](e-arc/e-arc-status.md).
+>
+> Kept in tree so historical commit references (C3 soak fixes, the
+> editor key-dispatch SESSION-BRIEF, etc.) remain interpretable.
+> At merge-to-master the file moves to `docs/archive/phase-c/`.
+
 Living status board for the Phase C work-units. The Corbomite agent
 updates this file in every Phase C commit touching either repo. Entries
 are append-only in the "Activity log" section; the work-unit status table

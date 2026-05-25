@@ -1,19 +1,16 @@
 cmake_minimum_required(VERSION 3.19)
 project(Markoff VERSION 0.1.0 LANGUAGES CXX)
 
-# Markoff-family libraries:
-#   - libs/rapidyaml       (ryml::ryml — YAML parser, vendored from biojppm/rapidyaml)
-#   - libs/markoff-parser  (MarkoffParser::MarkoffParser — tree-sitter Markdown AST + YAML frontmatter)
-#   - libs/markoff-core    (Markoff::Core — shared primitives)
-#   - libs/markoff-source  (Markoff::Source — Qutepart-based source-mode editor)
-#   - libs/markoff-live    (Markoff::Live — live-preview editor widget)
-#   - libs/jkqtmathtext    (jkqtmathtext — LaTeX math rendering, used by markoff-reading)
-#   - libs/markoff-reading (Markoff::Reading — Obsidian-compatible reading-mode widget)
+# Markoff-family libraries (new-foundation branch):
+#   - libs/rapidyaml          (ryml::ryml — YAML parser, vendored)
+#   - libs/markoff-parser     (Markoff::Parser — tree-sitter Markdown AST + YAML frontmatter)
+#   - libs/collabtext         (CRDT text engine, sibling-symlinked from /home/clinton/dev/collabtext)
+#   - libs/markoff-core (Markoff::Core — MarkoffDocument + ParsePool + Sessions)
+#   - libs/markoff-source (QPlainTextEdit-based source widget)
 #
-# Can be built standalone OR consumed as a git submodule from a parent project
-# (e.g., Corbomite). Qt6 / KF6 / optional helper libs (jkqtmathtext, mmdr) are
-# discovered via find_package — parent projects that already find them will
-# short-circuit our find_package calls.
+# Can be built standalone OR consumed as a git submodule from a parent project.
+# Qt6 / KF6 are discovered via find_package — parent projects that already find
+# them will short-circuit our find_package calls.
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -32,23 +29,56 @@ if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
 endif()
 
 # rapidyaml uses exceptions in its default callback — required for our
-# error-propagation contract in MarkoffParser.
+# error-propagation contract in Markoff::Parser.
 set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "" FORCE)
 
 add_subdirectory(libs/rapidyaml)
-add_subdirectory(libs/markoff-parser)
-add_subdirectory(libs/markoff-core)
-add_subdirectory(libs/markoff-source)
-add_subdirectory(libs/markoff-live)
-# jkqtmathtext is pulled in defensively by libs/markoff-live and
-# libs/markoff-reading via `if(NOT TARGET jkqtmathtext)` — don't add it
-# again here or CMake sees duplicate add_library calls.
-add_subdirectory(libs/markoff-reading)
 
-# Markoff's own integration tests. Parent projects may skip these by setting
-# MARKOFF_BUILD_TESTS=OFF before add_subdirectory().
+# rapidyaml + bundled c4core are non-Qt third-party C++ libraries; they
+# inherit the project-scope CMAKE_AUTOMOC / CMAKE_AUTOUIC ON flags above
+# and emit dev warnings ("No valid Qt version found for target"). Opt
+# them out. Guarded with if(TARGET ...) so parent projects providing
+# ryml via find_package don't see clobbered properties. See
+# docs/2026-05-03-cmake-warnings-rationale.md.
+if(TARGET ryml)
+    set_target_properties(ryml PROPERTIES AUTOMOC OFF AUTOUIC OFF)
+endif()
+if(TARGET c4core)
+    set_target_properties(c4core PROPERTIES AUTOMOC OFF AUTOUIC OFF)
+endif()
+
+add_subdirectory(libs/markoff-parser)
+
+# collabtext — CRDT engine, sibling library symlinked from /home/clinton/dev/collabtext.
+# Defensive guard against double-add by parent projects.
+if(NOT TARGET collabtext)
+    add_subdirectory(libs/collabtext)
+endif()
+
+add_subdirectory(libs/markoff-core)
+# jkqtmathtext — LaTeX math rendering for Math blocks in markoff-live.
+if(NOT TARGET jkqtmathtext)
+    add_subdirectory(libs/jkqtmathtext)
+endif()
+add_subdirectory(libs/markoff-live)
+add_subdirectory(libs/markoff-source)
+
+# Apps (markoff-collab-testapp, future scene-demo) are demo binaries that link
+# Qt::QuickWidgets and other extra components. Default-ON for standalone builds,
+# default-OFF when consumed as a subdirectory so parent projects don't have to
+# pull QuickWidgets just to satisfy the demo app's link line.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_MARKOFF_BUILD_APPS_DEFAULT ON)
+else()
+    set(_MARKOFF_BUILD_APPS_DEFAULT OFF)
+endif()
+option(MARKOFF_BUILD_APPS "Build Markoff demo apps (markoff-collab-testapp, etc.)" ${_MARKOFF_BUILD_APPS_DEFAULT})
+if(MARKOFF_BUILD_APPS)
+    add_subdirectory(apps)
+endif()
+unset(_MARKOFF_BUILD_APPS_DEFAULT)
+
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
 if(MARKOFF_BUILD_TESTS)
     enable_testing()
-    add_subdirectory(tests/markoff)
 endif()

@@ -3,8 +3,8 @@
 #include <QTest>
 #include <QFile>
 #include <QDir>
-#include <markoff-parser/Document.h>
-#include <markoff-parser/YamlValue.h>
+#include <markoff/parser/Document.h>
+#include <markoff/parser/YamlValue.h>
 
 using namespace Markoff;
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Markoff contributors, GPL-3.0-or-later.
 
-#include "markoff/MarkdownRenderChild.h"
+#include <markoff/core/MarkdownRenderChild.h>
 
 namespace Markoff {
 

@@ -1,0 +1,4386 @@
+{
+    "build_type": "RelWithDebInfo",
+    "git_sha": "cc63eed-1A",
+    "host": {
+        "cpu": "x86_64",
+        "kernel": "6.12.84-1-MANJARO",
+        "qt": "6.11.0"
+    },
+    "results": [
+        {
+            "corpus_profile": "tiny",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 3868801,
+                    "mean": 685347,
+                    "min": 222545,
+                    "p50": 479464,
+                    "p95": 2277619,
+                    "p99": 3806825
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 175,
+                    "max": 2546464,
+                    "mean": 57009,
+                    "min": 8869,
+                    "p50": 16830,
+                    "p95": 87208,
+                    "p99": 1356957
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 178,
+                    "max": 4234953,
+                    "mean": 454823,
+                    "min": 273683,
+                    "p50": 398740,
+                    "p95": 529078,
+                    "p99": 1915031
+                },
+                "phase_pool_queue": {
+                    "count": 178,
+                    "max": 4239117,
+                    "mean": 301943,
+                    "min": 0,
+                    "p50": 105893,
+                    "p95": 1898455,
+                    "p99": 4180257
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 175,
+                    "max": 9437978,
+                    "mean": 4809127,
+                    "min": 361224,
+                    "p50": 4912648,
+                    "p95": 7385418,
+                    "p99": 7978321
+                },
+                "phase_signal_hop": {
+                    "count": 175,
+                    "max": 3053019,
+                    "mean": 129135,
+                    "min": 9874,
+                    "p50": 20260,
+                    "p95": 741227,
+                    "p99": 2974371
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 10392507,
+                    "mean": 6233172,
+                    "min": 1029754,
+                    "p50": 6170349,
+                    "p95": 8230340,
+                    "p99": 9166853
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "tiny",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 256348095,
+                    "mean": 148413485,
+                    "min": 37695098,
+                    "p50": 156230990,
+                    "p95": 231469008,
+                    "p99": 256348095
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 3887,
+                    "mean": 2596,
+                    "min": 1217,
+                    "p50": 2468,
+                    "p95": 3698,
+                    "p99": 3887
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 20,
+                    "max": 5902043,
+                    "mean": 3651001,
+                    "min": 1763895,
+                    "p50": 3521589,
+                    "p95": 5621273,
+                    "p99": 5902043
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 66908,
+                    "mean": 50360,
+                    "min": 30516,
+                    "p50": 53919,
+                    "p95": 66687,
+                    "p99": 66908
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 18669506,
+                    "mean": 13758117,
+                    "min": 8117137,
+                    "p50": 14079569,
+                    "p95": 18408893,
+                    "p99": 18669506
+                },
+                "phase_signal_hop": {
+                    "count": 20,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 272740738,
+                    "mean": 162200162,
+                    "min": 46980135,
+                    "p50": 172302462,
+                    "p95": 247013469,
+                    "p99": 272740738
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "tiny",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 6483223,
+                    "mean": 6483223,
+                    "min": 6483223,
+                    "p50": 6483223,
+                    "p95": 6483223,
+                    "p99": 6483223
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 6483223,
+                    "mean": 6483223,
+                    "min": 6483223,
+                    "p50": 6483223,
+                    "p95": 6483223,
+                    "p99": 6483223
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        },
+        {
+            "corpus_profile": "mid_prose",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 700510,
+                    "mean": 437623,
+                    "min": 308649,
+                    "p50": 405876,
+                    "p95": 649782,
+                    "p99": 691906
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 180,
+                    "max": 45434,
+                    "mean": 8589,
+                    "min": 5383,
+                    "p50": 7898,
+                    "p95": 12623,
+                    "p99": 16507
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 180,
+                    "max": 4801263,
+                    "mean": 2906105,
+                    "min": 2411702,
+                    "p50": 2644909,
+                    "p95": 4163870,
+                    "p99": 4491575
+                },
+                "phase_pool_queue": {
+                    "count": 180,
+                    "max": 57616,
+                    "mean": 14670,
+                    "min": 5706,
+                    "p50": 11163,
+                    "p95": 46659,
+                    "p99": 53328
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 180,
+                    "max": 5869638,
+                    "mean": 4344230,
+                    "min": 1951306,
+                    "p50": 4213238,
+                    "p95": 5386842,
+                    "p99": 5485671
+                },
+                "phase_signal_hop": {
+                    "count": 180,
+                    "max": 54766,
+                    "mean": 19393,
+                    "min": 7836,
+                    "p50": 17057,
+                    "p95": 46974,
+                    "p99": 52865
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 9308391,
+                    "mean": 7730613,
+                    "min": 6995604,
+                    "p50": 7444405,
+                    "p95": 8966163,
+                    "p99": 9253477
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "mid_prose",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 241532247,
+                    "mean": 114236594,
+                    "min": 21035702,
+                    "p50": 97663574,
+                    "p95": 228036796,
+                    "p99": 241532247
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 2780,
+                    "mean": 1761,
+                    "min": 1213,
+                    "p50": 1660,
+                    "p95": 2354,
+                    "p99": 2780
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 20,
+                    "max": 7443007,
+                    "mean": 5119935,
+                    "min": 3853095,
+                    "p50": 4871286,
+                    "p95": 6955761,
+                    "p99": 7443007
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 69415,
+                    "mean": 37495,
+                    "min": 26155,
+                    "p50": 35301,
+                    "p95": 66495,
+                    "p99": 69415
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 17733552,
+                    "mean": 11825733,
+                    "min": 5782021,
+                    "p50": 11872618,
+                    "p95": 17205874,
+                    "p99": 17733552
+                },
+                "phase_signal_hop": {
+                    "count": 20,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 259281701,
+                    "mean": 126080715,
+                    "min": 26834757,
+                    "p50": 109555306,
+                    "p95": 245260217,
+                    "p99": 259281701
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "mid_prose",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 10368600,
+                    "mean": 10368600,
+                    "min": 10368600,
+                    "p50": 10368600,
+                    "p95": 10368600,
+                    "p99": 10368600
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 10368600,
+                    "mean": 10368600,
+                    "min": 10368600,
+                    "p50": 10368600,
+                    "p95": 10368600,
+                    "p99": 10368600
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        },
+        {
+            "corpus_profile": "mid_mixed",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 931073,
+                    "mean": 426507,
+                    "min": 299881,
+                    "p50": 408749,
+                    "p95": 555141,
+                    "p99": 847786
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 180,
+                    "max": 15379,
+                    "mean": 8443,
+                    "min": 5771,
+                    "p50": 8244,
+                    "p95": 11279,
+                    "p99": 14966
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 180,
+                    "max": 3378844,
+                    "mean": 2051783,
+                    "min": 1723477,
+                    "p50": 1955490,
+                    "p95": 2916395,
+                    "p99": 3165623
+                },
+                "phase_pool_queue": {
+                    "count": 180,
+                    "max": 53797,
+                    "mean": 16420,
+                    "min": 4786,
+                    "p50": 9267,
+                    "p95": 48967,
+                    "p99": 51161
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 180,
+                    "max": 9475181,
+                    "mean": 6618621,
+                    "min": 5330783,
+                    "p50": 6616893,
+                    "p95": 7258469,
+                    "p99": 8847103
+                },
+                "phase_signal_hop": {
+                    "count": 180,
+                    "max": 65426,
+                    "mean": 21141,
+                    "min": 7738,
+                    "p50": 12315,
+                    "p95": 53292,
+                    "p99": 62110
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 12103777,
+                    "mean": 9142917,
+                    "min": 8404743,
+                    "p50": 9046513,
+                    "p95": 9819769,
+                    "p99": 11315306
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "mid_mixed",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 241280478,
+                    "mean": 113731475,
+                    "min": 21585901,
+                    "p50": 95426987,
+                    "p95": 226349783,
+                    "p99": 241280478
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 2341,
+                    "mean": 1761,
+                    "min": 1449,
+                    "p50": 1651,
+                    "p95": 2164,
+                    "p99": 2341
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 20,
+                    "max": 5314323,
+                    "mean": 4454681,
+                    "min": 3140232,
+                    "p50": 4523404,
+                    "p95": 5303168,
+                    "p99": 5314323
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 69915,
+                    "mean": 34815,
+                    "min": 25714,
+                    "p50": 31008,
+                    "p95": 66851,
+                    "p99": 69915
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 19080008,
+                    "mean": 13433421,
+                    "min": 7283843,
+                    "p50": 12691341,
+                    "p95": 19020371,
+                    "p99": 19080008
+                },
+                "phase_signal_hop": {
+                    "count": 20,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 260315470,
+                    "mean": 127181406,
+                    "min": 28884778,
+                    "p50": 108134439,
+                    "p95": 245445021,
+                    "p99": 260315470
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "mid_mixed",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 15106638,
+                    "mean": 15106638,
+                    "min": 15106638,
+                    "p50": 15106638,
+                    "p95": 15106638,
+                    "p99": 15106638
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 15106638,
+                    "mean": 15106638,
+                    "min": 15106638,
+                    "p50": 15106638,
+                    "p95": 15106638,
+                    "p99": 15106638
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        },
+        {
+            "corpus_profile": "big_prose",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 1992339,
+                    "mean": 1200965,
+                    "min": 1027504,
+                    "p50": 1149287,
+                    "p95": 1634510,
+                    "p99": 1806909
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 176,
+                    "max": 3042,
+                    "mean": 1077,
+                    "min": 639,
+                    "p50": 937,
+                    "p95": 1703,
+                    "p99": 2794
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 164,
+                    "max": 18335526,
+                    "mean": 13189882,
+                    "min": 0,
+                    "p50": 15276490,
+                    "p95": 16345656,
+                    "p99": 18290038
+                },
+                "phase_pool_queue": {
+                    "count": 176,
+                    "max": 1593942,
+                    "mean": 55645,
+                    "min": 19548,
+                    "p50": 56063,
+                    "p95": 71085,
+                    "p99": 187346
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 176,
+                    "max": 22897462,
+                    "mean": 16696554,
+                    "min": 14398743,
+                    "p50": 16138273,
+                    "p95": 21266472,
+                    "p99": 22784906
+                },
+                "phase_signal_hop": {
+                    "count": 164,
+                    "max": 1080628,
+                    "mean": 81722,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 606221,
+                    "p99": 1076980
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 23997083,
+                    "mean": 17913835,
+                    "min": 16353143,
+                    "p50": 17365648,
+                    "p95": 21910481,
+                    "p99": 23948096
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "big_prose",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 241737094,
+                    "mean": 114248527,
+                    "min": 22046797,
+                    "p50": 97777088,
+                    "p95": 225988692,
+                    "p99": 241737094
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 2096,
+                    "mean": 1527,
+                    "min": 1155,
+                    "p50": 1480,
+                    "p95": 1798,
+                    "p99": 2096
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 19,
+                    "max": 19151430,
+                    "mean": 12472714,
+                    "min": 0,
+                    "p50": 17802070,
+                    "p95": 19151430,
+                    "p99": 19151430
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 69864,
+                    "mean": 34922,
+                    "min": 26558,
+                    "p50": 30637,
+                    "p95": 68176,
+                    "p99": 69864
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 26273528,
+                    "mean": 20968077,
+                    "min": 14356953,
+                    "p50": 21540340,
+                    "p95": 25585240,
+                    "p99": 26273528
+                },
+                "phase_signal_hop": {
+                    "count": 19,
+                    "max": 238027822,
+                    "mean": 21215138,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 238027822,
+                    "p99": 238027822
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 268028912,
+                    "mean": 135232856,
+                    "min": 36418395,
+                    "p50": 119332216,
+                    "p95": 251588747,
+                    "p99": 268028912
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "big_prose",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 58613411,
+                    "mean": 58613411,
+                    "min": 58613411,
+                    "p50": 58613411,
+                    "p95": 58613411,
+                    "p99": 58613411
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 58613411,
+                    "mean": 58613411,
+                    "min": 58613411,
+                    "p50": 58613411,
+                    "p95": 58613411,
+                    "p99": 58613411
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        },
+        {
+            "corpus_profile": "big_code_heavy",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 2057182,
+                    "mean": 1363174,
+                    "min": 1186557,
+                    "p50": 1335567,
+                    "p95": 1613702,
+                    "p99": 2041165
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 180,
+                    "max": 5754,
+                    "mean": 1581,
+                    "min": 1056,
+                    "p50": 1452,
+                    "p95": 2160,
+                    "p99": 2951
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 180,
+                    "max": 13453143,
+                    "mean": 9456545,
+                    "min": 8094780,
+                    "p50": 9272789,
+                    "p95": 11003183,
+                    "p99": 11842033
+                },
+                "phase_pool_queue": {
+                    "count": 180,
+                    "max": 77479,
+                    "mean": 33440,
+                    "min": 23036,
+                    "p50": 29186,
+                    "p95": 65119,
+                    "p99": 76035
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 180,
+                    "max": 34757303,
+                    "mean": 25549297,
+                    "min": 22682615,
+                    "p50": 25286346,
+                    "p95": 27833381,
+                    "p99": 34145941
+                },
+                "phase_signal_hop": {
+                    "count": 180,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 36225835,
+                    "mean": 26927130,
+                    "min": 24228489,
+                    "p50": 26627267,
+                    "p95": 29180990,
+                    "p99": 36146651
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "big_code_heavy",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 257644994,
+                    "mean": 114753222,
+                    "min": 24129372,
+                    "p50": 96287360,
+                    "p95": 224915386,
+                    "p99": 257644994
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 2361,
+                    "mean": 1605,
+                    "min": 1373,
+                    "p50": 1460,
+                    "p95": 2010,
+                    "p99": 2361
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 20,
+                    "max": 15927162,
+                    "mean": 11730854,
+                    "min": 9346325,
+                    "p50": 11580783,
+                    "p95": 15383099,
+                    "p99": 15927162
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 37237,
+                    "mean": 30438,
+                    "min": 27155,
+                    "p50": 30107,
+                    "p95": 33504,
+                    "p99": 37237
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 35071429,
+                    "mean": 29595426,
+                    "min": 24085573,
+                    "p50": 30144699,
+                    "p95": 34987076,
+                    "p99": 35071429
+                },
+                "phase_signal_hop": {
+                    "count": 20,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 292648161,
+                    "mean": 144365265,
+                    "min": 49649681,
+                    "p50": 124814694,
+                    "p95": 260005274,
+                    "p99": 292648161
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "big_code_heavy",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 99343087,
+                    "mean": 99343087,
+                    "min": 99343087,
+                    "p50": 99343087,
+                    "p95": 99343087,
+                    "p99": 99343087
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 99343087,
+                    "mean": 99343087,
+                    "min": 99343087,
+                    "p50": 99343087,
+                    "p95": 99343087,
+                    "p99": 99343087
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        },
+        {
+            "corpus_profile": "big_table_heavy",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 2278952,
+                    "mean": 1295848,
+                    "min": 1087346,
+                    "p50": 1273669,
+                    "p95": 1518141,
+                    "p99": 1944810
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 180,
+                    "max": 3187,
+                    "mean": 1625,
+                    "min": 925,
+                    "p50": 1508,
+                    "p95": 2297,
+                    "p99": 3096
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 180,
+                    "max": 19013560,
+                    "mean": 13215712,
+                    "min": 11447550,
+                    "p50": 12526163,
+                    "p95": 18404071,
+                    "p99": 18917545
+                },
+                "phase_pool_queue": {
+                    "count": 180,
+                    "max": 242847,
+                    "mean": 38355,
+                    "min": 22586,
+                    "p50": 30620,
+                    "p95": 66475,
+                    "p99": 81585
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 180,
+                    "max": 42273315,
+                    "mean": 27790265,
+                    "min": 25387422,
+                    "p50": 27019417,
+                    "p95": 31388195,
+                    "p99": 36060307
+                },
+                "phase_signal_hop": {
+                    "count": 180,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 43606089,
+                    "mean": 29100489,
+                    "min": 26633358,
+                    "p50": 28282737,
+                    "p95": 32701310,
+                    "p99": 37457887
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "big_table_heavy",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 242495578,
+                    "mean": 117392222,
+                    "min": 23858670,
+                    "p50": 105072396,
+                    "p95": 227210919,
+                    "p99": 242495578
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 2237,
+                    "mean": 1591,
+                    "min": 1218,
+                    "p50": 1448,
+                    "p95": 2169,
+                    "p99": 2237
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 20,
+                    "max": 15569379,
+                    "mean": 14171519,
+                    "min": 12908637,
+                    "p50": 14143649,
+                    "p95": 15540816,
+                    "p99": 15569379
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 69297,
+                    "mean": 38327,
+                    "min": 26668,
+                    "p50": 30757,
+                    "p95": 68888,
+                    "p99": 69297
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 38023018,
+                    "mean": 33242184,
+                    "min": 28278772,
+                    "p50": 33522147,
+                    "p95": 37626687,
+                    "p99": 38023018
+                },
+                "phase_signal_hop": {
+                    "count": 20,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 279269569,
+                    "mean": 150651211,
+                    "min": 52154362,
+                    "p50": 139564271,
+                    "p95": 264858666,
+                    "p99": 279269569
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "big_table_heavy",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 100892780,
+                    "mean": 100892780,
+                    "min": 100892780,
+                    "p50": 100892780,
+                    "p95": 100892780,
+                    "p99": 100892780
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 100892780,
+                    "mean": 100892780,
+                    "min": 100892780,
+                    "p50": 100892780,
+                    "p95": 100892780,
+                    "p99": 100892780
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        },
+        {
+            "corpus_profile": "big_footnote_heavy",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 1696674,
+                    "mean": 1195457,
+                    "min": 1040459,
+                    "p50": 1191792,
+                    "p95": 1316340,
+                    "p99": 1539645
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 180,
+                    "max": 2961,
+                    "mean": 1281,
+                    "min": 681,
+                    "p50": 1195,
+                    "p95": 1943,
+                    "p99": 2600
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 179,
+                    "max": 17379193,
+                    "mean": 14816603,
+                    "min": 0,
+                    "p50": 14876563,
+                    "p95": 16269817,
+                    "p99": 17193667
+                },
+                "phase_pool_queue": {
+                    "count": 180,
+                    "max": 5042549,
+                    "mean": 103973,
+                    "min": 20987,
+                    "p50": 58878,
+                    "p95": 71915,
+                    "p99": 4092264
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 180,
+                    "max": 22855760,
+                    "mean": 17754655,
+                    "min": 13041817,
+                    "p50": 17729366,
+                    "p95": 18436133,
+                    "p99": 19523278
+                },
+                "phase_signal_hop": {
+                    "count": 179,
+                    "max": 63603,
+                    "mean": 480,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 22471
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 24067534,
+                    "mean": 19015850,
+                    "min": 17578881,
+                    "p50": 18974946,
+                    "p95": 19660907,
+                    "p99": 20613544
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "big_footnote_heavy",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 247225184,
+                    "mean": 116960041,
+                    "min": 22006046,
+                    "p50": 97994706,
+                    "p95": 226953968,
+                    "p99": 247225184
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 2835,
+                    "mean": 1997,
+                    "min": 1611,
+                    "p50": 1881,
+                    "p95": 2395,
+                    "p99": 2835
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 20,
+                    "max": 19550527,
+                    "mean": 15631451,
+                    "min": 0,
+                    "p50": 18014985,
+                    "p95": 19451729,
+                    "p99": 19550527
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 41887,
+                    "mean": 32901,
+                    "min": 26401,
+                    "p50": 31490,
+                    "p95": 41089,
+                    "p99": 41887
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 29097706,
+                    "mean": 23077947,
+                    "min": 16770364,
+                    "p50": 22470848,
+                    "p95": 28963239,
+                    "p99": 29097706
+                },
+                "phase_signal_hop": {
+                    "count": 20,
+                    "max": 34513636,
+                    "mean": 4132890,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 27653869,
+                    "p99": 34513636
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 276205780,
+                    "mean": 140055233,
+                    "min": 38791527,
+                    "p50": 120948231,
+                    "p95": 256068291,
+                    "p99": 276205780
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "big_footnote_heavy",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 64239352,
+                    "mean": 64239352,
+                    "min": 64239352,
+                    "p50": 64239352,
+                    "p95": 64239352,
+                    "p99": 64239352
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 64239352,
+                    "mean": 64239352,
+                    "min": 64239352,
+                    "p50": 64239352,
+                    "p95": 64239352,
+                    "p99": 64239352
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        },
+        {
+            "corpus_profile": "huge",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 8583685,
+                    "mean": 5467633,
+                    "min": 5071878,
+                    "p50": 5343181,
+                    "p95": 6123772,
+                    "p99": 8262226
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 180,
+                    "max": 6643,
+                    "mean": 2102,
+                    "min": 1333,
+                    "p50": 1945,
+                    "p95": 2745,
+                    "p99": 5633
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 180,
+                    "max": 105169485,
+                    "mean": 63914298,
+                    "min": 59821812,
+                    "p50": 63002632,
+                    "p95": 68775617,
+                    "p99": 85262571
+                },
+                "phase_pool_queue": {
+                    "count": 180,
+                    "max": 84453,
+                    "mean": 41935,
+                    "min": 25385,
+                    "p50": 32393,
+                    "p95": 74235,
+                    "p99": 78018
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 180,
+                    "max": 142339967,
+                    "mean": 95333472,
+                    "min": 89929072,
+                    "p50": 93130266,
+                    "p95": 105229317,
+                    "p99": 117712386
+                },
+                "phase_signal_hop": {
+                    "count": 180,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 150946710,
+                    "mean": 100818462,
+                    "min": 95554026,
+                    "p50": 98549472,
+                    "p95": 110696361,
+                    "p99": 122925232
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "huge",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 257386091,
+                    "mean": 121379656,
+                    "min": 26687599,
+                    "p50": 102075565,
+                    "p95": 238195495,
+                    "p99": 257386091
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 2802,
+                    "mean": 2135,
+                    "min": 1725,
+                    "p50": 2009,
+                    "p95": 2678,
+                    "p99": 2802
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 20,
+                    "max": 84726956,
+                    "mean": 65690749,
+                    "min": 61590898,
+                    "p50": 64356786,
+                    "p95": 67655586,
+                    "p99": 84726956
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 76700,
+                    "mean": 35032,
+                    "min": 27451,
+                    "p50": 30254,
+                    "p95": 71045,
+                    "p99": 76700
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 114663133,
+                    "mean": 102682667,
+                    "min": 93740652,
+                    "p50": 102159623,
+                    "p95": 110006142,
+                    "p99": 114663133
+                },
+                "phase_signal_hop": {
+                    "count": 20,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 364699528,
+                    "mean": 224079942,
+                    "min": 121610609,
+                    "p50": 201868604,
+                    "p95": 348218585,
+                    "p99": 364699528
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "huge",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 449663845,
+                    "mean": 449663845,
+                    "min": 449663845,
+                    "p50": 449663845,
+                    "p95": 449663845,
+                    "p99": 449663845
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 449663845,
+                    "mean": 449663845,
+                    "min": 449663845,
+                    "p50": 449663845,
+                    "p95": 449663845,
+                    "p99": 449663845
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        },
+        {
+            "corpus_profile": "pathological",
+            "iterations": 180,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 180,
+                    "max": 31762899,
+                    "mean": 24342578,
+                    "min": 22762358,
+                    "p50": 24067131,
+                    "p95": 26460436,
+                    "p99": 31118817
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 180,
+                    "max": 4301,
+                    "mean": 2430,
+                    "min": 1656,
+                    "p50": 2263,
+                    "p95": 3470,
+                    "p99": 3936
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 180,
+                    "max": 292235521,
+                    "mean": 238850085,
+                    "min": 224632850,
+                    "p50": 237615323,
+                    "p95": 253680140,
+                    "p99": 275748096
+                },
+                "phase_pool_queue": {
+                    "count": 180,
+                    "max": 93850,
+                    "mean": 36548,
+                    "min": 28562,
+                    "p50": 34919,
+                    "p95": 43930,
+                    "p99": 76450
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 180,
+                    "max": 579692920,
+                    "mean": 515856163,
+                    "min": 494475862,
+                    "p50": 513851654,
+                    "p95": 540380969,
+                    "p99": 571824275
+                },
+                "phase_signal_hop": {
+                    "count": 180,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 180,
+                    "max": 603898153,
+                    "mean": 540219444,
+                    "min": 517645889,
+                    "p50": 538279442,
+                    "p95": 565443801,
+                    "p99": 596669567
+                }
+            },
+            "scenario": "type_end",
+            "tier": "render",
+            "warmup_iterations": 20
+        },
+        {
+            "corpus_profile": "pathological",
+            "iterations": 20,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 20,
+                    "max": 273983815,
+                    "mean": 141890101,
+                    "min": 47362020,
+                    "p50": 121415690,
+                    "p95": 262317520,
+                    "p99": 273983815
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 20,
+                    "max": 3287,
+                    "mean": 2433,
+                    "min": 1795,
+                    "p50": 2212,
+                    "p95": 3266,
+                    "p99": 3287
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 20,
+                    "max": 282628114,
+                    "mean": 243811577,
+                    "min": 228054000,
+                    "p50": 235412080,
+                    "p95": 269656482,
+                    "p99": 282628114
+                },
+                "phase_pool_queue": {
+                    "count": 20,
+                    "max": 40801,
+                    "mean": 33677,
+                    "min": 29142,
+                    "p50": 33557,
+                    "p95": 37770,
+                    "p99": 40801
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 20,
+                    "max": 584972414,
+                    "mean": 532035768,
+                    "min": 510392131,
+                    "p50": 528946166,
+                    "p95": 553201945,
+                    "p99": 584972414
+                },
+                "phase_signal_hop": {
+                    "count": 20,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 20,
+                    "max": 847307127,
+                    "mean": 673945236,
+                    "min": 558808465,
+                    "p50": 646802524,
+                    "p95": 811362782,
+                    "p99": 847307127
+                }
+            },
+            "scenario": "paste_4kb",
+            "tier": "render",
+            "warmup_iterations": 5
+        },
+        {
+            "corpus_profile": "pathological",
+            "iterations": 1,
+            "metrics": {
+                "alloc_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "alloc_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "block_changed_bytes": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "inline_reuse_count": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_apply_edit": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_diff": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_extract": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_model_update": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_block": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_inline": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_parse_work": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_pool_queue": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_queries": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_render_frame": {
+                    "count": 1,
+                    "max": 2191955949,
+                    "mean": 2191955949,
+                    "min": 2191955949,
+                    "p50": 2191955949,
+                    "p95": 2191955949,
+                    "p99": 2191955949
+                },
+                "phase_signal_hop": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "phase_snapshot": {
+                    "count": 0,
+                    "max": 0,
+                    "mean": 0,
+                    "min": 0,
+                    "p50": 0,
+                    "p95": 0,
+                    "p99": 0
+                },
+                "total_ns": {
+                    "count": 1,
+                    "max": 2191955949,
+                    "mean": 2191955949,
+                    "min": 2191955949,
+                    "p50": 2191955949,
+                    "p95": 2191955949,
+                    "p99": 2191955949
+                }
+            },
+            "scenario": "cold_parse",
+            "tier": "render",
+            "warmup_iterations": 0
+        }
+    ],
+    "schema_version": 1
+}

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
-#include <markoff-parser/MarkdownSplitter.h>
-#include <markoff-parser/TreeSitterParser.h>
+#include <markoff/parser/MarkdownSplitter.h>
+#include <markoff/parser/TreeSitterParser.h>
 
 using namespace Markoff;
 

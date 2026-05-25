@@ -1,0 +1,9 @@
+module org.markoff.live
+BlockOnlyDelegateBase 1.0 BlockOnlyDelegateBase.qml
+HorizontalRuleDelegate 1.0 HorizontalRuleDelegate.qml
+ImageDelegate 1.0 ImageDelegate.qml
+CodeBlockDelegate 1.0 CodeBlockDelegate.qml
+MathDelegate 1.0 MathDelegate.qml
+RemoteCursorOverlay 1.0 RemoteCursorOverlay.qml
+TableDelegate 1.0 TableDelegate.qml
+UnifiedInlineTextDelegate 1.0 UnifiedInlineTextDelegate.qml

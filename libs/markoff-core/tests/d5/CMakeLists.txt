@@ -1,0 +1,60 @@
+qt_add_executable(tst_d5_op_types tst_d5_op_types.cpp)
+target_link_libraries(tst_d5_op_types PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_op_types COMMAND tst_d5_op_types)
+
+qt_add_executable(tst_d5_sibling_map_envelope tst_d5_sibling_map_envelope.cpp)
+target_link_libraries(tst_d5_sibling_map_envelope PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_sibling_map_envelope COMMAND tst_d5_sibling_map_envelope)
+
+qt_add_executable(tst_d5_serialization tst_d5_serialization.cpp)
+target_link_libraries(tst_d5_serialization PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_serialization COMMAND tst_d5_serialization)
+
+qt_add_executable(tst_d5_replica_id tst_d5_replica_id.cpp)
+target_link_libraries(tst_d5_replica_id PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_replica_id COMMAND tst_d5_replica_id)
+
+qt_add_executable(tst_d5_local_ops_signal tst_d5_local_ops_signal.cpp)
+target_link_libraries(tst_d5_local_ops_signal PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_local_ops_signal COMMAND tst_d5_local_ops_signal)
+
+qt_add_executable(tst_d5_local_ops_emission tst_d5_local_ops_emission.cpp)
+target_link_libraries(tst_d5_local_ops_emission PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_local_ops_emission COMMAND tst_d5_local_ops_emission)
+
+qt_add_executable(tst_d5_two_doc_convergence tst_d5_two_doc_convergence.cpp)
+target_link_libraries(tst_d5_two_doc_convergence PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_two_doc_convergence COMMAND tst_d5_two_doc_convergence)
+
+qt_add_executable(tst_d5_three_doc_convergence tst_d5_three_doc_convergence.cpp)
+target_link_libraries(tst_d5_three_doc_convergence PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_three_doc_convergence COMMAND tst_d5_three_doc_convergence)
+
+qt_add_executable(tst_d5_idempotency tst_d5_idempotency.cpp)
+target_link_libraries(tst_d5_idempotency PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_idempotency COMMAND tst_d5_idempotency)
+
+qt_add_executable(tst_d5_sibling_map_emit tst_d5_sibling_map_emit.cpp)
+target_link_libraries(tst_d5_sibling_map_emit PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_sibling_map_emit COMMAND tst_d5_sibling_map_emit)
+
+qt_add_executable(tst_d5_sibling_map_lww tst_d5_sibling_map_lww.cpp)
+target_link_libraries(tst_d5_sibling_map_lww PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_sibling_map_lww COMMAND tst_d5_sibling_map_lww)
+
+qt_add_executable(tst_d5_sibling_map_edges tst_d5_sibling_map_edges.cpp)
+target_link_libraries(tst_d5_sibling_map_edges PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_sibling_map_edges COMMAND tst_d5_sibling_map_edges)
+
+qt_add_executable(tst_d5_watermark_gate tst_d5_watermark_gate.cpp)
+target_link_libraries(tst_d5_watermark_gate PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_watermark_gate COMMAND tst_d5_watermark_gate)
+
+qt_add_executable(tst_d5_remote_cursor_state tst_d5_remote_cursor_state.cpp)
+target_link_libraries(tst_d5_remote_cursor_state PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_remote_cursor_state COMMAND tst_d5_remote_cursor_state)
+
+qt_add_executable(tst_d5_remote_cursor_survival tst_d5_remote_cursor_survival.cpp)
+target_link_libraries(tst_d5_remote_cursor_survival PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d5_remote_cursor_survival COMMAND tst_d5_remote_cursor_survival)
+

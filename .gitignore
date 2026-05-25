@@ -7,3 +7,9 @@ compile_commands.json
 *.user
 *.autosave
 .worktrees/
+
+# Local scratch / debug dumps
+selection*.txt
+
+# Superpowers tooling cache
+.superpowers/

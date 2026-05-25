@@ -1,107 +1,170 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QTest>
+#include <QApplication>
+#include <QCoreApplication>
 #include <QSignalSpy>
 
-#include <markoff/MarkoffDocument.h>
-#include <markoff/MarkdownDelta.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Origin.h>
+#include <markoff/core/Session.h>
+#include <markoff/core/SessionParams.h>
 
 using namespace Markoff;
+
+static QByteArray fullText(const MarkoffDocument &doc) {
+    QByteArray out;
+    for (BlockId id : doc.iterateBlocks())
+        out += doc.blockText(id);
+    return out;
+}
 
 class TstMarkoffDocument : public QObject {
     Q_OBJECT
 private Q_SLOTS:
-    void resetContentFirstOpenEmitsContentsChanged() {
-        MarkoffDocument doc;
-        QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
-        doc.resetContent(QStringLiteral("hello"), Origin::FirstOpen);
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("hello"));
-        QVERIFY(spy.count() >= 1);
+    void constructed_with_replica_id() {
+        MarkoffDocument doc(42);
+        QCOMPARE(doc.replicaId(), quint16(42));
     }
 
-    void replaceMutatesTextAndEmits() {
-        MarkoffDocument doc;
-        doc.resetContent(QStringLiteral("hello world"), Origin::FirstOpen);
-        QSignalSpy spy(&doc, &MarkoffDocument::contentsChanged);
-        doc.undoStack()->push(new MarkdownDelta(&doc, 6, 5, QStringLiteral("there")));
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("hello there"));
-        QVERIFY(spy.count() >= 1);
+    void empty_document_has_zero_length() {
+        MarkoffDocument doc(1);
+        QCOMPARE(doc.visibleLength(), quint32(0));
+        QVERIFY(doc.toMarkdownUtf8().isEmpty());
+        QVERIFY(doc.toMarkdown().isEmpty());
     }
 
-    void insertAndRemove() {
-        MarkoffDocument doc;
-        doc.resetContent(QStringLiteral("ac"), Origin::FirstOpen);
-        doc.undoStack()->push(new MarkdownDelta(&doc, 1, 0, QStringLiteral("b")));
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("abc"));
-        doc.undoStack()->push(new MarkdownDelta(&doc, 0, 1, QString()));
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("bc"));
+    void replica_ids_independent() {
+        MarkoffDocument a(7);
+        MarkoffDocument b(13);
+        QCOMPARE(a.replicaId(), quint16(7));
+        QCOMPARE(b.replicaId(), quint16(13));
     }
 
-    void transactionBoundaryCoalescesUndo() {
-        MarkoffDocument doc;
-        doc.resetContent(QStringLiteral("hello"), Origin::FirstOpen);
-        const QString beforeTxn = doc.toMarkdown();
-
-        doc.undoStack()->beginMacro(QStringLiteral("two-inserts"));
-        doc.undoStack()->push(new MarkdownDelta(&doc, 5, 0, QStringLiteral(" a")));
-        doc.undoStack()->push(
-            new MarkdownDelta(&doc, doc.toMarkdown().size(), 0, QStringLiteral(" b")));
-        doc.undoStack()->endMacro();
-
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("hello a b"));
-
-        // One undo should revert the entire macro.
-        doc.undoStack()->undo();
-        QCOMPARE(doc.toMarkdown(), beforeTxn);
+    void applyFlatEdit_inserts_text() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("hello\n");
+        doc.applyFlatEdit(5, 5, "!", Origin::UserEdit);
+        QCOMPARE(fullText(doc), QByteArray("hello!"));
     }
 
-    void untransactedEditsAreIndividuallyUndoable() {
-        // Use replace-style deltas (non-pure-insert) so mergeWith never coalesces them.
-        MarkoffDocument doc;
-        doc.resetContent(QStringLiteral("_b_"), Origin::FirstOpen);
-
-        // Replace '_' at offset 0 with 'a'.
-        doc.undoStack()->push(new MarkdownDelta(&doc, 0, 1, QStringLiteral("a")));
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("ab_"));
-        // Replace '_' at offset 2 with 'c'.
-        doc.undoStack()->push(new MarkdownDelta(&doc, 2, 1, QStringLiteral("c")));
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("abc"));
-
-        doc.undoStack()->undo();
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("ab_"));
-        doc.undoStack()->undo();
-        QCOMPARE(doc.toMarkdown(), QStringLiteral("_b_"));
+    void applyFlatEdit_replaces_range() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("hello world\n");
+        // "world" = bytes 6..11 (no trailing \n in B1 buffers)
+        doc.applyFlatEdit(6, 11, "there", Origin::UserEdit);
+        QCOMPARE(fullText(doc), QByteArray("hello there"));
     }
 
-    void parseCompletesAsyncForSmallDocs() {
-        // Parsing is async via ParsePool debounce. After resetContent the parse
-        // is scheduled; spy.wait() pumps the event loop until parseUpdated fires.
-        MarkoffDocument doc;
-        doc.setCoalescingIdleMs(0);  // minimize debounce for tests
-        QSignalSpy spy(&doc, &MarkoffDocument::parseUpdated);
-        doc.resetContent(QStringLiteral("# Heading\n\nbody\n"), Origin::FirstOpen);
-        QVERIFY(spy.wait(2000));
-        QVERIFY(!doc.parseIsPending());
-        QVERIFY(doc.parsedDocument() != nullptr);
+    void applyFlatEdit_deletes_range() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("abcdef\n");
+        // Delete "cd" at bytes 2..4
+        doc.applyFlatEdit(2, 4, "", Origin::UserEdit);
+        QCOMPARE(fullText(doc), QByteArray("abef"));
     }
 
-    void parseIsRescheduledOnEdit() {
-        // After an edit the parse is invalidated (pending) and a new parseUpdated
-        // fires once the pool completes the new job.
-        MarkoffDocument doc;
-        doc.setCoalescingIdleMs(0);
-        QSignalSpy spy(&doc, &MarkoffDocument::parseUpdated);
-        doc.resetContent(QStringLiteral("# h\n"), Origin::FirstOpen);
-        QVERIFY(spy.wait(2000));  // first parse settles
+    void applyFlatEdit_emits_d2DocumentChanged() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("hello");
+        QSignalSpy spy(&doc, &MarkoffDocument::d2DocumentChanged);
+        doc.applyFlatEdit(5, 5, "!", Origin::UserEdit);
+        QCoreApplication::processEvents();
+        QCOMPARE(spy.count(), 1);
+    }
 
-        spy.clear();
-        doc.undoStack()->push(
-            new MarkdownDelta(&doc, doc.toMarkdown().size(), 0, QStringLiteral("\nmore\n")));
-        // After the delta, a new parse should be scheduled and eventually complete.
-        QVERIFY(spy.wait(2000));
-        QVERIFY(!doc.parseIsPending());
-        QVERIFY(doc.parsedDocument() != nullptr);
+    void undoD2_reverses_applyFlatEdit() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("ab\n");
+        doc.applyFlatEdit(2, 2, "c", Origin::UserEdit);
+        QCOMPARE(fullText(doc), QByteArray("abc"));
+        doc.undoD2();
+        QCOMPARE(fullText(doc), QByteArray("ab"));
+    }
+
+    void redoD2_reapplies_undone_applyFlatEdit() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("ab\n");
+        doc.applyFlatEdit(2, 2, "c", Origin::UserEdit);
+        doc.undoD2();
+        QCOMPARE(fullText(doc), QByteArray("ab"));
+        doc.redoD2();
+        QCOMPARE(fullText(doc), QByteArray("abc"));
+    }
+
+    void legacy_undo_with_no_history_returns_nullopt() {
+        MarkoffDocument doc(1);
+        QVERIFY(!doc.undo().has_value());
+    }
+
+    void anchor_at_resolves_to_offset() {
+        MarkoffDocument doc(1);
+        // resetContent seeds the legacy CRDT buffer used by anchorAt/resolveAnchor
+        doc.resetContent(QByteArray("abcdef"), Origin::FirstOpen);
+        const auto a = doc.anchorAt(3, CollabText::Crdt::Bias::Left);
+        QCOMPARE(doc.resolveAnchor(a), quint32(3));
+    }
+
+    void reset_content_first_open_clears_undo() {
+        MarkoffDocument doc(1);
+        doc.resetContent(QByteArray("old"), Origin::FirstOpen);
+        doc.resetContent(QByteArray("new"), Origin::UserRevertToSaved);
+        QVERIFY(doc.undoDepth() > 0);
+        doc.resetContent(QByteArray("new content"), Origin::FirstOpen);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("new content"));
+        QCOMPARE(doc.undoDepth(), 0);
+    }
+
+    void reset_content_emits_document_reloaded() {
+        MarkoffDocument doc(1);
+        QSignalSpy spy(&doc, &MarkoffDocument::documentReloaded);
+        doc.resetContent(QByteArray("hello"), Origin::FirstOpen);
+        QCOMPARE(spy.count(), 1);
+    }
+
+    void reset_content_user_revert_pushes_undo_entry() {
+        MarkoffDocument doc(1);
+        doc.resetContent(QByteArray("draft"), Origin::FirstOpen);
+        const int beforeDepth = doc.undoDepth();
+        doc.resetContent(QByteArray("saved"), Origin::UserRevertToSaved);
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("saved"));
+        QVERIFY(doc.undoDepth() > beforeDepth);
+        doc.undo();
+        QCOMPARE(doc.toMarkdownUtf8(), QByteArray("draft"));
+    }
+
+    void create_session_returns_owned_session() {
+        MarkoffDocument doc(1);
+        QSignalSpy spy(&doc, &MarkoffDocument::sessionCreated);
+        Session *s = doc.createSession();
+        QVERIFY(s != nullptr);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(doc.sessions().size(), 1);
+    }
+
+    void create_two_sessions_with_distinct_participants() {
+        MarkoffDocument doc(1);
+        SessionParams pa; pa.participantId = QStringLiteral("alice");
+        SessionParams pb; pb.participantId = QStringLiteral("bob");
+        Session *a = doc.createSession(pa);
+        Session *b = doc.createSession(pb);
+        QCOMPARE(doc.sessions().size(), 2);
+        QCOMPARE(doc.sessionForParticipant("alice"), a);
+        QCOMPARE(doc.sessionForParticipant("bob"),   b);
+    }
+
+    void destroy_session_removes_from_list() {
+        MarkoffDocument doc(1);
+        Session *s = doc.createSession();
+        QSignalSpy spy(&doc, &MarkoffDocument::sessionDestroyed);
+        doc.destroySession(s);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(doc.sessions().size(), 0);
     }
 };
 
-QTEST_MAIN(TstMarkoffDocument)
+int main(int argc, char *argv[]) {
+    QApplication app(argc, argv);
+    TstMarkoffDocument tc;
+    return QTest::qExec(&tc, argc, argv);
+}
 #include "tst_markoff_document.moc"

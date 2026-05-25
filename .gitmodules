@@ -1,0 +1,3 @@
+[submodule "libs/collabtext"]
+	path = libs/collabtext
+	url = git@codeberg.org:clintonthegeek/collabtext.git
