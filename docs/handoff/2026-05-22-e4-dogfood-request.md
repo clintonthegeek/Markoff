@@ -11,12 +11,15 @@ inline formatting + links work inside cells; the alignment row and
 ## How to run
 
 ```bash
-./build-dev/bin/markoff-live-app libs/markoff-live/tests/fixtures/tables_basic.md
+./build-dev/bin/markoff-live-app libs/markoff-live/tests/fixtures/tables_dogfood.md
 ```
 
-Or open any document with a pipe table (3+ columns, mixed alignment, a
-row containing `**bold**`, `*italic*`, `[[Page]]`, and
-`[click](https://example.com)`).
+The `tables_dogfood.md` fixture is organized 1-to-1 with the checklist
+below — each section in the fixture has the minimum markdown that
+exercises one checklist group, plus the adjacent paragraphs that
+boundary tests need. The older `tables_basic.md` and `tables_wrap.md`
+fixtures are still wired into the integration tests; either works for
+ad-hoc poking.
 
 ## Checklist
 
