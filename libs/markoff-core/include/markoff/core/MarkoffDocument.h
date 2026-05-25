@@ -497,6 +497,18 @@ private:
     void applyRemoteBlockAttrsMapOp(const QByteArray &payload);
     void applyRemoteFrontmatterMapOp(const QByteArray &payload);
     void applyRemoteLinkRefMapOp(const QByteArray &payload);
+    /// Reset all D2 in-memory state to the post-construction shape
+    /// (block IdList, all sibling maps, per-block buffers, proxies,
+    /// inline cache, blockLoadTimeBytes, edit-sequence tracking)
+    /// without disturbing replica id, the legacy buffer, the undo log,
+    /// or external signal connections. Used by resetContent() and
+    /// loadFromMarkdown() before they rebuild D2 from new bytes; safe
+    /// to call on a fresh document (every container is already empty).
+    ///
+    /// Single-replica only: this does NOT emit remote ops. A connected
+    /// collab peer would not see the wipe. See spec
+    /// docs/specs/2026-05-25-d2-reset-clear-design.md §6.2.
+    void wipeD2State();
     void applyRemoteFootnoteDefMapOp(const QByteArray &payload);
 
     struct Private;

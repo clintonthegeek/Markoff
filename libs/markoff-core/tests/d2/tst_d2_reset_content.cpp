@@ -12,12 +12,6 @@
 // documented as legacy-buffer-only and consumers always use
 // loadFromMarkdown."
 //
-// This test pins the "also builds D2" choice for the fresh-document
-// origin cases (FirstOpen, TestFixture). The non-fresh "wholesale
-// replace" origins (ExternalReloadClean/Resolved, UserRevertToSaved)
-// require a D2 state wipe pass that the IdList CRDT doesn't yet
-// expose cleanly; that's tracked as a follow-up.
-
 #include <QTest>
 #include <QSignalSpy>
 #include <markoff/core/MarkoffDocument.h>
@@ -34,6 +28,16 @@ private Q_SLOTS:
     void testFixture_buildsD2Blocks();
     void firstOpen_extractsFrontmatter();
     void firstOpen_iterateBlocksMatchesLoadFromMarkdown();
+    void nonFreshReset_replacePlain_noResidue();
+    void nonFreshReset_replaceHeader_noResidue();
+    void nonFreshReset_replaceUnicode_noResidue();
+    void nonFreshReset_externalReloadClean_noResidue();
+    void nonFreshReset_externalReloadResolved_noResidue();
+    void nonFreshReset_userRevertToSaved_noResidue();
+    void nonFreshReset_firstOpen_noResidue();
+    void loadFromMarkdown_calledTwice_replacesNotAppends();
+    void reset_clearsFrontmatterFromPrior();
+    void reset_clearsFootnotesFromPrior();
 };
 
 void TstD2ResetContent::firstOpen_emptyContent_zeroBlocks()
@@ -105,6 +109,94 @@ void TstD2ResetContent::firstOpen_iterateBlocksMatchesLoadFromMarkdown()
         QCOMPARE(reset.blockText(resetBlocks[i]),
                  loaded.blockText(loadedBlocks[i]));
     }
+}
+
+void TstD2ResetContent::nonFreshReset_replacePlain_noResidue()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("original content\n");
+    doc.resetContent("modified content\n", Origin::TestFixture);
+    QCOMPARE(doc.serializeForSave(), QByteArray("modified content\n"));
+}
+
+void TstD2ResetContent::nonFreshReset_replaceHeader_noResidue()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("# Note 1\n");
+    doc.resetContent("# Modified Note 1\n", Origin::TestFixture);
+    QCOMPARE(doc.serializeForSave(), QByteArray("# Modified Note 1\n"));
+}
+
+void TstD2ResetContent::nonFreshReset_replaceUnicode_noResidue()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown(QString::fromUtf8("日本語 café 🎉 résumé\n").toUtf8());
+    doc.resetContent(
+        QString::fromUtf8("日本語 café 🎉 résumé\n\nMore text\n").toUtf8(),
+        Origin::TestFixture);
+    QCOMPARE(doc.serializeForSave(),
+             QString::fromUtf8("日本語 café 🎉 résumé\n\nMore text\n").toUtf8());
+}
+
+void TstD2ResetContent::nonFreshReset_externalReloadClean_noResidue()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("original content\n");
+    doc.resetContent("modified content\n", Origin::ExternalReloadClean);
+    QCOMPARE(doc.serializeForSave(), QByteArray("modified content\n"));
+}
+
+void TstD2ResetContent::nonFreshReset_externalReloadResolved_noResidue()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("original content\n");
+    doc.resetContent("modified content\n", Origin::ExternalReloadResolved);
+    QCOMPARE(doc.serializeForSave(), QByteArray("modified content\n"));
+}
+
+void TstD2ResetContent::nonFreshReset_userRevertToSaved_noResidue()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("original content\n");
+    doc.resetContent("modified content\n", Origin::UserRevertToSaved);
+    QCOMPARE(doc.serializeForSave(), QByteArray("modified content\n"));
+}
+
+void TstD2ResetContent::nonFreshReset_firstOpen_noResidue()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("original content\n");
+    doc.resetContent("modified content\n", Origin::FirstOpen);
+    QCOMPARE(doc.serializeForSave(), QByteArray("modified content\n"));
+}
+
+void TstD2ResetContent::loadFromMarkdown_calledTwice_replacesNotAppends()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("first\n");
+    doc.loadFromMarkdown("second\n");
+    QCOMPARE(doc.serializeForSave(), QByteArray("second\n"));
+    QCOMPARE(doc.iterateBlocks().size(), size_t{1});
+}
+
+void TstD2ResetContent::reset_clearsFrontmatterFromPrior()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("---\ntitle: A\n---\n\nBody A\n");
+    doc.resetContent("Body B with no frontmatter\n",
+                     Origin::ExternalReloadClean);
+    QVERIFY(!doc.frontmatterValue("raw").has_value());
+    QCOMPARE(doc.serializeForSave(),
+             QByteArray("Body B with no frontmatter\n"));
+}
+
+void TstD2ResetContent::reset_clearsFootnotesFromPrior()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown("Text[^1]\n\n[^1]: footnote A\n");
+    doc.resetContent("Plain text\n", Origin::ExternalReloadClean);
+    // Stale footnote def must not survive into the serialized output.
+    QCOMPARE(doc.serializeForSave(), QByteArray("Plain text\n"));
 }
 
 QTEST_GUILESS_MAIN(TstD2ResetContent)

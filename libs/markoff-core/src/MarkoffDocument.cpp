@@ -731,19 +731,10 @@ void MarkoffDocument::resetContent(const QByteArray &newContent, Origin origin)
         Q_UNREACHABLE();
         break;
     }
-    // Build D2 per-block state from the new content so view bindings see the
-    // blocks. Without this, iterateBlocks() returns empty after a reset and
-    // any live view bound to this document renders nothing. Surfaced 2026-05-20
-    // by Corbomite Vault's first-open path; see
-    // docs/handoff/2026-05-20-port-first-session-recap.md §"Open Markoff-side
-    // issues" #1 and tst_d2_reset_content.
-    //
-    // Scope: this populates D2 on top of any pre-existing D2 state without
-    // clearing first. Correct for fresh-document origins (FirstOpen,
-    // TestFixture). For the wholesale-replace origins (ExternalReload*,
-    // UserRevertToSaved) on a non-fresh document, the right behavior is a
-    // full D2 wipe before rebuild; that requires IdList clear semantics the
-    // CRDT doesn't yet expose. Tracked as a follow-up.
+
+    // Wipe D2 state before rebuilding so a reset on a non-fresh document
+    // doesn't double its content. Safe on a fresh document (no-op-ish).
+    wipeD2State();
     buildD2FromBytes(newContent);
 
     Q_EMIT documentReloaded();
@@ -1819,6 +1810,38 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
     }
 }
 
+void MarkoffDocument::wipeD2State()
+{
+    // Dispose proxies via deleteLater so any in-flight signal
+    // emission unwinds before destruction. Each BufferProxy is
+    // parented to `this`; deleteLater() is the safe disposal.
+    for (auto it = d->bufferProxies.cbegin();
+         it != d->bufferProxies.cend(); ++it) {
+        if (it.value()) it.value()->deleteLater();
+    }
+    d->bufferProxies.clear();
+
+    // Plain Qt containers — drop in bulk.
+    d->blockBuffers.clear();
+    d->blockLoadTimeBytes.clear();
+    d->blockEditSequences.clear();
+    d->touchedSinceLoad.clear();
+    d->structuralEditSequence = 0;
+    if (d->inlineCache) d->inlineCache->clear();
+
+    // CRDT structures — non-emitting clears.
+    d->idList.local_clear();
+    d->kindTagMap.local_clear();
+    d->blockAttrsMap.local_clear();
+    d->frontmatterMap.local_clear();
+    d->linkRefMap.local_clear();
+    d->footnoteDefMap.local_clear();
+
+    // Intentionally preserved: d->replicaId, d->buffer (legacy),
+    // d->undoLog, d->nextBlockId (so freshly-allocated BlockIds
+    // remain globally unique across a document's lifetime).
+}
+
 void MarkoffDocument::buildD2FromBytes(const QByteArray &src)
 {
     // 1. Convert and extract frontmatter / footnotes
@@ -1850,6 +1873,7 @@ void MarkoffDocument::buildD2FromBytes(const QByteArray &src)
 
 void MarkoffDocument::loadFromMarkdown(const QByteArray &src)
 {
+    wipeD2State();
     buildD2FromBytes(src);
 
     // documentChanged() fires synchronously here so connected views can update
