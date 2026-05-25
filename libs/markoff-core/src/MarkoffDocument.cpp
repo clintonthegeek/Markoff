@@ -1829,6 +1829,12 @@ void MarkoffDocument::wipeD2State()
     d->structuralEditSequence = 0;
     if (d->inlineCache) d->inlineCache->clear();
 
+    // Drop queued remote ops referencing now-dead BlockIds (defensive
+    // local hygiene; full collab-reset semantics are out of scope, see
+    // spec §6.2).
+    d->pendingBufferOps.clear();
+    d->pendingOpPayloads.clear();
+
     // CRDT structures — non-emitting clears.
     d->idList.local_clear();
     d->kindTagMap.local_clear();

@@ -486,9 +486,13 @@ private:
     /// materialize D2 per-block state. Resets load-baseline trackers
     /// (`blockEditSequences`, `structuralEditSequence`, `touchedSinceLoad`,
     /// `inlineCache`). Does NOT emit signals — callers do that. Does NOT
-    /// touch the legacy `d->buffer`. Does NOT wipe pre-existing D2 state;
-    /// safe only when called on a fresh document or after an external
-    /// reload semantic where prior blocks have already been disposed of.
+    /// touch the legacy `d->buffer`.
+    ///
+    /// Callers are responsible for calling `wipeD2State()` first to drop any
+    /// pre-existing D2 state. Both current call sites (`resetContent`,
+    /// `loadFromMarkdown`) do this unconditionally. Calling this without a
+    /// prior `wipeD2State()` on a non-fresh document will append the new
+    /// content on top of the old, doubling the document.
     void buildD2FromBytes(const QByteArray &src);
     BlockId allocateD2BlockId() noexcept;
     void applyRemoteBufferOp(Markoff::BlockId blockId, const QByteArray &payload);
@@ -497,6 +501,7 @@ private:
     void applyRemoteBlockAttrsMapOp(const QByteArray &payload);
     void applyRemoteFrontmatterMapOp(const QByteArray &payload);
     void applyRemoteLinkRefMapOp(const QByteArray &payload);
+    void applyRemoteFootnoteDefMapOp(const QByteArray &payload);
     /// Reset all D2 in-memory state to the post-construction shape
     /// (block IdList, all sibling maps, per-block buffers, proxies,
     /// inline cache, blockLoadTimeBytes, edit-sequence tracking)
@@ -509,7 +514,6 @@ private:
     /// collab peer would not see the wipe. See spec
     /// docs/specs/2026-05-25-d2-reset-clear-design.md §6.2.
     void wipeD2State();
-    void applyRemoteFootnoteDefMapOp(const QByteArray &payload);
 
     struct Private;
     std::unique_ptr<Private> d;

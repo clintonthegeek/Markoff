@@ -38,6 +38,7 @@ private Q_SLOTS:
     void loadFromMarkdown_calledTwice_replacesNotAppends();
     void reset_clearsFrontmatterFromPrior();
     void reset_clearsFootnotesFromPrior();
+    void reset_clearsLinkRefsFromPrior();
 };
 
 void TstD2ResetContent::firstOpen_emptyContent_zeroBlocks()
@@ -196,6 +197,16 @@ void TstD2ResetContent::reset_clearsFootnotesFromPrior()
     doc.loadFromMarkdown("Text[^1]\n\n[^1]: footnote A\n");
     doc.resetContent("Plain text\n", Origin::ExternalReloadClean);
     // Stale footnote def must not survive into the serialized output.
+    QCOMPARE(doc.serializeForSave(), QByteArray("Plain text\n"));
+}
+
+void TstD2ResetContent::reset_clearsLinkRefsFromPrior()
+{
+    MarkoffDocument doc(1);
+    // Link-ref definition appears at the end of a CommonMark document.
+    doc.loadFromMarkdown("Click [here][example].\n\n[example]: https://example.com\n");
+    doc.resetContent("Plain text\n", Origin::ExternalReloadClean);
+    // Stale link-ref must not survive into the serialized output.
     QCOMPARE(doc.serializeForSave(), QByteArray("Plain text\n"));
 }
 
