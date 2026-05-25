@@ -1,4 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+// (c) 2026 Markoff contributors, GPL-3.0-or-later.
+//
+// Unit tests for Markoff::CausalLwwMap — including local_clear(), the
+// non-emitting single-replica reset primitive used by
+// MarkoffDocument::wipeD2State() to drop all entries from a sibling map
+// when the canonical content is replaced from outside the CRDT.
+//
+// Spec: docs/specs/2026-05-25-d2-reset-clear-design.md §3.2.
 #include <QTest>
 #include <markoff/core/CausalLwwMap.h>
 
@@ -17,6 +25,11 @@ private slots:
     void compact_dropsEntriesBelowWatermark();
     void applyRemote_acceptsForeignWrite();
     void applyRemote_doesNotEnterLocalUndoStack();
+    // local_clear() — non-emitting single-replica reset (Phase C)
+    void localClear_emptiesTheMap();
+    void localClear_preservesClockMonotonicity();
+    void localClear_doesNotFireChangeCallback();
+    void localClear_clearsRedoStack();
 };
 
 void TstCausalLwwMap::emptyMap_getReturnsNullopt() {
@@ -145,6 +158,68 @@ void TstCausalLwwMap::applyRemote_doesNotEnterLocalUndoStack() {
     map.undo();  // undoes only set(1, "local")
     QCOMPARE(map.get(1).has_value(), false);
     QCOMPARE(map.get(2).value(), QStringLiteral("remote")); // remote write survives
+}
+
+// --- local_clear() tests (Phase C: falsify then implement) ---
+
+void TstCausalLwwMap::localClear_emptiesTheMap()
+{
+    Markoff::CausalLwwMap<QByteArray, QByteArray> map(/*replicaId=*/1);
+    map.setWithNextStamp("a", "1");
+    map.setWithNextStamp("b", "2");
+    QVERIFY(map.get("a").has_value());
+    QVERIFY(map.get("b").has_value());
+
+    map.local_clear();
+
+    QVERIFY(!map.get("a").has_value());
+    QVERIFY(!map.get("b").has_value());
+
+    int liveCount = 0;
+    map.forEachValue([&](const QByteArray &, const QByteArray &){ ++liveCount; });
+    QCOMPARE(liveCount, 0);
+}
+
+void TstCausalLwwMap::localClear_preservesClockMonotonicity()
+{
+    Markoff::CausalLwwMap<QByteArray, QByteArray> map(/*replicaId=*/1);
+    map.setWithNextStamp("a", "1");
+    const Markoff::CausalStamp before = map.currentStamp();
+
+    map.local_clear();
+
+    map.setWithNextStamp("a", "2");
+    const Markoff::CausalStamp after = map.currentStamp();
+
+    QVERIFY(before < after);
+}
+
+void TstCausalLwwMap::localClear_doesNotFireChangeCallback()
+{
+    Markoff::CausalLwwMap<QByteArray, QByteArray> map(/*replicaId=*/1);
+    map.setWithNextStamp("a", "1");
+    map.setWithNextStamp("b", "2");
+
+    int calls = 0;
+    map.setOnChange([&](const QByteArray &, std::optional<QByteArray>,
+                        std::optional<QByteArray>){ ++calls; });
+
+    map.local_clear();
+
+    QCOMPARE(calls, 0);
+}
+
+void TstCausalLwwMap::localClear_clearsRedoStack()
+{
+    Markoff::CausalLwwMap<QByteArray, QByteArray> map(/*replicaId=*/1);
+    map.setWithNextStamp("a", "1");
+    map.undo();
+    // After undo, redo stack has one entry; calling redo would restore "a".
+
+    map.local_clear();
+    map.redo();  // must be a no-op; no crash, no resurrected entry.
+
+    QVERIFY(!map.get("a").has_value());
 }
 
 QTEST_GUILESS_MAIN(TstCausalLwwMap)

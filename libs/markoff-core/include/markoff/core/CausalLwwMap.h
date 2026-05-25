@@ -163,6 +163,22 @@ public:
         }
     }
 
+    /// Single-replica reset primitive. Drops all entries (live +
+    /// tombstoned), the undo stack, and the redo stack. Preserves
+    /// replicaId, the local counter, and the registered onChange
+    /// callback. Does NOT fire onChange. For use when the canonical
+    /// content is replaced from outside the CRDT (file reload,
+    /// revert-to-saved, programmatic content swap); calling on a
+    /// connected collab session is allowed but remote peers will not
+    /// see the clear.
+    void local_clear() noexcept {
+        m_entries.clear();
+        m_undoStack.clear();
+        m_redoStack.clear();
+        // Intentionally preserved: m_replicaId, m_localCounter,
+        // m_onChange. Intentionally not fired: m_onChange.
+    }
+
     // Apply a write from a remote replica — does NOT enter the local undo stack.
     void applyRemote(const RemoteOp &op) {
         auto it = m_entries.find(op.key);
