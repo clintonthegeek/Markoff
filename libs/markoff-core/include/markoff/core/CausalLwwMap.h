@@ -171,6 +171,8 @@ public:
     /// revert-to-saved, programmatic content swap); calling on a
     /// connected collab session is allowed but remote peers will not
     /// see the clear.
+    /// After clearing, applyRemote() accepts any remote op regardless of
+    /// stamp age, since there are no surviving entries to compare against.
     void local_clear() noexcept {
         m_entries.clear();
         m_undoStack.clear();

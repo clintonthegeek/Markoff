@@ -25,11 +25,13 @@ private slots:
     void compact_dropsEntriesBelowWatermark();
     void applyRemote_acceptsForeignWrite();
     void applyRemote_doesNotEnterLocalUndoStack();
-    // local_clear() — non-emitting single-replica reset (Phase C)
+    // local_clear() — non-emitting single-replica reset (spec §3.2)
     void localClear_emptiesTheMap();
     void localClear_preservesClockMonotonicity();
     void localClear_doesNotFireChangeCallback();
     void localClear_clearsRedoStack();
+    void localClear_clearsUndoStack();
+    void localClear_callbackSurvivesForSubsequentSets();
 };
 
 void TstCausalLwwMap::emptyMap_getReturnsNullopt() {
@@ -160,7 +162,7 @@ void TstCausalLwwMap::applyRemote_doesNotEnterLocalUndoStack() {
     QCOMPARE(map.get(2).value(), QStringLiteral("remote")); // remote write survives
 }
 
-// --- local_clear() tests (Phase C: falsify then implement) ---
+// --- local_clear() tests (spec §3.2: falsify then implement) ---
 
 void TstCausalLwwMap::localClear_emptiesTheMap()
 {
@@ -220,6 +222,34 @@ void TstCausalLwwMap::localClear_clearsRedoStack()
     map.redo();  // must be a no-op; no crash, no resurrected entry.
 
     QVERIFY(!map.get("a").has_value());
+}
+
+void TstCausalLwwMap::localClear_clearsUndoStack()
+{
+    Markoff::CausalLwwMap<QByteArray, QByteArray> map(/*replicaId=*/1);
+    map.setWithNextStamp("a", "1");
+    // The set above pushed an entry onto the undo stack.
+
+    map.local_clear();
+
+    map.undo();  // must be a no-op (undo stack was cleared).
+    QVERIFY(!map.get("a").has_value());
+}
+
+void TstCausalLwwMap::localClear_callbackSurvivesForSubsequentSets()
+{
+    Markoff::CausalLwwMap<QByteArray, QByteArray> map(/*replicaId=*/1);
+    int calls = 0;
+    map.setOnChange([&](const QByteArray &, std::optional<QByteArray>,
+                        std::optional<QByteArray>){ ++calls; });
+    map.setWithNextStamp("a", "1");
+    QCOMPARE(calls, 1);  // baseline: callback wired up
+
+    map.local_clear();
+    QCOMPARE(calls, 1);  // did not fire during clear
+
+    map.setWithNextStamp("a", "2");
+    QCOMPARE(calls, 2);  // callback survived the clear
 }
 
 QTEST_GUILESS_MAIN(TstCausalLwwMap)
