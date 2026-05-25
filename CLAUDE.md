@@ -13,7 +13,7 @@
 > | Repo | Branch | State |
 > |------|--------|-------|
 > | Markoff (this repo) | `master` | v0.6.x line. Frozen — `exploration/new-foundation` will eventually merge HERE. |
-> | Markoff (this repo) | `exploration/new-foundation` | **Active development branch.** D-arc + E-arc rebuild. ~1000 commits ahead of master. Tag held: `v0.7.0-e3a` (dogfood pending). |
+> | Markoff (this repo) | `exploration/new-foundation` | **Active development branch.** D-arc + E-arc rebuild. ~1000 commits ahead of master. Tag `v0.7.0-e3a` to be created after dogfood signoff. |
 > | Corbomite | `master` | Pinned to Markoff `master` tip (`2b7b3e7`). Stable, no port work. |
 > | Corbomite | `port/foundation-exploration` | **Active port branch.** Pinned to Markoff `exploration/new-foundation` HEAD. Compiles + launches + renders docs (degraded). |
 >
@@ -72,7 +72,7 @@
 >
 > **Prior closed items:** E2.6 tagged `v0.7.0-e2.6`, cursor architecture
 > (tiers 1–4c), QML integration harness, B1 buffer convention, code review
-> pass, E3a wikilinks (`109d3d3`; dogfood pending — tag `v0.7.0-e3a` held).
+> pass, E3a wikilinks (`109d3d3`; dogfood pending — tag `v0.7.0-e3a` to be created after signoff).
 >
 > **Port-driven items closed since 2026-05-20 (all four open items resolved):**
 > 1. ✅ **Find UI wiring** — Corbomite `fa72b4ee..7f975120` executed the
