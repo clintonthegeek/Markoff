@@ -91,6 +91,13 @@
 >    replace origins on a non-fresh doc still need a D2 wipe pass before
 >    rebuild (the IdList CRDT lacks `clear()` semantics yet); tracked in the
 >    test docstring + `resetContent` comment.
+> 5. ✅ **D2 reset/reload doubling** — closed 2026-05-25 by
+>    `wipeD2State()` (Markoff `f48525d`) + IdList/CausalLwwMap
+>    `local_clear()` primitives. Spec
+>    `docs/specs/2026-05-25-d2-reset-clear-design.md`. Closes
+>    the caveat previously documented at
+>    `MarkoffDocument.cpp:741-746` and the
+>    `tst_d2_reset_content.cpp` test docstring.
 >
 > **Currently open port-driven work:** none surfaced. Next port pressure
 > drives the next micro-spec — until then, opportunistic cleanup from the
