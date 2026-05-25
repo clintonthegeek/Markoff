@@ -71,9 +71,12 @@ fix.
 
 ## 3. Architecture
 
-Two new primitives in collabtext; one new helper in markoff-core.
+One new primitive in collabtext (`IdList`), one new primitive in
+markoff-core (`CausalLwwMap`, which is an in-tree template — `include/
+markoff/core/CausalLwwMap.h`, **not** a collabtext type), one new helper
+on `MarkoffDocument`.
 
-### 3.1 collabtext: `local_clear()` on the two CRDT classes
+### 3.1 New primitive: `IdList::local_clear()` (collabtext)
 
 **`CollabText::Crdt::IdList::local_clear()`** — single-replica reset
 primitive.
@@ -87,12 +90,18 @@ primitive.
   `m_on_local_op` / `m_on_change` callbacks. (Callers that need to
   notify downstream listeners do so explicitly after the clear.)
 
-**`CollabText::Crdt::CausalLwwMap<K,V>::local_clear()`** — same
-semantics for the LWW map.
+### 3.2 New primitive: `CausalLwwMap<K,V>::local_clear()` (markoff-core)
+
+**`Markoff::CausalLwwMap<K,V>::local_clear()`** — same semantics for the
+LWW map. Lives in markoff-core (header-only template at
+`include/markoff/core/CausalLwwMap.h`); no collabtext change required
+for this one.
 
 - Drops all entries (live + tombstoned), clears the undo stack.
 - Leaves `replica_id` / clock untouched.
 - Does **not** fire `m_onChange`.
+
+### 3.1/3.2 contract — applies to both
 
 Both methods are documented as **for use when the canonical content is
 replaced from outside the CRDT** (file reload, revert-to-saved,
@@ -101,7 +110,7 @@ is allowed but the downstream effect on remote peers is undefined — peers
 will not see the clear. Reconciling reset with collab is a higher-layer
 concern (see §6 out-of-scope).
 
-### 3.2 markoff-core: `MarkoffDocument::wipeD2State()`
+### 3.3 markoff-core: `MarkoffDocument::wipeD2State()`
 
 Private helper on `MarkoffDocument`. Performs the equivalent of "make
 this document instance behave like a freshly-constructed one" without
@@ -140,7 +149,7 @@ Sequence:
    a stale `BlockId` held by a view) is ever resolved against the
    document.
 
-### 3.3 Data flow after the fix
+### 3.4 Data flow after the fix
 
 ```
 resetContent(B, origin):
@@ -334,22 +343,27 @@ trivial — fold into the implementation work.
 
 ## 7. Cross-repo PR sequence
 
-The fix spans collabtext (new CRDT primitives) and Markoff (new helper +
-acceptance tests). Submodule pin discipline:
+The fix spans collabtext (one new `IdList` primitive) and Markoff (new
+`CausalLwwMap` primitive + new `wipeD2State()` helper + acceptance
+tests). Submodule pin discipline:
 
-1. **collabtext:** branch, add `local_clear()` to `IdList` and
-   `CausalLwwMap`, add unit tests, run collabtext's own test suite,
-   commit, push to `master` on Codeberg.
+1. **collabtext:** branch, add `local_clear()` to `IdList`, add unit
+   test, run collabtext's own test suite, commit, push to `master` on
+   Codeberg.
 2. **Markoff:** bump `libs/collabtext` submodule pin to the new
    collabtext tip in a dedicated commit (`chore(submodule): bump
-   collabtext to <sha> for local_clear`).
-3. **Markoff:** in a second commit, add `wipeD2State()` + acceptance
-   tests + comment cleanup.
-4. **Corbomite:** re-pins Markoff per its own steer; updates three
+   collabtext to <sha> for IdList::local_clear`).
+3. **Markoff:** add `CausalLwwMap::local_clear()` + unit test in its
+   own commit.
+4. **Markoff:** add `wipeD2State()` + acceptance tests + comment
+   cleanup.
+5. **Corbomite:** re-pins Markoff per its own steer; updates three
    integration tests for the now-correct (un-doubled) round-trip.
 
-The Markoff side is two commits, not squashed — the submodule bump is
-isolated so a bisect can identify the collabtext API change cleanly.
+The Markoff side is three commits, not squashed — the submodule bump is
+isolated so a bisect can identify the collabtext API change cleanly, and
+the LWW primitive lands separately from its caller so its falsifiability
+test is independently visible.
 
 ---
 
