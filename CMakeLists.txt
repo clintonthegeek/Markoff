@@ -49,9 +49,15 @@ endif()
 
 add_subdirectory(libs/markoff-parser)
 
-# collabtext — CRDT engine, sibling library symlinked from /home/clinton/dev/collabtext.
+# collabtext — CRDT engine, vendored as a git submodule (git@codeberg.org:clintonthegeek/collabtext.git).
 # Defensive guard against double-add by parent projects.
 if(NOT TARGET collabtext)
+    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/collabtext/CMakeLists.txt")
+        message(FATAL_ERROR
+            "libs/collabtext is empty — the collabtext submodule has not been initialized.\n"
+            "Run: git submodule update --init --recursive\n"
+            "(Requires SSH access to Codeberg; see ~/dev/CLAUDE.md.)")
+    endif()
     add_subdirectory(libs/collabtext)
 endif()
 
