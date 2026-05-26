@@ -1,4 +1,4 @@
-# Markoff (exploration/new-foundation branch)
+# Markoff
 
 > **2026-05-20 — Port-first phase ACTIVE. Corbomite renders foundation-exploration content (milestone hit late session).**
 >
@@ -8,31 +8,17 @@
 > producing real fixes against real consumer pressure. Full session recap:
 > [`docs/handoff/2026-05-20-port-first-session-recap.md`](docs/handoff/2026-05-20-port-first-session-recap.md).
 >
-> **Branch story across both repos:**
+> **Branch story across both repos (post-merge, 2026-05-25):**
 >
 > | Repo | Branch | State |
 > |------|--------|-------|
-> | Markoff (this repo) | `master` | v0.6.x line. Frozen — `exploration/new-foundation` will eventually merge HERE. |
-> | Markoff (this repo) | `exploration/new-foundation` | **Active development branch.** D-arc + E-arc rebuild. ~1000 commits ahead of master. Tag `v0.7.0-e3a` to be created after dogfood signoff. |
-> | Corbomite | `master` | Pinned to Markoff `master` tip (`2b7b3e7`). Stable, no port work. |
-> | Corbomite | `port/foundation-exploration` | **Active port branch.** Pinned to Markoff `exploration/new-foundation` HEAD. Compiles + launches + renders docs (degraded). |
+> | Markoff (this repo) | `master` | **Active development branch.** Foundation rebuild merged from `exploration/new-foundation` at `3c7afa9` (2026-05-25). All ongoing work happens here. |
+> | Corbomite | `master` | Active. Re-pinned to Markoff `master` post-merge per `docs/handoff/2026-05-25-to-corbomite-merge-complete.md`. |
 >
-> **Eventual merge plan (decided 2026-05-20):**
->
-> 1. Complete Corbomite port on `port/foundation-exploration` — port features one
->    at a time as evidence-driven micro-specs against this branch.
-> 2. When Corbomite port is functionally complete (find, source, embeds/tags/
->    callouts, table editor minimum), draft a small evidence-driven `markoff-core`
->    freeze spec based on actual port pressure (NOT the speculative draft below).
-> 3. Tag Markoff at that point (probably `v0.7.0-freeze`).
-> 4. Merge Markoff `exploration/new-foundation` → Markoff `master` (large merge —
->    retires old leaves wholesale; new layout becomes canonical).
-> 5. Merge Corbomite `port/foundation-exploration` → Corbomite `master`. Submodule
->    pin tracks the new Markoff master tip.
->
-> The order matters: Markoff merges first so Corbomite master's submodule pin
-> always points at a valid Markoff commit. Reversing the order would leave
-> Corbomite master with a Markoff pin nobody else can resolve.
+> The 2026-05-20 "eventual merge plan" has been executed: Markoff
+> `exploration/new-foundation` → `master` landed at `3c7afa9`, retiring the old
+> four-leaf layout wholesale, and Corbomite's `port/foundation-exploration` has
+> been merged + re-pinned. Both repos are single-line-of-development again.
 >
 > **Port-driven Markoff commits this session (2026-05-20, all on this branch):**
 >
@@ -416,7 +402,9 @@ was deleted in D4.
 
 ## Branch posture
 
-`exploration/new-foundation` diverges substantially from `master`. Don't
-attempt to merge the old leaves back — they're intentionally gone. If
-you need to preserve a piece of behavior from the deleted leaves,
-re-implement it inside the new layout.
+Master is the active branch (single line of development). The old four-leaf
+layout (`markoff-core`, `markoff-live`, `markoff-reading`, `markoff-source`)
+was retired wholesale during the `exploration/new-foundation` → `master`
+merge at `3c7afa9` (2026-05-25); the new layout (foundation library + two
+canonical view leaves) is canonical. Don't attempt to resurrect the old
+leaves — if you need behavior from them, re-implement it in the new layout.
