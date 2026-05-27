@@ -78,6 +78,13 @@ public:
     YamlValue setMap(const QString &key);
     YamlValue setSeqNode(const QString &key);
     void remove(const QString &key);
+
+    /// Deep-copy `src`'s subtree (any kind, nested arbitrarily) into this map
+    /// under `key`, appended as the last child so a fresh build preserves call
+    /// order. Replaces `key` if it already exists. Byte-faithful, unlike the
+    /// scalar setters. `this` is coerced to a map.
+    void setChildFrom(const QString &key, const YamlValue &src);
+
     YamlValue appendMap();
     void appendString(const QString &value);
 

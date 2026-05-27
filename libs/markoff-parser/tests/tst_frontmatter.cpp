@@ -36,6 +36,10 @@ private slots:
 
     // Legacy compatibility
     void legacyApi();
+
+    // setChildFrom tests
+    void testSetChildFromCopiesNestedMapVerbatim();
+    void testSetChildFromReplacesExistingKey();
 };
 
 void TestFrontmatter::standardFrontmatter()
@@ -320,6 +324,37 @@ void TestFrontmatter::legacyApi()
     QCOMPARE(props[0].value.toString(), QStringLiteral("My Note"));
     QCOMPARE(props[1].key, QStringLiteral("tags"));
     QCOMPARE(props[1].value.toStringList(), QStringList({QStringLiteral("foo"), QStringLiteral("bar")}));
+}
+
+void TestFrontmatter::testSetChildFromCopiesNestedMapVerbatim()
+{
+    using namespace Markoff;
+    QString err;
+    YamlValue src = YamlValue::parse(QStringLiteral(
+        "outer:\n  inner: value\n  count: 3\n  nested:\n    deep: yes\n"), &err);
+    QVERIFY(err.isEmpty());
+
+    YamlValue dst = YamlValue::emptyMap();
+    dst.setString(QStringLiteral("first"), QStringLiteral("a"));
+    dst.setChildFrom(QStringLiteral("outer"), src.get(QStringLiteral("outer")));
+
+    // Verbatim: the copied subtree stringifies identically to the source's.
+    QCOMPARE(dst.get(QStringLiteral("outer")).stringify(),
+             src.get(QStringLiteral("outer")).stringify());
+    // Appended last → order is first, then outer.
+    QCOMPARE(dst.keys(), QStringList({QStringLiteral("first"), QStringLiteral("outer")}));
+}
+
+void TestFrontmatter::testSetChildFromReplacesExistingKey()
+{
+    using namespace Markoff;
+    YamlValue dst = YamlValue::emptyMap();
+    dst.setString(QStringLiteral("k"), QStringLiteral("old"));
+    YamlValue src = YamlValue::parse(QStringLiteral("k:\n  - x\n  - y\n"));
+    dst.setChildFrom(QStringLiteral("k"), src.get(QStringLiteral("k")));
+    QCOMPARE(dst.keys(), QStringList({QStringLiteral("k")}));
+    QVERIFY(dst.get(QStringLiteral("k")).isSeq());
+    QCOMPARE(dst.get(QStringLiteral("k")).size(), 2);
 }
 
 QTEST_APPLESS_MAIN(TestFrontmatter)

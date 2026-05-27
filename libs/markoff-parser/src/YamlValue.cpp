@@ -451,6 +451,28 @@ void YamlValue::remove(const QString &key)
         d->tree->remove(ch);
 }
 
+void YamlValue::setChildFrom(const QString &key, const YamlValue &src)
+{
+    ensureMap(d->tree, d->nodeId);
+    if (!src.d || !src.d->tree || src.d->nodeId == ryml::NONE) {
+        setNull(key);
+        return;
+    }
+    QByteArray keyUtf8 = key.toUtf8();
+    ryml::csubstr keyView = d->tree->copy_to_arena(qstringToCsubstr(keyUtf8));
+
+    // Replace any existing key so position is controlled by call order.
+    ryml::id_type existing = d->tree->find_child(d->nodeId, keyView);
+    if (existing != ryml::NONE)
+        d->tree->remove(existing);
+
+    // Append a verbatim deep copy of src as the last child, then stamp the key.
+    ryml::id_type after = d->tree->last_child(d->nodeId);  // NONE if empty → first
+    ryml::id_type dup =
+        d->tree->duplicate(src.d->tree.get(), src.d->nodeId, d->nodeId, after);
+    d->tree->set_key(dup, keyView);
+}
+
 YamlValue YamlValue::appendMap()
 {
     if (!nodeValid(d->tree, d->nodeId)) return {};
