@@ -26,9 +26,15 @@ LinkInteraction::~LinkInteraction() = default;
 
 bool LinkInteraction::eventFilter(QObject *obj, QEvent *event) {
     if (m_edit && obj == m_edit->viewport()) {
-        if (event->type() == QEvent::MouseButtonPress) {
+        switch (event->type()) {
+        case QEvent::MouseButtonPress:
             handlePress(static_cast<QMouseEvent *>(event));
             // Don't consume — let the editor still place the caret.
+            break;
+        case QEvent::MouseMove:
+            handleMove(static_cast<QMouseEvent *>(event));
+            break;
+        default: break;
         }
     }
     return QObject::eventFilter(obj, event);
@@ -84,8 +90,23 @@ void LinkInteraction::handlePress(QMouseEvent *e) {
     if (act) m_service->activate(*act);
 }
 
-void LinkInteraction::handleMove(QMouseEvent *) {
-    // Implemented in Task 11.
+void LinkInteraction::handleMove(QMouseEvent *e) {
+    if (!m_service || !m_doc) return;
+    QTextCursor c = m_edit->cursorForPosition(e->pos());
+    const auto act = resolveLinkAt(c.position(), e->modifiers());
+    const QString newRaw = act ? act->rawText : QString();
+    if (newRaw == m_currentHoveredRawText) return;
+
+    if (!m_currentHoveredRawText.isEmpty()) {
+        m_service->notifyHoverLeft(m_currentHoveredRawText);
+    }
+    m_currentHoveredRawText = newRaw;
+    if (act) {
+        m_service->notifyHover(*act, e->globalPosition().toPoint());
+        m_edit->viewport()->setCursor(Qt::PointingHandCursor);
+    } else {
+        m_edit->viewport()->setCursor(Qt::IBeamCursor);
+    }
 }
 
 void LinkInteraction::handleLeave() {
