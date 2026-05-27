@@ -100,6 +100,9 @@ add_library(markoff_core STATIC
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
     src/Cmd/D2.cpp
+    # --- Detail/ (shared internal helpers) ---
+    include/markoff/core/Detail/FlatBlockResolve.h
+    src/Detail/FlatBlockResolve.cpp
     # --- MarkdownView polymorphic base (Task 4.5) ---
     include/markoff/core/MarkdownView.h
     src/MarkdownView.cpp

@@ -11,6 +11,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
+#include <markoff/core/Detail/FlatBlockResolve.h>
 
 #include <QKeyEvent>
 #include <QPalette>
@@ -214,72 +215,6 @@ void Editor::recomputeGutterWidth() {
 
 namespace {
 
-struct BlockHit {
-    Markoff::BlockId blockId;
-    quint32 byteInBlock;
-    int blockIndex;
-};
-
-// Resolve a sep-view byte offset to (blockId, byteInBlock). When sepOff
-// lands at a block boundary, biasForward picks the next block (start) vs
-// the previous (end).
-std::optional<BlockHit> findBlockAtSepByte(const Markoff::MarkoffDocument *doc,
-                                           quint32 sepOff,
-                                           bool biasForward) {
-    const auto blocks = doc->iterateBlocks();
-    if (blocks.empty()) return std::nullopt;
-    constexpr quint32 SEP_LEN = 2;
-    quint32 sepCursor = 0;
-    for (size_t i = 0; i < blocks.size(); ++i) {
-        const quint32 sz = static_cast<quint32>(doc->blockText(blocks[i]).size());
-        const quint32 blkEnd = sepCursor + sz;
-        if (sepOff < blkEnd) {
-            return BlockHit{blocks[i], sepOff - sepCursor, static_cast<int>(i)};
-        }
-        if (sepOff == blkEnd) {
-            if (!biasForward || i + 1 == blocks.size()) {
-                return BlockHit{blocks[i], sz, static_cast<int>(i)};
-            }
-            const size_t next = i + 1;
-            return BlockHit{blocks[next], 0, static_cast<int>(next)};
-        }
-        sepCursor = blkEnd;
-        if (i + 1 < blocks.size()) sepCursor += SEP_LEN;
-    }
-    return std::nullopt;
-}
-
-struct BlockSlice {
-    Markoff::BlockId blockId;
-    quint32 byteLo;   // start byte in block (inclusive)
-    quint32 byteHi;   // end byte in block (exclusive)
-};
-
-// Slice a sep-view byte range [sepLo, sepHi) into per-block sub-ranges.
-// Empty ranges (sepLo == sepHi) yield no slices; the cursor case uses
-// findBlockAtSepByte instead.
-QList<BlockSlice> sliceByBlocks(const Markoff::MarkoffDocument *doc,
-                                quint32 sepLo, quint32 sepHi) {
-    QList<BlockSlice> out;
-    if (sepLo >= sepHi) return out;
-    const auto blocks = doc->iterateBlocks();
-    constexpr quint32 SEP_LEN = 2;
-    quint32 sepCursor = 0;
-    for (size_t i = 0; i < blocks.size(); ++i) {
-        const quint32 sz = static_cast<quint32>(doc->blockText(blocks[i]).size());
-        const quint32 blkEnd = sepCursor + sz;
-        const quint32 sLo = std::max(sepLo, sepCursor);
-        const quint32 sHi = std::min(sepHi, blkEnd);
-        if (sLo < sHi) {
-            out.append({blocks[i], sLo - sepCursor, sHi - sepCursor});
-        }
-        sepCursor = blkEnd;
-        if (i + 1 < blocks.size()) sepCursor += SEP_LEN;
-        if (sepCursor >= sepHi) break;
-    }
-    return out;
-}
-
 // Toggle `delim` wrap around the QPlainTextEdit's selection (or insert an
 // empty pair at the cursor), mediated through the block-aware d2 API.
 //
@@ -308,7 +243,7 @@ void wrapToggle(QPlainTextEdit *te,
         const int qtPos = c.position();
         const quint32 sepByte =
             Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtPos);
-        auto hit = findBlockAtSepByte(doc, sepByte, /*biasForward=*/true);
+        auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepByte, /*biasForward=*/true);
         if (!hit) {
             // Empty document: applyFlatEdit auto-creates a paragraph block.
             doc->applyFlatEdit(0, 0, delim + delim, Markoff::Origin::UserEdit);
@@ -331,7 +266,7 @@ void wrapToggle(QPlainTextEdit *te,
         Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtStart);
     const quint32 sepEnd =
         Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtEnd);
-    const QList<BlockSlice> slices = sliceByBlocks(doc, sepStart, sepEnd);
+    const QList<Markoff::Detail::BlockSlice> slices = Markoff::Detail::sliceByBlocks(doc, sepStart, sepEnd);
     if (slices.isEmpty()) return;
 
     enum class Mode { SurroundedOutside, InsideMarkers, Wrap };
@@ -348,7 +283,7 @@ void wrapToggle(QPlainTextEdit *te,
         // ones' bytes (each slice is intra-block, so this matters only in
         // case of multi-block selection).
         for (int n = slices.size() - 1; n >= 0; --n) {
-            const BlockSlice &s = slices[n];
+            const Markoff::Detail::BlockSlice &s = slices[n];
             const QByteArray content = doc->blockText(s.blockId);
             const int blockSize = content.size();
             const int loInt = static_cast<int>(s.byteLo);
@@ -454,7 +389,7 @@ void Editor::insertLink() {
         const int qtPos = c.position();
         const quint32 sepByte =
             Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtPos);
-        auto hit = findBlockAtSepByte(doc, sepByte, /*biasForward=*/true);
+        auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepByte, /*biasForward=*/true);
         const QByteArray payload = QByteArrayLiteral("[](url)");
         if (!hit) {
             doc->applyFlatEdit(0, 0, payload, Markoff::Origin::UserEdit);
@@ -477,7 +412,7 @@ void Editor::insertLink() {
         Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtStart);
     const quint32 sepEnd =
         Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtEnd);
-    const QList<BlockSlice> slices = sliceByBlocks(doc, sepStart, sepEnd);
+    const QList<Markoff::Detail::BlockSlice> slices = Markoff::Detail::sliceByBlocks(doc, sepStart, sepEnd);
     if (slices.isEmpty()) return;
 
     {
@@ -486,7 +421,7 @@ void Editor::insertLink() {
         // Within a slice: insert trailing `](url)` first (higher byte), then
         // leading `[` — same higher-then-lower pattern as wrapToggle.
         for (int n = slices.size() - 1; n >= 0; --n) {
-            const BlockSlice &s = slices[n];
+            const Markoff::Detail::BlockSlice &s = slices[n];
             doc->d2ApplyBufferEdit(s.blockId, s.byteHi, 0,
                                    QByteArrayLiteral("](url)"), t);
             doc->d2ApplyBufferEdit(s.blockId, s.byteLo, 0,
