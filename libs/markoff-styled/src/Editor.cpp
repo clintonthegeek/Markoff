@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/styled/Editor.h>
 
+#include "StyleApplier.h"
+
 #include <QHBoxLayout>
 #include <QScrollBar>
 #include <QTextBlock>
@@ -27,6 +29,10 @@ Editor::Editor(QWidget *parent)
     m_editor->setTextInteractionFlags(Qt::TextEditorInteraction
                                       | Qt::LinksAccessibleByMouse);
     m_editor->viewport()->setMouseTracking(true);
+
+    m_styleApplier = new StyleApplier(this);
+    m_styleApplier->setTextDocument(m_editor->document());
+    m_styleApplier->setTheme(&m_theme);
 }
 
 Editor::~Editor() = default;
@@ -45,6 +51,7 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     }
 
     m_binding->setMarkoffDocument(doc);
+    m_styleApplier->setMarkoffDocument(doc);
     if (m_session) m_binding->setSession(m_session.data());
 
     Markoff::MarkdownView::setDocument(doc);
@@ -102,6 +109,7 @@ Markoff::Theme Editor::theme() const { return m_theme; }
 
 void Editor::setTheme(const Markoff::Theme &t) {
     m_theme = t;
+    if (m_styleApplier) m_styleApplier->setTheme(&m_theme);
     emit themeChanged();
 }
 
@@ -134,6 +142,7 @@ qreal Editor::fontScale() const { return m_fontScale; }
 void Editor::setFontScale(qreal s) {
     if (qFuzzyCompare(m_fontScale, s)) return;
     m_fontScale = s;
+    if (m_styleApplier) m_styleApplier->setFontScale(s);
     emit fontScaleChanged();
 }
 

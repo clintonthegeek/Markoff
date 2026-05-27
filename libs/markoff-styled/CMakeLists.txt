@@ -11,6 +11,8 @@ add_library(markoff_styled STATIC
     include/markoff/styled/Editor.h
     include/markoff/styled/MarkoffStyledExport.h
     src/Editor.cpp
+    src/StyleApplier.h
+    src/StyleApplier.cpp
 )
 
 target_include_directories(markoff_styled
