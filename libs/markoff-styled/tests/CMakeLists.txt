@@ -19,3 +19,10 @@ target_link_libraries(tst_styled_binding_roundtrip
     PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
 set_tests_properties(tst_styled_binding_roundtrip
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_block_formats tst_styled_block_formats.cpp)
+add_test(NAME tst_styled_block_formats COMMAND tst_styled_block_formats)
+target_link_libraries(tst_styled_block_formats
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_block_formats
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
