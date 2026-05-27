@@ -112,6 +112,21 @@ QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
     if (span.bold)          fmt.setFontWeight(QFont::Bold);
     if (span.italic)        fmt.setFontItalic(true);
     if (span.strikethrough) fmt.setFontStrikeOut(true);
+    if (span.code) {
+        fmt.setFontFamilies({QStringLiteral("monospace")});
+        fmt.setFontFixedPitch(true);
+        fmt.setBackground(QColor(245, 245, 245));   // Theme::InlineCodeBackground
+    }
+    if (span.highlight) {
+        fmt.setBackground(QColor(255, 240, 130));   // Theme::Highlight
+    }
+    if (span.isTag) {
+        fmt.setForeground(QColor(70, 130, 180));    // Theme::Tag
+    }
+    if (span.isFootnoteRef) {
+        fmt.setForeground(QColor(150, 90, 150));    // Theme::FootnoteRef
+        fmt.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
+    }
     return fmt;
 }
 

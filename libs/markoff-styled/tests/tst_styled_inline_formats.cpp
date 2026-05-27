@@ -68,6 +68,52 @@ private Q_SLOTS:
         QVERIFY(!cf.fontItalic());
         QVERIFY(!cf.fontStrikeOut());
     }
+
+    void inline_code_uses_monospace() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("a `inline` b"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        // 'i' in "inline" sits at char pos 3 ("a `[i]nline...").
+        const QTextCharFormat cf = formatAtChar(e.textEdit()->document(), 3);
+        QVERIFY(cf.fontFixedPitch() || cf.fontFamilies().toStringList().size() > 0);
+    }
+
+    void highlight_span_sets_background() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("==hl== word"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        const QTextCharFormat cf = formatAtChar(e.textEdit()->document(), 2);
+        QVERIFY(cf.background().style() != Qt::NoBrush);
+    }
+
+    void tag_span_distinct_foreground() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("a #tag b"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        // '#' at char 2, 't' at char 3.
+        const QTextCharFormat cf = formatAtChar(e.textEdit()->document(), 3);
+        QVERIFY(cf.foreground().style() != Qt::NoBrush);
+    }
+
+    void footnote_ref_distinct_foreground() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("a [^1] b"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        const QTextCharFormat cf = formatAtChar(e.textEdit()->document(), 3);
+        QVERIFY(cf.foreground().style() != Qt::NoBrush);
+    }
 };
 
 QTEST_MAIN(TstStyledInlineFormats)
