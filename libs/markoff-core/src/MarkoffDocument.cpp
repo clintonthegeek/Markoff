@@ -1429,7 +1429,9 @@ static QList<QByteArray> splitOnNewlineRuns(const QByteArray &text)
         }
     }
     if (segStart < n) parts.append(text.mid(segStart));
-    if (!sawNewline) { parts.clear(); parts.append(text); }  // no newline → one part
+    // No newline at all → the whole text is one part. (Distinct from the
+    // all-newline case, which correctly yields {} so the caller adds nothing.)
+    if (parts.isEmpty() && !sawNewline) parts.append(text);
     return parts;
 }
 
@@ -1602,7 +1604,7 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
                 QByteArray seed = parts[i];
                 if (isLast) seed += tail;
                 // Never create an empty block.
-                if (seed.isEmpty()) { after = blocks[startIdx]; continue; }
+                if (seed.isEmpty()) { continue; }
                 BlockId newBlk = d2InsertBlock(after, BlockKind::Paragraph, t);
                 d2ApplyBufferEdit(newBlk, 0, 0, seed, t);
                 after = newBlk;
