@@ -114,6 +114,33 @@ private Q_SLOTS:
         const QTextCharFormat cf = formatAtChar(e.textEdit()->document(), 3);
         QVERIFY(cf.foreground().style() != Qt::NoBrush);
     }
+
+    void link_span_is_anchored_and_underlined() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("[text](http://x) more"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        // "text" starts at char 1.
+        const QTextCharFormat cf = formatAtChar(e.textEdit()->document(), 2);
+        QVERIFY(cf.isAnchor());
+        QVERIFY(cf.fontUnderline());
+        QVERIFY(!cf.anchorHref().isEmpty());
+    }
+
+    void wikilink_span_is_anchored_and_underlined() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("[[target]] more"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        // 'target' starts at char 2.
+        const QTextCharFormat cf = formatAtChar(e.textEdit()->document(), 3);
+        QVERIFY(cf.isAnchor());
+        QVERIFY(cf.fontUnderline());
+    }
 };
 
 QTEST_MAIN(TstStyledInlineFormats)

@@ -127,6 +127,17 @@ QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
         fmt.setForeground(QColor(150, 90, 150));    // Theme::FootnoteRef
         fmt.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
     }
+    if (span.isLink || span.isWikilink) {
+        fmt.setAnchor(true);
+        // Anchor href is informational (accessibility introspection).
+        // Click resolution flows through LinkService (Task 10), NOT this href.
+        fmt.setAnchorHref(span.isWikilink ? span.linkTarget.page
+                                          : span.linkTarget.url);
+        fmt.setFontUnderline(true);
+        fmt.setForeground(span.isWikilink
+                          ? QColor(120, 80, 200)    // Theme::WikiLink
+                          : QColor(40, 100, 200));  // Theme::Link
+    }
     return fmt;
 }
 
