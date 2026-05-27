@@ -12,3 +12,10 @@ target_link_libraries(tst_styled_editor_construction
     PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
 set_tests_properties(tst_styled_editor_construction
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_binding_roundtrip tst_styled_binding_roundtrip.cpp)
+add_test(NAME tst_styled_binding_roundtrip COMMAND tst_styled_binding_roundtrip)
+target_link_libraries(tst_styled_binding_roundtrip
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_binding_roundtrip
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

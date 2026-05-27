@@ -34,7 +34,19 @@ Editor::~Editor() = default;
 // ---- MarkdownView contract ----------------------------------------------
 
 void Editor::setDocument(Markoff::MarkoffDocument *doc) {
-    // Binding/StyleApplier wiring lands in Task 3 + Task 4.
+    if (document() == doc) {
+        Markoff::MarkdownView::setDocument(doc);
+        return;
+    }
+
+    if (!m_binding) {
+        m_binding = new Markoff::SourceTextDocumentBinding(this);
+        m_binding->setTextDocument(m_editor->document());
+    }
+
+    m_binding->setMarkoffDocument(doc);
+    if (m_session) m_binding->setSession(m_session.data());
+
     Markoff::MarkdownView::setDocument(doc);
 }
 
@@ -75,6 +87,7 @@ Markoff::Session *Editor::session() const { return m_session.data(); }
 void Editor::setSession(Markoff::Session *s) {
     if (m_session.data() == s) return;
     m_session = s;
+    if (m_binding) m_binding->setSession(s);
     emit sessionChanged();
 }
 
