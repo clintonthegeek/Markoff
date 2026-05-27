@@ -3,6 +3,7 @@
 
 #include <cstring>
 
+#include <QDebug>
 #include <QFont>
 #include <QRegularExpression>
 #include <QScrollBar>
@@ -206,15 +207,16 @@ Markoff::BlockKind inferKindFromPrefix(const QByteArray &text,
         return Markoff::BlockKind::ListItem;
     }
 
-    // CodeBlock and HorizontalRule inference deferred to v0.2
-    // (fence-state matching, not pure prefix). Currently we rely on
-    // the CRDT load path to set these correctly.
-    if (currentKind == Markoff::BlockKind::CodeBlock
-        || currentKind == Markoff::BlockKind::HorizontalRule) {
-        return currentKind;  // preserve, don't reinfer.
-    }
-
-    return Markoff::BlockKind::Paragraph;
+    // Conservative: never DEMOTE a parsed block to Paragraph based on
+    // missing markers. The parser strips structural markers from blockText
+    // for many kinds (ListItem stores "text" not "- text"; Table stores
+    // "| ... |" but our infer rules don't recognize it; etc.). Returning
+    // Paragraph here on a non-Paragraph block would destroy loaded
+    // structure. Only PROMOTE Paragraph -> X when a positive rule above
+    // fires. The "user deletes `##` from a heading" demotion-on-typing
+    // case is acknowledged as a v0.2 concern; not worth corrupting loaded
+    // documents for.
+    return currentKind;
 }
 
 }  // namespace
@@ -263,6 +265,7 @@ void StyleApplier::setTextEdit(QTextEdit *edit) {
 void StyleApplier::captureScrollBeforeEdit() {
     if (!m_textEdit || !m_textEdit->verticalScrollBar()) return;
     m_pendingScrollCapture = m_textEdit->verticalScrollBar()->value();
+    qDebug() << "[StyleApplier] captureScrollBeforeEdit value=" << m_pendingScrollCapture;
 }
 
 void StyleApplier::rerender() {
@@ -279,6 +282,7 @@ void StyleApplier::applyFormats() {
     if (m_applyingFormats) return;
     if (!m_textDocument || !m_markoffDocument) return;
     m_applyingFormats = true;
+    qDebug() << "[StyleApplier] applyFormats START, m_pendingScrollCapture=" << m_pendingScrollCapture;
 
     // Snapshot scroll + previous block IDs for in-place-edit detection.
     // Prefer the pre-captured value from captureScrollBeforeEdit() (which
@@ -343,13 +347,18 @@ void StyleApplier::applyFormats() {
                 continue;
             }
             m_blockHashes[id] = h;
+            qDebug() << "[StyleApplier] block id=" << id.raw() << "kind=" << int(kind)
+                     << "text=" << text.left(60);
 
             // Kind transition: if text prefix disagrees with stored kind, queue a
             // Cmd::changeKind for deferred dispatch. The current pass still
             // formats using `kind` (the stored kind) — the next d2 cycle, after
             // changeKind lands, will format using the corrected kind.
             const Markoff::BlockKind inferred = inferKindFromPrefix(text, kind);
+            qDebug() << "[StyleApplier] block id=" << id.raw() << "inferred=" << int(inferred);
             if (inferred != kind) {
+                qDebug() << "[StyleApplier] QUEUE Cmd::changeKind id=" << id.raw()
+                         << "newKind=" << int(inferred);
                 m_pendingKindChanges.push_back({id, inferred});
             }
 
@@ -442,11 +451,17 @@ void StyleApplier::applyFormats() {
     // Skip restore on: structural changes (block set changed — natural scroll
     // is correct); first pass (previousBlockIds empty — cursor at start,
     // scroll at top is correct); no scroll handle available.
+    qDebug() << "[StyleApplier] applyFormats END structural=" << structural
+             << "previousBlockIds.size=" << previousBlockIds.size()
+             << "currentIds.size=" << currentIds.size()
+             << "savedScroll=" << savedScroll;
     if (!structural && !previousBlockIds.isEmpty() && savedScroll >= 0
         && m_textEdit) {
         QPointer<QTextEdit> editPtr = m_textEdit;
         QTimer::singleShot(0, this, [editPtr, savedScroll]() {
             if (editPtr && editPtr->verticalScrollBar()) {
+                qDebug() << "[StyleApplier] DEFERRED restore savedScroll=" << savedScroll
+                         << "current=" << editPtr->verticalScrollBar()->value();
                 editPtr->verticalScrollBar()->setValue(savedScroll);
             }
         });
@@ -461,6 +476,7 @@ void StyleApplier::applyFormats() {
 }
 
 void StyleApplier::applyPendingKindChanges() {
+    qDebug() << "[StyleApplier] applyPendingKindChanges count=" << m_pendingKindChanges.size();
     if (!m_markoffDocument) {
         m_pendingKindChanges.clear();
         return;
