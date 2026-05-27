@@ -73,6 +73,24 @@ private Q_SLOTS:
         QTest::keyClick(e.plainTextEdit(), Qt::Key_Z, Qt::ControlModifier);
         QTRY_COMPARE(fullText(doc), QByteArray());
     }
+
+    void typing_at_boundary_lands_in_correct_block() {
+        // End-to-end regression guard: typing at a block boundary must land
+        // the character in the correct (preceding) block, not the following
+        // one, and must not create a spurious third block.
+        Markoff::Source::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("alpha\n\nbeta"));
+        e.setDocument(&doc);
+        e.show();
+        // End of "alpha" = qtPos 5 (before the "\n\n").
+        QTextCursor c = e.plainTextEdit()->textCursor();
+        c.setPosition(5);
+        e.plainTextEdit()->setTextCursor(c);
+        QTest::keyClicks(e.plainTextEdit(), QStringLiteral(" "));
+        QTRY_COMPARE(doc.blockText(doc.iterateBlocks()[0]), QByteArrayLiteral("alpha "));
+        QCOMPARE(int(doc.iterateBlocks().size()), 2);   // still 2 blocks, no drift
+    }
 };
 
 QTEST_MAIN(TstSourceWidgetBindingRoundtrip)

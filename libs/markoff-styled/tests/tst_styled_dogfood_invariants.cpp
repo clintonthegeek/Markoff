@@ -140,6 +140,49 @@ private Q_SLOTS:
         c.setPosition(3, QTextCursor::KeepAnchor);
         QVERIFY(c.charFormat().fontPointSize() > 11.0);
     }
+
+    void typing_at_boundary_does_not_wipe_or_leap() {
+        // End-to-end regression guard for the 2026-05-27 dogfood report:
+        // boundary drift in the reverse sync caused applyFlatEdit to map the
+        // qtPos to the wrong block, triggering a spurious setPlainText that
+        // wiped all formatting and leaped the caret to end-of-document.
+        // RT1–RT4 (boundary-correct forward path, normalize-on-edit,
+        // incremental reverse sync) fixed the root causes; this slot proves
+        // the fix holds at the widget level.
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("# Heading\n\nbody one\n\nbody two"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        // Heading char is styled (>11pt) before the edit.
+        QTextCursor hc(qdoc); hc.setPosition(2); hc.setPosition(3, QTextCursor::KeepAnchor);
+        QVERIFY(hc.charFormat().fontPointSize() > 11.0);
+
+        // Type a space at the boundary between "# Heading" and "body one"
+        // (qtPos = end of "# Heading" = 9, just before the "\n\n").
+        QTextCursor c(qdoc);
+        c.setPosition(9);
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClicks(e.textEdit(), QStringLiteral(" "));
+        QTest::qWait(50);
+
+        // 1. Heading styling survived (no setPlainText wipe).
+        QTextCursor hc2(qdoc); hc2.setPosition(2); hc2.setPosition(3, QTextCursor::KeepAnchor);
+        QVERIFY(hc2.charFormat().fontPointSize() > 11.0);
+        // 2. Caret did not leap to end-of-document.
+        QVERIFY(e.textEdit()->textCursor().position() < qdoc->characterCount() - 1);
+        // 3. The space landed at the end of the heading block (boundary-correct):
+        //    block 0's text is now "# Heading " (trailing space), not "body one"
+        //    gaining a leading space.
+        const Markoff::BlockId b0 = doc.iterateBlocks()[0];
+        QCOMPARE(doc.blockText(b0), QByteArrayLiteral("# Heading "));
+    }
 };
 
 QTEST_MAIN(TstStyledDogfoodInvariants)
