@@ -1407,6 +1407,32 @@ BlockId MarkoffDocument::d2InsertBlock(BlockId afterBlock, BlockKind kind,
 
 // ===== D4: applyFlatEdit =====
 
+// Split `text` into block-content parts at runs of one-or-more newlines.
+// Collapses consecutive newlines so "a\n\n\n\nb" yields {"a","b"} (one
+// boundary, no empty parts). Never returns an empty part. Empty input yields
+// {""} (identity replace); all-newline input yields {} (caller adds nothing).
+static QList<QByteArray> splitOnNewlineRuns(const QByteArray &text)
+{
+    if (text.isEmpty()) return { QByteArray() };
+    QList<QByteArray> parts;
+    int i = 0, segStart = 0;
+    const int n = text.size();
+    bool sawNewline = false;
+    while (i < n) {
+        if (text[i] == '\n') {
+            if (i > segStart) parts.append(text.mid(segStart, i - segStart));
+            while (i < n && text[i] == '\n') ++i;   // collapse run
+            segStart = i;
+            sawNewline = true;
+        } else {
+            ++i;
+        }
+    }
+    if (segStart < n) parts.append(text.mid(segStart));
+    if (!sawNewline) { parts.clear(); parts.append(text); }  // no newline → one part
+    return parts;
+}
+
 void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
                                     uint32_t oldEnd,
                                     const QByteArray &newText,
@@ -1528,43 +1554,59 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
         const uint32_t removeLen = endWithin - startWithin;
         const QByteArray tail = currentText.mid(static_cast<int>(endWithin));
 
-        // Split newText on "\n\n" boundaries to determine new block count.
-        QList<QByteArray> parts;
-        int cursor2 = 0;
-        while (true) {
-            const int nextDouble = newText.indexOf("\n\n", cursor2);
-            if (nextDouble == -1) {
-                parts.append(newText.mid(cursor2));
-                break;
-            }
-            parts.append(newText.mid(cursor2, nextDouble - cursor2));
-            cursor2 = nextDouble + 2;
-        }
-        Q_ASSERT(parts.size() >= 1);
+        // Split newText on runs of newlines (collapses runs, never yields empty
+        // parts). Empty input → {""} (no-op insert, handled by fast path).
+        // All-newline input → {} (pure split — see head/tail logic below).
+        const QList<QByteArray> parts = splitOnNewlineRuns(newText);
 
-        // Replace the removed range + tail in the current block with the first part.
-        // B1: block buffers are content. parts[0] is the new content for the
-        // portion of the current block before the split; the serializer
-        // reconstructs separators.
-        QByteArray firstReplacement = parts.front();
-        d2ApplyBufferEdit(blocks[startIdx], startWithin,
-                          removeLen + static_cast<uint32_t>(tail.size()),
-                          firstReplacement, t);
-
-        // Insert subsequent blocks for each additional part.
-        BlockId after = blocks[startIdx];
-        for (int i = 1; i < parts.size(); ++i) {
-            BlockId newBlk = d2InsertBlock(after, BlockKind::Paragraph, t);
-            const bool isLast = (i == parts.size() - 1);
-            QByteArray seed = parts[i];
-            if (isLast) {
-                seed += tail;  // restore tail into last new block
+        if (parts.isEmpty()) {
+            // newText is purely newlines (one-or-more). The inserted newlines
+            // create a block boundary. The head (text before the edit point)
+            // stays in the current block; the tail (text after the edit point)
+            // goes into a new block. Empty heads are suppressed — if startWithin
+            // is 0 there is no head, so no new block is needed and the current
+            // block keeps the tail unchanged.
+            if (startWithin == 0) {
+                // Cursor is at the start of this block. Inserting newlines at
+                // position 0 would produce an empty head block (suppressed).
+                // Remove only the deleted range (removeLen bytes) from the
+                // block's front; tail stays in place. For a pure cursor-insert
+                // (removeLen==0) this is a complete no-op on the block content.
+                if (removeLen > 0) {
+                    d2ApplyBufferEdit(blocks[startIdx], 0, removeLen, tail, t);
+                }
+                // (No new block: empty head suppressed, tail stays here.)
+            } else {
+                // Head is non-empty. Trim current block to the head.
+                d2ApplyBufferEdit(blocks[startIdx], startWithin,
+                                  removeLen + static_cast<uint32_t>(tail.size()),
+                                  QByteArray(), t);
+                // Put the tail into a new block (only if non-empty).
+                if (!tail.isEmpty()) {
+                    BlockId newBlk = d2InsertBlock(blocks[startIdx], BlockKind::Paragraph, t);
+                    d2ApplyBufferEdit(newBlk, 0, 0, tail, t);
+                }
             }
-            // (No delimiter append: B1 buffers are content-only.)
-            if (!seed.isEmpty()) {
+        } else {
+            // newText has at least one content part. The first part replaces
+            // the edit range + tail in the current block; subsequent parts
+            // become new blocks, with the last one carrying the tail.
+            const QByteArray firstReplacement = parts.front();
+            d2ApplyBufferEdit(blocks[startIdx], startWithin,
+                              removeLen + static_cast<uint32_t>(tail.size()),
+                              firstReplacement, t);
+
+            BlockId after = blocks[startIdx];
+            for (int i = 1; i < parts.size(); ++i) {
+                const bool isLast = (i == parts.size() - 1);
+                QByteArray seed = parts[i];
+                if (isLast) seed += tail;
+                // Never create an empty block.
+                if (seed.isEmpty()) { after = blocks[startIdx]; continue; }
+                BlockId newBlk = d2InsertBlock(after, BlockKind::Paragraph, t);
                 d2ApplyBufferEdit(newBlk, 0, 0, seed, t);
+                after = newBlk;
             }
-            after = newBlk;
         }
         return;
     }
@@ -1586,43 +1628,31 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
     // Remove the end block.
     d2RemoveBlock(blocks[endIdx], t);
 
-    // Re-stitch: split newText on "\n\n" boundaries.
-    QList<QByteArray> parts;
-    int cursor2 = 0;
-    while (true) {
-        const int nextDouble = newText.indexOf("\n\n", cursor2);
-        if (nextDouble == -1) {
-            parts.append(newText.mid(cursor2));
-            break;
-        }
-        parts.append(newText.mid(cursor2, nextDouble - cursor2));
-        cursor2 = nextDouble + 2;
-    }
-    Q_ASSERT(parts.size() >= 1);
+    // Re-stitch: split newText on runs of newlines (collapses runs, suppresses
+    // empty parts). All-newline or empty newText → {} or {""} → no extra blocks.
+    const QList<QByteArray> parts = splitOnNewlineRuns(newText);
 
-    if (parts.size() == 1) {
-        // No block splits in newText: append newText + endTail into start block.
-        QByteArray combined = parts.front() + endTail;
-        d2ApplyBufferEdit(blocks[startIdx], startWithin, 0, combined, t);
+    if (parts.size() <= 1) {
+        // Zero or one content part: merge everything into start block.
+        // (parts={} for pure-newline newText, parts={""} for empty newText
+        // when the empty-doc fast-path has been skipped — but that case
+        // can't reach here; parts={...} for single-part newText.)
+        const QByteArray firstPart = parts.isEmpty() ? QByteArray() : parts.front();
+        d2ApplyBufferEdit(blocks[startIdx], startWithin, 0, firstPart + endTail, t);
     } else {
-        // newText has embedded "\n\n": append first part to start block,
-        // then insert new blocks for the rest.
-        // B1: block buffers are content; no synthetic delimiter.
-        QByteArray firstReplacement = parts.front();
-        d2ApplyBufferEdit(blocks[startIdx], startWithin, 0, firstReplacement, t);
+        // Multiple content parts: first part into start block, remaining into
+        // new blocks, last block carries endTail.
+        d2ApplyBufferEdit(blocks[startIdx], startWithin, 0, parts.front(), t);
 
         BlockId after = blocks[startIdx];
         for (int i = 1; i < parts.size(); ++i) {
-            BlockId newBlk = d2InsertBlock(after, BlockKind::Paragraph, t);
             const bool isLast = (i == parts.size() - 1);
             QByteArray seed = parts[i];
-            if (isLast) {
-                seed += endTail;
-            }
-            // (No delimiter append: B1 buffers are content-only.)
-            if (!seed.isEmpty()) {
-                d2ApplyBufferEdit(newBlk, 0, 0, seed, t);
-            }
+            if (isLast) seed += endTail;
+            // Never create an empty block.
+            if (seed.isEmpty()) { continue; }
+            BlockId newBlk = d2InsertBlock(after, BlockKind::Paragraph, t);
+            d2ApplyBufferEdit(newBlk, 0, 0, seed, t);
             after = newBlk;
         }
     }

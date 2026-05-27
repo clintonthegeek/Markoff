@@ -62,9 +62,11 @@ void TstD4ApplyFlatEdit::intraBlockDelete_dropsRangeFromTargetBlock()
 void TstD4ApplyFlatEdit::insertNewlineAtBlockEnd_splitsIntoTwoBlocks()
 {
     // "hello" → block0="hello" (5 bytes)
-    // Insert "\n\n" at offset 5 (end of block) → block0="hello", block1=""
-    // B1: block buffers are content-only; the '\n' delimiter is NOT stored in
-    // block0. The split produces a content-empty block1.
+    // Insert "\n\n" at offset 5 (end of block).
+    // Pre-normalization this produced block0="hello", block1="" (empty block).
+    // Post-normalization (RT2): empty trailing block is suppressed — the tail
+    // that would populate block1 is empty, so no new block is created.
+    // Canonical result: still 1 block "hello". (No content was actually split.)
     MarkoffDocument doc(1);
     doc.loadFromMarkdown(QByteArray("hello"));
     QCOMPARE(doc.iterateBlocks().size(), static_cast<size_t>(1));
@@ -72,9 +74,8 @@ void TstD4ApplyFlatEdit::insertNewlineAtBlockEnd_splitsIntoTwoBlocks()
     doc.applyFlatEdit(5, 5, QByteArray("\n\n"), Origin::UserEdit);
 
     const auto blocks = doc.iterateBlocks();
-    QCOMPARE(blocks.size(), static_cast<size_t>(2));
+    QCOMPARE(blocks.size(), static_cast<size_t>(1));
     QCOMPARE(doc.blockText(blocks[0]), QByteArray("hello"));
-    QCOMPARE(doc.blockText(blocks[1]), QByteArray(""));
 }
 
 // ── Task 1.6: insert newline mid-block → split ───────────────────────────────
