@@ -122,6 +122,16 @@
 
 - ~~Audit L4 (Ctrl+Shift+Left/Right within-block word-extend)~~ → closed by `docs/specs/2026-05-21-audit-L4-ctrl-shift-word-extend.md`. Decision: `LiveNavigationController::tryHandle` now claims Ctrl+Shift+Left/Right within a block, computes the word boundary via `QTextBoundaryFinder` (matching Qt's WordLeft/WordRight semantics), and routes through `cursorState->begin (lazy) + extend` so the document-layer anchor is canonical. Resolves the divergence where TextEdit drew a within-block selection while `m_selectionAnchor` stayed empty, breaking Ctrl+C. Bonus fix: the cross-block fallthrough also needed the lazy-begin (anchor wasn't being set for at-qtPos=0 case either). Pinned by `tst_live_render_ctrl_shift_word_extend_qml` (5 slots).
 
+- 2026-05-26 `libs/markoff-styled/src/StyleApplier.cpp:m_applyingFormats` — inv #7 — re-entry guard on format application — defended by QSignalBlocker + beginEditBlock/endEditBlock, but Qt format-change signals are genuinely re-entrant via observers; alternative (assume no observer) is fragile (per spec §7).
+
+- 2026-05-26 `libs/markoff-styled/src/Editor.cpp:m_applyingFontScale` — inv #7 — declared but never actually written/read in Editor.cpp. Possibly dead. Audit when font-scale wiring is exercised by a UI feature (Ctrl+/-).
+
+- 2026-05-26 `libs/markoff-styled/tests/tst_styled_inline_formats.cpp:inline_code_uses_monospace` — weak-assertion pattern — `|| fontFamilies().size() > 0` branch is tautological; tighten to `QVERIFY(cf.fontFixedPitch())` in v0.1.
+
+- 2026-05-26 `libs/markoff-styled/src/LinkInteraction.cpp:handleMove` — cursor-shape setter fires `setCursor()` on every MouseMove within the same link — idempotent in Qt but wasted call; cache shape in v0.1.
+
+- 2026-05-26 `libs/markoff-styled/tests/tst_styled_d2_integration.cpp:remote_edit_replays_text_and_restyles` — QEXPECT_FAIL: `applyFlatEdit` doesn't re-infer blockKind on prefix-changing edits — markoff-live has `KindTransition::inferBlockKind` in its `onD2Changed`; markoff-styled has no equivalent. Track via future micro-spec; fix options documented in `libs/markoff-styled/CLAUDE.md`.
+
 ---
 
 ## #1 — E2.6: theme wire-up + zoom + color wiring ✅ COMPLETE 2026-05-18 (tag `v0.7.0-e2.6`)

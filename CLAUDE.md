@@ -298,6 +298,13 @@ foundation library + two canonical view leaves.
 - `libs/markoff-source` — canonical QPlainTextEdit-based source
                                  widget (replaces the retired Qutepart-
                                  based `markoff-source`).
+- `libs/markoff-styled`        — third view leaf (2026-05-26). Plain-jane
+                                 QWidget editor on `markoff-core`. No QML, no
+                                 KF6. Parser-driven block + inline formats
+                                 via `MarkoffDocument::inlineSpansFor` and
+                                 `iterateBlocks`. `Markoff::Styled::Editor`
+                                 is the public widget. Spec
+                                 `docs/specs/2026-05-26-markoff-styled-leaf-design.md`.
 - `libs/jkqtmathtext`          — LaTeX math rendering. Untracked sibling
                                  wired in for D3's Math delegate.
 
@@ -381,6 +388,7 @@ was deleted in D4.
 - `libs/markoff-core/CLAUDE.md`
 - `libs/markoff-live/CLAUDE.md` — **active view leaf**
 - `libs/markoff-source/CLAUDE.md`
+- `libs/markoff-styled/CLAUDE.md`
 - `libs/markoff-parser/` (no per-lib CLAUDE.md; docs in `docs/specs/`)
 
 ## Docs layout
