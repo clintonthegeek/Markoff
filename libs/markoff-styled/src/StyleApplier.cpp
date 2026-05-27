@@ -3,7 +3,6 @@
 
 #include <cstring>
 
-#include <QDebug>
 #include <QFont>
 #include <QRegularExpression>
 #include <QScrollBar>
@@ -32,6 +31,24 @@ QTextBlockFormat baseBlockFormat() {
     return fmt;
 }
 
+// Apply a block-level char format both as the block default (for newly
+// typed text + test introspection via QTextBlock::charFormat()) AND to the
+// block's existing characters via a selection. The latter is load-bearing:
+// the inline-span pass that runs after the block-format pass uses
+// mergeCharFormat over span ranges, and merge operates on each character's
+// *explicit* format. Without an explicit per-character baseline here, the
+// merge starts from an empty format and the block's font size/weight is
+// lost (headings rendered at body size — dogfood bug 2026-05-27). Applying
+// to the selection establishes the baseline so inline emphasis stacks on
+// top without erasing size.
+void applyBlockCharFormat(QTextCursor &cursor, const QTextCharFormat &cf) {
+    cursor.setBlockCharFormat(cf);
+    QTextCursor sel(cursor);
+    sel.movePosition(QTextCursor::StartOfBlock);
+    sel.movePosition(QTextCursor::EndOfBlock, QTextCursor::KeepAnchor);
+    sel.setCharFormat(cf);
+}
+
 void applyHeading(QTextCursor &cursor, int level, qreal fontScale) {
     static constexpr qreal kBaseSize = 11.0;
     static constexpr qreal kRatios[6] = { 2.0, 1.7, 1.4, 1.2, 1.0, 0.9 };
@@ -44,7 +61,7 @@ void applyHeading(QTextCursor &cursor, int level, qreal fontScale) {
     QTextCharFormat cf;
     cf.setFontPointSize(kBaseSize * kRatios[idx] * fontScale);
     cf.setFontWeight(QFont::Bold);
-    cursor.setBlockCharFormat(cf);
+    applyBlockCharFormat(cursor, cf);
 }
 
 void applyParagraph(QTextCursor &cursor, qreal fontScale) {
@@ -56,7 +73,7 @@ void applyParagraph(QTextCursor &cursor, qreal fontScale) {
     QTextCharFormat cf;
     cf.setFontPointSize(11.0 * fontScale);
     cf.setFontWeight(QFont::Normal);
-    cursor.setBlockCharFormat(cf);
+    applyBlockCharFormat(cursor, cf);
 }
 
 void applyCodeBlock(QTextCursor &cursor, qreal fontScale) {
@@ -72,7 +89,7 @@ void applyCodeBlock(QTextCursor &cursor, qreal fontScale) {
     cf.setFontFamilies({QStringLiteral("monospace")});
     cf.setFontFixedPitch(true);
     cf.setFontPointSize(10.0 * fontScale);
-    cursor.setBlockCharFormat(cf);
+    applyBlockCharFormat(cursor, cf);
 }
 
 void applyBlockquote(QTextCursor &cursor, int depth, qreal fontScale) {
@@ -85,7 +102,7 @@ void applyBlockquote(QTextCursor &cursor, int depth, qreal fontScale) {
     QTextCharFormat cf;
     cf.setFontPointSize(11.0 * fontScale);
     cf.setForeground(QColor(100, 100, 100));  // Theme::Quote.
-    cursor.setBlockCharFormat(cf);
+    applyBlockCharFormat(cursor, cf);
 }
 
 void applyListItem(QTextCursor &cursor, int depth, qreal fontScale) {
@@ -97,7 +114,7 @@ void applyListItem(QTextCursor &cursor, int depth, qreal fontScale) {
 
     QTextCharFormat cf;
     cf.setFontPointSize(11.0 * fontScale);
-    cursor.setBlockCharFormat(cf);
+    applyBlockCharFormat(cursor, cf);
 }
 
 void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
@@ -111,7 +128,7 @@ void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
     cf.setFontFixedPitch(true);
     cf.setForeground(QColor(180, 180, 180));
     cf.setFontPointSize(11.0 * fontScale);
-    cursor.setBlockCharFormat(cf);
+    applyBlockCharFormat(cursor, cf);
 }
 
 QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
@@ -265,7 +282,6 @@ void StyleApplier::setTextEdit(QTextEdit *edit) {
 void StyleApplier::captureScrollBeforeEdit() {
     if (!m_textEdit || !m_textEdit->verticalScrollBar()) return;
     m_pendingScrollCapture = m_textEdit->verticalScrollBar()->value();
-    qDebug() << "[StyleApplier] captureScrollBeforeEdit value=" << m_pendingScrollCapture;
 }
 
 void StyleApplier::rerender() {
@@ -282,7 +298,6 @@ void StyleApplier::applyFormats() {
     if (m_applyingFormats) return;
     if (!m_textDocument || !m_markoffDocument) return;
     m_applyingFormats = true;
-    qDebug() << "[StyleApplier] applyFormats START, m_pendingScrollCapture=" << m_pendingScrollCapture;
 
     // Snapshot scroll + previous block IDs for in-place-edit detection.
     // Prefer the pre-captured value from captureScrollBeforeEdit() (which
@@ -347,18 +362,13 @@ void StyleApplier::applyFormats() {
                 continue;
             }
             m_blockHashes[id] = h;
-            qDebug() << "[StyleApplier] block id=" << id.raw() << "kind=" << int(kind)
-                     << "text=" << text.left(60);
 
             // Kind transition: if text prefix disagrees with stored kind, queue a
             // Cmd::changeKind for deferred dispatch. The current pass still
             // formats using `kind` (the stored kind) — the next d2 cycle, after
             // changeKind lands, will format using the corrected kind.
             const Markoff::BlockKind inferred = inferKindFromPrefix(text, kind);
-            qDebug() << "[StyleApplier] block id=" << id.raw() << "inferred=" << int(inferred);
             if (inferred != kind) {
-                qDebug() << "[StyleApplier] QUEUE Cmd::changeKind id=" << id.raw()
-                         << "newKind=" << int(inferred);
                 m_pendingKindChanges.push_back({id, inferred});
             }
 
@@ -451,17 +461,11 @@ void StyleApplier::applyFormats() {
     // Skip restore on: structural changes (block set changed — natural scroll
     // is correct); first pass (previousBlockIds empty — cursor at start,
     // scroll at top is correct); no scroll handle available.
-    qDebug() << "[StyleApplier] applyFormats END structural=" << structural
-             << "previousBlockIds.size=" << previousBlockIds.size()
-             << "currentIds.size=" << currentIds.size()
-             << "savedScroll=" << savedScroll;
     if (!structural && !previousBlockIds.isEmpty() && savedScroll >= 0
         && m_textEdit) {
         QPointer<QTextEdit> editPtr = m_textEdit;
         QTimer::singleShot(0, this, [editPtr, savedScroll]() {
             if (editPtr && editPtr->verticalScrollBar()) {
-                qDebug() << "[StyleApplier] DEFERRED restore savedScroll=" << savedScroll
-                         << "current=" << editPtr->verticalScrollBar()->value();
                 editPtr->verticalScrollBar()->setValue(savedScroll);
             }
         });
@@ -476,7 +480,6 @@ void StyleApplier::applyFormats() {
 }
 
 void StyleApplier::applyPendingKindChanges() {
-    qDebug() << "[StyleApplier] applyPendingKindChanges count=" << m_pendingKindChanges.size();
     if (!m_markoffDocument) {
         m_pendingKindChanges.clear();
         return;

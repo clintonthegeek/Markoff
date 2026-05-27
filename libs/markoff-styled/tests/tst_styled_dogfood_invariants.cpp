@@ -113,6 +113,33 @@ private Q_SLOTS:
         // in the edited block.
         QVERIFY(qAbs(bar->value() - target) <= 5);
     }
+
+    void heading_chars_render_at_heading_size() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        // Trailing context required: tree-sitter parses a bare "# x" with no
+        // following newline as a Paragraph, not an ATX Heading (same quirk as
+        // bare "---"). A heading in a real document always has surrounding
+        // structure.
+        doc.loadFromMarkdown(QByteArrayLiteral("# Heading\n\nbody text"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+
+        // Assert the ACTUAL character format (via a cursor selection), NOT
+        // QTextBlock::charFormat() (the block default). Regression guard for
+        // the 2026-05-27 dogfood bug: the heading block's '#' delimiter span
+        // triggers a mergeCharFormat pass after the block-format pass; if the
+        // heading size lives only in the block default (setBlockCharFormat),
+        // the merge wipes it and the heading renders at body size. The block
+        // default test passed while the visible text was unstyled — so this
+        // checks the characters that actually render.
+        QTextDocument *qdoc = e.textEdit()->document();
+        QTextCursor c(qdoc);
+        c.setPosition(2);  // inside "Heading"
+        c.setPosition(3, QTextCursor::KeepAnchor);
+        QVERIFY(c.charFormat().fontPointSize() > 11.0);
+    }
 };
 
 QTEST_MAIN(TstStyledDogfoodInvariants)
