@@ -65,12 +65,17 @@ void Editor::setCursorPosition(Markoff::CursorPos pos) {
 }
 
 float Editor::scrollPositionVisualLine() const {
-    auto *bar = m_editor->verticalScrollBar();
-    return bar->maximum() == 0 ? 0.0f : float(bar->value());
+    auto *sb = m_editor->verticalScrollBar();
+    if (!sb || sb->maximum() == 0) return 0.0f;
+    return static_cast<float>(sb->value())
+         / static_cast<float>(sb->maximum());
 }
 
 void Editor::setScrollPositionVisualLine(float pos) {
-    m_editor->verticalScrollBar()->setValue(int(pos));
+    auto *sb = m_editor->verticalScrollBar();
+    if (!sb || sb->maximum() == 0) return;
+    sb->setValue(static_cast<int>(pos
+                                  * static_cast<float>(sb->maximum())));
 }
 
 void Editor::setReadOnly(bool ro) {
