@@ -10,7 +10,6 @@
 #include <markoff/core/LinkKind.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/core/SourceTextDocumentBinding.h>
 #include <markoff/parser/SourceSpan.h>
 
 namespace Markoff::Styled {
@@ -46,42 +45,55 @@ bool LinkInteraction::eventFilter(QObject *obj, QEvent *event) {
 std::optional<Markoff::LinkActivation>
 LinkInteraction::resolveLinkAt(int charPos, Qt::KeyboardModifiers mods) const {
     if (!m_doc || !m_edit) return std::nullopt;
-    const QByteArray flat = m_doc->flatView();
 
-    quint32 bytePos = 0;
-    const auto blocks = m_doc->iterateBlocks();
-    static constexpr int kSepLen = 2;  // "\n\n"
-    for (size_t i = 0; i < blocks.size(); ++i) {
-        const Markoff::BlockId id = blocks[i];
-        const QByteArray text = m_doc->blockText(id);
-        const quint32 blockStartBytes = bytePos;
-        const quint32 blockEndBytes   = bytePos + static_cast<quint32>(text.size());
+    // Convert Qt UTF-16 char position to UTF-8 byte offset in the
+    // document's flat view. The flat view is what the QTextDocument
+    // mirrors (per SourceTextDocumentBinding's contract), so a char
+    // offset there maps to the matching byte offset here.
+    const QString plain = m_edit->toPlainText();
+    if (charPos < 0 || charPos > plain.size()) return std::nullopt;
+    const QByteArray prefix = plain.left(charPos).toUtf8();
+    const quint32 byteOffset = static_cast<quint32>(prefix.size());
 
-        const int startQt = Markoff::SourceTextDocumentBinding
-            ::byteOffsetToQtPos(flat, blockStartBytes);
-        const int endQt = Markoff::SourceTextDocumentBinding
-            ::byteOffsetToQtPos(flat, blockEndBytes);
+    // Bisect to the containing block via the CRDT index.
+    // textAnchorAt()'s D2 path walks per-block CRDT buffers, accumulating
+    // byte counts, and tags the returned anchor with the block's ID.
+    // anchor.block() gives us the block ID directly — O(blocks) but with
+    // early termination, which is still far cheaper than the old O(blocks +
+    // all_spans) approach for documents where the target is not the last block.
+    // blockAt(TextAnchor) is not used here because it relies on
+    // latestBlockRanges, which is only populated in the legacy (pre-D2) path.
+    const Markoff::TextAnchor anchor =
+        m_doc->textAnchorAt(byteOffset, /*rightBias=*/false);
+    const Markoff::BlockId id = anchor.block();
+    if (id.isNull()) return std::nullopt;
 
-        bytePos = blockEndBytes;
-        if (i + 1 < blocks.size()) bytePos += kSepLen;
+    // Offset within the block, in UTF-8 bytes.
+    // offsetInBlock()'s D2 path resolves directly against the per-block
+    // CRDT buffer, bypassing latestBlockRanges.
+    const int blockByteOffset = m_doc->offsetInBlock(id, anchor);
 
-        if (charPos < startQt || charPos > endQt) continue;
+    // Convert block-byte-offset to UTF-16 char offset within the
+    // block by converting the block-text prefix. Block text is
+    // typically <1KB; this conversion is cheap.
+    const QByteArray blockBytes = m_doc->blockText(id);
+    const QByteArray blockBytesPrefix = blockBytes.left(blockByteOffset);
+    const int blockCharPos = QString::fromUtf8(blockBytesPrefix).size();
 
-        for (const Markoff::SourceSpan &span : m_doc->inlineSpansFor(id)) {
-            if (!span.isLink && !span.isWikilink) continue;
-            const int spanStartQt = startQt + span.charOffset;
-            const int spanEndQt   = spanStartQt + span.charLength;
-            if (charPos < spanStartQt || charPos >= spanEndQt) continue;
+    // Walk only this block's spans.
+    for (const Markoff::SourceSpan &span : m_doc->inlineSpansFor(id)) {
+        if (!span.isLink && !span.isWikilink) continue;
+        if (blockCharPos < span.charOffset) continue;
+        if (blockCharPos >= span.charOffset + span.charLength) continue;
 
-            Markoff::LinkActivation a;
-            a.kind        = span.isWikilink ? Markoff::LinkKind::WikiLink
-                                            : Markoff::LinkKind::External;
-            a.rawText     = span.isWikilink ? span.linkTarget.page
-                                            : span.linkTarget.url;
-            a.modifiers   = mods;
-            a.fromContext = m_fromContext;
-            return a;
-        }
+        Markoff::LinkActivation a;
+        a.kind        = span.isWikilink ? Markoff::LinkKind::WikiLink
+                                        : Markoff::LinkKind::External;
+        a.rawText     = span.isWikilink ? span.linkTarget.page
+                                        : span.linkTarget.url;
+        a.modifiers   = mods;
+        a.fromContext = m_fromContext;
+        return a;
     }
     return std::nullopt;
 }
