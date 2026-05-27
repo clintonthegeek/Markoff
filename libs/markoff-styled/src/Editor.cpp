@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/styled/Editor.h>
 
+#include "LinkInteraction.h"
 #include "StyleApplier.h"
 
 #include <QHBoxLayout>
@@ -33,6 +34,8 @@ Editor::Editor(QWidget *parent)
     m_styleApplier = new StyleApplier(this);
     m_styleApplier->setTextDocument(m_editor->document());
     m_styleApplier->setTheme(&m_theme);
+
+    m_linkInteract = new LinkInteraction(m_editor, this);
 }
 
 Editor::~Editor() = default;
@@ -52,6 +55,7 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
 
     m_binding->setMarkoffDocument(doc);
     m_styleApplier->setMarkoffDocument(doc);
+    if (m_linkInteract) m_linkInteract->setMarkoffDocument(doc);
     if (m_session) m_binding->setSession(m_session.data());
 
     Markoff::MarkdownView::setDocument(doc);
@@ -124,6 +128,7 @@ Markoff::LinkService *Editor::linkService() const {
 void Editor::setLinkService(Markoff::LinkService *svc) {
     if (m_linkService == svc) return;
     m_linkService = svc;
+    if (m_linkInteract) m_linkInteract->setLinkService(svc);
     emit linkServiceChanged();
 }
 
@@ -132,6 +137,7 @@ QString Editor::fromContext() const { return m_fromContext; }
 void Editor::setFromContext(const QString &c) {
     if (m_fromContext == c) return;
     m_fromContext = c;
+    if (m_linkInteract) m_linkInteract->setFromContext(c);
     emit fromContextChanged();
 }
 

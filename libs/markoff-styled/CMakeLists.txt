@@ -13,6 +13,8 @@ add_library(markoff_styled STATIC
     src/Editor.cpp
     src/StyleApplier.h
     src/StyleApplier.cpp
+    src/LinkInteraction.h
+    src/LinkInteraction.cpp
 )
 
 target_include_directories(markoff_styled

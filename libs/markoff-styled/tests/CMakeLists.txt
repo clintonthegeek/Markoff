@@ -33,3 +33,12 @@ target_link_libraries(tst_styled_inline_formats
     PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
 set_tests_properties(tst_styled_inline_formats
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_link_interaction tst_styled_link_interaction.cpp)
+add_test(NAME tst_styled_link_interaction COMMAND tst_styled_link_interaction)
+target_link_libraries(tst_styled_link_interaction
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+target_include_directories(tst_styled_link_interaction
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+set_tests_properties(tst_styled_link_interaction
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
