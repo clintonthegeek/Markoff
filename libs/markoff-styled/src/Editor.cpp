@@ -119,6 +119,9 @@ void Editor::setSession(Markoff::Session *s) {
 Markoff::Theme Editor::theme() const { return m_theme; }
 
 void Editor::setTheme(const Markoff::Theme &t) {
+    // No same-value guard: Markoff::Theme has no operator==. Idempotent
+    // restyle on a same-theme set is cheap; consumers shouldn't see spurious
+    // themeChanged emissions in practice since theme changes are rare.
     m_theme = t;
     if (m_styleApplier) m_styleApplier->setTheme(&m_theme);
     emit themeChanged();
