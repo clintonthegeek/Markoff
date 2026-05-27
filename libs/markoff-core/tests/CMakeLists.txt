@@ -162,6 +162,11 @@ add_test(NAME tst_table_block_loading COMMAND tst_table_block_loading)
 target_link_libraries(tst_table_block_loading PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_table_block_loading PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_binding_forward tst_binding_forward.cpp)
+add_test(NAME tst_binding_forward COMMAND tst_binding_forward)
+target_link_libraries(tst_binding_forward PRIVATE Qt6::Test Qt6::Gui Qt6::Widgets markoff_core)
+set_tests_properties(tst_binding_forward PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_subdirectory(d2)
 add_subdirectory(d5)
 

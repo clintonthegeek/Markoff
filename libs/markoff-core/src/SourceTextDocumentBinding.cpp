@@ -7,6 +7,7 @@
 #include <markoff/core/Origin.h>
 #include <markoff/core/Selection.h>
 #include <markoff/core/Session.h>
+#include <markoff/core/Detail/FlatBlockResolve.h>
 
 namespace Markoff {
 
@@ -302,38 +303,25 @@ void SourceTextDocumentBinding::rewireQtDocument()
     syncQtDocumentFromMarkoff();
 }
 
-// Translate a byte offset in the separator-bearing flat-view space (what
-// `MarkoffDocument::flatView()` returns) to the equivalent offset in the
-// no-separator concatenation space used by `applyFlatEdit`. Offsets that
-// land inside a separator span are clamped to the no-separator boundary
-// between the surrounding blocks.
-//
-// Known gap (TODO): edits that delete separator bytes (e.g. backspace at
-// the start of a block, removing the `\n\n` between two blocks) currently
-// translate to a zero-length cursor edit in no-separator space, so the
-// model retains both blocks while the QTextDocument has them merged. The
-// subsequent `onD2DocumentChanged` then reverts the user's edit. Source
-// widget consumers should be aware that separator-zone deletes do not
-// merge blocks yet — needs a follow-on for full structural editing parity.
-static quint32 sepViewToNoSepByte(const Markoff::MarkoffDocument *doc, quint32 sepOff)
+// Translate a sep-view byte offset to no-separator coordinates for
+// applyFlatEdit, via findBlockAtSepByte (so a boundary/in-separator position
+// resolves to a real block edge; biasForward picks next-start vs prev-end).
+// Unlike the old clamp, a range straddling a separator yields distinct no-sep
+// offsets, so applyFlatEdit sees a real cross-block range and merges blocks.
+static quint32 sepViewToNoSepByteForEdit(const Markoff::MarkoffDocument *doc,
+                                         quint32 sepOff, bool biasForward)
 {
     const auto blocks = doc->iterateBlocks();
-    constexpr quint32 SEP_LEN = 2;   // "\n\n"
-    quint32 sepCursor   = 0;
-    quint32 noSepCursor = 0;
-    for (size_t i = 0; i < blocks.size(); ++i) {
-        const quint32 blkSize = static_cast<quint32>(doc->blockText(blocks[i]).size());
-        const quint32 blkEnd  = sepCursor + blkSize;
-        if (sepOff <= blkEnd) return noSepCursor + (sepOff - sepCursor);
-        sepCursor   = blkEnd;
-        noSepCursor += blkSize;
-        if (i + 1 < blocks.size()) {
-            const quint32 sepEnd = sepCursor + SEP_LEN;
-            if (sepOff < sepEnd) return noSepCursor;  // inside separator → clamp
-            sepCursor = sepEnd;
-        }
+    const auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepOff, biasForward);
+    if (!hit) {  // past end → total no-sep length
+        quint32 total = 0;
+        for (auto id : blocks) total += quint32(doc->blockText(id).size());
+        return total;
     }
-    return noSepCursor;
+    quint32 noSep = 0;
+    for (int i = 0; i < hit->blockIndex; ++i)
+        noSep += quint32(doc->blockText(blocks[size_t(i)]).size());
+    return noSep + hit->byteInBlock;
 }
 
 void SourceTextDocumentBinding::syncQtDocumentFromMarkoff()
@@ -354,29 +342,103 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
 {
     // Cycle guard: when T13's reverse path is mid-application, don't loop back.
     if (m_applyingRemoteEdit) return;
-    if (!m_markoffDocument) return;
-    if (!m_textDocument) return;
-
+    if (!m_markoffDocument || !m_textDocument) return;
     Markoff::MarkoffDocument *doc = m_markoffDocument;
 
-    // Compute byte offsets against the PRE-CHANGE document state in the
-    // separator-bearing flat view (what the QTextDocument holds).
+    // The QTextDocument mirrors flatView() (separator-bearing), so its plain
+    // text IS the sep-view. Compute sep-view byte offsets against PRE-change
+    // state. NOTE: qtPos/charsRemoved are in the PRE-change document; read the
+    // pre-change text from flatView() (the doc hasn't been mutated yet on the
+    // forward path), and the inserted text from the POST-change QTextDocument.
     const QByteArray preBytesSep = doc->flatView();
     const QString    preTextSep  = QString::fromUtf8(preBytesSep);
-    const quint32 oldStartSep = qtPosToByteOffset(preTextSep, qtPos);
-    const quint32 oldEndSep   = qtPosToByteOffset(preTextSep, qtPos + charsRemoved);
+    const quint32 sepStart = qtPosToByteOffset(preTextSep, qtPos);
+    const quint32 sepEnd   = qtPosToByteOffset(preTextSep, qtPos + charsRemoved);
 
-    // Translate to no-separator coordinates for applyFlatEdit.
-    const quint32 oldStart = sepViewToNoSepByte(doc, oldStartSep);
-    const quint32 oldEnd   = sepViewToNoSepByte(doc, oldEndSep);
-
-    // Extract the inserted text from the POST-CHANGE QTextDocument.
-    const QString postPlain = m_textDocument->toPlainText();
-    const QString insertedText = postPlain.mid(qtPos, charsAdded);
-    const QByteArray newText = insertedText.toUtf8();
+    const QString postPlain       = m_textDocument->toPlainText();
+    const QByteArray insertedUtf8 = postPlain.mid(qtPos, charsAdded).toUtf8();
+    const bool insertedHasNewline = insertedUtf8.contains('\n');
 
     m_applyingLocalEdit = true;
-    doc->applyFlatEdit(oldStart, oldEnd, newText, Markoff::Origin::UserEdit);
+
+    // Resolve both endpoints in sep-view (biasForward=false = previous-block bias
+    // for both; the structural split below handles differing blocks).
+    const auto hitStart = Markoff::Detail::findBlockAtSepByte(
+        doc, sepStart, /*biasForward=*/false);
+    const auto hitEnd = (charsRemoved == 0)
+        ? hitStart
+        : Markoff::Detail::findBlockAtSepByte(doc, sepEnd, /*biasForward=*/true);
+
+    // ── Fast path: single-block, structure-neutral edit (the common case) ──
+    // Typing or deleting within one block, no embedded newline, no separator-
+    // spanning range. Apply directly via d2ApplyBufferEdit with an explicit
+    // block ID — sidesteps applyFlatEdit's no-separator boundary ambiguity so
+    // end-of-block typing lands in the previous block (matches QTextEdit bias).
+    if (!insertedHasNewline && hitStart && hitEnd && hitStart->blockId == hitEnd->blockId) {
+        const uint32_t removeBytes = (charsRemoved == 0)
+            ? 0u : (hitEnd->byteInBlock - hitStart->byteInBlock);
+        UndoLog::Transaction t(doc->d2UndoLog());
+        doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock,
+                               removeBytes, insertedUtf8, t);
+        m_applyingLocalEdit = false;
+        return;
+    }
+
+    // ── Cross-block or structural edit ────────────────────────────────────
+    // Either: (a) insertedHasNewline (structural split/replace) or
+    //         (b) the edit spans a separator (hitStart and hitEnd in different
+    //             blocks) — including the pure separator-delete (backspace
+    //             across "\n\n") that must merge two blocks.
+    //
+    // For (b) without newlines we dispatch directly via d2 primitives so we
+    // can express "merge block0+block1 without deleting their content" — which
+    // applyFlatEdit cannot represent because in no-sep coordinates the end of
+    // block0 and start of block1 share the same byte offset.
+    //
+    // For (a) (structural, embedded newline), route to applyFlatEdit via the
+    // bias-aware no-sep translator which at least avoids the old clamping bug.
+    if (!insertedHasNewline && hitStart && hitEnd && hitStart->blockId != hitEnd->blockId) {
+        // Cross-block merge without structural newlines: directly apply via
+        // d2 primitives (mirrors applyFlatEdit's cross-block path).
+        const auto allBlocks = doc->iterateBlocks();
+        const QByteArray endTail = doc->blockText(hitEnd->blockId)
+                                       .mid(static_cast<int>(hitEnd->byteInBlock));
+
+        UndoLog::Transaction t(doc->d2UndoLog());
+
+        // Trim start block from hitStart->byteInBlock to its end.
+        const uint32_t startBlockSize = static_cast<uint32_t>(
+            doc->blockText(hitStart->blockId).size());
+        const uint32_t trimLen = startBlockSize - hitStart->byteInBlock;
+        if (trimLen > 0) {
+            doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock,
+                                   trimLen, QByteArray(), t);
+        }
+
+        // Remove any intermediate blocks (between hitStart+1 and hitEnd-1).
+        for (int i = hitStart->blockIndex + 1; i < hitEnd->blockIndex; ++i)
+            doc->d2RemoveBlock(allBlocks[size_t(i)], t);
+
+        // Remove the end block (its surviving tail is stitched below).
+        doc->d2RemoveBlock(hitEnd->blockId, t);
+
+        // Append inserted content + end-block tail to start block.
+        const QByteArray toAppend = insertedUtf8 + endTail;
+        doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock,
+                               0, toAppend, t);
+
+        m_applyingLocalEdit = false;
+        return;
+    }
+
+    // Structural edit (insertedHasNewline=true) or empty document: route
+    // through applyFlatEdit. Use the bias-aware no-sep translator (not the
+    // old clamp) so partial separator-spanning ranges at least get sensible
+    // coordinates; applyFlatEdit's RT2 normalization handles the rest.
+    const quint32 noSepStart = sepViewToNoSepByteForEdit(doc, sepStart, /*biasForward=*/false);
+    const quint32 noSepEnd   = sepViewToNoSepByteForEdit(doc, sepEnd,   /*biasForward=*/true);
+    doc->applyFlatEdit(noSepStart, noSepEnd, insertedUtf8, Markoff::Origin::UserEdit);
+
     m_applyingLocalEdit = false;
 }
 

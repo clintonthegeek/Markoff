@@ -1,0 +1,65 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+//
+// NOTE: QTextDocument::contentsChange (with position args) only fires when a
+// QAbstractTextDocumentLayout is installed on the document (as QPlainTextEdit does).
+// Tests must use QPlainTextEdit::document() rather than a raw QTextDocument.
+//
+#include <QTest>
+#include <QPlainTextEdit>
+#include <QTextCursor>
+#include <QTextDocument>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/SourceTextDocumentBinding.h>
+
+namespace { QByteArray flat(Markoff::MarkoffDocument &d) { return d.flatView(); } }
+
+class TstBindingForward : public QObject {
+    Q_OBJECT
+private Q_SLOTS:
+    void typing_at_block_boundary_lands_in_previous_block() {
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("alpha\n\nbeta"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding b;
+        b.setTextDocument(edit.document());
+        b.setMarkoffDocument(&doc);
+        QCOMPARE(edit.toPlainText(), QStringLiteral("alpha\n\nbeta"));
+        // End of "alpha" is qtPos 5 (before the "\n\n").
+        QTextCursor c(edit.document());
+        c.setPosition(5);
+        c.insertText(QStringLiteral(" "));   // fires contentsChange
+        QCOMPARE(flat(doc), QByteArrayLiteral("alpha \n\nbeta"));   // space in block 0
+        QCOMPARE(edit.toPlainText(), QStringLiteral("alpha \n\nbeta")); // no drift
+    }
+    void typing_mid_block_unaffected() {
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("alpha\n\nbeta"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding b;
+        b.setTextDocument(edit.document());
+        b.setMarkoffDocument(&doc);
+        QTextCursor c(edit.document());
+        c.setPosition(2);
+        c.insertText(QStringLiteral("X"));
+        QCOMPARE(flat(doc), QByteArrayLiteral("alXpha\n\nbeta"));
+    }
+    void backspace_over_separator_merges_blocks() {
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("alpha\n\nbeta"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding b;
+        b.setTextDocument(edit.document());
+        b.setMarkoffDocument(&doc);
+        // Select the "\n\n" (qtPos 5..7) and delete it.
+        QTextCursor c(edit.document());
+        c.setPosition(5);
+        c.setPosition(7, QTextCursor::KeepAnchor);
+        c.removeSelectedText();
+        QCOMPARE(int(doc.iterateBlocks().size()), 1);
+        QCOMPARE(flat(doc), QByteArrayLiteral("alphabeta"));
+        QCOMPARE(edit.toPlainText(), QStringLiteral("alphabeta"));
+    }
+};
+
+QTEST_MAIN(TstBindingForward)
+#include "tst_binding_forward.moc"
