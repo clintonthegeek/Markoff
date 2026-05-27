@@ -5,11 +5,13 @@
 
 #include <QFont>
 #include <QRegularExpression>
+#include <QScrollBar>
 #include <QSignalBlocker>
 #include <QTextBlock>
 #include <QTextBlockFormat>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextEdit>
 #include <QTimer>
 
 #include <markoff/core/BlockKind.h>
@@ -254,19 +256,54 @@ void StyleApplier::setFontScale(qreal s) {
     rerender();
 }
 
+void StyleApplier::setTextEdit(QTextEdit *edit) {
+    m_textEdit = edit;
+}
+
+void StyleApplier::captureScrollBeforeEdit() {
+    if (!m_textEdit || !m_textEdit->verticalScrollBar()) return;
+    m_pendingScrollCapture = m_textEdit->verticalScrollBar()->value();
+}
+
 void StyleApplier::rerender() {
     if (!m_textDocument || !m_markoffDocument) return;
     m_blockHashes.clear();  // Force every block to apply on next pass.
     applyFormats();
 }
 
-void StyleApplier::onD2Changed() { applyFormats(); }
+void StyleApplier::onD2Changed() {
+    applyFormats();
+}
 
 void StyleApplier::applyFormats() {
     if (m_applyingFormats) return;
     if (!m_textDocument || !m_markoffDocument) return;
     m_applyingFormats = true;
+
+    // Snapshot scroll + previous block IDs for in-place-edit detection.
+    // Prefer the pre-captured value from captureScrollBeforeEdit() (which
+    // fires before SourceTextDocumentBinding's setPlainText resets the bar),
+    // falling back to an in-place snapshot when no early capture is available
+    // (e.g. rerender() calls, direct onD2Changed without Editor wiring).
+    // The restore is deferred (see QTimer::singleShot below) because Qt's
+    // layout signals fire after endEditBlock and would override a synchronous
+    // setValue.
+    const int savedScroll = (m_pendingScrollCapture >= 0)
+        ? m_pendingScrollCapture
+        : ((m_textEdit && m_textEdit->verticalScrollBar())
+           ? m_textEdit->verticalScrollBar()->value() : -1);
+    m_pendingScrollCapture = -1;  // consume; next pass needs a fresh capture.
+
+    QHash<Markoff::BlockId, char> previousBlockIds;
+    for (auto it = m_blockHashes.constBegin();
+         it != m_blockHashes.constEnd(); ++it) {
+        previousBlockIds.insert(it.key(), 0);
+    }
+
     m_hashSkipsLastPass = 0;
+    // Declared outside the QSignalBlocker scope so it's visible to the
+    // structural-change check below.
+    QHash<Markoff::BlockId, char> currentIds;
     {
         QSignalBlocker block(m_textDocument);
         QTextCursor cursor(m_textDocument);
@@ -281,7 +318,6 @@ void StyleApplier::applyFormats() {
         static constexpr int kSepLen = 2;  // "\n\n"
 
         // Set-like map of all IDs present this pass, for stale-entry pruning below.
-        QHash<Markoff::BlockId, char> currentIds;
         currentIds.reserve(static_cast<qsizetype>(blocks.size()));
 
         quint32 bytePos = 0;
@@ -387,6 +423,35 @@ void StyleApplier::applyFormats() {
 
         cursor.endEditBlock();
     }
+
+    // Detect structural change: did any block ID disappear or appear?
+    bool structural = previousBlockIds.size() != currentIds.size();
+    if (!structural && !previousBlockIds.isEmpty()) {
+        for (auto it = currentIds.constBegin();
+             it != currentIds.constEnd(); ++it) {
+            if (!previousBlockIds.contains(it.key())) {
+                structural = true;
+                break;
+            }
+        }
+    }
+    // Deferred scroll restore: synchronous setValue would be overridden by
+    // Qt's post-endEditBlock layout signals (ensureCursorVisible etc.).
+    // Defer one event-loop tick so we land after Qt settles.
+    //
+    // Skip restore on: structural changes (block set changed — natural scroll
+    // is correct); first pass (previousBlockIds empty — cursor at start,
+    // scroll at top is correct); no scroll handle available.
+    if (!structural && !previousBlockIds.isEmpty() && savedScroll >= 0
+        && m_textEdit) {
+        QPointer<QTextEdit> editPtr = m_textEdit;
+        QTimer::singleShot(0, this, [editPtr, savedScroll]() {
+            if (editPtr && editPtr->verticalScrollBar()) {
+                editPtr->verticalScrollBar()->setValue(savedScroll);
+            }
+        });
+    }
+
     ++m_restyleCount;
     m_applyingFormats = false;
 

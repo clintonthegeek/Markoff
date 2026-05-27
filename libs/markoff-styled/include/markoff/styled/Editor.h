@@ -95,6 +95,7 @@ private:
     mutable Markoff::DefaultLinkService    *m_defaultLink  = nullptr;
     QString                                 m_fromContext;
     qreal                                   m_fontScale    = 1.0;
+    QMetaObject::Connection                 m_d2ScrollCaptureCon;
 };
 
 }  // namespace Markoff::Styled

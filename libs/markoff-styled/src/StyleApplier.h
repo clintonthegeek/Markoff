@@ -10,6 +10,7 @@
 #include <markoff/core/BlockKind.h>
 
 class QTextDocument;
+class QTextEdit;
 
 namespace Markoff {
 class MarkoffDocument;
@@ -40,6 +41,12 @@ public:
     void setFontScale(qreal s);
     qreal fontScale() const noexcept { return m_fontScale; }
 
+    /// Set the QTextEdit whose viewport scrollbar should be captured
+    /// and restored across in-place restyle passes. Optional; if not
+    /// set, scroll preservation is a no-op.
+    void setTextEdit(QTextEdit *edit);
+    QTextEdit *textEdit() const noexcept { return m_textEdit.data(); }
+
     /// Counter incremented on every restyle pass; tests assert progress.
     quint64 restyleCount() const noexcept { return m_restyleCount; }
 
@@ -49,6 +56,14 @@ public:
 
     /// Force a restyle without waiting for `d2DocumentChanged`.
     void rerender();
+
+    /// Snapshot the current scrollbar value for use by the next
+    /// applyFormats() pass. Editor wires this to d2DocumentChanged with
+    /// connection order placing it BEFORE SourceTextDocumentBinding's
+    /// reverse-path setPlainText, so we capture the pre-reset value.
+    /// (Spec §5: scroll preservation on in-place edits — see
+    /// docs/specs/2026-05-27-markoff-styled-dogfood-fixes-design.md.)
+    void captureScrollBeforeEdit();
 
 private Q_SLOTS:
     void onD2Changed();
@@ -63,10 +78,12 @@ private:
     };
 
     QPointer<QTextDocument>            m_textDocument;
+    QPointer<QTextEdit>                m_textEdit;
     Markoff::MarkoffDocument          *m_markoffDocument = nullptr;
     const Markoff::Theme              *m_theme           = nullptr;
     qreal                              m_fontScale       = 1.0;
     bool                               m_applyingFormats = false;
+    int                                m_pendingScrollCapture = -1;
     quint64                            m_restyleCount    = 0;
     QHash<Markoff::BlockId, quint64>   m_blockHashes;
     quint64                            m_hashSkipsLastPass = 0;

@@ -36,6 +36,7 @@ Editor::Editor(QWidget *parent)
     m_styleApplier = new StyleApplier(this);
     m_styleApplier->setTextDocument(m_editor->document());
     m_styleApplier->setTheme(&m_theme);
+    m_styleApplier->setTextEdit(m_editor);
 
     m_linkInteract = new LinkInteraction(m_editor, this);
     // Propagate the lazy default so LinkInteraction always has a non-null
@@ -55,9 +56,24 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         return;
     }
 
+    // Disconnect any prior early-capture connection.
+    if (m_d2ScrollCaptureCon) {
+        QObject::disconnect(m_d2ScrollCaptureCon);
+        m_d2ScrollCaptureCon = {};
+    }
+
     if (!m_binding) {
         m_binding = new Markoff::SourceTextDocumentBinding(this);
         m_binding->setTextDocument(m_editor->document());
+    }
+
+    // Connect captureScrollBeforeEdit BEFORE the binding wires its own
+    // onD2DocumentChanged. Connection order guarantees we fire first
+    // and capture the scroll value before setPlainText resets it.
+    if (doc && m_styleApplier) {
+        m_d2ScrollCaptureCon = QObject::connect(
+            doc, &Markoff::MarkoffDocument::d2DocumentChanged,
+            m_styleApplier, &Markoff::Styled::StyleApplier::captureScrollBeforeEdit);
     }
 
     m_binding->setMarkoffDocument(doc);

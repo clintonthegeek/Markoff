@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QApplication>
+#include <QScrollBar>
 #include <QTest>
 #include <QTextBlock>
 #include <QTextDocument>
@@ -69,6 +70,48 @@ private Q_SLOTS:
         const QTextBlock blk =
             e.textEdit()->document()->findBlockByNumber(0);
         QTRY_VERIFY(blk.charFormat().fontPointSize() > 11.0);
+    }
+
+    void scroll_preserved_on_inplace_edit() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        // Build a 50-block document so scrolling matters.
+        QByteArray src;
+        for (int i = 0; i < 50; ++i) {
+            src += QByteArrayLiteral("paragraph ");
+            src += QByteArray::number(i);
+            src += QByteArrayLiteral("\n\n");
+        }
+        // Drop the final separator.
+        src.chop(2);
+        doc.loadFromMarkdown(src);
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        // Scroll to roughly the middle.
+        auto *bar = e.textEdit()->verticalScrollBar();
+        QVERIFY(bar->maximum() > 0);  // sanity
+        const int target = bar->maximum() / 2;
+        bar->setValue(target);
+        QCOMPARE(bar->value(), target);
+
+        // Append a char to the first block via flat edit at position 1
+        // (mid-block on the first block). In-place edit, no structural
+        // change.
+        doc.applyFlatEdit(1, 1, QByteArrayLiteral("X"),
+                          Markoff::Origin::UserEdit);
+
+        // Spin the event loop for the d2 cycle.
+        QTest::qWait(50);
+
+        // Scroll position must be preserved (in-place edit, no
+        // structural change). Allow a tiny tolerance for layout drift
+        // in the edited block.
+        QVERIFY(qAbs(bar->value() - target) <= 5);
     }
 };
 
