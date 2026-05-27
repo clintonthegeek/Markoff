@@ -31,16 +31,42 @@ No KF6, no QML, no `markoff-live`.
 - Tests prefix `tst_styled_*`. All test binaries run under
   `QT_QPA_PLATFORM=offscreen`.
 
+## v0.1 invariants
+
+- **Per-block hash gating.** `StyleApplier::applyFormats` skips blocks
+  whose `(kind, text, spans, fontScale)` hash is unchanged. Test:
+  `tst_styled_dogfood_invariants::hash_gate_skips_unchanged_blocks`.
+  When adding new format inputs (e.g., a new `SourceSpan` flag), extend
+  the bit-pack in `computeBlockHash` to include it, or risk a missed
+  restyle on the change.
+- **Kind transition via `Cmd::changeKind`.** Prefix-rule kind
+  inference (Heading via leading `#`, BlockQuote via `> `, ListItem
+  via list-marker regex) runs inside the block walk; on disagreement
+  with the stored kind, `Cmd::changeKind` is queued for deferred
+  dispatch via `QTimer::singleShot(0)` to avoid synchronous re-entry
+  into `d2DocumentChanged`. CodeBlock and HorizontalRule are NOT
+  inferred (fence-state matching; left to the CRDT load path until
+  v0.2).
+- **Scroll position preserve.** In-place edits (no block added/removed)
+  preserve `verticalScrollBar()->value()`. Capture happens via
+  `StyleApplier::captureScrollBeforeEdit` connected to
+  `d2DocumentChanged` BEFORE the binding's `onD2DocumentChanged`
+  (Qt's FIFO connection delivery guarantees order); restore via
+  `QTimer::singleShot(0)` AFTER `endEditBlock` so Qt's layout signals
+  settle first. Structural edits let Qt's natural "ensure cursor
+  visible" behavior position the viewport.
+- **D2-broken core APIs to avoid.** `MarkoffDocument::blockAt(TextAnchor)`
+  and `MarkoffDocument::blockByteRange(BlockId)` both depend on
+  `latestBlockRanges`, which is NEVER populated by the D2 load path —
+  they return `std::nullopt` for any D2-loaded document. The styled
+  leaf works around both: `StyleApplier::applyFormats` reconstructs
+  byte ranges by walking `blockText(id).size() + interBlockSeparator`
+  for each block; `LinkInteraction::resolveLinkAt` uses
+  `textAnchorAt(byteOffset).block()` to extract the containing
+  BlockId from the anchor itself. When in doubt about a core API,
+  search `latestBlockRanges` first.
+
 ## Known v0 gaps (track in `docs/queue.md`)
-- **Kind transition on `applyFlatEdit`**: editing a block prefix (e.g.
-  Paragraph → Heading by typing `## `) does NOT re-infer `blockKind()`.
-  `markoff-live` runs `KindTransition::inferBlockKind` after every
-  `d2DocumentChanged`; `markoff-styled` does not. The
-  `remote_edit_replays_text_and_restyles` slot in
-  `tst_styled_d2_integration.cpp` is marked `QEXPECT_FAIL` for this.
-  Fix candidates: (a) replicate kind inference in `StyleApplier`; (b)
-  move kind inference into `MarkoffDocument::applyFlatEdit` so all
-  consumers benefit. Track via a future micro-spec.
 - **Delimiter visibility** is v0.1 work (`DocHighlighter` currently
   inert).
 - **Find bar** + `FindController` integration is v0.1.

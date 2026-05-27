@@ -130,7 +130,11 @@
 
 - 2026-05-26 `libs/markoff-styled/src/LinkInteraction.cpp:handleMove` — cursor-shape setter fires `setCursor()` on every MouseMove within the same link — idempotent in Qt but wasted call; cache shape in v0.1.
 
-- 2026-05-26 `libs/markoff-styled/tests/tst_styled_d2_integration.cpp:remote_edit_replays_text_and_restyles` — QEXPECT_FAIL: `applyFlatEdit` doesn't re-infer blockKind on prefix-changing edits — markoff-live has `KindTransition::inferBlockKind` in its `onD2Changed`; markoff-styled has no equivalent. Track via future micro-spec; fix options documented in `libs/markoff-styled/CLAUDE.md`.
+- ~~2026-05-26 `libs/markoff-styled/tests/tst_styled_d2_integration.cpp:remote_edit_replays_text_and_restyles` — QEXPECT_FAIL: `applyFlatEdit` doesn't re-infer blockKind on prefix-changing edits — markoff-live has `KindTransition::inferBlockKind` in its `onD2Changed`; markoff-styled has no equivalent. Track via future micro-spec; fix options documented in `libs/markoff-styled/CLAUDE.md`.~~ → fixed in v0.1 Task 2 (`Cmd::changeKind` prefix-rule inference added to `StyleApplier::onD2DocumentChanged`; `QEXPECT_FAIL` removed).
+
+- 2026-05-27 `libs/markoff-styled/src/StyleApplier.cpp` `applyPendingKindChanges`, invariant 6 — QTimer::singleShot(0) defers Cmd::changeKind out of d2DocumentChanged slot; the smell is justified per spec §4.4 (avoids synchronous CRDT re-entry during cascade). Mirrors markoff-live::LiveListModelBinding pattern.
+
+- 2026-05-27 `libs/markoff-styled/src/StyleApplier.cpp` `applyFormats`, invariant 6 — QTimer::singleShot(0) defers scroll-position restore until after Qt's post-endEditBlock layout signals settle; spec §5.2's synchronous restore was wrong (overridden by Qt's ensureCursorVisible logic).
 
 ---
 

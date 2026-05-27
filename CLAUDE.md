@@ -304,7 +304,9 @@ foundation library + two canonical view leaves.
                                  via `MarkoffDocument::inlineSpansFor` and
                                  `iterateBlocks`. `Markoff::Styled::Editor`
                                  is the public widget. Spec
-                                 `docs/specs/2026-05-26-markoff-styled-leaf-design.md`.
+                                 `docs/specs/2026-05-26-markoff-styled-leaf-design.md`. v0.1 added
+                                 per-block hash gating + kind transition + scroll-position preserve
+                                 (`docs/specs/2026-05-27-markoff-styled-dogfood-fixes-design.md`).
 - `libs/jkqtmathtext`          — LaTeX math rendering. Untracked sibling
                                  wired in for D3's Math delegate.
 
