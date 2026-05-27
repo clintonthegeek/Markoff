@@ -68,6 +68,7 @@ if(NOT TARGET jkqtmathtext)
 endif()
 add_subdirectory(libs/markoff-live)
 add_subdirectory(libs/markoff-source)
+add_subdirectory(libs/markoff-styled)
 
 # Apps (markoff-collab-testapp, future scene-demo) are demo binaries that link
 # Qt::QuickWidgets and other extra components. Default-ON for standalone builds,
