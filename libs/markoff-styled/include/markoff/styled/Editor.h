@@ -88,7 +88,7 @@ private:
     LinkInteraction                        *m_linkInteract = nullptr;
     Markoff::Theme                          m_theme;
     Markoff::LinkService                   *m_linkService  = nullptr;
-    Markoff::DefaultLinkService            *m_defaultLink  = nullptr;
+    mutable Markoff::DefaultLinkService    *m_defaultLink  = nullptr;
     QString                                 m_fromContext;
     qreal                                   m_fontScale    = 1.0;
 };

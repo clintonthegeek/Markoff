@@ -64,6 +64,29 @@ private Q_SLOTS:
         QTest::qWait(50);
         QCOMPARE(svc.activates.size(), 0);
     }
+
+    void editor_provides_default_link_service_when_none_set() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("a [text](http://x.test) b"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        // Do NOT call setLinkService — exercise the lazy default path.
+        QVERIFY(e.linkService() != nullptr);
+
+        // A click on a link should not crash (the default service is a no-op
+        // for activate, just emits the signal).
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+        const QPoint p = pointForChar(e.textEdit(), 4);
+        QTest::mouseClick(e.textEdit()->viewport(), Qt::LeftButton,
+                          Qt::NoModifier, p);
+        QTest::qWait(50);
+        // No assertion on the service's state — DefaultLinkService doesn't
+        // expose recording surface. The test verifies no crash + non-null.
+    }
 };
 
 QTEST_MAIN(TstStyledLinkInteraction)

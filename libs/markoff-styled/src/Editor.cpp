@@ -9,6 +9,7 @@
 #include <QTextBlock>
 #include <QTextEdit>
 
+#include <markoff/core/DefaultLinkService.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
@@ -36,6 +37,9 @@ Editor::Editor(QWidget *parent)
     m_styleApplier->setTheme(&m_theme);
 
     m_linkInteract = new LinkInteraction(m_editor, this);
+    // Propagate the lazy default so LinkInteraction always has a non-null
+    // service even before any setLinkService() call (spec §4).
+    m_linkInteract->setLinkService(linkService());
 }
 
 Editor::~Editor() = default;
@@ -121,14 +125,21 @@ void Editor::setTheme(const Markoff::Theme &t) {
 
 Markoff::LinkService *Editor::linkService() const {
     if (m_linkService) return m_linkService;
-    // Lazy DefaultLinkService is created on first read in Task 8 wiring.
-    return nullptr;
+    // Lazily create a DefaultLinkService so the Editor is functional
+    // standalone (spec §4). Cached in m_defaultLink; ownership = this.
+    if (!m_defaultLink) {
+        m_defaultLink = new Markoff::DefaultLinkService(
+            const_cast<Editor *>(this));
+    }
+    return m_defaultLink;
 }
 
 void Editor::setLinkService(Markoff::LinkService *svc) {
     if (m_linkService == svc) return;
     m_linkService = svc;
-    if (m_linkInteract) m_linkInteract->setLinkService(svc);
+    // Pass linkService() (not svc) so LinkInteraction gets the lazy
+    // default when svc is nullptr, keeping it non-null at all times.
+    if (m_linkInteract) m_linkInteract->setLinkService(linkService());
     emit linkServiceChanged();
 }
 
