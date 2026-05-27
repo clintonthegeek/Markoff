@@ -27,21 +27,6 @@ private Q_SLOTS:
     }
 
     void remote_edit_replays_text_and_restyles() {
-        // KNOWN PRODUCTION GAP: applyFlatEdit mutates block buffer content
-        // but does NOT update blockKind() when the content prefix changes
-        // (e.g. paragraph → heading). StyleApplier::applyFormats relies on
-        // blockKind(), so after an intra-block paragraph→heading edit the
-        // block is still formatted as a paragraph.
-        //
-        // markoff-live works around this via LiveListModelBinding's kind-
-        // transition heuristics (prefix-rule re-inference after each D2 edit).
-        // markoff-styled has no equivalent yet. The fix belongs in either:
-        //   (a) StyleApplier::applyFormats — infer kind from text content as
-        //       a fallback when blockKind() disagrees with the leading prefix.
-        //   (b) applyFlatEdit itself — call a kind-update helper when the
-        //       stored kind no longer matches the new leading prefix.
-        // Track as a production gap; do NOT fix inline (this is test-only).
-
         Markoff::Styled::Editor e;
         Markoff::MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("paragraph"));
@@ -57,13 +42,9 @@ private Q_SLOTS:
         // Text propagation works.
         QTRY_COMPARE(e.textEdit()->toPlainText(), QStringLiteral("## h2 line"));
 
-        // Format re-inference does NOT work: blockKind() is still Paragraph.
-        // QEXPECT_FAIL causes the sub-assertion to be recorded as an expected
-        // failure (the slot as a whole still passes).
-        QEXPECT_FAIL("", "Production gap: applyFlatEdit does not update blockKind; "
-                         "StyleApplier applies stale Paragraph format instead of "
-                         "Heading. Fix needed in StyleApplier or applyFlatEdit.",
-                     Continue);
+        // StyleApplier infers Heading from the "## " prefix and dispatches
+        // Cmd::changeKind via QTimer::singleShot(0). The next d2 cycle formats
+        // the block at heading size.
         QTRY_VERIFY(e.textEdit()->document()->findBlockByNumber(0)
                         .charFormat().fontPointSize() > 11.0);
     }

@@ -4,8 +4,10 @@
 #include <QHash>
 #include <QObject>
 #include <QPointer>
+#include <vector>
 
 #include <markoff/core/BlockId.h>
+#include <markoff/core/BlockKind.h>
 
 class QTextDocument;
 
@@ -50,9 +52,15 @@ public:
 
 private Q_SLOTS:
     void onD2Changed();
+    void applyPendingKindChanges();
 
 private:
     void applyFormats();
+
+    struct PendingKindChange {
+        Markoff::BlockId   id;
+        Markoff::BlockKind newKind;
+    };
 
     QPointer<QTextDocument>            m_textDocument;
     Markoff::MarkoffDocument          *m_markoffDocument = nullptr;
@@ -62,6 +70,7 @@ private:
     quint64                            m_restyleCount    = 0;
     QHash<Markoff::BlockId, quint64>   m_blockHashes;
     quint64                            m_hashSkipsLastPass = 0;
+    std::vector<PendingKindChange>     m_pendingKindChanges;
 };
 
 }  // namespace Markoff::Styled

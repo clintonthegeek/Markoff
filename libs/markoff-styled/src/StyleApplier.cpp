@@ -4,13 +4,16 @@
 #include <cstring>
 
 #include <QFont>
+#include <QRegularExpression>
 #include <QSignalBlocker>
 #include <QTextBlock>
 #include <QTextBlockFormat>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTimer>
 
 #include <markoff/core/BlockKind.h>
+#include <markoff/core/Cmd/D2.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
 #include <markoff/parser/SourceSpan.h>
@@ -173,6 +176,45 @@ quint64 computeBlockHash(Markoff::BlockKind kind,
     return h;
 }
 
+Markoff::BlockKind inferKindFromPrefix(const QByteArray &text,
+                                       Markoff::BlockKind currentKind) {
+    if (text.isEmpty()) return Markoff::BlockKind::Paragraph;
+
+    // Heading: 1-6 '#' followed by space, or 1-6 '#' followed by EOF.
+    int hashCount = 0;
+    while (hashCount < text.size() && hashCount < 7 && text[hashCount] == '#')
+        ++hashCount;
+    if (hashCount >= 1 && hashCount <= 6) {
+        if (hashCount == text.size()
+            || text[hashCount] == ' '
+            || text[hashCount] == '\n') {
+            return Markoff::BlockKind::Heading;
+        }
+    }
+
+    // BlockQuote: starts with "> " or is exactly ">".
+    if (text.startsWith("> ") || text == ">") {
+        return Markoff::BlockKind::BlockQuote;
+    }
+
+    // ListItem: ^[ \t]{0,3}([-*+]|\d+[.)])\s — same as markoff-live.
+    static const QRegularExpression listRe(
+        QStringLiteral("^[ \\t]{0,3}([-*+]|\\d+[.)])\\s"));
+    if (listRe.match(QString::fromUtf8(text)).hasMatch()) {
+        return Markoff::BlockKind::ListItem;
+    }
+
+    // CodeBlock and HorizontalRule inference deferred to v0.2
+    // (fence-state matching, not pure prefix). Currently we rely on
+    // the CRDT load path to set these correctly.
+    if (currentKind == Markoff::BlockKind::CodeBlock
+        || currentKind == Markoff::BlockKind::HorizontalRule) {
+        return currentKind;  // preserve, don't reinfer.
+    }
+
+    return Markoff::BlockKind::Paragraph;
+}
+
 }  // namespace
 
 namespace Markoff::Styled {
@@ -266,6 +308,15 @@ void StyleApplier::applyFormats() {
             }
             m_blockHashes[id] = h;
 
+            // Kind transition: if text prefix disagrees with stored kind, queue a
+            // Cmd::changeKind for deferred dispatch. The current pass still
+            // formats using `kind` (the stored kind) — the next d2 cycle, after
+            // changeKind lands, will format using the corrected kind.
+            const Markoff::BlockKind inferred = inferKindFromPrefix(text, kind);
+            if (inferred != kind) {
+                m_pendingKindChanges.push_back({id, inferred});
+            }
+
             const int startQt = Markoff::SourceTextDocumentBinding
                 ::byteOffsetToQtPos(flatBytes, blockStart);
             const int endQt = Markoff::SourceTextDocumentBinding
@@ -338,6 +389,22 @@ void StyleApplier::applyFormats() {
     }
     ++m_restyleCount;
     m_applyingFormats = false;
+
+    if (!m_pendingKindChanges.empty()) {
+        QTimer::singleShot(0, this, &StyleApplier::applyPendingKindChanges);
+    }
+}
+
+void StyleApplier::applyPendingKindChanges() {
+    if (!m_markoffDocument) {
+        m_pendingKindChanges.clear();
+        return;
+    }
+    auto changes = std::move(m_pendingKindChanges);
+    m_pendingKindChanges.clear();
+    for (const auto &chg : changes) {
+        Markoff::Cmd::changeKind(*m_markoffDocument, chg.id, chg.newKind);
+    }
 }
 
 }  // namespace Markoff::Styled

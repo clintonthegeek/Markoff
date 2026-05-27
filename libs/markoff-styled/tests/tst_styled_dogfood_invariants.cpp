@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <QApplication>
 #include <QTest>
+#include <QTextBlock>
 #include <QTextDocument>
 #include <QTextEdit>
 
+#include <markoff/core/BlockId.h>
+#include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>
@@ -37,6 +40,35 @@ private Q_SLOTS:
         QTRY_VERIFY(e.styleApplierHashSkips() > 0);
         // 9 of 10 blocks should be hash-skipped on this pass.
         QCOMPARE(e.styleApplierHashSkips(), quint64(9));
+    }
+
+    void kind_transition_paragraph_to_heading() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("plain"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+
+        const std::vector<Markoff::BlockId> blocks = doc.iterateBlocks();
+        QVERIFY(!blocks.empty());
+        const Markoff::BlockId id = blocks[0];  // first block
+
+        // Sanity: starts as Paragraph.
+        QCOMPARE(doc.blockKind(id), Markoff::BlockKind::Paragraph);
+
+        // Prepend "## " to the block content, turning it into a heading.
+        doc.applyFlatEdit(0, 0, QByteArrayLiteral("## "),
+                          Markoff::Origin::UserEdit);
+
+        // StyleApplier should infer Heading and emit Cmd::changeKind
+        // on the next event-loop tick. Wait for the model to update.
+        QTRY_COMPARE(doc.blockKind(id), Markoff::BlockKind::Heading);
+
+        // And the QTextBlock should now render at heading size.
+        const QTextBlock blk =
+            e.textEdit()->document()->findBlockByNumber(0);
+        QTRY_VERIFY(blk.charFormat().fontPointSize() > 11.0);
     }
 };
 
