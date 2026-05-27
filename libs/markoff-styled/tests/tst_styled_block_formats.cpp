@@ -68,6 +68,65 @@ private Q_SLOTS:
         // Paragraph charFormat must not impose a heading-bold weight.
         QVERIFY(b.charFormat().fontWeight() != int(QFont::Bold));
     }
+
+    void code_block_uses_monospace_and_background() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("```\ncode line\n```"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+
+        auto *qdoc = e.textEdit()->document();
+        // Fenced code spans 3 QTextBlocks: fence, content, fence.
+        const QTextBlock content = blockN(qdoc, 1);
+        const QTextCharFormat cf = content.charFormat();
+        QVERIFY(cf.fontFixedPitch() || cf.fontFamilies().toStringList().size() > 0);
+        QVERIFY(content.blockFormat().background().style() != Qt::NoBrush);
+    }
+
+    void blockquote_has_left_margin() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("> quoted text"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+
+        const QTextBlock b = blockN(e.textEdit()->document(), 0);
+        QVERIFY(b.blockFormat().leftMargin() > 0);
+    }
+
+    void list_item_has_left_margin() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("- first item"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+
+        const QTextBlock b = blockN(e.textEdit()->document(), 0);
+        QVERIFY(b.blockFormat().leftMargin() > 0);
+    }
+
+    void horizontal_rule_uses_monospace() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        // Use a thematic break preceded by a paragraph so tree-sitter
+        // unambiguously classifies the "---" line as ThematicBreak.
+        doc.loadFromMarkdown(QByteArrayLiteral("before\n\n---\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+
+        // Document has 2 MarkoffDocument blocks: Paragraph + HorizontalRule.
+        // The QTextDocument uses flatView (blocks joined by "\n\n"), giving:
+        // block 0 = "before", block 1 = "\n" (separator), block 2 = "---".
+        auto *qdoc = e.textEdit()->document();
+        const QTextBlock b = blockN(qdoc, 2);
+        const QTextCharFormat cf = b.charFormat();
+        QVERIFY(cf.fontFixedPitch() || cf.fontFamilies().toStringList().size() > 0);
+    }
 };
 
 QTEST_MAIN(TstStyledBlockFormats)

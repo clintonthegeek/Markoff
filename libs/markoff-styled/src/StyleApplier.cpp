@@ -50,6 +50,61 @@ void applyParagraph(QTextCursor &cursor, qreal fontScale) {
     cursor.setBlockCharFormat(cf);
 }
 
+void applyCodeBlock(QTextCursor &cursor, qreal fontScale) {
+    QTextBlockFormat bf = baseBlockFormat();
+    bf.setLeftMargin(12 * fontScale);
+    bf.setTopMargin(2);
+    bf.setBottomMargin(2);
+    bf.setBackground(QColor(245, 245, 245));  // Theme::CodeBlockBackground
+                                              // resolved in Task 9 wiring.
+    cursor.setBlockFormat(bf);
+
+    QTextCharFormat cf;
+    cf.setFontFamilies({QStringLiteral("monospace")});
+    cf.setFontFixedPitch(true);
+    cf.setFontPointSize(10.0 * fontScale);
+    cursor.setBlockCharFormat(cf);
+}
+
+void applyBlockquote(QTextCursor &cursor, int depth, qreal fontScale) {
+    QTextBlockFormat bf = baseBlockFormat();
+    bf.setLeftMargin(16 * fontScale * qMax(1, depth));
+    bf.setTopMargin(2);
+    bf.setBottomMargin(2);
+    cursor.setBlockFormat(bf);
+
+    QTextCharFormat cf;
+    cf.setFontPointSize(11.0 * fontScale);
+    cf.setForeground(QColor(100, 100, 100));  // Theme::Quote.
+    cursor.setBlockCharFormat(cf);
+}
+
+void applyListItem(QTextCursor &cursor, int depth, qreal fontScale) {
+    QTextBlockFormat bf = baseBlockFormat();
+    bf.setLeftMargin(16 * fontScale * qMax(1, depth + 1));
+    bf.setTopMargin(1);
+    bf.setBottomMargin(1);
+    cursor.setBlockFormat(bf);
+
+    QTextCharFormat cf;
+    cf.setFontPointSize(11.0 * fontScale);
+    cursor.setBlockCharFormat(cf);
+}
+
+void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
+    QTextBlockFormat bf = baseBlockFormat();
+    bf.setTopMargin(6 * fontScale);
+    bf.setBottomMargin(6 * fontScale);
+    cursor.setBlockFormat(bf);
+
+    QTextCharFormat cf;
+    cf.setFontFamilies({QStringLiteral("monospace")});
+    cf.setFontFixedPitch(true);
+    cf.setForeground(QColor(180, 180, 180));
+    cf.setFontPointSize(11.0 * fontScale);
+    cursor.setBlockCharFormat(cf);
+}
+
 }  // namespace
 
 namespace Markoff::Styled {
@@ -137,8 +192,26 @@ void StyleApplier::applyFormats() {
                     applyHeading(blkCursor, level, m_fontScale);
                 } else if (kind == Markoff::BlockKind::Paragraph) {
                     applyParagraph(blkCursor, m_fontScale);
+                } else if (kind == Markoff::BlockKind::CodeBlock) {
+                    applyCodeBlock(blkCursor, m_fontScale);
+                } else if (kind == Markoff::BlockKind::BlockQuote) {
+                    int depth = 1;
+                    const QByteArray text = m_markoffDocument->blockText(id);
+                    if (!text.isEmpty()) {
+                        depth = 0;
+                        for (int i = 0; i < text.size() && text[i] == '>'; ++i) ++depth;
+                        depth = qMax(1, depth);
+                    }
+                    applyBlockquote(blkCursor, depth, m_fontScale);
+                } else if (kind == Markoff::BlockKind::ListItem) {
+                    int depth = 0;
+                    const QByteArray text = m_markoffDocument->blockText(id);
+                    while (depth < text.size() && (text[depth] == ' ' || text[depth] == '\t')) ++depth;
+                    depth /= 2;  // 2 spaces per indent level — close enough for v0.
+                    applyListItem(blkCursor, depth, m_fontScale);
+                } else if (kind == Markoff::BlockKind::HorizontalRule) {
+                    applyHorizontalRule(blkCursor, m_fontScale);
                 } else {
-                    // Other kinds — Task 6.
                     applyParagraph(blkCursor, m_fontScale);
                 }
                 qblk = qblk.next();
