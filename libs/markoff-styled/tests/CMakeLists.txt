@@ -42,3 +42,10 @@ target_include_directories(tst_styled_link_interaction
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 set_tests_properties(tst_styled_link_interaction
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_delimiter_visibility tst_styled_delimiter_visibility.cpp)
+add_test(NAME tst_styled_delimiter_visibility COMMAND tst_styled_delimiter_visibility)
+target_link_libraries(tst_styled_delimiter_visibility
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_delimiter_visibility
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

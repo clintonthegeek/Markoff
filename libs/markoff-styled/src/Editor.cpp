@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/styled/Editor.h>
 
+#include "DocHighlighter.h"
 #include "LinkInteraction.h"
 #include "StyleApplier.h"
 
@@ -40,6 +41,8 @@ Editor::Editor(QWidget *parent)
     // Propagate the lazy default so LinkInteraction always has a non-null
     // service even before any setLinkService() call (spec §4).
     m_linkInteract->setLinkService(linkService());
+
+    m_highlighter = new DocHighlighter(m_editor->document());
 }
 
 Editor::~Editor() = default;
