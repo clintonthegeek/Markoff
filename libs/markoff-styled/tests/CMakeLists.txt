@@ -49,3 +49,10 @@ target_link_libraries(tst_styled_delimiter_visibility
     PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
 set_tests_properties(tst_styled_delimiter_visibility
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_d2_integration tst_styled_d2_integration.cpp)
+add_test(NAME tst_styled_d2_integration COMMAND tst_styled_d2_integration)
+target_link_libraries(tst_styled_d2_integration
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_d2_integration
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
