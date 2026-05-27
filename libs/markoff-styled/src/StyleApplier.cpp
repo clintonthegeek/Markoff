@@ -11,6 +11,7 @@
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
+#include <markoff/parser/SourceSpan.h>
 
 namespace {
 
@@ -103,6 +104,15 @@ void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
     cf.setForeground(QColor(180, 180, 180));
     cf.setFontPointSize(11.0 * fontScale);
     cursor.setBlockCharFormat(cf);
+}
+
+QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
+                                  qreal /*fontScale*/) {
+    QTextCharFormat fmt;
+    if (span.bold)          fmt.setFontWeight(QFont::Bold);
+    if (span.italic)        fmt.setFontItalic(true);
+    if (span.strikethrough) fmt.setFontStrikeOut(true);
+    return fmt;
 }
 
 }  // namespace
@@ -213,6 +223,21 @@ void StyleApplier::applyFormats() {
                     applyParagraph(blkCursor, m_fontScale);
                 }
                 qblk = qblk.next();
+            }
+
+            // Apply inline char formats (bold, italic, strikethrough) for this block.
+            // docLen - 1: QTextDocument always has a trailing paragraph separator that
+            // must not be selected, so cap positions at characterCount() - 1.
+            const int docLen = m_textDocument->characterCount() - 1;
+            for (const Markoff::SourceSpan &span : m_markoffDocument->inlineSpansFor(id)) {
+                if (span.charLength <= 0) continue;
+                const int spanStart = startQt + span.charOffset;
+                const int spanEnd   = startQt + span.charOffset + span.charLength;
+                if (spanStart >= docLen) continue;
+                QTextCursor c(m_textDocument);
+                c.setPosition(spanStart);
+                c.setPosition(qMin(spanEnd, docLen), QTextCursor::KeepAnchor);
+                c.mergeCharFormat(charFormatForSpan(span, m_fontScale));
             }
 
             // Advance past block content + separator ("\n\n") between blocks.
