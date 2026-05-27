@@ -59,6 +59,28 @@ private Q_SLOTS:
         QCOMPARE(flat(doc), QByteArrayLiteral("alphabeta"));
         QCOMPARE(edit.toPlainText(), QStringLiteral("alphabeta"));
     }
+    void cross_block_selection_delete_merges_content() {
+        // Delete spanning content of TWO blocks + the separator must merge
+        // into ONE canonical block (Tier 2 cross-block path).
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("hello\n\nworld"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding b;
+        b.setTextDocument(edit.document());
+        b.setMarkoffDocument(&doc);
+        QCOMPARE(edit.toPlainText(), QStringLiteral("hello\n\nworld"));
+
+        // Select qtPos 3..9 = "lo\n\nwo" (mid-block0 through the separator into
+        // mid-block1) and delete. Expect one merged block "helrld".
+        QTextCursor c(edit.document());
+        c.setPosition(3);
+        c.setPosition(9, QTextCursor::KeepAnchor);
+        c.removeSelectedText();
+
+        QCOMPARE(int(doc.iterateBlocks().size()), 1);
+        QCOMPARE(flat(doc), QByteArrayLiteral("helrld"));
+        QCOMPARE(edit.toPlainText(), QStringLiteral("helrld"));
+    }
 };
 
 QTEST_MAIN(TstBindingForward)
