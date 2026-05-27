@@ -34,6 +34,9 @@ bool LinkInteraction::eventFilter(QObject *obj, QEvent *event) {
         case QEvent::MouseMove:
             handleMove(static_cast<QMouseEvent *>(event));
             break;
+        case QEvent::Leave:
+            handleLeave();
+            break;
         default: break;
         }
     }
@@ -110,7 +113,12 @@ void LinkInteraction::handleMove(QMouseEvent *e) {
 }
 
 void LinkInteraction::handleLeave() {
-    // Implemented in Task 12.
+    if (m_currentHoveredRawText.isEmpty()) return;
+    if (m_service) m_service->notifyHoverLeft(m_currentHoveredRawText);
+    m_currentHoveredRawText.clear();
+    if (m_edit && m_edit->viewport()) {
+        m_edit->viewport()->setCursor(Qt::IBeamCursor);
+    }
 }
 
 }  // namespace Markoff::Styled

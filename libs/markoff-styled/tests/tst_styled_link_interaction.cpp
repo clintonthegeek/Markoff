@@ -156,6 +156,28 @@ private Q_SLOTS:
         QTest::mouseMove(e.textEdit()->viewport(), pointForChar(e.textEdit(), 31));
         QTRY_COMPARE(svc.hovers.size(), 2);
     }
+
+    void leave_event_clears_hover() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("a [text](http://x.test) b"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        RecordingLinkService svc;
+        e.setLinkService(&svc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTest::mouseMove(e.textEdit()->viewport(), pointForChar(e.textEdit(), 4));
+        QTRY_COMPARE(svc.hovers.size(), 1);
+
+        QEvent leaveEvent(QEvent::Leave);
+        QCoreApplication::sendEvent(e.textEdit()->viewport(), &leaveEvent);
+
+        QTRY_COMPARE(svc.hoverLefts.size(), 1);
+    }
 };
 
 QTEST_MAIN(TstStyledLinkInteraction)
