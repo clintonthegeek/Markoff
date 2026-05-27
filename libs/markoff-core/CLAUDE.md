@@ -74,6 +74,30 @@ callers still using `toMarkdownUtf8`/`toMarkdown` (notably
 `SourceTextDocumentBinding.cpp:205`, `SearchController.cpp:55`, and a
 handful of tests) are tracked for migration as a follow-up.
 
+## Single-document binding: canonical structure invariant
+
+Spec: `docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`
+
+**Invariant (enforced ONLY on the `applyFlatEdit` ingress):**
+- No internal `\n` in any block buffer (each buffer is a single logical paragraph/block; newlines are structure, not content).
+- No unintended empty blocks.
+- Inter-block separators in `flatView` are exactly single `\n\n`; the flat representation ends with a single `\n`.
+
+This invariant is enforced by `applyFlatEdit`'s canonicalization pass (splits inserted text on any newline-run, collapsing runs; never creates empty blocks). It is NOT enforced on the per-block path (`d2ApplyBufferEdit`, `d2InsertBlock`), so the live-view leaf's intentional empty-paragraph blocks are safe.
+
+**Forward path — `SourceTextDocumentBinding::onQtContentsChange`:**
+
+Edits arrive in separator-view (the flat text the QTextDocument holds). The binding resolves them via `Markoff::Detail::findBlockAtSepByte` (declared in `include/markoff/core/Detail/FlatBlockResolve.h`) and dispatches:
+- **Single-block, structure-neutral** → `d2ApplyBufferEdit` (boundary-correct; preserves B1 buffer convention).
+- **Cross-block non-structural** (separator-spanning deletes, selection deletes) → direct D2 primitives that merge blocks without going through the flat text.
+- **Structural** (newline insertion) → `applyFlatEdit`.
+
+`Markoff::Detail::findBlockAtSepByte` and `sliceByBlocks` are the shared sep-view ↔ block helpers used by both the binding and `markoff-source`.
+
+**Reverse path — `onD2DocumentChanged`:**
+
+When the model changes, the binding pushes content back to the QTextDocument via an incremental common-prefix/suffix text-diff executed through `QTextCursor`. This preserves formatting, cursor position, and scroll. Only the initial-load path (`syncQtDocumentFromMarkoff`) does a full `setPlainText` (nothing to preserve at load time).
+
 ## `applyFlatEdit` — flat-text entry point (D4)
 
 ```cpp

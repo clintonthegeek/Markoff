@@ -66,6 +66,20 @@ No KF6, no QML, no `markoff-live`.
   BlockId from the anchor itself. When in doubt about a core API,
   search `latestBlockRanges` first.
 
+## Resolved binding bugs (2026-05-27)
+
+The class of bug reported during 2026-05-27 dogfood — boundary drift on
+separator-spanning edits + `setPlainText`-wipe on every model change —
+has been resolved at the `markoff-core` binding layer, not in the styled
+leaf itself. The fix lives in `SourceTextDocumentBinding`'s forward path
+(sep-view dispatch + direct D2 merge primitives for cross-block deletes)
+and reverse path (incremental prefix/suffix text-diff instead of
+`setPlainText`). Reference spec:
+`docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`.
+
+The existing **D2-broken core APIs** caveat below still applies (`blockAt`
+/ `blockByteRange` → `latestBlockRanges` not populated by D2 load path).
+
 ## Known v0 gaps (track in `docs/queue.md`)
 - **Delimiter visibility** is v0.1 work (`DocHighlighter` currently
   inert).

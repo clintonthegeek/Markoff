@@ -136,6 +136,12 @@
 
 - 2026-05-27 `libs/markoff-styled/src/StyleApplier.cpp` `applyFormats`, invariant 6 — QTimer::singleShot(0) defers scroll-position restore until after Qt's post-endEditBlock layout signals settle; spec §5.2's synchronous restore was wrong (overridden by Qt's ensureCursorVisible logic).
 
+- ~~2026-05-18 `libs/markoff-core/src/SourceTextDocumentBinding.cpp:311-317` — inv #3 — separator-zone deletes (backspace at block start, cross-block selection delete) translated to a zero-length edit in no-separator space; model retained both blocks while QTextDocument had them merged; the subsequent `onD2DocumentChanged` reverted the user's edit.~~ → CLOSED 2026-05-27 by the robustness spec + RT3 plan. Sep-view dispatch via `Markoff::Detail::findBlockAtSepByte` routes separator-spanning deletes to direct D2 merge primitives. Guards: `tst_binding_forward::backspace_over_separator_merges_blocks` and `::cross_block_selection_delete_merges_content`. Reference spec `docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`.
+
+- 2026-05-27 `libs/markoff-core/src/SourceTextDocumentBinding.cpp:sepViewToNoSepByteForEdit` — inv #8 — calls `iterateBlocks()` twice: once directly and once inside `findBlockAtSepByte`. Inefficiency only; Tier-3 path, not hot. Optimize if profiling flags it.
+
+- 2026-05-27 `libs/markoff-core/src/SourceTextDocumentBinding.cpp` and `applyFlatEdit` cross-block branch — inv #8 — a delete spanning ALL content of ≥2 blocks can leave one empty surviving block (both `applyFlatEdit`'s cross-block branch and the binding's Tier-2 path). Whole-document-select-delete edge case; renders as an empty paragraph. Harmless in normal use; revisit if dogfood surfaces it.
+
 ---
 
 ## #1 — E2.6: theme wire-up + zoom + color wiring ✅ COMPLETE 2026-05-18 (tag `v0.7.0-e2.6`)
