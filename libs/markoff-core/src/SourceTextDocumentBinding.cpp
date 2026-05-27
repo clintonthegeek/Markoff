@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/core/SourceTextDocumentBinding.h>
 
+#include <QTextCursor>
 #include <QTextDocument>
+
+#include <algorithm>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
@@ -452,13 +455,42 @@ void SourceTextDocumentBinding::onD2DocumentChanged()
     if (!m_textDocument) return;
     if (!m_subscribedDoc) return;
 
-    const QString expectedStr = QString::fromUtf8(m_subscribedDoc->flatView());
+    const QString expected = QString::fromUtf8(m_subscribedDoc->flatView());
+    const QString actual   = m_textDocument->toPlainText();
     // After a forward edit the QTextDocument already holds the new text;
-    // this equality check prevents the unnecessary setPlainText re-application.
-    if (m_textDocument->toPlainText() == expectedStr) return;
+    // this equality check prevents any document mutation in the common case.
+    if (actual == expected) return;
+
+    // ── Incremental diff: longest common prefix + suffix ─────────────────────
+    // Replace only the minimal contiguous changed span via QTextCursor so that
+    // character formatting outside the changed region is preserved. This also
+    // means the view's cursor doesn't jump to the end on a remote edit.
+
+    // Longest common prefix.
+    int p = 0;
+    const int minLen = std::min(actual.size(), expected.size());
+    while (p < minLen && actual.at(p) == expected.at(p)) ++p;
+    // Don't split a surrogate pair at the prefix boundary.
+    if (p > 0 && p < actual.size() && actual.at(p - 1).isHighSurrogate()) --p;
+
+    // Longest common suffix, not overlapping the prefix.
+    int s = 0;
+    const int maxS = minLen - p;
+    while (s < maxS
+           && actual.at(actual.size() - 1 - s) == expected.at(expected.size() - 1 - s))
+        ++s;
+    // Don't split a surrogate pair at the suffix boundary.
+    if (s > 0 && actual.at(actual.size() - s).isLowSurrogate()) --s;
+
+    const int removeFrom = p;
+    const int removeTo   = actual.size() - s;   // exclusive
+    const QString middle = expected.mid(p, expected.size() - s - p);
 
     m_applyingRemoteEdit = true;
-    m_textDocument->setPlainText(expectedStr);
+    QTextCursor c(m_textDocument);
+    c.setPosition(removeFrom);
+    c.setPosition(removeTo, QTextCursor::KeepAnchor);
+    c.insertText(middle);
     m_applyingRemoteEdit = false;
 }
 
