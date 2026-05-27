@@ -56,3 +56,10 @@ target_link_libraries(tst_styled_d2_integration
     PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
 set_tests_properties(tst_styled_d2_integration
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_dogfood_invariants tst_styled_dogfood_invariants.cpp)
+add_test(NAME tst_styled_dogfood_invariants COMMAND tst_styled_dogfood_invariants)
+target_link_libraries(tst_styled_dogfood_invariants
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_dogfood_invariants
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

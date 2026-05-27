@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QHash>
 #include <QObject>
 #include <QPointer>
+
+#include <markoff/core/BlockId.h>
 
 class QTextDocument;
 
@@ -38,6 +41,10 @@ public:
     /// Counter incremented on every restyle pass; tests assert progress.
     quint64 restyleCount() const noexcept { return m_restyleCount; }
 
+    /// Number of blocks that were hash-skipped (formats not reapplied)
+    /// during the most recent applyFormats pass. Tests assert this.
+    quint64 hashSkips() const noexcept { return m_hashSkipsLastPass; }
+
     /// Force a restyle without waiting for `d2DocumentChanged`.
     void rerender();
 
@@ -53,6 +60,8 @@ private:
     qreal                              m_fontScale       = 1.0;
     bool                               m_applyingFormats = false;
     quint64                            m_restyleCount    = 0;
+    QHash<Markoff::BlockId, quint64>   m_blockHashes;
+    quint64                            m_hashSkipsLastPass = 0;
 };
 
 }  // namespace Markoff::Styled

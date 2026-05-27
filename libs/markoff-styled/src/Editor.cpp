@@ -158,6 +158,12 @@ void Editor::setFromContext(const QString &c) {
     emit fromContextChanged();
 }
 
+// ---- Test helpers -------------------------------------------------------
+
+quint64 Editor::styleApplierHashSkips() const {
+    return m_styleApplier ? m_styleApplier->hashSkips() : 0;
+}
+
 // ---- Font scale ---------------------------------------------------------
 
 qreal Editor::fontScale() const { return m_fontScale; }

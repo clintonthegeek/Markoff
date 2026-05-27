@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "StyleApplier.h"
 
+#include <cstring>
+
 #include <QFont>
 #include <QSignalBlocker>
 #include <QTextBlock>
@@ -141,6 +143,36 @@ QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
     return fmt;
 }
 
+quint64 computeBlockHash(Markoff::BlockKind kind,
+                         const QByteArray &text,
+                         const QList<Markoff::SourceSpan> &spans,
+                         qreal fontScale) {
+    quint64 h = qHash(int(kind));
+    h ^= qHash(text);
+    h ^= quint64(text.size()) * 0x9E3779B97F4A7C15ULL;
+    h ^= quint64(spans.size()) << 32;
+    for (const Markoff::SourceSpan &span : spans) {
+        h ^= quint64(span.charOffset) * 0xBF58476D1CE4E5B9ULL;
+        h ^= quint64(span.charLength) << 16;
+        const quint64 flagBits =
+            (span.bold          ? 1ULL << 0  : 0) |
+            (span.italic        ? 1ULL << 1  : 0) |
+            (span.strikethrough ? 1ULL << 2  : 0) |
+            (span.code          ? 1ULL << 3  : 0) |
+            (span.highlight     ? 1ULL << 4  : 0) |
+            (span.isLink        ? 1ULL << 5  : 0) |
+            (span.isWikilink    ? 1ULL << 6  : 0) |
+            (span.isTag         ? 1ULL << 7  : 0) |
+            (span.isFootnoteRef ? 1ULL << 8  : 0);
+        h ^= flagBits;
+    }
+    // Mix in fontScale (cast to quint64 bits for stable hashing).
+    quint64 fsBits = 0;
+    std::memcpy(&fsBits, &fontScale, sizeof(fsBits));
+    h ^= fsBits;
+    return h;
+}
+
 }  // namespace
 
 namespace Markoff::Styled {
@@ -182,6 +214,7 @@ void StyleApplier::setFontScale(qreal s) {
 
 void StyleApplier::rerender() {
     if (!m_textDocument || !m_markoffDocument) return;
+    m_blockHashes.clear();  // Force every block to apply on next pass.
     applyFormats();
 }
 
@@ -191,6 +224,7 @@ void StyleApplier::applyFormats() {
     if (m_applyingFormats) return;
     if (!m_textDocument || !m_markoffDocument) return;
     m_applyingFormats = true;
+    m_hashSkipsLastPass = 0;
     {
         QSignalBlocker block(m_textDocument);
         QTextCursor cursor(m_textDocument);
@@ -204,14 +238,34 @@ void StyleApplier::applyFormats() {
         const std::vector<Markoff::BlockId> blocks = m_markoffDocument->iterateBlocks();
         static constexpr int kSepLen = 2;  // "\n\n"
 
+        // Set-like map of all IDs present this pass, for stale-entry pruning below.
+        QHash<Markoff::BlockId, char> currentIds;
+        currentIds.reserve(static_cast<qsizetype>(blocks.size()));
+
         quint32 bytePos = 0;
         for (size_t i = 0; i < blocks.size(); ++i) {
             const Markoff::BlockId id = blocks[i];
+            currentIds.insert(id, 0);
+
             const QByteArray text = m_markoffDocument->blockText(id);
             const quint32 blockStart = bytePos;
             const quint32 blockEnd   = bytePos + static_cast<quint32>(text.size());
 
             const Markoff::BlockKind kind = m_markoffDocument->blockKind(id);
+            const QList<Markoff::SourceSpan> spans = m_markoffDocument->inlineSpansFor(id);
+            const quint64 h = computeBlockHash(kind, text, spans, m_fontScale);
+
+            if (m_blockHashes.value(id, 0) == h) {
+                // Block unchanged — skip format reapplication, but still
+                // advance the bytePos accumulator so subsequent blocks are
+                // computed correctly.
+                ++m_hashSkipsLastPass;
+                bytePos = blockEnd;
+                if (i + 1 < blocks.size()) bytePos += kSepLen;
+                continue;
+            }
+            m_blockHashes[id] = h;
+
             const int startQt = Markoff::SourceTextDocumentBinding
                 ::byteOffsetToQtPos(flatBytes, blockStart);
             const int endQt = Markoff::SourceTextDocumentBinding
@@ -234,7 +288,7 @@ void StyleApplier::applyFormats() {
                     int depth = 1;
                     if (!text.isEmpty()) {
                         depth = 0;
-                        for (int i = 0; i < text.size() && text[i] == '>'; ++i) ++depth;
+                        for (int bi = 0; bi < text.size() && text[bi] == '>'; ++bi) ++depth;
                         depth = qMax(1, depth);
                     }
                     applyBlockquote(blkCursor, depth, m_fontScale);
@@ -255,7 +309,7 @@ void StyleApplier::applyFormats() {
             // docLen - 1: QTextDocument always has a trailing paragraph separator that
             // must not be selected, so cap positions at characterCount() - 1.
             const int docLen = m_textDocument->characterCount() - 1;
-            for (const Markoff::SourceSpan &span : m_markoffDocument->inlineSpansFor(id)) {
+            for (const Markoff::SourceSpan &span : spans) {
                 if (span.charLength <= 0) continue;
                 const int spanStart = startQt + span.charOffset;
                 const int spanEnd   = startQt + span.charOffset + span.charLength;
@@ -269,6 +323,15 @@ void StyleApplier::applyFormats() {
             // Advance past block content + separator ("\n\n") between blocks.
             bytePos = blockEnd;
             if (i + 1 < blocks.size()) bytePos += kSepLen;
+        }
+
+        // Prune stale entries (blocks that no longer exist in the document).
+        for (auto it = m_blockHashes.begin(); it != m_blockHashes.end(); ) {
+            if (!currentIds.contains(it.key())) {
+                it = m_blockHashes.erase(it);
+            } else {
+                ++it;
+            }
         }
 
         cursor.endEditBlock();

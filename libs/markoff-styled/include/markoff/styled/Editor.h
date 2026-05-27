@@ -72,6 +72,10 @@ public:
     // Accessor for tests + internal helpers
     QTextEdit *textEdit() const { return m_editor; }
 
+    /// Test-only accessor: number of hash-skipped blocks during the
+    /// most recent StyleApplier restyle pass.
+    quint64 styleApplierHashSkips() const;
+
 Q_SIGNALS:
     void sessionChanged();
     void themeChanged();
