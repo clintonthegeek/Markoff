@@ -35,7 +35,7 @@ void applyHeading(QTextCursor &cursor, int level, qreal fontScale) {
     QTextCharFormat cf;
     cf.setFontPointSize(kBaseSize * kRatios[idx] * fontScale);
     cf.setFontWeight(QFont::Bold);
-    cursor.mergeBlockCharFormat(cf);
+    cursor.setBlockCharFormat(cf);
 }
 
 void applyParagraph(QTextCursor &cursor, qreal fontScale) {
@@ -196,7 +196,6 @@ void StyleApplier::applyFormats() {
                     applyCodeBlock(blkCursor, m_fontScale);
                 } else if (kind == Markoff::BlockKind::BlockQuote) {
                     int depth = 1;
-                    const QByteArray text = m_markoffDocument->blockText(id);
                     if (!text.isEmpty()) {
                         depth = 0;
                         for (int i = 0; i < text.size() && text[i] == '>'; ++i) ++depth;
@@ -205,7 +204,6 @@ void StyleApplier::applyFormats() {
                     applyBlockquote(blkCursor, depth, m_fontScale);
                 } else if (kind == Markoff::BlockKind::ListItem) {
                     int depth = 0;
-                    const QByteArray text = m_markoffDocument->blockText(id);
                     while (depth < text.size() && (text[depth] == ' ' || text[depth] == '\t')) ++depth;
                     depth /= 2;  // 2 spaces per indent level — close enough for v0.
                     applyListItem(blkCursor, depth, m_fontScale);
