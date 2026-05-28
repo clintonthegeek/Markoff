@@ -142,6 +142,15 @@
 
 - 2026-05-27 `libs/markoff-core/src/SourceTextDocumentBinding.cpp` and `applyFlatEdit` cross-block branch — inv #8 — a delete spanning ALL content of ≥2 blocks can leave one empty surviving block (both `applyFlatEdit`'s cross-block branch and the binding's Tier-2 path). Whole-document-select-delete edge case; renders as an empty paragraph. Harmless in normal use; revisit if dogfood surfaces it.
 
+- `libs/markoff-core/src/Detail/FlatBlockResolve.cpp:findBlockAtSepByte`
+  separator-zone underflow — fixed in `eb685f0` while landing the 2026-05-27
+  caret-authority work (a sep-view byte strictly inside `\n\n` underflowed
+  `byteInBlock` and silently mis-attributed the hit, bypassing cross-block
+  merge). Covered indirectly by the new
+  `tst_styled_dogfood_invariants::backspace_at_block_start_merges_with_caret_at_join`;
+  a dedicated unit test on `findBlockAtSepByte` separator-zone boundaries
+  would prevent regression and is worth adding (qt-code-review minor flag).
+
 ---
 
 ## #1 — E2.6: theme wire-up + zoom + color wiring ✅ COMPLETE 2026-05-18 (tag `v0.7.0-e2.6`)
@@ -762,32 +771,28 @@ the count drops.
 
 ---
 
-## #7 — Cursor authority for the flat-text view leaves (styled + source) 🔴 OPEN 2026-05-27
+## #7 — Cursor authority for the flat-text view leaves (styled + source) ✅ CLOSED 2026-05-27
 
-**The active frontier.** `markoff-styled` dogfood surfaced the live
-"Enter jumps to end of next paragraph" bug — guide §B.1. The flat-text
-binding (`SourceTextDocumentBinding`) has no cursor authority wired to
-the QTextEdit: after a structural edit the reverse-sync `insertText`
-leaves the caret past the canonical separator, and nothing re-asserts the
-intended caret. `syncFromSession` exists but (a) emits QML-binding signals
-never connected to `setTextCursor` and (b) computes positions in no-sep
-coordinates while the QTextEdit holds sep-view text.
+**Closed.** B.1 (Enter creates paragraph + caret lands correctly) and B.3
+(cross-block merge caret) are both solved. B.2/B.4 remain partials — see
+guide §B for the open follow-ups (collab/undo caret).
 
-**Fix:** port `LiveCursorState::establishFocus`'s contract to the
-single-document binding — declare the intended post-edit caret as a
-`TextAnchor` before mutating, re-resolve it to a sep-view QTextEdit
-position after `onD2DocumentChanged` settles, apply via `setTextCursor`.
-Closing §B.1 drags §B.2/§B.3/§B.4 along (shared root). Fixes styled AND
-source (shared binding).
+**Spec:** `docs/specs/2026-05-27-flat-view-enter-and-caret-authority-design.md`
 
-**This is an L3 authority decision — settle "who owns the QTextEdit
-caret" in the spec before the plan (INVARIANTS §2), and retire the old
-signal path in the same plan (INVARIANTS §3).**
+**Implementation commits:**
+- `ff33a6e` — `applyInteractiveNewline` + `m_pendingCaret` staging in `SourceTextDocumentBinding`
+- `88cc5dc` — `caretResolved` signal wired in `markoff-styled` Editor + `markoff-source` Editor
+- `a7535e3` — sep-view caret resolution at tail of `onD2DocumentChanged`
+- `eb685f0` — fix `findBlockAtSepByte` separator-zone underflow (prerequisite bug found in review)
 
-Full orientation brief, root cause, fix shape, code locations, required
-process, and definition of done:
-[`handoff/2026-05-27-cursor-authority-fix-handoff.md`](handoff/2026-05-27-cursor-authority-fix-handoff.md).
-Design reference: [`VIEW-IMPLEMENTORS-GUIDE.md`](VIEW-IMPLEMENTORS-GUIDE.md) §B.
+**Root cause (corrected from handoff brief):** the structural edit was *dropped*
+entirely — `applyFlatEdit`'s cursor-edit start-of-next-block bias + empty-head
+suppression + the no-empty-block invariant made a lone boundary `\n` a no-op,
+so no paragraph was created. The caret drift was a secondary symptom. The fix
+required both a new forward-path ingress (`applyInteractiveNewline`) and the
+caret re-assertion chokepoint.
+
+**Design reference:** [`VIEW-IMPLEMENTORS-GUIDE.md`](VIEW-IMPLEMENTORS-GUIDE.md) §B (updated 2026-05-27).
 
 ---
 

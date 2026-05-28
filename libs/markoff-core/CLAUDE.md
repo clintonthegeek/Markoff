@@ -85,6 +85,16 @@ Spec: `docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`
 
 This invariant is enforced by `applyFlatEdit`'s canonicalization pass (splits inserted text on any newline-run, collapsing runs; never creates empty blocks). It is NOT enforced on the per-block path (`d2ApplyBufferEdit`, `d2InsertBlock`), so the live-view leaf's intentional empty-paragraph blocks are safe.
 
+**Interactive-ingress exception — `applyInteractiveNewline`.** The canonical
+"no empty blocks" rule holds for the programmatic ingress (`applyFlatEdit`).
+The *interactive* ingress `applyInteractiveNewline` (WYSIWYG Enter, routed from
+`SourceTextDocumentBinding::onQtContentsChange` for a bare `\n`) deliberately
+MAY create a transient empty block — pressing Enter at end of a paragraph must
+produce a new empty paragraph with the caret in it. A still-empty paragraph
+collapses on serialize/reload (it round-trips as the ordinary `\n\n`
+separator), so it never persists. See
+`docs/specs/2026-05-27-flat-view-enter-and-caret-authority-design.md`.
+
 **Forward path — `SourceTextDocumentBinding::onQtContentsChange`:**
 
 Edits arrive in separator-view (the flat text the QTextDocument holds). The binding resolves them via `Markoff::Detail::findBlockAtSepByte` (declared in `include/markoff/core/Detail/FlatBlockResolve.h`) and dispatches:

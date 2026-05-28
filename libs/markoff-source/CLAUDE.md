@@ -4,10 +4,12 @@ Fully-owned QtWidgets Source view on `markoff-core`. Replaces the Qutepart-based
 
 > **Required reading before seam work:**
 > [`../../docs/VIEW-IMPLEMENTORS-GUIDE.md`](../../docs/VIEW-IMPLEMENTORS-GUIDE.md)
-> — the cross-cutting view↔model concerns and contracts. This leaf shares
-> `SourceTextDocumentBinding` with `markoff-styled`, so the §B cursor-authority
-> gap applies here too; the cursor-authority fix that lands for styled should
-> close it for source in the same stroke.
+> — the cross-cutting view↔model concerns and contracts.
+>
+> §B.1/§B.3 cursor authority is **closed** here too — `markoff-source` shares
+> `SourceTextDocumentBinding`, and the 2026-05-27 caret-authority fix
+> (`../../docs/specs/2026-05-27-flat-view-enter-and-caret-authority-design.md`)
+> wired `caretResolved` → `setTextCursor` in its Editor.
 
 ## Public surface
 - `Markoff::Source::Editor` — `QPlainTextEdit` subclass; main public widget.

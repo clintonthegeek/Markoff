@@ -240,14 +240,16 @@ document.
 
 ### B.1 — Caret re-assertion after a structural edit
 
-**Problem.** User presses Enter at the end of a paragraph. The split happens
-in the model; `applyFlatEdit` canonicalises the inserted `\n` to a `\n\n`
-separator; the reverse-path diff (§A.2) re-inserts via
-`QTextCursor::insertText`, which leaves the visible caret riding *past* the
-inserted separator — at the **start of the next paragraph** instead of the
-start of the new empty block (or wherever the structural operation intends).
-This is the exact bug `markoff-styled` reported on 2026-05-27 and the
-canonical example of why this group exists.
+**Problem.** User presses Enter at the end of a paragraph. On the flat-text
+leaves this surfaced as two coupled failures (reproduced 2026-05-27, spec
+`specs/2026-05-27-flat-view-enter-and-caret-authority-design.md`): (1) the
+structural edit was *dropped* — `applyFlatEdit`'s cursor-edit start-of-next-
+block bias + empty-head suppression + the no-empty-block invariant made a lone
+boundary `\n` a no-op, so no paragraph was created; and (2) the caret drifted
+into the inter-block gap, reading as "the caret jumped into the next
+paragraph." The fix is therefore *both* a forward-path change (an interactive
+ingress, `applyInteractiveNewline`, that creates a real — possibly transient
+empty — block) and the caret re-assertion below.
 
 **Contract.** The structural operation declares the *intended* post-edit
 caret as an anchor *before* it mutates the model. After the model settles
@@ -264,21 +266,14 @@ end of the `onD2Changed` cascade via `endStructuralCascade` →
 placement happens — see invariant discipline in
 [`specs/2026-05-22-cursor-authority-decision.md`](specs/2026-05-22-cursor-authority-decision.md).
 
-**Styled / source.** ❌ **OPEN** as of 2026-05-27 — this is the live Enter
-bug. The binding has 90% of the machinery: `syncFromSession()`
-(`SourceTextDocumentBinding.cpp:196`) resolves the Session selection anchors
-to positions and emits `cursorPositionChanged` / `selectionStartChanged` /
-`selectionEndChanged`. **But:** (1) those are *signals designed for QML
-property bindings* — nothing in the styled `Editor` connects them to
-`QTextEdit::setTextCursor`, so the QTextEdit's real caret is never
-re-asserted; and (2) `syncFromSession` concatenates `blockText` with **no
-separators** (`utf8 += blockText(id)`) while the QTextEdit holds **sep-view**
-text, so even the position it computes is in the wrong coordinate space. The
-single-document realisation of `establishFocus` is: *capture the intended
-post-edit anchor in `onQtContentsChange`, then after `onD2DocumentChanged`
-settles, re-resolve it to a **sep-view** QTextEdit position and call
-`setTextCursor`.* This is the design the forthcoming cursor-authority fix
-spec implements; this section is its reference.
+**Styled / source.** ✅ Solved (2026-05-27). Bare Enter routes through
+`SourceTextDocumentBinding::onQtContentsChange` → `applyInteractiveNewline`,
+which creates the paragraph and returns the caret's target block. The binding
+stages `m_pendingCaret{BlockId, offsetInBlock}` and, at the tail of
+`onD2DocumentChanged` (after the reverse diff settles — no `singleShot`,
+the signal is already debounced), resolves it to a sep-view position and emits
+`caretResolved(start, active)`. Each Editor connects that to `setTextCursor`.
+This is the single-document analogue of `LiveCursorState` as the chokepoint.
 
 **Citations.** `LiveCursorState::establishFocus` /
 `LiveStructuralKeyHandler.cpp`; `SourceTextDocumentBinding::syncFromSession`;
@@ -299,9 +294,10 @@ position moved.
 kind-transition `delegateAvailable` re-stages the pending focus so the new
 delegate inherits the caret (`LiveCursorState.cpp:425`).
 
-**Styled / source.** ❌ **OPEN** — same root as B.1. The Session round-trip
-exists (`pushSelectionToSession` / `syncFromSession`) but is not wired to the
-QTextEdit. Closing B.1 closes this.
+**Styled / source.** 🟡 Mechanism wired. `syncFromSession` now resolves an
+externally-driven `Session::primarySelection()` to a sep-view caret and emits
+`caretResolved`, so a collaborator-driven caret update lands correctly. Full
+parity awaits the local caret being pushed *to* the Session (not wired today).
 
 **Citations.** cursor-authority-decision spec §anchor-preservation;
 `LiveCursorState` cursor variants.
@@ -318,9 +314,8 @@ offset; the view `establishFocus`-es there.
 **Live.** `establishFocus(result.mergedInto, joinQtPos)` in the
 Backspace/Delete merge cases.
 
-**Styled / source.** ❌ **OPEN** — the merge itself is solved (§A.4) but the
-post-merge caret is subject to the same unwired-authority gap as B.1. Closes
-with B.1.
+**Styled / source.** ✅ Solved (2026-05-27). The cross-block merge path stages
+`m_pendingCaret{mergedInto, joinOffset}`; the chokepoint (B.1) delivers it.
 
 **Citations.** §A.4; `LiveStructuralKeyHandler.cpp` merge cases.
 
@@ -338,9 +333,10 @@ the pre-edit selection so it can be restored.
 `tst_live_render_focus_chokepoint_invariant` — listed in the project status
 as pre-existing; do not assume this corner is pristine.)
 
-**Styled / source.** ❌ **OPEN** — depends on B.1 wiring. Once the QTextEdit
-re-asserts from the Session anchor on any model change, undo is just another
-model change.
+**Styled / source.** 🟡 The delivery path exists (any model change re-resolves
+from the Session anchor via `syncFromSession`), but full restoration depends on
+`undoD2`/`redoD2` repopulating the Session selection — not added in the
+2026-05-27 fix. As honest as the live side here.
 
 **Citations.** `applyFlatEdit` undo/redo (`undoD2`/`redoD2`,
 `markoff-core/CLAUDE.md` §applyFlatEdit); B.1.
@@ -504,10 +500,10 @@ how changes flow back, and how the caret stays meaningful across both.
 | A.2 | Reverse sync, no wipe | N/A | ✅ | ✅ |
 | A.3 | Canonical structure on edit | ✅ (opt-out) | ✅ | ✅ |
 | A.4 | Cross-block delete → merge | ✅ | ✅ | ✅ |
-| B.1 | Caret re-assert after structural edit | ✅ | ❌ | ❌ |
-| B.2 | Caret survives model rebuild | ✅ | ❌ | ❌ |
-| B.3 | Multi-block selection-delete caret | ✅ | ❌ | ❌ |
-| B.4 | Undo/redo restores caret | 🟡 | ❌ | ❌ |
+| B.1 | Caret re-assert after structural edit | ✅ | ✅ | ✅ |
+| B.2 | Caret survives model rebuild | ✅ | 🟡 | 🟡 |
+| B.3 | Multi-block selection-delete caret | ✅ | ✅ | ✅ |
+| B.4 | Undo/redo restores caret | 🟡 | 🟡 | 🟡 |
 | C.2 | Kind transition without re-entrancy | ✅ | N/A | ✅ |
 | D.1 | Scroll preserved across edit | ✅ | 🟡 | 🟡 |
 | E.1 | Per-block delegate focus hand-off | ✅ | N/A | N/A |
@@ -516,9 +512,10 @@ how changes flow back, and how the caret stays meaningful across both.
 ✅ solved · 🟡 partial / known edge cases · ❌ open · N/A not applicable to
 this view shape.
 
-**The §B cluster is the active frontier for the flat-text leaves.** It is
-the single thing the single-document model does not inherit for free, and the
-forthcoming cursor-authority fix for `markoff-styled` (port of live's
-`establishFocus` to the single-document binding) closes B.1 — and B.2/B.3/B.4
-fall out with it. Update this table and the per-concern status lines when it
-lands.
+**B.1 and B.3 are closed for the flat-text leaves as of 2026-05-27** (spec
+`specs/2026-05-27-flat-view-enter-and-caret-authority-design.md`). B.2 and B.4
+remain partials — the mechanism is wired (`syncFromSession` resolves an inbound
+Session selection through the same `caretResolved` chokepoint), but full parity
+awaits two follow-ups: the local caret being pushed *to* the Session (so a
+collaborator can see it) and `undoD2`/`redoD2` repopulating the Session
+selection (so undo restores the precise pre-edit caret).
