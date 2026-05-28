@@ -150,6 +150,22 @@
   `tst_styled_dogfood_invariants::backspace_at_block_start_merges_with_caret_at_join`;
   a dedicated unit test on `findBlockAtSepByte` separator-zone boundaries
   would prevent regression and is worth adding (qt-code-review minor flag).
+- `libs/markoff-core/src/Detail/FlatBlockResolve.cpp` — `SEP_LEN`
+  reduced 2 → 1 under WP unification
+  (`docs/specs/2026-05-28-flat-view-wp-unification-design.md`). The
+  separator-zone branch in `findBlockAtSepByte` is now unreachable for
+  valid inputs (one-byte separator has no interior position); kept as
+  defensive code. A direct unit test on the boundary cases of
+  `findBlockAtSepByte` remains worth adding as a small follow-up — same
+  recommendation as the 2026-05-27 underflow find.
+- `libs/markoff-styled/src/StyleApplier.cpp` — `baseBlockFormat` 5pt
+  margins are dead in practice: every kind dispatch
+  (Paragraph/Heading/CodeBlock/BlockQuote/ListItem/HR plus the `else`
+  fallback to `applyParagraph`) overrides the base with kind-specific
+  values. The 5pt base matches the WP-unification spec literally but
+  acts only as a safety fallback for hypothetical future unhandled
+  kinds. Consider centralising margins through the base (kind-specific
+  deltas) once dogfood pins down the desired values.
 
 ---
 

@@ -74,6 +74,16 @@ No KF6, no QML, no `markoff-live`.
   `textAnchorAt(byteOffset).block()` to extract the containing
   BlockId from the anchor itself. When in doubt about a core API,
   search `latestBlockRanges` first.
+- **WP unification (2026-05-28).** The Editor's QTextDocument is seeded
+  from `widgetFlatView()` (single-`\n` separator). `StyleApplier::baseBlockFormat`
+  sets `topMargin`/`bottomMargin` = 5pt to provide the visible
+  inter-paragraph gap. An empty model block renders as an empty
+  QTextBlock whose margins contribute the "extra gap" signal of one
+  Enter. (Note: per-kind paths in `StyleApplier` currently override the
+  base with smaller values — e.g., 2pt for Paragraph at fontScale 1.0 —
+  so the *actual* margin a user sees comes from the per-kind setter, not
+  the base. Tuning is dogfood follow-up.) Spec
+  `../../docs/specs/2026-05-28-flat-view-wp-unification-design.md`.
 
 ## Resolved binding bugs (2026-05-27)
 

@@ -82,10 +82,13 @@ common source of off-by-a-block bugs:
    N+1's start byte — the boundary is ambiguous, which is why §A.1 exists.
 3. **Separator-view ("sep-view") global offset** — blocks joined by `"\n\n"`
    (`interBlockSeparator()`), terminated by a single `"\n"`
-   (`finalDocumentTerminator()`). This is what `flatView()` produces and what
-   the `QTextDocument` in a flat view actually holds. The mapping between
-   sep-view and no-sep is **not** a constant shift; it depends on how many
-   block boundaries you have crossed.
+   (`finalDocumentTerminator()`). This is what `flatView()` produces (the
+   canonical save/parse form). At runtime the flat-text widget views
+   (`markoff-styled`, `markoff-source`) instead hold `widgetFlatView()`
+   content — single-`\n` between blocks plus `QTextBlockFormat` paragraph
+   margins for the visible gap — see §0.2. The mapping between sep-view and
+   no-sep is **not** a constant shift; it depends on how many block boundaries
+   you have crossed.
 
 `Markoff::Detail::findBlockAtSepByte(doc, sepOff, biasForward)` and
 `sliceByBlocks` (in `include/markoff/core/Detail/FlatBlockResolve.h`) are the
@@ -102,6 +105,27 @@ blocks). It is deliberately **not** enforced on the per-block path, so
 live's intentional empty-paragraph blocks survive. A flat view gets
 CommonMark-style blank-line collapsing for free; a per-block view manages
 its own emptiness.
+
+---
+
+## §0.2 — Paragraph delineation is word-processor everywhere
+
+Markoff treats paragraphs as **first-class structural objects**, not as runs
+of bytes in a flat string. `markoff-live` lays out per-block QML delegates
+with margins; `markoff-styled` and `markoff-source` consume
+`MarkoffDocument::widgetFlatView()` (single-`\n` separator between
+QTextBlocks) and apply `QTextBlockFormat::topMargin/bottomMargin` to produce
+the visible inter-paragraph gap. Pressing Enter creates a *new model block*
+(possibly empty, transient) via `applyInteractiveNewline`. The cursor cannot
+land "in the gap" because the gap is layout space, not a byte position.
+
+`markoff-source` is a *visual* sibling of `markoff-styled` — distinguished
+only by not rendering inline markdown markers (`**`, `_`, `==`, etc. stay
+visible as characters). At the structural level (blocks, Enter, backspace,
+caret) it is identical to styled.
+
+Authoritative spec:
+`specs/2026-05-28-flat-view-wp-unification-design.md`.
 
 ---
 
@@ -274,6 +298,9 @@ stages `m_pendingCaret{BlockId, offsetInBlock}` and, at the tail of
 the signal is already debounced), resolves it to a sep-view position and emits
 `caretResolved(start, active)`. Each Editor connects that to `setTextCursor`.
 This is the single-document analogue of `LiveCursorState` as the chokepoint.
+Under WP unification (2026-05-28) the *rendering* of the structural edit
+changed from "literal `\n\n` per boundary" to "single `\n` + margins-driven
+gap"; the caret-authority machinery is unchanged.
 
 **Citations.** `LiveCursorState::establishFocus` /
 `LiveStructuralKeyHandler.cpp`; `SourceTextDocumentBinding::syncFromSession`;

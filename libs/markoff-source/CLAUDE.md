@@ -11,6 +11,16 @@ Fully-owned QtWidgets Source view on `markoff-core`. Replaces the Qutepart-based
 > (`../../docs/specs/2026-05-27-flat-view-enter-and-caret-authority-design.md`)
 > wired `caretResolved` → `setTextCursor` in its Editor.
 
+## WP unification (2026-05-28)
+
+Source view is structurally identical to styled — same `widgetFlatView()`,
+same caret-authority chokepoint, same Enter/backspace semantics. It is
+distinguished only by *not rendering* the inline markdown markers (the
+KSyntaxHighlighting pass keeps them visible as characters; styled hides
+them). Paragraph margins are applied via `Editor::applyParagraphMargins()`
+on every `d2DocumentChanged` (5pt top + 5pt bottom). Spec
+`../../docs/specs/2026-05-28-flat-view-wp-unification-design.md`.
+
 ## Public surface
 - `Markoff::Source::Editor` — `QPlainTextEdit` subclass; main public widget.
 - `Markoff::Source::FindBar` — standalone find UI.

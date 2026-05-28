@@ -74,6 +74,15 @@ callers still using `toMarkdownUtf8`/`toMarkdown` (notably
 `SourceTextDocumentBinding.cpp:205`, `SearchController.cpp:55`, and a
 handful of tests) are tracked for migration as a follow-up.
 
+**Runtime flat view — `widgetFlatView()`.** The flat-text view leaves
+(`markoff-styled`, `markoff-source`) consume `MarkoffDocument::widgetFlatView()`
+in their QTextDocument, NOT `flatView()`. `widgetFlatView()` joins blocks with
+a single `\n` instead of `\n\n`; the visible paragraph gap comes from
+`QTextBlockFormat::topMargin`/`bottomMargin` applied at the widget layer (WP
+unification, spec `docs/specs/2026-05-28-flat-view-wp-unification-design.md`).
+`flatView()` remains the canonical save/parse form and is used by
+`serializeForSave` and the binding's reverse-path expected-string-build.
+
 ## Single-document binding: canonical structure invariant
 
 Spec: `docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`
