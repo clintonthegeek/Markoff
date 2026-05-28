@@ -2183,6 +2183,19 @@ QByteArray MarkoffDocument::flatView() const
     return out;
 }
 
+QByteArray MarkoffDocument::widgetFlatView() const
+{
+    QByteArray out;
+    const auto blocks = iterateBlocks();
+    if (blocks.empty()) return out;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        out += blockText(blocks[i]);
+        if (i + 1 < blocks.size())
+            out += '\n';  // single-byte WP separator
+    }
+    return out;
+}
+
 bool MarkoffDocument::save(const QString &path)
 {
     QSaveFile f(path);

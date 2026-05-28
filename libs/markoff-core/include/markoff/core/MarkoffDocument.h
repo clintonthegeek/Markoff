@@ -207,6 +207,17 @@ public:
     /// different view; consumers translate between the two as needed.
     QByteArray flatView() const;
 
+    /// Runtime flat view for the WP-rendered flat-text widget views
+    /// (`markoff-styled`, `markoff-source`). Joins blocks with a SINGLE
+    /// `\n` (one QTextBlock per model block). The visible gap between
+    /// paragraphs comes from `QTextBlockFormat::topMargin/bottomMargin`,
+    /// not whitespace. Use this — NOT `flatView()` — for the QTextDocument
+    /// the user edits.
+    ///
+    /// `flatView()` remains the canonical save/parse form (`\n\n` between
+    /// content blocks).
+    QByteArray widgetFlatView() const;
+
     /// Structure-aware paste. Serializes `blocks` (a QJsonArray of block
     /// objects with "kind", "text", and optional "attrs") to flat markdown
     /// and calls applyFlatEdit on the byte range [startByte, endByte).

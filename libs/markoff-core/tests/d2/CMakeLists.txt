@@ -115,3 +115,7 @@ set_tests_properties(tst_d2_normalize_on_edit PROPERTIES ENVIRONMENT "QT_QPA_PLA
 qt_add_executable(tst_d2_interactive_newline tst_d2_interactive_newline.cpp)
 target_link_libraries(tst_d2_interactive_newline PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_interactive_newline COMMAND tst_d2_interactive_newline)
+
+qt_add_executable(tst_d2_widget_flat_view tst_d2_widget_flat_view.cpp)
+target_link_libraries(tst_d2_widget_flat_view PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d2_widget_flat_view COMMAND tst_d2_widget_flat_view)
