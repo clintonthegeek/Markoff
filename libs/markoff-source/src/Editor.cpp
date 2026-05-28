@@ -17,6 +17,9 @@
 #include <QPalette>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QTextBlock>
+#include <QTextBlockFormat>
+#include <QTextCursor>
 #include <QVBoxLayout>
 
 #include <optional>
@@ -99,12 +102,25 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         // owns all doc subscriptions and cleans them up via setMarkoffDocument(nullptr).
     }
 
+    // Disconnect the stale d2DocumentChanged→applyParagraphMargins connection
+    // from the previous document before wiring the new one.
+    if (m_paragraphMarginsCon) {
+        QObject::disconnect(m_paragraphMarginsCon);
+        m_paragraphMarginsCon = {};
+    }
+
     Markoff::MarkdownView::setDocument(doc);
 
     if (doc) {
         m_session = doc->createSession();
         m_binding->setMarkoffDocument(doc);
         m_binding->setSession(m_session.data());
+        m_paragraphMarginsCon = QObject::connect(
+            doc, &Markoff::MarkoffDocument::d2DocumentChanged,
+            this, &Editor::applyParagraphMargins);
+        // Initial pass — the binding seeded qdoc from widgetFlatView in
+        // setMarkoffDocument; margins for the initial blocks need to land too.
+        applyParagraphMargins();
     } else {
         m_binding->setMarkoffDocument(nullptr);
     }
@@ -550,6 +566,26 @@ void Editor::setHeadingLevel(int level) {
     QTextCursor c2 = m_editor->textCursor();
     c2.setPosition(newPos);
     m_editor->setTextCursor(c2);
+}
+
+void Editor::applyParagraphMargins()
+{
+    if (!m_editor) return;
+    QTextDocument *qdoc = m_editor->document();
+    if (!qdoc) return;
+    QTextCursor c(qdoc);
+    QSignalBlocker block(qdoc);   // do NOT loop back through the binding
+    c.beginEditBlock();
+    for (QTextBlock b = qdoc->begin(); b.isValid(); b = b.next()) {
+        c.setPosition(b.position());
+        QTextBlockFormat bf = b.blockFormat();
+        // Same values as styled — symmetry maintains a consistent visual
+        // gap between view leaves (spec 2026-05-28 §3.5).
+        bf.setTopMargin(5);
+        bf.setBottomMargin(5);
+        c.setBlockFormat(bf);
+    }
+    c.endEditBlock();
 }
 
 } // namespace Markoff::Source

@@ -94,6 +94,10 @@ private:
     void recomputeGutterWidth();
     int  gutterWidth() const;
 
+    /// Re-apply WP-unification paragraph margins to every QTextBlock after
+    /// the binding has settled a reverse-diff. Cheap idempotent pass.
+    void applyParagraphMargins();
+
     QPlainTextEdit                          *m_editor      = nullptr;
     QPointer<Markoff::Session>              m_session;
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
@@ -101,6 +105,7 @@ private:
     Detail::Gutter                         *m_gutter        = nullptr;
     Detail::SourceFindAdapter              *m_findAdapter   = nullptr;
     Markoff::Theme                          m_theme;
+    QMetaObject::Connection                 m_paragraphMarginsCon;
 
     friend class Markoff::Source::Detail::Gutter;
 };
