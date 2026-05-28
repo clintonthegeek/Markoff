@@ -12,6 +12,8 @@
 #include <QTextDocument>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
+#include <markoff/core/Session.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
 
 using Markoff::SourceTextDocumentBinding;
@@ -42,6 +44,35 @@ private Q_SLOTS:
         QCOMPARE(spy.at(0).at(1).toInt(), 7);
         // Model gained a block.
         QCOMPARE(int(doc.iterateBlocks().size()), 3);
+    }
+
+    void session_selection_change_resolves_caret_in_sep_view() {
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Hello\n\nWorld"));
+        // Drive the existing QPlainTextEdit pattern used elsewhere in this file.
+        QPlainTextEdit edit;
+        SourceTextDocumentBinding b;
+        auto *session = doc.createSession();
+        b.setMarkoffDocument(&doc);
+        b.setTextDocument(edit.document());
+        b.setSession(session);
+
+        QSignalSpy spy(&b, &SourceTextDocumentBinding::caretResolved);
+
+        // Place a collapsed selection at the start of "World" (no-sep byte 5).
+        // In sep-view that is position 7 ("Hello\n\n" = 7). The OLD
+        // no-separator concatenation would have wrongly returned 5.
+        const auto anchor = doc.textAnchorAt(5, /*rightBias*/ false);
+        Markoff::Selection sel;
+        sel.anchor = anchor;
+        sel.active = anchor;
+        sel.kind   = Markoff::Selection::Kind::Primary;
+        session->setPrimarySelection(sel);
+
+        QTRY_VERIFY(spy.count() >= 1);
+        const auto last = spy.last();
+        QCOMPARE(last.at(0).toInt(), 7);
+        QCOMPARE(last.at(1).toInt(), 7);
     }
 
     void ordinary_typing_does_not_resolve_caret() {

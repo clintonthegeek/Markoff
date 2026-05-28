@@ -24,11 +24,13 @@ namespace Markoff {
 /// Reverse path: `MarkoffDocument::d2DocumentChanged` → full-replace
 /// `QTextDocument::setPlainText` with block-buffer flat text.
 ///
-/// Cursor + selection are lifted to `Session::primarySelection()` (anchors,
-/// not ints) so they survive concurrent edits and round-trip through the
-/// CRDT layer. Two cycle guards (`m_applyingLocalEdit` /
-/// `m_applyingRemoteEdit`) prevent forward/reverse bounceback. A third
-/// (`m_applyingBackendCursor`) guards the int↔anchor cursor bridge.
+/// Cursor + selection authority: the binding owns the post-structural-edit
+/// caret. Structural ops stage an intended caret; onD2DocumentChanged resolves
+/// it (sep-view) and emits `caretResolved`, which the owning widget applies via
+/// setTextCursor. `syncFromSession` resolves an externally-driven
+/// Session::primarySelection() (collaborator / undo) through the same signal.
+/// Two cycle guards (`m_applyingLocalEdit` / `m_applyingRemoteEdit`) prevent
+/// forward/reverse bounceback.
 ///
 /// This class is QML-free; the QML view library registers it as
 /// `QML_FOREIGN` to expose it to QML without polluting the foundation header.
@@ -46,18 +48,6 @@ class MARKOFF_CORE_EXPORT SourceTextDocumentBinding : public QObject {
                READ textDocument
                WRITE setTextDocument
                NOTIFY textDocumentChanged)
-    Q_PROPERTY(int cursorPosition
-               READ cursorPosition
-               WRITE setCursorPosition
-               NOTIFY cursorPositionChanged)
-    Q_PROPERTY(int selectionStart
-               READ selectionStart
-               WRITE setSelectionStart
-               NOTIFY selectionStartChanged)
-    Q_PROPERTY(int selectionEnd
-               READ selectionEnd
-               WRITE setSelectionEnd
-               NOTIFY selectionEndChanged)
 public:
     explicit SourceTextDocumentBinding(QObject *parent = nullptr);
     ~SourceTextDocumentBinding() override;
@@ -80,22 +70,10 @@ public:
     QTextDocument *textDocument() const;
     void           setTextDocument(QTextDocument *);
 
-    int  cursorPosition() const;
-    void setCursorPosition(int pos);
-
-    int  selectionStart() const;
-    void setSelectionStart(int pos);
-
-    int  selectionEnd() const;
-    void setSelectionEnd(int pos);
-
 Q_SIGNALS:
     void markoffDocumentChanged();
     void sessionChanged();
     void textDocumentChanged();
-    void cursorPositionChanged();
-    void selectionStartChanged();
-    void selectionEndChanged();
     /// The binding-resolved caret, in sep-view (QTextDocument) coordinates.
     /// The owning widget applies this to its real caret. start==active is a
     /// collapsed caret. This is the SOLE caret-output of the binding.
@@ -118,11 +96,8 @@ private:
     /// Rewire the primarySelectionChanged subscription to the current Session.
     void rebindSessionSubscription();
 
-    /// Push the current (m_selectionStart, m_selectionEnd) ints to the session
-    /// as a Primary selection (anchors derived from current QTextDocument text).
-    void pushSelectionToSession();
-
-    /// Sync int cursor/selection from the current Session::primarySelection().
+    /// Sync cursor/selection from the current Session::primarySelection() into
+    /// sep-view coordinates, routing through emitCaret.
     void syncFromSession();
 
     /// Sep-view (QTextDocument, UTF-16) position of `byteInBlock` within
@@ -152,16 +127,11 @@ private:
 
     bool m_applyingLocalEdit      = false;  ///< T12: set during applyLocalEdit ingestion
     bool m_applyingRemoteEdit     = false;  ///< T13: set during reverse edit application
-    bool m_applyingBackendCursor  = false;  ///< T14: cycle guard for int↔anchor sync
 
     struct PendingCaret { Markoff::BlockId block; int offsetInBlock = 0; };
     /// Set by a structural op to declare the intended post-edit caret; resolved
     /// + emitted at the tail of onD2DocumentChanged once the reverse diff settles.
     std::optional<PendingCaret> m_pendingCaret;
-
-    int m_cursorPosition = 0;   ///< T14: mirrors TextArea.cursorPosition
-    int m_selectionStart = 0;   ///< T14: mirrors TextArea.selectionStart
-    int m_selectionEnd   = 0;   ///< T14: mirrors TextArea.selectionEnd
 };
 
 }  // namespace Markoff

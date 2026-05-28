@@ -125,70 +125,6 @@ void SourceTextDocumentBinding::setSession(Markoff::Session *s)
     rebindSessionSubscription();
 }
 
-// ---------------------------------------------------------------------------
-// T14: cursor/selection int properties (UTF-16 ↔ CRDT anchor bridge)
-// ---------------------------------------------------------------------------
-
-int SourceTextDocumentBinding::cursorPosition() const { return m_cursorPosition; }
-int SourceTextDocumentBinding::selectionStart()  const { return m_selectionStart; }
-int SourceTextDocumentBinding::selectionEnd()    const { return m_selectionEnd;   }
-
-void SourceTextDocumentBinding::setCursorPosition(int pos)
-{
-    if (m_cursorPosition == pos) return;
-    m_cursorPosition = pos;
-
-    if (!m_applyingBackendCursor && m_session && m_markoffDocument && m_textDocument) {
-        const QString text = m_textDocument->toPlainText();
-        const quint32 byteOff = qtPosToByteOffset(text, pos);
-        const auto anchor = m_markoffDocument->textAnchorAt(byteOff, /*rightBias*/ false);
-        // Cursor move => collapse selection.
-        Markoff::Selection sel;
-        sel.anchor = anchor;
-        sel.active = anchor;
-        sel.kind   = Markoff::Selection::Kind::Primary;
-        m_session->setPrimarySelection(sel);
-    }
-    Q_EMIT cursorPositionChanged();
-}
-
-void SourceTextDocumentBinding::setSelectionStart(int pos)
-{
-    if (m_selectionStart == pos) return;
-    m_selectionStart = pos;
-
-    if (!m_applyingBackendCursor) {
-        pushSelectionToSession();
-    }
-    Q_EMIT selectionStartChanged();
-}
-
-void SourceTextDocumentBinding::setSelectionEnd(int pos)
-{
-    if (m_selectionEnd == pos) return;
-    m_selectionEnd = pos;
-
-    if (!m_applyingBackendCursor) {
-        pushSelectionToSession();
-    }
-    Q_EMIT selectionEndChanged();
-}
-
-void SourceTextDocumentBinding::pushSelectionToSession()
-{
-    if (!m_session || !m_markoffDocument || !m_textDocument) return;
-    const QString text = m_textDocument->toPlainText();
-    const quint32 startByte = qtPosToByteOffset(text, m_selectionStart);
-    const quint32 endByte   = qtPosToByteOffset(text, m_selectionEnd);
-    const auto anchorA = m_markoffDocument->textAnchorAt(startByte, /*rightBias*/ false);
-    const auto anchorB = m_markoffDocument->textAnchorAt(endByte,   /*rightBias*/ true);
-    Markoff::Selection sel;
-    sel.anchor = anchorA;
-    sel.active = anchorB;
-    sel.kind   = Markoff::Selection::Kind::Primary;
-    m_session->setPrimarySelection(sel);
-}
-
 void SourceTextDocumentBinding::onSessionPrimarySelectionChanged(const Markoff::Selection &)
 {
     syncFromSession();
@@ -197,36 +133,18 @@ void SourceTextDocumentBinding::onSessionPrimarySelectionChanged(const Markoff::
 void SourceTextDocumentBinding::syncFromSession()
 {
     if (!m_session || !m_markoffDocument || !m_textDocument) return;
+    // Do not fight a local edit mid-flight; the structural path re-asserts the
+    // caret from m_pendingCaret at the tail of onD2DocumentChanged instead.
+    if (m_applyingLocalEdit) return;
 
     const Markoff::Selection sel = m_session->primarySelection();
     const quint32 anchorByte = m_markoffDocument->resolveTextAnchor(sel.anchor);
     const quint32 activeByte = m_markoffDocument->resolveTextAnchor(sel.active);
-    // D2 per-block concatenation in no-separator coordinates (the space
-    // `resolveTextAnchor` returns, and the same space `applyFlatEdit`
-    // operates in). The legacy `toMarkdownUtf8()` fallback was removed once
-    // resetContent started populating D2 blocks (Markoff `861196c`) —
-    // iterateBlocks() is now empty only on a genuinely empty document, where
-    // the legacy buffer would also be empty.
-    QByteArray utf8;
-    for (Markoff::BlockId id : m_markoffDocument->iterateBlocks())
-        utf8 += m_markoffDocument->blockText(id);
-    const int newStart = byteOffsetToQtPos(utf8, anchorByte);
-    const int newEnd   = byteOffsetToQtPos(utf8, activeByte);
-
-    m_applyingBackendCursor = true;
-    if (m_cursorPosition != newEnd) {
-        m_cursorPosition = newEnd;
-        Q_EMIT cursorPositionChanged();
-    }
-    if (m_selectionStart != newStart) {
-        m_selectionStart = newStart;
-        Q_EMIT selectionStartChanged();
-    }
-    if (m_selectionEnd != newEnd) {
-        m_selectionEnd = newEnd;
-        Q_EMIT selectionEndChanged();
-    }
-    m_applyingBackendCursor = false;
+    // resolveTextAnchor returns NO-SEPARATOR global bytes; map each to a
+    // sep-view QTextDocument position (the prior implementation concatenated
+    // blockText without separators — off by one separator per crossed boundary).
+    emitCaret(noSepByteToSepViewPos(anchorByte),
+              noSepByteToSepViewPos(activeByte));
 }
 
 void SourceTextDocumentBinding::rebindMarkoffDocumentSubscription()
@@ -362,20 +280,23 @@ int SourceTextDocumentBinding::noSepByteToSepViewPos(quint32 noSepByte) const
 {
     if (!m_markoffDocument) return 0;
     quint32 cursor = 0;
-    for (Markoff::BlockId id : m_markoffDocument->iterateBlocks()) {
+    const auto blocks = m_markoffDocument->iterateBlocks();
+    for (int i = 0; i < static_cast<int>(blocks.size()); ++i) {
+        const Markoff::BlockId id = blocks[static_cast<size_t>(i)];
         const quint32 sz =
             static_cast<quint32>(m_markoffDocument->blockText(id).size());
-        if (noSepByte <= cursor + sz) {
+        // A byte strictly within this block, OR at the end of the LAST block.
+        if (noSepByte < cursor + sz
+                || (i == static_cast<int>(blocks.size()) - 1)) {
             return sepViewPosOf(id, static_cast<int>(noSepByte - cursor));
         }
+        // noSepByte == cursor + sz means the byte is at the boundary between
+        // this block and the next — i.e. the START of the next block (no-sep
+        // space has no gap between blocks; the "\n\n" separator exists only in
+        // sep-view). Fall through to the next block.
         cursor += sz;
     }
-    // Past the last block: clamp to document end.
-    const auto blocks = m_markoffDocument->iterateBlocks();
-    if (blocks.empty()) return 0;
-    const Markoff::BlockId last = blocks.back();
-    return sepViewPosOf(last,
-        static_cast<int>(m_markoffDocument->blockText(last).size()));
+    return 0;  // empty document
 }
 
 void SourceTextDocumentBinding::emitCaret(int start, int active)
