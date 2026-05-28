@@ -1,5 +1,33 @@
 # Markoff
 
+> **2026-05-27 — `markoff-styled` view leaf landed + hardened; View Implementor's Guide written; cursor-authority fix is the next task.**
+>
+> A third view leaf, `markoff-styled` (QTextEdit, inline-styled, no QML/KF6),
+> landed 2026-05-26 (spec `docs/specs/2026-05-26-markoff-styled-leaf-design.md`).
+> Dogfood drove two follow-ups: v0.1 perf/styling fixes
+> (`docs/specs/2026-05-27-markoff-styled-dogfood-fixes-design.md`) and a
+> `markoff-core` binding-robustness arc that made the single-document binding
+> a first-class peer of the per-block path — boundary-correct forward
+> dispatch, normalize-on-edit, incremental reverse sync
+> (`docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`,
+> commits `f5cdc4e..10ed95a`).
+>
+> Dogfood then surfaced the live "Enter jumps to the end of the next
+> paragraph" bug — a SOLVED problem in `markoff-live` that the new leaf
+> re-discovered. Rather than re-derive it, the cross-cutting view↔model
+> concerns are now catalogued once in
+> **[`docs/VIEW-IMPLEMENTORS-GUIDE.md`](docs/VIEW-IMPLEMENTORS-GUIDE.md)**
+> (evergreen, peer to INVARIANTS; required reading for any view leaf). The
+> §B cursor-authority cluster is documented OPEN for the flat-text leaves.
+>
+> **Next task (fresh session):** port `establishFocus` to
+> `SourceTextDocumentBinding` to close guide §B (fixes styled + source).
+> Full brief: **[`docs/handoff/2026-05-27-cursor-authority-fix-handoff.md`](docs/handoff/2026-05-27-cursor-authority-fix-handoff.md)**;
+> tracked as `docs/queue.md` #7. Brainstorm → spec → plan → subagent-driven,
+> per the handoff's required-process section.
+>
+> ---
+>
 > **2026-05-20 — Port-first phase ACTIVE. Corbomite renders foundation-exploration content (milestone hit late session).**
 >
 > Corbomite's `port/foundation-exploration` branch successfully builds + launches +

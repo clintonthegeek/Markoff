@@ -3,6 +3,13 @@
 Plain-jane QWidget Markoff editor on `markoff-core`. Third view leaf
 alongside `markoff-source` and `markoff-live`. No QML, no KF6.
 
+> **Required reading before seam work:**
+> [`../../docs/VIEW-IMPLEMENTORS-GUIDE.md`](../../docs/VIEW-IMPLEMENTORS-GUIDE.md)
+> — the cross-cutting view↔model concerns and contracts. This leaf has
+> §A (text-sync) solved and §B (cursor authority) **open** — the §B.1
+> "Enter jumps to end of next paragraph" bug is the active frontier; the
+> guide's §B is the design reference for the fix.
+
 ## Public surface
 - `Markoff::Styled::Editor` — `Markoff::MarkdownView` subclass composing
   a `QTextEdit`. Setters: `setDocument`, `setSession`, `setTheme`,

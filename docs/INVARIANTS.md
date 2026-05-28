@@ -12,6 +12,15 @@
 > vote for it being normal. The mechanism for noting them without
 > derailing your task is invariant 8 below.
 
+> **Companion — required reading for view work.**
+> [`VIEW-IMPLEMENTORS-GUIDE.md`](VIEW-IMPLEMENTORS-GUIDE.md) is the
+> *what and why of the cross-cutting view↔model seam problems* (caret
+> after a structural edit, surviving a model rebuild, boundary
+> attribution, etc.), with a contract per concern and how each view leaf
+> satisfies it. This file (INVARIANTS) is *how you must work* while
+> solving them. Read the guide before building or hardening any view
+> leaf; read this file before touching the seam in any of them.
+
 ## Why these rules exist — cite once, then they're yours
 
 Read these once before your first non-trivial change in this codebase:

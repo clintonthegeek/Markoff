@@ -762,6 +762,35 @@ the count drops.
 
 ---
 
+## #7 — Cursor authority for the flat-text view leaves (styled + source) 🔴 OPEN 2026-05-27
+
+**The active frontier.** `markoff-styled` dogfood surfaced the live
+"Enter jumps to end of next paragraph" bug — guide §B.1. The flat-text
+binding (`SourceTextDocumentBinding`) has no cursor authority wired to
+the QTextEdit: after a structural edit the reverse-sync `insertText`
+leaves the caret past the canonical separator, and nothing re-asserts the
+intended caret. `syncFromSession` exists but (a) emits QML-binding signals
+never connected to `setTextCursor` and (b) computes positions in no-sep
+coordinates while the QTextEdit holds sep-view text.
+
+**Fix:** port `LiveCursorState::establishFocus`'s contract to the
+single-document binding — declare the intended post-edit caret as a
+`TextAnchor` before mutating, re-resolve it to a sep-view QTextEdit
+position after `onD2DocumentChanged` settles, apply via `setTextCursor`.
+Closing §B.1 drags §B.2/§B.3/§B.4 along (shared root). Fixes styled AND
+source (shared binding).
+
+**This is an L3 authority decision — settle "who owns the QTextEdit
+caret" in the spec before the plan (INVARIANTS §2), and retire the old
+signal path in the same plan (INVARIANTS §3).**
+
+Full orientation brief, root cause, fix shape, code locations, required
+process, and definition of done:
+[`handoff/2026-05-27-cursor-authority-fix-handoff.md`](handoff/2026-05-27-cursor-authority-fix-handoff.md).
+Design reference: [`VIEW-IMPLEMENTORS-GUIDE.md`](VIEW-IMPLEMENTORS-GUIDE.md) §B.
+
+---
+
 ## When this queue is empty / superseded
 
 Delete the file or move it to `docs/archive/`. The CLAUDE.md banner

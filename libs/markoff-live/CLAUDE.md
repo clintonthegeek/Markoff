@@ -17,7 +17,16 @@ This library is where the focus/caret/block-change regressions
 documented in the post-mortems live. The eight invariants in
 [`../../docs/INVARIANTS.md`](../../docs/INVARIANTS.md) apply
 directly to every file under `src/` and `qml/`. Read that file
-before any non-trivial change here. Of particular relevance:
+before any non-trivial change here.
+
+This library is also the **reference implementation** for the
+cross-cutting view-seam concerns catalogued in
+[`../../docs/VIEW-IMPLEMENTORS-GUIDE.md`](../../docs/VIEW-IMPLEMENTORS-GUIDE.md)
+— `LiveCursorState::establishFocus`, the diff-driven model, kind
+transition. When you change how this leaf solves one of those
+concerns, update the guide's status line for it.
+
+Of particular relevance:
 
 - **L4 is not yet decided in writing** (invariant 2). Until it is,
   do not add a new path that asserts authority over block content

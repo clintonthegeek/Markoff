@@ -2,6 +2,13 @@
 
 Fully-owned QtWidgets Source view on `markoff-core`. Replaces the Qutepart-based legacy source view over time.
 
+> **Required reading before seam work:**
+> [`../../docs/VIEW-IMPLEMENTORS-GUIDE.md`](../../docs/VIEW-IMPLEMENTORS-GUIDE.md)
+> — the cross-cutting view↔model concerns and contracts. This leaf shares
+> `SourceTextDocumentBinding` with `markoff-styled`, so the §B cursor-authority
+> gap applies here too; the cursor-authority fix that lands for styled should
+> close it for source in the same stroke.
+
 ## Public surface
 - `Markoff::Source::Editor` — `QPlainTextEdit` subclass; main public widget.
 - `Markoff::Source::FindBar` — standalone find UI.
