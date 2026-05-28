@@ -26,8 +26,24 @@ std::optional<BlockHit> findBlockAtSepByte(const Markoff::MarkoffDocument *doc,
             const size_t next = i + 1;
             return BlockHit{blocks[next], 0, static_cast<int>(next)};
         }
-        sepCursor = blkEnd;
-        if (i + 1 < blocks.size()) sepCursor += SEP_LEN;
+        // Separator zone: sepOff > blkEnd and < next block's start.
+        // (sepCursor is about to be set to blkEnd + SEP_LEN.)
+        if (i + 1 < blocks.size()) {
+            const quint32 nextStart = blkEnd + SEP_LEN;
+            if (sepOff < nextStart) {
+                // sepOff is within the "\n\n" separator between block i and i+1.
+                // Resolve based on bias: backward → end of current block,
+                // forward → start of next block.
+                if (!biasForward) {
+                    return BlockHit{blocks[i], sz, static_cast<int>(i)};
+                }
+                const size_t next = i + 1;
+                return BlockHit{blocks[next], 0, static_cast<int>(next)};
+            }
+            sepCursor = nextStart;
+        } else {
+            sepCursor = blkEnd;
+        }
     }
     return std::nullopt;
 }

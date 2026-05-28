@@ -183,6 +183,103 @@ private Q_SLOTS:
         const Markoff::BlockId b0 = doc.iterateBlocks()[0];
         QCOMPARE(doc.blockText(b0), QByteArrayLiteral("# Heading "));
     }
+
+    void enter_at_paragraph_end_creates_block_and_places_caret() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        QTextCursor c(qdoc);
+        c.setPosition(5);  // end of "Alpha"
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Return);
+        QTest::qWait(80);
+
+        // 1. A new (empty) block was created between Alpha and Bravo.
+        QCOMPARE(int(doc.iterateBlocks().size()), 3);
+        QCOMPARE(doc.blockText(doc.iterateBlocks()[1]), QByteArrayLiteral(""));
+        // 2. Caret landed at the start of the new empty block (sep-view pos 7),
+        //    NOT stranded in the gap (6) nor at the start of "Bravo".
+        QCOMPARE(e.textEdit()->textCursor().position(), 7);
+    }
+
+    void enter_at_document_end_creates_block() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Alpha"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTextCursor c(e.textEdit()->document());
+        c.setPosition(5);  // end of "Alpha"
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Return);
+        QTest::qWait(80);
+
+        QCOMPARE(int(doc.iterateBlocks().size()), 2);
+        QCOMPARE(doc.blockText(doc.iterateBlocks()[1]), QByteArrayLiteral(""));
+        QCOMPARE(e.textEdit()->textCursor().position(), 7);  // start of new block
+    }
+
+    void enter_mid_paragraph_splits_with_caret_at_new_block() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("AlphaBravo"));  // one block
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTextCursor c(e.textEdit()->document());
+        c.setPosition(5);  // between Alpha and Bravo
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Return);
+        QTest::qWait(80);
+
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(int(blocks.size()), 2);
+        QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("Alpha"));
+        QCOMPARE(doc.blockText(blocks[1]), QByteArrayLiteral("Bravo"));
+        QCOMPARE(e.textEdit()->textCursor().position(), 7);  // start of "Bravo"
+    }
+
+    void backspace_at_block_start_merges_with_caret_at_join() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTextCursor c(e.textEdit()->document());
+        c.setPosition(7);  // start of "Bravo"
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Backspace);
+        QTest::qWait(80);
+
+        // Blocks merged into one "AlphaBravo".
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(int(blocks.size()), 1);
+        QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("AlphaBravo"));
+        // Caret at the join point = end of "Alpha" = sep-view pos 5.
+        QCOMPARE(e.textEdit()->textCursor().position(), 5);
+    }
 };
 
 QTEST_MAIN(TstStyledDogfoodInvariants)

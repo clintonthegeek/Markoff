@@ -48,6 +48,14 @@ Editor::Editor(QWidget *parent)
     // It also disables that QTextDocument's own undo stack — CRDT undo via
     // MarkoffDocument is canonical (see SourceTextDocumentBinding::rewireQtDocument).
     m_binding->setTextDocument(m_editor->document());
+    connect(m_binding, &Markoff::SourceTextDocumentBinding::caretResolved,
+            this, [this](int start, int active) {
+                QTextCursor c(m_editor->document());
+                c.setPosition(start);
+                if (active != start)
+                    c.setPosition(active, QTextCursor::KeepAnchor);
+                m_editor->setTextCursor(c);
+            });
 
     // Parent the highlighter to the Editor (not to the QTextDocument) so its
     // lifetime is tied to the Editor regardless of any later setDocument() on

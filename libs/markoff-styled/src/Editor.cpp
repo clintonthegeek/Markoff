@@ -65,6 +65,14 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     if (!m_binding) {
         m_binding = new Markoff::SourceTextDocumentBinding(this);
         m_binding->setTextDocument(m_editor->document());
+        connect(m_binding, &Markoff::SourceTextDocumentBinding::caretResolved,
+                this, [this](int start, int active) {
+                    QTextCursor c(m_editor->document());
+                    c.setPosition(start);
+                    if (active != start)
+                        c.setPosition(active, QTextCursor::KeepAnchor);
+                    m_editor->setTextCursor(c);
+                });
     }
 
     // Connect captureScrollBeforeEdit BEFORE the binding wires its own
