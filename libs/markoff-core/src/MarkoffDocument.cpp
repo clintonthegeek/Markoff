@@ -1674,19 +1674,34 @@ Markoff::BlockId MarkoffDocument::applyInteractiveNewline(uint32_t atByte,
         blocks = iterateBlocks();
     }
 
-    // Resolve atByte -> (block index, byteInBlock) in no-sep coordinates with
-    // previous-block bias at an interior boundary: the `<=` test takes block N
-    // when atByte == end-of-N (rather than start-of-N+1). This is what makes
-    // Enter-at-end-of-paragraph split the paragraph the user is leaving.
+    // Resolve atByte -> (block index, byteInBlock) in no-sep coordinates.
+    // At an interior boundary (atByte == cumulative end of block N), the rule
+    // is "skip past any run of empty blocks and attribute to the LAST empty
+    // in the run" — this makes Enter at the start of an existing empty line
+    // insert the new sibling AFTER it (vim-faithful: cursor moves down).
     uint32_t cursor = 0;
     int idx = -1;
     uint32_t byteInBlock = 0;
     for (size_t i = 0; i < blocks.size(); ++i) {
         const uint32_t sz = static_cast<uint32_t>(blockText(blocks[i]).size());
         const uint32_t blkEnd = cursor + sz;
-        if (atByte <= blkEnd) {
+        if (atByte < blkEnd) {                          // strictly within
             idx = static_cast<int>(i);
             byteInBlock = atByte - cursor;
+            break;
+        }
+        if (atByte == blkEnd) {                         // at boundary
+            size_t j = i + 1;
+            while (j < blocks.size() && blockText(blocks[j]).size() == 0) ++j;
+            if (j == i + 1) {
+                // No empties after i — attribute to (i, end-of-i).
+                idx = static_cast<int>(i);
+                byteInBlock = sz;
+            } else {
+                // Run of empties after i — attribute to the LAST one at offset 0.
+                idx = static_cast<int>(j - 1);
+                byteInBlock = 0;
+            }
             break;
         }
         cursor = blkEnd;
