@@ -262,6 +262,34 @@ private Q_SLOTS:
         QCOMPARE(e.textEdit()->document()->toPlainText(), QStringLiteral("Alpha\nBravo"));
     }
 
+    void paragraph_margins_present_on_every_block() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        // Wait for the styler to run.
+        QTest::qWait(50);
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        // Both QTextBlocks should carry non-zero top + bottom margins so
+        // the visible inter-paragraph gap is layout-driven, not whitespace.
+        for (QTextBlock b = qdoc->begin(); b.isValid(); b = b.next()) {
+            QTextBlockFormat bf = b.blockFormat();
+            QVERIFY2(bf.topMargin() > 0.0,
+                     qPrintable(QStringLiteral("block %1 topMargin=%2")
+                                .arg(b.blockNumber()).arg(bf.topMargin())));
+            QVERIFY2(bf.bottomMargin() > 0.0,
+                     qPrintable(QStringLiteral("block %1 bottomMargin=%2")
+                                .arg(b.blockNumber()).arg(bf.bottomMargin())));
+        }
+    }
+
     void backspace_at_block_start_merges_with_caret_at_join() {
         Markoff::Styled::Editor e;
         Markoff::MarkoffDocument doc(1);

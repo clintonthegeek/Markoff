@@ -24,8 +24,14 @@ namespace {
 
 QTextBlockFormat baseBlockFormat() {
     QTextBlockFormat fmt;
-    fmt.setTopMargin(0);
-    fmt.setBottomMargin(0);
+    // Paragraph margins drive the visible inter-paragraph gap under WP
+    // unification (spec 2026-05-28). Hardcoded defaults; theme-driven
+    // tuning is a follow-up. Values are point-units; QTextDocument
+    // composes margins additively, so adjacent paragraphs sum their
+    // bottom+top to ~10pt of total gap, with an empty paragraph contributing
+    // ~10pt extra (the visible signal of "one Enter").
+    fmt.setTopMargin(5);
+    fmt.setBottomMargin(5);
     fmt.setLeftMargin(0);
     fmt.setIndent(0);
     return fmt;
