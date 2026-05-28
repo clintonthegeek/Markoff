@@ -111,3 +111,7 @@ qt_add_executable(tst_d2_normalize_on_edit tst_d2_normalize_on_edit.cpp)
 target_link_libraries(tst_d2_normalize_on_edit PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_normalize_on_edit COMMAND tst_d2_normalize_on_edit)
 set_tests_properties(tst_d2_normalize_on_edit PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+qt_add_executable(tst_d2_interactive_newline tst_d2_interactive_newline.cpp)
+target_link_libraries(tst_d2_interactive_newline PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d2_interactive_newline COMMAND tst_d2_interactive_newline)

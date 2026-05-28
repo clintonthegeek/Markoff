@@ -1660,6 +1660,59 @@ void MarkoffDocument::applyFlatEdit(uint32_t oldStart,
     }
 }
 
+Markoff::BlockId MarkoffDocument::applyInteractiveNewline(uint32_t atByte,
+                                                          Origin origin)
+{
+    Q_UNUSED(origin);
+    UndoLog::Transaction t(d2UndoLog());
+
+    auto blocks = iterateBlocks();
+
+    // Empty document: create the first paragraph so there is something to split.
+    if (blocks.empty()) {
+        d2InsertBlock(BlockId{}, BlockKind::Paragraph, t);
+        blocks = iterateBlocks();
+    }
+
+    // Resolve atByte -> (block index, byteInBlock) in no-sep coordinates with
+    // previous-block bias at an interior boundary: the `<=` test takes block N
+    // when atByte == end-of-N (rather than start-of-N+1). This is what makes
+    // Enter-at-end-of-paragraph split the paragraph the user is leaving.
+    uint32_t cursor = 0;
+    int idx = -1;
+    uint32_t byteInBlock = 0;
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        const uint32_t sz = static_cast<uint32_t>(blockText(blocks[i]).size());
+        const uint32_t blkEnd = cursor + sz;
+        if (atByte <= blkEnd) {
+            idx = static_cast<int>(i);
+            byteInBlock = atByte - cursor;
+            break;
+        }
+        cursor = blkEnd;
+    }
+    if (idx == -1) {  // past end -> last block at its end
+        idx = static_cast<int>(blocks.size()) - 1;
+        byteInBlock = static_cast<uint32_t>(blockText(blocks[size_t(idx)]).size());
+    }
+
+    const BlockId block = blocks[size_t(idx)];
+    const QByteArray text = blockText(block);
+    const QByteArray tail = text.mid(static_cast<int>(byteInBlock));
+
+    // Trim the tail off the current block (head stays).
+    if (!tail.isEmpty()) {
+        d2ApplyBufferEdit(block, byteInBlock,
+                          static_cast<uint32_t>(tail.size()), QByteArray(), t);
+    }
+    // New block after `block`, seeded with the tail (may be empty).
+    BlockId newBlk = d2InsertBlock(block, BlockKind::Paragraph, t);
+    if (!tail.isEmpty()) {
+        d2ApplyBufferEdit(newBlk, 0, 0, tail, t);
+    }
+    return newBlk;
+}
+
 void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
 {
     // Capture the former row before the IdList mutation.

@@ -186,6 +186,17 @@ public:
                        const QByteArray &newText,
                        Origin origin);
 
+    /// Interactive ingress (WYSIWYG Enter): split the block containing the
+    /// no-separator global byte offset `atByte` on a single newline. The head
+    /// stays in the current block; the tail moves into a NEW Paragraph block
+    /// inserted immediately after. The tail MAY be empty — this is the
+    /// deliberate exception to the no-empty-block canonical rule that
+    /// `applyFlatEdit` enforces (see binding-robustness spec). Performs NO
+    /// newline-run collapsing. Interior-boundary bias is previous-block:
+    /// `atByte` at the end of block N resolves to (N, end), not (N+1, 0).
+    /// Returns the BlockId the caret should occupy at offset 0 (the new block).
+    BlockId applyInteractiveNewline(uint32_t atByte, Origin origin);
+
     /// Source-view representation of the document: per-block content joined
     /// by `interBlockSeparator()` (`"\n\n"`). No final document terminator —
     /// a source widget should not render a phantom empty line at the end;
