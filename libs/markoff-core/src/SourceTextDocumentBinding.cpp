@@ -5,6 +5,7 @@
 #include <QTextDocument>
 
 #include <algorithm>
+#include <optional>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
@@ -341,6 +342,47 @@ void SourceTextDocumentBinding::syncQtDocumentFromMarkoff()
     m_applyingRemoteEdit = false;
 }
 
+int SourceTextDocumentBinding::sepViewPosOf(Markoff::BlockId block,
+                                            int byteInBlock) const
+{
+    if (!m_markoffDocument) return 0;
+    int pos = 0;
+    for (Markoff::BlockId id : m_markoffDocument->iterateBlocks()) {
+        const QByteArray text = m_markoffDocument->blockText(id);
+        if (id == block) {
+            return pos + byteOffsetToQtPos(text, static_cast<quint32>(byteInBlock));
+        }
+        pos += QString::fromUtf8(text).size();  // UTF-16 code units
+        pos += 2;                                // interBlockSeparator() "\n\n"
+    }
+    return pos;  // block not found (defensive) -> end of document
+}
+
+int SourceTextDocumentBinding::noSepByteToSepViewPos(quint32 noSepByte) const
+{
+    if (!m_markoffDocument) return 0;
+    quint32 cursor = 0;
+    for (Markoff::BlockId id : m_markoffDocument->iterateBlocks()) {
+        const quint32 sz =
+            static_cast<quint32>(m_markoffDocument->blockText(id).size());
+        if (noSepByte <= cursor + sz) {
+            return sepViewPosOf(id, static_cast<int>(noSepByte - cursor));
+        }
+        cursor += sz;
+    }
+    // Past the last block: clamp to document end.
+    const auto blocks = m_markoffDocument->iterateBlocks();
+    if (blocks.empty()) return 0;
+    const Markoff::BlockId last = blocks.back();
+    return sepViewPosOf(last,
+        static_cast<int>(m_markoffDocument->blockText(last).size()));
+}
+
+void SourceTextDocumentBinding::emitCaret(int start, int active)
+{
+    Q_EMIT caretResolved(start, active);
+}
+
 void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, int charsAdded)
 {
     // Cycle guard: when T13's reverse path is mid-application, don't loop back.
@@ -363,6 +405,21 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
     const bool insertedHasNewline = insertedUtf8.contains('\n');
 
     m_applyingLocalEdit = true;
+
+    // ── Pure single Enter: interactive newline split (WYSIWYG paragraph) ──
+    // A bare Enter (no selection, exactly one "\n" inserted) creates a real
+    // paragraph — possibly a transient empty one — via the interactive
+    // ingress, and declares the caret target. Everything else (paste,
+    // multi-newline, selection+Enter) keeps its existing routing below.
+    if (charsRemoved == 0 && insertedUtf8 == QByteArrayLiteral("\n")) {
+        const quint32 noSep =
+            sepViewToNoSepByteForEdit(doc, sepStart, /*biasForward=*/false);
+        const Markoff::BlockId newBlk =
+            doc->applyInteractiveNewline(noSep, Markoff::Origin::UserEdit);
+        m_pendingCaret = PendingCaret{ newBlk, 0 };
+        m_applyingLocalEdit = false;
+        return;
+    }
 
     // Resolve both endpoints in sep-view (biasForward=false = previous-block bias
     // for both; the structural split below handles differing blocks).
@@ -430,6 +487,11 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
         doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock,
                                0, toAppend, t);
 
+        // B.3: post-merge caret lands at the merge point = end of the start
+        // block's surviving head (byteInBlock where the trim began).
+        m_pendingCaret = PendingCaret{ hitStart->blockId,
+                                       static_cast<int>(hitStart->byteInBlock) };
+
         m_applyingLocalEdit = false;
         return;
     }
@@ -457,41 +519,50 @@ void SourceTextDocumentBinding::onD2DocumentChanged()
 
     const QString expected = QString::fromUtf8(m_subscribedDoc->flatView());
     const QString actual   = m_textDocument->toPlainText();
-    // After a forward edit the QTextDocument already holds the new text;
-    // this equality check prevents any document mutation in the common case.
-    if (actual == expected) return;
 
-    // ── Incremental diff: longest common prefix + suffix ─────────────────────
-    // Replace only the minimal contiguous changed span via QTextCursor so that
-    // character formatting outside the changed region is preserved. This also
-    // means the view's cursor doesn't jump to the end on a remote edit.
+    if (actual != expected) {
+        // ── Incremental diff: longest common prefix + suffix ─────────────────────
+        // Replace only the minimal contiguous changed span via QTextCursor so that
+        // character formatting outside the changed region is preserved. This also
+        // means the view's cursor doesn't jump to the end on a remote edit.
 
-    // Longest common prefix.
-    int p = 0;
-    const int minLen = std::min(actual.size(), expected.size());
-    while (p < minLen && actual.at(p) == expected.at(p)) ++p;
-    // Don't split a surrogate pair at the prefix boundary.
-    if (p > 0 && p < actual.size() && actual.at(p - 1).isHighSurrogate()) --p;
+        // Longest common prefix.
+        int p = 0;
+        const int minLen = std::min(actual.size(), expected.size());
+        while (p < minLen && actual.at(p) == expected.at(p)) ++p;
+        // Don't split a surrogate pair at the prefix boundary.
+        if (p > 0 && p < actual.size() && actual.at(p - 1).isHighSurrogate()) --p;
 
-    // Longest common suffix, not overlapping the prefix.
-    int s = 0;
-    const int maxS = minLen - p;
-    while (s < maxS
-           && actual.at(actual.size() - 1 - s) == expected.at(expected.size() - 1 - s))
-        ++s;
-    // Don't split a surrogate pair at the suffix boundary.
-    if (s > 0 && actual.at(actual.size() - s).isLowSurrogate()) --s;
+        // Longest common suffix, not overlapping the prefix.
+        int s = 0;
+        const int maxS = minLen - p;
+        while (s < maxS
+               && actual.at(actual.size() - 1 - s) == expected.at(expected.size() - 1 - s))
+            ++s;
+        // Don't split a surrogate pair at the suffix boundary.
+        if (s > 0 && actual.at(actual.size() - s).isLowSurrogate()) --s;
 
-    const int removeFrom = p;
-    const int removeTo   = actual.size() - s;   // exclusive
-    const QString middle = expected.mid(p, expected.size() - s - p);
+        const int removeFrom = p;
+        const int removeTo   = actual.size() - s;   // exclusive
+        const QString middle = expected.mid(p, expected.size() - s - p);
 
-    m_applyingRemoteEdit = true;
-    QTextCursor c(m_textDocument);
-    c.setPosition(removeFrom);
-    c.setPosition(removeTo, QTextCursor::KeepAnchor);
-    c.insertText(middle);
-    m_applyingRemoteEdit = false;
+        m_applyingRemoteEdit = true;
+        QTextCursor c(m_textDocument);
+        c.setPosition(removeFrom);
+        c.setPosition(removeTo, QTextCursor::KeepAnchor);
+        c.insertText(middle);
+        m_applyingRemoteEdit = false;
+    }
+
+    // ── Re-assert the caret declared by a structural op ─────────────────────
+    // The QTextDocument is now settled. No singleShot: d2DocumentChanged is
+    // already debounced past the synchronous keystroke (INVARIANTS §6).
+    if (m_pendingCaret) {
+        const int pos = sepViewPosOf(m_pendingCaret->block,
+                                     m_pendingCaret->offsetInBlock);
+        emitCaret(pos, pos);
+        m_pendingCaret.reset();
+    }
 }
 
 }  // namespace Markoff

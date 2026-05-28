@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <optional>
+
 #include <QByteArray>
 #include <QList>
 #include <QObject>
@@ -94,6 +96,10 @@ Q_SIGNALS:
     void cursorPositionChanged();
     void selectionStartChanged();
     void selectionEndChanged();
+    /// The binding-resolved caret, in sep-view (QTextDocument) coordinates.
+    /// The owning widget applies this to its real caret. start==active is a
+    /// collapsed caret. This is the SOLE caret-output of the binding.
+    void caretResolved(int start, int active);
 
 private Q_SLOTS:
     void onQtContentsChange(int qtPos, int charsRemoved, int charsAdded);
@@ -119,6 +125,18 @@ private:
     /// Sync int cursor/selection from the current Session::primarySelection().
     void syncFromSession();
 
+    /// Sep-view (QTextDocument, UTF-16) position of `byteInBlock` within
+    /// `block`: sum of each preceding block's UTF-16 length + 2 per "\n\n"
+    /// separator, plus the in-block UTF-16 offset.
+    int sepViewPosOf(Markoff::BlockId block, int byteInBlock) const;
+
+    /// Map a no-separator global byte offset (the space resolveTextAnchor
+    /// returns) to a sep-view QTextDocument position.
+    int noSepByteToSepViewPos(quint32 noSepByte) const;
+
+    /// Single emit point for the resolved caret.
+    void emitCaret(int start, int active);
+
     /// Seed m_textDocument with the current content of m_markoffDocument.
     /// Called whenever both pointers become available to handle the case where
     /// MarkoffDocument was populated (e.g. via resetContent) before the binding
@@ -135,6 +153,11 @@ private:
     bool m_applyingLocalEdit      = false;  ///< T12: set during applyLocalEdit ingestion
     bool m_applyingRemoteEdit     = false;  ///< T13: set during reverse edit application
     bool m_applyingBackendCursor  = false;  ///< T14: cycle guard for int↔anchor sync
+
+    struct PendingCaret { Markoff::BlockId block; int offsetInBlock = 0; };
+    /// Set by a structural op to declare the intended post-edit caret; resolved
+    /// + emitted at the tail of onD2DocumentChanged once the reverse diff settles.
+    std::optional<PendingCaret> m_pendingCaret;
 
     int m_cursorPosition = 0;   ///< T14: mirrors TextArea.cursorPosition
     int m_selectionStart = 0;   ///< T14: mirrors TextArea.selectionStart
