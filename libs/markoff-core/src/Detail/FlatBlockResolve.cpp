@@ -11,7 +11,7 @@ std::optional<BlockHit> findBlockAtSepByte(const Markoff::MarkoffDocument *doc,
                                            bool biasForward) {
     const auto blocks = doc->iterateBlocks();
     if (blocks.empty()) return std::nullopt;
-    constexpr quint32 SEP_LEN = 2;
+    constexpr quint32 SEP_LEN = 1;  // WP unification: single '\n' between QTextBlocks
     quint32 sepCursor = 0;
     for (size_t i = 0; i < blocks.size(); ++i) {
         const quint32 sz = static_cast<quint32>(doc->blockText(blocks[i]).size());
@@ -28,10 +28,13 @@ std::optional<BlockHit> findBlockAtSepByte(const Markoff::MarkoffDocument *doc,
         }
         // Separator zone: sepOff > blkEnd and < next block's start.
         // (sepCursor is about to be set to blkEnd + SEP_LEN.)
+        // With SEP_LEN == 1, nextStart == blkEnd + 1, so no sepOff satisfies
+        // blkEnd < sepOff < blkEnd + 1; this branch is unreachable for valid
+        // inputs. Left in place as defensive code.
         if (i + 1 < blocks.size()) {
             const quint32 nextStart = blkEnd + SEP_LEN;
             if (sepOff < nextStart) {
-                // sepOff is within the "\n\n" separator between block i and i+1.
+                // sepOff is within the '\n' separator between block i and i+1.
                 // Resolve based on bias: backward → end of current block,
                 // forward → start of next block.
                 if (!biasForward) {
@@ -53,7 +56,7 @@ QList<BlockSlice> sliceByBlocks(const Markoff::MarkoffDocument *doc,
     QList<BlockSlice> out;
     if (sepLo >= sepHi) return out;
     const auto blocks = doc->iterateBlocks();
-    constexpr quint32 SEP_LEN = 2;
+    constexpr quint32 SEP_LEN = 1;  // WP unification: single '\n' between QTextBlocks
     quint32 sepCursor = 0;
     for (size_t i = 0; i < blocks.size(); ++i) {
         const quint32 sz = static_cast<quint32>(doc->blockText(blocks[i]).size());

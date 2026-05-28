@@ -23,13 +23,15 @@ private Q_SLOTS:
         Markoff::SourceTextDocumentBinding b;
         b.setTextDocument(edit.document());
         b.setMarkoffDocument(&doc);
-        QCOMPARE(edit.toPlainText(), QStringLiteral("alpha\n\nbeta"));
-        // End of "alpha" is qtPos 5 (before the "\n\n").
+        // WP unification: widget view uses single '\n' between blocks.
+        QCOMPARE(edit.toPlainText(), QStringLiteral("alpha\nbeta"));
+        // End of "alpha" is qtPos 5 (before the '\n' separator).
         QTextCursor c(edit.document());
         c.setPosition(5);
         c.insertText(QStringLiteral(" "));   // fires contentsChange
         QCOMPARE(flat(doc), QByteArrayLiteral("alpha \n\nbeta"));   // space in block 0
-        QCOMPARE(edit.toPlainText(), QStringLiteral("alpha \n\nbeta")); // no drift
+        // Widget view reflects the change; still single '\n' separator.
+        QCOMPARE(edit.toPlainText(), QStringLiteral("alpha \nbeta")); // no drift
     }
     void typing_mid_block_unaffected() {
         Markoff::MarkoffDocument doc(1);
@@ -50,10 +52,11 @@ private Q_SLOTS:
         Markoff::SourceTextDocumentBinding b;
         b.setTextDocument(edit.document());
         b.setMarkoffDocument(&doc);
-        // Select the "\n\n" (qtPos 5..7) and delete it.
+        // WP unification: widget view uses single '\n' between blocks.
+        // Select the '\n' separator (qtPos 5..6) and delete it.
         QTextCursor c(edit.document());
         c.setPosition(5);
-        c.setPosition(7, QTextCursor::KeepAnchor);
+        c.setPosition(6, QTextCursor::KeepAnchor);
         c.removeSelectedText();
         QCOMPARE(int(doc.iterateBlocks().size()), 1);
         QCOMPARE(flat(doc), QByteArrayLiteral("alphabeta"));
@@ -68,13 +71,14 @@ private Q_SLOTS:
         Markoff::SourceTextDocumentBinding b;
         b.setTextDocument(edit.document());
         b.setMarkoffDocument(&doc);
-        QCOMPARE(edit.toPlainText(), QStringLiteral("hello\n\nworld"));
+        // WP unification: widget view uses single '\n' between blocks.
+        QCOMPARE(edit.toPlainText(), QStringLiteral("hello\nworld"));
 
-        // Select qtPos 3..9 = "lo\n\nwo" (mid-block0 through the separator into
-        // mid-block1) and delete. Expect one merged block "helrld".
+        // Select qtPos 3..8 = "lo\nwo" (mid-block0 through the single-'\n'
+        // separator into mid-block1) and delete. Expect one merged block "helrld".
         QTextCursor c(edit.document());
         c.setPosition(3);
-        c.setPosition(9, QTextCursor::KeepAnchor);
+        c.setPosition(8, QTextCursor::KeepAnchor);
         c.removeSelectedText();
 
         QCOMPARE(int(doc.iterateBlocks().size()), 1);

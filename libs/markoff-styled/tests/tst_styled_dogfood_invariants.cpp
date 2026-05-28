@@ -205,9 +205,13 @@ private Q_SLOTS:
         // 1. A new (empty) block was created between Alpha and Bravo.
         QCOMPARE(int(doc.iterateBlocks().size()), 3);
         QCOMPARE(doc.blockText(doc.iterateBlocks()[1]), QByteArrayLiteral(""));
-        // 2. Caret landed at the start of the new empty block (sep-view pos 7),
-        //    NOT stranded in the gap (6) nor at the start of "Bravo".
-        QCOMPARE(e.textEdit()->textCursor().position(), 7);
+        // 2. Caret landed at the start of the new empty block (sep-view pos 6),
+        //    NOT stranded in the gap nor at the start of "Bravo".
+        QCOMPARE(e.textEdit()->textCursor().position(), 6);
+        // WP unification: the QTextDocument plain text adds exactly one
+        // '\n' (one new QTextBlock for the empty block), not three blank
+        // lines. Length grew by 1, not 4.
+        QCOMPARE(qdoc->toPlainText(), QStringLiteral("Alpha\n\nBravo"));
     }
 
     void enter_at_document_end_creates_block() {
@@ -229,7 +233,8 @@ private Q_SLOTS:
 
         QCOMPARE(int(doc.iterateBlocks().size()), 2);
         QCOMPARE(doc.blockText(doc.iterateBlocks()[1]), QByteArrayLiteral(""));
-        QCOMPARE(e.textEdit()->textCursor().position(), 7);  // start of new block
+        QCOMPARE(e.textEdit()->textCursor().position(), 6);
+        QCOMPARE(e.textEdit()->document()->toPlainText(), QStringLiteral("Alpha\n"));
     }
 
     void enter_mid_paragraph_splits_with_caret_at_new_block() {
@@ -253,7 +258,8 @@ private Q_SLOTS:
         QCOMPARE(int(blocks.size()), 2);
         QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("Alpha"));
         QCOMPARE(doc.blockText(blocks[1]), QByteArrayLiteral("Bravo"));
-        QCOMPARE(e.textEdit()->textCursor().position(), 7);  // start of "Bravo"
+        QCOMPARE(e.textEdit()->textCursor().position(), 6);
+        QCOMPARE(e.textEdit()->document()->toPlainText(), QStringLiteral("Alpha\nBravo"));
     }
 
     void backspace_at_block_start_merges_with_caret_at_join() {
@@ -268,7 +274,7 @@ private Q_SLOTS:
         QTRY_VERIFY(e.isVisible());
 
         QTextCursor c(e.textEdit()->document());
-        c.setPosition(7);  // start of "Bravo"
+        c.setPosition(6);  // start of "Bravo" (WP unification: single '\n' separator)
         e.textEdit()->setTextCursor(c);
         QTest::keyClick(e.textEdit(), Qt::Key_Backspace);
         QTest::qWait(80);

@@ -27,8 +27,8 @@ private Q_SLOTS:
         QPlainTextEdit edit;
         SourceTextDocumentBinding b;
         b.setMarkoffDocument(&doc);
-        b.setTextDocument(edit.document());  // seeds qdoc with flatView "Hello\n\nWorld"
-        QCOMPARE(edit.toPlainText(), QStringLiteral("Hello\n\nWorld"));
+        b.setTextDocument(edit.document());  // seeds qdoc with widgetFlatView "Hello\nWorld"
+        QCOMPARE(edit.toPlainText(), QStringLiteral("Hello\nWorld"));
 
         QSignalSpy spy(&b, &SourceTextDocumentBinding::caretResolved);
 
@@ -38,11 +38,10 @@ private Q_SLOTS:
         c.insertText(QStringLiteral("\n"));  // fires contentsChange
 
         QTRY_COMPARE(spy.count(), 1);
-        // New empty block sits between Hello and World; its start in sep-view
-        // is after "Hello\n\n" == position 7.
-        QCOMPARE(spy.at(0).at(0).toInt(), 7);
-        QCOMPARE(spy.at(0).at(1).toInt(), 7);
-        // Model gained a block.
+        // WP runtime view: blocks joined by single '\n', so the new empty
+        // block's start is at sep-view position 6 ("Hello" + "\n").
+        QCOMPARE(spy.at(0).at(0).toInt(), 6);
+        QCOMPARE(spy.at(0).at(1).toInt(), 6);
         QCOMPARE(int(doc.iterateBlocks().size()), 3);
     }
 
@@ -60,8 +59,8 @@ private Q_SLOTS:
         QSignalSpy spy(&b, &SourceTextDocumentBinding::caretResolved);
 
         // Place a collapsed selection at the start of "World" (no-sep byte 5).
-        // In sep-view that is position 7 ("Hello\n\n" = 7). The OLD
-        // no-separator concatenation would have wrongly returned 5.
+        // In sep-view that is position 6 ("Hello\n" = 6, WP unification: single '\n').
+        // The OLD no-separator concatenation would have wrongly returned 5.
         const auto anchor = doc.textAnchorAt(5, /*rightBias*/ false);
         Markoff::Selection sel;
         sel.anchor = anchor;
@@ -71,8 +70,8 @@ private Q_SLOTS:
 
         QTRY_VERIFY(spy.count() >= 1);
         const auto last = spy.last();
-        QCOMPARE(last.at(0).toInt(), 7);
-        QCOMPARE(last.at(1).toInt(), 7);
+        QCOMPARE(last.at(0).toInt(), 6);
+        QCOMPARE(last.at(1).toInt(), 6);
     }
 
     void ordinary_typing_does_not_resolve_caret() {

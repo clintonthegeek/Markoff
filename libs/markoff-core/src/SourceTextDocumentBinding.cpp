@@ -249,11 +249,11 @@ static quint32 sepViewToNoSepByteForEdit(const Markoff::MarkoffDocument *doc,
 void SourceTextDocumentBinding::syncQtDocumentFromMarkoff()
 {
     if (!m_subscribedDoc || !m_textDocument) return;
-    // Use the separator-bearing flat view so the inner QTextDocument is a
-    // 1:1 mirror of the saved markdown — line/column positions match the
-    // file. `applyFlatEdit`'s coordinate space (no-separator) is translated
-    // in `onQtContentsChange`.
-    const QString text = QString::fromUtf8(m_subscribedDoc->flatView());
+    // Use the widget flat view (single '\n' between blocks) so the inner
+    // QTextDocument mirrors the WYSIWYG paragraph structure rather than the
+    // save form. `applyFlatEdit`'s coordinate space (no-separator) is
+    // translated in `onQtContentsChange`.
+    const QString text = QString::fromUtf8(m_subscribedDoc->widgetFlatView());
     if (m_textDocument->toPlainText() == text) return;  // already in sync
     m_applyingRemoteEdit = true;
     m_textDocument->setPlainText(text);
@@ -271,7 +271,7 @@ int SourceTextDocumentBinding::sepViewPosOf(Markoff::BlockId block,
             return pos + byteOffsetToQtPos(text, static_cast<quint32>(byteInBlock));
         }
         pos += QString::fromUtf8(text).size();  // UTF-16 code units
-        pos += 2;                                // interBlockSeparator() "\n\n"
+        pos += 1;                                // WP unification: single '\n' separator
     }
     return pos;  // block not found (defensive) -> end of document
 }
@@ -311,12 +311,12 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
     if (!m_markoffDocument || !m_textDocument) return;
     Markoff::MarkoffDocument *doc = m_markoffDocument;
 
-    // The QTextDocument mirrors flatView() (separator-bearing), so its plain
-    // text IS the sep-view. Compute sep-view byte offsets against PRE-change
-    // state. NOTE: qtPos/charsRemoved are in the PRE-change document; read the
-    // pre-change text from flatView() (the doc hasn't been mutated yet on the
-    // forward path), and the inserted text from the POST-change QTextDocument.
-    const QByteArray preBytesSep = doc->flatView();
+    // The QTextDocument mirrors widgetFlatView() (single '\n' between blocks),
+    // so its plain text IS the sep-view. Compute sep-view byte offsets against
+    // PRE-change state. NOTE: qtPos/charsRemoved are in the PRE-change document;
+    // read the pre-change text from widgetFlatView() (the doc hasn't been mutated
+    // yet on the forward path), and the inserted text from the POST-change QTextDocument.
+    const QByteArray preBytesSep = doc->widgetFlatView();
     const QString    preTextSep  = QString::fromUtf8(preBytesSep);
     const quint32 sepStart = qtPosToByteOffset(preTextSep, qtPos);
     const quint32 sepEnd   = qtPosToByteOffset(preTextSep, qtPos + charsRemoved);
@@ -438,7 +438,7 @@ void SourceTextDocumentBinding::onD2DocumentChanged()
     if (!m_textDocument) return;
     if (!m_subscribedDoc) return;
 
-    const QString expected = QString::fromUtf8(m_subscribedDoc->flatView());
+    const QString expected = QString::fromUtf8(m_subscribedDoc->widgetFlatView());
     const QString actual   = m_textDocument->toPlainText();
 
     if (actual != expected) {

@@ -28,12 +28,13 @@ private Q_SLOTS:
         Markoff::SourceTextDocumentBinding b;
         b.setTextDocument(edit.document());
         b.setMarkoffDocument(&doc);
-        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("alpha\n\nbeta"));
+        // WP unification: widget view uses single '\n' between blocks.
+        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("alpha\nbeta"));
 
-        // Apply a distinctive 22pt char format to "beta" (positions 7..11).
+        // Apply a distinctive 22pt char format to "beta" (positions 6..10).
         {
             QTextCursor c(edit.document());
-            c.setPosition(7); c.setPosition(11, QTextCursor::KeepAnchor);
+            c.setPosition(6); c.setPosition(10, QTextCursor::KeepAnchor);
             QTextCharFormat f; f.setFontPointSize(22.0);
             c.mergeCharFormat(f);
         }
@@ -43,10 +44,10 @@ private Q_SLOTS:
         doc.applyFlatEdit(0, 0, QByteArrayLiteral("X"), Markoff::Origin::UserEdit);
         pumpEvents();  // d2DocumentChanged is debounced via QTimer::singleShot(0)
 
-        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("Xalpha\n\nbeta"));
-        // "beta"'s 22pt format survived (shifted +1 → positions 8..12).
+        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("Xalpha\nbeta"));
+        // "beta"'s 22pt format survived (shifted +1 → positions 7..11).
         QTextCursor probe(edit.document());
-        probe.setPosition(9); probe.setPosition(10, QTextCursor::KeepAnchor);
+        probe.setPosition(8); probe.setPosition(9, QTextCursor::KeepAnchor);
         QCOMPARE(probe.charFormat().fontPointSize(), 22.0);
     }
 
@@ -59,7 +60,8 @@ private Q_SLOTS:
         b.setMarkoffDocument(&doc);
         doc.applyFlatEdit(0, 0, QByteArrayLiteral("X"), Markoff::Origin::UserEdit);
         pumpEvents();
-        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("Xalpha\n\nbeta"));
+        // WP unification: widget view uses single '\n' between blocks.
+        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("Xalpha\nbeta"));
     }
 
     void formatting_preserved_on_same_length_substitution() {
@@ -72,35 +74,36 @@ private Q_SLOTS:
         b.setTextDocument(edit.document());
         b.setMarkoffDocument(&doc);
 
-        // Apply 22pt format to "beta" (positions 7..11).
+        // WP unification: widget view uses single '\n' between blocks.
+        // Apply 22pt format to "beta" (positions 6..10).
         {
             QTextCursor c(edit.document());
-            c.setPosition(7); c.setPosition(11, QTextCursor::KeepAnchor);
+            c.setPosition(6); c.setPosition(10, QTextCursor::KeepAnchor);
             QTextCharFormat f; f.setFontPointSize(22.0);
             c.mergeCharFormat(f);
         }
 
-        // Change only "alpha" block — "beta" block (positions 7..11) is outside
+        // Change only "alpha" block — "beta" block (positions 6..10) is outside
         // the changed span; the incremental diff must leave it untouched.
         // applyFlatEdit(0, 5, "ALPHA") replaces "alpha" with "ALPHA" in no-sep
         // coordinates, leaving "beta" at the same relative position.
         doc.applyFlatEdit(0, 5, QByteArrayLiteral("ALPHA"), Markoff::Origin::UserEdit);
         pumpEvents();  // d2DocumentChanged is debounced via QTimer::singleShot(0)
-        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("ALPHA\n\nbeta"));
+        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("ALPHA\nbeta"));
 
-        // "beta"'s 22pt format survived (still at positions 7..11 — same offsets,
+        // "beta"'s 22pt format survived (still at positions 6..10 — same offsets,
         // because "alpha" and "ALPHA" are the same length in this block).
         QTextCursor probe(edit.document());
-        probe.setPosition(8); probe.setPosition(9, QTextCursor::KeepAnchor);
+        probe.setPosition(7); probe.setPosition(8, QTextCursor::KeepAnchor);
         QCOMPARE(probe.charFormat().fontPointSize(), 22.0);
     }
 
     void in_sync_reverse_is_noop() {
-        // Exercises the onD2DocumentChanged actual==flatView() early-return.
+        // Exercises the onD2DocumentChanged actual==widgetFlatView() early-return.
         // When a local edit goes through QPlainTextEdit's cursor, the forward
         // path (onContentsChange) updates both the QTextDocument and the CRDT
         // buffer in lockstep.  When the deferred d2DocumentChanged fires,
-        // onD2DocumentChanged computes flatView() == actual and early-returns
+        // onD2DocumentChanged computes widgetFlatView() == actual and early-returns
         // without issuing any QTextCursor edit — leaving "beta"'s format intact.
         Markoff::MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("alpha\n\nbeta"));
@@ -109,27 +112,28 @@ private Q_SLOTS:
         b.setTextDocument(edit.document());
         b.setMarkoffDocument(&doc);
 
-        // Apply a distinctive 22pt char format to "beta" (positions 7..11).
+        // WP unification: widget view uses single '\n' between blocks.
+        // Apply a distinctive 22pt char format to "beta" (positions 6..10).
         {
             QTextCursor c(edit.document());
-            c.setPosition(7); c.setPosition(11, QTextCursor::KeepAnchor);
+            c.setPosition(6); c.setPosition(10, QTextCursor::KeepAnchor);
             QTextCharFormat f; f.setFontPointSize(22.0);
             c.mergeCharFormat(f);
         }
 
         // Type via the QPlainTextEdit cursor (forward path updates the
         // QTextDocument AND the CRDT in lockstep).  When the deferred
-        // d2DocumentChanged fires, onD2DocumentChanged sees actual == flatView()
+        // d2DocumentChanged fires, onD2DocumentChanged sees actual == widgetFlatView()
         // and early-returns — no QTextCursor edit, so "beta"'s format is untouched.
         QTextCursor tc(edit.document());
         tc.setPosition(2);
-        tc.insertText(QStringLiteral("X"));   // "alXpha\n\nbeta"
+        tc.insertText(QStringLiteral("X"));   // "alXpha\nbeta"
         pumpEvents();  // deliver deferred d2DocumentChanged → early-return path
 
-        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("alXpha\n\nbeta"));
-        // "beta" shifted +1 → positions 8..12; probe character at position 9.
+        QCOMPARE(edit.document()->toPlainText(), QStringLiteral("alXpha\nbeta"));
+        // "beta" shifted +1 → positions 7..11; probe character at position 8.
         QTextCursor probe(edit.document());
-        probe.setPosition(9); probe.setPosition(10, QTextCursor::KeepAnchor);
+        probe.setPosition(8); probe.setPosition(9, QTextCursor::KeepAnchor);
         QCOMPARE(probe.charFormat().fontPointSize(), 22.0);
     }
 };
