@@ -2206,6 +2206,32 @@ QByteArray serializeFootnoteDefs(const Markoff::FootnoteDefMap &fdm)
     return out;
 }
 
+// BlockQuote serialization helpers (queue #8.1, spec
+// docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §6).
+QByteArray blockQuotePrefix(int depth)
+{
+    QByteArray out;
+    for (int i = 0; i < std::max(1, depth); ++i) out += "> ";
+    return out;
+}
+
+// Prepend `prefix` to the start of `content` and to the start of every
+// line following an internal '\n'. Used to wrap a non-BlockQuote inner
+// kind's native serializer output (e.g. heading, code block) with the
+// '> ' marker on every line.
+QByteArray prefixEveryLine(const QByteArray &content, const QByteArray &prefix)
+{
+    QByteArray out;
+    out.reserve(content.size() + prefix.size() * 4);
+    out += prefix;
+    for (int i = 0; i < content.size(); ++i) {
+        const char c = content[i];
+        out += c;
+        if (c == '\n' && i + 1 < content.size()) out += prefix;
+    }
+    return out;
+}
+
 }  // anonymous namespace
 
 QByteArray MarkoffDocument::serializeForSave() const
@@ -2221,9 +2247,24 @@ QByteArray MarkoffDocument::serializeForSave() const
     // 2. Blocks
     auto blocks = iterateBlocks();
     auto &reg = BuiltinBlockSerializerRegistry::instance();
+
+    // Read BlockQuote context (depth, RunId) from a block's attrs.
+    // depth=0/runId=0 means "not inside a quote." Spec
+    // docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §6.
+    auto quoteContextFor = [&](BlockId id) -> std::pair<int, int> {
+        const auto attrs = blockAttrs(id);
+        int depth = 0, runId = 0;
+        auto dIt = attrs.constFind(AttrNames::BlockQuoteDepth);
+        if (dIt != attrs.cend()) depth = std::get<int>(dIt.value());
+        auto rIt = attrs.constFind(AttrNames::BlockQuoteRunId);
+        if (rIt != attrs.cend()) runId = std::get<int>(rIt.value());
+        return {depth, runId};
+    };
+
     for (size_t i = 0; i < blocks.size(); ++i) {
         BlockId id = blocks[i];
         const BlockKind kind = blockKind(id);
+        const auto [depthI, runIdI] = quoteContextFor(id);
 
         // ListItem blocks need marker+indent reconstruction from attrs;
         // the buffer holds content-only (no marker, no indent, no newline).
@@ -2243,8 +2284,13 @@ QByteArray MarkoffDocument::serializeForSave() const
             const QByteArray marker = markerForListItem(attrs);
             const QByteArray content = blockText(id);
 
-            // Emit: <indent><marker> <content>  (separator is added below)
-            out += indentBytes + marker + " " + content;
+            // Emit: <indent><marker> <content>  (separator is added below).
+            // ListItem-in-quote: prepend depth × '> ' (TODO v0.2: per-line
+            // wrap once continuation lines are supported; v0 buffer is
+            // single-line).
+            QByteArray line = indentBytes + marker + " " + content;
+            if (depthI > 0) line = blockQuotePrefix(depthI) + line;
+            out += line;
 
             // Per B1 §3: the serializer owns inter-block separators.
             //   - Between two ListItems in the same run: loose -> "\n\n",
@@ -2253,6 +2299,12 @@ QByteArray MarkoffDocument::serializeForSave() const
             //     block separator "\n\n" (otherwise list-then-paragraph
             //     round-trips lose the blank line — surfaced 2026-05-21
             //     by Corbomite dogfood).
+            //
+            // TODO(v0.2): ListItem-inside-quote inter-item separator does
+            // not currently honour BlockQuoteRunId; the quoted-blank-line
+            // form (`>\n` between items) is not synthesised. Two adjacent
+            // quoted list items round-trip as `> - one\n> - two\n` which
+            // CommonMark accepts. Spec §6 ListItem-in-quote bullet.
             if (i + 1 < blocks.size()) {
                 const BlockKind nextKind = blockKind(blocks[i + 1]);
                 if (nextKind == BlockKind::ListItem)
@@ -2280,7 +2332,12 @@ QByteArray MarkoffDocument::serializeForSave() const
                     isSetextHeading = (*p == QStringLiteral("setext"));
             }
         }
-        if (!isBlockTouched(id) && !isSetextHeading) {
+        // Quoted blocks always reconstruct via the per-kind serializer +
+        // optional line-wrap pass; the load-time bytes for them are the
+        // post-canonicalisation buffer (markers stripped, \n collapsed),
+        // not source-byte-identical. Spec §6 untouched bypass.
+        const bool isBlockQuoted = (depthI > 0);
+        if (!isBlockTouched(id) && !isSetextHeading && !isBlockQuoted) {
             // Untouched: use original load-time bytes for byte-identical
             // content round-trip. Strip the load-time terminator so the
             // serializer owns separator placement (B1 §3).
@@ -2288,15 +2345,38 @@ QByteArray MarkoffDocument::serializeForSave() const
             if (bytes.endsWith('\n'))
                 bytes.chop(1);
         } else {
-            // Touched (or setext): re-serialize from CRDT state. Per-kind
-            // serializer is contracted to emit body only — no terminator
-            // (B1 §4).
+            // Touched (or setext or quoted): re-serialize from CRDT state.
+            // Per-kind serializer is contracted to emit body only — no
+            // terminator (B1 §4).
             auto fn = reg.get(kind);
             bytes = fn(kind, blockAttrs(id), blockText(id));
+            // Non-BlockQuote inner kinds in a quote (Heading, CodeBlock,
+            // ...): wrap each line with depth × '> '. BlockQuote-kind
+            // blocks were already wrapped by serializeBlockQuote itself.
+            if (isBlockQuoted && kind != BlockKind::BlockQuote) {
+                bytes = prefixEveryLine(bytes, blockQuotePrefix(depthI));
+            }
         }
         out += bytes;
-        if (i + 1 < blocks.size())
-            out += interBlockSeparator();
+        // Inter-block separator: same-RunId pair (two paragraphs of one
+        // parser block_quote) gets the quoted-blank-line form `\n>\n`
+        // (the blank-quoted-line carries depth × '>'). Different runs
+        // (including 0-vs-0 outside-quote, transitions in/out, two
+        // adjacent quotes) get the ordinary `\n\n`.
+        if (i + 1 < blocks.size()) {
+            const auto [depthNext, runIdNext] = quoteContextFor(blocks[i + 1]);
+            (void)depthNext;
+            if (runIdI > 0 && runIdI == runIdNext) {
+                // Marker-only quoted blank line. Use depth × '>' (no
+                // trailing space) so the round-trip matches the
+                // canonical `>\n` shape rather than `> \n`.
+                QByteArray markerOnly;
+                for (int k = 0; k < depthI; ++k) markerOnly += '>';
+                out += "\n" + markerOnly + "\n";
+            } else {
+                out += interBlockSeparator();
+            }
+        }
     }
 
     // B1: serializer owns the document-final '\n'. CommonMark convention.

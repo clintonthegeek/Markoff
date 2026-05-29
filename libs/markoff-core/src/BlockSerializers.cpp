@@ -2,7 +2,9 @@
 #include <markoff/core/BlockSerializer.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/BlockAttrsMap.h>
+#include <markoff/core/AttrNames.h>
 
+#include <algorithm>
 #include <variant>
 
 namespace Markoff {
@@ -120,12 +122,20 @@ QByteArray serializeListItem(BlockKind, const QHash<AttrName, AttrValue> &attrs,
 
 // --- Task 8.3: blockquote, hr, image, math, mermaid, html-block, table ---
 
-QByteArray serializeBlockQuote(BlockKind, const QHash<AttrName, AttrValue> &,
+QByteArray serializeBlockQuote(BlockKind, const QHash<AttrName, AttrValue> &attrs,
                                 const QByteArray &content)
 {
-    // v1: simple prefix — works for single-line content; multi-line handled by
-    // round-trip via load-time bytes for untouched blocks.
-    return "> " + content;
+    // Depth-aware (queue #8.1, spec
+    // docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §6).
+    // Buffer is content-only with no internal '\n' (B1 + Paragraph
+    // collapse). Empty content -> "> " (well-formed marker-only line).
+    int depth = 1;
+    auto it = attrs.constFind(AttrNames::BlockQuoteDepth);
+    if (it != attrs.cend())
+        depth = std::max(1, std::get<int>(it.value()));
+    QByteArray prefix;
+    for (int i = 0; i < depth; ++i) prefix += "> ";
+    return prefix + content;
 }
 
 QByteArray serializeHorizontalRule(BlockKind, const QHash<AttrName, AttrValue> &,
