@@ -560,12 +560,17 @@ void StyleApplier::applyFormats() {
                 } else if (kind == Markoff::BlockKind::CodeBlock) {
                     applyCodeBlock(blkCursor, m_fontScale);
                 } else if (kind == Markoff::BlockKind::BlockQuote) {
+                    // Depth from BlockQuoteDepth attr (queue #8.1).
+                    // Buffer no longer carries '>' markers post-load
+                    // canonicalisation, so the previous peel-from-text
+                    // path doesn't apply. Spec
+                    // docs/specs/2026-05-29-blockquote-multi-paragraph-
+                    // split-design.md §7.
                     int depth = 1;
-                    if (!text.isEmpty()) {
-                        depth = 0;
-                        for (int bi = 0; bi < text.size() && text[bi] == '>'; ++bi) ++depth;
-                        depth = qMax(1, depth);
-                    }
+                    if (auto it = attrs.find(Markoff::AttrNames::BlockQuoteDepth);
+                        it != attrs.end()
+                        && std::holds_alternative<int>(*it))
+                        depth = qMax(1, std::get<int>(*it));
                     applyBlockquote(blkCursor, depth, m_fontScale);
                 } else if (kind == Markoff::BlockKind::ListItem) {
                     // Read structural attrs from the model rather than guessing
@@ -592,6 +597,26 @@ void StyleApplier::applyFormats() {
                     applyHorizontalRule(blkCursor, m_fontScale);
                 } else {
                     applyParagraph(blkCursor, m_fontScale);
+                }
+
+                // BlockQuote depth overlay (queue #8.1): non-BlockQuote
+                // inner kinds (Heading, CodeBlock, ListItem, ...) inside
+                // a quote get an additive left-margin so the user reads
+                // them as quoted regardless of native styling. Matches
+                // applyBlockquote's emPt(fontScale) x depth shape. Spec
+                // docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §7.
+                if (kind != Markoff::BlockKind::BlockQuote) {
+                    int overlayDepth = 0;
+                    if (auto it = attrs.find(Markoff::AttrNames::BlockQuoteDepth);
+                        it != attrs.end()
+                        && std::holds_alternative<int>(*it))
+                        overlayDepth = std::get<int>(*it);
+                    if (overlayDepth > 0) {
+                        QTextBlockFormat bf = blkCursor.blockFormat();
+                        bf.setLeftMargin(bf.leftMargin()
+                                         + emPt(m_fontScale) * overlayDepth);
+                        blkCursor.setBlockFormat(bf);
+                    }
                 }
                 qblk = qblk.next();
             }
