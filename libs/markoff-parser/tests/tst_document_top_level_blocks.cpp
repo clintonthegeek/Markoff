@@ -132,9 +132,14 @@ void TestDocumentTopLevelBlocks::indentedCodeBlock()
 
 void TestDocumentTopLevelBlocks::blockQuote()
 {
+    // Post-spec 2026-05-29-blockquote-multi-paragraph-split-design.md:
+    // a single-line blockquote source emits its inner paragraph child
+    // as its own TLB tagged with blockQuoteDepth=1.
     auto blocks = blocksOf(QStringLiteral("> hello world\n"));
     QCOMPARE(blocks.size(), 1);
-    QCOMPARE(blocks[0].kind, Kind::BlockQuote);
+    QCOMPARE(blocks[0].kind, Kind::Paragraph);
+    QCOMPARE(blocks[0].blockQuoteDepth, 1);
+    QVERIFY(blocks[0].blockQuoteRunId >= 1);
 }
 
 void TestDocumentTopLevelBlocks::bulletList()
@@ -214,12 +219,16 @@ void TestDocumentTopLevelBlocks::mixedDocumentInOrder()
     QCOMPARE(blocks[0].headingLevel, 1);
 
     // Verify we see at least one of each expected kind, in order.
+    // Post-spec 2026-05-29-blockquote-multi-paragraph-split-design.md
+    // the inner-paragraph-of-a-blockquote emits as Kind::Paragraph
+    // tagged with blockQuoteDepth > 0; the standalone BlockQuote kind
+    // is no longer emitted by the walker.
     bool sawParagraph = false, sawCode = false, sawQuote = false;
     bool sawList = false, sawHr = false;
     for (const auto &b : blocks) {
         if (b.kind == Kind::Paragraph)        sawParagraph = true;
         if (b.kind == Kind::FencedCodeBlock)  sawCode      = true;
-        if (b.kind == Kind::BlockQuote)       sawQuote     = true;
+        if (b.blockQuoteDepth > 0)            sawQuote     = true;
         if (b.kind == Kind::ListItem)         sawList      = true;
         if (b.kind == Kind::ThematicBreak)    sawHr        = true;
     }

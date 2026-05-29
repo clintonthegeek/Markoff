@@ -1249,7 +1249,10 @@ static void harvestListItem(TSNode item, const QByteArray &utf8,
 static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
                                   QList<TopLevelBlock> &out,
                                   int currentIndent = 0,
-                                  bool currentLooseRun = false)
+                                  bool currentLooseRun = false,
+                                  int currentBlockQuoteDepth = 0,
+                                  int currentBlockQuoteRunId = 0,
+                                  quint32 *nextBlockQuoteRunId = nullptr)
 {
     const char *type = ts_node_type(node);
 
@@ -1258,7 +1261,36 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
         uint32_t count = ts_node_named_child_count(node);
         for (uint32_t i = 0; i < count; ++i) {
             TSNode child = ts_node_named_child(node, i);
-            collectTopLevelBlocks(child, utf8, out, currentIndent, currentLooseRun);
+            collectTopLevelBlocks(child, utf8, out, currentIndent,
+                                  currentLooseRun, currentBlockQuoteDepth,
+                                  currentBlockQuoteRunId, nextBlockQuoteRunId);
+        }
+        return;
+    }
+
+    // BlockQuote: do NOT emit a TLB for the block_quote node itself.
+    // Recurse into named children carrying depth+runId so each child
+    // emits its own native-kind TLB tagged with the quote context.
+    // Structural marker children (`block_quote_marker` = the literal `>`,
+    // `block_continuation` = blank-quoted-line separating paragraphs)
+    // are skipped — they carry no content and would otherwise generate
+    // spurious Kind::Other TLBs. See docs/specs/2026-05-29-blockquote-
+    // multi-paragraph-split-design.md §4.
+    if (strcmp(type, "block_quote") == 0) {
+        const int childDepth = currentBlockQuoteDepth + 1;
+        // Fresh runId for this block_quote node's direct children;
+        // any nested block_quote inside will take its own.
+        Q_ASSERT(nextBlockQuoteRunId != nullptr);
+        const int childRunId = static_cast<int>((*nextBlockQuoteRunId)++);
+        const uint32_t count = ts_node_named_child_count(node);
+        for (uint32_t i = 0; i < count; ++i) {
+            TSNode child = ts_node_named_child(node, i);
+            const char *childType = ts_node_type(child);
+            if (strcmp(childType, "block_quote_marker") == 0
+             || strcmp(childType, "block_continuation") == 0) continue;
+            collectTopLevelBlocks(child, utf8, out, currentIndent,
+                                  currentLooseRun, childDepth, childRunId,
+                                  nextBlockQuoteRunId);
         }
         return;
     }
@@ -1269,7 +1301,9 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
         const uint32_t count = ts_node_named_child_count(node);
         for (uint32_t i = 0; i < count; ++i) {
             TSNode child = ts_node_named_child(node, i);
-            collectTopLevelBlocks(child, utf8, out, currentIndent, loose);
+            collectTopLevelBlocks(child, utf8, out, currentIndent, loose,
+                                  currentBlockQuoteDepth,
+                                  currentBlockQuoteRunId, nextBlockQuoteRunId);
         }
         return;
     }
@@ -1280,6 +1314,8 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
         b.kind = TopLevelBlock::Kind::ListItem;
         b.indentDepth = currentIndent;
         b.looseRun = currentLooseRun;
+        b.blockQuoteDepth = currentBlockQuoteDepth;
+        b.blockQuoteRunId = currentBlockQuoteRunId;
         harvestListItem(node, utf8, b);
         out.append(b);
         // Recurse into nested list children at increased indent depth
@@ -1287,7 +1323,9 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
         for (uint32_t i = 0; i < count; ++i) {
             TSNode child = ts_node_named_child(node, i);
             if (strcmp(ts_node_type(child), "list") == 0) {
-                collectTopLevelBlocks(child, utf8, out, currentIndent + 1, currentLooseRun);
+                collectTopLevelBlocks(child, utf8, out, currentIndent + 1,
+                                      currentLooseRun, currentBlockQuoteDepth,
+                                      currentBlockQuoteRunId, nextBlockQuoteRunId);
             }
         }
         return;
@@ -1306,6 +1344,8 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
     b.kind      = classifyTopLevelKind(type);
     b.byteStart = static_cast<int>(ts_node_start_byte(node));
     b.byteEnd   = static_cast<int>(ts_node_end_byte(node));
+    b.blockQuoteDepth = currentBlockQuoteDepth;
+    b.blockQuoteRunId = currentBlockQuoteRunId;
 
     switch (b.kind) {
     case TopLevelBlock::Kind::AtxHeading:
@@ -1392,8 +1432,17 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
     TSNode blockRoot = ts_tree_root_node(m_blockTree);
     collectHeadingsForQuery(blockRoot, m_utf8, result.headings);
 
-    // Walk block tree for top-level blocks (linearised, in document order)
-    collectTopLevelBlocks(blockRoot, m_utf8, result.topLevelBlocks);
+    // Walk block tree for top-level blocks (linearised, in document order).
+    // `nextBlockQuoteRunId` is the doc-scoped counter for the per-`block_quote`
+    // RunId stamped on quoted children — see
+    // docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §4.
+    quint32 nextBlockQuoteRunId = 1;
+    collectTopLevelBlocks(blockRoot, m_utf8, result.topLevelBlocks,
+                          /*currentIndent=*/0,
+                          /*currentLooseRun=*/false,
+                          /*currentBlockQuoteDepth=*/0,
+                          /*currentBlockQuoteRunId=*/0,
+                          &nextBlockQuoteRunId);
 
     // Walk inline trees for links and tags
     for (TSTree *tree : m_inlineTrees) {
