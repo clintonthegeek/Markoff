@@ -10,11 +10,20 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/BlockKind.h>
+#include <markoff/core/AttrNames.h>
 #include <markoff/core/UndoLog.h>
 
 using namespace Markoff;
 
 namespace {
+
+int readIntAttr(MarkoffDocument &doc, BlockId id, const char *name)
+{
+    const auto attrs = doc.blockAttrs(id);
+    auto it = attrs.constFind(name);
+    if (it == attrs.cend()) return 0;
+    return std::get<int>(it.value());
+}
 
 struct Fixture {
     const char *name;
@@ -79,6 +88,17 @@ private slots:
     void setext_h1_save_reconstructs_underline_after_edit();
     void setext_h2_save_reconstructs_underline_after_edit();
     void setext_untouched_roundtrip_is_byte_identical();
+
+    void blockquote_buffer_strips_marker_and_collapses_newlines();
+    void blockquote_multi_paragraph_splits_into_two_blocks();
+    void blockquote_two_separate_quotes_have_distinct_runids();
+    void blockquote_nested_carries_depth_2();
+    void blockquote_heading_inside_quote_uses_native_kind();
+    void blockquote_round_trip_single_paragraph();
+    void blockquote_round_trip_multi_paragraph();
+    void blockquote_round_trip_two_adjacent_quotes();
+    void blockquote_round_trip_nested();
+    void blockquote_round_trip_heading_inside_quote();
 };
 
 void TstBlockBufferInvariant::no_load_terminator_data()
@@ -305,6 +325,122 @@ void TstBlockBufferInvariant::setext_untouched_roundtrip_is_byte_identical()
 
     const QByteArray saved = doc.serializeForSave();
     QCOMPARE(saved, QByteArrayLiteral("Heading\n=======\n"));
+}
+
+// BlockQuote — multi-paragraph split + depth attrs (queue #8.1).
+// Spec: docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md
+
+void TstBlockBufferInvariant::blockquote_buffer_strips_marker_and_collapses_newlines()
+{
+    const QByteArray source = "> first line\n> second line\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::BlockQuote);
+    QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("first line second line"));
+    QCOMPARE(readIntAttr(doc, blocks[0], AttrNames::BlockQuoteDepth), 1);
+    QVERIFY(readIntAttr(doc, blocks[0], AttrNames::BlockQuoteRunId) >= 1);
+}
+
+void TstBlockBufferInvariant::blockquote_multi_paragraph_splits_into_two_blocks()
+{
+    const QByteArray source = "> p1\n>\n> p2\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(2));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::BlockQuote);
+    QCOMPARE(doc.blockKind(blocks[1]), BlockKind::BlockQuote);
+    QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("p1"));
+    QCOMPARE(doc.blockText(blocks[1]), QByteArrayLiteral("p2"));
+    const int run0 = readIntAttr(doc, blocks[0], AttrNames::BlockQuoteRunId);
+    const int run1 = readIntAttr(doc, blocks[1], AttrNames::BlockQuoteRunId);
+    QVERIFY(run0 >= 1);
+    QCOMPARE(run0, run1);
+}
+
+void TstBlockBufferInvariant::blockquote_two_separate_quotes_have_distinct_runids()
+{
+    const QByteArray source = "> p1\n\n> p2\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(2));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::BlockQuote);
+    QCOMPARE(doc.blockKind(blocks[1]), BlockKind::BlockQuote);
+    const int run0 = readIntAttr(doc, blocks[0], AttrNames::BlockQuoteRunId);
+    const int run1 = readIntAttr(doc, blocks[1], AttrNames::BlockQuoteRunId);
+    QVERIFY(run0 >= 1 && run1 >= 1);
+    QVERIFY(run0 != run1);
+}
+
+void TstBlockBufferInvariant::blockquote_nested_carries_depth_2()
+{
+    const QByteArray source = "> > deep\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::BlockQuote);
+    QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("deep"));
+    QCOMPARE(readIntAttr(doc, blocks[0], AttrNames::BlockQuoteDepth), 2);
+}
+
+void TstBlockBufferInvariant::blockquote_heading_inside_quote_uses_native_kind()
+{
+    const QByteArray source = "> # H1\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::Heading);
+    QCOMPARE(readIntAttr(doc, blocks[0], AttrNames::BlockQuoteDepth), 1);
+}
+
+void TstBlockBufferInvariant::blockquote_round_trip_single_paragraph()
+{
+    const QByteArray source = "> hello\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+    QCOMPARE(doc.serializeForSave(), source);
+}
+
+void TstBlockBufferInvariant::blockquote_round_trip_multi_paragraph()
+{
+    const QByteArray source = "> p1\n>\n> p2\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+    QCOMPARE(doc.serializeForSave(), source);
+}
+
+void TstBlockBufferInvariant::blockquote_round_trip_two_adjacent_quotes()
+{
+    const QByteArray source = "> p1\n\n> p2\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+    QCOMPARE(doc.serializeForSave(), source);
+}
+
+void TstBlockBufferInvariant::blockquote_round_trip_nested()
+{
+    const QByteArray source = "> > deep\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+    QCOMPARE(doc.serializeForSave(), source);
+}
+
+void TstBlockBufferInvariant::blockquote_round_trip_heading_inside_quote()
+{
+    const QByteArray source = "> # H1\n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+    QCOMPARE(doc.serializeForSave(), source);
 }
 
 QTEST_MAIN(TstBlockBufferInvariant)
