@@ -67,6 +67,16 @@
 > - **`tst_source_widget_format_ops`** has 4 failures that crept in
 >   during the WP unification commits; pre-existed today's fixes
 >   but post-date the arc-start; needs investigation.
+> - **Enter at end of bullet under heading merges bullet into
+>   heading (styled leaf).** Surfaced 2026-05-29 by user dogfood
+>   immediately after the #8.1 push (`2a7d757`). Repro: open
+>   `docs/phase-c-status.md`, place caret at end of first bullet
+>   under `### C1 — DI seam`, press Enter — entire bullet body
+>   sucked into the heading with the bullet's first character (`R`)
+>   duplicated; caret jumps to end of last bullet and merges in the
+>   next heading. Filed as queue #8.8 with bisect plan
+>   (`46643e7` is the session-start pre-#8.1 commit). **Until
+>   bisected #8.1 is code-complete but not closure-confirmed.**
 >
 > **Test baseline (2026-05-29):** 249/254 pass via
 > `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`. The 5

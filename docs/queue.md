@@ -817,23 +817,26 @@ caret re-assertion chokepoint.
 Cluster of related follow-ups from the 2026-05-29 WP-unification dogfood
 arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
 
-1. ~~**BlockQuote internal `\n` collapse.**~~ → closed 2026-05-29 (parser
-   walker recursion + load-side marker strip + serializer reconstruction
-   + StyleApplier depth read). Spec
+1. ~~**BlockQuote internal `\n` collapse.**~~ → code-complete 2026-05-29
+   (parser walker recursion + load-side marker strip + serializer
+   reconstruction + StyleApplier depth read). Spec
    `docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md`;
    plan `docs/plans/2026-05-29-blockquote-multi-paragraph-split.md`.
-   Scope went beyond the original "(a) strip markers" framing: a single
-   parser `block_quote` is split into per-inner-child TLBs (multi-paragraph
-   quotes → N model blocks sharing a `BlockQuoteRunId`; nested `> >`
-   carries depth=2; non-paragraph children — heading/code/list inside a
-   quote — preserve native kind + take quote context via attrs).
-   Serializer reads depth + RunId to reconstruct `> ` × depth and
-   `\n>\n` vs `\n\n` separators. StyleApplier reads depth from attrs and
-   overlays left-margin on non-BlockQuote inner kinds. Tests: 6 parser
-   slots in `tst_document_top_level_blocks`, 10 buffer + round-trip
-   slots in `tst_block_buffer_invariant`, 3 render-invariant slots in
-   `tst_styled_dogfood_invariants`. All pass; baseline 249/254 binary
-   pass count preserved.
+   **Dogfood-surfaced regression filed as #8.8 below — full closure
+   gated on that bisect.** Scope went beyond the original "(a) strip
+   markers" framing: a single parser `block_quote` is split into
+   per-inner-child TLBs (multi-paragraph quotes → N model blocks
+   sharing a `BlockQuoteRunId`; nested `> >` carries depth=2;
+   non-paragraph children — heading/code/list inside a quote —
+   preserve native kind + take quote context via attrs). Serializer
+   reads depth + RunId to reconstruct `> ` × depth and `\n>\n` vs
+   `\n\n` separators. StyleApplier reads depth from attrs and
+   overlays left-margin on non-BlockQuote inner kinds. Tests: 6
+   parser slots in `tst_document_top_level_blocks`, 10 buffer +
+   round-trip slots in `tst_block_buffer_invariant`, 3 render-
+   invariant slots in `tst_styled_dogfood_invariants`. All pass;
+   baseline 249/254 binary pass count preserved (same 5 pre-existing
+   failures).
 
 2. ~~**Setext `Heading` internal `\n` collapse.**~~ → closed 2026-05-29
    in `0291ac6`. Load-side strip + soft-break collapse in
@@ -891,6 +894,86 @@ arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
    before the WP unification arc); `heading_levels_descend_in_size` and
    `horizontal_rule_uses_monospace`. Quick triage: are the tests too
    strict given v0 styling values, or has rendering drifted?
+
+8. **Enter at end of bullet under heading merges bullet content into
+   the preceding heading (styled leaf).** Surfaced 2026-05-29 by
+   user dogfood at the laptop, immediately after the #8.1 push
+   (`2a7d757`). **Status: filed for investigation; #8.1 NOT considered
+   fully closed until repro is bisected and either fixed or proven
+   pre-existing.**
+
+   Exact repro on `master` (commit at session-end `2a7d757`):
+   1. Open `docs/phase-c-status.md` in the `markoff-styled` widget.
+   2. Scroll to `### C1 — DI seam` (line 98).
+   3. Place caret at end of the **first** bullet content (the line
+      that begins `Replace the` and ends `each).`).
+   4. Press Enter.
+
+   Observed corruption:
+   - The entire first bullet body (multi-line continuation from
+     "Replace the" through "each).") is sucked into the preceding
+     heading line. The heading then reads
+     `### C1 — DI seamRReplace the ... each).` — note the **extra
+     `R`** between `seam` and `Replace` (the bullet's first character
+     duplicated, single-char tell of a wrong diff/insertion point).
+   - Caret jumps to the **end of the last bullet** (the line ending
+     `no embeds resolve.`), and the **next heading** (`### C5 — …`)
+     is pulled into that block: caret sits at
+     `no embeds resolve.|## C5 — Reading-mode`.
+
+   First-pass hypotheses (rule in/out before any fix):
+   - **(H1) Sep-view byte-arithmetic mis-target.** The block-count
+     change introduced by #8.1 (3 BlockQuote model blocks at the top
+     of `phase-c-status.md` where there used to be 1) shifts every
+     downstream block's index. A latent off-by-one in
+     `findBlockAtSepByte` or `applyInteractiveNewline`'s target
+     resolution would land the Enter on the heading instead of the
+     bullet.
+   - **(H2) Reverse-path incremental-diff edge case.** The single
+     duplicated `R` looks like a common-prefix/suffix diff
+     mis-bracket. Post-`applyInteractiveNewline` the binding does an
+     incremental QTextCursor diff against the new model state; if
+     prefix/suffix computation slips by one char in either
+     direction around the heading/bullet boundary, content lands in
+     the wrong QTextBlock and a character gets duplicated.
+   - **(H3) Pre-existing — exposed by #8.1, not caused.** The file
+     `phase-c-status.md` has a 3-paragraph blockquote at the top
+     (lines 3–15) which #8.1 split from 1 model block into 3.
+     Possible the bug exists in any document with multiple blocks
+     between a heading and a list — independent of #8.1.
+
+   **Bisect plan to discriminate (H3) vs (H1/H2):**
+   ```bash
+   git checkout 46643e7      # queue #8.5 closeout, pre-#8.1
+   cmake --build build-dev -j 8
+   # Open phase-c-status.md, repeat the repro
+   ```
+   - Repro fires → (H3) pre-existing; not #8.1-attributable.
+   - Repro absent → #8.1 caused (or first surfaced); investigate (H1)
+     vs (H2) by instrumenting `SourceTextDocumentBinding::
+     onQtContentsChange` byte resolution + the reverse-path diff
+     callsite.
+
+   Falsifiable test target: extend `tst_styled_dogfood_invariants`
+   with a fixture mirroring the C1 heading+bullets shape (no
+   filesystem dependency — embed the markdown inline). Test asserts:
+   after Enter at end of first bullet, the heading block's text is
+   unchanged and a new empty Paragraph block exists between the
+   bullet and its sibling.
+
+   Suspected files for instrumentation:
+   - `libs/markoff-core/src/SourceTextDocumentBinding.cpp` —
+     `onQtContentsChange` byte-resolution, `applyInteractiveNewline`
+     target lookup.
+   - `libs/markoff-core/src/Detail/FlatBlockResolve.cpp` —
+     `findBlockAtSepByte` (already had a separator-zone underflow
+     fix in `eb685f0`; revisit boundary conditions when adjacent
+     blocks have very different lengths).
+   - `libs/markoff-core/src/MarkoffDocument.cpp` — reverse-path
+     prefix/suffix diff in the binding's `onD2DocumentChanged`
+     consumer (incremental text-diff added in the binding-
+     robustness arc, spec `2026-05-27-markoff-core-binding-
+     robustness-design.md`).
 
 **Design references:**
 - Guide §0 "Load-side enforcement, Paragraph kind only" + §0.2
