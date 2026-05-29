@@ -70,6 +70,8 @@ add_library(markoff_core STATIC
     src/SyntaxHighlightService.cpp
     src/Kf6SyntaxHighlightService.cpp
     src/SourceTextDocumentBinding.cpp
+    include/markoff/core/StructuralKeyHandler.h
+    src/StructuralKeyHandler.cpp
     src/SearchEngine.cpp
     src/FindController.cpp
     src/CodeBlockProcessorRegistry.cpp

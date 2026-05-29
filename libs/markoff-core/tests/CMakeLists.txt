@@ -175,6 +175,11 @@ set_tests_properties(tst_binding_reverse PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM
 add_subdirectory(d2)
 add_subdirectory(d5)
 
+add_executable(tst_structural_key_handler tst_structural_key_handler.cpp)
+add_test(NAME tst_structural_key_handler COMMAND tst_structural_key_handler)
+target_link_libraries(tst_structural_key_handler PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_structural_key_handler PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # Ad-hoc load benchmark — not registered with ctest. Run manually:
 #   ./build-dev/bin/perf_load_bench <markdown-file>
 add_executable(perf_load_bench perf_load_bench.cpp)
