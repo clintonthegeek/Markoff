@@ -34,15 +34,22 @@
 >
 > **Still open from this arc (documented in queue + guide §0):**
 >
-> - `BlockQuote` retains internal `\n`s — its byte range includes
->   per-line `> ` markers that need marker-aware stripping. Flat-view
->   leaves still render BlockQuotes as multi-line until that's done.
->   Setext `Heading` closed 2026-05-29 in `0291ac6` — load-side strip
->   + `serializeHeading` reconstructs underline from
->   `(content.size(), level)`. `serializeForSave` bypasses its
->   untouched fast path for setext so reconstruction always runs.
->   `LiveListModelBinding`'s form-aware demote tightened: single-line
->   buffer no longer triggers demote (canonical setext shape).
+> - ~~`BlockQuote` retains internal `\n`s — its byte range includes
+>   per-line `> ` markers that need marker-aware stripping.~~ → closed
+>   2026-05-29 by queue #8.1 (spec
+>   `docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md`).
+>   Parser walker now recurses `block_quote` children carrying
+>   `blockQuoteDepth` + `blockQuoteRunId` fields; load strips `> `
+>   markers + collapses `\n→space`; serializer reconstructs depth ×
+>   `> ` and uses RunId for `\n>\n` (same run) vs `\n\n` separators;
+>   StyleApplier reads depth from attrs and overlays left-margin on
+>   non-BlockQuote inner kinds. Setext `Heading` closed 2026-05-29 in
+>   `0291ac6` — load-side strip + `serializeHeading` reconstructs
+>   underline from `(content.size(), level)`. `serializeForSave`
+>   bypasses its untouched fast path for setext so reconstruction
+>   always runs. `LiveListModelBinding`'s form-aware demote tightened:
+>   single-line buffer no longer triggers demote (canonical setext
+>   shape).
 > - **Source view shows list-item buffers without their markers** —
 >   the buffer is post-marker content, so `widgetFlatView` for source
 >   shows `foo` not `- foo`. Source-view marker reconstruction is a

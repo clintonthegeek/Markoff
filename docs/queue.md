@@ -817,17 +817,23 @@ caret re-assertion chokepoint.
 Cluster of related follow-ups from the 2026-05-29 WP-unification dogfood
 arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
 
-1. **BlockQuote internal `\n` collapse.** `MarkoffDocument::buildD2FromBytes`
-   currently skips BlockQuote because its byte range includes `> ` markers
-   on every line. Either (a) strip leading `> ` per line before storing,
-   then collapse internal `\n` → space (round-trip loses original
-   formatting but matches Paragraph approach), or (b) preserve `> `s as
-   structural and substitute `\n` → `U+2028` so QTextDocument sees soft
-   breaks. Decide in a brainstorm. `applyBlockquote` likely needs a
-   complementary change so it doesn't render `> ` as literal text. Spec
-   touches `MarkoffDocument.cpp:1900` block and `StyleApplier.cpp::applyBlockquote`.
-   Test pattern: extend `tst_block_buffer_invariant` mirror of
-   `paragraph_buffers_have_no_internal_newlines`.
+1. ~~**BlockQuote internal `\n` collapse.**~~ → closed 2026-05-29 (parser
+   walker recursion + load-side marker strip + serializer reconstruction
+   + StyleApplier depth read). Spec
+   `docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md`;
+   plan `docs/plans/2026-05-29-blockquote-multi-paragraph-split.md`.
+   Scope went beyond the original "(a) strip markers" framing: a single
+   parser `block_quote` is split into per-inner-child TLBs (multi-paragraph
+   quotes → N model blocks sharing a `BlockQuoteRunId`; nested `> >`
+   carries depth=2; non-paragraph children — heading/code/list inside a
+   quote — preserve native kind + take quote context via attrs).
+   Serializer reads depth + RunId to reconstruct `> ` × depth and
+   `\n>\n` vs `\n\n` separators. StyleApplier reads depth from attrs and
+   overlays left-margin on non-BlockQuote inner kinds. Tests: 6 parser
+   slots in `tst_document_top_level_blocks`, 10 buffer + round-trip
+   slots in `tst_block_buffer_invariant`, 3 render-invariant slots in
+   `tst_styled_dogfood_invariants`. All pass; baseline 249/254 binary
+   pass count preserved.
 
 2. ~~**Setext `Heading` internal `\n` collapse.**~~ → closed 2026-05-29
    in `0291ac6`. Load-side strip + soft-break collapse in

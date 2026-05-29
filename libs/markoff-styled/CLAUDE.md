@@ -112,6 +112,17 @@ No KF6, no QML, no `markoff-live`.
   that don't drive rendering (e.g. `LooseRun`) — acceptable vs. an
   allowlist that drifts as `applyFormats` grows new attr reads. Test:
   `tst_styled_dogfood_invariants::attr_toggle_re_renders_task_marker`.
+- **BlockQuote depth from attrs + non-BlockQuote overlay (2026-05-29).**
+  `StyleApplier::applyBlockquote` reads `BlockQuoteDepth` from attrs and
+  scales `leftMargin` linearly (depth=2 quote has ~2× depth=1's margin).
+  Non-BlockQuote inner kinds (Heading / CodeBlock / ListItem / HR with
+  `BlockQuoteDepth > 0`) get an additive left-margin overlay of
+  `emPt(fontScale) × depth` on top of their native block format, so a
+  quoted heading reads as quoted regardless of native styling. Spec
+  `docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md` §7.
+  Tests: `tst_styled_dogfood_invariants::blockquote_depth_1_has_left_margin`,
+  `blockquote_depth_2_has_double_left_margin`,
+  `heading_inside_quote_renders_with_left_margin_overlay`.
 
 ## Resolved binding bugs (2026-05-27)
 
