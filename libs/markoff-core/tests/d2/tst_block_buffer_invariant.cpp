@@ -10,6 +10,7 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/BlockKind.h>
+#include <markoff/core/UndoLog.h>
 
 using namespace Markoff;
 
@@ -26,8 +27,12 @@ const QList<Fixture> kCorpus = {
     {"single-block-with-eol",      "Heading\n"},
     {"two-paragraphs-with-eol",    "first\n\nsecond\n"},
     {"two-paragraphs-no-eol",      "first\n\nsecond"},
-    {"setext-h1",                  "Heading\n========\n"},
-    {"setext-h2",                  "Heading\n--------\n"},
+    // Setext underline widths match the title byte length (7) so the
+    // roundtrip_stability fixed-point holds. The width-drift behaviour
+    // (source-width != save-width when they differ) is explicitly pinned
+    // in setext_untouched_roundtrip_is_byte_identical below.
+    {"setext-h1",                  "Heading\n=======\n"},
+    {"setext-h2",                  "Heading\n-------\n"},
     {"atx-heading",                "# Heading\n"},
     {"fenced-code-with-newlines",  "```\nline1\nline2\n```\n"},
     {"tight-list",                 "- one\n- two\n- three\n"},
@@ -67,6 +72,13 @@ private slots:
 
     void paragraph_buffers_have_no_internal_newlines();
     void listitem_buffers_have_no_internal_newlines();
+
+    void setext_h1_strips_underline_from_buffer();
+    void setext_h2_strips_underline_from_buffer();
+    void setext_multiline_title_collapses_to_space();
+    void setext_h1_save_reconstructs_underline_after_edit();
+    void setext_h2_save_reconstructs_underline_after_edit();
+    void setext_untouched_roundtrip_is_byte_identical();
 };
 
 void TstBlockBufferInvariant::no_load_terminator_data()
@@ -183,6 +195,116 @@ void TstBlockBufferInvariant::listitem_buffers_have_no_internal_newlines()
                      .arg(QString::fromUtf8(text))));
     }
     QCOMPARE(itemsChecked, 2);
+}
+
+// Setext headings ("Title\n========" for H1, "Title\n--------" for H2) used
+// to land with the underline bytes in the block buffer; flat-view leaves
+// then rendered the underline as a literal second QTextBlock. The load
+// path now strips the underline (everything from the last '\n' onward in
+// the byte range) and collapses any soft-breaks in multi-line titles to
+// space. HeadingForm="setext" attr is already set so the serializer can
+// reconstruct on save.
+
+void TstBlockBufferInvariant::setext_h1_strips_underline_from_buffer()
+{
+    const QByteArray source = "Heading\n========\n";
+
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::Heading);
+    const QByteArray text = doc.blockText(blocks[0]);
+    QCOMPARE(text, QByteArrayLiteral("Heading"));
+    QVERIFY(!text.contains('\n'));
+    QVERIFY(!text.contains('='));
+}
+
+void TstBlockBufferInvariant::setext_h2_strips_underline_from_buffer()
+{
+    const QByteArray source = "Heading\n--------\n";
+
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::Heading);
+    const QByteArray text = doc.blockText(blocks[0]);
+    QCOMPARE(text, QByteArrayLiteral("Heading"));
+    QVERIFY(!text.contains('\n'));
+}
+
+void TstBlockBufferInvariant::setext_multiline_title_collapses_to_space()
+{
+    // CommonMark allows the setext title to wrap across multiple source
+    // lines; soft-breaks inside the title collapse to space the same way
+    // Paragraph soft-breaks do.
+    const QByteArray source = "line one\nline two\n==========\n";
+
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::Heading);
+    QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("line one line two"));
+}
+
+void TstBlockBufferInvariant::setext_h1_save_reconstructs_underline_after_edit()
+{
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(QByteArrayLiteral("Heading\n========\n"));
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    const BlockId id = blocks[0];
+
+    // Append "X" at end of title.
+    UndoLog::Transaction t1(doc.d2UndoLog());
+    doc.d2ApplyBufferEdit(id, /*offset=*/7, /*removedBytes=*/0,
+                          QByteArrayLiteral("X"), t1);
+    QCOMPARE(doc.blockText(id), QByteArrayLiteral("HeadingX"));
+
+    const QByteArray saved = doc.serializeForSave();
+    QCOMPARE(saved, QByteArrayLiteral("HeadingX\n========\n"));
+}
+
+void TstBlockBufferInvariant::setext_h2_save_reconstructs_underline_after_edit()
+{
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(QByteArrayLiteral("Sub\n---\n"));
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    const BlockId id = blocks[0];
+
+    // Append "head" at end.
+    UndoLog::Transaction t2(doc.d2UndoLog());
+    doc.d2ApplyBufferEdit(id, /*offset=*/3, /*removedBytes=*/0,
+                          QByteArrayLiteral("head"), t2);
+    QCOMPARE(doc.blockText(id), QByteArrayLiteral("Subhead"));
+
+    const QByteArray saved = doc.serializeForSave();
+    QCOMPARE(saved, QByteArrayLiteral("Subhead\n-------\n"));
+}
+
+void TstBlockBufferInvariant::setext_untouched_roundtrip_is_byte_identical()
+{
+    // The `setext-h1` and `setext-h2` fixtures in kCorpus already exercise
+    // roundtrip_stability(). This slot is the explicit by-name guard so a
+    // future corpus reshuffle can't hide a setext regression. Underline
+    // width = title byte length (7) — the source's 8-char underline gets
+    // shortened to 7 on round-trip; CommonMark accepts any width >=1, still
+    // parses as the same heading.
+    const QByteArray source = "Heading\n========\n";
+
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const QByteArray saved = doc.serializeForSave();
+    QCOMPARE(saved, QByteArrayLiteral("Heading\n=======\n"));
 }
 
 QTEST_MAIN(TstBlockBufferInvariant)

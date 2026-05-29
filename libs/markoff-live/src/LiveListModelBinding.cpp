@@ -487,12 +487,22 @@ void LiveListModelBinding::onD2Changed()
 
         // Form-aware Heading demote: if the buffer no longer matches the
         // stored form's marker pattern, demote to Paragraph.
+        //
+        // Setext note (2026-05-29): under the buffer canonicalisation in
+        // docs/specs/2026-05-29-setext-heading-buffer-canonicalisation-design.md,
+        // setext block buffers are content-only (no '\n', no underline).
+        // A single-line buffer is therefore the canonical setext shape and
+        // must NOT trigger demote — `matchesSetextShape` returns 0 for any
+        // single-line input. Only a multi-line buffer that fails to match
+        // the setext shape signals a genuine demote (e.g. backspace-merge
+        // brought a following block's content into the heading).
         if (rec.kind == BlockKind::Heading) {
             const QString form = rec.headingForm.isEmpty()
                 ? QStringLiteral("atx") : rec.headingForm;
             const bool atxLost    = (form == QStringLiteral("atx")
                                       && countLeadingHashes(rec.text) == 0);
             const bool setextLost = (form == QStringLiteral("setext")
+                                      && rec.text.contains(u'\n')
                                       && matchesSetextShape(rec.text) == 0);
             if (atxLost || setextLost) {
                 // Re-anchor the caret on the about-to-be-swapped delegate.

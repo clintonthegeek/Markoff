@@ -41,8 +41,8 @@ private Q_SLOTS:
 
     // Task 2B — form-aware serializeHeading
     void headingSerializer_atx_doesNotDoublePrefix();
-    void headingSerializer_setext_emitsBufferVerbatim();
-    void headingSerializer_setextH1_emitsBufferVerbatim();
+    void headingSerializer_setextH2_reconstructsUnderline();
+    void headingSerializer_setextH1_reconstructsUnderline();
 };
 
 // ── Task 8.1 ─────────────────────────────────────────────────────────────────
@@ -275,7 +275,13 @@ void TstD2Save::headingSerializer_atx_doesNotDoublePrefix()
              QByteArray("## Heading"));
 }
 
-void TstD2Save::headingSerializer_setext_emitsBufferVerbatim()
+// Setext serializer reconstructs the underline from (content.size(), level)
+// rather than emitting the buffer verbatim. The buffer is content-only
+// (load-side strip lands at MarkoffDocument::materializeBlocksFromParsedDoc;
+// per-block edits preserve the no-internal-'\n' invariant). Width = title
+// byte length; char = '=' for L1, '-' for L2. See
+// docs/specs/2026-05-29-setext-heading-buffer-canonicalisation-design.md.
+void TstD2Save::headingSerializer_setextH2_reconstructsUnderline()
 {
     BuiltinBlockSerializerRegistry::instance().registerBuiltins();
     auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::Heading);
@@ -284,11 +290,12 @@ void TstD2Save::headingSerializer_setext_emitsBufferVerbatim()
     attrs["level"] = AttrValue{2};
     attrs["headingForm"] = AttrValue{QString("setext")};
 
-    QCOMPARE(fn(BlockKind::Heading, attrs, "Heading\n---"),
-             QByteArray("Heading\n---"));
+    // Content "Heading" (7 bytes) -> "Heading\n-------"
+    QCOMPARE(fn(BlockKind::Heading, attrs, "Heading"),
+             QByteArray("Heading\n-------"));
 }
 
-void TstD2Save::headingSerializer_setextH1_emitsBufferVerbatim()
+void TstD2Save::headingSerializer_setextH1_reconstructsUnderline()
 {
     BuiltinBlockSerializerRegistry::instance().registerBuiltins();
     auto fn = BuiltinBlockSerializerRegistry::instance().get(BlockKind::Heading);
@@ -297,8 +304,9 @@ void TstD2Save::headingSerializer_setextH1_emitsBufferVerbatim()
     attrs["level"] = AttrValue{1};
     attrs["headingForm"] = AttrValue{QString("setext")};
 
-    QCOMPARE(fn(BlockKind::Heading, attrs, "Title\n==="),
-             QByteArray("Title\n==="));
+    // Content "Title" (5 bytes) -> "Title\n====="
+    QCOMPARE(fn(BlockKind::Heading, attrs, "Title"),
+             QByteArray("Title\n====="));
 }
 
 QTEST_GUILESS_MAIN(TstD2Save)

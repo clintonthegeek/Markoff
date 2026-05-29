@@ -70,14 +70,21 @@ QByteArray serializeHeading(BlockKind, const QHash<AttrName, AttrValue> &attrs,
             level = *p;
     }
 
-    // Setext form: buffer already contains `text\n<underline>`. Emit
-    // verbatim. Only valid for level 1 / 2 per CommonMark; fall through
-    // to ATX otherwise (defensive).
+    // Setext form: the buffer is content-only (the load path strips the
+    // underline; per-block edit ingress preserves the no-internal-'\n'
+    // invariant). Reconstruct the underline from level: '=' for L1, '-' for
+    // L2. Underline width = title byte length so ASCII titles get a visually
+    // matching rule; multibyte titles end up with a "too long" underline in
+    // glyphs but CommonMark accepts any width >=1 and re-parses correctly.
+    // Only valid for level 1 / 2 per CommonMark; fall through to ATX
+    // otherwise (defensive).
     auto fmIt = attrs.constFind("headingForm");
     if (fmIt != attrs.cend()) {
         if (const QString *p = std::get_if<QString>(&fmIt.value())) {
-            if (*p == QStringLiteral("setext") && (level == 1 || level == 2))
-                return content;
+            if (*p == QStringLiteral("setext") && (level == 1 || level == 2)) {
+                const char c = (level == 1) ? '=' : '-';
+                return content + "\n" + QByteArray(content.size(), c);
+            }
         }
     }
 

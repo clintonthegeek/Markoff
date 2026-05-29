@@ -4,6 +4,7 @@
 #include <markoff/live/BlockKind.h>
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Cmd/D2.h>
 
 using namespace Markoff::Live;
 
@@ -53,8 +54,8 @@ private Q_SLOTS:
     void inferBlockKind_mixedDashesAndEquals_returnsParagraph();
 
     void atxHeading_allHashesDeleted_demotesToParagraph();
-    void setextHeading_underlineDeleted_demotesToParagraph();
-    void setextHeading_levelChangeDashesToEquals_updatesLevel();
+    void setextHeading_singleLineBuffer_doesNotDemote();
+    void setextHeading_explicitChangeKind_demotes();
 };
 
 void TstKindTransition::inferBlockKind_setextH2_returnsHeading()
@@ -147,51 +148,65 @@ void TstKindTransition::atxHeading_allHashesDeleted_demotesToParagraph()
     QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Paragraph);
 }
 
-void TstKindTransition::setextHeading_underlineDeleted_demotesToParagraph()
+// Setext buffer-canonicalisation contract (spec
+// 2026-05-29-setext-heading-buffer-canonicalisation-design.md): the
+// underline is stripped at load and is reconstructed from
+// (content.size(), level) on save. The buffer for a setext heading is
+// content-only — single-line, no '\n', no '='/'-' underline. Two
+// retired tests (`setextHeading_underlineDeleted_demotesToParagraph`,
+// `setextHeading_levelChangeDashesToEquals_updatesLevel`) probed a
+// buffer-edit transition path that no longer exists under this
+// contract; replaced by the two slots below pinning the new shape.
+
+void TstKindTransition::setextHeading_singleLineBuffer_doesNotDemote()
 {
+    // Load a setext heading. After canonicalisation the buffer is a
+    // single line ("Heading") with kind=Heading and headingForm=setext.
+    // The kind-transition cascade must NOT demote it to Paragraph just
+    // because `matchesSetextShape("Heading") == 0` — single-line is the
+    // canonical setext buffer shape now.
+    Markoff::MarkoffDocument doc(/*replicaId=*/1);
+    LiveListModelBinding binding;
+    binding.setDocument(&doc);
+    QVERIFY(waitForModelRows(binding, doc, "Heading\n---\n", 1));
+
+    auto id = binding.model()->recordAt(0).blockAnchor;
+    QCOMPARE(doc.blockText(id), QByteArrayLiteral("Heading"));
+    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
+    QCOMPARE(binding.model()->recordAt(0).headingForm, QString("setext"));
+    QCOMPARE(binding.model()->recordAt(0).headingLevel, 2);
+
+    // Cascade once more (no-op edit) and re-check — the cascade is the
+    // demote risk we're pinning against.
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2ApplyBufferEdit(id, /*offset=*/7, /*removedBytes=*/0,
+                              QByteArrayLiteral("!"), t);
+    }
+    QTest::qWait(100);
+
+    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
+    QCOMPARE(binding.model()->recordAt(0).headingForm, QString("setext"));
+}
+
+void TstKindTransition::setextHeading_explicitChangeKind_demotes()
+{
+    // Under the new contract the only path from setext → Paragraph is an
+    // explicit Cmd::changeKind (toolbar action / kind cycling / etc.).
+    // Buffer-text inference no longer triggers because the underline isn't
+    // in the buffer.
     Markoff::MarkoffDocument doc(/*replicaId=*/1);
     LiveListModelBinding binding;
     binding.setDocument(&doc);
     QVERIFY(waitForModelRows(binding, doc, "Heading\n---\n", 1));
     QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
-    QCOMPARE(binding.model()->recordAt(0).headingForm, QString("setext"));
 
-    // Delete "\n---" from the buffer (keeping just "Heading").
     auto id = binding.model()->recordAt(0).blockAnchor;
-    const QByteArray cur = doc.blockText(id);
-    const int nlIdx = cur.indexOf('\n');
-    QVERIFY(nlIdx > 0);
-    {
-        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
-        doc.d2ApplyBufferEdit(id, nlIdx,
-                              cur.size() - nlIdx, QByteArray{}, t);
-    }
+    Markoff::Cmd::changeKind(doc, Markoff::BlockId(id),
+                             Markoff::BlockKind::Paragraph, {}, {});
     QTest::qWait(100);
 
     QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Paragraph);
-}
-
-void TstKindTransition::setextHeading_levelChangeDashesToEquals_updatesLevel()
-{
-    Markoff::MarkoffDocument doc(/*replicaId=*/1);
-    LiveListModelBinding binding;
-    binding.setDocument(&doc);
-    QVERIFY(waitForModelRows(binding, doc, "Heading\n---\n", 1));
-    QCOMPARE(binding.model()->recordAt(0).headingLevel, 2);
-
-    // Replace "---" with "===" in the buffer.
-    auto id = binding.model()->recordAt(0).blockAnchor;
-    const QByteArray cur = doc.blockText(id);
-    const int dashIdx = cur.indexOf('-');
-    QVERIFY(dashIdx > 0);
-    {
-        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
-        doc.d2ApplyBufferEdit(id, dashIdx, 3, QByteArray("==="), t);
-    }
-    QTest::qWait(100);
-
-    QCOMPARE(binding.model()->recordAt(0).headingLevel, 1);
-    QCOMPARE(binding.model()->recordAt(0).kind, BlockKind::Heading);
 }
 
 QTEST_MAIN(TstKindTransition)

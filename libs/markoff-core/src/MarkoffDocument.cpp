@@ -1902,21 +1902,37 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
             content.chop(1);
 
         // CommonMark "soft line break" rule: a single '\n' between non-blank
-        // lines inside a paragraph (or a list item's text content) renders
-        // as whitespace. Storing the raw source bytes would leave hard-wrap
-        // '\n's inside the buffer, which then become spurious QTextBlock
-        // boundaries in flat-view leaves (markoff-styled, markoff-source).
-        // Collapse to a single space at load time so these kinds honour the
-        // B1 "no internal '\n'" invariant on the load ingress, matching
-        // applyFlatEdit.
+        // lines inside a paragraph (or a list item's text content, or a
+        // setext heading's title) renders as whitespace. Storing the raw
+        // source bytes would leave hard-wrap '\n's inside the buffer, which
+        // then become spurious QTextBlock boundaries in flat-view leaves
+        // (markoff-styled, markoff-source). Collapse to a single space at
+        // load time so these kinds honour the B1 "no internal '\n'"
+        // invariant on the load ingress, matching applyFlatEdit.
+        //
+        // For setext headings the byte range also covers the underline line
+        // ("Title\n========"); strip from the last '\n' onward FIRST so the
+        // soft-break collapse only touches title interior. HeadingForm="setext"
+        // attr (set above) tells serializeHeading to reconstruct the
+        // underline on save.
         //
         // ListItem is safe to collapse because harvestListItem already
         // narrows the byte range to the item's content child (post-marker);
-        // the marker syntax never enters the buffer. BlockQuote and setext
-        // Heading still retain their internal '\n's pending separate
-        // marker-aware handling (`> ` strip / setext-underline strip).
-        if (kind == BlockKind::Paragraph || kind == BlockKind::ListItem)
+        // the marker syntax never enters the buffer. BlockQuote still
+        // retains its internal '\n's pending separate marker-aware
+        // handling (`> ` strip).
+        const bool isSetext = (kind == BlockKind::Heading
+                               && tb.kind == TLB::Kind::SetextHeading);
+        if (isSetext) {
+            const int lastNl = content.lastIndexOf('\n');
+            if (lastNl >= 0)
+                content.truncate(lastNl);
+        }
+        if (kind == BlockKind::Paragraph
+            || kind == BlockKind::ListItem
+            || isSetext) {
             content.replace('\n', ' ');
+        }
 
         auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);
         if (!content.isEmpty())
@@ -2168,7 +2184,23 @@ QByteArray MarkoffDocument::serializeForSave() const
         }
 
         QByteArray bytes;
-        if (!isBlockTouched(id)) {
+        // Setext headings need reconstruction even when "untouched":
+        // blockLoadTimeBytes stores the post-canonicalisation buffer
+        // (content only — no underline), so emitting it verbatim would
+        // produce a plain paragraph on reload. Route untouched setext
+        // through the reg serializer so serializeHeading reconstructs
+        // the underline. Width drifts toward title length (acceptable;
+        // see 2026-05-29-setext-heading-buffer-canonicalisation-design.md §7).
+        bool isSetextHeading = false;
+        if (kind == BlockKind::Heading) {
+            const auto attrs = blockAttrs(id);
+            auto fmIt = attrs.constFind("headingForm");
+            if (fmIt != attrs.cend()) {
+                if (const QString *p = std::get_if<QString>(&fmIt.value()))
+                    isSetextHeading = (*p == QStringLiteral("setext"));
+            }
+        }
+        if (!isBlockTouched(id) && !isSetextHeading) {
             // Untouched: use original load-time bytes for byte-identical
             // content round-trip. Strip the load-time terminator so the
             // serializer owns separator placement (B1 §3).
@@ -2176,8 +2208,9 @@ QByteArray MarkoffDocument::serializeForSave() const
             if (bytes.endsWith('\n'))
                 bytes.chop(1);
         } else {
-            // Touched: re-serialize from CRDT state. Per-kind serializer is
-            // contracted to emit body only — no terminator (B1 §4).
+            // Touched (or setext): re-serialize from CRDT state. Per-kind
+            // serializer is contracted to emit body only — no terminator
+            // (B1 §4).
             auto fn = reg.get(kind);
             bytes = fn(kind, blockAttrs(id), blockText(id));
         }
