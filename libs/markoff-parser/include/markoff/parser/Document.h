@@ -148,6 +148,19 @@ struct TopLevelBlock {
     /// (blank lines separated items in source). Always false for non-ListItem.
     bool looseRun = false;
 
+    /// For blocks whose AST ancestor chain includes one or more
+    /// `block_quote` nodes: nesting level (1 = top-level quote, 2 =
+    /// `> > ...`, etc.). `0` for blocks outside any quote.
+    /// See `docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md`.
+    int blockQuoteDepth = 0;
+
+    /// For blocks emitted as a child of a `block_quote` node: a
+    /// parser-assigned id (>= 1) shared by all siblings of one parser
+    /// `block_quote` node. `0` for blocks outside any quote.
+    /// Distinguishes "one quote split into N paragraphs" (same runId)
+    /// from "two adjacent quotes" (different runIds).
+    int blockQuoteRunId = 0;
+
     /// Inline structural spans (bold, italic, code, link, etc.) within
     /// this block's source range. Offsets are *block-relative*:
     ///   - `utf8Offset` is in [0, byteEnd - byteStart)
