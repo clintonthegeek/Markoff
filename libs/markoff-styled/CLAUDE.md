@@ -92,14 +92,18 @@ No KF6, no QML, no `markoff-live`.
   tuning is a one-line constant change. Targets: ~1em between paragraphs,
   ~0.36em between list items, ~1.15em above headings.
 - **ListItem marker rendering (2026-05-29).** `applyListItem` reads
-  `MarkerStyle`, `IndentLevel`, and (for tasks) `Checked` from the block
-  attrs — depth is no longer derived from buffer leading whitespace
-  (which is always 0 post-marker anyway). Task-list checkboxes use the
-  native `QTextBlockFormat::MarkerType::{Unchecked,Checked}`. Bullets
-  and decimals come from a per-item `QTextList` (`ListDisc` for
-  minus/plus/star markers; `ListDecimal` for dot/paren). Single-item
-  lists render the marker correctly but ordered items always read `1.`;
-  sibling-grouping is a v0.2 follow-up (see queue #8).
+  `MarkerStyle`, `IndentLevel`, and (for tasks) `Checked` from the
+  block attrs and applies block + char format. Task-list checkboxes
+  use the native `QTextBlockFormat::MarkerType::{Unchecked,Checked}`.
+  Bullets and decimals come from `QTextList`s assigned by the walk's
+  `manageListMembership` helper — consecutive same-(markerStyle,
+  depth) ListItems share one list so ordered numbering is continuous
+  (1, 2, 3). Nested-then-outer transitions resume the outer list per
+  CommonMark via a depth-stack. Marker-style transitions at the same
+  depth break the list. `manageListMembership` runs OUTSIDE the hash
+  gate because list membership depends on neighbour state, not
+  per-block content. Spec
+  `docs/specs/2026-05-29-styled-ordered-list-continuous-numbering-design.md`.
 - **Hash gate covers attrs (2026-05-29).** `computeBlockHash` mixes
   the full `blockAttrs(id)` QHash via XOR (order-insensitive — sidesteps
   Qt's non-deterministic QHash iteration). Attr-only mutations

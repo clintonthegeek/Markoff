@@ -852,13 +852,16 @@ arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
    spec needed; touches `SourceTextDocumentBinding` and the
    `markoff-source` Editor.
 
-4. **Ordered-list continuous numbering** in `markoff-styled`. Each ListItem
-   currently creates its own single-item `QTextList`, so every ordered
-   item shows `1.`. Group consecutive same-style ListItem blocks into a
-   shared `QTextList` (resilient to insertion at boundaries: detect
-   prev-block kind + markerStyle, reuse list if compatible, else create).
-   Marker-style transitions still break a list. `StyleApplier::applyFormats`
-   needs neighbour-aware state across the block walk.
+4. ~~**Ordered-list continuous numbering** in `markoff-styled`.~~ →
+   closed 2026-05-29 in `511ab81`. `manageListMembership` helper runs
+   once per block in the `applyFormats` walk, OUTSIDE the hash gate,
+   maintaining a depth-stack of `{depth, markerStyle, QTextList*}`.
+   Consecutive same-style items share one `QTextList`; nested-list
+   transitions resume the outer list (`1, ?, 2`); paragraph between
+   items breaks the chain; marker-style change at same depth also
+   breaks. `applyListItem` refactored to format-only. Spec:
+   `docs/specs/2026-05-29-styled-ordered-list-continuous-numbering-design.md`.
+   Plan: `docs/plans/2026-05-29-styled-ordered-list-continuous-numbering.md`.
 
 5. ~~**Hash gate covers attrs.**~~ → closed 2026-05-29 in `42720f3`.
    `computeBlockHash` now mixes the full `blockAttrs(id)` QHash via
