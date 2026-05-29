@@ -26,16 +26,37 @@
 
 namespace {
 
+// Base body font size. Every per-kind cf.setFontPointSize() uses this
+// (scaled) value; spacing helpers below derive from it so margins and
+// indents stay font-relative under zoom.
+constexpr qreal kBaseBodyPt = 11.0;
+
+inline qreal emPt(qreal fontScale) { return kBaseBodyPt * fontScale; }
+
+// Per-kind block margins, expressed as multiples of the current em.
+// Adjacent QTextBlockFormat margins do NOT collapse (unlike CSS), so the
+// effective inter-block gap is bottom-of-prev + top-of-next.
+//
+// Targets: ~1em between consecutive paragraphs (body-text rhythm),
+// tighter for list items (marker already groups them), and headings
+// announce themselves with a slightly larger top gap.
+inline qreal paragraphMarginPt(qreal s) { return emPt(s) * 0.45; }
+inline qreal listItemMarginPt(qreal s)  { return emPt(s) * 0.18; }
+inline qreal codeBlockMarginPt(qreal s) { return emPt(s) * 0.30; }
+inline qreal blockquoteMarginPt(qreal s){ return emPt(s) * 0.30; }
+inline qreal headingTopMarginPt(qreal s){ return emPt(s) * 0.80; }
+inline qreal headingBotMarginPt(qreal s){ return emPt(s) * 0.35; }
+inline qreal hruleMarginPt(qreal s)     { return emPt(s) * 0.60; }
+
+// QTextDocument::indentWidth — the per-indent-unit horizontal step used
+// by QTextList. Qt's default is the width of "0000" in the body font,
+// which produces oversized markers-to-text gaps for our visual rhythm.
+// ~1.5em keeps the bullet comfortably separated from text while letting
+// nested lists step in by visible-but-modest amounts.
+inline qreal docIndentWidthPx(qreal s) { return emPt(s) * 1.5; }
+
 QTextBlockFormat baseBlockFormat() {
     QTextBlockFormat fmt;
-    // Paragraph margins drive the visible inter-paragraph gap under WP
-    // unification (spec 2026-05-28). Hardcoded defaults; theme-driven
-    // tuning is a follow-up. Values are point-units; QTextDocument
-    // composes margins additively, so adjacent paragraphs sum their
-    // bottom+top to ~10pt of total gap, with an empty paragraph contributing
-    // ~10pt extra (the visible signal of "one Enter").
-    fmt.setTopMargin(5);
-    fmt.setBottomMargin(5);
     fmt.setLeftMargin(0);
     fmt.setIndent(0);
     return fmt;
@@ -60,37 +81,36 @@ void applyBlockCharFormat(QTextCursor &cursor, const QTextCharFormat &cf) {
 }
 
 void applyHeading(QTextCursor &cursor, int level, qreal fontScale) {
-    static constexpr qreal kBaseSize = 11.0;
     static constexpr qreal kRatios[6] = { 2.0, 1.7, 1.4, 1.2, 1.0, 0.9 };
     const int idx = qBound(1, level, 6) - 1;
     QTextBlockFormat bf = baseBlockFormat();
-    bf.setTopMargin(8 * fontScale);
-    bf.setBottomMargin(4 * fontScale);
+    bf.setTopMargin(headingTopMarginPt(fontScale));
+    bf.setBottomMargin(headingBotMarginPt(fontScale));
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
-    cf.setFontPointSize(kBaseSize * kRatios[idx] * fontScale);
+    cf.setFontPointSize(kBaseBodyPt * kRatios[idx] * fontScale);
     cf.setFontWeight(QFont::Bold);
     applyBlockCharFormat(cursor, cf);
 }
 
 void applyParagraph(QTextCursor &cursor, qreal fontScale) {
     QTextBlockFormat bf = baseBlockFormat();
-    bf.setTopMargin(2 * fontScale);
-    bf.setBottomMargin(2 * fontScale);
+    bf.setTopMargin(paragraphMarginPt(fontScale));
+    bf.setBottomMargin(paragraphMarginPt(fontScale));
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
-    cf.setFontPointSize(11.0 * fontScale);
+    cf.setFontPointSize(emPt(fontScale));
     cf.setFontWeight(QFont::Normal);
     applyBlockCharFormat(cursor, cf);
 }
 
 void applyCodeBlock(QTextCursor &cursor, qreal fontScale) {
     QTextBlockFormat bf = baseBlockFormat();
-    bf.setLeftMargin(12 * fontScale);
-    bf.setTopMargin(2);
-    bf.setBottomMargin(2);
+    bf.setLeftMargin(emPt(fontScale) * 1.0);
+    bf.setTopMargin(codeBlockMarginPt(fontScale));
+    bf.setBottomMargin(codeBlockMarginPt(fontScale));
     bf.setBackground(QColor(245, 245, 245));  // Theme::CodeBlockBackground
                                               // resolved in Task 9 wiring.
     cursor.setBlockFormat(bf);
@@ -98,19 +118,19 @@ void applyCodeBlock(QTextCursor &cursor, qreal fontScale) {
     QTextCharFormat cf;
     cf.setFontFamilies({QStringLiteral("monospace")});
     cf.setFontFixedPitch(true);
-    cf.setFontPointSize(10.0 * fontScale);
+    cf.setFontPointSize(emPt(fontScale) * (10.0 / kBaseBodyPt));
     applyBlockCharFormat(cursor, cf);
 }
 
 void applyBlockquote(QTextCursor &cursor, int depth, qreal fontScale) {
     QTextBlockFormat bf = baseBlockFormat();
-    bf.setLeftMargin(16 * fontScale * qMax(1, depth));
-    bf.setTopMargin(2);
-    bf.setBottomMargin(2);
+    bf.setLeftMargin(emPt(fontScale) * qMax(1, depth));
+    bf.setTopMargin(blockquoteMarginPt(fontScale));
+    bf.setBottomMargin(blockquoteMarginPt(fontScale));
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
-    cf.setFontPointSize(11.0 * fontScale);
+    cf.setFontPointSize(emPt(fontScale));
     cf.setForeground(QColor(100, 100, 100));  // Theme::Quote.
     applyBlockCharFormat(cursor, cf);
 }
@@ -119,9 +139,8 @@ void applyListItem(QTextCursor &cursor, int depth,
                    const QString &markerStyle, bool checked,
                    qreal fontScale) {
     QTextBlockFormat bf = baseBlockFormat();
-    bf.setLeftMargin(16 * fontScale * qMax(1, depth + 1));
-    bf.setTopMargin(1);
-    bf.setBottomMargin(1);
+    bf.setTopMargin(listItemMarginPt(fontScale));
+    bf.setBottomMargin(listItemMarginPt(fontScale));
 
     // Task-list checkboxes are the only marker type QTextBlockFormat can
     // render natively. Set them on the block format; clear any prior marker
@@ -135,7 +154,7 @@ void applyListItem(QTextCursor &cursor, int depth,
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
-    cf.setFontPointSize(11.0 * fontScale);
+    cf.setFontPointSize(emPt(fontScale));
     applyBlockCharFormat(cursor, cf);
 
     // Bullet / numeral rendering: Qt draws these via QTextList, not via
@@ -145,6 +164,10 @@ void applyListItem(QTextCursor &cursor, int depth,
     // into a shared list, which is fragile across structural edits and is
     // a v0.2 follow-up. Task-list items skip this path because their
     // checkbox is already drawn by the block-format marker above.
+    //
+    // listFormat.indent is the multiplier against QTextDocument::indentWidth
+    // (set per-pass in applyFormats). depth+1 gives top-level items a
+    // single indent step; nested items step further in.
     if (markerStyle == QStringLiteral("task"))
         return;
 
@@ -154,21 +177,21 @@ void applyListItem(QTextCursor &cursor, int depth,
         lf.setStyle(QTextListFormat::ListDecimal);
     else  // minus / plus / star / unknown → disc
         lf.setStyle(QTextListFormat::ListDisc);
-    lf.setIndent(qMax(1, depth + 1));
+    lf.setIndent(depth + 1);
     cursor.createList(lf);
 }
 
 void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
     QTextBlockFormat bf = baseBlockFormat();
-    bf.setTopMargin(6 * fontScale);
-    bf.setBottomMargin(6 * fontScale);
+    bf.setTopMargin(hruleMarginPt(fontScale));
+    bf.setBottomMargin(hruleMarginPt(fontScale));
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
     cf.setFontFamilies({QStringLiteral("monospace")});
     cf.setFontFixedPitch(true);
     cf.setForeground(QColor(180, 180, 180));
-    cf.setFontPointSize(11.0 * fontScale);
+    cf.setFontPointSize(emPt(fontScale));
     applyBlockCharFormat(cursor, cf);
 }
 
@@ -368,6 +391,12 @@ void StyleApplier::applyFormats() {
         QSignalBlocker block(m_textDocument);
         QTextCursor cursor(m_textDocument);
         cursor.beginEditBlock();
+
+        // QTextDocument::indentWidth governs the per-indent-step horizontal
+        // distance used by QTextList — the bullet-to-text gap and the
+        // depth-N indent. Set it font-relative here so it tracks fontScale
+        // changes (zoom).
+        m_textDocument->setIndentWidth(docIndentWidthPx(m_fontScale));
 
         // The QTextDocument is populated with widgetFlatView() (separator-bearing:
         // blocks joined by single "\n" — WP unification, 2026-05-28). Compute
