@@ -157,28 +157,13 @@ void applyListItem(QTextCursor &cursor, int depth,
     cf.setFontPointSize(emPt(fontScale));
     applyBlockCharFormat(cursor, cf);
 
-    // Bullet / numeral rendering: Qt draws these via QTextList, not via
-    // QTextBlockFormat::MarkerType. One QTextList per item — single-item
-    // lists render their marker correctly (disc / decimal). Continuous
-    // numbering across consecutive items would require grouping siblings
-    // into a shared list, which is fragile across structural edits and is
-    // a v0.2 follow-up. Task-list items skip this path because their
-    // checkbox is already drawn by the block-format marker above.
-    //
-    // listFormat.indent is the multiplier against QTextDocument::indentWidth
-    // (set per-pass in applyFormats). depth+1 gives top-level items a
-    // single indent step; nested items step further in.
-    if (markerStyle == QStringLiteral("task"))
-        return;
-
-    QTextListFormat lf;
-    if (markerStyle == QStringLiteral("dot")
-        || markerStyle == QStringLiteral("paren"))
-        lf.setStyle(QTextListFormat::ListDecimal);
-    else  // minus / plus / star / unknown → disc
-        lf.setStyle(QTextListFormat::ListDisc);
-    lf.setIndent(depth + 1);
-    cursor.createList(lf);
+    // QTextList membership (bullet / numeral rendering) is handled by
+    // manageListMembership in the walk so consecutive same-style items
+    // share one list (continuous numbering for ordered items). The walk
+    // runs OUTSIDE the hash gate so this format-only function isn't
+    // responsible for cross-block continuity. Spec:
+    // docs/specs/2026-05-29-styled-ordered-list-continuous-numbering-design.md.
+    Q_UNUSED(depth);
 }
 
 void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
@@ -324,6 +309,90 @@ Markoff::BlockKind inferKindFromPrefix(const QByteArray &text,
     return currentKind;
 }
 
+struct ListStackEntry {
+    int depth = -1;
+    QString markerStyle;
+    QTextList *list = nullptr;
+};
+
+// Reconcile a model block's QTextList membership against the
+// neighbour-aware list stack. Consecutive same-(markerStyle, depth)
+// ListItems share one QTextList (continuous numbering for ordered
+// items); nested-list transitions resume the outer list per CommonMark
+// via depth-stack pops; non-ListItem blocks and task ListItems break
+// the chain.
+//
+// Runs OUTSIDE the hash gate so a structural change (e.g. paragraph
+// inserted between two formerly-adjacent items) breaks the prior
+// shared list even when neither item's content hash changed.
+//
+// Spec: docs/specs/2026-05-29-styled-ordered-list-continuous-numbering-design.md.
+void manageListMembership(
+    QTextBlock qblk,
+    Markoff::BlockKind kind,
+    const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs,
+    std::vector<ListStackEntry> &listStack)
+{
+    auto removeFromAnyList = [&](QTextBlock b) {
+        if (QTextList *lst = b.textList())
+            lst->remove(b);
+    };
+
+    if (kind != Markoff::BlockKind::ListItem) {
+        // Any non-list block ends the enclosing list per CommonMark.
+        listStack.clear();
+        removeFromAnyList(qblk);
+        return;
+    }
+
+    int depth = 0;
+    if (auto it = attrs.find(Markoff::AttrNames::IndentLevel);
+        it != attrs.end() && std::holds_alternative<int>(*it))
+        depth = std::get<int>(*it);
+    QString markerStyle;
+    if (auto it = attrs.find(Markoff::AttrNames::MarkerStyle);
+        it != attrs.end() && std::holds_alternative<QString>(*it))
+        markerStyle = std::get<QString>(*it);
+
+    if (markerStyle == QStringLiteral("task")) {
+        // Task items render their checkbox via QTextBlockFormat::Marker,
+        // not via QTextList. They interrupt the same-depth list of any
+        // marker style.
+        while (!listStack.empty() && listStack.back().depth > depth)
+            listStack.pop_back();
+        if (!listStack.empty() && listStack.back().depth == depth)
+            listStack.pop_back();
+        removeFromAnyList(qblk);
+        return;
+    }
+
+    // Non-task ListItem: depth-stack reconciliation.
+    while (!listStack.empty() && listStack.back().depth > depth)
+        listStack.pop_back();
+
+    if (!listStack.empty() && listStack.back().depth == depth) {
+        if (listStack.back().markerStyle == markerStyle) {
+            listStack.back().list->add(qblk);
+            return;
+        }
+        // Same depth, different marker style: end the running list,
+        // fall through to create a fresh one at this depth.
+        listStack.pop_back();
+    }
+
+    // Empty stack or top is shallower than this item — new list.
+    QTextListFormat lf;
+    if (markerStyle == QStringLiteral("dot")
+        || markerStyle == QStringLiteral("paren"))
+        lf.setStyle(QTextListFormat::ListDecimal);
+    else  // minus / plus / star / unknown → disc
+        lf.setStyle(QTextListFormat::ListDisc);
+    lf.setIndent(depth + 1);
+    QTextCursor c(qblk);
+    QTextList *fresh = c.createList(lf);
+    listStack.push_back({depth, markerStyle, fresh});
+}
+
 }  // namespace
 
 namespace Markoff::Styled {
@@ -433,6 +502,12 @@ void StyleApplier::applyFormats() {
         // Set-like map of all IDs present this pass, for stale-entry pruning below.
         currentIds.reserve(static_cast<qsizetype>(blocks.size()));
 
+        // List-membership stack for continuous numbering across the walk.
+        // Reset each cascade; manageListMembership runs OUTSIDE the hash gate
+        // so a paragraph inserted between two formerly-adjacent items breaks
+        // the prior shared list even when neither item's hash changed.
+        std::vector<ListStackEntry> listStack;
+
         quint32 bytePos = 0;
         for (size_t i = 0; i < blocks.size(); ++i) {
             const Markoff::BlockId id = blocks[i];
@@ -447,15 +522,16 @@ void StyleApplier::applyFormats() {
             const auto attrs = m_markoffDocument->blockAttrs(id);
             const quint64 h = computeBlockHash(kind, text, spans, attrs, m_fontScale);
 
-            if (m_blockHashes.value(id, 0) == h) {
-                // Block unchanged — skip format reapplication, but still
-                // advance the bytePos accumulator so subsequent blocks are
-                // computed correctly.
+            // Resolve the QTextBlock for this model block once — used by
+            // both the format pass (when not hash-skipped) and the list-
+            // membership call below (always runs).
+            const int startQt = Markoff::SourceTextDocumentBinding
+                ::byteOffsetToQtPos(flatBytes, blockStart);
+
+            const bool hashSkipped = (m_blockHashes.value(id, 0) == h);
+            if (hashSkipped) {
                 ++m_hashSkipsLastPass;
-                bytePos = blockEnd;
-                if (i + 1 < blocks.size()) bytePos += kSepLen;
-                continue;
-            }
+            } else {
             m_blockHashes[id] = h;
 
             // Kind transition: if text prefix disagrees with stored kind, queue a
@@ -467,8 +543,6 @@ void StyleApplier::applyFormats() {
                 m_pendingKindChanges.push_back({id, inferred});
             }
 
-            const int startQt = Markoff::SourceTextDocumentBinding
-                ::byteOffsetToQtPos(flatBytes, blockStart);
             const int endQt = Markoff::SourceTextDocumentBinding
                 ::byteOffsetToQtPos(flatBytes, blockEnd);
 
@@ -536,6 +610,14 @@ void StyleApplier::applyFormats() {
                 c.setPosition(qMin(spanEnd, docLen), QTextCursor::KeepAnchor);
                 c.mergeCharFormat(charFormatForSpan(span, m_fontScale));
             }
+            }  // end !hashSkipped format pass
+
+            // List-membership reconciliation runs on EVERY block (hash-skipped
+            // or not). Cross-block continuity depends on neighbour state, not
+            // per-block content hashes — see spec
+            // docs/specs/2026-05-29-styled-ordered-list-continuous-numbering-design.md.
+            const QTextBlock listBlk = m_textDocument->findBlock(startQt);
+            manageListMembership(listBlk, kind, attrs, listStack);
 
             // Advance past block content + single-"\n" separator between blocks.
             bytePos = blockEnd;

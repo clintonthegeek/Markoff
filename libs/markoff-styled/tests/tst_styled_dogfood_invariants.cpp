@@ -5,6 +5,7 @@
 #include <QTextBlock>
 #include <QTextDocument>
 #include <QTextEdit>
+#include <QTextList>
 
 #include <markoff/core/BlockId.h>
 #include <markoff/core/BlockKind.h>
@@ -352,6 +353,85 @@ private Q_SLOTS:
         qblk = qdoc->findBlockByNumber(0);
         QCOMPARE(qblk.blockFormat().marker(),
                  QTextBlockFormat::MarkerType::Checked);
+    }
+
+    // Ordered-list continuous numbering (queue #8.4; spec
+    // 2026-05-29-styled-ordered-list-continuous-numbering-design.md).
+    // Consecutive same-(markerStyle, depth) ListItems must share one
+    // QTextList so ListDecimal numbers them 1, 2, 3 rather than 1, 1, 1.
+    void ordered_list_items_share_one_list_with_continuous_numbering() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("1. one\n2. two\n3. three\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        const QTextBlock b0 = qdoc->findBlockByNumber(0);
+        const QTextBlock b1 = qdoc->findBlockByNumber(1);
+        const QTextBlock b2 = qdoc->findBlockByNumber(2);
+
+        QVERIFY(b0.isValid());
+        QVERIFY(b1.isValid());
+        QVERIFY(b2.isValid());
+        QVERIFY(b0.textList() != nullptr);
+        QCOMPARE(b1.textList(), b0.textList());
+        QCOMPARE(b2.textList(), b0.textList());
+    }
+
+    void paragraph_between_items_breaks_list() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("1. one\n\nbreak\n\n2. two\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        const QTextBlock b0 = qdoc->findBlockByNumber(0);
+        const QTextBlock b1 = qdoc->findBlockByNumber(1);
+        const QTextBlock b2 = qdoc->findBlockByNumber(2);
+
+        QVERIFY(b0.textList() != nullptr);
+        QVERIFY(b2.textList() != nullptr);
+        QCOMPARE(b1.textList(), static_cast<QTextList *>(nullptr));
+        QVERIFY(b0.textList() != b2.textList());
+    }
+
+    void nested_list_then_outer_resumes() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        // "1. outer\n   1. nested\n2. outer-two\n" — outer items at depth 0,
+        // nested at depth 1, all dot style.
+        doc.loadFromMarkdown(QByteArrayLiteral(
+            "1. outer\n   1. nested\n2. outer-two\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        const QTextBlock b0 = qdoc->findBlockByNumber(0);
+        const QTextBlock b1 = qdoc->findBlockByNumber(1);
+        const QTextBlock b2 = qdoc->findBlockByNumber(2);
+
+        QVERIFY(b0.textList() != nullptr);
+        QVERIFY(b1.textList() != nullptr);
+        QVERIFY(b2.textList() != nullptr);
+        // Outer (b0) and outer-two (b2) share one list — the stack pops the
+        // nested entry when b2's depth (0) is shallower than nested's (1).
+        QCOMPARE(b2.textList(), b0.textList());
+        // Nested (b1) is in a different list.
+        QVERIFY(b1.textList() != b0.textList());
     }
 };
 
