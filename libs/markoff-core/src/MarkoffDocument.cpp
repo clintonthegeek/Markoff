@@ -1833,6 +1833,52 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
 
     Anchor lastAnchor = Anchor::min();
 
+    // BlockQuote support (queue #8.1) — spec
+    // docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §3+§5.
+    // Map parser-local runId to a stable doc-local runId sourced from
+    // d->nextBlockQuoteRunId. One mapping table per parse call.
+    QHash<int, int> parserRunIdToDocRunId;
+    auto docRunIdFor = [&](int parserRunId) -> int {
+        if (parserRunId <= 0) return 0;
+        auto it = parserRunIdToDocRunId.constFind(parserRunId);
+        if (it != parserRunIdToDocRunId.cend()) return it.value();
+        const int docId = static_cast<int>(d->nextBlockQuoteRunId++);
+        parserRunIdToDocRunId.insert(parserRunId, docId);
+        return docId;
+    };
+
+    // Strip per-line blockquote markers from a child block's source
+    // slice. For each '\n'-delimited line, skip up to 3 leading spaces
+    // then up to `depth` repetitions of '> ' (allowing '>' at line-end
+    // without space, which is the empty-quoted-line shape). Used only
+    // for blocks with blockQuoteDepth > 0.
+    auto stripBlockQuoteMarkers = [](QByteArray slice, int depth) -> QByteArray {
+        QByteArray out;
+        out.reserve(slice.size());
+        int i = 0;
+        const int n = slice.size();
+        while (i < n) {
+            const int lineStart = i;
+            int lineEnd = slice.indexOf('\n', i);
+            if (lineEnd < 0) lineEnd = n;
+            int p = lineStart;
+            for (int k = 0; k < depth; ++k) {
+                int sp = 0;
+                while (sp < 3 && p + sp < lineEnd && slice[p + sp] == ' ') ++sp;
+                if (p + sp < lineEnd && slice[p + sp] == '>') {
+                    p += sp + 1;
+                    if (p < lineEnd && slice[p] == ' ') ++p;
+                } else {
+                    break;
+                }
+            }
+            out.append(slice.constData() + p, lineEnd - p);
+            if (lineEnd < n) out.append('\n');
+            i = (lineEnd < n) ? lineEnd + 1 : n;
+        }
+        return out;
+    };
+
     for (const TLB &tb : parsed.topLevelBlocks()) {
         // Route link-ref definitions to LinkRefMap (not IdList)
         if (tb.kind == TLB::Kind::LinkReferenceDefinition) {
@@ -1850,8 +1896,17 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         d->idList.insert_after(lastAnchor, rawId);
         lastAnchor = d->idList.anchor_of(rawId, Bias::Right);
 
-        // Set kind
+        // Set kind. Paragraph-shaped children of a `block_quote` AST node
+        // (the common case) land as BlockKind::BlockQuote so the live
+        // view's `kind === "blockquote"` matcher keeps firing for the
+        // common case; non-paragraph children of a `block_quote` keep
+        // their native kind (Heading/CodeBlock/ListItem) and the quote
+        // context lives in attrs only. Spec
+        // docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §5.
         BlockKind kind = mapTopLevelKind(tb.kind);
+        if (tb.blockQuoteDepth > 0 && tb.kind == TLB::Kind::Paragraph) {
+            kind = BlockKind::BlockQuote;
+        }
         d->kindTagMap.setWithNextStamp(newId, kind);
 
         // Set kind-specific attrs
@@ -1887,6 +1942,18 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
                 BlockAttrKey{newId, AttrNames::LooseRun}, AttrValue{tb.looseRun});
         }
 
+        // BlockQuote context attrs — set for any block emitted as a child
+        // of a `block_quote` AST node, regardless of native kind. Spec
+        // docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §3+§5.
+        if (tb.blockQuoteDepth > 0) {
+            d->blockAttrsMap.setWithNextStamp(
+                BlockAttrKey{newId, AttrNames::BlockQuoteDepth},
+                AttrValue{tb.blockQuoteDepth});
+            d->blockAttrsMap.setWithNextStamp(
+                BlockAttrKey{newId, AttrNames::BlockQuoteRunId},
+                AttrValue{docRunIdFor(tb.blockQuoteRunId)});
+        }
+
         // Buffer content: full source range in UTF-8 bytes, then strip the
         // trailing block-terminator '\n' if present. Per B1 (spec
         // 2026-05-18-b1-buffer-convention-design.md §1), block buffers hold
@@ -1900,6 +1967,17 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         QByteArray content = bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart);
         if (content.endsWith('\n'))
             content.chop(1);
+
+        // BlockQuote canonicalisation: peel up to `depth` repetitions of
+        // '> ' off each '\n'-delimited line so the buffer carries
+        // content only (matching B1 + the Paragraph collapse below).
+        // Re-chop any trailing '\n' surfaced by the strip pass.
+        // Spec docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §5.
+        if (tb.blockQuoteDepth > 0) {
+            content = stripBlockQuoteMarkers(content, tb.blockQuoteDepth);
+            if (content.endsWith('\n'))
+                content.chop(1);
+        }
 
         // CommonMark "soft line break" rule: a single '\n' between non-blank
         // lines inside a paragraph (or a list item's text content, or a
@@ -1930,6 +2008,7 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         }
         if (kind == BlockKind::Paragraph
             || kind == BlockKind::ListItem
+            || kind == BlockKind::BlockQuote
             || isSetext) {
             content.replace('\n', ' ');
         }
