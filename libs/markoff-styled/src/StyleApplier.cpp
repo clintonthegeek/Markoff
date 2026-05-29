@@ -72,8 +72,8 @@ void applyHeading(QTextCursor &cursor, int level, qreal fontScale) {
 
 void applyParagraph(QTextCursor &cursor, qreal fontScale) {
     QTextBlockFormat bf = baseBlockFormat();
-    bf.setTopMargin(2 * fontScale);
-    bf.setBottomMargin(2 * fontScale);
+    bf.setTopMargin(5 * fontScale);
+    bf.setBottomMargin(5 * fontScale);
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
@@ -334,13 +334,13 @@ void StyleApplier::applyFormats() {
         QTextCursor cursor(m_textDocument);
         cursor.beginEditBlock();
 
-        // The QTextDocument is populated with flatView() (separator-bearing:
-        // blocks joined by "\n\n"). Compute block byte positions in that
-        // coordinate space by summing block sizes + separator lengths, then
-        // convert to Qt UTF-16 char positions.
-        const QByteArray flatBytes = m_markoffDocument->flatView();
+        // The QTextDocument is populated with widgetFlatView() (separator-bearing:
+        // blocks joined by single "\n" — WP unification, 2026-05-28). Compute
+        // block byte positions in that coordinate space by summing block sizes
+        // + separator lengths, then convert to Qt UTF-16 char positions.
+        const QByteArray flatBytes = m_markoffDocument->widgetFlatView();
         const std::vector<Markoff::BlockId> blocks = m_markoffDocument->iterateBlocks();
-        static constexpr int kSepLen = 2;  // "\n\n"
+        static constexpr int kSepLen = 1;  // single "\n"
 
         // Set-like map of all IDs present this pass, for stale-entry pruning below.
         currentIds.reserve(static_cast<qsizetype>(blocks.size()));
@@ -432,7 +432,7 @@ void StyleApplier::applyFormats() {
                 c.mergeCharFormat(charFormatForSpan(span, m_fontScale));
             }
 
-            // Advance past block content + separator ("\n\n") between blocks.
+            // Advance past block content + single-"\n" separator between blocks.
             bytePos = blockEnd;
             if (i + 1 < blocks.size()) bytePos += kSepLen;
         }
