@@ -30,6 +30,13 @@ private Q_SLOTS:
     void noTrailingNewline();
     void markerProducesParagraph();
     void markerRunProducesMultiple();
+
+    void blockQuoteSingleParagraph_carriesDepth1AndRunId();
+    void blockQuoteMultiParagraph_splitsIntoPerChildTlbs();
+    void blockQuoteTwoAdjacentQuotes_distinctRunIds();
+    void blockQuoteNested_bumpsDepthAndRunId();
+    void blockQuoteHeadingChild_emitsAtxHeadingKind();
+    void blockQuoteCodeChild_emitsFencedCodeBlockKind();
 };
 
 static QList<TopLevelBlock> blocksOf(const QString &source)
@@ -258,6 +265,77 @@ void TestDocumentTopLevelBlocks::markerRunProducesMultiple()
     QCOMPARE(blocks.size(), 3);
     QCOMPARE(blocks[1].kind, Kind::Paragraph);
     QCOMPARE(blocks[2].kind, Kind::Paragraph);
+}
+
+void TestDocumentTopLevelBlocks::blockQuoteSingleParagraph_carriesDepth1AndRunId()
+{
+    auto blocks = blocksOf(QStringLiteral("> quoted line\n"));
+    QCOMPARE(blocks.size(), 1);
+    QCOMPARE(blocks[0].kind, Kind::Paragraph);          // inner child kind
+    QCOMPARE(blocks[0].blockQuoteDepth, 1);
+    QVERIFY(blocks[0].blockQuoteRunId >= 1);
+}
+
+void TestDocumentTopLevelBlocks::blockQuoteMultiParagraph_splitsIntoPerChildTlbs()
+{
+    // CommonMark: blank quoted line (`>` alone) separates paragraphs
+    // inside a single block_quote node. Walker emits one TLB per inner
+    // paragraph; both share the same blockQuoteRunId.
+    const QString src = QStringLiteral("> p1\n>\n> p2\n");
+    auto blocks = blocksOf(src);
+    QCOMPARE(blocks.size(), 2);
+    QCOMPARE(blocks[0].kind, Kind::Paragraph);
+    QCOMPARE(blocks[1].kind, Kind::Paragraph);
+    QCOMPARE(blocks[0].blockQuoteDepth, 1);
+    QCOMPARE(blocks[1].blockQuoteDepth, 1);
+    QCOMPARE(blocks[0].blockQuoteRunId, blocks[1].blockQuoteRunId);
+}
+
+void TestDocumentTopLevelBlocks::blockQuoteTwoAdjacentQuotes_distinctRunIds()
+{
+    // Truly blank line (no '>' prefix) between two quotes splits them
+    // into separate block_quote nodes -> different runIds.
+    const QString src = QStringLiteral("> p1\n\n> p2\n");
+    auto blocks = blocksOf(src);
+    QCOMPARE(blocks.size(), 2);
+    QCOMPARE(blocks[0].kind, Kind::Paragraph);
+    QCOMPARE(blocks[1].kind, Kind::Paragraph);
+    QCOMPARE(blocks[0].blockQuoteDepth, 1);
+    QCOMPARE(blocks[1].blockQuoteDepth, 1);
+    QVERIFY(blocks[0].blockQuoteRunId != blocks[1].blockQuoteRunId);
+}
+
+void TestDocumentTopLevelBlocks::blockQuoteNested_bumpsDepthAndRunId()
+{
+    // `> > deep` — outer block_quote contains a nested block_quote
+    // which contains a paragraph. Neither block_quote emits a TLB; the
+    // inner paragraph emits one TLB at depth=2 with the inner block
+    // quote's runId.
+    const QString src = QStringLiteral("> > deep\n");
+    auto blocks = blocksOf(src);
+    QCOMPARE(blocks.size(), 1);
+    QCOMPARE(blocks[0].kind, Kind::Paragraph);
+    QCOMPARE(blocks[0].blockQuoteDepth, 2);
+    QVERIFY(blocks[0].blockQuoteRunId >= 1);
+}
+
+void TestDocumentTopLevelBlocks::blockQuoteHeadingChild_emitsAtxHeadingKind()
+{
+    const QString src = QStringLiteral("> # Quoted H1\n");
+    auto blocks = blocksOf(src);
+    QCOMPARE(blocks.size(), 1);
+    QCOMPARE(blocks[0].kind, Kind::AtxHeading);
+    QCOMPARE(blocks[0].headingLevel, 1);
+    QCOMPARE(blocks[0].blockQuoteDepth, 1);
+}
+
+void TestDocumentTopLevelBlocks::blockQuoteCodeChild_emitsFencedCodeBlockKind()
+{
+    const QString src = QStringLiteral("> ```\n> code\n> ```\n");
+    auto blocks = blocksOf(src);
+    QCOMPARE(blocks.size(), 1);
+    QCOMPARE(blocks[0].kind, Kind::FencedCodeBlock);
+    QCOMPARE(blocks[0].blockQuoteDepth, 1);
 }
 
 QTEST_GUILESS_MAIN(TestDocumentTopLevelBlocks)
