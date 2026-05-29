@@ -433,6 +433,82 @@ private Q_SLOTS:
         // Nested (b1) is in a different list.
         QVERIFY(b1.textList() != b0.textList());
     }
+
+    // BlockQuote depth from attrs + non-BlockQuote overlay (queue #8.1).
+    // Spec: docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §7.
+
+    void blockquote_depth_1_has_left_margin() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("> quoted line\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+        QTest::qWait(50);
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        QVERIFY(qdoc->blockCount() >= 1);
+        const qreal margin1 = qdoc->firstBlock().blockFormat().leftMargin();
+        QVERIFY2(margin1 > 0.0,
+                 qPrintable(QStringLiteral("depth=1 leftMargin should be > 0, got %1")
+                                .arg(margin1)));
+    }
+
+    void blockquote_depth_2_has_double_left_margin() {
+        Markoff::Styled::Editor e1;
+        Markoff::MarkoffDocument doc1(1);
+        doc1.loadFromMarkdown(QByteArrayLiteral("> one\n"));
+        auto *s1 = doc1.createSession();
+        e1.setSession(s1);
+        e1.setDocument(&doc1);
+        e1.resize(400, 200);
+        e1.show();
+
+        Markoff::Styled::Editor e2;
+        Markoff::MarkoffDocument doc2(1);
+        doc2.loadFromMarkdown(QByteArrayLiteral("> > two\n"));
+        auto *s2 = doc2.createSession();
+        e2.setSession(s2);
+        e2.setDocument(&doc2);
+        e2.resize(400, 200);
+        e2.show();
+
+        QTRY_VERIFY(e1.isVisible() && e2.isVisible());
+        QTest::qWait(50);
+
+        const qreal m1 = e1.textEdit()->document()->firstBlock().blockFormat().leftMargin();
+        const qreal m2 = e2.textEdit()->document()->firstBlock().blockFormat().leftMargin();
+        // Margin scales linearly with depth; tolerate small rounding.
+        QVERIFY2(m2 > m1 * 1.5,
+                 qPrintable(QStringLiteral("depth=2 (%1) should be ~2x depth=1 (%2)")
+                                .arg(m2).arg(m1)));
+    }
+
+    void heading_inside_quote_renders_with_left_margin_overlay() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("> # Quoted heading\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+        QTest::qWait(50);
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        QCOMPARE(qdoc->blockCount(), 1);
+        const QTextBlockFormat bf = qdoc->firstBlock().blockFormat();
+        // Heading-kind block tagged with BlockQuoteDepth=1 should pick up
+        // a left-margin from the quote overlay (heading defaults are
+        // top/bottom margins only, no left).
+        QVERIFY2(bf.leftMargin() > 0.0,
+                 qPrintable(QStringLiteral("heading-in-quote leftMargin should be > 0, got %1")
+                                .arg(bf.leftMargin())));
+    }
 };
 
 QTEST_MAIN(TstStyledDogfoodInvariants)
