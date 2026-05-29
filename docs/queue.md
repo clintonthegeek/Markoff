@@ -829,11 +829,18 @@ arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
    Test pattern: extend `tst_block_buffer_invariant` mirror of
    `paragraph_buffers_have_no_internal_newlines`.
 
-2. **Setext `Heading` internal `\n` collapse.** Buffer for a setext H1/H2
-   is `"Title\n======="` or `"Title\n-------"`. Need to drop the underline
-   line at load time and collapse the title's soft breaks. Heading
-   attrs already carry `HeadingForm = "setext"` so the serializer can
-   reconstruct the underline. Small.
+2. ~~**Setext `Heading` internal `\n` collapse.**~~ → closed 2026-05-29
+   in `0291ac6`. Load-side strip + soft-break collapse in
+   `materializeBlocksFromParsedDoc`; `serializeHeading` reconstructs
+   underline from `(content.size(), level)`; `serializeForSave`
+   fast-path bypasses for setext (untouched setext goes through
+   reconstruction because `blockLoadTimeBytes` is the post-canon
+   buffer). `LiveListModelBinding`'s form-aware demote tightened to
+   require multi-line buffer — single-line is the canonical setext
+   shape under the new convention. Width drift on load+save accepted
+   (CommonMark accepts ≥1 chars). Spec:
+   `docs/specs/2026-05-29-setext-heading-buffer-canonicalisation-design.md`.
+   Plan: `docs/plans/2026-05-29-setext-heading-buffer-canonicalisation.md`.
 
 3. **Source-view list-item markers.** `markoff-source` flat-text widget
    consumes `widgetFlatView()`, which for ListItem yields the post-marker

@@ -106,19 +106,23 @@ live's intentional empty-paragraph blocks survive. A flat view gets
 CommonMark-style blank-line collapsing for free; a per-block view manages
 its own emptiness.
 
-**Load-side enforcement, Paragraph kind only (2026-05-29).** `loadFromMarkdown`
-also collapses internal `\n` → space inside `Paragraph` blocks at the
-load ingress, so hard-wrapped markdown paragraphs (single block per
-CommonMark, multiple source lines joined by single `\n`s) become a single
-canonical buffer. Without this, every hard-wrap `\n` reaches QTextDocument
-in flat-view leaves and creates a spurious QTextBlock boundary inside what
-should be one paragraph. Other multi-line kinds — `BlockQuote`, `ListItem`,
-setext `Heading` — still retain their internal `\n`s because their byte
-ranges include marker syntax (`> `, indent continuations, the setext
-underline) that needs separate marker-aware handling; flat-view leaves
-will still see spurious boundaries inside those kinds until that's done.
-Trade-off accepted: paragraph hard-wraps are not preserved across
-save round-trips (this matches Obsidian / browser markdown rendering).
+**Load-side enforcement (2026-05-29).** `loadFromMarkdown` collapses
+internal `\n` → space inside `Paragraph`, `ListItem`, and setext
+`Heading` block buffers at the load ingress, so hard-wrapped
+markdown content becomes a single canonical buffer per kind. Without
+this, every hard-wrap `\n` reaches QTextDocument in flat-view leaves
+and creates a spurious QTextBlock boundary inside what should be one
+block. Setext headings additionally have their underline line stripped
+before the collapse; `serializeHeading` reconstructs the underline
+from `(content.size(), level)` on save, and `serializeForSave` bypasses
+its untouched-block fast path for setext so reconstruction always runs.
+`BlockQuote` still retains its internal `\n`s because the byte range
+includes per-line `> ` markers that need marker-aware stripping;
+flat-view leaves will still see spurious boundaries inside BlockQuotes
+until that's done. Trade-offs accepted: paragraph hard-wraps are not
+preserved across save round-trips (matches Obsidian / browser markdown
+rendering); setext underline width drifts toward title length on load+save
+(CommonMark accepts ≥1, still parses as the same setext heading).
 
 ---
 
