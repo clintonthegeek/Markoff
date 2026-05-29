@@ -72,8 +72,8 @@ void applyHeading(QTextCursor &cursor, int level, qreal fontScale) {
 
 void applyParagraph(QTextCursor &cursor, qreal fontScale) {
     QTextBlockFormat bf = baseBlockFormat();
-    bf.setTopMargin(5 * fontScale);
-    bf.setBottomMargin(5 * fontScale);
+    bf.setTopMargin(2 * fontScale);
+    bf.setBottomMargin(2 * fontScale);
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
