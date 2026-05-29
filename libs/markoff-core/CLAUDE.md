@@ -94,6 +94,8 @@ Spec: `docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`
 
 This invariant is enforced by `applyFlatEdit`'s canonicalization pass (splits inserted text on any newline-run, collapsing runs; never creates empty blocks). It is NOT enforced on the per-block path (`d2ApplyBufferEdit`, `d2InsertBlock`), so the live-view leaf's intentional empty-paragraph blocks are safe.
 
+**Load ingress — Paragraph kind only (2026-05-29).** `loadFromMarkdown` (via `buildD2FromBytes`) also collapses internal `\n` → space in `Paragraph` block buffers, so CommonMark hard-wrapped paragraphs (one block, source-side `\n`-joined lines) honour the "no internal `\n`" rule on the load ingress too. Other multi-line kinds (`BlockQuote`, `ListItem`, setext `Heading`) still retain their internal `\n`s pending marker-aware handling; flat-view leaves will still see spurious QTextBlock boundaries inside those kinds. See guide §0 "Load-side enforcement".
+
 **Interactive-ingress exception — `applyInteractiveNewline`.** The canonical
 "no empty blocks" rule holds for the programmatic ingress (`applyFlatEdit`).
 The *interactive* ingress `applyInteractiveNewline` (WYSIWYG Enter, routed from

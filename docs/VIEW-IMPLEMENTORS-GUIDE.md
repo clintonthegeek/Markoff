@@ -106,6 +106,20 @@ live's intentional empty-paragraph blocks survive. A flat view gets
 CommonMark-style blank-line collapsing for free; a per-block view manages
 its own emptiness.
 
+**Load-side enforcement, Paragraph kind only (2026-05-29).** `loadFromMarkdown`
+also collapses internal `\n` → space inside `Paragraph` blocks at the
+load ingress, so hard-wrapped markdown paragraphs (single block per
+CommonMark, multiple source lines joined by single `\n`s) become a single
+canonical buffer. Without this, every hard-wrap `\n` reaches QTextDocument
+in flat-view leaves and creates a spurious QTextBlock boundary inside what
+should be one paragraph. Other multi-line kinds — `BlockQuote`, `ListItem`,
+setext `Heading` — still retain their internal `\n`s because their byte
+ranges include marker syntax (`> `, indent continuations, the setext
+underline) that needs separate marker-aware handling; flat-view leaves
+will still see spurious boundaries inside those kinds until that's done.
+Trade-off accepted: paragraph hard-wraps are not preserved across
+save round-trips (this matches Obsidian / browser markdown rendering).
+
 ---
 
 ## §0.2 — Paragraph delineation is word-processor everywhere

@@ -9,6 +9,7 @@
 #include <QRegularExpression>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/BlockKind.h>
 
 using namespace Markoff;
 
@@ -63,6 +64,8 @@ private slots:
 
     void roundtrip_stability_data();
     void roundtrip_stability();
+
+    void paragraph_buffers_have_no_internal_newlines();
 };
 
 void TstBlockBufferInvariant::no_load_terminator_data()
@@ -114,6 +117,41 @@ void TstBlockBufferInvariant::roundtrip_stability()
     // First save equals normalize(source): collapses blank-line runs +
     // ensures single trailing '\n'.
     QCOMPARE(firstSave, normalize(source));
+}
+
+// CommonMark's "soft line break" rule: a single newline between
+// non-blank lines inside a paragraph renders as whitespace (typically a
+// space). Markoff stores this canonically — the model represents the
+// paragraph as a single block buffer with no internal '\n'. Flat-view
+// leaves (markoff-styled, markoff-source) rely on this because every
+// '\n' that reaches QTextDocument becomes a QTextBlock boundary.
+//
+// (BlockQuote/ListItem/Heading retain internal '\n' for now — marker
+// stripping is a separate concern; Route A v0 fixes Paragraph only.)
+void TstBlockBufferInvariant::paragraph_buffers_have_no_internal_newlines()
+{
+    const QByteArray source =
+        "First paragraph hard-wrapped\n"
+        "across three lines so that\n"
+        "soft breaks need collapsing.\n"
+        "\n"
+        "Second paragraph stays separate.\n";
+
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    int paragraphsChecked = 0;
+    for (BlockId id : blocks) {
+        if (doc.blockKind(id) != BlockKind::Paragraph) continue;
+        ++paragraphsChecked;
+        const QByteArray text = doc.blockText(id);
+        QVERIFY2(!text.contains('\n'),
+                 qPrintable(QString("Paragraph block %1 has internal '\\n': %2")
+                     .arg(id.raw())
+                     .arg(QString::fromUtf8(text))));
+    }
+    QCOMPARE(paragraphsChecked, 2);
 }
 
 QTEST_MAIN(TstBlockBufferInvariant)

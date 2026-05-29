@@ -1901,6 +1901,18 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
         if (content.endsWith('\n'))
             content.chop(1);
 
+        // CommonMark "soft line break" rule: a single '\n' between non-blank
+        // lines inside a paragraph renders as whitespace. Storing the raw
+        // source bytes would leave hard-wrap '\n's inside the buffer, which
+        // then become spurious QTextBlock boundaries in flat-view leaves
+        // (markoff-styled, markoff-source). Collapse to a single space at
+        // load time so Paragraph buffers honour the B1 "no internal '\n'"
+        // invariant on the load ingress, matching applyFlatEdit. Other
+        // multi-line kinds (BlockQuote, ListItem, Setext heading) retain
+        // their '\n's pending separate marker-aware handling.
+        if (kind == BlockKind::Paragraph)
+            content.replace('\n', ' ');
+
         auto buf = std::make_unique<CollabText::Crdt::Buffer>(d->replicaId);
         if (!content.isEmpty())
             buf->apply_local_edit({{0, 0}}, {content.toStdString()});
