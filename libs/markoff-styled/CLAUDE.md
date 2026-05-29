@@ -75,15 +75,34 @@ No KF6, no QML, no `markoff-live`.
   BlockId from the anchor itself. When in doubt about a core API,
   search `latestBlockRanges` first.
 - **WP unification (2026-05-28).** The Editor's QTextDocument is seeded
-  from `widgetFlatView()` (single-`\n` separator). `StyleApplier::baseBlockFormat`
-  sets `topMargin`/`bottomMargin` = 5pt to provide the visible
-  inter-paragraph gap. An empty model block renders as an empty
-  QTextBlock whose margins contribute the "extra gap" signal of one
-  Enter. (Note: per-kind paths in `StyleApplier` currently override the
-  base with smaller values — e.g., 2pt for Paragraph at fontScale 1.0 —
-  so the *actual* margin a user sees comes from the per-kind setter, not
-  the base. Tuning is dogfood follow-up.) Spec
+  from `widgetFlatView()` (single-`\n` separator). Each model block →
+  one QTextBlock; the visible inter-paragraph gap comes from per-kind
+  margins, not from extra `\n`s in the flat text. An empty model block
+  renders as an empty QTextBlock whose margins contribute the "extra
+  gap" signal of one Enter. Spec
   `../../docs/specs/2026-05-28-flat-view-wp-unification-design.md`.
+- **Em-based spacing (2026-05-29).** All per-kind block margins, list
+  indent, code-block left-margin, body font size, and
+  `QTextDocument::indentWidth` are computed from `kBaseBodyPt × fontScale`.
+  Zoom in/out scales spacing proportionally with text. Named multiplier
+  helpers (`paragraphMarginPt`, `listItemMarginPt`, `docIndentWidthPx`,
+  `headingTopMarginPt`, etc.) live at the top of `StyleApplier.cpp` —
+  tuning is a one-line constant change. Targets: ~1em between paragraphs,
+  ~0.36em between list items, ~1.15em above headings.
+- **ListItem marker rendering (2026-05-29).** `applyListItem` reads
+  `MarkerStyle`, `IndentLevel`, and (for tasks) `Checked` from the block
+  attrs — depth is no longer derived from buffer leading whitespace
+  (which is always 0 post-marker anyway). Task-list checkboxes use the
+  native `QTextBlockFormat::MarkerType::{Unchecked,Checked}`. Bullets
+  and decimals come from a per-item `QTextList` (`ListDisc` for
+  minus/plus/star markers; `ListDecimal` for dot/paren). Single-item
+  lists render the marker correctly but ordered items always read `1.`;
+  sibling-grouping is a v0.2 follow-up (see queue #8).
+- **Hash gate is text-only (caveat).** `computeBlockHash` covers
+  `(kind, text, spans, fontScale)` — **not** attrs. Attr-only mutations
+  (`toggleListItemChecked`, `IndentLevel` rewrite, marker-style flip)
+  leave the hash unchanged and skip the format reapplication. Add attrs
+  to the hash before relying on attr changes restyling automatically.
 
 ## Resolved binding bugs (2026-05-27)
 

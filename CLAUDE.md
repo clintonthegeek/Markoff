@@ -1,6 +1,68 @@
 # Markoff
 
-> **2026-05-27 — `markoff-styled` view leaf landed + hardened; View Implementor's Guide written; cursor-authority fix is the next task.**
+> **2026-05-29 — WP unification dogfood arc closed for Paragraph + ListItem; flat-view spacing now em-based; bullets render.**
+>
+> Two dogfood-driven arcs landed on top of the WP unification baseline
+> (commits `1f7fb99..b8a6bf8`):
+>
+> 1. **StyleApplier coordinate fix** (`6b5abcc`) — StyleApplier was
+>    computing block positions against `flatView()` (2-byte `\n\n` sep)
+>    while the QTextDocument is seeded from `widgetFlatView()` (1-byte
+>    `\n` sep). Every block past the first drifted by 1 char per
+>    preceding boundary, landing inline char-formats several chars past
+>    their span. Coordinate space realigned.
+>
+> 2. **Hard-wrapped paragraph & list-item rendering** (`fa3d9ce`,
+>    `845fc0f`). CommonMark "soft line breaks" (single `\n` inside a
+>    paragraph/list item) were surviving into block buffers as raw
+>    bytes, so flat-view leaves saw spurious QTextBlock boundaries per
+>    hard-wrap line. `MarkoffDocument::buildD2FromBytes` now collapses
+>    internal `\n` → space at load time for `Paragraph` and `ListItem`
+>    kinds. `markoff-styled`'s `applyListItem` now reads
+>    `MarkerStyle`/`IndentLevel`/`Checked` from block attrs and renders
+>    bullets/decimals via per-item `QTextList` (and task checkboxes via
+>    native `QTextBlockFormat` marker). Falsifiable invariants pinned
+>    in `tst_block_buffer_invariant`.
+>
+> 3. **Em-based spacing rework** (`6019b70`) — all per-kind block
+>    margins, list indent, and `QTextDocument::indentWidth` switched
+>    from pixel constants to em-multipliers derived from
+>    `kBaseBodyPt × fontScale`. Zoom in/out now scales gaps
+>    proportionally. Spacing helpers (`paragraphMarginPt`,
+>    `listItemMarginPt`, `docIndentWidthPx`, etc.) are named constants
+>    at the top of `StyleApplier.cpp` — one-line tuning, not a hunt.
+>
+> **Still open from this arc (documented in queue + guide §0):**
+>
+> - `BlockQuote` and setext `Heading` retain internal `\n`s — their
+>   byte ranges include marker syntax (`> `, setext underline) that
+>   needs separate marker-aware stripping. Flat-view leaves still
+>   render those as multi-line until that's done.
+> - **Source view shows list-item buffers without their markers** —
+>   the buffer is post-marker content, so `widgetFlatView` for source
+>   shows `foo` not `- foo`. Source-view marker reconstruction is a
+>   follow-up.
+> - **Ordered-list continuous numbering** — every item is its own
+>   single-item `QTextList`, so ordered items always render `1.`.
+>   Sibling-grouping needed.
+> - **Hash gate over attrs** — `computeBlockHash` covers
+>   `(kind, text, spans, fontScale)` but not attrs, so
+>   `toggleListItemChecked` and `IndentLevel` rewrites without text
+>   change don't restyle. Add attr hash to gate.
+> - **`tst_styled_block_formats`** has 2 pre-existing failures
+>   (`heading_levels_descend_in_size`, `horizontal_rule_uses_monospace`)
+>   that predate this arc; triage.
+> - **`tst_source_widget_format_ops`** has 4 failures that crept in
+>   during the WP unification commits; pre-existed today's fixes
+>   but post-date the arc-start; needs investigation.
+>
+> **Test baseline (2026-05-29):** 249/254 pass via
+> `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`. The 5
+> failures above; zero new regressions from this arc.
+>
+> ---
+>
+> **2026-05-27 — `markoff-styled` view leaf landed + hardened; View Implementor's Guide written; cursor-authority fix CLOSED.**
 >
 > A third view leaf, `markoff-styled` (QTextEdit, inline-styled, no QML/KF6),
 > landed 2026-05-26 (spec `docs/specs/2026-05-26-markoff-styled-leaf-design.md`).
@@ -12,19 +74,13 @@
 > (`docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`,
 > commits `f5cdc4e..10ed95a`).
 >
-> Dogfood then surfaced the live "Enter jumps to the end of the next
-> paragraph" bug — a SOLVED problem in `markoff-live` that the new leaf
-> re-discovered. Rather than re-derive it, the cross-cutting view↔model
-> concerns are now catalogued once in
+> Cursor-authority fix (queue #7) landed via `ff33a6e..eb685f0` —
+> `applyInteractiveNewline` + caret-resolution chokepoint in the
+> binding, consumed by both styled and source. Spec
+> `docs/specs/2026-05-27-flat-view-enter-and-caret-authority-design.md`.
+> The cross-cutting view↔model concerns are catalogued once in
 > **[`docs/VIEW-IMPLEMENTORS-GUIDE.md`](docs/VIEW-IMPLEMENTORS-GUIDE.md)**
-> (evergreen, peer to INVARIANTS; required reading for any view leaf). The
-> §B cursor-authority cluster is documented OPEN for the flat-text leaves.
->
-> **Next task (fresh session):** port `establishFocus` to
-> `SourceTextDocumentBinding` to close guide §B (fixes styled + source).
-> Full brief: **[`docs/handoff/2026-05-27-cursor-authority-fix-handoff.md`](docs/handoff/2026-05-27-cursor-authority-fix-handoff.md)**;
-> tracked as `docs/queue.md` #7. Brainstorm → spec → plan → subagent-driven,
-> per the handoff's required-process section.
+> (evergreen, peer to INVARIANTS; required reading for any view leaf).
 >
 > ---
 >

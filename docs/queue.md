@@ -812,6 +812,77 @@ caret re-assertion chokepoint.
 
 ---
 
+## #8 — Flat-view kind follow-ups (BlockQuote, Setext, source markers, list grouping, attr hash)
+
+Cluster of related follow-ups from the 2026-05-29 WP-unification dogfood
+arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
+
+1. **BlockQuote internal `\n` collapse.** `MarkoffDocument::buildD2FromBytes`
+   currently skips BlockQuote because its byte range includes `> ` markers
+   on every line. Either (a) strip leading `> ` per line before storing,
+   then collapse internal `\n` → space (round-trip loses original
+   formatting but matches Paragraph approach), or (b) preserve `> `s as
+   structural and substitute `\n` → `U+2028` so QTextDocument sees soft
+   breaks. Decide in a brainstorm. `applyBlockquote` likely needs a
+   complementary change so it doesn't render `> ` as literal text. Spec
+   touches `MarkoffDocument.cpp:1900` block and `StyleApplier.cpp::applyBlockquote`.
+   Test pattern: extend `tst_block_buffer_invariant` mirror of
+   `paragraph_buffers_have_no_internal_newlines`.
+
+2. **Setext `Heading` internal `\n` collapse.** Buffer for a setext H1/H2
+   is `"Title\n======="` or `"Title\n-------"`. Need to drop the underline
+   line at load time and collapse the title's soft breaks. Heading
+   attrs already carry `HeadingForm = "setext"` so the serializer can
+   reconstruct the underline. Small.
+
+3. **Source-view list-item markers.** `markoff-source` flat-text widget
+   consumes `widgetFlatView()`, which for ListItem yields the post-marker
+   buffer — so source shows `foo` instead of `- foo` for a `- foo` item.
+   Source view's whole point is "raw markdown visible." Either (a) source
+   uses `serializeForSave()` for its initial seed plus a separate
+   marker-aware widgetFlatView variant, or (b) keep `widgetFlatView()` and
+   have the binding prepend markers via per-block decoration. Architectural
+   spec needed; touches `SourceTextDocumentBinding` and the
+   `markoff-source` Editor.
+
+4. **Ordered-list continuous numbering** in `markoff-styled`. Each ListItem
+   currently creates its own single-item `QTextList`, so every ordered
+   item shows `1.`. Group consecutive same-style ListItem blocks into a
+   shared `QTextList` (resilient to insertion at boundaries: detect
+   prev-block kind + markerStyle, reuse list if compatible, else create).
+   Marker-style transitions still break a list. `StyleApplier::applyFormats`
+   needs neighbour-aware state across the block walk.
+
+5. **Hash gate covers attrs.** `computeBlockHash` hashes
+   `(kind, text, spans, fontScale)`. Attr-only mutations
+   (`toggleListItemChecked`, `IndentLevel` rewrites, marker-style change)
+   leave text unchanged → hash unchanged → block format skipped → stale
+   render. Extend the bit-pack to include the attrs that affect the
+   render path (MarkerStyle, IndentLevel, Checked, HeadingForm). Touches
+   `StyleApplier::computeBlockHash` and the new test:
+   "checking a task item without text change restyles the marker."
+
+6. **`tst_source_widget_format_ops` 4 failures.** Pre-existing as of
+   the WP unification commit-arc start (today), but post-dating
+   2026-05-23 baseline (235/238). Confirmed by stash-bisect (they fail
+   even with today's three fixes stashed). Investigation needed:
+   which WP-unification commit (`1f7fb99..b8a6bf8`) introduced them?
+   Probably the `widgetFlatView()`/sep-view byte-arithmetic transition.
+
+7. **`tst_styled_block_formats` 2 failures.** Truly pre-existing (failed
+   before the WP unification arc); `heading_levels_descend_in_size` and
+   `horizontal_rule_uses_monospace`. Quick triage: are the tests too
+   strict given v0 styling values, or has rendering drifted?
+
+**Design references:**
+- Guide §0 "Load-side enforcement, Paragraph kind only" + §0.2
+  "Paragraph delineation is word-processor everywhere".
+- `libs/markoff-core/CLAUDE.md` "Load ingress — Paragraph kind only".
+- `libs/markoff-styled/CLAUDE.md` "WP unification" + the v0.1 invariants
+  section.
+
+---
+
 ## When this queue is empty / superseded
 
 Delete the file or move it to `docs/archive/`. The CLAUDE.md banner
