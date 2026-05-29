@@ -66,6 +66,7 @@ private slots:
     void roundtrip_stability();
 
     void paragraph_buffers_have_no_internal_newlines();
+    void listitem_buffers_have_no_internal_newlines();
 };
 
 void TstBlockBufferInvariant::no_load_terminator_data()
@@ -152,6 +153,36 @@ void TstBlockBufferInvariant::paragraph_buffers_have_no_internal_newlines()
                      .arg(QString::fromUtf8(text))));
     }
     QCOMPARE(paragraphsChecked, 2);
+}
+
+// ListItems can also be hard-wrapped (continuation lines indented under
+// the item). harvestListItem narrows the byte range to the item's content
+// child (post-marker), so the buffer never sees the marker syntax — just
+// the text. We canonicalise internal '\n' → space for the same reason as
+// Paragraph: flat-view leaves treat any '\n' in the buffer as a
+// QTextBlock boundary.
+void TstBlockBufferInvariant::listitem_buffers_have_no_internal_newlines()
+{
+    const QByteArray source =
+        "- First item with a continuation\n"
+        "  that wraps onto a second line.\n"
+        "- Second item is a single line.\n";
+
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    int itemsChecked = 0;
+    for (BlockId id : blocks) {
+        if (doc.blockKind(id) != BlockKind::ListItem) continue;
+        ++itemsChecked;
+        const QByteArray text = doc.blockText(id);
+        QVERIFY2(!text.contains('\n'),
+                 qPrintable(QString("ListItem block %1 has internal '\\n': %2")
+                     .arg(id.raw())
+                     .arg(QString::fromUtf8(text))));
+    }
+    QCOMPARE(itemsChecked, 2);
 }
 
 QTEST_MAIN(TstBlockBufferInvariant)

@@ -12,8 +12,12 @@
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextEdit>
+#include <QTextList>
+#include <QTextListFormat>
 #include <QTimer>
 
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/BlockAttrsMap.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/Cmd/D2.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -111,16 +115,47 @@ void applyBlockquote(QTextCursor &cursor, int depth, qreal fontScale) {
     applyBlockCharFormat(cursor, cf);
 }
 
-void applyListItem(QTextCursor &cursor, int depth, qreal fontScale) {
+void applyListItem(QTextCursor &cursor, int depth,
+                   const QString &markerStyle, bool checked,
+                   qreal fontScale) {
     QTextBlockFormat bf = baseBlockFormat();
     bf.setLeftMargin(16 * fontScale * qMax(1, depth + 1));
     bf.setTopMargin(1);
     bf.setBottomMargin(1);
+
+    // Task-list checkboxes are the only marker type QTextBlockFormat can
+    // render natively. Set them on the block format; clear any prior marker
+    // when the kind isn't task.
+    if (markerStyle == QStringLiteral("task")) {
+        bf.setMarker(checked ? QTextBlockFormat::MarkerType::Checked
+                             : QTextBlockFormat::MarkerType::Unchecked);
+    } else {
+        bf.setMarker(QTextBlockFormat::MarkerType::NoMarker);
+    }
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
     cf.setFontPointSize(11.0 * fontScale);
     applyBlockCharFormat(cursor, cf);
+
+    // Bullet / numeral rendering: Qt draws these via QTextList, not via
+    // QTextBlockFormat::MarkerType. One QTextList per item — single-item
+    // lists render their marker correctly (disc / decimal). Continuous
+    // numbering across consecutive items would require grouping siblings
+    // into a shared list, which is fragile across structural edits and is
+    // a v0.2 follow-up. Task-list items skip this path because their
+    // checkbox is already drawn by the block-format marker above.
+    if (markerStyle == QStringLiteral("task"))
+        return;
+
+    QTextListFormat lf;
+    if (markerStyle == QStringLiteral("dot")
+        || markerStyle == QStringLiteral("paren"))
+        lf.setStyle(QTextListFormat::ListDecimal);
+    else  // minus / plus / star / unknown → disc
+        lf.setStyle(QTextListFormat::ListDisc);
+    lf.setIndent(qMax(1, depth + 1));
+    cursor.createList(lf);
 }
 
 void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
@@ -405,10 +440,26 @@ void StyleApplier::applyFormats() {
                     }
                     applyBlockquote(blkCursor, depth, m_fontScale);
                 } else if (kind == Markoff::BlockKind::ListItem) {
+                    // Read structural attrs from the model rather than guessing
+                    // from buffer text — the harvested ListItem buffer is
+                    // post-marker content with no marker syntax to recover.
+                    const auto attrs = m_markoffDocument->blockAttrs(id);
                     int depth = 0;
-                    while (depth < text.size() && (text[depth] == ' ' || text[depth] == '\t')) ++depth;
-                    depth /= 2;  // 2 spaces per indent level — close enough for v0.
-                    applyListItem(blkCursor, depth, m_fontScale);
+                    if (auto it = attrs.find(Markoff::AttrNames::IndentLevel);
+                        it != attrs.end()
+                        && std::holds_alternative<int>(*it))
+                        depth = std::get<int>(*it);
+                    QString markerStyle;
+                    if (auto it = attrs.find(Markoff::AttrNames::MarkerStyle);
+                        it != attrs.end()
+                        && std::holds_alternative<QString>(*it))
+                        markerStyle = std::get<QString>(*it);
+                    bool checked = false;
+                    if (auto it = attrs.find(Markoff::AttrNames::Checked);
+                        it != attrs.end()
+                        && std::holds_alternative<bool>(*it))
+                        checked = std::get<bool>(*it);
+                    applyListItem(blkCursor, depth, markerStyle, checked, m_fontScale);
                 } else if (kind == Markoff::BlockKind::HorizontalRule) {
                     applyHorizontalRule(blkCursor, m_fontScale);
                 } else {
