@@ -233,6 +233,7 @@ QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
 quint64 computeBlockHash(Markoff::BlockKind kind,
                          const QByteArray &text,
                          const QList<Markoff::SourceSpan> &spans,
+                         const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs,
                          qreal fontScale) {
     quint64 h = qHash(int(kind));
     h ^= qHash(text);
@@ -252,6 +253,29 @@ quint64 computeBlockHash(Markoff::BlockKind kind,
             (span.isTag         ? 1ULL << 7  : 0) |
             (span.isFootnoteRef ? 1ULL << 8  : 0);
         h ^= flagBits;
+    }
+    // Attrs: XOR-combine per-entry (order-insensitive; sidesteps QHash's
+    // non-deterministic iteration order across Qt versions). AttrValue is
+    // std::variant<int, QString, bool>; an unhandled alternative wedges a
+    // static_assert at compile time.
+    // Spec: docs/specs/2026-05-29-styled-hash-gate-over-attrs-design.md.
+    for (auto it = attrs.cbegin(); it != attrs.cend(); ++it) {
+        quint64 entry = qHash(it.key());
+        entry *= 0x9E3779B97F4A7C15ULL;
+        std::visit([&](const auto &v) {
+            using T = std::decay_t<decltype(v)>;
+            if constexpr (std::is_same_v<T, int>) {
+                entry ^= quint64(v) * 0xBF58476D1CE4E5B9ULL;
+            } else if constexpr (std::is_same_v<T, bool>) {
+                entry ^= v ? 1ULL : 2ULL;
+            } else if constexpr (std::is_same_v<T, QString>) {
+                entry ^= qHash(v);
+            } else {
+                static_assert(sizeof(T) == 0,
+                              "Unhandled AttrValue alternative");
+            }
+        }, it.value());
+        h ^= entry;
     }
     // Mix in fontScale (cast to quint64 bits for stable hashing).
     quint64 fsBits = 0;
@@ -420,7 +444,8 @@ void StyleApplier::applyFormats() {
 
             const Markoff::BlockKind kind = m_markoffDocument->blockKind(id);
             const QList<Markoff::SourceSpan> spans = m_markoffDocument->inlineSpansFor(id);
-            const quint64 h = computeBlockHash(kind, text, spans, m_fontScale);
+            const auto attrs = m_markoffDocument->blockAttrs(id);
+            const quint64 h = computeBlockHash(kind, text, spans, attrs, m_fontScale);
 
             if (m_blockHashes.value(id, 0) == h) {
                 // Block unchanged — skip format reapplication, but still
@@ -472,7 +497,7 @@ void StyleApplier::applyFormats() {
                     // Read structural attrs from the model rather than guessing
                     // from buffer text — the harvested ListItem buffer is
                     // post-marker content with no marker syntax to recover.
-                    const auto attrs = m_markoffDocument->blockAttrs(id);
+                    // `attrs` is the outer lookup also consumed by computeBlockHash.
                     int depth = 0;
                     if (auto it = attrs.find(Markoff::AttrNames::IndentLevel);
                         it != attrs.end()

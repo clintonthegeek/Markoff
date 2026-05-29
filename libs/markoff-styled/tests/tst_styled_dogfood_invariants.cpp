@@ -314,6 +314,45 @@ private Q_SLOTS:
         // Caret at the join point = end of "Alpha" = sep-view pos 5.
         QCOMPARE(e.textEdit()->textCursor().position(), 5);
     }
+
+    // computeBlockHash covers attrs (queue #8.5; spec
+    // 2026-05-29-styled-hash-gate-over-attrs-design.md). A task ListItem
+    // whose Checked attr flips must re-style — without attrs in the
+    // hash, the gate skipped the block and the native marker stayed
+    // Unchecked.
+    void attr_toggle_re_renders_task_marker() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("- [ ] task\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(int(blocks.size()), 1);
+        const Markoff::BlockId id = blocks[0];
+        QCOMPARE(doc.blockKind(id), Markoff::BlockKind::ListItem);
+
+        // Initial state: marker is Unchecked.
+        QTextDocument *qdoc = e.textEdit()->document();
+        QTextBlock qblk = qdoc->findBlockByNumber(0);
+        QCOMPARE(qblk.blockFormat().marker(),
+                 QTextBlockFormat::MarkerType::Unchecked);
+
+        // Toggle the Checked attr — no buffer change, only the attr flips.
+        doc.toggleListItemChecked(Markoff::BlockAnchor(id));
+        QTest::qWait(80);
+
+        // After the cascade the marker must be Checked. Without attrs in
+        // computeBlockHash, the hash gate would skip restyle and the
+        // marker would stay Unchecked.
+        qblk = qdoc->findBlockByNumber(0);
+        QCOMPARE(qblk.blockFormat().marker(),
+                 QTextBlockFormat::MarkerType::Checked);
+    }
 };
 
 QTEST_MAIN(TstStyledDogfoodInvariants)
