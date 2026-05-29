@@ -43,10 +43,12 @@ No KF6, no QML, no `markoff-live`.
 ## v0.1 invariants
 
 - **Per-block hash gating.** `StyleApplier::applyFormats` skips blocks
-  whose `(kind, text, spans, fontScale)` hash is unchanged. Test:
+  whose `(kind, text, spans, attrs, fontScale)` hash is unchanged. Test:
   `tst_styled_dogfood_invariants::hash_gate_skips_unchanged_blocks`.
-  When adding new format inputs (e.g., a new `SourceSpan` flag), extend
-  the bit-pack in `computeBlockHash` to include it, or risk a missed
+  Attrs were added 2026-05-29 (queue #8.5) so `toggleListItemChecked`,
+  `IndentLevel` rewrites, and marker-style flips trigger restyle. When
+  adding new format inputs (e.g., a new `SourceSpan` flag), extend the
+  bit-pack in `computeBlockHash` to include it, or risk a missed
   restyle on the change.
 - **Kind transition via `Cmd::changeKind`.** Prefix-rule kind
   inference (Heading via leading `#`, BlockQuote via `> `, ListItem
@@ -98,11 +100,14 @@ No KF6, no QML, no `markoff-live`.
   minus/plus/star markers; `ListDecimal` for dot/paren). Single-item
   lists render the marker correctly but ordered items always read `1.`;
   sibling-grouping is a v0.2 follow-up (see queue #8).
-- **Hash gate is text-only (caveat).** `computeBlockHash` covers
-  `(kind, text, spans, fontScale)` — **not** attrs. Attr-only mutations
+- **Hash gate covers attrs (2026-05-29).** `computeBlockHash` mixes
+  the full `blockAttrs(id)` QHash via XOR (order-insensitive — sidesteps
+  Qt's non-deterministic QHash iteration). Attr-only mutations
   (`toggleListItemChecked`, `IndentLevel` rewrite, marker-style flip)
-  leave the hash unchanged and skip the format reapplication. Add attrs
-  to the hash before relying on attr changes restyling automatically.
+  produce a fresh hash and trigger restyle. Over-conservative on attrs
+  that don't drive rendering (e.g. `LooseRun`) — acceptable vs. an
+  allowlist that drifts as `applyFormats` grows new attr reads. Test:
+  `tst_styled_dogfood_invariants::attr_toggle_re_renders_task_marker`.
 
 ## Resolved binding bugs (2026-05-27)
 

@@ -860,14 +860,16 @@ arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
    Marker-style transitions still break a list. `StyleApplier::applyFormats`
    needs neighbour-aware state across the block walk.
 
-5. **Hash gate covers attrs.** `computeBlockHash` hashes
-   `(kind, text, spans, fontScale)`. Attr-only mutations
-   (`toggleListItemChecked`, `IndentLevel` rewrites, marker-style change)
-   leave text unchanged → hash unchanged → block format skipped → stale
-   render. Extend the bit-pack to include the attrs that affect the
-   render path (MarkerStyle, IndentLevel, Checked, HeadingForm). Touches
-   `StyleApplier::computeBlockHash` and the new test:
-   "checking a task item without text change restyles the marker."
+5. ~~**Hash gate covers attrs.**~~ → closed 2026-05-29 in `42720f3`.
+   `computeBlockHash` now mixes the full `blockAttrs(id)` QHash via
+   XOR (order-insensitive). Slightly over-conservative on attrs that
+   don't drive rendering — acceptable vs. an allowlist that drifts.
+   Falsifiable test
+   `tst_styled_dogfood_invariants::attr_toggle_re_renders_task_marker`
+   pins the contract (toggle Checked on a task ListItem → marker
+   flips to Checked after the cascade). Spec:
+   `docs/specs/2026-05-29-styled-hash-gate-over-attrs-design.md`.
+   Plan: `docs/plans/2026-05-29-styled-hash-gate-over-attrs.md`.
 
 6. **`tst_source_widget_format_ops` 4 failures.** Pre-existing as of
    the WP unification commit-arc start (today), but post-dating
