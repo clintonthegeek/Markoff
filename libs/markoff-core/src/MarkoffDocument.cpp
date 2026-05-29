@@ -1960,6 +1960,7 @@ void MarkoffDocument::wipeD2State()
     d->blockEditSequences.clear();
     d->touchedSinceLoad.clear();
     d->structuralEditSequence = 0;
+    d->nextBlockQuoteRunId = 1;
     if (d->inlineCache) d->inlineCache->clear();
 
     // Drop queued remote ops referencing now-dead BlockIds (defensive

@@ -15,4 +15,6 @@ namespace Markoff::AttrNames {
     inline const AttrName Alt          = "alt";          // Image: QString alt text
     inline const AttrName Title        = "title";        // Image: QString (optional)
     inline const AttrName DisplayMode  = "displayMode";  // Math: bool (true = display, false = inline)
+    inline const AttrName BlockQuoteDepth = "blockQuoteDepth"; // Quoted block: int >= 1, nesting level
+    inline const AttrName BlockQuoteRunId = "blockQuoteRunId"; // Quoted block: int >= 1, doc-local run id
 }  // namespace Markoff::AttrNames

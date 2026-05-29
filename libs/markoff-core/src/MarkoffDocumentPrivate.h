@@ -97,6 +97,13 @@ struct MarkoffDocument::Private {
     // Structural edit sequence counter — bumps on every applyStructural call.
     quint64 structuralEditSequence = 0;
 
+    // Doc-local counter for BlockQuoteRunId attr writes. Each parser
+    // `block_quote` node assigns a parser-local run id to its
+    // immediate children; the load path remaps those to stable
+    // doc-local values sourced from this counter. Reset by wipeD2State.
+    // Spec: docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md §3.
+    quint32 nextBlockQuoteRunId = 1;
+
     // Blocks whose kind or attrs changed post-load (Phase 8 touch-test).
     // Cleared in loadFromMarkdown; populated by d2SetBlockKind/d2SetBlockAttr.
     QSet<BlockId> touchedSinceLoad;
