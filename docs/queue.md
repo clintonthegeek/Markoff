@@ -898,9 +898,51 @@ arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
 8. **Enter at end of bullet under heading merges bullet content into
    the preceding heading (styled leaf).** Surfaced 2026-05-29 by
    user dogfood at the laptop, immediately after the #8.1 push
-   (`2a7d757`). **Status: filed for investigation; #8.1 NOT considered
-   fully closed until repro is bisected and either fixed or proven
-   pre-existing.**
+   (`2a7d757`).
+
+   > **✅ RESOLVED 2026-05-29 on branch `fix/styled-structural-key-8.8`
+   > (8 commits `fdb01a6..1d5dc99`).** Spec
+   > `docs/specs/2026-05-29-styled-structural-key-authority-design.md`;
+   > plan `docs/plans/2026-05-29-styled-structural-key-authority.md`.
+   >
+   > **Verified root cause (all three filed hypotheses below were wrong):**
+   > the styled leaf renders list items with `QTextList`, and Qt's native
+   > list-aware Enter/Backspace/Tab perform block-restructuring that emits
+   > large, content-rewriting `contentsChange` events the observe-and-infer
+   > `SourceTextDocumentBinding` misreads as flat-text structural edits →
+   > routes to `applyFlatEdit` at the wrong byte range → the bullet merges
+   > into the heading with a duplicated first char. Proven with a
+   > Markoff-free bare-`QTextEdit`+`QTextList` control and a falsifiable
+   > headless repro. **NOT a #8.1 regression** — #8.1 (blockquote) is
+   > exonerated; the window opened at `845fc0f` (per-item `QTextList`
+   > bullets, 2026-05-29 09:58), which predates the report's own bisect
+   > point `46643e7`. Reproduces with no blockquote, pure ASCII, single-
+   > line bullet → rules out H1/H2/H3.
+   >
+   > **Fix:** the styled `QTextEdit` (`StructuralTextEdit`) now intercepts
+   > structural keys in `keyPressEvent` BEFORE native editing and forwards
+   > them to `SourceTextDocumentBinding::handleStructuralKey` → a new pure
+   > core `Markoff::StructuralKeyHandler` (kind × key → `Cmd::*`), mirroring
+   > `markoff-live`'s proven pattern. Selections collapse-then-apply via the
+   > extracted `deleteSepRange`; Ctrl+Z/Y route to `undoD2/redoD2`. The
+   > model is authoritative for intercepted keys; the observer path is
+   > retired for them by event consumption (INVARIANTS §2/§3).
+   >
+   > **Second co-cause found + fixed during implementation:** with
+   > interception in place the repro still failed because
+   > `StyleApplier::inferKindFromPrefix` returned `Paragraph` for an empty
+   > buffer, so the kind-transition pass demoted the freshly-inserted empty
+   > `ListItem` back to a paragraph. Now empty buffers preserve the stored
+   > kind (`845fc0f`-era latent bug). Empty Heading/BlockQuote also now stay
+   > their kind until a prefix is typed (v0.2 demotion-on-typing concern,
+   > already acknowledged in `StyleApplier.cpp`).
+   >
+   > **Falsifiable tests:** `tst_structural_key_handler` (24 slots, core
+   > rules), `tst_binding_structural_key` (binding + selection collapse),
+   > and `tst_styled_dogfood_invariants` widget slots incl.
+   > `enter_at_end_of_bullet_under_heading_keeps_structure` (proven to fail
+   > with interception stubbed). **#8.1 closure stands.** Awaiting user
+   > dogfood signoff on the branch before merge.
 
    Exact repro on `master` (commit at session-end `2a7d757`):
    1. Open `docs/phase-c-status.md` in the `markoff-styled` widget.

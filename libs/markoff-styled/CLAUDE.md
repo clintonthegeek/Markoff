@@ -138,6 +138,38 @@ and reverse path (incremental prefix/suffix text-diff instead of
 The existing **D2-broken core APIs** caveat below still applies (`blockAt`
 / `blockByteRange` → `latestBlockRanges` not populated by D2 load path).
 
+## Structural-key authority (queue #8.8, 2026-05-29)
+
+The styled leaf **owns structural keys**. `Markoff::Styled::StructuralTextEdit`
+(a `QTextEdit` subclass, `src/StructuralTextEdit.{h,cpp}`) overrides
+`keyPressEvent` to intercept Enter/Return/Backspace/Delete/Tab/Backtab and
+Ctrl+Z/Y BEFORE Qt's native editing runs, forwarding them to
+`SourceTextDocumentBinding::handleStructuralKey()` → the pure core
+`Markoff::StructuralKeyHandler` (`markoff-core`), which decides (block kind ×
+key) and mutates the model via `Cmd::*`. Undo/redo route to
+`MarkoffDocument::undoD2/redoD2`. Everything else (typing, navigation,
+within-block selection edits) falls through to native `QTextEdit` + the
+binding's observe-and-infer path.
+
+**Why:** the leaf renders list items with `QTextList`. Qt's native list-aware
+Enter/Backspace/Tab restructure blocks and emit content-rewriting
+`contentsChange` events the observer binding cannot reverse-engineer — they
+corrupted the model (bullet merged into the preceding heading, queue #8.8).
+Consuming the structural key in `keyPressEvent` means Qt never touches the
+`QTextDocument` for it, so the observer path is never reached for those keys
+(authority is the model; INVARIANTS §2/§3). Mirrors `markoff-live`'s
+`LiveStructuralKeyHandler` pattern, adapted to a `QTextEdit`. Spec
+`docs/specs/2026-05-29-styled-structural-key-authority-design.md`, plan
+`docs/plans/2026-05-29-styled-structural-key-authority.md`.
+
+**Kind inference is promote-only.** `StyleApplier::inferKindFromPrefix`
+never DEMOTES a non-Paragraph kind to Paragraph — including on an empty
+buffer (a freshly-inserted empty `ListItem` from Enter must stay a
+`ListItem`). Kind changes flow from a positive prefix rule or an explicit
+handler op (e.g. empty-list-item Enter → exit to Paragraph), never from
+momentary emptiness. Consequence: an empty Heading/BlockQuote keeps its kind
+until a prefix is typed (demotion-on-typing is a v0.2 concern).
+
 ## Known v0 gaps (track in `docs/queue.md`)
 - **Delimiter visibility** is v0.1 work (`DocHighlighter` currently
   inert).
