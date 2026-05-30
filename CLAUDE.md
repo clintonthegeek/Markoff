@@ -1,5 +1,40 @@
 # Markoff
 
+> **2026-05-30 (later) — `markoff-styled` renders tables (read-only QTextTable) via a new opaque-block seam.**
+>
+> `BlockKind::Table` blocks now render as native Qt `QTextTable` grids in the
+> styled view — real borders, per-cell alignment from the `:---:` row, bold
+> header — **read-only** (edit a table by dropping to Source mode; the grid
+> re-renders). The table buffer stays canonical and is never mutated by
+> rendering, so save round-trips byte-for-byte.
+>
+> The enabling piece is a view-agnostic **opaque-block seam** in `markoff-core`:
+> `Markoff::OpaqueBlockRenderer` + `SourceTextDocumentBinding::setOpaqueRenderer`.
+> A `QTextTable` frame's character stream is not the block's flat bytes, so the
+> binding's normal whole-document reverse diff would clobber it; with a renderer
+> set, the reverse path switches to **region-based** reconciliation (frames
+> partition the document into text regions diffed independently; frames survive
+> edits to other blocks). **Inert when no renderer is set** — `markoff-source` is
+> byte-identical to before. Non-obvious fact found via diagnostic: Qt forces a
+> trailing empty block after a table frame, so the document is *not* 1:1 with
+> model blocks — hence region-based, not naive lockstep.
+>
+> `markoff-styled` side: `TableFrame` (`parsePipeTable`/`materializeTable`, ports
+> the deleted master-era `TableConverter`/`TableSerializer::parseAlignments`),
+> `StyledTableRenderer` (opaque only when the buffer parses — malformed tables
+> degrade to text), `FormatPass` skips `Table`, `StructuralTextEdit` swallows
+> edit keys inside a frame. Spec/plan under `docs/superpowers/`.
+>
+> **Tests:** +24 table slots green (`tst_binding_opaque_block` 5,
+> `tst_styled_table_{parse 6, materialize 4, render 4, readonly 5}`) +
+> `tst_table_block_loading` gains an empty-pipe-row split guard (8/8). **Baseline
+> 259/262** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'` — the 3
+> failures are the long-standing offscreen flakes only; no regression.
+> **Deferred (seam is the foundation; in `docs/queue.md`):** in-grid cell edit,
+> structural row/col ops, alignment via context menu, source-reveal in-place flip.
+>
+> ---
+>
 > **2026-05-30 — Test baseline cleaned (queue #8.6/#8.7 closed) + #9 empty-blockquote regression bisected & fixed.**
 >
 > Triaged the two flagged failing binaries, classifying every slot
