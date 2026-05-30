@@ -17,6 +17,8 @@ add_library(markoff_styled STATIC
     src/DocHighlighter.cpp
     src/LinkInteraction.h
     src/LinkInteraction.cpp
+    src/StructuralTextEdit.h
+    src/StructuralTextEdit.cpp
 )
 
 target_include_directories(markoff_styled

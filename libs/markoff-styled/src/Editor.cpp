@@ -4,6 +4,7 @@
 #include "DocHighlighter.h"
 #include "LinkInteraction.h"
 #include "StyleApplier.h"
+#include "StructuralTextEdit.h"
 
 #include <QHBoxLayout>
 #include <QScrollBar>
@@ -20,7 +21,7 @@ namespace Markoff::Styled {
 
 Editor::Editor(QWidget *parent)
     : Markoff::MarkdownView(parent),
-      m_editor(new QTextEdit(this)) {
+      m_editor(new StructuralTextEdit(this)) {
     auto *layout = new QHBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->addWidget(m_editor);
@@ -73,6 +74,7 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
                         c.setPosition(active, QTextCursor::KeepAnchor);
                     m_editor->setTextCursor(c);
                 });
+        m_editor->setBinding(m_binding);
     }
 
     // Connect captureScrollBeforeEdit BEFORE the binding wires its own
@@ -183,6 +185,8 @@ void Editor::setFromContext(const QString &c) {
 }
 
 // ---- Test helpers -------------------------------------------------------
+
+QTextEdit *Editor::textEdit() const { return m_editor; }
 
 quint64 Editor::styleApplierHashSkips() const {
     return m_styleApplier ? m_styleApplier->hashSkips() : 0;

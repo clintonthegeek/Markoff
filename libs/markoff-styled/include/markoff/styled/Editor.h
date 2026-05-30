@@ -21,6 +21,7 @@ namespace Markoff::Styled {
 class StyleApplier;
 class DocHighlighter;
 class LinkInteraction;
+class StructuralTextEdit;
 
 class MARKOFF_STYLED_EXPORT Editor : public Markoff::MarkdownView {
     Q_OBJECT
@@ -70,7 +71,7 @@ public:
     void  setFontScale(qreal);
 
     // Accessor for tests + internal helpers
-    QTextEdit *textEdit() const { return m_editor; }
+    QTextEdit *textEdit() const;
 
     /// Test-only accessor: number of hash-skipped blocks during the
     /// most recent StyleApplier restyle pass.
@@ -84,7 +85,7 @@ Q_SIGNALS:
     void fontScaleChanged();
 
 private:
-    QTextEdit                              *m_editor       = nullptr;
+    StructuralTextEdit                     *m_editor       = nullptr;
     QPointer<Markoff::Session>              m_session;
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
     StyleApplier                           *m_styleApplier = nullptr;
