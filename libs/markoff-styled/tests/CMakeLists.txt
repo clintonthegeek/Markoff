@@ -70,3 +70,10 @@ target_link_libraries(tst_styled_binding_caret
     PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
 set_tests_properties(tst_styled_binding_caret
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_document_renderer tst_styled_document_renderer.cpp)
+add_test(NAME tst_styled_document_renderer COMMAND tst_styled_document_renderer)
+target_link_libraries(tst_styled_document_renderer
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_document_renderer
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

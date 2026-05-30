@@ -15,6 +15,8 @@ add_library(markoff_styled STATIC
     src/StyleApplier.cpp
     src/FormatPass.h
     src/FormatPass.cpp
+    include/markoff/styled/DocumentRenderer.h
+    src/DocumentRenderer.cpp
     src/DocHighlighter.h
     src/DocHighlighter.cpp
     src/LinkInteraction.h
