@@ -1,5 +1,48 @@
 # Markoff
 
+> **2026-05-30 — Test baseline cleaned (queue #8.6/#8.7 closed) + #9 empty-blockquote regression bisected & fixed.**
+>
+> Triaged the two flagged failing binaries, classifying every slot
+> drift-vs-real-bug *before* touching code. 6 of 7 slot failures were
+> **drift** from the WP-unification single-`\n` separator + soft-break
+> collapse — test contracts realigned to the new shape
+> (`tst_styled_block_formats` 9/9, `tst_source_widget_format_ops` 16/16;
+> e.g. heading-block indices off the retired `\n\n` separator blocks,
+> list-item indent assertion moved to `QTextList` membership, stale
+> 2-byte qt-coords). 1 was a **real production bug** (`a0d8f5b`):
+> `Source::Editor::setHeadingLevel` hardcoded `SEP_LEN = 2` in a bespoke
+> block-walk while reading positions from the live single-`\n`
+> `toPlainText()`, underflowing `byteInBlock` for any heading below the
+> first block — Ctrl+heading on a non-first line mangled it (`Hello## `).
+> Fixed by reusing the shared `Detail::findBlockAtSepByte` (single
+> `SEP_LEN == 1`), deleting the duplicate constant.
+>
+> The triage surfaced an **undocumented, consistently-failing** live
+> regression (`tst_live_render_structural::blockquote_enter_on_empty_exits`,
+> not one of the known offscreen flakes). `git bisect` (automated via
+> `git bisect run`) pinned it to `4faa451` (#8.1 `block_quote` per-child
+> recursion): an empty quote `"> "` has only marker children, so the
+> walker emitted **zero** TLBs and `loadFromMarkdown("> \n")` produced 0
+> blocks. Fixed at the parser layer (`3b0ca22`,
+> `TreeSitterParser::collectTopLevelBlocks`): a `block_quote` that recurses
+> to nothing now emits one empty `Paragraph` TLB carrying the quote
+> depth/runId; the load side maps it to `BlockKind::BlockQuote` and strips
+> the `"> "` buffer to empty, round-tripping to `"> "`. Falsifiable tests
+> added at the parser + core layers (both proven failing pre-fix).
+>
+> **Test baseline (2026-05-30): 254/257** via
+> `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`. The 3 remaining
+> are the long-standing offscreen/window-manager-dependent live failures
+> only (`tst_live_render_e2_nav_shift_extend`,
+> `tst_live_render_focus_chokepoint_invariant`,
+> `tst_live_render_cursor_typing_invariant`) — every remaining failure is a
+> known, deferred item. **Still open (logged in `docs/queue.md`):** the
+> `SourceFindAdapter.cpp:104 += 2` latent find-highlight drift (same
+> "one flat-view changed separator width, a sibling didn't" bug class as
+> the `setHeadingLevel` fix); queue #8.3 source-view list-item markers.
+>
+> ---
+>
 > **2026-05-29 — WP unification dogfood arc closed for Paragraph + ListItem; flat-view spacing now em-based; bullets render.**
 >
 > Two dogfood-driven arcs landed on top of the WP unification baseline
