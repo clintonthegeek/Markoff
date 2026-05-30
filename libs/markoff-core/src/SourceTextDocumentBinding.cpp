@@ -304,6 +304,39 @@ void SourceTextDocumentBinding::emitCaret(int start, int active)
     Q_EMIT caretResolved(start, active);
 }
 
+std::optional<SourceTextDocumentBinding::PendingCaret>
+SourceTextDocumentBinding::deleteSepRange(quint32 sepLo, quint32 sepHi)
+{
+    Markoff::MarkoffDocument *doc = m_markoffDocument;
+    const auto hitStart = Markoff::Detail::findBlockAtSepByte(doc, sepLo, /*biasForward=*/false);
+    const auto hitEnd   = Markoff::Detail::findBlockAtSepByte(doc, sepHi, /*biasForward=*/true);
+    if (!hitStart || !hitEnd) return std::nullopt;
+
+    if (hitStart->blockId == hitEnd->blockId) {
+        // Within one block: plain delete.
+        UndoLog::Transaction t(doc->d2UndoLog());
+        doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock,
+                               hitEnd->byteInBlock - hitStart->byteInBlock,
+                               QByteArray(), t);
+        return PendingCaret{ hitStart->blockId, static_cast<int>(hitStart->byteInBlock) };
+    }
+
+    const auto allBlocks = doc->iterateBlocks();
+    const QByteArray endTail = doc->blockText(hitEnd->blockId)
+                                   .mid(static_cast<int>(hitEnd->byteInBlock));
+    UndoLog::Transaction t(doc->d2UndoLog());
+    const uint32_t startBlockSize =
+        static_cast<uint32_t>(doc->blockText(hitStart->blockId).size());
+    const uint32_t trimLen = startBlockSize - hitStart->byteInBlock;
+    if (trimLen > 0)
+        doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock, trimLen, QByteArray(), t);
+    for (int i = hitStart->blockIndex + 1; i < hitEnd->blockIndex; ++i)
+        doc->d2RemoveBlock(allBlocks[size_t(i)], t);
+    doc->d2RemoveBlock(hitEnd->blockId, t);
+    doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock, 0, endTail, t);
+    return PendingCaret{ hitStart->blockId, static_cast<int>(hitStart->byteInBlock) };
+}
+
 void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, int charsAdded)
 {
     // Cycle guard: when T13's reverse path is mid-application, don't loop back.
@@ -379,40 +412,15 @@ void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, 
     // For (a) (structural, embedded newline), route to applyFlatEdit via the
     // bias-aware no-sep translator which at least avoids the old clamping bug.
     if (!insertedHasNewline && hitStart && hitEnd && hitStart->blockId != hitEnd->blockId) {
-        // Cross-block merge without structural newlines: directly apply via
-        // d2 primitives (mirrors applyFlatEdit's cross-block path).
-        const auto allBlocks = doc->iterateBlocks();
-        const QByteArray endTail = doc->blockText(hitEnd->blockId)
-                                       .mid(static_cast<int>(hitEnd->byteInBlock));
-
-        UndoLog::Transaction t(doc->d2UndoLog());
-
-        // Trim start block from hitStart->byteInBlock to its end.
-        const uint32_t startBlockSize = static_cast<uint32_t>(
-            doc->blockText(hitStart->blockId).size());
-        const uint32_t trimLen = startBlockSize - hitStart->byteInBlock;
-        if (trimLen > 0) {
-            doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock,
-                                   trimLen, QByteArray(), t);
+        m_pendingCaret = deleteSepRange(sepStart, sepEnd);
+        // Insert the typed replacement text (if any) at the merge point, in a
+        // second transaction. Skipped when the range didn't resolve (nullopt).
+        if (!insertedUtf8.isEmpty() && m_pendingCaret) {
+            UndoLog::Transaction t(doc->d2UndoLog());
+            doc->d2ApplyBufferEdit(m_pendingCaret->block,
+                                   static_cast<uint32_t>(m_pendingCaret->offsetInBlock),
+                                   0, insertedUtf8, t);
         }
-
-        // Remove any intermediate blocks (between hitStart+1 and hitEnd-1).
-        for (int i = hitStart->blockIndex + 1; i < hitEnd->blockIndex; ++i)
-            doc->d2RemoveBlock(allBlocks[size_t(i)], t);
-
-        // Remove the end block (its surviving tail is stitched below).
-        doc->d2RemoveBlock(hitEnd->blockId, t);
-
-        // Append inserted content + end-block tail to start block.
-        const QByteArray toAppend = insertedUtf8 + endTail;
-        doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock,
-                               0, toAppend, t);
-
-        // B.3: post-merge caret lands at the merge point = end of the start
-        // block's surviving head (byteInBlock where the trim began).
-        m_pendingCaret = PendingCaret{ hitStart->blockId,
-                                       static_cast<int>(hitStart->byteInBlock) };
-
         m_applyingLocalEdit = false;
         return;
     }

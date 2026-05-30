@@ -85,6 +85,8 @@ private Q_SLOTS:
     void onSessionPrimarySelectionChanged(const Markoff::Selection &);
 
 private:
+    struct PendingCaret { Markoff::BlockId block; int offsetInBlock = 0; };
+
     /// Called whenever the document or text-document pointer changes.
     /// Disables QTextDocument's own undo stack and (re)wires its
     /// contentsChange signal.
@@ -109,6 +111,13 @@ private:
     /// returns) to a sep-view QTextDocument position.
     int noSepByteToSepViewPos(quint32 noSepByte) const;
 
+    /// Delete the sep-view byte range [sepLo, sepHi) from the model via
+    /// direct D2 primitives (the cross-block merge path). Returns the
+    /// collapsed caret as (block, byteInBlock), or nullopt if the range
+    /// does not resolve to real blocks. Shared by onQtContentsChange
+    /// (selection delete) and (later) handleStructuralKey.
+    std::optional<PendingCaret> deleteSepRange(quint32 sepLo, quint32 sepHi);
+
     /// Single emit point for the resolved caret.
     void emitCaret(int start, int active);
 
@@ -128,7 +137,6 @@ private:
     bool m_applyingLocalEdit      = false;  ///< T12: set during applyLocalEdit ingestion
     bool m_applyingRemoteEdit     = false;  ///< T13: set during reverse edit application
 
-    struct PendingCaret { Markoff::BlockId block; int offsetInBlock = 0; };
     /// Set by a structural op to declare the intended post-edit caret; resolved
     /// + emitted at the tail of onD2DocumentChanged once the reverse diff settles.
     std::optional<PendingCaret> m_pendingCaret;
