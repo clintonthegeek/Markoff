@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
 #include <QTextEdit>
 
-namespace Markoff { class SourceTextDocumentBinding; }
+#include <markoff/core/SourceTextDocumentBinding.h>  // complete type for QPointer member
 
 namespace Markoff::Styled {
 
@@ -23,7 +24,10 @@ protected:
     void keyPressEvent(QKeyEvent *e) override;
 
 private:
-    Markoff::SourceTextDocumentBinding *m_binding = nullptr;
+    // QPointer so a teardown-order race (the sibling binding destroyed before
+    // this widget) leaves m_binding null rather than dangling; the use-site
+    // `if (m_binding)` guard then stays safe.
+    QPointer<Markoff::SourceTextDocumentBinding> m_binding;
 };
 
 }  // namespace Markoff::Styled

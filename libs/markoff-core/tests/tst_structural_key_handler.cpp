@@ -130,6 +130,25 @@ private Q_SLOTS:
         QCOMPARE(r.caretByteInBlock, 0u);
     }
 
+    void enter_at_start_of_non_first_block_inserts_empty_para_before() {
+        // The idx > 0 branch of paragraphEnter's at-start path: insert via
+        // enterAtEnd(prevBlock), which lands a new empty para before `block`.
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+        const auto blocks = doc.iterateBlocks();
+        const BlockId bravo = blocks[1];
+        auto r = StructuralKeyHandler::handle(doc, bravo, Qt::Key_Return,
+                                              Qt::NoModifier, 0u);
+        QVERIFY(r.handled);
+        const auto after = doc.iterateBlocks();
+        QCOMPARE(int(after.size()), 3);
+        QCOMPARE(doc.blockText(after[0]), QByteArrayLiteral("Alpha"));
+        QCOMPARE(doc.blockText(after[1]), QByteArrayLiteral(""));     // new empty para
+        QCOMPARE(doc.blockText(after[2]), QByteArrayLiteral("Bravo"));
+        QCOMPARE(r.caretBlock, after[1]);   // caret in the new empty para
+        QCOMPARE(r.caretByteInBlock, 0u);
+    }
+
     void listitem_enter_at_end_inserts_item_after() {
         MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
