@@ -11,6 +11,7 @@
 #include <markoff/core/Origin.h>
 #include <markoff/core/Selection.h>
 #include <markoff/core/Session.h>
+#include <markoff/core/StructuralKeyHandler.h>
 #include <markoff/core/Detail/FlatBlockResolve.h>
 
 namespace Markoff {
@@ -335,6 +336,36 @@ SourceTextDocumentBinding::deleteSepRange(quint32 sepLo, quint32 sepHi)
     doc->d2RemoveBlock(hitEnd->blockId, t);
     doc->d2ApplyBufferEdit(hitStart->blockId, hitStart->byteInBlock, 0, endTail, t);
     return PendingCaret{ hitStart->blockId, static_cast<int>(hitStart->byteInBlock) };
+}
+
+bool SourceTextDocumentBinding::handleStructuralKey(int key, int modifiers,
+                                                    int qtPos, int qtAnchor)
+{
+    if (!m_markoffDocument || !m_textDocument) return false;
+    Markoff::MarkoffDocument *doc = m_markoffDocument;
+
+    // Selection collapse is added in a later task; for now require empty selection.
+    if (qtPos != qtAnchor) return false;
+
+    const QByteArray preBytes = doc->widgetFlatView();
+    const QString    preText  = QString::fromUtf8(preBytes);
+    const quint32 sepPos = qtPosToByteOffset(preText, qtPos);
+    const auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepPos, /*biasForward=*/false);
+    if (!hit) return false;
+
+    m_applyingLocalEdit = true;
+    Markoff::StructuralResult r =
+        Markoff::StructuralKeyHandler::handle(*doc, hit->blockId, key, modifiers,
+                                              hit->byteInBlock);
+    m_applyingLocalEdit = false;
+
+    if (!r.handled) return false;
+
+    // The handler returns the correct within-block caret byte for every key
+    // (including Tab, which preserves the caret offset), so no per-key special
+    // casing is needed here.
+    m_pendingCaret = PendingCaret{ r.caretBlock, static_cast<int>(r.caretByteInBlock) };
+    return true;
 }
 
 void SourceTextDocumentBinding::onQtContentsChange(int qtPos, int charsRemoved, int charsAdded)

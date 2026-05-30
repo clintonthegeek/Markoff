@@ -70,6 +70,14 @@ public:
     QTextDocument *textDocument() const;
     void           setTextDocument(QTextDocument *);
 
+    /// Apply a structural key (Enter/Backspace/Delete/Tab/Backtab) at the
+    /// given QTextDocument caret. `qtPos`/`qtAnchor` are sep-view UTF-16
+    /// positions; a non-empty selection (qtPos != qtAnchor) is handled in a
+    /// later task (currently returns false). Returns true if the key was a
+    /// handled structural op (caller should consume the key event); false →
+    /// caller falls through to native editing. Stages m_pendingCaret on success.
+    bool handleStructuralKey(int key, int modifiers, int qtPos, int qtAnchor);
+
 Q_SIGNALS:
     void markoffDocumentChanged();
     void sessionChanged();
