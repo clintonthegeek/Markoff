@@ -38,6 +38,23 @@
 > plan: `docs/plans/2026-05-17-theme-color-wiring.md`. 76/77 tests green
 > (1 pre-existing `tst_live_render_setext_e2e` failure).
 >
+> **2026-05-29 — `Markoff::Styled::DocumentRenderer` landed (Corbomite port
+> pressure).** Headless, read-only renderer factored from `StyleApplier` via a
+> new internal `FormatPass` (single source of truth for block/inline formats;
+> pure w.r.t. the model — `StyleApplier` remains the sole `Cmd::changeKind`
+> actor). T1 `renderInto(QTextDocument*, const MarkoffDocument*)` + raw-bytes
+> overload; T2 `idealHeight`/`paint` over T1. Spec
+> `docs/specs/2026-05-29-markoff-styled-document-renderer-design.md`, plan
+> `docs/plans/2026-05-29-markoff-styled-document-renderer.md`. New test
+> `tst_styled_document_renderer` (11 slots incl. golden-vs-widget + graceful
+> degradation) green; styled suite otherwise unchanged (the 3 pre-existing
+> `tst_styled_block_formats` drift failures remain — separate triage). No
+> Discipline Log entries: the refactor added no new timers / re-entrance
+> guards (the surviving `singleShot(0)` for deferred `changeKind` + scroll
+> restore are pre-existing, preserved verbatim). Follow-up: Corbomite re-pins
+> to a master commit containing this; embed-hook / block-kind coverage remain
+> out of scope (spec §5).
+>
 > **2026-05-10 — Item #1 implemented.** Spec
 > `docs/specs/2026-05-10-e2.6-theme-zoom-design.md`; plan
 > `docs/plans/2026-05-10-e2.6-theme-zoom.md`. Tag candidate

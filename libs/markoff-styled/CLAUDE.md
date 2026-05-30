@@ -16,11 +16,34 @@ alongside `markoff-source` and `markoff-live`. No QML, no KF6.
 - `Markoff::Styled::Editor` — `Markoff::MarkdownView` subclass composing
   a `QTextEdit`. Setters: `setDocument`, `setSession`, `setTheme`,
   `setLinkService`, `setFromContext`, `setFontScale`.
+- `Markoff::Styled::DocumentRenderer`
+  (`include/markoff/styled/DocumentRenderer.h`) — headless, read-only
+  renderer. `renderInto(QTextDocument*, const MarkoffDocument*)` + a
+  raw-bytes overload (T1); `idealHeight(width)` + `paint(painter, rect)`
+  (T2, convenience one-shots over T1). No widget, no cursor, no model
+  mutation (`const MarkoffDocument*`; `inferKind=false`). Unsupported
+  block kinds graceful-degrade to source text. **Canvas hot path:** own a
+  `QTextDocument`, `renderInto` it once on change, then paint/measure it
+  directly — the T2 one-shots rebuild a doc per call and are for
+  hover-popover sizing / single static renders, not per-frame repaint.
+  Spec `docs/specs/2026-05-29-markoff-styled-document-renderer-design.md`.
 
 ## Internal
+- `Markoff::Styled::FormatPass` (`src/FormatPass.{h,cpp}`) — **single source
+  of truth for block + inline formatting.** Walks `iterateBlocks()` and applies
+  `QTextBlockFormat` + `QTextCharFormat` from `blockText`/`blockKind`/
+  `inlineSpansFor`/`blockAttrs` to a `QTextDocument` (which must already hold
+  `widgetFlatView()` text). Both `StyleApplier` and `DocumentRenderer` call
+  `FormatPass::apply`. **PURE w.r.t. the model:** kind-inference is returned as
+  `KindSuggestion`s for the caller to act on — `FormatPass` issues no `Cmd::*`.
+  Optional hash-gating (nullable `BlockHashMap*`) and a `Result.structural`
+  flag drive `StyleApplier`'s incremental restyle + scroll-preserve.
 - `Markoff::Styled::StyleApplier` — subscribes to
-  `MarkoffDocument::d2DocumentChanged`; applies `QTextBlockFormat` +
-  `QTextCharFormat` from `iterateBlocks()` + `inlineSpansFor()`.
+  `MarkoffDocument::d2DocumentChanged`; a thin wrapper over `FormatPass::apply`
+  (passes its `m_blockHashes` gate + `inferKind=true`). Owns the incremental
+  state: hash gate, scroll capture/restore via the optional `QTextEdit`, and is
+  the **sole actor that issues `Cmd::changeKind`** (from `FormatPass`'s
+  suggestions, deferred via `QTimer::singleShot(0)`). INVARIANTS §2/§3.
 - `Markoff::Styled::DocHighlighter` — whole-doc `QSyntaxHighlighter`
   stub. v0 inert; v0.1 owns cursor-aware delimiter visibility.
 - `Markoff::Styled::LinkInteraction` — event-filter on the
