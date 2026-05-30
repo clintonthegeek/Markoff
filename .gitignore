@@ -10,6 +10,11 @@ compile_commands.json
 
 # Local scratch / debug dumps
 selection*.txt
+.scratch/
+wherewasi.txt
+
+# Claude Code machine-specific settings
+.claude/
 
 # Superpowers tooling cache
 .superpowers/
