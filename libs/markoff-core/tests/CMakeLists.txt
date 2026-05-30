@@ -172,6 +172,11 @@ add_test(NAME tst_binding_reverse COMMAND tst_binding_reverse)
 target_link_libraries(tst_binding_reverse PRIVATE Qt6::Test Qt6::Gui Qt6::Widgets markoff_core)
 set_tests_properties(tst_binding_reverse PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_binding_opaque_block tst_binding_opaque_block.cpp)
+add_test(NAME tst_binding_opaque_block COMMAND tst_binding_opaque_block)
+target_link_libraries(tst_binding_opaque_block PRIVATE Qt6::Test Qt6::Gui Qt6::Widgets markoff_core)
+set_tests_properties(tst_binding_opaque_block PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_subdirectory(d2)
 add_subdirectory(d5)
 

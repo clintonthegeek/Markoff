@@ -3,11 +3,14 @@
 
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextFrame>
+#include <QTextTable>
 
 #include <algorithm>
 #include <optional>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/OpaqueBlockRenderer.h>
 #include <markoff/core/Origin.h>
 #include <markoff/core/Selection.h>
 #include <markoff/core/Session.h>
@@ -209,6 +212,15 @@ void SourceTextDocumentBinding::setTextDocument(QTextDocument *td)
     rewireQtDocument();
 }
 
+void SourceTextDocumentBinding::setOpaqueRenderer(Markoff::OpaqueBlockRenderer *r)
+{
+    if (m_opaqueRenderer == r) return;
+    m_opaqueRenderer = r;
+    // Re-seed: if the renderer is set after the document was already loaded,
+    // the initial plain-text seed has no frames. Rebuild opaque-aware.
+    syncQtDocumentFromMarkoff();
+}
+
 void SourceTextDocumentBinding::rewireQtDocument()
 {
     if (m_textDocument) {
@@ -250,14 +262,45 @@ static quint32 sepViewToNoSepByteForEdit(const Markoff::MarkoffDocument *doc,
 void SourceTextDocumentBinding::syncQtDocumentFromMarkoff()
 {
     if (!m_subscribedDoc || !m_textDocument) return;
-    // Use the widget flat view (single '\n' between blocks) so the inner
-    // QTextDocument mirrors the WYSIWYG paragraph structure rather than the
-    // save form. `applyFlatEdit`'s coordinate space (no-separator) is
-    // translated in `onQtContentsChange`.
-    const QString text = QString::fromUtf8(m_subscribedDoc->widgetFlatView());
-    if (m_textDocument->toPlainText() == text) return;  // already in sync
+
+    if (!m_opaqueRenderer) {
+        // Original path (markoff-source): single setPlainText of the flat view
+        // (single '\n' between blocks) so the inner QTextDocument mirrors the
+        // WYSIWYG paragraph structure rather than the save form. `applyFlatEdit`'s
+        // coordinate space (no-separator) is translated in `onQtContentsChange`.
+        const QString text = QString::fromUtf8(m_subscribedDoc->widgetFlatView());
+        if (m_textDocument->toPlainText() == text) return;  // already in sync
+        m_applyingRemoteEdit = true;
+        m_textDocument->setPlainText(text);
+        m_applyingRemoteEdit = false;
+        return;
+    }
+
+    // Opaque-aware seed: build the document block-by-block so opaque blocks are
+    // frames from the start (atomic top-level elements → clean 1:1 lockstep
+    // between model blocks and QTextDocument top-level elements). A multi-line
+    // table block would otherwise become several plain QTextBlocks under a
+    // single setPlainText, breaking that lockstep.
     m_applyingRemoteEdit = true;
-    m_textDocument->setPlainText(text);
+    m_textDocument->clear();
+    m_opaqueSnapshots.clear();
+    QTextCursor c(m_textDocument);
+    const auto blocks = m_subscribedDoc->iterateBlocks();
+    for (size_t i = 0; i < blocks.size(); ++i) {
+        const Markoff::BlockId id = blocks[i];
+        const Markoff::BlockKind kind = m_subscribedDoc->blockKind(id);
+        if (m_opaqueRenderer->isOpaque(id, kind)) {
+            // insertTable splits the current block; the cursor lands inside the
+            // frame. After rendering, move to just after the frame so the next
+            // block's separator/text is inserted outside it.
+            m_opaqueRenderer->renderOpaque(c, id);
+            c.movePosition(QTextCursor::End);
+            m_opaqueSnapshots.insert(id.raw(), m_subscribedDoc->blockText(id));
+        } else {
+            if (i > 0) c.insertBlock();   // single-'\n' separator (WP unification)
+            c.insertText(QString::fromUtf8(m_subscribedDoc->blockText(id)));
+        }
+    }
     m_applyingRemoteEdit = false;
 }
 
@@ -502,47 +545,13 @@ void SourceTextDocumentBinding::onD2DocumentChanged()
     // Cycle guard: if WE just called applyFlatEdit (forward path), m_applyingLocalEdit
     // is true for synchronous echoes. d2DocumentChanged is debounced, so by the time
     // it fires m_applyingLocalEdit is already false; primary protection is the
-    // equality check below.
+    // equality check inside reverseSyncWholeDoc.
     if (m_applyingLocalEdit) return;
     if (!m_textDocument) return;
     if (!m_subscribedDoc) return;
 
-    const QString expected = QString::fromUtf8(m_subscribedDoc->widgetFlatView());
-    const QString actual   = m_textDocument->toPlainText();
-
-    if (actual != expected) {
-        // ── Incremental diff: longest common prefix + suffix ─────────────────────
-        // Replace only the minimal contiguous changed span via QTextCursor so that
-        // character formatting outside the changed region is preserved. This also
-        // means the view's cursor doesn't jump to the end on a remote edit.
-
-        // Longest common prefix.
-        int p = 0;
-        const int minLen = std::min(actual.size(), expected.size());
-        while (p < minLen && actual.at(p) == expected.at(p)) ++p;
-        // Don't split a surrogate pair at the prefix boundary.
-        if (p > 0 && p < actual.size() && actual.at(p - 1).isHighSurrogate()) --p;
-
-        // Longest common suffix, not overlapping the prefix.
-        int s = 0;
-        const int maxS = minLen - p;
-        while (s < maxS
-               && actual.at(actual.size() - 1 - s) == expected.at(expected.size() - 1 - s))
-            ++s;
-        // Don't split a surrogate pair at the suffix boundary.
-        if (s > 0 && actual.at(actual.size() - s).isLowSurrogate()) --s;
-
-        const int removeFrom = p;
-        const int removeTo   = actual.size() - s;   // exclusive
-        const QString middle = expected.mid(p, expected.size() - s - p);
-
-        m_applyingRemoteEdit = true;
-        QTextCursor c(m_textDocument);
-        c.setPosition(removeFrom);
-        c.setPosition(removeTo, QTextCursor::KeepAnchor);
-        c.insertText(middle);
-        m_applyingRemoteEdit = false;
-    }
+    if (m_opaqueRenderer) reverseSyncPerBlock();
+    else                  reverseSyncWholeDoc();
 
     // ── Re-assert the caret declared by a structural op ─────────────────────
     // The QTextDocument is now settled. No singleShot: d2DocumentChanged is
@@ -553,6 +562,171 @@ void SourceTextDocumentBinding::onD2DocumentChanged()
         emitCaret(pos, pos);
         m_pendingCaret.reset();
     }
+}
+
+void SourceTextDocumentBinding::applyBoundedTextDiff(int regionStart,
+                                                     const QString &actual,
+                                                     const QString &expected)
+{
+    if (actual == expected) return;
+
+    // ── Incremental diff: longest common prefix + suffix ─────────────────────
+    // Replace only the minimal contiguous changed span via QTextCursor so that
+    // character formatting outside the changed region is preserved and the
+    // view's cursor doesn't jump to the end on a remote edit.
+
+    // Longest common prefix.
+    int p = 0;
+    const int minLen = std::min(actual.size(), expected.size());
+    while (p < minLen && actual.at(p) == expected.at(p)) ++p;
+    // Don't split a surrogate pair at the prefix boundary.
+    if (p > 0 && p < actual.size() && actual.at(p - 1).isHighSurrogate()) --p;
+
+    // Longest common suffix, not overlapping the prefix.
+    int s = 0;
+    const int maxS = minLen - p;
+    while (s < maxS
+           && actual.at(actual.size() - 1 - s) == expected.at(expected.size() - 1 - s))
+        ++s;
+    // Don't split a surrogate pair at the suffix boundary.
+    if (s > 0 && actual.at(actual.size() - s).isLowSurrogate()) --s;
+
+    const int removeFrom = regionStart + p;
+    const int removeTo   = regionStart + (actual.size() - s);   // exclusive
+    const QString middle = expected.mid(p, expected.size() - s - p);
+
+    QTextCursor c(m_textDocument);
+    c.setPosition(removeFrom);
+    c.setPosition(removeTo, QTextCursor::KeepAnchor);
+    c.insertText(middle);
+}
+
+void SourceTextDocumentBinding::reverseSyncWholeDoc()
+{
+    const QString expected = QString::fromUtf8(m_subscribedDoc->widgetFlatView());
+    const QString actual   = m_textDocument->toPlainText();
+    if (actual == expected) return;
+    m_applyingRemoteEdit = true;
+    applyBoundedTextDiff(0, actual, expected);
+    m_applyingRemoteEdit = false;
+}
+
+void SourceTextDocumentBinding::reverseSyncPerBlock()
+{
+    // Region-based reconciliation. Opaque frames partition both the model
+    // (opaque blocks split the block list) and the QTextDocument (table frames
+    // split the top-level elements) into the SAME number of text regions. When
+    // the ordered frame set matches and every opaque buffer is unchanged, we
+    // diff each text region independently and leave the frames untouched — so a
+    // frame survives an edit to any other block. Otherwise we re-seed.
+
+    // ── Model side: ordered opaque ids + expected text per region ────────────
+    const auto blocks = m_subscribedDoc->iterateBlocks();
+    QList<quint64> modelOpaqueIds;
+    QStringList    modelRegions;          // size == modelOpaqueIds.size() + 1
+    {
+        QString cur;
+        bool started = false;
+        auto flush = [&]() { modelRegions.append(cur); cur.clear(); started = false; };
+        for (Markoff::BlockId id : blocks) {
+            const Markoff::BlockKind kind = m_subscribedDoc->blockKind(id);
+            if (m_opaqueRenderer->isOpaque(id, kind)) {
+                flush();
+                modelOpaqueIds.append(id.raw());
+            } else {
+                if (started) cur += QLatin1Char('\n');
+                cur += QString::fromUtf8(m_subscribedDoc->blockText(id));
+                started = true;
+            }
+        }
+        flush();
+    }
+
+    // ── Doc side: ordered frame keys + region [start,end) ranges ─────────────
+    struct DocRegion { int start = -1; int end = -1; QString text; };
+    QList<quint64>   docFrameKeys;
+    QList<DocRegion> docRegions;
+    {
+        DocRegion rgn;
+        QTextBlock lastBlock;
+        auto closeRegion = [&]() {
+            if (rgn.start >= 0 && lastBlock.isValid()) {
+                QTextCursor end(lastBlock);
+                end.movePosition(QTextCursor::EndOfBlock);
+                rgn.end = end.position();
+            } else {
+                rgn.start = rgn.end = -1;   // empty region (e.g. adjacent frames)
+            }
+            docRegions.append(rgn);
+            rgn = DocRegion();
+            lastBlock = QTextBlock();
+        };
+        QTextFrame *root = m_textDocument->rootFrame();
+        for (auto it = root->begin(); it != root->end(); ++it) {
+            if (QTextFrame *cf = it.currentFrame()) {
+                if (qobject_cast<QTextTable *>(cf)) {
+                    closeRegion();
+                    docFrameKeys.append(cf->frameFormat()
+                        .stringProperty(OpaqueBlockKeyProperty).toULongLong());
+                    continue;
+                }
+            }
+            const QTextBlock b = it.currentBlock();
+            if (!b.isValid()) continue;
+            if (rgn.start < 0) { rgn.start = b.position(); }
+            else               { rgn.text += QLatin1Char('\n'); }
+            rgn.text += b.text();
+            lastBlock = b;
+        }
+        closeRegion();
+    }
+
+    // ── Decide: stable structure → region diff; else full re-seed ────────────
+    bool stable = (docFrameKeys == modelOpaqueIds)
+               && (docRegions.size() == modelRegions.size());
+    if (stable) {
+        for (quint64 key : modelOpaqueIds) {
+            // Find the model block for this key to compare its buffer snapshot.
+            for (Markoff::BlockId id : blocks) {
+                if (id.raw() != key) continue;
+                if (m_opaqueSnapshots.value(key) != m_subscribedDoc->blockText(id))
+                    stable = false;
+                break;
+            }
+            if (!stable) break;
+        }
+    }
+
+    if (!stable) {
+        syncQtDocumentFromMarkoff();   // full opaque-aware re-seed (+snapshots)
+        return;
+    }
+
+    // ── Region-by-region text diff, applied back-to-front so earlier regions'
+    //    captured [start,end) stay valid as later regions are edited. ─────────
+    m_applyingRemoteEdit = true;
+    for (int k = docRegions.size() - 1; k >= 0; --k) {
+        const DocRegion &dr = docRegions[k];
+        const QString &expected = modelRegions[k];
+        if (dr.start < 0) {
+            // Empty doc region: nothing to diff against. If the model expects
+            // content here, the structure genuinely differs → re-seed instead.
+            if (!expected.isEmpty()) {
+                m_applyingRemoteEdit = false;
+                syncQtDocumentFromMarkoff();
+                return;
+            }
+            continue;
+        }
+        QTextCursor sel(m_textDocument);
+        sel.setPosition(dr.start);
+        sel.setPosition(dr.end, QTextCursor::KeepAnchor);
+        // selectedText() uses U+2029 between blocks; normalise to '\n'.
+        const QString actual =
+            sel.selectedText().replace(QChar(0x2029), QLatin1Char('\n'));
+        applyBoundedTextDiff(dr.start, actual, expected);
+    }
+    m_applyingRemoteEdit = false;
 }
 
 }  // namespace Markoff

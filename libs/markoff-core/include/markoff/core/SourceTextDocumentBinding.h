@@ -4,6 +4,7 @@
 #include <optional>
 
 #include <QByteArray>
+#include <QHash>
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -15,6 +16,8 @@
 #include <markoff/core/Session.h>
 
 namespace Markoff {
+
+class OpaqueBlockRenderer;
 
 /// Bidirectional bridge between a Qt `QTextDocument` (the buffer behind a
 /// QML `TextArea` or a widget-side `QPlainTextEdit`) and a foundation
@@ -69,6 +72,11 @@ public:
 
     QTextDocument *textDocument() const;
     void           setTextDocument(QTextDocument *);
+
+    /// Register a renderer for opaque blocks. nullptr (default) → the binding
+    /// uses its original whole-document reverse diff (markoff-source path).
+    /// Setting a renderer re-seeds the document opaque-aware.
+    void setOpaqueRenderer(Markoff::OpaqueBlockRenderer *r);
 
     /// Apply a structural key (Enter/Backspace/Delete/Tab/Backtab) at the
     /// given QTextDocument caret. `qtPos`/`qtAnchor` are sep-view UTF-16
@@ -138,6 +146,18 @@ private:
     /// subscribed.
     void syncQtDocumentFromMarkoff();
 
+    /// Reverse-sync variants. Whole-doc is the original prefix/suffix text diff
+    /// (used when no opaque renderer is set). Per-block reconciles the text
+    /// regions *between* opaque frames, leaving unchanged frames in place.
+    void reverseSyncWholeDoc();
+    void reverseSyncPerBlock();
+
+    /// Apply the minimal prefix/suffix diff that turns the document text at
+    /// [regionStart, regionStart + actual.size()) into `expected`. Positions
+    /// are document-absolute. Caller batches m_applyingRemoteEdit.
+    void applyBoundedTextDiff(int regionStart, const QString &actual,
+                              const QString &expected);
+
     Markoff::MarkoffDocument *m_markoffDocument = nullptr;
     Markoff::Session         *m_session         = nullptr;
     QTextDocument            *m_textDocument    = nullptr;
@@ -147,6 +167,12 @@ private:
 
     bool m_applyingLocalEdit      = false;  ///< T12: set during applyLocalEdit ingestion
     bool m_applyingRemoteEdit     = false;  ///< T13: set during reverse edit application
+
+    Markoff::OpaqueBlockRenderer *m_opaqueRenderer = nullptr;
+    /// Snapshot of each opaque block's buffer at last render, keyed by
+    /// BlockId.raw(). reverseSyncPerBlock re-renders a frame only when its
+    /// buffer diverges from this snapshot (or the frame set changes).
+    QHash<quint64, QByteArray> m_opaqueSnapshots;
 
     /// Set by a structural op to declare the intended post-edit caret; resolved
     /// + emitted at the tail of onD2DocumentChanged once the reverse diff settles.

@@ -22,6 +22,7 @@ private Q_SLOTS:
     void surrounding_paragraphs_are_their_own_blocks();
     void empty_doc_has_no_tables();
     void table_only_doc_has_one_table_block();
+    void blank_body_row_does_not_split_table();
 };
 
 namespace {
@@ -141,6 +142,28 @@ void TstTableBlockLoading::table_only_doc_has_one_table_block()
     // depending on parser tolerance; the load-bearing assertion is that the
     // table itself becomes one Table block.
     QVERIFY(total >= 1);
+}
+
+// Inherited landmine (2026-05-30): a master-era tree-sitter grammar bug once
+// accepted a blank pipe row as a delimiter cell, splitting one table into two
+// pipe_table nodes (caused data loss in the deleted QTextTable leaf). Guard
+// that the current parser keeps a table with a blank-ish body row as ONE block.
+// Cited by docs/superpowers/specs/2026-05-30-styled-table-rendering-design.md §1.2.
+void TstTableBlockLoading::blank_body_row_does_not_split_table()
+{
+    MarkoffDocument doc(1);
+    doc.loadFromMarkdown(QByteArrayLiteral(
+        "| A | B |\n"
+        "|---|---|\n"
+        "|   |   |\n"
+        "| 1 | 2 |"
+    ));
+    int tableCount = 0;
+    for (BlockId id : doc.iterateBlocks()) {
+        if (doc.blockKind(id) == BlockKind::Table)
+            ++tableCount;
+    }
+    QCOMPARE(tableCount, 1);
 }
 
 QTEST_MAIN(TstTableBlockLoading)
