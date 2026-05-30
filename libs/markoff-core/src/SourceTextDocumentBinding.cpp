@@ -344,11 +344,41 @@ bool SourceTextDocumentBinding::handleStructuralKey(int key, int modifiers,
     if (!m_markoffDocument || !m_textDocument) return false;
     Markoff::MarkoffDocument *doc = m_markoffDocument;
 
-    // Selection collapse is added in a later task; for now require empty selection.
-    if (qtPos != qtAnchor) return false;
-
     const QByteArray preBytes = doc->widgetFlatView();
     const QString    preText  = QString::fromUtf8(preBytes);
+
+    // ── Non-empty selection: collapse then apply ─────────────────────────
+    // Delete the selected range through the model (reusing the cross-block
+    // delete primitive), collapse the caret to the join point, then dispatch
+    // the structural op at that point. This avoids ever letting Qt's native
+    // editing restructure a QTextList across the selection.
+    if (qtPos != qtAnchor) {
+        const int lo = std::min(qtPos, qtAnchor);
+        const int hi = std::max(qtPos, qtAnchor);
+        const quint32 sepLo = qtPosToByteOffset(preText, lo);
+        const quint32 sepHi = qtPosToByteOffset(preText, hi);
+
+        m_applyingLocalEdit = true;
+        std::optional<PendingCaret> collapse = deleteSepRange(sepLo, sepHi);
+        m_applyingLocalEdit = false;
+        if (!collapse) return false;
+
+        m_applyingLocalEdit = true;
+        Markoff::StructuralResult r = Markoff::StructuralKeyHandler::handle(
+            *doc, collapse->block, key, modifiers,
+            static_cast<uint32_t>(collapse->offsetInBlock));
+        m_applyingLocalEdit = false;
+
+        if (!r.handled) {
+            // Selection was still deleted; land the caret at the collapse point.
+            m_pendingCaret = collapse;
+            return true;
+        }
+        m_pendingCaret = PendingCaret{ r.caretBlock, static_cast<int>(r.caretByteInBlock) };
+        return true;
+    }
+
+    // ── Empty selection ──────────────────────────────────────────────────
     const quint32 sepPos = qtPosToByteOffset(preText, qtPos);
     const auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepPos, /*biasForward=*/false);
     if (!hit) return false;
