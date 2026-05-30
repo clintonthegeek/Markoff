@@ -7,6 +7,7 @@
 #include <QTextEdit>
 #include <QTextList>
 
+#include <markoff/core/AttrNames.h>
 #include <markoff/core/BlockId.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -508,6 +509,159 @@ private Q_SLOTS:
         QVERIFY2(bf.leftMargin() > 0.0,
                  qPrintable(QStringLiteral("heading-in-quote leftMargin should be > 0, got %1")
                                 .arg(bf.leftMargin())));
+    }
+
+    // ── Queue #8.8: Enter at end of a bullet under a heading must NOT merge
+    //    the bullet into the heading. FALSIFIABLE — fails on the pre-fix path
+    //    (heading gains the bullet body + a duplicated first char). ──
+    void enter_at_end_of_bullet_under_heading_keeps_structure() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral(
+            "### C1 seam\n\n- Replace the option with injection.\n- Retire the shim.\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(600, 400);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+        QTest::qWait(50);
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        int pos = -1;
+        for (QTextBlock b = qdoc->begin(); b.isValid(); b = b.next())
+            if (b.text().startsWith(QStringLiteral("Replace the"))) {
+                pos = b.position() + b.text().length(); break;
+            }
+        QVERIFY(pos >= 0);
+        QTextCursor c(qdoc);
+        c.setPosition(pos);
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Return);
+        QTest::qWait(100);
+
+        const auto blocks = doc.iterateBlocks();
+        // Heading text unchanged (no bullet body sucked in, no duplicated char).
+        QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("### C1 seam"));
+        // First bullet intact.
+        QCOMPARE(doc.blockText(blocks[1]),
+                 QByteArrayLiteral("Replace the option with injection."));
+        // New empty ListItem inserted between the two bullets.
+        QCOMPARE(doc.blockKind(blocks[2]), Markoff::BlockKind::ListItem);
+        QCOMPARE(doc.blockText(blocks[2]), QByteArrayLiteral(""));
+        // QTextDocument stayed in sync with the model.
+        QCOMPARE(qdoc->toPlainText(), QString::fromUtf8(doc.widgetFlatView()));
+    }
+
+    void tab_in_list_indents_via_widget() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+        QTest::qWait(50);
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        QTextBlock b1 = qdoc->findBlockByNumber(1);  // "two"
+        QVERIFY(b1.isValid());
+        QTextCursor c(qdoc);
+        c.setPosition(b1.position());
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Tab);
+        QTest::qWait(100);
+
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(int(blocks.size()), 2);  // Tab indents, doesn't add/remove blocks
+        const auto attrs = doc.blockAttrs(blocks[1]);
+        auto it = attrs.find(Markoff::AttrNames::IndentLevel);
+        QVERIFY(it != attrs.end());
+        QVERIFY(std::holds_alternative<int>(*it));
+        QCOMPARE(std::get<int>(*it), 1);
+    }
+
+    void backspace_at_list_start_merges_via_widget() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+        QTest::qWait(50);
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        QTextBlock b1 = qdoc->findBlockByNumber(1);  // "two"
+        QTextCursor c(qdoc);
+        c.setPosition(b1.position());  // start of "two"
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Backspace);
+        QTest::qWait(100);
+
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(int(blocks.size()), 1);  // merged
+        QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("onetwo"));
+        // The merged block keeps ListItem kind (backspaceMerge doesn't change kind).
+        QCOMPARE(doc.blockKind(blocks[0]), Markoff::BlockKind::ListItem);
+    }
+
+    void ctrl_z_undoes_structural_edit_via_widget() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Alpha"));
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+        QTest::qWait(50);
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        QTextCursor c(qdoc);
+        c.setPosition(5);  // end of "Alpha"
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Return);  // -> 2 blocks
+        QTest::qWait(100);
+        QCOMPARE(int(doc.iterateBlocks().size()), 2);
+
+        // Ctrl+Z routes to undoD2 via StructuralTextEdit::keyPressEvent.
+        QTest::keyClick(e.textEdit(), Qt::Key_Z, Qt::ControlModifier);
+        QTest::qWait(100);
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(int(blocks.size()), 1);  // structural edit undone
+        QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("Alpha"));
+    }
+
+    void selection_enter_collapses_via_widget() {
+        Markoff::Styled::Editor e;
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("oneXXXtwo"));  // single paragraph
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+        QTest::qWait(50);
+
+        QTextDocument *qdoc = e.textEdit()->document();
+        QTextCursor c(qdoc);
+        c.setPosition(3);            // after "one"
+        c.setPosition(6, QTextCursor::KeepAnchor);  // select "XXX"
+        e.textEdit()->setTextCursor(c);
+        QTest::keyClick(e.textEdit(), Qt::Key_Return);  // delete "XXX" then split
+        QTest::qWait(100);
+
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(int(blocks.size()), 2);
+        QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("one"));
+        QCOMPARE(doc.blockText(blocks[1]), QByteArrayLiteral("two"));
     }
 };
 

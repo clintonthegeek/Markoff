@@ -271,7 +271,15 @@ quint64 computeBlockHash(Markoff::BlockKind kind,
 
 Markoff::BlockKind inferKindFromPrefix(const QByteArray &text,
                                        Markoff::BlockKind currentKind) {
-    if (text.isEmpty()) return Markoff::BlockKind::Paragraph;
+    // An empty buffer cannot be positively identified by prefix rules, so
+    // preserve the stored kind (same conservative fallback as the bottom of
+    // this function). Never DEMOTE a non-Paragraph kind to Paragraph just
+    // because the buffer is momentarily empty — e.g. an empty ListItem freshly
+    // inserted by Enter must stay a ListItem until the user types a different
+    // prefix or an explicit handler op (StructuralKeyHandler's empty-item
+    // Enter→exit) changes it. As with the heading case below, an empty Heading
+    // / BlockQuote also stays its kind until a prefix is typed (v0.2 concern).
+    if (text.isEmpty()) return currentKind;
 
     // Heading: 1-6 '#' followed by space, or 1-6 '#' followed by EOF.
     int hashCount = 0;
