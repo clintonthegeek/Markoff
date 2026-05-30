@@ -3,6 +3,7 @@
 
 #include <QKeyEvent>
 #include <QTextCursor>
+#include <QTextTable>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
@@ -12,6 +13,34 @@ namespace Markoff::Styled {
 StructuralTextEdit::StructuralTextEdit(QWidget *parent) : QTextEdit(parent) {}
 
 void StructuralTextEdit::keyPressEvent(QKeyEvent *e) {
+    // Read-only tables: a table block is rendered as an opaque QTextTable frame.
+    // The styled view does not edit tables in place — edit them in Source mode.
+    // When the caret is inside a frame, let navigation/selection keys through
+    // (so the caret can move across and out of the table) but swallow anything
+    // that would mutate the frame's text.
+    if (textCursor().currentTable() != nullptr) {
+        switch (e->key()) {
+            case Qt::Key_Left:    case Qt::Key_Right:
+            case Qt::Key_Up:      case Qt::Key_Down:
+            case Qt::Key_Home:    case Qt::Key_End:
+            case Qt::Key_PageUp:  case Qt::Key_PageDown:
+            case Qt::Key_Tab:     case Qt::Key_Backtab:
+                // Navigation (incl. Tab cell-to-cell). Native handling moves the
+                // caret without editing.
+                QTextEdit::keyPressEvent(e);
+                return;
+            default:
+                // Allow copy/select-all (read affordances); swallow the rest.
+                if ((e->modifiers() & Qt::ControlModifier)
+                    && (e->key() == Qt::Key_C || e->key() == Qt::Key_A)) {
+                    QTextEdit::keyPressEvent(e);
+                    return;
+                }
+                e->accept();
+                return;
+        }
+    }
+
     if (m_binding) {
         const int key = e->key();
         const auto mods = e->modifiers();

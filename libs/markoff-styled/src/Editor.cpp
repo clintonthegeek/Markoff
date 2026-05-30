@@ -5,6 +5,7 @@
 #include "LinkInteraction.h"
 #include "StyleApplier.h"
 #include "StructuralTextEdit.h"
+#include "StyledTableRenderer.h"
 
 #include <QHBoxLayout>
 #include <QScrollBar>
@@ -76,6 +77,17 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
                 });
         m_editor->setBinding(m_binding);
     }
+
+    // Table blocks render as opaque QTextTable frames (read-only). The renderer
+    // is registered on the binding so its reverse path materializes + preserves
+    // the frames; FormatPass skips Table blocks. nullptr doc → renderer points
+    // at nullptr and reports nothing opaque (binding falls back to plain text).
+    if (!m_tableRenderer) {
+        m_tableRenderer = std::make_unique<StyledTableRenderer>();
+        m_binding->setOpaqueRenderer(m_tableRenderer.get());
+    }
+    m_tableRenderer->setMarkoffDocument(doc);
+    m_tableRenderer->setFontScale(m_fontScale);
 
     // Connect captureScrollBeforeEdit BEFORE the binding wires its own
     // onD2DocumentChanged. Connection order guarantees we fire first

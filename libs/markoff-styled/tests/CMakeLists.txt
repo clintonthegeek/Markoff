@@ -77,3 +77,31 @@ target_link_libraries(tst_styled_document_renderer
     PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
 set_tests_properties(tst_styled_document_renderer
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_table_parse tst_styled_table_parse.cpp)
+add_test(NAME tst_styled_table_parse COMMAND tst_styled_table_parse)
+target_link_libraries(tst_styled_table_parse
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_table_parse
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_table_materialize tst_styled_table_materialize.cpp)
+add_test(NAME tst_styled_table_materialize COMMAND tst_styled_table_materialize)
+target_link_libraries(tst_styled_table_materialize
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_table_materialize
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_table_render tst_styled_table_render.cpp)
+add_test(NAME tst_styled_table_render COMMAND tst_styled_table_render)
+target_link_libraries(tst_styled_table_render
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_table_render
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_styled_table_readonly tst_styled_table_readonly.cpp)
+add_test(NAME tst_styled_table_readonly COMMAND tst_styled_table_readonly)
+target_link_libraries(tst_styled_table_readonly
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_table_readonly
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

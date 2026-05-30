@@ -522,6 +522,12 @@ Result apply(QTextDocument *target,
                         applyListItem(blkCursor, depth, markerStyle, checked, fontScale);
                     } else if (kind == Markoff::BlockKind::HorizontalRule) {
                         applyHorizontalRule(blkCursor, fontScale);
+                    } else if (kind == Markoff::BlockKind::Table) {
+                        // Rendered as an opaque QTextTable frame by the binding's
+                        // OpaqueBlockRenderer (styled leaf). FormatPass must not
+                        // touch the frame's block format or apply inline spans —
+                        // the frame is self-formatting. Skipping leaves the
+                        // walk's qblk advance to the loop tail.
                     } else {
                         applyParagraph(blkCursor, fontScale);
                     }
@@ -548,16 +554,21 @@ Result apply(QTextDocument *target,
                 // Apply inline char formats for this block.
                 // docLen - 1: QTextDocument always has a trailing paragraph
                 // separator that must not be selected.
-                const int docLen = target->characterCount() - 1;
-                for (const Markoff::SourceSpan &span : spans) {
-                    if (span.charLength <= 0) continue;
-                    const int spanStart = startQt + span.charOffset;
-                    const int spanEnd   = startQt + span.charOffset + span.charLength;
-                    if (spanStart >= docLen) continue;
-                    QTextCursor c(target);
-                    c.setPosition(spanStart);
-                    c.setPosition(qMin(spanEnd, docLen), QTextCursor::KeepAnchor);
-                    c.mergeCharFormat(charFormatForSpan(span, fontScale));
+                // Table blocks are rendered as opaque QTextTable frames by the
+                // binding's OpaqueBlockRenderer; their startQt/charOffset spans
+                // do not map into the frame's cell structure, so skip them.
+                if (kind != Markoff::BlockKind::Table) {
+                    const int docLen = target->characterCount() - 1;
+                    for (const Markoff::SourceSpan &span : spans) {
+                        if (span.charLength <= 0) continue;
+                        const int spanStart = startQt + span.charOffset;
+                        const int spanEnd   = startQt + span.charOffset + span.charLength;
+                        if (spanStart >= docLen) continue;
+                        QTextCursor c(target);
+                        c.setPosition(spanStart);
+                        c.setPosition(qMin(spanEnd, docLen), QTextCursor::KeepAnchor);
+                        c.mergeCharFormat(charFormatForSpan(span, fontScale));
+                    }
                 }
             }  // end !hashSkipped format pass
 

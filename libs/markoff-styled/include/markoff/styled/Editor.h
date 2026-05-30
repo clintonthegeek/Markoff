@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <memory>
+
 #include <QPointer>
 #include <QTextEdit>
 
@@ -22,6 +24,7 @@ class StyleApplier;
 class DocHighlighter;
 class LinkInteraction;
 class StructuralTextEdit;
+class StyledTableRenderer;
 
 class MARKOFF_STYLED_EXPORT Editor : public Markoff::MarkdownView {
     Q_OBJECT
@@ -91,6 +94,9 @@ private:
     StyleApplier                           *m_styleApplier = nullptr;
     DocHighlighter                         *m_highlighter  = nullptr;
     LinkInteraction                        *m_linkInteract = nullptr;
+    // Non-QObject; owned via unique_ptr (Editor's dtor is out-of-line in the
+    // .cpp where StyledTableRenderer is a complete type).
+    std::unique_ptr<StyledTableRenderer>    m_tableRenderer;
     Markoff::Theme                          m_theme;
     Markoff::LinkService                   *m_linkService  = nullptr;
     mutable Markoff::DefaultLinkService    *m_defaultLink  = nullptr;
