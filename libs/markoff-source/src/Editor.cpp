@@ -497,26 +497,20 @@ void Editor::setHeadingLevel(int level) {
     const quint32 lineStartSep =
         Markoff::SourceTextDocumentBinding::qtPosToByteOffset(text, lineStartQt);
 
-    const auto blocks = doc->iterateBlocks();
-    if (blocks.empty()) return;
-    constexpr quint32 SEP_LEN = 2;  // "\n\n"
-    quint32 sepCursor = 0;
-    Markoff::BlockId targetBlock;
-    quint32 byteInBlock = 0;
-    bool found = false;
-    for (size_t i = 0; i < blocks.size(); ++i) {
-        const quint32 sz = static_cast<quint32>(doc->blockText(blocks[i]).size());
-        const quint32 blkEnd = sepCursor + sz;
-        if (lineStartSep <= blkEnd) {
-            targetBlock  = blocks[i];
-            byteInBlock  = lineStartSep - sepCursor;
-            found = true;
-            break;
-        }
-        sepCursor = blkEnd;
-        if (i + 1 < blocks.size()) sepCursor += SEP_LEN;
-    }
-    if (!found) return;
+    // Resolve the line-start sep-byte to its model block via the shared helper,
+    // which tracks the WP-unification single-'\n' separator (SEP_LEN == 1). The
+    // bespoke walk this replaced hardcoded SEP_LEN == 2 ("\n\n"); once
+    // widgetFlatView() went single-'\n', that walk over-advanced its cursor by
+    // one byte per preceding boundary, underflowing byteInBlock (quint32 wrap)
+    // for any heading below the first block — so the prefix landed at
+    // end-of-block ("Hello## ") instead of the line start. biasForward == false
+    // keeps an empty line's own (zero-length) block as the target rather than
+    // skipping forward to the next block.
+    const auto hit = Markoff::Detail::findBlockAtSepByte(
+        doc, lineStartSep, /*biasForward=*/false);
+    if (!hit) return;
+    const Markoff::BlockId targetBlock = hit->blockId;
+    const quint32 byteInBlock = hit->byteInBlock;
 
     const QByteArray content = doc->blockText(targetBlock);
     const int blockSize = content.size();

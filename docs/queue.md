@@ -55,6 +55,26 @@
 > to a master commit containing this; embed-hook / block-kind coverage remain
 > out of scope (spec §5).
 >
+> **2026-05-30 — Test-baseline triage (queue #8.6 + #8.7 closed).** Ran the
+> two flagged binaries and classified every slot drift-vs-real-bug before
+> touching anything. 6 of 7 slot failures were **drift** from the
+> WP-unification single-'\n' separator + soft-break collapse — test contracts
+> updated to the new shape. 1 was a **real production bug**:
+> `Editor::setHeadingLevel` hardcoded `SEP_LEN = 2` in a bespoke block-walk,
+> underflowing `byteInBlock` for any heading below the first block
+> (Ctrl+heading mangled the line → `Hello## `); fixed by reusing
+> `Detail::findBlockAtSepByte`. Both binaries fully green now
+> (`tst_styled_block_formats` 9/9, `tst_source_widget_format_ops` 16/16).
+> **New, undocumented live regression found —** filed as **#9** below:
+> `tst_live_render_structural::blockquote_enter_on_empty_exits` fails
+> *consistently* (not offscreen-flaky), confirmed via stash to fail at
+> session-start HEAD `8db7c5a` independent of this session's edits, and it is
+> NOT in the documented 3-failure live baseline — so it crept in during the
+> post-WP commit arc. Suite is 253/257; the remaining 4 = this blockquote
+> regression + the 3 long-standing offscreen-dependent live failures
+> (`e2_nav_shift_extend`, `focus_chokepoint_invariant`,
+> `cursor_typing_invariant`).
+>
 > **2026-05-10 — Item #1 implemented.** Spec
 > `docs/specs/2026-05-10-e2.6-theme-zoom-design.md`; plan
 > `docs/plans/2026-05-10-e2.6-theme-zoom.md`. Tag candidate
@@ -175,6 +195,24 @@
   defensive code. A direct unit test on the boundary cases of
   `findBlockAtSepByte` remains worth adding as a small follow-up — same
   recommendation as the 2026-05-27 underflow find.
+- ~~2026-05-30 `libs/markoff-source/src/Editor.cpp:502` — inv #8 —
+  `setHeadingLevel` carried a bespoke block-walk hardcoding `SEP_LEN = 2`
+  while its `lineStartSep` came from the live single-'\n' `toPlainText()`;
+  `byteInBlock` underflowed for any heading below the first block.~~ →
+  fixed 2026-05-30 (queue #8.6 closeout) by reusing `Detail::findBlockAtSepByte`
+  (single shared `SEP_LEN == 1`), deleting the duplicate constant. Class:
+  "one flat-text view changed separator width (`fdb68bf`), a sibling
+  byte-walk didn't."
+- 2026-05-30 `libs/markoff-source/src/Detail/SourceFindAdapter.cpp:104` —
+  inv #3 — **same bug class as the setHeadingLevel fix above, NOT yet
+  fixed.** Global-char mapping advances `globalChar += 2` for the `\n\n`
+  `interBlockSeparator()` (the canonical `flatView()`/serialize separator),
+  but the source widget now *displays* `widgetFlatView()` with a single '\n'
+  between blocks (WP unification). If find maps match offsets against the
+  2-byte flatView while the visible document is the 1-byte widgetFlatView,
+  multi-block find highlights drift by one char per preceding boundary. Not
+  exercised by the baseline-clean run; needs a source-view find-highlighting
+  dogfood/test pass to confirm + fix.
 - `libs/markoff-styled/src/StyleApplier.cpp` — `baseBlockFormat` 5pt
   margins are dead in practice: every kind dispatch
   (Paragraph/Heading/CodeBlock/BlockQuote/ListItem/HR plus the `else`
@@ -900,17 +938,41 @@ arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
    `docs/specs/2026-05-29-styled-hash-gate-over-attrs-design.md`.
    Plan: `docs/plans/2026-05-29-styled-hash-gate-over-attrs.md`.
 
-6. **`tst_source_widget_format_ops` 4 failures.** Pre-existing as of
-   the WP unification commit-arc start (today), but post-dating
-   2026-05-23 baseline (235/238). Confirmed by stash-bisect (they fail
-   even with today's three fixes stashed). Investigation needed:
-   which WP-unification commit (`1f7fb99..b8a6bf8`) introduced them?
-   Probably the `widgetFlatView()`/sep-view byte-arithmetic transition.
+6. ~~**`tst_source_widget_format_ops` 4 failures.**~~ → CLOSED 2026-05-30.
+   Classified before fixing (per the classify-first rule). **3 drift, 1
+   real bug.** Drift: `toggleBold_at_block_boundary` +
+   `insertLink_at_block_boundary` hardcoded 2-byte-era qt-positions and
+   `\n\n` expectations (the `wrapToggle`/`insertLink` code was already
+   correct — it resolves via the shared `findBlockAtSepByte`, which uses
+   `SEP_LEN == 1`); `setHeadingLevel_only_affects_current_line` loaded three
+   single-'\n' lines expecting three blocks, but `buildD2FromBytes` now
+   collapses soft breaks → one block (test reshaped to `\n\n`-delimited
+   blocks). **Real production bug:**
+   `setHeadingLevel_twice_does_not_merge_with_previous_block` exposed that
+   `Editor::setHeadingLevel` carried its *own* block-walk hardcoding
+   `SEP_LEN = 2`, while `lineStartSep` came from the live single-'\n'
+   `toPlainText()` — so `byteInBlock` underflowed (quint32 wrap) for any
+   heading below the first block and the prefix landed at end-of-block
+   (`Hello## `). Ctrl+heading on any non-first line in the source widget was
+   broken in production. Fixed by replacing the bespoke walk with
+   `Detail::findBlockAtSepByte(…, biasForward=false)`, deleting the
+   duplicate `SEP_LEN`. Falsifiability: the two `setHeadingLevel` tests,
+   updated to the new convention, were confirmed still-failing *before* the
+   code fix and green after. Binary now 16/16.
 
-7. **`tst_styled_block_formats` 2 failures.** Truly pre-existing (failed
-   before the WP unification arc); `heading_levels_descend_in_size` and
-   `horizontal_rule_uses_monospace`. Quick triage: are the tests too
-   strict given v0 styling values, or has rendering drifted?
+7. ~~**`tst_styled_block_formats` 2 failures.**~~ → CLOSED 2026-05-30. All
+   **drift; no production change** (behavior was correct). Running the binary
+   surfaced a *third* failure not noted here (`list_item_has_left_margin`):
+   - `heading_levels_descend_in_size` read blocks 0,2,4,6,8,10 (old `\n\n`
+     separator blocks); under single-'\n' headings are 0,1,2,3,4,5 and
+     6/8/10 are out-of-range (size 0, so `h4>h5` was `0>0`). Indices fixed.
+   - `list_item_has_left_margin` checked `blockFormat().leftMargin()`, but
+     #8.4 moved list indent onto `QTextList`. Renamed
+     `list_item_indents_via_qtextlist`; asserts list membership + indent.
+   - `horizontal_rule_uses_monospace` read block 2; HR is block 1 under
+     single-'\n'. Index fixed; tightened the Discipline-Log-flagged
+     tautological `|| fontFamilies().size() > 0` to `QVERIFY(cf.fontFixedPitch())`.
+   Binary now 9/9.
 
 8. **Enter at end of bullet under heading merges bullet content into
    the preceding heading (styled leaf).** Surfaced 2026-05-29 by
@@ -1040,6 +1102,37 @@ arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
 - `libs/markoff-core/CLAUDE.md` "Load ingress — Paragraph kind only".
 - `libs/markoff-styled/CLAUDE.md` "WP unification" + the v0.1 invariants
   section.
+
+---
+
+## #9 — `blockquote_enter_on_empty_exits` live regression (undocumented)
+
+**Surfaced 2026-05-30** during the #8.6/#8.7 baseline triage.
+`tst_live_render_structural::blockquote_enter_on_empty_exits` fails
+**consistently** (3/3 standalone runs) under offscreen — distinct from the
+3 known offscreen/window-manager-dependent live failures, which are
+focus/cursor-timing flakes. Confirmed **not caused by this session**: with
+the session's three edited files stashed, the slot still fails at HEAD
+`8db7c5a`; `tst_live_render_structural` does not link `markoff-source`.
+
+Not in the documented live baseline and post-dates the 2026-05-29 wherewasi
+251/254 note, so it regressed somewhere in the post-WP commit arc. **Bisect
+candidates** (all landed after wherewasi): the #8.1 BlockQuote
+multi-paragraph split (`block_quote` walker recursion + load-side `> `
+strip + serializer depth/RunId reconstruction), the #8.8 styled
+structural-key authority arc (`StructuralKeyHandler`,
+`SourceTextDocumentBinding::handleStructuralKey`, `deleteSepRange`
+extraction — core-level, could touch live), or the DocumentRenderer /
+FormatPass extraction. The slot name ("Enter on an empty blockquote exits
+the quote") points at structural Enter logic, so #8.1's blockquote model
+reshaping is the prime suspect.
+
+**Plan for a fresh agent:** `superpowers:systematic-debugging`. Phase 1 —
+read the QCOMPARE actual-vs-expected (`./build-dev/bin/tst_live_render_structural
+blockquote_enter_on_empty_exits`), then `git bisect` across the post-wherewasi
+arc (`b8a6bf8..8db7c5a`) using that single slot as the predicate. Fix the
+code (the test pins live structural behavior — drift is unlikely for a
+structural-Enter contract, but classify first).
 
 ---
 

@@ -4,6 +4,7 @@
 #include <QTextBlock>
 #include <QTextDocument>
 #include <QTextEdit>
+#include <QTextList>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
@@ -42,12 +43,16 @@ private Q_SLOTS:
         e.setDocument(&doc);
 
         auto *qdoc = e.textEdit()->document();
+        // WP unification: widgetFlatView() joins blocks with a single '\n',
+        // so each heading is its own QTextBlock at consecutive indices — there
+        // are no empty separator blocks. (Pre-WP "\n\n" put headings at
+        // 0,2,4,6,8,10 with empty separator blocks in between.)
         const qreal h1 = blockN(qdoc, 0).charFormat().fontPointSize();
-        const qreal h2 = blockN(qdoc, 2).charFormat().fontPointSize();
-        const qreal h3 = blockN(qdoc, 4).charFormat().fontPointSize();
-        const qreal h4 = blockN(qdoc, 6).charFormat().fontPointSize();
-        const qreal h5 = blockN(qdoc, 8).charFormat().fontPointSize();
-        const qreal h6 = blockN(qdoc, 10).charFormat().fontPointSize();
+        const qreal h2 = blockN(qdoc, 1).charFormat().fontPointSize();
+        const qreal h3 = blockN(qdoc, 2).charFormat().fontPointSize();
+        const qreal h4 = blockN(qdoc, 3).charFormat().fontPointSize();
+        const qreal h5 = blockN(qdoc, 4).charFormat().fontPointSize();
+        const qreal h6 = blockN(qdoc, 5).charFormat().fontPointSize();
         QVERIFY(h1 > h2);
         QVERIFY(h2 > h3);
         QVERIFY(h3 > h4);
@@ -97,7 +102,11 @@ private Q_SLOTS:
         QVERIFY(b.blockFormat().leftMargin() > 0);
     }
 
-    void list_item_has_left_margin() {
+    void list_item_indents_via_qtextlist() {
+        // #8.4 (2026-05-29) moved list indentation off blockFormat().leftMargin()
+        // and onto QTextList membership, so consecutive items share one list and
+        // ordered numbering stays continuous. The visible indent now derives from
+        // the list's indent level, not a block left-margin.
         Markoff::Styled::Editor e;
         Markoff::MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("- first item"));
@@ -106,7 +115,8 @@ private Q_SLOTS:
         e.setDocument(&doc);
 
         const QTextBlock b = blockN(e.textEdit()->document(), 0);
-        QVERIFY(b.blockFormat().leftMargin() > 0);
+        QVERIFY(b.textList() != nullptr);
+        QVERIFY(b.textList()->format().indent() > 0);
     }
 
     void horizontal_rule_uses_monospace() {
@@ -119,13 +129,15 @@ private Q_SLOTS:
         e.setSession(s);
         e.setDocument(&doc);
 
-        // Document has 2 MarkoffDocument blocks: Paragraph + HorizontalRule.
-        // The QTextDocument uses flatView (blocks joined by "\n\n"), giving:
-        // block 0 = "before", block 1 = "\n" (separator), block 2 = "---".
+        // Two MarkoffDocument blocks: Paragraph + HorizontalRule. Under WP
+        // unification widgetFlatView() joins them with a single '\n' and each
+        // model block maps to one QTextBlock, so block 0 = "before", block 1 =
+        // HR. (Pre-WP the "\n\n" separator inserted an empty block, putting the
+        // rule at block 2.)
         auto *qdoc = e.textEdit()->document();
-        const QTextBlock b = blockN(qdoc, 2);
+        const QTextBlock b = blockN(qdoc, 1);
         const QTextCharFormat cf = b.charFormat();
-        QVERIFY(cf.fontFixedPitch() || cf.fontFamilies().toStringList().size() > 0);
+        QVERIFY(cf.fontFixedPitch());
     }
 };
 

@@ -95,20 +95,21 @@ private Q_SLOTS:
         e.setDocument(&doc);
         QTest::qWait(50);
 
-        // Select "hello" which is the first 5 bytes of block 2 — its start
-        // (qt-pos 11) is exactly at the block boundary in sep-view.
-        selectRange(e, 11, 16);
+        // WP unification: widgetFlatView() joins blocks with a single '\n', so
+        // block 2 starts at qt-pos 10 and "hello" is qt 10..15 — its start sits
+        // exactly at the block boundary in sep-view.
+        selectRange(e, 10, 15);
         e.toggleBold();
         QCOMPARE(e.toPlainText(),
-                 QStringLiteral("para text\n\n**hello** world"));
+                 QStringLiteral("para text\n**hello** world"));
 
         // Unwrap a selection whose start sits one byte INTO the block —
         // markers sit BEFORE selection, at the boundary. Surrounded-outside
-        // detection must still see them.
-        selectRange(e, 13, 18);  // "hello" inside "**hello**"
+        // detection must still see them. After the wrap "hello" is qt 12..17.
+        selectRange(e, 12, 17);  // "hello" inside "**hello**"
         e.toggleBold();
         QCOMPARE(e.toPlainText(),
-                 QStringLiteral("para text\n\nhello world"));
+                 QStringLiteral("para text\nhello world"));
     }
 
     void toggleInlineCode_wraps_with_backticks() {
@@ -163,17 +164,19 @@ private Q_SLOTS:
         e.setDocument(&doc);
         QTest::qWait(50);
 
-        // Cursor at qt-pos 11 — exactly at the start of block 2 in sep-view.
-        placeCursor(e, 11);
+        // Cursor at qt-pos 10 — exactly at the start of block 2 in the
+        // single-'\n' sep-view under WP unification.
+        placeCursor(e, 10);
         e.insertLink();
         QCOMPARE(e.toPlainText(),
-                 QStringLiteral("para text\n\n[](url)hello world"));
+                 QStringLiteral("para text\n[](url)hello world"));
 
-        // Selection whose start sits at the block boundary.
-        selectRange(e, 18, 23);  // "hello" in the new layout
+        // Selection whose start sits inside the new layout: "[](url)" occupies
+        // qt 10..16, so "hello" is qt 17..22.
+        selectRange(e, 17, 22);  // "hello" in the new layout
         e.insertLink();
         QCOMPARE(e.toPlainText(),
-                 QStringLiteral("para text\n\n[](url)[hello](url) world"));
+                 QStringLiteral("para text\n[](url)[hello](url) world"));
     }
 
     void setHeadingLevel_promotes_paragraph_line() {
@@ -227,30 +230,37 @@ private Q_SLOTS:
         e.setDocument(&doc);
         QTest::qWait(50);
 
-        placeCursor(e, 14);  // inside "Hello"
+        // WP unification single-'\n' view: "para text\nHello", "Hello" at
+        // qt 10..15.
+        placeCursor(e, 12);  // inside "Hello"
         e.setHeadingLevel(2);
         QCOMPARE(e.toPlainText(),
-                 QStringLiteral("para text\n\n## Hello"));
+                 QStringLiteral("para text\n## Hello"));
 
         // Second invocation must not merge with the previous block.
         e.setHeadingLevel(3);
         QCOMPARE(e.toPlainText(),
-                 QStringLiteral("para text\n\n### Hello"));
+                 QStringLiteral("para text\n### Hello"));
 
         // And again — strip path also operates at the block boundary.
         e.setHeadingLevel(0);
         QCOMPARE(e.toPlainText(),
-                 QStringLiteral("para text\n\nHello"));
+                 QStringLiteral("para text\nHello"));
     }
 
     void setHeadingLevel_only_affects_current_line() {
         Markoff::Source::Editor e;
         Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("first line\nsecond line\nthird line"));
+        // Three separate paragraph blocks ("\n\n"-delimited in source). Pre-WP
+        // this used single '\n's, but buildD2FromBytes now collapses soft line
+        // breaks within a paragraph to spaces, so single-'\n'-joined lines load
+        // as ONE block. widgetFlatView() then renders the three blocks
+        // single-'\n'-joined, which is what toPlainText() shows.
+        doc.loadFromMarkdown(QByteArray("first line\n\nsecond line\n\nthird line"));
         e.setDocument(&doc);
         QTest::qWait(50);
 
-        // Place cursor in the second line.
+        // Place cursor in the second line (qt 11..22 in the single-'\n' view).
         placeCursor(e, 13);
         e.setHeadingLevel(2);
 
