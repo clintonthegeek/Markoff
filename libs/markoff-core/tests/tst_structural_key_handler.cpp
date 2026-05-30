@@ -279,6 +279,75 @@ private Q_SLOTS:
         QCOMPARE(int(doc.iterateBlocks().size()), countBefore);  // no merge
         QCOMPARE(std::get<int>(doc.blockAttrs(second).value(Markoff::AttrNames::IndentLevel)), 0);
     }
+
+    void codeblock_enter_inserts_soft_break_not_split() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("```\ncode\n```\n"));
+        BlockId code;
+        for (auto id : doc.iterateBlocks())
+            if (doc.blockKind(id) == BlockKind::CodeBlock) { code = id; break; }
+        QVERIFY(!code.isNull());
+        const uint32_t endByte = static_cast<uint32_t>(doc.blockText(code).size());
+        const int blockCountBefore = int(doc.iterateBlocks().size());
+        auto r = StructuralKeyHandler::handle(doc, code, Qt::Key_Return,
+                                              Qt::NoModifier, endByte);
+        QVERIFY(r.handled);
+        QCOMPARE(int(doc.iterateBlocks().size()), blockCountBefore);  // no split
+        QCOMPARE(r.caretBlock, code);
+        // Buffer grew by exactly the inserted '\n'; caret advanced past it.
+        QCOMPARE(static_cast<uint32_t>(doc.blockText(code).size()), endByte + 1u);
+        QCOMPARE(r.caretByteInBlock, endByte + 1u);
+    }
+
+    void codeblock_tab_inserts_four_spaces() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("```\ncode\n```\n"));
+        BlockId code;
+        for (auto id : doc.iterateBlocks())
+            if (doc.blockKind(id) == BlockKind::CodeBlock) { code = id; break; }
+        QVERIFY(!code.isNull());
+        const QByteArray before = doc.blockText(code);
+        auto r = StructuralKeyHandler::handle(doc, code, Qt::Key_Tab,
+                                              Qt::NoModifier, 0u);
+        QVERIFY(r.handled);
+        QCOMPARE(doc.blockText(code), QByteArray("    ") + before);
+        QCOMPARE(r.caretByteInBlock, 4u);
+    }
+
+    void blockquote_empty_enter_exits_to_paragraph() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("> quoted\n"));
+        BlockId q;
+        for (auto id : doc.iterateBlocks())
+            if (doc.blockKind(id) == BlockKind::BlockQuote) { q = id; break; }
+        QVERIFY(!q.isNull());
+        // Empty the buffer (simulate an empty quote line).
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2ApplyBufferEdit(q, 0,
+                static_cast<uint32_t>(doc.blockText(q).size()), QByteArray{}, t);
+        }
+        auto r = StructuralKeyHandler::handle(doc, q, Qt::Key_Return,
+                                              Qt::NoModifier, 0u);
+        QVERIFY(r.handled);
+        QCOMPARE(doc.blockKind(q), BlockKind::Paragraph);
+    }
+
+    void hr_enter_inserts_paragraph_after() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("text\n\n---\n\nmore\n"));
+        BlockId hr;
+        for (auto id : doc.iterateBlocks())
+            if (doc.blockKind(id) == BlockKind::HorizontalRule) { hr = id; break; }
+        QVERIFY(!hr.isNull());
+        const int before = int(doc.iterateBlocks().size());
+        auto r = StructuralKeyHandler::handle(doc, hr, Qt::Key_Return,
+                                              Qt::NoModifier, 0u);
+        QVERIFY(r.handled);
+        QCOMPARE(int(doc.iterateBlocks().size()), before + 1);
+        QCOMPARE(doc.blockKind(r.caretBlock), BlockKind::Paragraph);
+        QCOMPARE(r.caretByteInBlock, 0u);
+    }
 };
 
 QTEST_MAIN(TstStructuralKeyHandler)

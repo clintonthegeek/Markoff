@@ -193,6 +193,35 @@ StructuralResult listItemTab(MarkoffDocument &doc, BlockId block, int modifiers,
     return {true, block, caretByte};
 }
 
+// --- CodeBlock ---------------------------------------------------------------
+
+StructuralResult codeBlockEnter(MarkoffDocument &doc, BlockId block,
+                                uint32_t caretByte) {
+    Cmd::insertSoftBreak(doc, block, caretByte);   // literal '\n', no split
+    return {true, block, caretByte + 1};
+}
+
+StructuralResult codeBlockTab(MarkoffDocument &doc, BlockId block,
+                              uint32_t caretByte) {
+    UndoLog::Transaction t(doc.d2UndoLog());
+    doc.d2ApplyBufferEdit(block, caretByte, 0, QByteArrayLiteral("    "), t);
+    return {true, block, caretByte + 4};
+}
+
+// --- BlockQuote --------------------------------------------------------------
+
+StructuralResult blockQuoteEnter(MarkoffDocument &doc, BlockId block,
+                                 int modifiers, uint32_t caretByte) {
+    if (doc.blockText(block).isEmpty()) {          // exit quote
+        UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2SetBlockKind(block, BlockKind::Paragraph, t);
+        return {true, block, 0};
+    }
+    // Non-empty: reuse the paragraph split logic. (Quote-depth preservation on
+    // the new block is a documented follow-up; do not implement it here.)
+    return paragraphEnter(doc, block, modifiers, caretByte);
+}
+
 }  // namespace
 
 StructuralResult StructuralKeyHandler::handle(MarkoffDocument &doc, BlockId block,
@@ -219,8 +248,23 @@ StructuralResult StructuralKeyHandler::handle(MarkoffDocument &doc, BlockId bloc
         if (normKey == Qt::Key_Delete)    return listItemDelete(doc, block, caretByteInBlock);
         if (normKey == Qt::Key_Tab)       return listItemTab(doc, block, modifiers, caretByteInBlock);
         return {};
+    case BlockKind::CodeBlock:
+        if (isEnter)                      return codeBlockEnter(doc, block, caretByteInBlock);
+        if (normKey == Qt::Key_Backspace) return paragraphBackspace(doc, block, caretByteInBlock);
+        if (normKey == Qt::Key_Delete)    return paragraphDelete(doc, block, caretByteInBlock);
+        if (normKey == Qt::Key_Tab && (modifiers & Qt::ShiftModifier) == 0)
+                                          return codeBlockTab(doc, block, caretByteInBlock);
+        return {};
+    case BlockKind::BlockQuote:
+        if (isEnter)                      return blockQuoteEnter(doc, block, modifiers, caretByteInBlock);
+        if (normKey == Qt::Key_Backspace) return paragraphBackspace(doc, block, caretByteInBlock);
+        if (normKey == Qt::Key_Delete)    return paragraphDelete(doc, block, caretByteInBlock);
+        return {};
+    case BlockKind::HorizontalRule:
+        if (isEnter) { const BlockId nb = Cmd::enterAtEnd(doc, block); return {true, nb, 0}; }
+        return {};
     default:
-        return {};  // other kinds added in later tasks
+        return {};
     }
 }
 
