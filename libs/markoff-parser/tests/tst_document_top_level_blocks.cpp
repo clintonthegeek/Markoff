@@ -32,6 +32,7 @@ private Q_SLOTS:
     void markerRunProducesMultiple();
 
     void blockQuoteSingleParagraph_carriesDepth1AndRunId();
+    void blockQuoteEmpty_emitsOneEmptyParagraphAtDepth1();
     void blockQuoteMultiParagraph_splitsIntoPerChildTlbs();
     void blockQuoteTwoAdjacentQuotes_distinctRunIds();
     void blockQuoteNested_bumpsDepthAndRunId();
@@ -281,6 +282,21 @@ void TestDocumentTopLevelBlocks::blockQuoteSingleParagraph_carriesDepth1AndRunId
     auto blocks = blocksOf(QStringLiteral("> quoted line\n"));
     QCOMPARE(blocks.size(), 1);
     QCOMPARE(blocks[0].kind, Kind::Paragraph);          // inner child kind
+    QCOMPARE(blocks[0].blockQuoteDepth, 1);
+    QVERIFY(blocks[0].blockQuoteRunId >= 1);
+}
+
+void TestDocumentTopLevelBlocks::blockQuoteEmpty_emitsOneEmptyParagraphAtDepth1()
+{
+    // queue #9 regression: an empty quote (`> ` with no content child — the
+    // block_quote node holds only marker/continuation nodes, which the walker
+    // skips) must still emit one TLB. Without it the quoted line vanishes and
+    // a doc that is *only* "> " loads to zero blocks. Emitted as an empty
+    // Paragraph carrying depth=1 so the load side maps it to BlockKind::
+    // BlockQuote and `> `-strips its buffer to empty.
+    auto blocks = blocksOf(QStringLiteral("> \n"));
+    QCOMPARE(blocks.size(), 1);
+    QCOMPARE(blocks[0].kind, Kind::Paragraph);
     QCOMPARE(blocks[0].blockQuoteDepth, 1);
     QVERIFY(blocks[0].blockQuoteRunId >= 1);
 }

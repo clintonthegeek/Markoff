@@ -95,6 +95,7 @@ private slots:
     void blockquote_nested_carries_depth_2();
     void blockquote_heading_inside_quote_uses_native_kind();
     void blockquote_round_trip_single_paragraph();
+    void blockquote_empty_quote_loads_one_block_and_round_trips();
     void blockquote_round_trip_multi_paragraph();
     void blockquote_round_trip_two_adjacent_quotes();
     void blockquote_round_trip_nested();
@@ -408,6 +409,24 @@ void TstBlockBufferInvariant::blockquote_round_trip_single_paragraph()
     const QByteArray source = "> hello\n";
     MarkoffDocument doc(/*replicaId=*/1);
     doc.loadFromMarkdown(source);
+    QCOMPARE(doc.serializeForSave(), source);
+}
+
+void TstBlockBufferInvariant::blockquote_empty_quote_loads_one_block_and_round_trips()
+{
+    // queue #9: an empty quote (`> ` with no content child) must survive load
+    // as ONE BlockQuote block with an empty buffer — not vanish to zero blocks
+    // (which left the live model with no rows; regressed in #8.1 4faa451) — and
+    // round-trip on save.
+    const QByteArray source = "> \n";
+    MarkoffDocument doc(/*replicaId=*/1);
+    doc.loadFromMarkdown(source);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(1));
+    QCOMPARE(doc.blockKind(blocks[0]), BlockKind::BlockQuote);
+    QVERIFY(doc.blockText(blocks[0]).isEmpty());
+
     QCOMPARE(doc.serializeForSave(), source);
 }
 

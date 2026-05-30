@@ -1282,6 +1282,7 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
         // any nested block_quote inside will take its own.
         Q_ASSERT(nextBlockQuoteRunId != nullptr);
         const int childRunId = static_cast<int>((*nextBlockQuoteRunId)++);
+        const qsizetype before = out.size();
         const uint32_t count = ts_node_named_child_count(node);
         for (uint32_t i = 0; i < count; ++i) {
             TSNode child = ts_node_named_child(node, i);
@@ -1291,6 +1292,24 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
             collectTopLevelBlocks(child, utf8, out, currentIndent,
                                   currentLooseRun, childDepth, childRunId,
                                   nextBlockQuoteRunId);
+        }
+        // An empty quote (`> ` with no content child — only marker /
+        // continuation nodes, which we skip above) recurses to nothing.
+        // Pre-#8.1 the block_quote node itself emitted one TLB; without this
+        // an empty quoted line vanishes entirely (queue #9: loadFromMarkdown
+        // ("> \n") produced zero blocks, leaving the live model with no rows).
+        // Emit one empty Paragraph TLB carrying the quote context so the load
+        // side maps it to BlockKind::BlockQuote (blockQuoteDepth > 0 +
+        // Paragraph → BlockQuote) with a `> `-stripped empty buffer, which
+        // round-trips back to `> `.
+        if (out.size() == before) {
+            TopLevelBlock b;
+            b.kind            = TopLevelBlock::Kind::Paragraph;
+            b.byteStart       = static_cast<int>(ts_node_start_byte(node));
+            b.byteEnd         = static_cast<int>(ts_node_end_byte(node));
+            b.blockQuoteDepth = childDepth;
+            b.blockQuoteRunId = childRunId;
+            out.append(b);
         }
         return;
     }

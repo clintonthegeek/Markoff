@@ -70,8 +70,9 @@
 > *consistently* (not offscreen-flaky), confirmed via stash to fail at
 > session-start HEAD `8db7c5a` independent of this session's edits, and it is
 > NOT in the documented 3-failure live baseline — so it crept in during the
-> post-WP commit arc. Suite is 253/257; the remaining 4 = this blockquote
-> regression + the 3 long-standing offscreen-dependent live failures
+> post-WP commit arc. **Bisected + fixed same session (see #9 below, RESOLVED):
+> `4faa451` dropped empty blockquotes at parse.** Suite now 254/257; the 3
+> remaining are the long-standing offscreen-dependent live failures only
 > (`e2_nav_shift_extend`, `focus_chokepoint_invariant`,
 > `cursor_typing_invariant`).
 >
@@ -1106,6 +1107,27 @@ arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
 ---
 
 ## #9 — `blockquote_enter_on_empty_exits` live regression (undocumented)
+
+> **✅ RESOLVED 2026-05-30.** `git bisect` (bad `a0d8f5b`, good `46643e7`,
+> automated via `git bisect run` with the slot's exit code) pinned the first
+> bad commit to **`4faa451` `feat(parser): recurse block_quote into per-child
+> TLBs (queue #8.1)`** — the predicted culprit. Root cause is in the **load**
+> path (test line 461, before `tryHandle`): `collectTopLevelBlocks`'
+> `block_quote` branch recurses into named children and skips
+> `block_quote_marker`/`block_continuation`, so an empty quote `"> "` (only
+> marker children, no paragraph) emits **zero** TLBs — pre-#8.1 the
+> `block_quote` node itself emitted one. `loadFromMarkdown("> \n")` → 0 blocks
+> → live model with no rows. **Fix (parser layer, `TreeSitterParser.cpp`):**
+> when a `block_quote` recurses to nothing, emit one empty `Paragraph` TLB at
+> `childDepth`/`childRunId`; the load side maps depth>0 + Paragraph →
+> `BlockKind::BlockQuote` and `stripBlockQuoteMarkers` empties the `"> "`
+> buffer, round-tripping to `"> "`. Falsifiable tests added at the regression
+> layer:
+> `tst_markoff_parser_document_top_level_blocks::blockQuoteEmpty_emitsOneEmptyParagraphAtDepth1`
+> + `tst_block_buffer_invariant::blockquote_empty_quote_loads_one_block_and_round_trips`
+> (both proven failing pre-fix, green after). Suite now **254/257**; the 3
+> remaining are the long-standing offscreen-dependent live failures only, no
+> collateral regressions.
 
 **Surfaced 2026-05-30** during the #8.6/#8.7 baseline triage.
 `tst_live_render_structural::blockquote_enter_on_empty_exits` fails
