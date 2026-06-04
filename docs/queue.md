@@ -1162,3 +1162,35 @@ structural-Enter contract, but classify first).
 
 Delete the file or move it to `docs/archive/`. The CLAUDE.md banner
 that points here should be removed at the same time.
+
+---
+
+## Discipline Log — 2026-05-31: styled-table SIGSEGV (post-ship dogfood crash)
+
+`markoff-styled-app docs/phase-c-status.md` crashed (SIGSEGV) immediately after
+the read-only-tables feature shipped. Root cause: `FormatPass::apply` computed
+each model block's QTextDocument position from FLAT PIPE-SOURCE bytes
+(`byteOffsetToQtPos(widgetFlatView, ...)`). Once a table is a compact
+`QTextTable` frame, the frame occupies far fewer document positions than its
+verbose pipe source has bytes, so every block AFTER a table got a position that
+overran the document → `findBlock()` returned an invalid `QTextBlock` →
+`QTextList::add()` dereferenced a null doc pointer. Needed a LIST after a table
+to crash (a paragraph silently absorbed the bad position).
+
+**Why it shipped (INVARIANTS §4/§5 lesson):** this is exactly the coordinate
+divergence flagged in the spec (§3.2) and plan (Task 2.3), but the guard test
+(`inline_span_after_table_lands_correctly`) used a *paragraph* after the table,
+which tolerates an out-of-range position. The crash needed a *list*. The test
+was too weak to be falsifiable against the real failure mode. **Lesson: a guard
+test for "coordinates after an opaque frame" MUST include a list (the one
+construct that dereferences the position), not just a paragraph.**
+
+**Fix:** `FormatPass` now walks the document's actual top-level elements
+(`QTextFrame::iterator` over the root frame — does not descend into cells) in
+lockstep with model blocks, instead of flat-byte arithmetic; tables consume
+their frame, non-tables consume `text.count('\n')+1` blocks. Plus: a
+defense-in-depth `!qblk.isValid()` guard in `manageListMembership`, and a
+key-format fix (`StyledTableRenderer` wrote `"markoff-table:<n>"` but the binding
+read it via `.toULongLong()` → 0, so frames never matched and the binding
+re-seeded on every edit). Regression test `list_after_table_does_not_crash_and_
+renders` reproduces the original crash and now passes.

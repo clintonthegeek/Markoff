@@ -1,5 +1,26 @@
 # Markoff
 
+> **2026-05-31 — styled-table SIGSEGV fixed (dogfood crash on a list-after-table).**
+>
+> Opening a real doc with a table followed by a list
+> (`markoff-styled-app docs/phase-c-status.md`) crashed. `FormatPass` was
+> computing QTextDocument positions from flat pipe-source bytes; once a table is
+> a compact `QTextTable` frame, every block after it overran the document → an
+> invalid `QTextBlock` reached `QTextList::add()` → SIGSEGV. Fixed by making
+> `FormatPass` walk the document's real top-level elements
+> (`QTextFrame::iterator`, which doesn't descend into cells) in lockstep with
+> model blocks instead of byte arithmetic; plus a defense-in-depth invalid-block
+> guard in `manageListMembership`, and a frame-key format fix
+> (`StyledTableRenderer` wrote a `"markoff-table:"` prefix the binding read as 0,
+> so it re-seeded on every edit). Regression test
+> `tst_styled_table_render::list_after_table_does_not_crash_and_renders`
+> reproduces the crash and passes; the app loads `phase-c-status.md` cleanly.
+> Baseline still 259/262 (the 3 known offscreen flakes). Discipline-log lesson in
+> `docs/queue.md`: the original guard test used a paragraph-after-table, which
+> tolerates a bad position — a list is required to exercise the failure.
+>
+> ---
+>
 > **2026-05-30 (later) — `markoff-styled` renders tables (read-only QTextTable) via a new opaque-block seam.**
 >
 > `BlockKind::Table` blocks now render as native Qt `QTextTable` grids in the

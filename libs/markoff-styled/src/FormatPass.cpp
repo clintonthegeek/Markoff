@@ -11,6 +11,7 @@
 #include <QTextBlockFormat>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextFrame>
 #include <QTextList>
 #include <QTextListFormat>
 
@@ -343,6 +344,17 @@ void manageListMembership(
             lst->remove(b);
     };
 
+    // Defense in depth: a model block with no owning QTextBlock (a Table —
+    // rendered as an opaque frame — or a structural desync) cannot join or own
+    // a list. Never create/add a list on an invalid block (that dereferenced a
+    // null doc pointer in QTextList::add → SIGSEGV, 2026-05-31). End any running
+    // list and return; correct for tables (a table interrupts a list per
+    // CommonMark) and safe for the desync case.
+    if (!qblk.isValid()) {
+        listStack.clear();
+        return;
+    }
+
     if (kind != Markoff::BlockKind::ListItem) {
         // Any non-list block ends the enclosing list per CommonMark.
         listStack.clear();
@@ -430,58 +442,88 @@ Result apply(QTextDocument *target,
         // fontScale (zoom).
         target->setIndentWidth(docIndentWidthPx(fontScale));
 
-        // The QTextDocument is populated with widgetFlatView() (separator-
-        // bearing: blocks joined by single "\n" — WP unification, 2026-05-28).
-        // Compute block byte positions in that coordinate space by summing
-        // block sizes + separator lengths, then convert to Qt UTF-16 char
-        // positions.
-        const QByteArray flatBytes = source->widgetFlatView();
+        // The QTextDocument is populated by the binding's opaque-aware seed:
+        // each model block maps to one-or-more top-level QTextDocument elements
+        // (a paragraph is one QTextBlock; a code block is N QTextBlocks where
+        // N = lines; a Table is a QTextTable child frame). We CANNOT derive
+        // positions from flat pipe-source bytes: a table's verbose pipe source
+        // has far more bytes than its compact frame occupies in the document, so
+        // byte arithmetic overruns every element after a table — an invalid
+        // QTextBlock then fed to QTextList::add segfaulted (2026-05-31). Instead,
+        // walk the document's actual top-level elements (root-frame iterator;
+        // it does NOT descend into table cells) in lockstep with the model
+        // blocks.
         const std::vector<Markoff::BlockId> blocks = source->iterateBlocks();
-        static constexpr int kSepLen = 1;  // single "\n"
         currentIds.reserve(static_cast<qsizetype>(blocks.size()));
 
         // List-membership stack for continuous numbering across the walk.
         // Reset each cascade; manageListMembership runs OUTSIDE the hash gate.
         std::vector<ListStackEntry> listStack;
 
-        quint32 bytePos = 0;
+        QTextFrame *rootFrame = target->rootFrame();
+        QTextFrame::iterator docIt = rootFrame->begin();
+        auto skipArtifactBlocks = [&]() {
+            // Qt inserts an empty structural QTextBlock adjacent to a frame
+            // (e.g. between a table frame and the following content block). Such
+            // a block belongs to no model block; skip empty non-frame blocks.
+            while (docIt != rootFrame->end()
+                   && !docIt.currentFrame()
+                   && docIt.currentBlock().isValid()
+                   && docIt.currentBlock().text().isEmpty()) {
+                ++docIt;
+            }
+        };
+
         for (size_t i = 0; i < blocks.size(); ++i) {
             const Markoff::BlockId id = blocks[i];
             currentIds.insert(id, 0);
 
             const QByteArray text = source->blockText(id);
-            const quint32 blockStart = bytePos;
-            const quint32 blockEnd   = bytePos + static_cast<quint32>(text.size());
-
             const Markoff::BlockKind kind = source->blockKind(id);
             const QList<Markoff::SourceSpan> spans = source->inlineSpansFor(id);
             const auto attrs = source->blockAttrs(id);
             const quint64 h = computeBlockHash(kind, text, spans, attrs, fontScale);
-
-            const int startQt = Markoff::SourceTextDocumentBinding
-                ::byteOffsetToQtPos(flatBytes, blockStart);
-
             const bool hashSkipped = gate && (gate->value(id, 0) == h);
-            if (hashSkipped) {
-                ++out.hashSkips;
-            } else {
-                if (gate) (*gate)[id] = h;
+            if (gate && !hashSkipped) (*gate)[id] = h;
+            if (hashSkipped) ++out.hashSkips;
 
-                // Kind transition: if the text prefix disagrees with the stored
-                // kind, surface it as a suggestion for the caller to act on.
-                // FormatPass itself never mutates the model.
-                if (opts.inferKind) {
-                    const Markoff::BlockKind inferred = inferKindFromPrefix(text, kind);
-                    if (inferred != kind)
-                        out.kindSuggestions.push_back({id, inferred});
-                }
+            // Kind transition: if the text prefix disagrees with the stored
+            // kind, surface it as a suggestion for the caller to act on.
+            // FormatPass itself never mutates the model.
+            if (!hashSkipped && opts.inferKind) {
+                const Markoff::BlockKind inferred = inferKindFromPrefix(text, kind);
+                if (inferred != kind)
+                    out.kindSuggestions.push_back({id, inferred});
+            }
 
-                const int endQt = Markoff::SourceTextDocumentBinding
-                    ::byteOffsetToQtPos(flatBytes, blockEnd);
+            // ── Table: consume the QTextTable frame; it is self-formatting. ──
+            if (kind == Markoff::BlockKind::Table) {
+                skipArtifactBlocks();
+                if (docIt != rootFrame->end() && docIt.currentFrame())
+                    ++docIt;  // step over the frame
+                // A table breaks any running list; pass an invalid block so
+                // manageListMembership just clears the stack (no list op).
+                manageListMembership(QTextBlock(), kind, attrs, listStack);
+                continue;
+            }
 
-                cursor.setPosition(startQt);
-                QTextBlock qblk = cursor.block();
-                while (qblk.isValid() && qblk.position() <= endQt) {
+            // ── Non-table: format the next (lineCount) top-level QTextBlocks. ──
+            // The opaque-aware seed inserts each model block's content with its
+            // internal newlines preserved, so a block with K internal '\n's
+            // occupies K+1 consecutive top-level QTextBlocks. Format each block
+            // as it is consumed (single walk — avoids any byte-vs-char position
+            // arithmetic).
+            const int lineCount = text.count('\n') + 1;
+            skipArtifactBlocks();
+            QTextBlock firstBlk;
+            int consumed = 0;
+            while (consumed < lineCount && docIt != rootFrame->end()) {
+                if (docIt.currentFrame()) { ++docIt; continue; }  // defensive
+                QTextBlock qblk = docIt.currentBlock();
+                if (!qblk.isValid()) { ++docIt; continue; }
+                if (!firstBlk.isValid()) firstBlk = qblk;
+
+                if (!hashSkipped) {
                     QTextCursor blkCursor(qblk);
                     if (kind == Markoff::BlockKind::Heading) {
                         int level = 0;
@@ -522,12 +564,6 @@ Result apply(QTextDocument *target,
                         applyListItem(blkCursor, depth, markerStyle, checked, fontScale);
                     } else if (kind == Markoff::BlockKind::HorizontalRule) {
                         applyHorizontalRule(blkCursor, fontScale);
-                    } else if (kind == Markoff::BlockKind::Table) {
-                        // Rendered as an opaque QTextTable frame by the binding's
-                        // OpaqueBlockRenderer (styled leaf). FormatPass must not
-                        // touch the frame's block format or apply inline spans —
-                        // the frame is self-formatting. Skipping leaves the
-                        // walk's qblk advance to the loop tail.
                     } else {
                         applyParagraph(blkCursor, fontScale);
                     }
@@ -548,38 +584,33 @@ Result apply(QTextDocument *target,
                             blkCursor.setBlockFormat(bf);
                         }
                     }
-                    qblk = qblk.next();
                 }
+                ++docIt;
+                ++consumed;
+            }
 
-                // Apply inline char formats for this block.
-                // docLen - 1: QTextDocument always has a trailing paragraph
-                // separator that must not be selected.
-                // Table blocks are rendered as opaque QTextTable frames by the
-                // binding's OpaqueBlockRenderer; their startQt/charOffset spans
-                // do not map into the frame's cell structure, so skip them.
-                if (kind != Markoff::BlockKind::Table) {
-                    const int docLen = target->characterCount() - 1;
-                    for (const Markoff::SourceSpan &span : spans) {
-                        if (span.charLength <= 0) continue;
-                        const int spanStart = startQt + span.charOffset;
-                        const int spanEnd   = startQt + span.charOffset + span.charLength;
-                        if (spanStart >= docLen) continue;
-                        QTextCursor c(target);
-                        c.setPosition(spanStart);
-                        c.setPosition(qMin(spanEnd, docLen), QTextCursor::KeepAnchor);
-                        c.mergeCharFormat(charFormatForSpan(span, fontScale));
-                    }
+            if (!hashSkipped && firstBlk.isValid()) {
+                // Apply inline char formats for this block, relative to the
+                // block's actual document position (startQt). docLen - 1: the
+                // QTextDocument always has a trailing paragraph separator that
+                // must not be selected.
+                const int startQt = firstBlk.position();
+                const int docLen = target->characterCount() - 1;
+                for (const Markoff::SourceSpan &span : spans) {
+                    if (span.charLength <= 0) continue;
+                    const int spanStart = startQt + span.charOffset;
+                    const int spanEnd   = startQt + span.charOffset + span.charLength;
+                    if (spanStart >= docLen) continue;
+                    QTextCursor c(target);
+                    c.setPosition(spanStart);
+                    c.setPosition(qMin(spanEnd, docLen), QTextCursor::KeepAnchor);
+                    c.mergeCharFormat(charFormatForSpan(span, fontScale));
                 }
-            }  // end !hashSkipped format pass
+            }
 
             // List-membership reconciliation runs on EVERY block (hash-skipped
             // or not). Cross-block continuity depends on neighbour state.
-            const QTextBlock listBlk = target->findBlock(startQt);
-            manageListMembership(listBlk, kind, attrs, listStack);
-
-            // Advance past block content + single-"\n" separator between blocks.
-            bytePos = blockEnd;
-            if (i + 1 < blocks.size()) bytePos += kSepLen;
+            manageListMembership(firstBlk, kind, attrs, listStack);
         }
 
         // Prune stale gate entries (blocks that no longer exist).

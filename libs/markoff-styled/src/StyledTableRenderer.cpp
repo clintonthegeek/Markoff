@@ -21,8 +21,11 @@ int StyledTableRenderer::renderOpaque(QTextCursor &at, Markoff::BlockId id) {
     if (!m_doc) return 0;
     ParsedTable t = parsePipeTable(m_doc->blockText(id));
     if (!t.ok) return 0;
-    const QString key = QStringLiteral("markoff-table:")
-                        + QString::number(id.raw());
+    // Key MUST be exactly the raw id as a decimal string: the binding reads it
+    // back with stringProperty(...).toULongLong() to match a frame to its model
+    // block. A non-numeric prefix would parse to 0, so the binding would never
+    // match and would full-re-seed on every edit (losing cursor/scroll).
+    const QString key = QString::number(id.raw());
     return materializeTable(at, t, key, m_fontScale);
 }
 
