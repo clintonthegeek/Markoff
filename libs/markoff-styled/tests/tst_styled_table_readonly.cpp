@@ -16,17 +16,11 @@
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
 
+#include "support/TableTestHelpers.h"
+
 using namespace Markoff;
 
 static void pumpEvents() { QCoreApplication::processEvents(); }
-
-namespace {
-QTextTable *firstTable(QTextDocument *doc) {
-    for (QTextFrame *f : doc->rootFrame()->childFrames())
-        if (auto *t = qobject_cast<QTextTable *>(f)) return t;
-    return nullptr;
-}
-}  // namespace
 
 class TstStyledTableReadonly : public QObject {
     Q_OBJECT

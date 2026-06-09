@@ -17,6 +17,8 @@
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
 
+#include "support/TableTestHelpers.h"
+
 using namespace Markoff;
 
 static void pumpEvents() { QCoreApplication::processEvents(); }
@@ -27,11 +29,6 @@ int frameCount(QTextDocument *doc) {
     for (QTextFrame *f : doc->rootFrame()->childFrames())
         if (qobject_cast<QTextTable *>(f)) ++n;
     return n;
-}
-QTextTable *firstTable(QTextDocument *doc) {
-    for (QTextFrame *f : doc->rootFrame()->childFrames())
-        if (auto *t = qobject_cast<QTextTable *>(f)) return t;
-    return nullptr;
 }
 bool hasBlockText(QTextDocument *doc, const QString &text) {
     for (QTextBlock b = doc->begin(); b.isValid(); b = b.next())

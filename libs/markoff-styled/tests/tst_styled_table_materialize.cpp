@@ -9,16 +9,9 @@
 #include <markoff/core/OpaqueBlockRenderer.h>  // OpaqueBlockKeyProperty
 
 #include "../src/TableFrame.h"
+#include "support/TableTestHelpers.h"
 
 using namespace Markoff::Styled;
-
-namespace {
-QTextTable *firstTable(QTextDocument *doc) {
-    for (QTextFrame *f : doc->rootFrame()->childFrames())
-        if (auto *t = qobject_cast<QTextTable *>(f)) return t;
-    return nullptr;
-}
-}  // namespace
 
 class TstStyledTableMaterialize : public QObject {
     Q_OBJECT
