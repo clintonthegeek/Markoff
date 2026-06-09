@@ -61,8 +61,8 @@ public:
 
     /// Forward to the binding's attach hook. The controller is consumer-owned;
     /// EditorWidget does NOT take ownership.
-    void attachFindController(Markoff::FindController *fc);
-    void detachFindController();
+    void attachFindController(Markoff::FindController *fc) override;
+    void detachFindController() override;
 
 private:
     struct Private;

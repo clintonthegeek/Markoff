@@ -171,6 +171,7 @@ void Editor::detachFindController()
 Markoff::Theme Editor::theme() const { return m_theme; }
 
 void Editor::setTheme(const Markoff::Theme &t) {
+    MarkdownView::setTheme(t);  // base stores + emits themeChanged
     m_theme = t;
     QPalette p = m_editor->palette();
     p.setColor(QPalette::Base,            t.color(Markoff::Theme::Slot::EditorBackground));
@@ -187,7 +188,6 @@ void Editor::setTheme(const Markoff::Theme &t) {
         m_highlighter->rehighlight();
     }
     if (m_gutter) m_gutter->update();
-    emit themeChanged();
 }
 
 bool Editor::eventFilter(QObject *watched, QEvent *event) {

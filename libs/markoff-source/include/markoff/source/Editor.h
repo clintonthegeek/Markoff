@@ -36,9 +36,9 @@ public:
     bool hasCursor()  const override { return true; }
     bool hasEditing() const override { return !isReadOnly(); }
 
-    // Theme (source-specific)
-    Markoff::Theme theme() const;
-    void setTheme(const Markoff::Theme &);
+    // Theme
+    Markoff::Theme theme() const override;
+    void setTheme(const Markoff::Theme &) override;
 
     // Accessor to the inner QPlainTextEdit (for Gutter, find adapter, and tests)
     QPlainTextEdit *plainTextEdit() const { return m_editor; }
@@ -56,8 +56,8 @@ public:
     /// on navigation; focus stays with whatever widget currently has it
     /// (the consumer's find input). Owned by the consumer; pass nullptr
     /// to detach.
-    void attachFindController(Markoff::FindController *fc);
-    void detachFindController();
+    void attachFindController(Markoff::FindController *fc) override;
+    void detachFindController() override;
 
     // ---- Markdown format operations (parity with Live's LiveFormatController)
     //
@@ -69,26 +69,23 @@ public:
     // cursor between them.
 
     /// Wrap selection with `**...**` (or unwrap if already wrapped).
-    Q_INVOKABLE void toggleBold();
+    Q_INVOKABLE void toggleBold() override;
     /// Wrap selection with `_..._`.
-    Q_INVOKABLE void toggleItalic();
+    Q_INVOKABLE void toggleItalic() override;
     /// Wrap selection with `~~...~~`.
-    Q_INVOKABLE void toggleStrikethrough();
+    Q_INVOKABLE void toggleStrikethrough() override;
     /// Wrap selection with single backticks.
-    Q_INVOKABLE void toggleInlineCode();
+    Q_INVOKABLE void toggleInlineCode() override;
     /// Insert `[](url)` at cursor or wrap selection as `[selection](url)`.
-    Q_INVOKABLE void insertLink();
+    Q_INVOKABLE void insertLink() override;
     /// Set the current line's heading level. `level == 0` strips any
     /// leading ATX markers; `level` 1..6 replaces them with that many
     /// hashes + a space. Operates on the line containing the cursor.
-    Q_INVOKABLE void setHeadingLevel(int level);
+    Q_INVOKABLE void setHeadingLevel(int level) override;
 
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void resizeEvent(QResizeEvent *e) override;
-
-Q_SIGNALS:
-    void themeChanged();
 
 private:
     void recomputeGutterWidth();

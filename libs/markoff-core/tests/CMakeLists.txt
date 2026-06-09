@@ -190,6 +190,12 @@ add_test(NAME tst_binding_structural_key COMMAND tst_binding_structural_key)
 target_link_libraries(tst_binding_structural_key PRIVATE Qt6::Test Qt6::Gui Qt6::Widgets markoff_core)
 set_tests_properties(tst_binding_structural_key PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# MarkdownView contract v2: base default behaviors (spec §3)
+add_executable(tst_markdown_view_base tst_markdown_view_base.cpp)
+add_test(NAME tst_markdown_view_base COMMAND tst_markdown_view_base)
+target_link_libraries(tst_markdown_view_base PRIVATE Qt6::Test Qt6::Widgets markoff_core)
+set_tests_properties(tst_markdown_view_base PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # Ad-hoc load benchmark — not registered with ctest. Run manually:
 #   ./build-dev/bin/perf_load_bench <markdown-file>
 add_executable(perf_load_bench perf_load_bench.cpp)

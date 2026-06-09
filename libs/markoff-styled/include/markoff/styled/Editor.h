@@ -58,8 +58,8 @@ public:
     void              setSession(Markoff::Session *);
 
     // Theme
-    Markoff::Theme theme() const;
-    void           setTheme(const Markoff::Theme &);
+    Markoff::Theme theme() const override;
+    void           setTheme(const Markoff::Theme &) override;
 
     // Link service (lazy DefaultLinkService when nullptr)
     Markoff::LinkService *linkService() const;
@@ -70,8 +70,8 @@ public:
     void    setFromContext(const QString &);
 
     // Font scale (1.0 = default; Ctrl+/- multiplies block-format font sizes)
-    qreal fontScale() const;
-    void  setFontScale(qreal);
+    qreal fontScale() const override;
+    void  setFontScale(qreal) override;
 
     // Accessor for tests + internal helpers
     QTextEdit *textEdit() const;
@@ -82,10 +82,8 @@ public:
 
 Q_SIGNALS:
     void sessionChanged();
-    void themeChanged();
     void linkServiceChanged();
     void fromContextChanged();
-    void fontScaleChanged();
 
 private:
     StructuralTextEdit                     *m_editor       = nullptr;

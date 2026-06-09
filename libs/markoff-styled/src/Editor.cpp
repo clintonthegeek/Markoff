@@ -160,9 +160,9 @@ void Editor::setTheme(const Markoff::Theme &t) {
     // No same-value guard: Markoff::Theme has no operator==. Idempotent
     // restyle on a same-theme set is cheap; consumers shouldn't see spurious
     // themeChanged emissions in practice since theme changes are rare.
+    MarkdownView::setTheme(t);  // base stores + emits themeChanged
     m_theme = t;
     if (m_styleApplier) m_styleApplier->setTheme(&m_theme);
-    emit themeChanged();
 }
 
 // ---- LinkService --------------------------------------------------------
@@ -209,10 +209,10 @@ quint64 Editor::styleApplierHashSkips() const {
 qreal Editor::fontScale() const { return m_fontScale; }
 
 void Editor::setFontScale(qreal s) {
-    if (qFuzzyCompare(m_fontScale, s)) return;
-    m_fontScale = s;
-    if (m_styleApplier) m_styleApplier->setFontScale(s);
-    emit fontScaleChanged();
+    MarkdownView::setFontScale(s);  // base clamps + stores + emits
+    if (qFuzzyCompare(m_fontScale, MarkdownView::fontScale())) return;
+    m_fontScale = MarkdownView::fontScale();  // keep local in sync (StyleApplier reads it)
+    if (m_styleApplier) m_styleApplier->setFontScale(m_fontScale);
 }
 
 }  // namespace Markoff::Styled
