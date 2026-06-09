@@ -8,12 +8,15 @@
 #include "StructuralTextEdit.h"
 #include "StyledTableRenderer.h"
 
+#include <QDebug>
 #include <QHBoxLayout>
 #include <QScrollBar>
 #include <QTextBlock>
 #include <QTextEdit>
+#include <QTextFrame>
 
 #include <markoff/core/DefaultLinkService.h>
+#include <markoff/core/FormatOps.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
@@ -155,6 +158,118 @@ void Editor::attachFindController(Markoff::FindController *fc) {
 
 void Editor::detachFindController() {
     if (m_findAdapter) m_findAdapter->detach();
+}
+
+// ---- Format verbs (MarkdownView contract v2 §5) ---------------------------
+//
+// Thin wrappers over Markoff::FormatOps, modeled on the source leaf's
+// (libs/markoff-source/src/Editor.cpp). Styled-specific wrinkle: Table
+// blocks render as opaque QTextTable frames, and a frame's character
+// stream is NOT the table block's flat bytes — so once a frame is in the
+// QTextDocument, toPlainText() and cursor qt-positions diverge from
+// widgetFlatView() for everything at/after the frame. FormatOps documents
+// widgetFlatView as its contract space, so the verbs (a) always pass
+// widgetFlatView() as flatText, never toPlainText(), and (b) no-op unless
+// the selection lies in the region where QTextEdit cursor positions agree
+// with widgetFlatView positions.
+//
+// v1 frame-guard policy (conservative, documented in CLAUDE.md): no-op
+// with a qWarning when the caret/selection is inside a table frame, or
+// when the document contains ANY table frame and the selection reaches
+// the first frame or beyond. Strictly before the first frame the two
+// coordinate spaces agree, so verbs are allowed there. Spec §5 only
+// promises verbs where the coordinate space is trustworthy; format a
+// table region by dropping to Source mode.
+
+namespace {
+
+// True when te's caret/selection sits in the frame-free prefix where
+// QTextEdit qt-positions == widgetFlatView qt-positions.
+bool selectionInTrustworthyRegion(QTextEdit *te) {
+    QTextDocument *qdoc = te->document();
+    const QTextCursor c = te->textCursor();
+    if (c.currentFrame() != qdoc->rootFrame()) {
+        qWarning() << "Markoff::Styled::Editor: format verbs are unavailable"
+                      " inside a table frame; edit the table in Source mode";
+        return false;
+    }
+    const QList<QTextFrame *> frames = qdoc->rootFrame()->childFrames();
+    if (frames.isEmpty()) return true;
+    int firstFramePos = INT_MAX;
+    for (QTextFrame *f : frames)
+        firstFramePos = qMin(firstFramePos, f->firstPosition());
+    // firstPosition() is the first position INSIDE the frame; the frame's
+    // opening boundary char sits one before it. A selection is trustworthy
+    // only if it ends strictly before that boundary.
+    if (c.selectionEnd() >= firstFramePos - 1) {
+        qWarning() << "Markoff::Styled::Editor: format verbs are unavailable"
+                      " at/after a table frame (cursor positions diverge from"
+                      " the flat view); edit there in Source mode";
+        return false;
+    }
+    return true;
+}
+
+// Re-apply a FormatOps result to the editor's cursor. nullopt means no
+// edit was performed; leave the cursor untouched (mirrors the source
+// leaf's applyFormatOpsResult).
+void applyFormatOpsResult(QTextEdit *te,
+                          const std::optional<Markoff::FormatOps::QtRange> &r) {
+    if (!te || !r) return;
+    QTextCursor c = te->textCursor();
+    c.setPosition(r->start);
+    if (r->end != r->start)
+        c.setPosition(r->end, QTextCursor::KeepAnchor);
+    te->setTextCursor(c);
+}
+
+void wrapToggleVerb(QTextEdit *te,
+                    Markoff::SourceTextDocumentBinding *binding,
+                    const QByteArray &delim) {
+    if (!te || !binding) return;
+    Markoff::MarkoffDocument *doc = binding->markoffDocument();
+    if (!doc) return;
+    if (!selectionInTrustworthyRegion(te)) return;
+    const QTextCursor c = te->textCursor();
+    applyFormatOpsResult(
+        te, Markoff::FormatOps::wrapToggle(
+                doc, QString::fromUtf8(doc->widgetFlatView()),
+                {c.selectionStart(), c.selectionEnd()}, delim));
+}
+
+} // namespace
+
+// Format verbs are blocked while read-only (MarkdownView contract §10
+// check 2) — they mutate via d2 primitives, so the inner widget's
+// readOnly flag alone would not stop them.
+void Editor::toggleBold()          { if (isReadOnly()) return; wrapToggleVerb(m_editor, m_binding, "**"); }
+void Editor::toggleItalic()        { if (isReadOnly()) return; wrapToggleVerb(m_editor, m_binding, "_");  }
+void Editor::toggleStrikethrough() { if (isReadOnly()) return; wrapToggleVerb(m_editor, m_binding, "~~"); }
+void Editor::toggleInlineCode()    { if (isReadOnly()) return; wrapToggleVerb(m_editor, m_binding, "`");  }
+
+void Editor::insertLink() {
+    if (isReadOnly()) return;
+    if (!m_editor || !m_binding) return;
+    Markoff::MarkoffDocument *doc = m_binding->markoffDocument();
+    if (!doc) return;
+    if (!selectionInTrustworthyRegion(m_editor)) return;
+    const QTextCursor c = m_editor->textCursor();
+    applyFormatOpsResult(
+        m_editor, Markoff::FormatOps::insertLink(
+                      doc, QString::fromUtf8(doc->widgetFlatView()),
+                      {c.selectionStart(), c.selectionEnd()}));
+}
+
+void Editor::setHeadingLevel(int level) {
+    if (isReadOnly()) return;
+    if (!m_editor || !m_binding) return;
+    Markoff::MarkoffDocument *doc = m_binding->markoffDocument();
+    if (!doc) return;
+    if (!selectionInTrustworthyRegion(m_editor)) return;
+    applyFormatOpsResult(
+        m_editor, Markoff::FormatOps::setHeadingLevel(
+                      doc, QString::fromUtf8(doc->widgetFlatView()),
+                      m_editor->textCursor().position(), level));
 }
 
 // ---- Session ------------------------------------------------------------

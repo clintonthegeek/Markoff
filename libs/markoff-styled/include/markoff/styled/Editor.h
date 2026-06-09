@@ -59,6 +59,16 @@ public:
     void attachFindController(Markoff::FindController *fc) override;
     void detachFindController() override;
 
+    // Format verbs (MarkdownView contract v2 §5) — thin wrappers over
+    // Markoff::FormatOps in widgetFlatView coordinates, guarded against
+    // table frames (see the frame-guard comment in Editor.cpp).
+    void toggleBold() override;
+    void toggleItalic() override;
+    void toggleStrikethrough() override;
+    void toggleInlineCode() override;
+    void insertLink() override;
+    void setHeadingLevel(int level) override;
+
     // Session
     Markoff::Session *session() const;
     void              setSession(Markoff::Session *);
