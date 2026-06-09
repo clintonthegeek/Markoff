@@ -8,10 +8,10 @@
 #include <KSyntaxHighlighting/Repository>
 #include <KSyntaxHighlighting/Theme>
 
+#include <markoff/core/FormatOps.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
-#include <markoff/core/Detail/FlatBlockResolve.h>
 
 #include <QKeyEvent>
 #include <QPalette>
@@ -232,168 +232,40 @@ void Editor::recomputeGutterWidth() {
 
 // --- Markdown format operations -------------------------------------------
 //
-// All operate by resolving the cursor's qt-position to a markoff block and
-// applying the edit via d2ApplyBufferEdit, bypassing the lossy sep→no-sep
-// translation in SourceTextDocumentBinding (which sends range edits through
-// MarkoffDocument::applyFlatEdit). The translation drops boundary direction
-// and would route boundary-touching edits through applyFlatEdit's
-// cross-block branch, merging blocks. See setHeadingLevel below and the
-// 2026-05-21 source-view dogfood fix for the root-cause writeup.
+// The format-op logic lives in Markoff::FormatOps (markoff-core), hoisted
+// from this file 2026-06-09 (MarkdownView contract v2 §5) so the styled
+// leaf can share it. The verbs below are thin wrappers: extract the
+// selection from the inner QPlainTextEdit, call FormatOps with
+// toPlainText() (== widgetFlatView()), re-apply the returned
+// caret/selection. FormatOps flushes the model itself, so the binding has
+// already synced the QTextDocument by the time the range comes back.
 
 namespace {
 
-// Toggle `delim` wrap around the QPlainTextEdit's selection (or insert an
-// empty pair at the cursor), mediated through the block-aware d2 API.
-//
-// Detection (per slice, matching the legacy QTextCursor impl):
-//   * surroundedOutside — bytes outside the selection in the same block are
-//     already `delim`. Unwrap by removing both.
-//   * insideMarkers     — selection itself starts and ends with `delim`.
-//     Unwrap by stripping the inner markers.
-//   * otherwise         — wrap by inserting `delim` at both ends.
-//
-// Multi-block selections: each block's slice is handled independently
-// (matching LiveFormatController::wrapPerBlock).
+// Re-apply a FormatOps result to the inner editor's cursor. A nullopt
+// result means no edit was performed; leave the cursor untouched (matching
+// the pre-hoist early-return paths, which never called setTextCursor).
+void applyFormatOpsResult(QPlainTextEdit *te,
+                          const std::optional<Markoff::FormatOps::QtRange> &r) {
+    if (!te || !r) return;
+    QTextCursor c2 = te->textCursor();
+    c2.setPosition(r->start);
+    if (r->end != r->start)
+        c2.setPosition(r->end, QTextCursor::KeepAnchor);
+    te->setTextCursor(c2);
+}
+
 void wrapToggle(QPlainTextEdit *te,
                 Markoff::SourceTextDocumentBinding *binding,
                 const QByteArray &delim) {
     if (!te || !binding) return;
     Markoff::MarkoffDocument *doc = binding->markoffDocument();
     if (!doc) return;
-
-    QTextCursor c = te->textCursor();
-    const QString docText = te->toPlainText();
-    const int delimLen = delim.size();  // ASCII delims: bytes == UTF-16 units
-
-    // --- No selection: insert delim+delim, park cursor between. -----------
-    if (!c.hasSelection()) {
-        const int qtPos = c.position();
-        const quint32 sepByte =
-            Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtPos);
-        auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepByte, /*biasForward=*/true);
-        if (!hit) {
-            // Empty document: applyFlatEdit auto-creates a paragraph block.
-            doc->applyFlatEdit(0, 0, delim + delim, Markoff::Origin::UserEdit);
-        } else {
-            Markoff::UndoLog::Transaction t(doc->d2UndoLog());
-            doc->d2ApplyBufferEdit(hit->blockId, hit->byteInBlock, 0,
-                                   delim + delim, t);
-        }
-        doc->flushPendingD2Changed();
-        QTextCursor c2 = te->textCursor();
-        c2.setPosition(qtPos + delimLen);
-        te->setTextCursor(c2);
-        return;
-    }
-
-    // --- Selection: per-block toggle. ------------------------------------
-    const int qtStart = c.selectionStart();
-    const int qtEnd   = c.selectionEnd();
-    const quint32 sepStart =
-        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtStart);
-    const quint32 sepEnd =
-        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtEnd);
-    const QList<Markoff::Detail::BlockSlice> slices = Markoff::Detail::sliceByBlocks(doc, sepStart, sepEnd);
-    if (slices.isEmpty()) return;
-
-    enum class Mode { SurroundedOutside, InsideMarkers, Wrap };
-
-    // Determine per-slice mode and compute the post-edit selection
-    // restoration for the SINGLE-slice common case. For multi-slice we
-    // collapse the cursor to the end after all edits.
-    Mode firstMode = Mode::Wrap;
-
-    {
-        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
-
-        // Process slices in reverse so later block edits don't shift earlier
-        // ones' bytes (each slice is intra-block, so this matters only in
-        // case of multi-block selection).
-        for (int n = slices.size() - 1; n >= 0; --n) {
-            const Markoff::Detail::BlockSlice &s = slices[n];
-            const QByteArray content = doc->blockText(s.blockId);
-            const int blockSize = content.size();
-            const int loInt = static_cast<int>(s.byteLo);
-            const int hiInt = static_cast<int>(s.byteHi);
-
-            const bool surroundedOutside =
-                loInt >= delimLen
-                && hiInt + delimLen <= blockSize
-                && content.mid(loInt - delimLen, delimLen) == delim
-                && content.mid(hiInt, delimLen) == delim;
-            const bool insideMarkers =
-                !surroundedOutside
-                && (hiInt - loInt) >= 2 * delimLen
-                && content.mid(loInt, delimLen) == delim
-                && content.mid(hiInt - delimLen, delimLen) == delim;
-
-            Mode mode = Mode::Wrap;
-            if (surroundedOutside)    mode = Mode::SurroundedOutside;
-            else if (insideMarkers)   mode = Mode::InsideMarkers;
-            if (n == 0) firstMode = mode;
-
-            switch (mode) {
-            case Mode::SurroundedOutside:
-                // Remove trailing delim (higher byte) first, then leading.
-                doc->d2ApplyBufferEdit(s.blockId, s.byteHi,
-                                       static_cast<quint32>(delimLen),
-                                       QByteArray(), t);
-                doc->d2ApplyBufferEdit(s.blockId, s.byteLo - delimLen,
-                                       static_cast<quint32>(delimLen),
-                                       QByteArray(), t);
-                break;
-            case Mode::InsideMarkers:
-                doc->d2ApplyBufferEdit(s.blockId, s.byteHi - delimLen,
-                                       static_cast<quint32>(delimLen),
-                                       QByteArray(), t);
-                doc->d2ApplyBufferEdit(s.blockId, s.byteLo,
-                                       static_cast<quint32>(delimLen),
-                                       QByteArray(), t);
-                break;
-            case Mode::Wrap:
-                // Insert trailing delim first (higher byte), then leading.
-                doc->d2ApplyBufferEdit(s.blockId, s.byteHi, 0, delim, t);
-                doc->d2ApplyBufferEdit(s.blockId, s.byteLo, 0, delim, t);
-                break;
-            }
-        }
-    }
-
-    doc->flushPendingD2Changed();
-
-    // Restore selection. For a single-slice (intra-block) edit we know the
-    // exact range that survived. For multi-slice, collapse to the trailing
-    // edge — multi-block format toggles are an edge case and per-slice
-    // modes may differ, making exact restoration ambiguous.
-    QTextCursor c2 = te->textCursor();
-    if (slices.size() == 1) {
-        int newStart = qtStart;
-        int newEnd   = qtEnd;
-        switch (firstMode) {
-        case Mode::SurroundedOutside:
-            newStart -= delimLen;
-            newEnd   -= delimLen;
-            break;
-        case Mode::InsideMarkers:
-            newEnd -= 2 * delimLen;
-            break;
-        case Mode::Wrap:
-            newStart += delimLen;
-            newEnd   += delimLen;
-            break;
-        }
-        c2.setPosition(newStart);
-        c2.setPosition(newEnd, QTextCursor::KeepAnchor);
-    } else {
-        // Multi-slice: park cursor near the trailing end without a
-        // restored selection.
-        const int docLen = te->document()->characterCount() - 1;
-        int newPos = qtEnd;
-        if (newPos > docLen) newPos = docLen;
-        if (newPos < 0)      newPos = 0;
-        c2.setPosition(newPos);
-    }
-    te->setTextCursor(c2);
+    const QTextCursor c = te->textCursor();
+    applyFormatOpsResult(
+        te, Markoff::FormatOps::wrapToggle(
+                doc, te->toPlainText(),
+                {c.selectionStart(), c.selectionEnd()}, delim));
 }
 
 } // namespace
@@ -411,163 +283,25 @@ void Editor::insertLink() {
     if (!m_editor || !m_binding) return;
     Markoff::MarkoffDocument *doc = m_binding->markoffDocument();
     if (!doc) return;
-
-    QTextCursor c = m_editor->textCursor();
-    const QString docText = m_editor->toPlainText();
-
-    // --- No selection: insert `[](url)` template, park cursor between `[]`. -
-    if (!c.hasSelection()) {
-        const int qtPos = c.position();
-        const quint32 sepByte =
-            Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtPos);
-        auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepByte, /*biasForward=*/true);
-        const QByteArray payload = QByteArrayLiteral("[](url)");
-        if (!hit) {
-            doc->applyFlatEdit(0, 0, payload, Markoff::Origin::UserEdit);
-        } else {
-            Markoff::UndoLog::Transaction t(doc->d2UndoLog());
-            doc->d2ApplyBufferEdit(hit->blockId, hit->byteInBlock, 0,
-                                   payload, t);
-        }
-        doc->flushPendingD2Changed();
-        QTextCursor c2 = m_editor->textCursor();
-        c2.setPosition(qtPos + 1);
-        m_editor->setTextCursor(c2);
-        return;
-    }
-
-    // --- Selection: wrap `[selection](url)` per block slice. ---------------
-    const int qtStart = c.selectionStart();
-    const int qtEnd   = c.selectionEnd();
-    const quint32 sepStart =
-        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtStart);
-    const quint32 sepEnd =
-        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(docText, qtEnd);
-    const QList<Markoff::Detail::BlockSlice> slices = Markoff::Detail::sliceByBlocks(doc, sepStart, sepEnd);
-    if (slices.isEmpty()) return;
-
-    {
-        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
-        // Reverse order: later block edits don't shift earlier ones' bytes.
-        // Within a slice: insert trailing `](url)` first (higher byte), then
-        // leading `[` — same higher-then-lower pattern as wrapToggle.
-        for (int n = slices.size() - 1; n >= 0; --n) {
-            const Markoff::Detail::BlockSlice &s = slices[n];
-            doc->d2ApplyBufferEdit(s.blockId, s.byteHi, 0,
-                                   QByteArrayLiteral("](url)"), t);
-            doc->d2ApplyBufferEdit(s.blockId, s.byteLo, 0,
-                                   QByteArrayLiteral("["), t);
-        }
-    }
-
-    doc->flushPendingD2Changed();
-
-    QTextCursor c2 = m_editor->textCursor();
-    if (slices.size() == 1) {
-        // Single-block selection: park selection over `url` for easy replace.
-        // Layout: `[selection](url)` starting at qtStart; url at qtEnd+3..qtEnd+6.
-        c2.setPosition(qtEnd + 3);
-        c2.setPosition(qtEnd + 6, QTextCursor::KeepAnchor);
-    } else {
-        // Multi-slice: collapse near the trailing end (matches wrapToggle).
-        const int docLen = m_editor->document()->characterCount() - 1;
-        int newPos = qtEnd;
-        if (newPos > docLen) newPos = docLen;
-        if (newPos < 0)      newPos = 0;
-        c2.setPosition(newPos);
-    }
-    m_editor->setTextCursor(c2);
+    const QTextCursor c = m_editor->textCursor();
+    applyFormatOpsResult(
+        m_editor, Markoff::FormatOps::insertLink(
+                      doc, m_editor->toPlainText(),
+                      {c.selectionStart(), c.selectionEnd()}));
 }
 
 void Editor::setHeadingLevel(int level) {
     if (isReadOnly()) return;
     if (!m_editor || !m_binding) return;
-    if (level < 0 || level > 6) return;
     auto *doc = m_binding->markoffDocument();
     if (!doc) return;
-
-    // Editing the heading prefix via QTextCursor on the inner QPlainTextEdit
-    // and letting it route through SourceTextDocumentBinding::onQtContentsChange
-    // would issue a range edit whose start sits exactly at a markoff block
-    // boundary whenever the heading is the first line of a non-first block.
-    // The sep-view→no-sep-view translation loses the boundary direction, and
-    // applyFlatEdit's range-edit boundary bias ("<= blkEnd") then routes the
-    // edit through the cross-block-edit branch, removing the heading block
-    // and merging its tail into the previous block. Bypass the lossy
-    // coordinate translation by mutating the target block's buffer directly,
-    // the same way LiveFormatController::setHeadingLevel does.
-
-    const QTextCursor c = m_editor->textCursor();
-    const int origQtPos = c.position();
-    const QTextBlock qtb = c.block();
-    const int lineStartQt = qtb.position();
-    const QString text = m_editor->toPlainText();
-    const quint32 lineStartSep =
-        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(text, lineStartQt);
-
-    // Resolve the line-start sep-byte to its model block via the shared helper,
-    // which tracks the WP-unification single-'\n' separator (SEP_LEN == 1). The
-    // bespoke walk this replaced hardcoded SEP_LEN == 2 ("\n\n"); once
-    // widgetFlatView() went single-'\n', that walk over-advanced its cursor by
-    // one byte per preceding boundary, underflowing byteInBlock (quint32 wrap)
-    // for any heading below the first block — so the prefix landed at
-    // end-of-block ("Hello## ") instead of the line start. biasForward == false
-    // keeps an empty line's own (zero-length) block as the target rather than
-    // skipping forward to the next block.
-    const auto hit = Markoff::Detail::findBlockAtSepByte(
-        doc, lineStartSep, /*biasForward=*/false);
-    if (!hit) return;
-    const Markoff::BlockId targetBlock = hit->blockId;
-    const quint32 byteInBlock = hit->byteInBlock;
-
-    const QByteArray content = doc->blockText(targetBlock);
-    const int blockSize = content.size();
-    int oldBytes = 0;
-    while (oldBytes < 6
-           && static_cast<int>(byteInBlock) + oldBytes < blockSize
-           && content[static_cast<int>(byteInBlock) + oldBytes] == '#') {
-        ++oldBytes;
-    }
-    if (oldBytes > 0
-        && static_cast<int>(byteInBlock) + oldBytes < blockSize
-        && content[static_cast<int>(byteInBlock) + oldBytes] == ' ') {
-        ++oldBytes;
-    } else if (oldBytes > 0
-               && static_cast<int>(byteInBlock) + oldBytes != blockSize) {
-        // "##" with non-space follower — not an ATX prefix; leave alone.
-        oldBytes = 0;
-    }
-
-    const QByteArray newPrefix = (level == 0)
-        ? QByteArray()
-        : QByteArray(level, '#') + ' ';
-
-    if (newPrefix.size() == oldBytes
-        && content.mid(static_cast<int>(byteInBlock), oldBytes) == newPrefix)
-        return;
-
-    {
-        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
-        doc->d2ApplyBufferEdit(targetBlock, byteInBlock,
-                               static_cast<quint32>(oldBytes),
-                               newPrefix, t);
-    }
-
-    // Flush the debounced d2DocumentChanged so the binding syncs the
-    // QTextDocument synchronously. Users expect immediate visual feedback;
-    // tests expect toPlainText() to reflect the change without spinning the
-    // event loop.
-    doc->flushPendingD2Changed();
-
-    // Restore cursor: prefixes are ASCII so byte-count == UTF-16-unit count.
-    const int delta = static_cast<int>(newPrefix.size()) - oldBytes;
-    int newPos = origQtPos + delta;
-    if (newPos < lineStartQt) newPos = lineStartQt;
-    const int docLen = m_editor->document()->characterCount() - 1;
-    if (newPos > docLen) newPos = docLen;
-    QTextCursor c2 = m_editor->textCursor();
-    c2.setPosition(newPos);
-    m_editor->setTextCursor(c2);
+    // FormatOps validates the level and resolves the caret's line via the
+    // shared block-aware helpers (see FormatOps.cpp for the 2026-05-21
+    // boundary-merge root-cause writeup).
+    applyFormatOpsResult(
+        m_editor, Markoff::FormatOps::setHeadingLevel(
+                      doc, m_editor->toPlainText(),
+                      m_editor->textCursor().position(), level));
 }
 
 void Editor::applyParagraphMargins()

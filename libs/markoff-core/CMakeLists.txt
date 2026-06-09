@@ -105,6 +105,10 @@ add_library(markoff_core STATIC
     # --- Detail/ (shared internal helpers) ---
     include/markoff/core/Detail/FlatBlockResolve.h
     src/Detail/FlatBlockResolve.cpp
+    # --- FormatOps (MarkdownView contract v2 §5) — widget-free format
+    #     verbs hoisted from markoff-source's Editor ---
+    include/markoff/core/FormatOps.h
+    src/FormatOps.cpp
     # --- MarkdownView polymorphic base (Task 4.5) ---
     include/markoff/core/MarkdownView.h
     src/MarkdownView.cpp

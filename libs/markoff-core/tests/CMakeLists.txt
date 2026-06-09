@@ -190,6 +190,12 @@ add_test(NAME tst_binding_structural_key COMMAND tst_binding_structural_key)
 target_link_libraries(tst_binding_structural_key PRIVATE Qt6::Test Qt6::Gui Qt6::Widgets markoff_core)
 set_tests_properties(tst_binding_structural_key PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+# MarkdownView contract v2: widget-free format ops (spec §5)
+add_executable(tst_format_ops tst_format_ops.cpp)
+add_test(NAME tst_format_ops COMMAND tst_format_ops)
+target_link_libraries(tst_format_ops PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_format_ops PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # MarkdownView contract v2: base default behaviors (spec §3)
 add_executable(tst_markdown_view_base tst_markdown_view_base.cpp)
 add_test(NAME tst_markdown_view_base COMMAND tst_markdown_view_base)
