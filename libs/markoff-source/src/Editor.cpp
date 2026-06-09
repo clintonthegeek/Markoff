@@ -133,9 +133,12 @@ Markoff::CursorPos Editor::cursorPosition() const {
 
 void Editor::setCursorPosition(Markoff::CursorPos pos) {
     auto block = m_editor->document()->findBlockByNumber(pos.line - 1);
-    if (!block.isValid()) return;
+    if (!block.isValid())
+        block = m_editor->document()->lastBlock();
     QTextCursor cursor(block);
-    cursor.setPosition(block.position() + qMax(0, pos.column - 1));
+    // length() includes the block separator, so length()-1 is end-of-text.
+    cursor.setPosition(block.position()
+                       + qMin(qMax(0, pos.column - 1), block.length() - 1));
     m_editor->setTextCursor(cursor);
 }
 
@@ -395,12 +398,16 @@ void wrapToggle(QPlainTextEdit *te,
 
 } // namespace
 
-void Editor::toggleBold()          { wrapToggle(m_editor, m_binding, "**"); }
-void Editor::toggleItalic()        { wrapToggle(m_editor, m_binding, "_");  }
-void Editor::toggleStrikethrough() { wrapToggle(m_editor, m_binding, "~~"); }
-void Editor::toggleInlineCode()    { wrapToggle(m_editor, m_binding, "`");  }
+// Format verbs are blocked while read-only (MarkdownView contract §10
+// check 2) — they mutate via d2ApplyBufferEdit, so the inner widget's
+// readOnly flag alone would not stop them.
+void Editor::toggleBold()          { if (isReadOnly()) return; wrapToggle(m_editor, m_binding, "**"); }
+void Editor::toggleItalic()        { if (isReadOnly()) return; wrapToggle(m_editor, m_binding, "_");  }
+void Editor::toggleStrikethrough() { if (isReadOnly()) return; wrapToggle(m_editor, m_binding, "~~"); }
+void Editor::toggleInlineCode()    { if (isReadOnly()) return; wrapToggle(m_editor, m_binding, "`");  }
 
 void Editor::insertLink() {
+    if (isReadOnly()) return;
     if (!m_editor || !m_binding) return;
     Markoff::MarkoffDocument *doc = m_binding->markoffDocument();
     if (!doc) return;
@@ -473,6 +480,7 @@ void Editor::insertLink() {
 }
 
 void Editor::setHeadingLevel(int level) {
+    if (isReadOnly()) return;
     if (!m_editor || !m_binding) return;
     if (level < 0 || level > 6) return;
     auto *doc = m_binding->markoffDocument();

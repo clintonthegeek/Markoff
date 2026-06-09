@@ -115,8 +115,11 @@ Markoff::CursorPos Editor::cursorPosition() const {
 void Editor::setCursorPosition(Markoff::CursorPos pos) {
     QTextCursor c = m_editor->textCursor();
     QTextBlock blk = m_editor->document()->findBlockByNumber(pos.line - 1);
-    if (!blk.isValid()) return;
-    c.setPosition(blk.position() + qMax(0, pos.column - 1));
+    if (!blk.isValid())
+        blk = m_editor->document()->lastBlock();
+    // length() includes the block separator, so length()-1 is end-of-text.
+    c.setPosition(blk.position()
+                  + qMin(qMax(0, pos.column - 1), blk.length() - 1));
     m_editor->setTextCursor(c);
 }
 

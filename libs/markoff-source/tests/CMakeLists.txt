@@ -34,6 +34,11 @@ add_test(NAME tst_source_find_adapter COMMAND tst_source_find_adapter)
 target_link_libraries(tst_source_find_adapter PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
 set_tests_properties(tst_source_find_adapter PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_view_contract_source tst_view_contract_source.cpp)
+add_test(NAME tst_view_contract_source COMMAND tst_view_contract_source)
+target_link_libraries(tst_view_contract_source PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
+set_tests_properties(tst_view_contract_source PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_source_dogfood_invariants tst_source_dogfood_invariants.cpp)
 add_test(NAME tst_source_dogfood_invariants COMMAND tst_source_dogfood_invariants)
 target_link_libraries(tst_source_dogfood_invariants
