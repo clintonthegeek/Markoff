@@ -35,9 +35,12 @@ Read these once before your first non-trivial change in this codebase:
 - `docs/handoff/2026-05-09-setext-dogfood-findings.md` — the most
   recent instance of the failure pattern (the Tier 2 cursor pivot,
   commits `463fc36..6c44a07`).
-- `docs/queue.md` §#2 — the twelve cursor-architecture concerns the
-  Tier 2 attempt surfaced and the partial revert left standing. The
-  pattern's current open surface.
+- Queue #2 (now closed; archived in
+  `docs/archive/2026-06-09-queue-closed-items.md` §#2) — the twelve
+  cursor-architecture concerns the Tier 2 attempt surfaced and the
+  partial revert left standing. All twelve were resolved across the
+  tier 1–4c arc (closed 2026-05-16); the entry remains the canonical
+  worked example of the pattern.
 
 The pattern, in one sentence: **a new authority over "what is in
 block N right now" is added without retiring the old one;

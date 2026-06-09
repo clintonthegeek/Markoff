@@ -1,9 +1,8 @@
-# Session queue — 2026-05-10
+# Work queue
 
-> Items queued for sessions where interactive dogfood isn't available
-> (remote/SSH/etc). Ordered by **descending execution difficulty** —
-> a fresh agent should pick the topmost item that fits the available
-> time/energy budget.
+> Open work items + the append-only Discipline Log. Ordered by
+> **descending execution difficulty** — a fresh agent should pick the
+> topmost item that fits the available time/energy budget.
 >
 > **For a fresh agent landing here:** each item below names enough
 > context to draft a spec/plan. Use `superpowers:brainstorming` to
@@ -12,84 +11,13 @@
 > plans in `docs/plans/`, both dated `YYYY-MM-DD-<slug>.md`. Add a
 > back-reference here once the plan exists.
 >
-> **Current branch:** `master` (foundation rebuild merged from
-> `exploration/new-foundation` at `3c7afa9`, 2026-05-25).
-> **Tags held:** `v0.7.0-e2.5` (S1/S2/S3 cursor fixes, commits `463fc36..6c44a07`) and `v0.7.0-e2.6` (theme + zoom + color wiring, commits `9fff98d..ab6bf47`) — both pending interactive dogfood at user's local desktop. Dogfood checklists: e-arc-status.md TL;DR (E2.5) and `docs/specs/2026-05-17-theme-color-wiring-design.md` §"Definition of done" (E2.6 re-dogfood: Ctrl+Shift+D must visibly invert the editor).
+> **Current branch:** `master` (single line of development since the
+> foundation merge at `3c7afa9`, 2026-05-25).
 >
-> **2026-05-10 — Item #5 closed.** Code review of `463fc36..6c44a07`
-> ran clean (1 MED, 2 LOW). MED + 1 LOW fixed inline in this session
-> (comment expansion in `LiveEditBinding.cpp:165` documenting the
-> safety of the cursorChanged emission during the model update;
-> null-check ordering aligned across 5 delegates). The duplicated
-> qtPos clamp at `LiveListModelBinding.cpp:405-406, 522-523` is
-> exactly queue #2 concern #11 and is **folded into #2** — when #2's
-> spec is written, treat that as one of the surface points to
-> consolidate. 186/186 fast tests pass post-fixes.
->
-> **2026-05-18 — Item #1 extended: theme color wiring (E2.6 extension).** The
-> 2026-05-10 font/zoom implementation left all color properties reading from
-> `palette.*` or hardcoded hex. Color wiring landed in 13 commits
-> (`8ddaa93..ab6bf47`): `themeColorFor` Q_INVOKABLE proxy, `QML_FOREIGN` shim
-> exposing `Theme.*` enum to QML, all 19 color sites from the spec's slot
-> mapping table, 7 new QML integration tests. Zero `palette.*` references
-> remain in `libs/markoff-live/qml/`. Tag `v0.7.0-e2.6` now covers this
-> extension and is held until re-dogfood confirms Ctrl+Shift+D visibly inverts
-> the editor. Spec: `docs/specs/2026-05-17-theme-color-wiring-design.md`;
-> plan: `docs/plans/2026-05-17-theme-color-wiring.md`. 76/77 tests green
-> (1 pre-existing `tst_live_render_setext_e2e` failure).
->
-> **2026-05-29 — `Markoff::Styled::DocumentRenderer` landed (Corbomite port
-> pressure).** Headless, read-only renderer factored from `StyleApplier` via a
-> new internal `FormatPass` (single source of truth for block/inline formats;
-> pure w.r.t. the model — `StyleApplier` remains the sole `Cmd::changeKind`
-> actor). T1 `renderInto(QTextDocument*, const MarkoffDocument*)` + raw-bytes
-> overload; T2 `idealHeight`/`paint` over T1. Spec
-> `docs/specs/2026-05-29-markoff-styled-document-renderer-design.md`, plan
-> `docs/plans/2026-05-29-markoff-styled-document-renderer.md`. New test
-> `tst_styled_document_renderer` (11 slots incl. golden-vs-widget + graceful
-> degradation) green; styled suite otherwise unchanged (the 3 pre-existing
-> `tst_styled_block_formats` drift failures remain — separate triage). No
-> Discipline Log entries: the refactor added no new timers / re-entrance
-> guards (the surviving `singleShot(0)` for deferred `changeKind` + scroll
-> restore are pre-existing, preserved verbatim). Follow-up: Corbomite re-pins
-> to a master commit containing this; embed-hook / block-kind coverage remain
-> out of scope (spec §5).
->
-> **2026-05-30 — Test-baseline triage (queue #8.6 + #8.7 closed).** Ran the
-> two flagged binaries and classified every slot drift-vs-real-bug before
-> touching anything. 6 of 7 slot failures were **drift** from the
-> WP-unification single-'\n' separator + soft-break collapse — test contracts
-> updated to the new shape. 1 was a **real production bug**:
-> `Editor::setHeadingLevel` hardcoded `SEP_LEN = 2` in a bespoke block-walk,
-> underflowing `byteInBlock` for any heading below the first block
-> (Ctrl+heading mangled the line → `Hello## `); fixed by reusing
-> `Detail::findBlockAtSepByte`. Both binaries fully green now
-> (`tst_styled_block_formats` 9/9, `tst_source_widget_format_ops` 16/16).
-> **New, undocumented live regression found —** filed as **#9** below:
-> `tst_live_render_structural::blockquote_enter_on_empty_exits` fails
-> *consistently* (not offscreen-flaky), confirmed via stash to fail at
-> session-start HEAD `8db7c5a` independent of this session's edits, and it is
-> NOT in the documented 3-failure live baseline — so it crept in during the
-> post-WP commit arc. **Bisected + fixed same session (see #9 below, RESOLVED):
-> `4faa451` dropped empty blockquotes at parse.** Suite now 254/257; the 3
-> remaining are the long-standing offscreen-dependent live failures only
-> (`e2_nav_shift_extend`, `focus_chokepoint_invariant`,
-> `cursor_typing_invariant`).
->
-> **2026-05-10 — Item #1 implemented.** Spec
-> `docs/specs/2026-05-10-e2.6-theme-zoom-design.md`; plan
-> `docs/plans/2026-05-10-e2.6-theme-zoom.md`. Tag candidate
-> `v0.7.0-e2.6`; held until interactive dogfood signs off
-> (request: `docs/handoff/2026-05-10-e2.6-dogfood-request.md`).
-> 190/190 fast tests green.
->
-> **2026-05-10 — Item #3 implemented.** Spec
-> `docs/specs/2026-05-10-qml-integration-test-harness-design.md`; plan
-> `docs/plans/2026-05-10-qml-integration-test-harness.md`. New target
-> `tst_live_render_qml_integration` runs offscreen; eight slots green
-> (two QEXPECT_FAIL guards for queue #4 chop-\n). Full ctest still
-> green.
-
+> **Closed items** (#1–#7, #9, and the closed sub-items of #8, plus the
+> historical header banners) were archived 2026-06-09 to
+> [`docs/archive/2026-06-09-queue-closed-items.md`](archive/2026-06-09-queue-closed-items.md)
+> — verbatim snapshot. Live status board: [`docs/STATUS.md`](STATUS.md).
 ---
 
 ## Discipline Log
@@ -204,16 +132,17 @@
   (single shared `SEP_LEN == 1`), deleting the duplicate constant. Class:
   "one flat-text view changed separator width (`fdb68bf`), a sibling
   byte-walk didn't."
-- 2026-05-30 `libs/markoff-source/src/Detail/SourceFindAdapter.cpp:104` —
-  inv #3 — **same bug class as the setHeadingLevel fix above, NOT yet
-  fixed.** Global-char mapping advances `globalChar += 2` for the `\n\n`
+- ~~2026-05-30 `libs/markoff-source/src/Detail/SourceFindAdapter.cpp:104` —
+  inv #3 — **same bug class as the setHeadingLevel fix above.**
+  Global-char mapping advanced `globalChar += 2` for the `\n\n`
   `interBlockSeparator()` (the canonical `flatView()`/serialize separator),
-  but the source widget now *displays* `widgetFlatView()` with a single '\n'
-  between blocks (WP unification). If find maps match offsets against the
-  2-byte flatView while the visible document is the 1-byte widgetFlatView,
-  multi-block find highlights drift by one char per preceding boundary. Not
-  exercised by the baseline-clean run; needs a source-view find-highlighting
-  dogfood/test pass to confirm + fix.
+  but the source widget *displays* `widgetFlatView()` with a single '\n'
+  between blocks (WP unification) — multi-block find highlights drifted
+  by one char per preceding boundary (third instance of the "one
+  flat-view changed separator width, a sibling didn't" class).~~ →
+  fixed 2026-06-09; regression test `tst_source_find_adapter` (2 slots,
+  proven failing pre-fix) pins highlight + navigation positions against
+  the visible text.
 - `libs/markoff-styled/src/StyleApplier.cpp` — `baseBlockFormat` 5pt
   margins are dead in practice: every kind dispatch
   (Paragraph/Heading/CodeBlock/BlockQuote/ListItem/HR plus the `else`
@@ -223,974 +152,120 @@
   kinds. Consider centralising margins through the base (kind-specific
   deltas) once dogfood pins down the desired values.
 
----
 
-## #1 — E2.6: theme wire-up + zoom + color wiring ✅ COMPLETE 2026-05-18 (tag `v0.7.0-e2.6`)
+- 2026-05-31 styled-table SIGSEGV post-mortem (lesson entry; fix shipped in `b1b238f`) — inv #4/#5 — `FormatPass` computed QTextDocument positions from flat pipe-source bytes; once a table is a compact `QTextTable` frame every later block overran the document and an invalid `QTextBlock` reached `QTextList::add()`. The spec/plan flagged exactly this divergence, but the guard test used a *paragraph* after the table, which tolerates a bad position — only a *list* dereferences it. **Lesson: a guard test for "coordinates after an opaque frame" MUST include a list.** Fix: frame-aware lockstep walk (`QTextFrame::iterator`), invalid-block guard in `manageListMembership`, frame-key format fix. Regression test `tst_styled_table_render::list_after_table_does_not_crash_and_renders`. (Moved from the orphaned bottom-of-file log section, 2026-06-09.)
 
-**Effort:** ~1 week. **Status:** complete and tagged `v0.7.0-e2.6` at `e8514eb`. Dogfood confirmed Ctrl+Shift+D inverts colours, Ctrl+wheel zooms, keyboard zoom works.
-
-The `Markoff::Theme` infrastructure exists and ships
-`defaultLight()`/`defaultDark()`, per-slot fonts/colours, and a
-`fontSizeMultiplier(Slot)` getter — but every QML delegate hardcodes
-its `font.pixelSize`/`font.family`/heading-level switch. The theme
-object is in practice a decoration over `InlineHighlighter` only. No
-zoom infrastructure exists either.
-
-**Scope (from `docs/handoff/2026-05-09-post-e2-scope.md` §2.E2.6):**
-
-- Route `font.family`/`pixelSize`/`bold`/`italic` for every text-bearing
-  delegate through `Markoff::Theme`. Concrete files:
-  `qml/delegates/{Paragraph,Heading,Blockquote,CodeBlock,ListItem,Math}Delegate.qml`.
-- Replace `HeadingDelegate.qml`'s literal switch (28/24/20/18/16/14)
-  with theme-driven `font(Heading) * fontSizeMultiplier(HeadingN)`.
-- Add `fontScale` Q_PROPERTY on `LiveListModelBinding` (or a sibling
-  controller). All delegate font-size reads multiply by it.
-- Wire `Ctrl+=` / `Ctrl+-` / `Ctrl+0` (reset) / `Ctrl+wheel` zoom into
-  `LiveActionController`'s QAction set.
-- Light/dark toggle action.
-
-**Reading order for a fresh agent:**
-
-1. `docs/handoff/2026-05-09-post-e2-scope.md` §1.2, §1.3, §2.E2.6 —
-   audit + scope statement.
-2. `libs/markoff-core/include/markoff/core/Theme.h` — what's already
-   shipped.
-3. `libs/markoff-live/qml/delegates/*.qml` — every delegate that needs
-   updating; survey current font usage before designing.
-4. `libs/markoff-live/src/InlineHighlighter.cpp` — already consumes
-   `Theme::charFormat`; reference for the consumption pattern.
-5. `libs/markoff-live/src/LiveActionController.cpp` — where zoom QActions
-   should live (alongside Cut/Copy/Paste/Bold/etc).
-
-**Open design questions to brainstorm:**
-
-- Where does `fontScale` live? `LiveListModelBinding` (per-binding) or a
-  new `LiveZoomController`? Per-binding matches `Capabilities` flag
-  subtractability (E-arc framing §5).
-- Is `fontScale` a multiplier on theme sizes, or does it feed into
-  `Theme::fontSizeMultiplier` somehow?
-- Light/dark toggle: a per-binding QAction or an app-level setting? How
-  does the test app decide which to ship at launch?
-- Does theme switching invalidate any caches in `InlineHighlighter`?
-
-**Definition of done:** Tag `v0.7.0-e2.6`. All delegates draw fonts
-through `Theme`; Ctrl+= and Ctrl+- visibly resize text; light/dark
-toggle works; an interactive dogfood pass signs off.
+- 2026-06-09 `libs/markoff-core/src/MarkoffDocument.h:18-20` — inv #8 (audit finding) — public header includes `crdt/Anchor.h`/`Clock.h`/`Operations.h`, so view leaves transitively import CRDT types despite their own signatures being CRDT-clean. Fix shape: forward declarations + private-side includes. Related: `Session.h` uses raw `Crdt::Anchor` in public signatures while `Styled::Editor` exposes `Q_PROPERTY(Markoff::Session*)` — legal for consumers (heavy-CRDT policy) but one hop from a view-leaf API; needs an explicit written decision.
 
 ---
 
-## #2 — Cursor architecture cleanup
+## #8 — Flat-view kind follow-ups (one sub-item open)
 
-> **2026-05-16 — Tier 4c implemented.** Last queue #2 concern
-> closed: **#10** (`LiveSelectionView` / `LiveCursorState` dual
-> canonical stores). `LiveSelectionView` is now a stateless Q_OBJECT
-> facade preserving the QML-exposed API; `m_selectionAnchor` (new)
-> + `m_cursor` (existing) on `LiveCursorState` are the sole canonical
-> store, keyed by `BlockAnchor`. Session bridge (`syncSelectionToSession`,
-> `onSessionPrimarySelectionChanged`) moved with the state. The
-> `m_applyingSessionSelection` re-entrance guard is retired via the
-> equality short-circuit on the resolved (BlockAnchor, qtPos) pair
-> (invariant 7 cleared at this site). Spec
-> `docs/specs/2026-05-16-tier-4c-selection-cursor-unification-design.md`;
-> plan `docs/plans/2026-05-16-tier-4c-selection-cursor-unification.md`.
-> Two falsifiability proofs in history (stub-then-revert pairs). New
-> invariant binary `tst_live_render_selection_cursor_unification`
-> with 7 slots covering click-then-shift-click, cross-block shift-arrow,
-> double-click, clear-via-arrow, session round-trip no-echo,
-> selection-survives-structural-edit-above, and orphaned-anchor cleanup.
-> Queue #2 now has no remaining concerns.
->
-> **2026-05-16 — Tier 4b implemented.** Concerns **#3** (three
-> overlapping `requestTextCaretAt*` APIs — two unused variants
-> `requestTextCaretAtNewRow` and `requestTextCaretAtAnchor` deleted;
-> `requestTextCaretAtRow` retained as row-keyed convenience over
-> `establishFocus`) and **#4** (the second pending slot `m_pendingRow`
-> and its resolvers / slot handlers / signal connections deleted)
-> both closed. Spec
-> `docs/specs/2026-05-16-tier-4b-pending-slot-consolidation-design.md`;
-> plan `docs/plans/2026-05-16-tier-4b-pending-slot-consolidation.md`.
-> Falsifiability proofs A (m_pendingRow inert; full suite still
-> green) and B (initial-focus seed disabled; new
-> `initial_focus_lands_on_textedit_not_delegate_root` slot fails) both
-> committed and reverted in-history. Initial-focus seam closed via
-> `LiveView.qml`'s `onCountChanged` calling
-> `cursorState.requestTextCaretAtRow(0, 0)` once on first model
-> population (spec §4.4 prescribed `Component.onCompleted`; the
-> implementation moved to `onCountChanged` because `onCompleted` fires
-> before the debounced model load completes — see commit `dde6413`
-> message). Remaining concern: **#10**
-> (`LiveSelectionView` / `LiveCursorState` dual canonical stores) →
-> tier 4c.
->
-> **2026-05-16 — Tier 4 (partial) implemented.** Concerns **#5**
-> (cursor API poking doc flush — now routed through
-> `LiveListModelBinding::flushPendingDocumentChanges`), **#9**
-> (`tryResolvePending` unspecified transients — `validateVariant` is
-> now doc-aware and null-safe; the bypass is gone), and **#12**
-> (typed `currentTextCaret()` accessor — replaces the
-> `cursor()` + `std::get_if<TextCaret>` pattern at the two call
-> sites in `LiveListModelBinding`) all closed in tier-4 commits.
-> Remaining concerns: **#3** (three overlapping `requestTextCaretAt*`
-> APIs), **#4** (single-valued `m_pendingRow` plus the second
-> `m_pendingFocus` slot — two pending mechanisms now coexist), **#10**
-> (`LiveSelectionView` / `LiveCursorState` dual canonical stores).
-> Those three are substantive design refactors and deserve their
-> own spec-and-plan pass.
->
-> **2026-05-15/16 — Tier 3 (kind-transition delegate architecture) implemented.** Spec
-> `docs/specs/2026-05-15-tier-3-kind-transition-delegate-architecture-design.md`;
-> plan `docs/plans/2026-05-15-tier-3-kind-transition-delegate-architecture.md`.
-> Addressed the `kindOnlySwap`/`beginResetModel` workaround (discipline-log entry
-> 2026-05-11, now closed at d60f896). Cursor concern **#9** (`tryResolvePending`
-> unspecified transients) remains open — logged at discipline-log line 65 as the
-> explicit next concern for a tier-4 cursor pass.
->
-> **2026-05-15 — Tier 2 implemented.** Spec
-> `docs/specs/2026-05-15-tier-2-cursor-typing-authority-design.md`;
-> plan `docs/plans/2026-05-15-tier-2-cursor-typing-authority.md`.
-> Concerns **#1** (docstring honesty), **#2** (cachedQtPos rename),
-> **#6** (per-keystroke invariant test — 5 slots on
-> `LiveRealisticInputHarness`) all closed. Falsifiability proof
-> committed + reverted per invariant 4. Concern **#9** deferred to
-> tier 3 with discipline-log entry naming the unspecified
-> transients in `tryResolvePending`. Remaining concerns: #3, #4, #5,
-> #10, #12.
->
-> **2026-05-11 — Tier 1 (focus-chokepoint) implemented.** Concerns
-> **#1 (partial — structural side)**, **#7**, **#8**, **#11** are
-> resolved. See `docs/specs/2026-05-11-focus-chokepoint-design.md`,
-> `docs/plans/2026-05-11-focus-chokepoint.md`, and the dogfood
-> request at `docs/handoff/2026-05-11-focus-chokepoint-dogfood-request.md`.
-> Tag `v0.8.0-focus-chokepoint` held pending interactive sign-off.
-> Remaining concerns (#1 full, #2, #3, #4, #5, #6 full, #9, #10,
-> #12) tier into tier 2/3/4 per spec §10; no spec yet, gated on
-> tier-1 dogfood. Bug C (click-path chokepoint bypass) surfaced
-> only during the Task 16 revert and is also fixed; falsifiability
-> proof now covers both sides of the seam (`establishFocus` stub
-> `20dcaee` + `takeFocus` stub `2d609ba`).
->
-> **2026-05-11 (dogfood re-pass):** D-fc-1 (HR focus loss) and
-> D-fc-2 (new-heading impermeable to arrow keys) both fixed in
-> commit `4fb711f`. The deeper root cause for D-fc-2 was an
-> architectural one: `DelegateChooser` does not swap delegates on
-> `dataChanged`, and the pool reuses the wrong template under
-> remove+insert at the same row. `LiveBlockModel::applyOps` now
-> detects the kind-change pattern and emits a `beginResetModel`/
-> `endResetModel` for it. Chokepoint invariant suite 21/21.
->
-> **2026-05-11 (D-fc-3):** Follow-on dogfood found arrows still
-> didn't move past *already-existing* HRs. Root cause was the
-> chokepoint always staging a `TextCaret` cursor variant —
-> invalid for non-text-bearing kinds (HR, Image). Clicking on or
-> near an HR left the cursor in an invalid TextCaret state that
-> the HR delegate's `isSelected` guard rejected, breaking arrow
-> navigation entirely. Fixed in commit `9b30d75` by making the
-> chokepoint *variant-aware* via the existing
-> `BlockKindRegistry.supportedCursorVariants` — the generalisable
-> rule is "the chokepoint never stages a variant the target
-> can't honour." `focusedAnchorRow()` extended to all variants
-> for the same reason. Image and Math gain the same affordance
-> for free. Chokepoint suite now 28 tests (was 21), with the new
-> tests pinning the rule.
->
-> **2026-05-13 — Block-only kinds spec + plan landed.**
-> Spec: `docs/specs/2026-05-13-block-only-kinds-design.md`
-> Plan: `docs/plans/2026-05-13-block-only-kinds.md`
-> Work: 14-task chain on `exploration/new-foundation`. Delivers:
-> - `BlockKindDescriptor::isBlockOnly` explicit flag (HR + Image = true, Math = false)
-> - `BlockKindRegistry::isBlockOnly()` predicate — single decision point
-> - `BlockOnlyDelegateBase.qml` shared base (HR + Image inherit; Math unchanged)
-> - Navigation land-and-step (R-arrow-into/out): HR + Image are cursor stops
-> - Merge fence (R-backspace/delete-adjacent): fixes D-fc-4 orphaned cursor
-> - R-delete/enter/type/tripleclick: full block-only UX complete
-> - 16 new invariant tests (8 HR + 8 Image), falsifiability stub in history
+Cluster from the 2026-05-29 WP-unification dogfood arc. Sub-items
+1 (BlockQuote split), 2 (setext canonicalisation), 4 (ordered-list
+numbering), 5 (attr hash gate), 6 (`tst_source_widget_format_ops`
+triage + `setHeadingLevel` SEP_LEN fix), 7 (`tst_styled_block_formats`
+triage), and 8 (styled structural-key authority) are **all closed** —
+full records in the archive snapshot and their specs/plans.
 
-**Effort:** ~3 days. **Status:** critique captured (verbally during
-S1/S2/S3 pass), no spec, no plan.
-
-The S1/S2/S3 fix surfaced 12 architectural concerns in
-`LiveCursorState`. The Tier 2 attempt to fix them all at once
-overreached and caused multiple production regressions (typing reverses
-chars; Shift+Enter inert; arrow up skips paragraphs; cursor lost on
-Enter; column preservation broken). The partial revert in `6c44a07`
-left these concerns standing.
-
-**The 12 concerns** (from the critique notes; full text was in the
-pre-clear conversation, but the headlines + repro live below; the agent
-should read the relevant code to recover detail):
-
-1. `LiveCursorState`'s docstring claims "single canonical cursor value"
-   but `m_cursor` was never updated during typing pre-Tier-2; Tier 2
-   added the sync but the architecture still assumes pre-Tier-2 in
-   places.
-2. `TextCaret::cachedByteOffset` is named for bytes but receives `qtPos`
-   (UTF-16 code units) at every assignment site. Silent footgun for
-   non-ASCII content. `Coordinates::qtPosToByte` exists in
-   `LiveEditBinding.cpp:151` but isn't applied to TextCaret writes.
-3. Three `requestTextCaretAt*` APIs with overlapping resolution
-   semantics:
-   - `requestTextCaretAtRow(row, qtPos)` — resolves immediately if row
-     exists, else pending on `rowsInserted`.
-   - `requestTextCaretAtNewRow(row, qtPos)` — pure-pending row-keyed.
-   - `requestTextCaretAtAnchor(anchor, qtPos)` — pure-pending
-     anchor-keyed.
-   The choice depends on understanding the diff that's about to fire,
-   with docstring tripwires ("do not use after d2ApplyBufferEdit that
-   changes content") that aren't enforced.
-4. The pending-request slot is single-valued (`std::optional<PendingRow>`).
-   Latest-request-wins by convention, not by type.
-5. `flushPendingD2Changed` inside `requestTextCaretAtRow`
-   (`LiveCursorState.cpp:115`) is the cursor API poking the document's
-   internal flush plumbing — leaky abstraction.
-6. No invariant test asserts that `cursorState.focusedQtPos` matches the
-   focused `TextEdit`'s `cursorPosition` after every keystroke.
-7. `Component.onCompleted`'s match check is captured at construction
-   time; if the structural signal resolves AFTER, the new delegate never
-   focuses (suspected source of "cursor gone after Enter").
-8. `Connections { onCursorChanged }` doesn't `forceActiveFocus` —
-   non-VisualLineHint cross-block requests set `edit.cursorPosition` but
-   don't migrate Qt focus. Same suspicion as #7.
-9. `validateVariant` reads model state on read, not on write. A cursor
-   with a wrong variant for the current kind is silently swallowed.
-10. Selection state (`LiveSelectionView`) and cursor state
-    (`LiveCursorState`) are independent canonical stores with their own
-    sync paths; they overlap in concept.
-11. The "kind transition return point clamps to `rec.text.size()`"
-    pattern (just landed in `6c44a07`) is correct surgically but the
-    same clamp is needed everywhere TextCaret is consumed in a
-    delegate. Currently scattered between `focusEditAt`'s
-    `if (qtPos <= edit.length)` guard and the request-site clamp.
-12. `m_cursor` is exposed by-value (`Cursor cursor() const`) — callers
-    in `LiveListModelBinding.cpp` had to `std::get_if<TextCaret>(&cur)`
-    against a local copy. A typed `currentTextCaret() -> std::optional<TextCaret>`
-    would be clearer.
-
-**Reading order for a fresh agent:**
-
-1. `libs/markoff-live/include/markoff/live/LiveCursorState.h` — the
-   contract (read first, includes the API surface).
-2. `libs/markoff-live/src/LiveCursorState.cpp` — implementation.
-3. `libs/markoff-live/src/LiveListModelBinding.cpp` — kind-transition
-   call sites and the `cursor()` consumers.
-4. `libs/markoff-live/src/LiveEditBinding.cpp` — `syncFromTextEdit`
-   producer.
-5. `libs/markoff-live/qml/delegates/{Paragraph,Heading,Blockquote,CodeBlock,ListItem}Delegate.qml`
-   — the QML consumer pattern (`Connections { onCursorChanged }` and
-   `Component.onCompleted` both consume `focusedAnchorRow`/`focusedQtPos`).
-
-**Open design questions to brainstorm:**
-
-- Is concern #2 (bytes vs qtPos) a rename-only fix or does it require
-  semantic migration (some call sites might actually want bytes)?
-- Concerns #3 + #4 — is consolidating the three request APIs to one
-  with a `ResolveMode` enum strictly an improvement, or does the
-  variation reflect real differences worth preserving?
-- Concern #8 — should `Connections.onCursorChanged` call
-  `forceActiveFocus` on the matching delegate? What guards against
-  stealing focus during transient cursorChanged emissions?
-- Are concerns #7/#8 actually bugs in production, or theoretical? An
-  interactive dogfood probe (queue item #4 might surface evidence)
-  should inform priority within this plan.
-
-**Definition of done:** All 12 items either fixed or deliberately
-deferred with rationale in the spec. Invariant test added (#6).
-Existing 186/186 tests still pass. No new functional regressions in an
-interactive dogfood pass.
+**#8.3 — Source-view list-item markers (OPEN).** `markoff-source`
+consumes `widgetFlatView()`, which for ListItem yields the post-marker
+buffer — so source shows `foo` instead of `- foo` for a `- foo` item.
+Source view's whole point is "raw markdown visible." Either (a) source
+uses `serializeForSave()` for its initial seed plus a separate
+marker-aware widgetFlatView variant, or (b) keep `widgetFlatView()` and
+have the binding prepend markers via per-block decoration. Architectural
+spec needed; touches `SourceTextDocumentBinding` and the
+`markoff-source` Editor.
 
 ---
 
-## #3 — QML integration-test harness ✅ IMPLEMENTED 2026-05-10
+## #10 — Deterministic live-test failures (the former "3 known offscreen flakes")
 
-**Effort:** ~1 day. **Status:** implemented in
-`tst_live_render_qml_integration` (commit chain ending Task 11).
+**Filed 2026-06-09.** The 2026-06-09 audit ran the three failing
+binaries in isolation twice: **all 6 failing slots are deterministic
+under offscreen** — identical failures across runs. The "offscreen
+flake" label was masking real triage debt (some slots have been failing
+since ~2026-05-21). Classify-before-fixing applies per slot:
 
-Eight slots cover the queue-listed regression class. The harness loads
-production Main.qml via the markoff-live-app-internal STATIC library
-and drives input through LiveRealisticInputHarness (now wired up for
-the first time since it was authored). Three-layer assertion
-convention enforced: every edit asserts on buffer/model/delegate so
-failures pinpoint the broken pipeline link.
+1. `tst_live_render_e2_nav_shift_extend` —
+   `ctrl_shift_left_inside_block_returns_not_handled` +
+   `ctrl_shift_right_...` (2 slots). **Already classified** as
+   behavioral drift from the audit-L4 word-extend rework (`0cbdf48`);
+   see the 2026-05-22 Discipline Log entry. Either the
+   `LiveNavigationController` "claims the chord" behavior is correct
+   and the test contract should be renamed/reshaped, or the
+   not-handled return was load-bearing for a consumer. Owner: whoever
+   next pulls on `LiveNavigationController`.
+2. `tst_live_render_focus_chokepoint_invariant` — `undo_after_enter`,
+   `redo_after_undo`, `nav_into_runtime_promoted_heading` (3 slots).
+   Undo/redo caret restoration through the chokepoint; partial
+   investigation log in the archive snapshot (§#6 historical notes).
+   Suspect real gaps in undo-path caret authority
+   (VIEW-IMPLEMENTORS-GUIDE §B.4 partial).
+3. `tst_live_render_cursor_typing_invariant` —
+   `cursor_mirrors_textedit_through_emoji_typing` (1 slot). Surrogate-
+   pair (UTF-16) qtPos mirroring during typing; relates to queue-#2
+   concern #2 (bytes-vs-qtPos naming) which closed without a semantic
+   migration.
 
-Follow-ups:
-- queue.md #4 (chop-\n): surfaced and guarded by
-  `shift_enter_creates_visible_newline`'s two QEXPECT_FAIL markers.
-- Theme QML method registration in test env may limit pixelSize
-  assertions in `ctrl_wheel_zooms_font_scale` (graceful degradation).
-
----
-
-## ~~#4 — Chop-trailing-`\n` investigation + fix~~ ✅ COMPLETE 2026-05-18 (B1 spec)
-
-**Status:** complete. Landed in commits `a4df009` (markoff-core: B1 buffer convention) + `0f7de6c` (markoff-live: retire onD2Changed chop). Spec: `docs/specs/2026-05-18-b1-buffer-convention-design.md`. Plan: `docs/plans/2026-05-18-b1-buffer-convention.md`. Closes the long-standing soft-break regression in `shift_enter_creates_visible_newline`.
-
-**Effort:** ~1 day (refactor + fan-out fixes).
-**Status:** 2026-05-16 — investigation complete; chop's premise *is*
-wrong but the fix has substantial blast radius. Two safe-now changes
-landed (matchesSetextShape trailing-`\n` tolerance + clarifying
-comment on the chop pointing at this entry). The full fix is a
-buffer-convention refactor, written up below as the plan.
-
-### Investigation findings (2026-05-16)
-
-`materializeBlocksFromParsedDoc` in `libs/markoff-core/src/MarkoffDocument.cpp:1690`
-stores `bodyUtf8.mid(tb.byteStart, tb.byteEnd - tb.byteStart)` as the
-CRDT buffer for each block. Tree-sitter's byte range **does include**
-a trailing `\n` when the source has one (e.g. `"first\n\nsecond"` →
-block 0 buffer = `"first\n"`); it doesn't when the source doesn't
-(`"Heading"` standalone → buffer `"Heading"`). So the load convention
-is "buffer is whatever bytes tree-sitter delimited, including or
-excluding a trailing `\n`".
-
-The chop normalises that to "no trailing `\n` ever" at the display
-edge. **But** the same storage representation collides with
-user-typed soft breaks: after Shift+Enter at end of `"Heading"`,
-`insertSoftBreak` produces buffer `"Heading\n"` — indistinguishable
-from a loaded block whose source line ended with `\n`. The chop
-strips both. Loaded blocks: correct. Soft-broken blocks: bug
-(cursor can't park at pos 8, soft break invisible).
-
-`isBlockTouched()` exists but doesn't help disambiguate — any edit
-flips it (even unrelated character insertions), and a touched block
-might still have a load-time `\n` mixed with user edits elsewhere.
-
-The four downstream consumer categories of `BlockRecord.text`:
-
-  * **Kind-transition inference** (`inferBlockKind`, `countLeadingHashes`,
-    `matchesSetextShape`, `kPromoteMarker`): a few are sensitive to a
-    trailing `\n`. `matchesSetextShape` is the most fragile — it
-    `lastIndexOf('\n')` and treats the tail as the underline; with a
-    trailing `\n` the tail is empty and the match fails. Fixed
-    defensively in 2026-05-16 commit (trim trailing newlines first).
-  * **Navigation length** (`LiveNavigationController`, `LiveStructuralKeyHandler`):
-    use `text.length()` as "end of block". A chopped text gives a
-    shorter length than the buffer — consistent with the delegate's
-    `TextEdit.length` (which is also the chopped text), so today
-    these are internally consistent.
-  * **Clipboard / selection** (`LiveSelectionView`, `LiveClipboardController`):
-    serialize chopped text to the clipboard. Correct for delimiter `\n`
-    (user doesn't want it); wrong for soft-break `\n` (user expects
-    the line break preserved).
-  * **QML delegates** (`UnifiedInlineTextDelegate`, `CodeBlockDelegate`,
-    `MathDelegate`): bind `TextEdit.text` to `model.text`. The chopped
-    value is what renders. Soft breaks therefore can't be visible at
-    all under the current convention.
-
-### Attempted fix and its blast radius (2026-05-16)
-
-Tried Option B-pure (strip trailing `\n` in
-`materializeBlocksFromParsedDoc`, remove the chop in
-`LiveListModelBinding`): **12 test binaries failed**, including two
-subprocess aborts (`tst_markoff_doc_apply_structured_paste`,
-`tst_d4_apply_flat_edit`). The convention "buffer carries its
-delimiter `\n`" is load-bearing for `applyFlatEdit`'s text-as-flat
-reconstruction, the merge cmds (`backspaceMerge`, `deleteMerge`)
-both have explicit `stripsTrailingNewlineAtBoundary` tests, and
-several round-trip serializers assume it.
-
-Option A (kind-aware chop) doesn't separate the two cases either —
-a paragraph that was Shift+Entered at end has the same buffer shape
-as a paragraph that was loaded from `"text\n"`. Per-block "load-time
-delimiter" tracking is the only way to distinguish, and that's a
-substantial new piece of state.
-
-Option C (no chop + audit) has the same blast radius as Option B
-because the downstream consumers expect chopped text.
-
-### Plan for the proper fix
-
-1. **Pick a single buffer invariant.** Either
-   * **B1**: buffer is *always* terminator-free; load strips, the
-     serializer reconstructs the inter-block separator from
-     `interBlockSeparator()` for every block (not just touched ones);
-     `applyFlatEdit` and the merge cmds and `blockLoadTimeBytes` all
-     stop carrying the trailing `\n`. — or —
-   * **A1**: buffer always carries a single trailing `\n` (loaded
-     blocks already do; load adds `\n` for sources that don't end
-     with one; runtime adds `\n` on `d2InsertBlock` for new blocks).
-     Soft-break inserts `\n` *before* the terminator. The chop
-     becomes a strip of exactly the terminator; the soft-break `\n`
-     survives because it's not the *last* `\n`.
-
-   B1 is cleaner conceptually but touches more files. A1 is more
-   surgical but introduces a buffer-storage detail callers must
-   honour.
-
-2. **Audit and update** the consumer surface enumerated above. Each
-   consumer either gains an explicit "is the trailing `\n` part of
-   content?" check or accepts the new invariant verbatim.
-
-3. **Regression-test the soft-break case end-to-end.** The existing
-   `shift_enter_creates_visible_newline` test already has two
-   `QEXPECT_FAIL` markers ready to remove. Add a peer test that
-   types Shift+Enter+`-` and asserts the buffer is `"Heading\n-"`
-   not `"Heading-\n"` (the original symptom queue.md #4 was
-   chasing).
-
-4. **Round-trip verification.** Load a setext-heavy document, no
-   edits, save, diff against source — must be byte-identical for
-   untouched blocks. Then edit one paragraph (Shift+Enter at end),
-   save, diff — the new `\n` should appear in the right place.
-
-### Defense-in-depth fix (landed 2026-05-16)
-
-`matchesSetextShape` no longer fails when the buffer has a trailing
-`\n` — it strips trailing newlines before looking for the underline
-line. Pure additive change; no other tests affected. Without this,
-typing Shift+Enter inside a setext heading buffer (which can produce
-`"Heading\n=\n"`) would fall out of the setext path and demote to
-paragraph spuriously.
-
-### Original investigation notes (preserved)
-
-
-
-While debugging the cursor regressions, the chop in
-`LiveListModelBinding::onD2Changed:311–312` turned up as suspicious:
-
-```cpp
-QByteArray raw = doc->blockText(id);
-// Trim trailing newline. Per-item ListItem blocks have content-only
-// buffers (the parser strips all trailing newlines from the per-item
-// content). The single trailing '\n' is the block-delimiter convention.
-if (raw.endsWith('\n'))
-    raw.chop(1);
-r.text = QString::fromUtf8(raw);
-```
-
-For a paragraph that just received a soft break (Shift+Enter), buffer
-becomes `"Heading\n"`. The chop strips the `\n` → `model.text = "Heading"`
-→ delegate's `edit.length = 7` → cursor cannot reach `qtPos=8` (Qt's
-`QQuickTextEdit::setCursorPosition` rejects `pos > characterCount-1`).
-Symptom: Shift+Enter+typing setext underlines lands the underline
-character at the wrong byte offset (before the soft break, not after),
-producing `Heading=\n` instead of `Heading\n=`.
-
-The `typeShiftEnterDashes_producesSetextH2` unit test passes only
-because it bypasses the cursor logic and calls `d2ApplyBufferEdit` at
-byte 8 directly.
-
-**Investigation tasks:**
-
-1. Confirm with a test (either new harness from #3 or a
-   focused-typing test in existing infrastructure) that production
-   Shift+Enter+typing-`-` produces `Heading=\n` not `Heading\n-`.
-2. Read `MarkoffDocument::loadFromMarkdown` and the parser's
-   block-buffer convention — does load add trailing `\n` to all blocks?
-   If yes, the chop is correct *for loaded blocks*. If no, the chop's
-   premise is wrong.
-3. Decide on a fix shape:
-   - **Option A:** kind-aware chop. Paragraphs with internal `\n`
-     content keep the trailing `\n`; other kinds chop as today.
-   - **Option B:** change the buffer convention so blocks never end
-     with `\n` (load + insertSoftBreak both normalise).
-   - **Option C:** stop chopping; let the trailing `\n` show. Audit
-     every consumer of `BlockRecord.text`.
-
-**Reading order:**
-
-1. `libs/markoff-live/src/LiveListModelBinding.cpp:308-313` — the chop.
-2. `libs/markoff-core/src/Cmd/D2.cpp:49-54` — `insertSoftBreak`.
-3. `libs/markoff-core/src/MarkoffDocument.cpp` (search for
-   `loadFromMarkdown` / block insertion) — the load convention.
-4. `libs/markoff-core/tests/d2/tst_d2_cmd_decomposition.cpp:50-56` —
-   confirms `insertSoftBreak` produces a trailing `\n` buffer.
-5. Every consumer of `BlockRecord.text` (grep `recordAt` /
-   `record.text`) — Option C audit surface.
-
-**Open design questions to brainstorm:**
-
-- Is the original "block-delimiter convention" comment (in the chop
-  code) still accurate? Was it ever?
-- If Option B (normalise convention), what about `loadFromMarkdown` of
-  documents already containing trailing `\n` — does the parser
-  preserve them by intent?
-- Can we test #1 without #3's harness, or is the harness a hard
-  prerequisite?
-
-**Definition of done:** Either the chop is provably correct (close
-this item with a regression test guarding the convention) or it's
-fixed (with a regression test for Shift+Enter+typing-`-` →
-`Heading\n-` in the buffer).
+**Definition of done:** each slot either green or its contract
+explicitly renamed/reshaped with rationale (classify first); the
+"known failures" language is removed from STATUS.md/CLAUDE.md when the
+count reaches 262/262.
 
 ---
 
-## #5 — Code review of recent cursor-fix commits ✅ CLOSED 2026-05-10
+## #11 — Legacy flat-buffer APIs: retire or migrate
 
-**Effort:** <1 hour. **Status:** done. See banner at top for disposition.
+**Filed 2026-06-09.** `SearchEngine::findAll`/`findNext`/`findPrevious`
+and `CompletionDetector::detect` read `toMarkdown()`/`toMarkdownUtf8()`
+(the legacy flat buffer) and anchor results in that buffer's coordinate
+space. On a D2-loaded document the legacy buffer is stale-or-empty, so
+they return nothing useful. **They have zero production callers**
+(D2-native find is `SearchEngine::findByBlock` via `FindController`;
+live-leaf completion went with the retired view) — only their unit
+tests exercise them. Header doc-comments added 2026-06-09 state the
+constraint.
 
-Three commits implement the S1/S2/S3 fix and its pivots:
-
-- `463fc36` — Tier 2 (canonical sync, focusedQtPos clamp, delegate hooks).
-- `9ca7cb0` — defense-in-depth (silent qtPos-only emit, flush-then-sync).
-- `6c44a07` — partial revert (drop clamp + silent-emit, restore Tier 1
-  surgical fix on top of canonical sync).
-
-**To execute:** dispatch the `qt-code-reviewer` agent in foreground:
-
-> Review commits `463fc36..6c44a07` inclusive on branch
-> `exploration/new-foundation` in
-> `/home/clinton/dev/Markoff/.worktrees/foundation-exploration/`.
-> Context: implementing setext/ATX kind-transition cursor re-anchoring
-> (S1/S2/S3 from `docs/handoff/2026-05-09-setext-dogfood-findings.md`).
-> The chain pivoted twice; please flag any leftover dead code,
-> unit-test gaps, suspicious cross-call ordering, qtPos vs byte-offset
-> confusion, and Qt6 best-practice deviations. Specifically scrutinise
-> `LiveCursorState::syncFromTextEdit`, the kind-transition return
-> blocks in `LiveListModelBinding::onD2Changed`, and the
-> `onCursorPositionChanged` handlers added to the 5 text-bearing
-> delegates. Read-only review; report findings as a punch list under
-> 400 words.
-
-**Disposition rule:** findings that overlap queue item #2 (cursor
-architecture cleanup) get folded into that plan when it gets written.
-Findings that don't (style, dead code, isolated bugs) get fixed inline
-before the next dogfood.
+Resolution options when next touched: (a) delete them with their tests
+(API break — fine pre-1.0, nothing consumes them); (b) rewrite over
+`iterateBlocks()`/`blockText()` when a consumer actually wants
+whole-document search-with-Session-selections or completion. Blocked
+on nothing; bundle with any future legacy-buffer retirement pass
+(`toMarkdown` deprecation, `SourceTextDocumentBinding.cpp` legacy
+fallback, `version()`).
 
 ---
 
-## #6 — `nav_into_runtime_promoted_heading` regression (tier-3 fallout) ✅ CLOSED 2026-05-16
+## #12 — `EmbedRegistry` test coverage
 
-**Effort:** ~1 hour. **Status:** fixed — `LiveCursorState::tryResolvePending`'s
-stale-registration check now compares **delegate classes** rather than
-literal kind strings. Within-class transitions (paragraph ↔ heading,
-all in the `text-inline` `delegateClass`) no longer falsely bail.
-Cross-class staleness is preserved via the existing `delegateClassFor`
-mismatch path; an explicit empty-currentKind guard handles unknown
-blocks. Self-heals the registered kind once a class match is
-confirmed. Two `tst_live_cursor_state_chokepoint` unit tests updated
-to exercise post-tier-3 (cross-class) staleness — the pre-tier-3
-literal-kind staleness check is no longer the contract. Side benefit:
-the same fix recovers two pre-existing `tst_live_render_qml_integration`
-stress-test failures (`stress_walk_paragraph_heading_listitem_chain`,
-`stress_walk_enter_then_backspace_merge`). Falsifiability already
-in-tree: the test failed prior to the fix and passes after.
-
-(Historical investigation notes preserved below for context.)
-
-`tst_live_render_focus_chokepoint_invariant::nav_into_runtime_promoted_heading`
-fails on `exploration/new-foundation` post-tier-3 with the chokepoint
-invariant violated:
-
-```
-delegateRow: 2
-cursorRow  : 1
-```
-
-i.e. after the test promotes row 1 from paragraph to heading via typing
-`# `, then walks Down→Up, `LiveCursorState::focusedAnchorRow()` reports
-row 1 but `focusedDelegate()->property("modelIndex")` is row 2. Cursor
-state and delegate focus disagree — exactly the class of bug the
-chokepoint invariant suite was built to catch.
-
-The originating regression D-fc-2 ("new heading impermeable to arrow
-keys") was fixed in commit `4fb711f` (see
-`docs/handoff/2026-05-11-focus-chokepoint-dogfood-request.md:153` for
-the original symptom and §D-fc-2 disposition note in queue.md banner
-near line 160). That fix relied on `LiveBlockModel::applyOps` synthesising
-`beginResetModel`/`endResetModel` for the kind-change Delete+Insert
-pattern — a heavy hammer logged as an invariant-7 smell at the top of
-the Discipline Log.
-
-**The tier-3 work (commits `4a7d63a..30891eb`) retired that heavy
-hammer:** within-class kind transitions (paragraph↔heading,
-paragraph↔list-item, etc.) are now `dataChanged` on a single
-`UnifiedInlineTextDelegate` row rather than Delete+Insert. The
-Discipline Log entry that previously logged the hammer is now closed
-with `~~...~~ → fixed in d60f896`. The hammer is gone, but the chokepoint
-invariant test for the exact scenario it was protecting (arrow nav into
-a runtime-promoted heading) regressed at the same time.
-
-**Hypothesis to test first:** `LiveListModelBinding` updates the
-delegate-class on `dataChanged`, but `LiveCursorState::m_delegates`
-caches the *old* `(kind, root)` pair under the BlockAnchor. After the
-within-class kind transition, the new `Up` press resolves the pending
-focus against the stale `m_delegates` entry → focus lands on whatever
-delegate happens to claim activeFocus next (row 2's). Look for the
-delegate-going-away / delegate-available registration ordering during
-a within-class transition in
-`LiveCursorState::{delegateAvailable, delegateGoingAway}` (lines 356–
-404).
-
-**Reading order:**
-
-1. `tst_live_render_focus_chokepoint_invariant.cpp:259` — the test.
-2. `docs/specs/2026-05-15-tier-3-kind-transition-delegate-architecture-design.md`
-   — §5 (delegateClass authority) and §6 (kind-transition flow) describe
-   the new within-class transition mechanism.
-3. `libs/markoff-live/src/LiveCursorState.cpp:356–404` — delegate
-   registration and the chokepoint invariant logic. Especially the
-   `wasRegistered` re-stage at lines 371–381: that branch assumes the
-   delegate-root POINTER survived the kind transition, which under tier-3
-   it does (same UnifiedInlineTextDelegate). Does that path correctly
-   route the pending focus to the same delegate after `kind` changed?
-4. `libs/markoff-live/src/LiveBlockModel.cpp` — the retired
-   `kindOnlySwap` path (Discipline Log entry, line 63 `~~...~~`); the
-   D-fc-2 fix was the synthetic `beginResetModel`/`endResetModel` there.
-5. `docs/handoff/2026-05-11-focus-chokepoint-dogfood-request.md:153`
-   — the original D-fc-2 symptom; the test was written FOR this scenario.
-
-**Definition of done:** test green, with at least one paragraph in the
-commit message explaining why the tier-3 delegate-identity-preservation
-doesn't conflict with the chokepoint invariant for runtime-promoted
-headings. If the fix requires re-introducing a kind-transition-aware
-hammer, log a fresh invariant-7 entry in the Discipline Log explaining
-why the tier-3 retirement wasn't sufficient — the smell trail matters.
-
-**Open question:** are any of the other 5 baseline failing tests in
-`tst_live_render_qml_integration` (per tier-3 spec §117-119) actually
-the same regression? Worth running them after the fix lands to see if
-the count drops.
+**Filed 2026-06-09.** `EmbedRegistry` + `MarkdownRenderChild` +
+`EmbedDepthGuard` were restored for the Corbomite port (`47f62c4`),
+then grew `hasExtension`/`unregisterExtension` (`e8986f8`) — all with
+**zero test references**. Corbomite consumes the registry
+(`MainWindow` + `HoverPopover`). Needs a small unit binary:
+register/unregister/has, extension dispatch, depth-guard recursion
+cap. Also untested: `Gutter` (markoff-source), `StyledTableRenderer`
+(indirect only via `tst_styled_table_render`'s editor path).
 
 ---
 
-## #7 — Cursor authority for the flat-text view leaves (styled + source) ✅ CLOSED 2026-05-27
+## #13 — Source-view cursor/selection translation rewrite (from retired TODO.md)
 
-**Closed.** B.1 (Enter creates paragraph + caret lands correctly) and B.3
-(cross-block merge caret) are both solved. B.2/B.4 remain partials — see
-guide §B for the open follow-ups (collab/undo caret).
-
-**Spec:** `docs/specs/2026-05-27-flat-view-enter-and-caret-authority-design.md`
-
-**Implementation commits:**
-- `ff33a6e` — `applyInteractiveNewline` + `m_pendingCaret` staging in `SourceTextDocumentBinding`
-- `88cc5dc` — `caretResolved` signal wired in `markoff-styled` Editor + `markoff-source` Editor
-- `a7535e3` — sep-view caret resolution at tail of `onD2DocumentChanged`
-- `eb685f0` — fix `findBlockAtSepByte` separator-zone underflow (prerequisite bug found in review)
-
-**Root cause (corrected from handoff brief):** the structural edit was *dropped*
-entirely — `applyFlatEdit`'s cursor-edit start-of-next-block bias + empty-head
-suppression + the no-empty-block invariant made a lone boundary `\n` a no-op,
-so no paragraph was created. The caret drift was a secondary symptom. The fix
-required both a new forward-path ingress (`applyInteractiveNewline`) and the
-caret re-assertion chokepoint.
-
-**Design reference:** [`VIEW-IMPLEMENTORS-GUIDE.md`](VIEW-IMPLEMENTORS-GUIDE.md) §B (updated 2026-05-27).
-
----
-
-## #8 — Flat-view kind follow-ups (BlockQuote, Setext, source markers, list grouping, attr hash)
-
-Cluster of related follow-ups from the 2026-05-29 WP-unification dogfood
-arc. Loosely ordered easiest → hardest; pick by dogfood pressure.
-
-1. ~~**BlockQuote internal `\n` collapse.**~~ → code-complete 2026-05-29
-   (parser walker recursion + load-side marker strip + serializer
-   reconstruction + StyleApplier depth read). Spec
-   `docs/specs/2026-05-29-blockquote-multi-paragraph-split-design.md`;
-   plan `docs/plans/2026-05-29-blockquote-multi-paragraph-split.md`.
-   **Dogfood-surfaced regression filed as #8.8 below — full closure
-   gated on that bisect.** Scope went beyond the original "(a) strip
-   markers" framing: a single parser `block_quote` is split into
-   per-inner-child TLBs (multi-paragraph quotes → N model blocks
-   sharing a `BlockQuoteRunId`; nested `> >` carries depth=2;
-   non-paragraph children — heading/code/list inside a quote —
-   preserve native kind + take quote context via attrs). Serializer
-   reads depth + RunId to reconstruct `> ` × depth and `\n>\n` vs
-   `\n\n` separators. StyleApplier reads depth from attrs and
-   overlays left-margin on non-BlockQuote inner kinds. Tests: 6
-   parser slots in `tst_document_top_level_blocks`, 10 buffer +
-   round-trip slots in `tst_block_buffer_invariant`, 3 render-
-   invariant slots in `tst_styled_dogfood_invariants`. All pass;
-   baseline 249/254 binary pass count preserved (same 5 pre-existing
-   failures).
-
-2. ~~**Setext `Heading` internal `\n` collapse.**~~ → closed 2026-05-29
-   in `0291ac6`. Load-side strip + soft-break collapse in
-   `materializeBlocksFromParsedDoc`; `serializeHeading` reconstructs
-   underline from `(content.size(), level)`; `serializeForSave`
-   fast-path bypasses for setext (untouched setext goes through
-   reconstruction because `blockLoadTimeBytes` is the post-canon
-   buffer). `LiveListModelBinding`'s form-aware demote tightened to
-   require multi-line buffer — single-line is the canonical setext
-   shape under the new convention. Width drift on load+save accepted
-   (CommonMark accepts ≥1 chars). Spec:
-   `docs/specs/2026-05-29-setext-heading-buffer-canonicalisation-design.md`.
-   Plan: `docs/plans/2026-05-29-setext-heading-buffer-canonicalisation.md`.
-
-3. **Source-view list-item markers.** `markoff-source` flat-text widget
-   consumes `widgetFlatView()`, which for ListItem yields the post-marker
-   buffer — so source shows `foo` instead of `- foo` for a `- foo` item.
-   Source view's whole point is "raw markdown visible." Either (a) source
-   uses `serializeForSave()` for its initial seed plus a separate
-   marker-aware widgetFlatView variant, or (b) keep `widgetFlatView()` and
-   have the binding prepend markers via per-block decoration. Architectural
-   spec needed; touches `SourceTextDocumentBinding` and the
-   `markoff-source` Editor.
-
-4. ~~**Ordered-list continuous numbering** in `markoff-styled`.~~ →
-   closed 2026-05-29 in `511ab81`. `manageListMembership` helper runs
-   once per block in the `applyFormats` walk, OUTSIDE the hash gate,
-   maintaining a depth-stack of `{depth, markerStyle, QTextList*}`.
-   Consecutive same-style items share one `QTextList`; nested-list
-   transitions resume the outer list (`1, ?, 2`); paragraph between
-   items breaks the chain; marker-style change at same depth also
-   breaks. `applyListItem` refactored to format-only. Spec:
-   `docs/specs/2026-05-29-styled-ordered-list-continuous-numbering-design.md`.
-   Plan: `docs/plans/2026-05-29-styled-ordered-list-continuous-numbering.md`.
-
-5. ~~**Hash gate covers attrs.**~~ → closed 2026-05-29 in `42720f3`.
-   `computeBlockHash` now mixes the full `blockAttrs(id)` QHash via
-   XOR (order-insensitive). Slightly over-conservative on attrs that
-   don't drive rendering — acceptable vs. an allowlist that drifts.
-   Falsifiable test
-   `tst_styled_dogfood_invariants::attr_toggle_re_renders_task_marker`
-   pins the contract (toggle Checked on a task ListItem → marker
-   flips to Checked after the cascade). Spec:
-   `docs/specs/2026-05-29-styled-hash-gate-over-attrs-design.md`.
-   Plan: `docs/plans/2026-05-29-styled-hash-gate-over-attrs.md`.
-
-6. ~~**`tst_source_widget_format_ops` 4 failures.**~~ → CLOSED 2026-05-30.
-   Classified before fixing (per the classify-first rule). **3 drift, 1
-   real bug.** Drift: `toggleBold_at_block_boundary` +
-   `insertLink_at_block_boundary` hardcoded 2-byte-era qt-positions and
-   `\n\n` expectations (the `wrapToggle`/`insertLink` code was already
-   correct — it resolves via the shared `findBlockAtSepByte`, which uses
-   `SEP_LEN == 1`); `setHeadingLevel_only_affects_current_line` loaded three
-   single-'\n' lines expecting three blocks, but `buildD2FromBytes` now
-   collapses soft breaks → one block (test reshaped to `\n\n`-delimited
-   blocks). **Real production bug:**
-   `setHeadingLevel_twice_does_not_merge_with_previous_block` exposed that
-   `Editor::setHeadingLevel` carried its *own* block-walk hardcoding
-   `SEP_LEN = 2`, while `lineStartSep` came from the live single-'\n'
-   `toPlainText()` — so `byteInBlock` underflowed (quint32 wrap) for any
-   heading below the first block and the prefix landed at end-of-block
-   (`Hello## `). Ctrl+heading on any non-first line in the source widget was
-   broken in production. Fixed by replacing the bespoke walk with
-   `Detail::findBlockAtSepByte(…, biasForward=false)`, deleting the
-   duplicate `SEP_LEN`. Falsifiability: the two `setHeadingLevel` tests,
-   updated to the new convention, were confirmed still-failing *before* the
-   code fix and green after. Binary now 16/16.
-
-7. ~~**`tst_styled_block_formats` 2 failures.**~~ → CLOSED 2026-05-30. All
-   **drift; no production change** (behavior was correct). Running the binary
-   surfaced a *third* failure not noted here (`list_item_has_left_margin`):
-   - `heading_levels_descend_in_size` read blocks 0,2,4,6,8,10 (old `\n\n`
-     separator blocks); under single-'\n' headings are 0,1,2,3,4,5 and
-     6/8/10 are out-of-range (size 0, so `h4>h5` was `0>0`). Indices fixed.
-   - `list_item_has_left_margin` checked `blockFormat().leftMargin()`, but
-     #8.4 moved list indent onto `QTextList`. Renamed
-     `list_item_indents_via_qtextlist`; asserts list membership + indent.
-   - `horizontal_rule_uses_monospace` read block 2; HR is block 1 under
-     single-'\n'. Index fixed; tightened the Discipline-Log-flagged
-     tautological `|| fontFamilies().size() > 0` to `QVERIFY(cf.fontFixedPitch())`.
-   Binary now 9/9.
-
-8. **Enter at end of bullet under heading merges bullet content into
-   the preceding heading (styled leaf).** Surfaced 2026-05-29 by
-   user dogfood at the laptop, immediately after the #8.1 push
-   (`2a7d757`).
-
-   > **✅ RESOLVED 2026-05-29 on branch `fix/styled-structural-key-8.8`
-   > (8 commits `fdb01a6..1d5dc99`).** Spec
-   > `docs/specs/2026-05-29-styled-structural-key-authority-design.md`;
-   > plan `docs/plans/2026-05-29-styled-structural-key-authority.md`.
-   >
-   > **Verified root cause (all three filed hypotheses below were wrong):**
-   > the styled leaf renders list items with `QTextList`, and Qt's native
-   > list-aware Enter/Backspace/Tab perform block-restructuring that emits
-   > large, content-rewriting `contentsChange` events the observe-and-infer
-   > `SourceTextDocumentBinding` misreads as flat-text structural edits →
-   > routes to `applyFlatEdit` at the wrong byte range → the bullet merges
-   > into the heading with a duplicated first char. Proven with a
-   > Markoff-free bare-`QTextEdit`+`QTextList` control and a falsifiable
-   > headless repro. **NOT a #8.1 regression** — #8.1 (blockquote) is
-   > exonerated; the window opened at `845fc0f` (per-item `QTextList`
-   > bullets, 2026-05-29 09:58), which predates the report's own bisect
-   > point `46643e7`. Reproduces with no blockquote, pure ASCII, single-
-   > line bullet → rules out H1/H2/H3.
-   >
-   > **Fix:** the styled `QTextEdit` (`StructuralTextEdit`) now intercepts
-   > structural keys in `keyPressEvent` BEFORE native editing and forwards
-   > them to `SourceTextDocumentBinding::handleStructuralKey` → a new pure
-   > core `Markoff::StructuralKeyHandler` (kind × key → `Cmd::*`), mirroring
-   > `markoff-live`'s proven pattern. Selections collapse-then-apply via the
-   > extracted `deleteSepRange`; Ctrl+Z/Y route to `undoD2/redoD2`. The
-   > model is authoritative for intercepted keys; the observer path is
-   > retired for them by event consumption (INVARIANTS §2/§3).
-   >
-   > **Second co-cause found + fixed during implementation:** with
-   > interception in place the repro still failed because
-   > `StyleApplier::inferKindFromPrefix` returned `Paragraph` for an empty
-   > buffer, so the kind-transition pass demoted the freshly-inserted empty
-   > `ListItem` back to a paragraph. Now empty buffers preserve the stored
-   > kind (`845fc0f`-era latent bug). Empty Heading/BlockQuote also now stay
-   > their kind until a prefix is typed (v0.2 demotion-on-typing concern,
-   > already acknowledged in `StyleApplier.cpp`).
-   >
-   > **Falsifiable tests:** `tst_structural_key_handler` (24 slots, core
-   > rules), `tst_binding_structural_key` (binding + selection collapse),
-   > and `tst_styled_dogfood_invariants` widget slots incl.
-   > `enter_at_end_of_bullet_under_heading_keeps_structure` (proven to fail
-   > with interception stubbed). **#8.1 closure stands.** Awaiting user
-   > dogfood signoff on the branch before merge.
-
-   Exact repro on `master` (commit at session-end `2a7d757`):
-   1. Open `docs/phase-c-status.md` in the `markoff-styled` widget.
-   2. Scroll to `### C1 — DI seam` (line 98).
-   3. Place caret at end of the **first** bullet content (the line
-      that begins `Replace the` and ends `each).`).
-   4. Press Enter.
-
-   Observed corruption:
-   - The entire first bullet body (multi-line continuation from
-     "Replace the" through "each).") is sucked into the preceding
-     heading line. The heading then reads
-     `### C1 — DI seamRReplace the ... each).` — note the **extra
-     `R`** between `seam` and `Replace` (the bullet's first character
-     duplicated, single-char tell of a wrong diff/insertion point).
-   - Caret jumps to the **end of the last bullet** (the line ending
-     `no embeds resolve.`), and the **next heading** (`### C5 — …`)
-     is pulled into that block: caret sits at
-     `no embeds resolve.|## C5 — Reading-mode`.
-
-   First-pass hypotheses (rule in/out before any fix):
-   - **(H1) Sep-view byte-arithmetic mis-target.** The block-count
-     change introduced by #8.1 (3 BlockQuote model blocks at the top
-     of `phase-c-status.md` where there used to be 1) shifts every
-     downstream block's index. A latent off-by-one in
-     `findBlockAtSepByte` or `applyInteractiveNewline`'s target
-     resolution would land the Enter on the heading instead of the
-     bullet.
-   - **(H2) Reverse-path incremental-diff edge case.** The single
-     duplicated `R` looks like a common-prefix/suffix diff
-     mis-bracket. Post-`applyInteractiveNewline` the binding does an
-     incremental QTextCursor diff against the new model state; if
-     prefix/suffix computation slips by one char in either
-     direction around the heading/bullet boundary, content lands in
-     the wrong QTextBlock and a character gets duplicated.
-   - **(H3) Pre-existing — exposed by #8.1, not caused.** The file
-     `phase-c-status.md` has a 3-paragraph blockquote at the top
-     (lines 3–15) which #8.1 split from 1 model block into 3.
-     Possible the bug exists in any document with multiple blocks
-     between a heading and a list — independent of #8.1.
-
-   **Bisect plan to discriminate (H3) vs (H1/H2):**
-   ```bash
-   git checkout 46643e7      # queue #8.5 closeout, pre-#8.1
-   cmake --build build-dev -j 8
-   # Open phase-c-status.md, repeat the repro
-   ```
-   - Repro fires → (H3) pre-existing; not #8.1-attributable.
-   - Repro absent → #8.1 caused (or first surfaced); investigate (H1)
-     vs (H2) by instrumenting `SourceTextDocumentBinding::
-     onQtContentsChange` byte resolution + the reverse-path diff
-     callsite.
-
-   Falsifiable test target: extend `tst_styled_dogfood_invariants`
-   with a fixture mirroring the C1 heading+bullets shape (no
-   filesystem dependency — embed the markdown inline). Test asserts:
-   after Enter at end of first bullet, the heading block's text is
-   unchanged and a new empty Paragraph block exists between the
-   bullet and its sibling.
-
-   Suspected files for instrumentation:
-   - `libs/markoff-core/src/SourceTextDocumentBinding.cpp` —
-     `onQtContentsChange` byte-resolution, `applyInteractiveNewline`
-     target lookup.
-   - `libs/markoff-core/src/Detail/FlatBlockResolve.cpp` —
-     `findBlockAtSepByte` (already had a separator-zone underflow
-     fix in `eb685f0`; revisit boundary conditions when adjacent
-     blocks have very different lengths).
-   - `libs/markoff-core/src/MarkoffDocument.cpp` — reverse-path
-     prefix/suffix diff in the binding's `onD2DocumentChanged`
-     consumer (incremental text-diff added in the binding-
-     robustness arc, spec `2026-05-27-markoff-core-binding-
-     robustness-design.md`).
-
-**Design references:**
-- Guide §0 "Load-side enforcement, Paragraph kind only" + §0.2
-  "Paragraph delineation is word-processor everywhere".
-- `libs/markoff-core/CLAUDE.md` "Load ingress — Paragraph kind only".
-- `libs/markoff-styled/CLAUDE.md` "WP unification" + the v0.1 invariants
-  section.
-
----
-
-## #9 — `blockquote_enter_on_empty_exits` live regression (undocumented)
-
-> **✅ RESOLVED 2026-05-30.** `git bisect` (bad `a0d8f5b`, good `46643e7`,
-> automated via `git bisect run` with the slot's exit code) pinned the first
-> bad commit to **`4faa451` `feat(parser): recurse block_quote into per-child
-> TLBs (queue #8.1)`** — the predicted culprit. Root cause is in the **load**
-> path (test line 461, before `tryHandle`): `collectTopLevelBlocks`'
-> `block_quote` branch recurses into named children and skips
-> `block_quote_marker`/`block_continuation`, so an empty quote `"> "` (only
-> marker children, no paragraph) emits **zero** TLBs — pre-#8.1 the
-> `block_quote` node itself emitted one. `loadFromMarkdown("> \n")` → 0 blocks
-> → live model with no rows. **Fix (parser layer, `TreeSitterParser.cpp`):**
-> when a `block_quote` recurses to nothing, emit one empty `Paragraph` TLB at
-> `childDepth`/`childRunId`; the load side maps depth>0 + Paragraph →
-> `BlockKind::BlockQuote` and `stripBlockQuoteMarkers` empties the `"> "`
-> buffer, round-tripping to `"> "`. Falsifiable tests added at the regression
-> layer:
-> `tst_markoff_parser_document_top_level_blocks::blockQuoteEmpty_emitsOneEmptyParagraphAtDepth1`
-> + `tst_block_buffer_invariant::blockquote_empty_quote_loads_one_block_and_round_trips`
-> (both proven failing pre-fix, green after). Suite now **254/257**; the 3
-> remaining are the long-standing offscreen-dependent live failures only, no
-> collateral regressions.
-
-**Surfaced 2026-05-30** during the #8.6/#8.7 baseline triage.
-`tst_live_render_structural::blockquote_enter_on_empty_exits` fails
-**consistently** (3/3 standalone runs) under offscreen — distinct from the
-3 known offscreen/window-manager-dependent live failures, which are
-focus/cursor-timing flakes. Confirmed **not caused by this session**: with
-the session's three edited files stashed, the slot still fails at HEAD
-`8db7c5a`; `tst_live_render_structural` does not link `markoff-source`.
-
-Not in the documented live baseline and post-dates the 2026-05-29 wherewasi
-251/254 note, so it regressed somewhere in the post-WP commit arc. **Bisect
-candidates** (all landed after wherewasi): the #8.1 BlockQuote
-multi-paragraph split (`block_quote` walker recursion + load-side `> `
-strip + serializer depth/RunId reconstruction), the #8.8 styled
-structural-key authority arc (`StructuralKeyHandler`,
-`SourceTextDocumentBinding::handleStructuralKey`, `deleteSepRange`
-extraction — core-level, could touch live), or the DocumentRenderer /
-FormatPass extraction. The slot name ("Enter on an empty blockquote exits
-the quote") points at structural Enter logic, so #8.1's blockquote model
-reshaping is the prime suspect.
-
-**Plan for a fresh agent:** `superpowers:systematic-debugging`. Phase 1 —
-read the QCOMPARE actual-vs-expected (`./build-dev/bin/tst_live_render_structural
-blockquote_enter_on_empty_exits`), then `git bisect` across the post-wherewasi
-arc (`b8a6bf8..8db7c5a`) using that single slot as the predicate. Fix the
-code (the test pins live structural behavior — drift is unlikely for a
-structural-Enter contract, but classify first).
+Carried over from `docs/TODO.md` (archived 2026-06-09). The 2026-05-21
+source-view cleanup follow-ups
+(`docs/specs/2026-05-21-source-view-cleanup-followups.md`) listed four
+items: #1 `insertLink` block-aware port (done `a713f04`), #2 dead
+`toMarkdownUtf8()` fallback removal (done `9fad37f`), #4
+separator-delete merge gap (closed by the 2026-05-27 binding-robustness
+arc). **#3 remains:** cursor/selection translation rewrite via a
+block-aware intermediate (largest item; own spec+plan). Pull in
+opportunistically when next touching the source view.
 
 ---
 
 ## When this queue is empty / superseded
 
-Delete the file or move it to `docs/archive/`. The CLAUDE.md banner
-that points here should be removed at the same time.
-
----
-
-## Discipline Log — 2026-05-31: styled-table SIGSEGV (post-ship dogfood crash)
-
-`markoff-styled-app docs/phase-c-status.md` crashed (SIGSEGV) immediately after
-the read-only-tables feature shipped. Root cause: `FormatPass::apply` computed
-each model block's QTextDocument position from FLAT PIPE-SOURCE bytes
-(`byteOffsetToQtPos(widgetFlatView, ...)`). Once a table is a compact
-`QTextTable` frame, the frame occupies far fewer document positions than its
-verbose pipe source has bytes, so every block AFTER a table got a position that
-overran the document → `findBlock()` returned an invalid `QTextBlock` →
-`QTextList::add()` dereferenced a null doc pointer. Needed a LIST after a table
-to crash (a paragraph silently absorbed the bad position).
-
-**Why it shipped (INVARIANTS §4/§5 lesson):** this is exactly the coordinate
-divergence flagged in the spec (§3.2) and plan (Task 2.3), but the guard test
-(`inline_span_after_table_lands_correctly`) used a *paragraph* after the table,
-which tolerates an out-of-range position. The crash needed a *list*. The test
-was too weak to be falsifiable against the real failure mode. **Lesson: a guard
-test for "coordinates after an opaque frame" MUST include a list (the one
-construct that dereferences the position), not just a paragraph.**
-
-**Fix:** `FormatPass` now walks the document's actual top-level elements
-(`QTextFrame::iterator` over the root frame — does not descend into cells) in
-lockstep with model blocks, instead of flat-byte arithmetic; tables consume
-their frame, non-tables consume `text.count('\n')+1` blocks. Plus: a
-defense-in-depth `!qblk.isValid()` guard in `manageListMembership`, and a
-key-format fix (`StyledTableRenderer` wrote `"markoff-table:<n>"` but the binding
-read it via `.toULongLong()` → 0, so frames never matched and the binding
-re-seeded on every edit). Regression test `list_after_table_does_not_crash_and_
-renders` reproduces the original crash and now passes.
+Delete the file or move it to `docs/archive/`. Update `docs/STATUS.md`
+and the CLAUDE.md pointer at the same time.

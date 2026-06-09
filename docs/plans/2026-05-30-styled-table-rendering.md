@@ -8,7 +8,7 @@
 
 **Tech Stack:** C++20, Qt6 (Widgets/Gui/Test), CMake, QtTest. Build `build-dev`; tests via `scripts/run-tests.sh` (offscreen).
 
-**Spec:** `docs/superpowers/specs/2026-05-30-styled-table-rendering-design.md`
+**Spec:** `docs/specs/2026-05-30-styled-table-rendering-design.md`
 
 **Conventions for every file touched:** SPDX header `// SPDX-License-Identifier: GPL-3.0-or-later`; `tr()` for user strings; cap builds at `-j 8`; tests run offscreen via the harness.
 

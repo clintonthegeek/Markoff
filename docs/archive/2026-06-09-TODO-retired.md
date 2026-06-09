@@ -1,3 +1,13 @@
+> **RETIRED — 2026-06-09 docs-consolidation audit.** This TODO had been
+> stale since the day of its newest entry: items 1–2 of the 2026-05-21
+> entry were completed the same day (`a713f04`, `9fad37f`); item 4 was
+> closed by the 2026-05-27 binding-robustness arc; the 2026-04-30
+> entries reference `apps/bench` / `libs/markoff-bench` and the
+> incremental-parse pipeline, all deleted. The single live item (item 3,
+> cursor/selection translation rewrite) was carried into
+> `docs/queue.md` #13. Open work tracking lives in `docs/queue.md`;
+> status lives in `docs/STATUS.md`.
+
 # Markoff TODO
 
 ## 2026-05-21 — Source-view cleanup follow-ups

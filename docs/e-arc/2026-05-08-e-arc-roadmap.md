@@ -1,5 +1,13 @@
 # E-arc roadmap — orientation for fresh contexts
 
+> **DISPOSITION — 2026-06-09: E-arc dormant; this roadmap is historical.**
+> The phase table below predates E4's actual execution and contradicts the
+> status board (E4 row says `pending`/spec TBW; in reality E4 shipped phases
+> A–G 2026-05-22..23 with spec `../specs/2026-05-22-e4-tables-design.md`,
+> untagged — see the disposition banner on `e-arc-status.md`). Do not use
+> this table as current state. Live status: [`../STATUS.md`](../STATUS.md).
+
+
 **Date:** 2026-05-08
 **Branch:** `exploration/new-foundation`
 **Purpose:** Canonical orientation doc for the E-arc work. An empty agent context picking up any phase of E should read this first to understand what each phase delivers, the ordering constraints, and the invariants binding the arc.

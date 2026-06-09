@@ -1,5 +1,18 @@
 # E-arc — Status Board
 
+> **DISPOSITION — 2026-06-09: board closed; E-arc dormant.**
+> This board froze 2026-05-23 on the (now-deleted) `exploration/new-foundation`
+> branch and missed every commit since the 2026-05-25 master merge. Recorded
+> dispositions: **E1–E2.6 complete + tagged. E3a shipped at `109d3d3` but
+> `v0.7.0-e3a` was never created** (dogfood signoff never recorded). **E4
+> shipped phases A–G + the wrap/column-width follow-up (dogfood-confirmed
+> "quite usable") but the Phase H checklist was never executed and
+> `v0.7.0-e4` was never created.** E3b+/E5/E6 never started. The workfront
+> moved to the styled leaf / WP unification / flat-view binding 2026-05-26;
+> E-arc resumes only if live-leaf feature pressure returns. Live status:
+> [`../STATUS.md`](../STATUS.md). Everything below is historical.
+
+
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
 
 **Last updated:** 2026-05-23 (E4 wrap + smart column-width follow-up landed end-to-end — spec `65b6a35`, plan `9703bac`, impl A1..C2 + post-land dogfood fillHeight fix `6a0865a`; **wrap/widths dogfood-confirmed** "table seems quite usable". v0.7.0-e4 tag gated only on the broader Phase H checklist tick-off).
