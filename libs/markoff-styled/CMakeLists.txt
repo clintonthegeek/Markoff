@@ -15,6 +15,8 @@ add_library(markoff_styled STATIC
     src/StyleApplier.cpp
     src/FormatPass.h
     src/FormatPass.cpp
+    src/BlockPositionWalk.h
+    src/BlockPositionWalk.cpp
     src/TableFrame.h
     src/TableFrame.cpp
     src/StyledTableRenderer.h

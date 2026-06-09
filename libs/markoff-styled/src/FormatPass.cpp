@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "FormatPass.h"
 
+#include "BlockPositionWalk.h"
+
 #include <cstring>
 
 #include <QColor>
@@ -11,7 +13,6 @@
 #include <QTextBlockFormat>
 #include <QTextCursor>
 #include <QTextDocument>
-#include <QTextFrame>
 #include <QTextList>
 #include <QTextListFormat>
 
@@ -442,44 +443,22 @@ Result apply(QTextDocument *target,
         // fontScale (zoom).
         target->setIndentWidth(docIndentWidthPx(fontScale));
 
-        // The QTextDocument is populated by the binding's opaque-aware seed:
-        // each model block maps to one-or-more top-level QTextDocument elements
-        // (a paragraph is one QTextBlock; a code block is N QTextBlocks where
-        // N = lines; a Table is a QTextTable child frame). We CANNOT derive
-        // positions from flat pipe-source bytes: a table's verbose pipe source
-        // has far more bytes than its compact frame occupies in the document, so
-        // byte arithmetic overruns every element after a table — an invalid
-        // QTextBlock then fed to QTextList::add segfaulted (2026-05-31). Instead,
-        // walk the document's actual top-level elements (root-frame iterator;
-        // it does NOT descend into table cells) in lockstep with the model
-        // blocks.
-        const std::vector<Markoff::BlockId> blocks = source->iterateBlocks();
-        currentIds.reserve(static_cast<qsizetype>(blocks.size()));
+        // The frame-aware model-block ↔ QTextDocument lockstep walk lives in
+        // BlockPositionWalk (extracted 2026-06-09 so the find adapter cannot
+        // drift from the rendering walk — the 2026-05-31 SIGSEGV class). Each
+        // entry carries the model block's consumed top-level elements; all
+        // per-block formatting happens in this visitor.
 
         // List-membership stack for continuous numbering across the walk.
         // Reset each cascade; manageListMembership runs OUTSIDE the hash gate.
         std::vector<ListStackEntry> listStack;
 
-        QTextFrame *rootFrame = target->rootFrame();
-        QTextFrame::iterator docIt = rootFrame->begin();
-        auto skipArtifactBlocks = [&]() {
-            // Qt inserts an empty structural QTextBlock adjacent to a frame
-            // (e.g. between a table frame and the following content block). Such
-            // a block belongs to no model block; skip empty non-frame blocks.
-            while (docIt != rootFrame->end()
-                   && !docIt.currentFrame()
-                   && docIt.currentBlock().isValid()
-                   && docIt.currentBlock().text().isEmpty()) {
-                ++docIt;
-            }
-        };
-
-        for (size_t i = 0; i < blocks.size(); ++i) {
-            const Markoff::BlockId id = blocks[i];
+        walkBlocks(source, target, [&](const WalkEntry &entry) {
+            const Markoff::BlockId id = entry.blockId;
             currentIds.insert(id, 0);
 
-            const QByteArray text = source->blockText(id);
-            const Markoff::BlockKind kind = source->blockKind(id);
+            const QByteArray &text = entry.text;
+            const Markoff::BlockKind kind = entry.kind;
             const QList<Markoff::SourceSpan> spans = source->inlineSpansFor(id);
             const auto attrs = source->blockAttrs(id);
             const quint64 h = computeBlockHash(kind, text, spans, attrs, fontScale);
@@ -496,34 +475,19 @@ Result apply(QTextDocument *target,
                     out.kindSuggestions.push_back({id, inferred});
             }
 
-            // ── Table: consume the QTextTable frame; it is self-formatting. ──
-            if (kind == Markoff::BlockKind::Table) {
-                skipArtifactBlocks();
-                if (docIt != rootFrame->end() && docIt.currentFrame())
-                    ++docIt;  // step over the frame
+            // ── Table: its QTextTable frame is self-formatting. ──
+            if (entry.isFrame) {
                 // A table breaks any running list; pass an invalid block so
                 // manageListMembership just clears the stack (no list op).
                 manageListMembership(QTextBlock(), kind, attrs, listStack);
-                continue;
+                return;
             }
 
-            // ── Non-table: format the next (lineCount) top-level QTextBlocks. ──
-            // The opaque-aware seed inserts each model block's content with its
-            // internal newlines preserved, so a block with K internal '\n's
-            // occupies K+1 consecutive top-level QTextBlocks. Format each block
-            // as it is consumed (single walk — avoids any byte-vs-char position
-            // arithmetic).
-            const int lineCount = text.count('\n') + 1;
-            skipArtifactBlocks();
-            QTextBlock firstBlk;
-            int consumed = 0;
-            while (consumed < lineCount && docIt != rootFrame->end()) {
-                if (docIt.currentFrame()) { ++docIt; continue; }  // defensive
-                QTextBlock qblk = docIt.currentBlock();
-                if (!qblk.isValid()) { ++docIt; continue; }
-                if (!firstBlk.isValid()) firstBlk = qblk;
-
-                if (!hashSkipped) {
+            // ── Non-table: format each top-level QTextBlock the model block
+            // spans (the walk consumed them — no byte-vs-char arithmetic). ──
+            const QTextBlock firstBlk = entry.firstQtBlock;
+            if (!hashSkipped) {
+                for (const QTextBlock &qblk : entry.qtBlocks) {
                     QTextCursor blkCursor(qblk);
                     if (kind == Markoff::BlockKind::Heading) {
                         int level = 0;
@@ -585,8 +549,6 @@ Result apply(QTextDocument *target,
                         }
                     }
                 }
-                ++docIt;
-                ++consumed;
             }
 
             if (!hashSkipped && firstBlk.isValid()) {
@@ -611,7 +573,7 @@ Result apply(QTextDocument *target,
             // List-membership reconciliation runs on EVERY block (hash-skipped
             // or not). Cross-block continuity depends on neighbour state.
             manageListMembership(firstBlk, kind, attrs, listStack);
-        }
+        });
 
         // Prune stale gate entries (blocks that no longer exist).
         if (gate) {
