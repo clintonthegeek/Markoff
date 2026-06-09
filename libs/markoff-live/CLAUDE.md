@@ -36,9 +36,12 @@ Of particular relevance:
   or `Connections { onCursorChanged }` / `Component.onCompleted`
   blocks in delegates.
 - **You will encounter `Qt.callLater` and re-entrance guards** in
-  this directory (current count: 1 `Qt.callLater` site —
-  `MathDelegate.qml:113`, focus deferral during BlockInternalEdit;
-  re-entrance guard `m_applyingTextUpdate` in `LiveEditBinding`). Each
+  this directory (current count: 2 `Qt.callLater` sites —
+  `MathDelegate.qml:141`, focus deferral during BlockInternalEdit;
+  `TableDelegate.qml:133`, cell-focus restore after the binding
+  cascade settles (E4 C3, tracked in `docs/queue.md`) — and
+  re-entrance guards `m_applyingTextUpdate` in `LiveEditBinding` +
+  `TableEditBinding`, `m_applyingSelectionEmit` in `LiveCursorState`). Each
   one is a vote for the seam being unsettled. Log them as you encounter
   them (invariant 8). Do not silently extend their lineage.
 - **The QML integration harness exists** as of commit `0c2e72d`

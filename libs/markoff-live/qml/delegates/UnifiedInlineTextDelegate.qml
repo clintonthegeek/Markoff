@@ -55,9 +55,16 @@ Item {
     }
 
     readonly property int markerSlot: 0  // TextDefault, used for list marker
+    // Theme.Slot.CodeBlock — its font family is the theme's monospace face;
+    // the list-marker text uses it so task checkboxes [x]/[ ] stay fixed-width.
+    readonly property int monospaceFamilySlot: 8
 
     // -------- List-item geometry --------
-    readonly property int indentPx: 8 + indentLevel * 24
+    // Pixel-based for now; em-based rework (parity with markoff-styled's
+    // StyleApplier spacing constants) is a follow-up.
+    readonly property int listBaseIndentPx: 8      // left margin before the first level
+    readonly property int listPerLevelIndentPx: 24 // additional indent per nesting level
+    readonly property int indentPx: listBaseIndentPx + indentLevel * listPerLevelIndentPx
     readonly property string markerText: {
         if (markerStyle === "dot")   return markerNumber + "."
         if (markerStyle === "paren") return markerNumber + ")"
@@ -117,7 +124,7 @@ Item {
         topPadding: 2
         text: root.markerText
         font.family: (root.liveBinding && root.liveBinding.theme)
-                       ? root.liveBinding.themeFamilyFor(8 /* Slot.CodeBlock → Monospace */) : "monospace"
+                       ? root.liveBinding.themeFamilyFor(root.monospaceFamilySlot) : "monospace"
         font.pixelSize: (root.liveBinding && root.liveBinding.theme
                           ? root.liveBinding.themePixelSizeFor(0)  // TextDefault
                           : 14)

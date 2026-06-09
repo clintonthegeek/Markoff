@@ -112,16 +112,6 @@ void LiveCursorState::request(const Cursor &newCursor, bool preserveSelectionAnc
 
     m_cursor = newCursor;
 
-    QString desc = QStringLiteral("None");
-    if (auto *tc = std::get_if<TextCaret>(&newCursor)) {
-        const int row = m_model ? rowForBlock(tc->block) : -1;
-        desc = QStringLiteral("TextCaret(innerRow=%1, qtPos=%2)")
-                   .arg(row).arg(tc->cachedQtPos);
-    } else if (std::holds_alternative<NoCursor>(newCursor)) {
-        desc = QStringLiteral("NoCursor");
-    }
-    qInfo().noquote() << "[dogfood] CursorState: request" << desc;
-
     Q_EMIT cursorChanged();
 }
 
