@@ -45,7 +45,7 @@ Markoff::CursorPos toCursorPos(const Markoff::MarkoffDocument *doc,
             const int lineStart = (lastNl < 0) ? 0 : int(lastNl) + 1;
             return { line + innerLine, pos - lineStart + 1 };
         }
-        line += 1 + int(text.count(QLatin1Char('\n')));
+        line += 1;  // PROOF BREAK: drop internal-'\n' line contributions
     }
     return {1, 1};
 }
