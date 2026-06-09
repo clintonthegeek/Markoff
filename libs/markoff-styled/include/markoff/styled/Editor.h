@@ -26,6 +26,8 @@ class LinkInteraction;
 class StructuralTextEdit;
 class StyledTableRenderer;
 
+namespace Detail { class StyledFindAdapter; }
+
 class MARKOFF_STYLED_EXPORT Editor : public Markoff::MarkdownView {
     Q_OBJECT
     Q_PROPERTY(Markoff::Session *session
@@ -52,6 +54,10 @@ public:
     bool                       isReadOnly() const override;
     bool                       hasCursor()  const override { return true; }
     bool                       hasEditing() const override { return !isReadOnly(); }
+
+    // Find (frame-aware highlights via Detail::StyledFindAdapter)
+    void attachFindController(Markoff::FindController *fc) override;
+    void detachFindController() override;
 
     // Session
     Markoff::Session *session() const;
@@ -91,6 +97,7 @@ private:
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
     StyleApplier                           *m_styleApplier = nullptr;
     DocHighlighter                         *m_highlighter  = nullptr;
+    Detail::StyledFindAdapter              *m_findAdapter  = nullptr;
     LinkInteraction                        *m_linkInteract = nullptr;
     // Non-QObject; owned via unique_ptr (Editor's dtor is out-of-line in the
     // .cpp where StyledTableRenderer is a complete type).

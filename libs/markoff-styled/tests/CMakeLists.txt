@@ -106,6 +106,13 @@ target_link_libraries(tst_view_contract_styled
 set_tests_properties(tst_view_contract_styled
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_styled_find_adapter tst_styled_find_adapter.cpp)
+add_test(NAME tst_styled_find_adapter COMMAND tst_styled_find_adapter)
+target_link_libraries(tst_styled_find_adapter
+    PRIVATE Qt6::Test Qt6::Widgets markoff_styled markoff_core)
+set_tests_properties(tst_styled_find_adapter
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_styled_table_readonly tst_styled_table_readonly.cpp)
 add_test(NAME tst_styled_table_readonly COMMAND tst_styled_table_readonly)
 target_link_libraries(tst_styled_table_readonly

@@ -23,6 +23,8 @@ add_library(markoff_styled STATIC
     src/StyledTableRenderer.cpp
     include/markoff/styled/DocumentRenderer.h
     src/DocumentRenderer.cpp
+    src/Detail/StyledFindAdapter.h
+    src/Detail/StyledFindAdapter.cpp
     src/DocHighlighter.h
     src/DocHighlighter.cpp
     src/LinkInteraction.h

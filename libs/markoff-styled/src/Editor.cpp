@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/styled/Editor.h>
 
+#include "Detail/StyledFindAdapter.h"
 #include "DocHighlighter.h"
 #include "LinkInteraction.h"
 #include "StyleApplier.h"
@@ -143,6 +144,18 @@ void Editor::setReadOnly(bool ro) {
 }
 
 bool Editor::isReadOnly() const { return m_editor->isReadOnly(); }
+
+// ---- Find ----------------------------------------------------------------
+
+void Editor::attachFindController(Markoff::FindController *fc) {
+    if (!m_findAdapter)
+        m_findAdapter = new Detail::StyledFindAdapter(this, this);
+    m_findAdapter->attach(fc);
+}
+
+void Editor::detachFindController() {
+    if (m_findAdapter) m_findAdapter->detach();
+}
 
 // ---- Session ------------------------------------------------------------
 
