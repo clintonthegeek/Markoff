@@ -90,8 +90,11 @@ int SourceFindAdapter::globalCharPosFor(Markoff::FindController::Match m) const
     auto *doc = m_editor ? m_editor->document() : nullptr;
     if (!doc) return 0;
     // Walk iterateBlocks() until we hit m.block, accumulating QChar lengths
-    // plus the per-block separator. Source widget's flat text uses
-    // interBlockSeparator() == "\n\n" per the buffer convention.
+    // plus the per-block separator. The QTextDocument we highlight into is
+    // seeded from widgetFlatView(), which joins blocks with a single '\n'
+    // (WP unification) — NOT the canonical "\n\n" interBlockSeparator()
+    // used by flatView()/serializeForSave().
+    constexpr int kWidgetSepChars = 1;  // widgetFlatView() '\n'
     int globalChar = 0;
     const auto ids = doc->iterateBlocks();
     for (const Markoff::BlockId id : ids) {
@@ -101,7 +104,7 @@ int SourceFindAdapter::globalCharPosFor(Markoff::FindController::Match m) const
             return globalChar + QString::fromUtf8(prefix).size();
         }
         globalChar += QString::fromUtf8(btext).size();
-        globalChar += 2;  // "\n\n" interBlockSeparator (D2 buffer convention)
+        globalChar += kWidgetSepChars;
     }
     return globalChar;
 }
