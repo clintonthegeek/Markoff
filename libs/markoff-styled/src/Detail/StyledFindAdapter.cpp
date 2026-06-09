@@ -7,6 +7,7 @@
 #include <QTextCharFormat>
 #include <QTextCursor>
 #include <QTextDocument>
+#include <QTextFrame>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/styled/Editor.h>
@@ -101,11 +102,23 @@ void StyledFindAdapter::onMatchesChanged()
 void StyledFindAdapter::onNavigationRequested(Markoff::FindController::Match m)
 {
     auto *te = m_editor ? m_editor->textEdit() : nullptr;
-    if (!te) return;
-    const MappedSpan span = mapMatch(m);
-    if (span.start < 0) return;  // table-frame match: documented degradation
+    auto *doc = m_editor ? m_editor->document() : nullptr;
+    if (!te || !doc) return;
+    int target = -1;
+    walkBlocks(doc, te->document(), [&target, &m](const WalkEntry &e) {
+        if (e.blockId != m.block) return;
+        if (e.isFrame) {
+            // Spec §6: an in-frame match gets no highlight, but navigation
+            // still scrolls to the frame — park the caret at its start.
+            if (e.frame) target = e.frame->firstPosition();
+            return;
+        }
+        const MappedSpan span = spanWithinEntry(e, m);
+        if (span.start >= 0) target = span.start;
+    });
+    if (target < 0) return;  // desynced / unknown block
     QTextCursor cur(te->document());
-    cur.setPosition(span.start);
+    cur.setPosition(target);
     te->setTextCursor(cur);  // Does NOT call setFocus; focus stays where the user has it.
     te->ensureCursorVisible();
 }
@@ -148,20 +161,6 @@ void StyledFindAdapter::renderHighlights()
         m_highlights.append(sel);
     }
     te->setExtraSelections(m_highlights);
-}
-
-StyledFindAdapter::MappedSpan
-StyledFindAdapter::mapMatch(Markoff::FindController::Match m) const
-{
-    auto *te = m_editor ? m_editor->textEdit() : nullptr;
-    auto *doc = m_editor ? m_editor->document() : nullptr;
-    if (!te || !doc) return {};
-    MappedSpan result;
-    walkBlocks(doc, te->document(), [&result, &m](const WalkEntry &e) {
-        if (e.blockId == m.block)
-            result = spanWithinEntry(e, m);
-    });
-    return result;
 }
 
 }  // namespace Markoff::Styled::Detail

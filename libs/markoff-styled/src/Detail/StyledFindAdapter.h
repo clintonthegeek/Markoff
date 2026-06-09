@@ -27,8 +27,8 @@ namespace Detail {
 /// after a table (the 2026-05-31 SIGSEGV class). Matches INSIDE a table
 /// frame are a documented degradation: the match's byte offsets index the
 /// raw pipe source, which has no positional counterpart in the compact
-/// frame, so they are counted by the controller but not highlighted and
-/// navigation to them is inert.
+/// frame, so they are counted by the controller but get no highlight;
+/// navigation scrolls to the frame (caret parked at its first position).
 ///
 /// Stale-handle safety: WalkEntries / QTextBlocks are never cached as
 /// members — every render/navigation re-walks the live document (a
@@ -54,7 +54,6 @@ private slots:
     void onNavigationRequested(Markoff::FindController::Match);
 
 private:
-    MappedSpan mapMatch(Markoff::FindController::Match) const;
     void renderHighlights();
 
     Editor                            *m_editor;

@@ -5,7 +5,8 @@
 // at flat-byte arithmetic positions (spec §6; the 2026-05-31 SIGSEGV
 // class — positions must never be derived from flat pipe-source bytes).
 // Matches INSIDE a table frame are a documented degradation: counted by
-// the controller, but no highlight is rendered.
+// the controller, no highlight rendered, but navigation scrolls to the
+// frame (caret parked at its first position).
 #include <QTest>
 #include <QTextBlock>
 #include <QTextCursor>
@@ -15,6 +16,8 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+
+#include "support/TableTestHelpers.h"
 
 using Markoff::FindController;
 
@@ -109,9 +112,18 @@ private Q_SLOTS:
         // Documented degradation: no highlight for matches inside a frame —
         // the raw pipe-source offsets do not correspond to doc positions.
         QCOMPARE(te->extraSelections().size(), 0);
-        // Navigation into the frame match must be inert, not a crash.
+        // Navigation onto the frame match scrolls to the frame (spec §6):
+        // the caret parks at the frame's first position rather than the
+        // adapter going inert.
         fc.findNext();
-        QVERIFY(true);
+        QTextTable *table = firstTable(te->document());
+        QVERIFY(table);
+        const int caret = te->textCursor().position();
+        QVERIFY2(caret >= table->firstPosition() && caret <= table->lastPosition(),
+                 qPrintable(QStringLiteral("caret %1 not within frame [%2, %3]")
+                                .arg(caret)
+                                .arg(table->firstPosition())
+                                .arg(table->lastPosition())));
     }
 
     void match_in_multiline_code_block_lands_at_visible_position() {
