@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.19)
-project(markoff_live VERSION 0.1.0 LANGUAGES CXX)
+# Version tracks the top-level Markoff project (v0.7.x tag series).
+project(markoff_live VERSION 0.7.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -122,6 +123,17 @@ target_include_directories(markoff_live
     PUBLIC include/
     PRIVATE include/markoff/live/
     PRIVATE src/
+)
+
+# Namespaced alias, parity with Markoff::Core / Markoff::Source /
+# Markoff::Styled — consumers should link Markoff::Live, not the raw target.
+add_library(Markoff::Live ALIAS markoff_live)
+
+# Markoff::Live::version() derives from this project's version.
+target_compile_definitions(markoff_live PRIVATE
+    MARKOFF_LIVE_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+    MARKOFF_LIVE_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+    MARKOFF_LIVE_VERSION_PATCH=${PROJECT_VERSION_PATCH}
 )
 
 target_link_libraries(markoff_live PUBLIC

@@ -1,12 +1,17 @@
 cmake_minimum_required(VERSION 3.19)
-project(Markoff VERSION 0.1.0 LANGUAGES CXX)
+# Version tracks the v0.7.x tag series (see git tags v0.7.0-*).
+# Markoff::Live::version() derives from PROJECT_VERSION — keep in sync.
+project(Markoff VERSION 0.7.0 LANGUAGES CXX)
 
-# Markoff-family libraries (new-foundation branch):
+# Markoff-family libraries:
 #   - libs/rapidyaml          (ryml::ryml — YAML parser, vendored)
 #   - libs/markoff-parser     (Markoff::Parser — tree-sitter Markdown AST + YAML frontmatter)
-#   - libs/collabtext         (CRDT text engine, sibling-symlinked from /home/clinton/dev/collabtext)
-#   - libs/markoff-core (Markoff::Core — MarkoffDocument + ParsePool + Sessions)
-#   - libs/markoff-source (QPlainTextEdit-based source widget)
+#   - libs/collabtext         (CRDT text engine, git submodule)
+#   - libs/markoff-core       (Markoff::Core — MarkoffDocument + Sessions + flat-view binding)
+#   - libs/markoff-live       (QML live-preview view leaf + Markoff::Live::EditorWidget)
+#   - libs/markoff-source     (QPlainTextEdit-based source widget)
+#   - libs/markoff-styled     (QTextEdit-based inline-styled editor)
+#   - libs/jkqtmathtext       (LaTeX math rendering, vendored)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project.
 # Qt6 / KF6 are discovered via find_package — parent projects that already find
