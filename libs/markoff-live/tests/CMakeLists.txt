@@ -921,3 +921,19 @@ add_test(NAME tst_live_render_no_qt_calllater_in_focus_path
 add_test(NAME tst_live_render_focus_path_exits_through_chokepoint
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/scripts/check_focus_path_through_chokepoint.sh
                  ${CMAKE_SOURCE_DIR})
+
+# Contract v2 Task 7 (spec §4.1): MarkdownView contract — live leaf.
+# Drives the real Markoff::Live::EditorWidget, whose QQuickWidget loads
+# EditorContent.qml from the STATIC org.markoff.live module — hence the
+# plugin + plugin_init links (same pattern as
+# tst_live_render_theme_toggle_propagation).
+qt_add_executable(tst_view_contract_live
+    tst_view_contract_live.cpp)
+target_link_libraries(tst_view_contract_live PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::QuickWidgets
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff_liveplugin markoff_liveplugin_init)
+add_test(NAME tst_view_contract_live COMMAND tst_view_contract_live)
+set_tests_properties(tst_view_contract_live PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

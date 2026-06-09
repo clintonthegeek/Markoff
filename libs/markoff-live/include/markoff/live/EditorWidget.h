@@ -33,11 +33,21 @@ namespace Markoff::Live {
 ///   - `setDocument(doc)` wires the binding + auto-creates a `Session`
 ///     for the binding to use. The session is destroyed in `~EditorWidget`.
 ///
+/// Cursor contract (spec 2026-06-09-markdownview-contract-v2 §3/§4.1):
+///   - `cursorPosition()` reads `LiveCursorState::currentTextCaret()` (the
+///     canonical store — no widget-side cursor state) and maps
+///     (block row, qtPos) to the flat-line CursorPos model: each model
+///     block contributes 1 + internal-'\n' lines; column is 1-based UTF-16
+///     within the line. Non-TextCaret variants report the block's first
+///     line, column 1; no cursor reports {1,1}.
+///   - `setCursorPosition()` reverses the mapping and routes through the
+///     chokepoint `LiveCursorState::requestTextCaretAtRow` (L3 decision,
+///     docs/specs/2026-05-22-cursor-authority-decision.md). Out-of-range
+///     positions clamp to the last block / line end — never a no-op.
+///   - `cursorPositionChanged(line, column)` is emitted on every
+///     `LiveCursorState::cursorChanged`, mapped the same way.
+///
 /// Known degradations (port-state):
-///   - `cursorPosition()` / `setCursorPosition(CursorPos)` return / accept
-///     `{0,0}` — the legacy line/column model doesn't map directly to the
-///     new TextAnchor/BlockAnchor model. Re-implement when the
-///     EphemeralState round-trip pulls on it.
 ///   - `setReadOnly(true)` stores the bool but doesn't actually disable
 ///     editing; that requires `Capabilities::Editable` (E1, currently a
 ///     withdrawn live-freeze D11 amendment — reintroduce when HoverPopover
@@ -52,6 +62,14 @@ public:
 
     // MarkdownView contract.
     void setDocument(Markoff::MarkoffDocument *doc) override;
+
+    /// Flat-line CursorPos over LiveCursorState — see class doc. O(blocks)
+    /// per read; deliberately uncached (a cache would be a second cursor
+    /// store, INVARIANTS #3).
+    Markoff::CursorPos cursorPosition() const override;
+    /// Routes through LiveCursorState::requestTextCaretAtRow; clamps
+    /// out-of-range positions to the last block / line end.
+    void setCursorPosition(Markoff::CursorPos pos) override;
 
     bool hasCursor()  const override { return true; }
     bool hasEditing() const override { return !isReadOnly(); }
