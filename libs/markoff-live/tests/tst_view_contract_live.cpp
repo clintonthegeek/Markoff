@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // MarkdownView contract — live leaf (spec
 // docs/specs/2026-06-09-markdownview-contract-v2-design.md §4.1,
-// plan Task 7). Cursor slots now; read-only slots arrive in Task 8.
+// plan Task 7). Cursor slots, read-only slots (Task 8), theme/fontScale
+// forwarding + format-verb delegation (Task 9).
 //
 // Drives the REAL Markoff::Live::EditorWidget (QQuickWidget hosting
 // EditorContent.qml → LiveView) and reads/writes cursor position through
@@ -21,6 +22,7 @@
 // settles the event loop before any slot runs, and every read-after-write
 // goes through QTRY_*.
 
+#include <QAction>
 #include <QClipboard>
 #include <QGuiApplication>
 #include <QQuickItem>
@@ -31,6 +33,7 @@
 
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Theme.h>
 #include <markoff/live/EditorWidget.h>
 #include <markoff/live/LiveActionController.h>
 #include <markoff/live/LiveBlockModel.h>
@@ -280,6 +283,122 @@ private Q_SLOTS:
 
         delete w;
         delete doc;
+    }
+
+    // ---- Task 9: theme/fontScale forwarding + format verbs (§4.3-4.4) ----
+    //
+    // All drives go through the BASE pointer (invariant 5). The binding's
+    // theme() pointer is NEVER null — it rotates two internal copy-buffers
+    // (LiveListModelBinding.cpp, Private::themeBuffers) — so a non-null
+    // check alone cannot falsify forwarding; the CONTENT probes below can.
+    void theme_and_fontScale_forward_to_binding() {
+        auto *base = baseView();
+        const QColor lightBg = Markoff::Theme::defaultLight().color(
+            Markoff::Theme::Slot::EditorBackground);
+        const QColor darkBg = Markoff::Theme::defaultDark().color(
+            Markoff::Theme::Slot::EditorBackground);
+        QVERIFY(lightBg != darkBg);        // probe can discriminate
+        QCOMPARE(binding()->theme()->color(
+                     Markoff::Theme::Slot::EditorBackground), lightBg);
+
+        QSignalSpy themeSpy(base, &Markoff::MarkdownView::themeChanged);
+        QSignalSpy bindingThemeSpy(binding(),
+                                   &LiveListModelBinding::themeChanged);
+        base->setTheme(Markoff::Theme::defaultDark());
+        QCOMPARE(themeSpy.count(), 1);
+        QVERIFY(binding()->theme() != nullptr);       // forwarded...
+        QCOMPARE(binding()->theme()->color(           // ...with content
+                     Markoff::Theme::Slot::EditorBackground), darkBg);
+        QCOMPARE(bindingThemeSpy.count(), 1);
+        // Base store stays the read authority (no theme() override).
+        QCOMPARE(base->theme().color(
+                     Markoff::Theme::Slot::EditorBackground), darkBg);
+        // Repeated setTheme still notifies the binding: its two-buffer
+        // rotation hands out a fresh pointer + themeChanged per call, so
+        // there is no pointer-equality short-circuit to defeat.
+        base->setTheme(Markoff::Theme::defaultDark());
+        QCOMPARE(bindingThemeSpy.count(), 2);
+
+        QSignalSpy scaleSpy(base, &Markoff::MarkdownView::fontScaleChanged);
+        base->setFontScale(1.5);
+        QCOMPARE(base->fontScale(), 1.5);
+        QCOMPARE(binding()->fontScale(), 1.5);        // forwarded
+        QCOMPARE(scaleSpy.count(), 1);
+        base->setFontScale(1.0);
+        QCOMPARE(binding()->fontScale(), 1.0);
+    }
+
+    // Format verbs delegate to LiveActionController's QActions — the same
+    // QActions Corbomite's menus trigger today, so enabled-state gating
+    // (selection presence, read-only — QAction::trigger() ignores
+    // explicitly disabled actions) rides along in one authority. Bold +
+    // heading assert bytes-level effect end-to-end; the remaining verbs
+    // pin the verb→action mapping via triggered() spies, re-priming the
+    // selection between toggles because every wrapPerBlock edit rebuilds
+    // the model (same rhythm as tst_live_render_format_idempotent).
+    void format_verbs_delegate_to_action_controller() {
+        auto *ac = binding()->actionController();
+        QVERIFY(ac);
+        auto *base = baseView();
+
+        // Select "alpha" in row 0 chars 0..5 via the cursor authority —
+        // the begin/extend production drag priming Task 8's action test
+        // used (boldAction needs a selection per updateEnabledStates).
+        cursorState()->begin(0, 0);
+        cursorState()->extend(0, 5);
+        QTRY_VERIFY(ac->boldAction()->isEnabled());
+        base->toggleBold();
+        QTRY_VERIFY(m_doc->serializeForSave().contains("**alpha"));
+
+        // Heading verb: re-prime so the selection deterministically
+        // touches row 0 (the bold edit rebuilt the model); heading actions
+        // need only a wired doc, the controller targets selection rows.
+        cursorState()->begin(0, 0);
+        cursorState()->extend(0, 1);
+        QTRY_VERIFY(ac->heading2Action()->isEnabled());
+        base->setHeadingLevel(2);
+        QTRY_VERIFY(m_doc->serializeForSave().contains("## "));
+
+        // Mapping pins for the remaining verbs, on row 2 ("omega end") —
+        // away from the now-formatted row 0.
+        QSignalSpy italicSpy(ac->italicAction(), &QAction::triggered);
+        QSignalSpy strikeSpy(ac->strikeAction(), &QAction::triggered);
+        QSignalSpy codeSpy(ac->inlineCodeAction(), &QAction::triggered);
+        QSignalSpy linkSpy(ac->linkAction(), &QAction::triggered);
+
+        cursorState()->begin(2, 0);
+        cursorState()->extend(2, 5);
+        QTRY_VERIFY(ac->italicAction()->isEnabled());
+        base->toggleItalic();
+        QTRY_COMPARE(italicSpy.count(), 1);
+
+        cursorState()->begin(2, 0);
+        cursorState()->extend(2, 1);
+        QTRY_VERIFY(ac->strikeAction()->isEnabled());
+        base->toggleStrikethrough();
+        QTRY_COMPARE(strikeSpy.count(), 1);
+
+        cursorState()->begin(2, 0);
+        cursorState()->extend(2, 1);
+        QTRY_VERIFY(ac->inlineCodeAction()->isEnabled());
+        base->toggleInlineCode();
+        QTRY_COMPARE(codeSpy.count(), 1);
+
+        // Link allows empty selection (enabled with just a doc).
+        QTRY_VERIFY(ac->linkAction()->isEnabled());
+        base->insertLink();
+        QTRY_COMPARE(linkSpy.count(), 1);
+
+        // No cross-firing: each verb fired exactly its own action.
+        QCOMPARE(italicSpy.count(), 1);
+        QCOMPARE(strikeSpy.count(), 1);
+        QCOMPARE(codeSpy.count(), 1);
+
+        // Out-of-range heading levels are guarded no-ops.
+        const QByteArray settled = m_doc->serializeForSave();
+        base->setHeadingLevel(7);
+        base->setHeadingLevel(-1);
+        QCOMPARE(m_doc->serializeForSave(), settled);
     }
 
     void cursorPositionChanged_signal_fires() {

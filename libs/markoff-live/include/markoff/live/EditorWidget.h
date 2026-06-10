@@ -76,6 +76,29 @@ public:
     /// authority for the mutation-ingress gates (spec §4.2).
     void setReadOnly(bool ro) override;
 
+    /// Base store + signal, then forward a widget-owned copy's address to
+    /// the binding (spec §4.3). The binding's theme() is never null —
+    /// it rotates two internal copy-buffers — so the widget keeps a copy
+    /// alive and passes its address; there is no pointer-equality
+    /// short-circuit in the binding, so every call notifies QML.
+    void setTheme(const Markoff::Theme &t) override;
+
+    /// Base clamp + store + signal, then forward the base's canonical
+    /// value to the binding (spec §4.3).
+    void setFontScale(qreal s) override;
+
+    // --- Format verbs — delegate to LiveActionController's QActions ---
+    // (spec §4.4). QAction::trigger() respects the action's enabled state,
+    // so read-only gating, undo/redo, and selection requirements all ride
+    // along in one authority.
+    void toggleBold() override;
+    void toggleItalic() override;
+    void toggleStrikethrough() override;
+    void toggleInlineCode() override;
+    void insertLink() override;
+    /// Levels 0..6: trigger heading<level>Action(). Out-of-range: no-op.
+    void setHeadingLevel(int level) override;
+
     bool hasCursor()  const override { return true; }
     bool hasEditing() const override { return !isReadOnly(); }
 

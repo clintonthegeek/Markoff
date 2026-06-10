@@ -86,6 +86,7 @@ struct EditorWidget::Private {
     LiveListModelBinding   *binding     = nullptr;
     QQuickWidget           *quickWidget = nullptr;
     QPointer<Session>       session;        // owned by the document
+    Markoff::Theme          themeCopy;      // keeps the pointer alive for setTheme forwarding
 };
 
 EditorWidget::EditorWidget(LiveListModelBinding::Capabilities caps,
@@ -203,6 +204,81 @@ void EditorWidget::setReadOnly(bool ro)
     // per-document state, so it survives setDocument unchanged.
     Markoff::MarkdownView::setReadOnly(ro);
     d->binding->setReadOnly(ro);
+}
+
+void EditorWidget::setTheme(const Markoff::Theme &t)
+{
+    // Base stores + emits themeChanged() (spec §4.3).
+    Markoff::MarkdownView::setTheme(t);
+    // Keep a widget-owned copy; the binding takes a const pointer, so the
+    // pointed-to object must outlive the next setTheme call. The binding
+    // rotates two internal copy-buffers — no pointer-equality short-circuit
+    // — so every call reaches QML and emits themeChanged on the binding.
+    d->themeCopy = t;
+    if (d->binding)
+        d->binding->setTheme(&d->themeCopy);
+}
+
+void EditorWidget::setFontScale(qreal s)
+{
+    // Base clamps, stores, and emits fontScaleChanged (spec §4.3).
+    // Forward the base's clamped canonical value, not the raw s.
+    Markoff::MarkdownView::setFontScale(s);
+    if (d->binding)
+        d->binding->setFontScale(fontScale());
+}
+
+// --- Format verbs (spec §4.4) ---
+// Each verb delegates to the binding's actionController QAction.
+// QAction::trigger() is a no-op when the action is disabled, so
+// read-only gating and selection guards ride along automatically.
+
+void EditorWidget::toggleBold()
+{
+    if (auto *ac = d->binding ? d->binding->actionController() : nullptr)
+        ac->boldAction()->trigger();
+}
+
+void EditorWidget::toggleItalic()
+{
+    if (auto *ac = d->binding ? d->binding->actionController() : nullptr)
+        ac->italicAction()->trigger();
+}
+
+void EditorWidget::toggleStrikethrough()
+{
+    if (auto *ac = d->binding ? d->binding->actionController() : nullptr)
+        ac->strikeAction()->trigger();
+}
+
+void EditorWidget::toggleInlineCode()
+{
+    if (auto *ac = d->binding ? d->binding->actionController() : nullptr)
+        ac->inlineCodeAction()->trigger();
+}
+
+void EditorWidget::insertLink()
+{
+    if (auto *ac = d->binding ? d->binding->actionController() : nullptr)
+        ac->linkAction()->trigger();
+}
+
+void EditorWidget::setHeadingLevel(int level)
+{
+    // Guard: 0..6 are the only valid levels (0 = paragraph, 1..6 = ATX heading).
+    if (level < 0 || level > 6) return;
+    if (auto *ac = d->binding ? d->binding->actionController() : nullptr) {
+        switch (level) {
+        case 0: ac->heading0Action()->trigger(); break;
+        case 1: ac->heading1Action()->trigger(); break;
+        case 2: ac->heading2Action()->trigger(); break;
+        case 3: ac->heading3Action()->trigger(); break;
+        case 4: ac->heading4Action()->trigger(); break;
+        case 5: ac->heading5Action()->trigger(); break;
+        case 6: ac->heading6Action()->trigger(); break;
+        default: break;
+        }
+    }
 }
 
 void EditorWidget::setCursorPosition(Markoff::CursorPos pos)
