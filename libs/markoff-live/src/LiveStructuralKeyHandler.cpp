@@ -93,7 +93,7 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     // fallback (selection-replacement, literal '\n') from firing. Pure
     // navigation (Up/Down/F2/Escape) falls through untouched. Gated here,
     // at the top of dispatch, not per-rule.
-    if (false && m_readOnlyProvider && m_readOnlyProvider()) {  // PROOF: gate disabled
+    if (m_readOnlyProvider && m_readOnlyProvider()) {
         const bool headingLevelChord =
             (modifiers & Qt::ControlModifier) && (modifiers & Qt::ShiftModifier)
             && key >= Qt::Key_0 && key <= Qt::Key_6;
