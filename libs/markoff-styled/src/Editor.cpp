@@ -114,7 +114,7 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         m_binding->setOpaqueRenderer(m_tableRenderer.get());
     }
     m_tableRenderer->setMarkoffDocument(doc);
-    m_tableRenderer->setFontScale(m_fontScale);
+    m_tableRenderer->setFontScale(fontScale());
 
     // Connect captureScrollBeforeEdit BEFORE the binding wires its own
     // onD2DocumentChanged. Connection order guarantees we fire first
@@ -450,14 +450,22 @@ quint64 Editor::styleApplierHashSkips() const {
 }
 
 // ---- Font scale ---------------------------------------------------------
-
-qreal Editor::fontScale() const { return m_fontScale; }
+//
+// The base MarkdownView stores the scale and emits fontScaleChanged.
+// This override forwards the settled value to StyleApplier and
+// StyledTableRenderer (the two styled-leaf consumers).
+// No local m_fontScale copy: base fontScale() is the single authority
+// (eliminates the dual-store pattern flagged in the review note;
+// INVARIANTS §3). StyleApplier has its own internal m_fontScale but that
+// is an implementation detail of StyleApplier, not a competing authority —
+// it is kept in sync here via setFontScale().
 
 void Editor::setFontScale(qreal s) {
-    MarkdownView::setFontScale(s);  // base clamps + stores + emits
-    if (qFuzzyCompare(m_fontScale, MarkdownView::fontScale())) return;
-    m_fontScale = MarkdownView::fontScale();  // keep local in sync (StyleApplier reads it)
-    if (m_styleApplier) m_styleApplier->setFontScale(m_fontScale);
+    const qreal prev = fontScale();            // read base before update
+    MarkdownView::setFontScale(s);             // clamps + stores + emits (no-op if same)
+    if (qFuzzyCompare(prev, fontScale())) return;  // base was a no-op
+    if (m_styleApplier) m_styleApplier->setFontScale(fontScale());
+    if (m_tableRenderer) m_tableRenderer->setFontScale(fontScale());
 }
 
 }  // namespace Markoff::Styled

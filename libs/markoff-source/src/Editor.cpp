@@ -204,6 +204,28 @@ void Editor::setReadOnly(bool ro) {
     m_editor->setReadOnly(ro);
 }
 
+void Editor::setFontScale(qreal s) {
+    // Capture the base font size lazily on the first actual scale change
+    // (not in the ctor) so we get the style-settled point size, not the
+    // construction-time default that may be overridden by a QSS rule.
+    if (qFuzzyIsNull(m_baseFontPt))
+        m_baseFontPt = m_editor->font().pointSizeF();
+
+    Markoff::MarkdownView::setFontScale(s);  // clamp + store + signal (no-op if same)
+
+    QFont f = m_editor->font();
+    const qreal newPt = m_baseFontPt * fontScale();
+    if (qFuzzyCompare(f.pointSizeF(), newPt)) return;
+
+    f.setPointSizeF(newPt);
+    m_editor->setFont(f);
+    if (m_gutter) {
+        m_gutter->setFont(f);
+        recomputeGutterWidth();
+    }
+    applyParagraphMargins();
+}
+
 bool Editor::isReadOnly() const { return m_editor->isReadOnly(); }
 
 void Editor::attachFindController(Markoff::FindController *fc)

@@ -3,6 +3,7 @@
 #include <QScrollBar>
 #include <QSignalSpy>
 #include <QTest>
+#include <QTextCursor>
 
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -29,6 +30,53 @@ private Q_SLOTS:
     void undo_redo_via_base()           { ViewContract::checkUndoRedoViaBase(m_ed, m_doc); }
     void font_scale_signal()            { ViewContract::checkFontScaleSignal(m_ed); }
     void context_changed_kind_gated()   { ViewContract::checkContextChangedKindGated(m_ed); }
+
+    // ---- Task 12(A): fontScale actually scales the inner editor font ----
+    //
+    // Spec §8: Source::Editor::setFontScale must scale the inner
+    // QPlainTextEdit's font point size from the captured base size, and
+    // return to base when reset to 1.0. The signal test above (font_scale_signal)
+    // only proves the base store + signal; this slot proves the actual
+    // visual scaling (invariant 4: falsifiable by breaking the override).
+    void font_scale_scales_inner_editor_font() {
+        auto *te = m_ed->findChild<QPlainTextEdit *>();
+        QVERIFY(te);
+        const qreal base = te->font().pointSizeF();
+        static_cast<Markoff::MarkdownView *>(m_ed)->setFontScale(2.0);
+        QVERIFY(qFuzzyCompare(te->font().pointSizeF(), base * 2.0));
+        static_cast<Markoff::MarkdownView *>(m_ed)->setFontScale(1.0);
+        QVERIFY(qFuzzyCompare(te->font().pointSizeF(), base));
+    }
+
+    // ---- Task 12(B) §10 check 4: find — see dedicated test binary ----
+    //
+    // Spec §10 check 4 (find highlight) is covered by tst_source_find_adapter,
+    // which drives attachFindController() + match counts + extraSelection positions
+    // against the real production SourceFindAdapter. That binary is the
+    // authoritative find contract for this leaf; duplication here would not
+    // add falsifiability. Reference: libs/markoff-source/tests/tst_source_find_adapter.cpp.
+
+    // ---- Task 12(B) §10 check 6: format verbs via base pointer -----------
+    //
+    // Source leaf must expose format verbs through the MarkdownView base pointer
+    // (Corbomite's polymorphic handle). The contract is: a toggleBold() call
+    // via `MarkdownView *` wraps the selection in the document.
+    // Mirrors styled's format_verbs_match_source_semantics.
+    void format_verbs_via_base_pointer() {
+        auto *te = m_ed->plainTextEdit();
+        QVERIFY(te);
+        // Select "one" in "alpha one" (block 0, qt-positions 6..9).
+        QTextCursor c = te->textCursor();
+        c.setPosition(6);
+        c.setPosition(9, QTextCursor::KeepAnchor);
+        te->setTextCursor(c);
+        // Drive via the BASE pointer (the polymorphic handle Corbomite uses).
+        static_cast<Markoff::MarkdownView *>(m_ed)->toggleBold();
+        QVERIFY(m_doc->serializeForSave().startsWith("alpha **one**"));
+        // Second call toggles back (wrapToggle round-trip).
+        static_cast<Markoff::MarkdownView *>(m_ed)->toggleBold();
+        QVERIFY(m_doc->serializeForSave().startsWith("alpha one"));
+    }
 
     // ---- Task 11(B): scrollPositionChanged fires on programmatic scroll ----
     //

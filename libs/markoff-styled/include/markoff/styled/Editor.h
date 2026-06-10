@@ -86,8 +86,10 @@ public:
     QString fromContext() const;
     void    setFromContext(const QString &);
 
-    // Font scale (1.0 = default; Ctrl+/- multiplies block-format font sizes)
-    qreal fontScale() const override;
+    // Font scale (1.0 = default; Ctrl+/- multiplies block-format font sizes).
+    // The base MarkdownView stores + emits; this override forwards to
+    // StyleApplier and StyledTableRenderer (the only styled-leaf consumers).
+    // No local copy: base fontScale() is the single authority (INVARIANTS §3).
     void  setFontScale(qreal) override;
 
     // Accessor for tests + internal helpers
@@ -121,7 +123,6 @@ private:
     Markoff::LinkService                   *m_linkService  = nullptr;
     mutable Markoff::DefaultLinkService    *m_defaultLink  = nullptr;
     QString                                 m_fromContext;
-    qreal                                   m_fontScale    = 1.0;
     QMetaObject::Connection                 m_d2ScrollCaptureCon;
     QMetaObject::Connection                 m_contextCursorCon;
     QMetaObject::Connection                 m_contextD2Con;

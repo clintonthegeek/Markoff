@@ -37,6 +37,11 @@ public:
     bool hasCursor()  const override { return true; }
     bool hasEditing() const override { return !isReadOnly(); }
 
+    // Font scale (spec §8): scales the inner editor font, gutter, and
+    // paragraph margins from the captured base size. Clamping + signal
+    // are delegated to the base MarkdownView::setFontScale.
+    void setFontScale(qreal s) override;
+
     // Theme
     Markoff::Theme theme() const override;
     void setTheme(const Markoff::Theme &) override;
@@ -99,6 +104,10 @@ private:
     /// Recompute the EditorContext from the current caret position and emit
     /// contextChanged if the context has changed (change-gated, spec §7).
     void recomputeContext();
+
+    // Captured on first setFontScale call (lazy: avoids a QFont query in the
+    // ctor before the inner editor has its final default font from the style).
+    qreal                                    m_baseFontPt   = 0.0;
 
     QPlainTextEdit                          *m_editor      = nullptr;
     QPointer<Markoff::Session>              m_session;
