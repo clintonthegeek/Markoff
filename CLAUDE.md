@@ -6,11 +6,11 @@ Qt6/C++ markdown editor widget family: a CRDT-backed foundation library
 widget, `markoff-styled` QTextEdit inline-styled editor). Primary
 consumer: Corbomite (submodules this repo at `libs/markoff-family`).
 
-## Current status — 2026-06-09
+## Current status — 2026-06-10
 
 - **Active workfront:** the **MarkdownView contract-v2 arc** (public-API
-  finalization for Corbomite) is mid-flight — plan Tasks 1–8 of 13
-  done, 9–13 remain. **Resume from
+  finalization for Corbomite) is mid-flight — plan Tasks 1–11 of 13
+  done, 12–13 remain. **Resume from
   `docs/handoff/2026-06-09-contract-v2-arc-handoff.md`.** Spec:
   `docs/specs/2026-06-09-markdownview-contract-v2-design.md`. E-arc
   stays dormant (see `docs/STATUS.md`).
