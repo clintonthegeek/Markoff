@@ -6,6 +6,7 @@
 
 #include <KSyntaxHighlighting/SyntaxHighlighter>
 
+#include <markoff/core/EditorContext.h>
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
@@ -95,6 +96,10 @@ private:
     /// the binding has settled a reverse-diff. Cheap idempotent pass.
     void applyParagraphMargins();
 
+    /// Recompute the EditorContext from the current caret position and emit
+    /// contextChanged if the context has changed (change-gated, spec §7).
+    void recomputeContext();
+
     QPlainTextEdit                          *m_editor      = nullptr;
     QPointer<Markoff::Session>              m_session;
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
@@ -103,6 +108,9 @@ private:
     Detail::SourceFindAdapter              *m_findAdapter   = nullptr;
     Markoff::Theme                          m_theme;
     QMetaObject::Connection                 m_paragraphMarginsCon;
+    QMetaObject::Connection                 m_contextCursorCon;
+    QMetaObject::Connection                 m_contextD2Con;
+    Markoff::EditorContext                  m_lastContext;
 
     friend class Markoff::Source::Detail::Gutter;
 };

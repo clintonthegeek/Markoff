@@ -8,6 +8,10 @@
 #include <KSyntaxHighlighting/Repository>
 #include <KSyntaxHighlighting/Theme>
 
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/Detail/FlatBlockResolve.h>
+#include <markoff/core/EditorContext.h>
 #include <markoff/core/FormatOps.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
@@ -108,6 +112,15 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         QObject::disconnect(m_paragraphMarginsCon);
         m_paragraphMarginsCon = {};
     }
+    // Disconnect stale context connections.
+    if (m_contextD2Con) {
+        QObject::disconnect(m_contextD2Con);
+        m_contextD2Con = {};
+    }
+    if (m_contextCursorCon) {
+        QObject::disconnect(m_contextCursorCon);
+        m_contextCursorCon = {};
+    }
 
     Markoff::MarkdownView::setDocument(doc);
 
@@ -118,6 +131,19 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         m_paragraphMarginsCon = QObject::connect(
             doc, &Markoff::MarkoffDocument::d2DocumentChanged,
             this, &Editor::applyParagraphMargins);
+        // Wire context-refresh. Reset the sentinel so the first cursor
+        // movement after setDocument() always emits contextChanged.
+        m_lastContext = Markoff::EditorContext{};
+        m_lastContext.blockKind = QString{};  // sentinel: not a valid kind name
+        // Connect context-refresh to cursor movement only. The source leaf
+        // delegates kind inference to structural keys (Enter, Backspace) which
+        // always move the cursor; connecting d2DocumentChanged is unnecessary
+        // and causes false-fires from the syntax highlighter's format-only
+        // contentsChange notifies (which reach d2DocumentChanged via the
+        // binding's no-op edit path).
+        m_contextCursorCon = QObject::connect(
+            m_editor, &QPlainTextEdit::cursorPositionChanged,
+            this, &Editor::recomputeContext);
         // Initial pass — the binding seeded qdoc from widgetFlatView in
         // setMarkoffDocument; margins for the initial blocks need to land too.
         applyParagraphMargins();
@@ -302,6 +328,68 @@ void Editor::setHeadingLevel(int level) {
         m_editor, Markoff::FormatOps::setHeadingLevel(
                       doc, m_editor->toPlainText(),
                       m_editor->textCursor().position(), level));
+}
+
+namespace {
+
+// Map BlockKind enum to the canonical BlockKindNames string.
+const char *blockKindToName(Markoff::BlockKind kind) {
+    using BK = Markoff::BlockKind;
+    namespace BKN = Markoff::BlockKindNames;
+    switch (kind) {
+    case BK::Paragraph:      return BKN::Paragraph;
+    case BK::Heading:        return BKN::Heading;
+    case BK::CodeBlock:      return BKN::CodeBlock;
+    case BK::ListItem:       return BKN::ListItem;
+    case BK::BlockQuote:     return BKN::Blockquote;
+    case BK::HorizontalRule: return BKN::HorizontalRule;
+    case BK::Image:          return BKN::Image;
+    case BK::Math:           return BKN::Math;
+    case BK::Table:          return BKN::Table;
+    default:                 return BKN::Paragraph;  // Mermaid, HtmlBlock → graceful fallback
+    }
+}
+
+} // namespace
+
+void Editor::recomputeContext()
+{
+    auto *doc = Markoff::MarkdownView::document();
+    if (!doc || !m_editor) return;
+
+    // Map the caret qt-position (UTF-16 char offset in the QTextDocument) to
+    // a sep-view byte offset, then look up the containing block.
+    const QTextCursor cursor = m_editor->textCursor();
+    const int qtPos = cursor.position();
+    // The QTextDocument is seeded from widgetFlatView() so its text is the
+    // flat view. Convert using the same helper FormatOps uses.
+    const QString flatText = m_editor->toPlainText();
+    const quint32 sepByte =
+        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(flatText, qtPos);
+
+    const auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepByte,
+                                                          /*biasForward=*/false);
+    if (!hit) return;
+
+    const Markoff::BlockKind kind = doc->blockKind(hit->blockId);
+    Markoff::EditorContext ctx;
+    ctx.blockKind = blockKindToName(kind);
+    ctx.inTable   = (kind == Markoff::BlockKind::Table);
+
+    // Heading level from the "level" attr (int 1–6).
+    if (kind == Markoff::BlockKind::Heading) {
+        const auto attrs = doc->blockAttrs(hit->blockId);
+        auto it = attrs.constFind(Markoff::AttrNames::Level);
+        if (it != attrs.cend()) {
+            if (const int *p = std::get_if<int>(&it.value()))
+                ctx.headingLevel = *p;
+        }
+    }
+
+    // Change-gate: only emit if something actually changed.
+    if (ctx == m_lastContext) return;
+    m_lastContext = ctx;
+    emit contextChanged(m_lastContext);
 }
 
 void Editor::applyParagraphMargins()

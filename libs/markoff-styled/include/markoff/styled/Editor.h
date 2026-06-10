@@ -6,6 +6,7 @@
 #include <QPointer>
 #include <QTextEdit>
 
+#include <markoff/core/EditorContext.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -102,6 +103,10 @@ Q_SIGNALS:
     void fromContextChanged();
 
 private:
+    /// Recompute the EditorContext from the current caret position and emit
+    /// contextChanged if the context has changed (change-gated, spec §7).
+    void recomputeContext();
+
     StructuralTextEdit                     *m_editor       = nullptr;
     QPointer<Markoff::Session>              m_session;
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
@@ -118,6 +123,9 @@ private:
     QString                                 m_fromContext;
     qreal                                   m_fontScale    = 1.0;
     QMetaObject::Connection                 m_d2ScrollCaptureCon;
+    QMetaObject::Connection                 m_contextCursorCon;
+    QMetaObject::Connection                 m_contextD2Con;
+    Markoff::EditorContext                  m_lastContext;
 };
 
 }  // namespace Markoff::Styled

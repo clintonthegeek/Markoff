@@ -15,7 +15,11 @@
 #include <QTextEdit>
 #include <QTextFrame>
 
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/BlockKind.h>
 #include <markoff/core/DefaultLinkService.h>
+#include <markoff/core/Detail/FlatBlockResolve.h>
+#include <markoff/core/EditorContext.h>
 #include <markoff/core/FormatOps.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -67,6 +71,15 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         QObject::disconnect(m_d2ScrollCaptureCon);
         m_d2ScrollCaptureCon = {};
     }
+    // Disconnect stale context connections.
+    if (m_contextD2Con) {
+        QObject::disconnect(m_contextD2Con);
+        m_contextD2Con = {};
+    }
+    if (m_contextCursorCon) {
+        QObject::disconnect(m_contextCursorCon);
+        m_contextCursorCon = {};
+    }
 
     if (!m_binding) {
         m_binding = new Markoff::SourceTextDocumentBinding(this);
@@ -106,6 +119,23 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     m_styleApplier->setMarkoffDocument(doc);
     if (m_linkInteract) m_linkInteract->setMarkoffDocument(doc);
     if (m_session) m_binding->setSession(m_session.data());
+
+    // Wire context-refresh on cursor movement (spec §7).
+    // d2DocumentChanged is intentionally NOT connected here: it fires during
+    // the initial qWait cycle (from StyleApplier's deferred format pass) and
+    // would pre-warm m_lastContext before the first real cursor move, defeating
+    // the change-gate. Cursor-position-based triggering is sufficient for the
+    // contract: context is re-read on every cursor move regardless of what
+    // caused the kind change.
+    if (doc) {
+        // Reset the sentinel so the first cursor movement after setDocument()
+        // always emits contextChanged.
+        m_lastContext = Markoff::EditorContext{};
+        m_lastContext.blockKind = QString{};  // sentinel: not a valid kind name
+        m_contextCursorCon = QObject::connect(
+            m_editor, &QTextEdit::cursorPositionChanged,
+            this, &Editor::recomputeContext);
+    }
 
     Markoff::MarkdownView::setDocument(doc);
 }
@@ -325,6 +355,72 @@ void Editor::setFromContext(const QString &c) {
     m_fromContext = c;
     if (m_linkInteract) m_linkInteract->setFromContext(c);
     emit fromContextChanged();
+}
+
+// ---- EditorContext feed (spec §7) ----------------------------------------
+
+namespace {
+
+// Map BlockKind enum to the canonical BlockKindNames string.
+// (Mirrors the same helper in markoff-source/src/Editor.cpp; factored here
+// because styled has its own anonymous namespace for the frame-guard helpers.)
+const char *styledBlockKindToName(Markoff::BlockKind kind) {
+    using BK = Markoff::BlockKind;
+    namespace BKN = Markoff::BlockKindNames;
+    switch (kind) {
+    case BK::Paragraph:      return BKN::Paragraph;
+    case BK::Heading:        return BKN::Heading;
+    case BK::CodeBlock:      return BKN::CodeBlock;
+    case BK::ListItem:       return BKN::ListItem;
+    case BK::BlockQuote:     return BKN::Blockquote;
+    case BK::HorizontalRule: return BKN::HorizontalRule;
+    case BK::Image:          return BKN::Image;
+    case BK::Math:           return BKN::Math;
+    case BK::Table:          return BKN::Table;
+    default:                 return BKN::Paragraph;  // Mermaid, HtmlBlock → fallback
+    }
+}
+
+} // namespace
+
+void Editor::recomputeContext()
+{
+    auto *doc = Markoff::MarkdownView::document();
+    if (!doc || !m_editor || !m_binding) return;
+
+    // Map the caret qt-position to a sep-view byte offset using the same
+    // helper FormatOps uses, then look up the containing block.
+    // Note: for styled, widgetFlatView() is the authoritative flat text
+    // (toPlainText() diverges once QTextTable frames are present).
+    const QTextCursor cursor = m_editor->textCursor();
+    const int qtPos = cursor.position();
+    const QString flatText = QString::fromUtf8(doc->widgetFlatView());
+    const quint32 sepByte =
+        Markoff::SourceTextDocumentBinding::qtPosToByteOffset(flatText, qtPos);
+
+    const auto hit = Markoff::Detail::findBlockAtSepByte(doc, sepByte,
+                                                          /*biasForward=*/false);
+    if (!hit) return;
+
+    const Markoff::BlockKind kind = doc->blockKind(hit->blockId);
+    Markoff::EditorContext ctx;
+    ctx.blockKind = styledBlockKindToName(kind);
+    ctx.inTable   = (kind == Markoff::BlockKind::Table);
+
+    // Heading level from the "level" attr (int 1–6).
+    if (kind == Markoff::BlockKind::Heading) {
+        const auto attrs = doc->blockAttrs(hit->blockId);
+        auto it = attrs.constFind(Markoff::AttrNames::Level);
+        if (it != attrs.cend()) {
+            if (const int *p = std::get_if<int>(&it.value()))
+                ctx.headingLevel = *p;
+        }
+    }
+
+    // Change-gate: only emit if something actually changed.
+    if (ctx == m_lastContext) return;
+    m_lastContext = ctx;
+    emit contextChanged(m_lastContext);
 }
 
 // ---- Test helpers -------------------------------------------------------

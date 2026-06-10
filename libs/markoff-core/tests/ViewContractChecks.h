@@ -7,6 +7,7 @@
 #include <QSignalSpy>
 #include <QTest>
 
+#include <markoff/core/EditorContext.h>
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
 
@@ -63,6 +64,39 @@ inline void checkFontScaleSignal(Markoff::MarkdownView *v) {
     QCOMPARE(v->fontScale(), 1.25);
     QVERIFY(spy.count() >= 1);
     v->setFontScale(1.0);
+}
+
+// Spec §7: contextChanged is emitted on block kind change, and is
+// change-gated (no re-emit when the caret stays in the same block).
+//
+// Fixture flat lines (in the widget — code fence stripped to content by D2):
+//   line 1 → "alpha one"    (Paragraph, block 0)
+//   line 2 → "code line"    (CodeBlock, block 1)
+//   line 3 → "omega end"    (Paragraph, block 2)
+//
+// setCursorPosition({5, 1}) clamps to the last line → omega end (Paragraph).
+// setCursorPosition({2, 1}) → code line (CodeBlock).
+inline void checkContextChangedKindGated(Markoff::MarkdownView *v) {
+    qRegisterMetaType<Markoff::EditorContext>();
+    QSignalSpy spy(v, &Markoff::MarkdownView::contextChanged);
+
+    // Park on a known block first (omega end → Paragraph).
+    v->setCursorPosition({5, 1});
+    QTRY_VERIFY(spy.count() >= 1);
+    const auto ctx0 = spy.last().at(0).value<Markoff::EditorContext>();
+    QCOMPARE(ctx0.blockKind, QString(Markoff::BlockKindNames::Paragraph));
+
+    // Move within the SAME block (still omega end) — must NOT emit again.
+    const int n = spy.count();
+    v->setCursorPosition({5, 2});   // still clamped to the same last line
+    QTest::qWait(20);
+    QCOMPARE(spy.count(), n);       // change-gated → no new emit
+
+    // Move to code block (line 2 in widget flat view).
+    v->setCursorPosition({2, 1});
+    QTRY_VERIFY(spy.count() > n);
+    const auto ctx1 = spy.last().at(0).value<Markoff::EditorContext>();
+    QCOMPARE(ctx1.blockKind, QString(Markoff::BlockKindNames::CodeBlock));
 }
 
 }  // namespace ViewContract

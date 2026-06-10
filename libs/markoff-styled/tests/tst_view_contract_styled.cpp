@@ -23,10 +23,11 @@ private Q_SLOTS:
     }
     void cleanup() { delete m_ed; delete m_doc; }
 
-    void cursor_round_trip()   { ViewContract::checkCursorRoundTrip(m_ed); }
-    void read_only_blocks()    { ViewContract::checkReadOnlyBlocksUndoAndKeepsBytes(m_ed, m_doc); }
-    void undo_redo_via_base()  { ViewContract::checkUndoRedoViaBase(m_ed, m_doc); }
-    void font_scale_signal()   { ViewContract::checkFontScaleSignal(m_ed); }
+    void cursor_round_trip()            { ViewContract::checkCursorRoundTrip(m_ed); }
+    void read_only_blocks()             { ViewContract::checkReadOnlyBlocksUndoAndKeepsBytes(m_ed, m_doc); }
+    void undo_redo_via_base()           { ViewContract::checkUndoRedoViaBase(m_ed, m_doc); }
+    void font_scale_signal()            { ViewContract::checkFontScaleSignal(m_ed); }
+    void context_changed_kind_gated()   { ViewContract::checkContextChangedKindGated(m_ed); }
 
     void format_verbs_match_source_semantics() {
         auto *te = m_ed->textEdit();
