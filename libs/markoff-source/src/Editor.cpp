@@ -87,6 +87,16 @@ Editor::Editor(QWidget *parent)
             this, [this]() { if (m_gutter) m_gutter->update(); });
     recomputeGutterWidth();
 
+    // Contract §9: emit scrollPositionChanged on native scroll (user drag,
+    // programmatic setValue) via a single valueChanged connection. This covers
+    // both user-driven scrolling and the programmatic path in
+    // setScrollPositionVisualLine (which calls setValue). The manual emit has
+    // been removed from that setter so this is the single emit path.
+    connect(m_editor->verticalScrollBar(), &QScrollBar::valueChanged,
+            this, [this](int) {
+                Q_EMIT scrollPositionChanged(scrollPositionVisualLine());
+            });
+
     // Forward key events (undo/redo) from the inner editor
     m_editor->installEventFilter(this);
 }
@@ -176,8 +186,17 @@ float Editor::scrollPositionVisualLine() const {
 
 void Editor::setScrollPositionVisualLine(float pos) {
     auto *sb = m_editor->verticalScrollBar();
-    if (!sb || sb->maximum() == 0) return;
-    sb->setValue(static_cast<int>(pos * static_cast<float>(sb->maximum())));
+    if (!sb) return;
+    if (sb->maximum() != 0) {
+        // setValue fires valueChanged, which is connected (in the constructor)
+        // to emit scrollPositionChanged — single emit path (spec §9).
+        sb->setValue(static_cast<int>(pos * static_cast<float>(sb->maximum())));
+    } else {
+        // Document fits entirely in the viewport (maximum == 0); setValue
+        // would be a no-op and valueChanged would not fire. Emit explicitly
+        // so the caller always observes the set (spec §9 contract minimum).
+        Q_EMIT scrollPositionChanged(0.0f);
+    }
 }
 
 void Editor::setReadOnly(bool ro) {

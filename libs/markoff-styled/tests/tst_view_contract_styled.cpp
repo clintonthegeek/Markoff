@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QScrollBar>
+#include <QSignalSpy>
 #include <QTest>
 #include <QTextCursor>
+#include <QTextEdit>
 #include <QTextTable>
 
+#include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/styled/Editor.h>
 
@@ -94,6 +98,62 @@ private Q_SLOTS:
         static_cast<Markoff::MarkdownView *>(m_ed)->toggleBold();
         QCOMPARE(m_doc->serializeForSave(), before);
         m_ed->setReadOnly(false);
+    }
+
+    // ---- Task 11(B): scrollPositionChanged fires on programmatic scroll ----
+    //
+    // setScrollPositionVisualLine(pos) must emit scrollPositionChanged.
+    // The exact emitted value may differ from pos when the document fits
+    // entirely in the viewport (scrollbar clamped to 0); the contract only
+    // requires that the signal fires at least once.
+    void scrollPositionChanged_fires_on_set() {
+        QSignalSpy spy(m_ed,
+                       &Markoff::MarkdownView::scrollPositionChanged);
+        QVERIFY(spy.isValid());
+        m_ed->setScrollPositionVisualLine(0.5f);
+        QTRY_VERIFY(spy.count() >= 1);
+    }
+
+    // ---- Task 11(B) GAP 1: scrollPositionChanged fires on NATIVE scroll ----
+    //
+    // Spec §9 requires the signal on the native change signal (user drag).
+    // The native path for QTextEdit is verticalScrollBar()->valueChanged.
+    // Load a tall document so the scrollbar has range, then drive setValue
+    // directly — this IS the native valueChanged path — and verify the signal
+    // fires. The spec §9 connection in the constructor routes valueChanged to
+    // emit scrollPositionChanged unconditionally.
+    void scrollPositionChanged_fires_on_native_scroll() {
+        // Use a fresh editor + tall document so the scrollbar has range.
+        Markoff::MarkoffDocument doc(2);
+        // 30 paragraphs is tall enough for any reasonable default font.
+        QByteArray md;
+        for (int i = 0; i < 30; ++i)
+            md += QByteArrayLiteral("Paragraph line ") + QByteArray::number(i) + "\n\n";
+        doc.loadFromMarkdown(md);
+
+        Markoff::Styled::Editor ed;
+        ed.resize(400, 200);
+        ed.setDocument(&doc);
+        ed.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&ed));
+        QTest::qWait(50);
+
+        auto *te = ed.textEdit();
+        QVERIFY(te);
+        auto *sb = te->verticalScrollBar();
+        QVERIFY(sb);
+        if (sb->maximum() == 0) {
+            QSKIP("Scrollbar has no range in this viewport — content too short (offscreen rendering)");
+        }
+
+        QSignalSpy spy(static_cast<Markoff::MarkdownView *>(&ed),
+                       &Markoff::MarkdownView::scrollPositionChanged);
+        QVERIFY(spy.isValid());
+
+        // Drive the native path: setValue fires valueChanged, which is
+        // connected in the constructor to emit scrollPositionChanged.
+        sb->setValue(sb->maximum() / 2);
+        QTRY_VERIFY(spy.count() >= 1);
     }
 };
 

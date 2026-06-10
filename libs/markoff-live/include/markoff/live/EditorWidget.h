@@ -72,6 +72,15 @@ public:
     /// out-of-range positions to the last block / line end.
     void setCursorPosition(Markoff::CursorPos pos) override;
 
+    /// Read the QML ListView (Flickable) contentY / contentHeight ratio.
+    /// Returns 0.0 when the content fits in the viewport or when the
+    /// QML root has not yet loaded. O(1) QML property read.
+    float scrollPositionVisualLine() const override;
+    /// Set the ListView's contentY to pos × contentHeight and emit
+    /// scrollPositionChanged (spec §9). Clamps pos to [0, 1]. No-op
+    /// until the QML root is loaded.
+    void setScrollPositionVisualLine(float pos) override;
+
     /// Base store + push to the binding's `readOnly` flag — the single
     /// authority for the mutation-ingress gates (spec §4.2).
     void setReadOnly(bool ro) override;
@@ -111,6 +120,15 @@ public:
     void detachFindController() override;
 
 private:
+    /// Recompute the EditorContext from the current cursor (via LiveCursorState)
+    /// and emit contextChanged if the context has changed (change-gated, spec §7).
+    /// Called on every LiveCursorState::cursorChanged and on model dataChanged.
+    void recomputeContext();
+
+    /// Connected to the QML ListView's contentYChanged NOTIFY signal via the
+    /// runtime SIGNAL() string form. Emits scrollPositionChanged (spec §9).
+    Q_SLOT void onContentYChanged();
+
     struct Private;
     std::unique_ptr<Private> d;
 };

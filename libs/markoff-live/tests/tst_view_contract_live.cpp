@@ -410,6 +410,178 @@ private Q_SLOTS:
         QCOMPARE(spy.last().at(0).toInt(), 1);   // line 1 ("alpha one")
         QCOMPARE(spy.last().at(1).toInt(), 3);   // qtPos 2 → column 3
     }
+
+    // ---- Task 11(A): EditorContext feed for the live leaf (spec §7) ----
+    //
+    // The live leaf must emit contextChanged whenever the cursor moves to a
+    // different block kind, and must change-gate it (no re-emit on
+    // within-block moves). The signal is driven off LiveCursorState::cursorChanged
+    // (the cursor authority — L3 decision). Recomputation reads the block kind
+    // from MarkoffDocument::blockKind() via the same row→blockId path used by
+    // cursorPosition().
+    //
+    // Fixture model in the live leaf:
+    //   block 0: "alpha one"              → Paragraph
+    //   block 1: "```\ncode line\n```"    → CodeBlock
+    //   block 2: "omega end"              → Paragraph
+    //
+    // The live leaf's QML onCountChanged fires requestTextCaretAtRow(0, 0)
+    // during init(), which pre-warms m_lastContext to "paragraph" before the
+    // test slot runs. Unlike source/styled (where cursor-position-changed fires
+    // only on explicit cursor moves after setDocument), the live leaf's initial
+    // cursor seed is a QML-driven event that fires asynchronously but before
+    // init() returns. We therefore write a live-specific version of the gated
+    // check: drive to CodeBlock first (known to differ from the initial
+    // Paragraph), verify emission, then drive back to Paragraph, verify
+    // emission, then stay within Paragraph and verify change-gate.
+    void context_changed_kind_gated() {
+        qRegisterMetaType<Markoff::EditorContext>();
+        QSignalSpy spy(baseView(), &Markoff::MarkdownView::contextChanged);
+
+        // Step 1: Move to block 1 (CodeBlock). Since initial context is
+        // Paragraph (from the QML initial cursor seed), this MUST emit.
+        // Visual line 3 is inside the code block (block row 1).
+        cursorState()->requestTextCaretAtRow(1, 0);
+        QTRY_VERIFY(spy.count() >= 1);
+        const auto ctx0 = spy.last().at(0).value<Markoff::EditorContext>();
+        QCOMPARE(ctx0.blockKind, QString(Markoff::BlockKindNames::CodeBlock));
+
+        // Step 2: Move within the SAME block — change-gated, must NOT emit again.
+        const int n = spy.count();
+        cursorState()->requestTextCaretAtRow(1, 4);  // within CodeBlock
+        QTest::qWait(20);
+        QCOMPARE(spy.count(), n);  // change-gated → no new emit
+
+        // Step 3: Move to block 2 (Paragraph). Must emit (CodeBlock → Paragraph).
+        cursorState()->requestTextCaretAtRow(2, 0);
+        QTRY_VERIFY(spy.count() > n);
+        const auto ctx1 = spy.last().at(0).value<Markoff::EditorContext>();
+        QCOMPARE(ctx1.blockKind, QString(Markoff::BlockKindNames::Paragraph));
+    }
+
+    // ---- Task 11(A): in-table context (spec §7, contract minimum) ----
+    //
+    // When the caret lands on a Table block, contextChanged must report
+    // inTable == true and blockKind == "table". The table row/col fields
+    // may be -1 (contract minimum — see Task 11 spec note); this test
+    // asserts only the inTable flag and kind, not row/col.
+    //
+    // Note: table row/col would require surfacing TableEditBinding's per-cell
+    // state up to EditorWidget; the live leaf's cursor authority (LiveCursorState)
+    // does not carry per-cell coordinates. We assert the contract minimum here.
+    //
+    // The test uses a two-block document (paragraph + table) so we can start
+    // in the paragraph and then move to the table, triggering a contextChanged
+    // emission on the kind transition. Using a single-table document would
+    // leave m_lastContext pre-warmed to "table" by the QML initial cursor seed
+    // before the spy is wired, making the explicit move a no-op for the gate.
+    void context_changed_in_table_reports_inTable() {
+        qRegisterMetaType<Markoff::EditorContext>();
+        auto *doc = new Markoff::MarkoffDocument(2);
+        doc->loadFromMarkdown(
+            QByteArray("intro\n\n| A | B |\n| --- | --- |\n| x | y |"));
+        auto *w = new EditorWidget;
+        w->resize(800, 600);
+        w->setDocument(doc);
+        w->show();
+        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QTRY_VERIFY(w->binding()->model()->rowCount() >= 2);
+        QTRY_VERIFY(w->binding()->cursorState()->isDelegateRegistered(
+            w->binding()->cursorState()->blockAnchorAt(1)));
+        QTest::qWait(50);
+
+        // The QML initial cursor seed placed the caret at block 0 (paragraph),
+        // so m_lastContext is pre-warmed to "paragraph". Moving to block 1
+        // (table) triggers a contextChanged emission (kind change).
+        QSignalSpy spy(static_cast<Markoff::MarkdownView *>(w),
+                       &Markoff::MarkdownView::contextChanged);
+
+        // Move to block 1 (table). The kind-change paragraph→table must emit.
+        w->binding()->cursorState()->requestTextCaretAtRow(1, 0);
+        QTRY_VERIFY(spy.count() >= 1);
+        const auto ctx = spy.last().at(0).value<Markoff::EditorContext>();
+        QCOMPARE(ctx.blockKind, QString(Markoff::BlockKindNames::Table));
+        QVERIFY(ctx.inTable);
+
+        delete w;
+        delete doc;
+    }
+
+    // ---- Task 11(B): scrollPositionChanged fires on programmatic scroll ----
+    //
+    // setScrollPositionVisualLine(pos) is the cross-leaf programmatic scroll
+    // API. Calling it must emit scrollPositionChanged with the resulting
+    // position value. We don't need a tall document here — the setter drives
+    // the signal regardless of the scrollbar state, which is the contract.
+    void scrollPositionChanged_fires_on_set() {
+        QSignalSpy spy(baseView(),
+                       &Markoff::MarkdownView::scrollPositionChanged);
+        QVERIFY(spy.isValid());
+        // Call setScrollPositionVisualLine. The live leaf may clamp to 0.0
+        // when the document fits in the viewport (no scrollbar). What the
+        // contract requires is that the signal fires; the exact value is
+        // implementation-defined by clamping.
+        baseView()->setScrollPositionVisualLine(0.5f);
+        QTRY_VERIFY(spy.count() >= 1);
+    }
+
+    // ---- Task 11(B) GAP 1: scrollPositionChanged fires on NATIVE QML scroll ----
+    //
+    // Spec §9: the signal fires on the native change signal. For the live leaf,
+    // the native path is the QML ListView/Flickable's contentY property. Setting
+    // contentY directly on the root object simulates a user flick (bypassing the
+    // programmatic setter). The contentYChanged NOTIFY signal is connected in the
+    // EditorWidget constructor (via QQuickWidget::statusChanged → SIGNAL/SLOT
+    // string form) to emit scrollPositionChanged. This test exercises that path.
+    //
+    // Requires a tall document so contentHeight > viewport height; otherwise the
+    // QML clamps contentY to 0 and contentYChanged does not fire (skip if so).
+    void scrollPositionChanged_fires_on_native_qml_scroll() {
+        // Build a tall document — 20 paragraphs.
+        auto *doc = new Markoff::MarkoffDocument(3);
+        QByteArray md;
+        for (int i = 0; i < 20; ++i)
+            md += QByteArrayLiteral("Paragraph ") + QByteArray::number(i) + "\n\n";
+        doc->loadFromMarkdown(md);
+
+        auto *w = new EditorWidget;
+        w->resize(400, 200);
+        w->setDocument(doc);
+        w->show();
+        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QTRY_VERIFY(w->binding()->model()->rowCount() >= 5);
+        QTest::qWait(80);  // let QML lay out so contentHeight is settled
+
+        auto *qw = w->findChild<QQuickWidget *>();
+        QVERIFY(qw);
+        auto *root = qw->rootObject();
+        if (!root) {
+            delete w; delete doc;
+            QSKIP("QML root not ready");
+        }
+
+        bool ok = false;
+        const qreal contentH = root->property("contentHeight").toReal(&ok);
+        const qreal height   = root->property("height").toReal();
+        if (!ok || contentH <= height) {
+            delete w; delete doc;
+            QSKIP("Content fits in viewport — no scrollable range (offscreen rendering)");
+        }
+
+        QSignalSpy spy(static_cast<Markoff::MarkdownView *>(w),
+                       &Markoff::MarkdownView::scrollPositionChanged);
+        QVERIFY(spy.isValid());
+
+        // Set contentY directly on the root (native path — simulates a user flick).
+        // The contentYChanged NOTIFY fires and reaches onContentYChanged(), which
+        // emits scrollPositionChanged.
+        const qreal targetY = (contentH - height) * 0.5;
+        root->setProperty("contentY", QVariant::fromValue(targetY));
+        QTRY_VERIFY(spy.count() >= 1);
+
+        delete w;
+        delete doc;
+    }
 };
 
 QTEST_MAIN(TstViewContractLive)
