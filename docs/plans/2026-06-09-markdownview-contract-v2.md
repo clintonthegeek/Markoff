@@ -2,6 +2,28 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **PROGRESS — 2026-06-09 session handoff. Tasks 1–8 COMPLETE (implemented,
+> spec-reviewed, quality-reviewed, committed). Tasks 9–13 remain.**
+> Read `docs/handoff/2026-06-09-contract-v2-arc-handoff.md` before resuming —
+> it carries the per-task commit SHAs, the review dispositions, the accumulated
+> spec deviations Task 13 must reconcile, and the prepared context for Task 9
+> (whose RED-phase test slots are saved as
+> `docs/handoff/2026-06-09-task9-red-slots.patch`, ready to apply).
+>
+> | Task | Commit(s) | Note |
+> |---|---|---|
+> | 1 base contract | `9156224c` | |
+> | 2 contract suites | `e0910d1d` | found+fixed real bug: source verbs ignored read-only |
+> | 3 FormatOps hoist | `548f6793` | ops return `std::optional<QtRange>` (deviation, reviewed OK) |
+> | 4 BlockPositionWalk | `da8bfc1f` | WalkEntry carries kind/text/frame/qtBlocks |
+> | 5 StyledFindAdapter | `cf80da4a` + `f2505748` | in-frame nav scrolls to frame |
+> | 6 styled verbs | `0fd75082` | conservative after-frame guard |
+> | 7 live cursor mapping | `c2223a0f` (+proof pair `cf601e62`/`bcbeb683`) | seam work, falsifiability in history |
+> | 8 read-only gates | `1c0a4d46` (+proof pair `bffcc874`/`bab51a6d`) | +KeyDispatch.js deleteSelection gate the plan missed |
+>
+> Baseline at handoff: **266/269** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
+> (the 3 failures are the documented queue-#10 binaries, pre-existing).
+
 **Goal:** Make `Markoff::MarkdownView` the honest common contract of all
 three view leaves (find, undo/redo, theme, fontScale, format verbs,
 cursor, read-only, editor context) so Corbomite swaps views with zero

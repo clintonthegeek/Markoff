@@ -7,21 +7,28 @@
 > workfront, baseline, or open-item set changes; move superseded
 > dated entries to `docs/STATUS-LOG.md`.
 
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-09 (late — contract-v2 arc half landed)
 
 ## Workfront
 
-The flat-view leaves (`markoff-styled`, `markoff-source`) and the
-shared `markoff-core` single-document binding, plus **public-API
-finalization for Corbomite**. The QML live leaf (`markoff-live`) is
-feature-stable; no live-leaf feature work since the 2026-05-25 master
-merge.
+**The MarkdownView contract-v2 arc (API finalization for Corbomite) is
+mid-flight: plan Tasks 1–8 of 13 complete, Tasks 9–13 remain.**
+Resume from
+[`docs/handoff/2026-06-09-contract-v2-arc-handoff.md`](handoff/2026-06-09-contract-v2-arc-handoff.md)
+(per-task commits, review dispositions, Task-9 RED patch ready to
+apply). Spec
+`docs/specs/2026-06-09-markdownview-contract-v2-design.md`; plan
+`docs/plans/2026-06-09-markdownview-contract-v2.md` (progress banner).
+Landed so far: honest base contract (find/undo/theme/fontScale/verbs),
+FormatOps hoist, styled frame-aware find + verbs, live cursor mapping +
+read-only ingress gates (both with falsifiability proof pairs in
+history).
 
 ## Test baseline
 
-**260/263** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
-(verified 2026-06-09; was 259/262 before this session added
-`tst_source_find_adapter`). The 3 failing binaries
+**266/269** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
+(verified 2026-06-09 at handoff; the arc added 6 contract/find/format
+test binaries). The 3 failing binaries
 — `tst_live_render_e2_nav_shift_extend` (2 slots),
 `tst_live_render_focus_chokepoint_invariant` (3 slots),
 `tst_live_render_cursor_typing_invariant` (1 slot) — are

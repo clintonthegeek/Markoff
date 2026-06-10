@@ -8,13 +8,13 @@ consumer: Corbomite (submodules this repo at `libs/markoff-family`).
 
 ## Current status — 2026-06-09
 
-- **Active workfront:** the flat-view leaves (`markoff-styled` +
-  `markoff-source`) and the `markoff-core` single-document binding,
-  plus **public-API finalization for Corbomite** (cross-leaf parity:
-  find/theme/format/undo through `Markoff::MarkdownView` instead of
-  per-leaf escape hatches). The QML live leaf is feature-stable;
-  E-arc is dormant (see `docs/STATUS.md`).
-- **Test baseline:** **260/263** via
+- **Active workfront:** the **MarkdownView contract-v2 arc** (public-API
+  finalization for Corbomite) is mid-flight — plan Tasks 1–8 of 13
+  done, 9–13 remain. **Resume from
+  `docs/handoff/2026-06-09-contract-v2-arc-handoff.md`.** Spec:
+  `docs/specs/2026-06-09-markdownview-contract-v2-design.md`. E-arc
+  stays dormant (see `docs/STATUS.md`).
+- **Test baseline:** **266/269** via
   `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`. The 3
   failing binaries (`tst_live_render_e2_nav_shift_extend`,
   `tst_live_render_focus_chokepoint_invariant`,
@@ -196,7 +196,7 @@ Three modes:
 explicit per-task user permission. Even `--nested` should be reserved for
 visual verification work; the offscreen path is the daily driver.
 
-Expected baseline: **260/263** on the fast inner loop. The 3 failing
+Expected baseline: **266/269** on the fast inner loop. The 3 failing
 binaries are deterministic, documented failures (queue #10) — any
 *other* failure is a new regression. When a test fails, **classify
 before fixing**: rapid design evolution means many failures are
