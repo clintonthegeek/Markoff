@@ -14,8 +14,10 @@ consumer: Corbomite (submodules this repo at `libs/markoff-family`).
   `docs/specs/2026-06-09-markdownview-contract-v2-design.md`; plan:
   `docs/plans/2026-06-09-markdownview-contract-v2.md` (full task table
   with SHAs). E-arc stays dormant (see `docs/STATUS.md`).
-- **Test baseline:** **266/269** via
-  `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`. The 3
+- **Test baseline:** **268/271** via
+  `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'` (two binaries
+  added during Corbomite Phase 1 adoption: `tst_embed_image_node`,
+  `tst_view_contract_live_attach_window`). The 3
   failing binaries (`tst_live_render_e2_nav_shift_extend`,
   `tst_live_render_focus_chokepoint_invariant`,
   `tst_live_render_cursor_typing_invariant`, 6 slots total) are

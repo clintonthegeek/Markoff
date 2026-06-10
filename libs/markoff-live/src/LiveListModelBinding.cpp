@@ -166,6 +166,7 @@ struct LiveListModelBinding::Private {
     int                        activeThemeIdx   = 0;
     qreal                      fontScale        = kDefaultFontScale;
     bool                       readOnly         = false;
+    bool                       initialCaretRequested = false;  // attach-window contract
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
@@ -234,6 +235,13 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
     if (d->document == doc) return;
     if (d->document) {
         QObject::disconnect(d->document, nullptr, this, nullptr);
+    }
+    // Attach-window contract: each document attach opens a fresh window in
+    // which the QML initial-focus seed may fire unless the consumer places
+    // the caret first (EditorWidget::setCursorPosition sets this flag).
+    if (d->initialCaretRequested) {
+        d->initialCaretRequested = false;
+        Q_EMIT initialCaretRequestedChanged();
     }
     // Drop old structural components before reconstructing.
     delete d->structuralKeys; d->structuralKeys = nullptr;
@@ -308,6 +316,18 @@ LiveContextMenuHandler  *LiveListModelBinding::contextMenuHandler()  const { ret
 bool LiveListModelBinding::applyingModelUpdate() const
 {
     return d->applyingModelUpdate;
+}
+
+bool LiveListModelBinding::initialCaretRequested() const noexcept
+{
+    return d->initialCaretRequested;
+}
+
+void LiveListModelBinding::markInitialCaretRequested()
+{
+    if (d->initialCaretRequested) return;
+    d->initialCaretRequested = true;
+    Q_EMIT initialCaretRequestedChanged();
 }
 
 bool LiveListModelBinding::readOnly() const noexcept

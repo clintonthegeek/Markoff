@@ -211,8 +211,8 @@ Spec: `docs/specs/2026-05-17-theme-color-wiring-design.md`.
 |---|---|
 | `setDocument` | wires `LiveListModelBinding` + auto-creates a `Session`; session destroyed in `~EditorWidget` |
 | `cursorPosition()` | reads `LiveCursorState::currentTextCaret()`; maps (block row, qtPos) to flat-visual-line `CursorPos`; O(blocks); uncached (a cache would be a second cursor store — INVARIANTS #3) |
-| `setCursorPosition()` | reverse maps to (row, qtPos); routes through `LiveCursorState::requestTextCaretAtRow`; out-of-range positions clamp to last block/line-end (never a no-op) |
-| `scrollPositionVisualLine()` / `setScrollPositionVisualLine()` | reads/sets QML ListView contentY/contentHeight ratio; returns 0.0 before QML root loads |
+| `setCursorPosition()` | reverse maps to (row, qtPos); routes through `LiveCursorState::requestTextCaretAtRow`; out-of-range positions clamp to last block/line-end (never a no-op). Attach-window contract (2026-06-10): marks `binding()->initialCaretRequested`, so the LiveView.qml initial-focus seed yields — a write issued in the same call stack as `setDocument` is not clobbered by the seed's row-0 request |
+| `scrollPositionVisualLine()` / `setScrollPositionVisualLine()` | reads/sets QML ListView contentY/contentHeight ratio. Attach-window contract (2026-06-10): a write issued before the scene materializes (contentHeight 0) is latched and applied on `contentHeightChanged`, never dropped; the getter echoes the latched fraction while pending (pending write, not a second authority). Otherwise returns 0.0 before QML root loads |
 | `setReadOnly(bool)` / `isReadOnly()` | base store + push to `LiveListModelBinding::readOnly` flag; the single authority all six mutation-ingress gates read |
 | `hasCursor()` | returns `true` |
 | `hasEditing()` | returns `!isReadOnly()` |

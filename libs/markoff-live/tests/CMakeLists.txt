@@ -937,3 +937,19 @@ target_link_libraries(tst_view_contract_live PRIVATE
 add_test(NAME tst_view_contract_live COMMAND tst_view_contract_live)
 set_tests_properties(tst_view_contract_live PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Contract v2 attach-window write semantics (found by Corbomite Phase 1
+# adoption, 2026-06-10): base-contract writes issued in the same call
+# stack as setDocument must apply once the view materializes. Same
+# link pattern as tst_view_contract_live.
+qt_add_executable(tst_view_contract_live_attach_window
+    tst_view_contract_live_attach_window.cpp)
+target_link_libraries(tst_view_contract_live_attach_window PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::QuickWidgets
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff_liveplugin markoff_liveplugin_init)
+add_test(NAME tst_view_contract_live_attach_window
+         COMMAND tst_view_contract_live_attach_window)
+set_tests_properties(tst_view_contract_live_attach_window PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

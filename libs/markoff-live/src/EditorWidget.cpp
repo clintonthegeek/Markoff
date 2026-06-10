@@ -13,6 +13,7 @@
 #include <QVBoxLayout>
 
 #include <algorithm>
+#include <optional>
 #include <utility>
 
 #include <markoff/core/AttrNames.h>
@@ -98,6 +99,15 @@ struct EditorWidget::Private {
     QMetaObject::Connection contextCon;    // cursorChanged → recomputeContext
     QMetaObject::Connection dataCon;       // model dataChanged → recomputeContext (spec §7)
     QMetaObject::Connection scrollCon;     // contentYChanged → scrollPositionChanged (spec §9)
+    QMetaObject::Connection heightCon;     // contentHeightChanged → apply pending scroll
+
+    // Attach-window contract (2026-06-10): a scroll fraction written while
+    // the QML scene has no scrollable content yet (contentHeight == 0 right
+    // after setDocument). Applied — and cleared — on contentHeightChanged.
+    // This is a pending WRITE, not a second scroll authority (INVARIANTS
+    // #3): once applied, the QML contentY is the only store, exactly as
+    // before. Cleared on setDocument.
+    std::optional<float>    pendingScrollFrac;
 };
 
 EditorWidget::EditorWidget(LiveListModelBinding::Capabilities caps,
@@ -131,6 +141,10 @@ EditorWidget::EditorWidget(LiveListModelBinding::Capabilities caps,
             QObject::disconnect(d->scrollCon);
             d->scrollCon = {};
         }
+        if (d->heightCon) {
+            QObject::disconnect(d->heightCon);
+            d->heightCon = {};
+        }
         auto *root = d->quickWidget->rootObject();
         if (!root) return;
         d->scrollCon = QObject::connect(
@@ -139,6 +153,14 @@ EditorWidget::EditorWidget(LiveListModelBinding::Capabilities caps,
         if (!d->scrollCon)
             qWarning("Markoff::Live::EditorWidget: failed to connect QML contentYChanged; "
                      "native scroll signal will not fire (QML contract changed?)");
+        // Attach-window contract: contentHeightChanged drives the deferred
+        // apply of a scroll fraction written before the scene materialized.
+        d->heightCon = QObject::connect(
+            root, SIGNAL(contentHeightChanged()),
+            this, SLOT(onContentHeightChanged()));
+        if (!d->heightCon)
+            qWarning("Markoff::Live::EditorWidget: failed to connect QML contentHeightChanged; "
+                     "attach-window scroll writes will not apply (QML contract changed?)");
     };
     connect(d->quickWidget, &QQuickWidget::statusChanged,
             this, [wireScrollSignal](QQuickWidget::Status status) {
@@ -228,6 +250,10 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     // already in place when the binding's initial model population fires.
     d->lastContext = Markoff::EditorContext{};
     d->lastContext.blockKind = QString{};  // sentinel: not a valid kind name
+
+    // Attach-window contract: a scroll write latched against the previous
+    // document must not leak into the new one.
+    d->pendingScrollFrac.reset();
 
     Markoff::MarkdownView::setDocument(doc);
     d->binding->setDocument(doc);
@@ -443,6 +469,11 @@ void EditorWidget::onContentYChanged()
 
 float EditorWidget::scrollPositionVisualLine() const
 {
+    // Attach-window contract: while a write is latched (scene not yet
+    // materialized), read back the latched value so a capture immediately
+    // after a restore round-trips. Cleared on apply — afterwards the QML
+    // contentY is the only store, as before.
+    if (d->pendingScrollFrac) return *d->pendingScrollFrac;
     auto *root = d->quickWidget ? d->quickWidget->rootObject() : nullptr;
     if (!root) return 0.0f;
     bool ok = false;
@@ -467,18 +498,42 @@ void EditorWidget::setScrollPositionVisualLine(float pos)
         const qreal height   = root->property("height").toReal();
         const qreal scrollable = (ok && contentH > height) ? (contentH - height) : 0.0;
         if (scrollable > 0.0) {
+            d->pendingScrollFrac.reset();
             // setProperty fires contentYChanged → onContentYChanged → emit
             // scrollPositionChanged — single emit path (spec §9).
             root->setProperty("contentY",
                               QVariant::fromValue(static_cast<qreal>(clamped) * scrollable));
             return;
         }
+        if (ok && contentH > 0.0) {
+            // The scene is materialized and the content genuinely fits the
+            // viewport — the fraction is moot. setProperty would be a
+            // clamped no-op and contentYChanged would not fire; emit
+            // explicitly so the caller always observes the set (spec §9
+            // contract minimum).
+            d->pendingScrollFrac.reset();
+            Q_EMIT scrollPositionChanged(0.0f);
+            return;
+        }
     }
-    // Fallback: no root yet, or content fits entirely in the viewport
-    // (scrollable == 0) so setProperty would be a clamped no-op and
-    // contentYChanged would not fire. Emit explicitly so the caller
-    // always observes the set (spec §9 contract minimum).
-    Q_EMIT scrollPositionChanged(0.0f);
+    // Attach-window contract: no root yet, or the QML scene has not
+    // materialized the content (contentHeight still 0 — e.g. this write
+    // arrived in the same call stack as setDocument, the adoption brief's
+    // restore recipe). Latch and apply on contentHeightChanged — a one-shot
+    // write here must not be silently lost. See
+    // tst_view_contract_live_attach_window.
+    d->pendingScrollFrac = clamped;
+    Q_EMIT scrollPositionChanged(clamped);
+}
+
+void EditorWidget::onContentHeightChanged()
+{
+    if (!d->pendingScrollFrac) return;
+    // Re-dispatch through the setter: with scrollable content it applies
+    // and clears the latch; if the materialized content turns out to fit
+    // the viewport it clears the latch via the fits-viewport branch; if
+    // the scene is still not ready it re-latches the same value (no-op).
+    setScrollPositionVisualLine(*d->pendingScrollFrac);
 }
 
 void EditorWidget::setReadOnly(bool ro)
@@ -571,6 +626,11 @@ void EditorWidget::setCursorPosition(Markoff::CursorPos pos)
     auto *doc = document();
     auto *cs  = d->binding ? d->binding->cursorState() : nullptr;
     if (!doc || !cs) return;
+    // Attach-window contract: an explicit consumer caret placement IS the
+    // initial caret — LiveView.qml's initial-focus seed (which fires one
+    // frame after model population and would otherwise clobber this
+    // request's pending focus with row 0) checks this flag and yields.
+    d->binding->markInitialCaretRequested();
     const auto [row, qtPos] = fromCursorPos(doc, pos);
     // Chokepoint write (L3) — no widget-side cursor mutation.
     cs->requestTextCaretAtRow(row, qtPos);

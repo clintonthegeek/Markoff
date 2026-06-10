@@ -122,10 +122,22 @@ ListView {
     // actual window focus lands on the TextEdit. The _initialFocusSeeded
     // flag guards against re-firing on subsequent structural changes
     // (enter, paste, etc.) while ensuring we fire exactly once on load.
+    //
+    // binding.initialCaretRequested (attach-window contract, 2026-06-10,
+    // INVARIANTS #1 seam edit — reason): this handler fires one frame
+    // AFTER model population, so a consumer setCursorPosition() issued in
+    // the same call stack as setDocument() (the adoption brief's restore
+    // recipe) was being clobbered by the seed's row-0 request. An explicit
+    // consumer caret placement IS the initial caret — the seed yields.
+    // The cursorKind pre-warm problem above does not apply: the flag is
+    // set only by EditorWidget::setCursorPosition, never by delegate
+    // creation echoes. Falsified-then-fixed by
+    // tst_view_contract_live_attach_window.
     onCountChanged: {
         if (!root._initialFocusSeeded && count > 0 && binding && binding.cursorState) {
             root._initialFocusSeeded = true
-            binding.cursorState.requestTextCaretAtRow(0, 0)
+            if (!binding.initialCaretRequested)
+                binding.cursorState.requestTextCaretAtRow(0, 0)
         }
     }
 

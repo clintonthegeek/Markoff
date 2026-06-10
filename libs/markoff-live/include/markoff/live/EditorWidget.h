@@ -74,11 +74,16 @@ public:
 
     /// Read the QML ListView (Flickable) contentY / contentHeight ratio.
     /// Returns 0.0 when the content fits in the viewport or when the
-    /// QML root has not yet loaded. O(1) QML property read.
+    /// QML root has not yet loaded. While an attach-window write is
+    /// pending (see setter), returns the pending fraction so a
+    /// capture-after-restore round-trips. O(1) QML property read.
     float scrollPositionVisualLine() const override;
     /// Set the ListView's contentY to pos × contentHeight and emit
-    /// scrollPositionChanged (spec §9). Clamps pos to [0, 1]. No-op
-    /// until the QML root is loaded.
+    /// scrollPositionChanged (spec §9). Clamps pos to [0, 1].
+    /// Attach-window contract: a write issued before the QML scene has
+    /// scrollable content (e.g. in the same call stack as setDocument)
+    /// is latched and applied once contentHeight materializes — never
+    /// silently dropped.
     void setScrollPositionVisualLine(float pos) override;
 
     /// Base store + push to the binding's `readOnly` flag — the single
@@ -128,6 +133,11 @@ private:
     /// Connected to the QML ListView's contentYChanged NOTIFY signal via the
     /// runtime SIGNAL() string form. Emits scrollPositionChanged (spec §9).
     Q_SLOT void onContentYChanged();
+
+    /// Connected to the QML ListView's contentHeightChanged NOTIFY signal
+    /// (same SIGNAL() string pattern). Applies a pending attach-window
+    /// scroll write once the scene has scrollable content.
+    Q_SLOT void onContentHeightChanged();
 
     struct Private;
     std::unique_ptr<Private> d;

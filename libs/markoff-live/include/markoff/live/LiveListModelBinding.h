@@ -55,6 +55,14 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
     Q_PROPERTY(qreal fontScale     READ fontScale     WRITE setFontScale NOTIFY fontScaleChanged)
     Q_PROPERTY(qreal fontScaleStep READ fontScaleStep CONSTANT)
     Q_PROPERTY(bool readOnly READ readOnly WRITE setReadOnly NOTIFY readOnlyChanged)
+    // Attach-window contract (2026-06-10): true once the consumer has
+    // explicitly placed the caret on the current document. LiveView.qml's
+    // initial-focus seed (onCountChanged → requestTextCaretAtRow(0,0))
+    // checks this and yields, so a setCursorPosition() issued in the same
+    // call stack as setDocument() is not clobbered by the seed firing one
+    // frame later. Reset on every setDocument().
+    Q_PROPERTY(bool initialCaretRequested READ initialCaretRequested
+               NOTIFY initialCaretRequestedChanged)
 
     Q_PROPERTY(Markoff::Live::LiveClipboardController *clipboardController
                READ clipboardController CONSTANT)
@@ -97,6 +105,12 @@ public:
     /// the SelectionView. Pass nullptr to detach. The binding does NOT take
     /// ownership of the session (it is owned by the MarkoffDocument).
     Q_INVOKABLE void setSession(Markoff::Session *session);
+
+    /// Attach-window contract (see the Q_PROPERTY note above). C++-side
+    /// marker called by EditorWidget::setCursorPosition; not Q_INVOKABLE —
+    /// QML never sets it, only reads it in the initial-focus seed guard.
+    bool initialCaretRequested() const noexcept;
+    void markInitialCaretRequested();
 
     LiveBlockModel           *model()               const;
     LiveCursorState          *cursorState()         const;
@@ -180,6 +194,7 @@ Q_SIGNALS:
     void themeChanged();
     void fontScaleChanged();
     void readOnlyChanged();
+    void initialCaretRequestedChanged();
     void linkServiceChanged();
     void fromContextChanged();
 
