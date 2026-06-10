@@ -157,6 +157,8 @@
 
 - 2026-06-09 `libs/markoff-core/src/MarkoffDocument.h:18-20` — inv #8 (audit finding) — public header includes `crdt/Anchor.h`/`Clock.h`/`Operations.h`, so view leaves transitively import CRDT types despite their own signatures being CRDT-clean. Fix shape: forward declarations + private-side includes. Related: `Session.h` uses raw `Crdt::Anchor` in public signatures while `Styled::Editor` exposes `Q_PROPERTY(Markoff::Session*)` — legal for consumers (heavy-CRDT policy) but one hop from a view-leaf API; needs an explicit written decision.
 
+- 2026-06-09 `libs/markoff-live/src/LiveCursorState.cpp:selectAllBlocks` — inv #8 — sets `m_selectionExtended = true` AFTER `request()` has already emitted `selectionChanged`, so `LiveActionController::updateEnabledStates` (connected to that signal) evaluates `hasSelection()` as false on Ctrl+A: cut/copy stay disabled until the next selection event. Found during Task-8 contract-test triage; the test primes via `begin()/extend()` instead. Fix shape: set the flag before the `request()` call (or re-emit once after).
+
 ---
 
 ## #8 — Flat-view kind follow-ups (one sub-item open)

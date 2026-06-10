@@ -66,6 +66,13 @@ public:
     /// Replaces any prior registration for the same (kind, key).
     void registerHandler(const QString &kind, int key, HandlerFn fn);
 
+    /// Read-only gate source (contract-v2 spec §4.2). The provider reads
+    /// LiveListModelBinding's `readOnly` flag live (single authority — the
+    /// handler can't include the binding header, which includes this one).
+    /// While it returns true, `tryHandle` consumes mutating keys without
+    /// mutating; navigation keys fall through untouched.
+    void setReadOnlyProvider(std::function<bool()> provider);
+
     /// QML-invokable dispatch entry. See class docstring.
     Q_INVOKABLE bool tryHandle(int key,
                                int modifiers,
@@ -91,6 +98,8 @@ private:
 
     // Outer key: kind ("paragraph", etc.). Inner key: Qt::Key_*.
     QHash<QString, QHash<int, HandlerFn>> m_handlers;
+
+    std::function<bool()> m_readOnlyProvider;
 };
 
 }  // namespace Markoff::Live

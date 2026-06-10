@@ -139,6 +139,21 @@ void LiveEditBinding::onContentsChange(int qtPos, int charsRemoved, int charsAdd
         return;
     }
 
+    // Read-only gate (contract-v2 spec §4.2): drop the edit — no
+    // d2ApplyBufferEdit — and restore the canonical block text through
+    // the existing m_applyingTextUpdate-guarded push path so the TextEdit
+    // cannot drift from the model. The push's synchronous contentsChange
+    // echo is absorbed by the applyingTextUpdate guard above. Dismiss the
+    // m_previousText scope guard first: pushTextToDocument re-syncs it to
+    // the canonical text, which the guard would clobber with the
+    // user-typed text on exit.
+    if (m_binding->readOnly()) {
+        qCDebug(lcEdit) << "skip: readOnly — re-pushing canonical text";
+        _.dismiss();
+        pushTextToDocument();
+        return;
+    }
+
     // Guard: IME composition. Defer until commit.
     if (m_composing) {
         m_compositionPendingFlush = true;
@@ -206,6 +221,11 @@ void LiveEditBinding::flushPendingComposition()
     m_compositionPendingFlush = false;
 
     if (!m_binding || !m_binding->model() || !m_binding->document() || !m_listenedDoc)
+        return;
+    // Read-only gate (spec §4.2) — belt-and-braces: the onContentsChange
+    // gate fires before the composing guard, so no flush should be
+    // pending while read-only; this covers a flag flip mid-composition.
+    if (m_binding->readOnly())
         return;
     if (m_modelIndex < 0)
         return;

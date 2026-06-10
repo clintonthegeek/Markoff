@@ -160,28 +160,33 @@ void LiveActionController::updateEnabledStates() {
                          (QApplication::clipboard()->mimeData()->hasText() ||
                           QApplication::clipboard()->mimeData()->hasFormat(
                               LiveClipboardController::kBlocksMime));
+    // Read-only gate (contract-v2 spec §4.2): mutating actions disable
+    // while the binding's flag is set; copy/selectAll/save/zoom/dark are
+    // untouched. Folded into this single enabled-state authority (driven
+    // by readOnlyChanged via setBinding) rather than a parallel toggler.
+    const bool ro = m_binding && m_binding->readOnly();
 
-    m_cut->setEnabled(hasSel && hasDoc);
+    m_cut->setEnabled(hasSel && hasDoc && !ro);
     m_copy->setEnabled(hasSel && hasDoc);
-    m_paste->setEnabled(hasDoc && hasClip);
+    m_paste->setEnabled(hasDoc && hasClip && !ro);
     m_selectAll->setEnabled(hasDoc);
-    m_delete->setEnabled(hasSel && hasDoc);
+    m_delete->setEnabled(hasSel && hasDoc && !ro);
     m_save->setEnabled(hasDoc);
 
     // Undo/redo: enabled whenever a document is wired; no per-D2 depth query.
-    m_undo->setEnabled(hasDoc);
-    m_redo->setEnabled(hasDoc);
+    m_undo->setEnabled(hasDoc && !ro);
+    m_redo->setEnabled(hasDoc && !ro);
 
     // Bold/italic/strike/inlineCode/link: enabled when selection exists
     // (format controller not wired yet). Link allows empty selection.
-    m_bold->setEnabled(hasSel && hasDoc);
-    m_italic->setEnabled(hasSel && hasDoc);
-    m_strike->setEnabled(hasSel && hasDoc);
-    m_inlineCode->setEnabled(hasSel && hasDoc);
-    m_link->setEnabled(hasDoc);
+    m_bold->setEnabled(hasSel && hasDoc && !ro);
+    m_italic->setEnabled(hasSel && hasDoc && !ro);
+    m_strike->setEnabled(hasSel && hasDoc && !ro);
+    m_inlineCode->setEnabled(hasSel && hasDoc && !ro);
+    m_link->setEnabled(hasDoc && !ro);
     // Heading actions: enabled whenever a document is wired (acts on the
     // focused block; selection optional but allowed for multi-block changes).
-    for (int lvl = 0; lvl <= 6; ++lvl) m_heading[lvl]->setEnabled(hasDoc);
+    for (int lvl = 0; lvl <= 6; ++lvl) m_heading[lvl]->setEnabled(hasDoc && !ro);
 
     const bool hasBinding = m_binding != nullptr;
     m_zoomIn   ->setEnabled(hasBinding);
@@ -190,7 +195,14 @@ void LiveActionController::updateEnabledStates() {
 }
 
 void LiveActionController::setBinding(LiveListModelBinding *b) {
+    if (m_binding) {
+        disconnect(m_binding, nullptr, this, nullptr);
+    }
     m_binding = b;
+    if (m_binding) {
+        connect(m_binding, &LiveListModelBinding::readOnlyChanged,
+                this, &LiveActionController::updateEnabledStates);
+    }
     updateEnabledStates();
 }
 

@@ -21,20 +21,28 @@
 // settles the event loop before any slot runs, and every read-after-write
 // goes through QTRY_*.
 
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QQuickItem>
+#include <QQuickWidget>
+#include <QQuickWindow>
 #include <QSignalSpy>
 #include <QTest>
 
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/live/EditorWidget.h>
+#include <markoff/live/LiveActionController.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveListModelBinding.h>
+#include <markoff/live/TableEditBinding.h>
 
 #include "../../markoff-core/tests/ViewContractChecks.h"
 
 using Markoff::Live::EditorWidget;
 using Markoff::Live::LiveCursorState;
+using Markoff::Live::LiveListModelBinding;
 
 class TstViewContractLive : public QObject {
     Q_OBJECT
@@ -44,8 +52,48 @@ class TstViewContractLive : public QObject {
 
     // The contract is exercised through the base pointer (invariant 5).
     Markoff::MarkdownView *baseView() const { return m_widget; }
+    LiveListModelBinding *binding() const { return m_widget->binding(); }
     LiveCursorState *cursorState() const {
         return m_widget->binding()->cursorState();
+    }
+
+    // The QQuickWidget hosting EditorContent.qml. Key events sent to it
+    // are forwarded into its offscreen QQuickWindow (QQuickWidget's
+    // keyPressEvent re-dispatch) and land on the activeFocusItem — the
+    // same routing a real keystroke takes once the widget has focus.
+    QQuickWidget *quickWidget() const {
+        return m_widget->findChild<QQuickWidget *>();
+    }
+    QQuickWindow *quickWindow() const {
+        auto *qw = quickWidget();
+        return qw ? qw->quickWindow() : nullptr;
+    }
+
+    // Production typing path: chokepoint focus request (the same call the
+    // delegates' click handlers make), then real key events through the
+    // QQuickWidget → offscreen window → focused TextEdit.
+    void focusRow0AndType(const QString &s) {
+        cursorState()->requestTextCaretAtRow(0, 0);
+        QTRY_VERIFY(quickWindow() && quickWindow()->activeFocusItem());
+        for (QChar c : s)
+            QTest::keyClick(quickWidget(), c.toLatin1());
+        QTest::qWait(20);
+    }
+
+    // Production document-mutation path for gate 1 specifically:
+    // TextEdit.insert() mutates the delegate's QTextDocument, which fires
+    // QTextDocument::contentsChange → LiveEditBinding::onContentsChange —
+    // the exact signal chain user input uses. We drive it programmatically
+    // because the cosmetic QML `readOnly:` binding (spec §4.2, explicitly
+    // "not relied on by tests") stops key-driven text input BEFORE the
+    // document, which would otherwise mask the C++ gate.
+    void insertIntoFocusedTextEdit(const QString &s) {
+        QQuickItem *fi = quickWindow() ? quickWindow()->activeFocusItem()
+                                       : nullptr;
+        QVERIFY(fi);
+        QVERIFY(QMetaObject::invokeMethod(fi, "insert",
+                                          Q_ARG(int, 0), Q_ARG(QString, s)));
+        QTest::qWait(20);
     }
 
 private Q_SLOTS:
@@ -117,6 +165,121 @@ private Q_SLOTS:
         baseView()->setCursorPosition({9999, 99});
         QTRY_VERIFY(cursorState()->currentTextCaret().has_value());
         QTRY_VERIFY(baseView()->cursorPosition().line >= 5);
+    }
+
+    // ---- Task 8: read-only mutation-ingress gates (spec §4.2) ----
+    //
+    // Production path per assertion:
+    //   typing      — real key events → QQuickWidget → focused TextEdit
+    //                 (blocked by the cosmetic QML readOnly binding);
+    //   gate 1      — TextEdit.insert() → QTextDocument contentsChange →
+    //                 LiveEditBinding::onContentsChange (bypasses the QML
+    //                 cosmetic layer; the C++ gate is the contract);
+    //   structural  — Key_Return → delegate Keys.onPressed →
+    //                 LiveStructuralKeyHandler::tryHandle;
+    //   paste       — Ctrl+V → KeyDispatch.tryDispatchCtrlChord →
+    //                 LiveClipboardController::paste();
+    //   copy        — Ctrl+C → same chord dispatcher → copy() (ungated).
+    void readOnly_blocks_typing_structural_paste_but_not_copy() {
+        const QByteArray before = m_doc->serializeForSave();
+        m_widget->setReadOnly(true);
+
+        focusRow0AndType(QStringLiteral("XYZ"));
+        insertIntoFocusedTextEdit(QStringLiteral("GATE1"));
+        QTest::keyClick(quickWidget(), Qt::Key_Return);
+        QTest::qWait(30);
+        // Paste over a live selection (selectAll = the Ctrl+A chord's
+        // target): ungated, this replaces the whole document — the
+        // strongest possible falsification of the clipboard gate.
+        QGuiApplication::clipboard()->setText(QStringLiteral("PASTE"));
+        cursorState()->selectAll();
+        QTest::keyClick(quickWidget(), Qt::Key_V, Qt::ControlModifier);
+        QTest::qWait(50);
+        QCOMPARE(m_doc->serializeForSave(), before);
+
+        // Copy still works while read-only (selection survives from above).
+        QGuiApplication::clipboard()->setText(QStringLiteral("sentinel"));
+        QTest::keyClick(quickWidget(), Qt::Key_C, Qt::ControlModifier);
+        QTRY_VERIFY(QGuiApplication::clipboard()->text().contains(
+            QStringLiteral("alpha")));
+
+        // Editing restores when the flag clears (proves the drives above
+        // were live, not vacuous).
+        m_widget->setReadOnly(false);
+        cursorState()->clearSelection();
+        insertIntoFocusedTextEdit(QStringLiteral("Z"));
+        QTRY_VERIFY(m_doc->serializeForSave() != before);
+    }
+
+    void readOnly_disables_edit_actions_but_not_copy_zoom() {
+        auto *ac = binding()->actionController();
+        QVERIFY(ac);
+        // Preconditions so "enabled" is distinguishable from "never
+        // enabled": clipboard content (paste) + a selection (cut/copy/bold).
+        // begin()/extend() is the production drag/Shift-arrow priming —
+        // the same calls tst_live_render_actions_enabled_state uses.
+        // (selectAll() sets m_selectionExtended only AFTER its
+        // selectionChanged emission, so action states stay stale on it —
+        // logged in docs/queue.md Discipline Log.)
+        QGuiApplication::clipboard()->setText(QStringLiteral("clip-seed"));
+        cursorState()->begin(0, 0);
+        cursorState()->extend(0, 5);
+        QTRY_VERIFY(ac->pasteAction()->isEnabled());
+        QVERIFY(ac->copyAction()->isEnabled());
+        QVERIFY(ac->cutAction()->isEnabled());
+
+        m_widget->setReadOnly(true);
+        QVERIFY(!ac->pasteAction()->isEnabled());
+        QVERIFY(!ac->cutAction()->isEnabled());
+        QVERIFY(!ac->deleteAction()->isEnabled());
+        QVERIFY(!ac->undoAction()->isEnabled());
+        QVERIFY(!ac->redoAction()->isEnabled());
+        QVERIFY(!ac->boldAction()->isEnabled());
+        QVERIFY(!ac->heading2Action()->isEnabled());
+        QVERIFY(ac->copyAction()->isEnabled());
+        QVERIFY(ac->selectAllAction()->isEnabled());
+        QVERIFY(ac->zoomInAction()->isEnabled());
+        QVERIFY(ac->toggleDarkAction()->isEnabled());
+
+        m_widget->setReadOnly(false);
+        QVERIFY(ac->pasteAction()->isEnabled());
+        QVERIFY(ac->cutAction()->isEnabled());
+    }
+
+    // Gate 4. TableDelegate cells call TableEditBinding::applyCellEdit from
+    // their onContentsChange with (cellStartCharPos, cellQtPos, removed,
+    // added); we construct the binding exactly as the QML delegate does
+    // (binding + modelIndex properties) and invoke the same entry with the
+    // same argument shape — gate-level production-path drive, since the
+    // shared fixture has no table block.
+    void readOnly_blocks_table_cell_edit() {
+        auto *doc = new Markoff::MarkoffDocument(2);
+        doc->loadFromMarkdown(
+            QByteArray("| a | b |\n| --- | --- |\n| c | d |"));
+        auto *w = new EditorWidget;
+        w->resize(800, 600);
+        w->setDocument(doc);
+        w->show();
+        QVERIFY(QTest::qWaitForWindowExposed(w));
+        QTRY_VERIFY(w->binding()->model()->rowCount() >= 1);
+
+        const QByteArray before = doc->serializeForSave();
+        w->setReadOnly(true);
+
+        Markoff::Live::TableEditBinding teb;
+        teb.setBinding(w->binding());
+        teb.setModelIndex(0);
+        teb.applyCellEdit(/*cellStartCharPos=*/2, /*cellQtPos=*/0,
+                          /*removed=*/0, QStringLiteral("X"));
+        QTest::qWait(20);
+        QCOMPARE(doc->serializeForSave(), before);
+
+        w->setReadOnly(false);
+        teb.applyCellEdit(2, 0, 0, QStringLiteral("X"));
+        QTRY_VERIFY(doc->serializeForSave() != before);
+
+        delete w;
+        delete doc;
     }
 
     void cursorPositionChanged_signal_fires() {

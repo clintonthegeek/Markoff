@@ -54,6 +54,7 @@ class MARKOFF_LIVE_EXPORT LiveListModelBinding : public QObject {
     Q_PROPERTY(const Markoff::Theme *theme READ theme WRITE setTheme NOTIFY themeChanged)
     Q_PROPERTY(qreal fontScale     READ fontScale     WRITE setFontScale NOTIFY fontScaleChanged)
     Q_PROPERTY(qreal fontScaleStep READ fontScaleStep CONSTANT)
+    Q_PROPERTY(bool readOnly READ readOnly WRITE setReadOnly NOTIFY readOnlyChanged)
 
     Q_PROPERTY(Markoff::Live::LiveClipboardController *clipboardController
                READ clipboardController CONSTANT)
@@ -130,6 +131,13 @@ public:
     qreal fontScaleStep() const noexcept { return kFontScaleStep; }
     void  setFontScale(qreal s);
 
+    /// Single authority for the read-only state (contract-v2 spec §4.2).
+    /// Every mutation-ingress gate (LiveEditBinding, LiveStructuralKeyHandler,
+    /// LiveClipboardController, TableEditBinding, LiveActionController) reads
+    /// this flag — no second store. Emits readOnlyChanged only on change.
+    bool readOnly() const noexcept;
+    void setReadOnly(bool ro);
+
     /// True for the synchronous duration of `applyOps` while D2 CRDT change
     /// notification is mutating model rows. LiveEditBinding queries this
     /// inside its `contentsChange` slot to suppress the synchronous
@@ -171,6 +179,7 @@ Q_SIGNALS:
     void documentChanged();
     void themeChanged();
     void fontScaleChanged();
+    void readOnlyChanged();
     void linkServiceChanged();
     void fromContextChanged();
 

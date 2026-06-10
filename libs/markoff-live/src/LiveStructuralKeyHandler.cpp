@@ -68,6 +68,11 @@ void LiveStructuralKeyHandler::registerHandler(const QString &kind, int key, Han
     m_handlers[kind][key] = std::move(fn);
 }
 
+void LiveStructuralKeyHandler::setReadOnlyProvider(std::function<bool()> provider)
+{
+    m_readOnlyProvider = std::move(provider);
+}
+
 bool LiveStructuralKeyHandler::tryHandle(int key,
                                          int modifiers,
                                          int blockIndex,
@@ -82,6 +87,24 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
                       << "blockTextLen=" << blockText.length()
                       << "selEmpty=" << selectionEmpty;
     if (!m_document || !m_model || !m_cursorState || !m_registry) return false;
+
+    // Read-only gate (contract-v2 spec §4.2): mutating keys are consumed
+    // without mutating — returning true also keeps the TextEdit's native
+    // fallback (selection-replacement, literal '\n') from firing. Pure
+    // navigation (Up/Down/F2/Escape) falls through untouched. Gated here,
+    // at the top of dispatch, not per-rule.
+    if (m_readOnlyProvider && m_readOnlyProvider()) {
+        const bool headingLevelChord =
+            (modifiers & Qt::ControlModifier) && (modifiers & Qt::ShiftModifier)
+            && key >= Qt::Key_0 && key <= Qt::Key_6;
+        const bool mutatingKey =
+            key == Qt::Key_Return || key == Qt::Key_Enter
+            || key == Qt::Key_Backspace || key == Qt::Key_Delete
+            || key == Qt::Key_Tab || key == Qt::Key_Backtab
+            || headingLevelChord;
+        if (mutatingKey) return true;
+    }
+
     if (!selectionEmpty) {
         // R5 limitation: non-empty selection defers to TextEdit's native
         // selection-replacement (which routes through LiveEditBinding's

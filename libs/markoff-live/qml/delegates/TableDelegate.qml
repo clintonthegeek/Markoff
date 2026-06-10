@@ -466,7 +466,9 @@ Rectangle {
                         anchors.fill: parent
                         anchors.margins: 4
                         text: cellRect.cellText
-                        readOnly: false   // C2: cells become editable
+                        // C2: cells are editable; read-only is cosmetic
+                        // here (spec §4.2) — the C++ gate is the contract.
+                        readOnly: root.liveBinding ? root.liveBinding.readOnly : false
                         // E4 wrap B2: WordBoundary preferred; mid-word
                         // break only as a last resort (for hyper-long
                         // unbreakable runs — URLs, long identifiers).

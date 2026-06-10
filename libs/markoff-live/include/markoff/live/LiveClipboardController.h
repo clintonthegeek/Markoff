@@ -4,6 +4,7 @@
 #include <markoff/live/MarkoffLiveExport.h>
 
 #include <QObject>
+#include <functional>
 
 namespace Markoff {
 class MarkoffDocument;
@@ -37,6 +38,13 @@ public:
     void setSelectionView(LiveCursorState *sv);
     void setModel(const LiveBlockModel *model);
 
+    /// Read-only gate source (contract-v2 spec §4.2). The provider reads
+    /// LiveListModelBinding's `readOnly` flag live (single authority —
+    /// this header is included by the binding's, so no back-include).
+    /// While it returns true, cut/paste/pastePrimary/pasteText early-
+    /// return; copy() stays available.
+    void setReadOnlyProvider(std::function<bool()> provider);
+
     Q_INVOKABLE void copy();
     Q_INVOKABLE void cut();
     Q_INVOKABLE void paste();
@@ -60,9 +68,14 @@ private:
                                         // into the public header.
     bool resolveSelectionByteRange(uint32_t &startByte, uint32_t &endByte) const;
 
+    bool isReadOnly() const {
+        return m_readOnlyProvider && m_readOnlyProvider();
+    }
+
     Markoff::MarkoffDocument *m_document  = nullptr;
     LiveCursorState          *m_selection = nullptr;
     const LiveBlockModel     *m_model     = nullptr;
+    std::function<bool()>     m_readOnlyProvider;
 };
 
 }  // namespace Markoff::Live

@@ -27,6 +27,10 @@ LiveClipboardController::LiveClipboardController(QObject *parent) : QObject(pare
 void LiveClipboardController::setDocument(Markoff::MarkoffDocument *doc) { m_document = doc; }
 void LiveClipboardController::setSelectionView(LiveCursorState *sv) { m_selection = sv; }
 void LiveClipboardController::setModel(const LiveBlockModel *model) { m_model = model; }
+void LiveClipboardController::setReadOnlyProvider(std::function<bool()> provider)
+{
+    m_readOnlyProvider = std::move(provider);
+}
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -174,6 +178,7 @@ void LiveClipboardController::copy()
 
 void LiveClipboardController::cut()
 {
+    if (isReadOnly()) return;  // read-only gate (spec §4.2)
     if (!m_selection || !m_model || !m_document) return;
     if (!m_selection->hasSelection()) return;
 
@@ -214,11 +219,13 @@ void LiveClipboardController::cut()
 
 void LiveClipboardController::paste()
 {
+    if (isReadOnly()) return;  // read-only gate (spec §4.2)
     pasteFrom(static_cast<int>(QClipboard::Clipboard));
 }
 
 void LiveClipboardController::pastePrimary()
 {
+    if (isReadOnly()) return;  // read-only gate (spec §4.2)
     // PRIMARY selection only exists on platforms that report it
     // (X11/XWayland, wayland-primary-selection). On platforms without
     // it (offscreen QPA on a default setup, native Windows/macOS) the
@@ -253,6 +260,7 @@ bool LiveClipboardController::resolveSelectionByteRange(
 
 void LiveClipboardController::pasteFrom(int clipboardMode)
 {
+    if (isReadOnly()) return;  // read-only gate (spec §4.2)
     if (!m_selection || !m_document || !m_model) return;
     const auto mode = static_cast<QClipboard::Mode>(clipboardMode);
     const QMimeData *mime = QApplication::clipboard()->mimeData(mode);
@@ -295,6 +303,7 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
 
 void LiveClipboardController::pasteText(const QString &text)
 {
+    if (isReadOnly()) return;  // read-only gate (spec §4.2)
     if (text.isEmpty()) return;
     if (!m_selection || !m_document || !m_model) return;
 

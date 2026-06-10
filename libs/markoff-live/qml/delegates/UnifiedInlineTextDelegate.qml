@@ -176,7 +176,8 @@ Item {
         rightPadding: root.kind === "blockquote" ? 0 : 8
         topPadding: root.kind === "heading" ? 6 : (root.kind === "list-item" ? 2 : 4)
         bottomPadding: root.kind === "heading" ? 2 : (root.kind === "list-item" ? 2 : 4)
-        readOnly: false
+        // Cosmetic only (spec §4.2) — the C++ gates are the contract.
+        readOnly: root.liveBinding ? root.liveBinding.readOnly : false
         textFormat: TextEdit.PlainText
         wrapMode: TextEdit.Wrap
         readonly property var theme: root.liveBinding ? root.liveBinding.theme : null

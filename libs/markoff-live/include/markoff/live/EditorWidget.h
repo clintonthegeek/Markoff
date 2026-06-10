@@ -47,11 +47,12 @@ namespace Markoff::Live {
 ///   - `cursorPositionChanged(line, column)` is emitted on every
 ///     `LiveCursorState::cursorChanged`, mapped the same way.
 ///
-/// Known degradations (port-state):
-///   - `setReadOnly(true)` stores the bool but doesn't actually disable
-///     editing; that requires `Capabilities::Editable` (E1, currently a
-///     withdrawn live-freeze D11 amendment — reintroduce when HoverPopover
-///     or Reading-mode-via-Live pulls on it).
+/// Read-only contract (spec 2026-06-09-markdownview-contract-v2 §4.2):
+///   - `setReadOnly(ro)` stores via the base, then pushes to the binding's
+///     `readOnly` flag — the single authority every mutation-ingress gate
+///     reads (LiveEditBinding, LiveStructuralKeyHandler,
+///     LiveClipboardController, TableEditBinding, LiveActionController).
+///     Navigation, selection, copy, link activation and find keep working.
 class MARKOFF_LIVE_EXPORT EditorWidget : public Markoff::MarkdownView {
     Q_OBJECT
 public:
@@ -70,6 +71,10 @@ public:
     /// Routes through LiveCursorState::requestTextCaretAtRow; clamps
     /// out-of-range positions to the last block / line end.
     void setCursorPosition(Markoff::CursorPos pos) override;
+
+    /// Base store + push to the binding's `readOnly` flag — the single
+    /// authority for the mutation-ingress gates (spec §4.2).
+    void setReadOnly(bool ro) override;
 
     bool hasCursor()  const override { return true; }
     bool hasEditing() const override { return !isReadOnly(); }

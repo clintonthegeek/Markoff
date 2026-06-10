@@ -75,7 +75,8 @@ Item {
             width: parent.width - 16
             anchors.horizontalCenter: parent.horizontalCenter
             height: Math.max(60, implicitHeight)
-            readOnly: false
+            // Cosmetic only (spec §4.2) — the C++ gates are the contract.
+            readOnly: root.liveBinding ? root.liveBinding.readOnly : false
             textFormat: TextEdit.PlainText
             wrapMode: TextEdit.Wrap
             // Math uses Slot.Math (id 12); falls through Slot→Monospace role.

@@ -36,7 +36,8 @@ Rectangle {
         id: edit
         anchors { left: parent.left; right: parent.right
                   top: parent.top; bottom: parent.bottom; margins: 8 }
-        readOnly: false
+        // Cosmetic only (spec §4.2) — the C++ gates are the contract.
+        readOnly: root.liveBinding ? root.liveBinding.readOnly : false
         textFormat: TextEdit.PlainText
         wrapMode: TextEdit.NoWrap
         readonly property var theme: root.liveBinding ? root.liveBinding.theme : null

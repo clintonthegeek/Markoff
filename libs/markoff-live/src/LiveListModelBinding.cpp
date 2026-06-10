@@ -165,6 +165,7 @@ struct LiveListModelBinding::Private {
     };
     int                        activeThemeIdx   = 0;
     qreal                      fontScale        = kDefaultFontScale;
+    bool                       readOnly         = false;
 };
 
 LiveListModelBinding::LiveListModelBinding(QObject *parent)
@@ -189,6 +190,9 @@ LiveListModelBinding::LiveListModelBinding(Capabilities caps, QObject *parent)
         d->clipboard = new LiveClipboardController(this);
         d->clipboard->setSelectionView(d->cursorState);
         d->clipboard->setModel(d->model);
+        // Read-only gate source (spec §4.2): the controller reads this
+        // binding's flag live — single authority, no copied state.
+        d->clipboard->setReadOnlyProvider([this] { return readOnly(); });
     }
     if (caps & Format) {
         d->format = new LiveFormatController(this);
@@ -266,6 +270,10 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
 
         d->structuralKeys = new LiveStructuralKeyHandler(
             d->document, d->model, d->cursorState, &d->registry, this);
+        // Read-only gate source (spec §4.2) — live read of the single
+        // authority flag; rewired here because the handler is
+        // reconstructed per document.
+        d->structuralKeys->setReadOnlyProvider([this] { return readOnly(); });
     } else {
         d->cursorState->setSession(nullptr);
 
@@ -300,6 +308,18 @@ LiveContextMenuHandler  *LiveListModelBinding::contextMenuHandler()  const { ret
 bool LiveListModelBinding::applyingModelUpdate() const
 {
     return d->applyingModelUpdate;
+}
+
+bool LiveListModelBinding::readOnly() const noexcept
+{
+    return d->readOnly;
+}
+
+void LiveListModelBinding::setReadOnly(bool ro)
+{
+    if (d->readOnly == ro) return;
+    d->readOnly = ro;
+    Q_EMIT readOnlyChanged();
 }
 
 Markoff::LinkService *LiveListModelBinding::linkService() const { return m_linkService; }

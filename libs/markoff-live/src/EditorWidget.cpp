@@ -195,6 +195,16 @@ Markoff::CursorPos EditorWidget::cursorPosition() const
     return toCursorPos(doc, row, qtPos);
 }
 
+void EditorWidget::setReadOnly(bool ro)
+{
+    // Base stores (isReadOnly()/hasEditing()/undo()/redo() read it); the
+    // binding's flag is the single authority the live leaf's mutation-
+    // ingress gates consult (spec §4.2). The flag is binding state, not
+    // per-document state, so it survives setDocument unchanged.
+    Markoff::MarkdownView::setReadOnly(ro);
+    d->binding->setReadOnly(ro);
+}
+
 void EditorWidget::setCursorPosition(Markoff::CursorPos pos)
 {
     auto *doc = document();

@@ -54,6 +54,7 @@ void TableEditBinding::applyCellEdit(int cellStartCharPos,
 {
     MARKOFF_PERF_SCOPE("live.TableEditBinding::applyCellEdit");
     if (!m_binding || !m_binding->document() || !m_binding->model()) return;
+    if (m_binding->readOnly()) return;  // read-only gate (spec §4.2)
     if (m_modelIndex < 0) return;
     if (m_modelIndex >= m_binding->model()->rowCount()) return;
     if (cellStartCharPos < 0 || cellQtPos < 0 || removed < 0) return;

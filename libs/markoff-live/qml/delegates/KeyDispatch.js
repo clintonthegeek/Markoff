@@ -100,6 +100,13 @@ function tryDispatchCtrlChord(event, ctx) {
 function collapseSelectionIfMutating(event, ctx) {
     const binding = ctx.binding
     if (!binding) return { handled: false, accepted: false }
+    // Read-only (contract-v2 spec §4.2): never collapse-delete the
+    // selection. cs.deleteSelection() is a mutation ingress that must not
+    // fire; falling through lets the gated structural-key handler consume
+    // Return/Backspace/Delete and the gated edit binding swallow
+    // printable chars. (LiveCursorState itself stays ungated — it is
+    // cursor authority, not a mutation policy holder.)
+    if (binding.readOnly) return { handled: false, accepted: false }
     const cs = binding.cursorState
     if (!cs || !cs.hasSelection || !cs.hasSelection())
         return { handled: false, accepted: false }
