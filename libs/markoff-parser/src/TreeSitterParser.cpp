@@ -973,9 +973,33 @@ bool extractLinkFromNode(TSNode node, const QByteArray &utf8, LinkInfo &out)
         return true;
     }
     if (strcmp(type, "image") == 0) {
+        int sb = static_cast<int>(ts_node_start_byte(node));
+        int eb = static_cast<int>(ts_node_end_byte(node));
+        out.sourceOffset = sb;
+        out.sourceLength = eb - sb;
+
+        // Obsidian wiki-embed matched by the `image` grammar rule (happens
+        // for e.g. extension-less ![[Note]]): normalize exactly like the
+        // wiki_link path above so the same `![[…]]` source yields the same
+        // LinkInfo regardless of which rule matched. Corbomite steer
+        // 2026-06-04 (embed-image-node-target).
+        const QString raw = QString::fromUtf8(utf8.mid(sb, eb - sb));
+        if (raw.startsWith(QStringLiteral("![["))) {
+            out.type = LinkInfo::Embed;
+            QString inner = raw.mid(3, raw.size() - 5);   // strip "![[" … "]]"
+            const int pipeIdx = inner.indexOf(QLatin1Char('|'));
+            if (pipeIdx >= 0) {
+                out.target = inner.left(pipeIdx);
+                out.displayText = inner.mid(pipeIdx + 1);
+            } else {
+                out.target = inner;
+                out.displayText = inner;   // wiki_link convention: alias-less ⇒ displayText == target
+            }
+            out.structured = Markoff::Detail::decomposeWikilinkInner(QStringView{inner});
+            return true;
+        }
+
         out.type = LinkInfo::Image;
-        out.sourceOffset = static_cast<int>(ts_node_start_byte(node));
-        out.sourceLength = static_cast<int>(ts_node_end_byte(node)) - out.sourceOffset;
         out.target.clear();
         out.displayText.clear();
         uint32_t count = ts_node_child_count(node);
