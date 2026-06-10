@@ -9,6 +9,29 @@ their banner, not the present.
 
 ---
 
+> **2026-06-10 — contract-v2 arc COMPLETE (all 13 tasks landed); Corbomite adoption brief written.**
+>
+> Tasks 9–13 landed in this session on top of the Tasks 1–8 foundation from the
+> previous session (2026-06-09). The arc delivers a fully honest `Markoff::MarkdownView`
+> base contract: all three view leaves now implement find-attach/detach, base undo/redo
+> (→ `undoD2`), theme/fontScale forwarding, all six format verbs, real
+> `cursorPosition()`/`setCursorPosition()`, scroll signals, read-only mutation gates,
+> and `contextChanged(EditorContext)` — with zero leaf-type switches needed by the
+> consumer for any of those operations.
+>
+> Task 9 (`96b88eec`): live theme/fontScale/verb delegation.
+> Task 10 (`ebdbdeff`): contextChanged feed — source + styled.
+> Task 11 (`334bfd35`): contextChanged feed — live + scroll-signal sweep (amended through review+polish).
+> Task 12 (`ffbde444`): source fontScale + §10 contract-suite consolidation + styled fontScale authority consolidation.
+> Task 13 (this session): Corbomite adoption brief
+> (`docs/handoff/2026-06-09-corbomite-api-adoption-brief.md`), spec §5/§7 deviation
+> annotations, queue items #14–16 filed, per-lib CLAUDE.md public-surface sections
+> updated, STATUS board advanced. Test baseline unchanged: **266/269** fast inner loop.
+>
+> Next: Corbomite adoption (migration table in the brief; no Markoff code changes needed).
+
+---
+
 > **2026-05-31 — styled-table SIGSEGV fixed (dogfood crash on a list-after-table).**
 >
 > Opening a real doc with a table followed by a list

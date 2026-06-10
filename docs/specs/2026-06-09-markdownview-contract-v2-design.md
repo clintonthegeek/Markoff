@@ -208,14 +208,29 @@ struct QtRange { int start = 0; int end = 0; };  // UTF-16 positions over widget
 // UTF-16 positions; mutates the model via d2 primitives/applyFlatEdit;
 // returns the caret/selection the leaf should re-apply after the
 // binding's reverse sync. Widget-free: testable headlessly.
-QtRange wrapToggle(MarkoffDocument *doc, const QString &flatText,
-                   QtRange sel, const QByteArray &delim);   // ** _ ~~ `
-QtRange insertLink(MarkoffDocument *doc, const QString &flatText,
-                   QtRange sel);
-void    setHeadingLevel(MarkoffDocument *doc, const QString &flatText,
-                        int caretQtPos, int level);
+//
+// DEVIATION (shipped, reviewed OK in Task 3): all three ops return
+// std::optional<QtRange> rather than QtRange. std::nullopt means no edit
+// was performed and the caller must leave its cursor untouched (matching
+// the donor's early-return paths, which never called setTextCursor —
+// e.g. setHeadingLevel with level == current level must not collapse an
+// existing selection).
+std::optional<QtRange> wrapToggle(MarkoffDocument *doc, const QString &flatText,
+                                  QtRange sel, const QByteArray &delim);   // ** _ ~~ `
+std::optional<QtRange> insertLink(MarkoffDocument *doc, const QString &flatText,
+                                  QtRange sel);
+std::optional<QtRange> setHeadingLevel(MarkoffDocument *doc, const QString &flatText,
+                                       int caretQtPos, int level);
 }
 ```
+
+> **§5 deviation note (Task 3, reviewed-and-approved):** the shipped return
+> type is `std::optional<QtRange>` for all three ops. The spec showed `QtRange`
+> (for `wrapToggle`/`insertLink`) and `void` (for `setHeadingLevel`). The
+> `optional` shape was adopted because the donor's early-return paths never
+> called `setTextCursor` — returning a value that means "I did nothing, leave
+> the cursor alone" is more correct than returning a dummy range or requiring
+> callers to compare before/after. The `FormatOps.h` header is authoritative.
 
 (Signature shape matches the existing implementation — the source
 leaf's free functions already work in `(toPlainText, qtPos)` terms and
@@ -269,13 +284,24 @@ change signals — it must NOT become a second cursor authority;
 invariant 3):
 
 - **Styled/Source:** recompute on `QTextEdit/QPlainTextEdit::cursorPositionChanged`
-  + `d2DocumentChanged`: caret → `findBlockAtSepByte` → blockKind +
-  heading level from the buffer prefix; `inTable` true when the block
-  kind is Table (styled) / false (source shows pipe source).
+  only. ~~+ `d2DocumentChanged`~~ — **deviation (shipped, Tasks 10/12):**
+  `d2DocumentChanged` is intentionally NOT connected on these two leaves.
+  Reason: `d2DocumentChanged` fires during the `StyleApplier`'s deferred
+  format-only pass (triggered by the syntax highlighter's `contentsChange`
+  notifies that reach `d2DocumentChanged` via the binding's no-op edit path).
+  Connecting it would false-fire during those no-op passes and defeat the
+  change-gate, resulting in stale-context spam with no real block change.
+  Cursor-position-based triggering is sufficient: in practice every structural
+  key (Enter, Backspace, Tab, `#`-prefix typing) that changes the block kind
+  also moves the caret, so the context refreshes immediately.
+  **Known low-severity gap:** a kind-change that does NOT move the caret (e.g.
+  a programmatic `Cmd::changeKind` without a cursor op) leaves the emitted
+  context stale until the next caret move. Tracked in queue.
 - **Live:** recompute on `LiveCursorState::cursorChanged` +
-  kind-transition `dataChanged`: kind from the model record;
-  `inTable`/`tableRow`/`tableCol` from `TableEditBinding` when the
-  caret is in a cell.
+  kind-transition `dataChanged` (the model emits `dataChanged` for the
+  affected row on every `Cmd::changeKind` in `onD2Changed`): kind from the
+  model record; `inTable`/`tableRow`/`tableCol` from `TableEditBinding` when
+  the caret is in a cell. Live does not have the source/styled staleness gap.
 - Emission is change-gated (compare against last emitted struct) so
   per-keystroke no-op emits don't spam the host toolbar.
 

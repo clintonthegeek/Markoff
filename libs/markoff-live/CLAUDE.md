@@ -203,6 +203,43 @@ Two slots are deliberately reused as multi-purpose accents:
 
 Spec: `docs/specs/2026-05-17-theme-color-wiring-design.md`.
 
+## Public surface — MarkdownView contract overrides (contract-v2 arc, 2026-06-09)
+
+`Markoff::Live::EditorWidget` implements the full base contract:
+
+| Override | Notes |
+|---|---|
+| `setDocument` | wires `LiveListModelBinding` + auto-creates a `Session`; session destroyed in `~EditorWidget` |
+| `cursorPosition()` | reads `LiveCursorState::currentTextCaret()`; maps (block row, qtPos) to flat-visual-line `CursorPos`; O(blocks); uncached (a cache would be a second cursor store — INVARIANTS #3) |
+| `setCursorPosition()` | reverse maps to (row, qtPos); routes through `LiveCursorState::requestTextCaretAtRow`; out-of-range positions clamp to last block/line-end (never a no-op) |
+| `scrollPositionVisualLine()` / `setScrollPositionVisualLine()` | reads/sets QML ListView contentY/contentHeight ratio; returns 0.0 before QML root loads |
+| `setReadOnly(bool)` / `isReadOnly()` | base store + push to `LiveListModelBinding::readOnly` flag; the single authority all six mutation-ingress gates read |
+| `hasCursor()` | returns `true` |
+| `hasEditing()` | returns `!isReadOnly()` |
+| `attachFindController` / `detachFindController` | forwarded to `LiveListModelBinding`'s attach hook; controller is consumer-owned; attach after `setDocument` |
+| `undo()` / `redo()` | inherited from base (→ `doc->undoD2/redoD2`); no-op while read-only |
+| `setTheme` | base store + signal; then forwards a widget-owned copy's address to the binding (two internal copy-buffers — no pointer-equality short-circuit; every call notifies QML) |
+| `setFontScale` | base clamp + store + signal; then forwards the canonical base value to the binding |
+| `toggleBold` / `toggleItalic` / `toggleStrikethrough` / `toggleInlineCode` | delegate to `LiveActionController` QAction triggers; respects read-only gating, undo/redo, and selection requirements via QAction enabled-state |
+| `insertLink` | delegates to `LiveActionController` QAction trigger |
+| `setHeadingLevel(int)` | delegates to `heading<N>Action()` trigger; levels 0..6; out-of-range: no-op |
+| `contextChanged` signal | recomputed on `LiveCursorState::cursorChanged` AND model `dataChanged` kind-transition; change-gated; live does NOT have the source/styled staleness gap |
+| `cursorPositionChanged` signal | emitted on every `LiveCursorState::cursorChanged` |
+| `scrollPositionChanged` signal | emitted from QML ListView contentYChanged NOTIFY |
+
+**Read-only mutation gates (spec §4.2):**
+`binding()->readOnly` is the single authority. Six gates early-return on it:
+`LiveEditBinding::onContentsChange`, `LiveStructuralKeyHandler::tryHandle`,
+`LiveClipboardController::paste/pasteText/pastePrimary/cut/deleteSelection`,
+`TableEditBinding::applyCellEdit`, `LiveActionController` (disables
+cut/paste/delete/undo/redo/format/heading actions). Navigation, selection,
+copy, link activation, zoom, and find keep working when read-only.
+
+**Leaf-specific accessor:** `binding()` returns the raw `LiveListModelBinding*`
+for leaf-specific wiring (e.g. direct `cursorState()` access). Stop using
+`binding()->setTheme()` and `binding()->fontScale(...)` directly — route
+through `EditorWidget::setTheme`/`setFontScale` instead.
+
 ## Conventions
 
 - C++20, Qt 6.8+.

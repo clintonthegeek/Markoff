@@ -267,6 +267,59 @@ opportunistically when next touching the source view.
 
 ---
 
+---
+
+## #14 — Find-highlight color: theme integration (follow-up from contract-v2 arc)
+
+**Filed 2026-06-10.** All three leaf find adapters
+(`SourceFindAdapter`, `StyledFindAdapter`, `LiveFindAdapter`) use a
+**hardcoded soft yellow** for the find-highlight background (the
+`QTextCharFormat` / `ExtraSelection` color is a literal `QColor`
+constant in each adapter, not drawn from `Markoff::Theme`). The active
+match uses a slightly brighter variant, also hardcoded. `Theme` already
+has `SearchMatchBackground` and `SearchActiveMatchBackground` slots
+(used by the live delegate's `InlineHighlighter`). The fix is to have
+each adapter's `rebuildAndPushSpans`/`updateExtraSelections` read those
+slots from the current theme (subscribe to `MarkdownView::themeChanged`
+or accept a `Theme` reference on attach). Affects all three leaves
+uniformly — bundle as one small task.
+
+---
+
+## #15 — contextChanged staleness: kind-change without caret move (source + styled)
+
+**Filed 2026-06-10.** On `markoff-source` and `markoff-styled`,
+`contextChanged` is recomputed only on `cursorPositionChanged` (see
+spec §7 deviation note: connecting `d2DocumentChanged` caused false-fires
+from the `StyleApplier`'s format-only passes). A programmatic
+`Cmd::changeKind` that does not move the caret therefore leaves the
+`EditorContext` stale until the next caret move. In normal interactive
+use every structural key that changes a block kind also moves the caret,
+so the window is narrow. Severity: low. Resolution options: (a) connect
+a dedicated `d2StructuralChanged` signal (fired on kind/block-boundary
+changes only, not content edits); (b) post-filter the existing
+`d2DocumentChanged` to skip format-only passes (kind-change always bumps
+`d2EditSequence`; a format-only pass does not). Not blocking any current
+consumer. Fix in the same pass as any future structural-signal
+refactoring.
+
+---
+
+## #16 — styled fontScale path to StyledTableRenderer: test coverage gap
+
+**Filed 2026-06-10.** `Markoff::Styled::Editor::setFontScale()` forwards
+the new scale to `m_tableRenderer->setFontScale()` (Task 12,
+`libs/markoff-styled/src/Editor.cpp`). This path is untested:
+`tst_view_contract_styled` exercises fontScale via signal assertions and
+a `QPlainTextEdit` font-size check, but does not load a document
+containing a table block and verify that `StyledTableRenderer` was
+notified. Add a slot: load a doc with a table, call `setFontScale(1.5)`,
+assert `editor->styleApplierHashSkips() == 0` (i.e. a restyle ran) and
+optionally check that the renderer's internal scale matches. Binary:
+`tst_styled_table_render` or `tst_view_contract_styled`.
+
+---
+
 ## When this queue is empty / superseded
 
 Delete the file or move it to `docs/archive/`. Update `docs/STATUS.md`

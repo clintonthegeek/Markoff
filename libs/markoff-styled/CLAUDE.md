@@ -16,6 +16,51 @@ alongside `markoff-source` and `markoff-live`. No QML, no KF6.
 - `Markoff::Styled::Editor` — `Markoff::MarkdownView` subclass composing
   a `QTextEdit`. Setters: `setDocument`, `setSession`, `setTheme`,
   `setLinkService`, `setFromContext`, `setFontScale`.
+
+### MarkdownView contract overrides (contract-v2 arc, 2026-06-09)
+
+`Styled::Editor` implements the full base contract:
+
+| Override | Notes |
+|---|---|
+| `setDocument` | wires `SourceTextDocumentBinding` + `StyleApplier` + `StyledTableRenderer`; `setOpaqueRenderer` enables frame-aware reverse-diff |
+| `cursorPosition()` / `setCursorPosition()` | `blockNumber()+1`, `positionInBlock()+1` over the inner QTextEdit |
+| `scrollPositionVisualLine()` / `setScrollPositionVisualLine()` | reads/sets `verticalScrollBar()` as fraction of maximum |
+| `setReadOnly(bool)` / `isReadOnly()` | delegates to the inner QTextEdit (via `StructuralTextEdit`) |
+| `hasCursor()` | returns `true` |
+| `hasEditing()` | returns `!isReadOnly()` |
+| `attachFindController` / `detachFindController` | `Detail::StyledFindAdapter`; frame-aware (see constraints below); attach after `setDocument` |
+| `undo()` / `redo()` | inherited from base (→ `doc->undoD2/redoD2`); no-op while read-only |
+| `setTheme` / `theme()` | stores + signals in base; override propagates to `StyleApplier` |
+| `setFontScale` / `fontScale()` | base stores/clamps/signals; override forwards to `StyleApplier` and `StyledTableRenderer` (no local copy — base is the single authority, INVARIANTS §3) |
+| `toggleBold` / `toggleItalic` / `toggleStrikethrough` / `toggleInlineCode` | `FormatOps::wrapToggle`; guarded against table frames (see below) |
+| `insertLink` | `FormatOps::insertLink`; guarded against table frames |
+| `setHeadingLevel(int)` | `FormatOps::setHeadingLevel`; guarded against table frames |
+| `contextChanged` signal | recomputed on `QTextEdit::cursorPositionChanged` only (NOT `d2DocumentChanged` — see spec §7 deviation); change-gated |
+| `cursorPositionChanged` signal | emitted from `QTextEdit::cursorPositionChanged` |
+| `scrollPositionChanged` signal | emitted on vertical scroll bar changes |
+
+**StyledFindAdapter constraints:**
+- Attach after `setDocument`. Attaching before, or swapping the document while
+  attached, leaves the d2 connection on the old document. Detach → swap → re-attach.
+- Matches **inside a rendered `QTextTable` frame** are counted by `FindController`
+  and included in the match total, but are NOT highlighted (the frame is opaque;
+  `ExtraSelections` at overlapping positions do not paint). Navigation to an
+  in-frame match scrolls the `QTextEdit` to the table frame (the closest
+  reachable position).
+
+**Format-verb table-frame guard policy:**
+All six format verbs (`toggleBold/Italic/Strikethrough/InlineCode`, `insertLink`,
+`setHeadingLevel`) emit a `qWarning` and return without mutating when the cursor
+is **at or after the first rendered table frame** in the document. This is a v1
+limitation of the opaque-block seam. In normal use the styled leaf is read-only
+(`setReadOnly(true)` at construction in Corbomite's reading mode), so `hasEditing()`
+is false and format verbs should not be wired from toolbars in that mode. The guard
+is a belt-and-braces protection if styled is ever used in edit mode with tables.
+
+**contextChanged trigger note:** same as source — `d2DocumentChanged` intentionally
+not connected (see spec §7 deviation). See queue #15.
+
 - `Markoff::Styled::DocumentRenderer`
   (`include/markoff/styled/DocumentRenderer.h`) — headless, read-only
   renderer. `renderInto(QTextDocument*, const MarkoffDocument*)` + a

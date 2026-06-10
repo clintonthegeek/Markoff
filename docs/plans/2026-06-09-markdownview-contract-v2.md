@@ -2,13 +2,10 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **PROGRESS — 2026-06-09 session handoff. Tasks 1–8 COMPLETE (implemented,
-> spec-reviewed, quality-reviewed, committed). Tasks 9–13 remain.**
-> Read `docs/handoff/2026-06-09-contract-v2-arc-handoff.md` before resuming —
-> it carries the per-task commit SHAs, the review dispositions, the accumulated
-> spec deviations Task 13 must reconcile, and the prepared context for Task 9
-> (whose RED-phase test slots are saved as
-> `docs/handoff/2026-06-09-task9-red-slots.patch`, ready to apply).
+> **PROGRESS — ALL 13 tasks COMPLETE.**
+> Tasks 1–8 committed 2026-06-09 (see
+> `docs/handoff/2026-06-09-contract-v2-arc-handoff.md` for review dispositions
+> and spec deviations). Tasks 9–13 committed 2026-06-10.
 >
 > | Task | Commit(s) | Note |
 > |---|---|---|
@@ -20,9 +17,14 @@
 > | 6 styled verbs | `0fd75082` | conservative after-frame guard |
 > | 7 live cursor mapping | `c2223a0f` (+proof pair `cf601e62`/`bcbeb683`) | seam work, falsifiability in history |
 > | 8 read-only gates | `1c0a4d46` (+proof pair `bffcc874`/`bab51a6d`) | +KeyDispatch.js deleteSelection gate the plan missed |
+> | 9 live theme/fontScale/verbs | `96b88eec` | |
+> | 10 contextChanged source+styled | `ebdbdeff` | cursor-only trigger (no d2Doc — see spec §7 deviation) |
+> | 11 contextChanged live + scroll sweep | `334bfd35` | amended through review+polish |
+> | 12 source fontScale + consolidation | `ffbde444` | styled fontScale authority consolidation |
+> | 13 adoption brief + docs | *(this arc)* | Corbomite brief, spec §5/§7 annotations, queue #14–16, CLAUDE.md updates |
 >
-> Baseline at handoff: **266/269** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
-> (the 3 failures are the documented queue-#10 binaries, pre-existing).
+> Baseline throughout: **266/269** fast inner loop (3 deterministic failures =
+> queue #10, pre-existing and untouched by this arc).
 
 **Goal:** Make `Markoff::MarkdownView` the honest common contract of all
 three view leaves (find, undo/redo, theme, fontScale, format verbs,

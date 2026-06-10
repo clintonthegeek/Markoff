@@ -8,12 +8,12 @@ consumer: Corbomite (submodules this repo at `libs/markoff-family`).
 
 ## Current status — 2026-06-10
 
-- **Active workfront:** the **MarkdownView contract-v2 arc** (public-API
-  finalization for Corbomite) is mid-flight — plan Tasks 1–11 of 13
-  done, 12–13 remain. **Resume from
-  `docs/handoff/2026-06-09-contract-v2-arc-handoff.md`.** Spec:
-  `docs/specs/2026-06-09-markdownview-contract-v2-design.md`. E-arc
-  stays dormant (see `docs/STATUS.md`).
+- **Active workfront:** **MarkdownView contract-v2 arc COMPLETE** (all 13
+  tasks landed). Next: Corbomite adoption — brief at
+  `docs/handoff/2026-06-09-corbomite-api-adoption-brief.md`. Spec:
+  `docs/specs/2026-06-09-markdownview-contract-v2-design.md`; plan:
+  `docs/plans/2026-06-09-markdownview-contract-v2.md` (full task table
+  with SHAs). E-arc stays dormant (see `docs/STATUS.md`).
 - **Test baseline:** **266/269** via
   `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`. The 3
   failing binaries (`tst_live_render_e2_nav_shift_extend`,
@@ -23,8 +23,10 @@ consumer: Corbomite (submodules this repo at `libs/markoff-family`).
 - **Open items:** queue #8.3 (source-view list-item markers),
   queue #10 (deterministic live-test failures), queue #11 (legacy
   `findAll`/`CompletionDetector` retirement), queue #12 (EmbedRegistry
-  test coverage), deferred styled-table editing (in-grid cell edit,
-  row/col ops). Full list: `docs/queue.md`.
+  test coverage), queue #14 (find-highlight color theme integration),
+  queue #15 (contextChanged staleness on source/styled), queue #16
+  (styled table renderer fontScale test coverage), deferred styled-table
+  editing (in-grid cell edit, row/col ops). Full list: `docs/queue.md`.
 - **Recent history:** dated session banners live in
   [`docs/STATUS-LOG.md`](docs/STATUS-LOG.md) (newest first).
 
