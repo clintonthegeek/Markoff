@@ -64,6 +64,14 @@ Editor::Editor(QWidget *parent)
             this, [this](int) {
                 Q_EMIT scrollPositionChanged(scrollPositionVisualLine());
             });
+    // Contract v2: surface caret movement on the base signal so a host (e.g.
+    // an Ln/Col statusbar) can follow without reaching into the inner editor.
+    // QTextEdit::cursorPositionChanged is itself change-driven, so no extra
+    // gating is needed. Fires even while read-only (caret still moves).
+    connect(m_editor, &QTextEdit::cursorPositionChanged, this, [this]() {
+        const Markoff::CursorPos p = cursorPosition();
+        Q_EMIT cursorPositionChanged(p.line, p.column);
+    });
 }
 
 Editor::~Editor() = default;

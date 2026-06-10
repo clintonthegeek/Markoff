@@ -133,6 +133,24 @@ private Q_SLOTS:
         sb->setValue(sb->maximum() / 2);
         QTRY_VERIFY(spy.count() >= 1);
     }
+
+    // ---- Contract v2: cursorPositionChanged fires on caret move ----
+    //
+    // The base MarkdownView::cursorPositionChanged(line, column) must fire
+    // when the caret moves, so a host can drive an Ln/Col statusbar without
+    // reaching into the inner widget (per the leaf's documented contract).
+    // Falsifiable: without the constructor connection the spy stays empty.
+    // The emitted (line, column) must equal the leaf's own cursorPosition().
+    void cursorPositionChanged_fires_on_caret_move() {
+        QSignalSpy spy(static_cast<Markoff::MarkdownView *>(m_ed),
+                       &Markoff::MarkdownView::cursorPositionChanged);
+        QVERIFY(spy.isValid());
+        m_ed->setCursorPosition({5, 1});
+        QTRY_VERIFY(spy.count() >= 1);
+        const auto args = spy.last();
+        QCOMPARE(args.at(0).toInt(), m_ed->cursorPosition().line);
+        QCOMPARE(args.at(1).toInt(), m_ed->cursorPosition().column);
+    }
 };
 
 QTEST_MAIN(TstViewContractSource)

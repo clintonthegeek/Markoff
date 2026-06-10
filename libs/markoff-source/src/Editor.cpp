@@ -85,6 +85,14 @@ Editor::Editor(QWidget *parent)
     });
     connect(m_editor, &QPlainTextEdit::cursorPositionChanged,
             this, [this]() { if (m_gutter) m_gutter->update(); });
+    // Contract v2: surface caret movement on the base signal so a host (e.g.
+    // an Ln/Col statusbar) can follow without reaching into the inner editor.
+    // QPlainTextEdit::cursorPositionChanged is itself change-driven, so no
+    // extra gating is needed.
+    connect(m_editor, &QPlainTextEdit::cursorPositionChanged, this, [this]() {
+        const Markoff::CursorPos p = cursorPosition();
+        Q_EMIT cursorPositionChanged(p.line, p.column);
+    });
     recomputeGutterWidth();
 
     // Contract §9: emit scrollPositionChanged on native scroll (user drag,
