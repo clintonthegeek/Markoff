@@ -164,6 +164,15 @@ Markoff::CursorPos Editor::cursorPosition() const {
     return { blk.blockNumber() + 1, c.positionInBlock() + 1 };
 }
 
+QRect Editor::caretRect() const {
+    if (!document()) return {};
+    QTextEdit *te = textEdit();
+    if (!te) return {};
+    const QRect r = te->cursorRect();
+    return QRect(te->viewport()->mapTo(const_cast<Editor *>(this), r.topLeft()),
+                 r.size());
+}
+
 void Editor::setCursorPosition(Markoff::CursorPos pos) {
     QTextCursor c = m_editor->textCursor();
     QTextBlock blk = m_editor->document()->findBlockByNumber(pos.line - 1);

@@ -55,6 +55,7 @@ public:
     bool                       isReadOnly() const override;
     bool                       hasCursor()  const override { return true; }
     bool                       hasEditing() const override { return !isReadOnly(); }
+    QRect                      caretRect() const override;
 
     // Find (frame-aware highlights via Detail::StyledFindAdapter)
     void attachFindController(Markoff::FindController *fc) override;

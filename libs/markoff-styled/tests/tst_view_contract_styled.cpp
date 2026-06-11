@@ -173,6 +173,34 @@ private Q_SLOTS:
         QCOMPARE(args.at(0).toInt(), m_ed->cursorPosition().line);
         QCOMPARE(args.at(1).toInt(), m_ed->cursorPosition().column);
     }
+
+    // ---- Completion revival Task 2: caretRect() maps inner cursorRect ----
+    //
+    // The base default returns an invalid QRect; the Styled override must map
+    // the inner QTextEdit's cursorRect() (viewport coords) into editor-widget
+    // coords. Before attach there is no document, so caretRect() must stay
+    // invalid; after attach + a caret move it must be valid, inside the
+    // editor, and track the cursor downward as the caret moves to a later line.
+    void caretRect_validAfterAttach_tracksCursor()
+    {
+        Markoff::MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Alpha one.\n\nBeta two.\n\nGamma three.\n"));
+        Markoff::Styled::Editor ed;
+        ed.resize(600, 400);
+        ed.show();
+        QVERIFY(QTest::qWaitForWindowExposed(&ed));
+
+        QVERIFY(!ed.caretRect().isValid());   // before attach: no caret
+        ed.setDocument(&doc);
+        ed.setCursorPosition({1, 1});
+        const QRect r1 = ed.caretRect();
+        QVERIFY(r1.isValid());
+        QVERIFY(ed.rect().contains(r1.topLeft()));
+        ed.setCursorPosition({3, 1});          // a later visual line
+        const QRect r3 = ed.caretRect();
+        QVERIFY(r3.isValid());
+        QVERIFY2(r3.top() > r1.top(), "caretRect must move down with the cursor");
+    }
 };
 
 QTEST_MAIN(TstViewContractStyled)

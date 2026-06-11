@@ -175,6 +175,13 @@ Markoff::CursorPos Editor::cursorPosition() const {
     return { cursor.blockNumber() + 1, cursor.positionInBlock() + 1 };
 }
 
+QRect Editor::caretRect() const {
+    if (!Markoff::MarkdownView::document()) return {};
+    const QRect r = m_editor->cursorRect();               // viewport coords
+    return QRect(m_editor->viewport()->mapTo(const_cast<Editor *>(this), r.topLeft()),
+                 r.size());
+}
+
 void Editor::setCursorPosition(Markoff::CursorPos pos) {
     auto block = m_editor->document()->findBlockByNumber(pos.line - 1);
     if (!block.isValid())

@@ -36,6 +36,7 @@ public:
     bool isReadOnly() const override;
     bool hasCursor()  const override { return true; }
     bool hasEditing() const override { return !isReadOnly(); }
+    QRect caretRect() const override;
 
     // Font scale (spec §8): scales the inner editor font, gutter, and
     // paragraph margins from the captured base size. Clamping + signal
