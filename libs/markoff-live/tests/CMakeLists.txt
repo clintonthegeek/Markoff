@@ -969,3 +969,17 @@ add_test(NAME tst_view_contract_live_doc_destroyed
          COMMAND tst_view_contract_live_doc_destroyed)
 set_tests_properties(tst_view_contract_live_doc_destroyed PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Contract-v2 caret-rect extension (2026-06-11): caretRect() over the
+# focused QML delegate's TextEdit. Same link pattern as tst_view_contract_live.
+qt_add_executable(tst_view_contract_live_caret_rect
+    tst_view_contract_live_caret_rect.cpp)
+target_link_libraries(tst_view_contract_live_caret_rect PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::QuickWidgets
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff_liveplugin markoff_liveplugin_init)
+add_test(NAME tst_view_contract_live_caret_rect
+         COMMAND tst_view_contract_live_caret_rect)
+set_tests_properties(tst_view_contract_live_caret_rect PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

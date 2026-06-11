@@ -116,6 +116,12 @@ public:
     bool hasCursor()  const override { return true; }
     bool hasEditing() const override { return !isReadOnly(); }
 
+    /// Read-only query over the focused QML text item's cursorRectangle
+    /// (window activeFocusItem), mapped scene→widget coords. Invalid when
+    /// no document, no focused text item, or no QML window (spec §4.1
+    /// caret-rect extension). No new cursor authority (INVARIANTS #3).
+    QRect caretRect() const override;
+
     // Live-specific accessors.
     LiveListModelBinding *binding() const noexcept;
 

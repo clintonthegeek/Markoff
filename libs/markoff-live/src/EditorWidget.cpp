@@ -9,6 +9,7 @@
 #include <QQmlEngine>
 #include <QQuickItem>
 #include <QQuickWidget>
+#include <QQuickWindow>
 #include <QUrl>
 #include <QVBoxLayout>
 
@@ -327,6 +328,25 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
 LiveListModelBinding *EditorWidget::binding() const noexcept
 {
     return d->binding;
+}
+
+QRect EditorWidget::caretRect() const
+{
+    // Read-only query over the focused QML text item (INVARIANTS #3: no
+    // second cursor store). Whenever a TextCaret / cell edit is live, the
+    // window's activeFocusItem IS the focused TextEdit, for every
+    // text-bearing delegate kind — no per-delegate QML changes needed.
+    if (!document() || !d->quickWidget) return {};
+    QQuickWindow *win = d->quickWidget->quickWindow();
+    if (!win) return {};
+    QQuickItem *focus = win->activeFocusItem();
+    if (!focus) return {};
+    const QVariant cr = focus->property("cursorRectangle");
+    if (!cr.isValid() || !cr.canConvert<QRectF>()) return {};   // not a text item
+    const QRectF sceneRect = focus->mapRectToScene(cr.toRectF());
+    // Scene coords == QQuickWidget-local coords; translate into this widget.
+    const QPoint origin = d->quickWidget->mapTo(const_cast<EditorWidget *>(this), QPoint(0, 0));
+    return sceneRect.translated(origin.x(), origin.y()).toRect();
 }
 
 Markoff::CursorPos EditorWidget::cursorPosition() const
