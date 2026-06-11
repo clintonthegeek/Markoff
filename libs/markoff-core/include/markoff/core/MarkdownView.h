@@ -31,6 +31,13 @@ public:
     virtual bool hasCursor()  const { return false; }
     virtual bool hasEditing() const { return false; }
 
+    /// Caret rectangle in THIS widget's coordinate system, or an invalid
+    /// QRect when no caret is established (no document, no focus, cursor
+    /// not in a text-bearing state). Consumers anchor transient UI
+    /// (completion popups) at bottomLeft(). Contract-v2 extension
+    /// (2026-06-11 caret-rect; driven by Corbomite completion revival).
+    virtual QRect caretRect() const { return {}; }
+
     // --- Find (spec §3). Default: loud no-op. ---
     virtual void attachFindController(FindController *fc);
     virtual void detachFindController();

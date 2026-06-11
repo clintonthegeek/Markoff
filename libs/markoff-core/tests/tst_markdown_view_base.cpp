@@ -74,6 +74,14 @@ private Q_SLOTS:
         v.setHeadingLevel(2);
         QCOMPARE(doc.serializeForSave(), QByteArray("hello\n"));
     }
+
+    // Contract-v2 extension (caret-rect, 2026-06-11): the base default is
+    // an INVALID rect — "no caret established". Leaves override.
+    void caretRect_baseDefault_isInvalid()
+    {
+        Markoff::MarkdownView v;
+        QVERIFY(!v.caretRect().isValid());
+    }
 };
 
 QTEST_MAIN(TstMarkdownViewBase)
