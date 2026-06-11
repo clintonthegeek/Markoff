@@ -100,6 +100,7 @@ struct EditorWidget::Private {
     QMetaObject::Connection dataCon;       // model dataChanged → recomputeContext (spec §7)
     QMetaObject::Connection scrollCon;     // contentYChanged → scrollPositionChanged (spec §9)
     QMetaObject::Connection heightCon;     // contentHeightChanged → apply pending scroll
+    QMetaObject::Connection docDestroyedCon; // document destroyed() → null base m_document
 
     // Attach-window contract (2026-06-10): a scroll fraction written while
     // the QML scene has no scrollable content yet (contentHeight == 0 right
@@ -224,6 +225,11 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     }
     d->session = nullptr;
 
+    // Drop any prior document's destroyed() watch (the new/old documents are
+    // distinct here; the old one may still be alive on a swap).
+    QObject::disconnect(d->docDestroyedCon);
+    d->docDestroyedCon = {};
+
     // Disconnect the stale context connections from the previous document phase.
     // Unlike source/styled where the cursor object changes with the doc, LiveCursorState
     // is CONSTANT on the binding (never changes across setDocument calls). We still
@@ -259,6 +265,18 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     d->binding->setDocument(doc);
 
     if (doc) {
+        // Retire-on-destroy (INVARIANTS #3): the base MarkdownView holds the
+        // document by raw pointer (m_document). If the document is destroyed
+        // while still attached, null the base pointer so base accessors
+        // (cursorPosition/undo/redo/…) don't dereference freed memory. The
+        // qualified base call avoids virtual re-entry into our own
+        // setDocument() (which would touch the dying document's session). The
+        // binding detaches itself via its own destroyed() connection.
+        d->docDestroyedCon =
+            QObject::connect(doc, &QObject::destroyed, this, [this] {
+                Markoff::MarkdownView::setDocument(nullptr);
+            });
+
         d->session = doc->createSession();
         d->binding->setSession(d->session);
         // Force initial model population: setDocument only connects to

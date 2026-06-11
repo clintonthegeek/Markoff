@@ -248,6 +248,21 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
 
     d->document = doc;
     if (d->document) {
+        // Retire-on-destroy (INVARIANTS #3): the document is held by raw
+        // pointer and is owned elsewhere (Corbomite's Vault owns the
+        // NoteDocument that owns it). If it is destroyed while still attached
+        // — e.g. Vault::unload()/teardownTree() freeing m_docs while a Live
+        // leaf is alive — drop the dangling pointer so the chokepoint's
+        // guards stay correct. Without this, the deferred QML initial-focus
+        // seed (LiveView.qml onCountChanged → requestTextCaretAtRow(0,0))
+        // dereferences freed memory (2026-06-10 Corbomite first-run SIGSEGV).
+        // The matching disconnect on swap is the disconnect-all above; Qt also
+        // auto-removes this connection when either end is destroyed.
+        QObject::connect(d->document, &QObject::destroyed, this, [this] {
+            detachDocumentState();
+            Q_EMIT documentChanged();
+        });
+
         // D2: drive the model from two signal sources:
         // 1. documentLoaded() fires synchronously inside loadFromMarkdown(),
         //    giving immediate model population without waiting for the event loop.
@@ -283,16 +298,26 @@ void LiveListModelBinding::setDocument(Markoff::MarkoffDocument *doc)
         // reconstructed per document.
         d->structuralKeys->setReadOnlyProvider([this] { return readOnly(); });
     } else {
-        d->cursorState->setSession(nullptr);
-
-        if (d->clipboard)   d->clipboard->setDocument(nullptr);
-        if (d->format)      d->format->setDocument(nullptr);
-        if (d->actions)     d->actions->setDocument(nullptr);
-        if (d->contextMenu) d->contextMenu->setDocument(nullptr);
-
-        d->lastKeys.clear();
+        detachDocumentState();
     }
     Q_EMIT documentChanged();
+}
+
+void LiveListModelBinding::detachDocumentState()
+{
+    // Single null-state cleanup, shared by setDocument(nullptr) and the
+    // document's destroyed() handler. Mirrors the document-less state of a
+    // fresh binding. Does NOT QObject::disconnect the document — on the
+    // destroyed() path Qt has already removed those connections, and on the
+    // setDocument() path the disconnect-all ran before this.
+    d->document = nullptr;
+    delete d->structuralKeys; d->structuralKeys = nullptr;
+    d->cursorState->setSession(nullptr);
+    if (d->clipboard)   d->clipboard->setDocument(nullptr);
+    if (d->format)      d->format->setDocument(nullptr);
+    if (d->actions)     d->actions->setDocument(nullptr);
+    if (d->contextMenu) d->contextMenu->setDocument(nullptr);
+    d->lastKeys.clear();
 }
 
 void LiveListModelBinding::setSession(Markoff::Session *session)

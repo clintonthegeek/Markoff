@@ -202,6 +202,15 @@ Q_SIGNALS:
 private:
     void onD2Changed();
 
+    /// Retire-on-destroy (INVARIANTS #3). Drops the per-document state when the
+    /// raw `d->document` pointer is no longer valid — either a deliberate
+    /// detach (setDocument(nullptr)) or the document being destroyed out from
+    /// under us (its `destroyed()` signal). Leaves the binding in the same
+    /// state as a fresh, document-less binding so the `if (d->document)` guards
+    /// (and LiveCursorState's `m_binding->document()` guards) become correct
+    /// no-ops instead of dereferencing freed memory.
+    void detachDocumentState();
+
     struct Private;
     std::unique_ptr<Private> d;
 

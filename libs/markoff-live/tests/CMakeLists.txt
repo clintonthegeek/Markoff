@@ -953,3 +953,19 @@ add_test(NAME tst_view_contract_live_attach_window
          COMMAND tst_view_contract_live_attach_window)
 set_tests_properties(tst_view_contract_live_attach_window PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Retire-on-destroy (INVARIANTS #3): a document freed while a Live leaf is
+# attached must not dangle. Repro of the 2026-06-10 Corbomite first-run SIGSEGV
+# (Vault::unload teardown frees the doc; the QML init-focus seed then derefs
+# it). Same link pattern as tst_view_contract_live.
+qt_add_executable(tst_view_contract_live_doc_destroyed
+    tst_view_contract_live_doc_destroyed.cpp)
+target_link_libraries(tst_view_contract_live_doc_destroyed PRIVATE
+    Qt6::Core Qt6::Gui Qt6::Quick Qt6::QuickControls2 Qt6::QuickWidgets
+    Qt6::Widgets Qt6::Test
+    markoff_live markoff_core
+    markoff_liveplugin markoff_liveplugin_init)
+add_test(NAME tst_view_contract_live_doc_destroyed
+         COMMAND tst_view_contract_live_doc_destroyed)
+set_tests_properties(tst_view_contract_live_doc_destroyed PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
