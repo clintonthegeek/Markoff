@@ -20,6 +20,7 @@
 #include <crdt/Operations.h>
 
 #include <markoff/core/BlockAnchor.h>
+#include <markoff/core/SearchEngine.h>
 #include <markoff/core/BlockSerializerRegistry.h>
 #include <markoff/core/Cursor.h>
 #include <markoff/parser/SourceSpan.h>
@@ -185,6 +186,16 @@ public:
                        uint32_t oldEnd,
                        const QByteArray &newText,
                        Origin origin);
+
+    /// Replace each match's byte span with literal `replacement`, as ONE undo
+    /// transaction. `matches` carry block-local byte offsets (SearchEngine
+    /// coordinate space); they are mapped to global no-separator flat offsets
+    /// and applied descending-by-start so earlier-applied edits never shift
+    /// later ones. Stale matches (block no longer present) are skipped. Empty
+    /// list is a no-op. Ends with a synchronous d2DocumentChanged flush so an
+    /// active FindController has recomputed by the time this returns.
+    void replaceMatches(const QList<SearchHit> &matches,
+                        const QString &replacement);
 
     /// Interactive ingress (WYSIWYG Enter): split the block containing the
     /// no-separator global byte offset `atByte` on a single newline. The head

@@ -1728,6 +1728,56 @@ Markoff::BlockId MarkoffDocument::applyInteractiveNewline(uint32_t atByte,
     return newBlk;
 }
 
+void MarkoffDocument::replaceMatches(const QList<SearchHit> &matches,
+                                     const QString &replacement)
+{
+    if (matches.isEmpty())
+        return;
+
+    // Block-local match offsets → global no-separator flat offsets. Base of a
+    // block is the running sum of blockText sizes in iterateBlocks() order —
+    // the exact coordinate space applyFlatEdit consumes.
+    QHash<BlockId, quint32> baseOf;
+    quint32 cursor = 0;
+    for (BlockId id : iterateBlocks()) {
+        baseOf.insert(id, cursor);
+        cursor += static_cast<quint32>(blockText(id).size());
+    }
+
+    struct Edit { quint32 start; quint32 end; };
+    QList<Edit> edits;
+    edits.reserve(matches.size());
+    for (const SearchHit &m : matches) {
+        const auto it = baseOf.constFind(m.blockId);
+        if (it == baseOf.constEnd())
+            continue;  // stale match — block gone since the search
+        const quint32 g = *it + m.matchStart;
+        edits.append(Edit{ g, g + m.matchLen });
+    }
+    if (edits.isEmpty())
+        return;
+
+    // Apply back-to-front so an earlier-applied edit never shifts the offsets
+    // of an edit not yet applied. Wrap all applyFlatEdit calls in a single
+    // outer UndoLog::Transaction so they all land in one undo entry —
+    // applyFlatEdit's own Transaction becomes an inner (nested) transaction
+    // that shares the same entry.
+    std::sort(edits.begin(), edits.end(),
+              [](const Edit &a, const Edit &b) { return a.start > b.start; });
+
+    const QByteArray repl = replacement.toUtf8();
+    {
+        UndoLog::Transaction outerTx(d2UndoLog());
+        for (const Edit &e : edits)
+            applyFlatEdit(e.start, e.end, repl, Origin::UserEdit);
+    }
+
+    // applyFlatEdit debounces d2DocumentChanged (QTimer::singleShot(0)); flush
+    // once so the post-state — and any active FindController recompute — is
+    // synchronous for the caller.
+    flushPendingD2Changed();
+}
+
 void MarkoffDocument::d2RemoveBlock(BlockId block, UndoLog::Transaction &t)
 {
     // Capture the former row before the IdList mutation.
