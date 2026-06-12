@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/core/FindController.h>
 
+#include <QHash>
+#include <climits>
+
 #include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff {
@@ -64,6 +67,36 @@ void FindController::findPrevious()
     m_currentIndex = (m_currentIndex - 1 + m_matches.size()) % m_matches.size();
     Q_EMIT currentMatchChanged();
     Q_EMIT navigationRequested(m_matches[m_currentIndex]);
+}
+
+void FindController::selectMatchAtOrAfter(Markoff::BlockAnchor block,
+                                          quint32 offset)
+{
+    if (m_matches.isEmpty() || !m_doc)
+        return;
+
+    // Document-order index per block, for cross-block comparison.
+    QHash<Markoff::BlockId, int> order;
+    int n = 0;
+    for (Markoff::BlockId id : m_doc->iterateBlocks())
+        order.insert(id, n++);
+    const int targetOrd = order.value(block, INT_MAX);
+
+    int chosen = -1;
+    for (int k = 0; k < m_matches.size(); ++k) {
+        const int mOrd = order.value(m_matches[k].block, INT_MAX);
+        if (mOrd > targetOrd ||
+            (mOrd == targetOrd && m_matches[k].byteOffset >= offset)) {
+            chosen = k;
+            break;
+        }
+    }
+    if (chosen < 0)
+        chosen = 0;  // wrap
+    if (chosen == m_currentIndex)
+        return;
+    m_currentIndex = chosen;
+    Q_EMIT currentMatchChanged();
 }
 
 void FindController::recomputeMatches()

@@ -62,6 +62,12 @@ public:
     Q_INVOKABLE void findNext();
     Q_INVOKABLE void findPrevious();
 
+    /// Move the current-match selection to the first match at or after
+    /// (block, offset) in document order, wrapping to index 0 if none.
+    /// Mutation-free: touches only currentMatchIndex (emits currentMatchChanged).
+    /// Never touches the document, focus, cursor, or scroll (invariant D3).
+    void selectMatchAtOrAfter(Markoff::BlockAnchor block, quint32 offset);
+
 Q_SIGNALS:
     void needleChanged();
     void matchesChanged();

@@ -115,6 +115,30 @@ private slots:
         fc.findNext();
         QCOMPARE(navSpy.count(), 1);
     }
+
+    void selectMatchAtOrAfter_lands_on_first_at_or_after() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("aa bb aa bb aa\n");  // "aa" at byte 0, 6, 12
+        FindController fc(&doc);
+        fc.activate();
+        fc.setNeedle("aa");
+        QCOMPARE(fc.matchCount(), 3);
+        const auto block = fc.matches().at(0).block;
+        fc.selectMatchAtOrAfter(block, 6);
+        QCOMPARE(fc.currentMatchIndex(), 1);
+        fc.selectMatchAtOrAfter(block, 7);   // first >= 7 is the match at 12
+        QCOMPARE(fc.currentMatchIndex(), 2);
+    }
+    void selectMatchAtOrAfter_wraps_to_zero() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("aa aa\n");
+        FindController fc(&doc);
+        fc.activate();
+        fc.setNeedle("aa");
+        const auto block = fc.matches().at(0).block;
+        fc.selectMatchAtOrAfter(block, 9999);  // past end → wrap
+        QCOMPARE(fc.currentMatchIndex(), 0);
+    }
 };
 
 QTEST_MAIN(TstFoundationFindController)
