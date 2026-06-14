@@ -396,6 +396,34 @@ private Q_SLOTS:
         QVERIFY(restored[0] == a);
         QVERIFY(restored[1] == b);
     }
+
+    // findSpans are adapter-owned (written by LiveFindAdapter, never provided
+    // by the parse). A text-changing edit re-runs onD2Changed → applyOps with
+    // a FRESH record carrying no findSpans; the wholesale row assign must NOT
+    // wipe the adapter's spans, otherwise the delegate keeps painting stale
+    // find-highlights that can no longer be cleared (setFindSpans({}) would
+    // early-return as a no-op against the already-wiped value). Regression for
+    // the "find-highlight stuck after replace" bug (2026-06-14).
+    void apply_ops_preserves_adapter_owned_find_spans_on_text_change() {
+        LiveBlockModel m;
+        BlockRecord rec = makeRecord(BlockKind::Paragraph, "foo bar");
+        const QList<BlockKey> keys = { keyOf(rec) };
+        m.applyOps(AstBlockDiff::diff({}, keys), { rec });
+
+        m.setFindSpans(rec.blockAnchor, { FindSpan{ 0, 3, true } });
+        QCOMPARE(m.data(m.index(0), LiveBlockModel::FindSpansRole)
+                     .value<QList<FindSpan>>().size(), 1);
+
+        BlockRecord edited = rec;
+        edited.text      = QStringLiteral("xyz bar");  // text changed (same key)
+        edited.findSpans = {};                          // fresh record carries none
+        m.applyOps(AstBlockDiff::diff(keys, { keyOf(edited) }), { edited });
+
+        QCOMPARE(m.data(m.index(0), LiveBlockModel::TextRole).toString(),
+                 QStringLiteral("xyz bar"));
+        QCOMPARE(m.data(m.index(0), LiveBlockModel::FindSpansRole)
+                     .value<QList<FindSpan>>().size(), 1);  // preserved, not wiped
+    }
 };
 
 QTEST_GUILESS_MAIN(TstLiveRenderBlockModel)

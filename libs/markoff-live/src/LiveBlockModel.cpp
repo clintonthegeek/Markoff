@@ -119,6 +119,16 @@ void LiveBlockModel::applyOps(const QList<AstBlockDiff::Op> &ops,
             case AstBlockDiff::OpKind::Equal: {
                 const BlockRecord &next = nextRecords[op.nextIndex];
                 BlockRecord merged = next;
+                // findSpans are adapter-owned (LiveFindAdapter writes them via
+                // setFindSpans); the parse/onD2Changed records never carry them.
+                // Preserve them across the row update so a text-changing edit
+                // (e.g. find/replace) doesn't silently wipe active find-
+                // highlights — wiping them here leaves the delegate painting
+                // stale spans that setFindSpans({}) can no longer clear (it
+                // would no-op against the already-empty value). The adapter
+                // re-pushes the correct spans (with FindSpansRole signalled)
+                // on its own matchesChanged recompute.
+                merged.findSpans = m_rows[row].findSpans;
                 // D2: parseInputEditSeq is always std::numeric_limits<quint64>::max() in D2
                 // (every row is always fresh; the stale-text preservation path is dead).
                 // Cleanup deferred to Phase 14.
