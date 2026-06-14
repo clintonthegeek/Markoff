@@ -284,6 +284,17 @@ slots from the current theme (subscribe to `MarkdownView::themeChanged`
 or accept a `Theme` reference on attach). Affects all three leaves
 uniformly — bundle as one small task.
 
+**Addendum 2026-06-14 (dark half).** `Theme::defaultDark()` does **not**
+populate `SearchMatchBackground` / `SearchActiveMatchBackground` (only
+`defaultLight()` does). On a dark theme those slots fall back through
+`Theme::color()` to `TextDefault` (the light text color), so the live
+`InlineHighlighter` find-pass paints highlights in the text color rather
+than a distinct search color. Surfaced via the Corbomite Find/Replace
+dogfood (Corbomite's `ThemeService` was separately handing leaves an
+*empty* theme, which made light-mode highlights render black — fixed
+consumer-side). Fix here: add the two search slots to `defaultDark()`
+(and fold into this item's theme-integration pass).
+
 ---
 
 ## #15 — contextChanged staleness: kind-change without caret move (source + styled)

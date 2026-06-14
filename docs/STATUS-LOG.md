@@ -9,6 +9,28 @@ their banner, not the present.
 
 ---
 
+> **2026-06-14 — Find/Replace primitives for Corbomite + stuck-highlight fix.**
+>
+> Driven by Corbomite's Find/Replace feature. Two small additions to
+> `markoff-core` (spec `docs/specs/2026-06-12-replace-matches-primitive-design.md`):
+> `MarkoffDocument::replaceMatches(QList<SearchHit>, QString)` — replaces matches
+> as ONE undo transaction (back-to-front global flat offsets via
+> `iterateBlocks()`/`blockText()`; nested `UndoLog::Transaction`, NOT
+> `coalesceLastUndo()` which is legacy-buffer-only; ends with
+> `flushPendingD2Changed()` for a synchronous post-state) — and the mutation-free
+> `FindController::selectMatchAtOrAfter(BlockAnchor, offset)`. Tests
+> `tst_replace_matches` (6 slots) + 2 slots in `tst_foundation_find_controller`.
+>
+> Then a markoff-live fix (`fix/find-span-preserve` → `master`): `LiveBlockModel::applyOps`
+> wholesale-assigned a fresh parse record on a text-changing edit, wiping the
+> adapter-owned `findSpans` **without** signalling `FindSpansRole` — so after a
+> find/replace the live delegate kept painting stale find-highlights that could
+> not be cleared. Now preserves `findSpans` across the row update (same pattern as
+> `inlineSpans`); regression test
+> `apply_ops_preserves_adapter_owned_find_spans_on_text_change`. Tip `c3b5070f`.
+> Follow-up logged: `defaultDark()` lacks the search-highlight slots (queue #14
+> dark half).
+
 > **2026-06-10 — contract-v2 arc COMPLETE (all 13 tasks landed); Corbomite adoption brief written.**
 >
 > Tasks 9–13 landed in this session on top of the Tasks 1–8 foundation from the
