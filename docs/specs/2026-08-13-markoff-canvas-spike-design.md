@@ -337,6 +337,57 @@ the tree.
   for copied snippets (attribution + GPL-3.0-only pin) recorded
   there too.
 
+**T2 (2026-08-13) — caret, hit-test, typing**
+
+- **`QTest::keyClicks(QWidget*, QString)` cannot drive the E1 test as
+  written.** Its internal ASCII/Latin-1 table (`qasciikey.cpp`) covers
+  uppercase `É` (0xc9) but not lowercase `é` (0xe9) — `QTEST_ASSERT(false)`
+  fatally aborts the test process rather than failing a single check —
+  and has no representation at all for a codepoint outside the BMP (an
+  emoji's UTF-16 surrogate pair isn't one "key"). Fix: construct the
+  `QKeyEvent` directly (`Qt::Key_unknown` + the target `QString` as its
+  `text()`) and `QCoreApplication::sendEvent()` it at the widget. This is
+  still the real event path — `View::keyPressEvent` reads `event->text()`,
+  never the key code, for printable input (invariant 5's "production
+  callsite" is about the widget under test, not the stimulus helper) — and
+  is the same technique Qt's own test suite uses for non-Latin1 input.
+  Plain ASCII keys still go through `QTest::keyClicks` unchanged.
+- **`QAbstractScrollArea` needs an explicit `mouseReleaseEvent` override
+  or `QTest::mouseClick` warns "Mouse event not accepted."** Harmless
+  (release isn't part of E1's contract; T5 will use it for drag-selection
+  extension) but silenced by accepting the event, matching the existing
+  paintEvent/keyPressEvent override pattern for the viewport-forwarded
+  virtuals.
+- **`std::unique_ptr<QTextLayout>` does not propagate const.** A `const
+  BlockLayoutCache::Entry &` still hands out a non-const `QTextLayout*`
+  via `e.layout->...` (unique_ptr's `operator->`/`get()` are const
+  member functions returning `T*`, not `const T*`). Caret code reads
+  `entries()` (a `const std::vector<Entry>&`) and calls
+  `lineForTextPosition`/`lineAt`/`xToCursor`/`cursorToX` — all
+  `QTextLine`-returning const methods — directly off that without needing
+  a cast. Worth knowing before reaching for `const_cast` here reflexively.
+- **The byte↔QChar helper is now duplicated verbatim** between
+  `markoff-live/src/Coordinates.cpp` and `markoff-canvas/src/Coordinates.cpp`,
+  exactly as the plan's cheat sheet directs ("copy the logic … do not link
+  markoff-live"). Flagging for T11: if the spike passes, promoting this
+  helper into `markoff-core` (it has zero markoff-live-specific
+  dependencies) removes the duplication for the real leaf.
+- **Vertical caret motion crossing a block boundary uses a bare x pixel
+  value, not per-block-adjusted for `leftIndent`.** A list item's marker
+  indent shifts its layout's content start relative to a plain paragraph's;
+  landing "at the same x" across that boundary is therefore off by the
+  indent delta. Plan T2 explicitly waives exact column affinity as a
+  criterion, so left as-is — noting the specific mechanism in case it
+  surprises someone at T9 (table cells have their own x origin per column,
+  same class of imprecision).
+- Structural keys (Enter split, boundary Backspace/Delete merge) are
+  explicitly out of scope here — in-block Backspace/Delete no-op at the
+  block edge rather than doing anything to a neighbor, verified in
+  `backspace_and_delete_remove_clusters`. T3 is where those boundary cases
+  get real behavior via `StructuralKeyHandler`.
+- Full suite after T2: **280/280** (277 standstill baseline + 3 canvas:
+  `tst_canvas_render`, `tst_canvas_typing`, `tst_canvas_constitution`).
+
 ## 10. Verdict (fill at close)
 
 - **Result:** —
