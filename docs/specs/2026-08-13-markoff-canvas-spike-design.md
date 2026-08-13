@@ -313,6 +313,30 @@ the tree.
   Both T1 rendering defects above were found by looking at that grab,
   not by a failing test — worth keeping in the loop for later tasks.
 
+**Post-T1 direction review (2026-08-13) — checked against qtbase source**
+
+- User-directed evaluation: is the spike reinventing a wheel that
+  GPLv3 lets us simply take from Qt (`~/src/qtbase`, dual-licensed
+  LGPLv3/GPLv2/GPLv3 — copying into Markoff is legally permissible)?
+  **Answer: no.** Qt's editors internally do exactly what T1 built —
+  one lazy `QTextLayout` per block (`QPlainTextDocumentLayout`
+  realizes a block's layout only when first asked for its bounding
+  rect). The architecture is validated by Qt's own practice. But the
+  reusable input engine, `QWidgetTextControl` (~3.5k lines), is
+  coupled to `QTextCursor`/`QTextDocument` on ~212 lines — taking it
+  means taking the second document model, i.e. the exact two-model
+  arbitration problem this spike exists to falsify (C3). The code is
+  legally takeable and architecturally untakeable; the plan stands.
+- What IS worth taking is small and now indexed in the plan's new
+  "Qt upstream reference" section: `QInputControl::isAcceptableInput`
+  (T2 — the printable-key predicate has real edge cases: AltGr,
+  format chars, surrogates), `QKeySequence` standard-key dispatch
+  (T2/T5), and the `inputMethodEvent` ordering in
+  `qwidgettextcontrol.cpp` (T8 — confirms the plan's
+  `setPreeditArea` approach is what Qt itself does). License rule
+  for copied snippets (attribution + GPL-3.0-only pin) recorded
+  there too.
+
 ## 10. Verdict (fill at close)
 
 - **Result:** —

@@ -121,6 +121,62 @@ markoff-live.
 
 ---
 
+## Qt upstream reference (`~/src/qtbase`, if present on this machine)
+
+Verified 2026-08-13 (post-T1): Qt's own editors are built exactly the
+way this spike is building — **one `QTextLayout` per block, laid out
+lazily on demand** (`QPlainTextDocumentLayout::blockBoundingRect` →
+`layoutBlock` when `lineCount()==0`, in
+`src/widgets/widgets/qplaintextedit.cpp`). T1 independently converged
+on Qt's internal architecture; that is confirmation, not
+wheel-reinvention. The wheel Qt has is welded to `QTextDocument`'s
+axle: `QWidgetTextControl` (the shared input engine behind
+QTextEdit/QPlainTextEdit) speaks `QTextCursor`/`QTextBlock` on nearly
+every line and **cannot be extracted without taking the second
+document model that C3 forbids**. Do not try to lift it wholesale.
+
+What you SHOULD do with qtbase, per task:
+
+- **Read as reference, always.** When unsure how a real editor
+  handles an input edge case, the answer is in
+  `src/widgets/widgets/qwidgettextcontrol.cpp` — read it, then
+  implement against `MarkoffDocument`.
+- **T2:** copy the printable-key predicate from
+  `QInputControl::isAcceptableInput`
+  (`src/gui/text/qinputcontrol.cpp`, ~30 lines, self-contained: it
+  handles ZWJ/format chars, the Ctrl/Ctrl+Shift rejection with the
+  AltGr exception (QTBUG-35734), surrogate pairs, private-use).
+  A naive `!text.isEmpty() && !ctrl` check gets German AltGr wrong.
+  Also: use `event->matches(QKeySequence::MoveToNextChar)` etc. for
+  navigation keys instead of raw key codes — platform conventions
+  (macOS Home/End, Ctrl+arrows) come free, and it's how
+  `QWidgetTextControl::keyPressEvent` dispatches.
+- **T5:** `QWidgetTextControl` mouse handlers are the reference for
+  drag-selection edge cases (extend direction, autoscroll during
+  drag).
+- **T8:** `QWidgetTextControlPrivate::inputMethodEvent`
+  (`qwidgettextcontrol.cpp:2026` at tag ~v6.12) is the canonical
+  sequence and confirms this plan's shape: preedit goes into the
+  block layout via `setPreeditArea` (never the document),
+  `replacementStart/Length` are relative to the cursor, and the
+  event's `Cursor`/`TextFormat`/`Selection` attributes map to
+  preedit-cursor position and `FormatRange` overrides. Mirror that
+  ordering.
+
+**License rule for copying:** qtbase is dual-licensed
+`LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only`; Markoff is
+`GPL-3.0-or-later`. Copying is **legally fine**. Any file containing
+copied Qt code keeps The Qt Company's copyright line and gets
+`SPDX-License-Identifier: GPL-3.0-only` (drop our `-or-later` for
+that file) plus a comment naming the source file. Consequence: the
+combined binary is effectively GPLv3-only, which is acceptable —
+noted here so it is a decision, not an accident. Copy small,
+self-contained logic (predicates, event-ordering) only; anything
+touching `QTextCursor`/`QTextDocument`/`QTextBlock` is
+architecturally uncopyable here (C3).
+
+---
+
 ## Task checklist
 
 Fill SHAs as you go. "Fals." = falsification throwaway commit SHA
@@ -199,9 +255,12 @@ cheap smoke), tests green.
 `CanvasCursor { BlockId block; int byteOffset; }` owned by the view.
 Mouse press → block by y-lookup → `QTextLayout::lineAt/xToCursor` →
 QChar → byte helper → caret. Paint caret via `layout.drawCursor()`.
-`keyPressEvent` for printable text (use `event->text()`, non-empty,
-no Ctrl): `UndoLog::Transaction t(...); doc.d2ApplyBufferEdit(block,
-caretByte, 0, utf8, t);` advance caret by the inserted byte length.
+`keyPressEvent` for printable text — decide "is this a printable
+key?" with the copied `QInputControl::isAcceptableInput` predicate
+(see "Qt upstream reference" above; `event->text()` non-empty +
+no-Ctrl is NOT sufficient), then: `UndoLog::Transaction t(...);
+doc.d2ApplyBufferEdit(block, caretByte, 0, utf8, t);` advance caret
+by the inserted byte length.
 Plain Backspace/Delete *within* a block: same call with
 `removedBytes` = size of the QChar-cluster left/right of the caret
 (use `QTextLayout::previousCursorPosition/nextCursorPosition` for
@@ -325,6 +384,10 @@ reveal with caret inside; type inside the revealed span and assert
 buffer round-trip. **Falsify:** pin visibility on.
 
 ### T8 — IME (exit E6)
+
+> Reference implementation: `QWidgetTextControlPrivate::inputMethodEvent`
+> — see "Qt upstream reference" above for the exact event-ordering to
+> mirror.
 
 Implement `inputMethodQuery` (ImCursorRectangle, ImSurroundingText =
 current block's text as QString, ImCursorPosition in QChars,
