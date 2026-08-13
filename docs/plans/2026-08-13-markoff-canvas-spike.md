@@ -188,7 +188,7 @@ Fill SHAs as you go. "Fals." = falsification throwaway commit SHA
 | T1 read-only render + scroll | ☑ | `556008c5` | n/a |
 | T2 caret + hit-test + typing (E1) | ☑ | `9d11880d` | `b9aa326a` / `cfb5bbf3` |
 | T3 structural keys: split/merge (E2) | ☑ | `a798c10e` | `81c18bbb` / `20bdec6a` |
-| T4 undo/redo caret survival (E3) | ☐ | — | — |
+| T4 undo/redo caret survival (E3) | ☑ | `93ac3ff4` | `e44d9583` / `193de3fe` |
 | T5 selection + clipboard (E4) | ☐ | — | — |
 | T6 kind transitions (E5) | ☐ | — | — |
 | T7 inline spans + delimiter visibility (E7) | ☐ | — | — |

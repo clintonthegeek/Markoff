@@ -388,6 +388,41 @@ the tree.
 - Full suite after T2: **280/280** (277 standstill baseline + 3 canvas:
   `tst_canvas_render`, `tst_canvas_typing`, `tst_canvas_constitution`).
 
+**T4 (2026-08-13) — undo/redo caret survival**
+
+- **No new mechanism was needed.** `View::clampCaret`'s "nearest
+  surviving block" landing (built in T2, already load-bearing again
+  in T3's merge path) already covers undo/redo: `undoD2()`/`redoD2()`
+  are one-line delegators to `UndoLog::undo()`/`redo()` with zero
+  cursor semantics of their own (same fact `LiveListModelBinding`
+  documents at queue #10 item 2), so from the view's side an undo
+  that removes the caret's block is indistinguishable from any other
+  structural mutation that does the same thing. T4's entire diff is
+  routing `QKeySequence::Undo`/`Redo` to those two calls plus
+  `flushPendingD2Changed()` — no new caret-restoration code, no
+  special-casing.
+- **`flushPendingD2Changed()` is the right tool here, not a
+  workaround.** `d2DocumentChanged` is debounced via the document's
+  own `QTimer::singleShot(0)` (core-internal, not this leaf's — C2
+  forbids a *view-side* defer, and consuming the document's debounce
+  was already established as fine in T1/T2). Flushing collapses that
+  debounce to the same call stack as the key press, so `clampCaret`
+  has already run by the time `keyPressEvent` returns — the same
+  synchronous-settling discipline `ensureLayoutForViewport` uses for
+  scroll range (T1 finding). Without the flush, `caretBlock()` would
+  read stale for one event-loop turn after every undo/redo, which is
+  observable by a test driving real key events without an explicit
+  wait.
+- Exact caret-position restoration is confirmed NOT necessary for
+  E3: the merge-undo step in the falsification test lands the caret
+  at byte 0 of whichever block the clamp's `oldCaretIndexHint`
+  resolves to, not at the original split byte — only
+  never-stranded/never-out-of-range is asserted, per plan T4's
+  explicit scope note.
+- Full suite after T4: **282/282** (277 standstill baseline + 5
+  canvas: `tst_canvas_render`, `tst_canvas_typing`,
+  `tst_canvas_structural`, `tst_canvas_undo`, `tst_canvas_constitution`).
+
 ## 10. Verdict (fill at close)
 
 - **Result:** —
