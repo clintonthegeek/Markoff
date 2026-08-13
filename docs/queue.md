@@ -76,39 +76,19 @@ an implementer default**. Until D5 opens, the whole tree including
 `libs/markoff-canvas/` is bug-fix-only. Post-spike findings from
 hands-on use: **#18** below.
 
-## #18 — canvas: findings from first hands-on use *(post-spike, D5 inputs)*
+## #18 — canvas: findings from first hands-on use *(CLOSED 2026-08-13 — absorbed into the production arc)*
 
-Four findings raised by driving `libs/markoff-canvas/app` by hand on
-2026-08-13, after the spike's PASS verdict. Written up in full — with
-file/line evidence, the design points to decide, and the C4 read — in
-**spec §9, "Post-spike (2026-08-13)"**
-(`docs/specs/2026-08-13-markoff-canvas-spike-design.md`). Ordered
-largest first; the first two are D5 design decisions, the last two are
-bounded fixes.
-
-1. **Delimiter reflow.** Hiding is colour-only today; the requirement
-   is that markers appear/disappear and reflow. Do it by *omitting*
-   them from the layout string (this leaf builds its own), not by
-   markoff-live's per-glyph negative-letter-spacing hack. Costs a
-   per-`Entry` projection map (`layoutQChar ↔ byte`) threaded through
-   ~20 `View.cpp` call sites. Within C4, but adds an index space the
-   D5 design must name explicitly.
-2. **Selection across tables.** Table blocks have no block-level
-   layout (per-cell layouts only), so selection cannot cross one.
-   Needs a cell-ordered linear position sequence. Couples to #1 —
-   cell layouts would each need a projection map too.
-3. **Setext heading level / typed heading level.** Typed headings
-   always render H1: promotion sets kind but never the `level` attr,
-   which is only written at parse time. Carry the level out of
-   `inferBlockKind()` and set it in the same transaction. Smallest
-   item.
-4. **Setext test gap.** The Shift+Enter setext path works but is
-   untested (`tst_canvas_kind_transition.cpp` covers `# ` only).
+The four post-spike findings (delimiter reflow, cross-table selection,
+typed/setext heading level, setext test gap — full write-up in spike
+spec §9 "Post-spike") are now plan tasks in the canvas production arc:
+reflow → P2.1/P2.2, cross-table selection → P2.3, heading level +
+setext test → P1.1. Spec ruling on the projection map's C4 status:
+`docs/specs/2026-08-13-canvas-production-design.md` §3/§4.2.
 
 **Decided and closed, not an open item:** plain Enter stays
 word-processor new-paragraph. No backward-reaching input rule that
-merges a bare `===` block into the paragraph above — see spec §9 for
-why. Source mode is the escape hatch.
+merges a bare `===` block into the paragraph above — see spike spec §9
+for why. Source mode is the escape hatch.
 
 ## Other dormant (one line each)
 

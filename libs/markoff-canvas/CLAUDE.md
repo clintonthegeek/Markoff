@@ -1,33 +1,43 @@
-# markoff-canvas — projection view leaf (SPIKE)
+# markoff-canvas — projection view leaf (production arc)
 
 Custom `QAbstractScrollArea` widget rendering `MarkoffDocument`
 directly: one `QTextLayout` per block, own input pipeline. **No
-`QTextDocument`, no QML, no second document model, ever.**
+`QTextDocument`, no QML, no second document model, ever.** The
+2026-08-13 spike proved the premise (PASS, E1–E10); this leaf is now
+being built out to feature parity as Markoff's candidate primary
+editing leaf.
 
-This leaf is a time-boxed spike. Everything you need is in two
-files — read them in this order, then start:
+Everything you need is in two files — read them in this order:
 
-1. **Plan (do the topmost unchecked task):**
-   [`docs/plans/2026-08-13-markoff-canvas-spike.md`](../../docs/plans/2026-08-13-markoff-canvas-spike.md)
-   — session protocol, API cheat sheet, task checklist T0–T11.
+1. **Plan (do the topmost unchecked task in the current phase):**
+   [`docs/plans/2026-08-13-canvas-production-plan.md`](../../docs/plans/2026-08-13-canvas-production-plan.md)
+   — session protocol, cheat sheet, phase/task checklist P1–P7,
+   findings log.
 2. **Spec (normative):**
-   [`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](../../docs/specs/2026-08-13-markoff-canvas-spike-design.md)
-   — authority model (§2), constitution C1–C4 (§6), exit criteria
-   E1–E10 (§7), findings log (§9).
+   [`docs/specs/2026-08-13-canvas-production-design.md`](../../docs/specs/2026-08-13-canvas-production-design.md)
+   — authority model (§2), constitution (§3), architecture deltas
+   (§4), parity contract (§5), user gates (§8).
 
-## The four hard rules (constitution — violating one ends the spike)
+Spike record (verdict + findings the plan cites):
+[`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](../../docs/specs/2026-08-13-markoff-canvas-spike-design.md).
+
+## The four hard rules (constitution — now permanent law, spec §3)
 
 - **C1** no re-entrance guards (`m_applying*`, `isApplying*`, …).
 - **C2** no `singleShot(0)` / `Qt.callLater` / queued-connection
   deferrals in this leaf.
 - **C3** no `QTextDocument`, `QTextEdit`, `QPlainTextEdit`, or Quick
   text types.
-- **C4** one coordinate space: per-block UTF-8 byte offsets. No
-  `applyFlatEdit`, no `flatView()`, no cross-block byte sums.
+- **C4** one document coordinate space: per-block UTF-8 byte offsets.
+  No `applyFlatEdit`, no `flatView()`, no cross-block byte sums. The
+  **projection map** (layout QChar ↔ buffer byte, per realized entry)
+  is the one sanctioned layout-local index space — it lives only in
+  `ProjectionMap`/`Coordinates` and never crosses the layout boundary.
 
 `tests/check-constitution.sh` gates all four; run it before every
-commit. If an exit criterion seems to *require* violating a rule,
-that is the spike's answer — stop, log it in spec §9, report.
+commit. If a task seems to *require* violating a rule — stop, log it
+in the plan's findings log, report. That has been the correct move
+every time so far.
 
 ## Build / test
 
@@ -35,3 +45,6 @@ that is the spike's answer — stop, log it in spec §9, report.
 cmake --build build-dev -j 4          # never more than -j 4
 scripts/run-tests.sh -R canvas        # offscreen; never --direct
 ```
+
+Manual eyeball loop: the demo app takes a file argument and
+`MARKOFF_CANVAS_GRAB=<path.png>` renders offscreen to a file.

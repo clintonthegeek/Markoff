@@ -4,33 +4,31 @@ Qt6/C++ markdown editor widget family: a CRDT-backed foundation
 (`markoff-core` + `markoff-parser`) plus view leaves. Primary consumer:
 Corbomite (submodules this repo at `libs/markoff-family`).
 
-## Current workfront — 2026-08-13: none. The canvas spike is CLOSED (PASS)
+## Current workfront — 2026-08-13: canvas production arc (D5 part 1)
 
-The canvas spike — a projection view leaf (`libs/markoff-canvas/`)
-rendering `MarkoffDocument` directly via per-block `QTextLayout`, no
-second document model — **finished on 2026-08-13 with a PASS**. All
-ten exit criteria met with falsification proof; constitution (C1–C4)
-intact end to end. Task list T0–T11 is complete; there is no
-"topmost unchecked task" left to pick up.
+The canvas spike closed PASS on 2026-08-13 (verdict: spike spec §10),
+and the user opened the production arc the same day: build
+`libs/markoff-canvas/` out to feature parity — Corbomite contract v2,
+old-leaf parity, Obsidian Live Preview benchmark, and the collab
+rendering surface the projection architecture was chosen for.
 
-- Verdict + recommendation:
-  [`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](docs/specs/2026-08-13-markoff-canvas-spike-design.md)
-  §10; findings (incl. post-spike) §9.
-- Completed checklist + commit/falsification SHAs:
-  [`docs/plans/2026-08-13-markoff-canvas-spike.md`](docs/plans/2026-08-13-markoff-canvas-spike.md).
-- Direction rationale:
+- **Plan (do the topmost unchecked task in the current phase):**
+  [`docs/plans/2026-08-13-canvas-production-plan.md`](docs/plans/2026-08-13-canvas-production-plan.md)
+- **Spec (normative):**
+  [`docs/specs/2026-08-13-canvas-production-design.md`](docs/specs/2026-08-13-canvas-production-design.md)
+  — constitution C1–C4 now permanent (§3), architecture deltas (§4),
+  parity contract (§5), user gates G1–G3 (§8).
+- Spike record (findings referenced throughout):
+  [`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](docs/specs/2026-08-13-markoff-canvas-spike-design.md);
+  direction rationale:
   [`docs/specs/2026-08-13-view-authority-direction-decision.md`](docs/specs/2026-08-13-view-authority-direction-decision.md).
 
-**Next arc is D5** (candidate architecture + contingent retirement of
-markoff-live/styled). Per the decision record §6 that is a **user
-decision, not an implementer default** — do not open it unprompted.
-
-**Standstill, now tree-wide:** every leaf *including
-`libs/markoff-canvas/`* and `markoff-core` is **bug-fix-only** until
-D5 opens. No new features, no refactors, no opportunistic cleanup.
-Test baseline: **288/288** (full `scripts/run-tests.sh`, 277
-standstill + 11 canvas); any failure is a regression. Post-spike
-findings are queued (**#18**), not open work.
+**Standstill (spec §7):** canvas is the active workfront;
+`markoff-core` is open **only** for plan-named seams (P1 promotions
+and later named APIs); markoff-live/styled are **bug-fix-only** until
+gate G3 (retirement — a user decision); markoff-source is untouched,
+permanently. Test baseline: **288/288** (full `scripts/run-tests.sh`)
+at arc open; the plan ratchets it upward — any drop is a regression.
 
 ## Building
 

@@ -5,48 +5,37 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-13 (canvas spike closed — PASS)
+**Last updated:** 2026-08-13 (canvas production arc OPENED — D5 part 1)
 
-## Workfront — markoff-canvas spike: CLOSED, PASS
+## Workfront — canvas production arc (D5 part 1)
 
-Projection view leaf on `QTextLayout`, candidate replacement for the
-widget-composition leaves. All ten exit criteria (E1–E10) passed with
-falsification proof; constitution (C1–C4) intact end to end, confirmed
-by both the grep gate and T11's manual line-by-line read of every
-canvas source file. Verdict and recommendation to the D5 design:
-[`specs/2026-08-13-markoff-canvas-spike-design.md`](specs/2026-08-13-markoff-canvas-spike-design.md)
-§10. Full task history/findings: same spec §9; task checklist + SHAs:
-[`plans/2026-08-13-markoff-canvas-spike.md`](plans/2026-08-13-markoff-canvas-spike.md).
+User-opened 2026-08-13, same day the spike closed PASS. Goal: take
+`libs/markoff-canvas` to feature parity (Corbomite contract v2, old-leaf
+parity, Obsidian Live Preview benchmark, collab rendering surface).
 
-**Next:** the D5 design (candidate architecture + contingent
-retirement of markoff-live/styled, decision record §5.3) is a new,
-not-yet-opened arc — a user decision, not an implementer default.
-Until D5 opens, treat the whole tree (including `libs/markoff-canvas/`)
-as bug-fix-only.
+- **Spec (normative):**
+  [`specs/2026-08-13-canvas-production-design.md`](specs/2026-08-13-canvas-production-design.md)
+- **Plan (do the topmost unchecked task):**
+  [`plans/2026-08-13-canvas-production-plan.md`](plans/2026-08-13-canvas-production-plan.md)
+  — phases P1–P7, user gates G1 (a11y scope), G2 (Corbomite adoption),
+  G3 (retirement decision).
 
-Post-spike hands-on use of `libs/markoff-canvas/app` raised four
-findings (spec §9 "Post-spike", queue **#18**). Two of them —
-delimiter reflow via layout-string omission, and selection across
-tables — are **D5 design inputs** and should be priced into that arc
-rather than patched in as bug fixes.
+Standstill after this opening (spec §7): canvas active; `markoff-core`
+open **only** for plan-named seams; live/styled bug-fix-only until G3;
+source untouched. Queue **#18** is absorbed into the plan
+(P1.1, P2.1–P2.3).
 
 ## Test baseline
 
 **288/288 (100%)** on the full `scripts/run-tests.sh` (277 standstill
-+ 11 canvas), verified 2026-08-13 at spike close. Any failure is a new
-regression (classify before fixing).
++ 11 canvas), verified 2026-08-13 at spike close. The plan ratchets
+this up per task; any drop is a regression (classify before fixing).
 
-## Dormant items (not to be worked until D5 opens)
+## Dormant items
 
-- Queue **#18** — canvas findings from first hands-on use (2026-08-13,
-  post-verdict): delimiter hiding is colour-only and must become true
-  reflow via layout-string omission + a per-`Entry` projection map;
-  selection cannot cross a table; typed headings always render H1
-  (`level` attr never set outside parse time); the Shift+Enter setext
-  path works but is untested. Detail in spec §9 "Post-spike". The
-  first two are D5 design inputs, not bug fixes.
 - Queue **#13** — source cursor/selection translation rewrite.
-- Styled tables — in-grid cell edit, row/col ops (deferred).
+- Styled tables — in-grid cell edit, row/col ops (moot if G3 retires
+  styled; frozen until then).
 - Release scaffolding — install/export rules + header tiering for a
   non-submodule consumer.
 - E-arc — dormant since 2026-05-25 (`docs/e-arc/`, closed board).
@@ -63,4 +52,5 @@ jump to current master when next touched; **never** pin into
 
 Arc dispositions, closed queues, and dated banners:
 [`STATUS-LOG.md`](STATUS-LOG.md), `docs/archive/` (incl. the
-2026-08-13 pre-canvas snapshots of CLAUDE.md and queue.md).
+2026-08-13 pre-canvas snapshots of CLAUDE.md and queue.md; spike
+verdict: `specs/2026-08-13-markoff-canvas-spike-design.md` §10).
