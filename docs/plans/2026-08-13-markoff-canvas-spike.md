@@ -195,7 +195,7 @@ Fill SHAs as you go. "Fals." = falsification throwaway commit SHA
 | T8 IME (E6) | ☑ | `fd7b71d0` | `6771103f` / `8f04a5ae` |
 | T9 minimal table (E8) | ☑ | `3d60bf72` | `fd3565a7` / `50b5e1a4` |
 | T10 perf harness (E9) | ☑ | `c21d2eb2` | n/a (perf budget test, no falsification seam — see spec §9) |
-| T11 constitution audit + verdict (E10) | ☑ | *(record below)* | n/a (audit + verdict task, no falsification seam) |
+| T11 constitution audit + verdict (E10) | ☑ | `d6bfb4a0` | n/a (audit + verdict task, no falsification seam) |
 
 ---
 
