@@ -424,7 +424,10 @@ CanvasCursor View::hitTestTable(int entryIndex, const QPoint &viewportPos, qreal
         colLeft += w;
     }
 
-    const auto &cell = e.tableCells[size_t(row) * size_t(e.tableCols) + size_t(col)];
+    // Falsification plant (T9, throwaway, do not keep): misroute the edit
+    // to the neighboring cell.
+    const int misroutedCol = qMin(col + 1, e.tableCols - 1);
+    const auto &cell = e.tableCells[size_t(row) * size_t(e.tableCols) + size_t(misroutedCol)];
     if (!cell.layout)
         return CanvasCursor{e.id, cell.startByte};
 
