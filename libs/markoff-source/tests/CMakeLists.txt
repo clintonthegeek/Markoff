@@ -29,6 +29,11 @@ add_test(NAME tst_source_paragraph_margins COMMAND tst_source_paragraph_margins)
 target_link_libraries(tst_source_paragraph_margins PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
 set_tests_properties(tst_source_paragraph_margins PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_source_listitem_marker tst_source_listitem_marker.cpp)
+add_test(NAME tst_source_listitem_marker COMMAND tst_source_listitem_marker)
+target_link_libraries(tst_source_listitem_marker PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
+set_tests_properties(tst_source_listitem_marker PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_source_find_adapter tst_source_find_adapter.cpp)
 add_test(NAME tst_source_find_adapter COMMAND tst_source_find_adapter)
 target_link_libraries(tst_source_find_adapter PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)

@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(markoff_source STATIC
     src/Editor.cpp
     src/Gutter.cpp
+    src/InnerEditor.cpp
     src/Detail/SourceFindAdapter.h
     src/Detail/SourceFindAdapter.cpp
     include/markoff/source/Editor.h

@@ -90,6 +90,11 @@ public:
     /// hashes + a space. Operates on the line containing the cursor.
     Q_INVOKABLE void setHeadingLevel(int level) override;
 
+    /// Test-only accessor: the raw-markdown ListItem marker string
+    /// currently painted for the QTextBlock at `blockNumber` (queue #8.3).
+    /// Empty for non-ListItem blocks and once no document is set.
+    QString listItemMarkerForBlock(int blockNumber) const;
+
 protected:
     bool eventFilter(QObject *watched, QEvent *event) override;
     void resizeEvent(QResizeEvent *e) override;
@@ -101,6 +106,12 @@ private:
     /// Re-apply WP-unification paragraph margins to every QTextBlock after
     /// the binding has settled a reverse-diff. Cheap idempotent pass.
     void applyParagraphMargins();
+
+    /// Reserve left-margin space + refresh the paint-time marker table for
+    /// every ListItem QTextBlock (queue #8.3; decoration-only — does not
+    /// touch QTextDocument content). Cheap idempotent pass, run alongside
+    /// applyParagraphMargins().
+    void applyListItemMarkerDecorations();
 
     /// Recompute the EditorContext from the current caret position and emit
     /// contextChanged if the context has changed (change-gated, spec §7).
@@ -118,6 +129,7 @@ private:
     Detail::SourceFindAdapter              *m_findAdapter   = nullptr;
     Markoff::Theme                          m_theme;
     QMetaObject::Connection                 m_paragraphMarginsCon;
+    QMetaObject::Connection                 m_listMarkerCon;
     QMetaObject::Connection                 m_contextCursorCon;
     QMetaObject::Connection                 m_contextD2Con;
     Markoff::EditorContext                  m_lastContext;
