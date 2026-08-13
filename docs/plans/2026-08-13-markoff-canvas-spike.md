@@ -128,7 +128,7 @@ Fill SHAs as you go. "Fals." = falsification throwaway commit SHA
 
 | Task | Done | Commit | Fals. |
 |---|---|---|---|
-| T0 scaffold + constitution gate | ☑ | `5e81d6f4` | n/a (gate proven by planted violation, not committed — spec §9) |
+| T0 scaffold + constitution gate | ☑ | `a543e6e3` | n/a (gate proven by planted violation, not committed — spec §9) |
 | T1 read-only render + scroll | ☐ | — | n/a |
 | T2 caret + hit-test + typing (E1) | ☐ | — | — |
 | T3 structural keys: split/merge (E2) | ☐ | — | — |
