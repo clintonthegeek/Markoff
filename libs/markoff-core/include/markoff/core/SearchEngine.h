@@ -37,16 +37,12 @@ public:
     explicit SearchEngine(QObject *parent = nullptr);
     ~SearchEngine() override;
 
-    /// LEGACY coordinate space: findAll searches `toMarkdown()` (the legacy
-    /// flat buffer) and anchors Session selections in that buffer. On a
-    /// D2-loaded document the legacy buffer is stale-or-empty, so these find
-    /// nothing useful — D2-native consumers use `findByBlock` (FindController
-    /// does). No production caller remains; kept for the legacy Session-
-    /// selection path and its tests. Migrate or delete alongside the legacy
-    /// buffer's retirement (tracked in docs/queue.md).
-    int  findAll(MarkoffDocument *, Session *, const QString &needle, FindFlags = NoFlags);
-    bool findNext(MarkoffDocument *, Session *);
-    bool findPrevious(MarkoffDocument *, Session *);
+    /// Clears any `Selection::Kind::SearchMatch` secondary selections on
+    /// `sess`. Independent of `findByBlock` — kept as a small Session-
+    /// selection utility (the legacy `findAll`/`findNext`/`findPrevious`
+    /// trio that used to populate these selections from the legacy flat
+    /// buffer was removed 2026-06-10, queue #11: zero production callers,
+    /// D2-native find goes through `findByBlock` via `FindController`).
     void clearMatches(Session *);
 
     /// D2: iterate blocks directly and return one SearchHit per match.

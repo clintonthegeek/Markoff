@@ -11,62 +11,25 @@ using namespace Markoff;
 class TstFoundationSearchEngine : public QObject {
     Q_OBJECT
 private Q_SLOTS:
-    void find_all_populates_secondary_search_matches() {
-        MarkoffDocument doc(1);
-        doc.resetContent("foo bar foo baz foo", Origin::TestFixture);
-
-        Session *sess = doc.createSession();
-        SearchEngine s;
-        const int n = s.findAll(&doc, sess, "foo", {});
-        QCOMPARE(n, 3);
-
-        int matches = 0;
-        for (const Selection &x : sess->secondarySelections())
-            if (x.kind == Selection::Kind::SearchMatch) ++matches;
-        QCOMPARE(matches, 3);
-    }
-
-    void find_all_case_insensitive_default() {
-        MarkoffDocument doc(1);
-        doc.resetContent("Foo FOO foo", Origin::TestFixture);
-
-        Session *sess = doc.createSession();
-        SearchEngine s;
-        QCOMPARE(s.findAll(&doc, sess, "foo", {}), 3);
-    }
-
-    void find_all_case_sensitive() {
-        MarkoffDocument doc(1);
-        doc.resetContent("Foo FOO foo", Origin::TestFixture);
-
-        Session *sess = doc.createSession();
-        SearchEngine s;
-        QCOMPARE(s.findAll(&doc, sess, "foo",
-                           SearchEngine::FindFlag::CaseSensitive), 1);
-    }
-
-    void find_next_advances_primary_selection() {
-        MarkoffDocument doc(1);
-        doc.resetContent("ab cd ef", Origin::TestFixture);
-
-        Session *sess = doc.createSession();
-        SearchEngine s;
-        s.findAll(&doc, sess, "cd", {});
-        QVERIFY(s.findNext(&doc, sess));
-        const auto p = sess->primarySelection();
-        QCOMPARE(doc.resolveTextAnchor(p.anchor), quint32(3));
-    }
-
+    // clearMatches is a small Session-selection utility independent of the
+    // legacy findAll/findNext/findPrevious trio removed 2026-06-10 (queue
+    // #11) — populate a SearchMatch selection directly rather than via the
+    // deleted legacy-buffer search.
     void clear_matches_removes_search_kind() {
         MarkoffDocument doc(1);
         doc.resetContent("abc", Origin::TestFixture);
 
         Session *sess = doc.createSession();
+        Selection x;
+        x.kind = Selection::Kind::SearchMatch;
+        x.anchor = doc.textAnchorAt(0, /*rightBias*/ false);
+        x.active = doc.textAnchorAt(1, /*rightBias*/ true);
+        sess->addSecondarySelection(x);
+
         SearchEngine s;
-        s.findAll(&doc, sess, "a", {});
         s.clearMatches(sess);
-        for (const Selection &x : sess->secondarySelections())
-            QVERIFY(x.kind != Selection::Kind::SearchMatch);
+        for (const Selection &y : sess->secondarySelections())
+            QVERIFY(y.kind != Selection::Kind::SearchMatch);
     }
 
     // D2: per-block search finds matches in multiple blocks
