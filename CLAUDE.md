@@ -4,28 +4,33 @@ Qt6/C++ markdown editor widget family: a CRDT-backed foundation
 (`markoff-core` + `markoff-parser`) plus view leaves. Primary consumer:
 Corbomite (submodules this repo at `libs/markoff-family`).
 
-## Current workfront — 2026-08-13: the markoff-canvas spike
+## Current workfront — 2026-08-13: none. The canvas spike is CLOSED (PASS)
 
-**All active work is the canvas spike** — a new projection view leaf
-(`libs/markoff-canvas/`) rendering `MarkoffDocument` directly via
-per-block `QTextLayout`, with no second document model. It is the
-candidate replacement for the widget-composition approach and the
-project's path toward a true new Qt text element.
+The canvas spike — a projection view leaf (`libs/markoff-canvas/`)
+rendering `MarkoffDocument` directly via per-block `QTextLayout`, no
+second document model — **finished on 2026-08-13 with a PASS**. All
+ten exit criteria met with falsification proof; constitution (C1–C4)
+intact end to end. Task list T0–T11 is complete; there is no
+"topmost unchecked task" left to pick up.
 
-**If you are implementing: open
-[`docs/plans/2026-08-13-markoff-canvas-spike.md`](docs/plans/2026-08-13-markoff-canvas-spike.md)
-and do the topmost unchecked task.** The plan contains the session
-protocol, an API cheat sheet, and the task list; the spec
-([`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](docs/specs/2026-08-13-markoff-canvas-spike-design.md))
-is normative for the constitution (C1–C4) and exit criteria (E1–E10).
-Direction rationale (read only if you need the why):
-[`docs/specs/2026-08-13-view-authority-direction-decision.md`](docs/specs/2026-08-13-view-authority-direction-decision.md).
+- Verdict + recommendation:
+  [`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](docs/specs/2026-08-13-markoff-canvas-spike-design.md)
+  §10; findings (incl. post-spike) §9.
+- Completed checklist + commit/falsification SHAs:
+  [`docs/plans/2026-08-13-markoff-canvas-spike.md`](docs/plans/2026-08-13-markoff-canvas-spike.md).
+- Direction rationale:
+  [`docs/specs/2026-08-13-view-authority-direction-decision.md`](docs/specs/2026-08-13-view-authority-direction-decision.md).
 
-**Standstill:** the existing leaves (`markoff-live`, `markoff-styled`,
-`markoff-source`) and `markoff-core` are **bug-fix-only** while the
-spike is open. No new features, no refactors, no opportunistic
-cleanup outside `libs/markoff-canvas/`. Test baseline: **277/277**
-(full `scripts/run-tests.sh`); any failure is a regression.
+**Next arc is D5** (candidate architecture + contingent retirement of
+markoff-live/styled). Per the decision record §6 that is a **user
+decision, not an implementer default** — do not open it unprompted.
+
+**Standstill, now tree-wide:** every leaf *including
+`libs/markoff-canvas/`* and `markoff-core` is **bug-fix-only** until
+D5 opens. No new features, no refactors, no opportunistic cleanup.
+Test baseline: **288/288** (full `scripts/run-tests.sh`, 277
+standstill + 11 canvas); any failure is a regression. Post-spike
+findings are queued (**#18**), not open work.
 
 ## Building
 

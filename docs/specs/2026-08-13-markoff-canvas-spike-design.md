@@ -865,6 +865,91 @@ the tree.
   ongoing authoring cost by T5 onward — nobody reached for a guard or
   a `singleShot(0)` after T1.
 
+**Post-spike (2026-08-13) — first hands-on use of `app/main.cpp`**
+
+Surfaced by driving the demo app by hand after the verdict, not by a
+task. None of these falsify anything (the spike is closed, PASS
+stands); all four are inputs to the D5 design. Queue entry: **#18**.
+
+- **Delimiter hiding is colour-only; the real requirement is
+  reflow.** `InlineFormatting.cpp:59-65` paints a hidden delimiter in
+  the background colour, so `**` still occupies its advance — white
+  space, line length, and wrap points do not change when emphasis
+  markers hide/reveal. markoff-live *did* reflow, via a per-glyph
+  **negative letter-spacing** tuned to each character's advance
+  (`InlineHighlighter.cpp:66-73`) — a hack: kerning-sensitive,
+  per-glyph, and the caret can still land inside the collapsed run.
+  **The canvas has a strictly better pathway and should not port the
+  hack.** This leaf already builds its own layout string
+  (`BlockLayoutCache.cpp:40-45`, `layoutTextFor`) — it is a
+  projection, not a mirror — so the delimiter characters can simply
+  be **omitted from the layout string**, making reflow genuine
+  because the glyphs do not exist in the layout. Cost is one new
+  concept: a per-`Entry` **projection map** (kept-run list,
+  `layoutQChar ↔ buffer byte`). Today `Coordinates::byteToQtPos` /
+  `qtPosToByte` are a pure UTF-8↔UTF-16 identity called from ~20
+  sites in `View.cpp` (hit-test, caret motion, selection paint,
+  preedit splice, cursor draw); every one routes through the map
+  instead. Mechanical, but total. Four points to decide rather than
+  discover:
+  - `restyleInline()` currently only calls `setFormats()` on a caret
+    move. Under omission a caret move changes the layout *text*, so
+    it becomes a layout rebuild — per-block and cheap, but a real
+    change to that function's contract (and to the T7 comment
+    explaining why formats-then-lines cannot be split).
+  - Mapping a byte that lies *inside* an omitted run is undefined by
+    construction. The caret's own block is safe (the reveal rule
+    guarantees the caret's span is shown), but a **selection endpoint
+    in a non-caret block** can sit inside a hidden `**`. Needs a
+    stated snap-to-nearest-kept-boundary rule.
+  - Arrow-key motion improves for free: no cursor position exists
+    inside an omitted run, so Left steps over `**` in one press
+    instead of three invisible ones.
+  - **C4 read:** the map adds no *document* coordinate space — it is
+    layout-local presentation, which is what "projection view" means
+    — so this is within C4. But it introduces an index space that did
+    not exist during the spike, and the D5 design must say so
+    explicitly rather than let it arrive silently.
+- **Selection cannot cross a table.** Structural, and a consequence of
+  T9's deliberate scope. `realizeTable()`
+  (`BlockLayoutCache.cpp:166-245`) leaves `e.layout` null and stores a
+  grid of per-cell `QTextLayout`s; selection painting walks
+  `e.layout` (`View.cpp:1223`) and so has nothing to walk. Crossing a
+  table requires giving table blocks a **cell-ordered linear position
+  sequence**, so a table orders like every other block. Note the
+  coupling: the delimiter-omission work above lands on tables too —
+  each cell layout would need its own projection map.
+- **Setext headings already work — via Shift+Enter — and plain Enter
+  should stay as it is.** Reported as "typing `===` under a line does
+  nothing". It does nothing *across* blocks, correctly: plain Enter is
+  word-processor new-paragraph behaviour and is the desired
+  behaviour. The in-block path exists and is wired:
+  `StructuralKeyHandler.cpp:40-43` makes Shift+Enter a soft break
+  inside the block, `KindTransition::matchesSetextShape()`
+  (`KindTransition.cpp:18-52`) exists specifically to catch the
+  result (its own comment discusses the soft-break case), and
+  `promoteCaretBlockKind()` runs from `onDocumentChanged()`, so
+  `Title` → Shift+Enter → `=` promotes the block to Heading on the
+  first equals sign. **Explicitly rejected:** an input rule that
+  reaches backward to merge a bare `===` block into the paragraph
+  above. It fights the block model, and a rule that silently mutates
+  the *previous* block is exactly the surprise the Enter-key
+  behaviour is chosen to avoid. Source mode remains the escape hatch.
+  Gap: no test covers the soft-break setext path
+  (`tst_canvas_kind_transition.cpp` covers `# ` only).
+- **Typed headings are stuck at level 1.** `promoteCaretBlockKind()`
+  (`View.cpp:326-330`) sets the block *kind* and never the `level`
+  attr; `BlockPresentation.cpp:89` reads that attr with a default of
+  `1`; `level` is only ever written at parse time
+  (`MarkoffDocument.cpp:1971`). Because promotion fires only *from*
+  Paragraph, typing `### Foo` promotes on the first `#` and is never
+  re-evaluated — it renders H1. Setext has the same hole from the
+  other end: `matchesSetextShape()` computes the level (1 for `=`, 2
+  for `-`) and `inferBlockKind()` discards it, since its return type
+  is a bare `BlockKind`. Smallest and most contained of the four:
+  carry the level out of inference and set the attr in the same
+  `UndoLog::Transaction` as the kind.
+
 ## 10. Verdict (fill at close)
 
 - **Result: PASS.** All ten exit criteria (E1–E10) met, all with
