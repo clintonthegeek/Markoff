@@ -740,6 +740,52 @@ the tree.
 - Full suite after T9: **287/287** (277 standstill baseline + 10
   canvas: adds `tst_canvas_table`).
 
+**T10 (2026-08-13) — perf harness**
+
+- **The 500 ms load-to-first-paint budget is real-build-sensitive
+  enough to need the RelWithDebInfo run the plan specifies, not just
+  "any build".** In `build-dev` (this repo's default, no
+  `CMAKE_BUILD_TYPE` — effectively unoptimized), load-to-first-paint
+  measured **671 ms**, over budget; in a `build-perf` tree configured
+  with `-DCMAKE_BUILD_TYPE=RelWithDebInfo`, the same 500-block
+  synthetic doc measured **139–144 ms**, comfortably under. The other
+  three budgets passed in both configs (keystroke p95 ~0.8–1.2 ms vs.
+  the 16 ms gate, scroll realized 58/500 = 11.6% vs. the 30% gate, RSS
+  delta ~0). E9's own criterion text already says "release build" —
+  this is confirmation that clause is load-bearing, not boilerplate.
+  **Consequence:** the load-to-first-paint `QVERIFY2` is compiled
+  under `#ifdef NDEBUG` (set by `-DCMAKE_BUILD_TYPE=RelWithDebInfo`/
+  `Release`, absent from this repo's no-flag default `build-dev`) so
+  the budget is a hard gate where it's meant to be measured without
+  turning every default dev build red; in a non-NDEBUG build the test
+  logs a one-line note and skips just that assertion. The other three
+  budgets (keystroke p95, scroll-realize fraction, RSS delta) pass
+  unconditionally in both configs and are asserted regardless of
+  build type. `scripts/run-tests.sh -R canvas` is green against
+  `build-dev`; `MARKOFF_BUILD_DIR=build-perf scripts/run-tests.sh -R
+  canvas` (a `-DCMAKE_BUILD_TYPE=RelWithDebInfo` tree) is the run that
+  proves the load-time budget for real.
+- **`QTextStream::readLine()` over `/proc/self/status` silently
+  returns zero lines** in this environment (procfs reports a 0
+  `st_size`, and something about the sequential-device path swallows
+  the content) even though `QFile::readAll()` on the same handle
+  returns the full ~1.2 KB correctly. The RSS-delta helper
+  (`currentVmRssKb()`) reads the whole pseudo-file with `readAll()`
+  and does its own `VmRSS:` scan instead of using `QTextStream`. Filed
+  here in case another leaf reaches for `/proc/self/status` and hits
+  the same silent-empty-loop trap.
+- Synthetic doc: 500 blocks cycling five kinds (paragraph, heading,
+  list item, code block, blockquote; 100 each), each isolated by a
+  blank line so the parser gives one `BlockId` per cycle step.
+- Falsification: n/a for this task — a perf-budget test has no single
+  seam to break-and-revert the way a correctness test does (plan's own
+  framing: "Done when: all four budgets green", not a falsifiable
+  seam). Recorded as `n/a` in the checklist per T0/T11's precedent for
+  non-falsifiable gates.
+- Full suite after T10: **288/288** (277 standstill baseline + 11
+  canvas: adds `tst_canvas_perf_500`), measured against `build-perf`
+  (RelWithDebInfo).
+
 ## 10. Verdict (fill at close)
 
 - **Result:** —
