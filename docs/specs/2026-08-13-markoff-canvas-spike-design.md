@@ -168,7 +168,7 @@ commit SHA in the table on completion.
 | E3 | Undo after E2's split restores the merged block **and** the caret references a block that exists (never a vanished `BlockId`); redo likewise. This is the queue-#10 invariant, natively. | `undo_redo_never_strand_caret` |
 | E4 | Cross-block drag selection with real mouse events works in **both directions** (the 2026-05-21 asymmetry class); Ctrl+C then puts all selected blocks' text on the clipboard; a printable key on the selection collapses it and inserts at the first corner. | `drag_selection_both_directions_copy_and_collapse` |
 | E5 | Kind transition: typing `# ` at byte 0 of a paragraph promotes it to Heading without losing focus or caret; the block re-renders in heading style. | `hash_space_promotes_heading_caret_survives` |
-| E6 | IME: the five audit-L7 scenarios (commit-after-preedit, preedit-replace-commit, cancelled composition, commit into non-empty block, lifecycle probe) pass via `QInputMethodEvent`, with preedit visibly rendered (asserted via the layout's format ranges, not a screenshot). | `ime_l7_scenarios` (5 slots) |
+| E6 | IME: the five audit-L7 scenarios (commit-after-preedit, preedit-replace-commit, cancelled composition, commit into non-empty block, lifecycle probe) pass via `QInputMethodEvent`, with preedit visibly rendered (asserted via the layout's format ranges, not a screenshot). | `tst_canvas_ime` (5 slots) |
 | E7 | Delimiter visibility: `**bold**` renders with delimiters hidden and content styled when the caret is outside the span; moving the caret into the span reveals the delimiters; editing while revealed round-trips correctly. | `delimiter_visibility_follows_caret` |
 | E8 | Minimal table: caret can enter a cell by mouse, typing edits that cell's buffer only, adjacent cells and the following block are unaffected, and no crash on cell edit + repaint (the QML-Repeater UAF class must have no analogue). | `table_cell_edit_isolated` |
 | E9 | **Perf** (offscreen, release build, `-j 4` build cap per standing rule): on a 500-block synthetic document — load-to-first-paint < 500 ms; p95 keystroke→paint < 16 ms over a 200-keystroke run mid-document; scroll through the full document without layout of all blocks (assert the cache realized < 30% of blocks); RSS delta for the widget < 100 MB. Bench binary modeled on `tst_live_render_table_typing_perf`. | `tst_canvas_perf_500` |
@@ -610,6 +610,75 @@ the tree.
   catching.
 - Full suite after T7: **285/285** (277 standstill baseline + 8
   canvas: adds `tst_canvas_inline_formatting`).
+
+**T8 (2026-08-13) — IME composition**
+
+- **Standalone `QTextLayout` does not get Qt's document-backed preedit
+  position-shifting for free — the leaf has to do it by hand.**
+  `QTextEngine::setPreeditArea` splices the preedit text into
+  `layoutData->string` *before* any format-range resolution runs; for a
+  `QTextDocumentPrivate`-backed layout, `QTextEngine::formatIndex`/
+  itemization explicitly detect and shift positions past
+  `specialData->preeditPosition`, but that shifting code is gated on
+  `QTextDocumentPrivate::get(block) != nullptr` — dead for every layout
+  this leaf builds (C3 forbids `QTextDocument` outright). Consequence:
+  `restyleInline()` now has to manually shift any base inline-format
+  range (bold/italic/hidden-delimiter, computed from `SourceSpan`s
+  against the block's real text) that starts at or after the splice
+  point, by the preedit's length, or those ranges silently land on the
+  wrong characters the instant a composition is open over styled text.
+  A range straddling the splice point is widened rather than split —
+  an over-formatted preedit run, not a correctness bug, and not worth
+  the itemizer-level surgery for a spike. This is exactly the kind of
+  cost the decision record's "own coordinate space" tradeoff (C4) was
+  naming in the abstract; T8 is where it became a concrete diff.
+- **The plan's Qt-upstream reference
+  (`QWidgetTextControlPrivate::inputMethodEvent`, `qwidgettextcontrol.cpp:2026`)
+  ported cleanly as an *ordering* to mirror, not code to copy** (the
+  license rule's C3 exclusion — anything touching `QTextCursor`/
+  `QTextDocument` is architecturally uncopyable here — ruled out
+  copying it outright anyway). The two-phase shape held exactly:
+  (1) replacement + commit as one document write at the pre-event
+  caret, `replacementStart`/`Length` converted from Qt's cursor-
+  relative convention to this leaf's per-block byte offsets via the
+  existing `Coordinates` helper — no new coordinate concept; (2) the
+  *resulting* preedit string spliced into the layout only, never
+  written. `BlockLayoutCache::setPreedit`/`clearPreedit` are new but
+  structurally identical to the existing `setCaret` chokepoint
+  (T7 finding) — same "store the minimal cross-cutting state, restyle
+  only the (at most two) affected entries" shape, reused rather than
+  invented.
+- **View owns `m_preeditText`, a second piece of state beyond the
+  caret that the document doesn't know about** — same exception
+  already made for `m_selectionAnchor` at T5. Flagging it again here
+  because T11's "renamed guard" audit (C1) should treat this as a
+  known, load-bearing exception, not a fresh one to be suspicious of:
+  it is transient IME-composition state, never patched into the
+  document, dropped on commit/cancel exactly like the selection anchor
+  drops on a doc change that strands its block.
+- Ported the five audit-L7 scenarios
+  (`docs/specs/2026-05-21-audit-L7-ime-composition.md`) as individual
+  `tst_canvas_ime` slots rather than one `ime_l7_scenarios` binary —
+  same per-file convention every other canvas test uses. The live
+  leaf's L7 tests assert against QML's `inputMethodComposing`
+  property and `flushPendingComposition`'s wholesale block-replace;
+  this leaf's version asserts against `View::isComposing()`/
+  `preeditText()` (new inspection surface, same "nothing here is
+  authority" contract as `caretBlock()`/`hasSelection()`) and
+  `blockEditSequence()` to confirm one buffer edit for the whole
+  composition, not per-preedit-step. Behaviorally equivalent net
+  effect to the live leaf (composing is invisible to the CRDT until
+  commit, one edit lands at the end) via a structurally different
+  mechanism (no deferred wholesale swap — nothing is ever buffered
+  outside the layout).
+- Falsification: routed the preedit splice into a real
+  `d2ApplyBufferEdit` alongside the layout update. 4 of the 5 slots
+  failed as expected (the fifth, the composing-lifecycle probe, only
+  checks `isComposing()` transitions and is correctly insensitive to
+  where the text ends up — noted so a future reader doesn't read that
+  as the falsification being too weak).
+- Full suite after T8: **286/286** (277 standstill baseline + 9
+  canvas: adds `tst_canvas_ime`).
 
 ## 10. Verdict (fill at close)
 
