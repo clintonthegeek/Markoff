@@ -305,7 +305,7 @@ void View::insertPrintable(const QString &text)
     const QByteArray insert = text.toUtf8();
     UndoLog::Transaction t(m_doc->d2UndoLog());
     m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0, insert, t);
-    m_caret.byteOffset += insert.size();
+    // FALSIFICATION PLANT (T2, spec §9 falsification protocol) — do not commit.
 }
 
 void View::deleteCluster(bool forward)
