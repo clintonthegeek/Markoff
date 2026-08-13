@@ -70,6 +70,20 @@ public:
     void setCaret(const MarkoffDocument &doc, const Theme &theme,
                   BlockId block, int byteOffset);
 
+    /// Set/replace the IME preedit area (T8, exit E6): splices `text` into
+    /// `block`'s layout at `qcharPos` for line-breaking and painting only,
+    /// via QTextLayout::setPreeditArea — never touches blockText(). Rebuilds
+    /// the block's layout (restyleInline() re-runs beginLayout/createLine
+    /// unconditionally, same as every other formats-changing call here), so
+    /// preedit text wraps and paints exactly like typed text would. Base
+    /// inline-format ranges (bold/italic/hidden-delimiters) landing at or
+    /// after `qcharPos` are shifted by `text.length()` in restyleInline() so
+    /// they keep tracking their real characters once the preedit splices in.
+    void setPreedit(const MarkoffDocument &doc, const Theme &theme,
+                    BlockId block, int qcharPos, const QString &text);
+    /// Clear any active preedit area. No-op if none is set.
+    void clearPreedit(const MarkoffDocument &doc, const Theme &theme);
+
     void clear();
 
     const std::vector<Entry> &entries() const { return m_entries; }
@@ -97,6 +111,9 @@ private:
     quint64 m_structuralSeq  = 0;
     BlockId m_caretBlock;                //!< null = no caret tracked
     int     m_caretByte      = -1;
+    BlockId m_preeditBlock;              //!< null = no preedit tracked
+    int     m_preeditQCharPos = -1;
+    QString m_preeditText;
 };
 
 }  // namespace Markoff::Canvas

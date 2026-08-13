@@ -6,9 +6,12 @@
 
 #include <QAbstractScrollArea>
 #include <QRectF>
+#include <QVariant>
 
 #include <markoff/core/BlockId.h>
 #include <markoff/core/Theme.h>
+
+class QInputMethodEvent;
 
 namespace Markoff {
 class MarkoffDocument;
@@ -57,6 +60,11 @@ struct CanvasCursor {
  * kind after a document change; a Paragraph whose text now matches e.g. an
  * ATX heading prefix is promoted via `d2SetBlockKind` with the buffer left
  * untouched (see `promoteCaretBlockKind`).
+ * T8: IME composition. `inputMethodEvent` mirrors
+ * `QWidgetTextControlPrivate::inputMethodEvent`'s ordering: replacement +
+ * commit land as one `d2ApplyBufferEdit` at the caret; the (possibly new)
+ * preedit string is spliced into the caret block's `QTextLayout` via
+ * `setPreeditArea` — never the document — until it commits or cancels.
  */
 class View : public QAbstractScrollArea {
     Q_OBJECT
@@ -98,6 +106,16 @@ public:
     /// Test/inspection surface only — nothing here is authority.
     bool isDelimiterHiddenAt(BlockId id, int byteOffset) const;
 
+    /// Whether an IME composition is in progress (T8, exit E6): a non-empty
+    /// preedit string is currently spliced into the caret block's layout.
+    /// Mirrors QWidget::inputMethodComposing's role in the old leaves —
+    /// inspection only, driven entirely by inputMethodEvent().
+    bool isComposing() const;
+    /// The current preedit string, or an empty string if not composing.
+    /// Inspection surface for tests; the layout (via
+    /// QTextLayout::preeditAreaText()) is the actual authority painted from.
+    QString preeditText() const;
+
     // ---- Caret ----------------------------------------------------------
     // Inspection for tests; the caret is edited only through real events
     // (mouse press, key press) on the production widget, never set
@@ -124,6 +142,8 @@ protected:
     void mouseReleaseEvent(QMouseEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
+    void inputMethodEvent(QInputMethodEvent *event) override;
+    QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
 
 private:
     void onDocumentChanged();
@@ -197,6 +217,13 @@ private:
     CanvasCursor m_caret;
     std::optional<CanvasCursor> m_selectionAnchor;
     bool m_hasFocus = false;
+    // ---- IME (T8) ---------------------------------------------------------
+    // Composition state the document doesn't know about (same exception as
+    // m_selectionAnchor, T5): a preedit string exists only in this leaf's
+    // input pipeline and BlockLayoutCache's spliced-in layout until it is
+    // committed, at which point it becomes a real d2ApplyBufferEdit and
+    // this reverts to empty.
+    QString m_preeditText;
 };
 
 }  // namespace Markoff::Canvas

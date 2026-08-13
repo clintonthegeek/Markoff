@@ -6,6 +6,7 @@
 #include <QFocusEvent>
 #include <QFontMetricsF>
 #include <QGuiApplication>
+#include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QMouseEvent>
@@ -44,6 +45,7 @@ View::View(QWidget *parent)
 {
     viewport()->setFocusPolicy(Qt::NoFocus);
     setFocusPolicy(Qt::StrongFocus);
+    setAttribute(Qt::WA_InputMethodEnabled);
     horizontalScrollBar()->setRange(0, 0);  // text wraps; no horizontal scroll
 }
 
@@ -152,6 +154,16 @@ bool View::isDelimiterHiddenAt(BlockId id, int byteOffset) const
         }
     }
     return false;
+}
+
+bool View::isComposing() const
+{
+    return !m_preeditText.isEmpty();
+}
+
+QString View::preeditText() const
+{
+    return m_preeditText;
 }
 
 BlockId View::caretBlock() const
@@ -950,6 +962,89 @@ void View::focusOutEvent(QFocusEvent *event)
     QAbstractScrollArea::focusOutEvent(event);
     m_hasFocus = false;
     viewport()->update();
+}
+
+void View::inputMethodEvent(QInputMethodEvent *event)
+{
+    if (!m_doc || m_caret.block.isNull()) {
+        event->accept();
+        return;
+    }
+
+    // Mirror QWidgetTextControlPrivate::inputMethodEvent's ordering (plan
+    // T8): replacement + commit are a real document edit at the caret,
+    // issued as one d2ApplyBufferEdit (replacementStart/Length relative to
+    // the caret, converted to bytes); the preedit string that may follow is
+    // never written to the document (see below).
+    if (event->replacementLength() > 0 || !event->commitString().isEmpty()) {
+        const QByteArray text = m_doc->blockText(m_caret.block);
+        const qsizetype qlen = QString::fromUtf8(text).size();
+        const qsizetype qcharPos = coords::byteToQtPos(text, m_caret.byteOffset);
+        const qsizetype replStartQ = qBound(qsizetype(0), qcharPos + event->replacementStart(), qlen);
+        const qsizetype replEndQ = qBound(replStartQ, replStartQ + event->replacementLength(), qlen);
+        const int fromByte = int(coords::qtPosToByte(text, replStartQ));
+        const int toByte = int(coords::qtPosToByte(text, replEndQ));
+        const QByteArray commit = event->commitString().toUtf8();
+
+        UndoLog::Transaction t(m_doc->d2UndoLog());
+        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(fromByte),
+                                 uint32_t(toByte - fromByte), commit, t);
+        m_caret.byteOffset = fromByte + commit.size();
+        // Kind promotion (T6) must see the committed text before this
+        // handler returns, same reasoning as the printable-key path.
+        m_doc->flushPendingD2Changed();
+    }
+
+    // Empty commit + empty preedit = cancelled composition: clear the
+    // preedit area, no document change (already skipped above).
+    m_preeditText = event->preeditString();
+    if (m_preeditText.isEmpty()) {
+        m_cache->clearPreedit(*m_doc, m_theme);
+    } else {
+        const QByteArray text = m_doc->blockText(m_caret.block);
+        const qsizetype qcharPos = coords::byteToQtPos(text, m_caret.byteOffset);
+        m_cache->setPreedit(*m_doc, m_theme, m_caret.block, int(qcharPos), m_preeditText);
+    }
+
+    ensureCaretVisible();
+    viewport()->update();
+    event->accept();
+}
+
+QVariant View::inputMethodQuery(Qt::InputMethodQuery query) const
+{
+    if (!m_doc || m_caret.block.isNull())
+        return {};
+
+    const QByteArray text = m_doc->blockText(m_caret.block);
+
+    switch (query) {
+    case Qt::ImCursorRectangle: {
+        const int idx = m_cache->indexOf(m_caret.block);
+        if (idx < 0)
+            return {};
+        const auto &e = m_cache->entries()[size_t(idx)];
+        if (!e.layout)
+            return {};
+        const qsizetype qcharPos = coords::byteToQtPos(text, m_caret.byteOffset);
+        const QTextLine line = e.layout->lineForTextPosition(int(qcharPos));
+        if (!line.isValid())
+            return {};
+        const qreal scrollY = verticalScrollBar()->value();
+        const qreal contentX = pageMargin() + e.style.leftIndent;
+        const qreal contentY = (e.y - scrollY) + e.style.topMargin;
+        return QRectF(contentX + line.cursorToX(int(qcharPos)), contentY + line.y(),
+                     1, line.height()).toRect();
+    }
+    case Qt::ImSurroundingText:
+        return QString::fromUtf8(text);
+    case Qt::ImCursorPosition:
+        return int(coords::byteToQtPos(text, m_caret.byteOffset));
+    case Qt::ImHints:
+        return int(Qt::ImhNone);
+    default:
+        return {};
+    }
 }
 
 void View::paintEvent(QPaintEvent *event)

@@ -67,6 +67,9 @@ void BlockLayoutCache::clear()
     m_structuralSeq = 0;
     m_caretBlock = BlockId();
     m_caretByte = -1;
+    m_preeditBlock = BlockId();
+    m_preeditQCharPos = -1;
+    m_preeditText.clear();
 }
 
 void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme)
@@ -170,6 +173,32 @@ void BlockLayoutCache::restyleInline(const MarkoffDocument &doc, const Theme &th
                             ? e.style.background
                             : theme.color(Theme::Slot::EditorBackground);
 
+    QList<QTextLayout::FormatRange> ranges =
+        Detail::inlineFormatRanges(spans, caretQChar, theme, invisible);
+
+    // Preedit area (T8): set before beginLayout() (it's a QTextEngine
+    // rebuild trigger, same as setFormats() below) so the spliced-in text
+    // takes part in this pass's line breaking. Base format ranges are
+    // computed above against the block's real text, so any range starting
+    // at or after the splice point needs to shift by the preedit's length
+    // to keep landing on its real characters, same as Qt's own
+    // QTextDocumentPrivate-backed engine does internally for document-
+    // backed layouts (this leaf's layouts are standalone QTextLayouts —
+    // C3 — so that shift is not automatic and has to happen here). A range
+    // straddling the splice point is widened rather than split: an
+    // over-formatted preedit run is a cosmetic nit, not a correctness bug.
+    if (e.id == m_preeditBlock && m_preeditQCharPos >= 0) {
+        e.layout->setPreeditArea(m_preeditQCharPos, m_preeditText);
+        for (QTextLayout::FormatRange &r : ranges) {
+            if (r.start >= m_preeditQCharPos)
+                r.start += m_preeditText.size();
+            else if (r.start + r.length > m_preeditQCharPos)
+                r.length += m_preeditText.size();
+        }
+    } else {
+        e.layout->setPreeditArea(-1, QString());
+    }
+
     // QTextLayout::setFormats() unconditionally invalidates the layout's
     // line data when the format list is non-empty
     // (QTextEngine::setFormats -> invalidate() + clearLineData(), Qt
@@ -182,7 +211,7 @@ void BlockLayoutCache::restyleInline(const MarkoffDocument &doc, const Theme &th
     // call left every line-based query (hit-test, caret motion) broken
     // with lineCount()==0 until the next full re-realize — found via T7's
     // E7 test.
-    e.layout->setFormats(Detail::inlineFormatRanges(spans, caretQChar, theme, invisible));
+    e.layout->setFormats(ranges);
 
     const qreal width = qMax(qreal(1), m_textWidth - e.style.leftIndent);
     qreal h = 0;
@@ -247,6 +276,42 @@ void BlockLayoutCache::setCaret(const MarkoffDocument &doc, const Theme &theme,
     const int newIdx = indexOf(block);
     if (newIdx >= 0)
         restyleInline(doc, theme, m_entries[size_t(newIdx)]);
+}
+
+void BlockLayoutCache::setPreedit(const MarkoffDocument &doc, const Theme &theme,
+                                  BlockId block, int qcharPos, const QString &text)
+{
+    if (m_preeditBlock == block && m_preeditQCharPos == qcharPos && m_preeditText == text)
+        return;
+
+    const BlockId oldBlock = m_preeditBlock;
+    m_preeditBlock     = block;
+    m_preeditQCharPos  = qcharPos;
+    m_preeditText      = text;
+
+    if (oldBlock != block) {
+        const int oldIdx = indexOf(oldBlock);
+        if (oldIdx >= 0)
+            restyleInline(doc, theme, m_entries[size_t(oldIdx)]);
+    }
+    const int idx = indexOf(block);
+    if (idx >= 0)
+        restyleInline(doc, theme, m_entries[size_t(idx)]);
+}
+
+void BlockLayoutCache::clearPreedit(const MarkoffDocument &doc, const Theme &theme)
+{
+    if (m_preeditQCharPos < 0)
+        return;
+
+    const BlockId block = m_preeditBlock;
+    m_preeditBlock     = BlockId();
+    m_preeditQCharPos  = -1;
+    m_preeditText.clear();
+
+    const int idx = indexOf(block);
+    if (idx >= 0)
+        restyleInline(doc, theme, m_entries[size_t(idx)]);
 }
 
 void BlockLayoutCache::recomputePositions()
