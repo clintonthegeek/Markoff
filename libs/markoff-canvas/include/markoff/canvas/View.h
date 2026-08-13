@@ -2,6 +2,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 
 #include <QAbstractScrollArea>
 #include <QRectF>
@@ -47,6 +48,11 @@ struct CanvasCursor {
  * Backspace/Delete, arrow-key motion. Structural keys (Enter split,
  * boundary Backspace/Delete merge) arrive in T3. Undo/redo (T4) reuse
  * the T2 clamp — there is no separate caret-restoration mechanism.
+ * T5: selection — an optional anchor `CanvasCursor` alongside the caret.
+ * Drag/shift-extend moves the caret while the anchor holds; Ctrl+C/X join
+ * selected blocks' selected byte ranges onto the clipboard; a mutating key
+ * on a non-empty selection collapses it first (per-block deletes + a
+ * structural merge of the two boundary blocks, one transaction).
  */
 class View : public QAbstractScrollArea {
     Q_OBJECT
@@ -87,12 +93,21 @@ public:
     BlockId caretBlock() const;
     int     caretByteOffset() const;
 
+    // ---- Selection (T5) --------------------------------------------------
+    // Inspection for tests; edited only through real events (mouse drag,
+    // Shift+move, Ctrl+A), same rule as the caret.
+
+    bool    hasSelection() const;
+    BlockId selectionAnchorBlock() const;
+    int     selectionAnchorByteOffset() const;
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
     void scrollContentsBy(int dx, int dy) override;
     void keyPressEvent(QKeyEvent *event) override;
     void mousePressEvent(QMouseEvent *event) override;
+    void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
@@ -130,11 +145,31 @@ private:
     void clampCaret(int oldCaretIndexHint);
     void ensureCaretVisible();
 
+    // ---- Selection (T5) --------------------------------------------------
+
+    /// Document-order comparison of two carets via the cache's block index.
+    /// Ties (same block) compare by byte offset.
+    bool caretLessThan(const CanvasCursor &a, const CanvasCursor &b) const;
+    /// Anchor/caret in document order, {} if there is no selection (no
+    /// anchor, or anchor == caret).
+    std::optional<std::pair<CanvasCursor, CanvasCursor>> orderedSelection() const;
+    /// The selected byte sub-range of `id`'s text, given the already-
+    /// ordered selection endpoints. Empty range if `id` is not selected.
+    std::pair<int, int> selectedByteRangeInBlock(
+        BlockId id, const CanvasCursor &start, const CanvasCursor &end) const;
+    QByteArray selectedText() const;
+    /// Delete the selected range and merge its boundary blocks in one
+    /// transaction (plan T5: per-block deletes + a structural-path merge,
+    /// no cross-block byte math). Caret lands at the first corner; the
+    /// selection is cleared. No-op if there is no selection.
+    void collapseSelection();
+
     MarkoffDocument *m_doc = nullptr;
     Theme m_theme;
     std::unique_ptr<BlockLayoutCache> m_cache;
     quint64 m_paintCount = 0;
     CanvasCursor m_caret;
+    std::optional<CanvasCursor> m_selectionAnchor;
     bool m_hasFocus = false;
 };
 

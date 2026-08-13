@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/canvas/View.h>
 
+#include <QByteArrayList>
+#include <QClipboard>
 #include <QFocusEvent>
 #include <QFontMetricsF>
+#include <QGuiApplication>
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QMouseEvent>
@@ -56,6 +59,7 @@ void View::setDocument(MarkoffDocument *doc)
     m_doc = doc;
     m_cache->clear();
     m_caret = {};
+    m_selectionAnchor.reset();
 
     if (m_doc) {
         // d2DocumentChanged is the truth feed. Consuming the document's own
@@ -129,6 +133,21 @@ BlockId View::caretBlock() const
 int View::caretByteOffset() const
 {
     return m_caret.byteOffset;
+}
+
+bool View::hasSelection() const
+{
+    return orderedSelection().has_value();
+}
+
+BlockId View::selectionAnchorBlock() const
+{
+    return m_selectionAnchor ? m_selectionAnchor->block : BlockId{};
+}
+
+int View::selectionAnchorByteOffset() const
+{
+    return m_selectionAnchor ? m_selectionAnchor->byteOffset : 0;
 }
 
 // ---- Geometry -----------------------------------------------------------
@@ -210,6 +229,12 @@ void View::onDocumentChanged()
         m_cache->sync(*m_doc, m_theme);
     }
     clampCaret(oldCaretIndex);
+    // No UndoLog selection state (T4/T5, queue #10 item 2): if the anchor's
+    // block didn't survive the edit there is nothing sound to clamp it to,
+    // so the selection is dropped rather than guessed at. Mirrors the
+    // undo/redo path, which does the same before mutating.
+    if (m_selectionAnchor && m_cache->indexOf(m_selectionAnchor->block) < 0)
+        m_selectionAnchor.reset();
     ensureLayoutForViewport();
     viewport()->update();
 }
@@ -297,6 +322,116 @@ void View::ensureCaretVisible()
         vbar->setValue(qFloor(e.y));
     else if (e.y + e.height > vbar->value() + viewportH)
         vbar->setValue(qCeil(e.y + e.height - viewportH));
+}
+
+// ---- Selection (T5) -------------------------------------------------------
+
+bool View::caretLessThan(const CanvasCursor &a, const CanvasCursor &b) const
+{
+    if (a.block == b.block)
+        return a.byteOffset < b.byteOffset;
+    return m_cache->indexOf(a.block) < m_cache->indexOf(b.block);
+}
+
+std::optional<std::pair<CanvasCursor, CanvasCursor>> View::orderedSelection() const
+{
+    if (!m_selectionAnchor || m_selectionAnchor->block.isNull())
+        return std::nullopt;
+    if (*m_selectionAnchor == m_caret)
+        return std::nullopt;  // anchor caught up with the caret: empty range
+    if (caretLessThan(*m_selectionAnchor, m_caret))
+        return std::make_pair(*m_selectionAnchor, m_caret);
+    return std::make_pair(m_caret, *m_selectionAnchor);
+}
+
+std::pair<int, int> View::selectedByteRangeInBlock(
+    BlockId id, const CanvasCursor &start, const CanvasCursor &end) const
+{
+    if (!m_doc)
+        return {0, 0};
+    const int size = m_doc->blockText(id).size();
+    const int startIdx = m_cache->indexOf(id);
+    const int firstIdx = m_cache->indexOf(start.block);
+    const int lastIdx  = m_cache->indexOf(end.block);
+    if (startIdx < firstIdx || startIdx > lastIdx)
+        return {0, 0};
+
+    const int from = (id == start.block) ? start.byteOffset : 0;
+    const int to   = (id == end.block) ? end.byteOffset : size;
+    return {from, to};
+}
+
+QByteArray View::selectedText() const
+{
+    const auto sel = orderedSelection();
+    if (!sel || !m_doc)
+        return {};
+    const auto &[start, end] = *sel;
+
+    QByteArrayList parts;
+    for (const auto &e : m_cache->entries()) {
+        const int idx = m_cache->indexOf(e.id);
+        if (idx < m_cache->indexOf(start.block) || idx > m_cache->indexOf(end.block))
+            continue;
+        const auto [from, to] = selectedByteRangeInBlock(e.id, start, end);
+        parts << m_doc->blockText(e.id).mid(from, to - from);
+    }
+    return parts.join("\n\n");
+}
+
+void View::collapseSelection()
+{
+    const auto sel = orderedSelection();
+    if (!sel || !m_doc)
+        return;
+    const auto &[start, end] = *sel;
+
+    // Blocks strictly between the boundary blocks, document order — read
+    // before any mutation touches the id list.
+    std::vector<BlockId> middles;
+    bool inRange = false;
+    for (const auto &e : m_cache->entries()) {
+        if (e.id == start.block) { inRange = true; continue; }
+        if (e.id == end.block) { inRange = false; continue; }
+        if (inRange)
+            middles.push_back(e.id);
+    }
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+
+    if (start.block == end.block) {
+        m_doc->d2ApplyBufferEdit(start.block, uint32_t(start.byteOffset),
+                                 uint32_t(end.byteOffset - start.byteOffset),
+                                 QByteArray(), t);
+    } else {
+        const int startSize = m_doc->blockText(start.block).size();
+        m_doc->d2ApplyBufferEdit(start.block, uint32_t(start.byteOffset),
+                                 uint32_t(startSize - start.byteOffset),
+                                 QByteArray(), t);
+        m_doc->d2ApplyBufferEdit(end.block, 0, uint32_t(end.byteOffset),
+                                 QByteArray(), t);
+        for (BlockId mid : middles)
+            m_doc->d2RemoveBlock(mid, t);
+
+        // Merge the (now content-adjacent) boundary blocks via the same
+        // structural path T3 routes keys through — no cross-block byte
+        // math (C4): this is Backspace at byte 0 of `end.block`, which
+        // StructuralKeyHandler already knows how to merge into its
+        // document-order predecessor (start.block, once the middles are
+        // gone). The nested Transaction it opens joins this one (UndoLog
+        // supports nesting), so the whole collapse is one undo step.
+        const StructuralResult r = StructuralKeyHandler::handle(
+            *m_doc, end.block, Qt::Key_Backspace, Qt::NoModifier, 0);
+        if (r.handled) {
+            m_caret.block = r.caretBlock;
+            m_caret.byteOffset = int(r.caretByteInBlock);
+            m_selectionAnchor.reset();
+            return;
+        }
+    }
+
+    m_caret = start;
+    m_selectionAnchor.reset();
 }
 
 void View::insertPrintable(const QString &text)
@@ -533,6 +668,7 @@ void View::keyPressEvent(QKeyEvent *event)
     // synchronous flush, not a view-side defer (spec C2).
     if (event->matches(QKeySequence::Undo) || event->matches(QKeySequence::Redo)) {
         if (m_doc) {
+            m_selectionAnchor.reset();  // no UndoLog selection state (T4)
             if (event->matches(QKeySequence::Undo))
                 m_doc->undoD2();
             else
@@ -550,6 +686,51 @@ void View::keyPressEvent(QKeyEvent *event)
         return;
     }
 
+    if (ctrl && event->key() == Qt::Key_A) {
+        if (!m_cache->entries().empty()) {
+            const auto &first = m_cache->entries().front();
+            const auto &last = m_cache->entries().back();
+            m_selectionAnchor = CanvasCursor{first.id, 0};
+            setCaret(CanvasCursor{last.id, int(m_doc->blockText(last.id).size())});
+        }
+        event->accept();
+        return;
+    }
+
+    if (ctrl && (event->key() == Qt::Key_C || event->key() == Qt::Key_X)) {
+        if (hasSelection()) {
+            QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
+            if (event->key() == Qt::Key_X) {
+                collapseSelection();
+                ensureCaretVisible();
+                viewport()->update();
+            }
+        }
+        event->accept();
+        return;
+    }
+
+    // A mutating key on a non-empty selection collapses it first (plan T5).
+    // Backspace/Delete stop there — deleting the selection IS the whole
+    // operation. Enter/printable fall through so the structural/insert
+    // handling below runs at the post-collapse caret, same as typing at
+    // any other empty-selection caret position.
+    const bool isPrintable = Detail::isAcceptableTextInput(event);
+    const bool isMutatingKey = event->key() == Qt::Key_Backspace
+                             || event->key() == Qt::Key_Delete
+                             || event->key() == Qt::Key_Return
+                             || event->key() == Qt::Key_Enter
+                             || isPrintable;
+    if (hasSelection() && isMutatingKey) {
+        collapseSelection();
+        if (event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete) {
+            ensureCaretVisible();
+            viewport()->update();
+            event->accept();
+            return;
+        }
+    }
+
     // Structural keys (Enter split, boundary Backspace/Delete merge,
     // Tab/Shift+Tab list indent) are StructuralKeyHandler's call, not
     // this leaf's — it is the authority and has already applied the
@@ -559,6 +740,22 @@ void View::keyPressEvent(QKeyEvent *event)
         viewport()->update();
         event->accept();
         return;
+    }
+
+    // Shift+move extends the selection (setting an anchor if there wasn't
+    // one); plain move collapses any existing selection to a bare caret.
+    switch (event->key()) {
+    case Qt::Key_Left: case Qt::Key_Right: case Qt::Key_Up: case Qt::Key_Down:
+    case Qt::Key_Home: case Qt::Key_End:
+        if (event->modifiers().testFlag(Qt::ShiftModifier)) {
+            if (!m_selectionAnchor)
+                m_selectionAnchor = m_caret;
+        } else {
+            m_selectionAnchor.reset();
+        }
+        break;
+    default:
+        break;
     }
 
     switch (event->key()) {
@@ -614,7 +811,7 @@ void View::keyPressEvent(QKeyEvent *event)
         break;
     }
 
-    if (Detail::isAcceptableTextInput(event)) {
+    if (isPrintable) {
         insertPrintable(event->text());
         ensureCaretVisible();
         viewport()->update();
@@ -631,6 +828,16 @@ void View::mousePressEvent(QMouseEvent *event)
         const CanvasCursor hit = hitTest(event->pos());
         if (!hit.block.isNull()) {
             setFocus(Qt::MouseFocusReason);
+            // Shift+click extends the existing (or a fresh) selection. A
+            // plain click deliberately does NOT set an anchor here — only
+            // mouseMoveEvent does, lazily, on the first move past this
+            // press. A plain click with no drag must leave hasSelection()
+            // false, or the next keystroke (typing, arrow-without-shift)
+            // would see a stale one-point "selection" and misbehave.
+            if (event->modifiers().testFlag(Qt::ShiftModifier) && !m_selectionAnchor)
+                m_selectionAnchor = m_caret;
+            else if (!event->modifiers().testFlag(Qt::ShiftModifier))
+                m_selectionAnchor.reset();
             setCaret(hit);
             event->accept();
             return;
@@ -639,10 +846,27 @@ void View::mousePressEvent(QMouseEvent *event)
     QAbstractScrollArea::mousePressEvent(event);
 }
 
+void View::mouseMoveEvent(QMouseEvent *event)
+{
+    if (event->buttons().testFlag(Qt::LeftButton) && m_doc && !m_caret.block.isNull()) {
+        const CanvasCursor hit = hitTest(event->pos());
+        if (!hit.block.isNull()) {
+            // First move past the press establishes the anchor at the
+            // press point (already the caret, set in mousePressEvent).
+            if (!m_selectionAnchor)
+                m_selectionAnchor = m_caret;
+            setCaret(hit);
+            event->accept();
+            return;
+        }
+    }
+    QAbstractScrollArea::mouseMoveEvent(event);
+}
+
 void View::mouseReleaseEvent(QMouseEvent *event)
 {
-    // Caret placement happens on press; T5 adds drag-selection extension
-    // on move/release. Accept so the release doesn't propagate as unhandled.
+    // Caret/selection placement happens on press/move; nothing left to do
+    // on release. Accept so it doesn't propagate as unhandled.
     event->accept();
 }
 
@@ -679,6 +903,7 @@ void View::paintEvent(QPaintEvent *event)
     const qreal scrollY    = verticalScrollBar()->value();
     const qreal viewBottom = scrollY + viewport()->height();
     const qreal margin     = pageMargin();
+    const auto  sel        = orderedSelection();
 
     for (const auto &e : m_cache->entries()) {
         if (e.y >= viewBottom)
@@ -721,8 +946,22 @@ void View::paintEvent(QPaintEvent *event)
                        e.style.marker);
         }
 
+        QList<QTextLayout::FormatRange> selections;
+        if (sel) {
+            const auto &[start, end] = *sel;
+            const auto [fromByte, toByte] = selectedByteRangeInBlock(e.id, start, end);
+            if (toByte > fromByte) {
+                const QByteArray blockText = m_doc->blockText(e.id);
+                const int qFrom = int(coords::byteToQtPos(blockText, fromByte));
+                const int qTo   = int(coords::byteToQtPos(blockText, toByte));
+                QTextCharFormat fmt;
+                fmt.setBackground(m_theme.color(Theme::Slot::SelectionBackground));
+                selections.push_back({qFrom, qTo - qFrom, fmt});
+            }
+        }
+
         p.setPen(e.style.foreground);
-        e.layout->draw(&p, QPointF(contentX, contentY));
+        e.layout->draw(&p, QPointF(contentX, contentY), selections);
 
         if (m_hasFocus && e.id == m_caret.block) {
             const QByteArray blockText = m_doc->blockText(e.id);
