@@ -1004,11 +1004,6 @@ void View::inputMethodEvent(QInputMethodEvent *event)
         const QByteArray text = m_doc->blockText(m_caret.block);
         const qsizetype qcharPos = coords::byteToQtPos(text, m_caret.byteOffset);
         m_cache->setPreedit(*m_doc, m_theme, m_caret.block, int(qcharPos), m_preeditText);
-        // FALSIFICATION PLANT (T8, throwaway): write preedit into the
-        // document, which the constitution and E6 both forbid.
-        UndoLog::Transaction ft(m_doc->d2UndoLog());
-        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0,
-                                 m_preeditText.toUtf8(), ft);
     }
 
     ensureCaretVisible();
