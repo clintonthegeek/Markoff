@@ -423,6 +423,72 @@ the tree.
   canvas: `tst_canvas_render`, `tst_canvas_typing`,
   `tst_canvas_structural`, `tst_canvas_undo`, `tst_canvas_constitution`).
 
+**T5 (2026-08-13) — selection + clipboard**
+
+- **A plain click must NOT set the selection anchor — only a drag may,
+  lazily, on the first `mouseMoveEvent` past the press.** First
+  implementation set `m_selectionAnchor = hit` unconditionally on
+  every left-press (reasoning: "it's what a following drag would
+  extend"). That broke T2/T3's own tests: a click-then-type sequence
+  left the anchor sitting at the click point while the caret advanced
+  past it on each keystroke, so the *next* keystroke saw a stale
+  one-block, non-empty `orderedSelection()` and silently routed
+  through `collapseSelection()` instead of plain insertion — observed
+  as `tst_canvas_typing` losing a character and `tst_canvas_structural`
+  failing to merge (the collapse path ran instead of the boundary
+  Backspace). Fix: press only remembers the *caret*; `mouseMoveEvent`
+  is what promotes that caret to an anchor, and only if one doesn't
+  already exist. A click with no drag then leaves `hasSelection()`
+  false, same as before T5 existed. Filed as a caught regression, not
+  shipped — the falsification protocol didn't surface this one
+  (`tst_canvas_typing`/`_structural` aren't E4's falsification target)
+  but the mandatory "run the whole `-R canvas` suite before commit"
+  discipline did. Lesson for T6+: any view-side state added for one
+  exit criterion needs to be re-derivable to inert on every *other*
+  criterion's path, not just correct on its own test.
+- **The anchor needs the same "block vanished → drop it" clamp the
+  caret gets, but dropping (not re-clamping) is the right answer.**
+  Added a check in `onDocumentChanged` alongside `clampCaret`: if the
+  anchor's block didn't survive the edit, the anchor is reset rather
+  than landed on a nearest-surviving block. Unlike the caret (which
+  must always point somewhere, so "nearest surviving" is the only
+  sound answer), a selection whose one endpoint's block vanished
+  under an edit has no principled second endpoint to guess at —
+  dropping it and falling back to a bare caret is honest, and matches
+  the existing choice to reset the anchor around undo/redo (no
+  UndoLog selection state, per queue #10 item 2, same as T4).
+- **Collapsing a cross-block selection reuses `StructuralKeyHandler`
+  for the merge, not new merge logic** (plan's instruction, confirmed
+  in practice): after per-block `d2ApplyBufferEdit` trims the two
+  boundary blocks' selected tails/heads and `d2RemoveBlock` removes
+  any whole blocks in between, the boundary blocks are now
+  content-adjacent, and `StructuralKeyHandler::handle(doc, endBlock,
+  Key_Backspace, NoModifier, 0)` — literally T3's merge call — joins
+  them. `UndoLog::Transaction` nests (`m_isOutermost` tracks depth),
+  so wrapping the whole sequence in one outer `Transaction` and
+  letting the handler open its own inner one still commits as a
+  single undo step, with no transaction object threaded through the
+  call. This only covers Paragraph/Heading merges (the only kind
+  `StructuralKeyHandler` merges via plain Backspace-at-0); a
+  selection spanning an indented ListItem boundary would hit
+  `listItemBackspace`'s outdent branch instead of a merge and leave
+  the collapse partially done (trimmed but not joined) — not
+  exercised by E4's fixture (plain paragraphs), noted here as a gap
+  for the real leaf rather than fixed in the spike.
+- **`QTextLayout::draw()`'s `selections` parameter is the paint-time
+  answer for selection background, not `setFormats()`.** Passing a
+  transient `QList<FormatRange>` straight to `draw()` per paint avoids
+  ever mutating the cached layout for view-only state that changes
+  every mouse-move — no cache invalidation, no interaction with the
+  `(BlockId, seq)` cache-key discipline the rest of the leaf depends
+  on. `setFormats()` would have worked but persists on the `QTextLayout`
+  until explicitly cleared, which is one more piece of state to keep
+  in sync with the anchor by hand; the draw-time parameter needs
+  nothing kept in sync because it's recomputed from `orderedSelection()`
+  every paint.
+- Full suite after T5: **283/283** (277 standstill baseline + 6
+  canvas: adds `tst_canvas_selection`).
+
 ## 10. Verdict (fill at close)
 
 - **Result:** —
