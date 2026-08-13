@@ -225,14 +225,9 @@ void View::clampCaret(int oldCaretIndexHint)
 
     int index = m_cache->indexOf(m_caret.block);
     if (index < 0) {
-        // The caret's block vanished (or there was no caret yet). Land on
-        // the block now occupying roughly the same position — the
-        // "nearest surviving block" clamp the plan calls out as load-
-        // bearing for T4's undo/redo.
-        const int count = int(m_cache->entries().size());
-        index = qBound(0, oldCaretIndexHint < 0 ? 0 : oldCaretIndexHint, count - 1);
-        m_caret.block = m_cache->entries()[size_t(index)].id;
-        m_caret.byteOffset = 0;
+        // FALSIFICATION PLANT (T4, throwaway): skip the "nearest surviving
+        // block" landing when the caret's block has vanished — the caret
+        // is left dangling on a dead BlockId.
         return;
     }
 
