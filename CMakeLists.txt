@@ -11,6 +11,7 @@ project(Markoff VERSION 0.7.0 LANGUAGES CXX)
 #   - libs/markoff-live       (QML live-preview view leaf + Markoff::Live::EditorWidget)
 #   - libs/markoff-source     (QPlainTextEdit-based source widget)
 #   - libs/markoff-styled     (QTextEdit-based inline-styled editor)
+#   - libs/markoff-canvas     (Markoff::Canvas — projection view spike, QTextLayout per block)
 #   - libs/jkqtmathtext       (LaTeX math rendering, vendored)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project.
@@ -74,6 +75,7 @@ endif()
 add_subdirectory(libs/markoff-live)
 add_subdirectory(libs/markoff-source)
 add_subdirectory(libs/markoff-styled)
+add_subdirectory(libs/markoff-canvas)
 
 # Apps (markoff-collab-testapp, future scene-demo) are demo binaries that link
 # Qt::QuickWidgets and other extra components. Default-ON for standalone builds,

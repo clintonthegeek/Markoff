@@ -201,7 +201,45 @@ the tree.
 > anything that changes the cost estimate for the real leaf. On the
 > fail path this section *is* the deliverable.
 
-- *(empty — spike not started)*
+**T0 (2026-08-13) — scaffold + constitution gate**
+
+- **C2 bit within the first hour, in the demo app.** The idiomatic way
+  to make `app/main.cpp` construct-paint-exit under offscreen is
+  `QTimer::singleShot(0, &app, &QCoreApplication::quit)`. Wrote it
+  reflexively; the gate caught it. Replaced with
+  `QCoreApplication::processEvents(); return 0;`. Not a real ordering
+  defer, but the gate makes no exception for demo code and shouldn't:
+  the value of C2 is that the reflex gets interrupted every time. Cost
+  of compliance here: zero. Noting it because "how often does the
+  constitution bite, and how expensive is each bite" is the thing the
+  spike is actually measuring.
+- **The gate must ignore whole-line comments.** First run failed on the
+  leaf's own rationale prose — a comment explaining "C2 forbids
+  `singleShot(0)` here" reads as a `singleShot(0)`, and the CMake
+  comment naming `Qt6::Quick` as forbidden reads as a link to it. A
+  gate that punishes documenting its own rules trains agents to stop
+  documenting them. `check-constitution.sh` now blanks whole-line
+  comments before matching (line numbers preserved). Deliberate
+  asymmetry: C++ preprocessor lines are **not** stripped, so a real
+  `#include <QQuickItem>` is still caught; only CMake treats `#` as a
+  comment marker. A violation can never live on a pure comment line —
+  it is code or a build directive — so no coverage is lost. Hiding a
+  violation from the gate by commenting it out disables the code too.
+- **Grep is not the constraint** (spec §6, C1). The gate is a reflex
+  interrupt, not a proof. T11's honest read of every canvas file is
+  what actually decides C1 — a renamed guard passes this script.
+- **Gate proven falsifiable at T0**, ahead of the per-test protocol:
+  planted one non-comment violation of each of C1/C2/C3/C4 plus a
+  `Qt6::Quick` link line, confirmed all five reported with correct
+  file:line, removed the plant, re-ran clean. The plant was never
+  committed (it does not compile — `applyFlatEdit` has no declaration
+  here — which is itself a small assurance).
+- **Baseline after T0: 279/279** (the 277 standstill baseline + 2
+  canvas tests). No file outside `libs/markoff-canvas/` changed except
+  the root `CMakeLists.txt` registration line and its comment block.
+- Deferred to T1, flagged so it is a decision and not an oversight:
+  `View::paintEvent` is empty, so the widget does not yet paint its own
+  background. Theme-driven background fill lands with the paint path.
 
 ## 10. Verdict (fill at close)
 
