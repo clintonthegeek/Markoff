@@ -59,6 +59,7 @@ private:
     Editor                            *m_editor;
     QPointer<Markoff::FindController>  m_controller;
     QMetaObject::Connection            m_docChangedCon;
+    QMetaObject::Connection            m_themeChangedCon;
     QList<QTextEdit::ExtraSelection>   m_highlights;
 };
 

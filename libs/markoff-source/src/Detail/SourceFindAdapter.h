@@ -2,6 +2,7 @@
 #pragma once
 
 #include <QList>
+#include <QMetaObject>
 #include <QObject>
 #include <QPointer>
 #include <QTextEdit>
@@ -39,6 +40,7 @@ private:
     Editor                                *m_editor;
     QPointer<Markoff::FindController>      m_controller;
     QList<QTextEdit::ExtraSelection>       m_highlights;
+    QMetaObject::Connection                m_themeChangedCon;
 };
 
 }  // namespace Detail

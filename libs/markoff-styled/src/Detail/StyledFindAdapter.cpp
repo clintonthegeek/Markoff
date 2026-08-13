@@ -69,6 +69,8 @@ void StyledFindAdapter::attach(Markoff::FindController *fc)
             this, &StyledFindAdapter::onMatchesChanged);
     connect(m_controller, &Markoff::FindController::navigationRequested,
             this, &StyledFindAdapter::onNavigationRequested);
+    connect(m_controller, &Markoff::FindController::currentMatchChanged,
+            this, &StyledFindAdapter::onMatchesChanged);
     // A model change may rebuild frames/blocks wholesale via the binding's
     // reverse path — re-derive highlight positions from the live document.
     // This connection is made AFTER the binding's (attach follows
@@ -76,6 +78,10 @@ void StyledFindAdapter::attach(Markoff::FindController *fc)
     if (auto *doc = m_editor ? m_editor->document() : nullptr) {
         m_docChangedCon = connect(doc, &Markoff::MarkoffDocument::d2DocumentChanged,
                                   this, &StyledFindAdapter::onMatchesChanged);
+    }
+    if (m_editor) {
+        m_themeChangedCon = connect(m_editor, &Editor::themeChanged,
+                                    this, &StyledFindAdapter::onMatchesChanged);
     }
     onMatchesChanged();
 }
@@ -88,6 +94,10 @@ void StyledFindAdapter::detach()
     if (m_docChangedCon) {
         QObject::disconnect(m_docChangedCon);
         m_docChangedCon = {};
+    }
+    if (m_themeChangedCon) {
+        QObject::disconnect(m_themeChangedCon);
+        m_themeChangedCon = {};
     }
     m_highlights.clear();
     if (auto *te = m_editor ? m_editor->textEdit() : nullptr)
@@ -137,8 +147,12 @@ void StyledFindAdapter::renderHighlights()
         return;
     }
 
+    const Markoff::Theme theme = m_editor->theme();
     QTextCharFormat hlFmt;
-    hlFmt.setBackground(QColor(255, 235, 59, 120));  // soft yellow, theme follow-up
+    hlFmt.setBackground(theme.color(Markoff::Theme::Slot::SearchMatchBackground));
+    QTextCharFormat activeFmt;
+    activeFmt.setBackground(theme.color(Markoff::Theme::Slot::SearchActiveMatchBackground));
+    const int currentIdx = m_controller->currentMatchIndex();
 
     // One frame-aware walk per render; entries are consumed immediately and
     // never cached across model changes (stale QTextBlock handles).
@@ -147,7 +161,9 @@ void StyledFindAdapter::renderHighlights()
         entries.insert(e.blockId, e);
     });
 
-    for (const auto &m : m_controller->matches()) {
+    const auto &matches = m_controller->matches();
+    for (int i = 0; i < matches.size(); ++i) {
+        const auto &m = matches[i];
         const auto it = entries.constFind(m.block);
         if (it == entries.constEnd()) continue;
         const MappedSpan span = spanWithinEntry(*it, m);
@@ -157,7 +173,7 @@ void StyledFindAdapter::renderHighlights()
         cur.setPosition(span.start + span.length, QTextCursor::KeepAnchor);
         QTextEdit::ExtraSelection sel;
         sel.cursor = cur;
-        sel.format = hlFmt;
+        sel.format = (i == currentIdx) ? activeFmt : hlFmt;
         m_highlights.append(sel);
     }
     te->setExtraSelections(m_highlights);

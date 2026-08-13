@@ -324,31 +324,27 @@ opportunistically when next touching the source view.
 
 ---
 
-## #14 — Find-highlight color: theme integration (follow-up from contract-v2 arc)
-
-**Filed 2026-06-10.** All three leaf find adapters
-(`SourceFindAdapter`, `StyledFindAdapter`, `LiveFindAdapter`) use a
-**hardcoded soft yellow** for the find-highlight background (the
-`QTextCharFormat` / `ExtraSelection` color is a literal `QColor`
-constant in each adapter, not drawn from `Markoff::Theme`). The active
-match uses a slightly brighter variant, also hardcoded. `Theme` already
-has `SearchMatchBackground` and `SearchActiveMatchBackground` slots
-(used by the live delegate's `InlineHighlighter`). The fix is to have
-each adapter's `rebuildAndPushSpans`/`updateExtraSelections` read those
-slots from the current theme (subscribe to `MarkdownView::themeChanged`
-or accept a `Theme` reference on attach). Affects all three leaves
-uniformly — bundle as one small task.
-
-**Addendum 2026-06-14 (dark half).** `Theme::defaultDark()` does **not**
-populate `SearchMatchBackground` / `SearchActiveMatchBackground` (only
-`defaultLight()` does). On a dark theme those slots fall back through
-`Theme::color()` to `TextDefault` (the light text color), so the live
-`InlineHighlighter` find-pass paints highlights in the text color rather
-than a distinct search color. Surfaced via the Corbomite Find/Replace
-dogfood (Corbomite's `ThemeService` was separately handing leaves an
-*empty* theme, which made light-mode highlights render black — fixed
-consumer-side). Fix here: add the two search slots to `defaultDark()`
-(and fold into this item's theme-integration pass).
+~~## #14 — Find-highlight color: theme integration (follow-up from contract-v2 arc)~~
+→ closed 2026-08-13. `SourceFindAdapter::renderHighlights` and
+`StyledFindAdapter::renderHighlights` now build their `QTextCharFormat`s
+from `m_editor->theme().color(Theme::Slot::SearchMatchBackground)` /
+`SearchActiveMatchBackground` instead of a hardcoded `QColor(255, 235,
+59, 120)`, matching the live leaf's `InlineHighlighter`. Both adapters
+now also distinguish the current match with the Active slot (index
+compared against `FindController::currentMatchIndex()`, matches()
+order == currentMatchIndex ordering) and re-render on
+`Editor::themeChanged` (new connection, torn down in `detach()`) and on
+`FindController::currentMatchChanged` (previously only `matchesChanged`
+drove a render, so navigating between matches without the set changing
+left the old active-match highlight stale — fixed as part of this pass).
+Dark-half addendum turned out to be already resolved: `Theme::defaultDark()`
+constructs via `Theme t = defaultLight(); ...` (full-slot copy, then
+selective overrides) and never touches `SearchMatchBackground`/
+`SearchActiveMatchBackground`, so both slots already carry real color
+on dark themes, not the `TextDefault` fallback the addendum described.
+`tst_source_find_adapter`, `tst_styled_find_adapter`,
+`tst_live_find_adapter`, `tst_foundation_find_controller` all pass;
+full suite re-run pending.
 
 ---
 

@@ -11,12 +11,11 @@ consumer: Corbomite (submodules this repo at `libs/markoff-family`).
 - **Active workfront:** **MarkdownView contract-v2 arc COMPLETE**, Corbomite
   adoption **done** (see `docs/STATUS.md`). E-arc stays dormant.
 - **Test baseline:** **277/277 (100%)** via the full `scripts/run-tests.sh`
-  (including `tst_realistic` and `tst_benchmark`). Queue #10 is fully
+  (including `tst_realistic` and `tst_benchmark`). Queue #10/#14 are fully
   closed — no known deterministic failures remain.
 - **Open items:** queue #13 (source cursor/selection translation rewrite),
-  queue #14 (find-highlight color theme integration), deferred
-  styled-table editing (in-grid cell edit, row/col ops). Full list:
-  `docs/queue.md`.
+  deferred styled-table editing (in-grid cell edit, row/col ops). Full
+  list: `docs/queue.md`.
 - **Recent history:** dated session banners live in
   [`docs/STATUS-LOG.md`](docs/STATUS-LOG.md) (newest first).
 

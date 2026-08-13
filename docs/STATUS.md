@@ -77,8 +77,10 @@ fixes uncovered (delegate focus-before-cursorPosition ordering;
   have an 11-slot test binary.
 - **#13** — *(retired queue item numbering; was "source cursor/selection
   translation rewrite" — renamed from old TODO.md)*. See queue.md.
-- **#14** — find-highlight color hardcoded soft yellow in all three leaf
-  adapters; theme-integration follow-up.
+- ~~**#14**~~ — closed 2026-08-13: `SourceFindAdapter`/`StyledFindAdapter`
+  now read `Theme::Slot::SearchMatchBackground`/`SearchActiveMatchBackground`
+  instead of a hardcoded soft yellow, matching the live leaf; both also
+  gained active-match distinction and re-render on `themeChanged`.
 - ~~**#15**~~ — closed 2026-08-12: `Cmd::changeKind`'s real code path
   (`d2SetBlockKind`) never bumped `structuralEditSequence`; fixed, both
   leaves now recompute `contextChanged` on structural change without a

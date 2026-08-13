@@ -28,6 +28,12 @@ void SourceFindAdapter::attach(Markoff::FindController *fc)
             this, &SourceFindAdapter::onMatchesChanged);
     connect(m_controller, &Markoff::FindController::navigationRequested,
             this, &SourceFindAdapter::onNavigationRequested);
+    connect(m_controller, &Markoff::FindController::currentMatchChanged,
+            this, &SourceFindAdapter::onMatchesChanged);
+    if (m_editor) {
+        m_themeChangedCon = connect(m_editor, &Editor::themeChanged,
+                                    this, &SourceFindAdapter::onMatchesChanged);
+    }
     onMatchesChanged();
 }
 
@@ -36,6 +42,10 @@ void SourceFindAdapter::detach()
     if (!m_controller) return;
     disconnect(m_controller, nullptr, this, nullptr);
     m_controller = nullptr;
+    if (m_themeChangedCon) {
+        QObject::disconnect(m_themeChangedCon);
+        m_themeChangedCon = {};
+    }
     m_highlights.clear();
     if (auto *pte = m_editor ? m_editor->plainTextEdit() : nullptr)
         pte->setExtraSelections({});
@@ -65,10 +75,16 @@ void SourceFindAdapter::renderHighlights()
         if (pte) pte->setExtraSelections({});
         return;
     }
+    const Markoff::Theme theme = m_editor->theme();
     QTextCharFormat hlFmt;
-    hlFmt.setBackground(QColor(255, 235, 59, 120));  // soft yellow, theme follow-up
+    hlFmt.setBackground(theme.color(Markoff::Theme::Slot::SearchMatchBackground));
+    QTextCharFormat activeFmt;
+    activeFmt.setBackground(theme.color(Markoff::Theme::Slot::SearchActiveMatchBackground));
+    const int currentIdx = m_controller->currentMatchIndex();
     auto *doc = m_editor->document();
-    for (const auto &m : m_controller->matches()) {
+    const auto &matches = m_controller->matches();
+    for (int i = 0; i < matches.size(); ++i) {
+        const auto &m = matches[i];
         const int globalPos = globalCharPosFor(m);
         const QByteArray blockText = doc ? doc->blockText(m.block) : QByteArray();
         const int blockCharLen = QString::fromUtf8(
@@ -79,7 +95,7 @@ void SourceFindAdapter::renderHighlights()
         cur.setPosition(globalPos + blockCharLen, QTextCursor::KeepAnchor);
         QTextEdit::ExtraSelection sel;
         sel.cursor = cur;
-        sel.format = hlFmt;
+        sel.format = (i == currentIdx) ? activeFmt : hlFmt;
         m_highlights.append(sel);
     }
     pte->setExtraSelections(m_highlights);
