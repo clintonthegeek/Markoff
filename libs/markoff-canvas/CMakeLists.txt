@@ -22,6 +22,10 @@ add_library(markoff_canvas STATIC
     src/BlockLayoutCache.cpp
     src/BlockPresentation.h
     src/BlockPresentation.cpp
+    src/Coordinates.h
+    src/Coordinates.cpp
+    src/InputPredicate.h
+    src/InputPredicate.cpp
 )
 
 target_include_directories(markoff_canvas

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/canvas/View.h>
 
+#include <QFocusEvent>
 #include <QFontMetricsF>
 #include <QKeyEvent>
+#include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
 #include <QResizeEvent>
@@ -10,8 +12,13 @@
 #include <QtMath>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/UndoLog.h>
 
 #include "BlockLayoutCache.h"
+#include "Coordinates.h"
+#include "InputPredicate.h"
+
+namespace coords = Markoff::Canvas::Detail::Coordinates;
 
 namespace Markoff::Canvas {
 
@@ -46,6 +53,7 @@ void View::setDocument(MarkoffDocument *doc)
 
     m_doc = doc;
     m_cache->clear();
+    m_caret = {};
 
     if (m_doc) {
         // d2DocumentChanged is the truth feed. Consuming the document's own
@@ -109,6 +117,16 @@ QRectF View::blockRect(BlockId id) const
 quint64 View::paintCount() const
 {
     return m_paintCount;
+}
+
+BlockId View::caretBlock() const
+{
+    return m_caret.block;
+}
+
+int View::caretByteOffset() const
+{
+    return m_caret.byteOffset;
 }
 
 // ---- Geometry -----------------------------------------------------------
@@ -183,12 +201,246 @@ void View::ensureLayoutForViewport()
 
 void View::onDocumentChanged()
 {
+    const int oldCaretIndex = m_cache->indexOf(m_caret.block);
+
     if (m_doc) {
         m_cache->setTextWidth(textWidth());
         m_cache->sync(*m_doc, m_theme);
     }
+    clampCaret(oldCaretIndex);
     ensureLayoutForViewport();
     viewport()->update();
+}
+
+// ---- Caret / editing (T2) ------------------------------------------------
+
+void View::clampCaret(int oldCaretIndexHint)
+{
+    if (!m_doc || m_cache->entries().empty()) {
+        m_caret = {};
+        return;
+    }
+
+    int index = m_cache->indexOf(m_caret.block);
+    if (index < 0) {
+        // The caret's block vanished (or there was no caret yet). Land on
+        // the block now occupying roughly the same position — the
+        // "nearest surviving block" clamp the plan calls out as load-
+        // bearing for T4's undo/redo.
+        const int count = int(m_cache->entries().size());
+        index = qBound(0, oldCaretIndexHint < 0 ? 0 : oldCaretIndexHint, count - 1);
+        m_caret.block = m_cache->entries()[size_t(index)].id;
+        m_caret.byteOffset = 0;
+        return;
+    }
+
+    const int size = m_doc->blockText(m_caret.block).size();
+    m_caret.byteOffset = qBound(0, m_caret.byteOffset, size);
+}
+
+CanvasCursor View::hitTest(const QPoint &viewportPos) const
+{
+    if (!m_doc || m_cache->entries().empty())
+        return {};
+
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal docY    = viewportPos.y() + scrollY;
+    const int idx = m_cache->indexAtY(docY);
+    if (idx < 0)
+        return {};
+
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout || e.style.isRule)
+        return CanvasCursor{e.id, 0};
+
+    const qreal contentX = pageMargin() + e.style.leftIndent;
+    const qreal contentY = (e.y - scrollY) + e.style.topMargin;
+    const qreal localX   = viewportPos.x() - contentX;
+    const qreal localY   = viewportPos.y() - contentY;
+
+    QTextLine line = e.layout->lineAt(0);
+    for (int i = 0; i < e.layout->lineCount(); ++i) {
+        QTextLine l = e.layout->lineAt(i);
+        line = l;
+        if (localY < l.y() + l.height())
+            break;
+    }
+
+    const int qcharPos = line.isValid() ? line.xToCursor(localX) : 0;
+    const QByteArray text = m_doc->blockText(e.id);
+    const int byteOff = int(coords::qtPosToByte(text, qcharPos));
+    return CanvasCursor{e.id, byteOff};
+}
+
+void View::setCaret(const CanvasCursor &caret)
+{
+    m_caret = caret;
+    ensureCaretVisible();
+    viewport()->update();
+}
+
+void View::ensureCaretVisible()
+{
+    if (!m_doc || m_caret.block.isNull())
+        return;
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return;
+
+    const auto &e = m_cache->entries()[size_t(idx)];
+    QScrollBar *vbar = verticalScrollBar();
+    const qreal viewportH = viewport()->height();
+
+    if (e.y < vbar->value())
+        vbar->setValue(qFloor(e.y));
+    else if (e.y + e.height > vbar->value() + viewportH)
+        vbar->setValue(qCeil(e.y + e.height - viewportH));
+}
+
+void View::insertPrintable(const QString &text)
+{
+    if (!m_doc || m_caret.block.isNull() || text.isEmpty())
+        return;
+
+    const QByteArray insert = text.toUtf8();
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0, insert, t);
+    m_caret.byteOffset += insert.size();
+}
+
+void View::deleteCluster(bool forward)
+{
+    if (!m_doc || m_caret.block.isNull())
+        return;
+
+    const QByteArray text = m_doc->blockText(m_caret.block);
+    const QString qtext = QString::fromUtf8(text);
+    const int qcharPos = int(coords::byteToQtPos(text, m_caret.byteOffset));
+
+    if (forward) {
+        if (qcharPos >= qtext.size())
+            return;  // at block end: T3's job (merge with next block)
+        QTextLayout layout(qtext);
+        const int next = layout.nextCursorPosition(qcharPos);
+        const int removed = int(coords::qtPosToByte(text, next))
+                           - m_caret.byteOffset;
+        UndoLog::Transaction t(m_doc->d2UndoLog());
+        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset),
+                                 uint32_t(removed), QByteArray(), t);
+    } else {
+        if (qcharPos <= 0)
+            return;  // at block start: T3's job (merge with previous block)
+        QTextLayout layout(qtext);
+        const int prev = layout.previousCursorPosition(qcharPos);
+        const int prevByte = int(coords::qtPosToByte(text, prev));
+        const int removed = m_caret.byteOffset - prevByte;
+        UndoLog::Transaction t(m_doc->d2UndoLog());
+        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(prevByte),
+                                 uint32_t(removed), QByteArray(), t);
+        m_caret.byteOffset = prevByte;
+    }
+}
+
+void View::moveCaretHorizontally(bool forward)
+{
+    if (!m_doc || m_caret.block.isNull())
+        return;
+
+    const QByteArray text = m_doc->blockText(m_caret.block);
+    const QString qtext = QString::fromUtf8(text);
+    const int qcharPos = int(coords::byteToQtPos(text, m_caret.byteOffset));
+
+    if (forward) {
+        if (qcharPos >= qtext.size()) {
+            const int idx = m_cache->indexOf(m_caret.block);
+            if (idx >= 0 && idx + 1 < int(m_cache->entries().size())) {
+                m_caret.block = m_cache->entries()[size_t(idx + 1)].id;
+                m_caret.byteOffset = 0;
+            }
+            return;
+        }
+        QTextLayout layout(qtext);
+        const int next = layout.nextCursorPosition(qcharPos);
+        m_caret.byteOffset = int(coords::qtPosToByte(text, next));
+    } else {
+        if (qcharPos <= 0) {
+            const int idx = m_cache->indexOf(m_caret.block);
+            if (idx > 0) {
+                const auto &prevEntry = m_cache->entries()[size_t(idx - 1)];
+                m_caret.block = prevEntry.id;
+                m_caret.byteOffset = m_doc->blockText(prevEntry.id).size();
+            }
+            return;
+        }
+        QTextLayout layout(qtext);
+        const int prev = layout.previousCursorPosition(qcharPos);
+        m_caret.byteOffset = int(coords::qtPosToByte(text, prev));
+    }
+}
+
+void View::moveCaretToLineEdge(bool home)
+{
+    if (!m_doc || m_caret.block.isNull())
+        return;
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return;
+
+    const QByteArray text = m_doc->blockText(m_caret.block);
+    const int qcharPos = int(coords::byteToQtPos(text, m_caret.byteOffset));
+    const QTextLine line = e.layout->lineForTextPosition(qcharPos);
+    if (!line.isValid())
+        return;
+
+    const int edgeQChar = home ? line.textStart() : line.textStart() + line.textLength();
+    m_caret.byteOffset = int(coords::qtPosToByte(text, edgeQChar));
+}
+
+void View::moveCaretVertically(bool forward)
+{
+    if (!m_doc || m_caret.block.isNull())
+        return;
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return;
+
+    const QByteArray text = m_doc->blockText(m_caret.block);
+    const int qcharPos = int(coords::byteToQtPos(text, m_caret.byteOffset));
+    const QTextLine curLine = e.layout->lineForTextPosition(qcharPos);
+    const int lineNo = curLine.isValid() ? curLine.lineNumber() : 0;
+    const qreal x = curLine.isValid() ? curLine.cursorToX(qcharPos) : 0;
+
+    const int targetLineNo = lineNo + (forward ? 1 : -1);
+    if (targetLineNo >= 0 && targetLineNo < e.layout->lineCount()) {
+        const QTextLine targetLine = e.layout->lineAt(targetLineNo);
+        const int newQChar = targetLine.xToCursor(x);
+        m_caret.byteOffset = int(coords::qtPosToByte(text, newQChar));
+        return;
+    }
+
+    // Off the top/bottom of this block's layout: cross into the
+    // previous/next block, landing near the same x on its nearest edge
+    // line. Exact column affinity is not a criterion (plan T2).
+    const int nextIdx = idx + (forward ? 1 : -1);
+    if (nextIdx < 0 || nextIdx >= int(m_cache->entries().size()))
+        return;
+
+    const auto &target = m_cache->entries()[size_t(nextIdx)];
+    m_caret.block = target.id;
+    if (!target.layout || target.layout->lineCount() == 0) {
+        m_caret.byteOffset = 0;
+        return;
+    }
+    const QTextLine edgeLine = target.layout->lineAt(forward ? 0 : target.layout->lineCount() - 1);
+    const int newQChar = edgeLine.xToCursor(x);
+    const QByteArray targetText = m_doc->blockText(target.id);
+    m_caret.byteOffset = int(coords::qtPosToByte(targetText, newQChar));
 }
 
 // ---- Events -------------------------------------------------------------
@@ -223,8 +475,8 @@ void View::keyPressEvent(QKeyEvent *event)
     QScrollBar *vbar = verticalScrollBar();
     const bool ctrl = event->modifiers().testFlag(Qt::ControlModifier);
 
-    // T1 is read-only, so the arrow keys scroll. T2 takes them back for
-    // caret motion and leaves only the page/document keys here.
+    // Page/document-jump keys stay scroll actions even with a caret in
+    // play; T1's un-modified Up/Down/Home/End become caret motion below.
     switch (event->key()) {
     case Qt::Key_PageDown:
         vbar->triggerAction(QAbstractSlider::SliderPageStepAdd);
@@ -248,19 +500,112 @@ void View::keyPressEvent(QKeyEvent *event)
             return;
         }
         break;
-    case Qt::Key_Down:
-        vbar->triggerAction(QAbstractSlider::SliderSingleStepAdd);
+    default:
+        break;
+    }
+
+    if (!m_doc || m_caret.block.isNull()) {
+        QAbstractScrollArea::keyPressEvent(event);
+        return;
+    }
+
+    switch (event->key()) {
+    case Qt::Key_Left:
+        moveCaretHorizontally(false);
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    case Qt::Key_Right:
+        moveCaretHorizontally(true);
+        ensureCaretVisible();
+        viewport()->update();
         event->accept();
         return;
     case Qt::Key_Up:
-        vbar->triggerAction(QAbstractSlider::SliderSingleStepSub);
+        moveCaretVertically(false);
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    case Qt::Key_Down:
+        moveCaretVertically(true);
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    case Qt::Key_Home:
+        moveCaretToLineEdge(true);
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    case Qt::Key_End:
+        moveCaretToLineEdge(false);
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    case Qt::Key_Backspace:
+        deleteCluster(false);
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    case Qt::Key_Delete:
+        deleteCluster(true);
+        ensureCaretVisible();
+        viewport()->update();
         event->accept();
         return;
     default:
         break;
     }
 
+    if (Detail::isAcceptableTextInput(event)) {
+        insertPrintable(event->text());
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    }
+
     QAbstractScrollArea::keyPressEvent(event);
+}
+
+void View::mousePressEvent(QMouseEvent *event)
+{
+    if (event->button() == Qt::LeftButton && m_doc) {
+        const CanvasCursor hit = hitTest(event->pos());
+        if (!hit.block.isNull()) {
+            setFocus(Qt::MouseFocusReason);
+            setCaret(hit);
+            event->accept();
+            return;
+        }
+    }
+    QAbstractScrollArea::mousePressEvent(event);
+}
+
+void View::mouseReleaseEvent(QMouseEvent *event)
+{
+    // Caret placement happens on press; T5 adds drag-selection extension
+    // on move/release. Accept so the release doesn't propagate as unhandled.
+    event->accept();
+}
+
+void View::focusInEvent(QFocusEvent *event)
+{
+    QAbstractScrollArea::focusInEvent(event);
+    m_hasFocus = true;
+    viewport()->update();
+}
+
+void View::focusOutEvent(QFocusEvent *event)
+{
+    QAbstractScrollArea::focusOutEvent(event);
+    m_hasFocus = false;
+    viewport()->update();
 }
 
 void View::paintEvent(QPaintEvent *event)
@@ -326,6 +671,13 @@ void View::paintEvent(QPaintEvent *event)
 
         p.setPen(e.style.foreground);
         e.layout->draw(&p, QPointF(contentX, contentY));
+
+        if (m_hasFocus && e.id == m_caret.block) {
+            const QByteArray blockText = m_doc->blockText(e.id);
+            const int qcharPos = int(coords::byteToQtPos(blockText, m_caret.byteOffset));
+            p.setPen(m_theme.color(Theme::Slot::CursorPrimary));
+            e.layout->drawCursor(&p, QPointF(contentX, contentY), qcharPos);
+        }
     }
 }
 
