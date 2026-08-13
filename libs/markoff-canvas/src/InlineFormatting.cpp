@@ -23,9 +23,7 @@ bool delimiterShouldHide(const SourceSpan &span, int caretQCharOrNegative)
     if (span.isTag || span.isListMarker || span.isBlockquoteMarker)
         return false;
 
-    if (caretQCharOrNegative >= 0 &&
-        caretQCharOrNegative >= span.parentCharStart - 1 &&
-        caretQCharOrNegative <= span.parentCharEnd + 1) {
+    if (true) {
         return false;
     }
 
