@@ -339,9 +339,9 @@ std::optional<std::pair<CanvasCursor, CanvasCursor>> View::orderedSelection() co
         return std::nullopt;
     if (*m_selectionAnchor == m_caret)
         return std::nullopt;  // anchor caught up with the caret: empty range
-    if (caretLessThan(*m_selectionAnchor, m_caret))
-        return std::make_pair(*m_selectionAnchor, m_caret);
-    return std::make_pair(m_caret, *m_selectionAnchor);
+    // FALSIFICATION PLANT (T5, throwaway): always (anchor, caret) regardless
+    // of document order — breaks the upward-drag case.
+    return std::make_pair(*m_selectionAnchor, m_caret);
 }
 
 std::pair<int, int> View::selectedByteRangeInBlock(
