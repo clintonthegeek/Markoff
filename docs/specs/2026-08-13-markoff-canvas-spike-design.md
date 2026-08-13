@@ -170,7 +170,7 @@ commit SHA in the table on completion.
 | E5 | Kind transition: typing `# ` at byte 0 of a paragraph promotes it to Heading without losing focus or caret; the block re-renders in heading style. | `hash_space_promotes_heading_caret_survives` |
 | E6 | IME: the five audit-L7 scenarios (commit-after-preedit, preedit-replace-commit, cancelled composition, commit into non-empty block, lifecycle probe) pass via `QInputMethodEvent`, with preedit visibly rendered (asserted via the layout's format ranges, not a screenshot). | `tst_canvas_ime` (5 slots) |
 | E7 | Delimiter visibility: `**bold**` renders with delimiters hidden and content styled when the caret is outside the span; moving the caret into the span reveals the delimiters; editing while revealed round-trips correctly. | `delimiter_visibility_follows_caret` |
-| E8 | Minimal table: caret can enter a cell by mouse, typing edits that cell's buffer only, adjacent cells and the following block are unaffected, and no crash on cell edit + repaint (the QML-Repeater UAF class must have no analogue). | `table_cell_edit_isolated` |
+| E8 | Minimal table: caret can enter a cell by mouse, typing edits that cell's buffer only, adjacent cells and the following block are unaffected, and no crash on cell edit + repaint (the QML-Repeater UAF class must have no analogue). | `tst_canvas_table` |
 | E9 | **Perf** (offscreen, release build, `-j 4` build cap per standing rule): on a 500-block synthetic document — load-to-first-paint < 500 ms; p95 keystroke→paint < 16 ms over a 200-keystroke run mid-document; scroll through the full document without layout of all blocks (assert the cache realized < 30% of blocks); RSS delta for the widget < 100 MB. Bench binary modeled on `tst_live_render_table_typing_perf`. | `tst_canvas_perf_500` |
 | E10 | **Constitution**: `check-constitution.sh` passes on the final spike tree (C1–C4). | grep gate in CI |
 
@@ -679,6 +679,66 @@ the tree.
   as the falsification being too weak).
 - Full suite after T8: **286/286** (277 standstill baseline + 9
   canvas: adds `tst_canvas_ime`).
+
+**T9 (2026-08-13) — minimal table**
+
+- **Both existing pipe-table parsers are leaf-private, exactly as the
+  plan anticipated.** `markoff-parser`'s `TableHandler::detectTables`
+  takes a `QTextDocument*` and returns `QTextTable*` — architecturally
+  uncopyable here outright (C3). `markoff-live`'s actual tokenizer
+  (`parsedTable`, the thing `TableEditBinding::applyCellEdit`'s
+  `cellCharRanges` doc comment references) is not C++ at all — it's
+  `TableDelegate.qml`'s `parseTable()` JS function, never exposed
+  through any Q_INVOKABLE. Logged per the plan's contingency: wrote a
+  from-scratch byte-oriented tokenizer (`TableGeometry.{h,cpp}`)
+  against `blockText()` alone. Mirrors the live leaf's algorithm
+  (header row, alignment row consumed, GFM short/long-row tolerance)
+  but works in UTF-8 bytes directly rather than QString/QChar — `|`
+  and `\n` are single-byte ASCII and never occur as UTF-8 continuation
+  bytes, so the tokenizer's positions ARE buffer byte offsets with no
+  qtPosToByte round-trip, unlike the QString-based live-leaf
+  equivalent. A smaller, more C4-native version of the same parser,
+  not a port.
+- **The "one coordinate space" rule (C4) needed zero table-specific
+  exceptions.** The caret stayed `{BlockId, byteOffset}` exactly as
+  T2 defined it; a click inside a cell resolves to an absolute
+  block-relative byte offset (cell's start byte + in-cell offset), and
+  every existing editing path — `insertPrintable`, `deleteCluster`,
+  the structural-key route — worked against it completely unchanged.
+  Byte-level cluster-boundary math doesn't care that the bytes it's
+  walking happen to sit between two pipe characters. The only new
+  code is where a table block *differs* from a flat block: hit-testing
+  (`hitTestTable`, locate row/col from cumulative geometry, then
+  hit-test inside that cell's own layout) and painting (`paintTable`,
+  grid lines + per-cell `draw()`/`drawCursor()`). This is the
+  strongest confirmation yet of the decision record's C4 bet: even a
+  structurally irregular block (a 2-D grid inside a document that is
+  otherwise a 1-D sequence of blocks) didn't need to leak its shape
+  into the coordinate space.
+- **No single per-block `QTextLayout` for a Table entry** — `realize()`
+  dispatches to `realizeTable()` instead, which builds one
+  `QTextLayout` per cell (no-wrap, single line; wrapping inside a
+  cell is out of spike scope) plus per-column/per-row geometry
+  (`tableColWidths`/`tableRowHeights`, natural-width-capped at a fixed
+  240px budget — the plan's "column width = max cell natural width,
+  capped"). Every other per-block code path that assumes a single
+  `e.layout` (line-based caret motion, Home/End, vertical arrow
+  crossing) already null-checks `e.layout` and no-ops for a null one;
+  Table entries fall through those checks for free rather than
+  needing an `isTable` guard added to each — the existing "unrealized
+  or nonexistent layout" case and "this is a table" case look
+  identical from their point of view, and both correctly do nothing.
+  Row/col navigation and alignment are explicitly out of scope (plan
+  T9), so this is a feature of the design, not a gap being papered
+  over.
+- Falsification: misrouted `hitTestTable`'s resolved column to its
+  neighbor (`col + 1`, clamped) before building the returned caret.
+  `table_cell_edit_isolated` failed as expected — the click landed
+  outside the target cell's byte range, caught by the test's own
+  "click resolved somewhere inside the clicked cell's known content"
+  assertion before the edit even ran.
+- Full suite after T9: **287/287** (277 standstill baseline + 10
+  canvas: adds `tst_canvas_table`).
 
 ## 10. Verdict (fill at close)
 

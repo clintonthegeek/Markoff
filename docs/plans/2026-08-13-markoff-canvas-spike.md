@@ -193,7 +193,7 @@ Fill SHAs as you go. "Fals." = falsification throwaway commit SHA
 | T6 kind transitions (E5) | ☑ | `b0e030f3` | `9eb50708` / `72f9d34a` |
 | T7 inline spans + delimiter visibility (E7) | ☑ | `645b23ab` | `c3f2fb82` / `52656a65` |
 | T8 IME (E6) | ☑ | `fd7b71d0` | `6771103f` / `8f04a5ae` |
-| T9 minimal table (E8) | ☐ | — | — |
+| T9 minimal table (E8) | ☑ | `3d60bf72` | `fd3565a7` / `50b5e1a4` |
 | T10 perf harness (E9) | ☐ | — | — |
 | T11 constitution audit + verdict (E10) | ☐ | — | n/a |
 
