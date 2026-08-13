@@ -42,7 +42,6 @@ add_library(markoff_core STATIC
     include/markoff/core/CompletionTrigger.h
     include/markoff/core/CompletionContext.h
     include/markoff/core/CompletionCandidate.h
-    include/markoff/core/CompletionDetector.h
     include/markoff/core/CompletionProvider.h
     include/markoff/core/CompletionRegistry.h
     include/markoff/core/EmojiCompletionProvider.h
@@ -75,7 +74,6 @@ add_library(markoff_core STATIC
     src/SearchEngine.cpp
     src/FindController.cpp
     src/CodeBlockProcessorRegistry.cpp
-    src/CompletionDetector.cpp
     src/CompletionProvider.cpp
     src/CompletionRegistry.cpp
     src/EmojiCompletionProvider.cpp

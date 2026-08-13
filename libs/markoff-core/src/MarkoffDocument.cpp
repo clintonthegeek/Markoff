@@ -2224,6 +2224,19 @@ QByteArray markerForListItem(const QHash<Markoff::AttrName, Markoff::AttrValue> 
     return "-";  // fallback
 }
 
+// Indent bytes + marker + trailing space, e.g. "  - " or "1. ". Shared by
+// serializeForSave() and MarkoffDocument::listItemDisplayMarker() — single
+// source of truth for how a ListItem's marker prefix is reconstructed.
+QByteArray indentAndMarkerForListItem(const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs)
+{
+    using namespace Markoff::AttrNames;
+    int indent = 0;
+    auto indIt = attrs.constFind(IndentLevel);
+    if (indIt != attrs.cend()) indent = std::get<int>(indIt.value());
+    const QByteArray indentBytes(std::max(0, indent) * 3, ' ');
+    return indentBytes + markerForListItem(attrs) + " ";
+}
+
 QByteArray serializeFrontmatter(const Markoff::FrontmatterMap &fm)
 {
     auto raw = fm.get("raw");
@@ -2322,23 +2335,17 @@ QByteArray MarkoffDocument::serializeForSave() const
         if (kind == BlockKind::ListItem) {
             const auto attrs = blockAttrs(id);
 
-            int indent = 0;
-            auto indIt = attrs.constFind(AttrNames::IndentLevel);
-            if (indIt != attrs.cend()) indent = std::get<int>(indIt.value());
-
             bool looseRun = false;
             auto looseIt = attrs.constFind(AttrNames::LooseRun);
             if (looseIt != attrs.cend()) looseRun = std::get<bool>(looseIt.value());
 
-            const QByteArray indentBytes(std::max(0, indent) * 3, ' ');
-            const QByteArray marker = markerForListItem(attrs);
             const QByteArray content = blockText(id);
 
             // Emit: <indent><marker> <content>  (separator is added below).
             // ListItem-in-quote: prepend depth × '> ' (TODO v0.2: per-line
             // wrap once continuation lines are supported; v0 buffer is
             // single-line).
-            QByteArray line = indentBytes + marker + " " + content;
+            QByteArray line = indentAndMarkerForListItem(attrs) + content;
             if (depthI > 0) line = blockQuotePrefix(depthI) + line;
             out += line;
 
@@ -2469,6 +2476,12 @@ QByteArray MarkoffDocument::widgetFlatView() const
             out += '\n';  // single-byte WP separator
     }
     return out;
+}
+
+QByteArray MarkoffDocument::listItemDisplayMarker(BlockId id) const
+{
+    if (blockKind(id) != BlockKind::ListItem) return {};
+    return indentAndMarkerForListItem(blockAttrs(id));
 }
 
 bool MarkoffDocument::save(const QString &path)

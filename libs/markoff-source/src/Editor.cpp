@@ -130,6 +130,10 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         QObject::disconnect(m_paragraphMarginsCon);
         m_paragraphMarginsCon = {};
     }
+    if (m_listMarkerCon) {
+        QObject::disconnect(m_listMarkerCon);
+        m_listMarkerCon = {};
+    }
     // Disconnect stale context connections.
     if (m_contextD2Con) {
         QObject::disconnect(m_contextD2Con);
@@ -149,6 +153,9 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         m_paragraphMarginsCon = QObject::connect(
             doc, &Markoff::MarkoffDocument::d2DocumentChanged,
             this, &Editor::applyParagraphMargins);
+        m_listMarkerCon = QObject::connect(
+            doc, &Markoff::MarkoffDocument::d2DocumentChanged,
+            this, &Editor::applyListItemMarkerDecorations);
         // Wire context-refresh. Reset the sentinel so the first cursor
         // movement after setDocument() always emits contextChanged.
         m_lastContext = Markoff::EditorContext{};
@@ -165,6 +172,7 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         // Initial pass — the binding seeded qdoc from widgetFlatView in
         // setMarkoffDocument; margins for the initial blocks need to land too.
         applyParagraphMargins();
+        applyListItemMarkerDecorations();
     } else {
         m_binding->setMarkoffDocument(nullptr);
     }
@@ -239,6 +247,9 @@ void Editor::setFontScale(qreal s) {
         recomputeGutterWidth();
     }
     applyParagraphMargins();
+    // Marker pixel width depends on font metrics — refresh the reserved
+    // left margin + repaint after a font-scale change.
+    applyListItemMarkerDecorations();
 }
 
 bool Editor::isReadOnly() const { return m_editor->isReadOnly(); }
@@ -466,6 +477,53 @@ void Editor::applyParagraphMargins()
         c.setBlockFormat(bf);
     }
     c.endEditBlock();
+}
+
+void Editor::applyListItemMarkerDecorations()
+{
+    if (!m_editor) return;
+    QTextDocument *qdoc = m_editor->document();
+    if (!qdoc) return;
+    auto *doc = m_binding->markoffDocument();
+    if (!doc) return;
+
+    const auto blocks = doc->iterateBlocks();
+
+    QHash<int, QString> markers;
+    QTextCursor c(qdoc);
+    QSignalBlocker block(qdoc);   // do NOT loop back through the binding
+    c.beginEditBlock();
+
+    const QFontMetrics fm(m_editor->font());
+    int i = 0;
+    for (QTextBlock b = qdoc->begin(); b.isValid() && i < static_cast<int>(blocks.size());
+         b = b.next(), ++i) {
+        const QByteArray marker = doc->listItemDisplayMarker(blocks[i]);
+        c.setPosition(b.position());
+        QTextBlockFormat bf = b.blockFormat();
+        if (marker.isEmpty()) {
+            if (bf.leftMargin() != 0.0) {
+                bf.setLeftMargin(0.0);
+                c.setBlockFormat(bf);
+            }
+            continue;
+        }
+        const QString markerText = QString::fromUtf8(marker);
+        markers.insert(b.blockNumber(), markerText);
+        const qreal width = fm.horizontalAdvance(markerText) + 2.0;
+        if (bf.leftMargin() != width) {
+            bf.setLeftMargin(width);
+            c.setBlockFormat(bf);
+        }
+    }
+    c.endEditBlock();
+
+    static_cast<InnerEditor *>(m_editor)->setListItemMarkers(markers);
+}
+
+QString Editor::listItemMarkerForBlock(int blockNumber) const
+{
+    return static_cast<InnerEditor *>(m_editor)->listItemMarkerForBlock(blockNumber);
 }
 
 } // namespace Markoff::Source

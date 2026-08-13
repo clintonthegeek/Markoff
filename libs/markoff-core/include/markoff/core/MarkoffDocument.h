@@ -229,6 +229,20 @@ public:
     /// content blocks).
     QByteArray widgetFlatView() const;
 
+    /// The raw-markdown marker (indent + bullet/number/task-box + a single
+    /// space) that a `ListItem` block's `serializeForSave()` output carries
+    /// but its `blockText()`/`widgetFlatView()` segment does NOT — the
+    /// parser harvest narrows `ListItem` byte ranges to post-marker content
+    /// before the buffer is ever populated, unlike every other BlockKind
+    /// (whose markers stay inline in the buffer). Returns an empty
+    /// `QByteArray` for any non-ListItem block. Reuses the exact
+    /// reconstruction rules `serializeForSave()` uses — single source of
+    /// truth, no duplicated marker logic. Intended for display-only
+    /// decoration (queue #8.3;
+    /// docs/specs/2026-06-16-source-listitem-marker-decoration-design.md) —
+    /// NOT part of the edited flat-view byte space.
+    QByteArray listItemDisplayMarker(BlockId id) const;
+
     /// Structure-aware paste. Serializes `blocks` (a QJsonArray of block
     /// objects with "kind", "text", and optional "attrs") to flat markdown
     /// and calls applyFlatEdit on the byte range [startByte, endByte).
