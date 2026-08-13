@@ -39,19 +39,16 @@ contention, not a correctness regression).
 
 ## Test baseline
 
-**272/274** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
-(re-verified 2026-08-12). Queue #10 triage closed 2/6 previously-failing
-slots this session (`tst_live_render_e2_nav_shift_extend`, both slots —
-reshaped to match `LiveNavigationController`'s correct current
-behavior). The 2 remaining failing binaries
-— `tst_live_render_focus_chokepoint_invariant` (3 slots: undo/redo
-caret restoration, needs a `UndoLog` selection-snapshot extension) and
-`tst_live_render_cursor_typing_invariant` (1 slot: paste-without-
-selection silently no-ops, needs a `LiveCursorState`/
-`LiveClipboardController` decision) — are **deterministic, not
-flakes**, diagnosed in detail in queue #10 with a concrete next step
-for each. `tst_realistic` passes; `tst_benchmark` excluded from the
-fast loop for time.
+**277/277 (100%)** via the full `scripts/run-tests.sh` (including
+`tst_realistic` and `tst_benchmark`), verified 2026-08-13. Queue #10
+is fully closed — all 6 previously-failing slots across
+`tst_live_render_focus_chokepoint_invariant` and
+`tst_live_render_cursor_typing_invariant` are green; the "known
+failures" language is retired. See queue.md #10 for the two
+architectural decisions (chokepoint-owns-caret-after-undo;
+collapsed-cursor-is-a-valid-paste-target) and the two extra bugs those
+fixes uncovered (delegate focus-before-cursorPosition ordering;
+`applyFlatEdit`'s block-boundary byte-ambiguity).
 
 ## Arc dispositions
 
@@ -67,20 +64,27 @@ fast loop for time.
 
 - ~~**#8.3**~~ — closed 2026-08-12: source-view list-item markers now
   render via paint-time decoration.
-- **#10** — deterministic live-test failures; 2/6 slots closed
-  2026-08-12, 4 remain (3 undo/redo caret restoration, 1
-  paste-without-selection) with written diagnoses and next steps.
+- ~~**#10**~~ — closed 2026-08-13: all 6/6 previously-failing slots
+  green. Undo/redo caret loss fixed by having the chokepoint re-anchor
+  on a vanished focused block (not a `UndoLog` extension); a
+  focus-before-cursorPosition ordering bug in three QML delegates
+  fixed alongside. Paste-without-selection fixed by falling back to
+  the collapsed caret as the insertion point, which uncovered and
+  fixed an `applyFlatEdit` block-boundary byte ambiguity.
 - ~~**#11**~~ — closed 2026-08-12: legacy `SearchEngine::findAll`/
   `CompletionDetector` deleted (zero production callers, confirmed).
-- **#12** — `EmbedRegistry` has zero test coverage despite being
-  Corbomite-consumed.
+- ~~**#12**~~ — closed 2026-08-12: `EmbedRegistry`/`EmbedDepthGuard` now
+  have an 11-slot test binary.
 - **#13** — *(retired queue item numbering; was "source cursor/selection
   translation rewrite" — renamed from old TODO.md)*. See queue.md.
 - **#14** — find-highlight color hardcoded soft yellow in all three leaf
   adapters; theme-integration follow-up.
-- **#15** — `contextChanged` staleness: kind-change without caret move
-  on source + styled (low severity; see spec §7 deviation).
-- **#16** — styled `StyledTableRenderer::setFontScale` path untested.
+- ~~**#15**~~ — closed 2026-08-12: `Cmd::changeKind`'s real code path
+  (`d2SetBlockKind`) never bumped `structuralEditSequence`; fixed, both
+  leaves now recompute `contextChanged` on structural change without a
+  caret move.
+- ~~**#16**~~ — closed 2026-08-12: `setFontScale`→`StyledTableRenderer`
+  path now covered via observable frame geometry (`cellPadding`).
 - **Styled tables** — deferred: in-grid cell edit, structural row/col
   ops, alignment context menu, source-reveal flip (seam landed
   2026-05-30; queue/banner record in `docs/STATUS-LOG.md`).

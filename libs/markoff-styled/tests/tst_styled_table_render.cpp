@@ -157,6 +157,29 @@ private slots:
             if (doc.blockKind(id) == BlockKind::Table) tableRaw = id.raw();
         QCOMPARE(key, tableRaw);
     }
+
+    // Queue #16: Editor::setFontScale forwards to StyledTableRenderer (no
+    // local copy anywhere else — Editor.cpp:setFontScale calls
+    // m_tableRenderer->setFontScale() directly). Prove it reaches the
+    // renderer by observing its effect on materialized frame geometry
+    // (cellPadding == 4.0 * fontScale, TableFrame.cpp:materializeTable)
+    // rather than via StyleApplier's hash-gate (Table blocks are skipped
+    // by FormatPass, so a restyle pass alone doesn't touch the frame).
+    void set_font_scale_reaches_table_renderer_before_document_load() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral(
+            "| A | B |\n|---|---|\n| 1 | 2 |"));
+        Styled::Editor editor;
+        editor.setFontScale(1.5);
+        auto *s = doc.createSession();
+        editor.setSession(s);
+        editor.setDocument(&doc);
+        pumpEvents();
+
+        QTextTable *t = firstTable(editor.textEdit()->document());
+        QVERIFY(t != nullptr);
+        QCOMPARE(t->format().cellPadding(), 4.0 * 1.5);
+    }
 };
 
 QTEST_MAIN(TstStyledTableRender)

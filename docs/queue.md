@@ -203,46 +203,60 @@ since ~2026-05-21). Classify-before-fixing applies per slot:
    depends on the old `NotHandled` return. Both slots renamed to
    `..._claims_the_chord` and reshaped to assert `Handled`, citing the
    audit spec in-test. Green.
-2. `tst_live_render_focus_chokepoint_invariant` — `undo_after_enter`,
-   `redo_after_undo`, `nav_into_runtime_promoted_heading` (3 slots).
-   **Still open, diagnosed 2026-08-12:** `MarkoffDocument::undoD2`/
-   `redoD2` are one-line delegators to `UndoLog::undo()/redo()` with
-   zero cursor/selection restoration, and `UndoLog` has no
-   selection-snapshot mechanism at all. A real fix means extending
-   `UndoLog`'s transaction records to carry pre-edit selection state —
-   a cross-cutting core change, not a chokepoint-local patch. Owner:
-   whoever next extends `UndoLog`; needs its own spec per invariant 2
-   (decide whether `UndoLog` or the chokepoint owns caret-after-undo
-   authority) before code.
-3. `tst_live_render_cursor_typing_invariant` —
-   `cursor_mirrors_textedit_through_emoji_typing` (1 slot). **Still
-   open, diagnosed further 2026-08-12.** Not a surrogate-pair qtPos bug
-   as originally guessed — it's a real-Ctrl+V paste through
-   `LiveClipboardController::pasteFrom`/`pasteText`. Root cause: both
-   call `resolveSelectionRange()`, which requires
-   `LiveCursorState::selectionAnchor()` to be set; on a bare
-   (non-dragging) cursor with no active selection, `anchorBlock()`
-   returns -1 and the whole paste silently no-ops (nothing is inserted,
-   caret stays at 0) — this is a **paste-without-selection bug**, not
-   a caret-restoration bug, and looks broader than this one test slot
-   (any programmatic/keyboard paste with a collapsed cursor may be
-   affected — needs a production-path check, not just this test).
-   This session added `LiveClipboardController::advanceCaretPastPaste`
-   (wired into `pasteText()`/`pasteFrom()`'s flat-text branch) which is
-   correct and needed *once* the selection-resolution gap is fixed, but
-   does not by itself close this slot — verified still failing
-   (`actual 0, expected 5`) after that change. Next step: decide
-   whether `resolveSelectionRange` should fall back to
-   `(currentBlock, currentQtPos)` for a collapsed cursor, or whether
-   paste should have its own non-selection-based insertion-point
-   query — write that decision down before touching `LiveCursorState`
-   or `LiveClipboardController` further (invariant 2).
+2. ~~`tst_live_render_focus_chokepoint_invariant` — `undo_after_enter`,
+   `redo_after_undo`, `nav_into_runtime_promoted_heading` (3 slots).~~
+   → closed 2026-08-13. **Decision (invariant 2): the chokepoint owns
+   caret-after-undo placement policy, not `UndoLog`.** `UndoLog` stays
+   CRDT/op-focused with zero selection semantics — extending it to carry
+   pre-edit selection snapshots (the fix shape floated 2026-08-12) would
+   still need a view-layer interpreter for the resulting anchor on every
+   leaf, and doesn't fit `UndoLog`'s existing shape (it has no concept of
+   "row" or "qtPos", only `BlockId`/`OpId`). Instead, `LiveListModelBinding
+   ::onD2Changed` now enforces its own invariant directly: **never end a
+   structural cascade with the cursor pointing at a block that no longer
+   exists.** After `applyOps`, if the focused block vanished (undo removed
+   it) and nothing already staged a replacement focus target, it
+   re-anchors at the nearest surviving text-bearing row via new
+   `LiveNavigationController::nearestTextBearingRow(fromRow)`, using
+   `LiveCursorState::establishFocus` directly (NOT `requestTextCaretAtRow`,
+   which calls `flushPendingDocumentChanges()` → reentrant
+   `d2DocumentChanged` mid-cascade — crashed under test on first attempt).
+   This is a fallback landing spot, not exact caret-position restoration —
+   good enough to satisfy `assertChokepointInvariant` (internal
+   consistency: some delegate is focused and agrees with cursorState) and
+   to never strand the user typing into a void. Separately,
+   `nav_into_runtime_promoted_heading` turned out to be an unrelated bug:
+   `takeFocus()` in `UnifiedInlineTextDelegate.qml`/`CodeBlockDelegate.qml`/
+   `TableDelegate.qml` set `edit.cursorPosition` *before*
+   `edit.forceActiveFocus()`; `onCursorPositionChanged`'s `!edit.activeFocus`
+   guard then dropped the visual-hint-resolved position's sync back to
+   `LiveCursorState`, leaving cursorState's cached qtPos stuck at the
+   placeholder `0` the request was seeded with. Fixed by reordering to
+   focus-then-position in all three delegates.
+3. ~~`tst_live_render_cursor_typing_invariant` —
+   `cursor_mirrors_textedit_through_emoji_typing` (1 slot).~~ → closed
+   2026-08-13. **Decision (invariant 2): a collapsed cursor with no
+   selection anchor is a valid insertion point, not an error** —
+   `LiveClipboardController::resolveSelectionRange` now falls back to
+   `(activeBlock, activeQtPos)` when `anchorBlock() < 0`, per the
+   "next step" the 2026-08-12 diagnosis left open. Fixing the no-op
+   uncovered a second, previously-masked bug: `applyFlatEdit`'s global
+   zero-separator byte-range coordinate space is ambiguous exactly at a
+   block boundary (`MarkoffDocument.cpp`'s documented "cursor at
+   start-of-block biases to this block" rule) — a caret at the END of a
+   non-last block sits at that same boundary and was being misrouted
+   into the START of the *next* block. New
+   `LiveClipboardController::insertAtOrReplace` bypasses the ambiguity
+   for the collapsed single-block case by inserting directly via
+   `MarkoffDocument::d2ApplyBufferEdit(blockId, localByteOffset, ...)`
+   instead of `applyFlatEdit`'s global range; multi-block/selection paste
+   is unaffected (unchanged code path). `advanceCaretPastPaste` (added
+   2026-08-12) needed no further change once both bugs were fixed.
 
 **Definition of done:** each slot either green or its contract
 explicitly renamed/reshaped with rationale (classify first); the
 "known failures" language is removed from STATUS.md/CLAUDE.md when the
-count reaches 262/262. 2/6 slots closed as of 2026-08-12; 4 remain
-(3 undo/redo, 1 paste-without-selection — see diagnoses above).
+count reaches 262/262. **All 6/6 slots closed as of 2026-08-13.**
 
 ---
 
@@ -275,7 +289,13 @@ fallback, `version()`).
 
 ---
 
-## #12 — `EmbedRegistry` test coverage
+~~## #12 — `EmbedRegistry` test coverage~~ → closed 2026-08-12. New
+binary `tst_foundation_embed_registry` (11 slots): register/unregister/
+has (incl. case-insensitivity), dispatch routing + null-on-miss +
+null-on-no-extension + request pass-through, `EmbedDepthGuard::allow`
+boundary + placeholder round-trip. `Gutter` (markoff-source) and
+`StyledTableRenderer` (indirect coverage only) remain untested —
+out of scope for this pass, not re-filed.
 
 **Filed 2026-06-09.** `EmbedRegistry` + `MarkdownRenderChild` +
 `EmbedDepthGuard` were restored for the Corbomite port (`47f62c4`),
@@ -332,7 +352,23 @@ consumer-side). Fix here: add the two search slots to `defaultDark()`
 
 ---
 
-## #15 — contextChanged staleness: kind-change without caret move (source + styled)
+~~## #15 — contextChanged staleness: kind-change without caret move (source + styled)~~
+→ closed 2026-08-12. Root cause: `Cmd::changeKind`'s actual code path
+(`MarkoffDocument::d2SetBlockKind`) never bumped `structuralEditSequence`
+at all — only the separate (and apparently unused-by-Cmd) `applyStructural`/
+`StructuralOp::ChangeKind` path did. Fixed by bumping
+`structuralEditSequence` in `d2SetBlockKind` too, and adding a public
+`MarkoffDocument::structuralEditSequence()` accessor. Both leaves now
+also connect `d2DocumentChanged`, filtered on that counter (only recomputes
+`contextChanged` when it actually changed — untouched by content-only or
+format-only passes, so the false-fire concerns in the original spec §7
+deviation note don't apply). New shared contract check
+`ViewContract::checkContextChangedOnStructuralKindChangeWithoutCaretMove`
+in `ViewContractChecks.h`, wired into both `tst_view_contract_styled` and
+`tst_view_contract_source`; proven falsifiable (failed before the
+`d2SetBlockKind` fix landed).
+
+## #15 (superseded, kept for history) — contextChanged staleness: kind-change without caret move (source + styled)
 
 **Filed 2026-06-10.** On `markoff-source` and `markoff-styled`,
 `contextChanged` is recomputed only on `cursorPositionChanged` (see
@@ -351,7 +387,16 @@ refactoring.
 
 ---
 
-## #16 — styled fontScale path to StyledTableRenderer: test coverage gap
+~~## #16 — styled fontScale path to StyledTableRenderer: test coverage gap~~
+→ closed 2026-08-12. New slot
+`tst_styled_table_render::set_font_scale_reaches_table_renderer_before_document_load`
+proves `Editor::setFontScale` reaches `StyledTableRenderer` by observing
+its effect on materialized frame geometry (`QTextTableFormat::cellPadding()
+== 4.0 * fontScale`) rather than via the hash-gate — `FormatPass` skips
+`Table` blocks entirely, so a restyle pass alone never touches the frame
+regardless of whether fontScale propagated.
+
+## #16 (superseded, kept for history) — styled fontScale path to StyledTableRenderer: test coverage gap
 
 **Filed 2026-06-10.** `Markoff::Styled::Editor::setFontScale()` forwards
 the new scale to `m_tableRenderer->setFontScale()` (Task 12,

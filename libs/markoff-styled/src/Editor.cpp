@@ -139,12 +139,12 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     if (m_session) m_binding->setSession(m_session.data());
 
     // Wire context-refresh on cursor movement (spec §7).
-    // d2DocumentChanged is intentionally NOT connected here: it fires during
-    // the initial qWait cycle (from StyleApplier's deferred format pass) and
-    // would pre-warm m_lastContext before the first real cursor move, defeating
-    // the change-gate. Cursor-position-based triggering is sufficient for the
-    // contract: context is re-read on every cursor move regardless of what
-    // caused the kind change.
+    // d2DocumentChanged (raw) is intentionally NOT connected here: it fires
+    // during the initial qWait cycle (from StyleApplier's deferred format
+    // pass) and would pre-warm m_lastContext before the first real cursor
+    // move, defeating the change-gate. Cursor-position-based triggering is
+    // sufficient for the contract: context is re-read on every cursor move
+    // regardless of what caused the kind change.
     if (doc) {
         // Reset the sentinel so the first cursor movement after setDocument()
         // always emits contextChanged.
@@ -153,6 +153,21 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         m_contextCursorCon = QObject::connect(
             m_editor, &QTextEdit::cursorPositionChanged,
             this, &Editor::recomputeContext);
+        // Queue #15: also recompute on a genuine structural change (block
+        // Insert/Remove/ChangeKind — e.g. a programmatic Cmd::changeKind that
+        // doesn't move the caret) so contextChanged doesn't go stale until the
+        // next cursor move. Filtered on structuralEditSequence (not the raw
+        // signal) so format-only StyleApplier passes stay silent — including
+        // the initial qWait cycle, which doesn't touch structuralEditSequence.
+        m_lastStructuralSeq = doc->structuralEditSequence();
+        m_contextD2Con = QObject::connect(
+            doc, &Markoff::MarkoffDocument::d2DocumentChanged,
+            this, [this, doc]() {
+                const quint64 seq = doc->structuralEditSequence();
+                if (seq == m_lastStructuralSeq) return;
+                m_lastStructuralSeq = seq;
+                recomputeContext();
+            });
     }
 
     Markoff::MarkdownView::setDocument(doc);

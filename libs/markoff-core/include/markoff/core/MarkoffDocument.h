@@ -309,6 +309,12 @@ public:
     /// tracker for D2 internals).
     quint64 d2EditSequence() const noexcept;
 
+    /// D2: increments on block Insert/Remove/ChangeKind only — NOT on
+    /// per-block content edits (`d2ApplyBufferEdit`). Use to distinguish a
+    /// structural change (e.g. a programmatic `Cmd::changeKind`) from a
+    /// content-only or format-only `d2DocumentChanged` emission. Queue #15.
+    quint64 structuralEditSequence() const noexcept;
+
     /// Save-watermark API. The view-layer / host calls markSaved with the
     /// d2EditSequence captured immediately before its file write started;
     /// dirty() returns whether subsequent edits have advanced the sequence.

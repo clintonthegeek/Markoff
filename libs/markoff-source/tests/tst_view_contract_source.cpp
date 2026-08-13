@@ -30,6 +30,9 @@ private Q_SLOTS:
     void undo_redo_via_base()           { ViewContract::checkUndoRedoViaBase(m_ed, m_doc); }
     void font_scale_signal()            { ViewContract::checkFontScaleSignal(m_ed); }
     void context_changed_kind_gated()   { ViewContract::checkContextChangedKindGated(m_ed); }
+    void context_changed_on_structural_kind_change_without_caret_move() {
+        ViewContract::checkContextChangedOnStructuralKindChangeWithoutCaretMove(m_ed, m_doc);
+    }
 
     // ---- Task 12(A): fontScale actually scales the inner editor font ----
     //

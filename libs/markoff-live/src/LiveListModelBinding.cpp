@@ -29,6 +29,8 @@
 #include <QRegularExpression>
 #include <QScopeGuard>
 
+#include <type_traits>
+
 namespace Markoff::Live {
 
 using Detail::AstBlockDiff;
@@ -753,6 +755,55 @@ void LiveListModelBinding::onD2Changed()
     d->applyingModelUpdate = true;
     auto _ = qScopeGuard([this]{ d->applyingModelUpdate = false; });
     d->model->applyOps(ops, records);
+
+    // Queue #10: MarkoffDocument::undoD2/redoD2 do zero cursor/selection
+    // restoration (one-line delegators to UndoLog::undo()/redo()) — an
+    // undo that removes the block the caret was in leaves the chokepoint
+    // pointing at a block that no longer exists, so no delegate ends up
+    // focused at all. Rather than teach UndoLog about caret semantics (a
+    // cross-cutting core change belonging to its own spec — see queue.md
+    // #10), the chokepoint enforces its own invariant here: never end a
+    // structural cascade pointing at a dead block. If nothing has already
+    // staged a replacement focus target, re-anchor at the nearest
+    // surviving text-bearing row to the block's old position. This is a
+    // fallback landing spot, not exact caret-position restoration.
+    if (!d->cursorState->hasPendingFocus()) {
+        Markoff::BlockAnchor curBlock;
+        bool hasCursor = false;
+        std::visit([&](auto &&c) {
+            using T = std::decay_t<decltype(c)>;
+            if constexpr (!std::is_same_v<T, Markoff::NoCursor>) {
+                curBlock = c.block;
+                hasCursor = true;
+            }
+        }, d->cursorState->cursor());
+
+        if (hasCursor) {
+            bool stillExists = false;
+            for (const auto &id : blockIds) {
+                if (Markoff::BlockAnchor(id) == curBlock) { stillExists = true; break; }
+            }
+            if (!stillExists) {
+                int oldIdx = -1;
+                for (int i = 0; i < d->lastKeys.size(); ++i) {
+                    if (d->lastKeys[i].anchor == curBlock) { oldIdx = i; break; }
+                }
+                const int row = d->navigationCtrl->nearestTextBearingRow(
+                    oldIdx >= 0 ? oldIdx : 0);
+                // establishFocus() directly, NOT requestTextCaretAtRow(): the
+                // latter calls flushPendingDocumentChanges(), which
+                // unconditionally re-emits d2DocumentChanged — a reentrant
+                // call back into this onD2Changed while d->lastKeys/the model
+                // are still mid-update (crashed under test). blockIds is
+                // already the freshly-iterated block list, so the anchor at
+                // `row` is available without touching the document again.
+                if (row >= 0 && row < static_cast<int>(blockIds.size()))
+                    d->cursorState->establishFocus(
+                        Markoff::BlockAnchor(blockIds[static_cast<std::size_t>(row)]), 0);
+            }
+        }
+    }
+
     d->lastKeys = std::move(nextKeys);
 
 }

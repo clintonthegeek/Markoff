@@ -351,13 +351,21 @@ Item {
                 const lineH = edit.font.pixelSize
                 const targetY = (hint === 1) ? lineH * 0.5 : edit.contentHeight - lineH * 0.5
                 const xOff = root.kind === "blockquote" ? 12 : edit.leftPadding
-                edit.cursorPosition = edit.positionAt(desiredX - xOff, targetY)
+                // Focus BEFORE setting cursorPosition: onCursorPositionChanged
+                // guards on activeFocus to decide whether to sync back to
+                // LiveCursorState (queue #10). The visual-hint-resolved
+                // position generally differs from the qtPos=0 placeholder
+                // establishFocus() set synchronously — if activeFocus is
+                // still false when cursorPosition changes, that correction
+                // never reaches syncFromTextEdit and cursorState is left
+                // pointing at the wrong qtPos.
                 edit.forceActiveFocus()
+                edit.cursorPosition = edit.positionAt(desiredX - xOff, targetY)
                 return
             }
         }
-        edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
         edit.forceActiveFocus()
+        edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
     }
 
     Component.onCompleted: {

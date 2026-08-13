@@ -7,6 +7,7 @@
 #include <QSignalSpy>
 #include <QTest>
 
+#include <markoff/core/Cmd/D2.h>
 #include <markoff/core/EditorContext.h>
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -97,6 +98,39 @@ inline void checkContextChangedKindGated(Markoff::MarkdownView *v) {
     QTRY_VERIFY(spy.count() > n);
     const auto ctx1 = spy.last().at(0).value<Markoff::EditorContext>();
     QCOMPARE(ctx1.blockKind, QString(Markoff::BlockKindNames::CodeBlock));
+}
+
+// Queue #15: a programmatic Cmd::changeKind on the block the caret is
+// currently sitting in must refresh contextChanged even though the caret
+// itself never moves — source/styled only recompute on cursorPositionChanged
+// by default (spec §7 deviation), so this exercises the structuralEditSequence
+// fallback both leaves wire on top of that.
+inline void checkContextChangedOnStructuralKindChangeWithoutCaretMove(
+        Markoff::MarkdownView *v, Markoff::MarkoffDocument *doc) {
+    qRegisterMetaType<Markoff::EditorContext>();
+
+    // Park on block 0 ("alpha one", Paragraph).
+    v->setCursorPosition({1, 1});
+    QTest::qWait(20);  // let any pending cursor-driven recompute settle
+
+    const Markoff::BlockId block0 = doc->iterateBlocks().front();
+    QCOMPARE(doc->blockKind(block0), Markoff::BlockKind::Paragraph);
+
+    QSignalSpy spy(v, &Markoff::MarkdownView::contextChanged);
+    const auto posBefore = v->cursorPosition();
+
+    Markoff::Cmd::changeKind(*doc, block0, Markoff::BlockKind::Heading);
+
+    QTRY_VERIFY(spy.count() >= 1);
+    const auto ctx = spy.last().at(0).value<Markoff::EditorContext>();
+    QCOMPARE(ctx.blockKind, QString(Markoff::BlockKindNames::Heading));
+    // The caret genuinely did not move — proves this isn't just a
+    // cursor-driven recompute coincidentally landing on the new kind.
+    QCOMPARE(v->cursorPosition().line, posBefore.line);
+    QCOMPARE(v->cursorPosition().column, posBefore.column);
+
+    Markoff::Cmd::changeKind(*doc, block0, Markoff::BlockKind::Paragraph);  // restore
+    QTest::qWait(20);
 }
 
 }  // namespace ViewContract

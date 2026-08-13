@@ -81,6 +81,14 @@ private:
     void advanceCaretPastPaste(int firstRow, int lastRow, int firstQtPos,
                                const QString &insertedText);
 
+    /// Insert `insertedText` at [startByte, endByte), routing a collapsed
+    /// single-block cursor through the unambiguous block+offset primitive
+    /// instead of applyFlatEdit's boundary-ambiguous global byte range
+    /// (see the .cpp for why). Clears the selection either way.
+    void insertAtOrReplace(uint32_t startByte, uint32_t endByte,
+                           int firstRow, int lastRow, int firstQtPos,
+                           const QString &insertedText);
+
     bool isReadOnly() const {
         return m_readOnlyProvider && m_readOnlyProvider();
     }

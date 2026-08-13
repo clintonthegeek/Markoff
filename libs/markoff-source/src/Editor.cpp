@@ -160,15 +160,29 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         // movement after setDocument() always emits contextChanged.
         m_lastContext = Markoff::EditorContext{};
         m_lastContext.blockKind = QString{};  // sentinel: not a valid kind name
-        // Connect context-refresh to cursor movement only. The source leaf
+        // Connect context-refresh to cursor movement. The source leaf
         // delegates kind inference to structural keys (Enter, Backspace) which
-        // always move the cursor; connecting d2DocumentChanged is unnecessary
-        // and causes false-fires from the syntax highlighter's format-only
-        // contentsChange notifies (which reach d2DocumentChanged via the
-        // binding's no-op edit path).
+        // always move the cursor; connecting d2DocumentChanged directly would
+        // false-fire from the syntax highlighter's format-only contentsChange
+        // notifies (which reach d2DocumentChanged via the binding's no-op edit
+        // path).
         m_contextCursorCon = QObject::connect(
             m_editor, &QPlainTextEdit::cursorPositionChanged,
             this, &Editor::recomputeContext);
+        // Queue #15: also recompute on a genuine structural change (block
+        // Insert/Remove/ChangeKind — e.g. a programmatic Cmd::changeKind that
+        // doesn't move the caret) so contextChanged doesn't go stale until the
+        // next cursor move. Filtered on structuralEditSequence rather than the
+        // raw signal so content-only/format-only passes stay silent.
+        m_lastStructuralSeq = doc->structuralEditSequence();
+        m_contextD2Con = QObject::connect(
+            doc, &Markoff::MarkoffDocument::d2DocumentChanged,
+            this, [this, doc]() {
+                const quint64 seq = doc->structuralEditSequence();
+                if (seq == m_lastStructuralSeq) return;
+                m_lastStructuralSeq = seq;
+                recomputeContext();
+            });
         // Initial pass — the binding seeded qdoc from widgetFlatView in
         // setMarkoffDocument; margins for the initial blocks need to land too.
         applyParagraphMargins();

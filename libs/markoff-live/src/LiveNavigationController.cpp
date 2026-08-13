@@ -364,6 +364,20 @@ int LiveNavigationController::tryHandle(int key, int modifiers,
     return NotHandled;
 }
 
+int LiveNavigationController::nearestTextBearingRow(int fromRow) const {
+    if (!m_model) return -1;
+    const int rows = m_model->rowCount();
+    if (rows <= 0) return -1;
+    if (fromRow >= 0 && fromRow < rows && isTextBearing(fromRow)) return fromRow;
+    for (int d = 1; d < rows; ++d) {
+        const int down = fromRow + d;
+        if (down < rows && isTextBearing(down)) return down;
+        const int up = fromRow - d;
+        if (up >= 0 && isTextBearing(up)) return up;
+    }
+    return -1;
+}
+
 int LiveNavigationController::previousNavigableRow(int currentRow) const {
     for (int r = currentRow - 1; r >= 0; --r) {
         if (isTextBearing(r)) return r;

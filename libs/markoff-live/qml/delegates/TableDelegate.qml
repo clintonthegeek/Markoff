@@ -1126,8 +1126,10 @@ Rectangle {
                 const targetC   = _columnAtLocalX(targetR, desiredX)
                 const cell      = _cellAt(targetR, targetC)
                 if (cell && cell.edit) {
-                    cell.edit.cursorPosition = 0
+                    // Focus before cursorPosition — see the matching comment
+                    // in UnifiedInlineTextDelegate.qml::takeFocus (queue #10).
                     cell.edit.forceActiveFocus()
+                    cell.edit.cursorPosition = 0
                     return
                 }
             }
@@ -1147,8 +1149,8 @@ Rectangle {
                         const cellLen = cell.edit.length
                         const cellQtPos = Math.min(
                             Math.max(qtPos - range.start, 0), cellLen)
-                        cell.edit.cursorPosition = cellQtPos
                         cell.edit.forceActiveFocus()
+                        cell.edit.cursorPosition = cellQtPos
                         return
                     }
                 }
@@ -1158,8 +1160,8 @@ Rectangle {
         // Out-of-range qtPos: fall back to (0, 0) qtPos 0.
         const fallback = _cellAt(0, 0)
         if (fallback && fallback.edit) {
-            fallback.edit.cursorPosition = 0
             fallback.edit.forceActiveFocus()
+            fallback.edit.cursorPosition = 0
         } else {
             root.forceActiveFocus()
         }

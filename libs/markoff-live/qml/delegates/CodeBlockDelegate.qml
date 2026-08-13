@@ -218,14 +218,17 @@ Rectangle {
             if (hint !== 0 && desiredX >= 0) {
                 const lineH = edit.font.pixelSize
                 const targetY = (hint === 1) ? lineH * 0.5 : edit.contentHeight - lineH * 0.5
+                // Focus BEFORE setting cursorPosition — see the matching
+                // comment in UnifiedInlineTextDelegate.qml::takeFocus
+                // (queue #10).
+                edit.forceActiveFocus()
                 // CodeBlock TextEdit has 8px margin via anchors.margins
                 edit.cursorPosition = edit.positionAt(desiredX - 8, targetY)
-                edit.forceActiveFocus()
                 return
             }
         }
-        edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
         edit.forceActiveFocus()
+        edit.cursorPosition = Math.min(Math.max(qtPos, 0), edit.length)
     }
 
     Component.onCompleted: {

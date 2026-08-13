@@ -96,6 +96,11 @@ add_test(NAME tst_foundation_completion_registry COMMAND tst_foundation_completi
 target_link_libraries(tst_foundation_completion_registry PRIVATE Qt6::Test markoff_core)
 set_tests_properties(tst_foundation_completion_registry PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_foundation_embed_registry tst_foundation_embed_registry.cpp)
+add_test(NAME tst_foundation_embed_registry COMMAND tst_foundation_embed_registry)
+target_link_libraries(tst_foundation_embed_registry PRIVATE Qt6::Test markoff_core)
+set_tests_properties(tst_foundation_embed_registry PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_foundation_services_bundle tst_foundation_services_bundle.cpp)
 add_test(NAME tst_foundation_services_bundle COMMAND tst_foundation_services_bundle)
 target_link_libraries(tst_foundation_services_bundle PRIVATE Qt6::Test markoff_core)

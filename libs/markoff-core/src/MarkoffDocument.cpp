@@ -1130,6 +1130,11 @@ quint64 MarkoffDocument::d2EditSequence() const noexcept
     return sum;
 }
 
+quint64 MarkoffDocument::structuralEditSequence() const noexcept
+{
+    return d->structuralEditSequence;
+}
+
 // ============================================================================
 // Save-watermark API (E2.5 Task A1)
 // ============================================================================
@@ -1814,6 +1819,7 @@ void MarkoffDocument::d2SetBlockKind(BlockId block, BlockKind newKind,
     t.registerOp(UndoCrdtTarget::kindTagMap(), opId);
     d->pendingOpPayloads[{1, opId}] = buildKindTagMapPayload(block, newKind, opId, false);
     d->touchedSinceLoad.insert(block);
+    ++d->structuralEditSequence;
     scheduleD2Changed();
 }
 

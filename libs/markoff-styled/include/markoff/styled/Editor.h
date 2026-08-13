@@ -128,6 +128,7 @@ private:
     QMetaObject::Connection                 m_contextCursorCon;
     QMetaObject::Connection                 m_contextD2Con;
     Markoff::EditorContext                  m_lastContext;
+    quint64                                 m_lastStructuralSeq = 0;
 };
 
 }  // namespace Markoff::Styled

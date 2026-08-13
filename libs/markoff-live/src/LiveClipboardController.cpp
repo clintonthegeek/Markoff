@@ -248,11 +248,18 @@ bool LiveClipboardController::resolveSelectionRange(
 {
     if (!m_selection || !m_document || !m_model) return false;
 
-    const int ab = m_selection->anchorBlock();
-    const int ap = m_selection->anchorQtPos();
     const int xb = m_selection->activeBlock();
     const int xp = m_selection->activeQtPos();
-    if (ab < 0 || xb < 0) return false;
+    if (xb < 0) return false;
+
+    // No active selection anchor (a bare, non-dragging cursor) means no
+    // range to replace — but that's still a valid insertion point, not an
+    // error. Collapse to (activeBlock, activeQtPos) so paste/structured-
+    // paste callers insert at the caret instead of silently no-opping.
+    // Queue #10: this was the root cause of Ctrl+V doing nothing on a
+    // plain (unselected) cursor.
+    const int ab = (m_selection->anchorBlock() < 0) ? xb : m_selection->anchorBlock();
+    const int ap = (m_selection->anchorBlock() < 0) ? xp : m_selection->anchorQtPos();
 
     int fb, fo, lb, lo;
     if (ab < xb || (ab == xb && ap <= xp)) {
@@ -325,12 +332,48 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
     // Flat text fallback.
     if (mime->hasText()) {
         const QString insertedText = mime->text();
-        const QByteArray inserted = insertedText.toUtf8();
-        m_document->applyFlatEdit(startByte, endByte, inserted,
-                                  Markoff::Origin::UserEdit);
-        m_selection->clearSelection();
+        insertAtOrReplace(startByte, endByte, firstRow, lastRow, firstQtPos,
+                          insertedText);
         advanceCaretPastPaste(firstRow, lastRow, firstQtPos, insertedText);
     }
+}
+
+void LiveClipboardController::insertAtOrReplace(
+    uint32_t startByte, uint32_t endByte, int firstRow, int lastRow,
+    int firstQtPos, const QString &insertedText)
+{
+    const QByteArray inserted = insertedText.toUtf8();
+
+    // Collapsed cursor within a single block: insert at the block-local
+    // offset directly via d2ApplyBufferEdit rather than applyFlatEdit's
+    // global zero-separator byte range. That global range is genuinely
+    // ambiguous at a block boundary — MarkoffDocument::applyFlatEdit
+    // deliberately biases a boundary cursor-edit to the START of the
+    // FOLLOWING block (see its "Cursor at start-of-block: bias to this
+    // block" comment, load-bearing for other flows). A caret at the END
+    // of a non-last block sits at that exact boundary, so it would be
+    // misrouted into the start of the next block instead of staying in
+    // the block the user is actually in. Queue #10: this surfaced once
+    // paste-without-selection started actually inserting text (previously
+    // masked — the no-op bug meant this path never ran with real content).
+    if (firstRow == lastRow && startByte == endByte && firstRow >= 0) {
+        const auto ids = m_document->iterateBlocks();
+        if (firstRow < static_cast<int>(ids.size())) {
+            const Markoff::BlockId blockId = ids[static_cast<std::size_t>(firstRow)];
+            const QByteArray blockUtf8 = m_document->blockText(blockId);
+            const int clamped = qBound(0, firstQtPos, blockUtf8.size());
+            const int byteOff = coords::qtPosToByte(blockUtf8, clamped);
+            Markoff::UndoLog::Transaction t(m_document->d2UndoLog());
+            m_document->d2ApplyBufferEdit(blockId, static_cast<uint32_t>(byteOff),
+                                          0, inserted, t);
+            m_selection->clearSelection();
+            return;
+        }
+    }
+
+    m_document->applyFlatEdit(startByte, endByte, inserted,
+                              Markoff::Origin::UserEdit);
+    m_selection->clearSelection();
 }
 
 void LiveClipboardController::pasteText(const QString &text)
@@ -344,9 +387,7 @@ void LiveClipboardController::pasteText(const QString &text)
     if (!resolveSelectionRange(startByte, endByte, firstRow, firstQtPos, lastRow))
         return;
 
-    m_document->applyFlatEdit(startByte, endByte, text.toUtf8(),
-                              Markoff::Origin::UserEdit);
-    m_selection->clearSelection();
+    insertAtOrReplace(startByte, endByte, firstRow, lastRow, firstQtPos, text);
     advanceCaretPastPaste(firstRow, lastRow, firstQtPos, text);
 }
 

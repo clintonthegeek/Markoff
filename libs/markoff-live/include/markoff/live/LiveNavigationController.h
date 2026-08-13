@@ -41,6 +41,14 @@ public:
     int previousNavigableRow(int currentRow) const;
     int nextNavigableRow(int currentRow) const;
 
+    /// Nearest text-bearing row to `fromRow` (which may be out of range or
+    /// itself non-text-bearing) — checks `fromRow` first, then alternates
+    /// outward (fromRow-1, fromRow+1, fromRow-2, ...). Returns -1 if no
+    /// text-bearing row exists at all. Used to re-anchor the caret when the
+    /// previously-focused block disappears out from under it (e.g. undo
+    /// removing the block a structural edit had created — queue #10).
+    int nearestTextBearingRow(int fromRow) const;
+
 private:
     QObject *m_listView = nullptr;
     bool isAtVisualTopLine(QObject *editItem) const;
