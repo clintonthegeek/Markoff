@@ -12,6 +12,7 @@
 #include <QtMath>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/StructuralKeyHandler.h>
 #include <markoff/core/UndoLog.h>
 
 #include "BlockLayoutCache.h"
@@ -341,6 +342,22 @@ void View::deleteCluster(bool forward)
     }
 }
 
+bool View::tryStructuralKey(QKeyEvent *event)
+{
+    if (!m_doc || m_caret.block.isNull())
+        return false;
+
+    const StructuralResult r = StructuralKeyHandler::handle(
+        *m_doc, m_caret.block, event->key(), int(event->modifiers()),
+        uint32_t(m_caret.byteOffset));
+    if (!r.handled)
+        return false;
+
+    m_caret.block = r.caretBlock;
+    m_caret.byteOffset = int(r.caretByteInBlock);
+    return true;
+}
+
 void View::moveCaretHorizontally(bool forward)
 {
     if (!m_doc || m_caret.block.isNull())
@@ -506,6 +523,17 @@ void View::keyPressEvent(QKeyEvent *event)
 
     if (!m_doc || m_caret.block.isNull()) {
         QAbstractScrollArea::keyPressEvent(event);
+        return;
+    }
+
+    // Structural keys (Enter split, boundary Backspace/Delete merge,
+    // Tab/Shift+Tab list indent) are StructuralKeyHandler's call, not
+    // this leaf's — it is the authority and has already applied the
+    // mutation and placed the caret when this returns true (plan T3).
+    if (tryStructuralKey(event)) {
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
         return;
     }
 

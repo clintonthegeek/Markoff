@@ -116,6 +116,12 @@ private:
     void moveCaretToLineEdge(bool home);
     void insertPrintable(const QString &text);
     void deleteCluster(bool forward);
+    /// Route a key through StructuralKeyHandler (Enter split, boundary
+    /// Backspace/Delete merge, Tab/Shift+Tab list indent) before any other
+    /// handling. Returns true if the handler owned the key — it has
+    /// already applied the mutation and the caret has already been moved
+    /// to `r.caretBlock`/`r.caretByteInBlock`.
+    bool tryStructuralKey(QKeyEvent *event);
     /// Keep the caret referencing a block that still exists after a
     /// document change, biased toward the block's last known position
     /// (T2's version of the queue-#10 "never strand the caret" clamp;
