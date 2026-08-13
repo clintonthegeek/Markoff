@@ -126,6 +126,34 @@ quint64 View::paintCount() const
     return m_paintCount;
 }
 
+bool View::isDelimiterHiddenAt(BlockId id, int byteOffset) const
+{
+    if (!m_doc)
+        return false;
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return false;
+
+    const QByteArray text = m_doc->blockText(id);
+    const int qchar = int(coords::byteToQtPos(text, byteOffset));
+
+    const QColor invisible = e.style.background.isValid()
+                            ? e.style.background
+                            : m_theme.color(Theme::Slot::EditorBackground);
+
+    for (const QTextLayout::FormatRange &r : e.layout->formats()) {
+        if (qchar >= r.start && qchar < r.start + r.length) {
+            return r.format.hasProperty(QTextFormat::ForegroundBrush)
+                && r.format.foreground().color() == invisible;
+        }
+    }
+    return false;
+}
+
 BlockId View::caretBlock() const
 {
     return m_caret.block;
@@ -213,7 +241,7 @@ void View::ensureLayoutForViewport()
         const int top = verticalScrollBar()->value();
         // Realize the viewport plus one viewport-height either side, so a
         // scroll of up to a full page never exposes an unrealized block.
-        const bool realized = m_cache->realizeRange(*m_doc, top - height,
+        const bool realized = m_cache->realizeRange(*m_doc, m_theme, top - height,
                                                     top + 2 * height);
         updateScrollRange();
         if (!realized && verticalScrollBar()->value() == top)
@@ -338,6 +366,11 @@ void View::ensureCaretVisible()
 {
     if (!m_doc || m_caret.block.isNull())
         return;
+    // Single chokepoint (spec T7): every caret-changing code path in this
+    // file already calls ensureCaretVisible() afterward, so this is where
+    // the cache learns the caret moved and restyles the (at most two)
+    // affected blocks' delimiter visibility — not a full-document restyle.
+    m_cache->setCaret(*m_doc, m_theme, m_caret.block, m_caret.byteOffset);
     const int idx = m_cache->indexOf(m_caret.block);
     if (idx < 0)
         return;

@@ -24,6 +24,8 @@ add_library(markoff_canvas STATIC
     src/BlockPresentation.cpp
     src/Coordinates.h
     src/Coordinates.cpp
+    src/InlineFormatting.h
+    src/InlineFormatting.cpp
     src/InputPredicate.h
     src/InputPredicate.cpp
     src/KindTransition.h

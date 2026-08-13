@@ -58,7 +58,17 @@ public:
     /// Build real layouts for every block intersecting [top, bottom) in
     /// document coordinates. Returns true if anything was realized (i.e.
     /// heights moved and the caller should refresh its scroll range).
-    bool realizeRange(const MarkoffDocument &doc, qreal top, qreal bottom);
+    bool realizeRange(const MarkoffDocument &doc, const Theme &theme,
+                      qreal top, qreal bottom);
+
+    /// Tell the cache where the caret is, for inline delimiter visibility
+    /// (spec T7). Rebuilds formats only for the entries that can have
+    /// changed: the caret's old block (if it moved to a different block)
+    /// and its current block — not a full restyle pass. A block whose
+    /// layout is not yet realized just gets correct formats at realize()
+    /// time, same as the base bold/italic/code styling.
+    void setCaret(const MarkoffDocument &doc, const Theme &theme,
+                  BlockId block, int byteOffset);
 
     void clear();
 
@@ -74,13 +84,19 @@ public:
 private:
     void  recomputePositions();
     qreal estimateHeight(const MarkoffDocument &doc, const Entry &e) const;
-    void  realize(const MarkoffDocument &doc, Entry &e);
+    void  realize(const MarkoffDocument &doc, const Theme &theme, Entry &e);
+    /// Recompute one entry's inline formats (base styling + delimiter
+    /// visibility) and push them onto its layout via setFormats(). No-op
+    /// if the entry isn't realized yet.
+    void  restyleInline(const MarkoffDocument &doc, const Theme &theme, Entry &e) const;
 
     std::vector<Entry>  m_entries;
     QHash<BlockId, int> m_index;        //!< id → position in m_entries
     qreal   m_textWidth      = 0;
     qreal   m_totalHeight    = 0;
     quint64 m_structuralSeq  = 0;
+    BlockId m_caretBlock;                //!< null = no caret tracked
+    int     m_caretByte      = -1;
 };
 
 }  // namespace Markoff::Canvas

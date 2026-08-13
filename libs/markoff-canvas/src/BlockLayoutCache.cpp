@@ -8,6 +8,12 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
+#include <markoff/parser/SourceSpan.h>
+
+#include "Coordinates.h"
+#include "InlineFormatting.h"
+
+namespace coords = Markoff::Canvas::Detail::Coordinates;
 
 namespace Markoff::Canvas {
 
@@ -59,6 +65,8 @@ void BlockLayoutCache::clear()
     m_index.clear();
     m_totalHeight = 0;
     m_structuralSeq = 0;
+    m_caretBlock = BlockId();
+    m_caretByte = -1;
 }
 
 void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme)
@@ -124,7 +132,7 @@ qreal BlockLayoutCache::estimateHeight(const MarkoffDocument &doc,
     return e.style.topMargin + e.style.bottomMargin + lineHeight * lines;
 }
 
-void BlockLayoutCache::realize(const MarkoffDocument &doc, Entry &e)
+void BlockLayoutCache::realize(const MarkoffDocument &doc, const Theme &theme, Entry &e)
 {
     e.layout = std::make_unique<QTextLayout>(layoutTextFor(doc, e.id),
                                              e.style.font);
@@ -133,8 +141,50 @@ void BlockLayoutCache::realize(const MarkoffDocument &doc, Entry &e)
     opt.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
     e.layout->setTextOption(opt);
 
-    const qreal width = qMax(qreal(1), m_textWidth - e.style.leftIndent);
+    // restyleInline() does the formats-then-lines work, including the
+    // first (and every subsequent) create-line pass — see its comment for
+    // why the two cannot be split across separate calls.
+    restyleInline(doc, theme, e);
 
+    if (e.style.isRule)
+        e.height = e.style.topMargin + e.style.bottomMargin
+                 + QFontMetricsF(e.style.font).lineSpacing() * 0.5;
+
+    e.realized = true;
+}
+
+void BlockLayoutCache::restyleInline(const MarkoffDocument &doc, const Theme &theme,
+                                     Entry &e) const
+{
+    if (!e.layout)
+        return;
+
+    const QByteArray text = doc.blockText(e.id);
+    const QList<SourceSpan> spans = doc.inlineSpansFor(e.id);
+
+    int caretQChar = -1;
+    if (e.id == m_caretBlock && m_caretByte >= 0)
+        caretQChar = int(coords::byteToQtPos(text, m_caretByte));
+
+    const QColor invisible = e.style.background.isValid()
+                            ? e.style.background
+                            : theme.color(Theme::Slot::EditorBackground);
+
+    // QTextLayout::setFormats() unconditionally invalidates the layout's
+    // line data when the format list is non-empty
+    // (QTextEngine::setFormats -> invalidate() + clearLineData(), Qt
+    // 6.11's qtextengine.cpp) — even when called on an already-realized
+    // layout, well after its own beginLayout()/endLayout() pass. This
+    // function is called both from realize() (first build) and from
+    // setCaret() (delimiter-visibility recompute on caret move, no text
+    // or width change) — so the create-line pass below must run every
+    // time this runs, not just the first. Skipping it after a caret-move
+    // call left every line-based query (hit-test, caret motion) broken
+    // with lineCount()==0 until the next full re-realize — found via T7's
+    // E7 test.
+    e.layout->setFormats(Detail::inlineFormatRanges(spans, caretQChar, theme, invisible));
+
+    const qreal width = qMax(qreal(1), m_textWidth - e.style.leftIndent);
     qreal h = 0;
     e.layout->beginLayout();
     while (true) {
@@ -147,14 +197,14 @@ void BlockLayoutCache::realize(const MarkoffDocument &doc, Entry &e)
     }
     e.layout->endLayout();
 
-    if (e.style.isRule)
-        h = QFontMetricsF(e.style.font).lineSpacing() * 0.5;
-
-    e.height   = e.style.topMargin + e.style.bottomMargin + h;
-    e.realized = true;
+    // Not touched for the isRule case: realize() overwrites e.height with
+    // the fixed rule height right after calling this. Recomputing it here
+    // unconditionally would be harmless (same text/width in the
+    // caret-move-only call path) but pointless work for every other kind.
+    e.height = e.style.topMargin + e.style.bottomMargin + h;
 }
 
-bool BlockLayoutCache::realizeRange(const MarkoffDocument &doc,
+bool BlockLayoutCache::realizeRange(const MarkoffDocument &doc, const Theme &theme,
                                     qreal top, qreal bottom)
 {
     if (m_entries.empty() || m_textWidth <= 0)
@@ -170,13 +220,33 @@ bool BlockLayoutCache::realizeRange(const MarkoffDocument &doc,
             break;
         if (e.y + e.height <= top)
             continue;
-        realize(doc, e);
+        realize(doc, theme, e);
         changed = true;
     }
 
     if (changed)
         recomputePositions();
     return changed;
+}
+
+void BlockLayoutCache::setCaret(const MarkoffDocument &doc, const Theme &theme,
+                                BlockId block, int byteOffset)
+{
+    if (m_caretBlock == block && m_caretByte == byteOffset)
+        return;
+
+    const BlockId oldBlock = m_caretBlock;
+    m_caretBlock = block;
+    m_caretByte  = byteOffset;
+
+    if (oldBlock != block) {
+        const int oldIdx = indexOf(oldBlock);
+        if (oldIdx >= 0)
+            restyleInline(doc, theme, m_entries[size_t(oldIdx)]);
+    }
+    const int newIdx = indexOf(block);
+    if (newIdx >= 0)
+        restyleInline(doc, theme, m_entries[size_t(newIdx)]);
 }
 
 void BlockLayoutCache::recomputePositions()

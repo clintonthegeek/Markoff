@@ -89,6 +89,15 @@ public:
     /// to know a repaint actually happened.
     quint64 paintCount() const;
 
+    /// Whether the byte at `byteOffset` in block `id`'s realized layout is
+    /// currently painted as a hidden delimiter (spec T7, exit E7): its
+    /// format's foreground equals the "invisible" color the leaf paints
+    /// hidden delimiters with (the block's own background, or the editor
+    /// background). False if the block isn't realized, the offset is out
+    /// of range, or the format at that position isn't the invisible one.
+    /// Test/inspection surface only — nothing here is authority.
+    bool isDelimiterHiddenAt(BlockId id, int byteOffset) const;
+
     // ---- Caret ----------------------------------------------------------
     // Inspection for tests; the caret is edited only through real events
     // (mouse press, key press) on the production widget, never set
