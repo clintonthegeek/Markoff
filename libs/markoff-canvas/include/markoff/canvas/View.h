@@ -45,7 +45,8 @@ struct CanvasCursor {
  * scrolling.
  * T2: caret, mouse hit-testing, printable-key typing, in-block
  * Backspace/Delete, arrow-key motion. Structural keys (Enter split,
- * boundary Backspace/Delete merge) arrive in T3.
+ * boundary Backspace/Delete merge) arrive in T3. Undo/redo (T4) reuse
+ * the T2 clamp — there is no separate caret-restoration mechanism.
  */
 class View : public QAbstractScrollArea {
     Q_OBJECT

@@ -4,6 +4,7 @@
 #include <QFocusEvent>
 #include <QFontMetricsF>
 #include <QKeyEvent>
+#include <QKeySequence>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
@@ -519,6 +520,29 @@ void View::keyPressEvent(QKeyEvent *event)
         break;
     default:
         break;
+    }
+
+    // Undo/redo are document-level actions, not caret motion — they run
+    // even before the caret-null bail below. There is no UndoLog
+    // selection/caret state (plan T4, queue #10 item 2): undoD2()/redoD2()
+    // mutate the document and nothing else, so the caret is left where it
+    // was and clampCaret (already wired generically through
+    // onDocumentChanged) is the entire "never strand it" mechanism. Flush
+    // rather than wait for the debounced d2DocumentChanged so the caret is
+    // already valid by the time this handler returns — the document's own
+    // synchronous flush, not a view-side defer (spec C2).
+    if (event->matches(QKeySequence::Undo) || event->matches(QKeySequence::Redo)) {
+        if (m_doc) {
+            if (event->matches(QKeySequence::Undo))
+                m_doc->undoD2();
+            else
+                m_doc->redoD2();
+            m_doc->flushPendingD2Changed();
+            ensureCaretVisible();
+            viewport()->update();
+        }
+        event->accept();
+        return;
     }
 
     if (!m_doc || m_caret.block.isNull()) {
