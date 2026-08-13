@@ -236,7 +236,7 @@ void View::onDocumentChanged()
     // undo/redo path, which does the same before mutating.
     if (m_selectionAnchor && m_cache->indexOf(m_selectionAnchor->block) < 0)
         m_selectionAnchor.reset();
-    promoteCaretBlockKind();
+    // FALSIFICATION PLANT (T6, throwaway): promoteCaretBlockKind() skipped.
     ensureLayoutForViewport();
     viewport()->update();
 }
