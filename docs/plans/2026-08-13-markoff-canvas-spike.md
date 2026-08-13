@@ -187,7 +187,7 @@ Fill SHAs as you go. "Fals." = falsification throwaway commit SHA
 | T0 scaffold + constitution gate | ☑ | `a543e6e3` | n/a (gate proven by planted violation, not committed — spec §9) |
 | T1 read-only render + scroll | ☑ | `556008c5` | n/a |
 | T2 caret + hit-test + typing (E1) | ☑ | `9d11880d` | `b9aa326a` / `cfb5bbf3` |
-| T3 structural keys: split/merge (E2) | ☐ | — | — |
+| T3 structural keys: split/merge (E2) | ☑ | `a798c10e` | `81c18bbb` / `20bdec6a` |
 | T4 undo/redo caret survival (E3) | ☐ | — | — |
 | T5 selection + clipboard (E4) | ☐ | — | — |
 | T6 kind transitions (E5) | ☐ | — | — |
