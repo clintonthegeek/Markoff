@@ -1,7 +1,7 @@
 # markoff-canvas spike — projection view leaf on QTextLayout
 
 **Date:** 2026-08-13
-**Status:** authorized, not started
+**Status:** closed 2026-08-13 — PASS (see §10 verdict)
 **Decision record:** [`2026-08-13-view-authority-direction-decision.md`](2026-08-13-view-authority-direction-decision.md)
 **Implementation plan (task sequence + session protocol):**
 [`../plans/2026-08-13-markoff-canvas-spike.md`](../plans/2026-08-13-markoff-canvas-spike.md)
@@ -161,21 +161,22 @@ falsifiable** (invariant 4): break the target seam in a throwaway
 stub commit, watch the test fail, revert. Record the falsification
 commit SHA in the table on completion.
 
-| # | Criterion | Falsifiable test |
-|---|---|---|
-| E1 | Typing printable chars at an arbitrary caret position updates `blockText()` and advances the caret; rendered text matches the buffer after each keystroke. | `typing_updates_buffer_and_caret` |
-| E2 | Enter mid-block splits the block; caret lands at byte 0 of the new block. Backspace at byte 0 merges with the previous block; caret lands at the join point. Block count and content verified via `iterateBlocks()`. | `enter_splits_backspace_merges_caret_at_join` |
-| E3 | Undo after E2's split restores the merged block **and** the caret references a block that exists (never a vanished `BlockId`); redo likewise. This is the queue-#10 invariant, natively. | `undo_redo_never_strand_caret` |
-| E4 | Cross-block drag selection with real mouse events works in **both directions** (the 2026-05-21 asymmetry class); Ctrl+C then puts all selected blocks' text on the clipboard; a printable key on the selection collapses it and inserts at the first corner. | `drag_selection_both_directions_copy_and_collapse` |
-| E5 | Kind transition: typing `# ` at byte 0 of a paragraph promotes it to Heading without losing focus or caret; the block re-renders in heading style. | `hash_space_promotes_heading_caret_survives` |
-| E6 | IME: the five audit-L7 scenarios (commit-after-preedit, preedit-replace-commit, cancelled composition, commit into non-empty block, lifecycle probe) pass via `QInputMethodEvent`, with preedit visibly rendered (asserted via the layout's format ranges, not a screenshot). | `tst_canvas_ime` (5 slots) |
-| E7 | Delimiter visibility: `**bold**` renders with delimiters hidden and content styled when the caret is outside the span; moving the caret into the span reveals the delimiters; editing while revealed round-trips correctly. | `delimiter_visibility_follows_caret` |
-| E8 | Minimal table: caret can enter a cell by mouse, typing edits that cell's buffer only, adjacent cells and the following block are unaffected, and no crash on cell edit + repaint (the QML-Repeater UAF class must have no analogue). | `tst_canvas_table` |
-| E9 | **Perf** (offscreen, release build, `-j 4` build cap per standing rule): on a 500-block synthetic document — load-to-first-paint < 500 ms; p95 keystroke→paint < 16 ms over a 200-keystroke run mid-document; scroll through the full document without layout of all blocks (assert the cache realized < 30% of blocks); RSS delta for the widget < 100 MB. Bench binary modeled on `tst_live_render_table_typing_perf`. | `tst_canvas_perf_500` |
-| E10 | **Constitution**: `check-constitution.sh` passes on the final spike tree (C1–C4). | grep gate in CI |
+| # | Criterion | Falsifiable test | Result | Falsification SHA (plant / revert) |
+|---|---|---|---|---|
+| E1 | Typing printable chars at an arbitrary caret position updates `blockText()` and advances the caret; rendered text matches the buffer after each keystroke. | `typing_updates_buffer_and_caret` | **PASS** | `b9aa326a` / `cfb5bbf3` |
+| E2 | Enter mid-block splits the block; caret lands at byte 0 of the new block. Backspace at byte 0 merges with the previous block; caret lands at the join point. Block count and content verified via `iterateBlocks()`. | `enter_splits_backspace_merges_caret_at_join` | **PASS** | `81c18bbb` / `20bdec6a` |
+| E3 | Undo after E2's split restores the merged block **and** the caret references a block that exists (never a vanished `BlockId`); redo likewise. This is the queue-#10 invariant, natively. | `undo_redo_never_strand_caret` | **PASS** | `e44d9583` / `193de3fe` |
+| E4 | Cross-block drag selection with real mouse events works in **both directions** (the 2026-05-21 asymmetry class); Ctrl+C then puts all selected blocks' text on the clipboard; a printable key on the selection collapses it and inserts at the first corner. | `drag_selection_both_directions_copy_and_collapse` | **PASS** | `a12ffcfe` / `69a63d91` |
+| E5 | Kind transition: typing `# ` at byte 0 of a paragraph promotes it to Heading without losing focus or caret; the block re-renders in heading style. | `hash_space_promotes_heading_caret_survives` | **PASS** | `9eb50708` / `72f9d34a` |
+| E6 | IME: the five audit-L7 scenarios (commit-after-preedit, preedit-replace-commit, cancelled composition, commit into non-empty block, lifecycle probe) pass via `QInputMethodEvent`, with preedit visibly rendered (asserted via the layout's format ranges, not a screenshot). | `tst_canvas_ime` (5 slots) | **PASS** | `6771103f` / `8f04a5ae` |
+| E7 | Delimiter visibility: `**bold**` renders with delimiters hidden and content styled when the caret is outside the span; moving the caret into the span reveals the delimiters; editing while revealed round-trips correctly. | `delimiter_visibility_follows_caret` | **PASS** | `c3f2fb82` / `52656a65` |
+| E8 | Minimal table: caret can enter a cell by mouse, typing edits that cell's buffer only, adjacent cells and the following block are unaffected, and no crash on cell edit + repaint (the QML-Repeater UAF class must have no analogue). | `tst_canvas_table` | **PASS** | `fd3565a7` / `50b5e1a4` |
+| E9 | **Perf** (offscreen, release build, `-j 4` build cap per standing rule): on a 500-block synthetic document — load-to-first-paint < 500 ms; p95 keystroke→paint < 16 ms over a 200-keystroke run mid-document; scroll through the full document without layout of all blocks (assert the cache realized < 30% of blocks); RSS delta for the widget < 100 MB. Bench binary modeled on `tst_live_render_table_typing_perf`. | `tst_canvas_perf_500` | **PASS** (measured against `build-perf`, RelWithDebInfo — T10 finding: budget is real-build-sensitive, gated `#ifdef NDEBUG`) | n/a — no falsification seam for a perf-budget test (T10/T11 precedent) |
+| E10 | **Constitution**: `check-constitution.sh` passes on the final spike tree (C1–C4). | grep gate in CI | **PASS** — grep gate clean over 30 files (T0's planted-violation proof still stands; not re-run at T11 since it would require committing a non-compiling plant), **and** T11's manual line-by-line read of every canvas source file (2,864 lines across 14 files) found no renamed re-entrance guard, no disguised deferral, no QTextDocument/Quick text linkage, and no cross-block byte arithmetic. | n/a — grep gate + manual review, not a single-seam falsification |
 
 Pass = all ten. Anything less at timebox = the §6/§8 fail-or-extend
 path; there is no partial credit that quietly becomes "good enough."
+**T11 result: all ten criteria pass. See §9 (T11 entry) and §10.**
 
 ## 8. Execution shape
 
@@ -786,8 +787,109 @@ the tree.
   canvas: adds `tst_canvas_perf_500`), measured against `build-perf`
   (RelWithDebInfo).
 
+**T11 (2026-08-13) — constitution audit + verdict**
+
+- **Full suite: 288/288**, `scripts/run-tests.sh` against `build-dev`
+  (no `CMAKE_BUILD_TYPE`). No regression against the 277 standstill
+  baseline; the 11 canvas tests (T0–T10) all green.
+- **`check-constitution.sh`: clean, 30 files scanned, C1–C4.** Re-run
+  as part of this task, not just trusted from the last commit.
+- **Manual C1 read (the honest-review half of the gate — a renamed
+  guard passes grep) covered all 14 non-test source files, 2,864
+  lines: `View.{h,cpp}`, `BlockLayoutCache.{h,cpp}`,
+  `BlockPresentation.{h,cpp}`, `Coordinates.{h,cpp}`,
+  `InlineFormatting.{h,cpp}`, `InputPredicate.{h,cpp}`,
+  `KindTransition.{h,cpp}`, `TableGeometry.{h,cpp}`.** No hit. The two
+  pieces of view-side state beyond the caret — `m_selectionAnchor`
+  (T5) and `m_preeditText` (T8) — are both flagged in their own doc
+  comments as deliberate, bounded exceptions to "the view holds no
+  editable text state" (spec §2): neither is ever patched back into
+  `blockText()`, both are dropped/reset on the document changes that
+  would strand them (T5/T9 findings above), and neither suppresses a
+  reaction to the view's own write the way a C1 guard would — they
+  are cursor/composition state, not re-entrance flags. `m_hasFocus`
+  is a plain focus-tracking bool for paint, not a guard either.
+  `scrollContentsBy` not realizing (T1 finding) and the synchronous
+  `flushPendingD2Changed()` calls (T4/T6/T8 findings) remain the
+  structural answers to the two spots that would otherwise have
+  reached for a guard or a `singleShot(0)` — confirmed still true by
+  re-reading `ensureLayoutForViewport`, `scrollContentsBy`, and the
+  three flush call sites in `View.cpp`.
+- **C4 spot-check:** `Coordinates.cpp`'s byte↔QChar helper operates
+  only within one block's `QByteArray` (never a cross-block index);
+  every caller in `View.cpp`/`BlockLayoutCache.cpp` passes a single
+  block's `blockText()`/layout text. `selectedByteRangeInBlock`,
+  `collapseSelection`, and the table hit-test path (`hitTestTable`)
+  — the three places most tempted toward a flattened offset — all
+  keep `(BlockId, byte)` pairs throughout. No `applyFlatEdit`,
+  `flatView`, or `widgetFlatView` symbol appears anywhere in the leaf
+  (also covered by the grep gate).
+- **Findings carried forward for the D5 design** (collecting what
+  T1–T10 already flagged, not new discoveries):
+  - `KindTransition::inferBlockKind` and the `Coordinates` byte↔QChar
+    helper are duplicated verbatim from/parallel to markoff-live
+    (T2, T6 findings) — both are leaf-agnostic and should move into
+    `markoff-core` for the real leaf so both leaves consume one copy.
+  - `blockText()`'s marker convention is inconsistent across kinds
+    (Heading/CodeBlock keep their prefix, ListItem/BlockQuote don't —
+    T1 finding); canvas picked "keep, never strip" (T6), which is now
+    a live finding against `loadFromMarkdown`'s asymmetry, not fixed
+    here (standstill).
+  - `Theme::color()`'s TextDefault fallback silently produces
+    black-on-black for undefined background slots (T1 finding,
+    `QuoteBackground` specifically) — worked around locally
+    (`backgroundOrNone`), not fixed in Theme (standstill).
+  - Math's `$`/`$$` display-mode attr is classified but not wired to
+    `d2SetBlockAttr` (T6 finding) — inert unless a caller adds it.
+  - Selection collapse across a ListItem boundary is unhandled (T5
+    finding): `StructuralKeyHandler`'s outdent branch, not a merge,
+    fires instead, leaving the collapse trimmed-but-not-joined. Not
+    exercised by E4's plain-paragraph fixture; a gap for the real
+    leaf's selection code, not a spike defect.
+  - Accessibility (`QAccessibleTextInterface`) is out of spike scope
+    per §5 and remains an explicit, unpriced-in-weeks-but-real cost of
+    the real leaf — no accessibility work of any kind exists in this
+    tree.
+  - E9's load-to-first-paint budget only holds under an optimized
+    build (T10 finding) — the real leaf's perf story should keep
+    citing the `build-perf` (RelWithDebInfo) numbers, not `build-dev`'s.
+- **No new constitution violation, no near-miss, surfaced during this
+  audit that wasn't already caught and fixed in its originating task**
+  (T1's fixed-point-loop-not-a-guard, T4/T6/T8's flush-not-defer, T7's
+  restyleInline atomicity). The constitution's cost across the whole
+  spike reads as: caught a handful of reflexive violations early
+  (T0's demo-app `singleShot`, T1's scrollbar re-entrance temptation),
+  and in at least two documented cases (T1 fixed-point loop,
+  T1 `scrollContentsBy` non-realizing) forced a *better* design than
+  the guard/defer shortcut would have produced, at effectively zero
+  ongoing authoring cost by T5 onward — nobody reached for a guard or
+  a `singleShot(0)` after T1.
+
 ## 10. Verdict (fill at close)
 
-- **Result:** —
-- **Criteria table with falsification SHAs:** —
-- **Recommendation to the D5 design:** —
+- **Result: PASS.** All ten exit criteria (E1–E10) met, all with
+  falsification proof (E9/E10 exempted from the seam-break format for
+  the reasons stated in the table and T10/T11's findings). Constitution
+  (C1–C4) intact end to end — zero grep-gate hits, zero renamed-guard
+  hits on manual review, no near-misses left unresolved. Full suite
+  288/288.
+- **Criteria table with falsification SHAs:** see §7 above (populated
+  from the plan's task checklist, cross-checked against this task's
+  re-run of the suite and the gate).
+- **Recommendation to the D5 design:** the premise (§1) holds — a view
+  leaf that owns zero editable text state and renders `MarkoffDocument`
+  directly via per-block `QTextLayout` needed no re-entrance guard, no
+  view-side deferral, no second document model, and no cross-block
+  coordinate space across all ten criteria, including the ones judged
+  likeliest to force one (undo/redo caret survival, cross-block
+  selection, IME preedit splicing, and a 2-D table grid inside a 1-D
+  block sequence). Recommend proceeding to the D5 design as the
+  candidate replacement architecture, with the contingent retirement
+  question (markoff-live, possibly markoff-styled — decision record
+  §5.3) now backed by a passing spike rather than a hypothesis. Before
+  scoping D5's own task list, budget explicitly for: the two
+  core-promotion duplications (`KindTransition`, `Coordinates`), the
+  `loadFromMarkdown` marker-convention asymmetry, the `Theme`
+  background-fallback sharp edge, and — the largest unpriced item —
+  accessibility, none of which this spike needed to touch but all of
+  which a real leaf must.

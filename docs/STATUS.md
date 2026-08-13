@@ -5,28 +5,30 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-13 (board reset for the canvas spike)
+**Last updated:** 2026-08-13 (canvas spike closed — PASS)
 
-## Workfront — markoff-canvas spike
+## Workfront — markoff-canvas spike: CLOSED, PASS
 
-Projection view leaf on `QTextLayout`; candidate replacement for the
-widget-composition leaves. **Implementers: do the topmost unchecked
-task in [`docs/plans/2026-08-13-markoff-canvas-spike.md`](plans/2026-08-13-markoff-canvas-spike.md)**
-(progress is tracked in that plan's checklist, not here). Spec:
-[`specs/2026-08-13-markoff-canvas-spike-design.md`](specs/2026-08-13-markoff-canvas-spike-design.md).
-Decision record:
-[`specs/2026-08-13-view-authority-direction-decision.md`](specs/2026-08-13-view-authority-direction-decision.md).
+Projection view leaf on `QTextLayout`, candidate replacement for the
+widget-composition leaves. All ten exit criteria (E1–E10) passed with
+falsification proof; constitution (C1–C4) intact end to end, confirmed
+by both the grep gate and T11's manual line-by-line read of every
+canvas source file. Verdict and recommendation to the D5 design:
+[`specs/2026-08-13-markoff-canvas-spike-design.md`](specs/2026-08-13-markoff-canvas-spike-design.md)
+§10. Full task history/findings: same spec §9; task checklist + SHAs:
+[`plans/2026-08-13-markoff-canvas-spike.md`](plans/2026-08-13-markoff-canvas-spike.md).
 
-**Spike state:** not started (T0 next). Timebox: ~3 weeks from the T0
-commit.
-
-**Standstill:** live/styled/source + core are bug-fix-only until the
-spike closes.
+**Next:** the D5 design (candidate architecture + contingent
+retirement of markoff-live/styled, decision record §5.3) is a new,
+not-yet-opened arc — a user decision, not an implementer default.
+Until D5 opens, treat the whole tree (including `libs/markoff-canvas/`)
+as bug-fix-only.
 
 ## Test baseline
 
-**277/277 (100%)** on the full `scripts/run-tests.sh`, verified
-2026-08-13. Any failure is a new regression (classify before fixing).
+**288/288 (100%)** on the full `scripts/run-tests.sh` (277 standstill
++ 11 canvas), verified 2026-08-13 at spike close. Any failure is a new
+regression (classify before fixing).
 
 ## Dormant items (not to be worked during the spike)
 
