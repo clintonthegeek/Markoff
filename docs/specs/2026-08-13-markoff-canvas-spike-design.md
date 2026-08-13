@@ -489,6 +489,54 @@ the tree.
 - Full suite after T5: **283/283** (277 standstill baseline + 6
   canvas: adds `tst_canvas_selection`).
 
+**T6 (2026-08-13) — kind transitions**
+
+- **Decided the T1 finding's open question: canvas convention is
+  "buffer keeps the matched marker."** T1 (spec §9 above) flagged
+  that a *loaded* Heading's buffer keeps its `# ` prefix while
+  ListItem/BlockQuote are narrowed to content, and asked T6 to pick a
+  side rather than silently stripping on promotion. Picked "keep" —
+  `promoteCaretBlockKind()` calls only `d2SetBlockKind`, never a
+  `d2ApplyBufferEdit` strip. A typed `# Hello` and a loaded `# Hello`
+  are now byte-identical, which was the whole point of flagging it;
+  the alternative (content-only buffers for Heading/CodeBlock) would
+  have been a `loadFromMarkdown` finding against core, not a leaf fix,
+  per T1's own framing.
+- **`KindTransition::inferBlockKind` is copied, not shared, per the
+  plan's explicit instruction** — `libs/markoff-live/src/KindTransition.{h,cpp}`
+  is leaf-internal and this leaf may not link `markoff_live`
+  (constitution C3's link-line half, enforced by
+  `check-constitution.sh`). The copy
+  (`libs/markoff-canvas/src/KindTransition.{h,cpp}`) returns the
+  `Markoff::BlockKind` enum directly instead of live's `QString`
+  constants, since canvas talks to `MarkoffDocument::blockKind()`/
+  `d2SetBlockKind()` in enum terms with no string-keyed registry in
+  between. This is spike-throwaway duplication, flagged for the real
+  leaf to resolve by promoting the rule-set into `markoff-core` so
+  both leaves consume one copy — same note the plan already carries.
+- **Math's `$`/`$$` display-mode attr is deliberately left unwired.**
+  Live's `inferBlockKind` takes an out-param to distinguish inline
+  vs. display math; the canvas copy drops it since E5's scope is the
+  Paragraph→Heading path and there is no `d2SetBlockAttr` call site
+  in this leaf yet. `inferBlockKind` still classifies `$...`/`$$...`
+  as `BlockKind::Math` (guard "only promote FROM Paragraph" makes
+  this inert unless something later wires the attr too), but a typed
+  block starting with `$` will promote to Math without display-mode
+  set — noted here rather than silently shipped.
+- **Kind promotion needed the same synchronous-flush treatment T4 gave
+  undo/redo.** `promoteCaretBlockKind()` runs from `onDocumentChanged`,
+  which only fires on the *debounced* `d2DocumentChanged` — normally a
+  `QTimer::singleShot(0)` away. `insertPrintable`'s caller now calls
+  `flushPendingD2Changed()` right after, same trick as T4's
+  undo/redo path (spec §9 above), so a test driving a real `# `
+  keystroke sequence sees the promoted kind before `keyPressEvent`
+  returns, with no `QTest::qWait`. Not new discipline — restating
+  what T4 already established, needed a second time because T5
+  (selection/clipboard) didn't touch any document-change-triggered
+  side effect and so didn't need it.
+- Full suite after T6: **284/284** (277 standstill baseline + 7
+  canvas: adds `tst_canvas_kind_transition`).
+
 ## 10. Verdict (fill at close)
 
 - **Result:** —

@@ -190,7 +190,7 @@ Fill SHAs as you go. "Fals." = falsification throwaway commit SHA
 | T3 structural keys: split/merge (E2) | ☑ | `a798c10e` | `81c18bbb` / `20bdec6a` |
 | T4 undo/redo caret survival (E3) | ☑ | `93ac3ff4` | `e44d9583` / `193de3fe` |
 | T5 selection + clipboard (E4) | ☑ | `9eb842d6` | `a12ffcfe` / `69a63d91` |
-| T6 kind transitions (E5) | ☐ | — | — |
+| T6 kind transitions (E5) | ☑ | `b0e030f3` | `9eb50708` / `72f9d34a` |
 | T7 inline spans + delimiter visibility (E7) | ☐ | — | — |
 | T8 IME (E6) | ☐ | — | — |
 | T9 minimal table (E8) | ☐ | — | — |
