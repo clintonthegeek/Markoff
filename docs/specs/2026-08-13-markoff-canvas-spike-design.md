@@ -241,6 +241,78 @@ the tree.
   `View::paintEvent` is empty, so the widget does not yet paint its own
   background. Theme-driven background fill lands with the paint path.
 
+**T1 (2026-08-13) — read-only render, lazy layout, scroll**
+
+- **`blockText()`'s marker convention is inconsistent across kinds, and
+  it is load-bearing for T6/T7.** Verified empirically against
+  `loadFromMarkdown` (kind → buffer):
+  `ListItem` → `one QTextLayout per block` (marker stripped),
+  `BlockQuote` → `A block quote…` (`> ` stripped),
+  but `Heading` → `# Canvas spike` (prefix **kept**) and
+  `CodeBlock` → ` ```cpp\nint main…\n``` ` (fences **kept**).
+  So two kinds are narrowed to content and two are not. The core's own
+  `listItemDisplayMarker()` doc comment asserts the opposite ("unlike
+  every other BlockKind, whose markers stay inline") — it is right about
+  ListItem, wrong about BlockQuote.
+  **Consequence for T6:** the plan's step "promote to Heading + strip the
+  `# ` prefix via `d2ApplyBufferEdit`" would leave a *typed* heading's
+  buffer without the prefix while a *loaded* heading's buffer has one —
+  two representations of the same block, which is the class of divergence
+  this whole leaf exists to avoid. **T6 must not strip.** Decide there
+  whether the canvas convention is "buffer keeps ATX prefix" (then T6
+  only changes kind) or "buffer is content-only" (then the gap is in
+  `loadFromMarkdown`, which is core, which is standstill — so it becomes
+  a finding, not a fix).
+  **Consequence for T7:** hiding `# ` and ``` ``` ``` is the same
+  mechanism as hiding `**` delimiters. T1 renders them verbatim rather
+  than inventing a byte remap early; T7's elide-vs-invisible decision now
+  covers three delimiter classes, not one.
+- **`QTextLayout` does not break on `\n`.** It breaks on width, or on
+  `QChar::LineSeparator` — nothing else. A code block rendered as one
+  run-on line until `BlockLayoutCache` substituted U+2028 at the layout
+  boundary. The substitution is 1 QChar → 1 QChar, so QChar indices still
+  align with the block's real text. **T2 trap:** the byte↔QChar helper
+  must convert against `doc.blockText(id)`, never against the layout
+  string — U+2028 is 1 byte as `\n` but 3 as itself, so a naive
+  `layoutText.left(i).toUtf8().size()` is wrong by 2 per preceding
+  newline. Guarded by `newlines_inside_a_block_break_lines`.
+- **`Theme::color()` falls back to `TextDefault` for undefined slots**,
+  which is actively harmful for background slots: it returns the *text*
+  colour. `QuoteBackground` is defined in neither `defaultLight()` nor
+  `defaultDark()`, so blockquotes painted a black slab under black text.
+  The leaf now treats "resolves to exactly TextDefault" as "undefined"
+  (`backgroundOrNone`). Real Theme sharp edge, not spike-specific — worth
+  raising against core once the standstill lifts.
+- **Lazy layout needed a fixed-point loop, and the obvious alternatives
+  were both constitution violations.** Realizing corrects estimated
+  heights → the scroll range moves → a bottom-parked viewport must
+  re-pin → different blocks come into view. Ctrl+End first landed 23px
+  short of the end for exactly this reason. The reflexes are (a) a
+  `singleShot(0)` to "settle next spin" (C2) and (b) a re-entrance guard
+  around the scrollbar write, since `setValue` re-enters
+  `scrollContentsBy` (C1). Neither was needed: `ensureLayoutForViewport`
+  iterates to a fixed point synchronously (realization is monotonic, so
+  it terminates; cap 4 passes), and **`scrollContentsBy` deliberately
+  does not realize** — `paintEvent` is the single place estimates become
+  layouts, so the recursion cannot form. Structuring it away beat
+  guarding it. Second bite of the constitution, second time the
+  constraint improved the design rather than costing anything.
+- **A structural edit invalidates every cached style.** `blockKind`/attr
+  changes bump only `structuralEditSequence()` (global), not per-block
+  `blockEditSequence()`, so there is no way to tell *which* block's kind
+  moved. `sync()` restyles all blocks when the structural sequence
+  changes. Content typing — the case that must stay cheap, and the one
+  T10 measures — is untouched. If T10 shows this hurting, the fix is a
+  targeted core signal, i.e. a finding, not a leaf workaround.
+- **Numbers, first light:** the mixed-kind fixture (9 blocks) fully
+  realizes; a 200-block document realizes ~11% on first paint in a
+  600×400 viewport and stays under 100% after Ctrl+End (the middle is
+  never laid out). Real E9 measurement is T10's.
+- The manual harness takes `MARKOFF_CANVAS_GRAB=<path.png>` and renders
+  to a file, so the leaf can be eyeballed offscreen without `--direct`.
+  Both T1 rendering defects above were found by looking at that grab,
+  not by a failing test — worth keeping in the loop for later tasks.
+
 ## 10. Verdict (fill at close)
 
 - **Result:** —

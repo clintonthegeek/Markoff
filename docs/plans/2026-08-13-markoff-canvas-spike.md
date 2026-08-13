@@ -129,7 +129,7 @@ Fill SHAs as you go. "Fals." = falsification throwaway commit SHA
 | Task | Done | Commit | Fals. |
 |---|---|---|---|
 | T0 scaffold + constitution gate | ☑ | `a543e6e3` | n/a (gate proven by planted violation, not committed — spec §9) |
-| T1 read-only render + scroll | ☐ | — | n/a |
+| T1 read-only render + scroll | ☑ | `T1SHA` | n/a |
 | T2 caret + hit-test + typing (E1) | ☐ | — | — |
 | T3 structural keys: split/merge (E2) | ☐ | — | — |
 | T4 undo/redo caret survival (E3) | ☐ | — | — |
@@ -190,6 +190,11 @@ paint, assert heights/y monotonic.
 cheap smoke), tests green.
 
 ### T2 — caret, hit-test, typing (exit E1)
+
+> **T1 trap (spec §9):** the layout string is NOT the block's text —
+> `\n` is substituted with `QChar::LineSeparator` so QTextLayout breaks
+> lines at all. Indices align 1:1, but bytes do not. Convert against
+> `doc.blockText(id)`, never `layout.text()`.
 
 `CanvasCursor { BlockId block; int byteOffset; }` owned by the view.
 Mouse press → block by y-lookup → `QTextLayout::lineAt/xToCursor` →
@@ -267,9 +272,18 @@ ordering for the upward case.
 
 ### T6 — kind transitions (exit E5)
 
+> **Read spec §9's T1 entry before starting: "do not strip" now
+> overrides the prefix-strip below.** T1 established empirically that a
+> *loaded* Heading's buffer keeps its `# ` prefix (and a CodeBlock keeps
+> its fences), while ListItem and BlockQuote are narrowed to content.
+> Stripping on promotion would make a typed heading differ from a loaded
+> one — the exact divergence this leaf exists to avoid. Change the kind,
+> leave the bytes, and record which convention the canvas should adopt.
+
 On `d2DocumentChanged`, for the caret's block only (spike scope):
 infer kind from text and compare to `blockKind()`; on mismatch issue
-`d2SetBlockKind` (+ prefix strip via `d2ApplyBufferEdit`) in one
+`d2SetBlockKind` (+ prefix strip via `d2ApplyBufferEdit` — **but see the
+note above; T1 says do not strip**) in one
 transaction — the `# ` → Heading path. Reuse the *rules* of
 `KindTransition::inferBlockKind` by **copying the function pair into
 the canvas leaf** (`libs/markoff-live/src/KindTransition.{h,cpp}` is
@@ -285,6 +299,12 @@ Heading, prefix stripped, caret at byte 0 of content, widget still
 `hasFocus()`. **Falsify:** skip the caret fix-up after the strip.
 
 ### T7 — inline spans + delimiter visibility (exit E7)
+
+> **T1 finding (spec §9): three delimiter classes, not one.** Heading
+> `# ` prefixes and code-block ``` ``` ``` fences live in the buffer too
+> and currently render verbatim. Whatever mechanism you choose here
+> (elide + remap, or invisible-but-present) should be the answer for
+> those as well — decide once, state the scope in spec §9.
 
 `QTextLayout::setFormats()` from `inlineSpansFor(id)` (convert span
 byte ranges → QChar ranges with the one helper): bold/italic/inline-

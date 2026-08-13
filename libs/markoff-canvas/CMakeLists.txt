@@ -18,6 +18,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(markoff_canvas STATIC
     include/markoff/canvas/View.h
     src/View.cpp
+    src/BlockLayoutCache.h
+    src/BlockLayoutCache.cpp
+    src/BlockPresentation.h
+    src/BlockPresentation.cpp
 )
 
 target_include_directories(markoff_canvas

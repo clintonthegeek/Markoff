@@ -1,0 +1,86 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+#pragma once
+
+#include <memory>
+#include <vector>
+
+#include <QHash>
+#include <QTextLayout>
+
+#include <markoff/core/BlockId.h>
+
+#include "BlockPresentation.h"
+
+namespace Markoff {
+class MarkoffDocument;
+class Theme;
+}
+
+namespace Markoff::Canvas {
+
+/**
+ * Derived layout state for the document's blocks, in document order.
+ *
+ * Authority (spec §2): this is a CACHE, not a model. Every entry is
+ * keyed by (BlockId, blockEditSequence) and is rebuilt from blockText()
+ * when that key moves. Nothing is ever patched in place from view-side
+ * state — there is no view-side state to patch it from.
+ *
+ * Laziness: sync() gives every block an *estimated* height computed from
+ * font metrics and a newline count, without building a QTextLayout.
+ * realizeRange() builds real layouts only for the blocks intersecting a
+ * y-range (the viewport plus a margin). y-positions are a prefix sum over
+ * whichever height each block currently has, so the scroll range is
+ * correct-ish immediately and exact for the region you have looked at.
+ */
+class BlockLayoutCache {
+public:
+    struct Entry {
+        BlockId id;
+        std::unique_ptr<QTextLayout> layout;  //!< null until realized
+        BlockStyle style;
+        quint64 seq      = 0;      //!< blockEditSequence when measured
+        qreal   y        = 0;      //!< top of the block, document coords
+        qreal   height   = 0;      //!< estimated, or exact once realized
+        bool    realized = false;
+    };
+
+    /// Text column width available to layouts. A change invalidates every
+    /// realized layout (wrapping depends on it) but keeps the order.
+    void setTextWidth(qreal width);
+    qreal textWidth() const { return m_textWidth; }
+
+    /// Reconcile with the document: adopt the current block order, drop
+    /// layouts whose (id, seq) key moved, re-measure estimates for those.
+    /// Cheap enough to call on every d2DocumentChanged.
+    void sync(const MarkoffDocument &doc, const Theme &theme);
+
+    /// Build real layouts for every block intersecting [top, bottom) in
+    /// document coordinates. Returns true if anything was realized (i.e.
+    /// heights moved and the caller should refresh its scroll range).
+    bool realizeRange(const MarkoffDocument &doc, qreal top, qreal bottom);
+
+    void clear();
+
+    const std::vector<Entry> &entries() const { return m_entries; }
+    qreal totalHeight() const { return m_totalHeight; }
+    int   realizedCount() const;
+
+    /// Index of the block containing document-y, or the nearest one when y
+    /// falls in a margin. -1 only when the document is empty.
+    int indexAtY(qreal y) const;
+    int indexOf(BlockId id) const;
+
+private:
+    void  recomputePositions();
+    qreal estimateHeight(const MarkoffDocument &doc, const Entry &e) const;
+    void  realize(const MarkoffDocument &doc, Entry &e);
+
+    std::vector<Entry>  m_entries;
+    QHash<BlockId, int> m_index;        //!< id → position in m_entries
+    qreal   m_textWidth      = 0;
+    qreal   m_totalHeight    = 0;
+    quint64 m_structuralSeq  = 0;
+};
+
+}  // namespace Markoff::Canvas

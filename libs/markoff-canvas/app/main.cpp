@@ -22,7 +22,20 @@ int main(int argc, char **argv)
         "A projection view over MarkoffDocument.\n"
         "\n"
         "- one QTextLayout per block\n"
-        "- no second document model\n");
+        "- no second document model\n"
+        "\n"
+        "## Kinds\n"
+        "\n"
+        "> A block quote, rendered with a bar and its own colour.\n"
+        "\n"
+        "```cpp\n"
+        "int main() { return 0; }\n"
+        "```\n"
+        "\n"
+        "---\n"
+        "\n"
+        "A closing paragraph long enough to wrap across more than one line "
+        "so that word wrapping is visible in the grab as well.\n");
 
     Markoff::Canvas::View view;
     view.setDocument(&doc);
@@ -36,6 +49,14 @@ int main(int argc, char **argv)
     // this leaf, and the gate does not make exceptions for demo code.
     if (qEnvironmentVariable("QT_QPA_PLATFORM") == QLatin1String("offscreen")) {
         QCoreApplication::processEvents();
+        // MARKOFF_CANVAS_GRAB=<path.png> renders the widget to a file, so
+        // the leaf can be eyeballed without a visible session
+        // (scripts/run-tests.sh --direct needs per-task permission).
+        const QString grabPath = qEnvironmentVariable("MARKOFF_CANVAS_GRAB");
+        if (!grabPath.isEmpty() && !view.grab().save(grabPath)) {
+            qWarning("failed to write grab to %s", qUtf8Printable(grabPath));
+            return 1;
+        }
         return 0;
     }
 
