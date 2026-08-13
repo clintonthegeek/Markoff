@@ -537,6 +537,80 @@ the tree.
 - Full suite after T6: **284/284** (277 standstill baseline + 7
   canvas: adds `tst_canvas_kind_transition`).
 
+**T7 (2026-08-13) — inline spans + delimiter visibility**
+
+- **Decided the T7 delimiter-visibility mechanism: invisible-but-present,
+  not elide-and-remap.** Hidden delimiter runs get a `QTextCharFormat`
+  whose foreground equals the block's own background (falling back to
+  `Theme::Slot::EditorBackground` for blocks that paint none) — same
+  choice the plan flagged as "simpler and acceptable for the spike."
+  `SourceSpan::isDelimiter` already covers all three delimiter classes
+  the T1 finding named (emphasis/strong markers, ATX `# ` prefixes,
+  fenced-code delimiters/info-string/language) with one code path — no
+  per-kind special-casing was needed, because `MarkoffDocument::
+  inlineSpansFor` returns the same span shape regardless of which block
+  kind produced it.
+- **`SourceSpan::charOffset`/`charLength` are already block-relative
+  QChar indices — the plan's "convert span byte ranges → QChar ranges
+  with the one helper" undersold what's on the struct.** The parser
+  (`TreeSitterParser.cpp`) computes `charOffset` via
+  `buildUtf8ToCharMap` at parse time and `MarkoffDocument::
+  inlineSpansFor` rebases it to be block-relative
+  (`rel.charOffset = s.charOffset - blockCharStart`). Since
+  `BlockLayoutCache`'s layout text substitutes `\n` → `QChar::
+  LineSeparator` 1-for-1, the span's char offset is valid directly
+  against the layout text with no conversion step. The byte↔QChar
+  helper (`Coordinates.h`) is still the one required conversion, but
+  only for the caret's own byte offset when comparing it against a
+  span's `parentCharStart`/`parentCharEnd` — logged here since a future
+  reader who takes the plan's wording literally will look for a
+  conversion that isn't needed.
+- **`QTextLayout::setFormats()` unconditionally invalidates line data,
+  even long after the owning layout's own `beginLayout()`/`endLayout()`
+  pass — a real trap for T7's "recompute on caret move for the affected
+  block(s) only" instruction.** `QTextEngine::setFormats()` (Qt 6.11.1,
+  `qtextengine.cpp`) calls `invalidate()` + `clearLineData()` whenever
+  the format list is non-empty, with no path that rebuilds `lines`
+  afterward on its own. The first implementation called `setFormats()`
+  once inside `realize()` (fine, since the immediately-following
+  `beginLayout()`/`createLine()` pass rebuilds lines regardless) but
+  then called it a *second* time, standalone, from `BlockLayoutCache::
+  setCaret()` on an already-realized entry — exactly the "just restyle
+  the affected block" optimization the plan asks for. That second call
+  silently zeroed `lineCount()` for the block with no compile error, no
+  test failure at the format-application site, and no crash: every
+  *subsequent* line-based query (hit-test, `moveCaretToLineEdge`,
+  vertical caret motion) on that block just silently no-op'd instead,
+  which read at first like a caret-placement bug in `View`, not a
+  layout-cache one — cost real debugging time to trace back through
+  `moveCaretToLineEdge`'s early-return-on-invalid-line to the actual
+  cause. Fix: `restyleInline()` now owns the *entire*
+  `setFormats()` → `beginLayout()`/`createLine()`/`endLayout()`
+  sequence as one atomic unit and is the only thing that runs it —
+  `realize()` calls it once for the initial build, `setCaret()` calls
+  it again for a pure caret-move restyle, and both paths are safe
+  because every call rebuilds lines itself. Height is recomputed on
+  every call as a side effect (same text/width in the caret-only path,
+  so no observable drift) rather than threading a "skip re-layout"
+  flag through — simpler, and the extra `createLine()` pass on a
+  caret-only move is one block's worth of work, not a document-wide
+  one. Worth flagging for the real leaf: any future per-block QTextLayout
+  cache that calls `setFormats()` outside the block's own initial
+  layout pass will hit this same trap.
+- E7's falsification test (`delimiter_visibility_follows_caret`)
+  needed an explicit `realizedBlockCount() == 1` assertion right after
+  the first caret placement, not just `isDelimiterHiddenAt()` calls —
+  `isDelimiterHiddenAt()` returns `false` both for "genuinely revealed"
+  and for "block isn't realized, can't tell," so a "delimiters reveal"
+  assertion without that guard would pass vacuously if realization
+  regressed. Caught this while chasing the `setFormats()` bug above:
+  the "reveal" assertions kept passing throughout because they were
+  accidentally insensitive to the very defect the "hide" assertions
+  (which require a `true` return, not ambiguous with unrealized) were
+  catching.
+- Full suite after T7: **285/285** (277 standstill baseline + 8
+  canvas: adds `tst_canvas_inline_formatting`).
+
 ## 10. Verdict (fill at close)
 
 - **Result:** —
