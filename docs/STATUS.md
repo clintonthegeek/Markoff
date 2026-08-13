@@ -26,26 +26,32 @@ spec `docs/specs/2026-06-12-replace-matches-primitive-design.md`.
 
 **Workfront: Corbomite adoption.** Brief:
 [`docs/handoff/2026-06-09-corbomite-api-adoption-brief.md`](handoff/2026-06-09-corbomite-api-adoption-brief.md).
-As of 2026-08-12, Corbomite has been re-pinning to Markoff master after
-almost every commit (last re-pin `fde31e82` → Markoff `b349f122`, only
-2 commits behind current Markoff HEAD `2a551cde`); the migration-table
-call-site work (find-attach switch, undo/redo dual-authority fix, theme
+**Corbomite adoption is done as of 2026-08-12** (Corbomite `e9d70a8b`):
+re-pinned to Markoff master `2a551cde`; the migration-table call-site
+work (find-attach switch, undo/redo dual-authority fix, theme
 propagation, format-verb re-wire, contextChanged hook-up, cursor/scroll
-APIs, reading-mode find) is being landed on the Corbomite side now. No
-further Markoff code changes are required for the adoption itself — it
-is purely a consumer call-site migration.
+APIs, reading-mode find) turned out to already be implemented on
+Corbomite's `feature/find-replace` branch from an earlier adoption pass
+— verified against the brief's migration table item-by-item. Corbomite
+full ctest: 116/117 (the one failure, `tst_benchmark_layout`, is an
+unrelated `forcegraph` submodule benchmark timing out under build
+contention, not a correctness regression).
 
 ## Test baseline
 
-**268/271** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
-(re-verified 2026-08-12 after a ~2-month idle period — clean rebuild,
-no drift from baseline). The 3 failing binaries
-— `tst_live_render_e2_nav_shift_extend` (2 slots),
-`tst_live_render_focus_chokepoint_invariant` (3 slots),
-`tst_live_render_cursor_typing_invariant` (1 slot) — are
-**deterministic, not flakes**, and queue #10 tracks their triage.
-`tst_realistic` passes; `tst_benchmark` excluded from the fast loop for
-time.
+**272/274** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
+(re-verified 2026-08-12). Queue #10 triage closed 2/6 previously-failing
+slots this session (`tst_live_render_e2_nav_shift_extend`, both slots —
+reshaped to match `LiveNavigationController`'s correct current
+behavior). The 2 remaining failing binaries
+— `tst_live_render_focus_chokepoint_invariant` (3 slots: undo/redo
+caret restoration, needs a `UndoLog` selection-snapshot extension) and
+`tst_live_render_cursor_typing_invariant` (1 slot: paste-without-
+selection silently no-ops, needs a `LiveCursorState`/
+`LiveClipboardController` decision) — are **deterministic, not
+flakes**, diagnosed in detail in queue #10 with a concrete next step
+for each. `tst_realistic` passes; `tst_benchmark` excluded from the
+fast loop for time.
 
 ## Arc dispositions
 
@@ -59,13 +65,13 @@ time.
 
 ## Open items (summary — details in `docs/queue.md`)
 
-- **#8.3** — source-view list-item marker reconstruction (source widget
-  shows `foo` for `- foo`).
-- **#10** — deterministic live-test failures (the "3 known offscreen
-  flakes" relabeled honestly; 6 slots, classifications inside).
-- **#11** — legacy flat-buffer APIs (`SearchEngine::findAll`,
-  `CompletionDetector`) documented as legacy-coordinate-space; retire
-  or migrate with the legacy buffer.
+- ~~**#8.3**~~ — closed 2026-08-12: source-view list-item markers now
+  render via paint-time decoration.
+- **#10** — deterministic live-test failures; 2/6 slots closed
+  2026-08-12, 4 remain (3 undo/redo caret restoration, 1
+  paste-without-selection) with written diagnoses and next steps.
+- ~~**#11**~~ — closed 2026-08-12: legacy `SearchEngine::findAll`/
+  `CompletionDetector` deleted (zero production callers, confirmed).
 - **#12** — `EmbedRegistry` has zero test coverage despite being
   Corbomite-consumed.
 - **#13** — *(retired queue item numbering; was "source cursor/selection
