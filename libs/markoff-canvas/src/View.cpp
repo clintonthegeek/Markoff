@@ -353,8 +353,8 @@ bool View::tryStructuralKey(QKeyEvent *event)
     if (!r.handled)
         return false;
 
-    // FALSIFICATION PLANT (throwaway, do not keep): skip the caret
-    // application StructuralKeyHandler tells us to make.
+    m_caret.block = r.caretBlock;
+    m_caret.byteOffset = int(r.caretByteInBlock);
     return true;
 }
 
