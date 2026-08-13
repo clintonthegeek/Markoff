@@ -9,6 +9,31 @@ their banner, not the present.
 
 ---
 
+> **2026-08-13 — Contract-v2 arc + Corbomite adoption closed; canvas spike opens.**
+>
+> Superseded STATUS.md body, moved here when the board was reset for the
+> canvas spike: Contract-v2 arc COMPLETE (spec
+> `docs/specs/2026-06-09-markdownview-contract-v2-design.md`, plan with
+> SHAs `docs/plans/2026-06-09-markdownview-contract-v2.md`, plus
+> follow-ons: `caretRect()` `39c5423b..cdd2bd3c`, `replaceMatches`/
+> `selectMatchAtOrAfter` `ee77b157`/`b349f122`, findSpans preservation
+> `c3b5070f`). **Corbomite adoption done 2026-08-12** (Corbomite
+> `e9d70a8b`, re-pinned to Markoff `2a551cde`); migration-table call-site
+> work verified item-by-item against the brief
+> (`docs/handoff/2026-06-09-corbomite-api-adoption-brief.md`); Corbomite
+> ctest 116/117 (one unrelated forcegraph benchmark timeout). Test
+> baseline **277/277** verified 2026-08-13 — queue #10 fully closed (all
+> 6 slots; decisions: chokepoint-owns-caret-after-undo,
+> collapsed-cursor-is-valid-paste-target; bonus fixes: delegate
+> focus-before-cursorPosition ordering, `applyFlatEdit` block-boundary
+> byte ambiguity). Queue #8.3/#11/#12/#14/#15/#16 all closed 2026-08-12..13
+> (details in `docs/archive/2026-08-13-queue-pre-canvas-snapshot.md`).
+> Corbomite pin guidance: jump to current master when next touched; never
+> pin into `8c13c5d..079ac1f` (list-after-table SIGSEGV window, fixed
+> `b1b238f`). Same day: view-layer direction decided (qtbase fork
+> rejected; projection-view spike authorized) — see
+> `docs/specs/2026-08-13-view-authority-direction-decision.md`.
+
 > **2026-06-14 — Find/Replace primitives for Corbomite + stuck-highlight fix.**
 >
 > Driven by Corbomite's Find/Replace feature. Two small additions to
