@@ -201,7 +201,27 @@ private Q_SLOTS:
 
     // ---- G2: Ctrl+Shift+Left ----
 
-    void ctrl_shift_left_inside_block_returns_not_handled() {
+    // Renamed 2026-06-16 (queue #10 item 1). Pre-audit-L4 (commit `0cbdf48`)
+    // Ctrl+Shift+Left/Right within a block fell through to native TextEdit
+    // word-select, so tryHandle correctly returned NotHandled. Audit L4
+    // (`docs/specs/2026-05-21-audit-L4-ctrl-shift-word-extend.md`) deliberately
+    // changed this: `LiveNavigationController::tryHandle` now claims the
+    // chord within-block too, computing the word boundary in C++ and routing
+    // through `cursorState->begin/extend` so the document-layer selection
+    // anchor stays authoritative — the native-selection path left
+    // `m_selectionAnchor` empty, which silently broke Ctrl+C after a
+    // Ctrl+Shift+Left/Right word-extend. That fix is closed, ratified, and
+    // pinned by its own falsifiable QML test
+    // (`tst_live_render_ctrl_shift_word_extend_qml`, 5 slots, all green) —
+    // the production chord-claiming behavior is correct. These two slots
+    // were never updated when L4 landed; they were asserting the retired
+    // pre-L4 contract, not exercising a real regression. Checked: no
+    // production callsite (all delegates: UnifiedInlineTextDelegate,
+    // CodeBlockDelegate, BlockOnlyDelegateBase, TableDelegate, MathDelegate)
+    // treats a NotHandled return from this chord specially — every callsite
+    // just does `event.accepted = (tryHandle(...) != NotHandled)`. Reshaping
+    // to match the current, intentional contract.
+    void ctrl_shift_left_inside_block_claims_the_chord() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
@@ -209,17 +229,16 @@ private Q_SLOTS:
         auto *nav = binding.navigationController();
         QVERIFY(nav);
 
-        // qtPos > 0: native word-select handles within block
         const int result = nav->tryHandle(Qt::Key_Left,
                                           Qt::ControlModifier | Qt::ShiftModifier,
                                           1, 5, nullptr, QStringLiteral("hello world"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
     }
 
     // ctrl_shift_left_at_block_start_extends_into_prev_block moved to
     // tst_live_render_e2_nav_shift_extend_qml.cpp (chokepoint).
 
-    void ctrl_shift_right_inside_block_returns_not_handled() {
+    void ctrl_shift_right_inside_block_claims_the_chord() {
         Markoff::MarkoffDocument doc(/*replicaId=*/1);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
@@ -227,11 +246,10 @@ private Q_SLOTS:
         auto *nav = binding.navigationController();
         QVERIFY(nav);
 
-        // qtPos < length: native word-select handles within block
         const int result = nav->tryHandle(Qt::Key_Right,
                                           Qt::ControlModifier | Qt::ShiftModifier,
                                           0, 3, nullptr, QStringLiteral("hello world"));
-        QCOMPARE(result, static_cast<int>(LiveNavigationController::NotHandled));
+        QCOMPARE(result, static_cast<int>(LiveNavigationController::Handled));
     }
 
     // ctrl_shift_right_at_block_end_extends_into_next_block moved to

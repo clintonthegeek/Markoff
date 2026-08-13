@@ -238,6 +238,14 @@ void LiveClipboardController::pastePrimary()
 bool LiveClipboardController::resolveSelectionByteRange(
     uint32_t &startByte, uint32_t &endByte) const
 {
+    int firstRow, firstQtPos, lastRow;
+    return resolveSelectionRange(startByte, endByte, firstRow, firstQtPos, lastRow);
+}
+
+bool LiveClipboardController::resolveSelectionRange(
+    uint32_t &startByte, uint32_t &endByte,
+    int &firstRow, int &firstQtPos, int &lastRow) const
+{
     if (!m_selection || !m_document || !m_model) return false;
 
     const int ab = m_selection->anchorBlock();
@@ -252,10 +260,30 @@ bool LiveClipboardController::resolveSelectionByteRange(
     } else {
         fb = xb; fo = xp; lb = ab; lo = ap;
     }
+    firstRow = fb; firstQtPos = fo; lastRow = lb;
 
     startByte = flatByteOffset(*m_model, *m_document, fb, fo);
     endByte   = flatByteOffset(*m_model, *m_document, lb, lo);
     return startByte != UINT32_MAX && endByte != UINT32_MAX;
+}
+
+void LiveClipboardController::advanceCaretPastPaste(
+    int firstRow, int lastRow, int firstQtPos, const QString &insertedText)
+{
+    if (!m_selection || !m_document || !m_model) return;
+    if (firstRow != lastRow) return;               // cross-block: out of scope
+    if (insertedText.contains(u'\n')) return;       // structural: out of scope
+    if (firstRow < 0 || firstRow >= m_model->rowCount()) return;
+
+    // Force the model to rebuild from the just-applied edit before reading
+    // recordAt() / resolving the anchor, so establishFocus lands against
+    // current state (same discipline LiveEditBinding::onContentsChange
+    // uses before its own establishFocus-adjacent calls).
+    m_document->flushPendingD2Changed();
+    if (firstRow >= m_model->rowCount()) return;
+
+    const int newQtPos = firstQtPos + insertedText.size();
+    m_selection->establishFocus(m_model->recordAt(firstRow).blockAnchor, newQtPos);
 }
 
 void LiveClipboardController::pasteFrom(int clipboardMode)
@@ -267,7 +295,9 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
     if (!mime || (!mime->hasText() && !mime->hasFormat(kBlocksMime))) return;
 
     uint32_t startByte = 0, endByte = 0;
-    if (!resolveSelectionByteRange(startByte, endByte)) return;
+    int firstRow = -1, firstQtPos = 0, lastRow = -1;
+    if (!resolveSelectionRange(startByte, endByte, firstRow, firstQtPos, lastRow))
+        return;
 
     // Try the structured fast-path.
     if (mime->hasFormat(kBlocksMime)) {
@@ -294,10 +324,12 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
 
     // Flat text fallback.
     if (mime->hasText()) {
-        const QByteArray inserted = mime->text().toUtf8();
+        const QString insertedText = mime->text();
+        const QByteArray inserted = insertedText.toUtf8();
         m_document->applyFlatEdit(startByte, endByte, inserted,
                                   Markoff::Origin::UserEdit);
         m_selection->clearSelection();
+        advanceCaretPastPaste(firstRow, lastRow, firstQtPos, insertedText);
     }
 }
 
@@ -308,11 +340,14 @@ void LiveClipboardController::pasteText(const QString &text)
     if (!m_selection || !m_document || !m_model) return;
 
     uint32_t startByte = 0, endByte = 0;
-    if (!resolveSelectionByteRange(startByte, endByte)) return;
+    int firstRow = -1, firstQtPos = 0, lastRow = -1;
+    if (!resolveSelectionRange(startByte, endByte, firstRow, firstQtPos, lastRow))
+        return;
 
     m_document->applyFlatEdit(startByte, endByte, text.toUtf8(),
                               Markoff::Origin::UserEdit);
     m_selection->clearSelection();
+    advanceCaretPastPaste(firstRow, lastRow, firstQtPos, text);
 }
 
 }  // namespace Markoff::Live

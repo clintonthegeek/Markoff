@@ -158,6 +158,7 @@
 - 2026-06-09 `libs/markoff-core/src/MarkoffDocument.h:18-20` — inv #8 (audit finding) — public header includes `crdt/Anchor.h`/`Clock.h`/`Operations.h`, so view leaves transitively import CRDT types despite their own signatures being CRDT-clean. Fix shape: forward declarations + private-side includes. Related: `Session.h` uses raw `Crdt::Anchor` in public signatures while `Styled::Editor` exposes `Q_PROPERTY(Markoff::Session*)` — legal for consumers (heavy-CRDT policy) but one hop from a view-leaf API; needs an explicit written decision.
 
 - 2026-06-09 `libs/markoff-live/src/LiveCursorState.cpp:selectAllBlocks` — inv #8 — sets `m_selectionExtended = true` AFTER `request()` has already emitted `selectionChanged`, so `LiveActionController::updateEnabledStates` (connected to that signal) evaluates `hasSelection()` as false on Ctrl+A: cut/copy stay disabled until the next selection event. Found during Task-8 contract-test triage; the test primes via `begin()/extend()` instead. Fix shape: set the flag before the `request()` call (or re-emit once after).
+- 2026-06-16 `libs/markoff-live/src/LiveClipboardController.cpp:flatByteOffset` — inv #8 — yet another ad-hoc flat-byte coordinate space: sums `blockText(id).size()` across blocks with **zero** inter-block separator bytes — distinct from `flatView()`'s `"\n\n"`-joined space, `widgetFlatView()`'s single-`'\n'`-joined space, and `MarkoffDocument`'s own CRDT `TextAnchor` global-byte space. Same bug class the Discipline Log already carries three prior instances of ("one flat-text view changed separator/prefix width, a sibling byte-walk didn't" — 2026-05-27 `SEP_LEN` underflow, 2026-05-30 `setHeadingLevel`, 2026-06-09 `SourceFindAdapter`); this one happens to be internally consistent (both its writer and only reader agree on zero-separator) so it isn't currently broken, just one more local convention to keep straight. Not touched by the queue #10 item 3 paste-caret fix landed this session (that fix works entirely in per-block qtPos space, never crosses `flatByteOffset`'s coordinate space).
 
 ---
 
@@ -170,15 +171,18 @@ triage + `setHeadingLevel` SEP_LEN fix), 7 (`tst_styled_block_formats`
 triage), and 8 (styled structural-key authority) are **all closed** —
 full records in the archive snapshot and their specs/plans.
 
-**#8.3 — Source-view list-item markers (OPEN).** `markoff-source`
-consumes `widgetFlatView()`, which for ListItem yields the post-marker
-buffer — so source shows `foo` instead of `- foo` for a `- foo` item.
-Source view's whole point is "raw markdown visible." Either (a) source
-uses `serializeForSave()` for its initial seed plus a separate
-marker-aware widgetFlatView variant, or (b) keep `widgetFlatView()` and
-have the binding prepend markers via per-block decoration. Architectural
-spec needed; touches `SourceTextDocumentBinding` and the
-`markoff-source` Editor.
+~~**#8.3 — Source-view list-item markers.**~~ → closed 2026-08-12.
+Resolved via paint-time decoration (option b): `widgetFlatView()` stays
+untouched (avoids re-touching the shared `Detail::findBlockAtSepByte`
+byte-math that has broken three times before per the Discipline Log),
+new `MarkoffDocument::listItemDisplayMarker(BlockId)` is the single
+source of truth (shared with `serializeForSave`), and
+`Source::Editor`/`InnerEditor` reserve a `QTextBlockFormat` left-margin
+per ListItem block and paint the marker into it. Spec:
+`docs/specs/2026-06-16-source-listitem-marker-decoration-design.md`.
+Falsifiable test `tst_source_listitem_marker` (3 slots, all green)
+asserts the marker paints AND that `plainTextEdit()->toPlainText()`
+stays marker-free — proves decoration, not content injection.
 
 ---
 
@@ -190,35 +194,66 @@ under offscreen** — identical failures across runs. The "offscreen
 flake" label was masking real triage debt (some slots have been failing
 since ~2026-05-21). Classify-before-fixing applies per slot:
 
-1. `tst_live_render_e2_nav_shift_extend` —
+1. ~~`tst_live_render_e2_nav_shift_extend` —
    `ctrl_shift_left_inside_block_returns_not_handled` +
-   `ctrl_shift_right_...` (2 slots). **Already classified** as
-   behavioral drift from the audit-L4 word-extend rework (`0cbdf48`);
-   see the 2026-05-22 Discipline Log entry. Either the
-   `LiveNavigationController` "claims the chord" behavior is correct
-   and the test contract should be renamed/reshaped, or the
-   not-handled return was load-bearing for a consumer. Owner: whoever
-   next pulls on `LiveNavigationController`.
+   `ctrl_shift_right_...` (2 slots).~~ → closed 2026-08-12. Confirmed
+   via code read that `LiveNavigationController::tryHandle` correctly
+   claims Ctrl+Shift+Left/Right within a block per the closed
+   audit-L4 spec (2026-05-21), and confirmed no delegate callsite
+   depends on the old `NotHandled` return. Both slots renamed to
+   `..._claims_the_chord` and reshaped to assert `Handled`, citing the
+   audit spec in-test. Green.
 2. `tst_live_render_focus_chokepoint_invariant` — `undo_after_enter`,
    `redo_after_undo`, `nav_into_runtime_promoted_heading` (3 slots).
-   Undo/redo caret restoration through the chokepoint; partial
-   investigation log in the archive snapshot (§#6 historical notes).
-   Suspect real gaps in undo-path caret authority
-   (VIEW-IMPLEMENTORS-GUIDE §B.4 partial).
+   **Still open, diagnosed 2026-08-12:** `MarkoffDocument::undoD2`/
+   `redoD2` are one-line delegators to `UndoLog::undo()/redo()` with
+   zero cursor/selection restoration, and `UndoLog` has no
+   selection-snapshot mechanism at all. A real fix means extending
+   `UndoLog`'s transaction records to carry pre-edit selection state —
+   a cross-cutting core change, not a chokepoint-local patch. Owner:
+   whoever next extends `UndoLog`; needs its own spec per invariant 2
+   (decide whether `UndoLog` or the chokepoint owns caret-after-undo
+   authority) before code.
 3. `tst_live_render_cursor_typing_invariant` —
-   `cursor_mirrors_textedit_through_emoji_typing` (1 slot). Surrogate-
-   pair (UTF-16) qtPos mirroring during typing; relates to queue-#2
-   concern #2 (bytes-vs-qtPos naming) which closed without a semantic
-   migration.
+   `cursor_mirrors_textedit_through_emoji_typing` (1 slot). **Still
+   open, diagnosed further 2026-08-12.** Not a surrogate-pair qtPos bug
+   as originally guessed — it's a real-Ctrl+V paste through
+   `LiveClipboardController::pasteFrom`/`pasteText`. Root cause: both
+   call `resolveSelectionRange()`, which requires
+   `LiveCursorState::selectionAnchor()` to be set; on a bare
+   (non-dragging) cursor with no active selection, `anchorBlock()`
+   returns -1 and the whole paste silently no-ops (nothing is inserted,
+   caret stays at 0) — this is a **paste-without-selection bug**, not
+   a caret-restoration bug, and looks broader than this one test slot
+   (any programmatic/keyboard paste with a collapsed cursor may be
+   affected — needs a production-path check, not just this test).
+   This session added `LiveClipboardController::advanceCaretPastPaste`
+   (wired into `pasteText()`/`pasteFrom()`'s flat-text branch) which is
+   correct and needed *once* the selection-resolution gap is fixed, but
+   does not by itself close this slot — verified still failing
+   (`actual 0, expected 5`) after that change. Next step: decide
+   whether `resolveSelectionRange` should fall back to
+   `(currentBlock, currentQtPos)` for a collapsed cursor, or whether
+   paste should have its own non-selection-based insertion-point
+   query — write that decision down before touching `LiveCursorState`
+   or `LiveClipboardController` further (invariant 2).
 
 **Definition of done:** each slot either green or its contract
 explicitly renamed/reshaped with rationale (classify first); the
 "known failures" language is removed from STATUS.md/CLAUDE.md when the
-count reaches 262/262.
+count reaches 262/262. 2/6 slots closed as of 2026-08-12; 4 remain
+(3 undo/redo, 1 paste-without-selection — see diagnoses above).
 
 ---
 
-## #11 — Legacy flat-buffer APIs: retire or migrate
+~~## #11 — Legacy flat-buffer APIs: retire or migrate~~ → closed 2026-08-12,
+option (a): deleted `SearchEngine::findAll/findNext/findPrevious` (+ the
+`matchesInOrder` helper only they used) and `CompletionDetector` wholesale
+(header, impl, test), confirmed zero remaining production callers by
+repo-wide grep. `SearchEngine::clearMatches`/`findByBlock` kept (still
+used). One surviving test (`tst_foundation_search_engine`'s
+`clear_matches_removes_search_kind`) rewritten to populate a
+`SearchMatch` selection directly instead of via the deleted `findAll`.
 
 **Filed 2026-06-09.** `SearchEngine::findAll`/`findNext`/`findPrevious`
 and `CompletionDetector::detect` read `toMarkdown()`/`toMarkdownUtf8()`

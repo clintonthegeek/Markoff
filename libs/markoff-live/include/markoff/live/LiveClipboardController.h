@@ -67,6 +67,19 @@ private:
                                         // avoid leaking the include
                                         // into the public header.
     bool resolveSelectionByteRange(uint32_t &startByte, uint32_t &endByte) const;
+    bool resolveSelectionRange(uint32_t &startByte, uint32_t &endByte,
+                              int &firstRow, int &firstQtPos, int &lastRow) const;
+
+    /// Advance the caret to just past a single-line, same-block paste's
+    /// inserted text (queue #10 item 3: no code path previously advanced
+    /// the caret after a flat-text paste at all — see docs/queue.md).
+    /// Scope: `firstRow == lastRow` (collapsed cursor or a same-block
+    /// selection) and `insertedText` contains no '\n' (so the block count
+    /// is unchanged and row indices stay valid after the model rebuild).
+    /// Cross-block or structured (multi-block) pastes are unaffected —
+    /// known remaining gap, see queue.md.
+    void advanceCaretPastPaste(int firstRow, int lastRow, int firstQtPos,
+                               const QString &insertedText);
 
     bool isReadOnly() const {
         return m_readOnlyProvider && m_readOnlyProvider();
