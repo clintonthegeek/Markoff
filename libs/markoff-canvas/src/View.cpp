@@ -22,6 +22,7 @@
 #include "BlockLayoutCache.h"
 #include "Coordinates.h"
 #include "InputPredicate.h"
+#include "KindTransition.h"
 
 namespace coords = Markoff::Canvas::Detail::Coordinates;
 
@@ -235,8 +236,35 @@ void View::onDocumentChanged()
     // undo/redo path, which does the same before mutating.
     if (m_selectionAnchor && m_cache->indexOf(m_selectionAnchor->block) < 0)
         m_selectionAnchor.reset();
+    promoteCaretBlockKind();
     ensureLayoutForViewport();
     viewport()->update();
+}
+
+// ---- Kind transitions (T6) ------------------------------------------------
+
+void View::promoteCaretBlockKind()
+{
+    if (!m_doc || m_caret.block.isNull())
+        return;
+    // Only promote FROM Paragraph: a structural kind's buffer is either
+    // content-only (ListItem, BlockQuote) or already carries the marker
+    // that would re-trigger this exact inference (Heading, CodeBlock) —
+    // same guard as the live leaf's KindTransition consumer.
+    if (m_doc->blockKind(m_caret.block) != Markoff::BlockKind::Paragraph)
+        return;
+
+    const QByteArray text = m_doc->blockText(m_caret.block);
+    const Markoff::BlockKind inferred =
+        Detail::inferBlockKind(QString::fromUtf8(text));
+    if (inferred == Markoff::BlockKind::Paragraph)
+        return;
+
+    // No buffer edit: T1 established that a loaded Heading/CodeBlock keeps
+    // its ATX prefix/fence, so a typed one must match or the two
+    // representations of "the same block" diverge (spec §9, T1 finding).
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2SetBlockKind(m_caret.block, inferred, t);
 }
 
 // ---- Caret / editing (T2) ------------------------------------------------
@@ -813,6 +841,13 @@ void View::keyPressEvent(QKeyEvent *event)
 
     if (isPrintable) {
         insertPrintable(event->text());
+        // Flush rather than wait for the debounced d2DocumentChanged (same
+        // reasoning as the undo/redo path above): T6's kind-promotion check
+        // runs from onDocumentChanged, and a typed "# " must read back as
+        // Heading before this handler returns, not one event-loop spin
+        // later.
+        if (m_doc)
+            m_doc->flushPendingD2Changed();
         ensureCaretVisible();
         viewport()->update();
         event->accept();

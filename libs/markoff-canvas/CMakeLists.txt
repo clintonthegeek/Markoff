@@ -26,6 +26,8 @@ add_library(markoff_canvas STATIC
     src/Coordinates.cpp
     src/InputPredicate.h
     src/InputPredicate.cpp
+    src/KindTransition.h
+    src/KindTransition.cpp
 )
 
 target_include_directories(markoff_canvas

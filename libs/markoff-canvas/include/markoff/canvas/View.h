@@ -53,6 +53,10 @@ struct CanvasCursor {
  * selected blocks' selected byte ranges onto the clipboard; a mutating key
  * on a non-empty selection collapses it first (per-block deletes + a
  * structural merge of the two boundary blocks, one transaction).
+ * T6: kind transitions. The caret's block is checked against its inferred
+ * kind after a document change; a Paragraph whose text now matches e.g. an
+ * ATX heading prefix is promoted via `d2SetBlockKind` with the buffer left
+ * untouched (see `promoteCaretBlockKind`).
  */
 class View : public QAbstractScrollArea {
     Q_OBJECT
@@ -144,6 +148,19 @@ private:
     /// load-bearing again in T4).
     void clampCaret(int oldCaretIndexHint);
     void ensureCaretVisible();
+
+    // ---- Kind transitions (T6) -------------------------------------------
+
+    /// Caret's-block-only kind promotion (spec/plan T6, spike scope: no
+    /// document-wide scan). Infers the kind from the caret block's current
+    /// text and issues `d2SetBlockKind` on mismatch. Only promotes FROM
+    /// Paragraph — a structural kind's buffer is content-only (ListItem,
+    /// BlockQuote) or carries its own marker already (Heading, CodeBlock)
+    /// and would otherwise re-infer Paragraph. Never strips the matched
+    /// marker from the buffer (T1 finding, spec §9: a loaded Heading/
+    /// CodeBlock keeps its ATX prefix/fence, so a typed one must too, or
+    /// the two representations diverge).
+    void promoteCaretBlockKind();
 
     // ---- Selection (T5) --------------------------------------------------
 
