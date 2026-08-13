@@ -7,29 +7,39 @@
 > workfront, baseline, or open-item set changes; move superseded
 > dated entries to `docs/STATUS-LOG.md`.
 
-**Last updated:** 2026-06-10 (contract-v2 arc ALL 13 tasks complete)
+**Last updated:** 2026-08-12 (post-idle resync; contract-v2 arc tail +
+Corbomite adoption in progress)
 
 ## Workfront
 
-**Contract-v2 arc (API finalization for Corbomite) is COMPLETE.**
-All 13 tasks landed; Corbomite adoption brief written at
-[`docs/handoff/2026-06-09-corbomite-api-adoption-brief.md`](handoff/2026-06-09-corbomite-api-adoption-brief.md).
-Spec `docs/specs/2026-06-09-markdownview-contract-v2-design.md`;
+**Contract-v2 arc (API finalization for Corbomite) is COMPLETE**, plus
+four follow-on commits landed after the 2026-06-10 "all 13 tasks"
+banner: `caretRect()` base contract + per-leaf implementations
+(`39c5423b`..`cdd2bd3c`), `MarkdownView::replaceMatches` +
+`FindController::selectMatchAtOrAfter` (`ee77b157`, `b349f122`), and a
+fix preserving adapter-owned `findSpans` across `applyOps` row updates
+(`c3b5070f`). Spec `docs/specs/2026-06-09-markdownview-contract-v2-design.md`;
 plan `docs/plans/2026-06-09-markdownview-contract-v2.md` (full task table
-with SHAs).
+with SHAs); caret-rect mini-spec
+`docs/specs/2026-06-11-caret-rect-contract-design.md`; replaceMatches
+spec `docs/specs/2026-06-12-replace-matches-primitive-design.md`.
 
-**Next workfront: Corbomite adoption.** The brief is in hand. The
-migration table (find-attach switch, undo/redo dual-authority fix, theme
+**Workfront: Corbomite adoption.** Brief:
+[`docs/handoff/2026-06-09-corbomite-api-adoption-brief.md`](handoff/2026-06-09-corbomite-api-adoption-brief.md).
+As of 2026-08-12, Corbomite has been re-pinning to Markoff master after
+almost every commit (last re-pin `fde31e82` → Markoff `b349f122`, only
+2 commits behind current Markoff HEAD `2a551cde`); the migration-table
+call-site work (find-attach switch, undo/redo dual-authority fix, theme
 propagation, format-verb re-wire, contextChanged hook-up, cursor/scroll
-APIs, reading-mode find) is documented in the brief. No Markoff code
-changes are needed on the Corbomite side of the adoption — it is purely
-a consumer call-site migration.
+APIs, reading-mode find) is being landed on the Corbomite side now. No
+further Markoff code changes are required for the adoption itself — it
+is purely a consumer call-site migration.
 
 ## Test baseline
 
-**266/269** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
-(verified 2026-06-09 at handoff; the arc added 6 contract/find/format
-test binaries). The 3 failing binaries
+**268/271** via `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
+(re-verified 2026-08-12 after a ~2-month idle period — clean rebuild,
+no drift from baseline). The 3 failing binaries
 — `tst_live_render_e2_nav_shift_extend` (2 slots),
 `tst_live_render_focus_chokepoint_invariant` (3 slots),
 `tst_live_render_cursor_typing_invariant` (1 slot) — are
@@ -75,8 +85,10 @@ time.
 ## Corbomite pin
 
 Corbomite tracks Markoff via submodule at `libs/markoff-family`.
-As of 2026-06-10 (verified against Corbomite `b6ae2c0f`) the pin is
-behind master. **Re-pin guidance: jump to the commit containing Task 13**
-(the commit that adds the adoption brief). Never re-pin into the
-`8c13c5d..079ac1f` window, which renders styled tables but contains the
-list-after-table SIGSEGV fixed in `b1b238f`.
+As of 2026-08-12 (Corbomite `fde31e82`) the pin is at Markoff
+`b349f122`, 2 commits behind current master (`2a551cde`) — Corbomite
+has been re-pinning after nearly every Markoff commit since the
+adoption brief landed. **Re-pin guidance:** jump to current master when
+next touched. Never re-pin into the `8c13c5d..079ac1f` window, which
+renders styled tables but contains the list-after-table SIGSEGV fixed
+in `b1b238f`.
