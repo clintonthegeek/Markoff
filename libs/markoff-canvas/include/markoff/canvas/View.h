@@ -12,6 +12,7 @@
 #include <markoff/core/Theme.h>
 
 class QInputMethodEvent;
+class QPainter;
 
 namespace Markoff {
 class MarkoffDocument;
@@ -60,6 +61,11 @@ struct CanvasCursor {
  * kind after a document change; a Paragraph whose text now matches e.g. an
  * ATX heading prefix is promoted via `d2SetBlockKind` with the buffer left
  * untouched (see `promoteCaretBlockKind`).
+ * T9: minimal table. A Table block's entry has no single layout; instead
+ * BlockLayoutCache builds a grid of per-cell `QTextLayout`s (own coordinate
+ * space unchanged — cell content byte ranges are still block-relative
+ * offsets, so the caret/editing paths below need no table-specific
+ * branches beyond hit-testing and painting).
  * T8: IME composition. `inputMethodEvent` mirrors
  * `QWidgetTextControlPrivate::inputMethodEvent`'s ordering: replacement +
  * commit land as one `d2ApplyBufferEdit` at the caret; the (possibly new)
@@ -92,6 +98,12 @@ public:
     /// Block bounds in document coordinates (y=0 is the document top, not
     /// the viewport top). Null rect if the id is not in the document.
     QRectF blockRect(BlockId id) const;
+
+    /// Table cell bounds in document coordinates (T9, exit E8), or a null
+    /// rect if `id` is not a realized Table block or (row, col) is out of
+    /// range. row 0 is the header row. Test/inspection surface only —
+    /// nothing here is authority.
+    QRectF tableCellRect(BlockId id, int row, int col) const;
 
     /// Paints since construction. Cheap paint-counter for tests that need
     /// to know a repaint actually happened.
@@ -159,6 +171,18 @@ private:
     /// Block + byte offset under a viewport-coordinate point. Null block
     /// if the document is empty.
     CanvasCursor hitTest(const QPoint &viewportPos) const;
+    /// hitTest()'s Table-block branch (T9): locates the (row, col) cell
+    /// under the point in the cache entry at `entryIndex`, then hit-tests
+    /// within that cell's own layout. Takes an index rather than the cache
+    /// Entry type itself so this header doesn't need BlockLayoutCache.h
+    /// (private to src/).
+    CanvasCursor hitTestTable(int entryIndex, const QPoint &viewportPos,
+                              qreal scrollY) const;
+    /// paintEvent()'s Table-block branch (T9): draws the grid lines and
+    /// each cell's layout, plus the caret if it is inside this table.
+    /// `blockTop`/`contentX` are viewport-relative, same convention as
+    /// paintEvent's own locals.
+    void paintTable(QPainter &p, int entryIndex, qreal blockTop, qreal contentX) const;
     void setCaret(const CanvasCursor &caret);
     void moveCaretHorizontally(bool forward);
     void moveCaretVertically(bool forward);

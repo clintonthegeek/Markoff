@@ -18,6 +18,11 @@ class Theme;
 
 namespace Markoff::Canvas {
 
+/// Padding inside a table cell, on all four sides, in DIPs (T9). Shared
+/// between BlockLayoutCache's geometry pass and View's paint/hit-test paths
+/// so cell content lands at the same point it was measured against.
+constexpr qreal kTableCellPadding = 4.0;
+
 /**
  * Derived layout state for the document's blocks, in document order.
  *
@@ -35,14 +40,29 @@ namespace Markoff::Canvas {
  */
 class BlockLayoutCache {
 public:
+    /// One table cell (T9): its content's byte range within the block's
+    /// blockText() (absolute, block-relative — usable directly as
+    /// d2ApplyBufferEdit arguments) and its own single-line QTextLayout.
+    struct TableCell {
+        int startByte = 0;
+        int endByte   = 0;
+        std::unique_ptr<QTextLayout> layout;  //!< null until realized
+    };
+
     struct Entry {
         BlockId id;
-        std::unique_ptr<QTextLayout> layout;  //!< null until realized
+        std::unique_ptr<QTextLayout> layout;  //!< null until realized; unused for tables
         BlockStyle style;
         quint64 seq      = 0;      //!< blockEditSequence when measured
         qreal   y        = 0;      //!< top of the block, document coords
         qreal   height   = 0;      //!< estimated, or exact once realized
         bool    realized = false;
+
+        // ---- Table grid (T9, style.isTable only) --------------------------
+        int tableCols = 0;
+        std::vector<qreal> tableColWidths;    //!< size tableCols
+        std::vector<qreal> tableRowHeights;   //!< size tableCells.size()/tableCols
+        std::vector<TableCell> tableCells;    //!< row-major, size rows*tableCols
     };
 
     /// Text column width available to layouts. A change invalidates every
@@ -99,6 +119,9 @@ private:
     void  recomputePositions();
     qreal estimateHeight(const MarkoffDocument &doc, const Entry &e) const;
     void  realize(const MarkoffDocument &doc, const Theme &theme, Entry &e);
+    /// Table variant of realize() (T9): builds the per-cell grid instead of
+    /// a single block-wide layout. Dispatches on e.style.isTable.
+    void  realizeTable(const MarkoffDocument &doc, const Theme &theme, Entry &e);
     /// Recompute one entry's inline formats (base styling + delimiter
     /// visibility) and push them onto its layout via setFormats(). No-op
     /// if the entry isn't realized yet.

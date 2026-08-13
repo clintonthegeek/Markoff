@@ -12,6 +12,7 @@
 
 #include "Coordinates.h"
 #include "InlineFormatting.h"
+#include "TableGeometry.h"
 
 namespace coords = Markoff::Canvas::Detail::Coordinates;
 
@@ -137,6 +138,12 @@ qreal BlockLayoutCache::estimateHeight(const MarkoffDocument &doc,
 
 void BlockLayoutCache::realize(const MarkoffDocument &doc, const Theme &theme, Entry &e)
 {
+    if (e.style.isTable) {
+        realizeTable(doc, theme, e);
+        e.realized = true;
+        return;
+    }
+
     e.layout = std::make_unique<QTextLayout>(layoutTextFor(doc, e.id),
                                              e.style.font);
 
@@ -154,6 +161,87 @@ void BlockLayoutCache::realize(const MarkoffDocument &doc, const Theme &theme, E
                  + QFontMetricsF(e.style.font).lineSpacing() * 0.5;
 
     e.realized = true;
+}
+
+void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &theme, Entry &e)
+{
+    // No single per-block layout for tables — the grid of per-cell layouts
+    // below is the whole of this entry's realized state (plan T9).
+    e.layout.reset();
+    e.tableCells.clear();
+    e.tableColWidths.clear();
+    e.tableRowHeights.clear();
+
+    const QByteArray text = doc.blockText(e.id);
+    const ParsedTable parsed = parseTableBlock(text);
+
+    const qreal lineHeight = QFontMetricsF(e.style.font).lineSpacing();
+    if (!parsed.ok) {
+        // Malformed table source (should not happen for a real
+        // BlockKind::Table block, but the parser is defensive rather than
+        // assert-and-crash): render as a single empty row so the block
+        // still occupies sane space rather than collapsing to zero height.
+        e.tableCols = 0;
+        e.height = e.style.topMargin + e.style.bottomMargin + lineHeight;
+        return;
+    }
+
+    const int rows = int(parsed.rows.size());
+    const int cols = parsed.cols;
+    e.tableCols = cols;
+    e.tableColWidths.assign(size_t(cols), qreal(0));
+    e.tableRowHeights.assign(size_t(rows), qreal(0));
+    e.tableCells.resize(size_t(rows) * size_t(cols));
+
+    QFont headerFont = e.style.font;
+    headerFont.setBold(true);
+    // Column widths cap at a fixed budget rather than the text column
+    // width (plan T9: "capped"; no wrap/reflow policy is in spike scope,
+    // so an unbounded cap would let one long cell blow the table past the
+    // page margin with nothing to stop it).
+    constexpr qreal kMaxColumnWidth = 240.0;
+    constexpr qreal kMinColumnWidth = 40.0;
+
+    for (int r = 0; r < rows; ++r) {
+        const QFont &rowFont = (r == 0) ? headerFont : e.style.font;
+        const QFontMetricsF fm(rowFont);
+        qreal rowHeight = fm.lineSpacing();
+
+        for (int c = 0; c < cols; ++c) {
+            const TableCellRange &range = parsed.rows[size_t(r)][size_t(c)];
+            const QByteArray cellBytes = text.mid(range.start, range.end - range.start);
+            const QString cellText = QString::fromUtf8(cellBytes);
+
+            auto layout = std::make_unique<QTextLayout>(cellText, rowFont);
+            QTextOption opt;
+            opt.setWrapMode(QTextOption::NoWrap);
+            layout->setTextOption(opt);
+            layout->beginLayout();
+            QTextLine line = layout->createLine();
+            if (line.isValid())
+                line.setPosition(QPointF(0, 0));
+            layout->endLayout();
+
+            qreal &colWidth = e.tableColWidths[size_t(c)];
+            const qreal natural = fm.horizontalAdvance(cellText) + 2 * kTableCellPadding;
+            colWidth = std::max(colWidth, std::min(natural, kMaxColumnWidth));
+
+            TableCell &cell = e.tableCells[size_t(r) * size_t(cols) + size_t(c)];
+            cell.startByte = range.start;
+            cell.endByte   = range.end;
+            cell.layout    = std::move(layout);
+        }
+
+        e.tableRowHeights[size_t(r)] = rowHeight + 2 * kTableCellPadding;
+    }
+
+    for (qreal &w : e.tableColWidths)
+        w = std::max(w, kMinColumnWidth);
+
+    qreal total = e.style.topMargin + e.style.bottomMargin;
+    for (qreal h : e.tableRowHeights)
+        total += h;
+    e.height = total;
 }
 
 void BlockLayoutCache::restyleInline(const MarkoffDocument &doc, const Theme &theme,

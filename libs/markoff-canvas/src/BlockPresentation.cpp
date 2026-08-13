@@ -136,10 +136,12 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
         s.foreground = theme.color(Theme::Slot::Math);
         break;
 
-    // Out of T1 scope, rendered as their source text in the body font so
-    // the document stays navigable: Table gets a real grid in T9, and
-    // Image/Mermaid/HtmlBlock are out of spike scope entirely (spec §5).
     case BlockKind::Table:
+        s.isTable = true;
+        break;
+
+    // Out of spike scope entirely (spec §5), rendered as their source text
+    // in the body font so the document stays navigable.
     case BlockKind::Image:
     case BlockKind::Mermaid:
     case BlockKind::HtmlBlock:

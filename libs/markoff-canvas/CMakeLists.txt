@@ -30,6 +30,8 @@ add_library(markoff_canvas STATIC
     src/InputPredicate.cpp
     src/KindTransition.h
     src/KindTransition.cpp
+    src/TableGeometry.h
+    src/TableGeometry.cpp
 )
 
 target_include_directories(markoff_canvas

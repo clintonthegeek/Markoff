@@ -128,6 +128,28 @@ quint64 View::paintCount() const
     return m_paintCount;
 }
 
+QRectF View::tableCellRect(BlockId id, int row, int col) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return {};
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.style.isTable || e.tableCols <= 0)
+        return {};
+    const int rows = int(e.tableCells.size()) / e.tableCols;
+    if (row < 0 || row >= rows || col < 0 || col >= e.tableCols)
+        return {};
+
+    qreal x = pageMargin() + e.style.leftIndent;
+    for (int c = 0; c < col; ++c)
+        x += e.tableColWidths[size_t(c)];
+    qreal y = e.y + e.style.topMargin;
+    for (int r = 0; r < row; ++r)
+        y += e.tableRowHeights[size_t(r)];
+
+    return QRectF(x, y, e.tableColWidths[size_t(col)], e.tableRowHeights[size_t(row)]);
+}
+
 bool View::isDelimiterHiddenAt(BlockId id, int byteOffset) const
 {
     if (!m_doc)
@@ -345,6 +367,8 @@ CanvasCursor View::hitTest(const QPoint &viewportPos) const
         return {};
 
     const auto &e = m_cache->entries()[size_t(idx)];
+    if (e.style.isTable)
+        return hitTestTable(idx, viewportPos, scrollY);
     if (!e.layout || e.style.isRule)
         return CanvasCursor{e.id, 0};
 
@@ -364,6 +388,53 @@ CanvasCursor View::hitTest(const QPoint &viewportPos) const
     const int qcharPos = line.isValid() ? line.xToCursor(localX) : 0;
     const QByteArray text = m_doc->blockText(e.id);
     const int byteOff = int(coords::qtPosToByte(text, qcharPos));
+    return CanvasCursor{e.id, byteOff};
+}
+
+CanvasCursor View::hitTestTable(int entryIndex, const QPoint &viewportPos, qreal scrollY) const
+{
+    const auto &e = m_cache->entries()[size_t(entryIndex)];
+    if (e.tableCols <= 0 || e.tableCells.empty())
+        return CanvasCursor{e.id, 0};
+
+    const int rows = int(e.tableCells.size()) / e.tableCols;
+    const qreal contentX = pageMargin() + e.style.leftIndent;
+    const qreal contentY = (e.y - scrollY) + e.style.topMargin;
+    const qreal localX   = viewportPos.x() - contentX;
+    const qreal localY   = viewportPos.y() - contentY;
+
+    // Locate the row: walk cumulative row heights, clamp to the last row
+    // for a click below the grid (no row/col ops in spike scope — a click
+    // anywhere in the block lands in the nearest cell, not a no-op).
+    int row = 0;
+    qreal rowTop = 0;
+    for (; row < rows - 1; ++row) {
+        const qreal h = e.tableRowHeights[size_t(row)];
+        if (localY < rowTop + h)
+            break;
+        rowTop += h;
+    }
+
+    int col = 0;
+    qreal colLeft = 0;
+    for (; col < e.tableCols - 1; ++col) {
+        const qreal w = e.tableColWidths[size_t(col)];
+        if (localX < colLeft + w)
+            break;
+        colLeft += w;
+    }
+
+    const auto &cell = e.tableCells[size_t(row) * size_t(e.tableCols) + size_t(col)];
+    if (!cell.layout)
+        return CanvasCursor{e.id, cell.startByte};
+
+    const qreal cellLocalX = localX - colLeft - kTableCellPadding;
+    const QTextLine line = cell.layout->lineAt(0);
+    const int qcharPos = line.isValid() ? line.xToCursor(cellLocalX) : 0;
+
+    const QByteArray cellText = m_doc->blockText(e.id).mid(
+        cell.startByte, cell.endByte - cell.startByte);
+    const int byteOff = cell.startByte + int(coords::qtPosToByte(cellText, qcharPos));
     return CanvasCursor{e.id, byteOff};
 }
 
@@ -1047,6 +1118,52 @@ QVariant View::inputMethodQuery(Qt::InputMethodQuery query) const
     }
 }
 
+void View::paintTable(QPainter &p, int entryIndex, qreal blockTop, qreal contentX) const
+{
+    const auto &e = m_cache->entries()[size_t(entryIndex)];
+    if (e.tableCols <= 0 || e.tableCells.empty())
+        return;  // unrealized (outside the realized margin) or malformed
+
+    const int rows = int(e.tableCells.size()) / e.tableCols;
+    const QColor gridColor = m_theme.color(Theme::Slot::Quote);
+    QFont headerFont = e.style.font;
+    headerFont.setBold(true);
+
+    qreal rowY = blockTop;
+    for (int r = 0; r < rows; ++r) {
+        qreal colX = contentX;
+        const qreal rowH = e.tableRowHeights[size_t(r)];
+        for (int c = 0; c < e.tableCols; ++c) {
+            const qreal colW = e.tableColWidths[size_t(c)];
+            const QRectF cellRect(colX, rowY, colW, rowH);
+            p.setPen(QPen(gridColor, 1));
+            p.drawRect(cellRect);
+
+            const auto &cell = e.tableCells[size_t(r) * size_t(e.tableCols) + size_t(c)];
+            if (cell.layout) {
+                const QPointF textPos(cellRect.x() + kTableCellPadding,
+                                      cellRect.y() + kTableCellPadding);
+                p.setPen(e.style.foreground);
+                p.setFont(r == 0 ? headerFont : e.style.font);
+                cell.layout->draw(&p, textPos);
+
+                if (m_hasFocus && e.id == m_caret.block
+                    && m_caret.byteOffset >= cell.startByte
+                    && m_caret.byteOffset <= cell.endByte) {
+                    const QByteArray cellText = m_doc->blockText(e.id).mid(
+                        cell.startByte, cell.endByte - cell.startByte);
+                    const int qcharPos = int(coords::byteToQtPos(
+                        cellText, m_caret.byteOffset - cell.startByte));
+                    p.setPen(m_theme.color(Theme::Slot::CursorPrimary));
+                    cell.layout->drawCursor(&p, textPos, qcharPos);
+                }
+            }
+            colX += colW;
+        }
+        rowY += rowH;
+    }
+}
+
 void View::paintEvent(QPaintEvent *event)
 {
     ++m_paintCount;
@@ -1068,7 +1185,8 @@ void View::paintEvent(QPaintEvent *event)
     const qreal margin     = pageMargin();
     const auto  sel        = orderedSelection();
 
-    for (const auto &e : m_cache->entries()) {
+    for (size_t entryIndex = 0; entryIndex < m_cache->entries().size(); ++entryIndex) {
+        const auto &e = m_cache->entries()[entryIndex];
         if (e.y >= viewBottom)
             break;
         if (e.y + e.height <= scrollY)
@@ -1094,6 +1212,11 @@ void View::paintEvent(QPaintEvent *event)
             const qreal midY = blockTop + e.height / 2;
             p.setPen(QPen(e.style.foreground, 1));
             p.drawLine(QPointF(margin, midY), QPointF(margin + textWidth(), midY));
+            continue;
+        }
+
+        if (e.style.isTable) {
+            paintTable(p, int(entryIndex), blockTop, contentX);
             continue;
         }
 

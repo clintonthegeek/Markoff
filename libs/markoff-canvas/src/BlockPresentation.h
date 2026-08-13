@@ -39,6 +39,11 @@ struct BlockStyle {
     /// HorizontalRule paints a line and has no text.
     bool isRule = false;
 
+    /// Table (T9): the block's content is a grid of cells, laid out and
+    /// painted by BlockLayoutCache/View's table-specific paths rather than
+    /// the single per-block QTextLayout the rest of this switch presumes.
+    bool isTable = false;
+
     /// Background rect spans the full text column rather than hugging the
     /// text (code blocks, quotes).
     bool fullWidthBackground = false;
