@@ -6,7 +6,6 @@ namespace Markoff::Canvas::Detail {
 FootnoteDefInfo parseFootnoteDef(const QString &blockText)
 {
     FootnoteDefInfo info;
-    return info;  // FALSIFY (throwaway): parseFootnoteDef never detects a def
 
     if (!blockText.startsWith(QStringLiteral("[^")))
         return info;
