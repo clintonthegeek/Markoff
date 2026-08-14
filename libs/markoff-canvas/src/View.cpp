@@ -1102,7 +1102,7 @@ void View::buildContextMenu(QMenu &menu)
     // clipboard doesn't offer a dead menu item.
     QAction *pasteAction = menu.addAction(tr("Paste"), this, &View::paste);
     pasteAction->setShortcut(QKeySequence::Paste);
-    pasteAction->setEnabled(hasDoc && clipboardHasText);
+    pasteAction->setEnabled(!m_readOnly && hasDoc && clipboardHasText);
 
     QAction *selectAllAction = menu.addAction(tr("Select All"), this, &View::selectAll);
     selectAllAction->setShortcut(QKeySequence::SelectAll);
