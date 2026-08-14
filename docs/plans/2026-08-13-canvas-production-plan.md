@@ -130,7 +130,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.3 FormatOps verbs + CanvasActionController | ☑ | `2c3f482a` / `a1fe576f` | `48545c18` / `fa11992e` |
 | P4.4 Context menu | ☑ | `7944edc3` | `f3ce2870` / `f2fed72b` |
 | P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☑ (reduced scope — see finding) | `d365be58` | `e4b40d0e` / `06b1c06c` |
-| P4.9 Inline title band (user-directed; spec §5.2) | ☐ | | |
+| P4.9 Inline title band (user-directed; spec §5.2) | ☑ | `79db4dc2` | `dedab5ab` / `a22545ab` |
 | P4.6 Code-block syntax highlighting | ☐ | | |
 | P4.7 Task-list checkboxes (render + toggle) | ☐ | | |
 | P4.8 ⏸ phase close | ☐ | | n/a |
@@ -515,6 +515,28 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.9 (2026-08-14).**
+
+- Exclusion from `cursorPosition()`/find/selection-copy/serialization
+  holds by construction, not by an added guard: `toCursorPos`/
+  `fromCursorPos` walk `doc->iterateBlocks()` only, `selectedText()`
+  walks cache entries only, and the title is never added to
+  `BlockLayoutCache` — there was nothing to explicitly exclude. Only
+  `hitTest()` needed an explicit vertical-extent gate (so drag-select/
+  right-click can't resolve into the band).
+- `titleBandHeight()` is the single derived y-offset applied at every
+  y-consuming site (hitTest, paint, caretRect, blockRect,
+  tableCellRect, scroll anchor, ensureCaretVisible, documentHeight,
+  fontScale anchor capture) — one seam, not a scattered set of
+  special cases.
+- Spec names only a Down/Enter caret seam *into* block 0 from the
+  title; no described keyboard path *back up* from block 0 into the
+  title (mouse click only). Left as-is rather than invent one —
+  worth a decision if Corbomite dogfooding wants it.
+- Title band is fixed-height/no-wrap (unlike Obsidian, which wraps
+  long titles) — deliberate simplification, logged as a decide-
+  yourself call, not a gap.
 
 **P4.5 (2026-08-14).**
 
