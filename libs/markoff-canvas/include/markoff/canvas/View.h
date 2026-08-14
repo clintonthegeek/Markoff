@@ -63,6 +63,27 @@ struct FindHighlight {
     bool isCurrent = false;
 };
 
+/// Content column width policy (contract-v2 P4.5, spec §5.2 "Word wrap"):
+/// either the full viewport width, or a fixed readable-line-length column
+/// centered in the viewport (Obsidian "readable line length" toggle).
+/// `View::layoutWidthFor()` is the one place this turns into an actual
+/// pixel width; `pageMargin()`/`textWidth()` both derive from it, so
+/// everything keyed off page margin (caret, hit-testing, paint,
+/// block/table rects) centers along with the text automatically.
+struct ContentWidthPolicy {
+    enum Kind { FullWidth, FixedColumn };
+    Kind kind = FullWidth;
+    /// Only consulted when `kind == FixedColumn`. Obsidian's own default
+    /// calibration (spec §5.3, F1 audit): `--file-line-width: 700px`.
+    qreal fixedColumnWidth = 700.0;
+
+    static ContentWidthPolicy fullWidth() { return ContentWidthPolicy{FullWidth, 0.0}; }
+    static ContentWidthPolicy fixedColumn(qreal px)
+    {
+        return ContentWidthPolicy{FixedColumn, px};
+    }
+};
+
 /**
  * Projection view leaf: renders a MarkoffDocument directly, one
  * QTextLayout per block, with its own input pipeline.
@@ -121,6 +142,18 @@ public:
     /// nothing). No-op if `scale` is unchanged (fuzzy-compared).
     void setFontScale(qreal scale);
     qreal fontScale() const { return m_fontScale; }
+
+    /// Contract-v2 (P4.5, spec §5.2 "Word wrap"): sets the content column
+    /// width policy. Reflows the same way a resize does — realized entries
+    /// get exact relayout at the new width, off-screen entries fall back
+    /// to estimates until scrolled into view (`ensureLayoutForViewport`'s
+    /// existing lazy-realize path, unchanged) — and re-anchors the scroll
+    /// position to whichever block was at the top of the viewport before
+    /// the call (same mechanism `resizeEvent` uses), so toggling the
+    /// policy live doesn't fling the viewport to an unrelated block.
+    /// No-op if the policy is unchanged.
+    void setContentWidthPolicy(ContentWidthPolicy policy);
+    ContentWidthPolicy contentWidthPolicy() const { return m_contentWidthPolicy; }
 
     /// Read-only gate (contract-v2 P3.3, spec §4.2): the single authority
     /// every mutation-ingress path below checks (mirrors the live leaf's
@@ -393,6 +426,23 @@ private:
     void updateScrollRange();
     qreal pageMargin() const;
     qreal textWidth() const;
+    /// The one place a viewport width turns into an actual content-column
+    /// pixel width (P4.5's named falsification target): `FullWidth` is the
+    /// full available width (viewport minus the two page margins);
+    /// `FixedColumn` is the smaller of that and the policy's fixed width,
+    /// so a viewport narrower than the fixed column still shrinks it
+    /// rather than overflowing. `pageMargin()` centers whatever's left
+    /// over evenly on both sides.
+    qreal layoutWidthFor(qreal viewportWidth) const;
+    /// Shared by `resizeEvent()` and `setContentWidthPolicy()`: re-derives
+    /// layout for the current viewport/content width while keeping the
+    /// block that was at the top of the viewport pinned there (the same
+    /// anchor `scrollAnchor()`/`setScrollAnchor()` expose for P3.6's
+    /// ephemeral-state round-trip) — a bare `ensureLayoutForViewport()`
+    /// call alone would leave the scroll position at its old raw pixel
+    /// value, which means something different once every visible block's
+    /// height has reflowed under the new width.
+    void reflowKeepingScrollAnchor();
 
     // ---- Caret / editing (T2) -------------------------------------------
 
@@ -553,6 +603,9 @@ private:
     /// Font-scale multiplier (P3.5). Threaded into every `m_cache->sync()`
     /// call; see `setFontScale()`.
     qreal m_fontScale = 1.0;
+    /// Content column width policy (P4.5). See `setContentWidthPolicy`'s
+    /// doc comment; `layoutWidthFor()` is the sole consumer.
+    ContentWidthPolicy m_contentWidthPolicy;
     std::unique_ptr<BlockLayoutCache> m_cache;
     quint64 m_paintCount = 0;
     CanvasCursor m_caret;

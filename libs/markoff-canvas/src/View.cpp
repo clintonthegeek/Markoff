@@ -249,6 +249,34 @@ void View::setFontScale(qreal scale)
     viewport()->update();
 }
 
+void View::setContentWidthPolicy(ContentWidthPolicy policy)
+{
+    if (m_contentWidthPolicy.kind == policy.kind
+        && qFuzzyCompare(m_contentWidthPolicy.fixedColumnWidth + 1.0,
+                          policy.fixedColumnWidth + 1.0))
+        return;
+
+    m_contentWidthPolicy = policy;
+    reflowKeepingScrollAnchor();
+    viewport()->update();
+}
+
+void View::reflowKeepingScrollAnchor()
+{
+    const auto [anchorIdx, anchorFraction] = scrollAnchor();
+    BlockId anchorBlock;
+    if (m_doc && anchorIdx >= 0)
+        anchorBlock = m_cache->entries()[size_t(anchorIdx)].id;
+
+    ensureLayoutForViewport();
+
+    if (m_doc && !anchorBlock.isNull()) {
+        const int idx = m_cache->indexOf(anchorBlock);
+        if (idx >= 0)
+            setScrollAnchor(idx, anchorFraction);
+    }
+}
+
 void View::setReadOnly(bool ro)
 {
     if (m_readOnly == ro)
@@ -455,14 +483,28 @@ int View::selectionAnchorByteOffset() const
 
 // ---- Geometry -----------------------------------------------------------
 
+qreal View::layoutWidthFor(qreal viewportWidth) const
+{
+    const qreal available = qMax(qreal(1), viewportWidth - 2 * kPageMargin);
+    if (m_contentWidthPolicy.kind == ContentWidthPolicy::FixedColumn)
+        return qMin(available, qMax(qreal(1), m_contentWidthPolicy.fixedColumnWidth));
+    return available;
+}
+
 qreal View::pageMargin() const
 {
-    return kPageMargin;
+    // FixedColumn centers the column: whatever space is left over beyond
+    // the minimum page margin (kPageMargin) is split evenly on both
+    // sides. FullWidth's layoutWidthFor() already consumes all of it, so
+    // this collapses back to plain kPageMargin, same as before P4.5.
+    const qreal vw = viewport()->width();
+    const qreal contentW = layoutWidthFor(vw);
+    return qMax(kPageMargin, (vw - contentW) / 2.0);
 }
 
 qreal View::textWidth() const
 {
-    return qMax(qreal(1), viewport()->width() - 2 * pageMargin());
+    return layoutWidthFor(viewport()->width());
 }
 
 void View::updateScrollRange()
@@ -1492,7 +1534,12 @@ void View::moveCaretVertically(bool forward)
 void View::resizeEvent(QResizeEvent *event)
 {
     QAbstractScrollArea::resizeEvent(event);
-    ensureLayoutForViewport();
+    // A resize changes textWidth() (and, under FixedColumn, pageMargin()
+    // too), which reflows every visible block's height — keep the block
+    // that was on top pinned there rather than leaving the scrollbar at
+    // its old raw pixel value (P4.5 done-when: "scroll stays anchored to
+    // top visible block").
+    reflowKeepingScrollAnchor();
     viewport()->update();
 }
 
