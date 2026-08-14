@@ -86,8 +86,13 @@ public:
 
     /// Reconcile with the document: adopt the current block order, drop
     /// layouts whose (id, seq) key moved, re-measure estimates for those.
-    /// Cheap enough to call on every d2DocumentChanged.
-    void sync(const MarkoffDocument &doc, const Theme &theme);
+    /// Cheap enough to call on every d2DocumentChanged. `fontScale`
+    /// (contract-v2 P3.5) is forwarded to `presentationFor()` for every
+    /// entry this call (re)styles — callers that invalidate styling for a
+    /// scale change (View::setFontScale, via `clear()`) get every entry
+    /// restyled at the new scale on the very next call, same as a
+    /// structural edit already forces via `restyleAll` below.
+    void sync(const MarkoffDocument &doc, const Theme &theme, qreal fontScale = 1.0);
 
     /// Build real layouts for every block intersecting [top, bottom) in
     /// document coordinates. Returns true if anything was realized (i.e.

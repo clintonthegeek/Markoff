@@ -31,11 +31,13 @@ Theme::Slot headingSlot(int level)
 
 /// Build a QFont from a Theme slot's family/size/weight/slant. Uses pixel
 /// sizing because pixelSizeFor() has already folded in the slot's size
-/// multiplier — going back through point sizes would drop it.
-QFont fontForSlot(const Theme &theme, Theme::Slot slot)
+/// multiplier — going back through point sizes would drop it. `fontScale`
+/// (P3.5) multiplies on top of that, so it lands on every block uniformly
+/// regardless of which slot it uses.
+QFont fontForSlot(const Theme &theme, Theme::Slot slot, qreal fontScale)
 {
     QFont f(theme.familyFor(slot));
-    f.setPixelSize(qMax(1, qRound(theme.pixelSizeFor(slot))));
+    f.setPixelSize(qMax(1, qRound(theme.pixelSizeFor(slot) * fontScale)));
     f.setBold(theme.isBold(slot));
     f.setItalic(theme.isItalic(slot));
     return f;
@@ -56,10 +58,10 @@ int intAttr(const MarkoffDocument &doc, BlockId id, const AttrName &name,
 }  // namespace
 
 BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
-                           const Theme &theme)
+                           const Theme &theme, qreal fontScale)
 {
     BlockStyle s;
-    s.font       = fontForSlot(theme, Theme::Slot::TextDefault);
+    s.font       = fontForSlot(theme, Theme::Slot::TextDefault, fontScale);
     s.foreground = theme.color(Theme::Slot::TextDefault);
 
     const qreal em = QFontMetricsF(s.font).height();
@@ -73,7 +75,7 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
     case BlockKind::Heading: {
         const int level = qBound(1, intAttr(doc, id, AttrNames::Level, 1), 6);
         const Theme::Slot slot = headingSlot(level);
-        s.font       = fontForSlot(theme, slot);
+        s.font       = fontForSlot(theme, slot, fontScale);
         s.foreground = theme.color(slot);
         const qreal hem = QFontMetricsF(s.font).height();
         s.topMargin    = hem * 0.6;
@@ -82,7 +84,7 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
     }
 
     case BlockKind::CodeBlock:
-        s.font       = fontForSlot(theme, Theme::Slot::CodeBlock);
+        s.font       = fontForSlot(theme, Theme::Slot::CodeBlock, fontScale);
         s.foreground = theme.color(Theme::Slot::CodeBlock);
         s.background = theme.color(Theme::Slot::CodeBlockBackground);
         s.fullWidthBackground = true;
@@ -102,7 +104,7 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
 
     case BlockKind::BlockQuote: {
         const int depth = qMax(1, intAttr(doc, id, AttrNames::BlockQuoteDepth, 1));
-        s.font       = fontForSlot(theme, Theme::Slot::Quote);
+        s.font       = fontForSlot(theme, Theme::Slot::Quote, fontScale);
         s.foreground = theme.color(Theme::Slot::Quote);
         s.background = theme.color(Theme::Slot::QuoteBackground);
         s.fullWidthBackground = true;

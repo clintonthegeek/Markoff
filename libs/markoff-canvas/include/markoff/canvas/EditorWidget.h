@@ -6,6 +6,7 @@
 
 #include <QPointer>
 
+#include <markoff/core/EditorContext.h>
 #include <markoff/core/FindController.h>
 #include <markoff/core/MarkdownView.h>
 
@@ -137,7 +138,33 @@ public:
     /// highlights).
     void detachFindController() override;
 
+    /// Base store + emit `themeChanged` (`MarkdownView::setTheme`), then
+    /// push to the composed `View` — same "base first, then the real
+    /// authority" order as `setReadOnly` (P3.3). `View::setTheme` already
+    /// drops and re-measures every cache entry's style.
+    void setTheme(const Markoff::Theme &t) override;
+    /// Base store + clamp + emit `fontScaleChanged`
+    /// (`MarkdownView::setFontScale`), then push the CLAMPED result to the
+    /// composed `View::setFontScale` (P3.5) — reads `fontScale()` back
+    /// rather than forwarding `s` directly, so a value the base clamped
+    /// still reaches `View` at the value that is actually now in effect.
+    /// `View::setFontScale` does the full relayout + top-visible-block
+    /// scroll re-anchor; see its doc comment.
+    void setFontScale(qreal s) override;
+
 private:
+    /// Recomputes `EditorContext` from the composed `View`'s caret block
+    /// (kind + heading level + table row/col via `View::caretTableCell()`,
+    /// P3.5) and emits `contextChanged` iff it actually differs from
+    /// `m_lastContext` (change-gate — mirrors live/source's
+    /// `recomputeContext()`, spec §7). Called from two places: every
+    /// `View::caretChanged` (via `onViewCaretChanged`, below) and every
+    /// genuine structural document change (`d2DocumentChanged`, filtered
+    /// on `structuralEditSequence` so content-only edits stay silent) —
+    /// the latter covers a programmatic `Cmd::changeKind` on the caret's
+    /// own block that never moves the caret (Queue #15, same gap
+    /// live/source close the same way).
+    void recomputeContext();
     /// `View::caretChanged` handler: recomputes `cursorPosition()` and
     /// emits `cursorPositionChanged` iff it actually differs from
     /// `m_lastCursorPos` (change-gated per class doc).
@@ -160,6 +187,19 @@ private:
     Markoff::CursorPos m_lastCursorPos{1, 1};
     /// Consumer-owned; observed only (see `attachFindController` doc).
     QPointer<Markoff::FindController> m_findController;
+    /// Last `EditorContext` this widget emitted `contextChanged` for — the
+    /// change-gate `recomputeContext()` diffs against (P3.5). Not a
+    /// context authority (the document + composed `View`'s caret are);
+    /// same "cache, not a store" role as `m_lastCursorPos`.
+    Markoff::EditorContext m_lastContext;
+    /// `structuralEditSequence()` as of the last `recomputeContext()` (or
+    /// `setDocument()`) — gates the `d2DocumentChanged` connection so
+    /// content-only/format-only passes don't trigger a recompute pass
+    /// (mirrors live/source's `m_lastStructuralSeq`).
+    quint64 m_lastStructuralSeq = 0;
+    /// Structural-change → `recomputeContext()` connection (P3.5),
+    /// rewired on every `setDocument()` (mirrors `m_docDestroyedCon`).
+    QMetaObject::Connection m_contextD2Con;
 };
 
 }  // namespace Markoff::Canvas

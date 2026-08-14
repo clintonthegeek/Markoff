@@ -45,7 +45,7 @@ void BlockLayoutCache::clear()
     m_preeditText.clear();
 }
 
-void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme)
+void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme, qreal fontScale)
 {
     // A structural edit (insert/remove/change-kind) can move any block's
     // kind, attrs, and therefore its font — and blockEditSequence does not
@@ -80,7 +80,7 @@ void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme)
             e.layout.reset();
             e.realized = false;
             e.seq      = seq;
-            e.style    = presentationFor(doc, id, theme);
+            e.style    = presentationFor(doc, id, theme, fontScale);
             e.height   = estimateHeight(doc, e);
         }
 

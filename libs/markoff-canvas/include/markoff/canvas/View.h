@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <optional>
+#include <utility>
 
 #include <QAbstractScrollArea>
 #include <QHash>
@@ -103,6 +104,17 @@ public:
     void setTheme(const Theme &theme);
     const Theme &theme() const;
 
+    /// Contract-v2 (P3.5): multiplies every block's font pixel size on top
+    /// of the theme's own sizing (`BlockPresentation::fontForSlot`).
+    /// Invalidates every cache entry's style AND layout (width/height both
+    /// depend on the font) — a full re-style + re-measure, same shape as
+    /// `setTheme()` — but re-anchors the scroll position to the block that
+    /// was at the top of the viewport before the call, not the raw pixel
+    /// offset (every block's height just changed, so the old offset means
+    /// nothing). No-op if `scale` is unchanged (fuzzy-compared).
+    void setFontScale(qreal scale);
+    qreal fontScale() const { return m_fontScale; }
+
     /// Read-only gate (contract-v2 P3.3, spec §4.2): the single authority
     /// every mutation-ingress path below checks (mirrors the live leaf's
     /// `binding()->readOnly` six-gate table, this file's CLAUDE.md
@@ -182,6 +194,17 @@ public:
 
     BlockId caretBlock() const;
     int     caretByteOffset() const;
+
+    /// If the caret's block is a realized Table (T9), the (row, col) cell
+    /// its byte offset falls in — row 0 is the header row, same convention
+    /// as `tableCellRect()`. `std::nullopt` if the caret isn't in a table
+    /// block, or the table isn't realized yet (row/col derivation needs
+    /// `tableCells`, built only at realize time). Contract-v2 seam (P3.5):
+    /// `EditorWidget::recomputeContext()` calls this to fill
+    /// `EditorContext::tableRow`/`tableCol` — reuses the same row-major
+    /// cell-index sequence plan P2.3 built for table selection
+    /// (`cellIndexNear` in View.cpp), not a second table-position scheme.
+    std::optional<std::pair<int, int>> caretTableCell() const;
 
     /// Programmatic caret placement (contract-v2 EditorWidget seam, P3.1):
     /// the one sanctioned exception to "the caret is edited only through
@@ -338,6 +361,9 @@ private:
 
     MarkoffDocument *m_doc = nullptr;
     Theme m_theme;
+    /// Font-scale multiplier (P3.5). Threaded into every `m_cache->sync()`
+    /// call; see `setFontScale()`.
+    qreal m_fontScale = 1.0;
     std::unique_ptr<BlockLayoutCache> m_cache;
     quint64 m_paintCount = 0;
     CanvasCursor m_caret;

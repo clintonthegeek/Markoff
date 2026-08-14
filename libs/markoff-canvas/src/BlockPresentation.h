@@ -53,8 +53,12 @@ struct BlockStyle {
 };
 
 /// Derive the presentation for one block. Pure: reads the document's kind
-/// and attrs, never writes.
+/// and attrs, never writes. `fontScale` (contract-v2 P3.5, MarkdownView's
+/// own `setFontScale`) multiplies every slot's pixel size on top of the
+/// theme's own sizing/multiplier — it is the leaf's, not the theme's,
+/// concept, so it stays a separate parameter rather than folding into
+/// `Theme` itself.
 BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
-                           const Theme &theme);
+                           const Theme &theme, qreal fontScale = 1.0);
 
 }  // namespace Markoff::Canvas

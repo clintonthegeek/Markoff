@@ -5,6 +5,8 @@
 #include <QScrollBar>
 #include <QVBoxLayout>
 
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/core/TextUnits.h>
@@ -129,6 +131,18 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
 
     QObject::disconnect(m_docDestroyedCon);
     m_docDestroyedCon = {};
+    QObject::disconnect(m_contextD2Con);
+    m_contextD2Con = {};
+    // Reset the context sentinel BEFORE touching the composed View:
+    // View::setDocument's internal reset synchronously fires caretChanged
+    // (C2 — no queued step anywhere in this leaf), which reaches
+    // onViewCaretChanged()->recomputeContext() before this function
+    // returns. The sentinel must already be in place for that first
+    // recompute, or it would diff against the OLD document's context
+    // instead of unconditionally emitting for the new one (mirrors
+    // live/source's identical ordering note).
+    m_lastContext = Markoff::EditorContext{};
+    m_lastContext.blockKind = QString{};  // sentinel: not a valid kind name
 
     // Base store + documentChanged, then the composed View: View::setDocument
     // resets its caret to {} and re-realizes from the new document
@@ -150,6 +164,22 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
             Markoff::MarkdownView::setDocument(nullptr);
         });
         m_session = doc->createSession();
+
+        // Queue #15 (spec §7): also recompute on a genuine structural
+        // change (block Insert/Remove/ChangeKind — e.g. a programmatic
+        // Cmd::changeKind that doesn't move the caret) so contextChanged
+        // doesn't go stale until the next caret move. Filtered on
+        // structuralEditSequence rather than the raw signal so
+        // content-only/format-only passes stay silent (same pattern
+        // markoff-source/markoff-live use).
+        m_lastStructuralSeq = doc->structuralEditSequence();
+        m_contextD2Con = QObject::connect(
+            doc, &Markoff::MarkoffDocument::d2DocumentChanged, this, [this, doc]() {
+                const quint64 seq = doc->structuralEditSequence();
+                if (seq == m_lastStructuralSeq) return;
+                m_lastStructuralSeq = seq;
+                recomputeContext();
+            });
     }
 }
 
@@ -173,10 +203,103 @@ void EditorWidget::setCursorPosition(Markoff::CursorPos pos)
 void EditorWidget::onViewCaretChanged()
 {
     const Markoff::CursorPos p = cursorPosition();
-    if (p.line == m_lastCursorPos.line && p.column == m_lastCursorPos.column)
-        return;
-    m_lastCursorPos = p;
-    Q_EMIT cursorPositionChanged(p.line, p.column);
+    if (p.line != m_lastCursorPos.line || p.column != m_lastCursorPos.column) {
+        m_lastCursorPos = p;
+        Q_EMIT cursorPositionChanged(p.line, p.column);
+    }
+    // contextChanged is gated independently (on EditorContext, not
+    // CursorPos) — View::caretChanged is unconditional (P3.2), so this
+    // runs on every caret-changing code path; recomputeContext()'s own
+    // change-gate absorbs a caret move that stays within the same block
+    // (spec §7: "no re-emit when the caret stays in the same block").
+    recomputeContext();
+}
+
+void EditorWidget::recomputeContext()
+{
+    auto *doc = document();
+    if (!doc || !m_view) return;
+    // setDocument()'s internal caret reset fires View::caretChanged
+    // synchronously (the same P3.2 chokepoint every real caret move uses,
+    // C2 — no queued step to hide behind), reaching this function via
+    // onViewCaretChanged() before setDocument() has finished wiring
+    // m_contextD2Con. Skip that call rather than let it consume the
+    // fresh-document sentinel early: the contract (mirrored from
+    // live/source) is "the FIRST cursor movement AFTER setDocument()
+    // always emits", not "attaching a document counts as a movement".
+    // m_contextD2Con is only ever valid once setDocument() has finished
+    // wiring the current document — using it as the readiness check avoids
+    // a second, purpose-built flag for the same fact.
+    if (!m_contextD2Con) return;
+
+    const Markoff::BlockId block = m_view->caretBlock();
+    if (block.isNull()) return;
+
+    const Markoff::BlockKind kind = doc->blockKind(block);
+    Markoff::EditorContext ctx;
+    using BK = Markoff::BlockKind;
+    namespace BKN = Markoff::BlockKindNames;
+    switch (kind) {
+    case BK::Paragraph:      ctx.blockKind = BKN::Paragraph;      break;
+    case BK::Heading:        ctx.blockKind = BKN::Heading;         break;
+    case BK::CodeBlock:      ctx.blockKind = BKN::CodeBlock;       break;
+    case BK::ListItem:       ctx.blockKind = BKN::ListItem;        break;
+    case BK::BlockQuote:     ctx.blockKind = BKN::Blockquote;      break;
+    case BK::HorizontalRule: ctx.blockKind = BKN::HorizontalRule;  break;
+    case BK::Image:          ctx.blockKind = BKN::Image;           break;
+    case BK::Math:           ctx.blockKind = BKN::Math;            break;
+    case BK::Table:          ctx.blockKind = BKN::Table;           break;
+    default:                 ctx.blockKind = BKN::Paragraph;       break;  // Mermaid, HtmlBlock
+    }
+    ctx.inTable = (kind == BK::Table);
+
+    // Heading level from the "level" attr (int 1-6) — same attr P1.1's
+    // promoteCaretBlockKind()/updateCaretHeadingLevel() write.
+    if (kind == BK::Heading) {
+        const auto attrs = doc->blockAttrs(block);
+        const auto it = attrs.constFind(Markoff::AttrNames::Level);
+        if (it != attrs.cend()) {
+            if (const int *p = std::get_if<int>(&it.value()))
+                ctx.headingLevel = *p;
+        }
+    }
+
+    // Table row/col (P2.3's per-cell row-major sequence, via
+    // View::caretTableCell()) — unlike the live leaf (no stable C++ owner
+    // for a QML delegate's focused cell), canvas's View owns table layout
+    // directly, so row/col are cheaply derivable rather than a contract
+    // minimum (-1, -1).
+    if (kind == BK::Table) {
+        if (const auto rc = m_view->caretTableCell()) {
+            ctx.tableRow = rc->first;
+            ctx.tableCol = rc->second;
+        }
+    }
+
+    // Change-gate: only emit if something actually changed.
+    if (ctx == m_lastContext) return;
+    m_lastContext = ctx;
+    Q_EMIT contextChanged(m_lastContext);
+}
+
+void EditorWidget::setTheme(const Markoff::Theme &t)
+{
+    Markoff::MarkdownView::setTheme(t);  // base stores + emits themeChanged
+    if (m_view)
+        m_view->setTheme(theme());
+}
+
+void EditorWidget::setFontScale(qreal s)
+{
+    // Base clamps [0.25, 4.0], stores, and emits fontScaleChanged (no-op
+    // if the clamped value is unchanged). Read fontScale() back rather
+    // than forwarding `s` directly so View gets the value actually now in
+    // effect. View::setFontScale does the full relayout +
+    // top-visible-block scroll re-anchor (its own doc comment) and is
+    // itself a no-op if unchanged, so this is safe to call unconditionally.
+    Markoff::MarkdownView::setFontScale(s);
+    if (m_view)
+        m_view->setFontScale(fontScale());
 }
 
 float EditorWidget::scrollPositionVisualLine() const

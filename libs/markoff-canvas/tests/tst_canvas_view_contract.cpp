@@ -5,26 +5,31 @@
 // is that the contract works polymorphically, the same shape Corbomite's
 // leaf-swap dispatch uses.
 //
-// Not yet enrolled (land with their owning tasks, not stubbed early):
-//   - checkContextChangedKindGated /
-//     checkContextChangedOnStructuralKindChangeWithoutCaretMove — EditorWidget
-//     does not emit contextChanged yet (P3.5).
 // checkReadOnlyBlocksUndoAndKeepsBytes: EditorWidget now overrides
 // setReadOnly (P3.3), forwarding to the composed View — see
 // set_read_only_forwards_to_composed_view below for the wiring pin, and
 // tst_canvas_typing/tst_canvas_selection/tst_canvas_ime for the real
 // keyboard/mouse/IME gates this check doesn't reach (it only exercises
 // undo()/toggleBold() through the base MarkdownView virtuals).
-// checkFontScaleSignal still passes via the base class's own
-// storage/gating only — EditorWidget has not overridden setFontScale yet
-// (P3.5). Kept enrolled anyway: it costs nothing and starts earning its
-// keep the moment that override lands.
+// checkFontScaleSignal (P3.5): now exercises the real
+// EditorWidget::setFontScale override, not just the base class's own
+// storage — see font_scale_triggers_relayout_and_anchors_scroll below for
+// the relayout+scroll-anchor behavior this shared check doesn't reach (it
+// only asserts the signal fires and fontScale() reads back correctly).
+// checkContextChangedKindGated /
+// checkContextChangedOnStructuralKindChangeWithoutCaretMove (P3.5): now
+// enrolled — EditorWidget emits contextChanged via recomputeContext(),
+// hooked to View::caretChanged (every caret move) and a
+// structuralEditSequence-gated d2DocumentChanged connection (Queue #15,
+// a programmatic Cmd::changeKind on the caret's own block).
 #include <QScrollBar>
 #include <QSignalSpy>
 #include <QTest>
 
 #include <markoff/canvas/EditorWidget.h>
 #include <markoff/canvas/View.h>
+#include <markoff/core/BlockId.h>
+#include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
 
@@ -47,6 +52,14 @@ private Q_SLOTS:
     void read_only_blocks()   { ViewContract::checkReadOnlyBlocksUndoAndKeepsBytes(m_ed, m_doc); }
     void undo_redo_via_base() { ViewContract::checkUndoRedoViaBase(m_ed, m_doc); }
     void font_scale_signal()  { ViewContract::checkFontScaleSignal(m_ed); }
+
+    // ---- P3.5: EditorContext -----------------------------------------------
+    void context_changed_kind_gated() {
+        ViewContract::checkContextChangedKindGated(m_ed);
+    }
+    void context_changed_on_structural_kind_change_without_caret_move() {
+        ViewContract::checkContextChangedOnStructuralKindChangeWithoutCaretMove(m_ed, m_doc);
+    }
 
     // ---- P3.3: read-only gates + caretRect --------------------------------
 
@@ -185,6 +198,111 @@ private Q_SLOTS:
         }
         // Document must still be perfectly usable afterward.
         doc->loadFromMarkdown(ViewContract::fixture());
+        delete doc;
+    }
+
+    // ---- P3.5: EditorContext table row/col ---------------------------------
+
+    // Contract-v2 P3.5: canvas can derive REAL table row/col from the
+    // composed View's own per-cell layout (P2.3's row-major cell sequence,
+    // View::caretTableCell()) — unlike the live leaf, which has no stable
+    // C++ owner for a QML delegate's focused cell and reports the
+    // (-1, -1) contract minimum instead. row 0 is the header row (same
+    // convention as View::tableCellRect()), so the first body row is 1.
+    void context_reports_table_row_and_col() {
+        const QByteArray src =
+            "| h0 | h1 | h2 |\n"
+            "|----|----|----|\n"
+            "| a0 | a1 | a2 |\n"
+            "| b0 | b1 | b2 |\n"
+            "\n"
+            "after paragraph.\n";
+        auto *doc = new Markoff::MarkoffDocument(3);
+        doc->loadFromMarkdown(src);
+        auto *ed = new Markoff::Canvas::EditorWidget;
+        ed->resize(500, 400);
+        ed->setDocument(doc);
+        ed->show();
+        QVERIFY(QTest::qWaitForWindowExposed(ed));
+
+        Markoff::BlockId tableId;
+        for (const auto id : doc->iterateBlocks()) {
+            if (doc->blockKind(id) == Markoff::BlockKind::Table) { tableId = id; break; }
+        }
+        QVERIFY(!tableId.isNull());
+
+        const QByteArray text = doc->blockText(tableId);
+        const int a1Byte = text.indexOf("a1");
+        QVERIFY(a1Byte >= 0);
+
+        qRegisterMetaType<Markoff::EditorContext>();
+        QSignalSpy spy(ed, &Markoff::MarkdownView::contextChanged);
+        ed->view()->setCaretPosition(tableId, a1Byte);
+        QTRY_VERIFY(spy.count() >= 1);
+        const auto ctx = spy.last().at(0).value<Markoff::EditorContext>();
+        QCOMPARE(ctx.blockKind, QString(Markoff::BlockKindNames::Table));
+        QVERIFY(ctx.inTable);
+        QCOMPARE(ctx.tableRow, 1);   // first body row
+        QCOMPARE(ctx.tableCol, 1);   // second column ("a1")
+
+        delete ed;
+        delete doc;
+    }
+
+    // ---- P3.5: fontScale relayout + scroll re-anchor -----------------------
+
+    // The task's named falsifiable check: setFontScale must trigger a full
+    // relayout (every block's font — and therefore its layout width/height
+    // — depends on the scale), NOT just restyle in place, and must
+    // re-anchor scroll to the block that was at the viewport's top rather
+    // than preserving the old pixel offset (every height just changed, so
+    // the old offset would land on an unrelated block).
+    void font_scale_triggers_relayout_and_anchors_scroll() {
+        QByteArray src;
+        for (int i = 0; i < 40; ++i)
+            src += "paragraph number " + QByteArray::number(i) + "\n\n";
+        auto *doc = new Markoff::MarkoffDocument(4);
+        doc->loadFromMarkdown(src);
+        auto *ed = new Markoff::Canvas::EditorWidget;
+        ed->resize(300, 200);
+        ed->setDocument(doc);
+        ed->show();
+        QVERIFY(QTest::qWaitForWindowExposed(ed));
+
+        auto *view = ed->view();
+        QVERIFY(view->verticalScrollBar()->maximum() > 0);
+
+        // Scroll partway down and find the block sitting at the viewport's
+        // top edge.
+        view->verticalScrollBar()->setValue(view->verticalScrollBar()->maximum() / 2);
+        const qreal scrolledY = view->verticalScrollBar()->value();
+        QVERIFY(scrolledY > 0);
+
+        Markoff::BlockId anchor;
+        for (const auto id : doc->iterateBlocks()) {
+            const QRectF r = view->blockRect(id);
+            if (r.top() <= scrolledY && r.bottom() > scrolledY) { anchor = id; break; }
+        }
+        QVERIFY(!anchor.isNull());
+        const qreal heightBefore = view->blockRect(anchor).height();
+
+        ed->setFontScale(2.0);
+
+        // Falsifiable half 1: the relayout actually happened — height
+        // measurably grew under the larger font, not just a repaint with
+        // the old layout.
+        const qreal heightAfter = view->blockRect(anchor).height();
+        QVERIFY(heightAfter > heightBefore * 1.2);
+
+        // Falsifiable half 2: scroll followed the ANCHOR BLOCK, not the
+        // stale pixel offset — the anchor's top must now sit at (or just
+        // above) the viewport's top edge.
+        const qreal newScroll = view->verticalScrollBar()->value();
+        const QRectF anchorRectAfter = view->blockRect(anchor);
+        QVERIFY(anchorRectAfter.top() <= newScroll + 1.0);
+        QVERIFY(anchorRectAfter.bottom() > newScroll);
+
+        delete ed;
         delete doc;
     }
 };

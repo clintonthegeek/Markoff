@@ -174,6 +174,70 @@ const Theme &View::theme() const
     return m_theme;
 }
 
+void View::setFontScale(qreal scale)
+{
+    if (qFuzzyCompare(m_fontScale, scale))
+        return;
+
+    // Capture the block currently at the TOP of the viewport before
+    // invalidating anything — every block's height is about to change
+    // under the new scale, so "the old pixel/fraction offset" would land
+    // on an unrelated block; "which block was at the top" is the anchor
+    // that still means something afterward (plan P3.5).
+    BlockId anchorBlock;
+    if (m_doc && !m_cache->entries().empty()) {
+        const int idx = m_cache->indexAtY(verticalScrollBar()->value());
+        if (idx >= 0)
+            anchorBlock = m_cache->entries()[size_t(idx)].id;
+    }
+
+    m_fontScale = scale;
+    // Same shape as setTheme(): every entry's font (hence its style AND
+    // its layout's width/height) depends on this, so drop everything
+    // rather than trying to patch styles in place — clear() also resets
+    // the caret/preedit tracking the cache holds, re-seeded below.
+    m_cache->clear();
+
+    if (m_doc) {
+        m_cache->setTextWidth(textWidth());
+        m_cache->sync(*m_doc, m_theme, m_fontScale);
+        m_cache->setCaret(*m_doc, m_theme, m_caret.block, m_caret.byteOffset);
+    }
+
+    // Re-derive the scrollbar's range for the new (estimated) heights
+    // before restoring position — setValue() below would otherwise clamp
+    // against the stale (pre-clear) range.
+    updateScrollRange();
+    if (m_doc && !anchorBlock.isNull()) {
+        const int idx = m_cache->indexOf(anchorBlock);
+        if (idx >= 0)
+            verticalScrollBar()->setValue(qRound(m_cache->entries()[size_t(idx)].y));
+    }
+
+    // Realize the (now-restored) visible range — deliberately NOT
+    // ensureCaretVisible(): that would re-scroll to the caret's block,
+    // which may not be the block we just anchored to.
+    ensureLayoutForViewport();
+
+    // Realizing blocks BEFORE the anchor (estimateHeight() only counts
+    // newlines, no wrap simulation, so an estimate can be off) corrects
+    // their heights, which shifts every later y via the prefix sum —
+    // including the anchor's own. Re-read it and correct the scrollbar
+    // once more so the anchor's real top, not its pre-realization
+    // estimate, ends up at the viewport's top edge; realize again in case
+    // that correction exposes a not-yet-realized block at the new
+    // position (same "settle" reasoning as ensureLayoutForViewport's own
+    // fixed-point loop).
+    if (m_doc && !anchorBlock.isNull()) {
+        const int idx = m_cache->indexOf(anchorBlock);
+        if (idx >= 0)
+            verticalScrollBar()->setValue(qRound(m_cache->entries()[size_t(idx)].y));
+    }
+    ensureLayoutForViewport();
+
+    viewport()->update();
+}
+
 void View::setReadOnly(bool ro)
 {
     m_readOnly = ro;
@@ -329,6 +393,25 @@ int View::caretByteOffset() const
     return m_caret.byteOffset;
 }
 
+std::optional<std::pair<int, int>> View::caretTableCell() const
+{
+    if (!m_doc || m_caret.block.isNull())
+        return std::nullopt;
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return std::nullopt;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.style.isTable || e.tableCols <= 0 || e.tableCells.empty())
+        return std::nullopt;
+    // Same row-major cell-index lookup selection/hit-test already use
+    // (plan P2.3's cellIndexNear, this file's anonymous namespace) — not a
+    // second table-position scheme.
+    const int cellIdx = cellIndexNear(e, m_caret.byteOffset, /*preferAfter=*/true);
+    if (cellIdx < 0)
+        return std::nullopt;
+    return std::make_pair(cellIdx / e.tableCols, cellIdx % e.tableCols);
+}
+
 bool View::hasSelection() const
 {
     return orderedSelection().has_value();
@@ -420,7 +503,7 @@ void View::onDocumentChanged()
 
     if (m_doc) {
         m_cache->setTextWidth(textWidth());
-        m_cache->sync(*m_doc, m_theme);
+        m_cache->sync(*m_doc, m_theme, m_fontScale);
     }
     clampCaret(oldCaretIndex);
     // No UndoLog selection state (T4/T5, queue #10 item 2): if the anchor's
