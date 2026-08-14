@@ -247,8 +247,8 @@ void EditorWidget::attachFindController(Markoff::FindController *fc)
 
     QObject::connect(fc, &Markoff::FindController::matchesChanged,
                       this, &EditorWidget::rebuildFindHighlights);
-    QObject::connect(fc, &Markoff::FindController::currentMatchChanged,
-                      this, &EditorWidget::rebuildFindHighlights);
+    // FALSIFY (P3.4, throwaway): currentMatchChanged intentionally NOT
+    // connected here.
     QObject::connect(fc, &Markoff::FindController::navigationRequested,
                       this, &EditorWidget::onFindNavigationRequested);
 
