@@ -97,7 +97,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **P1 — core promotions & carried findings** | | | |
 | P1.1 KindTransition → core, with heading level (#18.3, #18.4) | ☑ | `72f446e0` | `c1e21740` / `01734f3f` |
 | P1.2 Coordinates byte↔QChar → core | ☑ | `ac405aa6` | `cd2588f1` / `95385e7f` |
-| P1.3 Theme background-slot fallback + missing slots | ☐ | | |
+| P1.3 Theme background-slot fallback + missing slots | ☑ | `33c0fc72` | `a6891970` / `9e8e28b9` |
 | P1.4 Marker-convention canonization (docs + doc-comment) | ☐ | | |
 | P1.5 ⏸ phase close: full suite + constitution + findings sweep | ☐ | | n/a |
 | **P2 — projection map (delimiter reflow)** | | | |
@@ -554,6 +554,30 @@ user with a one-page summary of what's proven.
   surrogate-truncation convention; used by `FormatOps` and the source
   leaf. Consolidating it means touching the flat-space seam, which P1.2
   does not name. Worth a look when P4.3 puts canvas on `FormatOps`.
+
+**P1.3 (2026-08-13).**
+
+- The bug was real but narrower than "missing slots" implied: only
+  `QuoteBackground` was ever undefined among the background-class slots
+  canvas reads (`CodeBlockBackground` was already set in both palettes).
+  `GutterBackground`/`ScrollbarThumb`/`FoldArrow` stay undefined — no
+  caller reads them yet, so defining a color for them would be
+  speculative.
+- `isBackgroundSlot()` is a closed switch over the `*Background`-named
+  slots, not a naming-convention guess — `CursorPrimary/Secondary/Presence`
+  paint as a pen, not a fill, so they were deliberately excluded even
+  though "Cursor" sits next to "Background" slots in the enum.
+- Live/styled audit (task's explicit check): grepped both for every
+  slot in the background list. Live never references `QuoteBackground`
+  at all; the slots it does use (`EditorBackground`, `CodeBlockBackground`,
+  `SelectionBackground`, `Search*MatchBackground`) were already defined,
+  so none of them ever hit the old TextDefault fallback. No reliance to
+  preserve.
+- Falsification test lives directly against `presentationFor()`
+  (`tst_canvas_render::blockquote_background_is_distinct_from_its_text_color`)
+  rather than a pixel-diff render — cheaper and it is the actual
+  contract (`BlockStyle::background`), a screenshot would only be
+  testing the paint path on top of it.
 
 ---
 
