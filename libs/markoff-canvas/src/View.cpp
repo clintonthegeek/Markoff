@@ -387,6 +387,12 @@ void View::onDocumentChanged()
         m_selectionAnchor.reset();
     promoteCaretBlockKind();
     ensureLayoutForViewport();
+    // A document-driven clamp (remote edit, undo/redo) can move the caret
+    // to a different block without any of the interactive code paths
+    // running — route it through the same chokepoint they use (P3.2) so
+    // EditorWidget::cursorPositionChanged still fires and the caret's new
+    // block scrolls into view, same as an interactive move would.
+    ensureCaretVisible();
     viewport()->update();
 }
 
@@ -653,6 +659,8 @@ void View::ensureCaretVisible()
         vbar->setValue(qFloor(e.y));
     else if (e.y + e.height > vbar->value() + viewportH)
         vbar->setValue(qCeil(e.y + e.height - viewportH));
+
+    emit caretChanged();
 }
 
 // ---- Selection (T5) -------------------------------------------------------

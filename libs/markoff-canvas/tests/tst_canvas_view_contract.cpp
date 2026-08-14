@@ -15,10 +15,12 @@
 // yet (P3.3, P3.5), so they exercise the base only. Kept enrolled anyway:
 // they cost nothing and start earning their keep the moment those
 // overrides land.
+#include <QScrollBar>
 #include <QSignalSpy>
 #include <QTest>
 
 #include <markoff/canvas/EditorWidget.h>
+#include <markoff/canvas/View.h>
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
 
@@ -41,6 +43,62 @@ private Q_SLOTS:
     void read_only_blocks()   { ViewContract::checkReadOnlyBlocksUndoAndKeepsBytes(m_ed, m_doc); }
     void undo_redo_via_base() { ViewContract::checkUndoRedoViaBase(m_ed, m_doc); }
     void font_scale_signal()  { ViewContract::checkFontScaleSignal(m_ed); }
+
+    // ---- P3.2: cursor/scroll position mapping + signals -------------------
+
+    // Shared check (new this task, general over any MarkdownView*):
+    // cursorPositionChanged fires on a genuine caret move and stays silent
+    // on a same-position re-set.
+    void cursor_position_changed_signal() {
+        ViewContract::checkCursorPositionChangedSignal(m_ed);
+    }
+
+    // Out-of-range setCursorPosition clamps rather than no-ops — the
+    // task's named falsifiable check. checkCursorRoundTrip already covers
+    // this generically (park on line 1, set an absurd line, verify it
+    // moved); this slot pins it directly against EditorWidget so the
+    // falsification below has an obvious, EditorWidget-specific target.
+    void set_cursor_position_out_of_range_clamps() {
+        m_ed->setCursorPosition({1, 1});
+        m_ed->setCursorPosition({9999, 9999});
+        QVERIFY(m_ed->cursorPosition().line > 1);
+    }
+
+    // scrollPositionChanged must fire on a programmatic set — same minimum
+    // Source::Editor/Styled::Editor assert (their scrollPositionChanged_
+    // fires_on_set slots): the exact resulting value may legitimately
+    // differ from the requested fraction (e.g. clamped to 0 when the
+    // document fits the viewport), but the signal must fire.
+    void scroll_position_changed_fires_on_set() {
+        QSignalSpy spy(m_ed, &Markoff::MarkdownView::scrollPositionChanged);
+        QVERIFY(spy.isValid());
+        m_ed->setScrollPositionVisualLine(0.5f);
+        QTRY_VERIFY(spy.count() >= 1);
+    }
+
+    // A genuinely scrollable view (viewport shrunk below document height)
+    // round-trips a mid-range fraction and clamps an out-of-range one —
+    // never a no-op. Needs a real, shown viewport: the composed View is a
+    // QAbstractScrollArea and only computes a non-zero scrollbar range
+    // once it has a real size to lay out against.
+    void scroll_position_round_trip_and_clamps() {
+        m_ed->resize(220, 60);
+        m_ed->show();
+        QVERIFY(QTest::qWaitForWindowExposed(m_ed));
+        QVERIFY(m_ed->view()->verticalScrollBar()->maximum() > 0);
+
+        m_ed->setScrollPositionVisualLine(0.5f);
+        const float mid = m_ed->scrollPositionVisualLine();
+        QVERIFY(mid > 0.0f);
+        QVERIFY(mid < 1.0f);
+
+        m_ed->setScrollPositionVisualLine(-1.0f);           // clamps to 0
+        QCOMPARE(m_ed->scrollPositionVisualLine(), 0.0f);
+        m_ed->setScrollPositionVisualLine(2.0f);             // clamps to 1
+        QCOMPARE(m_ed->scrollPositionVisualLine(), 1.0f);
+
+        m_ed->hide();
+    }
 
     // ---- P3.1: the task's named falsifiable check -------------------------
     void attach_window_caret_write_survives() {

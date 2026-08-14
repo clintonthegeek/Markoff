@@ -2,6 +2,7 @@
 // (c) 2026 Markoff contributors, GPL-3.0-or-later.
 #include <markoff/canvas/EditorWidget.h>
 
+#include <QScrollBar>
 #include <QVBoxLayout>
 
 #include <markoff/core/MarkoffDocument.h>
@@ -88,6 +89,21 @@ EditorWidget::EditorWidget(QWidget *parent)
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
     layout->addWidget(m_view);
+
+    // cursorPositionChanged (P3.2): View::caretChanged is the composed
+    // view's unconditional caret-moved signal (real events AND
+    // document-driven clamps, see View.h); onViewCaretChanged() does the
+    // CursorPos-space change-gating the base contract requires.
+    QObject::connect(m_view, &View::caretChanged, this, &EditorWidget::onViewCaretChanged);
+
+    // scrollPositionChanged (P3.2): the composed View is a
+    // QAbstractScrollArea — its vertical scrollbar's valueChanged already
+    // fires on both user-driven scrolling (wheel, drag) and the
+    // programmatic path in setScrollPositionVisualLine (via setValue), so
+    // one connection covers the whole contract (mirrors
+    // Source::Editor/Styled::Editor's single-emit-path pattern).
+    QObject::connect(m_view->verticalScrollBar(), &QScrollBar::valueChanged, this,
+                      [this](int) { emit scrollPositionChanged(scrollPositionVisualLine()); });
 }
 
 EditorWidget::~EditorWidget()
@@ -152,6 +168,45 @@ void EditorWidget::setCursorPosition(Markoff::CursorPos pos)
         return;
     const auto [block, byteOffset] = fromCursorPos(doc, pos);
     m_view->setCaretPosition(block, byteOffset);
+}
+
+void EditorWidget::onViewCaretChanged()
+{
+    const Markoff::CursorPos p = cursorPosition();
+    if (p.line == m_lastCursorPos.line && p.column == m_lastCursorPos.column)
+        return;
+    m_lastCursorPos = p;
+    Q_EMIT cursorPositionChanged(p.line, p.column);
+}
+
+float EditorWidget::scrollPositionVisualLine() const
+{
+    if (!m_view)
+        return 0.0f;
+    const auto *sb = m_view->verticalScrollBar();
+    if (!sb || sb->maximum() == 0)
+        return 0.0f;
+    return float(sb->value()) / float(sb->maximum());
+}
+
+void EditorWidget::setScrollPositionVisualLine(float pos)
+{
+    if (!m_view)
+        return;
+    auto *sb = m_view->verticalScrollBar();
+    if (!sb)
+        return;
+    const float clamped = qBound(0.0f, pos, 1.0f);
+    if (sb->maximum() != 0) {
+        // setValue fires valueChanged, wired in the constructor to emit
+        // scrollPositionChanged — single emit path (matches Source/Styled).
+        sb->setValue(qRound(clamped * float(sb->maximum())));
+        return;
+    }
+    // The document fits entirely in the viewport (nothing to scroll):
+    // setValue would be a silent no-op and valueChanged would not fire.
+    // Emit explicitly so the write is always observable (never a no-op).
+    Q_EMIT scrollPositionChanged(0.0f);
 }
 
 View *EditorWidget::view() const noexcept

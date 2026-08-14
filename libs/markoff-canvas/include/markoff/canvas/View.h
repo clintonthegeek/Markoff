@@ -163,6 +163,18 @@ public:
     BlockId selectionAnchorBlock() const;
     int     selectionAnchorByteOffset() const;
 
+signals:
+    /// Fired from `ensureCaretVisible()` (P3.2) — the file's single
+    /// chokepoint every caret-changing code path already calls afterward
+    /// (T2/T7 comment on that function), now also called from
+    /// `onDocumentChanged()` so a document-driven clamp (remote edit,
+    /// undo/redo landing on a different block) notifies too. Unconditional
+    /// — `caretBlock()`/`caretByteOffset()` may not have actually changed
+    /// from the caller's point of view (e.g. re-realizing the same block);
+    /// `EditorWidget` does the real change-gating in `CursorPos` space, the
+    /// coordinate space its own `cursorPositionChanged` contract is in.
+    void caretChanged();
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;

@@ -47,8 +47,19 @@ class View;
 /// the same model live/source/styled report. O(blocks) per call,
 /// deliberately uncached (a cache would be a second cursor store,
 /// INVARIANTS #3). Out-of-range positions clamp to the last block/byte
-/// end — never a no-op. `cursorPositionChanged`/`scrollPositionChanged`
-/// emission and `scrollPositionVisualLine()` land in P3.2.
+/// end — never a no-op.
+///
+/// Signals (P3.2): `cursorPositionChanged` is wired to `View::caretChanged`
+/// — the composed view's single chokepoint every caret-changing code path
+/// (real events AND document-driven clamps) already funnels through
+/// (`View::ensureCaretVisible`). `View::caretChanged` itself is
+/// unconditional; the change-gating that matters at the contract's
+/// `CursorPos` granularity happens here, comparing against the last
+/// emitted position — a plain diff check, not a second caret store
+/// (INVARIANTS #3 is about authority, not about remembering what you last
+/// told a signal listener). `scrollPositionChanged` is wired to the
+/// composed `View`'s `verticalScrollBar()->valueChanged` — see
+/// `scrollPositionVisualLine()`.
 class EditorWidget : public Markoff::MarkdownView {
     Q_OBJECT
 public:
@@ -66,6 +77,26 @@ public:
     /// block/byte end (never a no-op).
     void setCursorPosition(Markoff::CursorPos pos) override;
 
+    /// Fraction of the composed `View`'s vertical scrollbar range (same
+    /// convention as `Source::Editor`/`Styled::Editor` — despite the name,
+    /// this is `value() / maximum()`, not a literal line number). The
+    /// scrollbar's range is in pixels over `View::documentHeight()`, whose
+    /// unrealized entries carry an estimated height (`BlockLayoutCache`);
+    /// no separate correction step is needed here because
+    /// `View::updateScrollRange()` already re-derives the range (and
+    /// re-pins a bottom-parked view) every time realization corrects an
+    /// estimate — this accessor just reads whatever the scrollbar's
+    /// current range says, after that correction has already happened.
+    /// 0.0 if there is nothing to scroll (document fits the viewport) or
+    /// no `View` yet.
+    float scrollPositionVisualLine() const override;
+    /// Clamps `pos` to `[0, 1]` — never a no-op. If the document currently
+    /// fits the viewport (scrollbar range is empty), `setValue` would be a
+    /// silent no-op and the scrollbar's own `valueChanged` would not fire;
+    /// `scrollPositionChanged` is emitted explicitly in that case so the
+    /// contract's "the write is always observable" minimum still holds.
+    void setScrollPositionVisualLine(float pos) override;
+
     bool hasCursor() const override { return true; }
 
     /// The composed rendering/input engine. Non-owning; valid for the
@@ -74,9 +105,18 @@ public:
     View *view() const noexcept;
 
 private:
+    /// `View::caretChanged` handler: recomputes `cursorPosition()` and
+    /// emits `cursorPositionChanged` iff it actually differs from
+    /// `m_lastCursorPos` (change-gated per class doc).
+    void onViewCaretChanged();
+
     View *m_view = nullptr;
     Markoff::Session *m_session = nullptr;
     QMetaObject::Connection m_docDestroyedCon;
+    /// Last `CursorPos` this widget emitted `cursorPositionChanged` for —
+    /// the change-gate `onViewCaretChanged` diffs against. Not a cursor
+    /// authority (the composed `View`'s caret is); see class doc.
+    Markoff::CursorPos m_lastCursorPos{1, 1};
 };
 
 }  // namespace Markoff::Canvas

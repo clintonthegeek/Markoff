@@ -60,6 +60,29 @@ inline void checkUndoRedoViaBase(Markoff::MarkdownView *v,
     v->undo();   // restore fixture for subsequent checks
 }
 
+// cursorPositionChanged (canvas production plan P3.2, 2026-08-14): general
+// over any MarkdownView* — the base contract requires the signal fire when
+// the caret genuinely moves and stay silent when a set lands on the SAME
+// position (change-gated, mirrors checkContextChangedKindGated's shape for
+// contextChanged). Uses the shared 5-line `fixture()` above.
+inline void checkCursorPositionChangedSignal(Markoff::MarkdownView *v) {
+    QSignalSpy spy(v, &Markoff::MarkdownView::cursorPositionChanged);
+
+    v->setCursorPosition({1, 1});
+    const int n0 = spy.count();
+    v->setCursorPosition({5, 1});           // clamps onto "omega end"
+    QTRY_VERIFY(spy.count() > n0);
+    const auto args = spy.last();
+    QCOMPARE(args.at(0).toInt(), v->cursorPosition().line);
+    QCOMPARE(args.at(1).toInt(), v->cursorPosition().column);
+
+    // Re-setting the SAME resulting position must NOT re-emit.
+    const int n1 = spy.count();
+    v->setCursorPosition(v->cursorPosition());
+    QTest::qWait(20);
+    QCOMPARE(spy.count(), n1);
+}
+
 inline void checkFontScaleSignal(Markoff::MarkdownView *v) {
     QSignalSpy spy(v, &Markoff::MarkdownView::fontScaleChanged);
     v->setFontScale(1.25);
