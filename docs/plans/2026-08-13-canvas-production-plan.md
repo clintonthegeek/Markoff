@@ -136,7 +136,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.8 ⏸ phase close | ☑ | n/a | n/a |
 | **P5 — block parity** | | | |
 | P5.1 Table: in-cell wrap + cell navigation | ☑ | `d6a0ce0a` | `3a7afd9e` / `70854dc5` |
-| P5.2 Table: row/col ops + alignment | ☐ | | |
+| P5.2 Table: row/col ops + alignment | ☑ | `13ebc8fa` | `281fbc73` / `68557575` |
 | P5.3 Math blocks (jkqtmathtext) | ☐ | | |
 | P5.4 Images + Mermaid/embed seams | ☐ | | |
 | P5.5 Callouts + frontmatter + footnote defs | ☐ | | |
@@ -515,6 +515,24 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P5.2 (2026-08-14).**
+
+- `InsertTable`/`DeleteRow`/`DeleteColumn` `ActionId` enumerators
+  existed since the original v1.0 enum but were never wired to
+  anything until this task.
+- The delimiter row's byte range was being discarded entirely by
+  `TableGeometry` before this task (parsed then thrown away).
+  Recovering it for mutation required a new parallel `lines` field
+  (every physical line — header + delimiter + body) alongside the
+  existing row-major `rows`, rather than folding it into `rows`'
+  shape, to avoid disturbing P2.3/P5.1 callers.
+- Column ops apply one buffer edit per physical line, computed
+  bottom-to-top from a single frozen parse so earlier edits' byte
+  offsets don't invalidate later ones within the same transaction.
+- Full suite 302/302 (was 300/300 after P4.8); canvas tier 25/25;
+  `check-constitution.sh` clean over 49 files. No C1-C4 issues, no
+  core changes beyond the ActionId enumerators.
 
 **P5.1 (2026-08-14).**
 
