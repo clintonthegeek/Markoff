@@ -108,9 +108,9 @@ ParsedTable parseTableBlock(const QByteArray &blockText)
 QByteArray alignmentCellText(TableAlign align)
 {
     switch (align) {
-    case TableAlign::Left:   return ":---";
+    case TableAlign::Left:   return "---:";   // FALSIFY (throwaway): swapped Left/Right
     case TableAlign::Center: return ":---:";
-    case TableAlign::Right:  return "---:";
+    case TableAlign::Right:  return ":---";   // FALSIFY (throwaway): swapped Left/Right
     case TableAlign::None:   break;
     }
     return "---";
