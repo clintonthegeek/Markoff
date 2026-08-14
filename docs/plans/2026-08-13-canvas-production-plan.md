@@ -98,7 +98,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P1.1 KindTransition → core, with heading level (#18.3, #18.4) | ☑ | `72f446e0` | `c1e21740` / `01734f3f` |
 | P1.2 Coordinates byte↔QChar → core | ☑ | `ac405aa6` | `cd2588f1` / `95385e7f` |
 | P1.3 Theme background-slot fallback + missing slots | ☑ | `33c0fc72` | `a6891970` / `9e8e28b9` |
-| P1.4 Marker-convention canonization (docs + doc-comment) | ☐ | | |
+| P1.4 Marker-convention canonization (docs + doc-comment) | ☑ | `f6a28a5f` | n/a |
 | P1.5 ⏸ phase close: full suite + constitution + findings sweep | ☐ | | n/a |
 | **P2 — projection map (delimiter reflow)** | | | |
 | P2.1 ProjectionMap + omission for emphasis/strong | ☐ | | |
@@ -578,6 +578,30 @@ user with a one-page summary of what's proven.
   rather than a pixel-diff render — cheaper and it is the actual
   contract (`BlockStyle::background`), a screenshot would only be
   testing the paint path on top of it.
+
+**P1.4 (2026-08-13).**
+
+- Pure documentation task, no code behavior touched: fixed
+  `listItemDisplayMarker()`'s doc comment (it claimed ListItem was the
+  only narrowed kind; BlockQuote is narrowed the same way — T1's
+  finding), added the per-kind buffer-marker table to
+  `markoff-core/CLAUDE.md`, and a pointer + summary in
+  `VIEW-IMPLEMENTORS-GUIDE.md` §1.
+- Filling in the table surfaced one more kind than T1's four-kind
+  spot-check covered: `HorizontalRule`'s buffer is irrelevant —
+  `serializeHorizontalRule` ignores content entirely and always emits
+  `---`. Not a marker-convention question at all, but worth stating so
+  nobody adds it to the "kept vs stripped" table by pattern-matching.
+- Left uninvestigated, flagged instead: `serializeCodeBlock` always
+  re-wraps `content` with fresh fences (`"```" + info + "\n" + content +
+  "\n```"`), which would double the fences if `content` already carries
+  them — and T1 says a *loaded* CodeBlock's buffer does. This is only
+  survivable today because `serializeForSave`'s untouched-block fast
+  path emits `blockLoadTimeBytes` verbatim and never calls the
+  serializer for blocks nobody edited. Whether a *touched* code block
+  round-trips correctly is untested and outside P1.4's docs-only scope
+  — worth a real look before anything edits CodeBlock buffers in canvas
+  (P4.6 syntax highlighting territory).
 
 ---
 
