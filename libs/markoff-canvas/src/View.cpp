@@ -362,6 +362,8 @@ void View::promoteCaretBlockKind()
                                              uint32_t(text.size() - underlineNl),
                                              QByteArray(), t);
             }
+            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::Level,
+                                  inferred.headingLevel, t);
             m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::HeadingForm,
                                   inferred.setextHeading ? QStringLiteral("setext")
                                                          : QStringLiteral("atx"),
