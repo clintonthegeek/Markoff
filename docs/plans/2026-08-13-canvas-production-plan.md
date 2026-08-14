@@ -113,7 +113,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P1.5 ⏸ phase close: full suite + constitution + findings sweep | ☑ | n/a | n/a |
 | **P2 — projection map (delimiter reflow)** | | | |
 | P2.1 ProjectionMap + omission for emphasis/strong | ☑ | `edb800c5` | `441fd827` / `d7de4364` |
-| P2.2 Omission for heading prefix + code fences | ☐ | | |
+| P2.2 Omission for heading prefix + code fences | ☑ | `24725a47` | `dcd62756` / `904edc08` |
 | P2.3 Per-cell maps + cross-table selection (#18.2) | ☐ | | |
 | P2.4 ⏸ perf re-baseline (E9 budgets, build-perf) | ☐ | | n/a |
 | **P3 — MarkdownView contract v2** | | | |
@@ -702,6 +702,51 @@ user with a one-page summary of what's proven.
   unit test and the reflow test fail, reverted.
 - Full suite: **289/289** (288 baseline + the one new executable).
   `check-constitution.sh` clean.
+
+**P2.2 (2026-08-14).**
+
+- **Headings needed zero canvas code.** Traced `TreeSitterParser.cpp`'s
+  post-processing order by hand before writing anything: post-process 1
+  gives every still-unset delimiter span inside a heading's byte range a
+  parent range spanning the WHOLE heading line (`h.startByte`/`endByte`),
+  and runs *before* post-process 2, which then overwrites that wide range
+  with a narrow one for any delimiter that's actually part of an inline
+  tree (e.g. a nested `**bold**` inside the heading text). The ATX marker
+  span itself isn't part of any inline tree, so it's never touched by
+  post-process 2 and keeps the whole-line range. Net effect: the
+  existing per-span `touchedByAnyCursor` check (unchanged since P2.1)
+  already implements per-block reveal for the marker, and still gives a
+  nested emphasis span inside a heading its own correct per-span reveal
+  — both for free, no special-casing. `tst_parser_inline_span_bake.cpp`'s
+  `heading_marker_has_parent_range_without_trailing_newline` (pre-
+  existing, unrelated regression guard) was the tell that pointed at this
+  before any code was read.
+- **Code fences DID need a real change**, and it's canvas-local:
+  `fenced_code_block_delimiter`/`info_string`/`language` spans are never
+  given a parent range at all (`collectParentRanges` only walks inline
+  ASTs — fences aren't inline content), so the shared predicate always
+  bailed out at the `parentCharStart < 0` guard and never hid them.
+  `delimiterShouldHide` special-cases `isCodeBlockFence` directly:
+  hidden unless `cursorsInBlock` is non-empty. No parser change, so
+  markoff-live (frozen, bug-fix-only) is untouched — the two-flag
+  distinction (`isHeading` gets a parser-level parent range;
+  `isCodeBlockFence` doesn't) meant the "same mechanism" the plan
+  promised only had to grow one new branch, not touch shared code.
+- Code content's monospace font + background were already block-level
+  presentation (`BlockPresentation.cpp`'s `CodeBlock` case), never
+  inline spans — "code content keeps monospace + background" needed no
+  work at all.
+- New tests in `tst_canvas_inline_formatting.cpp` (grown, not a new
+  executable): `heading_marker_hides_per_block` places the caret at the
+  far END of the heading text (byte 7 of `"# Title"`, nowhere near the
+  marker's own `[0,2)` span) and confirms it still reveals — the actual
+  proof that reveal is per-block, not incidentally per-span-that-happens-
+  to-be-wide. `code_fence_hides_per_block` mirrors it for a fenced code
+  block. Falsified per the plan's own named target: pinned
+  `span.isHeading` to always-visible, confirmed
+  `heading_marker_hides_per_block` fails, reverted.
+- Full suite: **289/289**, unchanged test count (grew an existing
+  executable). `check-constitution.sh` clean.
 
 ---
 
