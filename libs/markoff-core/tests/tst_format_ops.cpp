@@ -120,6 +120,100 @@ private Q_SLOTS:
         QCOMPARE(r->start, 6);   // parked between "[]"
         QCOMPARE(r->end, 6);
     }
+
+    // ---- Per-block overloads (canvas production plan P4.3) ----------------
+    // Same algorithms as above, ported to per-block byte-offset space; each
+    // case mirrors the flat-space test with the same fixture and expected
+    // bytes, minus the flat-position resolution the per-block API doesn't
+    // need.
+
+    void wrapToggleInBlock_wraps_and_unwraps_selection() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("hello world\n\nsecond block");
+        const BlockId block = doc.iterateBlocks().front();
+        auto r = FormatOps::wrapToggleInBlock(&doc, block, {6, 11}, "**");
+        QCOMPARE(doc.serializeForSave(),
+                 QByteArray("hello **world**\n\nsecond block\n"));
+        QVERIFY(r.has_value());
+        QCOMPARE(r->start, 8);
+        QCOMPARE(r->end, 13);
+        r = FormatOps::wrapToggleInBlock(&doc, block, *r, "**");
+        QCOMPARE(doc.serializeForSave(),
+                 QByteArray("hello world\n\nsecond block\n"));
+        QVERIFY(r.has_value());
+        QCOMPARE(r->start, 6);
+        QCOMPARE(r->end, 11);
+    }
+
+    void wrapToggleInBlock_no_selection_inserts_pair_and_parks_between() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("hello");
+        const BlockId block = doc.iterateBlocks().front();
+        const auto r = FormatOps::wrapToggleInBlock(&doc, block, {5, 5}, "**");
+        QCOMPARE(doc.serializeForSave(), QByteArray("hello****\n"));
+        QVERIFY(r.has_value());
+        QCOMPARE(r->start, 7);
+        QCOMPARE(r->end, 7);
+    }
+
+    void wrapToggleInBlock_second_block_is_block_local() {
+        // Companion to wrapToggle_in_second_block_is_block_aware: the
+        // per-block API never resolves a flat position at all, so the
+        // "boundary" concern that test exists for cannot arise here — the
+        // caller already names block 2 and its own local byte range [0, 6).
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("first\n\nsecond block");
+        const BlockId second = doc.iterateBlocks()[1];
+        FormatOps::wrapToggleInBlock(&doc, second, {0, 6}, "_");
+        QCOMPARE(doc.serializeForSave(),
+                 QByteArray("first\n\n_second_ block\n"));
+    }
+
+    void insertLinkInBlock_wraps_selection() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("see docs here");
+        const BlockId block = doc.iterateBlocks().front();
+        const auto r = FormatOps::insertLinkInBlock(&doc, block, {4, 8});
+        QCOMPARE(doc.serializeForSave(), QByteArray("see [docs](url) here\n"));
+        QVERIFY(r.has_value());
+        QCOMPARE(r->start, 11);
+        QCOMPARE(r->end, 14);
+    }
+
+    void insertLinkInBlock_no_selection_inserts_template() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("hello");
+        const BlockId block = doc.iterateBlocks().front();
+        const auto r = FormatOps::insertLinkInBlock(&doc, block, {5, 5});
+        QCOMPARE(doc.serializeForSave(), QByteArray("hello[](url)\n"));
+        QVERIFY(r.has_value());
+        QCOMPARE(r->start, 6);
+        QCOMPARE(r->end, 6);
+    }
+
+    void setHeadingLevelInBlock_on_non_first_block() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("first\n\nsecond");
+        const BlockId block = doc.iterateBlocks()[1];
+        // "second" is 6 bytes; caret at byte 2 ("se|cond").
+        auto r = FormatOps::setHeadingLevelInBlock(&doc, block, /*caretByteOffset=*/2, 2);
+        QCOMPARE(doc.serializeForSave(), QByteArray("first\n\n## second\n"));
+        QVERIFY(r.has_value());
+        QCOMPARE(*r, 5);   // caret shifted by the "## " insertion (2 + 3)
+        r = FormatOps::setHeadingLevelInBlock(&doc, block, 5, 0);
+        QCOMPARE(doc.serializeForSave(), QByteArray("first\n\nsecond\n"));
+        QVERIFY(r.has_value());
+        QCOMPARE(*r, 2);   // 5 - 3
+    }
+
+    void setHeadingLevelInBlock_noop_returns_nullopt() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown("## Hello");
+        const BlockId block = doc.iterateBlocks().front();
+        const auto r = FormatOps::setHeadingLevelInBlock(&doc, block, 4, 2);
+        QVERIFY(!r.has_value());
+        QCOMPARE(doc.serializeForSave(), QByteArray("## Hello\n"));
+    }
 };
 
 QTEST_MAIN(TstFormatOps)

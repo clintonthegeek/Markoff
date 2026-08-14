@@ -348,4 +348,179 @@ std::optional<QtRange> setHeadingLevel(MarkoffDocument *doc,
     return QtRange{newPos, newPos};
 }
 
+// ---------------------------------------------------------------------
+// Per-block byte-offset overloads (canvas production plan P4.3).
+//
+// Same three algorithms as above, minus the flat-position resolution
+// step (qtPosToByteOffset / findBlockAtSepByte / sliceByBlocks) — the
+// caller already names the block and the local byte range, so there is
+// only ever one slice, and no cross-block loop is needed here at all.
+// ---------------------------------------------------------------------
+
+std::optional<ByteRange> wrapToggleInBlock(MarkoffDocument *doc,
+                                           BlockId block,
+                                           ByteRange sel,
+                                           const QByteArray &delim) {
+    if (!doc || block.isNull()) return std::nullopt;
+
+    if (sel.start > sel.end) std::swap(sel.start, sel.end);
+    const int delimLen = delim.size();
+
+    // --- No selection: insert delim+delim, park caret between. ------------
+    if (sel.start == sel.end) {
+        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+        doc->d2ApplyBufferEdit(block, static_cast<quint32>(sel.start), 0,
+                               delim + delim, t);
+        doc->flushPendingD2Changed();
+        const int pos = sel.start + delimLen;
+        return ByteRange{pos, pos};
+    }
+
+    // --- Selection: single-slice toggle (same detection as wrapToggle's
+    // per-slice branch). -----------------------------------------------
+    const QByteArray content = doc->blockText(block);
+    const int blockSize = content.size();
+    const int loInt = sel.start;
+    const int hiInt = sel.end;
+
+    const bool surroundedOutside =
+        loInt >= delimLen
+        && hiInt + delimLen <= blockSize
+        && content.mid(loInt - delimLen, delimLen) == delim
+        && content.mid(hiInt, delimLen) == delim;
+    const bool insideMarkers =
+        !surroundedOutside
+        && (hiInt - loInt) >= 2 * delimLen
+        && content.mid(loInt, delimLen) == delim
+        && content.mid(hiInt - delimLen, delimLen) == delim;
+
+    enum class Mode { SurroundedOutside, InsideMarkers, Wrap };
+    Mode mode = Mode::Wrap;
+    if (surroundedOutside)  mode = Mode::SurroundedOutside;
+    else if (insideMarkers) mode = Mode::InsideMarkers;
+
+    {
+        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+        switch (mode) {
+        case Mode::SurroundedOutside:
+            // Remove trailing delim (higher byte) first, then leading.
+            doc->d2ApplyBufferEdit(block, static_cast<quint32>(hiInt),
+                                   static_cast<quint32>(delimLen), QByteArray(), t);
+            doc->d2ApplyBufferEdit(block, static_cast<quint32>(loInt - delimLen),
+                                   static_cast<quint32>(delimLen), QByteArray(), t);
+            break;
+        case Mode::InsideMarkers:
+            doc->d2ApplyBufferEdit(block, static_cast<quint32>(hiInt - delimLen),
+                                   static_cast<quint32>(delimLen), QByteArray(), t);
+            doc->d2ApplyBufferEdit(block, static_cast<quint32>(loInt),
+                                   static_cast<quint32>(delimLen), QByteArray(), t);
+            break;
+        case Mode::Wrap:
+            // Insert trailing delim first (higher byte), then leading.
+            doc->d2ApplyBufferEdit(block, static_cast<quint32>(hiInt), 0, delim, t);
+            doc->d2ApplyBufferEdit(block, static_cast<quint32>(loInt), 0, delim, t);
+            break;
+        }
+    }
+    doc->flushPendingD2Changed();
+
+    int newStart = loInt;
+    int newEnd   = hiInt;
+    switch (mode) {
+    case Mode::SurroundedOutside:
+        newStart -= delimLen;
+        newEnd   -= delimLen;
+        break;
+    case Mode::InsideMarkers:
+        newEnd -= 2 * delimLen;
+        break;
+    case Mode::Wrap:
+        newStart += delimLen;
+        newEnd   += delimLen;
+        break;
+    }
+    return ByteRange{newStart, newEnd};
+}
+
+std::optional<ByteRange> insertLinkInBlock(MarkoffDocument *doc,
+                                           BlockId block,
+                                           ByteRange sel) {
+    if (!doc || block.isNull()) return std::nullopt;
+
+    if (sel.start > sel.end) std::swap(sel.start, sel.end);
+
+    // --- No selection: insert `[](url)` template, park caret between `[]`. -
+    if (sel.start == sel.end) {
+        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+        doc->d2ApplyBufferEdit(block, static_cast<quint32>(sel.start), 0,
+                               QByteArrayLiteral("[](url)"), t);
+        doc->flushPendingD2Changed();
+        const int pos = sel.start + 1;
+        return ByteRange{pos, pos};
+    }
+
+    // --- Selection: wrap `[selection](url)`. -------------------------------
+    {
+        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+        // Insert trailing `](url)` first (higher byte), then leading `[`.
+        doc->d2ApplyBufferEdit(block, static_cast<quint32>(sel.end), 0,
+                               QByteArrayLiteral("](url)"), t);
+        doc->d2ApplyBufferEdit(block, static_cast<quint32>(sel.start), 0,
+                               QByteArrayLiteral("["), t);
+    }
+    doc->flushPendingD2Changed();
+
+    // Park selection over `url` for easy replace. Layout:
+    // `[selection](url)` starting at sel.start; url at sel.end+3..sel.end+6.
+    return ByteRange{sel.end + 3, sel.end + 6};
+}
+
+std::optional<int> setHeadingLevelInBlock(MarkoffDocument *doc,
+                                          BlockId block,
+                                          int caretByteOffset, int level) {
+    if (!doc || block.isNull()) return std::nullopt;
+    if (level < 0 || level > 6) return std::nullopt;
+
+    // No flat-text line-start search needed here: per B1 (block buffer
+    // convention, markoff-core/CLAUDE.md), a block's buffer never carries
+    // an internal '\n', so the block start IS the line start — exactly
+    // what the flat version's backward-\n search resolves to, without
+    // needing to resolve it.
+    const QByteArray content = doc->blockText(block);
+    const int blockSize = content.size();
+
+    int oldBytes = 0;
+    while (oldBytes < 6 && oldBytes < blockSize && content[oldBytes] == '#') {
+        ++oldBytes;
+    }
+    if (oldBytes > 0 && oldBytes < blockSize && content[oldBytes] == ' ') {
+        ++oldBytes;
+    } else if (oldBytes > 0 && oldBytes != blockSize) {
+        // "##" with non-space follower — not an ATX prefix; leave alone.
+        oldBytes = 0;
+    }
+
+    const QByteArray newPrefix = (level == 0)
+        ? QByteArray()
+        : QByteArray(level, '#') + ' ';
+
+    if (newPrefix.size() == oldBytes && content.left(oldBytes) == newPrefix)
+        return std::nullopt;
+
+    {
+        Markoff::UndoLog::Transaction t(doc->d2UndoLog());
+        doc->d2ApplyBufferEdit(block, 0, static_cast<quint32>(oldBytes),
+                               newPrefix, t);
+    }
+    doc->flushPendingD2Changed();
+
+    // Restore caret: prefixes are ASCII so byte-count is exact.
+    const int delta = static_cast<int>(newPrefix.size()) - oldBytes;
+    int newPos = caretByteOffset + delta;
+    if (newPos < 0) newPos = 0;
+    const int newBlockSize = static_cast<int>(doc->blockText(block).size());
+    if (newPos > newBlockSize) newPos = newBlockSize;
+    return newPos;
+}
+
 }  // namespace Markoff::FormatOps
