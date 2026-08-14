@@ -95,7 +95,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | Task | Done | Commit | Fals. |
 |---|---|---|---|
 | **P1 — core promotions & carried findings** | | | |
-| P1.1 KindTransition → core, with heading level (#18.3, #18.4) | ☐ | | |
+| P1.1 KindTransition → core, with heading level (#18.3, #18.4) | ☑ | `72f446e0` | `c1e21740` / `01734f3f` |
 | P1.2 Coordinates byte↔QChar → core | ☐ | | |
 | P1.3 Theme background-slot fallback + missing slots | ☐ | | |
 | P1.4 Marker-convention canonization (docs + doc-comment) | ☐ | | |
@@ -479,4 +479,30 @@ user with a one-page summary of what's proven.
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
 
-*(empty at arc open)*
+**P1.1 (2026-08-13).**
+
+- **Heading levels were never reachable by typing.** The first `#`
+  satisfies `countLeadingHashes` on its own, so the block promotes to
+  Heading at one keystroke and the promote path — guarded on "Paragraph
+  only" — never sees `##`…`######`. Canvas grew
+  `updateCaretHeadingLevel()` (form-aware, raise-only; demotion stays
+  with the structural-key path), mirroring live's same-kind level branch.
+  Consequence before the fix: *every* typed heading serialized as `# `,
+  because `serializeHeading` reads the `level` attr and canvas wrote none.
+- **Setext is the one promotion that must edit the buffer.** T6's "keep
+  the matched marker" rule exists so a typed block matches a *loaded*
+  one — and a loaded setext heading's buffer is content-only (load drops
+  the underline; `serializeHeading` rebuilds it from `level`). Keeping the
+  typed underline made `Hello\n=` save as `Hello\n=\n=====`. Trimmed in
+  the promoting transaction; the caret then sits past the new end, and
+  nothing clamps it afterwards (the promote runs *inside* the
+  document-changed pass), so the clamp is explicit at the end of
+  `promoteCaretBlockKind`.
+- **Display math is unreachable by typing, in both leaves.** `$`
+  promotes to Math before the second `$` arrives, so `mathDisplay` is
+  always false for typed math. The rule distinguishes the two and the
+  attr is written in the promoting transaction; re-inference *within* a
+  Math block is left for whoever needs display math (P5.3), recorded here
+  rather than fixed unprompted.
+- Test count unchanged at **288/288** — P1.1 grew an existing executable
+  (`tst_canvas_kind_transition`, 1 → 13 assertions) rather than adding one.
