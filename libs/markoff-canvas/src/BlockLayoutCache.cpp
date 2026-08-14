@@ -196,7 +196,7 @@ void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &the
             const qreal natural = fm.horizontalAdvance(cellText) + 2 * kTableCellPadding;
             colWidth = std::max(colWidth, std::min(natural, kMaxColumnWidth));
 
-            TableCell &cell = e.tableCells[size_t(r) * size_t(cols) + size_t(cols - 1 - c)];
+            TableCell &cell = e.tableCells[size_t(r) * size_t(cols) + size_t(c)];
             cell.startByte  = range.start;
             cell.endByte    = range.end;
             cell.layout     = std::move(layout);
