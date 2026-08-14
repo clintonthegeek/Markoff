@@ -121,9 +121,7 @@ QList<QTextLayout::FormatRange> inlineFormatRanges(
             any = true;
         }
         if (span.isWikilink) {
-            applyEmphasis(fmt, theme, Theme::Slot::WikiLink);
-            fmt.setFontUnderline(true);
-            any = true;
+            // FALSIFY (throwaway): wikilink slot mapping dropped.
         }
         if (span.isTag) {
             applyEmphasis(fmt, theme, Theme::Slot::Tag);
