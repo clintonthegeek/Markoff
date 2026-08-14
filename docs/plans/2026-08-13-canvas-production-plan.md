@@ -132,7 +132,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☑ (reduced scope — see finding) | `d365be58` | `e4b40d0e` / `06b1c06c` |
 | P4.9 Inline title band (user-directed; spec §5.2) | ☑ | `79db4dc2` | `dedab5ab` / `a22545ab` |
 | P4.6 Code-block syntax highlighting | ☑ | `fb3bfa3e` | `512cb721` / `c66d577d` |
-| P4.7 Task-list checkboxes (render + toggle) | ☐ | | |
+| P4.7 Task-list checkboxes (render + toggle) | ☑ | `31e5c138` | `81e92490` / `7d714198` |
 | P4.8 ⏸ phase close | ☐ | | n/a |
 | **P5 — block parity** | | | |
 | P5.1 Table: in-cell wrap + cell navigation | ☐ | | |
@@ -515,6 +515,20 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.7 (2026-08-14).**
+
+- **The task's literal "toggle the `x` byte via `d2ApplyBufferEdit`"
+  wording doesn't match core's actual architecture** — per
+  markoff-core's documented ListItem convention, a task marker
+  (`[ ]`/`[x]`) is stripped from the buffer at load and is
+  display-only, reconstructed from `MarkerStyle`/`Checked` attrs via
+  `listItemDisplayMarker()`. There is no in-buffer "x byte" to touch.
+  Used `MarkoffDocument::toggleListItemChecked(BlockId)` instead — the
+  correct existing one-transaction primitive (`d2SetBlockAttr` inside
+  one `UndoLog::Transaction`), same API markoff-live's QML delegate
+  already calls. This is a plan-text wording fix to make, not an
+  implementation gap.
 
 **P4.6 (2026-08-14).**
 
