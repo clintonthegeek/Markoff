@@ -310,10 +310,13 @@ private Q_SLOTS:
 
     // ---- P3.6: ephemeral state JSON round-trip -----------------------------
 
-    // Schema pin (plan P3.6): "scroll" is {blockIndex, fraction}, "cursors"
-    // is an ARRAY of one {blockIndex, byte} element (F1a multi-cursor
-    // readiness — not a bare object), "folds" is an empty array (key exists
-    // ahead of P5.6 so the schema doesn't need a migration later).
+    // Schema pin (plan P3.6, folds filled in P5.6): "scroll" is
+    // {blockIndex, fraction}, "cursors" is an ARRAY of one {blockIndex,
+    // byte} element (F1a multi-cursor readiness — not a bare object),
+    // "folds" is an array of {blockIndex} objects, empty here because this
+    // fixture's document has no folds toggled — see
+    // tst_canvas_folding.cpp's ephemeral_state_round_trip_through_
+    // detach_reattach for the populated case.
     void ephemeral_state_schema_shape() {
         m_ed->setCursorPosition({1, 1});
         const QJsonObject state = m_ed->saveEphemeralState();

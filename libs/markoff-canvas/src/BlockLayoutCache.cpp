@@ -576,9 +576,24 @@ void BlockLayoutCache::recomputePositions()
     qreal y = 0;
     for (Entry &e : m_entries) {
         e.y = y;
-        y += e.height;
+        if (!e.folded)
+            y += e.height;
     }
     m_totalHeight = y;
+}
+
+void BlockLayoutCache::setFoldedBlocks(const QSet<BlockId> &hidden)
+{
+    bool changed = false;
+    for (Entry &e : m_entries) {
+        const bool folded = hidden.contains(e.id);
+        if (folded != e.folded) {
+            e.folded = folded;
+            changed = true;
+        }
+    }
+    if (changed)
+        recomputePositions();
 }
 
 int BlockLayoutCache::realizedCount() const

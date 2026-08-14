@@ -374,9 +374,19 @@ QJsonObject EditorWidget::saveEphemeralState() const
     }
     out[QStringLiteral("cursors")] = cursors;
 
-    // Folding lands in P5.6 (via Session); the key exists now so this
-    // schema is stable ahead of that.
-    out[QStringLiteral("folds")] = QJsonArray{};
+    // Folding (P5.6): document-order indices of every currently-folded
+    // head — same "index survives detach/reattach, a raw BlockId doesn't"
+    // reasoning as `cursors` above (`View::foldedHeadIndices`'s own doc
+    // comment). One object per fold rather than a bare int array, room for
+    // a future per-fold field (e.g. kind) without a schema migration —
+    // same F1a-style forward-compat the `cursors` array already follows.
+    QJsonArray folds;
+    for (const int idx : m_view->foldedHeadIndices()) {
+        QJsonObject fold;
+        fold[QStringLiteral("blockIndex")] = idx;
+        folds.append(fold);
+    }
+    out[QStringLiteral("folds")] = folds;
 
     return out;
 }
@@ -430,7 +440,22 @@ void EditorWidget::restoreEphemeralState(const QJsonObject &state)
         }
     }
 
-    // folds: always empty until P5.6 — nothing to restore yet.
+    // Folding (P5.6): restore whatever of the saved indices still resolve
+    // to a foldable block in THIS document — View::setFoldedHeadIndices
+    // does the per-index validity check (class doc: never fatal on a
+    // stale/foreign blob).
+    const QJsonValue foldsVal = state.value(QStringLiteral("folds"));
+    if (foldsVal.isArray()) {
+        QList<int> indices;
+        for (const QJsonValue &v : foldsVal.toArray()) {
+            if (!v.isObject())
+                continue;
+            const QJsonValue idxVal = v.toObject().value(QStringLiteral("blockIndex"));
+            if (idxVal.isDouble())
+                indices << idxVal.toInt();
+        }
+        m_view->setFoldedHeadIndices(indices);
+    }
 }
 
 View *EditorWidget::view() const noexcept

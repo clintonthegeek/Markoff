@@ -121,16 +121,18 @@ public:
     /// needed beyond View's own viewport->View mapping).
     QRect caretRect() const override;
 
-    /// Contract-v2 (P3.6): `{"scroll": {"blockIndex", "fraction"},
-    /// "cursors": [{"blockIndex", "byte"}], "folds": []}` — scroll and
-    /// cursor both in the composed `View`'s own document-order-index +
-    /// byte-offset space (`View::scrollAnchor()`/`blockIndexOf()`), not
+    /// Contract-v2 (P3.6, folds filled in P5.6): `{"scroll": {"blockIndex",
+    /// "fraction"}, "cursors": [{"blockIndex", "byte"}], "folds":
+    /// [{"blockIndex"}]}` — scroll, cursor, and fold heads are all in the
+    /// composed `View`'s own document-order-index space
+    /// (`View::scrollAnchor()`/`blockIndexOf()`/`foldedHeadIndices()`), not
     /// the base contract's flat-line `CursorPos` — an index survives a
     /// detach/reattach cycle in a way a raw `BlockId` does not. `cursors`
     /// is a one-element array (F1a multi-cursor readiness; see base class
-    /// doc) — `View` has exactly one caret today. `folds` is always empty
-    /// until P5.6; the key exists now so this schema doesn't need a
-    /// migration later. Empty object if there is no composed `View` yet
+    /// doc) — `View` has exactly one caret today. `folds` is one object
+    /// per currently-folded head (order-independent) rather than a bare
+    /// int array, leaving room for a future per-fold field without a
+    /// schema migration. Empty object if there is no composed `View` yet
     /// or no document attached.
     QJsonObject saveEphemeralState() const override;
     /// Inverse of `saveEphemeralState()`. Missing or malformed keys are

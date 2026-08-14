@@ -34,6 +34,7 @@
 #include <markoff/canvas/CanvasActionController.h>
 
 #include "BlockLayoutCache.h"
+#include "Folding.h"
 #include "FrontmatterBlock.h"
 #include "InlineFormatting.h"
 #include "InputPredicate.h"
@@ -45,8 +46,17 @@ namespace coords = Markoff::TextUnits;
 namespace Markoff::Canvas {
 
 namespace {
-/// Page margin, in device-independent pixels, either side of the text column.
-constexpr qreal kPageMargin = 16.0;
+/// Page margin, in device-independent pixels, either side of the text
+/// column. Widened from 16 to 28 in P5.6 to make room for the fold
+/// affordance (below) alongside the marker/checkbox decoration slot that
+/// already lived at the margin's inner edge — both fit without colliding
+/// now, whereas 16px was already fully claimed by the marker/checkbox
+/// alone (findings log, P5.6: a real gutter seam per the F1 audit's #12
+/// suggestion is future work; this is the minimal width bump this task
+/// needed). Every geometry function in this file derives from
+/// `pageMargin()`, never this constant directly, so the bump propagates
+/// uniformly.
+constexpr qreal kPageMargin = 28.0;
 /// Gap between a list marker (or quote bar) and its content.
 constexpr qreal kMarkerGap = 6.0;
 /// Width of the blockquote bar.
@@ -65,6 +75,23 @@ QRectF taskCheckboxRect(const QFontMetricsF &fm, qreal contentX, qreal contentY)
     const qreal right = contentX - kMarkerGap;
     const qreal top = contentY + (fm.ascent() - side) / 2.0;
     return QRectF(right - side, top, side, side);
+}
+
+// ---- Fold affordance glyph (P5.6) ------------------------------------------
+// Painted at the far-left edge of the page margin — deliberately NOT the
+// contentX-relative marker/checkbox slot `taskCheckboxRect` above uses
+// (leftIndent-shifted, and already claimed by the bullet/number/checkbox
+// for a ListItem head): a foldable ListItem (a long list's first item) can
+// ALSO be a task item, and the two glyphs must never collide. Anchored to
+// `pageMarginX` (== `View::pageMargin()`'s return, unaffected by a block's
+// own `leftIndent`) instead, same one-function-decides-the-rect,
+// paint-and-hit-test-share-it shape as `taskCheckboxRect`.
+QRectF foldAffordanceRect(const QFontMetricsF &fm, qreal pageMarginX, qreal contentY)
+{
+    const qreal side = fm.ascent() * 0.55;
+    const qreal left = qMax(qreal(2), pageMarginX * 0.28 - side / 2.0);
+    const qreal top  = contentY + (fm.ascent() - side) / 2.0;
+    return QRectF(left, top, side, side);
 }
 
 // ---- Inline title band (P4.9) ---------------------------------------------
@@ -192,6 +219,13 @@ void View::setDocument(MarkoffDocument *doc)
     m_cache->clear();
     m_caret = {};
     m_selectionAnchor.reset();
+    // Folding (P5.6): fold state is keyed by THIS document's BlockIds — a
+    // detach (doc == nullptr) or a swap to a different document leaves
+    // them meaningless (same reasoning m_caret/m_selectionAnchor's reset
+    // above already follows). EditorWidget::restoreEphemeralState's
+    // "reattach, then restore" flow is what repopulates this after a real
+    // detach/reattach cycle.
+    m_foldedHeads.clear();
 
     if (m_doc) {
         // d2DocumentChanged is the truth feed. Consuming the document's own
@@ -256,6 +290,13 @@ void View::setFontScale(qreal scale)
         m_cache->setTextWidth(textWidth());
         m_cache->sync(*m_doc, m_theme, m_fontScale);
         m_cache->setCaret(*m_doc, m_theme, m_caret.block, m_caret.byteOffset);
+        // Folding (P5.6): sync() above reset every entry's `folded` flag
+        // (fresh Entry construction on structural-vs-not doesn't matter
+        // here — clear() below/setTheme's own clear() already wiped
+        // everything). Fold SHAPE is unaffected by a scale change, so no
+        // caret-relocation check is needed here (only toggleFold/document
+        // edits can newly hide the caret's own block).
+        refreshFoldedBlocks();
     }
 
     // Re-derive the scrollbar's range for the new (estimated) heights
@@ -413,7 +454,15 @@ QRectF View::blockRect(BlockId id) const
     if (i < 0)
         return {};
     const auto &e = m_cache->entries()[size_t(i)];
-    return QRectF(pageMargin(), e.y + leadingBandHeight(), textWidth(), e.height);
+    // Folding (P5.6): the reported height is the EFFECTIVE (y-layout)
+    // height — 0 for a folded-away entry, matching `recomputePositions()`'s
+    // own zero contribution — not the entry's own `height` field (which
+    // stays the real/estimated content height internally, unaffected by
+    // folding, so realization/measurement keep working). `i >= 0` alone
+    // already proves the block is still found/queryable; a zero-height
+    // rect at the right y is "occupies no y-space", not "doesn't exist".
+    const qreal h = e.folded ? qreal(0) : e.height;
+    return QRectF(pageMargin(), e.y + leadingBandHeight(), textWidth(), h);
 }
 
 QRectF View::taskCheckboxRectFor(BlockId id) const
@@ -589,6 +638,118 @@ bool View::isFootnoteDefBlock(BlockId id) const
     if (idx < 0)
         return false;
     return m_cache->entries()[size_t(idx)].style.isFootnoteDef;
+}
+
+// ---- Folding (P5.6) -------------------------------------------------------
+
+QSet<BlockId> View::hiddenBlocksFromFolds() const
+{
+    QSet<BlockId> hidden;
+    if (!m_doc)
+        return hidden;
+    for (const BlockId head : m_foldedHeads) {
+        const Detail::FoldInfo info = Detail::resolveFoldable(*m_doc, head);
+        for (const BlockId b : info.body)
+            hidden.insert(b);
+    }
+    return hidden;
+}
+
+void View::refreshFoldedBlocks()
+{
+    // Drop heads the document no longer agrees are foldable (deleted, or
+    // edited into a shape resolveFoldable no longer recognizes) — the same
+    // "re-derive from authority, don't carry stale view state" rule
+    // hiddenBlocksFromFolds() itself follows.
+    if (m_doc) {
+        QSet<BlockId> stale;
+        for (const BlockId head : m_foldedHeads) {
+            if (Detail::resolveFoldable(*m_doc, head).kind == Detail::FoldKind::None)
+                stale.insert(head);
+        }
+        m_foldedHeads.subtract(stale);
+    }
+    m_cache->setFoldedBlocks(hiddenBlocksFromFolds());
+}
+
+bool View::isBlockFoldable(BlockId id) const
+{
+    if (!m_doc)
+        return false;
+    return Detail::resolveFoldable(*m_doc, id).kind != Detail::FoldKind::None;
+}
+
+bool View::isBlockFolded(BlockId id) const
+{
+    return m_foldedHeads.contains(id);
+}
+
+bool View::isBlockHidden(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    return m_cache->entries()[size_t(idx)].folded;
+}
+
+void View::toggleFold(BlockId id)
+{
+    if (!m_doc || !isBlockFoldable(id))
+        return;
+
+    if (m_foldedHeads.contains(id)) {
+        m_foldedHeads.remove(id);
+    } else {
+        m_foldedHeads.insert(id);
+    }
+    refreshFoldedBlocks();
+
+    // If the caret is now inside a body this just hid, it must not be left
+    // referencing invisible content — land it on the head instead, same
+    // "never strand the caret" rule clampCaret enforces for structural
+    // edits. A caret sitting on the head itself, or unaffected by this
+    // fold at all, is left untouched.
+    const int caretIdx = m_cache->indexOf(m_caret.block);
+    if (caretIdx >= 0 && m_cache->entries()[size_t(caretIdx)].folded) {
+        setCaret(CanvasCursor{id, 0});
+    }
+
+    ensureLayoutForViewport();
+    viewport()->update();
+}
+
+QRectF View::foldAffordanceRectFor(BlockId id) const
+{
+    const int i = m_cache->indexOf(id);
+    if (i < 0 || !isBlockFoldable(id))
+        return {};
+    const auto &e = m_cache->entries()[size_t(i)];
+    const qreal contentY = e.y + leadingBandHeight() + e.style.topMargin;
+    const QFontMetricsF fm(e.style.font);
+    return foldAffordanceRect(fm, pageMargin(), contentY);
+}
+
+QList<int> View::foldedHeadIndices() const
+{
+    QList<int> out;
+    for (size_t i = 0; i < m_cache->entries().size(); ++i) {
+        if (m_foldedHeads.contains(m_cache->entries()[i].id))
+            out << int(i);
+    }
+    return out;
+}
+
+void View::setFoldedHeadIndices(const QList<int> &indices)
+{
+    m_foldedHeads.clear();
+    for (const int idx : indices) {
+        const BlockId id = blockIdAt(idx);
+        if (!id.isNull() && isBlockFoldable(id))
+            m_foldedHeads.insert(id);
+    }
+    refreshFoldedBlocks();
+    ensureLayoutForViewport();
+    viewport()->update();
 }
 
 bool View::isComposing() const
@@ -1078,6 +1239,11 @@ void View::onDocumentChanged()
         m_cache->setTextWidth(textWidth());
         m_cache->sync(*m_doc, m_theme, m_fontScale);
     }
+    // Folding (P5.6): sync() rebuilds every entry (Entry::folded resets to
+    // false along with everything else), and a structural edit can also
+    // change what a fold head's body even IS — refresh before clampCaret so
+    // a caret clamp never lands inside a range this pass just re-hid.
+    refreshFoldedBlocks();
     clampCaret(oldCaretIndex);
     // No UndoLog selection state (T4/T5, queue #10 item 2): if the anchor's
     // block didn't survive the edit there is nothing sound to clamp it to,
@@ -1325,6 +1491,32 @@ std::optional<BlockId> View::taskCheckboxAt(const QPoint &viewportPos) const
     const qreal contentY = (e.y + leadingBandHeight() - scrollY) + e.style.topMargin;
     const QFontMetricsF fm(e.style.font);
     if (!taskCheckboxRect(fm, contentX, contentY).contains(QPointF(viewportPos)))
+        return std::nullopt;
+    return e.id;
+}
+
+std::optional<BlockId> View::foldAffordanceAt(const QPoint &viewportPos) const
+{
+    if (!m_doc || m_cache->entries().empty())
+        return std::nullopt;
+
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal docY    = viewportPos.y() + scrollY;
+    if (docY < leadingBandHeight())
+        return std::nullopt;
+    const int idx = m_cache->indexAtY(docY - leadingBandHeight());
+    if (idx < 0)
+        return std::nullopt;
+
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout || e.folded)
+        return std::nullopt;
+    if (!isBlockFoldable(e.id))
+        return std::nullopt;
+
+    const qreal contentY = (e.y + leadingBandHeight() - scrollY) + e.style.topMargin;
+    const QFontMetricsF fm(e.style.font);
+    if (!foldAffordanceRect(fm, pageMargin(), contentY).contains(QPointF(viewportPos)))
         return std::nullopt;
     return e.id;
 }
@@ -2037,8 +2229,13 @@ void View::moveCaretHorizontally(bool forward)
 
     if (forward) {
         if (layoutPos >= layoutLen) {
-            if (idx + 1 < int(m_cache->entries().size())) {
-                m_caret.block = m_cache->entries()[size_t(idx + 1)].id;
+            // Folding (P5.6): step to the next VISIBLE entry, not a bare
+            // idx+1 — a folded range's blocks are still real cache entries
+            // (BlockLayoutCache::Entry, "found/queryable"), just invisible,
+            // so a plain +1 would land the caret inside now-hidden content.
+            const int nextIdx = nextVisibleEntryIndex(idx, /*forward=*/true);
+            if (nextIdx >= 0) {
+                m_caret.block = m_cache->entries()[size_t(nextIdx)].id;
                 m_caret.byteOffset = 0;
             }
             return;
@@ -2047,8 +2244,9 @@ void View::moveCaretHorizontally(bool forward)
         m_caret.byteOffset = e.projection.layoutQCharToByte(next);
     } else {
         if (layoutPos <= 0) {
-            if (idx > 0) {
-                const auto &prevEntry = m_cache->entries()[size_t(idx - 1)];
+            const int prevIdx = nextVisibleEntryIndex(idx, /*forward=*/false);
+            if (prevIdx >= 0) {
+                const auto &prevEntry = m_cache->entries()[size_t(prevIdx)];
                 m_caret.block = prevEntry.id;
                 m_caret.byteOffset = m_doc->blockText(prevEntry.id).size();
             }
@@ -2057,6 +2255,18 @@ void View::moveCaretHorizontally(bool forward)
         const int prev = e.layout->previousCursorPosition(layoutPos);
         m_caret.byteOffset = e.projection.layoutQCharToByte(prev);
     }
+}
+
+int View::nextVisibleEntryIndex(int idx, bool forward) const
+{
+    const auto &entries = m_cache->entries();
+    int i = idx + (forward ? 1 : -1);
+    while (i >= 0 && i < int(entries.size())) {
+        if (!entries[size_t(i)].folded)
+            return i;
+        i += forward ? 1 : -1;
+    }
+    return -1;
 }
 
 void View::moveCaretToLineEdge(bool home)
@@ -2115,9 +2325,11 @@ void View::moveCaretVertically(bool forward)
 
     // Off the top/bottom of this block's layout: cross into the
     // previous/next block, landing near the same x on its nearest edge
-    // line. Exact column affinity is not a criterion (plan T2).
-    const int nextIdx = idx + (forward ? 1 : -1);
-    if (nextIdx < 0 || nextIdx >= int(m_cache->entries().size()))
+    // line. Exact column affinity is not a criterion (plan T2). Folding
+    // (P5.6): the next VISIBLE entry, not a bare idx+-1 — see
+    // moveCaretHorizontally's identical reasoning.
+    const int nextIdx = nextVisibleEntryIndex(idx, forward);
+    if (nextIdx < 0)
         return;
 
     const auto &target = m_cache->entries()[size_t(nextIdx)];
@@ -2218,8 +2430,10 @@ void View::moveCaretVerticallyInTable(int idx, bool forward)
     // moveCaretVertically's own cross-block path uses for entries with a
     // real `e.layout`. `x` has to move from cell-local to table-content-
     // local coordinates first (the same space that path's `x` lives in).
-    const int nextIdx = idx + (forward ? 1 : -1);
-    if (nextIdx < 0 || nextIdx >= int(m_cache->entries().size()))
+    // Folding (P5.6): next VISIBLE entry — a table can itself sit inside a
+    // folded heading section's body, same as any other block kind.
+    const int nextIdx = nextVisibleEntryIndex(idx, forward);
+    if (nextIdx < 0)
         return;
 
     qreal colLeft = 0;
@@ -3013,6 +3227,22 @@ void View::mousePressEvent(QMouseEvent *event)
     }
 
     if (event->button() == Qt::LeftButton && m_doc) {
+        // Fold-affordance toggle (P5.6): checked ahead of the task-checkbox/
+        // hitTest/caret paths, same "gutter click never reaches text
+        // hit-testing" reasoning taskCheckboxAt's own comment gives —
+        // foldAffordanceRect lives at a DIFFERENT x than taskCheckboxRect
+        // (see its own doc comment), so there is no ambiguity between the
+        // two either. Unlike the checkbox, folding is a pure VIEW-side
+        // toggle (spec §2/§3: the document is untouched), so it is not
+        // read-only-gated — collapsing/expanding a section is navigation,
+        // not an edit, same as scroll/selection staying live in read-only
+        // mode elsewhere in this file.
+        if (const auto foldHead = foldAffordanceAt(event->pos())) {
+            toggleFold(*foldHead);
+            event->accept();
+            return;
+        }
+
         // Task-checkbox toggle (P4.7): checked ahead of hitTest/caret
         // placement — the glyph sits in the gutter left of contentX, which
         // hitTest's own text hit-testing never resolves to (negative
@@ -3280,6 +3510,16 @@ void View::paintEvent(QPaintEvent *event)
 
     for (size_t entryIndex = 0; entryIndex < m_cache->entries().size(); ++entryIndex) {
         const auto &e = m_cache->entries()[entryIndex];
+        // Folding (P5.6): a folded entry contributes 0 to the y-layout
+        // (BlockLayoutCache::recomputePositions) but its OWN `height`
+        // field stays the real content height (Entry::folded's own doc
+        // comment) — so it must never be painted, or it would draw on top
+        // of whatever now occupies its old y. This is the one place that
+        // distinction matters: every check below it still uses the
+        // unmodified `e.height`, which is correct for entries that DO
+        // reach this point (they're never folded).
+        if (e.folded)
+            continue;
         if (e.y + titleH >= viewBottom)
             break;
         if (e.y + titleH + e.height <= scrollY)
@@ -3288,6 +3528,33 @@ void View::paintEvent(QPaintEvent *event)
         const qreal blockTop = e.y + titleH - scrollY;
         const qreal contentX = margin + e.style.leftIndent;
         const qreal contentY = blockTop + e.style.topMargin;
+
+        // Fold affordance (P5.6): a small chevron at the page margin's
+        // left edge for any block CURRENTLY heading a foldable unit —
+        // independent of table/rule/image/etc. branches below (drawn
+        // before all of them, same "gutter decoration first" order the
+        // quote bar/callout header already follow), so every foldable
+        // kind gets it without duplicating this block per branch.
+        if (isBlockFoldable(e.id)) {
+            const QFontMetricsF gfm(e.style.font);
+            const QRectF glyph = foldAffordanceRect(gfm, margin, contentY);
+            QPainterPath tri;
+            if (m_foldedHeads.contains(e.id)) {
+                // Collapsed: right-pointing chevron ">".
+                tri.moveTo(glyph.left(), glyph.top());
+                tri.lineTo(glyph.right(), glyph.center().y());
+                tri.lineTo(glyph.left(), glyph.bottom());
+            } else {
+                // Expanded: down-pointing chevron "v".
+                tri.moveTo(glyph.left(), glyph.top());
+                tri.lineTo(glyph.right(), glyph.top());
+                tri.lineTo(glyph.center().x(), glyph.bottom());
+            }
+            tri.closeSubpath();
+            p.setPen(Qt::NoPen);
+            p.setBrush(e.style.foreground);
+            p.drawPath(tri);
+        }
 
         if (e.style.background.isValid()) {
             const qreal bgX = e.style.fullWidthBackground ? margin : contentX;

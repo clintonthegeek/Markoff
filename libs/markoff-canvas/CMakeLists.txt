@@ -37,6 +37,8 @@ add_library(markoff_canvas STATIC
     src/CodeHighlighting.cpp
     src/FootnoteDefBlocks.h
     src/FootnoteDefBlocks.cpp
+    src/Folding.h
+    src/Folding.cpp
     src/FrontmatterBlock.h
     src/FrontmatterBlock.cpp
     src/InlineFormatting.h

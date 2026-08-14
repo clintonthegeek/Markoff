@@ -59,10 +59,13 @@ void TstCanvasLayoutWidth::full_width_policy_spans_the_viewport()
 
     // FullWidth: the column fills the viewport minus the (small, fixed)
     // page margins on either side — nowhere near a 700px "readable" cap.
+    // Margin widened 16 -> 28 in P5.6 (room for the fold-affordance glyph
+    // alongside the marker/checkbox decoration slot); threshold bumped to
+    // match — still "small relative to an 800px viewport", just not <20.
     QVERIFY2(r.width() > 700.0,
              qPrintable(QStringLiteral("FullWidth column is %1px, expected > 700")
                             .arg(r.width())));
-    QVERIFY2(r.x() < 20.0,
+    QVERIFY2(r.x() < 40.0,
              qPrintable(QStringLiteral("FullWidth column x is %1, expected near 0")
                             .arg(r.x())));
 }

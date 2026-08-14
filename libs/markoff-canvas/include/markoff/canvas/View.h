@@ -10,6 +10,7 @@
 #include <QHash>
 #include <QList>
 #include <QRectF>
+#include <QSet>
 #include <QVariant>
 
 #include <markoff/core/BlockId.h>
@@ -327,6 +328,63 @@ public:
     /// — carries the back-reference marker/color/italic presentation,
     /// distinct from a plain paragraph. Test/inspection surface only.
     bool isFootnoteDefBlock(BlockId id) const;
+
+    // ---- Folding (P5.6) ---------------------------------------------------
+    // Heading sections, long lists (>= Detail::kLongListFoldThreshold
+    // top-level items), and callouts (P5.5's typed blockquote header) are
+    // foldable — see `Folding::resolveFoldable`'s own doc comment for the
+    // exact per-kind body rules. Fold STATE (which head blocks are
+    // currently toggled) lives here as a `BlockId` set (`m_foldedHeads`);
+    // fold SHAPE (what body a given head's fold would hide) is always
+    // re-derived fresh from current document structure, never cached
+    // (spec §2/§3: the document is the one authority) — an edit that
+    // shrinks/removes a fold head's body is picked up on the very next
+    // `onDocumentChanged()`, no separate invalidation path needed.
+
+    /// What foldable unit (if any) `id` currently heads, purely a function
+    /// of document structure — independent of whether it's actually folded
+    /// right now. False for a block that isn't a heading/callout/long-list
+    /// head, or one of those shapes with nothing to hide (e.g. the last
+    /// heading in the document, with no body after it).
+    bool isBlockFoldable(BlockId id) const;
+    /// True iff `id` is a fold head whose fold is currently ON. False for
+    /// a block that isn't foldable at all, and for a block that's merely
+    /// HIDDEN inside someone else's active fold (see `isBlockHidden`).
+    bool isBlockFolded(BlockId id) const;
+    /// True iff `id` is currently invisible because it falls inside some
+    /// OTHER block's active fold body. A folded head is never "hidden" by
+    /// its own fold (it's still the visible affordance row) — this and
+    /// `isBlockFolded` are deliberately not each other's negation.
+    bool isBlockHidden(BlockId id) const;
+    /// Toggles `id`'s fold state. No-op if `id` isn't currently foldable
+    /// (re-derived fresh, not read off stale state). Turning a fold ON
+    /// while the caret sits inside the body it just hid moves the caret to
+    /// `id` byte 0 first — through the same `setCaret` chokepoint every
+    /// other caret-changing path in this file uses — so the caret is never
+    /// left referencing now-invisible content (mirrors `clampCaret`'s
+    /// "never strand the caret" rule for structural edits).
+    void toggleFold(BlockId id);
+    /// Fold-affordance glyph bounds in document coordinates, or a null
+    /// rect if `id` isn't realized or isn't currently foldable. Same rect
+    /// `paintEvent` draws and the click hit-test checks — test/inspection
+    /// surface only, same convention as `taskCheckboxRectFor`.
+    QRectF foldAffordanceRectFor(BlockId id) const;
+
+    /// Ephemeral-state seam (P5.6, fills the P3.6 schema's empty "folds"
+    /// key): document-order indices of every currently-folded head, in
+    /// `m_cache` entry order. Mirrors `blockIndexOf`'s "an index survives
+    /// detach/reattach, a raw BlockId doesn't" reasoning —
+    /// `EditorWidget::saveEphemeralState` persists these, not BlockIds.
+    QList<int> foldedHeadIndices() const;
+    /// Inverse of `foldedHeadIndices()`: replaces the current folded-head
+    /// set with whichever of `indices` still resolves (in the CURRENT
+    /// document) to a block that is actually foldable — a stale/foreign
+    /// index, or one landing on a block that no longer heads a foldable
+    /// unit, is silently dropped rather than treated as a hard failure,
+    /// same "restore whatever you can" rule the rest of ephemeral-state
+    /// restore already follows (`EditorWidget::restoreEphemeralState`'s
+    /// class doc).
+    void setFoldedHeadIndices(const QList<int> &indices);
 
     /// Whether an IME composition is in progress (T8, exit E6): a non-empty
     /// preedit string is currently spliced into the caret block's layout.
@@ -648,6 +706,13 @@ private:
     /// the table's top/bottom row entirely. `idx` is the caret's entry
     /// index in the cache, same convention as hitTestTable/paintTable.
     void moveCaretVerticallyInTable(int idx, bool forward);
+    /// Folding (P5.6): the next entry index in `forward`/backward document
+    /// order that is NOT `Entry::folded`, or -1 if there is none.
+    /// `moveCaretHorizontally`/`moveCaretVertically` route their
+    /// cross-block index step through here instead of a bare `idx +- 1` so
+    /// caret motion steps OVER a folded range's now-invisible content
+    /// rather than landing inside it.
+    int nextVisibleEntryIndex(int idx, bool forward) const;
     void moveCaretToLineEdge(bool home);
     void insertPrintable(const QString &text);
     void deleteCluster(bool forward);
@@ -821,6 +886,16 @@ private:
     /// requirement), or a non-task ListItem/other kind.
     std::optional<BlockId> taskCheckboxAt(const QPoint &viewportPos) const;
 
+    // ---- Folding hit-test (P5.6) -------------------------------------------
+
+    /// The foldable head BlockId whose fold-affordance glyph covers
+    /// `viewportPos`, if any. Same shape as `taskCheckboxAt`: realized-only,
+    /// checks the click point against the identical rect `paintEvent`
+    /// draws and `foldAffordanceRectFor` reports (via `foldAffordanceRect`
+    /// in View.cpp — one geometry, not two). `nullopt` for a miss, an
+    /// unrealized entry, or a block that isn't currently foldable.
+    std::optional<BlockId> foldAffordanceAt(const QPoint &viewportPos) const;
+
     // ---- Inline title (P4.9) ----------------------------------------------
 
     /// The band's height in DIPs when visible, 0 when not (spec §5.2 "off
@@ -871,6 +946,27 @@ private:
     /// `m_titleCaretActive` — its own caret. Viewport-relative, same
     /// convention as the rest of `paintEvent`'s locals.
     void paintTitle(QPainter &p) const;
+
+    // ---- Folding (P5.6) ----------------------------------------------
+    // Fold SHAPE (what a head's body is) is `Folding::resolveFoldable`,
+    // canvas-local, stateless. Fold STATE (which heads are currently
+    // toggled) is `m_foldedHeads` below, the one piece of view-local state
+    // this seam owns — same "leaf state the document doesn't know about"
+    // exception `m_selectionAnchor`/preedit already are (spec §2/§3: the
+    // document itself is untouched by folding, same as a selection).
+
+    /// The union of every currently-folded head's body blocks, freshly
+    /// re-derived from `Folding::resolveFoldable` (never cached across
+    /// calls) — cheap relative to a keystroke, and re-deriving means an
+    /// edit that shrinks/removes a fold head's body is picked up for free
+    /// on the very next call, no separate invalidation path.
+    QSet<BlockId> hiddenBlocksFromFolds() const;
+    /// Pushes `hiddenBlocksFromFolds()` into `m_cache` (`BlockLayoutCache::
+    /// setFoldedBlocks`). Called from `onDocumentChanged()` and
+    /// `setFontScale()` — the two places `m_cache->sync()` runs and so
+    /// resets every entry's `folded` flag to false — and from
+    /// `toggleFold()` itself.
+    void refreshFoldedBlocks();
 
     // ---- Frontmatter (P5.5) -------------------------------------------
     // Frontmatter is NOT a document block (markoff-core's
@@ -929,6 +1025,13 @@ private:
     /// during `paintEvent`. Draw-time-only paint state — see
     /// `setFindHighlights`'s doc comment.
     QHash<BlockId, QList<FindHighlight>> m_findHighlightsByBlock;
+
+    // ---- Folding (P5.6) -------------------------------------------------
+    /// Fold heads currently toggled ON. The only piece of fold STATE this
+    /// leaf owns — see the private "Folding" section's doc comment for why
+    /// fold SHAPE is never stored here.
+    QSet<BlockId> m_foldedHeads;
+
     // ---- IME (T8) ---------------------------------------------------------
     // Composition state the document doesn't know about (same exception as
     // m_selectionAnchor, T5): a preedit string exists only in this leaf's

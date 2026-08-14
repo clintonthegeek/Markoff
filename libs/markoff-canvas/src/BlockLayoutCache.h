@@ -6,6 +6,7 @@
 
 #include <QHash>
 #include <QPixmap>
+#include <QSet>
 #include <QTextLayout>
 
 #include <markoff/core/BlockId.h>
@@ -126,6 +127,20 @@ public:
         qreal   height   = 0;      //!< estimated, or exact once realized
         bool    realized = false;
 
+        /// Folding (P5.6): true when this block is currently hidden by an
+        /// active fold — its OWN `height` field is left untouched (still
+        /// the real/estimated content height, so the entry stays fully
+        /// findable/queryable: `blockRect`, `indexOf`, a realized layout
+        /// for search/selection all keep working exactly as if it weren't
+        /// folded) but `recomputePositions()` adds 0 for it instead of
+        /// `height` — the entry is "skipped in y-layout" by contributing
+        /// no space, never by being forced back to unrealized (an
+        /// unrealized entry's `height` is `estimateHeight()`'s non-zero
+        /// guess, which would defeat the whole point). `View` derives this
+        /// set fresh from `Folding::resolveFoldable` + its own folded-head
+        /// set every time it changes; nothing here decides fold policy.
+        bool    folded   = false;
+
         // ---- Table grid (T9, style.isTable only) --------------------------
         int tableCols = 0;
         std::vector<qreal> tableColWidths;    //!< size tableCols
@@ -193,6 +208,16 @@ public:
     void setMermaidRenderer(MermaidRenderer *renderer);
     /// P5.4 embed seam. Not owned. Same re-realize-on-set behavior.
     void setEmbedRegistry(Markoff::EmbedRegistry *registry);
+
+    /// Folding (P5.6): marks every entry whose id is in `hidden` as
+    /// `Entry::folded` (clearing it on every other entry) and recomputes
+    /// y-positions so hidden entries contribute zero height. Cheap: no
+    /// layout work, just the `folded` flags + the existing prefix-sum pass.
+    /// Safe to call every time `View`'s folded-head set could have changed
+    /// (fold toggle, or a document edit that could have moved a fold
+    /// head's body) — `hidden` is always freshly derived, never patched
+    /// incrementally.
+    void setFoldedBlocks(const QSet<BlockId> &hidden);
 
     void clear();
 
