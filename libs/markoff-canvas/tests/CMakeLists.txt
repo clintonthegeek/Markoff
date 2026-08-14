@@ -54,6 +54,11 @@ add_test(NAME tst_canvas_table COMMAND tst_canvas_table)
 target_link_libraries(tst_canvas_table PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
 set_tests_properties(tst_canvas_table PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_canvas_table_selection tst_canvas_table_selection.cpp)
+add_test(NAME tst_canvas_table_selection COMMAND tst_canvas_table_selection)
+target_link_libraries(tst_canvas_table_selection PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+set_tests_properties(tst_canvas_table_selection PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_canvas_perf_500 tst_canvas_perf_500.cpp)
 add_test(NAME tst_canvas_perf_500 COMMAND tst_canvas_perf_500)
 target_link_libraries(tst_canvas_perf_500 PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)

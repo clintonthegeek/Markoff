@@ -176,7 +176,11 @@ void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &the
         for (int c = 0; c < cols; ++c) {
             const TableCellRange &range = parsed.rows[size_t(r)][size_t(c)];
             const QByteArray cellBytes = text.mid(range.start, range.end - range.start);
-            const QString cellText = QString::fromUtf8(cellBytes);
+            // No omitted ranges inside a cell (P2.3 scope: identity map,
+            // still routed through ProjectionMap for the sanctioned C4
+            // coordinate path rather than an ad hoc byte<->QChar call).
+            ProjectionMap projection = ProjectionMap::build(cellBytes, {});
+            const QString &cellText = projection.layoutText();
 
             auto layout = std::make_unique<QTextLayout>(cellText, rowFont);
             QTextOption opt;
@@ -193,9 +197,10 @@ void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &the
             colWidth = std::max(colWidth, std::min(natural, kMaxColumnWidth));
 
             TableCell &cell = e.tableCells[size_t(r) * size_t(cols) + size_t(c)];
-            cell.startByte = range.start;
-            cell.endByte   = range.end;
-            cell.layout    = std::move(layout);
+            cell.startByte  = range.start;
+            cell.endByte    = range.end;
+            cell.layout     = std::move(layout);
+            cell.projection = std::move(projection);
         }
 
         e.tableRowHeights[size_t(r)] = rowHeight + 2 * kTableCellPadding;

@@ -48,6 +48,13 @@ public:
         int startByte = 0;
         int endByte   = 0;
         std::unique_ptr<QTextLayout> layout;  //!< null until realized
+        /// Byte<->layout-QChar map for this cell's own text (spec §4.2,
+        /// plan P2.3): built together with `layout`, cell-relative (byte 0
+        /// == startByte). No delimiter omission happens inside a cell yet,
+        /// so this is presently an identity map modulo UTF-8 width — but it
+        /// is still the one sanctioned conversion path (C4), replacing the
+        /// ad hoc coords:: calls hit-test/paint used before P2.3.
+        ProjectionMap projection;
     };
 
     struct Entry {

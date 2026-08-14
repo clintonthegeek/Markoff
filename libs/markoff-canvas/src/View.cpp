@@ -16,6 +16,9 @@
 #include <QScrollBar>
 #include <QtMath>
 
+#include <tuple>
+#include <utility>
+
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/KindInference.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -39,6 +42,77 @@ constexpr qreal kPageMargin = 16.0;
 constexpr qreal kMarkerGap = 6.0;
 /// Width of the blockquote bar.
 constexpr qreal kQuoteBarWidth = 3.0;
+
+/// Row-major cell index nearest `byteOffset` (block-relative) in a Table
+/// entry's cell-ordered linear sequence (plan P2.3): the sequence itself is
+/// just `tableCells`' own order (already row-major, built row-by-row in
+/// BlockLayoutCache::realizeTable) — misordering *that* build is the plan's
+/// named falsification, not anything computed here. `preferAfter` picks the
+/// nearest following cell for a byte that falls in the gap between cells
+/// (pipes/padding aren't part of any cell); its complement picks the
+/// nearest preceding one.
+int cellIndexNear(const BlockLayoutCache::Entry &e, int byteOffset, bool preferAfter)
+{
+    const int n = int(e.tableCells.size());
+    if (n == 0)
+        return -1;
+    if (preferAfter) {
+        for (int i = 0; i < n; ++i) {
+            if (e.tableCells[size_t(i)].endByte >= byteOffset)
+                return i;
+        }
+        return n - 1;
+    }
+    for (int i = n - 1; i >= 0; --i) {
+        if (e.tableCells[size_t(i)].startByte <= byteOffset)
+            return i;
+    }
+    return 0;
+}
+
+/// [lo, hi] row-major cell indices covered by the raw byte range
+/// [fromByte, toByte) of a table block's text, or {-1, -1} if the range is
+/// empty. A table participates in block-level selection at cell
+/// granularity (plan P2.3) — the whole cell a selection endpoint lands in
+/// counts as covered, not just the characters under it.
+std::pair<int, int> coveredCellRange(const BlockLayoutCache::Entry &e, int fromByte, int toByte)
+{
+    if (e.tableCells.empty() || toByte <= fromByte)
+        return {-1, -1};
+    const int lo = cellIndexNear(e, fromByte, /*preferAfter=*/true);
+    const int hi = cellIndexNear(e, toByte, /*preferAfter=*/false);
+    if (lo < 0 || hi < 0 || hi < lo)
+        return {-1, -1};
+    return {lo, hi};
+}
+
+/// Serializes the [lo, hi] covered cells (plan P2.3) row-major, pipe-
+/// separated within a row, '\n' between rows — the clipboard format for a
+/// selection that touches a table, in place of a raw byte-range dump (which
+/// would include pipes, alignment-row leftovers, and padding).
+QByteArray serializeTableCells(const MarkoffDocument &doc, const BlockLayoutCache::Entry &e,
+                               int lo, int hi)
+{
+    if (lo < 0 || hi < 0 || e.tableCols <= 0)
+        return {};
+    const QByteArray text = doc.blockText(e.id);
+    QByteArrayList rows;
+    QByteArrayList row;
+    int curRow = lo / e.tableCols;
+    for (int i = lo; i <= hi; ++i) {
+        const int rowIdx = i / e.tableCols;
+        if (rowIdx != curRow) {
+            rows << row.join(" | ");
+            row.clear();
+            curRow = rowIdx;
+        }
+        const auto &cell = e.tableCells[size_t(i)];
+        row << text.mid(cell.startByte, cell.endByte - cell.startByte).trimmed();
+    }
+    if (!row.isEmpty())
+        rows << row.join(" | ");
+    return rows.join("\n");
+}
 }  // namespace
 
 View::View(QWidget *parent)
@@ -523,9 +597,7 @@ CanvasCursor View::hitTestTable(int entryIndex, const QPoint &viewportPos, qreal
     const QTextLine line = cell.layout->lineAt(0);
     const int qcharPos = line.isValid() ? line.xToCursor(cellLocalX) : 0;
 
-    const QByteArray cellText = m_doc->blockText(e.id).mid(
-        cell.startByte, cell.endByte - cell.startByte);
-    const int byteOff = cell.startByte + int(coords::qtPosToByte(cellText, qcharPos));
+    const int byteOff = cell.startByte + cell.projection.layoutQCharToByte(qcharPos);
     return CanvasCursor{e.id, byteOff};
 }
 
@@ -609,6 +681,15 @@ QByteArray View::selectedText() const
         if (idx < m_cache->indexOf(start.block) || idx > m_cache->indexOf(end.block))
             continue;
         const auto [from, to] = selectedByteRangeInBlock(e.id, start, end);
+        if (e.style.isTable) {
+            // Cell-ordered serialization (plan P2.3), not a raw byte-range
+            // dump — see serializeTableCells's comment.
+            const auto [lo, hi] = coveredCellRange(e, from, to);
+            const QByteArray cellText = serializeTableCells(*m_doc, e, lo, hi);
+            if (!cellText.isEmpty())
+                parts << cellText;
+            continue;
+        }
         parts << m_doc->blockText(e.id).mid(from, to - from);
     }
     return parts.join("\n\n");
@@ -831,6 +912,31 @@ void View::moveCaretVertically(bool forward)
 
     const auto &target = m_cache->entries()[size_t(nextIdx)];
     m_caret.block = target.id;
+
+    // P2.3: crossing into a table from an adjacent block's edge lands in
+    // the nearest cell by x — row 0 (header) when entering from above, the
+    // last row when entering from below — not byte 0 of the raw block
+    // text, which the generic layout-less fallback below would give.
+    if (target.style.isTable) {
+        if (target.tableCols <= 0 || target.tableCells.empty()) {
+            m_caret.byteOffset = 0;
+            return;
+        }
+        int col = 0;
+        qreal colLeft = 0;
+        for (; col < target.tableCols - 1; ++col) {
+            const qreal w = target.tableColWidths[size_t(col)];
+            if (x < colLeft + w)
+                break;
+            colLeft += w;
+        }
+        const int rows = int(target.tableCells.size()) / target.tableCols;
+        const int row = forward ? 0 : rows - 1;
+        const auto &cell = target.tableCells[size_t(row) * size_t(target.tableCols) + size_t(col)];
+        m_caret.byteOffset = cell.startByte;
+        return;
+    }
+
     if (!target.layout || target.layout->lineCount() == 0) {
         m_caret.byteOffset = 0;
         return;
@@ -1230,6 +1336,16 @@ void View::paintTable(QPainter &p, int entryIndex, qreal blockTop, qreal content
     QFont headerFont = e.style.font;
     headerFont.setBold(true);
 
+    // Cell-granularity selection tint (plan P2.3): a selection touching
+    // this table block covers whole cells via the row-major cell-ordered
+    // sequence, not individual characters — see coveredCellRange's comment.
+    int selLo = -1, selHi = -1;
+    if (const auto sel = orderedSelection()) {
+        const auto &[start, end] = *sel;
+        const auto [fromByte, toByte] = selectedByteRangeInBlock(e.id, start, end);
+        std::tie(selLo, selHi) = coveredCellRange(e, fromByte, toByte);
+    }
+
     qreal rowY = blockTop;
     for (int r = 0; r < rows; ++r) {
         qreal colX = contentX;
@@ -1237,6 +1353,11 @@ void View::paintTable(QPainter &p, int entryIndex, qreal blockTop, qreal content
         for (int c = 0; c < e.tableCols; ++c) {
             const qreal colW = e.tableColWidths[size_t(c)];
             const QRectF cellRect(colX, rowY, colW, rowH);
+
+            const int cellIdx = r * e.tableCols + c;
+            if (selLo >= 0 && cellIdx >= selLo && cellIdx <= selHi)
+                p.fillRect(cellRect, m_theme.color(Theme::Slot::SelectionBackground));
+
             p.setPen(QPen(gridColor, 1));
             p.drawRect(cellRect);
 
@@ -1251,10 +1372,8 @@ void View::paintTable(QPainter &p, int entryIndex, qreal blockTop, qreal content
                 if (m_hasFocus && e.id == m_caret.block
                     && m_caret.byteOffset >= cell.startByte
                     && m_caret.byteOffset <= cell.endByte) {
-                    const QByteArray cellText = m_doc->blockText(e.id).mid(
-                        cell.startByte, cell.endByte - cell.startByte);
-                    const int qcharPos = int(coords::byteToQtPos(
-                        cellText, m_caret.byteOffset - cell.startByte));
+                    const int qcharPos = cell.projection.byteToLayoutQChar(
+                        m_caret.byteOffset - cell.startByte);
                     p.setPen(m_theme.color(Theme::Slot::CursorPrimary));
                     cell.layout->drawCursor(&p, textPos, qcharPos);
                 }
