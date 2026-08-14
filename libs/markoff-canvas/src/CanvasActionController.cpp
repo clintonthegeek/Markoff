@@ -108,7 +108,7 @@ void CanvasActionController::updateEnabledStates()
     // is the actual mutation surface every trigger above calls into).
     const bool hasDoc = m_view && m_view->document() != nullptr;
     const bool ro     = !m_view || m_view->isReadOnly();
-    const bool enabled = hasDoc && ro;  // FALSIFY: inverted read-only gate
+    const bool enabled = hasDoc && !ro;
 
     for (auto *a : {m_bold, m_italic, m_strike, m_inlineCode, m_link})
         a->setEnabled(enabled);
