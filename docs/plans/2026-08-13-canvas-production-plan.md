@@ -112,7 +112,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P1.4 Marker-convention canonization (docs + doc-comment) | ☑ | `f6a28a5f` | n/a |
 | P1.5 ⏸ phase close: full suite + constitution + findings sweep | ☑ | n/a | n/a |
 | **P2 — projection map (delimiter reflow)** | | | |
-| P2.1 ProjectionMap + omission for emphasis/strong | ☐ | | |
+| P2.1 ProjectionMap + omission for emphasis/strong | ☑ | `edb800c5` | `441fd827` / `d7de4364` |
 | P2.2 Omission for heading prefix + code fences | ☐ | | |
 | P2.3 Per-cell maps + cross-table selection (#18.2) | ☐ | | |
 | P2.4 ⏸ perf re-baseline (E9 budgets, build-perf) | ☐ | | n/a |
@@ -641,6 +641,67 @@ user with a one-page summary of what's proven.
   P4.3).
 - `docs/STATUS.md` baseline line updated to record the re-verification
   and Phase 1 close; workfront line points at Phase 2 next.
+
+**P2.1 (2026-08-13).**
+
+- New `ProjectionMap` (`src/ProjectionMap.{h,cpp}`): kept-run list built
+  from a block's raw text + a set of omitted "full" QChar ranges,
+  byte↔layoutQChar both ways. `BlockLayoutCache::rebuildInline()` (split
+  out of the old `restyleInline()`) builds it fresh every time the entry
+  rebuilds — caret move or content edit — from `omittedDelimiterRanges()`
+  (`InlineFormatting.h`, the old `delimiterShouldHide` predicate
+  unchanged, now generalized to take a cursor *set* per F1a). The old
+  invisible-foreground-color format-range mechanism is gone entirely.
+- **The snap-direction parameter is real for `layoutQCharToByte` but
+  provably a no-op for `byteToLayoutQChar`/`fullQCharToLayoutQChar`.**
+  Worked out by hand before trusting it: a hidden run has zero LAYOUT
+  width by construction (kept runs concatenate back-to-back with no
+  placeholder for what they omit), so the "run before" and "run after" a
+  gap always share the exact same layout boundary — Left and Right
+  necessarily compute the identical number. The direction only has
+  observable effect on the REVERSE query (a given layout position that
+  sits on a seam between two kept runs resolves to the *earlier* run's
+  byte, "snap left," by construction of the search rather than a branch
+  on `dir`). Kept the parameter on the forward functions anyway (API
+  symmetry with the spec's own wording, and callers like the paint
+  loop's selection-range code read correctly either way); documented the
+  equivalence directly in `tst_canvas_projection` rather than asserting
+  a divergence that doesn't exist.
+- **Caret-motion routing through the entry's real (reveal-aware) layout
+  is what makes "skip a hidden run in one press" true, and it falls out
+  for free.** `moveCaretHorizontally`/`deleteCluster` used to build a
+  disposable `QTextLayout` over the untransformed block text purely for
+  `nextCursorPosition`/`previousCursorPosition`'s grapheme-boundary
+  logic. Once hidden delimiters are actually removed from `e.layout`'s
+  text, stepping through *that* layout instead automatically steps over
+  them — no new skip logic needed, just routing through the cache's
+  entry instead of a scratch layout. Verified by hand against the T7
+  fixture (`a **b** c`) before trusting it: reveal already fires one
+  keystroke *before* the caret would ever need to skip anything in this
+  particular fixture (the reveal window is `[parentCharStart-1,
+  parentCharEnd+1]`, and `parentCharStart` sits right at the delimiter's
+  own start), so `tst_canvas_inline_formatting`'s existing 4-keystroke
+  assertion needed no changes — a coincidence of that fixture's shape,
+  not a general guarantee; a document where the caret has to cross
+  several kept QChars *before* touching the reveal window would show
+  the skip distinctly, which `tst_canvas_projection`'s ProjectionMap
+  unit tests exercise directly instead of fighting pixel/keystroke
+  choreography for it.
+- Multi-cursor readiness (F1a): `omittedDelimiterRanges`/
+  `inlineFormatRanges` take `QList<int> cursorsInBlock` throughout, one
+  reveal check per span against the whole set. One member today
+  (the caret, if it's in this block).
+- Table cells (P2.3's scope) are untouched: `TableCell::layout` still
+  holds raw, unomitted cell text — no projection there yet.
+- New test file `tests/tst_canvas_projection.cpp`: a pure `ProjectionMap`
+  unit layer (no `QApplication` needed — it's `QString` arithmetic) plus
+  a `View`-integration reflow check via a new inspection accessor,
+  `View::lineNaturalWidth(BlockId)` (mirrors `isDelimiterHiddenAt`'s
+  existing "read the real layout state" pattern). Falsified: planted a
+  `+1` in `fullQCharToLayoutQChar`'s in-run branch, confirmed both the
+  unit test and the reflow test fail, reverted.
+- Full suite: **289/289** (288 baseline + the one new executable).
+  `check-constitution.sh` clean.
 
 ---
 
