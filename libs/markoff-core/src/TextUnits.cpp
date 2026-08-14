@@ -40,7 +40,7 @@ qsizetype qtPosToByte(const QByteArray &utf8, qsizetype qtPos)
         qtCursor   += (seqLen == 4) ? 2 : 1;
         byteCursor += seqLen;
     }
-    return byteCursor > 0 ? byteCursor - 1 : byteCursor;  // FALSIFY: off-by-one
+    return byteCursor;
 }
 
 }  // namespace Markoff::TextUnits
