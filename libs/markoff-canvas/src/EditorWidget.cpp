@@ -92,6 +92,9 @@ EditorWidget::EditorWidget(QWidget *parent)
     m_view = new View(this);
     m_actionController = new CanvasActionController(this);
     m_actionController->setView(m_view);
+    // Context menu's format section (P4.4) is built from these same
+    // QActions — no second format-verb wiring.
+    m_view->setActionController(m_actionController);
 
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);

@@ -17,7 +17,9 @@
 #include <markoff/core/LinkActivation.h>
 #include <markoff/core/Theme.h>
 
+class QContextMenuEvent;
 class QInputMethodEvent;
+class QMenu;
 class QPainter;
 
 namespace Markoff {
@@ -28,6 +30,7 @@ class LinkService;
 namespace Markoff::Canvas {
 
 class BlockLayoutCache;
+class CanvasActionController;
 
 /// The view's caret: which block, and a UTF-8 byte offset into that
 /// block's buffer (spec §4, C4 — one coordinate space, per block; never a
@@ -319,6 +322,16 @@ public:
     /// 1..6 sets/replaces it. Out-of-range levels are a no-op.
     void setHeadingLevel(int level);
 
+    // ---- Context menu (contract-v2 P4.4) ---------------------------------
+
+    /// Consumer-owned format-verb actions the context menu's format section
+    /// is built from (`buildContextMenu`). Not owned; nullptr (the default)
+    /// omits the format section entirely rather than adding disabled/dead
+    /// items — same "reference, not owner" role `setLinkService` plays.
+    /// `EditorWidget` wires this to its own `CanvasActionController` right
+    /// after construction.
+    void setActionController(CanvasActionController *controller);
+
 signals:
     /// Fired from `ensureCaretVisible()` (P3.2) — the file's single
     /// chokepoint every caret-changing code path already calls afterward
@@ -351,6 +364,19 @@ protected:
     void focusOutEvent(QFocusEvent *event) override;
     void inputMethodEvent(QInputMethodEvent *event) override;
     QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
+    /// Builds the standard edit context menu directly onto `menu`: cut/
+    /// copy/paste/select-all, a separator, the format-verb section (from
+    /// `setActionController`'s controller, if one is attached — omitted
+    /// entirely otherwise), and "Copy Link Target" when the triggering
+    /// right-click landed on a link/wikilink/tag span (spec §5.2 "Context
+    /// menu": standard edit menu, extensible by consumer). Protected
+    /// virtual so a consumer subclass can override to call the base
+    /// implementation and then append its own items — the sanctioned
+    /// extension seam this task names. Populates `menu` in place rather
+    /// than returning one so an override can insert items anywhere in the
+    /// sequence, not just append.
+    virtual void buildContextMenu(QMenu &menu);
     /// Viewport `QEvent::Leave` only reaches this widget via an event
     /// filter — `QAbstractScrollArea::viewportEvent` does not forward
     /// Enter/Leave the way it forwards mouse-button/move events (same
@@ -450,6 +476,31 @@ private:
     /// selection is cleared. No-op if there is no selection.
     void collapseSelection();
 
+    // ---- Cut/copy/paste/select-all (P4.4) --------------------------------
+    // Shared by the keyboard shortcuts (keyPressEvent's existing
+    // Ctrl+A/C/X, plus the Ctrl+V this task adds) and the context menu's
+    // corresponding QActions — one implementation of each op, not a second
+    // copy behind the menu.
+
+    /// No-op while read-only or with no selection (Cut is disabled in its
+    /// entirety while read-only, including the copy-to-clipboard half —
+    /// mirrors Qt's own disabled-Cut-action convention).
+    void cut();
+    /// No-op with no selection. Unaffected by read-only (spec §4.2: copy
+    /// keeps working).
+    void copy();
+    /// Inserts the system clipboard's text at the caret, replacing any
+    /// active selection first. No-op while read-only, with no document/
+    /// caret, or with empty clipboard text. Multi-line text is split on
+    /// '\n' (CRLF normalized first): each line is inserted via
+    /// `insertPrintable`, with a synthesized Return key routed through
+    /// `tryStructuralKey` between lines — the same block-split path a real
+    /// Enter keystroke uses, not a second one built for paste.
+    void paste();
+    /// Selects the whole document (first block byte 0 through the last
+    /// block's end). No-op with no document or no blocks.
+    void selectAll();
+
     // ---- Format verbs (P4.3) ----------------------------------------------
 
     /// Shared driver behind `toggleBold`/`Italic`/`Strikethrough`/
@@ -535,6 +586,19 @@ private:
     /// pointing-hand override. Only a hover state TRANSITION flips this and
     /// calls setCursor/unsetCursor — see updateHover's doc comment.
     bool m_cursorIsPointingHand = false;
+
+    // ---- Context menu (P4.4) ---------------------------------------------
+    // Consumer-owned; not linked, only read from — same "reference, not
+    // owner" role m_linkService plays.
+    CanvasActionController *m_actionController = nullptr;
+    /// The link/wikilink/tag span (if any) under the point the context menu
+    /// was last invoked at — set by `contextMenuEvent` right before
+    /// `buildContextMenu` runs, consulted by both `buildContextMenu` (to
+    /// decide whether to add "Copy Link Target") and that item's own
+    /// trigger handler. Independent of hover/caret state: a right-click can
+    /// land on a link the pointer never hovered and the caret never
+    /// touched.
+    std::optional<Markoff::LinkActivation> m_contextMenuLink;
 };
 
 }  // namespace Markoff::Canvas

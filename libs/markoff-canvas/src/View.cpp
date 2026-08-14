@@ -3,12 +3,14 @@
 
 #include <QByteArrayList>
 #include <QClipboard>
+#include <QContextMenuEvent>
 #include <QFocusEvent>
 #include <QFontMetricsF>
 #include <QGuiApplication>
 #include <QInputMethodEvent>
 #include <QKeyEvent>
 #include <QKeySequence>
+#include <QMenu>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
@@ -27,6 +29,8 @@
 #include <markoff/core/StructuralKeyHandler.h>
 #include <markoff/core/TextUnits.h>
 #include <markoff/core/UndoLog.h>
+
+#include <markoff/canvas/CanvasActionController.h>
 
 #include "BlockLayoutCache.h"
 #include "InlineFormatting.h"
@@ -980,6 +984,167 @@ void View::collapseSelection()
     m_selectionAnchor.reset();
 }
 
+// ---- Cut/copy/paste/select-all (P4.4) --------------------------------------
+// Shared by keyPressEvent's Ctrl+A/C/X/V and the context menu's matching
+// QActions — one implementation of each op (class doc comment in the header
+// explains why paste routes newlines through tryStructuralKey rather than a
+// second block-split implementation).
+
+void View::cut()
+{
+    // Read-only gate (P3.3, spec §4.2): Cut is disabled in its entirety
+    // while read-only — including the copy-to-clipboard half — mirroring
+    // Qt's own QAction-disabled convention for Cut (unlike Copy, which stays
+    // enabled below).
+    if (m_readOnly || !hasSelection())
+        return;
+    QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
+    collapseSelection();
+    ensureCaretVisible();
+    viewport()->update();
+}
+
+void View::copy()
+{
+    if (!hasSelection())
+        return;
+    QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
+}
+
+void View::paste()
+{
+    if (!m_doc || m_readOnly || m_caret.block.isNull())
+        return;
+
+    QString text = QGuiApplication::clipboard()->text();
+    if (text.isEmpty())
+        return;
+
+    if (hasSelection())
+        collapseSelection();
+
+    // Normalize line endings before splitting — clipboard text pasted from
+    // outside this process may carry CRLF/CR; a bare '\r' left in a line
+    // chunk would land as a literal control byte in the block buffer.
+    text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
+    text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
+    const QStringList lines = text.split(QLatin1Char('\n'));
+
+    for (int i = 0; i < lines.size(); ++i) {
+        if (i > 0) {
+            // Between-lines split routes through the SAME StructuralKeyHandler
+            // path a real Enter keystroke uses (tryStructuralKey), not a
+            // second, paste-only block-split implementation.
+            QKeyEvent enterEvent(QEvent::KeyPress, Qt::Key_Return, Qt::NoModifier);
+            tryStructuralKey(&enterEvent);
+        }
+        insertPrintable(lines.at(i));
+    }
+
+    m_doc->flushPendingD2Changed();
+    ensureCaretVisible();
+    viewport()->update();
+}
+
+void View::selectAll()
+{
+    if (!m_doc || m_cache->entries().empty())
+        return;
+    const auto &first = m_cache->entries().front();
+    const auto &last = m_cache->entries().back();
+    m_selectionAnchor = CanvasCursor{first.id, 0};
+    setCaret(CanvasCursor{last.id, int(m_doc->blockText(last.id).size())});
+}
+
+// ---- Context menu (P4.4) ---------------------------------------------------
+
+void View::contextMenuEvent(QContextMenuEvent *event)
+{
+    // Resolve the link (if any) under the triggering point BEFORE building
+    // the menu — independent of hover/caret state, since a right-click can
+    // land on a link the pointer never hovered and the caret never touched.
+    // Qt::NoModifier: this is a menu-population lookup, not a click
+    // activation gesture (linkActivationAt's `mods` only matters to
+    // callers that branch on Ctrl, which this one doesn't).
+    m_contextMenuLink.reset();
+    if (m_doc) {
+        const CanvasCursor hit = hitTest(event->pos());
+        if (!hit.block.isNull())
+            m_contextMenuLink = linkActivationAt(hit, Qt::NoModifier);
+    }
+
+    QMenu menu(this);
+    buildContextMenu(menu);
+    if (menu.actions().isEmpty()) {
+        event->ignore();
+        return;
+    }
+    menu.exec(event->globalPos());
+    event->accept();
+}
+
+void View::buildContextMenu(QMenu &menu)
+{
+    const bool hasDoc = m_doc && !m_caret.block.isNull();
+    const bool clipboardHasText = !QGuiApplication::clipboard()->text().isEmpty();
+
+    QAction *cutAction = menu.addAction(tr("Cut"), this, &View::cut);
+    cutAction->setShortcut(QKeySequence::Cut);
+    cutAction->setEnabled(!m_readOnly && hasSelection());
+
+    QAction *copyAction = menu.addAction(tr("Copy"), this, &View::copy);
+    copyAction->setShortcut(QKeySequence::Copy);
+    copyAction->setEnabled(hasSelection());
+
+    // The falsification target named by the plan (P4.4): Paste must be
+    // disabled while read-only. Gated on clipboard content too (mirrors
+    // QPlainTextEdit's own canPaste()-driven Paste action) so an empty
+    // clipboard doesn't offer a dead menu item.
+    QAction *pasteAction = menu.addAction(tr("Paste"), this, &View::paste);
+    pasteAction->setShortcut(QKeySequence::Paste);
+    pasteAction->setEnabled(!m_readOnly && hasDoc && clipboardHasText);
+
+    QAction *selectAllAction = menu.addAction(tr("Select All"), this, &View::selectAll);
+    selectAllAction->setShortcut(QKeySequence::SelectAll);
+    selectAllAction->setEnabled(m_doc && !m_cache->entries().empty());
+
+    // Format section (spec §5.2 "Context menu": "format section" — the P4.3
+    // CanvasActionController's own QActions, each already carrying its own
+    // enabled-state; omitted entirely when no controller is attached rather
+    // than adding disabled/dead items).
+    if (m_actionController) {
+        menu.addSeparator();
+        menu.addAction(m_actionController->boldAction());
+        menu.addAction(m_actionController->italicAction());
+        menu.addAction(m_actionController->strikeAction());
+        menu.addAction(m_actionController->inlineCodeAction());
+        menu.addAction(m_actionController->linkAction());
+        QMenu *headingMenu = menu.addMenu(tr("Heading"));
+        headingMenu->addAction(m_actionController->heading0Action());
+        headingMenu->addAction(m_actionController->heading1Action());
+        headingMenu->addAction(m_actionController->heading2Action());
+        headingMenu->addAction(m_actionController->heading3Action());
+        headingMenu->addAction(m_actionController->heading4Action());
+        headingMenu->addAction(m_actionController->heading5Action());
+        headingMenu->addAction(m_actionController->heading6Action());
+    }
+
+    // "Copy Link Target" (spec §5.2): only present when the right-click
+    // landed on a link/wikilink/tag span — resolved once in contextMenuEvent,
+    // read here and by the trigger handler below.
+    if (m_contextMenuLink) {
+        menu.addSeparator();
+        const Markoff::LinkActivation link = *m_contextMenuLink;
+        QAction *copyLinkAction = menu.addAction(tr("Copy Link Target"), this, [link] {
+            const QString target = link.resolvedTarget.isValid()
+                ? link.resolvedTarget.toString()
+                : link.rawText;
+            QGuiApplication::clipboard()->setText(target);
+        });
+        Q_UNUSED(copyLinkAction);
+    }
+}
+
 // ---- Format verbs (P4.3) --------------------------------------------------
 
 void View::applyFormatOp(const FormatOpFn &applyOne)
@@ -1119,6 +1284,11 @@ void View::setHeadingLevel(int level)
 
     m_selectionAnchor.reset();
     setCaret(CanvasCursor{block, *result});
+}
+
+void View::setActionController(CanvasActionController *controller)
+{
+    m_actionController = controller;
 }
 
 void View::insertPrintable(const QString &text)
@@ -1412,34 +1582,28 @@ void View::keyPressEvent(QKeyEvent *event)
     }
 
     if (ctrl && event->key() == Qt::Key_A) {
-        if (!m_cache->entries().empty()) {
-            const auto &first = m_cache->entries().front();
-            const auto &last = m_cache->entries().back();
-            m_selectionAnchor = CanvasCursor{first.id, 0};
-            setCaret(CanvasCursor{last.id, int(m_doc->blockText(last.id).size())});
-        }
+        selectAll();
         event->accept();
         return;
     }
 
     if (ctrl && event->key() == Qt::Key_C) {
-        if (hasSelection())
-            QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
+        copy();
         event->accept();
         return;
     }
 
     if (ctrl && event->key() == Qt::Key_X) {
-        // Read-only gate (P3.3, spec §4.2): Cut is disabled in its entirety
-        // while read-only — including the copy-to-clipboard half — mirroring
-        // Qt's own QAction-disabled convention for Cut (unlike Copy, which
-        // stays enabled and has its own branch above).
-        if (!m_readOnly && hasSelection()) {
-            QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
-            collapseSelection();
-            ensureCaretVisible();
-            viewport()->update();
-        }
+        cut();
+        event->accept();
+        return;
+    }
+
+    if (ctrl && event->key() == Qt::Key_V) {
+        // paste() carries its own read-only/empty-clipboard/no-caret checks
+        // (P4.4) — same "the op checks itself, the shortcut just calls it"
+        // shape as cut()/copy()/selectAll() above.
+        paste();
         event->accept();
         return;
     }
