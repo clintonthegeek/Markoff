@@ -3,6 +3,26 @@
 #include <markoff/core/CodeTokenKind.h>
 
 namespace {
+
+/// Slots whose color paints a background rather than text/foreground.
+/// An undefined background slot must not fall back to TextDefault —
+/// that hands a caller its text colour to fill a rectangle with,
+/// which reads as a black (or white) slab painted under matching text.
+/// Callers treat an invalid QColor as "paint nothing" (BlockStyle::background
+/// and friends already gate on QColor::isValid()).
+bool isBackgroundSlot(Markoff::Theme::Slot s) {
+    using S = Markoff::Theme::Slot;
+    switch (s) {
+        case S::SelectionBackground:
+        case S::SearchMatchBackground: case S::SearchActiveMatchBackground:
+        case S::EditorBackground: case S::GutterBackground:
+        case S::CodeBlockBackground: case S::QuoteBackground:
+            return true;
+        default:
+            return false;
+    }
+}
+
 Markoff::Theme::FontRole roleFor(Markoff::Theme::Slot s) {
     using S = Markoff::Theme::Slot;
     using R = Markoff::Theme::FontRole;
@@ -24,6 +44,7 @@ QColor Theme::color(Slot s) const
 {
     const auto it = m_colors.constFind(static_cast<int>(s));
     if (it != m_colors.constEnd()) return it.value();
+    if (isBackgroundSlot(s)) return QColor();  // caller paints nothing
     // Fallback to TextDefault.
     const auto td = m_colors.constFind(static_cast<int>(Slot::TextDefault));
     if (td != m_colors.constEnd()) return td.value();
@@ -129,6 +150,7 @@ Theme Theme::defaultLight()
     t.setColor(Slot::InlineCode,       QColor("#882020"));
     t.setColor(Slot::CodeBlock,        QColor("#222222"));
     t.setColor(Slot::CodeBlockBackground, QColor("#f4f4f4"));
+    t.setColor(Slot::QuoteBackground,     QColor("#f4f4f4"));
     t.setColor(Slot::SelectionBackground, QColor("#b0d0ff"));
     t.setColor(Slot::SearchMatchBackground, QColor("#ffe080"));
     t.setColor(Slot::SearchActiveMatchBackground, QColor("#ffb050"));
@@ -162,6 +184,7 @@ Theme Theme::defaultDark()
     t.setColor(Slot::Heading3,         QColor("#dcdcdc"));
     t.setColor(Slot::Quote,            QColor("#aaaaaa"));
     t.setColor(Slot::CodeBlockBackground, QColor("#2d2d2d"));
+    t.setColor(Slot::QuoteBackground,     QColor("#2d2d2d"));
     t.setColor(Slot::SelectionBackground, QColor("#264070"));
     return t;
 }

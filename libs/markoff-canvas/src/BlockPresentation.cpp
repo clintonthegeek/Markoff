@@ -41,21 +41,6 @@ QFont fontForSlot(const Theme &theme, Theme::Slot slot)
     return f;
 }
 
-/// Theme::color() falls back to TextDefault for any slot the theme does
-/// not define. That is survivable for a foreground, but for a BACKGROUND
-/// slot it hands back the text colour — painting a black slab under black
-/// text. Neither defaultLight() nor defaultDark() defines QuoteBackground
-/// today, so this is the live case, not a hypothetical.
-///
-/// Treat "resolved to exactly TextDefault" as "not defined" and paint no
-/// background. A theme that genuinely wants its quote background to equal
-/// its body text colour loses nothing worth having.
-QColor backgroundOrNone(const Theme &theme, Theme::Slot slot)
-{
-    const QColor c = theme.color(slot);
-    return c == theme.color(Theme::Slot::TextDefault) ? QColor() : c;
-}
-
 int intAttr(const MarkoffDocument &doc, BlockId id, const AttrName &name,
             int fallback)
 {
@@ -99,7 +84,7 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
     case BlockKind::CodeBlock:
         s.font       = fontForSlot(theme, Theme::Slot::CodeBlock);
         s.foreground = theme.color(Theme::Slot::CodeBlock);
-        s.background = backgroundOrNone(theme, Theme::Slot::CodeBlockBackground);
+        s.background = theme.color(Theme::Slot::CodeBlockBackground);
         s.fullWidthBackground = true;
         s.leftIndent = em * 0.5;
         break;
@@ -119,7 +104,7 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
         const int depth = qMax(1, intAttr(doc, id, AttrNames::BlockQuoteDepth, 1));
         s.font       = fontForSlot(theme, Theme::Slot::Quote);
         s.foreground = theme.color(Theme::Slot::Quote);
-        s.background = backgroundOrNone(theme, Theme::Slot::QuoteBackground);
+        s.background = theme.color(Theme::Slot::QuoteBackground);
         s.fullWidthBackground = true;
         s.hasQuoteBar = true;
         s.leftIndent  = em * 1.0 * depth;

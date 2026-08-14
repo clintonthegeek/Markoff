@@ -12,6 +12,9 @@
 
 #include <markoff/canvas/View.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Theme.h>
+
+#include "../src/BlockPresentation.h"
 
 using Markoff::BlockId;
 using Markoff::Canvas::View;
@@ -78,6 +81,7 @@ private slots:
     void fixture_renders_every_kind();
     void geometry_is_monotonic_and_contiguous();
     void per_kind_presentation_differs();
+    void blockquote_background_is_distinct_from_its_text_color();
     void newlines_inside_a_block_break_lines();
     void layout_is_lazy_on_a_large_document();
     void scrolling_realizes_on_demand_and_stays_lazy();
@@ -176,6 +180,27 @@ void TstCanvasRender::per_kind_presentation_differs()
     // This is the cheap proof that the per-kind switch reached the layout.
     QVERIFY2(view.blockRect(blocks[0]).height() > view.blockRect(blocks[1]).height(),
              "heading should lay out taller than a paragraph");
+}
+
+void TstCanvasRender::blockquote_background_is_distinct_from_its_text_color()
+{
+    // P1.3: an undefined background slot must resolve to "paint nothing",
+    // not to TextDefault — a theme that painted its quote background as
+    // its own text colour would be invisible text on a matching slab.
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown("> quoted text\n");
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(int(blocks.size()), 1);
+    QCOMPARE(doc.blockKind(blocks[0]), Markoff::BlockKind::BlockQuote);
+
+    const Markoff::Theme theme = Markoff::Theme::defaultLight();
+    const Markoff::Canvas::BlockStyle style =
+        Markoff::Canvas::presentationFor(doc, blocks[0], theme);
+
+    QVERIFY2(style.background.isValid(), "quote background must be defined");
+    QVERIFY2(style.background != theme.color(Markoff::Theme::Slot::TextDefault),
+             "quote background must not equal the quote's own text colour");
 }
 
 void TstCanvasRender::newlines_inside_a_block_break_lines()
