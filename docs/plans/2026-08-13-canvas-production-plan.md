@@ -123,7 +123,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P3.4 FindController: highlight + navigate | ☑ | `a26a0795` | `de9920ef` / `c5a22a58` |
 | P3.5 EditorContext + theme/fontScale through the wrapper | ☑ | `44481d40` | `93795083` / `c4278364` |
 | P3.6 Ephemeral state JSON round-trip | ☑ | `3b4247a0` | `0fdb7a85` / `45026f6c` |
-| P3.7 ⏸ phase close | ☐ | | n/a |
+| P3.7 ⏸ phase close | ☑ | n/a | n/a |
 | **P4 — inline/text parity** | | | |
 | P4.1 Full inline kind set (highlight/strike/link/wikilink/tag/footnote-ref) | ☐ | | |
 | P4.2 Link activation + hover | ☐ | | |
@@ -1314,6 +1314,55 @@ user with a one-page summary of what's proven.
   the diff crosses into `markoff-core`'s `MarkdownView.h` — a seam
   live/source/styled all depend on — even though only canvas overrides
   the new virtuals.
+
+---
+
+**P3.7 (2026-08-14) — phase close.**
+
+- Full suite: **293/293 (100%)**, no drop from P3.6's count — confirms
+  P3.7 itself added no new executables (it's a checkpoint task).
+- `check-constitution.sh`: clean, 35 files scanned, C1–C4.
+- Honest C1–C4 read (manual, not grep) over every file P3.1–P3.6
+  actually touched — `git diff 3a7a884a..8a8390be` (P2.4's phase-close
+  commit to P3.6's), 18 files across `libs/markoff-canvas` +
+  `libs/markoff-core`: no re-entrance guard (`m_lastCursorPos`/
+  `m_lastContext`/`m_lastStructuralSeq` in `EditorWidget` are
+  documented change-gate caches, not reaction-suppression flags — each
+  has a doc comment distinguishing it from a C1 guard); no deferral
+  (`singleShot`/`QueuedConnection`/`callLater`) anywhere in the diff;
+  no `QTextDocument`/`QPlainTextEdit`/`QTextEdit`/Quick-text linkage;
+  no cross-block or flat byte arithmetic (`EditorWidget`'s
+  `toCursorPos`/`fromCursorPos` walk blocks to build a flat *line*
+  count for the base contract's `CursorPos`, never a byte offset —
+  the per-block byte space stays block-relative throughout). Find
+  highlights (P3.4) confirmed draw-time `QTextLayout::FormatRange`
+  pushed into the same `selections` vector selection already uses in
+  `paintEvent` — no `setFormats` mutation of any layout anywhere in
+  the diff (grepped and hand-checked; the two `setFormats` hits in the
+  diff are doc-comment prose warning against it, not code). Clean —
+  nothing found, nothing fixed.
+- Findings log sweep: read all six P3.x entries end to end. One loose
+  thread carried forward explicitly (no fix in this session — it
+  predates P3 and isn't this phase's to fix): `View::caretRect()` /
+  `caretRectInViewport()` (P3.3) doesn't special-case a caret inside a
+  Table block (T9's pre-existing gap, inherited via
+  `inputMethodQuery`'s `Qt::ImCursorRectangle` case, not introduced by
+  P3.3) — same table-caret limitation P3.4's find-highlight painting
+  already carries forward to **P5.1/P5.2** (table cell wrap +
+  navigation); folded into the same pointer rather than a separate
+  one, since both gaps close together once tables get real per-cell
+  layouts. Everything else in the six entries either resolved fully
+  within its own task or already carries an explicit forward pointer
+  (P4.3: `FormatOps`-adjacent coordinate-helper consolidation,
+  checkbox/action-enabled-state gating; P4.4/P7.2: paste; P4.6:
+  `serializeCodeBlock` double-fence risk, carried from P1.4). No
+  action items dropped.
+- `docs/STATUS.md` baseline updated to **293/293**; also backfilled
+  the Phase 2 close banner it had missed (P2.4 closed 2026-08-14 but
+  the board was never touched — caught during this sweep, not a P3.x
+  regression). Workfront line now points at Phase 4 (P4.1) next.
+- Phase 3 (MarkdownView contract v2) closes clean. Next: **P4.1** —
+  full inline kind set.
 
 ---
 

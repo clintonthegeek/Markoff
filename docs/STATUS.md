@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-13 (canvas production arc — Phase 1 CLOSED, P1.5)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 3 CLOSED, P3.7)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -18,21 +18,28 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
 - **Plan (do the topmost unchecked task):**
   [`plans/2026-08-13-canvas-production-plan.md`](plans/2026-08-13-canvas-production-plan.md)
   — phases P1–P7, user gates G1 (a11y scope), G2 (Corbomite adoption),
-  G3 (retirement decision). Phase 1 (core promotions) closed 2026-08-13
-  at P1.5; Phase 2 (projection map) is next.
+  G3 (retirement decision). Phase 1 (core promotions) closed
+  2026-08-13 at P1.5; Phase 2 (projection map) closed 2026-08-14 at
+  P2.4 (perf re-baseline, all E9 budgets held); Phase 3 (MarkdownView
+  contract v2) closed 2026-08-14 at P3.7. Phase 4 (inline/text parity)
+  is next, starting at P4.1.
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
-source untouched. Queue **#18** is absorbed into the plan
-(P1.1 done, P2.1–P2.3 next).
+source untouched. Queue **#18** is absorbed into the plan (P1.1,
+P2.1–P2.3 done).
 
 ## Test baseline
 
-**288/288 (100%)** on the full `scripts/run-tests.sh` (277 standstill
-+ 11 canvas), re-verified 2026-08-13 at Phase 1 close (P1.5) — count
-unchanged from spike close: P1.1–P1.4 grew existing executables rather
-than adding new ones. The plan ratchets this up per task; any drop is
-a regression (classify before fixing).
+**293/293 (100%)** on the full `scripts/run-tests.sh`, re-verified
+2026-08-14 at Phase 3 close (P3.7) — up from the 288/288 baseline
+recorded at arc open via five new canvas executables registered since
+(`tst_canvas_projection` P2.1, `tst_canvas_table_selection` P2.3,
+`tst_canvas_perf_formatted` P2.4, `tst_canvas_view_contract` P3.1,
+`tst_canvas_find` P3.4); P3.2/P3.5/P3.6 grew existing/shared contract
+checks in place rather than adding files. `check-constitution.sh`
+clean (C1–C4) over 35 files. The plan ratchets this up per task; any
+drop is a regression (classify before fixing).
 
 ## Dormant items
 
