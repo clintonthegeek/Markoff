@@ -122,7 +122,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P3.3 Read-only gates + caretRect | ☑ | `21a020a2` | `6a5fefe9` / `fa9c1704` |
 | P3.4 FindController: highlight + navigate | ☑ | `a26a0795` | `de9920ef` / `c5a22a58` |
 | P3.5 EditorContext + theme/fontScale through the wrapper | ☑ | `44481d40` | `93795083` / `c4278364` |
-| P3.6 Ephemeral state JSON round-trip | ☐ | | |
+| P3.6 Ephemeral state JSON round-trip | ☑ | `3b4247a0` | `0fdb7a85` / `45026f6c` |
 | P3.7 ⏸ phase close | ☐ | | n/a |
 | **P4 — inline/text parity** | | | |
 | P4.1 Full inline kind set (highlight/strike/link/wikilink/tag/footnote-ref) | ☐ | | |
@@ -1231,6 +1231,89 @@ user with a one-page summary of what's proven.
   two shared checks enrolled were already present in
   `ViewContractChecks.h` from P3.1/P3.2, unmodified this task). Full
   suite not run for this task.
+
+---
+
+**P3.6 (2026-08-14).**
+
+- Neither `MarkdownView` (core) nor any leaf had `saveEphemeralState`/
+  `restoreEphemeralState` before this task — the "check what live does"
+  instruction found nothing to mirror (grepped `EphemeralState`/
+  `ephemeral` across all four leaves + core: zero hits besides an
+  unrelated `Session` comment and a foundation test). Corbomite's own
+  `Corbomite::EphemeralState` (`libs/storage/include/corbomite/storage/
+  EphemeralState.h`) is the actual consumer the plan's spec §5 line
+  references — but it's Obsidian's `{mode, source}` + flat `{line,
+  column}` cursor shape, built externally from the base contract's
+  existing `cursorPosition()`/`scrollPositionVisualLine()` accessors,
+  not from a per-leaf JSON method. So this task adds the virtuals to
+  `MarkdownView` itself (P3's own "contract v2" pattern — P3.1–P3.5 each
+  added a virtual the same way) rather than reusing Corbomite's schema
+  verbatim: canvas's native coordinate space is block-index + byte, not
+  line/column, and the task text names that shape explicitly.
+- Schema landed exactly as specced: `{"scroll": {"blockIndex",
+  "fraction"}, "cursors": [{"blockIndex", "byte"}], "folds": []}`.
+  `cursors` is confirmed a JSON ARRAY of one element (F1a), not a bare
+  object — pinned directly by `ephemeral_state_schema_shape`
+  (`QCOMPARE(cursors.size(), 1)`). Block **index**, not raw `BlockId`,
+  in both scroll and cursor — an index survives detach/reattach (the
+  task's own required test) in a way a raw id cannot: a reattached
+  document's cache mints fresh internal state, but document-order
+  position is stable. `View` grew the index↔id conversion
+  (`blockIndexOf`/`blockIdAt`) and the scroll-anchor pair
+  (`scrollAnchor`/`setScrollAnchor`) needed to read/write that space —
+  reusing P3.5's exact "block at the top of the viewport" concept
+  (`indexAtY(verticalScrollBar()->value())`), generalized with a
+  within-block fraction (P3.5's fontScale re-anchor snaps to a block's
+  top edge only; this task's precision requirement needed more).
+- **Real bug found by the round-trip test itself, not invented for the
+  falsification:** the first working version restored scroll, then
+  cursor — and failed its own in-place round-trip test by ~126px.
+  Cause: `View::setCaretPosition` (the cursor-restore call) routes
+  through `ensureCaretVisible()`, which auto-scrolls the caret's block
+  into view if it isn't already visible; restoring scroll first and
+  cursor second let that auto-scroll silently clobber the just-restored
+  scroll position whenever the saved caret block didn't happen to sit
+  inside the saved scroll viewport (a legal, independent combination —
+  this schema deliberately saves the two separately). Fixed by
+  restoring cursor BEFORE scroll, so the explicitly-saved scroll always
+  wins. Debugged by dumping the same block's `blockRect()` at save vs.
+  restore time (identical — ruling out an estimate-vs-real-height
+  drift, P3.5's own known failure mode for scroll math) before finding
+  the actual cause in call order.
+- **This bug became the falsification target**, in place of the task
+  text's suggested "skip restoring cursor position" — a real regression
+  the test caught, planted deliberately (reverting the restore order
+  back to scroll-then-cursor), confirmed
+  `ephemeral_state_round_trip_in_place` fails
+  (`'qAbs(... - savedScrollValue) <= 2' returned FALSE`) while every
+  other slot in the file stays green, then reverted.
+- Missing/malformed JSON: every sub-key read is individually
+  `isDouble()`/`isObject()`/`isArray()`-guarded and skipped (not
+  fatal) on mismatch — `ephemeral_state_restore_handles_malformed_json`
+  round-trips an empty object and a blob with all three top-level keys
+  present but wrong-typed, confirming no crash and no unintended
+  mutation.
+- Base `MarkdownView::saveEphemeralState()`/`restoreEphemeralState()`
+  default to an empty object / no-op (same "inert until a leaf
+  overrides" shape as `caretRect()`'s `{}` default) — live/source/
+  styled inherit that default unchanged; adopting the real schema for
+  those leaves is out of this task's scope (canvas-only, per session
+  protocol) and not attempted.
+- New tests in `tst_canvas_view_contract.cpp`: `ephemeral_state_schema_
+  shape`, `ephemeral_state_round_trip_in_place`, `ephemeral_state_
+  round_trip_through_detach_reattach` (real `setDocument(nullptr)` +
+  `setDocument(doc)` cycle, per the task's explicit wording — not just
+  an in-place restore), `ephemeral_state_restore_handles_malformed_
+  json`. `-R canvas` 16/16 green (constitution included); full suite
+  **293/293** (288 baseline + 5 new slots, no regressions — checked
+  because this task touched `markoff-core/MarkdownView.h`, a shared
+  seam every leaf compiles against, not just canvas). `check-
+  constitution.sh`: clean (C1–C4).
+- Test tier: full suite run this task (not canvas-scoped-only) because
+  the diff crosses into `markoff-core`'s `MarkdownView.h` — a seam
+  live/source/styled all depend on — even though only canvas overrides
+  the new virtuals.
 
 ---
 
