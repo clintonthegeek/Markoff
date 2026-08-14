@@ -608,6 +608,30 @@ void View::setCaret(const CanvasCursor &caret)
     viewport()->update();
 }
 
+void View::setCaretPosition(BlockId block, int byteOffset)
+{
+    m_selectionAnchor.reset();
+
+    if (m_cache->entries().empty()) {
+        m_caret = {};
+        viewport()->update();
+        return;
+    }
+
+    int index = m_cache->indexOf(block);
+    if (index < 0) {
+        // Unknown block (stale id from a previous document, or a caller
+        // that never inspected the current one): clamp to the last block,
+        // the same "nearest surviving block" fallback clampCaret uses when
+        // there is no better positional hint.
+        index = int(m_cache->entries().size()) - 1;
+        block = m_cache->entries()[size_t(index)].id;
+    }
+
+    const int size = m_doc ? m_doc->blockText(block).size() : 0;
+    setCaret(CanvasCursor{block, qBound(0, byteOffset, size)});
+}
+
 void View::ensureCaretVisible()
 {
     if (!m_doc || m_caret.block.isNull())

@@ -13,7 +13,7 @@
 #include <QFile>
 #include <QTextStream>
 
-#include <markoff/canvas/View.h>
+#include <markoff/canvas/EditorWidget.h>
 #include <markoff/core/MarkoffDocument.h>
 
 int main(int argc, char **argv)
@@ -56,7 +56,7 @@ int main(int argc, char **argv)
     }
     doc.loadFromMarkdown(source.toUtf8());
 
-    Markoff::Canvas::View view;
+    Markoff::Canvas::EditorWidget view;
     view.setDocument(&doc);
     view.setWindowTitle(QStringLiteral("markoff-canvas (spike)"));
     const int w = qEnvironmentVariableIntValue("MARKOFF_CANVAS_W") > 0

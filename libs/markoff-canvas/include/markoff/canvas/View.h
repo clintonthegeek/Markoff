@@ -144,6 +144,17 @@ public:
     BlockId caretBlock() const;
     int     caretByteOffset() const;
 
+    /// Programmatic caret placement (contract-v2 EditorWidget seam, P3.1):
+    /// the one sanctioned exception to "the caret is edited only through
+    /// real events" above — `Markoff::Canvas::EditorWidget::setCursorPosition`
+    /// routes through here. `block` is clamped to the last surviving block
+    /// (mirroring `clampCaret`'s "nearest surviving block" rule) if it is
+    /// unknown to the cache; `byteOffset` is clamped to the target block's
+    /// length. Clears any active selection anchor, same as a real click.
+    /// Synchronous, no queued/deferred application (C2) — the caller sees
+    /// the new caret the moment this returns.
+    void setCaretPosition(BlockId block, int byteOffset);
+
     // ---- Selection (T5) --------------------------------------------------
     // Inspection for tests; edited only through real events (mouse drag,
     // Shift+move, Ctrl+A), same rule as the caret.

@@ -4,6 +4,7 @@
 // against the BASE pointer — the point is that the contract works
 // polymorphically. Spec §10.
 #pragma once
+#include <QCoreApplication>
 #include <QSignalSpy>
 #include <QTest>
 
@@ -131,6 +132,30 @@ inline void checkContextChangedOnStructuralKindChangeWithoutCaretMove(
 
     Markoff::Cmd::changeKind(*doc, block0, Markoff::BlockKind::Paragraph);  // restore
     QTest::qWait(20);
+}
+
+// Attach-window contract (canvas production plan P3.1, 2026-08-13): a
+// cursor write issued by the consumer in the same call stack as
+// `setDocument()` — i.e. immediately after it returns, with no event-loop
+// spin in between — must stick. A leaf that schedules any deferred/async
+// re-seed of the caret after attach (live's QML initial-focus seed is the
+// motivating precedent; canvas has none — C2 forbids deferral there
+// outright) would silently win the race and clobber it. `doc` must be the
+// same document `v` is already attached to (re-attaching exercises the
+// same teardown/setup path a leaf swap or reattach would take).
+inline void checkAttachWindowCaretWriteSurvives(Markoff::MarkdownView *v,
+                                                Markoff::MarkoffDocument *doc) {
+    v->setDocument(doc);
+    v->setCursorPosition({3, 1});
+    // A leaf with no async re-seed has nothing to pump here — this is a
+    // no-op for a fully synchronous setDocument(). It is included so the
+    // check is a genuine test of "nothing queued wins the race" rather
+    // than merely "nothing raced yet": a regression that defers part of
+    // setDocument()'s caret handling onto the event queue would still be
+    // caught, because that deferred step gets a chance to run before the
+    // assertion below.
+    QCoreApplication::processEvents();
+    QCOMPARE(v->cursorPosition().line, 3);
 }
 
 }  // namespace ViewContract
