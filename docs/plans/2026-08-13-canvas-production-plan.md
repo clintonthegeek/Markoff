@@ -127,7 +127,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **P4 — inline/text parity** | | | |
 | P4.1 Full inline kind set (highlight/strike/link/wikilink/tag/footnote-ref) | ☑ | `a51917f8` | `81bb62fe` / `6c51bbe5` |
 | P4.2 Link activation + hover | ☑ | `0d4b49b1` | `bf1fffb0` / `3cf92c23` |
-| P4.3 FormatOps verbs + CanvasActionController | ☐ | | |
+| P4.3 FormatOps verbs + CanvasActionController | ☑ | `2c3f482a` / `a1fe576f` | `48545c18` / `fa11992e` |
 | P4.4 Context menu | ☐ | | |
 | P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☐ | | |
 | P4.9 Inline title band (user-directed; spec §5.2) | ☐ | | |
@@ -515,6 +515,36 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.3 (2026-08-14).**
+
+- **Coordinate-space fork, resolved by user decision.** Core
+  `FormatOps` (`wrapToggle`/`insertLink`/`setHeadingLevel`) operates
+  entirely over flat `widgetFlatView`/`QtRange` — a real C4 conflict
+  for canvas, not a missing-feature gap; the P1.2 findings entry had
+  flagged this coming ("worth a look when P4.3 puts canvas on
+  FormatOps") but left it unresolved. First pass at this task
+  correctly stopped rather than construct a flat view or hand-sum
+  block byte offsets. User decision: add per-block, byte-offset
+  overloads (`wrapToggleInBlock`/`insertLinkInBlock`/
+  `setHeadingLevelInBlock`, new `ByteRange` type) to core `FormatOps`
+  as a named seam — flat overloads untouched, live/source unaffected.
+- `setHeadingLevelInBlock` needed no line-start search: B1 (no
+  internal `\n` in a block buffer) makes block-start *is* line-start
+  unconditionally, so the flat version's backward-`\n` scan collapses
+  to a no-op in per-block space.
+- Multi-block format-op application must snapshot the covered-block
+  list *before* mutating: each `FormatOps` call flushes synchronously
+  (C2), resyncing `BlockLayoutCache`'s entries vector via
+  `onDocumentChanged()` — iterating that vector live while mutating
+  through it would be a use-after-resync. Same discipline
+  `collapseSelection`'s `middles` collection already established.
+- No canvas verb exists yet for `Blockquote`/`BulletedList`/
+  `NumberedList`/`TaskList`/`IndentMore`/`IndentLess` `ActionId`s
+  (list/blockquote toggle only via typed-marker kind inference;
+  indent only via real Tab through `StructuralKeyHandler`) — no
+  QActions built for them rather than ship dead triggers, matching
+  the plan's own table-ops deferral discipline.
 
 **P4.2 (2026-08-14).**
 
