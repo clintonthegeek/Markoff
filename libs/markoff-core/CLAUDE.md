@@ -177,6 +177,33 @@ hold content only. No trailing structural `\n`. Separators are the
 serializer's responsibility (`interBlockSeparator() == "\n\n"`,
 `finalDocumentTerminator() == "\n"`).
 
+**"Content only" does not mean "marker-free" — it is per-kind, and the
+two are easy to conflate.** Verified empirically against
+`loadFromMarkdown` (canvas spike T1 finding, `docs/specs/2026-08-13-markoff-canvas-spike-design.md` §9;
+decided for the typed-block path by T6):
+
+| Kind | Buffer keeps its marker? | Notes |
+|---|---|---|
+| `Paragraph` | n/a — no marker | — |
+| `Heading` (ATX) | **Yes** — `# ` prefix inline | `# Title` buffer, `# Title` on save. Typed and loaded headings are byte-identical (T6); `serializeHeading` defends against double-prefixing via `stripLeadingHashes`. |
+| `Heading` (setext) | **No** — content-only | Load strips the underline; `serializeHeading` reconstructs `=`/`-` from the `level`/`headingForm` attrs, width = title byte length (drift on multibyte titles is accepted). |
+| `CodeBlock` | **Yes** — fences inline | ` ```lang\n…\n``` ` is the buffer, not just the interior. |
+| `ListItem` | **No** — marker stripped | Bullet/number/task-box is display-only via `listItemDisplayMarker()`, reconstructed from the `marker` attr; never re-derive it by hand (queue #8.3). |
+| `BlockQuote` | **No** — `> ` stripped per depth | Split at load into one top-level block per parser child (queue #8.1); serializer rebuilds `depth × "> "` from `BlockQuoteDepth`. |
+| `HorizontalRule` | n/a — buffer ignored | `serializeHorizontalRule` always emits `---` regardless of content. |
+| `Math`, `Image`, `Mermaid`, `HtmlBlock`, `Table` | **Yes** — passthrough | `serializePassthrough` returns the buffer verbatim; whatever `loadFromMarkdown` put there is exactly what save emits. |
+
+The split exists because the parser harvest narrows some kinds' byte
+ranges to post-marker content before the buffer is ever populated
+(`ListItem`, `BlockQuote`) and leaves others alone (`Heading` ATX,
+`CodeBlock`, the passthrough kinds). A consumer that infers a kind's
+buffer shape from a different kind's behavior will be wrong about half
+the time — check this table, don't extrapolate from one example.
+`Markoff::inferBlockKind` (`<markoff/core/KindInference.h>`) must only
+run against buffers still carrying their markers per this table
+(Paragraph/Heading/CodeBlock); a content-narrowed ListItem/BlockQuote
+buffer infers Paragraph and demotes wrongly (§ Kind inference above).
+
 ## Text units (`<markoff/core/TextUnits.h>`, P1.2 2026-08-13)
 
 `Markoff::TextUnits::byteToQtPos` / `qtPosToByte` — the byte↔QChar

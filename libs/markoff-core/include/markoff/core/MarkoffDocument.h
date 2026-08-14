@@ -233,9 +233,12 @@ public:
     /// space) that a `ListItem` block's `serializeForSave()` output carries
     /// but its `blockText()`/`widgetFlatView()` segment does NOT — the
     /// parser harvest narrows `ListItem` byte ranges to post-marker content
-    /// before the buffer is ever populated, unlike every other BlockKind
-    /// (whose markers stay inline in the buffer). Returns an empty
-    /// `QByteArray` for any non-ListItem block. Reuses the exact
+    /// before the buffer is ever populated. `BlockQuote` is narrowed the
+    /// same way (`> ` stripped per depth); `Heading` and `CodeBlock` are
+    /// NOT — their buffers keep the ATX prefix / fences inline. See the
+    /// per-kind buffer-convention table in `markoff-core/CLAUDE.md` before
+    /// assuming either behavior for a kind not listed here. Returns an
+    /// empty `QByteArray` for any non-ListItem block. Reuses the exact
     /// reconstruction rules `serializeForSave()` uses — single source of
     /// truth, no duplicated marker logic. Intended for display-only
     /// decoration (queue #8.3;

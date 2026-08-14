@@ -76,6 +76,15 @@ common source of off-by-a-block bugs:
 1. **Per-block byte offset** — offset within one block's buffer. Block
    buffers hold *content only*, no trailing `\n` (the **B1 buffer
    convention**; see the b1 spec). Separators are the serializer's job.
+   **"Content only" is not "marker-free" — that's per-kind, not
+   universal.** `ListItem` and `BlockQuote` buffers are narrowed to
+   post-marker content at parse time (bullet/number/task-box and `> `
+   are stripped); `Heading` (ATX) and `CodeBlock` buffers keep their
+   `# ` prefix / fences inline, and the passthrough kinds (`Math`,
+   `Image`, `Mermaid`, `HtmlBlock`, `Table`) keep everything. Full table
+   and rationale: `markoff-core/CLAUDE.md` § "Block buffer convention"
+   (canvas spike T1/T6 findings, 2026-08-13). Do not infer one kind's
+   buffer shape from another's.
 2. **No-separator global byte offset** — blocks concatenated with *nothing*
    between them. This is the space `applyFlatEdit` consumes and the space
    `resolveTextAnchor` returns. In it, block N's end byte *equals* block
