@@ -137,7 +137,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **P5 — block parity** | | | |
 | P5.1 Table: in-cell wrap + cell navigation | ☑ | `d6a0ce0a` | `3a7afd9e` / `70854dc5` |
 | P5.2 Table: row/col ops + alignment | ☑ | `13ebc8fa` | `281fbc73` / `68557575` |
-| P5.3 Math blocks (jkqtmathtext) | ☐ | | |
+| P5.3 Math blocks (jkqtmathtext) | ☑ | `f482a4d0` | `6dea6ab6` / `58d373bb` |
 | P5.4 Images + Mermaid/embed seams | ☐ | | |
 | P5.5 Callouts + frontmatter + footnote defs | ☐ | | |
 | P5.6 Folding via Session | ☐ | | |
@@ -515,6 +515,40 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P5.3 (2026-08-14).**
+
+- Display math renders via a new plain-C++ `MathRendering.{h,cpp}`
+  wrapper around vendored `jkqtmathtext` (linked privately into
+  `markoff_canvas`); `BlockLayoutCache::rebuildInline` builds the
+  pixmap only when the caret is outside the block, `View::paintEvent`
+  swaps text-layout paint for the pixmap in that state. Text layout is
+  always built regardless so hit-test/caret/selection stay correct.
+  Caret-in-block reveals raw LaTeX, same per-block trigger as the
+  code-fence mechanism (P2.2).
+- Inline `$...$` renders as a styled monospace/code-like run, not real
+  glyph rendering — `QTextLayout` has no inline-object-replacement
+  path without a backing `QTextDocument`, which C3 forbids. This is
+  the plan's own anticipated fallback ("log if inline visual parity
+  demands more") — flagged as a real, intentional gap vs. Obsidian's
+  inline-rendered math, not a bug to silently work around.
+- **Parser gap found**: `latex_span`/`latex_block` delimiter spans
+  never get `parentCharStart`/`parentCharEnd` populated —
+  `collectParentRanges` checks for a `latex_span` node type the
+  markoff-parser grammar never actually emits (both `$...$` and
+  `$$...$$` parse as `latex_block`). Worked around with a per-block
+  reveal rule (matching code fences) instead of opening the parser
+  seam; revisit if per-span (not per-block) math reveal granularity
+  is ever needed.
+- Closed a carried P1.1 finding: typing `$$` could never reach display
+  math (first `$` promotes to inline Math before the second `$`
+  arrives). Added `View::updateCaretMathDisplayMode()` (raise-only,
+  mirrors `updateCaretHeadingLevel`).
+- markoff-live's `MathRenderer`/jkqtmathtext wiring was dead code —
+  `MathDelegate.qml` never called it, always showed raw source.
+  Canvas P5.3 is the first real rendering use of jkqtmathtext in the
+  codebase.
+- Canvas tier 26/26; `check-constitution.sh` clean over 52 files.
 
 **P5.2 (2026-08-14).**
 
