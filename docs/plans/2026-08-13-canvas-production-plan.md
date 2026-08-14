@@ -221,6 +221,10 @@ Route every `View.cpp` conversion call site through the entry's map
 (~20 sites — mechanical, total; grep for the old helper and leave no
 direct caller). `restyleInline()` becomes a full per-block rebuild on
 reveal-state change. Delete the background-color hiding path.
+**Multi-cursor readiness (F1a):** ask "is this entry/span revealed by
+*any* cursor" through **one** predicate function taking the cursor set —
+not `m_caret.block == entry.id` repeated across the restyle sites. The
+set has one member today; this costs nothing now and is a sweep later.
 **Tests:** reflow is real: with caret outside `a **b** c`, layout
 width < revealed width AND `lineAt(0).naturalTextWidth()` changes on
 caret entry; Left/Right step over hidden runs in one press; selection
@@ -307,6 +311,10 @@ anchored to the top visible block, not the pixel offset).
 (top-visible block index + fraction), cursor (block index + byte),
 fold list (empty until P5.6; the key exists now so the schema is
 stable). Round-trip test through detach/reattach.
+**Multi-cursor readiness (F1a):** write the cursor key as a *list* of
+one, not a scalar, so the deferred multi-cursor arc is not a schema
+migration. `cursorPosition()` on the contract stays single — that is the
+primary caret by definition.
 
 ### P3.7 ⏸ — phase close (as P1.5).
 
@@ -453,6 +461,10 @@ name flag (top of caret, fading like collabedit's), selection tint
 per participant color, all draw-time `FormatRange`s (never cached
 state). Stale/departed filtering is the consumer's job (collabtext
 `PresenceManager::is_live` — reference `app/collabedit`, do not link).
+**Multi-cursor readiness (F1a):** paint from a **kind-tagged** list
+(`Selection::Kind` discriminates `Presence` from local `Secondary`)
+rather than a remote-only list, so the deferred local multi-cursor arc
+reuses this paint path instead of growing a second one.
 **Falsify:** paint remote selection with the local selection color;
 distinct-color assertion fails.
 
@@ -558,6 +570,60 @@ user with a one-page summary of what's proven.
 (Obsidian doesn't), lint, autocompletion UI (Corbomite owns it via
 `CompletionRegistry`), indent-on-input for code, `basic-setup`'s line
 numbers by default.
+
+**F1a — local multi-cursor: deferral + feasibility check (2026-08-13,
+user decision).** Multi-cursor *editing* is deferred to its own arc with
+its own spec. Before deferring, the user asked for two confirmations:
+that it is possible at all, and that nothing in this arc works against
+the refactor. Both checked against the code, not assumed.
+
+*Possible — the foundation was already built for it.*
+
+| Requirement | What exists today |
+|---|---|
+| A selection model with more than one editable cursor | `Selection::Kind` has **`Secondary` — "editable, multi-cursor (commands apply to all)"** alongside `Primary`, `SearchMatch` and `Presence`. Local extra carets and remote presences are already *different kinds*, so they cannot collide |
+| Storage + persistence for them | `Session::secondarySelections()` / `addSecondarySelection` / `clearSecondarySelectionsOfKind`, kind-tagged JSON round-trip (`Selection::toJson`). Live already: `SearchEngine` writes `SearchMatch` entries into that same list |
+| Carets that survive an edit made at *another* caret | `TextAnchor` is CRDT-identity-based and block-scoped: `textAnchorAt(BlockAnchor, offset, bias)` → anchor, `offsetInBlock(BlockAnchor, anchor)` → offset (`BlockAnchor` *is* `BlockId`). N carets → N anchors, apply edits one at a time, re-resolve. No flat offsets, no reverse-order trickery, C4-clean |
+| N edits as one undo step | `UndoLog::Transaction` already hosts arbitrarily many ops per entry |
+| Per-caret structural keys | `StructuralKeyHandler::handle` is pure and takes one `(block, byte)` — call it per caret |
+| Prior art in-house | collabtext's `MultiCursorController` / `CollabPlainTextEdit` |
+
+The canvas side is a real but bounded refactor: `m_caret` (98 uses) and
+`m_selectionAnchor` (22) become a cursor *list* plus a primary index.
+The uses are mostly mechanical reads, and the helpers are already
+value-typed (`CanvasCursor`, `setCaret`, `hitTest`, `caretLessThan`,
+`selectedByteRangeInBlock`), which is the shape that makes the change
+mechanical rather than architectural.
+
+*Nothing in P1–P7 is blocking.* Three places would be
+**counter-productive if written caret-singular**, so they get a
+constraint now (recorded on the tasks themselves, and each is cheap
+today and expensive later):
+
+1. **P2.1 reveal predicate.** Delimiter reveal must be asked as
+   "is this entry/span revealed by *any* cursor", through one predicate
+   function — not `m_caret.block == entry.id` scattered across the
+   restyle sites. One cursor in the set today.
+2. **P3.6 ephemeral-state schema.** Write the cursor key as a *list* of
+   one, not a scalar, so multi-cursor is not a schema migration. (The
+   `MarkdownView` contract's `cursorPosition()` stays single by
+   definition — that is the primary caret, and correctly so.)
+3. **P6.2 presence painting.** Paint from a kind-tagged list rather than
+   a remote-only `RemotePresence` list, so local `Secondary` carets
+   reuse the path instead of growing a second one. Core's
+   `Selection::Kind` is the natural discriminator.
+
+Two accepted limitations to carry into the future spec, both matching
+CodeMirror/Obsidian: IME preedit belongs to the primary caret only, and
+undo coalescing (`CoalesceContext::block`) breaks per keystroke when
+carets sit in different blocks — the future arc decides whether to widen
+the coalesce key.
+
+*One genuine dependency, and it is already on the plan:* per-caret
+anchor survivability runs through the same `TextAnchor` round-trip
+**P6.1** must build for Session caret authority. P6.1 is therefore the
+enabling task, not an obstacle — if that seam has gaps, P6.1 finds them
+first.
 
 *User-directed additions (2026-08-13, folded into the spec — see §5.2):*
 

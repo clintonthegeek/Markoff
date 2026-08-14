@@ -191,6 +191,19 @@ decision): vim mode, PDF export/printing, embedded-note transclusion
 rendering (embed *seam* only), RTL/bidi *testing* beyond what
 QTextLayout gives for free, smooth/kinetic scrolling polish.
 
+**Local multi-cursor editing** — deferred to its own arc and its own
+spec by user decision (2026-08-13), *after* a feasibility check rather
+than on assumption. Core already models it (`Selection::Kind::Secondary`
+is distinct from `Kind::Presence`; `Session` stores and persists both)
+and per-caret survivability rides the block-scoped `TextAnchor` round
+trip that P6.1 builds anyway. Nothing in P1–P7 blocks it; three tasks
+carry a "multi-cursor readiness" constraint so this arc does not write
+itself into a corner — see the plan's finding **F1a** for the evidence
+table, the canvas-side cost, and the two accepted limitations (IME
+preedit is primary-caret-only; undo coalescing breaks across blocks).
+Per invariant 3 the retirement of that deferral is written when the arc
+opens, not now.
+
 ### 5.4 Accessibility
 
 `QAccessibleTextInterface` remains the largest unpriced item (spike
