@@ -485,10 +485,8 @@ int View::selectionAnchorByteOffset() const
 
 qreal View::layoutWidthFor(qreal viewportWidth) const
 {
-    const qreal available = qMax(qreal(1), viewportWidth - 2 * kPageMargin);
-    if (m_contentWidthPolicy.kind == ContentWidthPolicy::FixedColumn)
-        return qMin(available, qMax(qreal(1), m_contentWidthPolicy.fixedColumnWidth));
-    return available;
+    // FALSIFY (throwaway): ignore the policy entirely.
+    return qMax(qreal(1), viewportWidth - 2 * kPageMargin);
 }
 
 qreal View::pageMargin() const
