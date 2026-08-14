@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+#include <QJsonObject>
 #include <QWidget>
 #include <markoff/core/CursorPos.h>
 #include <markoff/core/EditorContext.h>
@@ -37,6 +38,24 @@ public:
     /// (completion popups) at bottomLeft(). Contract-v2 extension
     /// (2026-06-11 caret-rect; driven by Corbomite completion revival).
     virtual QRect caretRect() const { return {}; }
+
+    // --- Ephemeral (non-content) view state, as JSON (contract-v2 P3.6).
+    //     Corbomite's `EphemeralState` round-trip (spec §5) persists this
+    //     across a session/workspace save; the document's own content is
+    //     never part of it. Schema is per-leaf (coordinate spaces differ —
+    //     canvas's is block-index + byte, others may differ), but every
+    //     leaf's top-level shape is the same three keys: "scroll", the
+    //     leaf's scroll-position state; "cursors", a JSON ARRAY (multi-
+    //     cursor readiness, F1a — `cursorPosition()` above stays the
+    //     single primary caret; the array's first element is the leaf's
+    //     restore target until a leaf grows real multi-cursor support);
+    //     "folds", always empty until P5.6, key present so the schema
+    //     doesn't need a migration when folding lands. Default: no state
+    //     (empty object) / no-op restore — a leaf that hasn't implemented
+    //     this yet round-trips as "nothing to persist, nothing to
+    //     restore", never a crash on a foreign or partial blob. ---
+    virtual QJsonObject saveEphemeralState() const { return {}; }
+    virtual void restoreEphemeralState(const QJsonObject &state) { Q_UNUSED(state); }
 
     // --- Find (spec §3). Default: loud no-op. ---
     virtual void attachFindController(FindController *fc);

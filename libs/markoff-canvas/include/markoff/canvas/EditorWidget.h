@@ -4,6 +4,7 @@
 
 #include <memory>
 
+#include <QJsonObject>
 #include <QPointer>
 
 #include <markoff/core/EditorContext.h>
@@ -115,6 +116,25 @@ public:
     /// widget's entire client area (spec §4.1 composition; no translation
     /// needed beyond View's own viewport->View mapping).
     QRect caretRect() const override;
+
+    /// Contract-v2 (P3.6): `{"scroll": {"blockIndex", "fraction"},
+    /// "cursors": [{"blockIndex", "byte"}], "folds": []}` — scroll and
+    /// cursor both in the composed `View`'s own document-order-index +
+    /// byte-offset space (`View::scrollAnchor()`/`blockIndexOf()`), not
+    /// the base contract's flat-line `CursorPos` — an index survives a
+    /// detach/reattach cycle in a way a raw `BlockId` does not. `cursors`
+    /// is a one-element array (F1a multi-cursor readiness; see base class
+    /// doc) — `View` has exactly one caret today. `folds` is always empty
+    /// until P5.6; the key exists now so this schema doesn't need a
+    /// migration later. Empty object if there is no composed `View` yet
+    /// or no document attached.
+    QJsonObject saveEphemeralState() const override;
+    /// Inverse of `saveEphemeralState()`. Missing or malformed keys are
+    /// skipped individually, not fatal to the whole restore — a blob
+    /// missing "cursors", or one written by a future schema version with
+    /// extra keys, restores whatever it can. No-op (not a crash) if there
+    /// is no composed `View`/document yet.
+    void restoreEphemeralState(const QJsonObject &state) override;
 
     /// The composed rendering/input engine. Non-owning; valid for the
     /// widget's lifetime. Leaf-specific escape hatch for tests/demo, same

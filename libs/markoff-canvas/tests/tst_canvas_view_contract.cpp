@@ -22,6 +22,8 @@
 // hooked to View::caretChanged (every caret move) and a
 // structuralEditSequence-gated d2DocumentChanged connection (Queue #15,
 // a programmatic Cmd::changeKind on the caret's own block).
+#include <QJsonArray>
+#include <QJsonObject>
 #include <QScrollBar>
 #include <QSignalSpy>
 #include <QTest>
@@ -304,6 +306,160 @@ private Q_SLOTS:
 
         delete ed;
         delete doc;
+    }
+
+    // ---- P3.6: ephemeral state JSON round-trip -----------------------------
+
+    // Schema pin (plan P3.6): "scroll" is {blockIndex, fraction}, "cursors"
+    // is an ARRAY of one {blockIndex, byte} element (F1a multi-cursor
+    // readiness — not a bare object), "folds" is an empty array (key exists
+    // ahead of P5.6 so the schema doesn't need a migration later).
+    void ephemeral_state_schema_shape() {
+        m_ed->setCursorPosition({1, 1});
+        const QJsonObject state = m_ed->saveEphemeralState();
+
+        QVERIFY(state.contains(QStringLiteral("scroll")));
+        QVERIFY(state.value(QStringLiteral("scroll")).isObject());
+        const QJsonObject scroll = state.value(QStringLiteral("scroll")).toObject();
+        QVERIFY(scroll.contains(QStringLiteral("blockIndex")));
+        QVERIFY(scroll.contains(QStringLiteral("fraction")));
+
+        QVERIFY(state.contains(QStringLiteral("cursors")));
+        QVERIFY(state.value(QStringLiteral("cursors")).isArray());
+        const QJsonArray cursors = state.value(QStringLiteral("cursors")).toArray();
+        QCOMPARE(cursors.size(), 1);   // list of ONE, not a scalar (F1a)
+        QVERIFY(cursors.first().isObject());
+        const QJsonObject cursor = cursors.first().toObject();
+        QVERIFY(cursor.contains(QStringLiteral("blockIndex")));
+        QVERIFY(cursor.contains(QStringLiteral("byte")));
+
+        QVERIFY(state.contains(QStringLiteral("folds")));
+        QVERIFY(state.value(QStringLiteral("folds")).isArray());
+        QVERIFY(state.value(QStringLiteral("folds")).toArray().isEmpty());
+    }
+
+    // Save → mutate (caret AND scroll both moved elsewhere) → restore →
+    // both must land back on the originally-saved values, not wherever the
+    // mutation left them. This is the task's own named falsification
+    // target (skip restoring cursor position) applied as a real test.
+    void ephemeral_state_round_trip_in_place() {
+        QByteArray src;
+        for (int i = 0; i < 40; ++i)
+            src += "paragraph number " + QByteArray::number(i) + "\n\n";
+        auto *doc = new Markoff::MarkoffDocument(5);
+        doc->loadFromMarkdown(src);
+        auto *ed = new Markoff::Canvas::EditorWidget;
+        ed->resize(300, 200);
+        ed->setDocument(doc);
+        ed->show();
+        QVERIFY(QTest::qWaitForWindowExposed(ed));
+        QVERIFY(ed->view()->verticalScrollBar()->maximum() > 0);
+
+        // Park the caret + scroll somewhere in the middle of the document.
+        Markoff::BlockId savedBlock;
+        int i = 0;
+        for (const auto id : doc->iterateBlocks()) {
+            if (i++ == 20) { savedBlock = id; break; }
+        }
+        QVERIFY(!savedBlock.isNull());
+        ed->view()->setCaretPosition(savedBlock, 3);
+        ed->view()->verticalScrollBar()->setValue(
+            ed->view()->verticalScrollBar()->maximum() / 3);
+
+        const QJsonObject saved = ed->saveEphemeralState();
+        const Markoff::BlockId savedCaretBlock = ed->view()->caretBlock();
+        const int savedCaretByte = ed->view()->caretByteOffset();
+        const int savedScrollValue = ed->view()->verticalScrollBar()->value();
+
+        // Mutate: caret to the very first block, scroll to the very top —
+        // as different from the saved state as this fixture allows.
+        Markoff::BlockId firstBlock = *doc->iterateBlocks().begin();
+        ed->view()->setCaretPosition(firstBlock, 0);
+        ed->view()->verticalScrollBar()->setValue(0);
+        QVERIFY(ed->view()->caretBlock() != savedCaretBlock
+                || ed->view()->caretByteOffset() != savedCaretByte);
+
+        ed->restoreEphemeralState(saved);
+
+        QCOMPARE(ed->view()->caretBlock(), savedCaretBlock);
+        QCOMPARE(ed->view()->caretByteOffset(), savedCaretByte);
+        // Scroll restore is anchor-based (block + within-block fraction),
+        // so it need not reproduce the exact pixel value bit-for-bit, but
+        // it must land close — same tolerance spirit as the fontScale
+        // re-anchor test above.
+        QVERIFY(qAbs(ed->view()->verticalScrollBar()->value() - savedScrollValue) <= 2);
+
+        delete ed;
+        delete doc;
+    }
+
+    // Round-trip through a REAL detach/reattach cycle (plan P3.6's own
+    // wording), not just an in-place restore: save state, detach the
+    // document (setDocument(nullptr)), reattach it, then restore — the
+    // saved block INDICES must still resolve against the same document's
+    // re-synced cache and land the caret/scroll back where they were.
+    void ephemeral_state_round_trip_through_detach_reattach() {
+        QByteArray src;
+        for (int i = 0; i < 40; ++i)
+            src += "paragraph number " + QByteArray::number(i) + "\n\n";
+        auto *doc = new Markoff::MarkoffDocument(6);
+        doc->loadFromMarkdown(src);
+        auto *ed = new Markoff::Canvas::EditorWidget;
+        ed->resize(300, 200);
+        ed->setDocument(doc);
+        ed->show();
+        QVERIFY(QTest::qWaitForWindowExposed(ed));
+        QVERIFY(ed->view()->verticalScrollBar()->maximum() > 0);
+
+        Markoff::BlockId savedBlock;
+        int i = 0;
+        for (const auto id : doc->iterateBlocks()) {
+            if (i++ == 15) { savedBlock = id; break; }
+        }
+        QVERIFY(!savedBlock.isNull());
+        ed->view()->setCaretPosition(savedBlock, 2);
+        ed->view()->verticalScrollBar()->setValue(
+            ed->view()->verticalScrollBar()->maximum() / 4);
+
+        const QJsonObject saved = ed->saveEphemeralState();
+        const int savedBlockIndex =
+            saved.value(QStringLiteral("cursors")).toArray().first()
+                .toObject().value(QStringLiteral("blockIndex")).toInt();
+
+        // Real detach/reattach — not an in-place restore.
+        ed->setDocument(nullptr);
+        QCOMPARE(ed->document(), nullptr);
+        ed->setDocument(doc);
+
+        ed->restoreEphemeralState(saved);
+
+        QCOMPARE(ed->view()->blockIndexOf(ed->view()->caretBlock()), savedBlockIndex);
+        QCOMPARE(ed->view()->caretByteOffset(), 2);
+
+        delete ed;
+        delete doc;
+    }
+
+    // Restoring against missing/malformed JSON must not crash and must
+    // leave whatever pieces it can't parse untouched — e.g. an empty
+    // object (fresh-document case), or a blob with the right top-level
+    // keys but the wrong inner shape.
+    void ephemeral_state_restore_handles_malformed_json() {
+        m_ed->setCursorPosition({1, 1});
+        const Markoff::BlockId beforeBlock = m_ed->view()->caretBlock();
+        const int beforeByte = m_ed->view()->caretByteOffset();
+
+        m_ed->restoreEphemeralState(QJsonObject{});   // completely empty
+        QCOMPARE(m_ed->view()->caretBlock(), beforeBlock);
+        QCOMPARE(m_ed->view()->caretByteOffset(), beforeByte);
+
+        QJsonObject malformed;
+        malformed[QStringLiteral("scroll")] = QStringLiteral("not an object");
+        malformed[QStringLiteral("cursors")] = QStringLiteral("not an array");
+        malformed[QStringLiteral("folds")] = 42;
+        m_ed->restoreEphemeralState(malformed);        // must not crash
+        QCOMPARE(m_ed->view()->caretBlock(), beforeBlock);
+        QCOMPARE(m_ed->view()->caretByteOffset(), beforeByte);
     }
 };
 

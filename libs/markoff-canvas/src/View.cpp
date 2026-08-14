@@ -308,6 +308,18 @@ QRectF View::blockRect(BlockId id) const
     return QRectF(pageMargin(), e.y, textWidth(), e.height);
 }
 
+int View::blockIndexOf(BlockId id) const
+{
+    return m_cache->indexOf(id);
+}
+
+BlockId View::blockIdAt(int index) const
+{
+    if (index < 0 || index >= int(m_cache->entries().size()))
+        return {};
+    return m_cache->entries()[size_t(index)].id;
+}
+
 quint64 View::paintCount() const
 {
     return m_paintCount;
@@ -763,6 +775,39 @@ void View::setCaretPosition(BlockId block, int byteOffset)
 
     const int size = m_doc ? m_doc->blockText(block).size() : 0;
     setCaret(CanvasCursor{block, qBound(0, byteOffset, size)});
+}
+
+std::pair<int, float> View::scrollAnchor() const
+{
+    if (!m_doc || m_cache->entries().empty())
+        return {-1, 0.0f};
+
+    const qreal value = qreal(verticalScrollBar()->value());
+    const int idx = m_cache->indexAtY(value);
+    if (idx < 0)
+        return {-1, 0.0f};
+
+    const auto &e = m_cache->entries()[size_t(idx)];
+    const qreal height = qMax(e.height, qreal(1.0));
+    const float fraction = float(qBound(0.0, (value - e.y) / height, 1.0));
+    return {idx, fraction};
+}
+
+void View::setScrollAnchor(int blockIndex, float fraction)
+{
+    if (!m_doc || m_cache->entries().empty())
+        return;
+
+    blockIndex = qBound(0, blockIndex, int(m_cache->entries().size()) - 1);
+    const auto &e = m_cache->entries()[size_t(blockIndex)];
+    const qreal target = e.y + qBound(0.0f, fraction, 1.0f) * e.height;
+    // setValue() fires valueChanged -> scrollContentsBy(), which only
+    // marks the viewport dirty (deliberately does not realize, per its own
+    // comment) — paintEvent is what turns the newly-visible range's
+    // estimates into real layouts, same as any other programmatic scroll
+    // write in this file (setScrollPositionVisualLine's EditorWidget-side
+    // counterpart works the same way).
+    verticalScrollBar()->setValue(qRound(target));
 }
 
 void View::ensureCaretVisible()

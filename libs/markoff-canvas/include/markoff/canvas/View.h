@@ -146,6 +146,17 @@ public:
     int   realizedBlockCount() const;
     qreal documentHeight() const;
 
+    /// Document-order index of `id`, or -1 if it is not (or no longer) in
+    /// the current document. Contract-v2 seam (P3.6): the "block index"
+    /// half of the ephemeral-state schema — an index survives a
+    /// detach/reattach cycle in a way a raw `BlockId` does not (a
+    /// reloaded/reattached document mints fresh ids), so
+    /// `EditorWidget::saveEphemeralState()` persists indices, not ids.
+    int blockIndexOf(BlockId id) const;
+    /// Inverse of `blockIndexOf()`: the block at document-order `index`, or
+    /// a null `BlockId` if out of range for the current document.
+    BlockId blockIdAt(int index) const;
+
     /// Block bounds in document coordinates (y=0 is the document top, not
     /// the viewport top). Null rect if the id is not in the document.
     QRectF blockRect(BlockId id) const;
@@ -216,6 +227,26 @@ public:
     /// Synchronous, no queued/deferred application (C2) — the caller sees
     /// the new caret the moment this returns.
     void setCaretPosition(BlockId block, int byteOffset);
+
+    // ---- Scroll anchor (contract-v2 P3.6) --------------------------------
+
+    /// The block currently at the top of the viewport, and how far
+    /// scrolled into it: 0.0 = the block's own top edge sits exactly at
+    /// the viewport top, approaching 1.0 near the block's bottom edge.
+    /// Generalizes `setFontScale()`'s P3.5 "top visible block" re-anchor
+    /// concept (which snaps to a block's top edge only) with a
+    /// within-block fraction, so `EditorWidget::saveEphemeralState()` can
+    /// restore scroll position more precisely than "block N's top edge".
+    /// `{-1, 0.0f}` if there is nothing to anchor to (no document, or no
+    /// entries yet).
+    std::pair<int, float> scrollAnchor() const;
+    /// Inverse of `scrollAnchor()`: scrolls so `blockIndex`'s top edge
+    /// sits `fraction` (clamped to `[0, 1]`) of the block's height below
+    /// the viewport top. `blockIndex` is clamped to `[0, blockCount() - 1]`
+    /// — restoring against a document shorter than the one the state was
+    /// captured from lands on the last block rather than doing nothing.
+    /// No-op if the current document has no blocks at all.
+    void setScrollAnchor(int blockIndex, float fraction);
 
     // ---- Selection (T5) --------------------------------------------------
     // Inspection for tests; edited only through real events (mouse drag,
