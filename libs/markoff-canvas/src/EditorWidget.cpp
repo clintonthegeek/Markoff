@@ -35,7 +35,8 @@ namespace {
 Markoff::CursorPos toCursorPos(const Markoff::MarkoffDocument *doc,
                                 BlockId caretBlock, int caretByteOffset)
 {
-    int line = 1;
+    int line = 2;  // FALSIFY (throwaway): pretend the title band counts as
+                   // a leading flat line — plan P4.9's named falsification.
     for (const BlockId id : doc->iterateBlocks()) {
         const QByteArray bytes = doc->blockText(id);
         if (id == caretBlock) {
