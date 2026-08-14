@@ -2261,7 +2261,11 @@ void View::mousePressEvent(QMouseEvent *event)
         // checkbox is a no-op, not a caret jump into the gutter.
         if (const auto taskId = taskCheckboxAt(event->pos())) {
             if (!m_readOnly) {
-                m_doc->toggleListItemChecked(*taskId);
+                // FALSIFY (throwaway): toggle always hits the document's
+                // first block, ignoring which checkbox was actually
+                // clicked — plants a wrong-block write to prove
+                // neighbor_item_click_does_not_toggle actually falsifies.
+                m_doc->toggleListItemChecked(m_doc->iterateBlocks().front());
                 viewport()->update();
             }
             event->accept();
