@@ -373,32 +373,47 @@ void EditorWidget::restoreEphemeralState(const QJsonObject &state)
     if (!m_view || !document())
         return;
 
-    // FALSIFY (throwaway, P3.6): scroll restored BEFORE cursor — planted
-    // to confirm the round-trip test catches the auto-scroll clobber this
-    // order avoids.
-    const QJsonValue scrollVal = state.value(QStringLiteral("scroll"));
-    if (scrollVal.isObject()) {
-        const QJsonObject scroll = scrollVal.toObject();
-        const QJsonValue idxVal = scroll.value(QStringLiteral("blockIndex"));
-        if (idxVal.isDouble()) {
-            const float fraction =
-                float(scroll.value(QStringLiteral("fraction")).toDouble(0.0));
-            m_view->setScrollAnchor(idxVal.toInt(), fraction);
-        }
-    }
-
+    // Cursor restore BEFORE scroll restore, deliberately: View::setCaretPosition
+    // routes through ensureCaretVisible(), which auto-scrolls the caret's
+    // block into view if it isn't already — if that ran AFTER the scroll
+    // restore below, a caret whose saved block sits outside the saved
+    // scroll viewport (a perfectly legal independent combination — this
+    // schema saves the two separately) would silently override the scroll
+    // restore. Doing scroll last makes the explicitly-saved scroll always
+    // win, matching what a consumer restoring from a persisted blob
+    // expects: the exact scroll position it asked for, not wherever the
+    // cursor's own auto-scroll side effect happened to leave it.
     const QJsonValue cursorsVal = state.value(QStringLiteral("cursors"));
     if (cursorsVal.isArray()) {
         const QJsonArray cursors = cursorsVal.toArray();
+        // Single-caret leaf today (F1a note, class doc): restore only the
+        // array's first element, per the base contract's "cursorPosition()
+        // is the primary caret" rule.
         if (!cursors.isEmpty() && cursors.first().isObject()) {
             const QJsonObject cursor = cursors.first().toObject();
             const QJsonValue idxVal = cursor.value(QStringLiteral("blockIndex"));
             const QJsonValue byteVal = cursor.value(QStringLiteral("byte"));
             if (idxVal.isDouble() && byteVal.isDouble()) {
                 const BlockId block = m_view->blockIdAt(idxVal.toInt());
+                // Unknown index (foreign/stale blob): skip rather than
+                // guess — setCaretPosition's own "unknown block" clamp is
+                // for a stale BlockId, not an out-of-range index.
                 if (!block.isNull())
                     m_view->setCaretPosition(block, byteVal.toInt());
             }
+        }
+    }
+
+    const QJsonValue scrollVal = state.value(QStringLiteral("scroll"));
+    if (scrollVal.isObject()) {
+        const QJsonObject scroll = scrollVal.toObject();
+        const QJsonValue idxVal = scroll.value(QStringLiteral("blockIndex"));
+        // Malformed/missing sub-key: skip just this piece, not the whole
+        // restore (class doc — never fatal on a partial or foreign blob).
+        if (idxVal.isDouble()) {
+            const float fraction =
+                float(scroll.value(QStringLiteral("fraction")).toDouble(0.0));
+            m_view->setScrollAnchor(idxVal.toInt(), fraction);
         }
     }
 
