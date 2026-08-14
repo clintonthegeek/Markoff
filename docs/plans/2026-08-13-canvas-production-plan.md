@@ -129,7 +129,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.2 Link activation + hover | ☑ | `0d4b49b1` | `bf1fffb0` / `3cf92c23` |
 | P4.3 FormatOps verbs + CanvasActionController | ☑ | `2c3f482a` / `a1fe576f` | `48545c18` / `fa11992e` |
 | P4.4 Context menu | ☑ | `7944edc3` | `f3ce2870` / `f2fed72b` |
-| P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☐ | | |
+| P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☑ (reduced scope — see finding) | `d365be58` | `e4b40d0e` / `06b1c06c` |
 | P4.9 Inline title band (user-directed; spec §5.2) | ☐ | | |
 | P4.6 Code-block syntax highlighting | ☐ | | |
 | P4.7 Task-list checkboxes (render + toggle) | ☐ | | |
@@ -515,6 +515,29 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.5 (2026-08-14).**
+
+- Landed reduced scope, per the plan's own escape hatch: content-width
+  policy (`FullWidth`/`FixedColumn{px}`), centered column via
+  `pageMargin()`, resize/policy-toggle relayout with scroll-anchor
+  preservation (reusing P3.6's `scrollAnchor()`/`setScrollAnchor()`).
+  **Not landed:** tables/code blocks exceeding the column with their
+  own horizontal pan (Obsidian's actual overflow behavior) — they
+  currently just take the (possibly narrowed) column width like any
+  other block. Needs per-rect horizontal scroll-offset state that
+  doesn't exist anywhere in `BlockLayoutCache`/`View` yet; a real
+  sub-feature, carried open rather than rushed. A future session
+  should pick this up before the Obsidian-parity audit (P7.3) if it's
+  still open then.
+- `layoutWidthFor()` becoming the single conversion point means
+  `pageMargin()`, `textWidth()`, paint, hit-test, caret, `blockRect()`
+  and table rects all center for free — no second code path needed
+  for centering.
+- `BlockLayoutCache::setTextWidth()` already dropped realized entries
+  back to estimates on a width change (pre-existing lazy-realize
+  machinery); P4.5 needed no changes there, only the anchor-preserving
+  wrapper around the existing relayout trigger.
 
 **P4.4 (2026-08-14).**
 
