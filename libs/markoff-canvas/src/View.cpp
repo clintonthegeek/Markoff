@@ -1354,6 +1354,17 @@ void View::inputMethodEvent(QInputMethodEvent *event)
         return;
     }
 
+    // Read-only gate (P3.3, spec §4.2) — the task's named falsification
+    // target: IME composition never mutates the document while read-only.
+    // Disabled outright (no preedit splice either) rather than letting
+    // composition run and only blocking the eventual commit — a live
+    // composition that can never commit is a worse UX than none at all,
+    // and matches "cut disabled in its entirety" above.
+    if (m_readOnly) {
+        event->accept();
+        return;
+    }
+
     // Mirror QWidgetTextControlPrivate::inputMethodEvent's ordering (plan
     // T8): replacement + commit are a real document edit at the caret,
     // issued as one d2ApplyBufferEdit (replacementStart/Length relative to
