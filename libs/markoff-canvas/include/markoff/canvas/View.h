@@ -12,6 +12,7 @@
 #include <QVariant>
 
 #include <markoff/core/BlockId.h>
+#include <markoff/core/LinkActivation.h>
 #include <markoff/core/Theme.h>
 
 class QInputMethodEvent;
@@ -19,6 +20,7 @@ class QPainter;
 
 namespace Markoff {
 class MarkoffDocument;
+class LinkService;
 }
 
 namespace Markoff::Canvas {
@@ -274,6 +276,23 @@ public:
     /// `id`, in the order last passed to `setFindHighlights`.
     QList<FindHighlight> findHighlightsForBlock(BlockId id) const;
 
+    // ---- Links (contract-v2 P4.2) ---------------------------------------
+
+    /// Consumer-owned link resolution/activation authority (spec §5.2).
+    /// Not owned; nullptr (the default) disables link click/hover handling
+    /// entirely — hit-tested link/wikilink/tag spans are simply never
+    /// looked up against a service. Mirrors
+    /// `Markoff::Live::LiveListModelBinding::setLinkService` /
+    /// `Markoff::Styled::LinkInteraction::setLinkService`: this view calls
+    /// `LinkService::activate`/`notifyHover`/`notifyHoverLeft` directly and
+    /// emits no wrapper signals of its own — consumers connect to
+    /// `Markoff::LinkService::linkActivated`/`linkHovered`/`linkHoverLeft`.
+    void setLinkService(Markoff::LinkService *service);
+    /// Forwarded into every `LinkActivation::fromContext` (e.g. the current
+    /// note's path, for relative wikilink resolution). Mirrors live/styled's
+    /// `setFromContext`.
+    void setFromContext(const QString &context);
+
 signals:
     /// Fired from `ensureCaretVisible()` (P3.2) — the file's single
     /// chokepoint every caret-changing code path already calls afterward
@@ -298,6 +317,13 @@ protected:
     void focusOutEvent(QFocusEvent *event) override;
     void inputMethodEvent(QInputMethodEvent *event) override;
     QVariant inputMethodQuery(Qt::InputMethodQuery query) const override;
+    /// Viewport `QEvent::Leave` only reaches this widget via an event
+    /// filter — `QAbstractScrollArea::viewportEvent` does not forward
+    /// Enter/Leave the way it forwards mouse-button/move events (same
+    /// reason styled's `LinkInteraction` installs one). Used solely to
+    /// close out an in-progress link hover when the pointer leaves the
+    /// viewport without a `mouseMoveEvent` ever reporting "no link here".
+    bool eventFilter(QObject *obj, QEvent *event) override;
 
 private:
     void onDocumentChanged();
@@ -390,6 +416,36 @@ private:
     /// selection is cleared. No-op if there is no selection.
     void collapseSelection();
 
+    // ---- Links (P4.2) -----------------------------------------------------
+
+    /// The link/wikilink/tag span (if any) covering `cursor`'s byte offset
+    /// in its own block, resolved into a `LinkActivation`. `std::nullopt` if
+    /// `cursor`'s block is unknown/null or no such span covers the offset —
+    /// independent of whether a `LinkService` is set (callers decide what
+    /// nullopt-vs-no-service means; `linkActivationAt` itself only answers
+    /// "is there a link span here"). Reuses `hitTest`'s `CanvasCursor`
+    /// output (block + byte offset) — the ONE hit-test path in this file —
+    /// rather than a second span-lookup mechanism; both `mousePressEvent`'s
+    /// activation gesture and `updateHover`'s tracking call through here.
+    std::optional<Markoff::LinkActivation> linkActivationAt(
+        const CanvasCursor &cursor, Qt::KeyboardModifiers mods) const;
+    /// Mouse-move hover tracking (P4.2): re-hit-tests at `viewportPos`,
+    /// diffs against the currently-hovered link's raw text, and only on an
+    /// actual state TRANSITION (a different link, or link ↔ no-link) fires
+    /// `LinkService::notifyHoverLeft`/`notifyHover` and touches the
+    /// viewport cursor shape. Called on every plain (no-button) mouse move,
+    /// but the transition-gating above means the `setCursor`/`unsetCursor`
+    /// calls do not — the "styled smell"
+    /// (`libs/markoff-styled/src/LinkInteraction.cpp:handleMove` sets
+    /// `QCursor` unconditionally on every move within the same link) this
+    /// task was explicitly told to avoid repeating.
+    void updateHover(const QPoint &viewportPos, const QPoint &globalPos);
+    /// Closes out an in-progress hover (link → none): fires
+    /// `notifyHoverLeft` if one was active and restores the I-beam/arrow
+    /// cursor. Called from the viewport-leave event filter and whenever
+    /// `updateHover` finds no link under the pointer.
+    void clearHover();
+
     MarkoffDocument *m_doc = nullptr;
     Theme m_theme;
     /// Font-scale multiplier (P3.5). Threaded into every `m_cache->sync()`
@@ -413,6 +469,21 @@ private:
     // committed, at which point it becomes a real d2ApplyBufferEdit and
     // this reverts to empty.
     QString m_preeditText;
+
+    // ---- Links (P4.2) -------------------------------------------------
+    // Consumer-owned; not linked, only observed via its own signals (see
+    // setLinkService's doc comment). Same "reference, not owner" role as
+    // m_findController plays in EditorWidget.
+    Markoff::LinkService *m_linkService = nullptr;
+    QString m_linkFromContext;
+    /// Raw text of the currently-hovered link, empty if none — the hover
+    /// state `updateHover`/`clearHover` diff against (mirrors styled's
+    /// LinkInteraction::m_currentHoveredRawText).
+    QString m_hoveredLinkRawText;
+    /// Cursor-shape cache: whether the viewport's cursor is currently the
+    /// pointing-hand override. Only a hover state TRANSITION flips this and
+    /// calls setCursor/unsetCursor — see updateHover's doc comment.
+    bool m_cursorIsPointingHand = false;
 };
 
 }  // namespace Markoff::Canvas

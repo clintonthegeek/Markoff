@@ -21,6 +21,7 @@
 
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/KindInference.h>
+#include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/StructuralKeyHandler.h>
 #include <markoff/core/TextUnits.h>
@@ -124,6 +125,11 @@ View::View(QWidget *parent)
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
     horizontalScrollBar()->setRange(0, 0);  // text wraps; no horizontal scroll
+    // P4.2: hover tracking needs mouseMoveEvent without a button held, and
+    // viewport Leave (to close out an in-progress hover) only reaches this
+    // widget via the event filter below.
+    viewport()->setMouseTracking(true);
+    viewport()->installEventFilter(this);
 }
 
 View::~View() = default;
@@ -1429,11 +1435,145 @@ void View::keyPressEvent(QKeyEvent *event)
     QAbstractScrollArea::keyPressEvent(event);
 }
 
+// ---- Links (P4.2) ---------------------------------------------------------
+
+std::optional<Markoff::LinkActivation> View::linkActivationAt(
+    const CanvasCursor &cursor, Qt::KeyboardModifiers mods) const
+{
+    if (!m_doc || cursor.block.isNull())
+        return std::nullopt;
+
+    const QByteArray text = m_doc->blockText(cursor.block);
+    const int qcharPos = int(coords::byteToQtPos(text, cursor.byteOffset));
+
+    for (const Markoff::SourceSpan &span : m_doc->inlineSpansFor(cursor.block)) {
+        if (!(span.isLink || span.isWikilink || span.isTag))
+            continue;
+        // Half-open [charOffset, charOffset+charLength) — the same
+        // convention every other span-covers-position check in this file
+        // uses (isDelimiterHiddenAt above, InlineFormatting's format-range
+        // build). A position exactly at charOffset+charLength (one past the
+        // span's last QChar) belongs to whatever comes next, not this span
+        // — this is the off-by-one the plan's falsification target lives
+        // in; get it wrong either direction and the boundary QChar
+        // mis-resolves.
+        if (qcharPos < span.charOffset || qcharPos >= span.charOffset + span.charLength)
+            continue;
+
+        Markoff::LinkActivation a;
+        a.modifiers   = mods;
+        a.fromContext = m_linkFromContext;
+
+        if (span.isWikilink) {
+            a.kind       = Markoff::LinkKind::WikiLink;
+            a.page       = span.linkTarget.page;
+            a.section    = span.linkTarget.section;
+            a.blockRef   = span.linkTarget.blockRef;
+            a.alias      = span.linkTarget.alias;
+            a.anchorHint = a.section;
+            QString inner = a.page;
+            if (!a.section.isEmpty())  inner += QLatin1Char('#') + a.section;
+            if (!a.blockRef.isEmpty()) inner += QStringLiteral("#^") + a.blockRef;
+            if (!a.alias.isEmpty())    inner += QLatin1Char('|') + a.alias;
+            a.rawText = QStringLiteral("[[%1]]").arg(inner);
+        } else if (span.isLink) {
+            a.rawText = span.linkTarget.url;
+            a.kind = m_linkService ? m_linkService->classify(a.rawText)
+                                    : Markoff::LinkKind::Unknown;
+        } else {  // isTag — no LinkTarget payload (parser sets isTag alone,
+                  // see markoff-parser/src/TreeSitterParser.cpp); the span's
+                  // own char range IS the tag text, "#" included.
+            a.kind = Markoff::LinkKind::Tag;
+            a.rawText = QString::fromUtf8(text).mid(span.charOffset, span.charLength);
+        }
+
+        a.resolvedTarget = m_linkService
+            ? m_linkService->resolve(a.rawText, m_linkFromContext)
+            : QUrl(a.rawText);
+        return a;
+    }
+    return std::nullopt;
+}
+
+void View::setLinkService(Markoff::LinkService *service)
+{
+    m_linkService = service;
+}
+
+void View::setFromContext(const QString &context)
+{
+    m_linkFromContext = context;
+}
+
+void View::updateHover(const QPoint &viewportPos, const QPoint &globalPos)
+{
+    const CanvasCursor hit = m_doc ? hitTest(viewportPos) : CanvasCursor{};
+    const auto act = hit.block.isNull()
+        ? std::nullopt
+        : linkActivationAt(hit, QGuiApplication::keyboardModifiers());
+    const QString newRaw = act ? act->rawText : QString();
+
+    if (newRaw == m_hoveredLinkRawText)
+        return;  // no state transition — see doc comment (cursor-shape cache)
+
+    if (!m_hoveredLinkRawText.isEmpty() && m_linkService)
+        m_linkService->notifyHoverLeft(m_hoveredLinkRawText);
+    m_hoveredLinkRawText = newRaw;
+
+    if (act) {
+        if (m_linkService)
+            m_linkService->notifyHover(*act, globalPos);
+        if (!m_cursorIsPointingHand) {
+            viewport()->setCursor(Qt::PointingHandCursor);
+            m_cursorIsPointingHand = true;
+        }
+    } else if (m_cursorIsPointingHand) {
+        viewport()->unsetCursor();
+        m_cursorIsPointingHand = false;
+    }
+}
+
+void View::clearHover()
+{
+    if (!m_hoveredLinkRawText.isEmpty() && m_linkService)
+        m_linkService->notifyHoverLeft(m_hoveredLinkRawText);
+    m_hoveredLinkRawText.clear();
+    if (m_cursorIsPointingHand) {
+        viewport()->unsetCursor();
+        m_cursorIsPointingHand = false;
+    }
+}
+
+bool View::eventFilter(QObject *obj, QEvent *event)
+{
+    if (obj == viewport() && event->type() == QEvent::Leave)
+        clearHover();
+    return QAbstractScrollArea::eventFilter(obj, event);
+}
+
 void View::mousePressEvent(QMouseEvent *event)
 {
     if (event->button() == Qt::LeftButton && m_doc) {
         const CanvasCursor hit = hitTest(event->pos());
         if (!hit.block.isNull()) {
+            // Link activation (P4.2, spec §5.2): plain click while
+            // read-only, Ctrl+click while editing — editing mode needs
+            // plain click free for caret placement, read-only mode has no
+            // conflicting use for it (navigation/selection still work via
+            // drag, matching live/styled's read-only-keeps-working rule).
+            // A miss (no link under the point) falls through to normal
+            // caret placement either way.
+            const bool activationGesture =
+                m_readOnly || event->modifiers().testFlag(Qt::ControlModifier);
+            if (activationGesture) {
+                if (const auto act = linkActivationAt(hit, event->modifiers())) {
+                    if (m_linkService)
+                        m_linkService->activate(*act);
+                    event->accept();
+                    return;
+                }
+            }
+
             setFocus(Qt::MouseFocusReason);
             // Shift+click extends the existing (or a fresh) selection. A
             // plain click deliberately does NOT set an anchor here — only
@@ -1467,6 +1607,10 @@ void View::mouseMoveEvent(QMouseEvent *event)
             return;
         }
     }
+
+    if (event->buttons() == Qt::NoButton)
+        updateHover(event->pos(), event->globalPosition().toPoint());
+
     QAbstractScrollArea::mouseMoveEvent(event);
 }
 
