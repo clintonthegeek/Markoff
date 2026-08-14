@@ -133,7 +133,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.9 Inline title band (user-directed; spec §5.2) | ☑ | `79db4dc2` | `dedab5ab` / `a22545ab` |
 | P4.6 Code-block syntax highlighting | ☑ | `fb3bfa3e` | `512cb721` / `c66d577d` |
 | P4.7 Task-list checkboxes (render + toggle) | ☑ | `31e5c138` | `81e92490` / `7d714198` |
-| P4.8 ⏸ phase close | ☐ | | n/a |
+| P4.8 ⏸ phase close | ☑ | n/a | n/a |
 | **P5 — block parity** | | | |
 | P5.1 Table: in-cell wrap + cell navigation | ☐ | | |
 | P5.2 Table: row/col ops + alignment | ☐ | | |
@@ -515,6 +515,29 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.8 (2026-08-14) — phase close.**
+
+- Full suite: **300/300**, up from 293/293 at Phase 3 close.
+  `check-constitution.sh`: clean (C1–C4) over 46 files.
+- Seven new canvas test executables this phase
+  (`tst_canvas_links`, `tst_canvas_format_ops`, `tst_canvas_context_menu`,
+  `tst_canvas_layout_width`, `tst_canvas_inline_title`,
+  `tst_canvas_code_highlight`, `tst_canvas_task_checkbox`) plus growth
+  in `tst_canvas_inline_formatting` (P4.1) and core's `tst_format_ops`
+  (+8 cases, P4.3).
+- Two items carried open into `docs/STATUS.md` dormant list rather
+  than closed this phase: table/code horizontal-pan-within-own-rect
+  (P4.5 reduced scope) and the `Theme` Code*-token color-slot gap
+  (P4.6 finding). Neither blocks Phase 5.
+- Table ops (`P5.1`/`P5.2`) remain explicitly deferred, as the plan
+  always intended — no format/action work was built for them this
+  phase.
+- One real core-seam decision this phase: P4.3's per-block `FormatOps`
+  overloads, made by explicit user choice after the first attempt
+  correctly stopped rather than violate C4. See P4.3's findings entry.
+- `docs/STATUS.md` baseline and workfront pointer updated to Phase 5
+  as next.
 
 **P4.7 (2026-08-14).**
 
