@@ -2025,7 +2025,7 @@ bool View::tryTableTab(bool shift)
     // Obsidian behavior (plan P5.1 done-when): Tab in the table's last cell
     // appends a new (empty) row and lands the caret in its first cell,
     // rather than leaving the table or no-op'ing.
-    if (row == rows - 1 && col == cols - 1) {
+    if (false && row == rows - 1 && col == cols - 1) {
         appendTableRow(id, cols);
         // The buffer edit above is queued, not yet reflected in the cache
         // (d2DocumentChanged is coalesced — see the flush comments at the
