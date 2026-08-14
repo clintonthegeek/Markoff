@@ -140,7 +140,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P5.3 Math blocks (jkqtmathtext) | ☑ | `f482a4d0` | `6dea6ab6` / `58d373bb` |
 | P5.4 Images + Mermaid/embed seams | ☑ | `f94bf525` | `1c4654ee` / `c851e604` |
 | P5.5 Callouts + frontmatter + footnote defs | ☑ | `20949498` | `715b301b` / `c421810c` |
-| P5.6 Folding via Session | ☐ | | |
+| P5.6 Folding via Session | ☑ (reduced scope — see finding) | `989c714d` | `1a4fd240` / `ef298d6a` |
 | P5.7 ⏸ phase close | ☐ | | n/a |
 | **P6 — collaboration surface** | | | |
 | P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☐ | | |
@@ -515,6 +515,46 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P5.6 (2026-08-14).**
+
+- **Reduced scope vs. plan text**: the task named `Session::foldedRegions`
+  (`FoldRef`) as the seam to consume. `FoldRef::start` is a raw
+  `CollabText::Crdt::Anchor`, and the only public constructor
+  (`MarkoffDocument::anchorAt`) is backed by the legacy flat buffer —
+  documented elsewhere as stale/unreliable on a D2-loaded document,
+  which canvas exclusively is. No public, D2-safe accessor exists to
+  build an anchor from a `BlockId`+offset (the private per-block
+  conversion lives in core's `src/`, not `include/`). Same wall P3.6
+  hit for scroll/cursor, which already bypasses Session's anchor
+  accessors via View's own block-index scheme — P5.6 follows that
+  precedent instead of inventing a core API: fold state lives in
+  `View::m_foldedHeads` (BlockId set), and ephemeral-state
+  round-trips it via View's own block-index API, not Session.
+  `Session::foldedRegions` remains genuinely unwired, same as its
+  already-unused scroll/selection accessors. **Follow-up needed
+  before this can close for real**: a D2-safe public
+  `(BlockAnchor, offset) -> CollabText::Crdt::Anchor` accessor in
+  core.
+- New `Folding.{h,cpp}`: stateless `resolveFoldable(doc, id)` —
+  canvas-local shape rules for the three foldable kinds (heading
+  section, long list run, callout body — P5.5's `BlockQuoteRunId`
+  needed zero adjustment to become foldable).
+  "Long list" interpreted as: first item of a run of ≥6 consecutive
+  top-level `ListItem` blocks; folding hides every subsequent item in
+  the run at any indent (a judgment call, logged as such — the plan
+  text didn't pin a threshold).
+  `BlockLayoutCache::recomputePositions()` adds 0 height for a folded
+  entry while its real `height` field is left untouched (queryable,
+  not unrealized, per the task's literal wording). Caret Up/Down/
+  Left/Right cross-block stepping routes through a new
+  `nextVisibleEntryIndex()` so motion skips folded ranges; toggling a
+  fold under the caret relocates it to the fold head.
+  `kPageMargin` widened 16→28px so the new gutter fold-chevron
+  doesn't collide with the existing marker/checkbox slot.
+- Canvas tier green (`tst_canvas_folding` new, 13 cases); one
+  pre-existing `tst_canvas_layout_width` threshold fixed after the
+  margin bump; `check-constitution.sh` clean.
 
 **P5.5 (2026-08-14).**
 
