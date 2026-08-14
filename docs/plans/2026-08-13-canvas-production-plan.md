@@ -139,7 +139,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P5.2 Table: row/col ops + alignment | ☑ | `13ebc8fa` | `281fbc73` / `68557575` |
 | P5.3 Math blocks (jkqtmathtext) | ☑ | `f482a4d0` | `6dea6ab6` / `58d373bb` |
 | P5.4 Images + Mermaid/embed seams | ☑ | `f94bf525` | `1c4654ee` / `c851e604` |
-| P5.5 Callouts + frontmatter + footnote defs | ☐ | | |
+| P5.5 Callouts + frontmatter + footnote defs | ☑ | `20949498` | `715b301b` / `c421810c` |
 | P5.6 Folding via Session | ☐ | | |
 | P5.7 ⏸ phase close | ☐ | | n/a |
 | **P6 — collaboration surface** | | | |
@@ -515,6 +515,38 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P5.5 (2026-08-14).**
+
+- Reparse-helper pattern (P4.6/P5.4 precedent) held for callout and
+  frontmatter, not footnote defs:
+  - **Callout** — no core concept; `BlockKind::BlockQuote` covers
+    plain and typed alike. New `CalloutBlocks::parseCallout`
+    (canvas-local). A custom callout title is unrecoverable: B1's
+    soft-break `\n`→space collapse destroys the line break between a
+    typed title and its body before this parser ever sees the
+    buffer, so the header shows a fixed type label ("Note"/"Warning"/
+    etc.), never a recovered custom title.
+  - **Frontmatter** — genuinely not a block; `markoff-parser`'s
+    `Document::extract` strips it from the body before block-parsing.
+    Rendered as a leading non-block y-layout entry, same shape as
+    P4.9's inline-title band (`FrontmatterBlock::parseFrontmatterProperties`,
+    bounded flat-scalar YAML only). Click-to-toggle collapsed/raw
+    stands in for "caret-inside reveals source" since there's no
+    block for a real caret to enter.
+  - **Footnote definitions** — turned out to be an ordinary
+    `BlockKind::Paragraph` block with a real `BlockId`:
+    `Document::extract` only *copies* footnote-def lines for
+    numbering, it does not strip them from the body (unlike
+    frontmatter). Handled via a `BlockPresentation::presentationFor`
+    per-kind case (`FootnoteDefBlocks::parseFootnoteDef`) — no second
+    y-layout entry, no new paint path.
+- `Theme::Slot` enumerators `CalloutNote/Warning/Tip/Important/Caution`
+  already existed (unused, no default colors) — same latent-slot gap
+  as P1.3's `QuoteBackground` and P4.6's Code-token slots. Only
+  `defaultLight()`/`defaultDark()` colors were added; no enum changes.
+- Full suite 305/305 (required since `Theme.cpp` is core); canvas
+  tier 28/28; `check-constitution.sh` clean over 63 files.
 
 **P5.4 (2026-08-14).**
 
