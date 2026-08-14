@@ -143,6 +143,41 @@ listed; everything else in core stays bug-fix-only:
   and the next restyle re-splices preedit over the new text. This is
   the single most important falsifiable test of the collab phase.
 
+### 4.5 Inline object replacement (Qt ≥ 6.12 — the sanctioned path)
+
+Investigated 2026-08-14 (findings log, same date) after P5.3 logged
+"inline `$...$` is styled text, not glyphs" as a permanent gap. It is
+not permanent. **Standalone `QTextLayout` supports inline objects
+from Qt 6.12** — qtbase commit `be73ca50a34` ("QTextLayout: Support
+inline objects for standalone layouts", merged 2026-05-12, in
+v6.12.0-beta1; closes QTBUG-112717 et al.). Mechanism, normative for
+this leaf when the gate below opens:
+
+- The layout text carries `QChar::ObjectReplacementCharacter`
+  (U+FFFC) at the object position; the same `setFormats()` call
+  `rebuildInline()` already makes applies a **`QTextImageFormat`**
+  with explicit `width`/`height` (+ `verticalAlignment`) over that
+  one QChar. `QTextEngine` then itemizes it as an Object item and
+  reserves exactly that box in wrapping, line height, `cursorToX`,
+  and eliding. **No `QTextDocument`, no handler registration — C3 is
+  not touched.** `QTextImageFormat` is a plain `QTextCharFormat`
+  subclass; "image" names only the geometry carrier, not the content.
+- Qt does **not** paint the object. `View::paintEvent` paints
+  whatever the span means (jkqtmathtext pixmap, image, video frame,
+  tag pill …) at the reserved rect (`lineForTextPosition` +
+  `cursorToX`) — the identical paint-time-substitution pattern P5.3/
+  P5.4 already use at block level, moved to span level.
+- The U+FFFC substitution is a **projection-map omission** like any
+  other (§4.2): buffer bytes of the span map to one layout QChar when
+  the caret is outside the span, to raw source when inside. Caret
+  motion, hit-testing, and selection fall out of the projection;
+  nothing new crosses the layout boundary.
+- **Gate:** `QT_VERSION_CHECK(6, 12, 0)`. Below it, keep the current
+  styled-text fallback (P5.3). **Do not** build a pre-6.12 shim
+  (letter-spacing width reservation à la Kate's InlineNoteProvider) —
+  rejected 2026-08-14 as exactly the hack genre this arc exists to
+  end. The gated task in the plan carries the implementation steps.
+
 ## 5. Feature scope (the parity contract)
 
 ### 5.1 Already built (spike) — carried forward

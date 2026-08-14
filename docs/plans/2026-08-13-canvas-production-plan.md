@@ -143,6 +143,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P5.6 Folding via Session | ☑ (reduced scope — see finding) | `989c714d` | `1a4fd240` / `ef298d6a` |
 | P5.7 ⏸ phase close | ☑ | n/a | n/a |
 | **P6 — collaboration surface** | | | |
+| P6.0 Core anchor seam (BlockId,offset)→Crdt::Anchor + fold retro-wire | ☐ | | |
 | P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☐ | | |
 | P6.2 Remote presence rendering (carets, tints, flags) | ☐ | | |
 | P6.3 Remote-edit-mid-IME + concurrency torture tests | ☐ | | |
@@ -453,6 +454,26 @@ the seam named in the task's test when you write it.
 
 ## Phase 6 — collaboration surface
 
+### P6.0 — core anchor seam (plan-named, added 2026-08-14)
+The D2-safe public accessor P3.6 and P5.6 both hit the wall on, done
+FIRST so P6.1 doesn't bypass Session a third time (two bypasses is
+precedent; three is architecture). In core, spec §4.3 named-seam
+rules: a public `(BlockId, int byteOffset) -> CollabText::Crdt::Anchor`
+(and its inverse resolve) that is correct on a **D2-loaded** document
+— the existing `MarkoffDocument::anchorAt` is backed by the legacy
+flat buffer and documented stale under D2; the per-block conversion
+it needs already exists privately in core's `src/`. Promote, don't
+reinvent. Then: (a) P6.1 consumes it for `setPrimarySelection`;
+(b) retro-wire `Session::foldedRegions`/`FoldRef` so P5.6's
+`View::m_foldedHeads` block-index scheme becomes a cache of Session
+state rather than the authority (close P5.6's "follow-up needed"
+finding and the STATUS.md dormant bullet); (c) leave P3.6
+scroll/cursor as-is unless trivially absorbable.
+**Falsify:** feed the accessor a block created after D2 load (never
+present in the legacy flat buffer); the legacy-backed `anchorAt`
+path returns a wrong/stale anchor where the new seam resolves
+correctly.
+
 ### P6.1 — Session caret authority closure
 Every local caret/selection change → `Session::setPrimarySelection`
 (anchor-typed). After any model change the view re-resolves from the
@@ -511,10 +532,83 @@ user with a one-page summary of what's proven.
 
 ---
 
+## Gated task — G-Q612: inline object replacement (opens at Qt 6.12)
+
+> Not in the P1–P7 sequence: its gate is a Qt release, not a phase.
+> **Gate check:** `QT_VERSION >= QT_VERSION_CHECK(6, 12, 0)` on the
+> build machine (Qt 6.12 final expected autumn 2026; Manjaro tracks
+> fast; the mechanism is already verifiable today against the
+> `~/src/qtbase` checkout, which contains it). Normative mechanism:
+> spec §4.5. Full investigation: findings log 2026-08-14 below.
+
+Do, in order, all behind the version gate (styled-text fallback
+compiles below it — never a pre-6.12 shim, spec §4.5):
+
+1. **ProjectionMap**: a new omission kind that maps a buffer byte
+   span (e.g. the whole `$...$` run) to a single U+FFFC layout QChar
+   when the caret is outside the span — same reveal trigger shape as
+   T7 delimiter omission. Per-span reveal wants the `latex_span`
+   parser gap fixed (P5.3 finding / STATUS dormant); per-block reveal
+   (current code-fence precedent) is an acceptable first cut.
+2. **BlockLayoutCache::rebuildInline**: for each object span, append
+   one `FormatRange` over the U+FFFC position whose format is a
+   `QTextImageFormat` with the rendered object's width/height (math:
+   size the jkqtmathtext pixmap first, then set the format from it);
+   goes through the ONE existing `setFormats()` call (T7 trap rule).
+   Cache the pixmap on the Entry alongside `mathPixmap`.
+3. **View::paintEvent**: paint each cached pixmap at its reserved
+   rect — `layout->lineForTextPosition(pos)` + `line.cursorToX(pos)`
+   for x, line y + ascent − object ascent for y. Qt reserves space
+   only; it never paints the object.
+4. **Tests**: extend `tst_canvas_math` — wrapping moves with the
+   object's width; caret lands before/after the object as one unit;
+   reveal-on-entry restores source; version-gated with `QSKIP` below
+   6.12. Falsify: drop the `QTextImageFormat` from the range; the
+   reserved-width assertion fails (U+FFFC degrades to an unsized
+   replacement glyph, which is the whole pre-6.12 behavior).
+5. **Close out**: flip inline `$...$` from styled-text fallback to
+   glyph rendering; update the STATUS.md dormant bullet; note in the
+   findings log. Inline images / future video-frame/pill spans reuse
+   steps 1–3 unchanged — only the pixmap source differs.
+
+---
+
 ## Findings log (append here; spike spec §9 is closed)
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**2026-08-14 — inline-object investigation (post-P5.7, user-directed).**
+
+- P5.3's "permanent" gap ("`QTextLayout` has no inline
+  object-replacement path without a `QTextDocument`") is **obsolete
+  upstream**: qtbase `be73ca50a34` ("QTextLayout: Support inline
+  objects for standalone layouts", Vladimir Belyavsky, reviewed by
+  Eskil Abrahamsen Blomfeldt, merged 2026-05-12, tagged
+  v6.12.0-beta1, closes QTBUG-112717/-97536/-57191/-36163/-39107/
+  -43820/-113829/-133284). Verified in the `~/src/qtbase` checkout:
+  `itemize()` flags U+FFFC as `QScriptAnalysis::Object` when a
+  `QTextImageFormat` covers it in `specialData->formats`
+  (qtextengine.cpp ~2137); `shape()` reserves the format's
+  width/height + baseline (~1882); 231 lines of autotests cover
+  wrapping/cursorToX/eliding/line-height. Qt reserves geometry only —
+  painting stays the caller's, i.e. exactly this leaf's existing
+  paint-time-substitution pattern.
+- **C3 is not implicated**: `QTextImageFormat` is a bare
+  `QTextCharFormat` subclass fed through the existing single
+  `setFormats()` call; no document, no object handler.
+- Build machine runs Qt 6.11.1 → feature gated, not available.
+  Decision: version-gate (`QT_VERSION_CHECK(6,12,0)`), keep P5.3's
+  styled-text fallback below the gate, and **reject** the pre-6.12
+  letter-spacing shim (Kate `InlineNoteProvider` technique) — hack
+  genre this arc exists to end. Spec §4.5 (new) is the normative
+  mechanism; task **G-Q612** (new gated section above the findings
+  log) carries the implementation steps. Generalizes past inline
+  math to inline images/video-frames/pills — only the pixmap source
+  differs.
+- Same investigation resolved the P5.6/P3.6 anchor-accessor question:
+  promoted to plan task **P6.0** (new) so Phase 6 opens with the
+  named core seam instead of a third Session bypass.
 
 **P5.7 (2026-08-14) — phase close.**
 

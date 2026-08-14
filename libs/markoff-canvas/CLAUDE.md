@@ -41,6 +41,15 @@ commit. If a task seems to *require* violating a rule — stop, log it
 in the plan's findings log, report. That has been the correct move
 every time so far.
 
+**C3 does NOT block inline objects** (math glyphs, inline images,
+future video-frame/pill spans): from **Qt 6.12**, standalone
+`QTextLayout` sizes a U+FFFC char via a `QTextImageFormat` in
+`setFormats()` — no `QTextDocument` involved. Do not re-conclude
+"impossible without a document" (that was true pre-6.12 and is
+logged as obsolete). Mechanism: spec §4.5; steps: plan gated task
+G-Q612. Below 6.12: keep the styled-text fallback; never build a
+shim.
+
 ## Build / test
 
 ```bash

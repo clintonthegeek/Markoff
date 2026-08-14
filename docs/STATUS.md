@@ -52,12 +52,17 @@ task; any drop is a regression (classify before fixing).
   `CollabText::Crdt::Anchor`** (P5.6 finding): blocks genuinely wiring
   `Session::foldedRegions`/`FoldRef` — canvas folding instead lives in
   `View`'s own block-index scheme, same precedent P3.6 already set for
-  scroll/cursor. Small, cleanly-scoped core follow-up.
+  scroll/cursor. **Scheduled 2026-08-14: plan task P6.0** (Phase 6
+  opener) — no longer merely dormant; closes when P6.0 lands.
 - **Inline math (`$...$`) renders as styled monospace, not real
-  glyphs** (P5.3 finding): `QTextLayout` has no inline
-  object-replacement path without a backing `QTextDocument`, which C3
-  forbids — an intentional, logged gap vs. Obsidian's inline-rendered
-  math, not a bug.
+  glyphs** (P5.3 finding) — **now a scheduled arrival, not a Qt
+  limitation** (2026-08-14 investigation): standalone `QTextLayout`
+  gains a C3-clean inline-object path in **Qt 6.12** (qtbase
+  `be73ca50a34`; U+FFFC + `QTextImageFormat` via `setFormats()`).
+  Build machine is on 6.11.1, so the styled-text fallback stands
+  until then. Mechanism: spec §4.5; implementation steps: plan gated
+  task **G-Q612**; full record: plan findings log 2026-08-14. No
+  pre-6.12 shim (rejected, same entry).
 - **Parser gap: `latex_span`/`latex_block` delimiter spans never get
   `parentCharStart`/`parentCharEnd`** (P5.3 finding) —
   `collectParentRanges` checks for a `latex_span` node type
