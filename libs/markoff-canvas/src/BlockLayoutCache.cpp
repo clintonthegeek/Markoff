@@ -350,7 +350,7 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
     // code-block text layout (CodeHighlighting's own "service miss
     // renders plain monospace" precedent; no placeholder box here).
     e.mermaidPixmap = QPixmap();
-    if (e.style.isCodeBlock && e.id != m_caretBlock && m_mermaidRenderer) {
+    if (e.style.isCodeBlock && m_mermaidRenderer) {
         const Detail::CodeFenceInfo fence = Detail::parseCodeFence(text);
         if (fence.language.compare(QStringLiteral("mermaid"), Qt::CaseInsensitive) == 0
             && fence.contentEnd > fence.contentStart) {
