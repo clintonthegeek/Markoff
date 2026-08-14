@@ -119,7 +119,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **P3 — MarkdownView contract v2** | | | |
 | P3.1 EditorWidget wrapper + setDocument/Session + contract harness | ☑ | `07b3301c` | `b65c8aae` / `b62b45ec` |
 | P3.2 Cursor/scroll position mapping + signals | ☑ | `83adcc2d` | `8ba90e7a` / `a07e715c` |
-| P3.3 Read-only gates + caretRect | ☐ | | |
+| P3.3 Read-only gates + caretRect | ☑ | `21a020a2` | `6a5fefe9` / `fa9c1704` |
 | P3.4 FindController: highlight + navigate | ☐ | | |
 | P3.5 EditorContext + theme/fontScale through the wrapper | ☐ | | |
 | P3.6 Ephemeral state JSON round-trip | ☐ | | |
@@ -949,6 +949,97 @@ user with a one-page summary of what's proven.
   shared). `-R canvas` 15/15 green (constitution included); full suite
   292/292 green (up from the 288/288 baseline recorded at arc open —
   net +4 from this task's new checks).
+
+---
+
+**P3.3 (2026-08-14).**
+
+- `View` gained the read-only authority itself (`setReadOnly`/
+  `isReadOnly`, `m_readOnly`) — the base `MarkdownView`'s own store
+  wasn't wired to anything the composed `View` reads, same gap P3.2's
+  cursor/scroll work found and closed for position mapping.
+  `EditorWidget::setReadOnly` now overrides to forward: base store
+  first (keeps `isReadOnly()`/`hasEditing()` coherent for a caller
+  reading the base pointer), then `View::setReadOnly` (the actual
+  gate authority), mirroring `Live::EditorWidget::setReadOnly`'s
+  documented pattern exactly.
+- Six-gate table, mapped onto what actually exists in this leaf today:
+  - **Real gates** (block on `m_readOnly`, all in `View.cpp`):
+    printable insertion; `StructuralKeyHandler` (Enter split, boundary
+    Backspace/Delete merge, Tab/Shift+Tab list indent — Tab/Backtab
+    added to the read-only key set even though the pre-existing
+    `isMutatingKey` local deliberately excludes them, since that
+    local also gates the *selection-collapses-first* branch and
+    Tab-with-a-selection isn't "collapse then type" today); the
+    Undo/Redo keyboard shortcut (`Ctrl+Z`/`Ctrl+Shift+Z` apply
+    `undoD2`/`redoD2` directly in `keyPressEvent`, bypassing
+    `MarkdownView::undo()`/`redo()` entirely — that base-level no-op
+    while read-only does NOT cover this path, so it needed its own
+    check, found by reading the base's doc comment against what
+    `View::keyPressEvent` actually does rather than assuming the
+    inherited behavior reached here); Cut (`Ctrl+X`) — disabled in
+    its *entirety* while read-only, including the copy-to-clipboard
+    half, mirroring Qt's convention of disabling the whole Cut
+    `QAction` rather than only its mutating half (Copy keeps its own
+    branch, unaffected); IME commit — the task's named falsification
+    target, `inputMethodEvent` now returns immediately while
+    read-only, disabling composition outright rather than letting
+    preedit run and only blocking the eventual commit (a composition
+    that can never commit is worse UX than none, and matches Cut's
+    "disabled in its entirety" choice above).
+  - **Placeholder / not yet real** (nothing to gate because the
+    feature doesn't exist in this leaf yet): checkbox toggles (P4.7)
+    and format verbs via action enabled-state (P4.3, no
+    `CanvasActionController` yet — `MarkdownView`'s default
+    `toggleBold()`/etc. no-ops are inert regardless of read-only
+    state). Paste is *also* not implemented at all yet (no `Ctrl+V`
+    handling anywhere in `View.cpp` — deferred to P4.4's context menu
+    and P7.2's drag-drop/middle-click paste per the plan's own task
+    list), so it isn't a "gate" so much as "nothing to gate" — noted
+    here so a future paste implementation knows to add the
+    `m_readOnly` check at the same time it lands, not after.
+- `caretRect()`: `View::caretRectInViewport()` is a new private helper
+  factoring out math `inputMethodQuery(Qt::ImCursorRectangle)` already
+  had (moved, not duplicated — `inputMethodQuery` now just calls it,
+  no behavior change there). `View::caretRect()` translates that into
+  View's own local frame via `viewport()->mapTo(this, ...)`;
+  `EditorWidget::caretRect()` does the same one more hop
+  (`view()->mapTo(this, ...)`) rather than assuming the zero-margin
+  `QVBoxLayout` keeps the frames identical — correct even if that
+  layout ever grows a margin. Known gap, inherited from
+  `inputMethodQuery` (not introduced by this task): table-cell carets
+  (T9) aren't special-cased, so `caretRect()` while the caret is
+  inside a `Table` block shares whatever `inputMethodQuery` already
+  did there (untouched by this task; not a new limitation).
+- Contract harness: `checkReadOnlyBlocksUndoAndKeepsBytes` was already
+  enrolled (P3.1) but only exercised `undo()`/`toggleBold()` through
+  the base `MarkdownView` virtuals — it didn't reach any of the real
+  gates above (those are `View`'s own keyboard/mouse/IME event
+  handlers, a different ingress entirely). Left it enrolled as-is (it
+  now exercises the real `EditorWidget::setReadOnly` forward, which
+  it didn't before this task) and added
+  `set_read_only_forwards_to_composed_view` (pins the
+  `EditorWidget`→`View` wiring specifically) and
+  `caret_rect_is_valid_and_in_widget_bounds` to
+  `tst_canvas_view_contract.cpp`. No new *shared* check was needed in
+  `ViewContractChecks.h` for the gates themselves — they're
+  `View`-specific event-handling behavior, not something generic over
+  any `MarkdownView*`, so they're canvas-local tests instead:
+  `tst_canvas_ime.cpp` (`read_only_blocks_ime_commit` — the named
+  falsification target), `tst_canvas_typing.cpp`
+  (`read_only_blocks_printable_and_backspace_but_not_navigation`),
+  `tst_canvas_selection.cpp` (`read_only_blocks_cut_but_not_copy`).
+- Falsification: removed `inputMethodEvent`'s read-only early-return
+  (the IME-commit gate) — `tst_canvas_ime::read_only_blocks_ime_commit`
+  failed as expected (`'!view.isComposing()' returned FALSE`), other
+  four gates' tests were unaffected (each has its own independent
+  early-return, so this falsification only exercises the one target
+  named in the task). Reverted; `-R canvas` and the constitution check
+  both green again after the revert. `check-constitution.sh`: clean
+  (C1–C4) throughout. Full suite: **292/292** green, unchanged from
+  P3.2's count (this task added tests but touched no new test
+  *files*, so the total count didn't move — the new slots landed
+  inside already-counted `.cpp` files).
 
 ---
 
