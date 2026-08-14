@@ -118,7 +118,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P2.4 ⏸ perf re-baseline (E9 budgets, build-perf) | ☑ | n/a | n/a |
 | **P3 — MarkdownView contract v2** | | | |
 | P3.1 EditorWidget wrapper + setDocument/Session + contract harness | ☑ | `07b3301c` | `b65c8aae` / `b62b45ec` |
-| P3.2 Cursor/scroll position mapping + signals | ☐ | | |
+| P3.2 Cursor/scroll position mapping + signals | ☑ | `83adcc2d` | `8ba90e7a` / `a07e715c` |
 | P3.3 Read-only gates + caretRect | ☐ | | |
 | P3.4 FindController: highlight + navigate | ☐ | | |
 | P3.5 EditorContext + theme/fontScale through the wrapper | ☐ | | |
@@ -887,6 +887,68 @@ user with a one-page summary of what's proven.
   tests. `-R canvas` now 16/16 green (constitution included); full
   suite green (STATUS.md's 288/288 baseline line is a phase-close-only
   update per the session protocol, left for P3.7).
+
+**P3.2 (2026-08-14).**
+
+- `View` gained one new signal, `caretChanged()` — emitted
+  unconditionally from `ensureCaretVisible()`, the file's own
+  documented chokepoint every caret-changing code path (mouse,
+  keyboard, IME, structural keys) already calls afterward.
+  `onDocumentChanged()` did NOT previously call it (only the
+  interactive code paths did) — a document-driven caret clamp
+  (`clampCaret`, e.g. a remote edit or undo/redo landing the caret on
+  a different surviving block) went unnoticed and didn't scroll-follow.
+  Added the call there too, so `EditorWidget::cursorPositionChanged`
+  and the caret's scroll-into-view now fire for that path as well —
+  a small, in-scope completion of the chokepoint the file already
+  claimed to have, not a new invention.
+- `caretChanged()` is deliberately unconditional (no "did it really
+  move" check inside `View`); `EditorWidget::onViewCaretChanged()` does
+  the real change-gating in `CursorPos` space against
+  `m_lastCursorPos`, the coordinate space the base contract's
+  `cursorPositionChanged(int line, int column)` is actually in. Two
+  gating layers (View's "something might have changed", EditorWidget's
+  "did the reported position actually change") rather than one is
+  intentional: `View`'s internal caret representation and the flat-line
+  `CursorPos` model are different spaces, and only the latter is what a
+  consumer cares about.
+- `scrollPositionVisualLine()`/`setScrollPositionVisualLine()`/
+  `scrollPositionChanged` land on the same "fraction of
+  `verticalScrollBar()`'s range" convention `Source::Editor` and
+  `Styled::Editor` already use (confirmed by reading both before
+  writing this — `libs/markoff-source/src/Editor.cpp:218-235` is the
+  closest reference; canvas's `View` is already a `QAbstractScrollArea`
+  tracking a real pixel-space scrollbar, so no new scroll-state needed
+  inventing). The plan's "estimated-height correction" phrase turned
+  out to need no separate mechanism: `View::updateScrollRange()`
+  already re-derives the scrollbar range (and re-pins a bottom-parked
+  view) every time block realization corrects an estimated height, so
+  `scrollPositionVisualLine()` reading the scrollbar's current
+  value/maximum picks up that correction for free.
+- Falsification finding: `QAbstractSlider::setValue()` (which
+  `QScrollBar` inherits) already clamps its argument to
+  `[minimum(), maximum()]` internally, so the `qBound(0.0f, pos, 1.0f)`
+  guard added to `setScrollPositionVisualLine()` is provably redundant
+  on the `maximum() != 0` branch — removing it as a first falsification
+  attempt produced **zero** test failures (verified, not assumed; see
+  process notes below). Kept the `qBound` anyway (defense-in-depth,
+  cheap, and it's what makes the function's contract legible without
+  reading `QAbstractSlider`'s docs) but retargeted the falsification
+  commit at the cursor clamp instead — see checklist SHAs. Worth a
+  maintainer's-note-to-self: any future "skip the clamp" falsification
+  task on this scrollbar-backed setter needs a different target (e.g.
+  the `maximum() == 0` explicit-emit branch), not the `qBound`.
+- `checkCursorPositionChangedSignal` added to the shared
+  `ViewContractChecks.h` (general over any `MarkdownView*`, same shape
+  as `checkFontScaleSignal`) and enrolled here alongside two
+  canvas-local slots (`set_cursor_position_out_of_range_clamps`,
+  `scroll_position_changed_fires_on_set` /
+  `scroll_position_round_trip_and_clamps` — the latter needs a real
+  shown/resized widget since `View`'s scrollbar range is 0 until it has
+  laid out against a real viewport size, so it's leaf-local rather than
+  shared). `-R canvas` 15/15 green (constitution included); full suite
+  292/292 green (up from the 288/288 baseline recorded at arc open —
+  net +4 from this task's new checks).
 
 ---
 
