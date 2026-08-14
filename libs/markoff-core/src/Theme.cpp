@@ -151,6 +151,15 @@ Theme Theme::defaultLight()
     t.setColor(Slot::CodeBlock,        QColor("#222222"));
     t.setColor(Slot::CodeBlockBackground, QColor("#f4f4f4"));
     t.setColor(Slot::QuoteBackground,     QColor("#f4f4f4"));
+    // Callout accents (P5.5) — one hue per Obsidian-vocabulary type, used
+    // for the typed header (icon + label) and quote-bar; distinct from the
+    // generic Quote slot so a callout reads differently from a plain
+    // blockquote at a glance.
+    t.setColor(Slot::CalloutNote,      QColor("#0066cc"));  // info blue
+    t.setColor(Slot::CalloutTip,       QColor("#2e8b40"));  // green
+    t.setColor(Slot::CalloutWarning,   QColor("#b8860b"));  // amber
+    t.setColor(Slot::CalloutImportant, QColor("#8040c0"));  // violet
+    t.setColor(Slot::CalloutCaution,   QColor("#c0392b"));  // red
     t.setColor(Slot::SelectionBackground, QColor("#b0d0ff"));
     t.setColor(Slot::SearchMatchBackground, QColor("#ffe080"));
     t.setColor(Slot::SearchActiveMatchBackground, QColor("#ffb050"));
@@ -185,6 +194,13 @@ Theme Theme::defaultDark()
     t.setColor(Slot::Quote,            QColor("#aaaaaa"));
     t.setColor(Slot::CodeBlockBackground, QColor("#2d2d2d"));
     t.setColor(Slot::QuoteBackground,     QColor("#2d2d2d"));
+    // Callout accents, dark-palette variants (P5.5) — lighter/desaturated
+    // so they stay legible on the dark editor background.
+    t.setColor(Slot::CalloutNote,      QColor("#5b9bd5"));
+    t.setColor(Slot::CalloutTip,       QColor("#6fbf73"));
+    t.setColor(Slot::CalloutWarning,   QColor("#d4a72c"));
+    t.setColor(Slot::CalloutImportant, QColor("#b183e0"));
+    t.setColor(Slot::CalloutCaution,   QColor("#e0685c"));
     t.setColor(Slot::SelectionBackground, QColor("#264070"));
     return t;
 }

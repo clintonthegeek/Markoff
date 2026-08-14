@@ -99,6 +99,26 @@ struct BlockStyle {
     /// only... placeholder rendering") — `View::paintEvent` never attempts
     /// to actually mount a dispatched `MarkdownRenderChild` here.
     bool isEmbedBlock = false;
+
+    /// `BlockKind::BlockQuote` whose buffer starts with an Obsidian-style
+    /// `[!type]` callout marker (P5.5, `CalloutBlocks::parseCallout`).
+    /// `topMargin` above already has the header row's height folded in
+    /// (see `presentationFor`'s BlockQuote case) so `View::paintEvent` can
+    /// paint `calloutIcon`/`calloutLabel` in the reserved band above the
+    /// block's own text-layout start (`contentY`), and `leftIndent` is
+    /// widened beyond a plain quote's for the "body indent" the plan names
+    /// — no second height/indent computation lives outside `presentationFor`.
+    bool isCallout = false;
+    QString calloutIcon;
+    QString calloutLabel;
+
+    /// `BlockKind::Paragraph` whose buffer is a footnote definition
+    /// (`[^label]: ...`, P5.5 `FootnoteDefBlocks::parseFootnoteDef`) — a
+    /// real Paragraph block (see that file's doc comment for why), given
+    /// back-reference styling (marker slot shows `[^label]`, `foreground`
+    /// is Link-slot, `font` italic) rather than a second paint code path.
+    /// Test/inspection surface: `View::isFootnoteDefBlock`.
+    bool isFootnoteDef = false;
 };
 
 /// Derive the presentation for one block. Pure: reads the document's kind

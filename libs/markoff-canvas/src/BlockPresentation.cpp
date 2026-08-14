@@ -8,6 +8,8 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
 
+#include "CalloutBlocks.h"
+#include "FootnoteDefBlocks.h"
 #include "MediaBlocks.h"
 
 namespace Markoff::Canvas {
@@ -83,8 +85,25 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
     s.bottomMargin = em * 0.35;
 
     switch (doc.blockKind(id)) {
-    case BlockKind::Paragraph:
+    case BlockKind::Paragraph: {
+        // Footnote definition (P5.5, `FootnoteDefBlocks::parseFootnoteDef`):
+        // a real Paragraph block (see that file's doc comment for why —
+        // markoff-parser's extract() copies but does not strip these lines
+        // from the body), given back-reference styling — the marker
+        // decoration slot (same one list bullets/checkboxes use) shows the
+        // `[^label]` back-reference, and the block's own text renders in
+        // Link-slot color/italic so it reads as distinct from a plain
+        // paragraph at a glance, without a second paint code path.
+        const Detail::FootnoteDefInfo fn =
+            Detail::parseFootnoteDef(QString::fromUtf8(doc.blockText(id)));
+        if (fn.isFootnoteDef) {
+            s.isFootnoteDef = true;
+            s.marker        = QStringLiteral("[^%1]").arg(fn.label);
+            s.foreground    = theme.color(Theme::Slot::Link);
+            s.font.setItalic(true);
+        }
         break;
+    }
 
     case BlockKind::Heading: {
         const int level = qBound(1, intAttr(doc, id, AttrNames::Level, 1), 6);
@@ -143,6 +162,29 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
         s.fullWidthBackground = true;
         s.hasQuoteBar = true;
         s.leftIndent  = em * 1.0 * depth;
+
+        // Callout (P5.5): only the run's FIRST block carries the `[!type]`
+        // marker (a continuation paragraph in the same BlockQuoteRunId, or
+        // a plain quote, is never callout-shaped) — CalloutBlocks::
+        // parseCallout is naturally false for those, so they fall through
+        // to the plain-quote styling above unchanged.
+        const Detail::CalloutInfo callout =
+            Detail::parseCallout(QString::fromUtf8(doc.blockText(id)));
+        if (callout.isCallout) {
+            s.isCallout     = true;
+            s.calloutIcon   = callout.icon;
+            s.calloutLabel  = callout.label;
+            s.foreground    = theme.color(callout.slot);
+            // "body indent" (plan wording): a further step beyond the
+            // plain quote's own depth-scaled indent.
+            s.leftIndent   += em * 0.6;
+            // Reserve a header band above the text layout's own start
+            // (contentY = e.y + topMargin) for the icon+label row —
+            // View::paintEvent paints into [e.y, e.y + old topMargin)
+            // when style.isCallout, then the text layout starts exactly
+            // where it always did relative to the (now taller) topMargin.
+            s.topMargin    += QFontMetricsF(s.font).height() * 1.4;
+        }
         break;
     }
 

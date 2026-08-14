@@ -34,6 +34,7 @@
 #include <markoff/canvas/CanvasActionController.h>
 
 #include "BlockLayoutCache.h"
+#include "FrontmatterBlock.h"
 #include "InlineFormatting.h"
 #include "InputPredicate.h"
 #include "ProjectionMap.h"
@@ -72,6 +73,22 @@ QRectF taskCheckboxRect(const QFontMetricsF &fm, qreal contentX, qreal contentY)
 constexpr qreal kTitleFontScale = 1.6;
 constexpr qreal kTitleTopPadding = 24.0;
 constexpr qreal kTitleBottomPadding = 12.0;
+
+// ---- Frontmatter band (P5.5) -----------------------------------------------
+constexpr qreal kFrontmatterTopPadding    = 8.0;
+constexpr qreal kFrontmatterBottomPadding = 8.0;
+
+/// Body font at `fontScale`, same pixel-size derivation `fontForSlot`
+/// (BlockPresentation.cpp) uses for every block — the frontmatter band is
+/// a non-block entry but still shares the document's font scale (P3.5), so
+/// its height math and its paint must derive it identically or the two
+/// disagree (band clipped or under-filled).
+QFont scaledBodyFont(const Theme &theme, qreal fontScale)
+{
+    QFont f(theme.familyFor(Theme::Slot::TextDefault));
+    f.setPixelSize(qMax(1, qRound(theme.pixelSizeFor(Theme::Slot::TextDefault) * fontScale)));
+    return f;
+}
 
 /// Row-major cell index nearest `byteOffset` (block-relative) in a Table
 /// entry's cell-ordered linear sequence (plan P2.3): the sequence itself is
@@ -223,7 +240,7 @@ void View::setFontScale(qreal scale)
     if (m_doc && !m_cache->entries().empty()) {
         // Old titleBandHeight() (pre-scale) — matches the still-current
         // font at the moment of this read.
-        const int idx = m_cache->indexAtY(verticalScrollBar()->value() - titleBandHeight());
+        const int idx = m_cache->indexAtY(verticalScrollBar()->value() - leadingBandHeight());
         if (idx >= 0)
             anchorBlock = m_cache->entries()[size_t(idx)].id;
     }
@@ -249,7 +266,7 @@ void View::setFontScale(qreal scale)
         const int idx = m_cache->indexOf(anchorBlock);
         if (idx >= 0)
             verticalScrollBar()->setValue(
-                qRound(m_cache->entries()[size_t(idx)].y + titleBandHeight()));
+                qRound(m_cache->entries()[size_t(idx)].y + leadingBandHeight()));
     }
 
     // Realize the (now-restored) visible range — deliberately NOT
@@ -270,7 +287,7 @@ void View::setFontScale(qreal scale)
         const int idx = m_cache->indexOf(anchorBlock);
         if (idx >= 0)
             verticalScrollBar()->setValue(
-                qRound(m_cache->entries()[size_t(idx)].y + titleBandHeight()));
+                qRound(m_cache->entries()[size_t(idx)].y + leadingBandHeight()));
     }
     ensureLayoutForViewport();
 
@@ -355,7 +372,7 @@ QRect View::caretRectInViewport() const
         return {};
     const qreal scrollY = verticalScrollBar()->value();
     const qreal contentX = pageMargin() + e.style.leftIndent;
-    const qreal contentY = (e.y + titleBandHeight() - scrollY) + e.style.topMargin;
+    const qreal contentY = (e.y + leadingBandHeight() - scrollY) + e.style.topMargin;
     return QRectF(contentX + line.cursorToX(layoutPos), contentY + line.y(),
                  1, line.height()).toRect();
 }
@@ -387,7 +404,7 @@ int View::realizedBlockCount() const
 
 qreal View::documentHeight() const
 {
-    return m_cache->totalHeight() + titleBandHeight();
+    return m_cache->totalHeight() + leadingBandHeight();
 }
 
 QRectF View::blockRect(BlockId id) const
@@ -396,7 +413,7 @@ QRectF View::blockRect(BlockId id) const
     if (i < 0)
         return {};
     const auto &e = m_cache->entries()[size_t(i)];
-    return QRectF(pageMargin(), e.y + titleBandHeight(), textWidth(), e.height);
+    return QRectF(pageMargin(), e.y + leadingBandHeight(), textWidth(), e.height);
 }
 
 QRectF View::taskCheckboxRectFor(BlockId id) const
@@ -408,7 +425,7 @@ QRectF View::taskCheckboxRectFor(BlockId id) const
     if (!e.style.isTaskItem)
         return {};
     const qreal contentX = pageMargin() + e.style.leftIndent;
-    const qreal contentY = e.y + titleBandHeight() + e.style.topMargin;
+    const qreal contentY = e.y + leadingBandHeight() + e.style.topMargin;
     const QFontMetricsF fm(e.style.font);
     return taskCheckboxRect(fm, contentX, contentY);
 }
@@ -445,7 +462,7 @@ QRectF View::tableCellRect(BlockId id, int row, int col) const
     qreal x = pageMargin() + e.style.leftIndent;
     for (int c = 0; c < col; ++c)
         x += e.tableColWidths[size_t(c)];
-    qreal y = e.y + titleBandHeight() + e.style.topMargin;
+    qreal y = e.y + leadingBandHeight() + e.style.topMargin;
     for (int r = 0; r < row; ++r)
         y += e.tableRowHeights[size_t(r)];
 
@@ -556,6 +573,22 @@ QString View::mediaLabelFor(BlockId id) const
     if (idx < 0)
         return {};
     return m_cache->entries()[size_t(idx)].mediaLabel;
+}
+
+bool View::isCalloutBlock(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    return m_cache->entries()[size_t(idx)].style.isCallout;
+}
+
+bool View::isFootnoteDefBlock(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    return m_cache->entries()[size_t(idx)].style.isFootnoteDef;
 }
 
 bool View::isComposing() const
@@ -869,10 +902,114 @@ void View::paintTitle(QPainter &p) const
     }
 }
 
+// ---- Frontmatter (P5.5) ----------------------------------------------------
+
+qreal View::frontmatterBandHeight() const
+{
+    if (!m_doc)
+        return 0.0;
+    const auto raw = m_doc->frontmatterValue(QByteArrayLiteral("raw"));
+    if (!raw.has_value() || raw->isEmpty())
+        return 0.0;
+
+    const QFontMetricsF fm(scaledBodyFont(m_theme, m_fontScale));
+    const qreal lineHeight = fm.lineSpacing();
+
+    if (m_frontmatterExpanded) {
+        const QString rawYaml = QString::fromUtf8(*raw);
+        const int lines = qMax(1, rawYaml.count(QLatin1Char('\n')) + 1);
+        return kFrontmatterTopPadding + lineHeight * lines + kFrontmatterBottomPadding;
+    }
+
+    const auto props = Detail::parseFrontmatterProperties(QString::fromUtf8(*raw));
+    const int rows = qMax(1, props.size());  // at least the "Properties" summary row
+    return kFrontmatterTopPadding + lineHeight * rows + kFrontmatterBottomPadding;
+}
+
+qreal View::leadingBandHeight() const
+{
+    return titleBandHeight() + frontmatterBandHeight();
+}
+
+bool View::hitTestFrontmatter(const QPoint &viewportPos) const
+{
+    const qreal bandH = frontmatterBandHeight();
+    if (bandH <= 0.0)
+        return false;
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal docY = viewportPos.y() + scrollY;
+    const qreal bandTop = titleBandHeight();
+    return docY >= bandTop && docY < bandTop + bandH;
+}
+
+void View::paintFrontmatter(QPainter &p) const
+{
+    const qreal bandH = frontmatterBandHeight();
+    if (bandH <= 0.0)
+        return;
+
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal top = titleBandHeight() - scrollY;  // right after the title band
+    if (top + bandH <= 0 || top >= viewport()->height())
+        return;  // scrolled fully out of view
+
+    const qreal contentX = pageMargin();
+    QFont font = scaledBodyFont(m_theme, m_fontScale);
+    const QFontMetricsF fm(font);
+    const qreal lineHeight = fm.lineSpacing();
+
+    p.fillRect(QRectF(contentX, top, textWidth(), bandH),
+               m_theme.color(Theme::Slot::CodeBlockBackground));
+
+    p.setFont(font);
+    qreal y = top + kFrontmatterTopPadding;
+
+    const auto raw = m_doc->frontmatterValue(QByteArrayLiteral("raw"));
+    const QString rawYaml = raw.has_value() ? QString::fromUtf8(*raw) : QString();
+
+    if (m_frontmatterExpanded) {
+        // Caret/click reveal (same "show raw source" role code-fence/math
+        // per-block reveal plays for a real block — the band has no
+        // BlockId, so a click toggles it instead of caret entry).
+        QFont mono = m_theme.font(Theme::FontRole::Monospace);
+        mono.setPixelSize(font.pixelSize());
+        p.setFont(mono);
+        p.setPen(m_theme.color(Theme::Slot::TextDefault));
+        const QFontMetricsF mfm(mono);
+        for (const QString &line : rawYaml.split(QLatin1Char('\n'))) {
+            p.drawText(QPointF(contentX + kMarkerGap, y + mfm.ascent()), line);
+            y += mfm.lineSpacing();
+        }
+        return;
+    }
+
+    const auto props = Detail::parseFrontmatterProperties(rawYaml);
+    p.setPen(m_theme.color(Theme::Slot::Heading6));
+    if (props.isEmpty()) {
+        p.drawText(QPointF(contentX + kMarkerGap, y + fm.ascent()),
+                    tr("Properties"));
+        return;
+    }
+    for (const Detail::FrontmatterProperty &prop : props) {
+        QFont bold = font;
+        bold.setBold(true);
+        p.setFont(bold);
+        p.setPen(m_theme.color(Theme::Slot::Heading6));
+        const QString keyText = prop.key + QStringLiteral(": ");
+        p.drawText(QPointF(contentX + kMarkerGap, y + fm.ascent()), keyText);
+        p.setFont(font);
+        p.setPen(m_theme.color(Theme::Slot::TextDefault));
+        p.drawText(QPointF(contentX + kMarkerGap + QFontMetricsF(bold).horizontalAdvance(keyText),
+                            y + fm.ascent()),
+                    prop.value);
+        y += lineHeight;
+    }
+}
+
 void View::updateScrollRange()
 {
     const int viewportH = viewport()->height();
-    const int max = qMax(0, qCeil(m_cache->totalHeight() + titleBandHeight()) - viewportH);
+    const int max = qMax(0, qCeil(m_cache->totalHeight() + leadingBandHeight()) - viewportH);
 
     QScrollBar *vbar = verticalScrollBar();
 
@@ -922,7 +1059,7 @@ void View::ensureLayoutForViewport()
         // title band's height is subtracted back out before querying it —
         // titleBandHeight()'s doc comment names this file's every such
         // conversion.
-        const qreal cacheTop = top - titleBandHeight();
+        const qreal cacheTop = top - leadingBandHeight();
         // Realize the viewport plus one viewport-height either side, so a
         // scroll of up to a full page never exposes an unrealized block.
         const bool realized = m_cache->realizeRange(*m_doc, m_theme, cacheTop - height,
@@ -1134,9 +1271,9 @@ CanvasCursor View::hitTest(const QPoint &viewportPos) const
     // and this is the ONE hit-test path in this file (mouse press/drag,
     // hover, context-menu link lookup), so gating it here also keeps a
     // drag-selection or a right-click from resolving into the title.
-    if (docY < titleBandHeight())
+    if (docY < leadingBandHeight())
         return {};
-    const int idx = m_cache->indexAtY(docY - titleBandHeight());
+    const int idx = m_cache->indexAtY(docY - leadingBandHeight());
     if (idx < 0)
         return {};
 
@@ -1147,7 +1284,7 @@ CanvasCursor View::hitTest(const QPoint &viewportPos) const
         return CanvasCursor{e.id, 0};
 
     const qreal contentX = pageMargin() + e.style.leftIndent;
-    const qreal contentY = (e.y + titleBandHeight() - scrollY) + e.style.topMargin;
+    const qreal contentY = (e.y + leadingBandHeight() - scrollY) + e.style.topMargin;
     const qreal localX   = viewportPos.x() - contentX;
     const qreal localY   = viewportPos.y() - contentY;
 
@@ -1171,9 +1308,9 @@ std::optional<BlockId> View::taskCheckboxAt(const QPoint &viewportPos) const
 
     const qreal scrollY = verticalScrollBar()->value();
     const qreal docY    = viewportPos.y() + scrollY;
-    if (docY < titleBandHeight())
+    if (docY < leadingBandHeight())
         return std::nullopt;
-    const int idx = m_cache->indexAtY(docY - titleBandHeight());
+    const int idx = m_cache->indexAtY(docY - leadingBandHeight());
     if (idx < 0)
         return std::nullopt;
 
@@ -1185,7 +1322,7 @@ std::optional<BlockId> View::taskCheckboxAt(const QPoint &viewportPos) const
         return std::nullopt;
 
     const qreal contentX = pageMargin() + e.style.leftIndent;
-    const qreal contentY = (e.y + titleBandHeight() - scrollY) + e.style.topMargin;
+    const qreal contentY = (e.y + leadingBandHeight() - scrollY) + e.style.topMargin;
     const QFontMetricsF fm(e.style.font);
     if (!taskCheckboxRect(fm, contentX, contentY).contains(QPointF(viewportPos)))
         return std::nullopt;
@@ -1200,7 +1337,7 @@ CanvasCursor View::hitTestTable(int entryIndex, const QPoint &viewportPos, qreal
 
     const int rows = int(e.tableCells.size()) / e.tableCols;
     const qreal contentX = pageMargin() + e.style.leftIndent;
-    const qreal contentY = (e.y + titleBandHeight() - scrollY) + e.style.topMargin;
+    const qreal contentY = (e.y + leadingBandHeight() - scrollY) + e.style.topMargin;
     const qreal localX   = viewportPos.x() - contentX;
     const qreal localY   = viewportPos.y() - contentY;
 
@@ -1289,7 +1426,7 @@ std::pair<int, float> View::scrollAnchor() const
     if (!m_doc || m_cache->entries().empty())
         return {-1, 0.0f};
 
-    const qreal value = qreal(verticalScrollBar()->value()) - titleBandHeight();
+    const qreal value = qreal(verticalScrollBar()->value()) - leadingBandHeight();
     const int idx = m_cache->indexAtY(value);
     if (idx < 0)
         return {-1, 0.0f};
@@ -1307,7 +1444,7 @@ void View::setScrollAnchor(int blockIndex, float fraction)
 
     blockIndex = qBound(0, blockIndex, int(m_cache->entries().size()) - 1);
     const auto &e = m_cache->entries()[size_t(blockIndex)];
-    const qreal target = e.y + titleBandHeight() + qBound(0.0f, fraction, 1.0f) * e.height;
+    const qreal target = e.y + leadingBandHeight() + qBound(0.0f, fraction, 1.0f) * e.height;
     // setValue() fires valueChanged -> scrollContentsBy(), which only
     // marks the viewport dirty (deliberately does not realize, per its own
     // comment) — paintEvent is what turns the newly-visible range's
@@ -1333,7 +1470,7 @@ void View::ensureCaretVisible()
     const auto &e = m_cache->entries()[size_t(idx)];
     QScrollBar *vbar = verticalScrollBar();
     const qreal viewportH = viewport()->height();
-    const qreal docY = e.y + titleBandHeight();
+    const qreal docY = e.y + leadingBandHeight();
 
     if (docY < vbar->value())
         vbar->setValue(qFloor(docY));
@@ -2861,6 +2998,18 @@ void View::mousePressEvent(QMouseEvent *event)
             m_titleCaretActive = false;
             viewport()->update();
         }
+
+        // Frontmatter band (P5.5): read-only, so a click's only job is to
+        // toggle collapsed/expanded — same "click reveals source" role
+        // hitTestTitle's caret-entry plays for the title, adapted since
+        // this band has no BlockId/text for a real caret to enter.
+        if (hitTestFrontmatter(event->pos())) {
+            m_frontmatterExpanded = !m_frontmatterExpanded;
+            reflowKeepingScrollAnchor();
+            viewport()->update();
+            event->accept();
+            return;
+        }
     }
 
     if (event->button() == Qt::LeftButton && m_doc) {
@@ -3117,16 +3266,17 @@ void View::paintEvent(QPaintEvent *event)
     // re-entered.
     ensureLayoutForViewport();
 
-    // Leading non-block entry (P4.9), painted before the block loop below —
-    // shares the content column but is never one of BlockLayoutCache's
-    // entries.
+    // Leading non-block entries (P4.9 title, P5.5 frontmatter), painted
+    // before the block loop below — share the content column but are never
+    // among BlockLayoutCache's entries.
     paintTitle(p);
+    paintFrontmatter(p);
 
     const qreal scrollY    = verticalScrollBar()->value();
     const qreal viewBottom = scrollY + viewport()->height();
     const qreal margin     = pageMargin();
     const auto  sel        = orderedSelection();
-    const qreal titleH     = titleBandHeight();
+    const qreal titleH     = leadingBandHeight();
 
     for (size_t entryIndex = 0; entryIndex < m_cache->entries().size(); ++entryIndex) {
         const auto &e = m_cache->entries()[entryIndex];
@@ -3149,6 +3299,22 @@ void View::paintEvent(QPaintEvent *event)
             p.fillRect(QRectF(contentX - kMarkerGap - kQuoteBarWidth, blockTop,
                               kQuoteBarWidth, e.height),
                        e.style.foreground);
+        }
+
+        // Callout typed header (P5.5): painted into the band presentationFor
+        // reserved by inflating style.topMargin — sits directly above
+        // contentY (== blockTop + style.topMargin), so it never overlaps
+        // the block's own text layout.
+        if (e.style.isCallout) {
+            QFont headerFont = e.style.font;
+            headerFont.setBold(true);
+            const QFontMetricsF hfm(headerFont);
+            p.setFont(headerFont);
+            p.setPen(e.style.foreground);
+            const QString header = e.style.calloutIcon + QStringLiteral(" ")
+                                  + e.style.calloutLabel;
+            p.drawText(QPointF(contentX, blockTop + hfm.ascent() + hfm.height() * 0.2),
+                       header);
         }
 
         if (e.style.isRule) {

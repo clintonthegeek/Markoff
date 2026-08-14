@@ -31,8 +31,14 @@ add_library(markoff_canvas STATIC
     src/BlockLayoutCache.cpp
     src/BlockPresentation.h
     src/BlockPresentation.cpp
+    src/CalloutBlocks.h
+    src/CalloutBlocks.cpp
     src/CodeHighlighting.h
     src/CodeHighlighting.cpp
+    src/FootnoteDefBlocks.h
+    src/FootnoteDefBlocks.cpp
+    src/FrontmatterBlock.h
+    src/FrontmatterBlock.cpp
     src/InlineFormatting.h
     src/InlineFormatting.cpp
     src/InputPredicate.h

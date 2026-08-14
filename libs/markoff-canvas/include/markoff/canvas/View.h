@@ -317,6 +317,17 @@ public:
     /// surface only — nothing here is authority.
     QString mediaLabelFor(BlockId id) const;
 
+    /// P5.5: whether `id`'s realized entry is a callout blockquote
+    /// (`> [!type]`, `CalloutBlocks::parseCallout`) — carries the typed
+    /// icon+label header band, distinct from a plain blockquote. Test/
+    /// inspection surface only.
+    bool isCalloutBlock(BlockId id) const;
+    /// P5.5: whether `id`'s realized entry is a footnote-definition
+    /// Paragraph (`[^label]: ...`, `FootnoteDefBlocks::parseFootnoteDef`)
+    /// — carries the back-reference marker/color/italic presentation,
+    /// distinct from a plain paragraph. Test/inspection surface only.
+    bool isFootnoteDefBlock(BlockId id) const;
+
     /// Whether an IME composition is in progress (T8, exit E6): a non-empty
     /// preedit string is currently spliced into the caret block's layout.
     /// Mirrors QWidget::inputMethodComposing's role in the old leaves —
@@ -861,6 +872,44 @@ private:
     /// convention as the rest of `paintEvent`'s locals.
     void paintTitle(QPainter &p) const;
 
+    // ---- Frontmatter (P5.5) -------------------------------------------
+    // Frontmatter is NOT a document block (markoff-core's
+    // `Document::extract` splits it off `source` before the body is ever
+    // parsed into blocks — `extracted.body` never contains it, so it has
+    // no `BlockId`) — same "leading non-block y-layout entry" shape P4.9's
+    // title band established, read-only, driven straight from `m_doc`
+    // rather than duplicated into view-local state.
+    //
+    // Footnote DEFINITIONS turned out NOT to need this treatment (see
+    // FootnoteDefBlocks.h's doc comment): unlike frontmatter,
+    // `Document::extract` only *copies* footnote-def lines into its
+    // `footnotes` list for numbering — it does not strip them from
+    // `extracted.body`, so `[^1]: text` remains a completely ordinary
+    // `BlockKind::Paragraph` block in `IdList`. Its back-reference styling
+    // is therefore just another `BlockPresentation::presentationFor`
+    // per-kind case (`FootnoteDefBlocks::parseFootnoteDef`), no second
+    // y-layout entry needed.
+
+    /// Height of the leading frontmatter band, 0 when the document has no
+    /// frontmatter. Collapsed (default): one row per recognized `key:
+    /// value` property (`FrontmatterBlock::parseFrontmatterProperties`), or
+    /// a single "Properties" summary row if none parsed. Expanded
+    /// (`m_frontmatterExpanded`, toggled by clicking the band): one row per
+    /// line of the raw YAML — same "caret/click reveals source" shape the
+    /// code-fence and math-block per-block reveal already use, adapted to a
+    /// click since this band has no BlockId for a real caret to enter.
+    qreal frontmatterBandHeight() const;
+    /// `titleBandHeight() + frontmatterBandHeight()` — the offset every
+    /// block-y consumer in this file now adds/subtracts (titleBandHeight()
+    /// alone stayed reserved for the title band's OWN hit-test/paint, which
+    /// occupies only its own sub-range at the very top).
+    qreal leadingBandHeight() const;
+    /// True if `viewportPos` falls inside the frontmatter band's vertical
+    /// extent. No char-offset output (unlike `hitTestTitle`) — the band is
+    /// read-only, a click anywhere in it just toggles `m_frontmatterExpanded`.
+    bool hitTestFrontmatter(const QPoint &viewportPos) const;
+    void paintFrontmatter(QPainter &p) const;
+
     MarkoffDocument *m_doc = nullptr;
     Theme m_theme;
     /// Font-scale multiplier (P3.5). Threaded into every `m_cache->sync()`
@@ -935,6 +984,13 @@ private:
     /// space (a plain QString offset, not a `CanvasCursor`/byte offset;
     /// there is no document buffer here for C4 to apply to).
     int m_titleCaretPos = 0;
+
+    // ---- Frontmatter (P5.5) ------------------------------------------------
+    /// Collapsed (properties header) vs. expanded (raw YAML) — the ONLY
+    /// piece of view-local state this seam owns; the content itself is
+    /// always read fresh from `m_doc->frontmatterValue("raw")`, never
+    /// cached here (see the frontmatterBandHeight() doc comment).
+    bool m_frontmatterExpanded = false;
 };
 
 }  // namespace Markoff::Canvas
