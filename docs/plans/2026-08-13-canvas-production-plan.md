@@ -135,7 +135,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.7 Task-list checkboxes (render + toggle) | ☑ | `31e5c138` | `81e92490` / `7d714198` |
 | P4.8 ⏸ phase close | ☑ | n/a | n/a |
 | **P5 — block parity** | | | |
-| P5.1 Table: in-cell wrap + cell navigation | ☐ | | |
+| P5.1 Table: in-cell wrap + cell navigation | ☑ | `d6a0ce0a` | `3a7afd9e` / `70854dc5` |
 | P5.2 Table: row/col ops + alignment | ☐ | | |
 | P5.3 Math blocks (jkqtmathtext) | ☐ | | |
 | P5.4 Images + Mermaid/embed seams | ☐ | | |
@@ -515,6 +515,38 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P5.1 (2026-08-14).**
+
+- `BlockLayoutCache::realizeTable` is now two-pass: pass 1 finalizes
+  each column's width budget (240px cap / 40px min, unchanged), pass
+  2 wraps every cell's `QTextLayout` to that width via the same
+  `beginLayout`/`createLine`/`setLineWidth`/`setPosition` loop
+  `rebuildInline()` uses elsewhere; row height is the max wrapped-cell
+  height. Replaces the old `NoWrap` single-line cell layouts that
+  silently overflowed the column cap.
+  `View::tryTableTab` hops cells row-major; last-cell Tab calls new
+  `View::appendTableRow` (one `d2ApplyBufferEdit` transaction).
+  Because the cache's cell grid is only rebuilt lazily, the
+  post-append caret is computed by re-parsing the fresh buffer via
+  `TableGeometry::parseTableBlock` rather than trusting the
+  momentarily-stale cache. `View::moveCaretVerticallyInTable` walks
+  lines within the cell's own wrap first, then rows in the same
+  column, then falls through to the existing cross-block exit path.
+  `hitTestTable` now picks the line by y within the cell like
+  `hitTest()` does for ordinary blocks, instead of always resolving
+  `lineAt(0)`.
+- No core changes needed or made.
+- Shift+Tab at the first cell is a no-op (undecided by the plan;
+  matches Obsidian's own behavior of just staying put).
+- **Commit-message SHA correction**: `d6a0ce0a`'s message cites a
+  fabricated falsification SHA (`c9e3729`) written before the
+  falsification pass actually ran — a process mistake, left
+  uncorrected per the no-amend policy. The real falsification pair is
+  `3a7afd9e` (throwaway: disabled last-cell-Tab row-append, causing an
+  out-of-bounds `tableCells` index / abort) / `70854dc5` (revert) —
+  those are the SHAs recorded in the checklist row above; trust this
+  log entry over that commit's own message.
 
 **P4.8 (2026-08-14) — phase close.**
 
