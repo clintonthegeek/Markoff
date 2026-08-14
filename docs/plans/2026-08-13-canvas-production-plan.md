@@ -120,7 +120,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P3.1 EditorWidget wrapper + setDocument/Session + contract harness | ☑ | `07b3301c` | `b65c8aae` / `b62b45ec` |
 | P3.2 Cursor/scroll position mapping + signals | ☑ | `83adcc2d` | `8ba90e7a` / `a07e715c` |
 | P3.3 Read-only gates + caretRect | ☑ | `21a020a2` | `6a5fefe9` / `fa9c1704` |
-| P3.4 FindController: highlight + navigate | ☐ | | |
+| P3.4 FindController: highlight + navigate | ☑ | `a26a0795` | `de9920ef` / `c5a22a58` |
 | P3.5 EditorContext + theme/fontScale through the wrapper | ☐ | | |
 | P3.6 Ephemeral state JSON round-trip | ☐ | | |
 | P3.7 ⏸ phase close | ☐ | | n/a |
@@ -1040,6 +1040,90 @@ user with a one-page summary of what's proven.
   P3.2's count (this task added tests but touched no new test
   *files*, so the total count didn't move — the new slots landed
   inside already-counted `.cpp` files).
+
+---
+
+**P3.4 (2026-08-14).**
+
+- `View` gained a leaf-local `FindHighlight { BlockId; int byteOffset;
+  int byteLength; bool isCurrent; }` and `setFindHighlights(QList<FindHighlight>)`
+  — deliberately **not** `Markoff::FindController::Match`: `View`
+  stays ignorant of `FindController` entirely (same separation as
+  `CanvasCursor`/selection), so `EditorWidget::attachFindController`
+  is the only place that translates the controller's shape into the
+  view's own idiom. Storage is `QHash<BlockId, QList<FindHighlight>>`
+  grouped at `setFindHighlights` time, for O(1) per-block lookup in
+  `paintEvent` rather than an O(matches) scan per visible block.
+- Paint mechanism confirmed draw-time `QTextLayout::FormatRange`,
+  reusing the exact list `paintEvent` already builds for selection
+  (`e.layout->draw(&p, pos, selections)`) — find highlights are
+  appended to the same `selections` vector after the selection range,
+  through the same `ProjectionMap::byteToLayoutQChar` snap-left/
+  snap-right byte→QChar mapping selection already uses. No
+  `QTextCharFormat`/`setFormats` mutation of the layout anywhere;
+  `check-constitution.sh` stayed clean throughout (C1–C4 unaffected —
+  this task didn't touch any of the four; the "draw-time not
+  setFormats" rule is a spec §3 architectural discipline, not one of
+  the grep-checked C-rules). Current-match vs other-matches use the
+  two dedicated slots that already existed in `Theme::Slot`
+  (`SearchMatchBackground` / `SearchActiveMatchBackground` — no new
+  slot needed. Table-cell matches are a known gap: `paintTable` never
+  consults `m_findHighlightsByBlock` (same limitation selection
+  already has there, T9 deferred to P5.1/P5.2) — noted in both the
+  `setFindHighlights` doc comment and here so a future table-editing
+  task knows to wire it up, not rediscover the gap.
+- `EditorWidget::attachFindController`/`detachFindController`:
+  subscribes `matchesChanged` + `currentMatchChanged` to a single
+  `rebuildFindHighlights()` (whole-list rebuild from
+  `m_findController->matches()` + `currentMatchIndex()` — cheap
+  relative to a keystroke, one source of truth, no incremental diffing
+  to get wrong) and `navigationRequested` to
+  `onFindNavigationRequested`. `m_findController` is a `QPointer`
+  (consumer-owned, never linked) mirroring live's `LiveFindAdapter`
+  pattern read as reference before writing this (never copied — no
+  `FindSpan`-equivalent type needed here since `View` already had a
+  draw-time highlight mechanism live doesn't). `detachFindController`
+  disconnects and calls `setFindHighlights({})` — the empty-list path
+  already clears `m_findHighlightsByBlock` via `.clear()`.
+- Navigation turned out to need **zero new plumbing**: `View::
+  setCaretPosition(BlockId, int)` (P3.1's sanctioned programmatic
+  caret entrypoint) already routes through `setCaret()` →
+  `ensureCaretVisible()` (P3.2's chokepoint), which already scrolls
+  the target block into the viewport AND emits `caretChanged()` (which
+  `EditorWidget` already turns into `cursorPositionChanged`). Neither
+  function touches `QWidget::setFocus`, so
+  `FindController::navigationRequested`'s documented contract ("MAY
+  scroll + place the caret, MUST NOT take focus") holds for free — no
+  focus-suppression logic had to be written or verified against a race,
+  it simply isn't there. `onFindNavigationRequested` is therefore a
+  one-line forward: `m_view->setCaretPosition(match.block,
+  int(match.byteOffset))`. `Markoff::BlockAnchor` (the `Match::block`
+  field's type) is confirmed a plain alias for `BlockId`
+  (`markoff/core/BlockAnchor.h`), not a distinct type needing
+  resolution — no lookup step exists here the way live's
+  `resolveByteToQtPos` needs one (canvas's caret coordinate space
+  already *is* block+byte, live's is a ListView row + QChar position).
+- New `tst_canvas_find.cpp` (3 tests, all green): match/current-match
+  highlight placement + movement on `findNext()`, navigate places the
+  caret and scrolls without stealing focus (asserted via
+  `QWidget::hasFocus()` before/after — the widget can genuinely hold
+  focus from an earlier `show()`, so the check compares state across
+  the navigate call rather than assuming focus is always false),
+  detach clears highlights and stops reacting to a controller left
+  running. Registered in `tests/CMakeLists.txt`. `-R canvas` 16/16
+  green (constitution included).
+- Falsification: commented out the `currentMatchChanged` connection in
+  `attachFindController` (throwaway commit `de9920ef`) —
+  `matches_and_current_match_paint_highlights` failed as expected
+  (`'!h0b.first().isCurrent' returned FALSE`: the current-match
+  highlight never moved off the first match after `findNext()`); the
+  navigate test stayed green (it only exercises `navigationRequested`,
+  a separate connection — expected, not a gap). Reverted (`c5a22a58`);
+  `-R canvas` 16/16 green again after the revert.
+- Test tier: canvas-scoped only per the session protocol (diff stays
+  entirely inside `libs/markoff-canvas/`, no core seam touched —
+  `FindController` itself is pre-existing, unmodified). Full suite not
+  run for this task.
 
 ---
 
