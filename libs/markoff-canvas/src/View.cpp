@@ -178,6 +178,11 @@ void View::setFontScale(qreal scale)
 {
     if (qFuzzyCompare(m_fontScale, scale))
         return;
+    // FALSIFY (throwaway, plan P3.5): skip the relayout entirely — store
+    // the scale but never invalidate the cache, so every block keeps its
+    // pre-scale font/height forever.
+    m_fontScale = scale;
+    return;
 
     // Capture the block currently at the TOP of the viewport before
     // invalidating anything — every block's height is about to change
