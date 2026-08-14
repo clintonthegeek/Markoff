@@ -1457,7 +1457,7 @@ std::optional<Markoff::LinkActivation> View::linkActivationAt(
         // — this is the off-by-one the plan's falsification target lives
         // in; get it wrong either direction and the boundary QChar
         // mis-resolves.
-        if (qcharPos < span.charOffset || qcharPos >= span.charOffset + span.charLength - 1)
+        if (qcharPos < span.charOffset || qcharPos >= span.charOffset + span.charLength)
             continue;
 
         Markoff::LinkActivation a;
