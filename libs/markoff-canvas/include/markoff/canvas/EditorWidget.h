@@ -193,6 +193,28 @@ public:
     /// same role as `view()`.
     CanvasActionController *actionController() const noexcept;
 
+    // ---- Inline title (contract-v2 P4.9, spec §5.2) ----------------------
+    // Thin pass-throughs to the composed View — the leaf-specific escape
+    // hatch this wrapper already follows for view()/actionController(), not
+    // a second copy of the band's state.
+
+    /// Programmatic setter (e.g. syncing the band to the current file name
+    /// on load, or after an external rename) — does NOT emit `titleEdited`.
+    /// See `View::setInlineTitle`'s doc comment.
+    void setInlineTitle(const QString &title);
+    QString inlineTitle() const;
+    /// Off by default (spec §5.2 "off by default").
+    void setInlineTitleVisible(bool visible);
+    bool inlineTitleVisible() const;
+
+signals:
+    /// Forwarded from the composed `View::titleEdited` — the consumer turns
+    /// this into a file rename (spec §5.2). Declared on `EditorWidget`
+    /// (rather than requiring a consumer to reach through `view()`) because
+    /// this, unlike `View`, is the `MarkdownView` contract surface Corbomite
+    /// actually binds against.
+    void titleEdited(const QString &title);
+
 private:
     /// Recomputes `EditorContext` from the composed `View`'s caret block
     /// (kind + heading level + table row/col via `View::caretTableCell()`,

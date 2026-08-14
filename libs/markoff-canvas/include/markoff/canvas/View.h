@@ -21,6 +21,7 @@ class QContextMenuEvent;
 class QInputMethodEvent;
 class QMenu;
 class QPainter;
+class QTextLayout;
 
 namespace Markoff {
 class MarkoffDocument;
@@ -365,7 +366,44 @@ public:
     /// after construction.
     void setActionController(CanvasActionController *controller);
 
+    // ---- Inline title (contract-v2 P4.9, spec §5.2) ----------------------
+    // Optional leading title band (Obsidian's `.inline-title`): the file
+    // basename, editable, NOT a document block. Off by default. Rendered as
+    // a leading non-block entry in the y-layout, ahead of block 0, sharing
+    // the content column (P4.5's `layoutWidthFor()`/`pageMargin()`) — see
+    // `titleBandHeight()`'s doc comment for how every block-y consumer in
+    // this file accounts for the extra offset. Deliberately owns no
+    // BlockId, no byte-offset coordinate, and is never added to
+    // `BlockLayoutCache`'s entries: `cursorPosition()` (EditorWidget, which
+    // walks `doc->iterateBlocks()`), find (`FindController`, document-only),
+    // selection-copy (`selectedText()`, cache-entries-only) and
+    // serialization (core, blocks-only) exclude it BY CONSTRUCTION — there
+    // is no second index space to gate (C4 stays about document content
+    // only).
+
+    /// Sets the title text shown in the band. The PROGRAMMATIC setter (a
+    /// consumer syncing after an external rename, or the initial file name)
+    /// — does not emit `titleEdited` (that signal is reserved for edits the
+    /// user made through the band itself, same "the view never echoes back
+    /// what the consumer just pushed" shape as `setTheme`/`setReadOnly`).
+    /// No-op if unchanged.
+    void setInlineTitle(const QString &title);
+    QString inlineTitle() const { return m_inlineTitle; }
+
+    /// Shows/hides the band. Off by default (spec §5.2). Reflows the
+    /// document below it (title band height counts toward
+    /// `documentHeight()`/the scroll range) the same way a content-width
+    /// policy change does. No-op if unchanged.
+    void setInlineTitleVisible(bool visible);
+    bool inlineTitleVisible() const { return m_inlineTitleVisible; }
+
 signals:
+    /// Fired only on a user edit made directly in the title band (typing,
+    /// Backspace/Delete) — never from `setInlineTitle`. The consumer turns
+    /// this into a file rename (spec §5.2); this view has no rename
+    /// authority of its own.
+    void titleEdited(const QString &title);
+
     /// Fired from `ensureCaretVisible()` (P3.2) — the file's single
     /// chokepoint every caret-changing code path already calls afterward
     /// (T2/T7 comment on that function), now also called from
@@ -598,6 +636,57 @@ private:
     /// `updateHover` finds no link under the pointer.
     void clearHover();
 
+    // ---- Inline title (P4.9) ----------------------------------------------
+
+    /// The band's height in DIPs when visible, 0 when not (spec §5.2 "off
+    /// by default"). Fixed regardless of title length/content (single-line,
+    /// no-wrap band — a decide-yourself-and-log simplification; Obsidian
+    /// itself wraps a very long title, which this leaf does not attempt).
+    /// This is the ONE offset every y-consuming function in this file adds
+    /// (converting a `BlockLayoutCache` y — which starts at 0 for block 0 —
+    /// into document/viewport space) or subtracts (the reverse, converting
+    /// a scroll/click position into the cache's own y-space before querying
+    /// it) — `hitTest()`'s and `paintEvent()`'s own comments point back
+    /// here. There is no second coordinate STORE, only this one derived
+    /// offset applied at every read (same "derived, not stored" shape as
+    /// `layoutWidthFor()`).
+    qreal titleBandHeight() const;
+    /// The (bold, upscaled Heading-role) font the title band paints and
+    /// hit-tests with. Scales with `m_fontScale` like block presentation
+    /// does, so "bigger text" affects the title band too.
+    QFont titleFont() const;
+    /// Shared by `paintTitle()` and `hitTestTitle()`: lays out `text` as a
+    /// single no-wrap line at `textWidth()`, in `titleFont()`. Not cached —
+    /// a title is short and this runs at most once per paint/click, not per
+    /// keystroke of document typing.
+    void layoutTitleLine(QTextLayout &layout, const QString &text) const;
+    /// True if `viewportPos` falls inside the title band's vertical extent
+    /// (any x — the whole band width is a click target, matching a normal
+    /// line edit). When true and `outCharPos` is non-null, fills it with
+    /// the UTF-16 char offset into `m_inlineTitle` nearest the point's x —
+    /// the title's own tiny coordinate space (character offsets into a
+    /// QString), deliberately NOT `CanvasCursor`/BlockId/byte-offset (C4 is
+    /// about document content; the title has none).
+    bool hitTestTitle(const QPoint &viewportPos, int *outCharPos) const;
+    /// Key handling while `m_titleCaretActive` (P4.9): printable insert,
+    /// Backspace/Delete, Left/Right/Home/End within the title text: Down/
+    /// Enter exit to block 0 byte 0 (the caret seam spec §5.2 names);
+    /// Escape/Up exit without moving the document caret (no block sits
+    /// above the title for Up to enter — spec names only the Down
+    /// direction). Every mutating branch emits `titleEdited`.
+    void handleTitleKeyPress(QKeyEvent *event);
+    /// The Down/Enter caret-seam target: leaves title-edit mode and places
+    /// the real document caret at block 0 byte 0 via `setCaretPosition`
+    /// (the same chokepoint every other programmatic caret placement uses).
+    /// No-op (title-edit mode still clears) if the document has no blocks.
+    void exitTitleEditingToBlockZero();
+    /// `paintEvent()`'s title-band branch: draws the band's text (or an
+    /// "Untitled" placeholder, dimmed, when `m_inlineTitle` is empty and
+    /// not currently being edited) and — while focused and
+    /// `m_titleCaretActive` — its own caret. Viewport-relative, same
+    /// convention as the rest of `paintEvent`'s locals.
+    void paintTitle(QPainter &p) const;
+
     MarkoffDocument *m_doc = nullptr;
     Theme m_theme;
     /// Font-scale multiplier (P3.5). Threaded into every `m_cache->sync()`
@@ -652,6 +741,26 @@ private:
     /// land on a link the pointer never hovered and the caret never
     /// touched.
     std::optional<Markoff::LinkActivation> m_contextMenuLink;
+
+    // ---- Inline title (P4.9) -----------------------------------------
+    // View-local widget state ONLY (spec §5.2: "not a document block") —
+    // the document, Session, and UndoLog know nothing of this. Off by
+    // default; not persisted here (EditorWidget's contract setter is the
+    // consumer-facing surface, same "leaf state vs. contract state" split
+    // readOnly/theme/fontScale already follow).
+    QString m_inlineTitle;
+    bool m_inlineTitleVisible = false;
+    /// Whether keyboard input is currently routed into the title band
+    /// rather than the document (mouse click in the band, or Up/no-op from
+    /// it, sets/clears this — see `handleTitleKeyPress`/`mousePressEvent`).
+    /// `setCaret()` — the one chokepoint every real document caret move
+    /// funnels through — clears it unconditionally, so any document-side
+    /// caret placement always wins focus away from the title.
+    bool m_titleCaretActive = false;
+    /// UTF-16 char offset into `m_inlineTitle` — the title's own coordinate
+    /// space (a plain QString offset, not a `CanvasCursor`/byte offset;
+    /// there is no document buffer here for C4 to apply to).
+    int m_titleCaretPos = 0;
 };
 
 }  // namespace Markoff::Canvas

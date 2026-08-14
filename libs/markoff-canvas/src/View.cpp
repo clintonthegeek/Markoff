@@ -49,6 +49,13 @@ constexpr qreal kMarkerGap = 6.0;
 /// Width of the blockquote bar.
 constexpr qreal kQuoteBarWidth = 3.0;
 
+// ---- Inline title band (P4.9) ---------------------------------------------
+/// Multiplies Theme::FontRole::Heading's point size for the title band —
+/// Obsidian's own `.inline-title` renders noticeably larger than an H1.
+constexpr qreal kTitleFontScale = 1.6;
+constexpr qreal kTitleTopPadding = 24.0;
+constexpr qreal kTitleBottomPadding = 12.0;
+
 /// Row-major cell index nearest `byteOffset` (block-relative) in a Table
 /// entry's cell-ordered linear sequence (plan P2.3): the sequence itself is
 /// just `tableCells`' own order (already row-major, built row-by-row in
@@ -197,7 +204,9 @@ void View::setFontScale(qreal scale)
     // that still means something afterward (plan P3.5).
     BlockId anchorBlock;
     if (m_doc && !m_cache->entries().empty()) {
-        const int idx = m_cache->indexAtY(verticalScrollBar()->value());
+        // Old titleBandHeight() (pre-scale) — matches the still-current
+        // font at the moment of this read.
+        const int idx = m_cache->indexAtY(verticalScrollBar()->value() - titleBandHeight());
         if (idx >= 0)
             anchorBlock = m_cache->entries()[size_t(idx)].id;
     }
@@ -222,7 +231,8 @@ void View::setFontScale(qreal scale)
     if (m_doc && !anchorBlock.isNull()) {
         const int idx = m_cache->indexOf(anchorBlock);
         if (idx >= 0)
-            verticalScrollBar()->setValue(qRound(m_cache->entries()[size_t(idx)].y));
+            verticalScrollBar()->setValue(
+                qRound(m_cache->entries()[size_t(idx)].y + titleBandHeight()));
     }
 
     // Realize the (now-restored) visible range — deliberately NOT
@@ -242,7 +252,8 @@ void View::setFontScale(qreal scale)
     if (m_doc && !anchorBlock.isNull()) {
         const int idx = m_cache->indexOf(anchorBlock);
         if (idx >= 0)
-            verticalScrollBar()->setValue(qRound(m_cache->entries()[size_t(idx)].y));
+            verticalScrollBar()->setValue(
+                qRound(m_cache->entries()[size_t(idx)].y + titleBandHeight()));
     }
     ensureLayoutForViewport();
 
@@ -306,7 +317,7 @@ QRect View::caretRectInViewport() const
         return {};
     const qreal scrollY = verticalScrollBar()->value();
     const qreal contentX = pageMargin() + e.style.leftIndent;
-    const qreal contentY = (e.y - scrollY) + e.style.topMargin;
+    const qreal contentY = (e.y + titleBandHeight() - scrollY) + e.style.topMargin;
     return QRectF(contentX + line.cursorToX(layoutPos), contentY + line.y(),
                  1, line.height()).toRect();
 }
@@ -338,7 +349,7 @@ int View::realizedBlockCount() const
 
 qreal View::documentHeight() const
 {
-    return m_cache->totalHeight();
+    return m_cache->totalHeight() + titleBandHeight();
 }
 
 QRectF View::blockRect(BlockId id) const
@@ -347,7 +358,7 @@ QRectF View::blockRect(BlockId id) const
     if (i < 0)
         return {};
     const auto &e = m_cache->entries()[size_t(i)];
-    return QRectF(pageMargin(), e.y, textWidth(), e.height);
+    return QRectF(pageMargin(), e.y + titleBandHeight(), textWidth(), e.height);
 }
 
 int View::blockIndexOf(BlockId id) const
@@ -382,7 +393,7 @@ QRectF View::tableCellRect(BlockId id, int row, int col) const
     qreal x = pageMargin() + e.style.leftIndent;
     for (int c = 0; c < col; ++c)
         x += e.tableColWidths[size_t(c)];
-    qreal y = e.y + e.style.topMargin;
+    qreal y = e.y + titleBandHeight() + e.style.topMargin;
     for (int r = 0; r < row; ++r)
         y += e.tableRowHeights[size_t(r)];
 
@@ -507,10 +518,216 @@ qreal View::textWidth() const
     return layoutWidthFor(viewport()->width());
 }
 
+// ---- Inline title (P4.9) --------------------------------------------------
+
+qreal View::titleBandHeight() const
+{
+    if (!m_inlineTitleVisible)
+        return 0.0;
+    const QFontMetricsF fm(titleFont());
+    return kTitleTopPadding + fm.height() + kTitleBottomPadding;
+}
+
+QFont View::titleFont() const
+{
+    QFont f = m_theme.font(Theme::FontRole::Heading);
+    f.setPointSizeF(qMax(1.0, f.pointSizeF() * kTitleFontScale * m_fontScale));
+    f.setBold(true);
+    return f;
+}
+
+void View::layoutTitleLine(QTextLayout &layout, const QString &text) const
+{
+    layout.setFont(titleFont());
+    QTextOption opt;
+    opt.setWrapMode(QTextOption::NoWrap);
+    layout.setTextOption(opt);
+    layout.setText(text);
+    layout.beginLayout();
+    QTextLine line = layout.createLine();
+    if (line.isValid())
+        line.setLineWidth(textWidth());
+    layout.endLayout();
+}
+
+void View::setInlineTitle(const QString &title)
+{
+    if (m_inlineTitle == title)
+        return;
+    m_inlineTitle = title;
+    m_titleCaretPos = qBound(0, m_titleCaretPos, m_inlineTitle.size());
+    viewport()->update();
+}
+
+void View::setInlineTitleVisible(bool visible)
+{
+    if (m_inlineTitleVisible == visible)
+        return;
+    m_inlineTitleVisible = visible;
+    if (!visible)
+        m_titleCaretActive = false;
+    // The band's height changes what "document top" means for every block
+    // below it — same reflow-and-reanchor shape setContentWidthPolicy()
+    // uses for a width change.
+    reflowKeepingScrollAnchor();
+    viewport()->update();
+}
+
+bool View::hitTestTitle(const QPoint &viewportPos, int *outCharPos) const
+{
+    if (!m_inlineTitleVisible)
+        return false;
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal docY = viewportPos.y() + scrollY;
+    if (docY < 0 || docY >= titleBandHeight())
+        return false;
+    if (outCharPos) {
+        QTextLayout layout;
+        layoutTitleLine(layout, m_inlineTitle);
+        const QTextLine line = layout.lineAt(0);
+        const qreal contentX = pageMargin();
+        const qreal localX = viewportPos.x() - contentX;
+        *outCharPos = line.isValid() ? line.xToCursor(localX) : 0;
+    }
+    return true;
+}
+
+void View::exitTitleEditingToBlockZero()
+{
+    m_titleCaretActive = false;
+    if (!m_doc || m_cache->entries().empty())
+        return;
+    // setCaretPosition -> setCaret is the one chokepoint every other
+    // programmatic caret placement in this file routes through (P3.1) —
+    // no second "move the caret" path for this seam.
+    setCaretPosition(m_cache->entries().front().id, 0);
+}
+
+void View::handleTitleKeyPress(QKeyEvent *event)
+{
+    const int key = event->key();
+
+    // Caret seam (spec §5.2): Down or Enter from the title lands at block 0
+    // byte 0.
+    if (key == Qt::Key_Down || key == Qt::Key_Return || key == Qt::Key_Enter) {
+        exitTitleEditingToBlockZero();
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    // No block sits above the title for an "Up" seam to enter (spec names
+    // only the Down direction) — Escape/Up simply leave title-edit mode
+    // without moving the document caret.
+    if (key == Qt::Key_Escape || key == Qt::Key_Up) {
+        m_titleCaretActive = false;
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    if (key == Qt::Key_Left) {
+        if (m_titleCaretPos > 0) --m_titleCaretPos;
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    if (key == Qt::Key_Right) {
+        if (m_titleCaretPos < m_inlineTitle.size()) ++m_titleCaretPos;
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    if (key == Qt::Key_Home) {
+        m_titleCaretPos = 0;
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    if (key == Qt::Key_End) {
+        m_titleCaretPos = m_inlineTitle.size();
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    if (key == Qt::Key_Backspace) {
+        // Backspace at title position 0: nothing to consume in this
+        // direction (the falsification target, plan P4.9) — there is no
+        // document content above the title for it to reach into; it is
+        // simply a no-op here, same as a plain line edit at its own start.
+        if (m_titleCaretPos > 0) {
+            m_inlineTitle.remove(m_titleCaretPos - 1, 1);
+            --m_titleCaretPos;
+            emit titleEdited(m_inlineTitle);
+            viewport()->update();
+        }
+        event->accept();
+        return;
+    }
+    if (key == Qt::Key_Delete) {
+        if (m_titleCaretPos < m_inlineTitle.size()) {
+            m_inlineTitle.remove(m_titleCaretPos, 1);
+            emit titleEdited(m_inlineTitle);
+            viewport()->update();
+        }
+        event->accept();
+        return;
+    }
+    if (Detail::isAcceptableTextInput(event) && !event->text().isEmpty()) {
+        // Titles are a single line (Obsidian's own inline-title behavior);
+        // strip any embedded newline defensively rather than let one split
+        // the band into a wrapped multi-line control.
+        QString clean = event->text();
+        clean.remove(QLatin1Char('\n'));
+        if (!clean.isEmpty()) {
+            m_inlineTitle.insert(m_titleCaretPos, clean);
+            m_titleCaretPos += clean.size();
+            emit titleEdited(m_inlineTitle);
+        }
+        viewport()->update();
+        event->accept();
+        return;
+    }
+    event->ignore();
+}
+
+void View::paintTitle(QPainter &p) const
+{
+    if (!m_inlineTitleVisible)
+        return;
+
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal bandH = titleBandHeight();
+    const qreal top = -scrollY;  // the band always starts at document y=0
+    if (top + bandH <= 0 || top >= viewport()->height())
+        return;  // scrolled fully out of view
+
+    // Placeholder text is shown only when empty AND not currently being
+    // edited — matches a normal line edit's placeholder convention, and
+    // keeps the caret's character offsets meaningful (drawn against the
+    // REAL m_inlineTitle, never the placeholder string).
+    const bool showPlaceholder = m_inlineTitle.isEmpty() && !m_titleCaretActive;
+    QTextLayout layout;
+    layoutTitleLine(layout, showPlaceholder ? tr("Untitled") : m_inlineTitle);
+
+    const qreal contentX = pageMargin();
+    const qreal textY = top + kTitleTopPadding;
+
+    QColor color = m_theme.color(Theme::Slot::Heading1);
+    if (showPlaceholder)
+        color.setAlpha(120);
+    p.setPen(color);
+    layout.draw(&p, QPointF(contentX, textY));
+
+    if (m_hasFocus && m_titleCaretActive) {
+        p.setPen(m_theme.color(Theme::Slot::CursorPrimary));
+        layout.drawCursor(&p, QPointF(contentX, textY),
+                          qBound(0, m_titleCaretPos, m_inlineTitle.size()));
+    }
+}
+
 void View::updateScrollRange()
 {
     const int viewportH = viewport()->height();
-    const int max = qMax(0, qCeil(m_cache->totalHeight()) - viewportH);
+    const int max = qMax(0, qCeil(m_cache->totalHeight() + titleBandHeight()) - viewportH);
 
     QScrollBar *vbar = verticalScrollBar();
 
@@ -555,10 +772,16 @@ void View::ensureLayoutForViewport()
     constexpr int kMaxPasses = 4;
     for (int pass = 0; pass < kMaxPasses; ++pass) {
         const int top = verticalScrollBar()->value();
+        // The scrollbar's value is in document space (title band + blocks,
+        // P4.9); the cache's own y-space starts at 0 for block 0, so the
+        // title band's height is subtracted back out before querying it —
+        // titleBandHeight()'s doc comment names this file's every such
+        // conversion.
+        const qreal cacheTop = top - titleBandHeight();
         // Realize the viewport plus one viewport-height either side, so a
         // scroll of up to a full page never exposes an unrealized block.
-        const bool realized = m_cache->realizeRange(*m_doc, m_theme, top - height,
-                                                    top + 2 * height);
+        const bool realized = m_cache->realizeRange(*m_doc, m_theme, cacheTop - height,
+                                                    cacheTop + 2 * height);
         updateScrollRange();
         if (!realized && verticalScrollBar()->value() == top)
             break;
@@ -729,7 +952,13 @@ CanvasCursor View::hitTest(const QPoint &viewportPos) const
 
     const qreal scrollY = verticalScrollBar()->value();
     const qreal docY    = viewportPos.y() + scrollY;
-    const int idx = m_cache->indexAtY(docY);
+    // The title band (P4.9) is not part of hit-testing — it has no BlockId,
+    // and this is the ONE hit-test path in this file (mouse press/drag,
+    // hover, context-menu link lookup), so gating it here also keeps a
+    // drag-selection or a right-click from resolving into the title.
+    if (docY < titleBandHeight())
+        return {};
+    const int idx = m_cache->indexAtY(docY - titleBandHeight());
     if (idx < 0)
         return {};
 
@@ -740,7 +969,7 @@ CanvasCursor View::hitTest(const QPoint &viewportPos) const
         return CanvasCursor{e.id, 0};
 
     const qreal contentX = pageMargin() + e.style.leftIndent;
-    const qreal contentY = (e.y - scrollY) + e.style.topMargin;
+    const qreal contentY = (e.y + titleBandHeight() - scrollY) + e.style.topMargin;
     const qreal localX   = viewportPos.x() - contentX;
     const qreal localY   = viewportPos.y() - contentY;
 
@@ -765,7 +994,7 @@ CanvasCursor View::hitTestTable(int entryIndex, const QPoint &viewportPos, qreal
 
     const int rows = int(e.tableCells.size()) / e.tableCols;
     const qreal contentX = pageMargin() + e.style.leftIndent;
-    const qreal contentY = (e.y - scrollY) + e.style.topMargin;
+    const qreal contentY = (e.y + titleBandHeight() - scrollY) + e.style.topMargin;
     const qreal localX   = viewportPos.x() - contentX;
     const qreal localY   = viewportPos.y() - contentY;
 
@@ -804,6 +1033,12 @@ CanvasCursor View::hitTestTable(int entryIndex, const QPoint &viewportPos, qreal
 
 void View::setCaret(const CanvasCursor &caret)
 {
+    // The one chokepoint every real document caret placement funnels
+    // through (P3.1/P3.2 doc comments) — any document-side caret move wins
+    // input focus away from the title band (P4.9), so a stale
+    // m_titleCaretActive never survives an interactive or programmatic
+    // document caret change.
+    m_titleCaretActive = false;
     m_caret = caret;
     ensureCaretVisible();
     viewport()->update();
@@ -838,7 +1073,7 @@ std::pair<int, float> View::scrollAnchor() const
     if (!m_doc || m_cache->entries().empty())
         return {-1, 0.0f};
 
-    const qreal value = qreal(verticalScrollBar()->value());
+    const qreal value = qreal(verticalScrollBar()->value()) - titleBandHeight();
     const int idx = m_cache->indexAtY(value);
     if (idx < 0)
         return {-1, 0.0f};
@@ -856,7 +1091,7 @@ void View::setScrollAnchor(int blockIndex, float fraction)
 
     blockIndex = qBound(0, blockIndex, int(m_cache->entries().size()) - 1);
     const auto &e = m_cache->entries()[size_t(blockIndex)];
-    const qreal target = e.y + qBound(0.0f, fraction, 1.0f) * e.height;
+    const qreal target = e.y + titleBandHeight() + qBound(0.0f, fraction, 1.0f) * e.height;
     // setValue() fires valueChanged -> scrollContentsBy(), which only
     // marks the viewport dirty (deliberately does not realize, per its own
     // comment) — paintEvent is what turns the newly-visible range's
@@ -882,11 +1117,12 @@ void View::ensureCaretVisible()
     const auto &e = m_cache->entries()[size_t(idx)];
     QScrollBar *vbar = verticalScrollBar();
     const qreal viewportH = viewport()->height();
+    const qreal docY = e.y + titleBandHeight();
 
-    if (e.y < vbar->value())
-        vbar->setValue(qFloor(e.y));
-    else if (e.y + e.height > vbar->value() + viewportH)
-        vbar->setValue(qCeil(e.y + e.height - viewportH));
+    if (docY < vbar->value())
+        vbar->setValue(qFloor(docY));
+    else if (docY + e.height > vbar->value() + viewportH)
+        vbar->setValue(qCeil(docY + e.height - viewportH));
 
     emit caretChanged();
 }
@@ -1595,6 +1831,16 @@ void View::keyPressEvent(QKeyEvent *event)
         break;
     }
 
+    // Title-band input (P4.9): while editing the title, keys are routed
+    // there instead of the document — a completely separate handler, not a
+    // reuse of the document's StructuralKeyHandler/insertPrintable/
+    // deleteCluster paths (the title has no BlockId/byte buffer for those
+    // to operate on).
+    if (m_titleCaretActive) {
+        handleTitleKeyPress(event);
+        return;
+    }
+
     // Undo/redo are document-level actions, not caret motion — they run
     // even before the caret-null bail below. There is no UndoLog
     // selection/caret state (plan T4, queue #10 item 2): undoD2()/redoD2()
@@ -1909,6 +2155,25 @@ bool View::eventFilter(QObject *obj, QEvent *event)
 
 void View::mousePressEvent(QMouseEvent *event)
 {
+    if (event->button() == Qt::LeftButton) {
+        int titleCharPos = 0;
+        if (hitTestTitle(event->pos(), &titleCharPos)) {
+            setFocus(Qt::MouseFocusReason);
+            m_selectionAnchor.reset();
+            m_titleCaretActive = true;
+            m_titleCaretPos = qBound(0, titleCharPos, m_inlineTitle.size());
+            viewport()->update();
+            event->accept();
+            return;
+        }
+        if (m_titleCaretActive) {
+            // A click into the document area exits title-edit mode, same as
+            // any other blur-by-click-elsewhere text field.
+            m_titleCaretActive = false;
+            viewport()->update();
+        }
+    }
+
     if (event->button() == Qt::LeftButton && m_doc) {
         const CanvasCursor hit = hitTest(event->pos());
         if (!hit.block.isNull()) {
@@ -2146,19 +2411,25 @@ void View::paintEvent(QPaintEvent *event)
     // re-entered.
     ensureLayoutForViewport();
 
+    // Leading non-block entry (P4.9), painted before the block loop below —
+    // shares the content column but is never one of BlockLayoutCache's
+    // entries.
+    paintTitle(p);
+
     const qreal scrollY    = verticalScrollBar()->value();
     const qreal viewBottom = scrollY + viewport()->height();
     const qreal margin     = pageMargin();
     const auto  sel        = orderedSelection();
+    const qreal titleH     = titleBandHeight();
 
     for (size_t entryIndex = 0; entryIndex < m_cache->entries().size(); ++entryIndex) {
         const auto &e = m_cache->entries()[entryIndex];
-        if (e.y >= viewBottom)
+        if (e.y + titleH >= viewBottom)
             break;
-        if (e.y + e.height <= scrollY)
+        if (e.y + titleH + e.height <= scrollY)
             continue;
 
-        const qreal blockTop = e.y - scrollY;
+        const qreal blockTop = e.y + titleH - scrollY;
         const qreal contentX = margin + e.style.leftIndent;
         const qreal contentY = blockTop + e.style.topMargin;
 

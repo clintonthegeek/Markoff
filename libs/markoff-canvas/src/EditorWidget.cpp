@@ -115,6 +115,11 @@ EditorWidget::EditorWidget(QWidget *parent)
     // Source::Editor/Styled::Editor's single-emit-path pattern).
     QObject::connect(m_view->verticalScrollBar(), &QScrollBar::valueChanged, this,
                       [this](int) { emit scrollPositionChanged(scrollPositionVisualLine()); });
+
+    // Inline title (P4.9): a bare forward, not a second signal-emission
+    // path — View::titleEdited already carries the finished (post-edit)
+    // string.
+    QObject::connect(m_view, &View::titleEdited, this, &EditorWidget::titleEdited);
 }
 
 EditorWidget::~EditorWidget()
@@ -436,6 +441,28 @@ View *EditorWidget::view() const noexcept
 CanvasActionController *EditorWidget::actionController() const noexcept
 {
     return m_actionController;
+}
+
+// --- Inline title (contract-v2 P4.9) ---
+
+void EditorWidget::setInlineTitle(const QString &title)
+{
+    if (m_view) m_view->setInlineTitle(title);
+}
+
+QString EditorWidget::inlineTitle() const
+{
+    return m_view ? m_view->inlineTitle() : QString();
+}
+
+void EditorWidget::setInlineTitleVisible(bool visible)
+{
+    if (m_view) m_view->setInlineTitleVisible(visible);
+}
+
+bool EditorWidget::inlineTitleVisible() const
+{
+    return m_view && m_view->inlineTitleVisible();
 }
 
 // --- Format verbs (contract-v2 P4.3) ---
