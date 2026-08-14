@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-13 (canvas production arc OPENED — D5 part 1)
+**Last updated:** 2026-08-13 (canvas production arc — Phase 1 CLOSED, P1.5)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -18,18 +18,21 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
 - **Plan (do the topmost unchecked task):**
   [`plans/2026-08-13-canvas-production-plan.md`](plans/2026-08-13-canvas-production-plan.md)
   — phases P1–P7, user gates G1 (a11y scope), G2 (Corbomite adoption),
-  G3 (retirement decision).
+  G3 (retirement decision). Phase 1 (core promotions) closed 2026-08-13
+  at P1.5; Phase 2 (projection map) is next.
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
 source untouched. Queue **#18** is absorbed into the plan
-(P1.1, P2.1–P2.3).
+(P1.1 done, P2.1–P2.3 next).
 
 ## Test baseline
 
 **288/288 (100%)** on the full `scripts/run-tests.sh` (277 standstill
-+ 11 canvas), verified 2026-08-13 at spike close. The plan ratchets
-this up per task; any drop is a regression (classify before fixing).
++ 11 canvas), re-verified 2026-08-13 at Phase 1 close (P1.5) — count
+unchanged from spike close: P1.1–P1.4 grew existing executables rather
+than adding new ones. The plan ratchets this up per task; any drop is
+a regression (classify before fixing).
 
 ## Dormant items
 

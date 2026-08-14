@@ -99,7 +99,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P1.2 Coordinates byte↔QChar → core | ☑ | `ac405aa6` | `cd2588f1` / `95385e7f` |
 | P1.3 Theme background-slot fallback + missing slots | ☑ | `33c0fc72` | `a6891970` / `9e8e28b9` |
 | P1.4 Marker-convention canonization (docs + doc-comment) | ☑ | `f6a28a5f` | n/a |
-| P1.5 ⏸ phase close: full suite + constitution + findings sweep | ☐ | | n/a |
+| P1.5 ⏸ phase close: full suite + constitution + findings sweep | ☑ | n/a | n/a |
 | **P2 — projection map (delimiter reflow)** | | | |
 | P2.1 ProjectionMap + omission for emphasis/strong | ☐ | | |
 | P2.2 Omission for heading prefix + code fences | ☐ | | |
@@ -602,6 +602,34 @@ user with a one-page summary of what's proven.
   round-trips correctly is untested and outside P1.4's docs-only scope
   — worth a real look before anything edits CodeBlock buffers in canvas
   (P4.6 syntax highlighting territory).
+
+**P1.5 (2026-08-13) — phase close.**
+
+- Full suite: **288/288 (100%)**, no drop from spike-close baseline —
+  confirms P1.1's note that P1.1–P1.4 grew existing executables rather
+  than adding new ones.
+- `check-constitution.sh`: clean, 26 files scanned, C1–C4.
+- Honest C1–C4 read (manual, not grep) over every file this phase
+  actually touched — `git diff 603713c4..f6a28a5f` on
+  `libs/markoff-canvas` + `libs/markoff-core`, 19 files: no re-entrance
+  guard, no deferral (`singleShot`/`QMetaObject::invokeMethod` queued),
+  no `QTextDocument`/QML text linkage, no cross-block byte arithmetic.
+  `TextUnits::byteToQtPos/qtPosToByte` (P1.2) and `KindInference`
+  (P1.1) are pure single-block functions; `promoteCaretBlockKind`/
+  `updateCaretHeadingLevel` (P1.1) do all writes inside one
+  `UndoLog::Transaction` scoped to the caret's block. Core's two new
+  files (`KindInference`, `TextUnits`) aren't grep-scanned by
+  `check-constitution.sh` (canvas-only script) — read directly instead;
+  clean.
+- Findings log: all four P1.x entries present and complete; nothing
+  from this phase left unresolved needing an in-phase fix. Two items
+  explicitly deferred on record rather than fixed unprompted: the
+  `serializeCodeBlock` double-fence risk (P1.4, flagged for P4.6) and
+  the third coordinate-helper consolidation
+  (`SourceTextDocumentBinding::qtPosToByteOffset`, P1.2, flagged for
+  P4.3).
+- `docs/STATUS.md` baseline line updated to record the re-verification
+  and Phase 1 close; workfront line points at Phase 2 next.
 
 ---
 
