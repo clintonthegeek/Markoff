@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <QHash>
+#include <QPixmap>
 #include <QTextLayout>
 
 #include <markoff/core/BlockId.h>
@@ -68,6 +69,19 @@ public:
         /// crosses into View.cpp except through this member.
         ProjectionMap projection;
         BlockStyle style;
+
+        /// Display Math (P5.3): a jkqtmathtext render of this block's bare
+        /// LaTeX (style.isMathDisplay only), built by rebuildInline()
+        /// whenever the caret is NOT in this block — i.e. exactly when
+        /// paintEvent should paint it instead of `layout`. Null while the
+        /// caret is in the block (source revealed, same trigger as the
+        /// code-fence per-block reveal) or if jkqtmathtext failed to parse
+        /// the source. `layout` itself is always built regardless — the
+        /// pixmap only ever substitutes at PAINT time, so hit-testing/
+        /// caret motion/selection keep working against real text
+        /// unconditionally.
+        QPixmap mathPixmap;
+
         quint64 seq      = 0;      //!< blockEditSequence when measured
         qreal   y        = 0;      //!< top of the block, document coords
         qreal   height   = 0;      //!< estimated, or exact once realized

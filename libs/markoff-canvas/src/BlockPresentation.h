@@ -64,6 +64,17 @@ struct BlockStyle {
     /// switch" rule.
     bool isCodeBlock = false;
 
+    /// Math block whose `DisplayMode` attr is true (P5.3): tells
+    /// BlockLayoutCache::rebuildInline to attempt a jkqtmathtext pixmap
+    /// render (Detail::renderMathPixmap) alongside the always-built text
+    /// layout, and tells View::paintEvent to paint that pixmap instead of
+    /// the text layout when the caret is not in this block. False for
+    /// inline math (a Math block whose DisplayMode is false, or a `$...$`
+    /// span inside a Paragraph) — both render as plain styled text, never
+    /// a pixmap (spec P5.3: "QTextLayout format with object replacement is
+    /// NOT available without a document").
+    bool isMathDisplay = false;
+
     /// Background rect spans the full text column rather than hugging the
     /// text (code blocks, quotes).
     bool fullWidthBackground = false;

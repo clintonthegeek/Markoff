@@ -46,6 +46,21 @@ bool delimiterShouldHide(const SourceSpan &span, const QList<int> &cursorsInBloc
     if (span.isCodeBlockFence)
         return cursorsInBlock.isEmpty();
 
+    // Math delimiters ($, $$ — P5.3): per-BLOCK reveal too, same rule as
+    // code fences, per the plan's own wording ("Caret-in-block reveals
+    // source (same reveal rule as code fences)") rather than the generic
+    // parentCharStart/End per-span mechanism below. This sidesteps a real
+    // parser gap: TreeSitterParser's collectParentRanges lists latex_span
+    // as a formatting-parent node type, but the grammar never actually
+    // emits that node (its own comment: "does NOT have a separate
+    // latex_span node type — both `$x^2$` and `$$x^2$$` are parsed as
+    // latex_block", which collectParentRanges does NOT list) — so a math
+    // delimiter's parentCharStart/End would always be -1 and never hide.
+    // Fixing that is a markoff-parser change this task doesn't name; the
+    // per-block rule below needs none of it.
+    if (span.math)
+        return cursorsInBlock.isEmpty();
+
     // The ATX heading marker (`# `) needs NO special case here despite
     // also being per-block in Obsidian: the parser already gives that
     // specific span a parent range spanning the WHOLE heading line (post-
@@ -94,6 +109,23 @@ QList<QTextLayout::FormatRange> inlineFormatRanges(
         if (span.italic) { applyEmphasis(fmt, theme, Theme::Slot::ItalicEmphasis); any = true; }
         if (span.code) {
             const QColor fg = theme.color(Theme::Slot::InlineCode);
+            const QColor bg = theme.color(Theme::Slot::CodeBlockBackground);
+            if (fg.isValid()) fmt.setForeground(fg);
+            if (bg.isValid()) fmt.setBackground(bg);
+            fmt.setFontFamilies(theme.font(Theme::FontRole::Monospace).families());
+            any = true;
+        }
+        // Math (P5.3): "$…$" inline spans render as a styled inline run,
+        // code-like — QTextLayout has no inline-object-replacement path
+        // without a backing QTextDocument (C3 forbids one), so a real
+        // glyph-rendered pixmap mid-line is not available; this is the
+        // documented fallback (plan P5.3: "render inline math as a styled
+        // span in-line (code-like)"), not a placeholder for it. Applies
+        // uniformly to a Math BLOCK's own text too when its source is
+        // revealed (caret inside) — same "reveal shows source styled like
+        // source" shape as CodeBlock.
+        if (span.math) {
+            const QColor fg = theme.color(Theme::Slot::Math);
             const QColor bg = theme.color(Theme::Slot::CodeBlockBackground);
             if (fg.isValid()) fmt.setForeground(fg);
             if (bg.isValid()) fmt.setBackground(bg);

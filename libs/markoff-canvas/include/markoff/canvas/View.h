@@ -248,6 +248,16 @@ public:
     /// only — nothing here is authority.
     qreal lineNaturalWidth(BlockId id) const;
 
+    /// Display Math (P5.3): whether `id`'s realized entry currently has a
+    /// jkqtmathtext pixmap standing in for its text layout in paintEvent
+    /// — true exactly when it's a display-math block (DisplayMode attr),
+    /// jkqtmathtext parsed its LaTeX successfully, AND the caret is not in
+    /// this block (source not being revealed). False for an unrealized
+    /// block, an inline-math block, a non-math block, a parse failure, or
+    /// while the caret is inside the block revealing raw source. Test/
+    /// inspection surface only — nothing here is authority.
+    bool isMathPixmapActive(BlockId id) const;
+
     /// Whether an IME composition is in progress (T8, exit E6): a non-empty
     /// preedit string is currently spliced into the caret block's layout.
     /// Mirrors QWidget::inputMethodComposing's role in the old leaves —
@@ -630,6 +640,13 @@ private:
     /// Only raises a level it can infer — demotion is the structural-key
     /// path's business, not this one's.
     void updateCaretHeadingLevel();
+
+    /// Re-infers display-mode within an already-Math block (P5.3): the
+    /// first '$' promotes to Math (inline) before a second '$' can ever
+    /// reach the Paragraph-only promote path, so this is the only place a
+    /// typed "$$…$$" can set DisplayMode true. Raise-only, same shape as
+    /// updateCaretHeadingLevel.
+    void updateCaretMathDisplayMode();
 
     // ---- Selection (T5) --------------------------------------------------
 

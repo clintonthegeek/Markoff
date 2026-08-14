@@ -55,6 +55,18 @@ int intAttr(const MarkoffDocument &doc, BlockId id, const AttrName &name,
     return fallback;
 }
 
+bool boolAttr(const MarkoffDocument &doc, BlockId id, const AttrName &name,
+              bool fallback)
+{
+    const auto attrs = doc.blockAttrs(id);
+    const auto it = attrs.constFind(name);
+    if (it == attrs.cend())
+        return fallback;
+    if (const bool *p = std::get_if<bool>(&it.value()))
+        return *p;
+    return fallback;
+}
+
 }  // namespace
 
 BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
@@ -139,7 +151,14 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
         break;
 
     case BlockKind::Math:
+        // Math (P5.3): Slot::Math falls through to the Monospace font
+        // role (Theme.cpp), same as live's MathDelegate uses for its raw-
+        // source Text element — the block's own text layout (always built,
+        // never skipped) is the "reveal source" representation, and it
+        // should look like source, not body text.
+        s.font       = fontForSlot(theme, Theme::Slot::Math, fontScale);
         s.foreground = theme.color(Theme::Slot::Math);
+        s.isMathDisplay = boolAttr(doc, id, AttrNames::DisplayMode, false);
         break;
 
     case BlockKind::Table:

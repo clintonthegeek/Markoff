@@ -487,6 +487,14 @@ qreal View::lineNaturalWidth(BlockId id) const
     return e.layout->lineAt(0).naturalTextWidth();
 }
 
+bool View::isMathPixmapActive(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    return !m_cache->entries()[size_t(idx)].mathPixmap.isNull();
+}
+
 bool View::isComposing() const
 {
     return !m_preeditText.isEmpty();
@@ -907,6 +915,17 @@ void View::promoteCaretBlockKind()
         return;
     }
 
+    // Display math is unreachable by the FIRST '$': that keystroke already
+    // promotes the block to Math (mathDisplay=false, the "$…$" inline
+    // reading) before a second '$' could ever arrive, so the promote path
+    // below — guarded on Paragraph-only — never sees "$$". Re-infer within
+    // an already-Math block instead, same shape as the Heading branch
+    // above (P1.1 finding: "left for whoever needs display math (P5.3)").
+    if (current == Markoff::BlockKind::Math) {
+        updateCaretMathDisplayMode();
+        return;
+    }
+
     // Otherwise only promote FROM Paragraph: a structural kind's buffer is
     // either content-only (ListItem, BlockQuote) or already carries the
     // marker that would re-trigger this exact inference (CodeBlock) —
@@ -991,6 +1010,28 @@ void View::updateCaretHeadingLevel()
 
     UndoLog::Transaction t(m_doc->d2UndoLog());
     m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::Level, newLevel, t);
+}
+
+void View::updateCaretMathDisplayMode()
+{
+    // Raise-only, same rule as updateCaretHeadingLevel: once display mode
+    // is set it is never cleared back to inline by this path (deleting a
+    // trailing '$' is the structural-key/backspace path's business, not
+    // typing-inference's).
+    const auto attrs = m_doc->blockAttrs(m_caret.block);
+    if (const auto it = attrs.constFind(Markoff::AttrNames::DisplayMode);
+        it != attrs.cend()) {
+        if (const bool *v = std::get_if<bool>(&it.value()); v && *v)
+            return;
+    }
+
+    const QString text = QString::fromUtf8(m_doc->blockText(m_caret.block));
+    const Markoff::KindInference inferred = Markoff::inferBlockKind(text);
+    if (inferred.kind != Markoff::BlockKind::Math || !inferred.mathDisplay)
+        return;
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::DisplayMode, true, t);
 }
 
 // ---- Caret / editing (T2) ------------------------------------------------
@@ -3061,6 +3102,24 @@ void View::paintEvent(QPaintEvent *event)
 
         if (!e.layout)
             continue;  // unrealized: outside the realized margin
+
+        // Display Math (P5.3): a non-null mathPixmap means the caret is
+        // NOT in this block (BlockLayoutCache::rebuildInline only builds
+        // one under that exact condition) — paint the rendered LaTeX
+        // instead of the raw-source text layout, centered in the content
+        // column. Caret-in-block paints nothing here (mathPixmap is null
+        // then) and falls through to the normal text-layout path below,
+        // which is the "reveal source" state — same per-block switch shape
+        // as the code-fence reveal, just swapping which surface is drawn
+        // rather than which text is shown.
+        if (!e.mathPixmap.isNull()) {
+            const qreal dpr = qMax(1.0, e.mathPixmap.devicePixelRatio());
+            const qreal pw = e.mathPixmap.width() / dpr;
+            const qreal avail = margin + textWidth() - contentX;
+            const qreal px = contentX + qMax(qreal(0), (avail - pw) / 2.0);
+            p.drawPixmap(QPointF(px, contentY), e.mathPixmap);
+            continue;
+        }
 
         if (e.style.isTaskItem) {
             // Checkbox glyph (P4.7): same decoration slot list bullets use

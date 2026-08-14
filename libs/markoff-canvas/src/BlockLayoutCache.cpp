@@ -13,6 +13,7 @@
 
 #include "CodeHighlighting.h"
 #include "InlineFormatting.h"
+#include "MathRendering.h"
 #include "TableGeometry.h"
 
 namespace coords = Markoff::TextUnits;
@@ -371,6 +372,27 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
     // unconditionally would be harmless (same text/width in the
     // caret-move-only call path) but pointless work for every other kind.
     e.height = e.style.topMargin + e.style.bottomMargin + h;
+
+    // Display Math (P5.3): render the pixmap only while the caret is NOT
+    // in this block — the exact condition under which paintEvent will
+    // choose it over `layout` (source revealed on caret-in, same trigger
+    // as the code-fence per-block reveal). This call already re-runs on
+    // every caret entry/exit of the block (setCaret's restyleInline), so
+    // the pixmap and the height below always match what will actually be
+    // painted at the current caret state — no separate invalidation path
+    // needed.
+    e.mathPixmap = QPixmap();
+    if (e.style.isMathDisplay && e.id != m_caretBlock) {
+        const QString latex = Detail::stripMathDelimiters(QString::fromUtf8(text));
+        e.mathPixmap = Detail::renderMathPixmap(
+            latex, e.style.font.pixelSize(), e.style.foreground,
+            e.style.background.isValid() ? e.style.background
+                                          : theme.color(Theme::Slot::EditorBackground));
+        if (!e.mathPixmap.isNull()) {
+            const qreal pixmapH = e.mathPixmap.height() / qMax(1.0, e.mathPixmap.devicePixelRatio());
+            e.height = e.style.topMargin + e.style.bottomMargin + pixmapH;
+        }
+    }
 }
 
 bool BlockLayoutCache::realizeRange(const MarkoffDocument &doc, const Theme &theme,

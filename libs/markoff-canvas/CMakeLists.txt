@@ -8,6 +8,10 @@ project(markoff_canvas LANGUAGES CXX)
 # Qt6::Quick / Qt6::QuickWidgets, no markoff_live / markoff_styled /
 # markoff_source. Adding one of those to the link line below is a
 # constitution violation, not a build fix.
+#
+# jkqtmathtext (P5.3) is a vendored third-party library, not a Markoff
+# family member — linking it renders LaTeX math to a QPixmap synchronously
+# from C++, same library markoff-live's (unused) MathRenderer wraps.
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 
@@ -33,6 +37,8 @@ add_library(markoff_canvas STATIC
     src/InlineFormatting.cpp
     src/InputPredicate.h
     src/InputPredicate.cpp
+    src/MathRendering.h
+    src/MathRendering.cpp
     src/ProjectionMap.h
     src/ProjectionMap.cpp
     src/TableGeometry.h
@@ -48,6 +54,7 @@ target_link_libraries(markoff_canvas
     PUBLIC  Qt6::Core Qt6::Gui Qt6::Widgets
             markoff_core
             Markoff::Parser
+    PRIVATE jkqtmathtext
 )
 
 add_library(Markoff::Canvas ALIAS markoff_canvas)

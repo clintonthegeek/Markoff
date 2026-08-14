@@ -80,6 +80,7 @@ private slots:
     void setext_underline_promotes_with_level();
     void dollar_promotes_inline_math_with_display_attr();
     void inference_reports_display_math_for_double_dollar();
+    void typing_second_dollar_sets_display_mode();
 };
 
 void TstCanvasKindTransition::hash_space_promotes_heading_caret_survives()
@@ -245,10 +246,12 @@ void TstCanvasKindTransition::dollar_promotes_inline_math_with_display_attr()
 
 void TstCanvasKindTransition::inference_reports_display_math_for_double_dollar()
 {
-    // Typing cannot reach display math: the first '$' already promotes the
-    // block to Math, and promotion only runs on Paragraphs (the live leaf
-    // behaves identically). The rule itself distinguishes the two, so a
-    // later task that re-infers within Math has the information it needs.
+    // The FIRST '$' always promotes to inline Math before a second '$' can
+    // arrive (promotion only runs on Paragraphs), so the buffer-level
+    // inference rule itself distinguishes the two forms rather than typing
+    // ever landing on Math with two markers already present. P5.3 (below)
+    // uses this same distinction via a re-infer-within-Math path
+    // (View::updateCaretMathDisplayMode) to reach display mode by typing.
     const Markoff::KindInference inline_ = Markoff::inferBlockKind(QStringLiteral("$x$"));
     QCOMPARE(inline_.kind, BlockKind::Math);
     QCOMPARE(inline_.mathDisplay, false);
@@ -256,6 +259,44 @@ void TstCanvasKindTransition::inference_reports_display_math_for_double_dollar()
     const Markoff::KindInference display = Markoff::inferBlockKind(QStringLiteral("$$x$$"));
     QCOMPARE(display.kind, BlockKind::Math);
     QCOMPARE(display.mathDisplay, true);
+}
+
+// P5.3: closes the P1.1 finding ("display math is unreachable by typing...
+// left for whoever needs display math"). The second '$' arrives while the
+// block is already Math (not Paragraph), so promoteCaretBlockKind's normal
+// guard would skip it entirely without the dedicated Math branch added
+// this task (View::updateCaretMathDisplayMode, mirrors
+// updateCaretHeadingLevel's raise-only shape).
+void TstCanvasKindTransition::typing_second_dollar_sets_display_mode()
+{
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown("Hello world.\n");
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId block = doc.iterateBlocks().front();
+    QVERIFY(clickAtBlockStart(view, block));
+
+    QTest::keyClicks(&view, QStringLiteral("$"));
+    QCOMPARE(doc.blockKind(block), BlockKind::Math);
+    QCOMPARE(boolAttr(doc, block, Markoff::AttrNames::DisplayMode, true), false);
+
+    QTest::keyClicks(&view, QStringLiteral("$"));
+    QCOMPARE(doc.blockKind(block), BlockKind::Math);
+    QCOMPARE(boolAttr(doc, block, Markoff::AttrNames::DisplayMode, false), true);
+
+    // Content typed after the display promotion doesn't need to re-infer
+    // again (already display) — buffer just keeps growing normally (the
+    // caret is at byte 2, right after the two typed '$'s, ahead of the
+    // pre-existing "Hello world." text — same "typed prefix" shape every
+    // other promotion test in this file already exercises).
+    QTest::keyClicks(&view, QStringLiteral("x^2$$"));
+    QCOMPARE(doc.blockText(block), QByteArray("$$x^2$$Hello world."));
+    QCOMPARE(boolAttr(doc, block, Markoff::AttrNames::DisplayMode, false), true);
 }
 
 QTEST_MAIN(TstCanvasKindTransition)
