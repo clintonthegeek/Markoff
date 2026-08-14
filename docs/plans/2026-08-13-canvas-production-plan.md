@@ -41,8 +41,19 @@ tasks (marked ⏸) and user gates (G1–G3) are hard stops.
 - Falsification protocol for every functional test (unchanged from
   the spike): make it pass → plant a break in a throwaway commit →
   watch it fail → revert → record both SHAs. Perf/audit tasks exempt.
-- Run the **full** suite (`scripts/run-tests.sh`) before commit. The
-  baseline only ratchets up (288/288 at arc open).
+- **Test-run tier before commit** — full suite is not the default per
+  task; it's reserved for tasks with real cross-leaf risk:
+  - **Canvas-scoped only** (`scripts/run-tests.sh -R canvas`): the
+    default. Any task whose diff stays inside
+    `libs/markoff-canvas/` and doesn't change a core seam's observable
+    behavior for other consumers.
+  - **Full suite** (`scripts/run-tests.sh`): required when the task
+    touches `libs/markoff-core/` (a promoted seam can regress live/
+    styled/source silently) OR edits more than one leaf. Also required
+    at every ⏸ phase-close task, regardless of what that task itself
+    touches.
+  - Unsure which tier a task lands in: run the full suite. The cost of
+    a wrong guess only cuts one way.
 
 **End:** tick the checkbox, fill SHAs, append surprises to the
 **findings log at the bottom of this file** (one line minimum; the
