@@ -85,6 +85,27 @@ public:
     void setTheme(const Theme &theme);
     const Theme &theme() const;
 
+    /// Read-only gate (contract-v2 P3.3, spec §4.2): the single authority
+    /// every mutation-ingress path below checks (mirrors the live leaf's
+    /// `binding()->readOnly` six-gate table, this file's CLAUDE.md
+    /// cheat-sheet reference). Navigation, selection, copy, and find are
+    /// unaffected — only paths that call `d2ApplyBufferEdit`/
+    /// `d2SetBlockKind`/`undoD2`/`redoD2` or otherwise mutate the document
+    /// gate on this.
+    void setReadOnly(bool ro);
+    bool isReadOnly() const;
+
+    /// Caret rectangle in THIS widget's (View's) coordinate system — i.e.
+    /// viewport-local pixels translated into View's own frame, matching
+    /// `QWidget::inputMethodQuery(Qt::ImCursorRectangle)`'s convention.
+    /// `Markoff::Canvas::EditorWidget::caretRect()` is a thin pass-through
+    /// (View fills EditorWidget's client area, spec §4.1 composition).
+    /// Invalid QRect if there is no document, no caret, or the caret's
+    /// block is not currently realized. Table-cell carets (T9) are not yet
+    /// special-cased here — same known gap as `inputMethodQuery`'s
+    /// `Qt::ImCursorRectangle` case, which this shares its math with.
+    QRect caretRect() const;
+
     // ---- Inspection surface -------------------------------------------
     // Read-only views onto the derived cache, for tests and the manual
     // harness. Nothing here is authority; it all recomputes from the
@@ -232,6 +253,10 @@ private:
     /// load-bearing again in T4).
     void clampCaret(int oldCaretIndexHint);
     void ensureCaretVisible();
+    /// Shared math behind `caretRect()` and `inputMethodQuery`'s
+    /// `Qt::ImCursorRectangle` case — viewport-local pixel rect of the
+    /// caret in the realized entry's layout. Invalid QRect if unrealized.
+    QRect caretRectInViewport() const;
 
     // ---- Kind transitions (T6) -------------------------------------------
 
@@ -282,6 +307,8 @@ private:
     CanvasCursor m_caret;
     std::optional<CanvasCursor> m_selectionAnchor;
     bool m_hasFocus = false;
+    /// Read-only gate authority (P3.3). See `setReadOnly`'s doc comment.
+    bool m_readOnly = false;
     // ---- IME (T8) ---------------------------------------------------------
     // Composition state the document doesn't know about (same exception as
     // m_selectionAnchor, T5): a preedit string exists only in this leaf's

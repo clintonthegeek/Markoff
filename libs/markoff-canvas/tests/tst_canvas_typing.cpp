@@ -41,6 +41,7 @@ private slots:
     void typing_updates_buffer_and_caret();
     void mouse_click_places_caret_by_hit_test();
     void backspace_and_delete_remove_clusters();
+    void read_only_blocks_printable_and_backspace_but_not_navigation();
 };
 
 void TstCanvasTyping::typing_updates_buffer_and_caret()
@@ -151,6 +152,53 @@ void TstCanvasTyping::backspace_and_delete_remove_clusters()
     QTest::keyClick(&view, Qt::Key_End);
     QTest::keyClick(&view, Qt::Key_Delete);
     QCOMPARE(doc.blockText(block), QByteArray("b"));
+}
+
+// P3.3 — read-only gates. setReadOnly(true) must block printable
+// insertion, Backspace/Delete, and Enter-split (StructuralKeyHandler),
+// while caret navigation (arrow keys, Home/End) keeps working — spec
+// §4.2's "navigation/selection/copy/find keep working" half of the
+// contract.
+void TstCanvasTyping::read_only_blocks_printable_and_backspace_but_not_navigation()
+{
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown("Hello\n");
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId block = doc.iterateBlocks().front();
+    const QRectF rect = view.blockRect(block);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(rect.x()) + 30, int(rect.y()) + 8));
+    QTest::keyClick(&view, Qt::Key_End);
+    const int caretBefore = view.caretByteOffset();
+
+    view.setReadOnly(true);
+    QVERIFY(view.isReadOnly());
+
+    QTest::keyClicks(&view, QStringLiteral("X"));
+    QCOMPARE(doc.blockText(block), QByteArray("Hello"));
+
+    QTest::keyClick(&view, Qt::Key_Backspace);
+    QCOMPARE(doc.blockText(block), QByteArray("Hello"));
+
+    QTest::keyClick(&view, Qt::Key_Return);
+    QCOMPARE(doc.iterateBlocks().size(), size_t(1));
+
+    // Navigation is unaffected while read-only.
+    QTest::keyClick(&view, Qt::Key_Home);
+    QCOMPARE(view.caretByteOffset(), 0);
+    QTest::keyClick(&view, Qt::Key_End);
+    QCOMPARE(view.caretByteOffset(), caretBefore);
+
+    // The gate lifts cleanly.
+    view.setReadOnly(false);
+    QTest::keyClicks(&view, QStringLiteral("X"));
+    QCOMPARE(doc.blockText(block), QByteArray("HelloX"));
 }
 
 QTEST_MAIN(TstCanvasTyping)

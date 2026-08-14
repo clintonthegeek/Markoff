@@ -64,6 +64,7 @@ private slots:
     void preedit_then_empty_no_commit_leaves_buffer_unchanged();
     void commit_into_non_empty_block_inserts_at_caret();
     void composing_lifecycle_matches_qt_native();
+    void read_only_blocks_ime_commit();
 };
 
 void TstCanvasIme::commit_after_preedit_lands_in_buffer()
@@ -191,6 +192,38 @@ void TstCanvasIme::composing_lifecycle_matches_qt_native()
 
     sendPreedit(view, QString());
     QVERIFY(!view.isComposing());
+}
+
+// P3.3's named falsification target: the IME-commit read-only gate.
+// setReadOnly(true) must block a commit from ever reaching the document —
+// no partial application, no preedit splice either (View::inputMethodEvent
+// disables composition outright while read-only, see its doc comment).
+void TstCanvasIme::read_only_blocks_ime_commit()
+{
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown("seed\n");
+    const BlockId block = doc.iterateBlocks().front();
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+    placeCaretAtEnd(view, block);
+
+    view.setReadOnly(true);
+    QVERIFY(view.isReadOnly());
+
+    sendPreedit(view, QStringLiteral("ab"));
+    QVERIFY(!view.isComposing());  // composition itself is disabled
+    QCOMPARE(doc.blockText(block), QByteArray("seed"));
+
+    sendCommit(view, QStringLiteral("ab"));
+    QCOMPARE(doc.blockText(block), QByteArray("seed"));  // never mutated
+
+    view.setReadOnly(false);
+    sendCommit(view, QStringLiteral("ab"));
+    QCOMPARE(doc.blockText(block), QByteArray("seedab"));  // gate lifts cleanly
 }
 
 QTEST_MAIN(TstCanvasIme)

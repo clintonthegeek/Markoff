@@ -214,4 +214,25 @@ View *EditorWidget::view() const noexcept
     return m_view;
 }
 
+void EditorWidget::setReadOnly(bool ro)
+{
+    Markoff::MarkdownView::setReadOnly(ro);
+    if (m_view)
+        m_view->setReadOnly(ro);
+}
+
+QRect EditorWidget::caretRect() const
+{
+    if (!m_view)
+        return {};
+    const QRect r = m_view->caretRect();
+    if (!r.isValid())
+        return r;
+    // View::caretRect() is already in View's own local coordinates; map
+    // into this widget's frame explicitly rather than assume the
+    // zero-margin QVBoxLayout keeps them identical (mapTo is correct even
+    // if that layout ever grows a margin).
+    return r.translated(m_view->mapTo(const_cast<EditorWidget *>(this), QPoint(0, 0)));
+}
+
 }  // namespace Markoff::Canvas

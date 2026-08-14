@@ -24,6 +24,7 @@ class TstCanvasSelection : public QObject {
 
 private slots:
     void drag_selection_both_directions_copy_and_collapse();
+    void read_only_blocks_cut_but_not_copy();
 };
 
 void TstCanvasSelection::drag_selection_both_directions_copy_and_collapse()
@@ -146,6 +147,46 @@ void TstCanvasSelection::drag_selection_both_directions_copy_and_collapse()
         QCOMPARE(view.caretBlock(), blocksAfter[0]);
         QCOMPARE(view.caretByteOffset(), b0 + 1);
     }
+}
+
+// P3.3 — read-only gate. Ctrl+X must not mutate the document (nor even
+// touch the clipboard, mirroring Qt's disabled-Cut-action convention)
+// while read-only; Ctrl+C keeps working per spec §4.2's "copy keeps
+// working" half.
+void TstCanvasSelection::read_only_blocks_cut_but_not_copy()
+{
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown("Alpha one.\n");
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId block = doc.iterateBlocks().front();
+    const QRectF rect = view.blockRect(block);
+    QTest::mousePress(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(rect.x()) + 2, int(rect.y()) + 8));
+    QTest::mouseMove(view.viewport(), QPoint(int(rect.x()) + 40, int(rect.y()) + 8));
+    QTest::mouseRelease(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                        QPoint(int(rect.x()) + 40, int(rect.y()) + 8));
+    QVERIFY(view.hasSelection());
+    const QByteArray before = doc.blockText(block);
+    const int lo = qMin(view.selectionAnchorByteOffset(), view.caretByteOffset());
+    const int hi = qMax(view.selectionAnchorByteOffset(), view.caretByteOffset());
+    const QByteArray expectedSelection = before.mid(lo, hi - lo);
+
+    view.setReadOnly(true);
+    QGuiApplication::clipboard()->clear();
+
+    QTest::keyClick(&view, Qt::Key_X, Qt::ControlModifier);
+    QCOMPARE(doc.blockText(block), before);
+    QVERIFY(view.hasSelection());  // Cut is a full no-op, not just the delete half
+    QVERIFY(QGuiApplication::clipboard()->text().isEmpty());
+
+    QTest::keyClick(&view, Qt::Key_C, Qt::ControlModifier);
+    QCOMPARE(QGuiApplication::clipboard()->text().toUtf8(), expectedSelection);
 }
 
 QTEST_MAIN(TstCanvasSelection)

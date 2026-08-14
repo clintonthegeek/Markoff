@@ -9,12 +9,16 @@
 //   - checkContextChangedKindGated /
 //     checkContextChangedOnStructuralKindChangeWithoutCaretMove — EditorWidget
 //     does not emit contextChanged yet (P3.5).
-// checkReadOnlyBlocksUndoAndKeepsBytes and checkFontScaleSignal pass today
-// via the base class's own storage/gating (setReadOnly/isReadOnly,
-// setFontScale/fontScaleChanged) — EditorWidget has not overridden either
-// yet (P3.3, P3.5), so they exercise the base only. Kept enrolled anyway:
-// they cost nothing and start earning their keep the moment those
-// overrides land.
+// checkReadOnlyBlocksUndoAndKeepsBytes: EditorWidget now overrides
+// setReadOnly (P3.3), forwarding to the composed View — see
+// set_read_only_forwards_to_composed_view below for the wiring pin, and
+// tst_canvas_typing/tst_canvas_selection/tst_canvas_ime for the real
+// keyboard/mouse/IME gates this check doesn't reach (it only exercises
+// undo()/toggleBold() through the base MarkdownView virtuals).
+// checkFontScaleSignal still passes via the base class's own
+// storage/gating only — EditorWidget has not overridden setFontScale yet
+// (P3.5). Kept enrolled anyway: it costs nothing and starts earning its
+// keep the moment that override lands.
 #include <QScrollBar>
 #include <QSignalSpy>
 #include <QTest>
@@ -43,6 +47,37 @@ private Q_SLOTS:
     void read_only_blocks()   { ViewContract::checkReadOnlyBlocksUndoAndKeepsBytes(m_ed, m_doc); }
     void undo_redo_via_base() { ViewContract::checkUndoRedoViaBase(m_ed, m_doc); }
     void font_scale_signal()  { ViewContract::checkFontScaleSignal(m_ed); }
+
+    // ---- P3.3: read-only gates + caretRect --------------------------------
+
+    // EditorWidget::setReadOnly (now overridden, P3.3) must forward to the
+    // composed View — the real authority its six mutation-ingress gates
+    // read (tst_canvas_typing/selection/ime exercise those gates directly
+    // against View; this pins the EditorWidget->View wiring specifically).
+    void set_read_only_forwards_to_composed_view() {
+        QVERIFY(!m_ed->view()->isReadOnly());
+        m_ed->setReadOnly(true);
+        QVERIFY(m_ed->isReadOnly());
+        QVERIFY(m_ed->view()->isReadOnly());
+        QVERIFY(!m_ed->hasEditing());
+        m_ed->setReadOnly(false);
+        QVERIFY(!m_ed->view()->isReadOnly());
+        QVERIFY(m_ed->hasEditing());
+    }
+
+    // caretRect() (base contract's completion-popup anchor, P3.3) is valid
+    // once a document is loaded and the caret is on a realized block —
+    // EditorWidget coordinates, i.e. within its own local rect.
+    void caret_rect_is_valid_and_in_widget_bounds() {
+        m_ed->resize(220, 80);
+        m_ed->show();
+        QVERIFY(QTest::qWaitForWindowExposed(m_ed));
+        m_ed->setCursorPosition({1, 1});
+        const QRect r = m_ed->caretRect();
+        QVERIFY(r.isValid());
+        QVERIFY(m_ed->rect().contains(r.topLeft()));
+        m_ed->hide();
+    }
 
     // ---- P3.2: cursor/scroll position mapping + signals -------------------
 

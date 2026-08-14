@@ -174,6 +174,50 @@ const Theme &View::theme() const
     return m_theme;
 }
 
+void View::setReadOnly(bool ro)
+{
+    m_readOnly = ro;
+}
+
+bool View::isReadOnly() const
+{
+    return m_readOnly;
+}
+
+QRect View::caretRectInViewport() const
+{
+    if (!m_doc || m_caret.block.isNull())
+        return {};
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return {};
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return {};
+    const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
+    const QTextLine line = e.layout->lineForTextPosition(layoutPos);
+    if (!line.isValid())
+        return {};
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal contentX = pageMargin() + e.style.leftIndent;
+    const qreal contentY = (e.y - scrollY) + e.style.topMargin;
+    return QRectF(contentX + line.cursorToX(layoutPos), contentY + line.y(),
+                 1, line.height()).toRect();
+}
+
+QRect View::caretRect() const
+{
+    // viewport() is at (0, 0) within View for this QAbstractScrollArea (no
+    // frame/scrollbar-corner offset in this leaf's stylesheet), so the
+    // viewport-local rect IS View's own local rect. Translate explicitly
+    // rather than assume, so a future frame/margin change doesn't silently
+    // break the completion-popup anchor.
+    const QRect r = caretRectInViewport();
+    if (!r.isValid())
+        return r;
+    return r.translated(viewport()->mapTo(const_cast<View *>(this), QPoint(0, 0)));
+}
+
 // ---- Inspection ---------------------------------------------------------
 
 int View::blockCount() const
@@ -1049,7 +1093,11 @@ void View::keyPressEvent(QKeyEvent *event)
     // already valid by the time this handler returns — the document's own
     // synchronous flush, not a view-side defer (spec C2).
     if (event->matches(QKeySequence::Undo) || event->matches(QKeySequence::Redo)) {
-        if (m_doc) {
+        // Read-only gate (P3.3, spec §4.2): this shortcut applies undoD2/
+        // redoD2 directly and bypasses MarkdownView::undo()/redo() (which
+        // already no-ops while read-only over the base store) — it needs
+        // its own check, or Ctrl+Z would mutate a read-only document.
+        if (m_doc && !m_readOnly) {
             m_selectionAnchor.reset();  // no UndoLog selection state (T4)
             if (event->matches(QKeySequence::Undo))
                 m_doc->undoD2();
@@ -1079,14 +1127,23 @@ void View::keyPressEvent(QKeyEvent *event)
         return;
     }
 
-    if (ctrl && (event->key() == Qt::Key_C || event->key() == Qt::Key_X)) {
-        if (hasSelection()) {
+    if (ctrl && event->key() == Qt::Key_C) {
+        if (hasSelection())
             QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
-            if (event->key() == Qt::Key_X) {
-                collapseSelection();
-                ensureCaretVisible();
-                viewport()->update();
-            }
+        event->accept();
+        return;
+    }
+
+    if (ctrl && event->key() == Qt::Key_X) {
+        // Read-only gate (P3.3, spec §4.2): Cut is disabled in its entirety
+        // while read-only — including the copy-to-clipboard half — mirroring
+        // Qt's own QAction-disabled convention for Cut (unlike Copy, which
+        // stays enabled and has its own branch above).
+        if (!m_readOnly && hasSelection()) {
+            QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
+            collapseSelection();
+            ensureCaretVisible();
+            viewport()->update();
         }
         event->accept();
         return;
@@ -1103,6 +1160,23 @@ void View::keyPressEvent(QKeyEvent *event)
                              || event->key() == Qt::Key_Return
                              || event->key() == Qt::Key_Enter
                              || isPrintable;
+    // Read-only gate (P3.3, spec §4.2): every remaining mutation ingress —
+    // selection-collapse-on-type, StructuralKeyHandler (Enter split,
+    // boundary Backspace/Delete merge, Tab/Shift+Tab list indent),
+    // in-block Backspace/Delete, and printable insertion — is swallowed
+    // here in one place, before any of it runs. A superset of
+    // `isMutatingKey` (adds Tab/Backtab, StructuralKeyHandler's list-indent
+    // keys, which the selection-collapse block below deliberately excludes
+    // — Tab-with-a-selection is not "collapse then type" today).
+    // Navigation (arrow keys, Home/End, PageUp/Down, handled above/below
+    // this point) and selection-extension (Shift+move, Ctrl+A, handled
+    // above) are untouched: this block only ever matches keys that mutate.
+    if (m_readOnly && (isMutatingKey || event->key() == Qt::Key_Tab
+                       || event->key() == Qt::Key_Backtab)) {
+        event->accept();
+        return;
+    }
+
     if (hasSelection() && isMutatingKey) {
         collapseSelection();
         if (event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete) {
@@ -1280,6 +1354,17 @@ void View::inputMethodEvent(QInputMethodEvent *event)
         return;
     }
 
+    // Read-only gate (P3.3, spec §4.2) — the task's named falsification
+    // target: IME composition never mutates the document while read-only.
+    // Disabled outright (no preedit splice either) rather than letting
+    // composition run and only blocking the eventual commit — a live
+    // composition that can never commit is a worse UX than none at all,
+    // and matches "cut disabled in its entirety" above.
+    if (m_readOnly) {
+        event->accept();
+        return;
+    }
+
     // Mirror QWidgetTextControlPrivate::inputMethodEvent's ordering (plan
     // T8): replacement + commit are a real document edit at the caret,
     // issued as one d2ApplyBufferEdit (replacementStart/Length relative to
@@ -1329,23 +1414,8 @@ QVariant View::inputMethodQuery(Qt::InputMethodQuery query) const
     const QByteArray text = m_doc->blockText(m_caret.block);
 
     switch (query) {
-    case Qt::ImCursorRectangle: {
-        const int idx = m_cache->indexOf(m_caret.block);
-        if (idx < 0)
-            return {};
-        const auto &e = m_cache->entries()[size_t(idx)];
-        if (!e.layout)
-            return {};
-        const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
-        const QTextLine line = e.layout->lineForTextPosition(layoutPos);
-        if (!line.isValid())
-            return {};
-        const qreal scrollY = verticalScrollBar()->value();
-        const qreal contentX = pageMargin() + e.style.leftIndent;
-        const qreal contentY = (e.y - scrollY) + e.style.topMargin;
-        return QRectF(contentX + line.cursorToX(layoutPos), contentY + line.y(),
-                     1, line.height()).toRect();
-    }
+    case Qt::ImCursorRectangle:
+        return caretRectInViewport();
     case Qt::ImSurroundingText:
         return QString::fromUtf8(text);
     case Qt::ImCursorPosition:

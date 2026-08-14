@@ -99,6 +99,20 @@ public:
 
     bool hasCursor() const override { return true; }
 
+    /// Base store (`isReadOnly()`/`hasEditing()` read it) + push to the
+    /// composed `View`'s own `setReadOnly` — the single authority its six
+    /// mutation-ingress gates read (P3.3, spec §4.2; mirrors
+    /// `Markoff::Live::EditorWidget::setReadOnly`'s pattern).
+    void setReadOnly(bool ro) override;
+
+    bool hasEditing() const override { return !isReadOnly(); }
+
+    /// Composed `View::caretRect()`, which already reports in View's own
+    /// widget-local coordinates — a pass-through, since View fills this
+    /// widget's entire client area (spec §4.1 composition; no translation
+    /// needed beyond View's own viewport->View mapping).
+    QRect caretRect() const override;
+
     /// The composed rendering/input engine. Non-owning; valid for the
     /// widget's lifetime. Leaf-specific escape hatch for tests/demo, same
     /// role as `Live::EditorWidget::binding()`.
