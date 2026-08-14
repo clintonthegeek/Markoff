@@ -128,7 +128,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.1 Full inline kind set (highlight/strike/link/wikilink/tag/footnote-ref) | ☑ | `a51917f8` | `81bb62fe` / `6c51bbe5` |
 | P4.2 Link activation + hover | ☑ | `0d4b49b1` | `bf1fffb0` / `3cf92c23` |
 | P4.3 FormatOps verbs + CanvasActionController | ☑ | `2c3f482a` / `a1fe576f` | `48545c18` / `fa11992e` |
-| P4.4 Context menu | ☐ | | |
+| P4.4 Context menu | ☑ | `7944edc3` | `f3ce2870` / `f2fed72b` |
 | P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☐ | | |
 | P4.9 Inline title band (user-directed; spec §5.2) | ☐ | | |
 | P4.6 Code-block syntax highlighting | ☐ | | |
@@ -515,6 +515,26 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.4 (2026-08-14).**
+
+- Paste didn't exist in the leaf at all before this task (no
+  `Key_V` handling anywhere in `View.cpp`) — P4.4 ended up building
+  canvas's first real paste path (clipboard text insertion, multi-line
+  split routed through the existing `tryStructuralKey` path), not just
+  its context-menu affordance. This closes the gap the P3.3 findings
+  entry flagged ("no Ctrl+V handling anywhere ... deferred to P4.4").
+  Ctrl+V wired too, beyond the task's literal menu-only wording.
+- `check-constitution.sh`'s C2 regex (`singleShot\(0`) false-positives
+  on a legitimate `QTimer::singleShot(0, ...)` test pattern used to
+  intercept `QMenu::exec()`'s nested event loop; worked around with
+  `singleShot(20, ...)` + a comment. Worth tightening the script's
+  regex if this recurs.
+- `QMenu::exec()` genuinely blocks (nested event loop) — a guessed
+  pixel click-point in the first draft of the e2e context-menu test
+  hung the whole `-R canvas` run for 137s. Any future context-menu
+  test should use the exact-QChar `pointForFullQChar` technique
+  (`tst_canvas_links.cpp`) rather than guessed coordinates.
 
 **P4.3 (2026-08-14).**
 
