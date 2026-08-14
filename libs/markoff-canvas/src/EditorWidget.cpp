@@ -13,6 +13,7 @@
 #include <markoff/core/Session.h>
 #include <markoff/core/TextUnits.h>
 
+#include <markoff/canvas/CanvasActionController.h>
 #include <markoff/canvas/View.h>
 
 namespace coords = Markoff::TextUnits;
@@ -89,6 +90,9 @@ EditorWidget::EditorWidget(QWidget *parent)
     : Markoff::MarkdownView(parent)
 {
     m_view = new View(this);
+    m_actionController = new CanvasActionController(this);
+    m_actionController->setView(m_view);
+
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
     layout->setSpacing(0);
@@ -155,6 +159,7 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     // sticks; see the attach-window note on the class doc.
     Markoff::MarkdownView::setDocument(doc);
     m_view->setDocument(doc);
+    m_actionController->setDocument(doc);
 
     if (doc) {
         m_docDestroyedCon = QObject::connect(doc, &QObject::destroyed, this, [this] {
@@ -423,6 +428,50 @@ void EditorWidget::restoreEphemeralState(const QJsonObject &state)
 View *EditorWidget::view() const noexcept
 {
     return m_view;
+}
+
+CanvasActionController *EditorWidget::actionController() const noexcept
+{
+    return m_actionController;
+}
+
+// --- Format verbs (contract-v2 P4.3) ---
+// Each verb delegates straight to the composed View's own method — no
+// second implementation, and no indirection through actionController()'s
+// QActions (QAction::trigger() would work too, since its slots call the
+// same View methods, but going direct here avoids a disabled-action
+// early-return silently swallowing a call made through the base contract
+// API rather than through a QAction a consumer forgot to enable).
+
+void EditorWidget::toggleBold()
+{
+    if (m_view) m_view->toggleBold();
+}
+
+void EditorWidget::toggleItalic()
+{
+    if (m_view) m_view->toggleItalic();
+}
+
+void EditorWidget::toggleStrikethrough()
+{
+    if (m_view) m_view->toggleStrikethrough();
+}
+
+void EditorWidget::toggleInlineCode()
+{
+    if (m_view) m_view->toggleInlineCode();
+}
+
+void EditorWidget::insertLink()
+{
+    if (m_view) m_view->insertLink();
+}
+
+void EditorWidget::setHeadingLevel(int level)
+{
+    if (level < 0 || level > 6) return;
+    if (m_view) m_view->setHeadingLevel(level);
 }
 
 void EditorWidget::setReadOnly(bool ro)

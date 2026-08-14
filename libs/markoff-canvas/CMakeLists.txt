@@ -20,6 +20,8 @@ add_library(markoff_canvas STATIC
     src/View.cpp
     include/markoff/canvas/EditorWidget.h
     src/EditorWidget.cpp
+    include/markoff/canvas/CanvasActionController.h
+    src/CanvasActionController.cpp
     src/BlockLayoutCache.h
     src/BlockLayoutCache.cpp
     src/BlockPresentation.h

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <optional>
 #include <utility>
@@ -12,6 +13,7 @@
 #include <QVariant>
 
 #include <markoff/core/BlockId.h>
+#include <markoff/core/FormatOps.h>
 #include <markoff/core/LinkActivation.h>
 #include <markoff/core/Theme.h>
 
@@ -293,6 +295,30 @@ public:
     /// `setFromContext`.
     void setFromContext(const QString &context);
 
+    // ---- Format verbs (contract-v2 P4.3) ---------------------------------
+    // Each op is a thin per-block driver over the new
+    // `<markoff/core/FormatOps.h>` per-block overloads (C4: no flat/global
+    // byte offsets). No-op while read-only or with no document/caret. A
+    // caret-only call (no selection) inserts a paired-marker template and
+    // parks the caret inside it, matching the old leaves' behavior; a
+    // selection spanning multiple blocks applies the op independently to
+    // each covered block's own local byte range — never a cross-block byte
+    // sum — and collapses the selection to the trailing edge afterward
+    // (mirrors `FormatOps::wrapToggle`'s own multi-slice tail behavior).
+
+    void toggleBold();
+    void toggleItalic();
+    void toggleStrikethrough();
+    void toggleInlineCode();
+    /// Selection: wraps `[selection](url)` and leaves `url` selected for
+    /// easy replace. No selection: inserts `[](url)` and parks the caret
+    /// between `[]`.
+    void insertLink();
+    /// Acts on the caret's own block only (headings are never multi-block).
+    /// `level` 0 demotes to a plain paragraph (strips the ATX prefix);
+    /// 1..6 sets/replaces it. Out-of-range levels are a no-op.
+    void setHeadingLevel(int level);
+
 signals:
     /// Fired from `ensureCaretVisible()` (P3.2) — the file's single
     /// chokepoint every caret-changing code path already calls afterward
@@ -304,6 +330,14 @@ signals:
     /// `EditorWidget` does the real change-gating in `CursorPos` space, the
     /// coordinate space its own `cursorPositionChanged` contract is in.
     void caretChanged();
+
+    /// Fired from `setReadOnly()` on an actual change (gated, unlike
+    /// `caretChanged()`). Contract-v2 seam (P4.3): the read-only half of
+    /// `CanvasActionController::updateEnabledStates`'s enabled-state
+    /// wiring — the other half rides `caretChanged`/the document's
+    /// `d2DocumentChanged`, neither of which fires on a read-only flip by
+    /// itself.
+    void readOnlyChanged(bool ro);
 
 protected:
     void paintEvent(QPaintEvent *event) override;
@@ -415,6 +449,23 @@ private:
     /// no cross-block byte math). Caret lands at the first corner; the
     /// selection is cleared. No-op if there is no selection.
     void collapseSelection();
+
+    // ---- Format verbs (P4.3) ----------------------------------------------
+
+    /// Shared driver behind `toggleBold`/`Italic`/`Strikethrough`/
+    /// `InlineCode` and `insertLink`: dispatches to the caret-only,
+    /// single-block-selection, or multi-block-selection case, invoking
+    /// `applyOne` once per covered block with that block's own local byte
+    /// range (never a cross-block sum). `applyOne` is
+    /// `FormatOps::wrapToggleInBlock`/`insertLinkInBlock` bound to its
+    /// extra argument (the delimiter, or nothing for the link op). A
+    /// single-block result restores the returned selection/caret exactly;
+    /// a multi-block result collapses to the last covered block's returned
+    /// caret/selection end, mirroring `FormatOps::wrapToggle`'s own
+    /// multi-slice tail behavior.
+    using FormatOpFn = std::function<std::optional<Markoff::FormatOps::ByteRange>(
+        BlockId, Markoff::FormatOps::ByteRange)>;
+    void applyFormatOp(const FormatOpFn &applyOne);
 
     // ---- Links (P4.2) -----------------------------------------------------
 

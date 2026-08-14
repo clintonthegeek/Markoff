@@ -18,6 +18,7 @@ class Session;
 namespace Markoff::Canvas {
 
 class View;
+class CanvasActionController;
 
 /// `Markoff::MarkdownView` contract-v2 wrapper composing the projection
 /// `View` (spec §4.1 "EditorWidget wrapper"). `View` stays public for tests
@@ -172,6 +173,26 @@ public:
     /// scroll re-anchor; see its doc comment.
     void setFontScale(qreal s) override;
 
+    // ---- Format verbs (contract-v2 P4.3) ---------------------------------
+    // Each override delegates to the composed View's own verb, which is
+    // itself a thin driver over core FormatOps's per-block overloads —
+    // exactly one implementation of each op, reachable both through this
+    // base-contract API AND through actionController()'s QActions (the
+    // QAction triggers call the same View methods directly, not through
+    // here — see CanvasActionController's own doc).
+
+    void toggleBold() override;
+    void toggleItalic() override;
+    void toggleStrikethrough() override;
+    void toggleInlineCode() override;
+    void insertLink() override;
+    void setHeadingLevel(int level) override;
+
+    /// QActions for the format-verb set (P4.3) — Corbomite binds its KF6
+    /// shortcuts to these. Non-owning; valid for the widget's lifetime,
+    /// same role as `view()`.
+    CanvasActionController *actionController() const noexcept;
+
 private:
     /// Recomputes `EditorContext` from the composed `View`'s caret block
     /// (kind + heading level + table row/col via `View::caretTableCell()`,
@@ -199,6 +220,7 @@ private:
     void onFindNavigationRequested(Markoff::FindController::Match match);
 
     View *m_view = nullptr;
+    CanvasActionController *m_actionController = nullptr;
     Markoff::Session *m_session = nullptr;
     QMetaObject::Connection m_docDestroyedCon;
     /// Last `CursorPos` this widget emitted `cursorPositionChanged` for —

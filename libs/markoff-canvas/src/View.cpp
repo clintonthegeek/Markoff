@@ -18,6 +18,7 @@
 
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/KindInference.h>
@@ -246,7 +247,10 @@ void View::setFontScale(qreal scale)
 
 void View::setReadOnly(bool ro)
 {
+    if (m_readOnly == ro)
+        return;
     m_readOnly = ro;
+    emit readOnlyChanged(ro);
 }
 
 bool View::isReadOnly() const
@@ -974,6 +978,147 @@ void View::collapseSelection()
 
     m_caret = start;
     m_selectionAnchor.reset();
+}
+
+// ---- Format verbs (P4.3) --------------------------------------------------
+
+void View::applyFormatOp(const FormatOpFn &applyOne)
+{
+    if (!m_doc || m_readOnly || m_caret.block.isNull())
+        return;
+
+    using Markoff::FormatOps::ByteRange;
+
+    const auto sel = orderedSelection();
+
+    if (!sel) {
+        // Caret only: single call at the caret's own position. Note:
+        // applyOne's underlying FormatOps call flushes the document change
+        // synchronously (C2 forbids deferral in this leaf), so
+        // onDocumentChanged() has already re-synced the cache against the
+        // OLD m_caret by the time this returns — setCaret() below is what
+        // actually moves the caret to the op's result and re-syncs it a
+        // second time against the correct (post-edit) block content.
+        const ByteRange r{m_caret.byteOffset, m_caret.byteOffset};
+        const auto result = applyOne(m_caret.block, r);
+        if (!result)
+            return;  // no-op (matches FormatOps' nullopt contract)
+        m_selectionAnchor.reset();
+        setCaret(CanvasCursor{m_caret.block, result->start});
+        return;
+    }
+
+    const auto &[start, end] = *sel;
+
+    if (start.block == end.block) {
+        // Single-block selection: exact restoration, same as FormatOps'
+        // own single-slice case.
+        const ByteRange r{start.byteOffset, end.byteOffset};
+        const auto result = applyOne(start.block, r);
+        if (!result)
+            return;
+        m_selectionAnchor = CanvasCursor{start.block, result->start};
+        setCaret(CanvasCursor{start.block, result->end});
+        return;
+    }
+
+    // Multi-block selection: apply to each covered block's own local byte
+    // range (never a cross-block sum, C4) inside one outer transaction so
+    // the whole gesture is one undo step (UndoLog transactions nest — same
+    // pattern collapseSelection's structural-merge tail relies on).
+    //
+    // Read the covered (block, range) list FIRST, before any mutation —
+    // same discipline as collapseSelection's `middles` collection. Each
+    // applyOne() call below flushes synchronously (C2), which re-syncs
+    // m_cache's own entries vector via onDocumentChanged(); iterating that
+    // vector live while mutating through it would be a use-after-resync.
+    std::vector<std::pair<BlockId, ByteRange>> covered;
+    for (const auto &e : m_cache->entries()) {
+        const int idx = m_cache->indexOf(e.id);
+        if (idx < m_cache->indexOf(start.block) || idx > m_cache->indexOf(end.block))
+            continue;
+        const auto [from, to] = selectedByteRangeInBlock(e.id, start, end);
+        if (to <= from)
+            continue;  // nothing selected in this block (shouldn't happen for
+                       // a boundary block, but middles can be empty)
+        covered.emplace_back(e.id, ByteRange{from, to});
+    }
+
+    BlockId lastBlock;
+    std::optional<ByteRange> lastResult;
+    {
+        Markoff::UndoLog::Transaction t(m_doc->d2UndoLog());
+        for (const auto &[id, range] : covered) {
+            const auto result = applyOne(id, range);
+            if (result) {
+                lastBlock = id;
+                lastResult = result;
+            }
+        }
+    }
+
+    m_selectionAnchor.reset();
+    if (lastResult) {
+        // Collapse to the trailing edge of the last covered block that
+        // actually changed, mirroring FormatOps::wrapToggle's own
+        // multi-slice tail.
+        const int size = m_doc->blockText(lastBlock).size();
+        setCaret(CanvasCursor{lastBlock, qBound(0, lastResult->end, size)});
+    } else {
+        setCaret(end);
+    }
+}
+
+void View::toggleBold()
+{
+    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+        return Markoff::FormatOps::wrapToggleInBlock(m_doc, b, r, "**");
+    });
+}
+
+void View::toggleItalic()
+{
+    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+        return Markoff::FormatOps::wrapToggleInBlock(m_doc, b, r, "_");
+    });
+}
+
+void View::toggleStrikethrough()
+{
+    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+        return Markoff::FormatOps::wrapToggleInBlock(m_doc, b, r, "~~");
+    });
+}
+
+void View::toggleInlineCode()
+{
+    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+        return Markoff::FormatOps::wrapToggleInBlock(m_doc, b, r, "`");
+    });
+}
+
+void View::insertLink()
+{
+    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+        return Markoff::FormatOps::insertLinkInBlock(m_doc, b, r);
+    });
+}
+
+void View::setHeadingLevel(int level)
+{
+    if (!m_doc || m_readOnly || m_caret.block.isNull())
+        return;
+    if (level < 0 || level > 6)
+        return;
+
+    const BlockId block = m_caret.block;
+    const auto result = Markoff::FormatOps::setHeadingLevelInBlock(
+        m_doc, block, m_caret.byteOffset, level);
+    if (!result)
+        return;  // no-op: already at the requested level
+
+    m_selectionAnchor.reset();
+    setCaret(CanvasCursor{block, *result});
 }
 
 void View::insertPrintable(const QString &text)
