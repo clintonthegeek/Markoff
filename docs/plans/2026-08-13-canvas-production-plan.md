@@ -96,7 +96,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 |---|---|---|---|
 | **P1 — core promotions & carried findings** | | | |
 | P1.1 KindTransition → core, with heading level (#18.3, #18.4) | ☑ | `72f446e0` | `c1e21740` / `01734f3f` |
-| P1.2 Coordinates byte↔QChar → core | ☐ | | |
+| P1.2 Coordinates byte↔QChar → core | ☑ | `ac405aa6` | `cd2588f1` / `95385e7f` |
 | P1.3 Theme background-slot fallback + missing slots | ☐ | | |
 | P1.4 Marker-convention canonization (docs + doc-comment) | ☐ | | |
 | P1.5 ⏸ phase close: full suite + constitution + findings sweep | ☐ | | n/a |
