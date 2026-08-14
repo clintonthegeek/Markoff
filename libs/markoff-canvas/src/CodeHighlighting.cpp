@@ -82,11 +82,13 @@ QList<QTextLayout::FormatRange> codeTokenFormatRanges(
     const QByteArray content =
         blockText.mid(fence.contentStart, fence.contentEnd - fence.contentStart);
 
-    // FALSIFY (throwaway, P4.6): feed the wrong language key regardless of
-    // what the fence actually says — the parsed fence.language is ignored.
-    // This must make tst_canvas_code_highlight's token-color test fail.
-    const QList<Markoff::CodeSpan> spans =
-        service.highlight(QStringLiteral("not-a-real-language-xyz"), content);
+    // Service miss (unrecognized language key): highlight() returns an
+    // empty list for this leaf's own def-lookup misses (see
+    // Kf6SyntaxHighlightService::highlight — an invalid Definition returns
+    // {} before doing any tokenizing), so the loop below simply produces no
+    // ranges and the block keeps its plain BlockPresentation monospace
+    // color, per spec's "a service miss renders plain monospace".
+    const QList<Markoff::CodeSpan> spans = service.highlight(fence.language, content);
     ranges.reserve(spans.size());
 
     for (const Markoff::CodeSpan &sp : spans) {
