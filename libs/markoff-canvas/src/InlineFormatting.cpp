@@ -35,6 +35,8 @@ bool delimiterShouldHide(const SourceSpan &span, const QList<int> &cursorsInBloc
         return false;
     if (span.isTag || span.isListMarker || span.isBlockquoteMarker)
         return false;
+    if (span.isHeading)
+        return false;  // FALSIFY: pin heading-prefix visibility on
 
     // Code fences (P2.2, spec §4.2): per-BLOCK reveal, not per-span — the
     // whole fence line shows only when the caret is anywhere in the code
