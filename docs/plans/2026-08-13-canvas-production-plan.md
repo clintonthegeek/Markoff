@@ -115,7 +115,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P2.1 ProjectionMap + omission for emphasis/strong | ☑ | `edb800c5` | `441fd827` / `d7de4364` |
 | P2.2 Omission for heading prefix + code fences | ☑ | `24725a47` | `dcd62756` / `904edc08` |
 | P2.3 Per-cell maps + cross-table selection (#18.2) | ☑ | `bfe0bb4e` | `e9d95a3c` / `0ba7ca4b` |
-| P2.4 ⏸ perf re-baseline (E9 budgets, build-perf) | ☐ | | n/a |
+| P2.4 ⏸ perf re-baseline (E9 budgets, build-perf) | ☑ | n/a | n/a |
 | **P3 — MarkdownView contract v2** | | | |
 | P3.1 EditorWidget wrapper + setDocument/Session + contract harness | ☐ | | |
 | P3.2 Cursor/scroll position mapping + signals | ☐ | | |
@@ -800,6 +800,39 @@ user with a one-page summary of what's proven.
   caught this class of bug), reverted.
 - Full suite: **290/290** (289 baseline + the one new executable).
   `check-constitution.sh` clean.
+
+**P2.4 (2026-08-14) — phase close, perf re-baseline.**
+
+- `build-perf` = `-DCMAKE_BUILD_TYPE=Release`. Re-ran
+  `tst_canvas_perf_500` unchanged: all four E9 budgets hold with the
+  full P2.1–P2.3 projection-map/per-cell-map mechanism active, and
+  with margin to spare — the projection work has not regressed the
+  spike-era numbers:
+  - load → first paint: **143 ms** (budget < 500 ms; NDEBUG-gated
+    assertion, per the T10 finding — Release satisfies it).
+  - p95 keystroke → paint: **0.734 ms** (p50 0.523 ms; budget < 16 ms),
+    mid-document, plain-paragraph caret — same fixture as the spike.
+  - scroll start → end realized: **58/500 = 11.6 %** (budget < 30 %).
+  - RSS delta across the run: **0 KB** (budget < 100 MB).
+- New `tst_canvas_perf_formatted` (`tests/tst_canvas_perf_formatted.cpp`):
+  the 500-doc run's mid-document caret sits in a plain paragraph with no
+  spans nearby, so its ProjectionMap is trivial (no omitted runs) — it
+  never exercises the reveal/omission machinery on the hot per-keystroke
+  path at all. This test types 200 keystrokes with the caret **inside**
+  a revealed `**bold**` span in a single formatted paragraph that also
+  carries a second (unrevealed) `*italic*` span, so the block's
+  `ProjectionMap` carries real kept-run boundaries and rebuilds fully
+  every keystroke (P2.1's restyleInline() note) for the whole run.
+  Result: **p95 1.001 ms, p50 0.707 ms** (budget < 16 ms) — comfortably
+  under, in both `build-perf` (Release) and `build-dev` (unoptimized;
+  ran via `scripts/run-tests.sh -R canvas`, 14/14 green including the
+  new test).
+- No fix needed — all budgets pass with wide margin (p95 keystroke
+  costs sit two orders of magnitude under budget in both the plain and
+  formatted-paragraph cases), so nothing was profiled. Registered in
+  `libs/markoff-canvas/tests/CMakeLists.txt` alongside the existing
+  perf target, `QT_QPA_PLATFORM=offscreen` like every other canvas
+  test. Phase 2 closes clean.
 
 ---
 
