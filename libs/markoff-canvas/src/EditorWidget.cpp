@@ -122,7 +122,12 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     // caller's setCursorPosition() issued right after this call therefore
     // sticks; see the attach-window note on the class doc.
     Markoff::MarkdownView::setDocument(doc);
-    m_view->setDocument(doc);
+    // FALSIFY (throwaway, plan P3.1): defer the caret-resetting half of
+    // setDocument's teardown past this call's return. A caller's
+    // setCursorPosition() issued right after setDocument() now loses the
+    // race against this queued reset once the event loop turns over.
+    QMetaObject::invokeMethod(this, [this, doc] { m_view->setDocument(doc); },
+                               Qt::QueuedConnection);
 
     if (doc) {
         m_docDestroyedCon = QObject::connect(doc, &QObject::destroyed, this, [this] {
