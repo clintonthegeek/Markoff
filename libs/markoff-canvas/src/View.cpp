@@ -24,7 +24,9 @@
 #include <markoff/core/UndoLog.h>
 
 #include "BlockLayoutCache.h"
+#include "InlineFormatting.h"
 #include "InputPredicate.h"
+#include "ProjectionMap.h"
 
 namespace coords = Markoff::TextUnits;
 
@@ -166,17 +168,27 @@ bool View::isDelimiterHiddenAt(BlockId id, int byteOffset) const
     const QByteArray text = m_doc->blockText(id);
     const int qchar = int(coords::byteToQtPos(text, byteOffset));
 
-    const QColor invisible = e.style.background.isValid()
-                            ? e.style.background
-                            : m_theme.color(Theme::Slot::EditorBackground);
+    QList<int> cursorsInBlock;
+    if (id == m_caret.block)
+        cursorsInBlock.push_back(int(coords::byteToQtPos(text, m_caret.byteOffset)));
 
-    for (const QTextLayout::FormatRange &r : e.layout->formats()) {
-        if (qchar >= r.start && qchar < r.start + r.length) {
-            return r.format.hasProperty(QTextFormat::ForegroundBrush)
-                && r.format.foreground().color() == invisible;
-        }
+    const auto omitted = Detail::omittedDelimiterRanges(m_doc->inlineSpansFor(id), cursorsInBlock);
+    for (const auto &[start, length] : omitted) {
+        if (qchar >= start && qchar < start + length)
+            return true;
     }
     return false;
+}
+
+qreal View::lineNaturalWidth(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return -1;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout || e.layout->lineCount() == 0)
+        return -1;
+    return e.layout->lineAt(0).naturalTextWidth();
 }
 
 bool View::isComposing() const
@@ -466,8 +478,7 @@ CanvasCursor View::hitTest(const QPoint &viewportPos) const
     }
 
     const int qcharPos = line.isValid() ? line.xToCursor(localX) : 0;
-    const QByteArray text = m_doc->blockText(e.id);
-    const int byteOff = int(coords::qtPosToByte(text, qcharPos));
+    const int byteOff = e.projection.layoutQCharToByte(qcharPos);
     return CanvasCursor{e.id, byteOff};
 }
 
@@ -674,26 +685,33 @@ void View::deleteCluster(bool forward)
     if (!m_doc || m_caret.block.isNull())
         return;
 
-    const QByteArray text = m_doc->blockText(m_caret.block);
-    const QString qtext = QString::fromUtf8(text);
-    const int qcharPos = int(coords::byteToQtPos(text, m_caret.byteOffset));
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return;  // not yet realized: caret motion no-ops here too (T2)
+
+    // Stepping through the entry's REAL (reveal-aware) layout, not a
+    // throwaway copy of the untransformed text, is what makes a hidden
+    // delimiter run get skipped in one keystroke (spec §4.2 P2.1 exit
+    // criterion) — those bytes simply aren't present in this text.
+    const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
 
     if (forward) {
-        if (qcharPos >= qtext.size())
+        if (layoutPos >= int(e.projection.layoutText().size()))
             return;  // at block end: T3's job (merge with next block)
-        QTextLayout layout(qtext);
-        const int next = layout.nextCursorPosition(qcharPos);
-        const int removed = int(coords::qtPosToByte(text, next))
-                           - m_caret.byteOffset;
+        const int next = e.layout->nextCursorPosition(layoutPos);
+        const int nextByte = e.projection.layoutQCharToByte(next);
+        const int removed = nextByte - m_caret.byteOffset;
         UndoLog::Transaction t(m_doc->d2UndoLog());
         m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset),
                                  uint32_t(removed), QByteArray(), t);
     } else {
-        if (qcharPos <= 0)
+        if (layoutPos <= 0)
             return;  // at block start: T3's job (merge with previous block)
-        QTextLayout layout(qtext);
-        const int prev = layout.previousCursorPosition(qcharPos);
-        const int prevByte = int(coords::qtPosToByte(text, prev));
+        const int prev = e.layout->previousCursorPosition(layoutPos);
+        const int prevByte = e.projection.layoutQCharToByte(prev);
         const int removed = m_caret.byteOffset - prevByte;
         UndoLog::Transaction t(m_doc->d2UndoLog());
         m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(prevByte),
@@ -723,25 +741,31 @@ void View::moveCaretHorizontally(bool forward)
     if (!m_doc || m_caret.block.isNull())
         return;
 
-    const QByteArray text = m_doc->blockText(m_caret.block);
-    const QString qtext = QString::fromUtf8(text);
-    const int qcharPos = int(coords::byteToQtPos(text, m_caret.byteOffset));
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return;  // not yet realized: no-op, same as moveCaretVertically (T2)
+
+    // Stepping through the entry's real (reveal-aware) layout — see
+    // deleteCluster's comment — is what skips a hidden delimiter run in
+    // one press.
+    const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
+    const int layoutLen = int(e.projection.layoutText().size());
 
     if (forward) {
-        if (qcharPos >= qtext.size()) {
-            const int idx = m_cache->indexOf(m_caret.block);
-            if (idx >= 0 && idx + 1 < int(m_cache->entries().size())) {
+        if (layoutPos >= layoutLen) {
+            if (idx + 1 < int(m_cache->entries().size())) {
                 m_caret.block = m_cache->entries()[size_t(idx + 1)].id;
                 m_caret.byteOffset = 0;
             }
             return;
         }
-        QTextLayout layout(qtext);
-        const int next = layout.nextCursorPosition(qcharPos);
-        m_caret.byteOffset = int(coords::qtPosToByte(text, next));
+        const int next = e.layout->nextCursorPosition(layoutPos);
+        m_caret.byteOffset = e.projection.layoutQCharToByte(next);
     } else {
-        if (qcharPos <= 0) {
-            const int idx = m_cache->indexOf(m_caret.block);
+        if (layoutPos <= 0) {
             if (idx > 0) {
                 const auto &prevEntry = m_cache->entries()[size_t(idx - 1)];
                 m_caret.block = prevEntry.id;
@@ -749,9 +773,8 @@ void View::moveCaretHorizontally(bool forward)
             }
             return;
         }
-        QTextLayout layout(qtext);
-        const int prev = layout.previousCursorPosition(qcharPos);
-        m_caret.byteOffset = int(coords::qtPosToByte(text, prev));
+        const int prev = e.layout->previousCursorPosition(layoutPos);
+        m_caret.byteOffset = e.projection.layoutQCharToByte(prev);
     }
 }
 
@@ -766,14 +789,13 @@ void View::moveCaretToLineEdge(bool home)
     if (!e.layout)
         return;
 
-    const QByteArray text = m_doc->blockText(m_caret.block);
-    const int qcharPos = int(coords::byteToQtPos(text, m_caret.byteOffset));
-    const QTextLine line = e.layout->lineForTextPosition(qcharPos);
+    const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
+    const QTextLine line = e.layout->lineForTextPosition(layoutPos);
     if (!line.isValid())
         return;
 
     const int edgeQChar = home ? line.textStart() : line.textStart() + line.textLength();
-    m_caret.byteOffset = int(coords::qtPosToByte(text, edgeQChar));
+    m_caret.byteOffset = e.projection.layoutQCharToByte(edgeQChar);
 }
 
 void View::moveCaretVertically(bool forward)
@@ -787,17 +809,16 @@ void View::moveCaretVertically(bool forward)
     if (!e.layout)
         return;
 
-    const QByteArray text = m_doc->blockText(m_caret.block);
-    const int qcharPos = int(coords::byteToQtPos(text, m_caret.byteOffset));
-    const QTextLine curLine = e.layout->lineForTextPosition(qcharPos);
+    const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
+    const QTextLine curLine = e.layout->lineForTextPosition(layoutPos);
     const int lineNo = curLine.isValid() ? curLine.lineNumber() : 0;
-    const qreal x = curLine.isValid() ? curLine.cursorToX(qcharPos) : 0;
+    const qreal x = curLine.isValid() ? curLine.cursorToX(layoutPos) : 0;
 
     const int targetLineNo = lineNo + (forward ? 1 : -1);
     if (targetLineNo >= 0 && targetLineNo < e.layout->lineCount()) {
         const QTextLine targetLine = e.layout->lineAt(targetLineNo);
         const int newQChar = targetLine.xToCursor(x);
-        m_caret.byteOffset = int(coords::qtPosToByte(text, newQChar));
+        m_caret.byteOffset = e.projection.layoutQCharToByte(newQChar);
         return;
     }
 
@@ -816,8 +837,7 @@ void View::moveCaretVertically(bool forward)
     }
     const QTextLine edgeLine = target.layout->lineAt(forward ? 0 : target.layout->lineCount() - 1);
     const int newQChar = edgeLine.xToCursor(x);
-    const QByteArray targetText = m_doc->blockText(target.id);
-    m_caret.byteOffset = int(coords::qtPosToByte(targetText, newQChar));
+    m_caret.byteOffset = target.projection.layoutQCharToByte(newQChar);
 }
 
 // ---- Events -------------------------------------------------------------
@@ -1152,9 +1172,10 @@ void View::inputMethodEvent(QInputMethodEvent *event)
     if (m_preeditText.isEmpty()) {
         m_cache->clearPreedit(*m_doc, m_theme);
     } else {
-        const QByteArray text = m_doc->blockText(m_caret.block);
-        const qsizetype qcharPos = coords::byteToQtPos(text, m_caret.byteOffset);
-        m_cache->setPreedit(*m_doc, m_theme, m_caret.block, int(qcharPos), m_preeditText);
+        // Byte offset (this block's coordinate space, C4) — the cache
+        // resolves it to a layout position itself, against the projection
+        // it rebuilds for this caret position (spec §4.2).
+        m_cache->setPreedit(*m_doc, m_theme, m_caret.block, m_caret.byteOffset, m_preeditText);
     }
 
     ensureCaretVisible();
@@ -1177,14 +1198,14 @@ QVariant View::inputMethodQuery(Qt::InputMethodQuery query) const
         const auto &e = m_cache->entries()[size_t(idx)];
         if (!e.layout)
             return {};
-        const qsizetype qcharPos = coords::byteToQtPos(text, m_caret.byteOffset);
-        const QTextLine line = e.layout->lineForTextPosition(int(qcharPos));
+        const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
+        const QTextLine line = e.layout->lineForTextPosition(layoutPos);
         if (!line.isValid())
             return {};
         const qreal scrollY = verticalScrollBar()->value();
         const qreal contentX = pageMargin() + e.style.leftIndent;
         const qreal contentY = (e.y - scrollY) + e.style.topMargin;
-        return QRectF(contentX + line.cursorToX(int(qcharPos)), contentY + line.y(),
+        return QRectF(contentX + line.cursorToX(layoutPos), contentY + line.y(),
                      1, line.height()).toRect();
     }
     case Qt::ImSurroundingText:
@@ -1317,12 +1338,20 @@ void View::paintEvent(QPaintEvent *event)
             const auto &[start, end] = *sel;
             const auto [fromByte, toByte] = selectedByteRangeInBlock(e.id, start, end);
             if (toByte > fromByte) {
-                const QByteArray blockText = m_doc->blockText(e.id);
-                const int qFrom = int(coords::byteToQtPos(blockText, fromByte));
-                const int qTo   = int(coords::byteToQtPos(blockText, toByte));
-                QTextCharFormat fmt;
-                fmt.setBackground(m_theme.color(Theme::Slot::SelectionBackground));
-                selections.push_back({qFrom, qTo - qFrom, fmt});
+                // Snap rule (spec §4.2): a selection start landing inside a
+                // hidden run snaps left (shrink toward the visible content),
+                // its end snaps right (grow to cover it) — the range never
+                // shrinks to nothing just because its edge sat inside an
+                // omitted run.
+                const int qFrom = e.projection.byteToLayoutQChar(
+                    fromByte, ProjectionMap::SnapDirection::Left);
+                const int qTo = e.projection.byteToLayoutQChar(
+                    toByte, ProjectionMap::SnapDirection::Right);
+                if (qTo > qFrom) {
+                    QTextCharFormat fmt;
+                    fmt.setBackground(m_theme.color(Theme::Slot::SelectionBackground));
+                    selections.push_back({qFrom, qTo - qFrom, fmt});
+                }
             }
         }
 
@@ -1330,10 +1359,9 @@ void View::paintEvent(QPaintEvent *event)
         e.layout->draw(&p, QPointF(contentX, contentY), selections);
 
         if (m_hasFocus && e.id == m_caret.block) {
-            const QByteArray blockText = m_doc->blockText(e.id);
-            const int qcharPos = int(coords::byteToQtPos(blockText, m_caret.byteOffset));
+            const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
             p.setPen(m_theme.color(Theme::Slot::CursorPrimary));
-            e.layout->drawCursor(&p, QPointF(contentX, contentY), qcharPos);
+            e.layout->drawCursor(&p, QPointF(contentX, contentY), layoutPos);
         }
     }
 }

@@ -7,29 +7,13 @@ namespace Markoff::Canvas::Detail {
 
 namespace {
 
-/// Mirrors InlineHighlighter::delimiterShouldHide (markoff-live), minus the
-/// selection-range reveal (T7's scope is caret-driven visibility only; no
-/// selection-touches-delimiter criterion exists for this leaf).
-bool delimiterShouldHide(const SourceSpan &span, int caretQCharOrNegative)
+bool touchedByAnyCursor(const SourceSpan &span, const QList<int> &cursorsInBlock)
 {
-    if (!span.isDelimiter)
-        return false;
-    if (span.parentCharStart < 0 || span.parentCharEnd < 0)
-        return false;
-
-    // Always shown regardless of caret — parity with live, though these
-    // flags never occur in this leaf's content-only ListItem/BlockQuote
-    // buffers today.
-    if (span.isTag || span.isListMarker || span.isBlockquoteMarker)
-        return false;
-
-    if (caretQCharOrNegative >= 0 &&
-        caretQCharOrNegative >= span.parentCharStart - 1 &&
-        caretQCharOrNegative <= span.parentCharEnd + 1) {
-        return false;
+    for (const int c : cursorsInBlock) {
+        if (c >= span.parentCharStart - 1 && c <= span.parentCharEnd + 1)
+            return true;
     }
-
-    return true;
+    return false;
 }
 
 void applyEmphasis(QTextCharFormat &fmt, const Theme &theme, Theme::Slot slot)
@@ -45,9 +29,35 @@ void applyEmphasis(QTextCharFormat &fmt, const Theme &theme, Theme::Slot slot)
 
 }  // namespace
 
+bool delimiterShouldHide(const SourceSpan &span, const QList<int> &cursorsInBlock)
+{
+    if (!span.isDelimiter)
+        return false;
+    if (span.parentCharStart < 0 || span.parentCharEnd < 0)
+        return false;
+    if (span.isTag || span.isListMarker || span.isBlockquoteMarker)
+        return false;
+    if (touchedByAnyCursor(span, cursorsInBlock))
+        return false;
+    return true;
+}
+
+QList<std::pair<int, int>> omittedDelimiterRanges(const QList<SourceSpan> &spans,
+                                                   const QList<int> &cursorsInBlock)
+{
+    QList<std::pair<int, int>> out;
+    for (const SourceSpan &span : spans) {
+        if (span.charLength <= 0)
+            continue;
+        if (delimiterShouldHide(span, cursorsInBlock))
+            out.push_back({span.charOffset, span.charLength});
+    }
+    return out;
+}
+
 QList<QTextLayout::FormatRange> inlineFormatRanges(
-    const QList<SourceSpan> &spans, int caretQCharOrNegative,
-    const Theme &theme, const QColor &invisibleColor)
+    const QList<SourceSpan> &spans, const QList<int> &cursorsInBlock,
+    const Theme &theme, const ProjectionMap &projection)
 {
     QList<QTextLayout::FormatRange> ranges;
     ranges.reserve(spans.size());
@@ -55,14 +65,8 @@ QList<QTextLayout::FormatRange> inlineFormatRanges(
     for (const SourceSpan &span : spans) {
         if (span.charLength <= 0)
             continue;
-
-        if (span.isDelimiter && delimiterShouldHide(span, caretQCharOrNegative)) {
-            QTextCharFormat fmt;
-            if (invisibleColor.isValid())
-                fmt.setForeground(invisibleColor);
-            ranges.push_back({span.charOffset, span.charLength, fmt});
-            continue;
-        }
+        if (span.isDelimiter && delimiterShouldHide(span, cursorsInBlock))
+            continue;  // omitted from the layout text entirely — nothing to format
 
         QTextCharFormat fmt;
         bool any = false;
@@ -76,8 +80,13 @@ QList<QTextLayout::FormatRange> inlineFormatRanges(
             fmt.setFontFamilies(theme.font(Theme::FontRole::Monospace).families());
             any = true;
         }
-        if (any)
-            ranges.push_back({span.charOffset, span.charLength, fmt});
+        if (!any)
+            continue;
+
+        const int layoutStart = projection.fullQCharToLayoutQChar(span.charOffset);
+        const int layoutEnd   = projection.fullQCharToLayoutQChar(span.charOffset + span.charLength);
+        if (layoutEnd > layoutStart)
+            ranges.push_back({layoutStart, layoutEnd - layoutStart, fmt});
     }
 
     return ranges;

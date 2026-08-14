@@ -26,6 +26,8 @@ add_library(markoff_canvas STATIC
     src/InlineFormatting.cpp
     src/InputPredicate.h
     src/InputPredicate.cpp
+    src/ProjectionMap.h
+    src/ProjectionMap.cpp
     src/TableGeometry.h
     src/TableGeometry.cpp
 )

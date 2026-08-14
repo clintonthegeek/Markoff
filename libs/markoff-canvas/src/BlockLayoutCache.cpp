@@ -18,34 +18,6 @@ namespace coords = Markoff::TextUnits;
 
 namespace Markoff::Canvas {
 
-namespace {
-
-/// Layout text for a block. Content-only: the ListItem marker is painted
-/// as decoration and is deliberately NOT part of this string, so QChar
-/// indices into it map to buffer bytes with no marker fudge-factor.
-///
-/// QTextLayout does not treat '\n' as a line break — it only breaks where
-/// createLine() runs out of width, or at QChar::LineSeparator. A code
-/// block would otherwise render as one run-on line. The substitution is
-/// deliberately 1 QChar → 1 QChar so that QChar indices into this string
-/// still correspond one-for-one with QChar indices into the block's real
-/// text.
-///
-/// T2 trap, stated here because this is where the divergence is created:
-/// the byte↔QChar helper must convert against the block's ACTUAL text
-/// (doc.blockText(id)), never against this layout string. U+2028 is one
-/// byte as '\n' but three bytes as itself, so round-tripping this string
-/// through toUtf8() yields byte offsets that are wrong by two per
-/// preceding newline.
-QString layoutTextFor(const MarkoffDocument &doc, BlockId id)
-{
-    QString text = QString::fromUtf8(doc.blockText(id));
-    text.replace(QLatin1Char('\n'), QChar::LineSeparator);
-    return text;
-}
-
-}  // namespace
-
 void BlockLayoutCache::setTextWidth(qreal width)
 {
     if (qFuzzyCompare(m_textWidth, width))
@@ -69,7 +41,7 @@ void BlockLayoutCache::clear()
     m_caretBlock = BlockId();
     m_caretByte = -1;
     m_preeditBlock = BlockId();
-    m_preeditQCharPos = -1;
+    m_preeditByte = -1;
     m_preeditText.clear();
 }
 
@@ -144,17 +116,11 @@ void BlockLayoutCache::realize(const MarkoffDocument &doc, const Theme &theme, E
         return;
     }
 
-    e.layout = std::make_unique<QTextLayout>(layoutTextFor(doc, e.id),
-                                             e.style.font);
-
-    QTextOption opt;
-    opt.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
-    e.layout->setTextOption(opt);
-
-    // restyleInline() does the formats-then-lines work, including the
-    // first (and every subsequent) create-line pass — see its comment for
-    // why the two cannot be split across separate calls.
-    restyleInline(doc, theme, e);
+    // rebuildInline() does the projection + text + formats + lines work,
+    // including the first (and every subsequent) create-line pass — see
+    // its comment for why formats and lines cannot be split across
+    // separate calls.
+    rebuildInline(doc, theme, e);
 
     if (e.style.isRule)
         e.height = e.style.topMargin + e.style.bottomMargin
@@ -247,40 +213,64 @@ void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &the
 void BlockLayoutCache::restyleInline(const MarkoffDocument &doc, const Theme &theme,
                                      Entry &e) const
 {
-    if (!e.layout)
+    // A caret/preedit change on a block that hasn't been realized yet needs
+    // no work here: realize() will build it correctly, with the current
+    // reveal state, whenever it is first realized (spec §4.2).
+    if (!e.realized)
         return;
+    rebuildInline(doc, theme, e);
+}
 
+void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &theme,
+                                     Entry &e) const
+{
     const QByteArray text = doc.blockText(e.id);
     const QList<SourceSpan> spans = doc.inlineSpansFor(e.id);
 
-    int caretQChar = -1;
+    // Multi-cursor readiness (F1a, spec §4.2 P2.1 note): every cursor's
+    // QChar position within THIS block, fed as a set to one reveal
+    // predicate rather than a repeated single-caret check at each site.
+    // Exactly one member today.
+    QList<int> cursorsInBlock;
     if (e.id == m_caretBlock && m_caretByte >= 0)
-        caretQChar = int(coords::byteToQtPos(text, m_caretByte));
+        cursorsInBlock.push_back(int(coords::byteToQtPos(text, m_caretByte)));
 
-    const QColor invisible = e.style.background.isValid()
-                            ? e.style.background
-                            : theme.color(Theme::Slot::EditorBackground);
+    const QList<std::pair<int, int>> omitted =
+        Detail::omittedDelimiterRanges(spans, cursorsInBlock);
+    e.projection = ProjectionMap::build(text, omitted);
+
+    // A caret move that changes delimiter visibility changes the LAYOUT
+    // TEXT (omission target moved), not just formats — spec §4.2 — so this
+    // is always a fresh QTextLayout, not a setText() on the old one.
+    e.layout = std::make_unique<QTextLayout>(e.projection.layoutText(), e.style.font);
+    QTextOption opt;
+    opt.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+    e.layout->setTextOption(opt);
 
     QList<QTextLayout::FormatRange> ranges =
-        Detail::inlineFormatRanges(spans, caretQChar, theme, invisible);
+        Detail::inlineFormatRanges(spans, cursorsInBlock, theme, e.projection);
 
     // Preedit area (T8): set before beginLayout() (it's a QTextEngine
     // rebuild trigger, same as setFormats() below) so the spliced-in text
-    // takes part in this pass's line breaking. Base format ranges are
-    // computed above against the block's real text, so any range starting
-    // at or after the splice point needs to shift by the preedit's length
-    // to keep landing on its real characters, same as Qt's own
+    // takes part in this pass's line breaking. The preedit's own position
+    // is always inside a kept run (it sits at the caret, and the caret's
+    // own span is always revealed — spec §4.2), so the byte->layout
+    // conversion here is exact, no snap ambiguity. Base format ranges are
+    // already in LAYOUT space (computed above), so any range starting at
+    // or after the splice point needs to shift by the preedit's length to
+    // keep landing on its real characters, same as Qt's own
     // QTextDocumentPrivate-backed engine does internally for document-
     // backed layouts (this leaf's layouts are standalone QTextLayouts —
     // C3 — so that shift is not automatic and has to happen here). A range
     // straddling the splice point is widened rather than split: an
     // over-formatted preedit run is a cosmetic nit, not a correctness bug.
-    if (e.id == m_preeditBlock && m_preeditQCharPos >= 0) {
-        e.layout->setPreeditArea(m_preeditQCharPos, m_preeditText);
+    if (e.id == m_preeditBlock && m_preeditByte >= 0) {
+        const int preeditLayoutPos = e.projection.byteToLayoutQChar(m_preeditByte);
+        e.layout->setPreeditArea(preeditLayoutPos, m_preeditText);
         for (QTextLayout::FormatRange &r : ranges) {
-            if (r.start >= m_preeditQCharPos)
+            if (r.start >= preeditLayoutPos)
                 r.start += m_preeditText.size();
-            else if (r.start + r.length > m_preeditQCharPos)
+            else if (r.start + r.length > preeditLayoutPos)
                 r.length += m_preeditText.size();
         }
     } else {
@@ -367,15 +357,15 @@ void BlockLayoutCache::setCaret(const MarkoffDocument &doc, const Theme &theme,
 }
 
 void BlockLayoutCache::setPreedit(const MarkoffDocument &doc, const Theme &theme,
-                                  BlockId block, int qcharPos, const QString &text)
+                                  BlockId block, int byteOffset, const QString &text)
 {
-    if (m_preeditBlock == block && m_preeditQCharPos == qcharPos && m_preeditText == text)
+    if (m_preeditBlock == block && m_preeditByte == byteOffset && m_preeditText == text)
         return;
 
     const BlockId oldBlock = m_preeditBlock;
-    m_preeditBlock     = block;
-    m_preeditQCharPos  = qcharPos;
-    m_preeditText      = text;
+    m_preeditBlock  = block;
+    m_preeditByte   = byteOffset;
+    m_preeditText   = text;
 
     if (oldBlock != block) {
         const int oldIdx = indexOf(oldBlock);
@@ -389,12 +379,12 @@ void BlockLayoutCache::setPreedit(const MarkoffDocument &doc, const Theme &theme
 
 void BlockLayoutCache::clearPreedit(const MarkoffDocument &doc, const Theme &theme)
 {
-    if (m_preeditQCharPos < 0)
+    if (m_preeditByte < 0)
         return;
 
     const BlockId block = m_preeditBlock;
-    m_preeditBlock     = BlockId();
-    m_preeditQCharPos  = -1;
+    m_preeditBlock  = BlockId();
+    m_preeditByte   = -1;
     m_preeditText.clear();
 
     const int idx = indexOf(block);

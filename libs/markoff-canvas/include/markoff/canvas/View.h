@@ -109,14 +109,22 @@ public:
     /// to know a repaint actually happened.
     quint64 paintCount() const;
 
-    /// Whether the byte at `byteOffset` in block `id`'s realized layout is
-    /// currently painted as a hidden delimiter (spec T7, exit E7): its
-    /// format's foreground equals the "invisible" color the leaf paints
-    /// hidden delimiters with (the block's own background, or the editor
-    /// background). False if the block isn't realized, the offset is out
-    /// of range, or the format at that position isn't the invisible one.
-    /// Test/inspection surface only — nothing here is authority.
+    /// Whether the byte at `byteOffset` in block `id` currently falls
+    /// inside a hidden delimiter run (spec §4.2, P2.1): such a run is
+    /// OMITTED from the block's layout text entirely, not merely painted
+    /// invisible, so this re-evaluates the same reveal predicate the
+    /// projection was built from rather than inspecting a format range.
+    /// False if the block isn't realized or the offset isn't inside a
+    /// currently-hidden run. Test/inspection surface only — nothing here
+    /// is authority.
     bool isDelimiterHiddenAt(BlockId id, int byteOffset) const;
+
+    /// The realized layout's first line's natural (unwrapped) text width in
+    /// DIPs, or -1 if `id` isn't realized (spec §4.2 P2.1 exit criterion:
+    /// this is real reflow, not a cosmetic recolor — hiding a delimiter run
+    /// narrows what the layout actually measures). Test/inspection surface
+    /// only — nothing here is authority.
+    qreal lineNaturalWidth(BlockId id) const;
 
     /// Whether an IME composition is in progress (T8, exit E6): a non-empty
     /// preedit string is currently spliced into the caret block's layout.

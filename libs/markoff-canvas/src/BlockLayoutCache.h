@@ -10,6 +10,7 @@
 #include <markoff/core/BlockId.h>
 
 #include "BlockPresentation.h"
+#include "ProjectionMap.h"
 
 namespace Markoff {
 class MarkoffDocument;
@@ -52,6 +53,12 @@ public:
     struct Entry {
         BlockId id;
         std::unique_ptr<QTextLayout> layout;  //!< null until realized; unused for tables
+        /// Byte<->layout-QChar map for `layout`'s text (spec §4.2, P2.1):
+        /// built together with `layout` every rebuild, empty/default for
+        /// tables (their per-cell layouts hold raw, unomitted cell text —
+        /// P2.3's job). The one sanctioned second coordinate space; never
+        /// crosses into View.cpp except through this member.
+        ProjectionMap projection;
         BlockStyle style;
         quint64 seq      = 0;      //!< blockEditSequence when measured
         qreal   y        = 0;      //!< top of the block, document coords
@@ -82,25 +89,29 @@ public:
                       qreal top, qreal bottom);
 
     /// Tell the cache where the caret is, for inline delimiter visibility
-    /// (spec T7). Rebuilds formats only for the entries that can have
-    /// changed: the caret's old block (if it moved to a different block)
-    /// and its current block — not a full restyle pass. A block whose
-    /// layout is not yet realized just gets correct formats at realize()
-    /// time, same as the base bold/italic/code styling.
+    /// (spec T7/§4.2). Rebuilds the entries that can have changed: the
+    /// caret's old block (if it moved to a different block) and its current
+    /// block — not a full restyle pass. A caret move that changes delimiter
+    /// visibility changes the LAYOUT TEXT (omission, not just formats), so
+    /// this is a full per-block rebuild (projection + layout text + formats
+    /// + lines), not merely a setFormats() call. A block whose layout is
+    /// not yet realized just gets correct text/formats at realize() time.
     void setCaret(const MarkoffDocument &doc, const Theme &theme,
                   BlockId block, int byteOffset);
 
     /// Set/replace the IME preedit area (T8, exit E6): splices `text` into
-    /// `block`'s layout at `qcharPos` for line-breaking and painting only,
-    /// via QTextLayout::setPreeditArea — never touches blockText(). Rebuilds
-    /// the block's layout (restyleInline() re-runs beginLayout/createLine
-    /// unconditionally, same as every other formats-changing call here), so
-    /// preedit text wraps and paints exactly like typed text would. Base
-    /// inline-format ranges (bold/italic/hidden-delimiters) landing at or
-    /// after `qcharPos` are shifted by `text.length()` in restyleInline() so
-    /// they keep tracking their real characters once the preedit splices in.
+    /// `block`'s layout at `byteOffset` (this block's own coordinate space,
+    /// C4 — the layout-QChar position it needs is resolved internally via
+    /// the entry's projection, once rebuilt) for line-breaking and painting
+    /// only, via QTextLayout::setPreeditArea — never touches blockText().
+    /// Rebuilds the block's layout the same way setCaret() does, so preedit
+    /// text wraps and paints exactly like typed text would, and any
+    /// currently-hidden delimiters stay hidden around it. Base inline-format
+    /// ranges landing at or after the preedit's layout position are shifted
+    /// by `text.length()` so they keep tracking their real characters once
+    /// the preedit splices in.
     void setPreedit(const MarkoffDocument &doc, const Theme &theme,
-                    BlockId block, int qcharPos, const QString &text);
+                    BlockId block, int byteOffset, const QString &text);
     /// Clear any active preedit area. No-op if none is set.
     void clearPreedit(const MarkoffDocument &doc, const Theme &theme);
 
@@ -122,10 +133,16 @@ private:
     /// Table variant of realize() (T9): builds the per-cell grid instead of
     /// a single block-wide layout. Dispatches on e.style.isTable.
     void  realizeTable(const MarkoffDocument &doc, const Theme &theme, Entry &e);
-    /// Recompute one entry's inline formats (base styling + delimiter
-    /// visibility) and push them onto its layout via setFormats(). No-op
-    /// if the entry isn't realized yet.
+    /// Full per-block rebuild triggered by a caret/preedit change (spec
+    /// §4.2): no-op if the entry isn't realized yet (realize() gets it
+    /// right on its own first pass instead — see rebuildInline()).
     void  restyleInline(const MarkoffDocument &doc, const Theme &theme, Entry &e) const;
+    /// The actual rebuild: projection (omission + '\n' substitution) +
+    /// fresh QTextLayout text + formats + the createLine pass. Called
+    /// unconditionally by realize() (first build) and by restyleInline()
+    /// (already-realized entries, guarded there so an unrealized entry
+    /// isn't force-built early).
+    void  rebuildInline(const MarkoffDocument &doc, const Theme &theme, Entry &e) const;
 
     std::vector<Entry>  m_entries;
     QHash<BlockId, int> m_index;        //!< id → position in m_entries
@@ -135,7 +152,7 @@ private:
     BlockId m_caretBlock;                //!< null = no caret tracked
     int     m_caretByte      = -1;
     BlockId m_preeditBlock;              //!< null = no preedit tracked
-    int     m_preeditQCharPos = -1;
+    int     m_preeditByte    = -1;       //!< this block's byte space (C4)
     QString m_preeditText;
 };
 
