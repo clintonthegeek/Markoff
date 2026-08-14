@@ -576,8 +576,7 @@ void BlockLayoutCache::recomputePositions()
     qreal y = 0;
     for (Entry &e : m_entries) {
         e.y = y;
-        if (!e.folded)
-            y += e.height;
+        y += e.height;
     }
     m_totalHeight = y;
 }
