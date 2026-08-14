@@ -121,7 +121,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P3.2 Cursor/scroll position mapping + signals | ☑ | `83adcc2d` | `8ba90e7a` / `a07e715c` |
 | P3.3 Read-only gates + caretRect | ☑ | `21a020a2` | `6a5fefe9` / `fa9c1704` |
 | P3.4 FindController: highlight + navigate | ☑ | `a26a0795` | `de9920ef` / `c5a22a58` |
-| P3.5 EditorContext + theme/fontScale through the wrapper | ☐ | | |
+| P3.5 EditorContext + theme/fontScale through the wrapper | ☑ | `44481d40` | `93795083` / `c4278364` |
 | P3.6 Ephemeral state JSON round-trip | ☐ | | |
 | P3.7 ⏸ phase close | ☐ | | n/a |
 | **P4 — inline/text parity** | | | |
@@ -1124,6 +1124,113 @@ user with a one-page summary of what's proven.
   entirely inside `libs/markoff-canvas/`, no core seam touched —
   `FindController` itself is pre-existing, unmodified). Full suite not
   run for this task.
+
+---
+
+**P3.5 (2026-08-14).**
+
+- `contextChanged`: `EditorWidget::recomputeContext()` reads the
+  composed `View`'s caret block (`caretBlock()`), maps kind→
+  `EditorContext::blockKind` and heading level (same switch/attr-read
+  shape as live/source's `recomputeContext()`, read as reference), and
+  is called from two places — `onViewCaretChanged()` (every
+  `View::caretChanged`, P3.2's chokepoint) and a
+  `structuralEditSequence`-gated `d2DocumentChanged` connection wired
+  in `setDocument()` (Queue #15: a programmatic `Cmd::changeKind` on
+  the caret's own block that never moves the caret). Both shared
+  checks (`checkContextChangedKindGated`,
+  `checkContextChangedOnStructuralKindChangeWithoutCaretMove`) were
+  already sitting in `ViewContractChecks.h`, added ahead of need by
+  P3.1/P3.2 — no core change needed, just enrollment.
+- **Table row/col is real, not the live leaf's `(-1, -1)` contract
+  minimum.** Live has no stable C++ owner for a QML delegate's
+  focused cell; canvas's `View` owns table layout directly
+  (`BlockLayoutCache::Entry::tableCells`, row-major, P2.3), so a new
+  `View::caretTableCell()` reuses the exact row-major cell-index
+  lookup (`cellIndexNear`, P2.3's own helper) selection/hit-testing
+  already use — not a second table-position scheme. Returns
+  `std::optional<std::pair<row, col>>`; `std::nullopt` if the caret
+  isn't in a table block or the table isn't realized yet (row/col
+  derivation needs `tableCells`, built at realize time). `row 0` is
+  the header row, same convention as `tableCellRect()`.
+- **Ordering finding (attach-window interaction with the sentinel):**
+  `EditorWidget`'s permanent ctor-time `View::caretChanged` connection
+  fires *synchronously* during `setDocument()`'s internal caret reset
+  (the same C2 chokepoint every real move uses — canvas has no queued
+  step anywhere to hide behind). live/source's contract text reads
+  "the FIRST cursor movement after `setDocument()` always emits"; on
+  live/source that holds for free because their cursor-move connection
+  is wired fresh *inside* `setDocument()`, after the sentinel reset, so
+  nothing can fire before it. Canvas's connection is permanent and
+  fires *during* `setDocument()`, before the sentinel-consuming
+  `if (doc) {...}` block that wires `m_contextD2Con` even runs —
+  without a guard this silently consumes the fresh-document sentinel
+  during attach, so the *test's own* first post-attach move (landing
+  on the same block kind by coincidence, as the shared fixture's
+  clamp-to-last-line does) sees no change and never emits, breaking
+  `checkContextChangedKindGated` populated by `init()` before the
+  test's spy attaches. Fixed by guarding `recomputeContext()` on
+  `m_contextD2Con` being valid (only true once `setDocument()` has
+  finished wiring the current document) — not a re-entrance flag on
+  shared mutation state (C1's actual target), just reusing an
+  already-existing piece of readiness state rather than inventing a
+  new boolean for the same fact. `cursorPositionChanged` doesn't hit
+  this class of bug: the same eager fire's resulting `CursorPos`
+  happens to equal `m_lastCursorPos`'s `{1,1}` default (a fresh
+  document's caret always lands on block 0/byte 0 = flat line 1,
+  column 1), so it was already a coincidental no-op before this task
+  touched anything.
+- `setTheme`/`setFontScale`: both now override to push base-store-first
+  into the composed `View` (mirrors `setReadOnly`'s P3.3 pattern).
+  `View` already had `setTheme` from the spike (clears the cache +
+  resyncs, so it needed no new relayout mechanism); `setFontScale` on
+  `View` is new this task. `BlockPresentation::fontForSlot`/
+  `presentationFor` gained a `fontScale` parameter (default 1.0,
+  multiplies every slot's pixel size) threaded through
+  `BlockLayoutCache::sync` — the ONE call site that ever calls
+  `presentationFor` (styles are computed once per entry and cached in
+  `Entry::style`, reused by `realize()`/`realizeTable()`, so this is
+  the only seam that needed touching, not every layout call).
+- **Scroll re-anchoring needed a two-pass correction, not one.**
+  `View::setFontScale` captures the block at `indexAtY(scrollbar
+  value)` before `clear()`, resyncs at the new scale (estimated
+  heights only — `BlockLayoutCache::estimateHeight()` counts newlines,
+  no wrap simulation), sets the scrollbar to that block's *estimated*
+  new `y`, then calls `ensureLayoutForViewport()` to realize the
+  visible range. First attempt stopped there and the scroll-anchor
+  half of the falsifiable test failed at the 1px tolerance: realizing
+  blocks *before* the anchor corrects their estimated heights (real
+  layout height rarely equals the newline-count estimate exactly),
+  which shifts every later `y` via the prefix sum — including the
+  anchor's own — AFTER the scrollbar had already been set from the
+  pre-realization estimate. Fixed by re-reading the anchor's `y` and
+  re-setting the scrollbar a second time after realization, then
+  realizing once more (same "fixed-point, not one-shot" reasoning
+  `ensureLayoutForViewport()`'s own doc comment already documents for
+  its own loop). Deliberately NOT `ensureCaretVisible()`: that would
+  re-scroll to the caret's block, which is not necessarily the block
+  that was at the viewport's top.
+- New tests in `tst_canvas_view_contract.cpp`:
+  `context_reports_table_row_and_col` (real row/col, not contract
+  minimum — see above) and
+  `font_scale_triggers_relayout_and_anchors_scroll` (the task's named
+  falsifiable check: asserts the anchor block's real height actually
+  grew under the larger font AND that the anchor's top ends up back at
+  the viewport's top edge after the scale change). `-R canvas` 16/16
+  green (constitution included).
+- Falsification: `View::setFontScale` short-circuited to store the
+  scale and `return` before any cache invalidation (throwaway commit
+  `93795083`) — `font_scale_triggers_relayout_and_anchors_scroll`
+  failed exactly on the relayout half
+  (`'heightAfter > heightBefore * 1.2' returned FALSE`: the block's
+  height never changed under the "larger" font). Reverted (`c4278364`);
+  `-R canvas` 16/16 green again after the revert, `check-constitution.sh`
+  clean (C1–C4) throughout.
+- Test tier: canvas-scoped only per the session protocol (diff stays
+  entirely inside `libs/markoff-canvas/`, no core seam touched — the
+  two shared checks enrolled were already present in
+  `ViewContractChecks.h` from P3.1/P3.2, unmodified this task). Full
+  suite not run for this task.
 
 ---
 
