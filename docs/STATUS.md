@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 4 CLOSED, P4.8)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 5 CLOSED, P5.7)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -22,8 +22,9 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   2026-08-13 at P1.5; Phase 2 (projection map) closed 2026-08-14 at
   P2.4 (perf re-baseline, all E9 budgets held); Phase 3 (MarkdownView
   contract v2) closed 2026-08-14 at P3.7; Phase 4 (inline/text parity)
-  closed 2026-08-14 at P4.8. Phase 5 (block parity) is next, starting
-  at P5.1.
+  closed 2026-08-14 at P4.8; Phase 5 (block parity) closed 2026-08-14
+  at P5.7 (perf re-baseline held). Phase 6 (collaboration surface) is
+  next, starting at P6.1.
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -32,20 +33,37 @@ P2.1–P2.3 done).
 
 ## Test baseline
 
-**300/300 (100%)** on the full `scripts/run-tests.sh`, re-verified
-2026-08-14 at Phase 4 close (P4.8) — up from the 293/293 baseline at
-Phase 3 close via seven new canvas executables registered this phase
-(`tst_canvas_links` P4.2, `tst_canvas_format_ops` P4.3,
-`tst_canvas_context_menu` P4.4, `tst_canvas_layout_width` P4.5,
-`tst_canvas_inline_title` P4.9, `tst_canvas_code_highlight` P4.6,
-`tst_canvas_task_checkbox` P4.7); P4.1's inline-kind-set growth landed
-in the existing `tst_canvas_inline_formatting` binary rather than a
-new one; `tst_format_ops` (core) grew 8 per-block cases (P4.3).
-`check-constitution.sh` clean (C1–C4) over 46 files. The plan ratchets
-this up per task; any drop is a regression (classify before fixing).
+**306/306 (100%)** on the full `scripts/run-tests.sh`, re-verified
+2026-08-14 at Phase 5 close (P5.7) — up from the 300/300 baseline at
+Phase 4 close via six new canvas executables registered this phase
+(`tst_canvas_table_wrap_nav` P5.1, `tst_canvas_table_ops` P5.2,
+`tst_canvas_math` P5.3, `tst_canvas_media_seams` P5.4,
+`tst_canvas_side_content` P5.5, `tst_canvas_folding` P5.6).
+`check-constitution.sh` clean (C1–C4) over 66 files. Perf re-baseline
+(`build-perf`, `tst_canvas_perf_500` + `tst_canvas_perf_formatted`)
+held with folding + table wrap/ops in the y-position walk: load→paint
+188 ms/500 ms, p95 keystroke 1.38 ms/16 ms, scroll-realize
+11.6 %/30 %, RSS delta 0 KB/100 MB. The plan ratchets this up per
+task; any drop is a regression (classify before fixing).
 
 ## Dormant items
 
+- **No D2-safe core accessor from `(BlockAnchor, offset)` to a
+  `CollabText::Crdt::Anchor`** (P5.6 finding): blocks genuinely wiring
+  `Session::foldedRegions`/`FoldRef` — canvas folding instead lives in
+  `View`'s own block-index scheme, same precedent P3.6 already set for
+  scroll/cursor. Small, cleanly-scoped core follow-up.
+- **Inline math (`$...$`) renders as styled monospace, not real
+  glyphs** (P5.3 finding): `QTextLayout` has no inline
+  object-replacement path without a backing `QTextDocument`, which C3
+  forbids — an intentional, logged gap vs. Obsidian's inline-rendered
+  math, not a bug.
+- **Parser gap: `latex_span`/`latex_block` delimiter spans never get
+  `parentCharStart`/`parentCharEnd`** (P5.3 finding) —
+  `collectParentRanges` checks for a `latex_span` node type
+  markoff-parser's grammar never emits (both `$...$` and `$$...$$`
+  parse as `latex_block`). Worked around with per-block (not per-span)
+  math reveal; revisit if per-span granularity is ever needed.
 - **Table/code horizontal-pan-within-own-rect** (P4.5 carried scope):
   tables and code blocks currently take the (possibly narrowed)
   readable-line-width column like any other block instead of

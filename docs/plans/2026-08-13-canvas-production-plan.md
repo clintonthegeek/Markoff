@@ -141,7 +141,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P5.4 Images + Mermaid/embed seams | ☑ | `f94bf525` | `1c4654ee` / `c851e604` |
 | P5.5 Callouts + frontmatter + footnote defs | ☑ | `20949498` | `715b301b` / `c421810c` |
 | P5.6 Folding via Session | ☑ (reduced scope — see finding) | `989c714d` | `1a4fd240` / `ef298d6a` |
-| P5.7 ⏸ phase close | ☐ | | n/a |
+| P5.7 ⏸ phase close | ☑ | n/a | n/a |
 | **P6 — collaboration surface** | | | |
 | P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☐ | | |
 | P6.2 Remote presence rendering (carets, tints, flags) | ☐ | | |
@@ -515,6 +515,45 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P5.7 (2026-08-14) — phase close.**
+
+- Full suite: **306/306**, up from 300/300 at Phase 4 close (via the
+  P5.1–P5.6 growth already logged per-task below: new
+  `tst_canvas_table_wrap_nav`, `tst_canvas_table_ops`, `tst_canvas_math`,
+  `tst_canvas_media_seams`, `tst_canvas_side_content`,
+  `tst_canvas_folding` executables). `check-constitution.sh`: clean
+  (C1–C4) over 66 files.
+- Perf re-run in `build-perf` (Release), `tst_canvas_perf_500` +
+  `tst_canvas_perf_formatted`, same method as P2.4/P4.8: all budgets
+  hold with folding + table wrap/ops now in the y-position walk —
+  load→paint **188 ms**/500 ms, p95 keystroke **1.38 ms**/16 ms
+  (formatted-paragraph case **1.08 ms**/16 ms), scroll-realize
+  **11.6 %**/30 %, RSS delta **0 KB**/100 MB. No regression from
+  P2.4's numbers; nothing to profile.
+- Honest C1 read: diffed 56c67f75..HEAD (28 non-test canvas/core
+  files touched across P5.1–P5.6, ~4750 lines) — grepped for
+  re-entrance-guard-shaped members (`m_in*`, `m_updating*`,
+  `m_guard*`, `blockSignals`, `QSignalBlocker`, `m_suppress*`) and
+  read the two most state-shaped new files (`Folding.{h,cpp}`,
+  `CalloutBlocks.cpp`) by hand. Zero hits, zero violations. Only
+  core-src changes this phase: `ActionId.h` (two enumerators, already
+  declared) and `Theme.cpp` (default-palette colors for
+  callout/math slots) — no seam beyond what P5.1–P5.6 individually
+  logged.
+- Findings swept into `docs/STATUS.md` dormant items (new bullets,
+  see that file): P5.6's core-accessor gap (`(BlockAnchor, offset) ->
+  CollabText::Crdt::Anchor`, needed before `Session::foldedRegions`
+  can be genuinely wired — folding currently lives in `View`'s own
+  block-index scheme, same precedent as P3.6 scroll/cursor) and
+  P5.3's two math gaps (inline `$...$` renders as styled monospace,
+  not real glyphs — `QTextLayout` has no object-replacement path
+  without a `QTextDocument`, C3 forbids one; and the
+  `latex_span`/`latex_block` parser gap — `collectParentRanges` checks
+  for a `latex_span` node type the grammar never emits, worked around
+  per-block instead of per-span).
+- `docs/STATUS.md` baseline and workfront pointer updated to Phase 6
+  as next, starting at P6.1.
 
 **P5.6 (2026-08-14).**
 
