@@ -13,6 +13,7 @@ CanvasActionController::CanvasActionController(QObject *parent)
     : QObject(parent)
 {
     setupActions();
+    setupTableActions();
 }
 
 void CanvasActionController::setupActions()
@@ -74,6 +75,64 @@ void CanvasActionController::setupActions()
     }
 }
 
+void CanvasActionController::setupTableActions()
+{
+    m_insertTable       = new QAction(tr("Insert Table"),        this);
+    m_insertRowAbove    = new QAction(tr("Insert Row Above"),    this);
+    m_insertRowBelow    = new QAction(tr("Insert Row Below"),    this);
+    m_deleteRow         = new QAction(tr("Delete Row"),          this);
+    m_insertColumnLeft  = new QAction(tr("Insert Column Left"),  this);
+    m_insertColumnRight = new QAction(tr("Insert Column Right"), this);
+    m_deleteColumn      = new QAction(tr("Delete Column"),       this);
+
+    m_alignGroup = new QActionGroup(this);
+    m_alignGroup->setExclusive(true);
+    m_alignColumn[int(TableAlign::None)]   = new QAction(tr("No Alignment"), this);
+    m_alignColumn[int(TableAlign::Left)]   = new QAction(tr("Align Left"),   this);
+    m_alignColumn[int(TableAlign::Center)] = new QAction(tr("Align Center"), this);
+    m_alignColumn[int(TableAlign::Right)]  = new QAction(tr("Align Right"),  this);
+    for (QAction *a : m_alignColumn) {
+        a->setCheckable(true);
+        m_alignGroup->addAction(a);
+    }
+
+    for (auto *a : {m_insertTable, m_insertRowAbove, m_insertRowBelow, m_deleteRow,
+                    m_insertColumnLeft, m_insertColumnRight, m_deleteColumn})
+        a->setEnabled(false);
+    for (QAction *a : m_alignColumn)
+        a->setEnabled(false);
+
+    // Triggers call straight through to the composed View's own verb, same
+    // "no format logic of its own" shape as setupActions()'s connections.
+    connect(m_insertTable, &QAction::triggered, this, [this] {
+        if (m_view) m_view->insertTable();
+    });
+    connect(m_insertRowAbove, &QAction::triggered, this, [this] {
+        if (m_view) m_view->insertTableRowAbove();
+    });
+    connect(m_insertRowBelow, &QAction::triggered, this, [this] {
+        if (m_view) m_view->insertTableRowBelow();
+    });
+    connect(m_deleteRow, &QAction::triggered, this, [this] {
+        if (m_view) m_view->deleteTableRow();
+    });
+    connect(m_insertColumnLeft, &QAction::triggered, this, [this] {
+        if (m_view) m_view->insertTableColumnLeft();
+    });
+    connect(m_insertColumnRight, &QAction::triggered, this, [this] {
+        if (m_view) m_view->insertTableColumnRight();
+    });
+    connect(m_deleteColumn, &QAction::triggered, this, [this] {
+        if (m_view) m_view->deleteTableColumn();
+    });
+    for (int i = 0; i < 4; ++i) {
+        const TableAlign align = static_cast<TableAlign>(i);
+        connect(m_alignColumn[i], &QAction::triggered, this, [this, align] {
+            if (m_view) m_view->setTableColumnAlignment(align);
+        });
+    }
+}
+
 void CanvasActionController::setView(View *view)
 {
     if (m_view)
@@ -113,6 +172,31 @@ void CanvasActionController::updateEnabledStates()
     for (auto *a : {m_bold, m_italic, m_strike, m_inlineCode, m_link})
         a->setEnabled(enabled);
     for (int lvl = 0; lvl <= 6; ++lvl) m_heading[lvl]->setEnabled(enabled);
+
+    // Table actions (P5.2). InsertTable works from outside a table too —
+    // it's enabled/disabled exactly like the format verbs. Every other
+    // table action needs the caret actually sitting in a table cell.
+    m_insertTable->setEnabled(enabled);
+
+    const auto ctx = (enabled && m_view) ? m_view->caretTableContext() : std::nullopt;
+    const bool inTable = ctx.has_value();
+
+    m_insertRowAbove->setEnabled(inTable && ctx->row > 0);
+    m_insertRowBelow->setEnabled(inTable);
+    m_deleteRow->setEnabled(inTable && ctx->row > 0);
+    m_insertColumnLeft->setEnabled(inTable);
+    m_insertColumnRight->setEnabled(inTable);
+    m_deleteColumn->setEnabled(inTable && ctx->colCount > 1);
+
+    for (QAction *a : m_alignColumn)
+        a->setEnabled(inTable);
+    // Reflect the caret column's current alignment in the checked state
+    // (radio-button group) rather than leaving whatever was checked before
+    // the caret moved — this is display sync, not a document write, so it
+    // does not go through setChecked's own toggled() signal semantics for
+    // triggering anything.
+    if (inTable)
+        m_alignColumn[int(ctx->columnAlign)]->setChecked(true);
 }
 
 }  // namespace Markoff::Canvas

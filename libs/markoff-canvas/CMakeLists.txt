@@ -22,6 +22,7 @@ add_library(markoff_canvas STATIC
     src/EditorWidget.cpp
     include/markoff/canvas/CanvasActionController.h
     src/CanvasActionController.cpp
+    include/markoff/canvas/TableTypes.h
     src/BlockLayoutCache.h
     src/BlockLayoutCache.cpp
     src/BlockPresentation.h

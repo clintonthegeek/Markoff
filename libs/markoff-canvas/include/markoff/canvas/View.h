@@ -17,6 +17,8 @@
 #include <markoff/core/LinkActivation.h>
 #include <markoff/core/Theme.h>
 
+#include <markoff/canvas/TableTypes.h>
+
 class QContextMenuEvent;
 class QInputMethodEvent;
 class QMenu;
@@ -274,6 +276,47 @@ public:
     /// cell-index sequence plan P2.3 built for table selection
     /// (`cellIndexNear` in View.cpp), not a second table-position scheme.
     std::optional<std::pair<int, int>> caretTableCell() const;
+
+    /// The caret's row/col plus its table's shape and the caret column's
+    /// current alignment (contract-v2 P5.2). `nullopt` under exactly the
+    /// same conditions as `caretTableCell()` (this wraps it and adds a
+    /// fresh `TableGeometry` re-parse for the alignment/column-count
+    /// fields the cache alone doesn't carry). `CanvasActionController`'s
+    /// enabled/checked-state wiring and `buildContextMenu`'s table section
+    /// both read this instead of re-deriving row/col/cols separately.
+    struct TableCellContext {
+        int row = 0;
+        int col = 0;
+        int rowCount = 0;
+        int colCount = 0;
+        TableAlign columnAlign = TableAlign::None;
+    };
+    std::optional<TableCellContext> caretTableContext() const;
+
+    // ---- Table row/col ops + alignment (contract-v2 P5.2) -----------------
+    // Byte edits to the table block's own buffer via TableGeometry, each one
+    // UndoLog::Transaction (mirrors P5.1's appendTableRow). Act on the
+    // caret's current table cell (caretTableContext()); no-op while
+    // read-only, with no document, or when the caret isn't in a table.
+    // Guard rules matching GFM/Obsidian sense: the header row (row 0) can't
+    // be deleted or have a row inserted above it; the table's last surviving
+    // column can't be deleted.
+
+    void insertTableRowAbove();
+    void insertTableRowBelow();
+    void deleteTableRow();
+    void insertTableColumnLeft();
+    void insertTableColumnRight();
+    void deleteTableColumn();
+    /// Tri-state alignment write: rewrites the caret column's delimiter-row
+    /// cell content in place (the surrounding pipes are untouched).
+    void setTableColumnAlignment(TableAlign align);
+    /// `ActionId::InsertTable`: inserts a new 2x2 table block right after
+    /// the caret's current block and lands the caret in its first cell. The
+    /// one table op here that is NOT an edit to an existing table's buffer
+    /// — there may be no table yet. No-op while read-only or with no
+    /// document/caret.
+    void insertTable();
 
     /// Programmatic caret placement (contract-v2 EditorWidget seam, P3.1):
     /// the one sanctioned exception to "the caret is edited only through
@@ -545,6 +588,15 @@ private:
     /// transaction — `cols` empty cells, syntactically valid for
     /// TableGeometry's tokenizer.
     void appendTableRow(BlockId block, int cols);
+    /// Shared by every P5.2 row/col/alignment op: re-parses `block` (via
+    /// `TableGeometry`, already reflecting the just-applied edit — same
+    /// "read back off the fresh buffer" discipline `appendTableRow()`
+    /// established) and lands the caret at `row`/`col`'s cell start, both
+    /// clamped into range. Generalizes `appendTableRow`'s own inline
+    /// version of this because these ops (unlike a plain append) can shift
+    /// bytes BEFORE the caret's own row — a bare byte-offset clamp isn't
+    /// enough to keep the caret in the same logical cell.
+    void repositionCaretInTable(BlockId block, int row, int col);
     /// Keep the caret referencing a block that still exists after a
     /// document change, biased toward the block's last known position
     /// (T2's version of the queue-#10 "never strand the caret" clamp;

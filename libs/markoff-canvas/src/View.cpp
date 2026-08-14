@@ -526,6 +526,31 @@ std::optional<std::pair<int, int>> View::caretTableCell() const
     return std::make_pair(cellIdx / e.tableCols, cellIdx % e.tableCols);
 }
 
+std::optional<View::TableCellContext> View::caretTableContext() const
+{
+    const auto cell = caretTableCell();
+    if (!cell)
+        return std::nullopt;
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return std::nullopt;
+    const auto &e = m_cache->entries()[size_t(idx)];
+
+    TableCellContext ctx;
+    ctx.row = cell->first;
+    ctx.col = cell->second;
+    ctx.colCount = e.tableCols;
+    ctx.rowCount = e.tableCols > 0 ? int(e.tableCells.size()) / e.tableCols : 0;
+
+    // Alignment isn't in the cache's own table grid (BlockLayoutCache never
+    // needed it before P5.2) — a fresh TableGeometry parse is the same
+    // "read the buffer directly" discipline every other P5.2 op uses.
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(m_caret.block));
+    if (parsed.ok && ctx.col >= 0 && ctx.col < int(parsed.alignment.size()))
+        ctx.columnAlign = parsed.alignment[size_t(ctx.col)];
+    return ctx;
+}
+
 bool View::hasSelection() const
 {
     return orderedSelection().has_value();
@@ -1494,6 +1519,34 @@ void View::buildContextMenu(QMenu &menu)
         headingMenu->addAction(m_actionController->heading6Action());
     }
 
+    // Table section (P5.2): only present when the CARET (not necessarily
+    // the right-click point — table ops act on the caret's cell, same as
+    // the format section acts on the caret's block) is currently sitting
+    // in a table. InsertTable is offered unconditionally alongside it
+    // (via the controller's own enabled-state, which doesn't require being
+    // in a table) rather than needing its own separate menu section.
+    if (m_actionController) {
+        const bool inTable = caretTableContext().has_value();
+        menu.addSeparator();
+        menu.addAction(m_actionController->insertTableAction());
+        if (inTable) {
+            QMenu *tableMenu = menu.addMenu(tr("Table"));
+            tableMenu->addAction(m_actionController->insertRowAboveAction());
+            tableMenu->addAction(m_actionController->insertRowBelowAction());
+            tableMenu->addAction(m_actionController->deleteRowAction());
+            tableMenu->addSeparator();
+            tableMenu->addAction(m_actionController->insertColumnLeftAction());
+            tableMenu->addAction(m_actionController->insertColumnRightAction());
+            tableMenu->addAction(m_actionController->deleteColumnAction());
+            tableMenu->addSeparator();
+            QMenu *alignMenu = tableMenu->addMenu(tr("Column Alignment"));
+            alignMenu->addAction(m_actionController->alignColumnNoneAction());
+            alignMenu->addAction(m_actionController->alignColumnLeftAction());
+            alignMenu->addAction(m_actionController->alignColumnCenterAction());
+            alignMenu->addAction(m_actionController->alignColumnRightAction());
+        }
+    }
+
     // "Copy Link Target" (spec §5.2): only present when the right-click
     // landed on a link/wikilink/tag span — resolved once in contextMenuEvent,
     // read here and by the trigger handler below.
@@ -2047,6 +2100,238 @@ bool View::tryTableTab(bool shift)
     const auto &cell = e.tableCells[size_t(row) * size_t(cols) + size_t(col)];
     setCaret(CanvasCursor{id, cell.startByte});
     return true;
+}
+
+// ---- Tables: row/col ops + alignment (P5.2) --------------------------------
+
+void View::repositionCaretInTable(BlockId block, int row, int col)
+{
+    if (!m_doc)
+        return;
+    m_doc->flushPendingD2Changed();
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(block));
+    if (!parsed.ok || parsed.rows.empty() || parsed.cols <= 0)
+        return;
+    row = qBound(0, row, int(parsed.rows.size()) - 1);
+    col = qBound(0, col, parsed.cols - 1);
+    setCaret(CanvasCursor{block, parsed.rows[size_t(row)][size_t(col)].start});
+}
+
+void View::insertTableRowAbove()
+{
+    if (!m_doc || m_readOnly)
+        return;
+    const auto ctx = caretTableContext();
+    if (!ctx || ctx->row <= 0)  // nothing sensible above the header
+        return;
+    const BlockId block = m_caret.block;
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(block));
+    if (!parsed.ok)
+        return;
+
+    // rows[r] (r >= 1) is lines[r + 1]; "above row r" lands the new row
+    // right after the PRECEDING line, i.e. right before row r's own line.
+    const int rowLineIdx = ctx->row + 1;
+    if (rowLineIdx <= 0 || rowLineIdx > int(parsed.lines.size()))
+        return;
+    const int pos = parsed.lines[size_t(rowLineIdx - 1)].lineEnd;
+
+    QByteArray rowBytes = "|";
+    for (int c = 0; c < parsed.cols; ++c) rowBytes += "  |";
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(block, uint32_t(pos), 0, "\n" + rowBytes, t);
+
+    repositionCaretInTable(block, ctx->row + 1, ctx->col);
+}
+
+void View::insertTableRowBelow()
+{
+    if (!m_doc || m_readOnly)
+        return;
+    const auto ctx = caretTableContext();
+    if (!ctx)
+        return;
+    const BlockId block = m_caret.block;
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(block));
+    if (!parsed.ok)
+        return;
+
+    // "Below the header" (row 0) can't land between the header and its
+    // delimiter row — it lands after the delimiter instead, as the new
+    // first body row. rows[r] (r >= 1) is lines[r + 1]: "below row r"
+    // inserts right after that row's own line.
+    const int anchorLineIdx = (ctx->row == 0) ? 1 : ctx->row + 1;
+    if (anchorLineIdx < 0 || anchorLineIdx >= int(parsed.lines.size()))
+        return;
+    const int pos = parsed.lines[size_t(anchorLineIdx)].lineEnd;
+
+    QByteArray rowBytes = "|";
+    for (int c = 0; c < parsed.cols; ++c) rowBytes += "  |";
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(block, uint32_t(pos), 0, "\n" + rowBytes, t);
+
+    repositionCaretInTable(block, ctx->row, ctx->col);
+}
+
+void View::deleteTableRow()
+{
+    if (!m_doc || m_readOnly)
+        return;
+    const auto ctx = caretTableContext();
+    if (!ctx || ctx->row <= 0)  // the header isn't deletable
+        return;
+    const BlockId block = m_caret.block;
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(block));
+    if (!parsed.ok)
+        return;
+
+    const int rowLineIdx = ctx->row + 1;  // rows[r] (r >= 1) is lines[r + 1]
+    if (rowLineIdx <= 0 || rowLineIdx >= int(parsed.lines.size()))
+        return;
+    const int from = parsed.lines[size_t(rowLineIdx - 1)].lineEnd;
+    const int to   = parsed.lines[size_t(rowLineIdx)].lineEnd;
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(block, uint32_t(from), uint32_t(to - from), QByteArray(), t);
+
+    // The deleted row's slot is now occupied by what used to be the next
+    // row (or the previous one, if it was the last row) — land there.
+    const int newRow = (ctx->row < int(parsed.rows.size()) - 1) ? ctx->row : ctx->row - 1;
+    repositionCaretInTable(block, newRow, ctx->col);
+}
+
+void View::insertTableColumnLeft()
+{
+    if (!m_doc || m_readOnly)
+        return;
+    const auto ctx = caretTableContext();
+    if (!ctx)
+        return;
+    const BlockId block = m_caret.block;
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(block));
+    if (!parsed.ok || ctx->col < 0 || ctx->col >= parsed.cols)
+        return;
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    // Reverse line order (last physical line first): each insert position
+    // below is taken from the frozen `parsed` snapshot, and d2ApplyBufferEdit
+    // applies synchronously, so an edit on a LATER line must land first —
+    // it never shifts an EARLIER line's still-to-be-used byte positions.
+    for (int li = int(parsed.lines.size()) - 1; li >= 0; --li) {
+        const TableLine &line = parsed.lines[size_t(li)];
+        if (ctx->col >= int(line.cells.size()))
+            continue;
+        const int pos = line.cells[size_t(ctx->col)].start;  // right after the preceding '|'
+        const QByteArray newCell =
+            (li == 1) ? (alignmentCellText(TableAlign::None) + "|") : QByteArray("  |");
+        m_doc->d2ApplyBufferEdit(block, uint32_t(pos), 0, newCell, t);
+    }
+
+    repositionCaretInTable(block, ctx->row, ctx->col + 1);
+}
+
+void View::insertTableColumnRight()
+{
+    if (!m_doc || m_readOnly)
+        return;
+    const auto ctx = caretTableContext();
+    if (!ctx)
+        return;
+    const BlockId block = m_caret.block;
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(block));
+    if (!parsed.ok || ctx->col < 0 || ctx->col >= parsed.cols)
+        return;
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    for (int li = int(parsed.lines.size()) - 1; li >= 0; --li) {
+        const TableLine &line = parsed.lines[size_t(li)];
+        if (ctx->col >= int(line.cells.size()))
+            continue;
+        const int pos = line.cells[size_t(ctx->col)].end + 1;  // right after the following '|'
+        const QByteArray newCell =
+            (li == 1) ? (alignmentCellText(TableAlign::None) + "|") : QByteArray("  |");
+        m_doc->d2ApplyBufferEdit(block, uint32_t(pos), 0, newCell, t);
+    }
+
+    repositionCaretInTable(block, ctx->row, ctx->col);
+}
+
+void View::deleteTableColumn()
+{
+    if (!m_doc || m_readOnly)
+        return;
+    const auto ctx = caretTableContext();
+    if (!ctx || ctx->colCount <= 1)  // the table's last column isn't deletable
+        return;
+    const BlockId block = m_caret.block;
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(block));
+    if (!parsed.ok || parsed.cols <= 1 || ctx->col < 0 || ctx->col >= parsed.cols)
+        return;
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    for (int li = int(parsed.lines.size()) - 1; li >= 0; --li) {
+        const TableLine &line = parsed.lines[size_t(li)];
+        if (ctx->col >= int(line.cells.size()))
+            continue;
+        const TableCellRange &cell = line.cells[size_t(ctx->col)];
+        // Removes the pipe PRECEDING this column plus its content, leaving
+        // the following pipe as the new boundary — works uniformly for the
+        // first, a middle, or the last column, no special-casing needed.
+        const int from = cell.start - 1;
+        const int to   = cell.end;
+        if (from < line.lineStart)
+            continue;  // defensive; shouldn't happen for a well-formed line
+        m_doc->d2ApplyBufferEdit(block, uint32_t(from), uint32_t(to - from), QByteArray(), t);
+    }
+
+    const int newCol = (ctx->col < parsed.cols - 1) ? ctx->col : ctx->col - 1;
+    repositionCaretInTable(block, ctx->row, newCol);
+}
+
+void View::setTableColumnAlignment(TableAlign align)
+{
+    if (!m_doc || m_readOnly)
+        return;
+    const auto ctx = caretTableContext();
+    if (!ctx)
+        return;
+    const BlockId block = m_caret.block;
+    const ParsedTable parsed = parseTableBlock(m_doc->blockText(block));
+    if (!parsed.ok || ctx->col < 0 || ctx->col >= parsed.cols || parsed.lines.size() < 2)
+        return;
+    const TableLine &alignLine = parsed.lines[1];
+    if (ctx->col >= int(alignLine.cells.size()))
+        return;
+    const TableCellRange &cell = alignLine.cells[size_t(ctx->col)];
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(block, uint32_t(cell.start), uint32_t(cell.end - cell.start),
+                             alignmentCellText(align), t);
+
+    // The caret's own row/col don't move, but the delimiter row (always
+    // physically before every body row) just changed size, which shifts
+    // every byte offset after it — reposition even though the logical
+    // cell is unchanged.
+    repositionCaretInTable(block, ctx->row, ctx->col);
+}
+
+void View::insertTable()
+{
+    if (!m_doc || m_readOnly || m_caret.block.isNull())
+        return;
+
+    static const QByteArray kTemplate =
+        "|  |  |\n"
+        "| --- | --- |\n"
+        "|  |  |";
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    const BlockId newId = m_doc->d2InsertBlock(m_caret.block, Markoff::BlockKind::Table, t);
+    m_doc->d2ApplyBufferEdit(newId, 0, 0, kTemplate, t);
+
+    repositionCaretInTable(newId, 0, 0);
 }
 
 // ---- Events -------------------------------------------------------------

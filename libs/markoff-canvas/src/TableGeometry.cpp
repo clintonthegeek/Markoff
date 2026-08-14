@@ -48,6 +48,18 @@ std::optional<std::vector<TableCellRange>> tokenizeLine(const QByteArray &src, L
     return ranges;
 }
 
+/// `cols`-sized cell list for `line`, tokenized and padded/truncated to
+/// match the header's column count — the same GFM tolerance every row
+/// (including, as of P5.2, the delimiter row) gets.
+std::vector<TableCellRange> tokenizeLinePadded(const QByteArray &src, Line line, int cols)
+{
+    std::vector<TableCellRange> cells;
+    if (const auto row = tokenizeLine(src, line))
+        cells = *row;
+    cells.resize(size_t(cols), TableCellRange{line.end, line.end});
+    return cells;
+}
+
 }  // namespace
 
 ParsedTable parseTableBlock(const QByteArray &blockText)
@@ -65,25 +77,56 @@ ParsedTable parseTableBlock(const QByteArray &blockText)
     const int cols = int(header->size());
     result.cols = cols;
     result.rows.push_back(*header);
+    result.lines.push_back(TableLine{lines[0].start, lines[0].end, *header});
 
-    // lines[1] is the alignment row — consumed, not rendered as a body row
-    // (no alignment UI, plan T9 scope).
+    // lines[1] is the alignment row — no longer discarded outright (P5.2):
+    // its cells and per-column alignment survive in `lines`/`alignment`,
+    // it just still isn't folded into `rows` (unchanged row-major contract
+    // for the render/navigation callers that predate P5.2).
+    const std::vector<TableCellRange> alignCells = tokenizeLinePadded(blockText, lines[1], cols);
+    result.lines.push_back(TableLine{lines[1].start, lines[1].end, alignCells});
+    result.alignment.reserve(size_t(cols));
+    for (const TableCellRange &c : alignCells) {
+        result.alignment.push_back(
+            parseAlignmentCell(blockText.mid(c.start, c.end - c.start)));
+    }
+
     for (size_t r = 2; r < lines.size(); ++r) {
         const Line &rowLine = lines[r];
         if (rowLine.start == rowLine.end)
             continue;  // trailing blank-line residue
 
-        std::vector<TableCellRange> cells;
-        if (const auto row = tokenizeLine(blockText, rowLine))
-            cells = *row;
-        // Pad short rows / truncate long rows to the header's column count
-        // (GFM tolerance, mirrors the live leaf's parseTable).
-        cells.resize(size_t(cols), TableCellRange{rowLine.end, rowLine.end});
-        result.rows.push_back(std::move(cells));
+        const std::vector<TableCellRange> cells = tokenizeLinePadded(blockText, rowLine, cols);
+        result.rows.push_back(cells);
+        result.lines.push_back(TableLine{rowLine.start, rowLine.end, cells});
     }
 
     result.ok = true;
     return result;
+}
+
+QByteArray alignmentCellText(TableAlign align)
+{
+    switch (align) {
+    case TableAlign::Left:   return ":---";
+    case TableAlign::Center: return ":---:";
+    case TableAlign::Right:  return "---:";
+    case TableAlign::None:   break;
+    }
+    return "---";
+}
+
+TableAlign parseAlignmentCell(const QByteArray &cellBytes)
+{
+    const QByteArray trimmed = cellBytes.trimmed();
+    if (trimmed.isEmpty())
+        return TableAlign::None;
+    const bool left  = trimmed.startsWith(':');
+    const bool right = trimmed.endsWith(':');
+    if (left && right)  return TableAlign::Center;
+    if (right)           return TableAlign::Right;
+    if (left)            return TableAlign::Left;
+    return TableAlign::None;
 }
 
 }  // namespace Markoff::Canvas

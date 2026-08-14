@@ -12,6 +12,8 @@ enum class ActionId {
     IndentMore, IndentLess,
     Link, Image, HorizontalRule,
     InsertTable, DeleteRow, DeleteColumn,
+    InsertRowAbove, InsertRowBelow, InsertColumnLeft, InsertColumnRight,
+    AlignColumnNone, AlignColumnLeft, AlignColumnCenter, AlignColumnRight,
 };
 Q_ENUM_NS(ActionId)
 } // namespace Markoff
