@@ -49,6 +49,11 @@ add_test(NAME tst_canvas_ime COMMAND tst_canvas_ime)
 target_link_libraries(tst_canvas_ime PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
 set_tests_properties(tst_canvas_ime PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_canvas_task_checkbox tst_canvas_task_checkbox.cpp)
+add_test(NAME tst_canvas_task_checkbox COMMAND tst_canvas_task_checkbox)
+target_link_libraries(tst_canvas_task_checkbox PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+set_tests_properties(tst_canvas_task_checkbox PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_canvas_table tst_canvas_table.cpp)
 add_test(NAME tst_canvas_table COMMAND tst_canvas_table)
 target_link_libraries(tst_canvas_table PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)

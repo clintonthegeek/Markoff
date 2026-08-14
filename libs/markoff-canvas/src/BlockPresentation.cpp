@@ -95,9 +95,27 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
     case BlockKind::ListItem: {
         const int indent = qMax(0, intAttr(doc, id, AttrNames::IndentLevel, 0));
         s.leftIndent = em * kIndentSteps * (indent + 1);
-        // Single source of truth for the marker text (queue #8.3) — do not
-        // re-derive it from markerStyle/markerNumber attrs.
-        s.marker = QString::fromUtf8(doc.listItemDisplayMarker(id)).trimmed();
+
+        const auto attrs = doc.blockAttrs(id);
+        bool isTask = false;
+        if (const auto it = attrs.constFind(AttrNames::MarkerStyle); it != attrs.cend()) {
+            if (const QString *v = std::get_if<QString>(&it.value()))
+                isTask = (*v == QStringLiteral("task"));
+        }
+        if (isTask) {
+            // Checkbox glyph (P4.7) replaces the bracket-text marker in the
+            // same decoration slot — see BlockPresentation.h's note on why
+            // `marker` stays empty here.
+            s.isTaskItem = true;
+            if (const auto ci = attrs.constFind(AttrNames::Checked); ci != attrs.cend()) {
+                if (const bool *cv = std::get_if<bool>(&ci.value()))
+                    s.taskChecked = *cv;
+            }
+        } else {
+            // Single source of truth for the marker text (queue #8.3) — do
+            // not re-derive it from markerStyle/markerNumber attrs.
+            s.marker = QString::fromUtf8(doc.listItemDisplayMarker(id)).trimmed();
+        }
         s.topMargin    = em * 0.15;
         s.bottomMargin = em * 0.15;
         break;

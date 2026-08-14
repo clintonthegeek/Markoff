@@ -14,6 +14,7 @@
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
+#include <QPainterPath>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QtMath>
@@ -48,6 +49,21 @@ constexpr qreal kPageMargin = 16.0;
 constexpr qreal kMarkerGap = 6.0;
 /// Width of the blockquote bar.
 constexpr qreal kQuoteBarWidth = 3.0;
+
+// ---- Task-list checkbox glyph (P4.7) ---------------------------------------
+// Painted in the same decoration slot as a list bullet/number (left of
+// contentX, gapped by kMarkerGap) but drawn as a box rather than measured
+// text, so its hit-test rect doesn't depend on font-metrics text width the
+// way the bullet/number marker's would. One function computes the rect;
+// paintEvent and taskCheckboxAt both call it, so the clickable area is
+// always exactly what got painted.
+QRectF taskCheckboxRect(const QFontMetricsF &fm, qreal contentX, qreal contentY)
+{
+    const qreal side = fm.ascent() * 0.72;
+    const qreal right = contentX - kMarkerGap;
+    const qreal top = contentY + (fm.ascent() - side) / 2.0;
+    return QRectF(right - side, top, side, side);
+}
 
 // ---- Inline title band (P4.9) ---------------------------------------------
 /// Multiplies Theme::FontRole::Heading's point size for the title band —
@@ -359,6 +375,20 @@ QRectF View::blockRect(BlockId id) const
         return {};
     const auto &e = m_cache->entries()[size_t(i)];
     return QRectF(pageMargin(), e.y + titleBandHeight(), textWidth(), e.height);
+}
+
+QRectF View::taskCheckboxRectFor(BlockId id) const
+{
+    const int i = m_cache->indexOf(id);
+    if (i < 0)
+        return {};
+    const auto &e = m_cache->entries()[size_t(i)];
+    if (!e.style.isTaskItem)
+        return {};
+    const qreal contentX = pageMargin() + e.style.leftIndent;
+    const qreal contentY = e.y + titleBandHeight() + e.style.topMargin;
+    const QFontMetricsF fm(e.style.font);
+    return taskCheckboxRect(fm, contentX, contentY);
 }
 
 int View::blockIndexOf(BlockId id) const
@@ -1002,6 +1032,34 @@ CanvasCursor View::hitTest(const QPoint &viewportPos) const
     const int qcharPos = line.isValid() ? line.xToCursor(localX) : 0;
     const int byteOff = e.projection.layoutQCharToByte(qcharPos);
     return CanvasCursor{e.id, byteOff};
+}
+
+std::optional<BlockId> View::taskCheckboxAt(const QPoint &viewportPos) const
+{
+    if (!m_doc || m_cache->entries().empty())
+        return std::nullopt;
+
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal docY    = viewportPos.y() + scrollY;
+    if (docY < titleBandHeight())
+        return std::nullopt;
+    const int idx = m_cache->indexAtY(docY - titleBandHeight());
+    if (idx < 0)
+        return std::nullopt;
+
+    const auto &e = m_cache->entries()[size_t(idx)];
+    // Realized-only, same as the marker/checkbox paint branch below (no
+    // font metrics worth trusting for layout an unrealized entry's
+    // estimated height never actually measured).
+    if (!e.layout || !e.style.isTaskItem)
+        return std::nullopt;
+
+    const qreal contentX = pageMargin() + e.style.leftIndent;
+    const qreal contentY = (e.y + titleBandHeight() - scrollY) + e.style.topMargin;
+    const QFontMetricsF fm(e.style.font);
+    if (!taskCheckboxRect(fm, contentX, contentY).contains(QPointF(viewportPos)))
+        return std::nullopt;
+    return e.id;
 }
 
 CanvasCursor View::hitTestTable(int entryIndex, const QPoint &viewportPos, qreal scrollY) const
@@ -2193,6 +2251,23 @@ void View::mousePressEvent(QMouseEvent *event)
     }
 
     if (event->button() == Qt::LeftButton && m_doc) {
+        // Task-checkbox toggle (P4.7): checked ahead of hitTest/caret
+        // placement — the glyph sits in the gutter left of contentX, which
+        // hitTest's own text hit-testing never resolves to (negative
+        // localX clamps into the text at byte 0), so there is no gesture
+        // ambiguity to arbitrate the way link-activation-vs-caret has.
+        // Gated read-only like every other mutation in this file (cut,
+        // paste, format verbs): a plain click on a read-only document's
+        // checkbox is a no-op, not a caret jump into the gutter.
+        if (const auto taskId = taskCheckboxAt(event->pos())) {
+            if (!m_readOnly) {
+                m_doc->toggleListItemChecked(*taskId);
+                viewport()->update();
+            }
+            event->accept();
+            return;
+        }
+
         const CanvasCursor hit = hitTest(event->pos());
         if (!hit.block.isNull()) {
             // Link activation (P4.2, spec §5.2): plain click while
@@ -2478,7 +2553,26 @@ void View::paintEvent(QPaintEvent *event)
         if (!e.layout)
             continue;  // unrealized: outside the realized margin
 
-        if (!e.style.marker.isEmpty()) {
+        if (e.style.isTaskItem) {
+            // Checkbox glyph (P4.7): same decoration slot list bullets use
+            // (left of contentX, kMarkerGap-gapped), but a drawn box+check
+            // rather than measured bracket text — taskCheckboxRect is the
+            // one function that decides where it goes, shared with
+            // taskCheckboxAt's hit-test so the clickable area always
+            // matches what's on screen.
+            const QFontMetricsF fm(e.style.font);
+            const QRectF box = taskCheckboxRect(fm, contentX, contentY);
+            p.setPen(QPen(e.style.foreground, 1.2));
+            p.setBrush(Qt::NoBrush);
+            p.drawRoundedRect(box, 2.0, 2.0);
+            if (e.style.taskChecked) {
+                QPainterPath check;
+                check.moveTo(box.left() + box.width() * 0.18, box.top() + box.height() * 0.55);
+                check.lineTo(box.left() + box.width() * 0.42, box.top() + box.height() * 0.78);
+                check.lineTo(box.left() + box.width() * 0.84, box.top() + box.height() * 0.22);
+                p.strokePath(check, QPen(e.style.foreground, 1.6));
+            }
+        } else if (!e.style.marker.isEmpty()) {
             const QFontMetricsF fm(e.style.font);
             p.setPen(e.style.foreground);
             p.setFont(e.style.font);

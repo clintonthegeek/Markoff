@@ -31,10 +31,22 @@ struct BlockStyle {
     qreal  leftIndent   = 0;    //!< added to the view's page margin
 
     /// ListItem bullet/number, painted as decoration to the left of the
-    /// content. Empty for every other kind. The buffer never contains it:
+    /// content. Empty for every other kind, AND empty for a task-list item
+    /// (`isTaskItem` below) — a task item paints a checkbox glyph in this
+    /// same decoration slot instead of bracket text (P4.7), so the two are
+    /// mutually exclusive by construction rather than by a second
+    /// `blockKind()` check at paint time. The buffer never contains this:
     /// the parser narrows ListItem ranges to post-marker content, so this
     /// is display-only and must not enter any byte-offset arithmetic.
     QString marker;
+
+    /// True for a ListItem whose `MarkerStyle` attr is "task" (`- [ ]`/
+    /// `- [x]`) — tells the paint/hit-test paths to use the checkbox-glyph
+    /// decoration instead of `marker` text (P4.7). The Checked attr's
+    /// current value, display-only like `marker` above (the CRDT attr,
+    /// not this bool, is what a toggle click writes).
+    bool isTaskItem = false;
+    bool taskChecked = false;
 
     /// HorizontalRule paints a line and has no text.
     bool isRule = false;

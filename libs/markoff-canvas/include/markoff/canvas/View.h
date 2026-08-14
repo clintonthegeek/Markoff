@@ -208,6 +208,13 @@ public:
     /// nothing here is authority.
     QRectF tableCellRect(BlockId id, int row, int col) const;
 
+    /// Task-checkbox glyph bounds in document coordinates (P4.7), or a null
+    /// rect if `id` isn't a task-list ListItem. Same rect `paintEvent`
+    /// draws and `taskCheckboxAt`'s click hit-test checks (via the shared
+    /// `taskCheckboxRect` geometry function in View.cpp) — test/inspection
+    /// surface only, same convention as `blockRect`/`tableCellRect`.
+    QRectF taskCheckboxRectFor(BlockId id) const;
+
     /// Paints since construction. Cheap paint-counter for tests that need
     /// to know a repaint actually happened.
     quint64 paintCount() const;
@@ -645,6 +652,18 @@ private:
     /// cursor. Called from the viewport-leave event filter and whenever
     /// `updateHover` finds no link under the pointer.
     void clearHover();
+
+    // ---- Task-list checkboxes (P4.7) ---------------------------------------
+
+    /// The task-item BlockId whose checkbox glyph covers `viewportPos`,
+    /// if any. Reuses `hitTest`'s cache-entry y-lookup (`indexAtY`) rather
+    /// than a second one, then checks the click point against the same
+    /// glyph rect `paintEvent`'s task-checkbox branch draws (both go
+    /// through `taskCheckboxRect` in View.cpp — one geometry, not two).
+    /// `nullopt` for a miss, an unrealized entry (no font metrics without a
+    /// layout — matches the marker-text decoration's own realized-only
+    /// requirement), or a non-task ListItem/other kind.
+    std::optional<BlockId> taskCheckboxAt(const QPoint &viewportPos) const;
 
     // ---- Inline title (P4.9) ----------------------------------------------
 
