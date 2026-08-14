@@ -11,9 +11,12 @@
 #include <markoff/core/Theme.h>
 #include <markoff/parser/SourceSpan.h>
 
+#include <markoff/core/EmbedRegistry.h>
+
 #include "CodeHighlighting.h"
 #include "InlineFormatting.h"
 #include "MathRendering.h"
+#include "MediaBlocks.h"
 #include "TableGeometry.h"
 
 namespace coords = Markoff::TextUnits;
@@ -27,11 +30,34 @@ void BlockLayoutCache::setTextWidth(qreal width)
     m_textWidth = width;
     // Wrapping changed under every layout; keep the order and the
     // estimates, drop the realizations.
+    invalidateRealizedLayouts();
+}
+
+void BlockLayoutCache::invalidateRealizedLayouts()
+{
     for (Entry &e : m_entries) {
         e.layout.reset();
         e.realized = false;
     }
     recomputePositions();
+}
+
+void BlockLayoutCache::setImageResourceLookup(ImageResourceLookup lookup)
+{
+    m_imageLookup = std::move(lookup);
+    invalidateRealizedLayouts();
+}
+
+void BlockLayoutCache::setMermaidRenderer(MermaidRenderer *renderer)
+{
+    m_mermaidRenderer = renderer;
+    invalidateRealizedLayouts();
+}
+
+void BlockLayoutCache::setEmbedRegistry(Markoff::EmbedRegistry *registry)
+{
+    m_embedRegistry = registry;
+    invalidateRealizedLayouts();
 }
 
 void BlockLayoutCache::clear()
@@ -313,6 +339,59 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
         ranges += Detail::codeTokenFormatRanges(text, m_syntaxHighlighter, theme, e.projection);
     }
 
+    // Mermaid (P5.4): a fenced code block whose info-string language is
+    // "mermaid" — same fence parse P4.6 already does for token coloring,
+    // just keyed differently. Built only while the caret is NOT in this
+    // block, same trigger as display Math's mathPixmap below (this call
+    // already re-runs on every caret entry/exit via setCaret's
+    // restyleInline, so the pixmap always matches what paintEvent is about
+    // to choose). No renderer, no "mermaid" language, or a render failure
+    // all fall through to null — paintEvent's fallback is the normal
+    // code-block text layout (CodeHighlighting's own "service miss
+    // renders plain monospace" precedent; no placeholder box here).
+    e.mermaidPixmap = QPixmap();
+    if (e.style.isCodeBlock && e.id != m_caretBlock && m_mermaidRenderer) {
+        const Detail::CodeFenceInfo fence = Detail::parseCodeFence(text);
+        if (fence.language.compare(QStringLiteral("mermaid"), Qt::CaseInsensitive) == 0
+            && fence.contentEnd > fence.contentStart) {
+            const QByteArray content =
+                text.mid(fence.contentStart, fence.contentEnd - fence.contentStart);
+            e.mermaidPixmap = m_mermaidRenderer->render(QString::fromUtf8(content));
+        }
+    }
+
+    // Image / Embed (P5.4): both are BlockKind::Image forms
+    // (MediaBlocks::parseImageBlock's isEmbed split, set into
+    // style.isImageBlock/isEmbedBlock by BlockPresentation::presentationFor).
+    // Not caret-gated — unlike Math/mermaid's "source reveals on caret
+    // entry" rule, the plan names no such toggle for images/embeds.
+    e.imagePixmap = QPixmap();
+    e.mediaLabel.clear();
+    if (e.style.isImageBlock || e.style.isEmbedBlock) {
+        const Detail::ImageBlockInfo info = Detail::parseImageBlock(text);
+        const QString display = info.altOrAlias.isEmpty() ? info.target : info.altOrAlias;
+
+        if (e.style.isImageBlock) {
+            if (m_imageLookup)
+                e.imagePixmap = m_imageLookup(info.target);
+            e.mediaLabel = display.isEmpty() ? QStringLiteral("[image]") : display;
+        } else {
+            // Embed *seam* only (plan P5.4): EmbedRegistry is consulted
+            // for its hasExtension() answer (proves the seam is actually
+            // wired to something), but dispatch()/mounting a real
+            // MarkdownRenderChild is out of this task's scope — always
+            // placeholder-rendered, per the plan's own wording.
+            const int dot = info.target.lastIndexOf(QLatin1Char('.'));
+            const QString ext = dot >= 0 ? info.target.mid(dot + 1) : QString();
+            const bool registered =
+                m_embedRegistry && !ext.isEmpty() && m_embedRegistry->hasExtension(ext);
+            const QString label = display.isEmpty() ? info.target : display;
+            e.mediaLabel = registered
+                ? QStringLiteral("Embed: %1").arg(label)
+                : QStringLiteral("Embed (no factory): %1").arg(label);
+        }
+    }
+
     // Preedit area (T8): set before beginLayout() (it's a QTextEngine
     // rebuild trigger, same as setFormats() below) so the spliced-in text
     // takes part in this pass's line breaking. The preedit's own position
@@ -392,6 +471,22 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
             const qreal pixmapH = e.mathPixmap.height() / qMax(1.0, e.mathPixmap.devicePixelRatio());
             e.height = e.style.topMargin + e.style.bottomMargin + pixmapH;
         }
+    }
+
+    // Mermaid (P5.4): pixmap built above, height override mirrors Math's.
+    if (!e.mermaidPixmap.isNull()) {
+        const qreal pixmapH = e.mermaidPixmap.height() / qMax(1.0, e.mermaidPixmap.devicePixelRatio());
+        e.height = e.style.topMargin + e.style.bottomMargin + pixmapH;
+    }
+
+    // Image / Embed (P5.4): a resolved image pixmap sizes to itself; a
+    // placeholder (image miss, or any embed) uses the fixed placeholder
+    // height so the block still occupies sane, predictable space.
+    if (!e.imagePixmap.isNull()) {
+        const qreal pixmapH = e.imagePixmap.height() / qMax(1.0, e.imagePixmap.devicePixelRatio());
+        e.height = e.style.topMargin + e.style.bottomMargin + pixmapH;
+    } else if (e.style.isImageBlock || e.style.isEmbedBlock) {
+        e.height = e.style.topMargin + e.style.bottomMargin + kMediaPlaceholderHeight;
     }
 }
 

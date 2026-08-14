@@ -465,6 +465,23 @@ bool EditorWidget::inlineTitleVisible() const
     return m_view && m_view->inlineTitleVisible();
 }
 
+// --- Image / Mermaid / Embed seams (P5.4) ---
+
+void EditorWidget::setImageResourceLookup(Markoff::Canvas::ImageResourceLookup lookup)
+{
+    if (m_view) m_view->setImageResourceLookup(std::move(lookup));
+}
+
+void EditorWidget::setMermaidRenderer(Markoff::Canvas::MermaidRenderer *renderer)
+{
+    if (m_view) m_view->setMermaidRenderer(renderer);
+}
+
+void EditorWidget::setEmbedRegistry(Markoff::EmbedRegistry *registry)
+{
+    if (m_view) m_view->setEmbedRegistry(registry);
+}
+
 // --- Format verbs (contract-v2 P4.3) ---
 // Each verb delegates straight to the composed View's own method — no
 // second implementation, and no indirection through actionController()'s

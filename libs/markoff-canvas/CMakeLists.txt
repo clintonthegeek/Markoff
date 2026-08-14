@@ -39,6 +39,9 @@ add_library(markoff_canvas STATIC
     src/InputPredicate.cpp
     src/MathRendering.h
     src/MathRendering.cpp
+    include/markoff/canvas/MediaSeams.h
+    src/MediaBlocks.h
+    src/MediaBlocks.cpp
     src/ProjectionMap.h
     src/ProjectionMap.cpp
     src/TableGeometry.h

@@ -11,12 +11,15 @@
 #include <markoff/core/BlockId.h>
 #include <markoff/core/Kf6SyntaxHighlightService.h>
 
+#include <markoff/canvas/MediaSeams.h>
+
 #include "BlockPresentation.h"
 #include "ProjectionMap.h"
 
 namespace Markoff {
 class MarkoffDocument;
 class Theme;
+class EmbedRegistry;
 }
 
 namespace Markoff::Canvas {
@@ -25,6 +28,12 @@ namespace Markoff::Canvas {
 /// between BlockLayoutCache's geometry pass and View's paint/hit-test paths
 /// so cell content lands at the same point it was measured against.
 constexpr qreal kTableCellPadding = 4.0;
+
+/// Fixed height of an Image/Embed placeholder box (P5.4), in DIPs — used
+/// both for BlockLayoutCache's height computation and View::paintEvent's
+/// box-drawing, so the two never disagree about how much space a
+/// placeholder occupies.
+constexpr qreal kMediaPlaceholderHeight = 80.0;
 
 /**
  * Derived layout state for the document's blocks, in document order.
@@ -81,6 +90,36 @@ public:
         /// caret motion/selection keep working against real text
         /// unconditionally.
         QPixmap mathPixmap;
+
+        /// Image resource-lookup result (P5.4, `style.isImageBlock` only):
+        /// built by `rebuildInline()` from the injected
+        /// `ImageResourceLookup`, keyed off the block's own parsed target
+        /// (`MediaBlocks::parseImageBlock`). Null when no lookup is set,
+        /// the lookup returned null (a miss), or this isn't an image
+        /// block — `View::paintEvent` paints a placeholder box using
+        /// `mediaLabel` in that case.
+        QPixmap imagePixmap;
+
+        /// Mermaid renderer result (P5.4, `style.isCodeBlock` + a
+        /// "mermaid" fence language only): built the same way display
+        /// Math's `mathPixmap` is — only while the caret is NOT in this
+        /// block. Null when no renderer is injected, the block isn't a
+        /// mermaid fence, the renderer returned null, or the caret is in
+        /// the block (source revealed) — `View::paintEvent` falls back to
+        /// the normal code-block text layout in every one of those cases
+        /// (no placeholder box for mermaid, unlike Image/Embed: a missing
+        /// renderer is exactly `CodeHighlighting`'s own "service miss
+        /// renders plain monospace" precedent).
+        QPixmap mermaidPixmap;
+
+        /// Parsed target/label for a `style.isImageBlock` or
+        /// `style.isEmbedBlock` entry (P5.4) —
+        /// `MediaBlocks::parseImageBlock`'s target/altOrAlias (plus, for
+        /// an embed, an `EmbedRegistry::hasExtension` consultation folded
+        /// into the text), cached here so `View::paintEvent`'s
+        /// placeholder-box label doesn't reparse the buffer every paint.
+        /// Empty for every other entry.
+        QString mediaLabel;
 
         quint64 seq      = 0;      //!< blockEditSequence when measured
         qreal   y        = 0;      //!< top of the block, document coords
@@ -142,6 +181,19 @@ public:
     /// Clear any active preedit area. No-op if none is set.
     void clearPreedit(const MarkoffDocument &doc, const Theme &theme);
 
+    /// P5.4 image seam. Not owned (callback semantics — same "reference,
+    /// not owner" convention `m_syntaxHighlighter`'s concrete-service role
+    /// already follows, just injectable now). Forces every already-
+    /// realized entry to re-realize on the next `realizeRange()` call, so
+    /// a lookup set after the document is already loaded takes effect on
+    /// the next paint rather than only on the next structural edit.
+    void setImageResourceLookup(ImageResourceLookup lookup);
+    /// P5.4 mermaid seam. Not owned — see `MermaidRenderer`'s own doc
+    /// comment. Same re-realize-on-set behavior as the image lookup above.
+    void setMermaidRenderer(MermaidRenderer *renderer);
+    /// P5.4 embed seam. Not owned. Same re-realize-on-set behavior.
+    void setEmbedRegistry(Markoff::EmbedRegistry *registry);
+
     void clear();
 
     const std::vector<Entry> &entries() const { return m_entries; }
@@ -170,6 +222,12 @@ private:
     /// (already-realized entries, guarded there so an unrealized entry
     /// isn't force-built early).
     void  rebuildInline(const MarkoffDocument &doc, const Theme &theme, Entry &e) const;
+    /// Drops every entry's realized layout (keeps the estimate/y-position
+    /// otherwise), forcing a fresh `realize()`/`rebuildInline()` pass on
+    /// the next `realizeRange()` — same invalidation `setTextWidth()` was
+    /// already doing inline; factored out so the P5.4 seam setters below
+    /// can reuse it without also forcing a width change.
+    void invalidateRealizedLayouts();
 
     /// Code-block token colorer (P4.6): keyed per call by the fence's own
     /// info string (CodeHighlighting::parseCodeFence), not stored per
@@ -180,6 +238,13 @@ private:
     /// instantiates one — grep confirms it), so this leaf owns its own
     /// instance directly, same as it owns everything else in this cache.
     Kf6SyntaxHighlightService m_syntaxHighlighter;
+
+    /// P5.4 seams — all "reference, not owner": the consumer keeps the
+    /// renderer/registry alive, this cache only reads through them at
+    /// rebuild time. See the setters' own doc comments.
+    ImageResourceLookup    m_imageLookup;
+    MermaidRenderer        *m_mermaidRenderer = nullptr;
+    Markoff::EmbedRegistry *m_embedRegistry   = nullptr;
 
     std::vector<Entry>  m_entries;
     QHash<BlockId, int> m_index;        //!< id → position in m_entries

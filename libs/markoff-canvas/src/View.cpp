@@ -289,6 +289,27 @@ void View::setContentWidthPolicy(ContentWidthPolicy policy)
     viewport()->update();
 }
 
+void View::setImageResourceLookup(ImageResourceLookup lookup)
+{
+    m_cache->setImageResourceLookup(std::move(lookup));
+    ensureLayoutForViewport();
+    viewport()->update();
+}
+
+void View::setMermaidRenderer(MermaidRenderer *renderer)
+{
+    m_cache->setMermaidRenderer(renderer);
+    ensureLayoutForViewport();
+    viewport()->update();
+}
+
+void View::setEmbedRegistry(Markoff::EmbedRegistry *registry)
+{
+    m_cache->setEmbedRegistry(registry);
+    ensureLayoutForViewport();
+    viewport()->update();
+}
+
 void View::reflowKeepingScrollAnchor()
 {
     const auto [anchorIdx, anchorFraction] = scrollAnchor();
@@ -493,6 +514,48 @@ bool View::isMathPixmapActive(BlockId id) const
     if (idx < 0)
         return false;
     return !m_cache->entries()[size_t(idx)].mathPixmap.isNull();
+}
+
+bool View::isImagePixmapActive(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    return e.style.isImageBlock && !e.imagePixmap.isNull();
+}
+
+bool View::isImagePlaceholderActive(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    return e.style.isImageBlock && e.imagePixmap.isNull();
+}
+
+bool View::isMermaidPixmapActive(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    return !m_cache->entries()[size_t(idx)].mermaidPixmap.isNull();
+}
+
+bool View::isEmbedPlaceholderActive(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    return m_cache->entries()[size_t(idx)].style.isEmbedBlock;
+}
+
+QString View::mediaLabelFor(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return {};
+    return m_cache->entries()[size_t(idx)].mediaLabel;
 }
 
 bool View::isComposing() const
@@ -3102,6 +3165,50 @@ void View::paintEvent(QPaintEvent *event)
 
         if (!e.layout)
             continue;  // unrealized: outside the realized margin
+
+        // Image / Embed (P5.4): both are BlockKind::Image forms
+        // (MediaBlocks::parseImageBlock's isEmbed split; see
+        // BlockStyle::isImageBlock/isEmbedBlock's own doc comments for why
+        // the two are mutually exclusive). A resolved image pixmap paints
+        // centered in the content column, same as Math's own centering
+        // below; anything else (no lookup, a lookup miss, or any embed —
+        // embeds are always placeholder this task) paints a dashed
+        // placeholder box with the parsed target/label text.
+        if (e.style.isImageBlock || e.style.isEmbedBlock) {
+            if (!e.imagePixmap.isNull()) {
+                const qreal dpr = qMax(1.0, e.imagePixmap.devicePixelRatio());
+                const qreal pw  = e.imagePixmap.width() / dpr;
+                const qreal avail = margin + textWidth() - contentX;
+                const qreal px = contentX + qMax(qreal(0), (avail - pw) / 2.0);
+                p.drawPixmap(QPointF(px, contentY), e.imagePixmap);
+            } else {
+                const QRectF box(contentX, contentY, textWidth(), kMediaPlaceholderHeight);
+                p.setPen(QPen(e.style.foreground, 1.0, Qt::DashLine));
+                p.setBrush(m_theme.color(Theme::Slot::CodeBlockBackground));
+                p.drawRoundedRect(box, 4.0, 4.0);
+                p.setPen(e.style.foreground);
+                p.drawText(box, Qt::AlignCenter | Qt::TextWordWrap,
+                           e.mediaLabel.isEmpty() ? QStringLiteral("[no target]")
+                                                   : e.mediaLabel);
+            }
+            continue;
+        }
+
+        // Mermaid (P5.4): a non-null mermaidPixmap means the caret is not
+        // in this block AND the injected MermaidRenderer produced a
+        // pixmap for it — same centering as the Image/Math pixmap paths.
+        // Caret-in-block, no renderer, or a render failure all fall
+        // through to the normal code-block text layout below (no
+        // placeholder box for mermaid — see mermaidPixmap's own doc
+        // comment).
+        if (!e.mermaidPixmap.isNull()) {
+            const qreal dpr = qMax(1.0, e.mermaidPixmap.devicePixelRatio());
+            const qreal pw  = e.mermaidPixmap.width() / dpr;
+            const qreal avail = margin + textWidth() - contentX;
+            const qreal px = contentX + qMax(qreal(0), (avail - pw) / 2.0);
+            p.drawPixmap(QPointF(px, contentY), e.mermaidPixmap);
+            continue;
+        }
 
         // Display Math (P5.3): a non-null mathPixmap means the caret is
         // NOT in this block (BlockLayoutCache::rebuildInline only builds

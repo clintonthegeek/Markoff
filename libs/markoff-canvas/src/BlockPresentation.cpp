@@ -8,6 +8,8 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
 
+#include "MediaBlocks.h"
+
 namespace Markoff::Canvas {
 
 namespace {
@@ -165,9 +167,26 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
         s.isTable = true;
         break;
 
+    // Image / Embed (P5.4): KindInference maps both `![alt](src)` and
+    // `![[target]]` to this one BlockKind (its own "starts with ![" rule),
+    // so MediaBlocks::parseImageBlock reparses the buffer to tell them
+    // apart. BlockLayoutCache::rebuildInline does the actual pixmap/
+    // placeholder-label work (it, not this pure function, holds the
+    // injected ImageResourceLookup/EmbedRegistry seams) — this switch only
+    // sets which of the two mutually-exclusive flags applies.
+    case BlockKind::Image: {
+        const QByteArray text = doc.blockText(id);
+        const Detail::ImageBlockInfo info = Detail::parseImageBlock(text);
+        s.isEmbedBlock = info.isEmbed;
+        s.isImageBlock = !info.isEmbed;
+        break;
+    }
+
     // Out of spike scope entirely (spec §5), rendered as their source text
-    // in the body font so the document stays navigable.
-    case BlockKind::Image:
+    // in the body font so the document stays navigable. (Mermaid diagrams
+    // arrive as a fenced ```mermaid CodeBlock, not this BlockKind — see
+    // BlockLayoutCache::rebuildInline's mermaid-pixmap handling instead;
+    // BlockKind::Mermaid itself is never assigned by the load path.)
     case BlockKind::Mermaid:
     case BlockKind::HtmlBlock:
         break;

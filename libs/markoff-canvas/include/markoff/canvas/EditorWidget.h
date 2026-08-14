@@ -11,8 +11,11 @@
 #include <markoff/core/FindController.h>
 #include <markoff/core/MarkdownView.h>
 
+#include <markoff/canvas/MediaSeams.h>
+
 namespace Markoff {
 class Session;
+class EmbedRegistry;
 }  // namespace Markoff
 
 namespace Markoff::Canvas {
@@ -206,6 +209,16 @@ public:
     /// Off by default (spec §5.2 "off by default").
     void setInlineTitleVisible(bool visible);
     bool inlineTitleVisible() const;
+
+    // ---- Image / Mermaid / Embed seams (P5.4) -----------------------------
+    // Thin pass-throughs to the composed View — the leaf-specific escape
+    // hatch this wrapper already follows for view()/actionController(), not
+    // a second copy of the seam state. See View::setImageResourceLookup/
+    // setMermaidRenderer/setEmbedRegistry's own doc comments.
+
+    void setImageResourceLookup(Markoff::Canvas::ImageResourceLookup lookup);
+    void setMermaidRenderer(Markoff::Canvas::MermaidRenderer *renderer);
+    void setEmbedRegistry(Markoff::EmbedRegistry *registry);
 
 signals:
     /// Forwarded from the composed `View::titleEdited` — the consumer turns

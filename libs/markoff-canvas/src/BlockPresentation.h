@@ -81,6 +81,24 @@ struct BlockStyle {
 
     /// Quote bar down the left edge.
     bool hasQuoteBar = false;
+
+    /// `BlockKind::Image` whose buffer is standard markdown-image syntax
+    /// (`![alt](src)`) — NOT the embed form below (P5.4,
+    /// `MediaBlocks::parseImageBlock`). Tells `BlockLayoutCache::
+    /// rebuildInline` to attempt a consumer resource-lookup pixmap, and
+    /// `View::paintEvent` to paint that pixmap, or a placeholder box when
+    /// there is no pixmap (no lookup set, or a lookup miss).
+    bool isImageBlock = false;
+
+    /// `BlockKind::Image` whose buffer is Obsidian block-embed syntax
+    /// (`![[target]]`/`![[target|alias]]`) — mutually exclusive with
+    /// `isImageBlock` above (`MediaBlocks::parseImageBlock`'s `isEmbed`
+    /// flag; both kinds share `BlockKind::Image` per `KindInference`'s own
+    /// "starts with `![`" rule, so this leaf reparses to tell them apart).
+    /// Always placeholder-painted this task (plan P5.4: "Embed *seam*
+    /// only... placeholder rendering") — `View::paintEvent` never attempts
+    /// to actually mount a dispatched `MarkdownRenderChild` here.
+    bool isEmbedBlock = false;
 };
 
 /// Derive the presentation for one block. Pure: reads the document's kind

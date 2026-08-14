@@ -17,6 +17,7 @@
 #include <markoff/core/LinkActivation.h>
 #include <markoff/core/Theme.h>
 
+#include <markoff/canvas/MediaSeams.h>
 #include <markoff/canvas/TableTypes.h>
 
 class QContextMenuEvent;
@@ -28,6 +29,7 @@ class QTextLayout;
 namespace Markoff {
 class MarkoffDocument;
 class LinkService;
+class EmbedRegistry;
 }
 
 namespace Markoff::Canvas {
@@ -158,6 +160,31 @@ public:
     void setContentWidthPolicy(ContentWidthPolicy policy);
     ContentWidthPolicy contentWidthPolicy() const { return m_contentWidthPolicy; }
 
+    // ---- Image / Mermaid / Embed seams (P5.4) ----------------------------
+    // All three follow the "reference, not owner" convention setLinkService/
+    // setActionController already use in this file: the consumer keeps the
+    // callback/renderer/registry alive; this view only reads through it at
+    // rebuild time. Each setter forces every already-realized entry to
+    // re-realize (BlockLayoutCache::invalidateRealizedLayouts), so setting
+    // one after the document is already loaded still takes effect on the
+    // next paint.
+
+    /// Image blocks (`![alt](src)`) paint `lookup`'s result, or a
+    /// placeholder box on a miss/unset lookup. See `ImageResourceLookup`'s
+    /// own doc comment (MediaSeams.h).
+    void setImageResourceLookup(ImageResourceLookup lookup);
+    /// Fenced code blocks whose info-string language is "mermaid" paint
+    /// `renderer`'s pixmap while the caret is outside the block, source
+    /// while inside. `nullptr` (the default) means mermaid blocks always
+    /// show as plain code (P4.6 monospace styling), never a placeholder.
+    void setMermaidRenderer(MermaidRenderer *renderer);
+    /// Obsidian-style block embeds (`![[target]]`) consult `registry` for
+    /// `hasExtension()` only (this view never mounts a real
+    /// `MarkdownRenderChild` — always placeholder-rendered, plan P5.4).
+    /// `nullptr` (the default) renders every embed as an "unregistered"
+    /// placeholder.
+    void setEmbedRegistry(Markoff::EmbedRegistry *registry);
+
     /// Read-only gate (contract-v2 P3.3, spec §4.2): the single authority
     /// every mutation-ingress path below checks (mirrors the live leaf's
     /// `binding()->readOnly` six-gate table, this file's CLAUDE.md
@@ -257,6 +284,38 @@ public:
     /// while the caret is inside the block revealing raw source. Test/
     /// inspection surface only — nothing here is authority.
     bool isMathPixmapActive(BlockId id) const;
+
+    /// P5.4: whether `id`'s realized entry currently has a consumer-
+    /// resolved image pixmap standing in for its text layout — true
+    /// exactly when it's a standard-image-form Image block AND the
+    /// injected `ImageResourceLookup` returned a non-null pixmap for its
+    /// target. False for an unrealized block, a non-image block, an
+    /// embed-form Image block, or a lookup miss/unset lookup (in which
+    /// case `isImagePlaceholderActive` is true instead). Test/inspection
+    /// surface only — nothing here is authority.
+    bool isImagePixmapActive(BlockId id) const;
+    /// P5.4: whether `id`'s realized entry is a standard-image-form Image
+    /// block currently painting the placeholder box (no pixmap resolved).
+    /// Test/inspection surface only.
+    bool isImagePlaceholderActive(BlockId id) const;
+    /// P5.4: whether `id`'s realized entry currently has an injected
+    /// `MermaidRenderer`'s pixmap standing in for its text layout — true
+    /// exactly when it's a fenced code block whose language is "mermaid",
+    /// a renderer is set, the render succeeded, AND the caret is not in
+    /// this block. Test/inspection surface only.
+    bool isMermaidPixmapActive(BlockId id) const;
+    /// P5.4: whether `id` is an embed-form Image block (`![[target]]`) —
+    /// always placeholder-painted this task, so this is equivalent to
+    /// "is this block an embed" rather than a pixmap-active check. Test/
+    /// inspection surface only.
+    bool isEmbedPlaceholderActive(BlockId id) const;
+    /// P5.4: the placeholder/target label text `paintEvent` would draw for
+    /// `id`'s Image-block entry (standard image OR embed form) — for an
+    /// embed, this is where `EmbedRegistry::hasExtension()`'s answer shows
+    /// up (a different label string for "registered" vs "no factory").
+    /// Empty for a non-image entry or an unrealized block. Test/inspection
+    /// surface only — nothing here is authority.
+    QString mediaLabelFor(BlockId id) const;
 
     /// Whether an IME composition is in progress (T8, exit E6): a non-empty
     /// preedit string is currently spliced into the caret block's layout.
