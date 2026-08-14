@@ -164,14 +164,18 @@ From `NoteEditorWidget` + the live leaf's contract table; all
 | Inline kinds | the full 8-kind set the live highlighter renders: bold, italic, strikethrough, code, highlight (`==`), link, wikilink, tag — plus footnote refs |
 | Context menu | standard edit menu (cut/copy/paste/select-all + format section), extensible by consumer |
 | Ephemeral state | save/restore scroll + cursor + fold as JSON (Corbomite `EphemeralState` round-trip) |
-| Word wrap | adjustable content-column policy: full-width or fixed readable line length, centered (Obsidian "readable line length"); live-resizable |
+| Word wrap | adjustable content-column policy: full-width or fixed readable line length, centered (Obsidian "readable line length"); live-resizable. Obsidian calibration (F1): `--file-line-width: 700px` default, centered, user-toggleable; full viewport width when off; tables and code blocks may exceed the column with their own horizontal scroll |
+| Inline title | **optional** leading title band showing the file name (Obsidian's `.inline-title`), editable, edits reported to the consumer for the rename. It is **not a document block** — Obsidian writes no H1 and neither do we. It is therefore excluded from `cursorPosition()` flat-line coordinates, find, selection-copy and serialization, and participates in caret motion only at the seam: Down/Enter from the title enters block 0; Backspace at document start does not consume it. Shares the content column. User-directed 2026-08-13; off by default |
 | Mermaid/math/images | injection seams: `MermaidRenderer`, jkqtmathtext for Math blocks, image blocks via consumer resource provider |
 
 ### 5.3 Obsidian Live Preview parity — within reason
 
-Benchmark features to match (audit task P1.1 verifies against the
-CodeMirror checkout once present; list from product knowledge until
-then): checkbox rendering + click-to-toggle for task lists; ordered/
+Benchmark features to match (audit task **F1** verified this list
+against the `~/src/codemirror` checkout on 2026-08-13; its gap table and
+proposed edits to this section are in the plan's findings log, awaiting
+the user's decision — in particular an **editing-command floor** and
+**local multi-cursor**, neither of which this section currently names):
+checkbox rendering + click-to-toggle for task lists; ordered/
 bullet list markers styled; code-block syntax highlighting
 (`Kf6SyntaxHighlightService`, already in core); blockquote styling
 (done) + callout rendering (type/icon/fold header); horizontal rules;

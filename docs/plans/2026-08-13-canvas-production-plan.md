@@ -118,7 +118,8 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.2 Link activation + hover | ☐ | | |
 | P4.3 FormatOps verbs + CanvasActionController | ☐ | | |
 | P4.4 Context menu | ☐ | | |
-| P4.5 Readable-line-width policy + resize | ☐ | | |
+| P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☐ | | |
+| P4.9 Inline title band (user-directed; spec §5.2) | ☐ | | |
 | P4.6 Code-block syntax highlighting | ☐ | | |
 | P4.7 Task-list checkboxes (render + toggle) | ☐ | | |
 | P4.8 ⏸ phase close | ☐ | | n/a |
@@ -369,6 +370,19 @@ decoration, like list bullets); click toggles the `x` byte via
 read-only). Caret/typing in the item text unaffected.
 **Falsify:** toggle writes to the wrong byte; neighbor-item test fails.
 
+### P4.9 — inline title band
+Optional leading title band per spec §5.2 (user-directed 2026-08-13):
+`setInlineTitle(QString)` / `setInlineTitleVisible(bool)` on
+`EditorWidget`, an editing affordance, and a `titleEdited(QString)`
+signal the consumer turns into a file rename. Rendered as a leading
+non-document entry in the y-layout, sharing the content column (P4.5).
+It is not a block: excluded from `cursorPosition()` flat lines, find,
+selection-copy and serialization. Caret seam: Down/Enter from the title
+lands at block 0 byte 0; Backspace at document start does not consume
+the title.
+**Falsify:** include the title in the flat-line walk; a
+`cursorPosition()` round-trip assertion must fail.
+
 ### P4.8 ⏸ — phase close (as P1.5; re-run perf).
 
 ---
@@ -506,3 +520,59 @@ user with a one-page summary of what's proven.
   rather than fixed unprompted.
 - Test count unchanged at **288/288** — P1.1 grew an existing executable
   (`tst_canvas_kind_transition`, 1 → 13 assertions) rather than adding one.
+
+---
+
+**F1 — CodeMirror parity audit (2026-08-13).** Source: `~/src/codemirror`
+(`view`, `state`, `commands`, `lang-markdown`, `search`, `autocomplete`,
+`language`, `basic-setup`). Nothing implemented; §5.3 edits proposed below.
+
+*Corrections to the spec as written:*
+
+- §5.3 says "audit task **P1.1** verifies against the CodeMirror
+  checkout" — the audit is **F1**. Fixed in the spec.
+- §5.3's list is a *rendering* benchmark. Obsidian's Live Preview is
+  CodeMirror 6 with `basic-setup`-shaped extensions, so the real parity
+  surface also includes an **editing-command floor** and **local
+  multi-cursor**, neither of which appears anywhere in the spec. Those
+  are the two findings that change the arc's shape; the rest are small.
+
+*Gaps, ranked. (CM refs are file:symbol in the checkout.)*
+
+| # | Gap | CM / Obsidian reference | Our status | Proposal |
+|---|---|---|---|---|
+| 1 | **Editing-command floor.** Word-wise motion + selection, word-wise delete, Ctrl+Home/End, delete-line, move/copy line up-down, select-line, Esc→simplify | `commands/src/commands.ts` `defaultKeymap` (l.1040–1138): `cursorGroupLeft/Right`, `deleteGroupBackward/Forward`, `cursorDocStart/End`, `deleteLine`, `moveLineUp/Down`, `copyLineUp/Down`, `selectLine`, `simplifySelection`. Obsidian binds most of these | Canvas has arrows/Home/End/PageUp-Down/Backspace/Delete/Ctrl+A,C,X,V,Z **only** | New spec §5.2 row + a P4 task. Word boundaries: `state/src/charcategory.ts` maps to `QTextBoundaryFinder`, not hand-rolled |
+| 2 | **Local multi-cursor.** Add cursor above/below, Alt+click, select-next-occurrence, rectangular selection, Esc to collapse | `commands`: `addCursorAbove/Below`; `view/src/rectangular-selection.ts`, `clickAddsSelectionRange`; `search/src/selection-match.ts` | Absent. Caret is one `{BlockId, byte}` + one anchor; `Session::secondarySelections` exists but is spoken for by *remote* presence (P6.2) | **Decide explicitly.** Recommend: painting comes free with P6.2 (same draw-time path); the *editing* half multiplies every mutation ingress and should be its own arc. Either way it belongs in §5.3 as scope or in the deferred list — silence is the wrong answer |
+| 3 | **Canvas undo is per-keystroke.** | `commands/src/history.ts` `newGroupDelay: 500` | Core already coalesces (`UndoLog::maybeCoalesceOrTransaction`: 1000 ms, same block, printable-only) and live gets it via `Cmd::insertCharacter` — but `View::insertPrintable` opens a bare `Transaction` per key, bypassing it | Straight defect, no core change: route canvas typing through `Cmd::insertCharacter`. Fold into a P4 task |
+| 4 | **Auto-pairing / wrap-selection.** Typing `(`/`[`/`"`/`` ` ``/`**` with a selection wraps it; typing the closer over an auto-inserted one types through; Backspace between a fresh pair deletes both | `autocomplete/src/closebrackets.ts` (`insertBracket`, `deleteBracketPair`, `closeBracketsKeymap`) | Absent from spec and code | Add to §5.3; sized as one P4 task. Note CM tracks auto-inserted closers in a `StateField` — for us that is *view* state and needs a §2 justification, or derive it from the undo entry |
+| 5 | **Markdown Enter/Backspace semantics are a spec, and we should test against it.** Enter continues list/quote markers, renumbers ordered lists, and outdents one level on an empty item; Backspace at content start replaces the marker with blank space or removes one indent level instead of merging blocks | `lang-markdown/src/commands.ts`: `insertNewlineContinueMarkup` (l.98), `deleteMarkupBackward` (l.240) | `StructuralKeyHandler` covers Enter-split / boundary-merge / list Tab; `Cmd::renumberRunStartingAt` exists. Coverage vs. these two commands is **unverified** | Not a spec change: a checklist test in P4/P5 diffing our structural keys against these two commands' documented cases |
+| 6 | **Atomic-range skipping has three ingresses, not one.** | `view/src/cursor.ts` `skipAtoms`; applied at `editorview.ts:680` (char), `:687` (group), `:721` (vertical) **and** `domchange.ts:179` for selections derived from pointer/DOM | P2.1's snap rule is written for byte→layout queries | Tighten P2.1's done-when: hit-test (mouse) and vertical motion must snap too, not just horizontal stepping |
+| 7 | Highlight other occurrences of the selection | `search/src/selection-match.ts` `highlightSelectionMatches` (`minSelectionLength`, `wholeWords`) | Absent | Add to §5.3 as optional; cheap once P3.4's match painting exists |
+| 8 | Scroll past end | `view/src/scrollpastend.ts` — bottom padding = viewport − one line | Absent | §5.3 one-liner; trivial in our y-layout |
+| 9 | Invisible/control-character rendering | `view/src/special-chars.ts` `Specials` — C0/C1, U+00AD, U+200B, U+200E/F, **U+202D/E and U+2066–9 (bidi overrides)**, U+FEFF | We substitute U+2028 for `\n` and nothing else | §5.3 addition. The bidi-override set matters beyond cosmetics — invisible RTL overrides in a note are a spoofing surface |
+| 10 | Empty-document placeholder; drop-cursor during drag; bracket-match highlight | `view/src/placeholder.ts`, `dropcursor.ts`, `language/src/matchbrackets.ts` | Absent | §5.3 minor list; drop cursor folds into P7.2 |
+| 11 | Fold state is serialized as part of editor state | `language/src/fold.ts:129` `foldState.toJSON/fromJSON` | P3.6 already reserves the fold key | No change — confirms the design |
+| 12 | Gutter is a general seam, not a fold detail | `view/src/gutter.ts` (line numbers, fold markers, active-line gutter) | P5.6 paints "a fold affordance in the gutter margin" | Suggest P5.6 build a small gutter seam rather than a fold-only affordance; line numbers then cost nothing |
+
+*Not gaps (checked, deliberately staying out):* active-line highlight
+(Obsidian doesn't), lint, autocompletion UI (Corbomite owns it via
+`CompletionRegistry`), indent-on-input for code, `basic-setup`'s line
+numbers by default.
+
+*User-directed additions (2026-08-13, folded into the spec — see §5.2):*
+
+- **Inline title.** Note: this is **not** a CodeMirror feature. Obsidian
+  renders `.inline-title` in the source-view container *above* the
+  CodeMirror instance; it is the file basename, editable, renames the
+  file, and is not part of the document text (Obsidian does not write an
+  H1). For us that means a leading title band on `EditorWidget` that is
+  **not a document block** — so document authority and C4 are untouched,
+  but it must be excluded from `cursorPosition()` flat-line coordinates,
+  find, selection-copy and serialization, while participating in caret
+  motion at the seam (Down/Enter from the title enters block 0; Backspace
+  at doc start does not consume it).
+- **Fixed-width column** is already spec §5.2 "Word wrap" / task P4.5.
+  Obsidian calibration recorded there: `--file-line-width: 700px`
+  default, centered, toggleable ("Readable line length"); full viewport
+  width when off; tables and code may exceed the column with their own
+  horizontal scroll. The inline title shares the same column.
