@@ -11,6 +11,7 @@
 #include <markoff/core/Theme.h>
 #include <markoff/parser/SourceSpan.h>
 
+#include "CodeHighlighting.h"
 #include "InlineFormatting.h"
 #include "TableGeometry.h"
 
@@ -254,6 +255,21 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
 
     QList<QTextLayout::FormatRange> ranges =
         Detail::inlineFormatRanges(spans, cursorsInBlock, theme, e.projection);
+
+    // Code-block token coloring (P4.6): appended to the SAME ranges list
+    // consumed by the ONE setFormats() call below, rather than a second
+    // out-of-band setFormats() after the fact — that second-call shape is
+    // exactly the T7 setFormats trap (a format update outside the paired
+    // formats-then-lines rebuild leaves the layout's line data stale).
+    // Going through rebuildInline like this means every trigger that
+    // already forces a full rebuild (content edit, caret move revealing/
+    // hiding the fence, structural restyle) recomputes token colors for
+    // free; nothing new invalidates the entry. A service miss (unknown
+    // fence language) or a non-fenced CodeBlock yields an empty list here,
+    // so the block keeps BlockPresentation's plain monospace styling.
+    if (e.style.isCodeBlock) {
+        ranges += Detail::codeTokenFormatRanges(text, m_syntaxHighlighter, theme, e.projection);
+    }
 
     // Preedit area (T8): set before beginLayout() (it's a QTextEngine
     // rebuild trigger, same as setFormats() below) so the spliced-in text

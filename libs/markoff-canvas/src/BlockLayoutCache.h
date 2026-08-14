@@ -8,6 +8,7 @@
 #include <QTextLayout>
 
 #include <markoff/core/BlockId.h>
+#include <markoff/core/Kf6SyntaxHighlightService.h>
 
 #include "BlockPresentation.h"
 #include "ProjectionMap.h"
@@ -155,6 +156,16 @@ private:
     /// (already-realized entries, guarded there so an unrealized entry
     /// isn't force-built early).
     void  rebuildInline(const MarkoffDocument &doc, const Theme &theme, Entry &e) const;
+
+    /// Code-block token colorer (P4.6): keyed per call by the fence's own
+    /// info string (CodeHighlighting::parseCodeFence), not stored per
+    /// instance here — this service object itself is stateless lookup
+    /// (KSyntaxHighlighting::Repository), owned once and reused for every
+    /// CodeBlock entry's rebuild. Canvas has no consumer-injected
+    /// MarkoffServices wiring yet (nothing in the tree currently
+    /// instantiates one — grep confirms it), so this leaf owns its own
+    /// instance directly, same as it owns everything else in this cache.
+    Kf6SyntaxHighlightService m_syntaxHighlighter;
 
     std::vector<Entry>  m_entries;
     QHash<BlockId, int> m_index;        //!< id → position in m_entries

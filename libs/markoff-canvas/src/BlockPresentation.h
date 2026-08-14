@@ -44,6 +44,14 @@ struct BlockStyle {
     /// the single per-block QTextLayout the rest of this switch presumes.
     bool isTable = false;
 
+    /// CodeBlock (P4.6): tells BlockLayoutCache::rebuildInline to attempt
+    /// token-color formatting via CodeHighlighting::codeTokenFormatRanges
+    /// on top of the plain monospace/background already set above. Kept
+    /// here rather than a second `doc.blockKind(id)` switch in
+    /// BlockLayoutCache, per this struct's own "resist a second per-kind
+    /// switch" rule.
+    bool isCodeBlock = false;
+
     /// Background rect spans the full text column rather than hugging the
     /// text (code blocks, quotes).
     bool fullWidthBackground = false;

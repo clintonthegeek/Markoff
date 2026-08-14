@@ -427,6 +427,24 @@ bool View::isDelimiterHiddenAt(BlockId id, int byteOffset) const
     return false;
 }
 
+QColor View::codeTokenColorAt(BlockId id, int byteOffset) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return QColor();
+
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return QColor();
+
+    const int layoutQChar = e.projection.byteToLayoutQChar(byteOffset);
+    for (const QTextLayout::FormatRange &fr : e.layout->formats()) {
+        if (layoutQChar >= fr.start && layoutQChar < fr.start + fr.length)
+            return fr.format.foreground().color();
+    }
+    return QColor();
+}
+
 qreal View::lineNaturalWidth(BlockId id) const
 {
     const int idx = m_cache->indexOf(id);

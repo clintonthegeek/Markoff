@@ -104,6 +104,11 @@ add_test(NAME tst_canvas_layout_width COMMAND tst_canvas_layout_width)
 target_link_libraries(tst_canvas_layout_width PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
 set_tests_properties(tst_canvas_layout_width PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_canvas_code_highlight tst_canvas_code_highlight.cpp)
+add_test(NAME tst_canvas_code_highlight COMMAND tst_canvas_code_highlight)
+target_link_libraries(tst_canvas_code_highlight PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+set_tests_properties(tst_canvas_code_highlight PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # The constitution gate (spec §6, C1–C4) runs as a test so that
 # `scripts/run-tests.sh -R canvas` enforces it alongside the leaf's own
 # tests. Name carries "canvas" deliberately — that is the -R filter.

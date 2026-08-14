@@ -89,6 +89,7 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
         s.background = theme.color(Theme::Slot::CodeBlockBackground);
         s.fullWidthBackground = true;
         s.leftIndent = em * 0.5;
+        s.isCodeBlock = true;
         break;
 
     case BlockKind::ListItem: {

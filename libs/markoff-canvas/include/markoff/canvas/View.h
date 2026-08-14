@@ -222,6 +222,16 @@ public:
     /// is authority.
     bool isDelimiterHiddenAt(BlockId id, int byteOffset) const;
 
+    /// The foreground color painted at `byteOffset` in block `id`'s realized
+    /// layout (P4.6, code-block token coloring), read directly off the
+    /// layout's own `formats()` — the same list `BlockLayoutCache::
+    /// rebuildInline`'s one `setFormats()` call installed, not a
+    /// recomputation. An invalid QColor means no format range covers that
+    /// position (plain BlockPresentation styling applies instead) or the
+    /// block isn't realized. Test/inspection surface only — nothing here is
+    /// authority.
+    QColor codeTokenColorAt(BlockId id, int byteOffset) const;
+
     /// The realized layout's first line's natural (unwrapped) text width in
     /// DIPs, or -1 if `id` isn't realized (spec §4.2 P2.1 exit criterion:
     /// this is real reflow, not a cosmetic recolor — hiding a delimiter run
