@@ -16,6 +16,8 @@
 #include <QScrollBar>
 #include <QtMath>
 
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/KindInference.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/StructuralKeyHandler.h>
 #include <markoff/core/UndoLog.h>
@@ -23,7 +25,6 @@
 #include "BlockLayoutCache.h"
 #include "Coordinates.h"
 #include "InputPredicate.h"
-#include "KindTransition.h"
 
 namespace coords = Markoff::Canvas::Detail::Coordinates;
 
@@ -309,24 +310,103 @@ void View::promoteCaretBlockKind()
 {
     if (!m_doc || m_caret.block.isNull())
         return;
-    // Only promote FROM Paragraph: a structural kind's buffer is either
-    // content-only (ListItem, BlockQuote) or already carries the marker
-    // that would re-trigger this exact inference (Heading, CodeBlock) —
+
+    const Markoff::BlockKind current = m_doc->blockKind(m_caret.block);
+
+    // A Heading's *level* keeps tracking its buffer after promotion: the
+    // first `#` already promoted the block, so `##`…`######` would never
+    // be seen by the promote path below. Form-aware, and only upward-
+    // defined — a heading that loses its marker demotes through the
+    // structural-key path, not here (live's KindTransition does the same).
+    if (current == Markoff::BlockKind::Heading) {
+        updateCaretHeadingLevel();
+        return;
+    }
+
+    // Otherwise only promote FROM Paragraph: a structural kind's buffer is
+    // either content-only (ListItem, BlockQuote) or already carries the
+    // marker that would re-trigger this exact inference (CodeBlock) —
     // same guard as the live leaf's KindTransition consumer.
-    if (m_doc->blockKind(m_caret.block) != Markoff::BlockKind::Paragraph)
+    if (current != Markoff::BlockKind::Paragraph)
         return;
 
     const QByteArray text = m_doc->blockText(m_caret.block);
-    const Markoff::BlockKind inferred =
-        Detail::inferBlockKind(QString::fromUtf8(text));
-    if (inferred == Markoff::BlockKind::Paragraph)
+    const Markoff::KindInference inferred =
+        Markoff::inferBlockKind(QString::fromUtf8(text));
+    if (inferred.kind == Markoff::BlockKind::Paragraph)
         return;
 
-    // No buffer edit: T1 established that a loaded Heading/CodeBlock keeps
-    // its ATX prefix/fence, so a typed one must match or the two
-    // representations of "the same block" diverge (spec §9, T1 finding).
+    // No buffer edit for ATX/fence promotions: T1 established that a loaded
+    // Heading/CodeBlock keeps its ATX prefix/fence, so a typed one must
+    // match or the two representations of "the same block" diverge (spec
+    // §9, T1 finding). Setext is the exception below — its *loaded*
+    // representation is content-only, so matching it means trimming.
+    //
+    // The kind-defining attrs go in the *same* transaction as the kind
+    // (P1.1): a Heading whose level lands in a second transaction renders
+    // as H1 for one paint and undoes in two steps.
+    {
+        UndoLog::Transaction t(m_doc->d2UndoLog());
+        m_doc->d2SetBlockKind(m_caret.block, inferred.kind, t);
+        if (inferred.kind == Markoff::BlockKind::Heading) {
+            // Setext is the one promotion that DOES edit the buffer: the
+            // load path drops the underline and `serializeHeading` rebuilds
+            // it from `level`, so keeping the typed underline would double
+            // it on save.
+            if (inferred.setextHeading) {
+                int end = text.size();
+                while (end > 0 && text[end - 1] == '\n') --end;
+                const int underlineNl = text.lastIndexOf('\n', end - 1);
+                if (underlineNl >= 0)
+                    m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(underlineNl),
+                                             uint32_t(text.size() - underlineNl),
+                                             QByteArray(), t);
+            }
+            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::Level,
+                                  inferred.headingLevel, t);
+            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::HeadingForm,
+                                  inferred.setextHeading ? QStringLiteral("setext")
+                                                         : QStringLiteral("atx"),
+                                  t);
+        } else if (inferred.kind == Markoff::BlockKind::Math) {
+            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::DisplayMode,
+                                  inferred.mathDisplay, t);
+        }
+    }
+
+    // The setext trim shortens the block under the caret, which sits past
+    // the new end (the user just typed the underline). This runs inside the
+    // document-changed pass that called us, so no later clamp is coming.
+    m_caret.byteOffset = qBound(0, m_caret.byteOffset,
+                                m_doc->blockText(m_caret.block).size());
+}
+
+void View::updateCaretHeadingLevel()
+{
+    const QString text = QString::fromUtf8(m_doc->blockText(m_caret.block));
+    const auto attrs = m_doc->blockAttrs(m_caret.block);
+
+    QString form = QStringLiteral("atx");
+    if (const auto it = attrs.constFind(Markoff::AttrNames::HeadingForm);
+        it != attrs.constEnd()) {
+        if (const QString *v = std::get_if<QString>(&it.value()); v && !v->isEmpty())
+            form = *v;
+    }
+    int level = 0;
+    if (const auto it = attrs.constFind(Markoff::AttrNames::Level);
+        it != attrs.constEnd()) {
+        if (const int *v = std::get_if<int>(&it.value()))
+            level = *v;
+    }
+
+    const int newLevel = (form == QStringLiteral("setext"))
+        ? Markoff::matchesSetextShape(text)
+        : Markoff::countLeadingHashes(text);
+    if (newLevel <= 0 || newLevel == level)
+        return;
+
     UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2SetBlockKind(m_caret.block, inferred, t);
+    m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::Level, newLevel, t);
 }
 
 // ---- Caret / editing (T2) ------------------------------------------------

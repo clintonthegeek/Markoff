@@ -28,8 +28,6 @@ add_library(markoff_canvas STATIC
     src/InlineFormatting.cpp
     src/InputPredicate.h
     src/InputPredicate.cpp
-    src/KindTransition.h
-    src/KindTransition.cpp
     src/TableGeometry.h
     src/TableGeometry.cpp
 )

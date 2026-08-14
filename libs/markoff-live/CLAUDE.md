@@ -96,10 +96,13 @@ path + `m_pendingRow` slot were retired in tier 4b
 (`docs/specs/2026-05-16-tier-4b-pending-slot-consolidation-design.md`).
 The parse-cycle path is gone.
 
-**Kind transition.** View-driven, in `KindTransition.cpp`'s
-`inferBlockKind`. Runs against each Equal-op block's text in
-`LiveListModelBinding::onD2Changed`; calls `Cmd::changeKind` on mismatch.
-Hardcoded prefix rules. The ListItem prefix detection becomes simpler
+**Kind transition.** View-driven. The *rules* moved to markoff-core at
+P1.1 (2026-08-13) — `<markoff/core/KindInference.h>`; `KindTransition.cpp`
+is now a thin adapter mapping the core enum back to this leaf's kind
+strings (and forwarding `countLeadingHashes` / `matchesSetextShape`). The
+*policy* is unchanged: run against each Equal-op block's text in
+`LiveListModelBinding::onD2Changed`; call `Cmd::changeKind` on mismatch.
+Fix inference bugs in core, not here. The ListItem prefix detection becomes simpler
 under per-item granularity (single-line text, not multi-line).
 
 **Block kind dispatch.** `BlockKindRegistry` (per-document, not global)

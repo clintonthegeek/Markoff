@@ -213,7 +213,17 @@ private:
     /// marker from the buffer (T1 finding, spec §9: a loaded Heading/
     /// CodeBlock keeps its ATX prefix/fence, so a typed one must too, or
     /// the two representations diverge).
+    ///
+    /// Kind-defining attrs (Heading level + form, Math display mode) are
+    /// written in the same `UndoLog::Transaction` as the kind (P1.1).
     void promoteCaretBlockKind();
+
+    /// Keeps an already-promoted Heading's `level` attr tracking its buffer
+    /// (the first `#` promotes, so `##`…`######` never reach the promote
+    /// path). Form-aware: ATX counts hashes, setext reads the underline.
+    /// Only raises a level it can infer — demotion is the structural-key
+    /// path's business, not this one's.
+    void updateCaretHeadingLevel();
 
     // ---- Selection (T5) --------------------------------------------------
 

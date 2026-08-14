@@ -177,6 +177,23 @@ hold content only. No trailing structural `\n`. Separators are the
 serializer's responsibility (`interBlockSeparator() == "\n\n"`,
 `finalDocumentTerminator() == "\n"`).
 
+## Kind inference (`<markoff/core/KindInference.h>`, P1.1 2026-08-13)
+
+`Markoff::inferBlockKind(text) → KindInference{kind, headingLevel,
+setextHeading, mathDisplay}` is the one copy of the view-driven
+kind-transition rules (promoted out of markoff-live and markoff-canvas,
+which each carried a fork). `countLeadingHashes` / `matchesSetextShape`
+are exported alongside it for form-aware heading-level checks. Pure — no
+document, no view state, no Qt-widget deps.
+
+Callers own the *policy*: when to run inference, whether to demote, and
+how to dispatch the change. markoff-live keeps a string-keyed adapter
+(`src/KindTransition.h`) because its model is string-keyed; markoff-canvas
+consumes the enum directly. Inference must only be run on blocks whose
+buffers still carry their markers (Paragraph, Heading, CodeBlock) — a
+content-narrowed ListItem/BlockQuote buffer would infer Paragraph and
+demote wrongly. See the buffer convention above.
+
 ## See also
 
 - Spec: `docs/specs/2026-04-30-block-anchor-foundation-design.md`

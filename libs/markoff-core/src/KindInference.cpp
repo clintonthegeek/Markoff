@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-#include "KindTransition.h"
+#include <markoff/core/KindInference.h>
 
 #include <QRegularExpression>
 
-namespace Markoff::Canvas::Detail {
+namespace Markoff {
 
 int countLeadingHashes(const QString &text)
 {
@@ -17,12 +17,13 @@ int countLeadingHashes(const QString &text)
 
 int matchesSetextShape(const QString &text)
 {
-    // Strip any trailing newlines first: a soft-break-then-underline-then-
-    // soft-break sequence produces e.g. "Heading\n=\n". Without trimming,
-    // lastIndexOf('\n') would point at the trailing newline and the tail
-    // would be empty, missing the underline. Trim only the trailing run of
-    // newlines so internal structure (the content line(s) and the
-    // underline) is preserved.
+    // Strip any trailing newlines first. The post-queue-#4 buffer convention
+    // is "the buffer is exactly what was typed, no auto-appended terminator",
+    // so a soft-break-then-underline-then-soft-break sequence produces
+    // e.g. "Heading\n=\n". Without trimming, lastIndexOf('\n') would point
+    // at the trailing newline and the tail would be empty, missing the
+    // underline. Trim only the trailing run of newlines so internal
+    // structure (the leading content line(s) and the underline) is preserved.
     int endIdx = text.size();
     while (endIdx > 0 && text[endIdx - 1] == u'\n') --endIdx;
     const QString trimmed = text.left(endIdx);
@@ -51,24 +52,35 @@ int matchesSetextShape(const QString &text)
     return level;
 }
 
-Markoff::BlockKind inferBlockKind(const QString &text)
+KindInference inferBlockKind(const QString &text)
 {
-    if (text.isEmpty())
-        return Markoff::BlockKind::Paragraph;
+    KindInference r;
 
-    // Heading: 1-6 '#' followed by space or EOL
-    if (countLeadingHashes(text) > 0)
-        return Markoff::BlockKind::Heading;
+    if (text.isEmpty())
+        return r;  // Paragraph
+
+    // Heading: 1–6 '#' followed by space or EOL
+    if (const int hashes = countLeadingHashes(text); hashes > 0) {
+        r.kind = BlockKind::Heading;
+        r.headingLevel = hashes;
+        return r;
+    }
 
     // CodeBlock: starts with ``` or ~~~ (3+ chars)
     if ((text.startsWith(QStringLiteral("```")) && text.size() >= 3) ||
-        (text.startsWith(QStringLiteral("~~~")) && text.size() >= 3))
-        return Markoff::BlockKind::CodeBlock;
+        (text.startsWith(QStringLiteral("~~~")) && text.size() >= 3)) {
+        r.kind = BlockKind::CodeBlock;
+        return r;
+    }
 
     // Setext heading: text + \n + underline. Checked before bare-`---`-HR
     // so `Heading\n---` wins over `---` alone.
-    if (matchesSetextShape(text) > 0)
-        return Markoff::BlockKind::Heading;
+    if (const int setext = matchesSetextShape(text); setext > 0) {
+        r.kind = BlockKind::Heading;
+        r.headingLevel = setext;
+        r.setextHeading = true;
+        return r;
+    }
 
     // HorizontalRule: trimmed is ---, ***, or ___ (single-line only).
     // Only applied when the buffer has no newline, to avoid misclassifying
@@ -77,32 +89,47 @@ Markoff::BlockKind inferBlockKind(const QString &text)
         const QString trimmed = text.trimmed();
         if (trimmed == QStringLiteral("---") ||
             trimmed == QStringLiteral("***") ||
-            trimmed == QStringLiteral("___"))
-            return Markoff::BlockKind::HorizontalRule;
+            trimmed == QStringLiteral("___")) {
+            r.kind = BlockKind::HorizontalRule;
+            return r;
+        }
     }
 
     // Image: starts with ![
-    if (text.startsWith(QStringLiteral("![")))
-        return Markoff::BlockKind::Image;
+    if (text.startsWith(QStringLiteral("!["))) {
+        r.kind = BlockKind::Image;
+        return r;
+    }
 
-    // Math: $$ or $ prefix (longest-match first). Display-mode attr not
-    // wired here — see header comment.
-    if (text.startsWith(QStringLiteral("$$")) || text.startsWith(u'$'))
-        return Markoff::BlockKind::Math;
+    // Math: check $$ before $ (longest-match first)
+    if (text.startsWith(QStringLiteral("$$"))) {
+        r.kind = BlockKind::Math;
+        r.mathDisplay = true;
+        return r;
+    }
+    if (text.startsWith(u'$')) {
+        r.kind = BlockKind::Math;
+        r.mathDisplay = false;
+        return r;
+    }
 
     // ListItem: [-*+] followed by space, or \d+[.)]\s
     {
         static const QRegularExpression listRe(
             QStringLiteral("^[ \\t]{0,3}([-*+]|\\d+[.)])\\s"));
-        if (listRe.match(text).hasMatch())
-            return Markoff::BlockKind::ListItem;
+        if (listRe.match(text).hasMatch()) {
+            r.kind = BlockKind::ListItem;
+            return r;
+        }
     }
 
     // Blockquote: starts with "> " or is exactly ">"
-    if (text.startsWith(QStringLiteral("> ")) || text == QStringLiteral(">"))
-        return Markoff::BlockKind::BlockQuote;
+    if (text.startsWith(QStringLiteral("> ")) || text == QStringLiteral(">")) {
+        r.kind = BlockKind::BlockQuote;
+        return r;
+    }
 
-    return Markoff::BlockKind::Paragraph;
+    return r;  // Paragraph
 }
 
-}  // namespace Markoff::Canvas::Detail
+}  // namespace Markoff

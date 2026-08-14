@@ -412,9 +412,25 @@ into a paragraph just because the `#` is mid-deletion) — return the current
 kind on ambiguity. A cascade of spurious demotions was a real styled bug
 (fixed by making `inferKindFromPrefix` conservative, commit `fc606b7`).
 
-**Live.** `KindTransition.cpp`'s `inferBlockKind`, run against each Equal-op
-block in `LiveListModelBinding::onD2Changed`; calls `Cmd::changeKind` on
-mismatch. Hardcoded prefix rules.
+**The rules live in core** (since P1.1, 2026-08-13):
+`<markoff/core/KindInference.h>` — `Markoff::inferBlockKind(text)` returns
+`{kind, headingLevel, setextHeading, mathDisplay}`, plus
+`countLeadingHashes` / `matchesSetextShape` for form-aware level checks.
+Pure, view-agnostic, one copy. A new leaf consumes it directly; it decides
+for itself *when* to run inference and how to dispatch the change.
+
+**Live.** `KindTransition.cpp` is now a thin string-keyed adapter over the
+core rules (live's model is string-keyed and open to plugin kinds). Run
+against each Equal-op block in `LiveListModelBinding::onD2Changed`; calls
+`Cmd::changeKind` on mismatch.
+
+**Canvas.** `View::promoteCaretBlockKind()` runs inference on the caret's
+block only, after each document change, and writes kind + kind-defining
+attrs (heading level/form, math display mode) in one `UndoLog::Transaction`.
+No deferral is needed — the leaf has no re-entrant signal path (C2), so the
+smell below does not apply to it. `updateCaretHeadingLevel()` keeps an
+already-promoted heading's level tracking its buffer, since the first `#`
+promotes before `##` can be typed.
 
 **Styled.** Solved — same prefix rules, deferred dispatch via
 `QTimer::singleShot(0)`, conservative inference. Documented in

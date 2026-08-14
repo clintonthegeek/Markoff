@@ -71,6 +71,8 @@ add_library(markoff_core STATIC
     src/SourceTextDocumentBinding.cpp
     include/markoff/core/StructuralKeyHandler.h
     src/StructuralKeyHandler.cpp
+    include/markoff/core/KindInference.h
+    src/KindInference.cpp
     src/SearchEngine.cpp
     src/FindController.cpp
     src/CodeBlockProcessorRegistry.cpp
