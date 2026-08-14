@@ -131,7 +131,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P4.4 Context menu | ☑ | `7944edc3` | `f3ce2870` / `f2fed72b` |
 | P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☑ (reduced scope — see finding) | `d365be58` | `e4b40d0e` / `06b1c06c` |
 | P4.9 Inline title band (user-directed; spec §5.2) | ☑ | `79db4dc2` | `dedab5ab` / `a22545ab` |
-| P4.6 Code-block syntax highlighting | ☐ | | |
+| P4.6 Code-block syntax highlighting | ☑ | `fb3bfa3e` | `512cb721` / `c66d577d` |
 | P4.7 Task-list checkboxes (render + toggle) | ☐ | | |
 | P4.8 ⏸ phase close | ☐ | | n/a |
 | **P5 — block parity** | | | |
@@ -515,6 +515,37 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.6 (2026-08-14).**
+
+- **`Theme::defaultLight()`/`defaultDark()` define no colors for any
+  of the 16 `Code*` token slots** (`CodeKeyword`, `CodeControlFlow`,
+  `CodeString`, …) — `Theme::colorForCodeToken()` returns invalid
+  `QColor` for most kinds out of the box, so real-world code
+  highlighting under the default theme currently shows no token
+  differentiation even though the wiring is correct end to end (the
+  test built its own `Theme` with explicit colors to exercise the
+  mechanism). This is a `Theme` default-palette gap, not a wiring bug
+  — a small, cleanly-scoped core follow-up (define the 16 slots),
+  not urgent since nothing regresses, but worth doing before any
+  visual/dogfood pass.
+- Buffer keeps fences inline (per the P1.4 marker-convention), so
+  `parseCodeFence` is a pure string scan over `blockText()` for the
+  language token + content byte range — no AST spans needed, same
+  "canvas-local rule" precedent as `isCodeBlockFence`.
+- T7 avoidance: token-color ranges are appended to the same `ranges`
+  list `InlineFormatting::inlineFormatRanges` already produces, before
+  the one `setFormats()` call in `rebuildInline()` — no second
+  out-of-band `setFormats()` call, everything rides the existing
+  atomic formats-then-lines rebuild.
+- `Kf6SyntaxHighlightService::definitionForName()` resolves common
+  lowercase fence identifiers case-insensitively (`cpp`, `python`,
+  `javascript`, `json`, `bash`, `rust` all hit; `shell`/`sh` do not).
+- The P1.4 finding about `serializeCodeBlock`'s double-fence risk
+  ("worth a look before anything edits CodeBlock buffers in canvas")
+  still doesn't apply — P4.6 is read-only rendering, never edits
+  CodeBlock buffers — remains open for whenever canvas code-block
+  editing lands.
 
 **P4.9 (2026-08-14).**
 
