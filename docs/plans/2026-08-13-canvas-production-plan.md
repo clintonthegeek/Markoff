@@ -138,7 +138,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P5.1 Table: in-cell wrap + cell navigation | ☑ | `d6a0ce0a` | `3a7afd9e` / `70854dc5` |
 | P5.2 Table: row/col ops + alignment | ☑ | `13ebc8fa` | `281fbc73` / `68557575` |
 | P5.3 Math blocks (jkqtmathtext) | ☑ | `f482a4d0` | `6dea6ab6` / `58d373bb` |
-| P5.4 Images + Mermaid/embed seams | ☐ | | |
+| P5.4 Images + Mermaid/embed seams | ☑ | `f94bf525` | `1c4654ee` / `c851e604` |
 | P5.5 Callouts + frontmatter + footnote defs | ☐ | | |
 | P5.6 Folding via Session | ☐ | | |
 | P5.7 ⏸ phase close | ☐ | | n/a |
@@ -515,6 +515,28 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P5.4 (2026-08-14).**
+
+- `KindInference` maps both `![alt](src)` and `![[target]]` (embed) to
+  the same `BlockKind::Image` — there's no parser-level distinction.
+  New `src/MediaBlocks.{h,cpp}` (`Detail::parseImageBlock`) reparses
+  the buffer to tell them apart, same "canvas-local rule" precedent
+  as `CodeHighlighting::parseCodeFence` (P4.6 finding).
+  `BlockKind::Mermaid` is a vestigial enumerator the load path never
+  assigns — mermaid arrives as a plain fenced `CodeBlock`, so the
+  mermaid seam hangs off `isCodeBlock` + fence-language detection
+  (reusing `CodeHighlighting::parseCodeFence`), not that kind.
+- `setImageResourceLookup` (`std::function<QPixmap(QString)>`),
+  `setMermaidRenderer` (new canvas-local `MermaidRenderer` abstract —
+  none existed anywhere in the tree), `setEmbedRegistry` (wires the
+  existing unmodified core `Markoff::EmbedRegistry`, consulted for
+  `hasExtension()` only, always placeholder — never mounts a
+  `MarkdownRenderChild`, per the plan's explicit placeholder-only
+  scope). Mermaid miss/no-renderer falls back to plain code-block
+  source, matching P4.6's "service miss renders plain monospace."
+- No core changes needed; `EmbedRegistry` used as-is.
+- Canvas tier 27/27; `check-constitution.sh` clean over 56 files.
 
 **P5.3 (2026-08-14).**
 
