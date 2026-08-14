@@ -126,7 +126,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P3.7 ⏸ phase close | ☑ | n/a | n/a |
 | **P4 — inline/text parity** | | | |
 | P4.1 Full inline kind set (highlight/strike/link/wikilink/tag/footnote-ref) | ☑ | `a51917f8` | `81bb62fe` / `6c51bbe5` |
-| P4.2 Link activation + hover | ☐ | | |
+| P4.2 Link activation + hover | ☑ | `0d4b49b1` | `bf1fffb0` / `3cf92c23` |
 | P4.3 FormatOps verbs + CanvasActionController | ☐ | | |
 | P4.4 Context menu | ☐ | | |
 | P4.5 Readable-line-width policy + resize (Obsidian calibration: F1) | ☐ | | |
@@ -515,6 +515,27 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.2 (2026-08-14).**
+
+- `LinkService::notifyHover`'s real signature is `(LinkActivation,
+  QPoint)` — no `QRect`, despite the plan text's "target + global
+  rect" wording. Core is read-only for this task, so passed the mouse
+  event's global position as the anchor (same precedent as live/
+  styled). If Corbomite's `HoverPopover` genuinely needs a rect, that
+  is a core-seam task to name explicitly, not something to improvise
+  here.
+- Tags: live's `findLinkSpanAt` doesn't support tag activation at all
+  (only checks `isLink || isWikilink`); canvas adds it per this
+  task's explicit wording. A tag `SourceSpan` carries no `LinkTarget`
+  — its own char range *is* the tag text including `#`.
+- `QAbstractScrollArea::viewportEvent` doesn't forward Enter/Leave the
+  way it forwards mouse-button/move — needed a `viewport()` event
+  filter to close hover state on pointer-exit, same reason styled's
+  `LinkInteraction` installs one.
+- Cursor-shape caching (avoiding the styled smell of `setCursor`
+  every mouse-move) gated on a bool tracking hover-state transitions,
+  not per-move.
 
 **P4.1 (2026-08-14).**
 
