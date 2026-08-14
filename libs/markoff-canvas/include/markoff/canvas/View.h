@@ -519,6 +519,12 @@ private:
     void setCaret(const CanvasCursor &caret);
     void moveCaretHorizontally(bool forward);
     void moveCaretVertically(bool forward);
+    /// moveCaretVertically()'s Table-block branch (P5.1): Up/Down inside a
+    /// table walks line-in-cell, then row-in-column (same column), then
+    /// falls through to the generic cross-block exit once the caret is off
+    /// the table's top/bottom row entirely. `idx` is the caret's entry
+    /// index in the cache, same convention as hitTestTable/paintTable.
+    void moveCaretVerticallyInTable(int idx, bool forward);
     void moveCaretToLineEdge(bool home);
     void insertPrintable(const QString &text);
     void deleteCluster(bool forward);
@@ -528,6 +534,17 @@ private:
     /// already applied the mutation and the caret has already been moved
     /// to `r.caretBlock`/`r.caretByteInBlock`.
     bool tryStructuralKey(QKeyEvent *event);
+    /// Table Tab/Shift+Tab cell navigation (P5.1). False if the caret isn't
+    /// inside a table (StructuralKeyHandler/the generic key switch handle
+    /// Tab everywhere else); true means this call owned the key and has
+    /// already moved the caret (and possibly mutated the document — see
+    /// appendTableRow()).
+    bool tryTableTab(bool shift);
+    /// Appends one empty row (P5.1's "last cell Tab appends a row",
+    /// Obsidian behavior) to `block`'s buffer as a single d2ApplyBufferEdit
+    /// transaction — `cols` empty cells, syntactically valid for
+    /// TableGeometry's tokenizer.
+    void appendTableRow(BlockId block, int cols);
     /// Keep the caret referencing a block that still exists after a
     /// document change, biased toward the block's last known position
     /// (T2's version of the queue-#10 "never strand the caret" clamp;

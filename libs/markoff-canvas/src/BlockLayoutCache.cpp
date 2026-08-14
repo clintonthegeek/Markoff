@@ -163,16 +163,27 @@ void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &the
     QFont headerFont = e.style.font;
     headerFont.setBold(true);
     // Column widths cap at a fixed budget rather than the text column
-    // width (plan T9: "capped"; no wrap/reflow policy is in spike scope,
-    // so an unbounded cap would let one long cell blow the table past the
-    // page margin with nothing to stop it).
+    // width (plan T9: "capped"). P5.1 promotes this from a hard clip to a
+    // wrap budget: a cell whose natural width exceeds the cap wraps inside
+    // it (pass 2 below) instead of overflowing past the page margin.
     constexpr qreal kMaxColumnWidth = 240.0;
     constexpr qreal kMinColumnWidth = 40.0;
+
+    // Pass 1: every cell's own text + its natural (unwrapped) width, which
+    // decides each column's FINAL width. Wrapping a cell needs that final
+    // width as its layout's text width, so building the real per-cell
+    // QTextLayouts has to be a second pass once every column in the row has
+    // been seen — the P5.1 done-when "row height = max wrapped cell height"
+    // isn't knowable until then either.
+    struct CellText {
+        QString text;
+        ProjectionMap projection;
+    };
+    std::vector<CellText> cellTexts(size_t(rows) * size_t(cols));
 
     for (int r = 0; r < rows; ++r) {
         const QFont &rowFont = (r == 0) ? headerFont : e.style.font;
         const QFontMetricsF fm(rowFont);
-        qreal rowHeight = fm.lineSpacing();
 
         for (int c = 0; c < cols; ++c) {
             const TableCellRange &range = parsed.rows[size_t(r)][size_t(c)];
@@ -181,34 +192,64 @@ void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &the
             // still routed through ProjectionMap for the sanctioned C4
             // coordinate path rather than an ad hoc byte<->QChar call).
             ProjectionMap projection = ProjectionMap::build(cellBytes, {});
-            const QString &cellText = projection.layoutText();
+            const QString cellText = projection.layoutText();
 
-            auto layout = std::make_unique<QTextLayout>(cellText, rowFont);
-            QTextOption opt;
-            opt.setWrapMode(QTextOption::NoWrap);
-            layout->setTextOption(opt);
-            layout->beginLayout();
-            QTextLine line = layout->createLine();
-            if (line.isValid())
-                line.setPosition(QPointF(0, 0));
-            layout->endLayout();
+            const size_t cellPos = size_t(r) * size_t(cols) + size_t(c);
+            TableCell &cell = e.tableCells[cellPos];
+            cell.startByte = range.start;
+            cell.endByte   = range.end;
 
             qreal &colWidth = e.tableColWidths[size_t(c)];
             const qreal natural = fm.horizontalAdvance(cellText) + 2 * kTableCellPadding;
             colWidth = std::max(colWidth, std::min(natural, kMaxColumnWidth));
 
-            TableCell &cell = e.tableCells[size_t(r) * size_t(cols) + size_t(c)];
-            cell.startByte  = range.start;
-            cell.endByte    = range.end;
-            cell.layout     = std::move(layout);
-            cell.projection = std::move(projection);
+            cellTexts[cellPos] = CellText{cellText, std::move(projection)};
         }
-
-        e.tableRowHeights[size_t(r)] = rowHeight + 2 * kTableCellPadding;
     }
 
     for (qreal &w : e.tableColWidths)
         w = std::max(w, kMinColumnWidth);
+
+    // Pass 2: wrap every cell to its column's final width (the same
+    // beginLayout/createLine/setLineWidth/setPosition loop
+    // rebuildInline() uses for a block's own layout), then take the row's
+    // height as the max over its cells' wrapped heights.
+    for (int r = 0; r < rows; ++r) {
+        const QFont &rowFont = (r == 0) ? headerFont : e.style.font;
+        qreal rowHeight = 0;
+
+        for (int c = 0; c < cols; ++c) {
+            const size_t cellPos = size_t(r) * size_t(cols) + size_t(c);
+            CellText &ct = cellTexts[cellPos];
+            TableCell &cell = e.tableCells[cellPos];
+
+            auto layout = std::make_unique<QTextLayout>(ct.text, rowFont);
+            QTextOption opt;
+            opt.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+            layout->setTextOption(opt);
+
+            const qreal cellWidth =
+                qMax(qreal(1), e.tableColWidths[size_t(c)] - 2 * kTableCellPadding);
+            qreal h = 0;
+            layout->beginLayout();
+            while (true) {
+                QTextLine line = layout->createLine();
+                if (!line.isValid())
+                    break;
+                line.setLineWidth(cellWidth);
+                line.setPosition(QPointF(0, h));
+                h += line.height();
+            }
+            layout->endLayout();
+
+            rowHeight = std::max(rowHeight, h + 2 * kTableCellPadding);
+
+            cell.layout     = std::move(layout);
+            cell.projection = std::move(ct.projection);
+        }
+
+        e.tableRowHeights[size_t(r)] = rowHeight;
+    }
 
     qreal total = e.style.topMargin + e.style.bottomMargin;
     for (qreal h : e.tableRowHeights)

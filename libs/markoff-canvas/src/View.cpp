@@ -37,6 +37,7 @@
 #include "InlineFormatting.h"
 #include "InputPredicate.h"
 #include "ProjectionMap.h"
+#include "TableGeometry.h"
 
 namespace coords = Markoff::TextUnits;
 
@@ -1100,7 +1101,17 @@ CanvasCursor View::hitTestTable(int entryIndex, const QPoint &viewportPos, qreal
         return CanvasCursor{e.id, cell.startByte};
 
     const qreal cellLocalX = localX - colLeft - kTableCellPadding;
-    const QTextLine line = cell.layout->lineAt(0);
+    const qreal cellLocalY = localY - rowTop - kTableCellPadding;
+    // P5.1: a wrapped cell can hold more than one line — pick the line the
+    // click's y falls in, same walk hitTest() does for a non-table block's
+    // layout, rather than always resolving against lineAt(0).
+    QTextLine line = cell.layout->lineAt(0);
+    for (int i = 0; i < cell.layout->lineCount(); ++i) {
+        QTextLine l = cell.layout->lineAt(i);
+        line = l;
+        if (cellLocalY < l.y() + l.height())
+            break;
+    }
     const int qcharPos = line.isValid() ? line.xToCursor(cellLocalX) : 0;
 
     const int byteOff = cell.startByte + cell.projection.layoutQCharToByte(qcharPos);
@@ -1782,6 +1793,16 @@ void View::moveCaretVertically(bool forward)
     if (idx < 0)
         return;
     const auto &e = m_cache->entries()[size_t(idx)];
+
+    // P5.1: a table has its own per-cell wrapped layouts, not one
+    // block-wide `e.layout` (that member is unused/null for tables — see
+    // realizeTable's comment) — Up/Down inside one needs its own walk:
+    // line-in-cell, then row-in-column, then out of the table entirely.
+    if (e.style.isTable) {
+        moveCaretVerticallyInTable(idx, forward);
+        return;
+    }
+
     if (!e.layout)
         return;
 
@@ -1839,6 +1860,193 @@ void View::moveCaretVertically(bool forward)
     const QTextLine edgeLine = target.layout->lineAt(forward ? 0 : target.layout->lineCount() - 1);
     const int newQChar = edgeLine.xToCursor(x);
     m_caret.byteOffset = target.projection.layoutQCharToByte(newQChar);
+}
+
+void View::moveCaretVerticallyInTable(int idx, bool forward)
+{
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (e.tableCols <= 0 || e.tableCells.empty())
+        return;
+
+    const int cols = e.tableCols;
+    const int rows = int(e.tableCells.size()) / cols;
+    // Same row-major cell lookup Tab navigation and caretTableCell() use
+    // (plan P2.3's cellIndexNear) — not a second table-position scheme.
+    const int cellIdx = cellIndexNear(e, m_caret.byteOffset, /*preferAfter=*/true);
+    if (cellIdx < 0)
+        return;
+    const int row = cellIdx / cols;
+    const int col = cellIdx % cols;
+    const auto &cell = e.tableCells[size_t(cellIdx)];
+
+    qreal x = 0;
+    int lineNo = 0;
+    const int lineCount = cell.layout ? cell.layout->lineCount() : 0;
+    if (cell.layout && lineCount > 0) {
+        const int layoutPos = cell.projection.byteToLayoutQChar(m_caret.byteOffset - cell.startByte);
+        const QTextLine curLine = cell.layout->lineForTextPosition(layoutPos);
+        lineNo = curLine.isValid() ? curLine.lineNumber() : 0;
+        x = curLine.isValid() ? curLine.cursorToX(layoutPos) : 0;
+    }
+
+    // Step 1 (P5.1 done-when "Up/Down at cell edge moves rows"): still
+    // inside this cell's own wrap — move a line within it, same as the
+    // non-table case above.
+    const int targetLineNo = lineNo + (forward ? 1 : -1);
+    if (targetLineNo >= 0 && targetLineNo < lineCount) {
+        const QTextLine targetLine = cell.layout->lineAt(targetLineNo);
+        const int newQChar = targetLine.xToCursor(x);
+        m_caret.byteOffset = cell.startByte + cell.projection.layoutQCharToByte(newQChar);
+        return;
+    }
+
+    // Step 2: at the top/bottom line of this cell's own wrap — move to the
+    // same column, next/previous row. The column doesn't change, so `x`
+    // (cell-local) is directly comparable against the target cell's own
+    // layout with no coordinate conversion.
+    const int targetRow = row + (forward ? 1 : -1);
+    if (targetRow >= 0 && targetRow < rows) {
+        const auto &targetCell = e.tableCells[size_t(targetRow) * size_t(cols) + size_t(col)];
+        if (targetCell.layout && targetCell.layout->lineCount() > 0) {
+            const QTextLine targetLine = targetCell.layout->lineAt(
+                forward ? 0 : targetCell.layout->lineCount() - 1);
+            const int newQChar = targetLine.xToCursor(x);
+            m_caret.byteOffset =
+                targetCell.startByte + targetCell.projection.layoutQCharToByte(newQChar);
+        } else {
+            m_caret.byteOffset = targetCell.startByte;
+        }
+        return;
+    }
+
+    // Step 3 (done-when "...then exits the table"): off the top/bottom row
+    // — leave the table for the adjacent block, same x-based landing
+    // moveCaretVertically's own cross-block path uses for entries with a
+    // real `e.layout`. `x` has to move from cell-local to table-content-
+    // local coordinates first (the same space that path's `x` lives in).
+    const int nextIdx = idx + (forward ? 1 : -1);
+    if (nextIdx < 0 || nextIdx >= int(m_cache->entries().size()))
+        return;
+
+    qreal colLeft = 0;
+    for (int c = 0; c < col; ++c)
+        colLeft += e.tableColWidths[size_t(c)];
+    const qreal tableX = colLeft + kTableCellPadding + x;
+
+    const auto &target = m_cache->entries()[size_t(nextIdx)];
+    m_caret.block = target.id;
+
+    if (target.style.isTable) {
+        if (target.tableCols <= 0 || target.tableCells.empty()) {
+            m_caret.byteOffset = 0;
+            return;
+        }
+        int tcol = 0;
+        qreal tcolLeft = 0;
+        for (; tcol < target.tableCols - 1; ++tcol) {
+            const qreal w = target.tableColWidths[size_t(tcol)];
+            if (tableX < tcolLeft + w)
+                break;
+            tcolLeft += w;
+        }
+        const int trows = int(target.tableCells.size()) / target.tableCols;
+        const int trow = forward ? 0 : trows - 1;
+        const auto &tcell =
+            target.tableCells[size_t(trow) * size_t(target.tableCols) + size_t(tcol)];
+        m_caret.byteOffset = tcell.startByte;
+        return;
+    }
+
+    if (!target.layout || target.layout->lineCount() == 0) {
+        m_caret.byteOffset = 0;
+        return;
+    }
+    const QTextLine edgeLine = target.layout->lineAt(forward ? 0 : target.layout->lineCount() - 1);
+    const int newQChar = edgeLine.xToCursor(tableX);
+    m_caret.byteOffset = target.projection.layoutQCharToByte(newQChar);
+}
+
+// ---- Tables: Tab / Shift+Tab cell navigation (P5.1) ------------------------
+
+void View::appendTableRow(BlockId block, int cols)
+{
+    if (!m_doc)
+        return;
+    const QByteArray text = m_doc->blockText(block);
+    // A minimal syntactically-valid empty row for `cols` columns: `cols+1`
+    // pipes bounding `cols` one-space cell ranges (TableGeometry's
+    // tokenizeLine just needs >= 2 pipes per line; it doesn't require the
+    // padding spaces real markdown tables usually carry).
+    QByteArray row = "\n|";
+    for (int c = 0; c < cols; ++c)
+        row += "  |";
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(block, uint32_t(text.size()), 0, row, t);
+}
+
+bool View::tryTableTab(bool shift)
+{
+    if (!m_doc || m_caret.block.isNull())
+        return false;
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return false;
+
+    const BlockId id = m_caret.block;
+    int row = -1, col = -1, cols = 0, rows = 0;
+    {
+        const auto &e = m_cache->entries()[size_t(idx)];
+        if (!e.style.isTable || e.tableCols <= 0 || e.tableCells.empty())
+            return false;
+        cols = e.tableCols;
+        rows = int(e.tableCells.size()) / cols;
+        const int cellIdx = cellIndexNear(e, m_caret.byteOffset, /*preferAfter=*/true);
+        if (cellIdx < 0)
+            return false;
+        row = cellIdx / cols;
+        col = cellIdx % cols;
+    }
+
+    // Tab/Shift+Tab always collapses any selection to the destination
+    // cell's start — there is no "extend selection with Tab" semantic.
+    m_selectionAnchor.reset();
+
+    if (shift) {
+        if (row == 0 && col == 0)
+            return true;  // first cell: still ours to swallow, just a no-op
+        --col;
+        if (col < 0) { col = cols - 1; --row; }
+        const auto &e = m_cache->entries()[size_t(m_cache->indexOf(id))];
+        const auto &cell = e.tableCells[size_t(row) * size_t(cols) + size_t(col)];
+        setCaret(CanvasCursor{id, cell.startByte});
+        return true;
+    }
+
+    // Obsidian behavior (plan P5.1 done-when): Tab in the table's last cell
+    // appends a new (empty) row and lands the caret in its first cell,
+    // rather than leaving the table or no-op'ing.
+    if (row == rows - 1 && col == cols - 1) {
+        appendTableRow(id, cols);
+        // The buffer edit above is queued, not yet reflected in the cache
+        // (d2DocumentChanged is coalesced — see the flush comments at the
+        // other d2ApplyBufferEdit call sites in this file); flush so the
+        // new row exists before this function reads it back, and read it
+        // straight off the fresh buffer (TableGeometry) rather than trust
+        // the cache's own (lazily-realized) table grid to already reflect
+        // it.
+        m_doc->flushPendingD2Changed();
+        const ParsedTable parsed = parseTableBlock(m_doc->blockText(id));
+        if (parsed.ok && !parsed.rows.empty() && !parsed.rows.back().empty())
+            setCaret(CanvasCursor{id, parsed.rows.back().front().start});
+        return true;
+    }
+
+    ++col;
+    if (col >= cols) { col = 0; ++row; }
+    const auto &e = m_cache->entries()[size_t(m_cache->indexOf(id))];
+    const auto &cell = e.tableCells[size_t(row) * size_t(cols) + size_t(col)];
+    setCaret(CanvasCursor{id, cell.startByte});
+    return true;
 }
 
 // ---- Events -------------------------------------------------------------
@@ -2024,6 +2232,22 @@ void View::keyPressEvent(QKeyEvent *event)
         viewport()->update();
         event->accept();
         return;
+    }
+
+    // Table cell navigation (P5.1): Tab/Shift+Tab next/previous cell, last-
+    // cell Tab appends a row. Only "ours" when the caret is actually inside
+    // a table — tryTableTab() returns false otherwise and this falls
+    // through to the generic Tab handling below (none today; matches the
+    // pre-P5.1 behavior of any other block kind). Key_Backtab is how Qt
+    // usually delivers Shift+Tab; the modifier check covers platforms that
+    // instead deliver Key_Tab with ShiftModifier set.
+    if (event->key() == Qt::Key_Tab || event->key() == Qt::Key_Backtab) {
+        const bool shift = event->key() == Qt::Key_Backtab
+                         || event->modifiers().testFlag(Qt::ShiftModifier);
+        if (tryTableTab(shift)) {
+            event->accept();
+            return;
+        }
     }
 
     // Shift+move extends the selection (setting an anchor if there wasn't
