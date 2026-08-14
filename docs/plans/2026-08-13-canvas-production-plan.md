@@ -533,6 +533,28 @@ user with a one-page summary of what's proven.
 - Test count unchanged at **288/288** — P1.1 grew an existing executable
   (`tst_canvas_kind_transition`, 1 → 13 assertions) rather than adding one.
 
+**P1.2 (2026-08-13).**
+
+- Promotion was clean — the two forks were byte-identical apart from
+  comments, so `<markoff/core/TextUnits.h>` is a straight lift (the
+  UTF-8 lead-byte switch is now one shared `sequenceLength` helper).
+- Live's `<markoff/live/Coordinates.h>` is **kept as a using-declaration
+  alias** rather than deleted: it is a public exported header, live's
+  ~14 call sites all reach it through a `coords::` namespace alias, and
+  a consumer outside this repo may include it. Zero call-site edits;
+  the implementation copy is gone, which is what the task was for.
+- **Coverage now sits in the wrong suite.** The only tests of these
+  functions are `tst_live_render_coords` — a *live* test exercising a
+  *core* helper (through the alias). Recorded in `markoff-core/CLAUDE.md`
+  too: if live retires at G3, that test **moves to core**, it does not
+  retire with the leaf.
+- **A third conversion helper exists in core and was left alone:**
+  `SourceTextDocumentBinding::qtPosToByteOffset(QString, int)` — same
+  idea, `QString` input, flat/D4 coordinate space, different
+  surrogate-truncation convention; used by `FormatOps` and the source
+  leaf. Consolidating it means touching the flat-space seam, which P1.2
+  does not name. Worth a look when P4.3 puts canvas on `FormatOps`.
+
 ---
 
 **F1 — CodeMirror parity audit (2026-08-13).** Source: `~/src/codemirror`

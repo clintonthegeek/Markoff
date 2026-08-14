@@ -7,14 +7,14 @@
 #include <QTextOption>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/TextUnits.h>
 #include <markoff/core/Theme.h>
 #include <markoff/parser/SourceSpan.h>
 
-#include "Coordinates.h"
 #include "InlineFormatting.h"
 #include "TableGeometry.h"
 
-namespace coords = Markoff::Canvas::Detail::Coordinates;
+namespace coords = Markoff::TextUnits;
 
 namespace Markoff::Canvas {
 

@@ -43,7 +43,6 @@ qt_add_qml_module(markoff_live
         include/markoff/live/LiveListModelBinding.h
         src/BlockKind.cpp
         src/BlockKindRegistry.cpp
-        src/Coordinates.cpp
         src/AstBlockDiff.cpp
         src/KindTransition.h
         src/KindTransition.cpp

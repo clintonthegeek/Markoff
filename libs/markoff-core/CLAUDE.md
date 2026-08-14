@@ -177,6 +177,25 @@ hold content only. No trailing structural `\n`. Separators are the
 serializer's responsibility (`interBlockSeparator() == "\n\n"`,
 `finalDocumentTerminator() == "\n"`).
 
+## Text units (`<markoff/core/TextUnits.h>`, P1.2 2026-08-13)
+
+`Markoff::TextUnits::byteToQtPos` / `qtPosToByte` — the byte↔QChar
+conversions every view straddles, promoted out of markoff-live and
+markoff-canvas (identical forks). Pure, allocation-free, no view deps.
+Call them against a block's own `blockText()`, never a layout's `text()`
+— see the header's note on the U+2028 substitution trap.
+
+Live's `<markoff/live/Coordinates.h>` survives as a using-declaration
+alias so existing call sites (in-tree and in consumers) keep compiling.
+Note that the only coverage of these functions is currently
+`tst_live_render_coords` in the **live** suite — if live retires at G3,
+that test moves to core rather than going with it.
+
+Not to be confused with `SourceTextDocumentBinding::qtPosToByteOffset`,
+which is the same idea over `QString` in the flat/D4 coordinate space
+(used by `FormatOps` and the source leaf). Consolidating the two was out
+of P1.2's named scope.
+
 ## Kind inference (`<markoff/core/KindInference.h>`, P1.1 2026-08-13)
 
 `Markoff::inferBlockKind(text) → KindInference{kind, headingLevel,

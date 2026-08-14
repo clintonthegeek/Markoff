@@ -32,7 +32,9 @@ Spike record (verdict + findings the plan cites):
   No `applyFlatEdit`, no `flatView()`, no cross-block byte sums. The
   **projection map** (layout QChar ↔ buffer byte, per realized entry)
   is the one sanctioned layout-local index space — it lives only in
-  `ProjectionMap`/`Coordinates` and never crosses the layout boundary.
+  `ProjectionMap` and never crosses the layout boundary. The byte↔QChar
+  helpers themselves are core's since P1.2
+  (`<markoff/core/TextUnits.h>`, aliased here as `coords::`).
 
 `tests/check-constitution.sh` gates all four; run it before every
 commit. If a task seems to *require* violating a rule — stop, log it

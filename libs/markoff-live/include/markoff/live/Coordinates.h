@@ -1,23 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
-#include <markoff/live/MarkoffLiveExport.h>
-#include <QByteArray>
-#include <QtGlobal>
+#include <markoff/core/TextUnits.h>
 
+/// Compatibility alias. The byte↔QChar helpers moved to markoff-core at
+/// P1.2 (`<markoff/core/TextUnits.h>`) so live and canvas share one copy;
+/// this header keeps the `Markoff::Live::Detail::Coordinates` spelling
+/// working for existing call sites (in-tree and in consumers). New code
+/// should include the core header and call `Markoff::TextUnits::` directly.
 namespace Markoff::Live::Detail::Coordinates {
 
-/// Number of Qt UTF-16 code units (QChars) spanned by the first
-/// `byteOffset` UTF-8 bytes in `utf8`. Returns the total QChar count
-/// if `byteOffset >= utf8.size()`. No allocation; O(byteOffset) scan.
-MARKOFF_LIVE_EXPORT
-qsizetype byteToQtPos(const QByteArray &utf8, qsizetype byteOffset);
+using Markoff::TextUnits::byteToQtPos;
+using Markoff::TextUnits::qtPosToByte;
 
-/// Byte offset in `utf8` at which the `qtPos`-th UTF-16 code unit begins.
-/// Returns `utf8.size()` if `qtPos` is past the end. No allocation;
-/// O(qtPos) scan. For a surrogate pair (4-byte UTF-8 codepoint), both
-/// surrogates map to the same 4-byte sequence's start byte.
-MARKOFF_LIVE_EXPORT
-qsizetype qtPosToByte(const QByteArray &utf8, qsizetype qtPos);
-
-} // namespace Markoff::Live::Detail::Coordinates
+}  // namespace Markoff::Live::Detail::Coordinates

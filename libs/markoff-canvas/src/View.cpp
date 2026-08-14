@@ -20,13 +20,13 @@
 #include <markoff/core/KindInference.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/StructuralKeyHandler.h>
+#include <markoff/core/TextUnits.h>
 #include <markoff/core/UndoLog.h>
 
 #include "BlockLayoutCache.h"
-#include "Coordinates.h"
 #include "InputPredicate.h"
 
-namespace coords = Markoff::Canvas::Detail::Coordinates;
+namespace coords = Markoff::TextUnits;
 
 namespace Markoff::Canvas {
 
