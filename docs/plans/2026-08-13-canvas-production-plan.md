@@ -114,7 +114,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **P2 — projection map (delimiter reflow)** | | | |
 | P2.1 ProjectionMap + omission for emphasis/strong | ☑ | `edb800c5` | `441fd827` / `d7de4364` |
 | P2.2 Omission for heading prefix + code fences | ☑ | `24725a47` | `dcd62756` / `904edc08` |
-| P2.3 Per-cell maps + cross-table selection (#18.2) | ☐ | | |
+| P2.3 Per-cell maps + cross-table selection (#18.2) | ☑ | `bfe0bb4e` | `e9d95a3c` / `0ba7ca4b` |
 | P2.4 ⏸ perf re-baseline (E9 budgets, build-perf) | ☐ | | n/a |
 | **P3 — MarkdownView contract v2** | | | |
 | P3.1 EditorWidget wrapper + setDocument/Session + contract harness | ☐ | | |
@@ -747,6 +747,59 @@ user with a one-page summary of what's proven.
   `heading_marker_hides_per_block` fails, reverted.
 - Full suite: **289/289**, unchanged test count (grew an existing
   executable). `check-constitution.sh` clean.
+
+**P2.3 (2026-08-14).**
+
+- The "cell-ordered linear position sequence" the task asks for already
+  existed: T9's `BlockLayoutCache::realizeTable` has always filled
+  `tableCells` row-major (`e.tableCells[r * cols + c]`, byte ranges
+  strictly increasing across the whole vector). P2.3's job was making
+  selection/copy actually *walk* that sequence instead of treating a
+  table block like any other — raw-byte-range dumping — which is what
+  `View::selectedText()` was doing for a table caught inside a wider
+  drag before this task.
+- Per-cell `ProjectionMap`s (`BlockLayoutCache::TableCell::projection`)
+  are an identity map today — no delimiter omission happens inside a
+  cell yet — but they replace the ad hoc `coords::byteToQtPos`/
+  `qtPosToByte` calls `hitTestTable`/`paintTable` used before, so cell
+  coordinate conversion goes through the one sanctioned C4 path like
+  every other block's does.
+- New free helpers in `View.cpp`'s anonymous namespace:
+  `cellIndexNear` (byte → nearest row-major cell index, gap bytes
+  round to the nearest following/preceding cell per a `preferAfter`
+  flag), `coveredCellRange` (byte range → `[lo, hi]` cell-index range —
+  the table's contribution to a selection is **cell granularity**, the
+  whole cell an endpoint lands in counts as covered, not the characters
+  under it), `serializeTableCells` (covered cells, row-major,
+  `" | "` within a row, `\n` between rows, each cell **trimmed** of the
+  tokenizer's pipe-padding spaces — a raw substring would carry those,
+  plus for any range spanning rows the alignment-row's leftover bytes).
+  `View::selectedText()`/`paintTable()` (tint) both call through these
+  instead of the raw byte-range path when `e.style.isTable`.
+- Caret motion: only the "entering a table from an adjacent block's
+  edge" half of `moveCaretVertically` changed — landing in row 0
+  (nearest column by x) when crossing in from above, the last row when
+  crossing in from below. Motion *inside* an already-caret-occupied
+  table (row-to-row Up/Down, Left/Right, Backspace/Delete) is
+  unaffected — it was already a no-op before this task (`e.layout` is
+  null for tables; every per-block motion path guards on it) and stays
+  one; that's explicitly P5.1's job ("Up/Down at cell edge moves rows,
+  then exits the table"), not this task's — P2.3's own wording ("in/out
+  … at top/bottom edges") reads as *entering* at either edge, not a
+  request to build full in-table row navigation early.
+- New test file `tests/tst_canvas_table_selection.cpp` (2 cases): a
+  within-table cross-cell drag (header row excluded, both body rows
+  covered) and a whole-table selection nested inside a wider
+  before/after-paragraph drag — both assert the clipboard against the
+  cell-serialized form, not a byte substring. Falsified per the task's
+  own named target: reversed `realizeTable`'s per-row column fill order
+  (`cols - 1 - c` in place of `c`) in a throwaway commit so the
+  row-major vector no longer matched byte order; both new cases failed
+  (`tst_canvas_table`'s existing single-cell-edit case, which never
+  crosses cells, stayed green — a reminder that it alone would not have
+  caught this class of bug), reverted.
+- Full suite: **290/290** (289 baseline + the one new executable).
+  `check-constitution.sh` clean.
 
 ---
 
