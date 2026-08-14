@@ -21,6 +21,8 @@ class TstCanvasInlineFormatting : public QObject {
 
 private slots:
     void delimiter_visibility_follows_caret();
+    void heading_marker_hides_per_block();
+    void code_fence_hides_per_block();
 };
 
 void TstCanvasInlineFormatting::delimiter_visibility_follows_caret()
@@ -74,6 +76,101 @@ void TstCanvasInlineFormatting::delimiter_visibility_follows_caret()
     QTest::keyClick(&view, Qt::Key_Home);
     QCOMPARE(view.caretByteOffset(), 0);
     QVERIFY(view.isDelimiterHiddenAt(block, 2));
+}
+
+// P2.2 — heading prefix omission, per-BLOCK reveal (spec §4.2): unlike
+// emphasis/strong, the "# " marker reveals when the caret is ANYWHERE in
+// the heading line, not just adjacent to the marker's own two bytes —
+// Obsidian parity. No canvas code change was needed for this case (the
+// parser already gives the ATX marker span a parent range spanning the
+// whole heading line — verified against
+// tst_parser_inline_span_bake.cpp's heading_marker_has_parent_range_
+// without_trailing_newline); this test is the canvas-side proof.
+void TstCanvasInlineFormatting::heading_marker_hides_per_block()
+{
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown("# Title\n\nOther paragraph\n");
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), 2);
+    const BlockId heading = blocks[0];
+    const BlockId other   = blocks[1];
+    QCOMPARE(doc.blockText(heading), QByteArray("# Title"));
+
+    // Caret elsewhere entirely: the marker is hidden.
+    const QRectF otherRect = view.blockRect(other);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(otherRect.x()) + 1, int(otherRect.y()) + 8));
+    QCOMPARE(view.caretBlock(), other);
+    QVERIFY(view.isDelimiterHiddenAt(heading, 0));
+
+    // Click into the heading block, then walk to its END (byte 7, right
+    // after "Title" — nowhere near the marker's own two bytes at [0,2)):
+    // still revealed, because reveal is per-block here, not per-span.
+    const QRectF headingRect = view.blockRect(heading);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(headingRect.x()) + 1, int(headingRect.y()) + 8));
+    QTest::keyClick(&view, Qt::Key_End);
+    QCOMPARE(view.caretBlock(), heading);
+    QCOMPARE(view.caretByteOffset(), 7);
+    QVERIFY(!view.isDelimiterHiddenAt(heading, 0));
+
+    // Back out: hidden again.
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(otherRect.x()) + 1, int(otherRect.y()) + 8));
+    QVERIFY(view.isDelimiterHiddenAt(heading, 0));
+}
+
+// P2.2 — code fence omission, per-BLOCK reveal (spec §4.2): the opening
+// fence's "```cpp" is a canvas-local special case (delimiterShouldHide),
+// since the parser never gives fenced_code_block_delimiter/info_string
+// spans a parent range at all (they aren't part of any inline tree) — so
+// unlike headings, this one needed a real code change, not just a proof.
+void TstCanvasInlineFormatting::code_fence_hides_per_block()
+{
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown("```cpp\nint main() {}\n```\n\nOther\n");
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), 2);
+    const BlockId code  = blocks[0];
+    const BlockId other = blocks[1];
+    QVERIFY(doc.blockText(code).startsWith("```cpp"));
+
+    // Caret elsewhere: the opening fence's backticks are hidden.
+    const QRectF otherRect = view.blockRect(other);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(otherRect.x()) + 1, int(otherRect.y()) + 8));
+    QCOMPARE(view.caretBlock(), other);
+    QVERIFY(view.isDelimiterHiddenAt(code, 0));
+
+    // Click into the code block itself (second line, "int main..."): the
+    // caret is anywhere in the block, not adjacent to the fence glyphs —
+    // still reveals, per-block.
+    const QRectF codeRect = view.blockRect(code);
+    const QFontMetricsF fm(view.theme().font(Markoff::Theme::FontRole::Monospace));
+    const qreal lineHeight = fm.lineSpacing();
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(codeRect.x()) + 1, int(codeRect.y() + lineHeight) + 4));
+    QCOMPARE(view.caretBlock(), code);
+    QVERIFY(!view.isDelimiterHiddenAt(code, 0));
+
+    // Back out: hidden again.
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(otherRect.x()) + 1, int(otherRect.y()) + 8));
+    QVERIFY(view.isDelimiterHiddenAt(code, 0));
 }
 
 QTEST_MAIN(TstCanvasInlineFormatting)

@@ -33,9 +33,29 @@ bool delimiterShouldHide(const SourceSpan &span, const QList<int> &cursorsInBloc
 {
     if (!span.isDelimiter)
         return false;
-    if (span.parentCharStart < 0 || span.parentCharEnd < 0)
-        return false;
     if (span.isTag || span.isListMarker || span.isBlockquoteMarker)
+        return false;
+
+    // Code fences (P2.2, spec §4.2): per-BLOCK reveal, not per-span — the
+    // whole fence line shows only when the caret is anywhere in the code
+    // block, matching Obsidian. Unlike the ATX heading marker (below),
+    // fenced_code_block_delimiter/info_string/language spans are never
+    // given a parent range by the parser (they aren't part of any inline
+    // tree — collectParentRanges only walks inline ASTs), so this has to
+    // be a canvas-local rule rather than reusing parentCharStart/End.
+    if (span.isCodeBlockFence)
+        return cursorsInBlock.isEmpty();
+
+    // The ATX heading marker (`# `) needs NO special case here despite
+    // also being per-block in Obsidian: the parser already gives that
+    // specific span a parent range spanning the WHOLE heading line (post-
+    // process 1, TreeSitterParser.cpp), not just its own bytes — a nested
+    // delimiter inside the heading's text (e.g. "# **Bold**"'s "**") gets
+    // its own narrow range instead, overwritten by post-process 2, so it
+    // correctly keeps per-span reveal. The touchedByAnyCursor check below
+    // already does the right thing for both cases without knowing which
+    // one it's looking at.
+    if (span.parentCharStart < 0 || span.parentCharEnd < 0)
         return false;
     if (touchedByAnyCursor(span, cursorsInBlock))
         return false;
