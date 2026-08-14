@@ -100,6 +100,46 @@ QList<QTextLayout::FormatRange> inlineFormatRanges(
             fmt.setFontFamilies(theme.font(Theme::FontRole::Monospace).families());
             any = true;
         }
+        if (span.strikethrough) {
+            fmt.setFontStrikeOut(true);
+            const QColor c = theme.color(Theme::Slot::StrikeEmphasis);
+            if (c.isValid()) fmt.setForeground(c);
+            any = true;
+        }
+        if (span.highlight) {
+            const QColor c = theme.color(Theme::Slot::Highlight);
+            if (c.isValid()) fmt.setBackground(c);
+            any = true;
+        }
+        // isLink/isWikilink/isTag: mutually exclusive in practice (a span's
+        // parent-formatting propagation sets at most one of these three per
+        // the parser's isLinkParent walk), same Theme::Slot mapping as
+        // live's InlineHighlighter::formatFor.
+        if (span.isLink) {
+            applyEmphasis(fmt, theme, Theme::Slot::Link);
+            fmt.setFontUnderline(true);
+            any = true;
+        }
+        if (span.isWikilink) {
+            applyEmphasis(fmt, theme, Theme::Slot::WikiLink);
+            fmt.setFontUnderline(true);
+            any = true;
+        }
+        if (span.isTag) {
+            applyEmphasis(fmt, theme, Theme::Slot::Tag);
+            any = true;
+        }
+        // Footnote refs ([^1]) are outside the live highlighter's 8-kind
+        // table entirely (live's E1 test explicitly keeps them out of
+        // scope) and there is no dedicated Theme::Slot for them — adding
+        // one would be a markoff-core seam this task doesn't name. Render
+        // as superscript only (Obsidian parity, spec §5.3's "footnote refs
+        // superscripted"), no color override: a leaf-local rendering
+        // decision, not a slot mapping.
+        if (span.isFootnoteRef) {
+            fmt.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
+            any = true;
+        }
         if (!any)
             continue;
 

@@ -37,7 +37,14 @@ QList<std::pair<int, int>> omittedDelimiterRanges(
     const QList<Markoff::SourceSpan> &spans, const QList<int> &cursorsInBlock);
 
 /// Build QTextLayout format ranges for one block's inline spans (spec T7,
-/// reworked for P2.1): bold/italic/inline-code styling. Hidden delimiter
+/// reworked for P2.1, extended P4.1 to the live highlighter's 8-kind set +
+/// footnote refs): bold/italic/strikethrough/inline-code/highlight/link/
+/// wikilink/tag styling, same Theme::Slot mapping as
+/// Markoff::Live::InlineHighlighter::formatFor (bold->BoldEmphasis,
+/// italic->ItalicEmphasis, strikethrough->StrikeEmphasis, code->InlineCode,
+/// highlight->Highlight, isLink->Link, isWikilink->WikiLink, isTag->Tag),
+/// plus isFootnoteRef rendered as superscript (no dedicated slot — out of
+/// live's 8-kind table, see .cpp). Hidden delimiter
 /// spans are omitted entirely — they have already been removed from the
 /// layout text by `projection`, so they need no format range at all (the
 /// old "invisible foreground colour over a same-width run" mechanism is
