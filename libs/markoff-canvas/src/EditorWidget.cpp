@@ -166,8 +166,6 @@ void EditorWidget::setCursorPosition(Markoff::CursorPos pos)
     auto *doc = document();
     if (!doc || !m_view)
         return;
-    if (pos.line > 4)  // FALSIFY (throwaway): skip the clamp — silent no-op instead
-        return;
     const auto [block, byteOffset] = fromCursorPos(doc, pos);
     m_view->setCaretPosition(block, byteOffset);
 }
