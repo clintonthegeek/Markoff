@@ -80,7 +80,7 @@ int ProjectionMap::fullQCharToLayoutQChar(int fullQChar, SnapDirection dir) cons
                                            : int(m_layoutText.size());
     }
     if (fullQChar >= it->fullStart)
-        return it->layoutStart + (fullQChar - it->fullStart);
+        return it->layoutStart + (fullQChar - it->fullStart) + 1;  // FALSIFY: off-by-one
 
     // Strictly inside the omitted gap before `it`.
     if (dir == SnapDirection::Right)
