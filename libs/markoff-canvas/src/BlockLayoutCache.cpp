@@ -382,7 +382,7 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
     // painted at the current caret state — no separate invalidation path
     // needed.
     e.mathPixmap = QPixmap();
-    if (e.style.isMathDisplay) {
+    if (e.style.isMathDisplay && e.id != m_caretBlock) {
         const QString latex = Detail::stripMathDelimiters(QString::fromUtf8(text));
         e.mathPixmap = Detail::renderMathPixmap(
             latex, e.style.font.pixelSize(), e.style.foreground,
