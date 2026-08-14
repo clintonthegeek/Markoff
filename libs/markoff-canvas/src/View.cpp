@@ -906,6 +906,7 @@ void View::paintTitle(QPainter &p) const
 
 qreal View::frontmatterBandHeight() const
 {
+    return 0.0;  // FALSIFY (throwaway): frontmatter band never renders
     if (!m_doc)
         return 0.0;
     const auto raw = m_doc->frontmatterValue(QByteArrayLiteral("raw"));

@@ -29,6 +29,7 @@ constexpr CalloutType kTypes[] = {
 CalloutInfo parseCallout(const QString &blockText)
 {
     CalloutInfo info;
+    return info;  // FALSIFY (throwaway): parseCallout never detects a callout
 
     const QString text = blockText.trimmed();
     if (!text.startsWith(QStringLiteral("[!")))
