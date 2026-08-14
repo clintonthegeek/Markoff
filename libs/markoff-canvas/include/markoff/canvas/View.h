@@ -5,6 +5,8 @@
 #include <optional>
 
 #include <QAbstractScrollArea>
+#include <QHash>
+#include <QList>
 #include <QRectF>
 #include <QVariant>
 
@@ -35,6 +37,22 @@ struct CanvasCursor {
     {
         return block == o.block && byteOffset == o.byteOffset;
     }
+};
+
+/// A find-match highlight to paint (contract-v2 P3.4). View-agnostic on
+/// purpose — this type deliberately does not know about
+/// `Markoff::FindController`; `EditorWidget::attachFindController`
+/// translates `FindController::Match` (+ current-index) into a list of
+/// these. Byte range is block-relative, same convention as everywhere
+/// else in this leaf (C4).
+struct FindHighlight {
+    BlockId block;
+    int byteOffset = 0;
+    int byteLength = 0;
+    /// Distinct visual weight from the other matches (Theme::Slot
+    /// SearchActiveMatchBackground vs SearchMatchBackground) — the
+    /// currently-selected match under FindController::currentMatchIndex.
+    bool isCurrent = false;
 };
 
 /**
@@ -184,6 +202,24 @@ public:
     BlockId selectionAnchorBlock() const;
     int     selectionAnchorByteOffset() const;
 
+    // ---- Find highlights (contract-v2 P3.4) ------------------------------
+
+    /// Replace all find-match highlights to paint. Draw-time
+    /// `QTextLayout::FormatRange` only, added in `paintEvent` alongside the
+    /// selection range built there — never a `QTextCharFormat`/`setFormats`
+    /// mutation of the layout itself (spec §3: no second per-character
+    /// format store; the layout stays a pure derived cache). Passing an
+    /// empty list clears all highlight paint state, which is exactly what
+    /// `EditorWidget::detachFindController` does. Table-cell matches (T9)
+    /// are a known gap shared with selection's own table limitation — not
+    /// special-cased here; `paintTable` does not consult this list.
+    void setFindHighlights(const QList<FindHighlight> &highlights);
+
+    /// Test/inspection surface only — nothing here is authority (same rule
+    /// as the rest of this section). The highlights currently set for
+    /// `id`, in the order last passed to `setFindHighlights`.
+    QList<FindHighlight> findHighlightsForBlock(BlockId id) const;
+
 signals:
     /// Fired from `ensureCaretVisible()` (P3.2) — the file's single
     /// chokepoint every caret-changing code path already calls afterward
@@ -309,6 +345,10 @@ private:
     bool m_hasFocus = false;
     /// Read-only gate authority (P3.3). See `setReadOnly`'s doc comment.
     bool m_readOnly = false;
+    /// Find-match highlights (P3.4), grouped by block for O(1) lookup
+    /// during `paintEvent`. Draw-time-only paint state — see
+    /// `setFindHighlights`'s doc comment.
+    QHash<BlockId, QList<FindHighlight>> m_findHighlightsByBlock;
     // ---- IME (T8) ---------------------------------------------------------
     // Composition state the document doesn't know about (same exception as
     // m_selectionAnchor, T5): a preedit string exists only in this leaf's

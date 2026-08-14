@@ -4,10 +4,12 @@
 
 #include <memory>
 
+#include <QPointer>
+
+#include <markoff/core/FindController.h>
 #include <markoff/core/MarkdownView.h>
 
 namespace Markoff {
-class FindController;
 class Session;
 }  // namespace Markoff
 
@@ -118,11 +120,36 @@ public:
     /// role as `Live::EditorWidget::binding()`.
     View *view() const noexcept;
 
+    /// Find (contract-v2 P3.4, spec §3): subscribes to `fc`'s
+    /// `matchesChanged`/`currentMatchChanged` and repaints all-match +
+    /// current-match highlights on the composed `View` (draw-time
+    /// `FormatRange`s — see `View::setFindHighlights`), and to
+    /// `navigationRequested` to scroll the match into view + place a
+    /// non-focusing caret at it (both via `View::setCaretPosition`, the
+    /// same chokepoint `setCursorPosition` routes through — its
+    /// `ensureCaretVisible` call already does the scroll-into-view, so no
+    /// separate scroll step is needed here). `fc` is consumer-owned; not
+    /// linked, only observed. Calling this while already attached to a
+    /// different controller detaches from the old one first.
+    void attachFindController(Markoff::FindController *fc) override;
+    /// Disconnects from the attached controller (if any) and clears all
+    /// find-related paint state on the composed `View` (no leftover
+    /// highlights).
+    void detachFindController() override;
+
 private:
     /// `View::caretChanged` handler: recomputes `cursorPosition()` and
     /// emits `cursorPositionChanged` iff it actually differs from
     /// `m_lastCursorPos` (change-gated per class doc).
     void onViewCaretChanged();
+
+    /// Rebuilds the composed `View`'s find highlights wholesale from
+    /// `m_findController->matches()` + `currentMatchIndex()`. Shared by
+    /// both `matchesChanged` and `currentMatchChanged` — whole-list
+    /// rebuild is cheap relative to a keystroke and keeps a single source
+    /// of truth (the controller) rather than diffing incrementally.
+    void rebuildFindHighlights();
+    void onFindNavigationRequested(Markoff::FindController::Match match);
 
     View *m_view = nullptr;
     Markoff::Session *m_session = nullptr;
@@ -131,6 +158,8 @@ private:
     /// the change-gate `onViewCaretChanged` diffs against. Not a cursor
     /// authority (the composed `View`'s caret is); see class doc.
     Markoff::CursorPos m_lastCursorPos{1, 1};
+    /// Consumer-owned; observed only (see `attachFindController` doc).
+    QPointer<Markoff::FindController> m_findController;
 };
 
 }  // namespace Markoff::Canvas

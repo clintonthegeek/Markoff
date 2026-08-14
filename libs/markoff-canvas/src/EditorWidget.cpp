@@ -235,4 +235,68 @@ QRect EditorWidget::caretRect() const
     return r.translated(m_view->mapTo(const_cast<EditorWidget *>(this), QPoint(0, 0)));
 }
 
+void EditorWidget::attachFindController(Markoff::FindController *fc)
+{
+    if (m_findController == fc)
+        return;
+    if (m_findController)
+        detachFindController();
+    m_findController = fc;
+    if (!fc)
+        return;
+
+    QObject::connect(fc, &Markoff::FindController::matchesChanged,
+                      this, &EditorWidget::rebuildFindHighlights);
+    QObject::connect(fc, &Markoff::FindController::currentMatchChanged,
+                      this, &EditorWidget::rebuildFindHighlights);
+    QObject::connect(fc, &Markoff::FindController::navigationRequested,
+                      this, &EditorWidget::onFindNavigationRequested);
+
+    // The controller may already carry matches (needle set before attach)
+    // — push them through immediately rather than waiting for the next
+    // matchesChanged.
+    rebuildFindHighlights();
+}
+
+void EditorWidget::detachFindController()
+{
+    if (!m_findController)
+        return;
+    QObject::disconnect(m_findController, nullptr, this, nullptr);
+    m_findController = nullptr;
+    if (m_view)
+        m_view->setFindHighlights({});
+}
+
+void EditorWidget::rebuildFindHighlights()
+{
+    if (!m_view)
+        return;
+    QList<FindHighlight> highlights;
+    if (m_findController) {
+        const QList<Markoff::FindController::Match> &matches = m_findController->matches();
+        const int currentIdx = m_findController->currentMatchIndex();
+        highlights.reserve(matches.size());
+        for (int i = 0; i < matches.size(); ++i) {
+            const auto &m = matches[i];
+            highlights.push_back(FindHighlight{
+                m.block, int(m.byteOffset), int(m.byteLength), i == currentIdx});
+        }
+    }
+    m_view->setFindHighlights(highlights);
+}
+
+void EditorWidget::onFindNavigationRequested(Markoff::FindController::Match match)
+{
+    if (!m_view)
+        return;
+    // Non-focusing caret placement (FindController's contract: the adapter
+    // MAY scroll + place the caret but MUST NOT take focus) — setCaretPosition
+    // never calls QWidget::setFocus, and its ensureCaretVisible() chokepoint
+    // already scrolls the target block into view (P3.2), so this single call
+    // covers both halves of "scrolls the match visible + places the caret"
+    // without inventing a second caret-move path.
+    m_view->setCaretPosition(match.block, int(match.byteOffset));
+}
+
 }  // namespace Markoff::Canvas

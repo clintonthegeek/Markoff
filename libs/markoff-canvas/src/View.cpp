@@ -771,6 +771,22 @@ QByteArray View::selectedText() const
     return parts.join("\n\n");
 }
 
+void View::setFindHighlights(const QList<FindHighlight> &highlights)
+{
+    m_findHighlightsByBlock.clear();
+    for (const FindHighlight &h : highlights) {
+        if (h.byteLength <= 0)
+            continue;
+        m_findHighlightsByBlock[h.block].append(h);
+    }
+    viewport()->update();
+}
+
+QList<FindHighlight> View::findHighlightsForBlock(BlockId id) const
+{
+    return m_findHighlightsByBlock.value(id);
+}
+
 void View::collapseSelection()
 {
     const auto sel = orderedSelection();
@@ -1571,6 +1587,27 @@ void View::paintEvent(QPaintEvent *event)
                 if (qTo > qFrom) {
                     QTextCharFormat fmt;
                     fmt.setBackground(m_theme.color(Theme::Slot::SelectionBackground));
+                    selections.push_back({qFrom, qTo - qFrom, fmt});
+                }
+            }
+        }
+
+        // Find-match highlights (P3.4): same draw-time FormatRange
+        // mechanism as selection above, never a layout format mutation.
+        // Current match gets its own slot (distinct visual weight) from
+        // the other matches.
+        if (const auto it = m_findHighlightsByBlock.constFind(e.id);
+            it != m_findHighlightsByBlock.constEnd()) {
+            for (const FindHighlight &h : it.value()) {
+                const int qFrom = e.projection.byteToLayoutQChar(
+                    h.byteOffset, ProjectionMap::SnapDirection::Left);
+                const int qTo = e.projection.byteToLayoutQChar(
+                    h.byteOffset + h.byteLength, ProjectionMap::SnapDirection::Right);
+                if (qTo > qFrom) {
+                    QTextCharFormat fmt;
+                    fmt.setBackground(m_theme.color(h.isCurrent
+                        ? Theme::Slot::SearchActiveMatchBackground
+                        : Theme::Slot::SearchMatchBackground));
                     selections.push_back({qFrom, qTo - qFrom, fmt});
                 }
             }
