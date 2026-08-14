@@ -125,7 +125,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P3.6 Ephemeral state JSON round-trip | ☑ | `3b4247a0` | `0fdb7a85` / `45026f6c` |
 | P3.7 ⏸ phase close | ☑ | n/a | n/a |
 | **P4 — inline/text parity** | | | |
-| P4.1 Full inline kind set (highlight/strike/link/wikilink/tag/footnote-ref) | ☐ | | |
+| P4.1 Full inline kind set (highlight/strike/link/wikilink/tag/footnote-ref) | ☑ | `a51917f8` | `81bb62fe` / `6c51bbe5` |
 | P4.2 Link activation + hover | ☐ | | |
 | P4.3 FormatOps verbs + CanvasActionController | ☐ | | |
 | P4.4 Context menu | ☐ | | |
@@ -515,6 +515,24 @@ user with a one-page summary of what's proven.
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P4.1 (2026-08-14).**
+
+- Delimiter omission for the five new kinds (`==`, `~~`, `[[ ]]`,
+  link-destination, `[^n]`) needed **zero new code** — the parser's
+  `collectParentRanges` already emits parent ranges for
+  `strikethrough`/`highlight`/`wiki_link`/`inline_link`/`shortcut_link`
+  the same way it does for emphasis/strong/code_span, and
+  `delimiterShouldHide` was already generic over any `isDelimiter` span.
+  Mirrors the P2.2 heading-marker finding — one mechanism, no per-kind
+  branching, exactly as spec §4.2 intends.
+- No `Theme::Slot` exists for footnote refs; live's own
+  `InlineHighlighter` leaves them out-of-scope too. Rendered
+  superscript-only rather than opening a core seam this task didn't
+  name. Revisit if footnote refs need a distinct color later.
+- `isLink`/`isWikilink`/`isTag` are mutually exclusive in the parser's
+  span data in practice — documented as an assumption rather than
+  adding defensive precedence logic.
 
 **P1.1 (2026-08-13).**
 
