@@ -117,7 +117,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P2.3 Per-cell maps + cross-table selection (#18.2) | ☑ | `bfe0bb4e` | `e9d95a3c` / `0ba7ca4b` |
 | P2.4 ⏸ perf re-baseline (E9 budgets, build-perf) | ☑ | n/a | n/a |
 | **P3 — MarkdownView contract v2** | | | |
-| P3.1 EditorWidget wrapper + setDocument/Session + contract harness | ☐ | | |
+| P3.1 EditorWidget wrapper + setDocument/Session + contract harness | ☑ | `07b3301c` | `b65c8aae` / `b62b45ec` |
 | P3.2 Cursor/scroll position mapping + signals | ☐ | | |
 | P3.3 Read-only gates + caretRect | ☐ | | |
 | P3.4 FindController: highlight + navigate | ☐ | | |
@@ -833,6 +833,60 @@ user with a one-page summary of what's proven.
   `libs/markoff-canvas/tests/CMakeLists.txt` alongside the existing
   perf target, `QT_QPA_PLATFORM=offscreen` like every other canvas
   test. Phase 2 closes clean.
+
+**P3.1 (2026-08-14).**
+
+- `View` gained one new public method, `setCaretPosition(BlockId,
+  byteOffset)` — the sanctioned way `EditorWidget` drives the caret
+  programmatically, funnelled through the same private `setCaret()`
+  every real-event path already uses (no second caret-mutation
+  entrypoint). Clamps an unknown block to the last surviving one and
+  the byte offset to the target block's length; clears the selection
+  anchor, matching a real click.
+- `EditorWidget::cursorPosition()`/`setCursorPosition()` implement the
+  full flat-visual-line `CursorPos` mapping now, not a stub deferred to
+  P3.2 — the task's own falsifiable "attach-window" check needs a real
+  caret write/read to be meaningful, and the plan's P3.2 line reads as
+  "grow this with signals + scroll", not "invent it from scratch". The
+  mapping mirrors live's `toCursorPos`/`fromCursorPos` shape exactly,
+  substituted to canvas's byte-offset caret via
+  `TextUnits::byteToQtPos`/`qtPosToByte` against `blockText()` (never
+  the layout string — P1.2's U+2028 substitution note). P3.2's
+  remaining scope: `scrollPositionVisualLine()`/setter, and the
+  `cursorPositionChanged`/`scrollPositionChanged` signal emissions
+  (neither wired yet — `cursorPosition()` is a pull-only accessor here,
+  same as it will be for scroll before P3.2).
+- Added a new **shared** `ViewContractChecks.h` check,
+  `checkAttachWindowCaretWriteSurvives` — general over any
+  `MarkdownView*`, not canvas-specific, so live/source/styled can adopt
+  it too (not required by this task; left for their own maintainers).
+  It pumps `QCoreApplication::processEvents()` between the write and
+  the read specifically so it can catch a regression that defers part
+  of `setDocument()`'s caret handling onto the event queue — for a
+  fully synchronous leaf (canvas today) the pump is a no-op, but it's
+  what makes the check load-bearing rather than merely "nothing raced
+  *yet*". Falsification planted exactly that: `setDocument()`'s
+  `m_view->setDocument(doc)` call deferred via
+  `QMetaObject::invokeMethod(..., Qt::QueuedConnection)`. Confirmed
+  both `attach_window_caret_write_survives` AND `cursor_round_trip`
+  fail (the latter because `init()` itself relies on the same
+  synchronous-attach property) — reverted clean.
+- `checkContextChangedKindGated` /
+  `checkContextChangedOnStructuralKindChangeWithoutCaretMove` are
+  deliberately **not** enrolled yet — `EditorWidget` doesn't emit
+  `contextChanged` until P3.5. `checkReadOnlyBlocksUndoAndKeepsBytes`
+  and `checkFontScaleSignal` **are** enrolled and pass today, but only
+  by exercising the base class's own storage (`setReadOnly`/
+  `isReadOnly`, `setFontScale`/`fontScaleChanged`) — `EditorWidget`
+  hasn't overridden either yet (P3.3, P3.5 respectively). Left enrolled
+  rather than held back: they cost nothing today and start testing real
+  behavior the moment those overrides land, with no separate
+  enrollment step to remember.
+- New executable `tst_canvas_view_contract` (9 test slots, all green)
+  registered in `tests/CMakeLists.txt` alongside the existing canvas
+  tests. `-R canvas` now 16/16 green (constitution included); full
+  suite green (STATUS.md's 288/288 baseline line is a phase-close-only
+  update per the session protocol, left for P3.7).
 
 ---
 
