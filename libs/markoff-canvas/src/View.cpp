@@ -5,6 +5,7 @@
 #include <QByteArrayList>
 #include <QClipboard>
 #include <QContextMenuEvent>
+#include <QDateTime>
 #include <QDrag>
 #include <QDragEnterEvent>
 #include <QDragMoveEvent>
@@ -30,6 +31,7 @@
 #include <vector>
 
 #include <markoff/core/AttrNames.h>
+#include <markoff/core/Cmd/D2.h>
 #include <markoff/core/KindInference.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -2513,10 +2515,35 @@ void View::insertPrintable(const QString &text)
     if (!m_doc || m_caret.block.isNull() || text.isEmpty())
         return;
 
-    const QByteArray insert = text.toUtf8();
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0, insert, t);
-    m_caret.byteOffset += insert.size();
+    // P7.2a: route each character through Cmd::insertCharacter so
+    // printable-only, same-block, <1000ms runs coalesce into one undo
+    // entry (UndoLog::maybeCoalesceOrTransaction) instead of opening a
+    // bare Transaction per keystroke (F1 gap #3). insertCharacter takes a
+    // single QChar, so a surrogate-pair codepoint (e.g. an emoji, already
+    // covered by tst_canvas_typing) can't go through it without data loss
+    // — QString::toUtf8() on a lone unpaired surrogate half silently
+    // yields zero bytes. Those fall back to a direct
+    // maybeCoalesceOrTransaction call with the full codepoint's bytes and
+    // isPrintable=false, which (a) preserves exact byte content and
+    // (b) deliberately breaks any coalescing chain around it rather than
+    // risk mis-grouping the surrounding keystrokes' undo entries.
+    int i = 0;
+    while (i < text.size()) {
+        const QChar ch = text.at(i);
+        if (ch.isHighSurrogate() && i + 1 < text.size() && text.at(i + 1).isLowSurrogate()) {
+            const QByteArray insert = text.mid(i, 2).toUtf8();
+            const CoalesceContext ctx{m_caret.block, false, QDateTime::currentMSecsSinceEpoch()};
+            m_doc->d2UndoLog().maybeCoalesceOrTransaction(ctx, [&](UndoLog::Transaction &t) {
+                m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0, insert, t);
+            });
+            m_caret.byteOffset += insert.size();
+            i += 2;
+        } else {
+            Cmd::insertCharacter(*m_doc, m_caret.block, uint32_t(m_caret.byteOffset), ch);
+            m_caret.byteOffset += QString(ch).toUtf8().size();
+            i += 1;
+        }
+    }
     // P6.1: does NOT funnel through setCaret() (a plain byteOffset bump,
     // not a "placement") — pushed here directly, same reasoning as
     // deleteCluster()/tryStructuralKey()/the arrow-key moveCaret* helpers

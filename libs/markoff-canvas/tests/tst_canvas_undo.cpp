@@ -24,6 +24,7 @@ class TstCanvasUndo : public QObject {
 
 private slots:
     void undo_redo_never_strand_caret();
+    void consecutive_printable_keys_coalesce_into_one_undo_entry();
 };
 
 namespace {
@@ -86,6 +87,39 @@ void TstCanvasUndo::undo_redo_never_strand_caret()
         assertCaretSound(doc, view);
     }
     QCOMPARE(doc.iterateBlocks().size(), size_t(2));
+}
+
+// P7.2a (F1 gap #3) — View::insertPrintable must route through
+// Cmd::insertCharacter so consecutive same-block printable keystrokes
+// coalesce (UndoLog::maybeCoalesceOrTransaction, 1000ms window) instead of
+// each keystroke opening its own bare Transaction. No wall-clock sleep
+// needed: the coalesce window is checked against QDateTime timestamps at
+// call time, and two QTest::keyClick calls in a row land well inside it.
+void TstCanvasUndo::consecutive_printable_keys_coalesce_into_one_undo_entry()
+{
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown("Hello world.\n");
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId firstBlock = doc.iterateBlocks().front();
+    const QRectF rect = view.blockRect(firstBlock);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(rect.x()) + 30, int(rect.y()) + 8));
+    QCOMPARE(view.caretBlock(), firstBlock);
+
+    const size_t before = doc.d2UndoLog().entryCount();
+
+    QTest::keyClick(&view, Qt::Key_X);
+    QTest::keyClick(&view, Qt::Key_Y);
+
+    // Two printable keystrokes, same block, well within the 1000ms
+    // coalesce window: exactly one new undo entry, not two.
+    QCOMPARE(doc.d2UndoLog().entryCount(), before + 1);
 }
 
 QTEST_MAIN(TstCanvasUndo)
