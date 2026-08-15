@@ -152,6 +152,13 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **P7 — polish + a11y** | | | |
 | P7.1 Accessibility (per G1) | ⏭ deferred — see G1 | n/a | n/a |
 | P7.2 Drag-drop + middle-click paste | ☑ | `565aeee1` (+ comment fix `2131929e`) | A: `056f9215`/`504fbc4f`; B: `67c2d433`/`1254a421`; C: `b285a6e7`/`f9e7e2c9` |
+| P7.2a F1#3 undo-coalescing defect fix | ☐ | | |
+| P7.2b F1#1 editing-command floor | ☐ | | |
+| P7.2c F1#4 auto-pairing / wrap-selection | ☐ | | |
+| P7.2d F1#5 Enter/Backspace semantics checklist | ☐ | | |
+| P7.2e F1#7 highlight selection occurrences | ☐ | | |
+| P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☐ | | |
+| P7.2g F1#9 invisible/control-char rendering | ☐ | | |
 | P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☐ | | n/a |
 | **G2 — user gate: Corbomite adoption** (work lands in Corbomite repo) | ☐ | — | — |
 | **G3 — user gate: retirement decision** (successor spec) | ☐ | — | — |
@@ -529,6 +536,69 @@ task if a11y is ever prioritized.
 Text drag in/out (plain text + `text/markdown`), file-drop → signal
 to consumer (Corbomite decides embed vs link), X11 primary-selection
 paste. Reference `QWidgetTextControl` for event ordering.
+### P7.2a-g — F1 gap closure (user-directed 2026-08-14)
+P7.3's own close-out condition ("F1 parity audit done or explicitly
+waived") surfaced 7 of F1's 12 gaps (plan findings log, "F1 —
+CodeMirror parity audit (2026-08-13)") never landed anywhere in P1–P7
+— neither implemented nor written into spec §5.3 as an explicit
+deferral. Presented to the user 2026-08-14; decision: **fix all 7**
+before P7.3 closes. Each sub-task below cites its F1 gap number for
+full context/rationale/CM-reference rather than re-deriving it — read
+the F1 table entry before starting the task with that number.
+- **P7.2a (F1 #3) — undo-coalescing defect.** `View::insertPrintable`
+  opens a bare `UndoLog::Transaction` per keystroke instead of routing
+  through `Cmd::insertCharacter` (core already coalesces: same block,
+  printable-only, 1000ms — `UndoLog::maybeCoalesceOrTransaction`).
+  Straight defect fix, no core change. **Falsify:** type two chars
+  within the coalesce window; undo depth must be 1, not 2.
+- **P7.2b (F1 #1) — editing-command floor.** Word-wise motion +
+  selection (Ctrl+Left/Right), word-wise delete (Ctrl+Backspace/
+  Delete), Ctrl+Home/End (doc start/end), delete-line, move-line up/
+  down, select-line, Esc→simplify-selection. Word boundaries via
+  `QTextBoundaryFinder`, not hand-rolled (F1's own note). Also: write
+  the spec §5.2 row F1 proposed and never landed.
+- **P7.2c (F1 #4) — auto-pairing / wrap-selection.** Typing `(`/`[`/
+  `"`/`` ` ``/`**` with a selection wraps it; typing the closer over
+  an auto-inserted one types through; Backspace between a fresh pair
+  deletes both. View-local tracked state (needs a spec §2 view-state
+  justification per F1's note, or derive from the undo entry — pick
+  one, log it). Add to spec §5.3.
+- **P7.2d (F1 #5) — Markdown Enter/Backspace semantics checklist.**
+  Test-only: diff `StructuralKeyHandler`'s Enter-split/boundary-merge/
+  list-Tab behavior against CodeMirror's `lang-markdown/src/
+  commands.ts` `insertNewlineContinueMarkup`/`deleteMarkupBackward`
+  documented cases; add any missing coverage as new falsifiable tests,
+  fix any real gap found (small, in-scope) or log it if not.
+- **P7.2e (F1 #7) — highlight other selection occurrences.** Cheap
+  once P3.4's match-painting exists (it does) — reuse the same
+  draw-time `FormatRange` mechanism `setFindHighlights` uses, keyed
+  off the current selection's text (min length, whole-word option per
+  CM's `highlightSelectionMatches`). Add to spec §5.3 as implemented,
+  not "optional."
+- **P7.2f (F1 #8, #10) — scroll-past-end, empty-doc placeholder,
+  bracket-match highlight, drag drop-cursor indicator.** Four small,
+  independent visual additions bundled as one task: bottom scroll
+  padding = viewport height − one line; a placeholder string painted
+  when the document is empty and unfocused; bracket-match highlight
+  (`language/src/matchbrackets.ts` reference) painted at the caret;
+  P7.2's `dragMoveEvent` gets a visible drop-cursor indicator (it
+  currently only calls `acceptProposedAction()` with no paint). Add
+  all four to spec §5.3.
+- **P7.2g (F1 #9) — invisible/control-character rendering.** C0/C1
+  controls, U+00AD (soft hyphen), U+200B (zero-width space), U+200E/F
+  (LRM/RLM), **U+202D/E and U+2066–9 (bidi overrides — flagged by F1
+  as a spoofing surface, not just cosmetic)**, U+FEFF (BOM) get a
+  visible placeholder glyph/box instead of rendering invisibly or
+  silently affecting layout direction. Add to spec §5.3.
+Falsification for each follows the standard protocol. Canvas-scoped
+test tier unless a task's diff touches core (none of these are
+expected to). F1's gap #2 (multi-cursor) and #11/#12 (fold-state,
+gutter seam) are already closed — no task needed. F1's gap #6 (atomic-
+range snap on hit-test/vertical motion) has the weakest "closed"
+evidence (phase-closed without an explicit confirming test) — P7.2f's
+agent or P7.3 should spot-check it with a quick test read, fix if
+genuinely missing, otherwise just confirm and note it.
+
 ### P7.3 ⏸ — arc close
 Full suite; perf; constitution honest read of every file touched
 since P1; F1 parity audit done or explicitly waived by the user;
