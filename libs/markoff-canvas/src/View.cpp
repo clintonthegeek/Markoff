@@ -3859,10 +3859,9 @@ void View::keyPressEvent(QKeyEvent *event)
         event->accept();
         return;
     case Qt::Key_End:
-        if (ctrl)
-            moveCaretToDocumentEnd();
-        else
-            moveCaretToLineEdge(false);
+        // FALSIFY (throwaway, P7.2b group B): Ctrl+End keeps scrolling but
+        // never moves the caret to document end.
+        moveCaretToLineEdge(false);
         pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
