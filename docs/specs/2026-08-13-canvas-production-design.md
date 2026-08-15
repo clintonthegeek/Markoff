@@ -258,7 +258,18 @@ highlight: the caret-adjacent bracket and its nesting-aware match
 `Theme::Slot::BracketMatchBackground`. Drag drop-cursor indicator: a
 dashed vertical bar in `Theme::Slot::CursorPrimary`, hit-tested fresh
 on every `dragEnterEvent`/`dragMoveEvent`, cleared on
-`dragLeaveEvent`/`dropEvent`.
+`dragLeaveEvent`/`dropEvent`. **Invisible/control-character rendering**
+(P7.2g, F1 #9, last of the 7 F1 gap-closure sub-tasks) — C0 controls
+(excluding `\t`/`\n`) + DEL get their Unicode Control Picture glyph
+(U+2400+code, DEL→U+2421); C1 controls, soft hyphen, ZWSP, LRM/RLM,
+BOM, and the safety-relevant bidi override/isolate controls
+(U+202D/E, U+2066–9) get a Private-Use sentinel (U+E000) substituted
+1 QChar for 1 QChar at layout-build time, with a hex-labeled box
+painted over its (transparent) glyph slot in
+`Theme::Slot::InvisibleCharBox`. The bidi subset is **neutralized at
+the substitution point**, not merely covered with paint — U+E000
+defaults to bidi class L (strong LTR), so the dangerous character
+never reaches `QTextLayout`'s own bidi algorithm.
 
 **Explicitly deferred out of this arc** (recorded so absence is a
 decision): vim mode, PDF export/printing, embedded-note transclusion

@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2f landed)
+**Last updated:** 2026-08-15 (canvas production arc — Phase 7, all F1 gap-closure tasks (P7.2a-g) complete)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -122,8 +122,17 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   new `Theme::Slot::BracketMatchBackground`. The P7.2 drag-drop
   handlers gained a dashed drop-cursor indicator (`Theme::Slot::
   CursorPrimary`, re-hit-tested on every drag move, never cached).
-  Phase 7 continues at P7.2g (invisible/control-char rendering), then
-  P7.3 (⏸ arc close: Obsidian parity audit + full audit).
+  **P7.2g (invisible/control-char rendering, F1 #9)** landed 2026-08-15
+  — the last of the 7 user-directed F1 gap-closure sub-tasks (all now
+  ☑). C0 controls/DEL get Unicode Control Picture glyphs; C1 controls,
+  soft hyphen, ZWSP, LRM/RLM, BOM, and the safety-relevant bidi
+  override/isolate controls (U+202D/E, U+2066–9) get a boxed-hex
+  Private-Use sentinel (U+E000, new `Theme::Slot::InvisibleCharBox`).
+  The bidi subset is **neutralized at the substitution point**, not
+  merely painted over — U+E000 defaults to bidi class L, so it never
+  reaches `QTextLayout`'s bidi algorithm; the boxed label is the
+  visible warning on top of an already-safe substitution. Phase 7
+  continues at P7.3 (⏸ arc close: Obsidian parity audit + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -218,6 +227,13 @@ enumerator + light/dark default colors). Canvas-scoped suite **37/37**
 focus-independence + typing-clears-it, bracket-match nesting depth,
 drop-cursor drag-move tracking). `check-constitution.sh` clean
 (C1–C4, 74 files).
+
+P7.2g (2026-08-15): **full suite 315/315** (unchanged count — one new
+`Theme::Slot::InvisibleCharBox` enumerator, required the full-suite
+tier rule same as P7.2e/P7.2f, but no new test executable — extended
+`tst_canvas_projection` with 2 cases). Canvas-scoped suite still
+37/37. `check-constitution.sh` clean (C1–C4, 74 files). All 7 F1
+gap-closure sub-tasks (P7.2a–g) now complete.
 
 ## Dormant items
 

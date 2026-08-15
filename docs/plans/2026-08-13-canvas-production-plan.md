@@ -160,7 +160,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | *(out-of-band)* P7.2d addendum: Backspace de-lists, never merges | ☑ | `fc7ea6fe` | `a48bdfa0`/`8e59beb4` |
 | P7.2e F1#7 highlight selection occurrences | ☑ | `003b3191` (+ core `da910863`) | `90bb7c0b`/`80cfd222` |
 | P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☑ | `f722216b` (+ core `3f8cafb1`) | A: `1736c414`/`5a8725b1`; B: `4c54a080`/`33fd6383`; C: `4758653b`/`8aa40cf7`; D: `fc19e0b7`/`d6eee01f` |
-| P7.2g F1#9 invisible/control-char rendering | ☐ | | |
+| P7.2g F1#9 invisible/control-char rendering | ☑ | `fca7a800` | A: `63bdcda5`/`8743e417`; B: `d409f7f2`/`fa7c2c4b` |
 | P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☐ | | n/a |
 | **G2 — user gate: Corbomite adoption** (work lands in Corbomite repo) | ☐ | — | — |
 | **G3 — user gate: retirement decision** (successor spec) | ☐ | — | — |
@@ -654,6 +654,42 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P7.2g (2026-08-15) — last of the 7 F1 gap-closure sub-tasks.**
+
+- Character coverage: C0 controls (excluding `\t`/`\n`, already allowed
+  through elsewhere in this leaf) + DEL get their Unicode Control
+  Picture glyph (U+2400+code, DEL→U+2421 — CodeMirror's own choice
+  too), rendered as an ordinary glyph via the block's existing
+  foreground format — no extra paint pass. C1 controls, soft hyphen,
+  ZWSP, LRM/RLM, BOM, and **the safety-relevant bidi override/isolate
+  controls (U+202D/E, U+2066–9)** get a Private-Use sentinel (U+E000)
+  substituted at the exact point `\n`→U+2028 already substitutes at —
+  1 QChar for 1 QChar, C4-clean, folded into the same scan rather than
+  a second pass.
+- **The bidi subset is neutralized, not merely painted over**: U+E000
+  is unassigned and defaults to bidi class L (strong LTR) per
+  `DerivedBidiClass.txt` — substituting it means the dangerous
+  character never reaches `QTextLayout`'s bidi algorithm at all. The
+  custom hex-labeled box (painted at `View::paintEvent`, sentinel's
+  own glyph made transparent via one more `FormatRange` into
+  `BlockLayoutCache::rebuildInline`'s existing `setFormats()` call) is
+  purely the visible warning on top of an already-neutralized
+  character, not the only defense.
+- New `Theme::Slot::InvisibleCharBox` (core touch, light/dark
+  defaults) — `core(Theme)` commit split from the canvas commit, same
+  pattern P7.2e/P7.2f used.
+- Falsification, two pairs (the safety subset got its OWN pair per the
+  task's explicit instruction, not folded into the cosmetic group):
+  A removed the bidi override/isolate range from the substitution set
+  — `bidi_override_chars_are_neutralized_not_just_hidden` failed
+  (`63bdcda5`/`8743e417`). B removed the C0-control-picture treatment
+  — `control_and_invisible_chars_get_boxed_1to1` failed
+  (`d409f7f2`/`fa7c2c4b`).
+- **All 7 F1 gap-closure sub-tasks (a–g) now ☑** in the checklist
+  table — sanity-checked directly, no discrepancies found.
+- Full suite: **315/315** (up from 314/314 at P7.2e). Canvas suite
+  37/37. Constitution clean (74 files).
 
 **P7.2f (2026-08-15).**
 
