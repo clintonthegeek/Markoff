@@ -891,14 +891,9 @@ CollabText::Crdt::Anchor
 MarkoffDocument::blockCrdtAnchorAt(const BlockAnchor &b, int offset,
                                     CollabText::Crdt::Bias bias) const
 {
-    // D2 path: use the per-block buffer directly, bypassing latestBlockRanges.
-    auto it = d->blockBuffers.find(b);
-    if (it != d->blockBuffers.end()) {
-        const int sz = static_cast<int>(it->second->visible_length());
-        const int clamped = std::max(0, std::min(offset, sz));
-        return it->second->anchor_at(static_cast<uint32_t>(clamped), bias);
-    }
-
+    // FALSIFY (throwaway): D2 branch disabled — always fall through to the
+    // legacy flat-buffer path, reproducing the pre-P6.0 staleness on a
+    // block created after D2 load.
     // Legacy fallback: use parse-based block byte ranges against the
     // legacy flat buffer.
     const auto rng = blockByteRange(b);
