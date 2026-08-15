@@ -155,8 +155,8 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P7.2a F1#3 undo-coalescing defect fix | ☑ | `0ceceda0` | `44cc112d` / `be83a674` |
 | P7.2b F1#1 editing-command floor | ☑ | `965b6aee` | A: `0d28bb61`/`1ab59f6e`; B: `745a5d10`/`45f3fe79`; C: `0c81115f`/`d7741e9a`; D: `4ee7eb1e`/`af73a63f` |
 | *(out-of-band)* regression fix: coalesced ops never reached onCommit | ☑ | `623ed6ca` | `a6bcbd76`/`80dfc784` |
-| P7.2c F1#4 auto-pairing / wrap-selection | ☑ | `82f0c9d7` | `6c0fc4ea`/`b8a9d04f` |
-| P7.2d F1#5 Enter/Backspace semantics checklist | ☐ | | |
+| P7.2c F1#4 auto-pairing / wrap-selection | ☑ | `82f0c9d7` | A: `6c0fc4ea`/`b8a9d04f`; B: `1419d97f`/`d4b0d836` |
+| P7.2d F1#5 Enter/Backspace semantics checklist | ☑ | `8e56ab46` | A: `ed2f713c`/`be7938c1`; B: `c6c6a9d6`/`44780937` |
 | P7.2e F1#7 highlight selection occurrences | ☐ | | |
 | P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☐ | | |
 | P7.2g F1#9 invisible/control-char rendering | ☐ | | |
@@ -874,16 +874,128 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
   subject to this: it mirrors `deleteCluster()`'s own bare
   `UndoLog::Transaction`, which was never part of the coalescing
   machinery the regression lived in.
-- Falsification: one pair covers both type-through and delete-fresh-
-  pair, since both depend on the same `m_autoPairedClose` tracking —
-  breaking it (never recording the closer) fails both dependent test
-  cases simultaneously, confirming neither behavior works
-  independently of the tracking.
+- Falsification: two pairs. A covers type-through + delete-fresh-pair
+  together, since both depend on the same `m_autoPairedClose` tracking
+  — breaking it (never recording the closer) fails both dependent
+  test cases simultaneously. B is broader: disabling
+  `tryAutoPairOrWrap` entirely also falsifies plain auto-pair and
+  wrap-selection, which A's narrower break didn't independently cover.
 - New test `tst_canvas_auto_pair` (8 cases). Canvas suite 35/35 (up
   from 34/34), constitution clean (72 files, up from 71).
   `tst_canvas_concurrency` (including the gremlin fuzz) explicitly
   re-verified passing across 3 runs — no regression in the typing
   path this task shares with the collab-convergence fix above.
+
+**P7.2d (2026-08-15).**
+
+Diffed `StructuralKeyHandler` against CodeMirror lang-markdown's
+`insertNewlineContinueMarkup`/`deleteMarkupBackward` (read in full)
+case by case. Test-only task; no source change landed.
+
+- **Case 1, Enter continues list/quote markers.** Lists: **correct**
+  — every list-Enter path (`insertListItemBefore`/`After`) creates a
+  same-kind `ListItem` sibling, and since markoff's ListItem buffers
+  never carry a literal marker (markoff-core CLAUDE.md's buffer-
+  convention table — marker is display-derived from
+  `MarkerStyle`/`MarkerNumber`/`IndentLevel`), "continuing the marker"
+  is structural and automatic, not a text-copy step the way CM's flat-
+  text model needs. Blockquote: **known, already-logged gap, not new**
+  — `blockQuoteEnter`'s non-empty-line path reuses `paragraphEnter`,
+  which explicitly inserts a *Paragraph* after (not a same-depth
+  `BlockQuote`), so a continuation line drops out of the quote. This
+  is not an oversight: `docs/plans/2026-05-29-styled-structural-key-
+  authority.md:670` documents it by name ("BlockQuote split nuance...
+  full quote-split fidelity is a known follow-up if dogfood needs
+  it"), written before this task existed. Re-confirmed, not re-fixed
+  — out of this task's "small, in-scope" bar (quote-depth/run-id
+  propagation through a split is its own piece of work) and already
+  tracked where a reader would find it.
+- **Case 2, Enter renumbers ordered lists.** **Correct**, but
+  completely untested before this task — every existing list test in
+  `tst_structural_key_handler.cpp` used bullet lists (`MarkerStyle`
+  never `"dot"`/`"paren"`), so `Cmd::renumberRunStartingAt` (called
+  after every list-Enter path) had zero direct coverage of its actual
+  renumbering logic, only of being harmlessly a no-op on bullets. New
+  test `listitem_enter_mid_split_ordered_list_renumbers` loads a
+  3-item ordered list, splits item 2 mid-content, and asserts the
+  resulting 4 items number 1,2,3,4 (CM's own documented example,
+  `commands.ts:66` `renumberList`) — passes clean.
+- **Case 3, Enter outdents an empty item one level; exits the list
+  only from an empty top-level item.** **Correct**, and the exit-at-
+  indent-0 half already had a test
+  (`listitem_enter_empty_at_indent0_exits_list`); the outdent-at-
+  indent>0 half did not. New test
+  `listitem_enter_empty_at_indent_gt0_outdents_not_exits` covers it:
+  empties a nested (indent 1) item, presses Enter, asserts it drops to
+  indent 0 and stays a `ListItem` (no exit, no new block).
+- **Case 4, Backspace at content-start un-indents or de-lists, never
+  merges with the previous block.** **Real gap found, deliberately
+  NOT fixed — logged instead per this task's own stop condition.**
+  `listItemBackspace`'s indent>0 branch already matches CM exactly
+  (outdent, no merge — tested,
+  `listitem_backspace_at_start_indent_gt0_outdents`). Its indent==0
+  branch does not: CM's `deleteMarkupBackward` (l.240, the
+  `contextNodeForDelete`/"Delete one level of indentation" branch)
+  deletes the marker text and leaves the line as a plain, unmerged
+  paragraph — it never reaches for the previous block. Ours instead
+  calls `Cmd::backspaceMerge(doc, block)`, joining the item's content
+  into the previous block. This is not a fresh regression: it is
+  existing, deliberately-tested behavior —
+  `listitem_backspace_at_start_indent0_merges` (pre-existing, name and
+  all) asserts the merge as the intended outcome, meaning some earlier
+  design pass chose merge-into-previous on purpose, most likely to
+  match old-leaf (`live`/`source`) backspace-at-block-start convention
+  rather than CM's flat-text-overlay one (see `paragraphBackspace`,
+  the same merge-on-Backspace-at-start pattern for every other kind
+  in this file). Changing it to CM's "de-list, don't merge" behavior
+  is exactly the case this task's own instructions call out to stop
+  on: `StructuralKeyHandler` is the shared, core-internal handler
+  live/source's `LiveStructuralKeyHandler`/source binding are built
+  parallel to, an existing named test would have to be rewritten to
+  assert the opposite of what it asserts today, and the two behaviors
+  are genuinely different products (backspace-merges-blocks is a
+  reasonable, deliberate editor choice, not obviously a bug) — a call
+  for the user, not an in-session judgment call. **Logged, not
+  fixed.**
+- No falsifiable-but-trivial cases found; both new tests exercise real
+  logic (`renumberRunStartingAt`'s actual numbering math; the
+  indent>0-vs-==0 branch split), so both got the full protocol rather
+  than being waved through as "trivially true."
+- **Falsification, two pairs** (grouped by the branch each test
+  actually exercises — no single break covers both, they're different
+  `if`-branches in `listItemEnter`):
+  - **A** (empty-item outdent-vs-exit): forced the indent>0 branch off
+    (`if (false && ...)`) and merged the exit condition to fire
+    unconditionally — `listitem_enter_empty_at_indent_gt0_outdents_
+    not_exits` fails (block demotes to Paragraph instead of outdenting
+    — `Actual: 0 (Paragraph), Expected: 3 (ListItem)`); the pre-
+    existing `listitem_enter_empty_at_indent0_exits_list` still passes
+    (confirms the break is isolated to the outdent path, not a
+    blanket break). `ed2f713c` / revert `be7938c1`.
+  - **B** (ordered-list renumber): dropped the
+    `Cmd::renumberRunStartingAt(doc, nb, t)` call from the mid-content
+    split path only — `listitem_enter_mid_split_ordered_list_
+    renumbers` fails on the last item's number (`Actual: 3, Expected:
+    4`), all other tests (including the item-before/item-after list
+    paths, which call `renumberRunStartingAt` from a different call
+    site) still pass. `c6c6a9d6` / revert `44780937`.
+- No canvas-level test added: `View::tryStructuralKey` calls
+  `StructuralKeyHandler::handle` directly with no canvas-side
+  transformation of the Enter/Backspace/Tab decision (read in full
+  before deciding), so a canvas-level integration test would exercise
+  the identical code path the core-level test already exercises,
+  just through more machinery (a `View` widget, paint/scroll
+  plumbing) for zero additional coverage — the established pattern
+  (`tst_structural_key_handler.cpp` is StructuralKeyHandler's one
+  direct-test home; canvas's own `tst_canvas_structural.cpp` tests
+  canvas-specific glue, e.g. selection-collapse-before-structural-key,
+  not the handler's decision logic itself) agrees.
+- Core-scoped suite (`tst_structural_key_handler`): 27/27 (up from
+  25/25). Full suite run per the plan's own tier rule (task touches
+  `libs/markoff-core/` — test-only, but the tier rule doesn't carve
+  out an exception for that): **313/313**, up from 312/312 at the
+  regression-fix entry above. Constitution check not applicable (no
+  canvas files touched this task).
 
 **Regression fix (2026-08-14/15, out-of-band — not a plan task number).**
 

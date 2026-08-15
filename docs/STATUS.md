@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2c landed)
+**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2d landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -75,9 +75,26 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   (`m_autoPairedClose`), insertion routed through the same
   `insertPrintable`/`Cmd::insertCharacter` machinery the regression
   fix lives in (deliberately, to not reintroduce that bug class) — see
-  plan findings log. Phase 7 continues at P7.2d (Enter/Backspace
-  semantics checklist) through P7.2g, then P7.3 (⏸ arc close: Obsidian
-  parity audit + full audit).
+  plan findings log. **P7.2d (Enter/Backspace semantics checklist,
+  F1 #5)** landed 2026-08-15, test-only: diffed `StructuralKeyHandler`
+  against CodeMirror lang-markdown's `insertNewlineContinueMarkup`/
+  `deleteMarkupBackward` case by case. 3 of 4 documented cases already
+  correct — 2 had no direct regression test (ordered-list renumber on
+  mid-split; empty-nested-item outdent) and got one each; the 3rd
+  (blockquote continuation losing quote depth) is a pre-existing,
+  already-logged follow-up (`docs/plans/2026-05-29-styled-structural-
+  key-authority.md:670`), re-confirmed not re-fixed. The 4th case is a
+  **real, found gap left unfixed on purpose**: CM's Backspace at an
+  indent-0 list item's content-start de-lists the line without
+  touching the previous block; ours instead merges into the previous
+  block via `Cmd::backspaceMerge` — existing, deliberately-tested
+  behavior (`listitem_backspace_at_start_indent0_merges`), not a fresh
+  regression, and changing it would flip a shared core handler's
+  documented behavior against its own test's name — logged as a
+  dormant item (below) rather than changed unilaterally. No core
+  source change landed. Phase 7 continues at P7.2e (highlight
+  selection occurrences) through P7.2g, then P7.3 (⏸ arc close:
+  Obsidian parity audit + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -144,8 +161,34 @@ fuzz) explicitly re-run 3x to confirm no regression in the shared
 typing path. Full suite not re-run per the plan's tier rule (no core
 seam touched this task).
 
+P7.2d (2026-08-15): **full suite 313/313** (up from 312/312 at the
+regression fix) — required by the plan's own tier rule since this
+task's diff touches `libs/markoff-core/tests/` even though it's
+test-only, not a source change. `tst_structural_key_handler` 27/27
+(up from 25/25): two new regression tests
+(`listitem_enter_mid_split_ordered_list_renumbers`,
+`listitem_enter_empty_at_indent_gt0_outdents_not_exits`). No canvas
+files touched, so `check-constitution.sh` not applicable this task.
+
 ## Dormant items
 
+- **`StructuralKeyHandler`'s indent-0 ListItem Backspace merges with
+  the previous block; CodeMirror's equivalent de-lists the line
+  in place instead** (P7.2d finding, 2026-08-15) — CM's
+  `deleteMarkupBackward` (`lang-markdown/src/commands.ts:240`) at a
+  list item's content-start deletes the marker and leaves the line as
+  an unmerged plain paragraph; ours calls `Cmd::backspaceMerge` and
+  joins it into the previous block. Not a fresh regression: existing,
+  deliberately-tested behavior
+  (`listitem_backspace_at_start_indent0_merges`, pre-existing test
+  name and all), most likely chosen to match old-leaf
+  backspace-at-block-start convention rather than CM's flat-text-
+  overlay one. `StructuralKeyHandler` is core-internal but
+  consumer-facing across all three view leaves (markoff-core
+  CLAUDE.md), so flipping this would mean rewriting an existing named
+  test to assert the opposite outcome and is a genuine product
+  decision (which convention canvas should follow), not an in-session
+  call — needs the user. Full writeup: plan findings log, P7.2d entry.
 - **CLOSED 2026-08-15 (commit `623ed6ca`):** the P7.2a-introduced
   gremlin-fuzz convergence regression (fixed seed `3237998146`,
   bisected to exactly one commit — see the plan findings log's
