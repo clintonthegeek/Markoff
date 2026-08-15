@@ -30,14 +30,20 @@
 //  - drop_inserts_at_hit_tested_position: make dropEvent() always hitTest
 //    QPoint(0, 0) regardless of the drop position -> the "content lands at
 //    the drop point, not block 0 byte 0" assertion fails.
-//  - middle_click_is_noop_when_selection_unsupported: bypass the
-//    supportsSelection() guard -> because QPlatformClipboard's default
-//    mimeData() ignores the Mode argument entirely (it is a single
-//    mode-agnostic store), an unguarded read of QClipboard::Selection
-//    under offscreen actually returns the regular Ctrl+C/X clipboard's
-//    content — so removing the guard makes the "no insertion happened"
-//    assertion fail for a real, observable reason in this environment,
-//    not a no-op break.
+//  - middle_click_is_noop_when_selection_unsupported: a bare
+//    supportsSelection()-bypass turned out NOT to falsify anything in this
+//    environment — QClipboard::mimeData()'s own wrapper independently
+//    gates on supportsMode(Selection), which the default QPlatformClipboard
+//    also reports false for, so the call still returns nullptr with or
+//    without this leaf's own guard. The break that DOES fail (used for the
+//    recorded pair): bypass the guard AND read QClipboard::Clipboard
+//    instead of QClipboard::Selection — i.e. conflate primary selection
+//    with the regular clipboard, the exact thing the real code's doc
+//    comment says never to do. That reads back the "PRIMARYTEST" this test
+//    put on the regular clipboard, so the "no insertion happened"
+//    assertion fails for a real, observable reason. Logged as a finding:
+//    the literal single-guard bypass is not a meaningful falsification
+//    target under this offscreen QPA.
 
 #include <QClipboard>
 #include <QDropEvent>
@@ -224,10 +230,13 @@ void TstCanvasDragDrop::middle_click_is_noop_when_selection_unsupported()
     QTest::mouseRelease(view.viewport(), Qt::MiddleButton, Qt::NoModifier, clickPos);
 
     if (!selectionSupported) {
-        // Falsification target: bypassing the supportsSelection() guard
-        // makes this fail, because QPlatformClipboard's default mimeData()
-        // ignores the Mode argument and would return the regular
-        // clipboard's "PRIMARYTEST" text instead of doing nothing.
+        // See the file header comment for the falsification finding: the
+        // break that actually fails this assertion bypasses the guard AND
+        // reads QClipboard::Clipboard instead of QClipboard::Selection
+        // (conflating primary selection with the regular clipboard) — a
+        // bare supportsSelection()-bypass alone is a no-op here, since
+        // QClipboard::mimeData()'s own supportsMode(Selection) gate blocks
+        // it independently under this offscreen QPA.
         QCOMPARE(doc.blockText(block), before);
     } else {
         // This environment does support primary selection after all — the
