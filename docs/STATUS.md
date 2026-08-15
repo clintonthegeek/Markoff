@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2a/P7.2b's convergence regression fixed)
+**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2c landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -62,13 +62,22 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   `BlockId`s, since core's `StructuralOp`/`IdList` has no reorder
   primitive; logged, not a core change), select-line (Alt+L), and Esc
   simplify-selection. New test `tst_canvas_editing_command_floor` (4
-  falsification-backed scenario groups). **Found, not caused by this
-  task:** `tst_canvas_concurrency`'s gremlin-fuzz convergence test now
-  fails deterministically — confirmed pre-existing at the P7.2a
-  baseline too (see plan findings log), flagged for P7.3's audit, not
-  diagnosed here (no core seam named). Phase 7 continues at P7.2c
-  (auto-pairing/wrap-selection) through P7.2g, then P7.3 (⏸ arc close:
-  Obsidian parity audit + full audit).
+  falsification-backed scenario groups). P7.2b's agent found
+  `tst_canvas_concurrency`'s gremlin-fuzz convergence test failing
+  deterministically and mis-logged it as pre-existing; independently
+  re-bisected and **fixed same day**: a latent `UndoLog` bug (coalesced
+  transactions never fired `onCommit`, silently dropping ops to collab
+  peers after a run's first keystroke) made reachable for the first
+  time by P7.2a's routing change (commit `623ed6ca`; see Dormant items
+  and the plan findings log's "Regression fix" entry for the full
+  writeup). **P7.2c (auto-pairing/wrap-selection, F1 #4)** landed
+  2026-08-15: 5 named pairs, view-local freshness tracking
+  (`m_autoPairedClose`), insertion routed through the same
+  `insertPrintable`/`Cmd::insertCharacter` machinery the regression
+  fix lives in (deliberately, to not reintroduce that bug class) — see
+  plan findings log. Phase 7 continues at P7.2d (Enter/Backspace
+  semantics checklist) through P7.2g, then P7.3 (⏸ arc close: Obsidian
+  parity audit + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -120,6 +129,20 @@ falsification-backed groups). `check-constitution.sh` clean (C1–C4,
 independently re-bisected by the orchestrator and found to be a real
 regression introduced by P7.2a, one commit prior; fixed same day
 (`623ed6ca`, see Dormant items below and the plan findings log).
+
+Regression fix (2026-08-15): full suite **312/312** (up from 311/311
+at P7.2) — the only run since P6.4 that re-verified the whole tree,
+since a core header (`UndoLog.h`) was touched. `check-constitution.sh`
+clean.
+
+P7.2c (2026-08-15): canvas-scoped suite **35/35** — up from 34/34 via
+one new executable, `tst_canvas_auto_pair` (8 cases: auto-pair,
+type-through, wrap-selection, bold two-star completion, fresh-pair
+Backspace, manually-typed-pair non-interference). `check-constitution.sh`
+clean (C1–C4, 72 files). `tst_canvas_concurrency` (incl. the gremlin
+fuzz) explicitly re-run 3x to confirm no regression in the shared
+typing path. Full suite not re-run per the plan's tier rule (no core
+seam touched this task).
 
 ## Dormant items
 

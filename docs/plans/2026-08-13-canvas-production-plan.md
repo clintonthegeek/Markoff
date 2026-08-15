@@ -847,6 +847,44 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
   tier rule (diff stays inside `libs/markoff-canvas/`, no core seam
   touched, core header included is pre-existing public API).
 
+**P7.2c (2026-08-15).**
+
+- All 3 behaviors landed: wrap-selection, auto-pair + type-through,
+  Backspace-deletes-fresh-pair. 5 named pairs only: `(`/`)`, `[`/`]`,
+  `"`/`"`, `` ` ``/`` ` ``, and Markdown bold `**`/`**` — no `{`/`}`,
+  no `'`/`'` (not named by the plan, not added).
+- **"Was this pair just auto-inserted" tracking**: view-local state
+  (`m_autoPairedClose`), spec §2 justified — the document has no way
+  to distinguish a manually-typed `()` from an auto-paired one at the
+  byte level, so this can't be re-derived from content the way fold
+  shape or delimiter-hiddenness can. Deriving it from the undo entry
+  (the plan's other offered option) was rejected: `UndoLog` doesn't
+  currently tag a transaction as "specifically an auto-pair insert,"
+  and adding that tag would be a core change outside this task's
+  scope guard. **Deliberately narrow freshness window** (logged
+  simplification vs. CodeMirror's real per-position `StateField` that
+  survives cursor round-trips): valid for exactly the next keystroke,
+  snapshotted-then-cleared at the top of every `keyPressEvent` — any
+  intervening key invalidates it, not just ones that touch the pair.
+- **Insertion path discipline** (directly informed by the regression
+  fix just above): auto-pair/wrap insertion routes through
+  `insertPrintable()` → `Cmd::insertCharacter`, never a second bare-
+  `Transaction` path — avoids reintroducing the same class of
+  collab-convergence bug. Deletion (`tryDeleteFreshPair`) is NOT
+  subject to this: it mirrors `deleteCluster()`'s own bare
+  `UndoLog::Transaction`, which was never part of the coalescing
+  machinery the regression lived in.
+- Falsification: one pair covers both type-through and delete-fresh-
+  pair, since both depend on the same `m_autoPairedClose` tracking —
+  breaking it (never recording the closer) fails both dependent test
+  cases simultaneously, confirming neither behavior works
+  independently of the tracking.
+- New test `tst_canvas_auto_pair` (8 cases). Canvas suite 35/35 (up
+  from 34/34), constitution clean (72 files, up from 71).
+  `tst_canvas_concurrency` (including the gremlin fuzz) explicitly
+  re-verified passing across 3 runs — no regression in the typing
+  path this task shares with the collab-convergence fix above.
+
 **Regression fix (2026-08-14/15, out-of-band — not a plan task number).**
 
 `fix(core): coalesced undo transactions never fired onCommit, ops

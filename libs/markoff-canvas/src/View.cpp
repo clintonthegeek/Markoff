@@ -2413,7 +2413,6 @@ bool View::tryDeleteFreshPair(const std::optional<AutoPairedCloser> &pendingClos
 
 bool View::tryAutoPairOrWrap(QKeyEvent *event, const std::optional<AutoPairedCloser> &pendingClose)
 {
-    return false;  // FALSIFY (throwaway): disable auto-pair/wrap-selection entirely
     if (!m_doc || m_caret.block.isNull() || isComposing())
         return false;
     const QString text = event->text();
