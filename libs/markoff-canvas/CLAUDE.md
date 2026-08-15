@@ -21,6 +21,12 @@ Everything you need is in two files — read them in this order:
 Spike record (verdict + findings the plan cites):
 [`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](../../docs/specs/2026-08-13-markoff-canvas-spike-design.md).
 
+**Status (2026-08-15):** Phases P1–P6 closed; Phase 7 closing at
+P7.3 (arc close) — G1 (accessibility) deferred by user decision, all
+7 F1 CodeMirror-parity gaps (P7.2a–g) closed. Full suite 315/315,
+perf budgets held, constitution clean. G2 (Corbomite adoption) is the
+next open question, for the user.
+
 ## The four hard rules (constitution — now permanent law, spec §3)
 
 - **C1** no re-entrance guards (`m_applying*`, `isApplying*`, …).

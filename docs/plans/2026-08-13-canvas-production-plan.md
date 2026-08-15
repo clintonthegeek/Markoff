@@ -161,7 +161,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P7.2e F1#7 highlight selection occurrences | ☑ | `003b3191` (+ core `da910863`) | `90bb7c0b`/`80cfd222` |
 | P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☑ | `f722216b` (+ core `3f8cafb1`) | A: `1736c414`/`5a8725b1`; B: `4c54a080`/`33fd6383`; C: `4758653b`/`8aa40cf7`; D: `fc19e0b7`/`d6eee01f` |
 | P7.2g F1#9 invisible/control-char rendering | ☑ | `fca7a800` | A: `63bdcda5`/`8743e417`; B: `d409f7f2`/`fa7c2c4b` |
-| P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☐ | | n/a |
+| P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☑ | n/a | n/a |
 | **G2 — user gate: Corbomite adoption** (work lands in Corbomite repo) | ☐ | — | — |
 | **G3 — user gate: retirement decision** (successor spec) | ☐ | — | — |
 
@@ -654,6 +654,55 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P7.3 (2026-08-15) — arc close.**
+
+- **Full suite:** 315/315 (unchanged since P7.2g — nothing landed
+  between them). `check-constitution.sh` clean (C1–C4) over 74 files.
+- **Perf re-baseline** (`build-perf`, RelWithDebInfo): all four E9
+  budgets held, comfortably — load→paint 128 ms/500 ms, p95 keystroke
+  0.64 ms/16 ms (also checked `tst_canvas_perf_formatted`'s revealed-
+  span variant: 0.71 ms/16 ms), scroll-realize 9 %/30 %, RSS delta
+  0 KB/100 MB. No regression despite P7.2a–g's substantial typing-
+  path/paint-path churn (undo-coalescing routing, auto-pairing,
+  occurrence highlighting, invisible-char substitution all touch
+  `insertPrintable`/`rebuildInline`/`paintEvent`).
+- **Constitution honest read** (beyond `check-constitution.sh`'s own
+  string-matching): whole-leaf grep sweep for C1/C2 smell keywords
+  (`m_applying*`, `isApplying*`, `singleShot(0)`, `Qt.callLater`) and
+  C3/C4 violations (`QTextDocument`/`QTextEdit`/`QPlainTextEdit`
+  outside doc comments explaining why they're absent; `applyFlatEdit`/
+  `flatView()` cross-block usage) across `libs/markoff-canvas/src` and
+  `include` — clean. One `singleShot(0)` string match was a doc
+  comment explicitly describing what a piece of code deliberately does
+  NOT do (View.cpp:1453), not a violation.
+- **F1 parity audit: done, not waived.** All 12 gaps from the
+  2026-08-13 CodeMirror parity audit are now closed — 3 were already
+  correctly implemented (confirmed with new regression-test coverage
+  where it was missing), 2 were already closed at spike/P1 time (fold
+  state serialization, gutter seam), 1 was explicitly deferred with
+  user sign-off (local multi-cursor, F1a), and 7 were user-directed
+  fixes this arc (P7.2a–g) — including a genuine document-convergence
+  regression found and fixed along the way (not one of the original
+  12, but directly caused by closing gap #3) and one user-approved
+  behavior change (Backspace-at-list-start) resolved after a P7.2d
+  finding. No open F1 gap remains.
+- **STATUS/CLAUDE/queue updated:** `docs/STATUS.md` workfront +
+  baseline sections current as of this entry; top-level
+  `Markoff/CLAUDE.md` and `libs/markoff-canvas/CLAUDE.md` both carry a
+  2026-08-15 status line pointing at Phase 7 close and the G2
+  question; `docs/queue.md`'s canvas entries (#17, #18) were already
+  closed/absorbed at arc-open and need no further update — canvas's
+  ongoing findings live in this plan's own findings log, not the
+  queue, per that file's own scope note.
+- **G2 (Corbomite adoption) handed to the user** — see the standalone
+  one-page summary delivered alongside this arc-close entry (not
+  duplicated into this findings log; the summary is the deliverable,
+  this entry is the record that it was produced).
+- Phase 7 (polish + a11y) closes here. The canvas production arc
+  (D5 part 1) is complete pending the user's G2 decision. G3
+  (retirement of live/styled/source) remains open and unaffected by
+  this close.
 
 **P7.2g (2026-08-15) — last of the 7 F1 gap-closure sub-tasks.**
 

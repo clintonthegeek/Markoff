@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-15 (canvas production arc — Phase 7, all F1 gap-closure tasks (P7.2a-g) complete)
+**Last updated:** 2026-08-15 (canvas production arc — Phase 7 CLOSED, P7.3 arc close; G2 pending the user)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -132,7 +132,14 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   merely painted over — U+E000 defaults to bidi class L, so it never
   reaches `QTextLayout`'s bidi algorithm; the boxed label is the
   visible warning on top of an already-safe substitution. Phase 7
-  continues at P7.3 (⏸ arc close: Obsidian parity audit + full audit).
+  continues at P7.3 (⏸ arc close). **P7.3 closed 2026-08-15**: full
+  suite 315/315, perf budgets held (build-perf: load→paint 128ms/500ms,
+  p95 keystroke 0.64ms/16ms, scroll-realize 9%/30%, RSS delta 0KB/100MB
+  — no regression despite P7.2a-g's typing/paint-path churn), whole-leaf
+  constitution honest read clean, F1 parity audit done (all 12 gaps
+  closed, not waived). **The canvas production arc (D5 part 1) is
+  complete pending the user's G2 (Corbomite adoption) decision** — see
+  the one-page summary delivered alongside this close.
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;

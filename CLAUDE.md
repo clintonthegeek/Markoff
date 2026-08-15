@@ -28,7 +28,16 @@ rendering surface the projection architecture was chosen for.
 and later named APIs); markoff-live/styled are **bug-fix-only** until
 gate G3 (retirement — a user decision); markoff-source is untouched,
 permanently. Test baseline: **288/288** (full `scripts/run-tests.sh`)
-at arc open; the plan ratchets it upward — any drop is a regression.
+at arc open, ratcheted to **315/315** by Phase 7 close — the plan
+ratchets it upward; any drop is a regression.
+
+**Status (2026-08-15):** Phases P1–P6 closed; Phase 7 closing at
+P7.3 (arc close). G1 (accessibility) deferred by user decision; all
+7 F1 CodeMirror-parity gaps closed (P7.2a–g), including a real
+document-convergence regression found and fixed mid-arc (`623ed6ca`)
+and one user-approved behavior change (`StructuralKeyHandler`
+Backspace-at-list-start, `fc7ea6fe`). G2 (Corbomite adoption) is
+next, pending the user.
 
 ## Building
 
