@@ -233,7 +233,15 @@ neither). Freshness is tracked as view-local state
 (`View::m_autoPairedClose`, valid for exactly one keystroke) — see
 that field's own doc comment for the spec §2 view-state justification.
 Multi-block-selection wrap is a logged scope cut (falls through to
-plain replace); only these 5 pairs are in scope, no `{}`/`''`.
+plain replace); only these 5 pairs are in scope, no `{}`/`''`. **Highlight
+other occurrences of the current selection** (P7.2e, F1 #7) — a
+non-trivial, non-whitespace-only selection (min length 2, case-
+sensitive, no whole-word requirement — `View::recomputeOccurrenceHighlights`'s
+own doc comment, matching CM `highlightSelectionMatches`' defaults)
+gets every OTHER exact-text occurrence within the realized entries
+painted with `Theme::Slot::SelectionOccurrenceBackground`, distinct
+from both the active selection and find-match highlights; the active
+selection's own span is never counted as an occurrence of itself.
 
 **Explicitly deferred out of this arc** (recorded so absence is a
 decision): vim mode, PDF export/printing, embedded-note transclusion

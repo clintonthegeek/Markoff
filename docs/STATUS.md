@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2d landed)
+**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2e landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -94,9 +94,20 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   dormant item (below) rather than changed unilaterally. No core
   source change landed. **User decided same day: switch to CM's
   de-list-in-place semantics** — implemented and closed, see Dormant
-  items below. Phase 7 continues at P7.2e (highlight selection
-  occurrences) through P7.2g, then P7.3 (⏸ arc close:
-  Obsidian parity audit + full audit).
+  items below. **P7.2e (highlight selection occurrences, F1 #7)**
+  landed 2026-08-15: a non-trivial (min length 2), non-whitespace-only
+  selection gets every OTHER exact-text occurrence in the realized
+  entries painted with a new `Theme::Slot::SelectionOccurrenceBackground`
+  (green, distinct from both the active selection's blue and find's
+  orange), via `View::recomputeOccurrenceHighlights()` hooked into the
+  existing `pushSelectionToSession()` chokepoint — same draw-time
+  `QTextLayout::FormatRange` mechanism `setFindHighlights` established.
+  Realized-entries-only scope (matches every other paint-time
+  highlight feature in this leaf); case-sensitive, no whole-word
+  requirement (CM `highlightSelectionMatches` defaults). Phase 7
+  continues at P7.2f (scroll-past-end + placeholder + bracket-match +
+  drop-cursor) through P7.2g, then P7.3 (⏸ arc close: Obsidian parity
+  audit + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -171,6 +182,16 @@ test-only, not a source change. `tst_structural_key_handler` 27/27
 (`listitem_enter_mid_split_ordered_list_renumbers`,
 `listitem_enter_empty_at_indent_gt0_outdents_not_exits`). No canvas
 files touched, so `check-constitution.sh` not applicable this task.
+
+P7.2e (2026-08-15): **full suite 314/314** (up from 313/313 at P7.2d)
+— required by the plan's tier rule since this task added
+`Theme::Slot::SelectionOccurrenceBackground` (a new, additive core
+`Theme.h` enumerator + light/dark default colors). One new executable,
+`tst_canvas_selection_matches` (3 cases: selecting a repeated word
+highlights its other occurrences, not its own span; sub-minimum-length
+and whitespace-only selections highlight nothing; collapsing the
+selection clears all highlights). `check-constitution.sh` clean
+(C1–C4, 73 files).
 
 ## Dormant items
 

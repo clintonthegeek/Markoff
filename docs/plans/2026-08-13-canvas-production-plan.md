@@ -158,7 +158,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P7.2c F1#4 auto-pairing / wrap-selection | ☑ | `82f0c9d7` | A: `6c0fc4ea`/`b8a9d04f`; B: `1419d97f`/`d4b0d836` |
 | P7.2d F1#5 Enter/Backspace semantics checklist | ☑ | `8e56ab46` | A: `ed2f713c`/`be7938c1`; B: `c6c6a9d6`/`44780937` |
 | *(out-of-band)* P7.2d addendum: Backspace de-lists, never merges | ☑ | `fc7ea6fe` | `a48bdfa0`/`8e59beb4` |
-| P7.2e F1#7 highlight selection occurrences | ☐ | | |
+| P7.2e F1#7 highlight selection occurrences | ☑ | `003b3191` (+ core `da910863`) | `90bb7c0b`/`80cfd222` |
 | P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☐ | | |
 | P7.2g F1#9 invisible/control-char rendering | ☐ | | |
 | P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☐ | | n/a |
@@ -654,6 +654,78 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P7.2e (2026-08-15).**
+
+- **Chokepoint: `pushSelectionToSession()` directly, not a new call
+  site per selection-change location.** It is already the one
+  function every selection-changing path in this file funnels
+  through (setCaret, arrow/shift motion, drag-selection,
+  deleteCluster, insertPrintable, tryStructuralKey — same call-site
+  set P6.1's own findings-log entry audited). `recomputeOccurrenceHighlights()`
+  is called unconditionally at the top of `pushSelectionToSession()`,
+  **ahead of** that function's own `!m_session || !m_doc ||
+  m_caret.block.isNull()` early return — occurrence highlights are a
+  purely view-local, Session-independent feature and must keep
+  working for a bare `View` with no `Session` attached (every test in
+  this leaf, spike-era consumers), unlike the Session-selection push
+  the rest of that function does.
+- **Min selection length: 2, not CM's default of 1.** CM's own
+  `highlightSelectionMatches` `minSelectionLength` defaults to 1 (any
+  non-empty selection). Task spec asked for "something like 2+" so a
+  bare 1-character selection doesn't light up every instance of a
+  common letter; logged as a deliberate deviation from CM's literal
+  default, not a misreading of it. Whitespace-only selections are
+  excluded regardless of length (`query.trimmed().isEmpty()`) — also
+  not literally in CM's default config (that's `wholeWords`-adjacent
+  behavior CM gets for free from its word-boundary check when
+  `wholeWords` is on; we have no `wholeWords` requirement per CM's
+  own default, so it needed an explicit check here).
+- **Scope: realized entries only (`m_cache->entries()`), not a
+  whole-document walk.** Matches every other paint-time highlight
+  feature in this leaf (`setFindHighlights`'s own consumer scoping,
+  the remote-presence tint) and Obsidian/CM's own viewport-only
+  scoping (`view.visibleRanges`) — logged per the task's own "your
+  call, log it" rather than re-derived from scratch.
+- **Multi-block selections short-circuit to "no highlights" rather
+  than searching per-block fragments.** A multi-block selection's
+  text is what `selectedText()` would join with `"\n\n"` — no single
+  block's plain byte text could ever contain that joined string
+  verbatim, so there is nothing to search for; checked up front
+  (`start.block != end.block`) instead of building and searching a
+  query that could never match.
+- **Type shape: a bare `QList<std::pair<int,int>>` per block, not a
+  reused/extended `FindHighlight`.** `FindHighlight` carries
+  `isCurrent` for find's "currently-selected match" distinction,
+  which this feature has no analogue for (every occurrence is
+  painted identically) — reusing it would mean either an
+  always-`false` dead field or overloading `isCurrent` to mean
+  something else entirely. Simpler, per the task's own "your call,
+  simpler is better here" note.
+- **New `Theme::Slot::SelectionOccurrenceBackground`** (core touch,
+  named in-scope by this task): light `#c3f0c3`, dark `#2e4a2e` — a
+  third, green hue distinct from `SelectionBackground`'s blue and
+  `SearchMatchBackground`/`SearchActiveMatchBackground`'s orange,
+  matching CM's own default theme choice (green,
+  `"#99ff7780"`/translucent) for the same "other occurrences of the
+  selection" role. No unused existing slot fit cleanly, so a new one
+  was added rather than repurposed, per the task's own instruction.
+- **F1a (multi-cursor readiness): nothing needed.** This feature is
+  already unambiguously "occurrences of THE (one) selection's text" —
+  a future local multi-cursor list narrows that to "the primary
+  selection" with no shape change here, matching the task's own
+  prediction rather than requiring speculative work now.
+- Falsification: skip the `recomputeOccurrenceHighlights()` call in
+  `pushSelectionToSession()` → 2 of 3 new test cases failed as
+  expected (occurrence count 0 instead of 2, and 0 instead of 1 on
+  the collapse-clears-highlights case) → reverted. New test
+  `tst_canvas_selection_matches` (3 scenarios: 3 occurrences of a
+  selected word highlight the other 2; single-char and
+  whitespace-only selections highlight nothing; collapsing the
+  selection to a bare caret clears all highlights).
+- Full suite required (core `Theme.h` touch, additive-only):
+  see STATUS.md for the count. Canvas-scoped suite + constitution
+  check both clean.
 
 **P6.2 (2026-08-14).**
 
