@@ -41,14 +41,20 @@
 
 #include <QTest>
 
+#include <crdt/Anchor.h>
+
 #include <markoff/canvas/EditorWidget.h>
 #include <markoff/canvas/View.h>
+#include <markoff/core/FoldRef.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Session.h>
 
 using Markoff::BlockId;
 using Markoff::Canvas::EditorWidget;
 using Markoff::Canvas::View;
+using Markoff::FoldRef;
 using Markoff::MarkoffDocument;
+using Markoff::Session;
 
 class TstCanvasFolding : public QObject {
     Q_OBJECT
@@ -67,6 +73,7 @@ private slots:
     void caret_up_skips_folded_heading_body();
     void toggling_fold_under_caret_relocates_caret_to_head();
     void ephemeral_state_round_trip_through_detach_reattach();
+    void toggle_fold_writes_through_to_session();
 };
 
 void TstCanvasFolding::heading_with_no_body_is_not_foldable()
@@ -421,6 +428,50 @@ void TstCanvasFolding::ephemeral_state_round_trip_through_detach_reattach()
     QVERIFY(ed->view()->isBlockFolded(heading));
     const BlockId para = doc->iterateBlocks()[1];
     QVERIFY(ed->view()->isBlockHidden(para));
+
+    delete ed;
+    delete doc;
+}
+
+// P6.0 falsification: toggleFold() must write through to the attached
+// Session, not merely keep its own m_foldedHeads mirror. An EXTERNAL
+// reader (this test, standing in for a remote-presence/collab consumer
+// that never touches View at all) reads session->foldedRegions()
+// directly after view->toggleFold(id) — same shape P6.1's planned
+// falsification uses for primarySelection(). If toggleFold() stopped
+// pushing to the Session (the throwaway break below), this is the
+// assertion that fails; isBlockFolded() alone would not catch it, since
+// that reads View's own local cache, not the Session.
+void TstCanvasFolding::toggle_fold_writes_through_to_session()
+{
+    auto *doc = new MarkoffDocument(3);
+    doc->loadFromMarkdown("# Section One\npara one\n\n# Section Two\npara two\n");
+    auto *ed = new EditorWidget;
+    ed->resize(300, 200);
+    ed->setDocument(doc);
+    ed->show();
+    QVERIFY(QTest::qWaitForWindowExposed(ed));
+
+    Session *session = ed->view()->session();
+    QVERIFY(session != nullptr);
+    QVERIFY(session->foldedRegions().isEmpty());
+
+    const BlockId heading = doc->iterateBlocks().front();
+    ed->view()->toggleFold(heading);
+
+    // The View's own cache agrees...
+    QVERIFY(ed->view()->isBlockFolded(heading));
+    // ...and, independently, the Session — read straight off its own
+    // accessor, not through View at all — genuinely received the fold.
+    const QList<FoldRef> regions = session->foldedRegions();
+    QCOMPARE(regions.size(), 1);
+    QCOMPARE(regions.first().kind, FoldRef::Kind::Heading);
+    QVERIFY(!(regions.first().start == CollabText::Crdt::Anchor{}));
+
+    // Toggling again removes it from the Session too (not merely from
+    // View's local cache) — a real write-through, not a one-shot append.
+    ed->view()->toggleFold(heading);
+    QVERIFY(session->foldedRegions().isEmpty());
 
     delete ed;
     delete doc;

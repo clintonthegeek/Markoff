@@ -132,6 +132,9 @@ EditorWidget::~EditorWidget()
     // to tear down here.
     if (m_session && document())
         document()->destroySession(m_session);
+    // No m_view->setSession(nullptr) needed here: m_view is a child widget
+    // of this EditorWidget and is being torn down in the same destructor
+    // sequence.
 }
 
 void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
@@ -142,6 +145,9 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     if (m_session && document())
         document()->destroySession(m_session);
     m_session = nullptr;
+    // P6.0: the View's fold-state cache is resolved from the Session — a
+    // dying/absent session must not leave it pointing at one.
+    m_view->setSession(nullptr);
 
     QObject::disconnect(m_docDestroyedCon);
     m_docDestroyedCon = {};
@@ -176,9 +182,11 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
             // re-entering our own setDocument (which would touch the dying
             // document's session).
             m_session = nullptr;
+            m_view->setSession(nullptr);
             Markoff::MarkdownView::setDocument(nullptr);
         });
         m_session = doc->createSession();
+        m_view->setSession(m_session);
 
         // Queue #15 (spec §7): also recompute on a genuine structural
         // change (block Insert/Remove/ChangeKind — e.g. a programmatic

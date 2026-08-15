@@ -14,6 +14,7 @@
 #include <QVariant>
 
 #include <markoff/core/BlockId.h>
+#include <markoff/core/FoldRef.h>
 #include <markoff/core/FormatOps.h>
 #include <markoff/core/LinkActivation.h>
 #include <markoff/core/Theme.h>
@@ -31,6 +32,7 @@ namespace Markoff {
 class MarkoffDocument;
 class LinkService;
 class EmbedRegistry;
+class Session;
 }
 
 namespace Markoff::Canvas {
@@ -134,6 +136,21 @@ public:
     /// Non-owning. Null is legal (an unbound view paints an empty page).
     void setDocument(MarkoffDocument *doc);
     MarkoffDocument *document() const;
+
+    /// P6.0: non-owning reference to the current document's per-view
+    /// Session (owned by `EditorWidget`, threaded in right after it calls
+    /// `doc->createSession()`; cleared to null wherever the owner nulls or
+    /// destroys its session). When set, `toggleFold()` additionally
+    /// writes every fold through to `session->toggleFold()` — so an
+    /// external reader of `session->foldedRegions()` sees real state — on
+    /// top of its unconditional local `m_foldedHeads` update (see
+    /// `toggleFold()`'s doc comment for why a *generic* reverse
+    /// resolution of Session state back into `m_foldedHeads` is not
+    /// attempted: it is unsound under D2's per-block CRDT buffers, a
+    /// P6.0 finding). Null is legal — every existing direct-`View` test
+    /// that never attaches a Session keeps working unchanged.
+    void setSession(Session *session);
+    Session *session() const;
 
     void setTheme(const Theme &theme);
     const Theme &theme() const;
@@ -968,6 +985,18 @@ private:
     /// `toggleFold()` itself.
     void refreshFoldedBlocks();
 
+    /// P6.0: builds the `Markoff::FoldRef` that identifies `id` as a fold
+    /// head — `kind` (canvas's `LongList`/`Callout` both map to core's
+    /// generic `FoldRef::Kind::Block`; `Heading` maps directly), `start`
+    /// (the raw `CollabText::Crdt::Anchor` at `id`'s byte 0, via
+    /// `MarkoffDocument::blockCrdtAnchorAt` — the D2-safe seam this task
+    /// added to core), and `headingLevel` for the Heading case (read off
+    /// the same `AttrNames::Level` attribute `Folding::resolveFoldable`
+    /// already reads). `headingPath` is left empty — see the P6.0 findings
+    /// log entry. Caller must already know `id` is foldable
+    /// (`isBlockFoldable`); this does not itself check.
+    Markoff::FoldRef foldRefFor(BlockId id) const;
+
     // ---- Frontmatter (P5.5) -------------------------------------------
     // Frontmatter is NOT a document block (markoff-core's
     // `Document::extract` splits it off `source` before the body is ever
@@ -1026,11 +1055,17 @@ private:
     /// `setFindHighlights`'s doc comment.
     QHash<BlockId, QList<FindHighlight>> m_findHighlightsByBlock;
 
-    // ---- Folding (P5.6) -------------------------------------------------
-    /// Fold heads currently toggled ON. The only piece of fold STATE this
-    /// leaf owns — see the private "Folding" section's doc comment for why
+    // ---- Folding (P5.6, retro-wired to Session in P6.0) ------------------
+    /// Fold heads currently toggled ON. Remains the authority for the
+    /// View's own writes (see `toggleFold()`'s doc comment for why a
+    /// Session-state-derived cache is not attempted); when a Session is
+    /// attached, every write here is mirrored to it via
+    /// `Session::toggleFold()` so it stays a genuine second reader
+    /// surface — see the private "Folding" section's doc comment for why
     /// fold SHAPE is never stored here.
     QSet<BlockId> m_foldedHeads;
+    /// P6.0: non-owning, see `setSession()`.
+    Session *m_session = nullptr;
 
     // ---- IME (T8) ---------------------------------------------------------
     // Composition state the document doesn't know about (same exception as

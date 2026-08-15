@@ -159,6 +159,29 @@ public:
     /// textAnchorAt(quint32, bool).
     TextAnchor textAnchorAt(const BlockAnchor &, int offset, bool rightBias) const;
 
+    /// D2-safe companion to anchorAt()/resolveAnchor() for consumers that
+    /// need the raw CRDT anchor type on a block that may not exist in the
+    /// legacy flat buffer (e.g. a block created after D2 load). Unlike
+    /// anchorAt(quint32, Crdt::Bias), which is backed by the legacy flat
+    /// buffer and is stale on such blocks, this resolves directly against
+    /// the block's own per-block CRDT buffer (falling back to the legacy
+    /// flat-buffer path only when no D2 buffer exists for the block).
+    /// textAnchorAt(BlockAnchor, int, bool) wraps this in the public
+    /// TextAnchor type; use this overload directly when the raw
+    /// CollabText::Crdt::Anchor type is what the caller needs (see
+    /// FoldRef::start / Session::topVisibleAnchor for the established
+    /// precedent of raw-typed accessors at this boundary).
+    CollabText::Crdt::Anchor
+        blockCrdtAnchorAt(const BlockAnchor &, int offset,
+                          CollabText::Crdt::Bias bias) const;
+
+    /// Inverse of blockCrdtAnchorAt(): resolves a raw CollabText::Crdt::Anchor
+    /// to its block-local UTF-8 byte offset, against the BlockAnchor's own
+    /// per-block CRDT buffer. D2-safe companion to offsetInBlock(BlockAnchor,
+    /// TextAnchor) for callers holding the raw anchor type.
+    int resolveBlockCrdtAnchor(const BlockAnchor &,
+                                const CollabText::Crdt::Anchor &) const;
+
     // ===== Sessions (filled in Task 23) =====
     Session *createSession(const SessionParams &params = {});
     void     destroySession(Session *);

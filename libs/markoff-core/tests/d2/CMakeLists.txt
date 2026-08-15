@@ -54,6 +54,12 @@ qt_add_executable(tst_d2_load tst_d2_load.cpp)
 target_link_libraries(tst_d2_load PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_load COMMAND tst_d2_load)
 
+# P6.0 — D2-safe block-CRDT anchor accessor (blockCrdtAnchorAt /
+# resolveBlockCrdtAnchor), falsified against a block created after load.
+qt_add_executable(tst_d2_block_crdt_anchor tst_d2_block_crdt_anchor.cpp)
+target_link_libraries(tst_d2_block_crdt_anchor PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d2_block_crdt_anchor COMMAND tst_d2_block_crdt_anchor)
+
 # resetContent must populate D2 per-block state (port-first fix 2026-05-20)
 qt_add_executable(tst_d2_reset_content tst_d2_reset_content.cpp)
 target_link_libraries(tst_d2_reset_content PRIVATE Qt6::Test markoff_core)

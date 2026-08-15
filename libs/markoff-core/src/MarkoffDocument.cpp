@@ -854,9 +854,7 @@ int MarkoffDocument::offsetInBlock(const BlockAnchor &b, const TextAnchor &t) co
     // D2 path: resolve anchor directly against the per-block CRDT buffer.
     auto it = d->blockBuffers.find(b);
     if (it != d->blockBuffers.end()) {
-        const CollabText::Crdt::Anchor a = Detail::toCrdtAnchor(t);
-        const uint32_t localOff = it->second->resolve_anchor(a);
-        return static_cast<int>(localOff);
+        return resolveBlockCrdtAnchor(b, Detail::toCrdtAnchor(t));
     }
 
     // Legacy fallback.
@@ -877,10 +875,7 @@ TextAnchor MarkoffDocument::textAnchorAt(const BlockAnchor &b,
     if (it != d->blockBuffers.end()) {
         const auto bias = rightBias ? CollabText::Crdt::Bias::Right
                                     : CollabText::Crdt::Bias::Left;
-        const int sz = static_cast<int>(it->second->visible_length());
-        const int clamped = std::max(0, std::min(offset, sz));
-        const CollabText::Crdt::Anchor a =
-            it->second->anchor_at(static_cast<uint32_t>(clamped), bias);
+        const CollabText::Crdt::Anchor a = blockCrdtAnchorAt(b, offset, bias);
         return Detail::toTextAnchor(b, a);
     }
 
@@ -890,6 +885,46 @@ TextAnchor MarkoffDocument::textAnchorAt(const BlockAnchor &b,
     const int clamped = std::max(0, std::min(offset,
         static_cast<int>(rng->second - rng->first)));
     return textAnchorAt(rng->first + static_cast<quint32>(clamped), rightBias);
+}
+
+CollabText::Crdt::Anchor
+MarkoffDocument::blockCrdtAnchorAt(const BlockAnchor &b, int offset,
+                                    CollabText::Crdt::Bias bias) const
+{
+    // D2 path: use the per-block buffer directly, bypassing latestBlockRanges.
+    auto it = d->blockBuffers.find(b);
+    if (it != d->blockBuffers.end()) {
+        const int sz = static_cast<int>(it->second->visible_length());
+        const int clamped = std::max(0, std::min(offset, sz));
+        return it->second->anchor_at(static_cast<uint32_t>(clamped), bias);
+    }
+
+    // Legacy fallback: use parse-based block byte ranges against the
+    // legacy flat buffer.
+    const auto rng = blockByteRange(b);
+    if (!rng.has_value()) return CollabText::Crdt::Anchor{};
+    const int clamped = std::max(0, std::min(offset,
+        static_cast<int>(rng->second - rng->first)));
+    return anchorAt(rng->first + static_cast<quint32>(clamped), bias);
+}
+
+int MarkoffDocument::resolveBlockCrdtAnchor(const BlockAnchor &b,
+                                             const CollabText::Crdt::Anchor &a) const
+{
+    // D2 path: resolve directly against the per-block CRDT buffer.
+    auto it = d->blockBuffers.find(b);
+    if (it != d->blockBuffers.end()) {
+        return static_cast<int>(it->second->resolve_anchor(a));
+    }
+
+    // Legacy fallback: resolve against the legacy flat buffer and project
+    // onto the block's byte range.
+    const auto rng = blockByteRange(b);
+    if (!rng.has_value()) return 0;
+    const quint32 byte = resolveAnchor(a);
+    if (byte <= rng->first)  return 0;
+    if (byte >= rng->second) return static_cast<int>(rng->second - rng->first);
+    return static_cast<int>(byte - rng->first);
 }
 
 Session *MarkoffDocument::createSession(const SessionParams &params)

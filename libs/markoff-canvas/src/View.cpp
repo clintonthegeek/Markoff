@@ -27,6 +27,7 @@
 #include <markoff/core/KindInference.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Session.h>
 #include <markoff/core/StructuralKeyHandler.h>
 #include <markoff/core/TextUnits.h>
 #include <markoff/core/UndoLog.h>
@@ -245,6 +246,46 @@ void View::setDocument(MarkoffDocument *doc)
 MarkoffDocument *View::document() const
 {
     return m_doc;
+}
+
+void View::setSession(Session *session)
+{
+    if (m_session == session)
+        return;
+
+    m_session = session;
+
+    // NOTE (P6.0 finding, see plan findings log): a generic "rebuild
+    // m_foldedHeads FROM m_session->foldedRegions()" step is deliberately
+    // NOT implemented here. FoldRef::start is a raw per-block
+    // CollabText::Crdt::Anchor with no block identity attached, and
+    // per-block CRDT buffers each run their OWN Lamport clock seeded only
+    // by the shared document replica id (MarkoffDocument constructs every
+    // block's Buffer as Buffer(d->replicaId), no per-block offset) — so
+    // two different foldable blocks' byte-0 anchors routinely collide on
+    // (replica_id, char_value) (confirmed: both come out {replicaId, 1}
+    // whenever both blocks' first characters were authored by the same
+    // replica, the common case for a freshly loaded/typed document).
+    // Reverse-resolving an arbitrary FoldRef to "the" BlockId it names is
+    // therefore ambiguous whenever more than one foldable block collides
+    // this way — this is NOT a rare edge case, it reproduces on any
+    // two-heading document. `toggleFold()` below instead keeps
+    // m_foldedHeads authoritative for ITS OWN writes (it always knows the
+    // exact BlockId at the point it pushes a FoldRef to the Session) and
+    // pushes through to the Session so external readers (falsification:
+    // reading `session->foldedRegions()` after `toggleFold()`) see real
+    // state — Session genuinely receives every fold, it just isn't (yet)
+    // resolvable back into a BlockId set from cold session state alone.
+    // A session created fresh by EditorWidget::setDocument() always
+    // starts with empty foldedRegions(), so this gap does not affect any
+    // currently-exercised code path; it would need FoldRef to carry a
+    // block identity (a core schema change beyond this task's named
+    // seam) to close generally.
+}
+
+Session *View::session() const
+{
+    return m_session;
 }
 
 void View::setTheme(const Theme &theme)
@@ -672,6 +713,41 @@ void View::refreshFoldedBlocks()
     m_cache->setFoldedBlocks(hiddenBlocksFromFolds());
 }
 
+Markoff::FoldRef View::foldRefFor(BlockId id) const
+{
+    Markoff::FoldRef ref;
+    if (!m_doc)
+        return ref;
+    const Detail::FoldInfo info = Detail::resolveFoldable(*m_doc, id);
+    if (info.kind == Detail::FoldKind::None)
+        return ref;
+
+    // LongList/Callout are canvas-local interpretations of core's generic
+    // FoldRef::Kind::Block (Folding.h's own doc comment) — core has no
+    // concept of either shape.
+    ref.kind = (info.kind == Detail::FoldKind::Heading)
+                   ? Markoff::FoldRef::Kind::Heading
+                   : Markoff::FoldRef::Kind::Block;
+    // D2-safe raw anchor at the head block's byte 0 — the P6.0 core seam.
+    ref.start = m_doc->blockCrdtAnchorAt(id, 0, CollabText::Crdt::Bias::Left);
+
+    if (info.kind == Detail::FoldKind::Heading) {
+        const auto attrs = m_doc->blockAttrs(id);
+        const auto it = attrs.constFind(AttrNames::Level);
+        if (it != attrs.cend()) {
+            if (const int *v = std::get_if<int>(&it.value()))
+                ref.headingLevel = *v;
+        }
+        // headingPath is left empty: resolveFoldable's FoldInfo doesn't
+        // carry the ancestor heading chain, and deriving it would mean
+        // walking backward through iterateBlocks() re-deriving heading
+        // nesting — new plumbing beyond this task's named scope. Logged
+        // as a P6.0 finding rather than built here.
+    }
+    return ref;
+}
+
+
 bool View::isBlockFoldable(BlockId id) const
 {
     if (!m_doc)
@@ -697,11 +773,22 @@ void View::toggleFold(BlockId id)
     if (!m_doc || !isBlockFoldable(id))
         return;
 
+    // P6.0: m_foldedHeads stays authoritative for the View's OWN writes —
+    // at this exact call site the BlockId <-> FoldRef correspondence is
+    // known exactly (see foldRefFor()'s and setSession()'s doc comments
+    // for why a *generic* reverse resolution from Session state alone is
+    // NOT sound and is therefore not attempted). When a Session is
+    // attached, the same toggle is pushed through to it so external
+    // readers (falsification: `session->foldedRegions()` after this call)
+    // see real state — Session is a genuine second writer target, not
+    // just decoration.
     if (m_foldedHeads.contains(id)) {
         m_foldedHeads.remove(id);
     } else {
         m_foldedHeads.insert(id);
     }
+    if (m_session)
+        m_session->toggleFold(foldRefFor(id));
     refreshFoldedBlocks();
 
     // If the caret is now inside a body this just hid, it must not be left
