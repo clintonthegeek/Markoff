@@ -151,7 +151,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **G1 — user gate: accessibility scope** | ☑ deferred 2026-08-14 | — | — |
 | **P7 — polish + a11y** | | | |
 | P7.1 Accessibility (per G1) | ⏭ deferred — see G1 | n/a | n/a |
-| P7.2 Drag-drop + middle-click paste | ☐ | | |
+| P7.2 Drag-drop + middle-click paste | ☑ | `565aeee1` (+ comment fix `2131929e`) | A: `056f9215`/`504fbc4f`; B: `67c2d433`/`1254a421`; C: `b285a6e7`/`f9e7e2c9` |
 | P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☐ | | n/a |
 | **G2 — user gate: Corbomite adoption** (work lands in Corbomite repo) | ☐ | — | — |
 | **G3 — user gate: retirement decision** (successor spec) | ☐ | — | — |
@@ -680,6 +680,60 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
 - Phase 6 (collaboration surface) closes here. Remaining before G1:
   nothing — G1 (accessibility scope) is a user gate, not a task;
   Phase 7 is next once the user opens it.
+
+**P7.2 (2026-08-14).**
+
+- **Move-vs-Copy-only drag decision:** drag-out offers Copy while
+  read-only (mirrors "copy keeps working," spec §4.2) and Copy+Move
+  once editable, following `qwidgettextcontrol.cpp`'s `startDrag()`
+  shape. But a successful Move only deletes the source selection when
+  `drag->target() != viewport()` — i.e. the drop landed somewhere
+  else (another view, another app). A **self-drop Move (drag inside
+  the same View) is deliberately treated as a copy instead** — the
+  source selection is left untouched even though the action reports
+  `MoveAction`. Reasoning: this leaf's `CanvasCursor` positions are
+  raw per-block byte offsets (C4) with no cursor-adjustment machinery;
+  deleting the pre-drag selection AFTER the drop's own insert has
+  already run in the same document would need re-deriving the source
+  range's now-stale offsets (shifted by the insert if same-block, or
+  needing no adjustment if a different block — the two cases would
+  need to be told apart in the same gesture). Rather than build that
+  invalidation-tracking for one gesture, self-drop-Move duplicates
+  text without deleting the source, a defensible and clearly logged
+  scope cut, not a bug.
+- **`fileDropped` signal shape:** `View::fileDropped(const QList<QUrl>
+  &urls, const QPoint &viewportPos)`, forwarded verbatim by
+  `EditorWidget::fileDropped` — the same bare-forward wiring shape
+  `titleEdited` already uses (View emits, EditorWidget connects and
+  re-emits with no transformation). This leaf never inserts file
+  content as text and never decides embed-vs-link; the signal is the
+  entire scope named by the plan.
+- **Middle-click / offscreen-environment finding:**
+  `QGuiApplication::clipboard()->supportsSelection()` is false under
+  this leaf's `QT_QPA_PLATFORM=offscreen` test environment (no
+  platform clipboard integration registered at all — `QOffscreenIntegration`
+  has no `clipboard()`/capability override, so
+  `QPlatformIntegration`'s default `QPlatformClipboard` singleton
+  answers, whose `supportsMode()` only returns true for
+  `QClipboard::Clipboard`). The middle-click test therefore only
+  exercises the guard/no-op path, per the task's own anticipated case.
+  **Falsification correction discovered while planting the break:** a
+  bare bypass of this leaf's own `supportsSelection()` guard does
+  **not** falsify anything in this environment — `QClipboard::
+  mimeData()`'s own public wrapper independently re-checks
+  `supportsMode(Selection)` before ever reaching the platform
+  clipboard, so the call still returns `nullptr` with or without this
+  leaf's guard. The break that DOES fail (the one recorded): bypass
+  the guard **and** read `QClipboard::Clipboard` instead of
+  `QClipboard::Selection` — i.e. conflate primary selection with the
+  regular clipboard, the exact thing the real code's doc comment says
+  never to do. Test comments corrected in a small follow-up commit
+  (`2131929e`) after the first draft recorded the disproven theory.
+- Canvas-scoped suite: 33/33 (added `tst_canvas_drag_drop`, up from
+  32/32 — P6.4's close and the intervening G1/P7.1 doc-only commits
+  didn't add executables). Constitution clean (C1–C4). Full suite not
+  run per the plan's own tier rule (diff stays inside
+  `libs/markoff-canvas/`, no core seam touched).
 
 **P6.3 (2026-08-14).**
 

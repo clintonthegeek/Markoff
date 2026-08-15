@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 6 CLOSED, P6.4)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 7, P7.2 landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -33,8 +33,17 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   phase close, full suite 310/310). **G1 decided 2026-08-14: user
   deferred accessibility** — P7.1 skipped for this arc, canvas ships
   with no a11y support this arc (explicit, logged gap, not an
-  oversight). Phase 7 continues at P7.2 (drag-drop + middle-click
-  paste).
+  oversight). P7.2 (drag-drop + middle-click paste) landed the same
+  day: text drag out (Copy while read-only, Copy+Move once editable —
+  self-drop Move is treated as a copy, logged decision, see plan
+  findings log), text/file drag in (text routes through the same
+  `insertText()` `paste()` uses; file drops emit
+  `EditorWidget::fileDropped(urls, viewportPos)`, Corbomite decides
+  embed-vs-link), and X11 primary-selection middle-click paste
+  (no-op under this leaf's offscreen test environment, which has no
+  platform clipboard integration — real behavior can't be exercised
+  here, only the guard path). Phase 7 continues at P7.3 (⏸ arc close:
+  Obsidian parity audit + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -61,8 +70,28 @@ load→paint 188 ms/500 ms, p95 keystroke 1.38 ms/16 ms, scroll-realize
 11.6 %/30 %, RSS delta 0 KB/100 MB. The plan ratchets this up per
 task; any drop is a regression (classify before fixing).
 
+**Canvas-scoped suite (`scripts/run-tests.sh -R canvas`): 33/33**,
+verified 2026-08-14 at P7.2 — up from 32/32 via one new executable,
+`tst_canvas_drag_drop` (drag-out MIME shape, drop-position accuracy,
+file-drop signal shape, middle-click no-op-when-unsupported).
+`check-constitution.sh` clean (C1–C4). Full suite not re-run per the
+plan's tier rule (P7.2's diff stays inside `libs/markoff-canvas/`, no
+core seam touched); the 310/310 full-suite figure above is still the
+last verified whole-tree number, from P6.4.
+
 ## Dormant items
 
+- **Self-drop text-drag Move does not delete the source selection**
+  (P7.2, 2026-08-14) — dragging a selection and dropping it back
+  inside the SAME `View` duplicates the text instead of moving it
+  (the source selection is left intact even though the drop reports
+  `Qt::MoveAction`). Deliberate scope cut, not a bug: deleting the
+  source after the drop's own insert has already run in the same
+  document would need re-deriving the source range's now-stale byte
+  offsets, which this leaf's raw per-block-byte `CanvasCursor` model
+  (C4) has no cursor-adjustment machinery for. Cross-view/cross-app
+  Move (drop target ≠ this view's own viewport) works correctly. Full
+  writeup: plan findings log, P7.2 entry.
 - **`BlockLayoutCache::m_preeditByte` goes stale across a remote edit
   mid-composition** (P6.3 finding, 2026-08-14) — cosmetic only,
   bounded to the paint between a remote edit landing and the next real
