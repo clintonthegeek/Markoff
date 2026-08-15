@@ -37,51 +37,101 @@ private slots:
     void clearing_presences_empties_the_block_index();
 };
 
-// A remote participant selecting "Hello" (bytes 0..5) in "Hello world." must
-// paint with ITS OWN presenceColor, distinct from
-// Theme::Slot::SelectionBackground (the local selection's color) — this is
-// exactly the plan's own falsification target.
-void TstCanvasRemotePresence::remote_selection_uses_participant_color_not_local_selection_color()
+/// Count of pixels in `img` matching `color` exactly.
+int countColorPixels(const QImage &img, QColor color)
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("Hello world.\n");
-    const BlockId block = doc.iterateBlocks().front();
+    const QRgb target = color.rgb();
+    int count = 0;
+    for (int y = 0; y < img.height(); ++y)
+        for (int x = 0; x < img.width(); ++x)
+            if (img.pixel(x, y) == target)
+                ++count;
+    return count;
+}
 
+/// Renders a single presence over "X X" and returns how many painted
+/// pixels exactly match `presenceColor`. Both the caret bar and the
+/// selection tint paint in the participant's own color (View::paintEvent),
+/// so an ordinary "does this color appear anywhere" scan can't tell tint
+/// pixels apart from caret-bar/flag pixels — the caller isolates the tint's
+/// contribution by diffing a real range against a collapsed (caret-only)
+/// one of the same color, below.
+int presenceColorPixelCount(BlockId block, MarkoffDocument &doc, TextAnchor anchor,
+                             TextAnchor active, QColor presenceColor)
+{
     EditorWidget ed;
     ed.setDocument(&doc);
 
-    const TextAnchor start = doc.textAnchorAt(block, 0, /*rightBias=*/false);
-    const TextAnchor end   = doc.textAnchorAt(block, 5, /*rightBias=*/true);
-
-    const QColor participantColor(0x1A, 0x9C, 0xE5);  // arbitrary, != theme selection bg
     Selection sel;
-    sel.anchor = start;
-    sel.active = end;
+    sel.anchor = anchor;
+    sel.active = active;
     sel.kind = Selection::Kind::Presence;
     sel.participantId = QStringLiteral("p1");
     sel.participantLabel = QStringLiteral("Alice");
-    sel.presenceColor = participantColor;
-
+    sel.presenceColor = presenceColor;
     ed.setRemotePresences({RemotePresence{sel}});
 
-    const QList<RemotePresence> resolved = ed.view()->remotePresencesForBlock(block);
-    QCOMPARE(resolved.size(), 1);
-    QCOMPARE(resolved.first().selection.presenceColor, participantColor);
-    QCOMPARE(resolved.first().selection.participantLabel, QStringLiteral("Alice"));
-
-    // The load-bearing distinct-color assertion the plan's falsification
-    // targets: a remote presence never shares the local selection's color.
-    const QColor localSelectionColor = ed.view()->theme().color(Theme::Slot::SelectionBackground);
-    QVERIFY(resolved.first().selection.presenceColor != localSelectionColor);
-
-    // Real paint exercise (offscreen) — must not crash, and is the actual
-    // code path setRemotePresences/remotePresencesForBlock's assertions
-    // above are standing in for (constructing the same FormatRange::
-    // background from presence.selection.presenceColor).
     ed.resize(400, 300);
     ed.show();
-    QVERIFY(QTest::qWaitForWindowExposed(&ed));
-    QTest::qWait(0);
+    (void)QTest::qWaitForWindowExposed(&ed);
+    ed.view()->viewport()->repaint();
+    return countColorPixels(ed.view()->grab().toImage(), presenceColor);
+}
+
+// A remote participant selecting "X X" (bytes 0..3) must paint the
+// SELECTION TINT in ITS OWN presenceColor, distinct from
+// Theme::Slot::SelectionBackground (the local selection's color) — this is
+// exactly the plan's own falsification target ("paint remote selection with
+// the local selection color; distinct-color assertion fails"). Reads the
+// ACTUAL painted pixels (real paintEvent, via grab().toImage()), not the
+// input Selection echoed back at itself.
+//
+// The caret bar + name flag ALSO paint in presenceColor (correctly, and
+// unaffected by a tint-only regression), so a plain "does presenceColor
+// appear anywhere in the frame" scan cannot tell a broken tint apart from
+// just the caret residue — confirmed empirically: that weaker assertion
+// kept passing under this test's own planted falsification break (tint
+// reusing Theme::Slot::SelectionBackground) because the caret bar alone
+// still contributed matching pixels. The real range vs. a collapsed
+// (caret-only) range of the SAME color isolates the tint's own
+// contribution instead.
+void TstCanvasRemotePresence::remote_selection_uses_participant_color_not_local_selection_color()
+{
+    MarkoffDocument docReal(1);
+    docReal.loadFromMarkdown("X X\n");
+    const BlockId blockReal = docReal.iterateBlocks().front();
+    const TextAnchor start = docReal.textAnchorAt(blockReal, 0, /*rightBias=*/false);
+    const TextAnchor end   = docReal.textAnchorAt(blockReal, 3, /*rightBias=*/true);
+
+    // A saturated color that won't already appear anywhere in the default
+    // theme's text/background/cursor palette.
+    const QColor participantColor(0x1A, 0x9C, 0xE5);
+
+    const int withTintCount =
+        presenceColorPixelCount(blockReal, docReal, start, end, participantColor);
+
+    MarkoffDocument docCaretOnly(2);
+    docCaretOnly.loadFromMarkdown("X X\n");
+    const BlockId blockCaretOnly = docCaretOnly.iterateBlocks().front();
+    const TextAnchor caretOnly = docCaretOnly.textAnchorAt(blockCaretOnly, 3, /*rightBias=*/true);
+
+    const int caretOnlyCount = presenceColorPixelCount(
+        blockCaretOnly, docCaretOnly, caretOnly, caretOnly, participantColor);
+
+    // The colors themselves must differ (sanity on the input data).
+    View bare;
+    const QColor localSelectionColor = bare.theme().color(Theme::Slot::SelectionBackground);
+    QVERIFY(participantColor != localSelectionColor);
+
+    // The load-bearing check: a real selection range must paint
+    // MEASURABLY MORE presenceColor pixels than the same participant's bare
+    // caret alone — proof the tint FormatRange itself used presenceColor,
+    // not just the caret bar/flag next to it.
+    QVERIFY2(withTintCount > caretOnlyCount + 20,
+             qPrintable(QStringLiteral("withTint=%1 caretOnly=%2 — tint did not add "
+                                        "measurably more presenceColor-painted pixels")
+                            .arg(withTintCount)
+                            .arg(caretOnlyCount)));
 }
 
 // A collapsed presence (anchor == active — a bare remote caret, no
