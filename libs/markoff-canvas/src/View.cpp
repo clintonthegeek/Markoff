@@ -1889,7 +1889,12 @@ void View::recomputeOccurrenceHighlights()
 
 void View::pushSelectionToSession()
 {
-    // FALSIFY (throwaway): skip the recompute call entirely.
+    // Unconditional, ahead of the Session/doc gate below (see this
+    // function's own header-side doc comment): occurrence highlights are
+    // a purely view-local, Session-independent feature and must update
+    // even for a bare View with no Session attached (tests, spike-era
+    // consumers).
+    recomputeOccurrenceHighlights();
 
     if (!m_session || !m_doc || m_caret.block.isNull())
         return;
