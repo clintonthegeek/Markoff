@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 6, P6.1 landed)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 6, P6.2 landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -26,7 +26,9 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   at P5.7 (perf re-baseline held). Phase 6 (collaboration surface)
   opened 2026-08-14 with P6.0 (core anchor seam + fold retro-wire to
   Session, reduced scope — see plan findings log); P6.1 (Session caret
-  authority closure) landed the same day; next is P6.2.
+  authority closure) landed the same day; P6.2 (remote presence
+  rendering — caret bar, name flag, selection tint) landed the same
+  day; next is P6.3.
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -49,18 +51,26 @@ was touched) and not yet root-caused. This currently blocks a clean
 next full-suite run until someone in the live/styled/source bug-fix
 lane looks at it. New dormant item below.
 
-**Canvas-scoped suite (`scripts/run-tests.sh -R canvas`): 30/30**,
-verified 2026-08-14 at P6.1 — up from 29/29 at P5.7 close via one new
-executable, `tst_canvas_session_selection`. `check-constitution.sh`
-clean (C1–C4) over 67 files (was 66 at P6.0; `pushSelectionToSession()`
-+ the new test file). Perf re-baseline not re-run this task (P6.1 does
-not touch the y-position walk); last held figures (P5.7):
+**Canvas-scoped suite (`scripts/run-tests.sh -R canvas`): 31/31**,
+verified 2026-08-14 at P6.2 — up from 30/30 at P6.1 via one new
+executable, `tst_canvas_remote_presence`. `check-constitution.sh`
+clean (C1–C4) over 68 files (was 67 at P6.1; the new test file).
+Perf re-baseline not re-run this task (P6.2 is paint-time-only,
+touching neither the y-position walk nor realization); last held
+figures (P5.7):
 load→paint 188 ms/500 ms, p95 keystroke 1.38 ms/16 ms, scroll-realize
 11.6 %/30 %, RSS delta 0 KB/100 MB. The plan ratchets this up per
 task; any drop is a regression (classify before fixing).
 
 ## Dormant items
 
+- **Remote presence name flag has no fade** (P6.2, 2026-08-14) —
+  `Selection::cursorVersion` is an opaque monotonic counter, not a
+  timestamp, so a real "fade out N seconds since last move" needs
+  either a core timestamp field (out of P6.2's closed-core scope) or
+  view-local per-participant timer state this leaf's draw-time-only
+  design otherwise avoids. Painted at full, constant opacity. Full
+  writeup: plan findings log, P6.2 entry.
 - **`MarkoffDocument::blockAt(const TextAnchor &)` always returns
   `nullopt`** (P6.1 finding, 2026-08-14) — its implementation reads
   `d->latestBlockRanges`/`d->latestBlockAnchors`

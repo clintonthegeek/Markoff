@@ -145,7 +145,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **P6 — collaboration surface** | | | |
 | P6.0 Core anchor seam (BlockId,offset)→Crdt::Anchor + fold retro-wire | ☑ (reduced scope — see finding) | `f2e705d5` | A: `0ae44b21`/`a27055d0`; B: `2e115920`/`f0ac20a3` |
 | P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☑ | `f8b66807` | `4e1711df`/`f073658d` |
-| P6.2 Remote presence rendering (carets, tints, flags) | ☐ | | |
+| P6.2 Remote presence rendering (carets, tints, flags) | ☑ | `d920c694` (+ test fix `b8f2fff4`) | `df42c919`/`b11122fb` |
 | P6.3 Remote-edit-mid-IME + concurrency torture tests | ☐ | | |
 | P6.4 ⏸ phase close | ☐ | | n/a |
 | **G1 — user gate: accessibility scope** | ☐ | — | — |
@@ -577,6 +577,75 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P6.2 (2026-08-14).**
+
+- **Type-shape decision: `RemotePresence` is a thin wrapper
+  (`{ Markoff::Selection selection; }`), not the plan's literal flat
+  `{Selection, displayName, QColor}` triple.** `Selection` already
+  carries `participantLabel`/`presenceColor`/`kind` — fields
+  purpose-built for `Kind::Presence` (Selection.h's own doc comment
+  names it exactly this role) — so a parallel flat triple would just
+  be a second, potentially-drifting copy of the same three fields with
+  no way to keep them in sync. F1a (multi-cursor readiness) is honored
+  by keying `View::paintEvent`'s dispatch off
+  `presence.selection.kind == Selection::Kind::Presence` itself, never
+  off which list the entry arrived through — a future local
+  `Kind::Secondary` multi-cursor list can feed the identical paint
+  path (selection tint / caret bar / name flag) without a second
+  implementation.
+- **The plan's "fading like collabedit's" citation does not hold up.**
+  `~/dev/collabtext/app/collabedit/CollabPane.cpp` has no visual
+  caret/flag paint code at all — it's `PresenceManager`/participant-
+  list-only (no `paintEvent`, no `ExtraSelection`, no opacity/fade
+  logic anywhere in that file) — there is nothing there to model a
+  fade on. Not pursued further per the task's own instruction not to
+  go hunting deeper into collabtext for it.
+- **No fade implemented** — logged as a gap, not a silent omission.
+  `Selection::cursorVersion` is an opaque monotonic counter (bumped on
+  each write), not a timestamp; a real opacity decay needs "time since
+  last change," which would need either a wall-clock timestamp added
+  to `Selection` (a core change, out of this task's closed-core scope)
+  or view-local per-participant timer/QElapsedTimer bookkeeping (a
+  second piece of cached-per-participant state this task's own "never
+  cached, draw-time only" design deliberately avoided elsewhere). The
+  name flag paints at full, constant opacity.
+- Storage is a flat `QList<RemotePresence>` (`View::m_remotePresences`),
+  NOT grouped by block the way `m_findHighlightsByBlock` is:
+  `FindHighlight` already carries a resolved `BlockId`, but a
+  Presence's range is named by two `TextAnchor`s that only resolve to
+  a block by re-consulting the document — a per-block index built at
+  `setRemotePresences()` time would itself be exactly the kind of
+  cached-resolved-position state the "draw-time only" rule (this
+  leaf's find-highlight precedent, and this task's own doc comments)
+  rules out. `View::resolvePresenceAnchor()` (new private helper)
+  reuses P6.1's already-established `TextAnchor::block()` +
+  `offsetInBlock()` workaround for the always-nullopt
+  `MarkoffDocument::blockAt()`, rather than re-deriving it.
+- **Test-writing pitfall, caught before recording the falsification
+  pair, not after:** the first version of
+  `tst_canvas_remote_presence`'s load-bearing test scanned the whole
+  grabbed frame for any pixel matching the participant's
+  `presenceColor`. That's too weak — the caret bar and name flag ALSO
+  correctly paint in `presenceColor`, independent of the selection
+  tint — so planting the actual falsification break (tint reusing
+  `Theme::Slot::SelectionBackground`) left that assertion passing
+  anyway (the caret bar alone supplied matching pixels). Caught by
+  actually running the planted break against the test before trusting
+  it, not by inspection. Fixed with a differential check: render the
+  same participant color as a real 3-byte selection range vs. a
+  collapsed caret-only presence at the same position, and assert the
+  real range paints measurably more `presenceColor` pixels than the
+  caret-only baseline — isolates the tint's own contribution. Re-ran
+  against the same planted break afterward: now fails as expected
+  (`withTint=191, caretOnly=191`, no measurable difference), and
+  passes clean on the reverted code.
+- Canvas-scoped suite: 31/31 (added `tst_canvas_remote_presence`, up
+  from 30/30). Constitution clean (C1–C4). Full suite not run per the
+  plan's own tier rule (diff stays inside `libs/markoff-canvas/`, no
+  core seam touched — `markoff-core` was read-only for this task,
+  consuming `Selection`/`TextAnchor`/`offsetInBlock` exactly as
+  scoped).
 
 **2026-08-14 — inline-object investigation (post-P5.7, user-directed).**
 
