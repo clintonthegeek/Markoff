@@ -1731,7 +1731,7 @@ void View::setCaret(const CanvasCursor &caret)
     // document caret change.
     m_titleCaretActive = false;
     m_caret = caret;
-    pushSelectionToSession();
+    // FALSIFY (throwaway): pushSelectionToSession();
     ensureCaretVisible();
     viewport()->update();
 }
