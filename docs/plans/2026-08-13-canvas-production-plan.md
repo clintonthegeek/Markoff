@@ -155,7 +155,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P7.2a F1#3 undo-coalescing defect fix | ☑ | `0ceceda0` | `44cc112d` / `be83a674` |
 | P7.2b F1#1 editing-command floor | ☑ | `965b6aee` | A: `0d28bb61`/`1ab59f6e`; B: `745a5d10`/`45f3fe79`; C: `0c81115f`/`d7741e9a`; D: `4ee7eb1e`/`af73a63f` |
 | *(out-of-band)* regression fix: coalesced ops never reached onCommit | ☑ | `623ed6ca` | `a6bcbd76`/`80dfc784` |
-| P7.2c F1#4 auto-pairing / wrap-selection | ☐ | | |
+| P7.2c F1#4 auto-pairing / wrap-selection | ☑ | `82f0c9d7` | `6c0fc4ea`/`b8a9d04f` |
 | P7.2d F1#5 Enter/Backspace semantics checklist | ☐ | | |
 | P7.2e F1#7 highlight selection occurrences | ☐ | | |
 | P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☐ | | |
