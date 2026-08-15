@@ -282,6 +282,59 @@ private Q_SLOTS:
         QCOMPARE(r.caretByteInBlock, 0u);
     }
 
+    void listitem_enter_empty_at_indent_gt0_outdents_not_exits() {
+        // CM insertNewlineContinueMarkup: Enter on an EMPTY nested item outdents
+        // one level; only an empty TOP-level item exits the list entirely.
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
+        const BlockId second = doc.iterateBlocks()[1];
+        { auto r = StructuralKeyHandler::handle(doc, second, Qt::Key_Tab,
+                                                Qt::NoModifier, 0u); QVERIFY(r.handled); }
+        QCOMPARE(std::get<int>(doc.blockAttrs(second).value(Markoff::AttrNames::IndentLevel)), 1);
+        // Empty its content (simulate an empty nested list line).
+        {
+            UndoLog::Transaction t(doc.d2UndoLog());
+            doc.d2ApplyBufferEdit(second, 0,
+                static_cast<uint32_t>(doc.blockText(second).size()), QByteArray{}, t);
+        }
+        const int countBefore = int(doc.iterateBlocks().size());
+        auto r = StructuralKeyHandler::handle(doc, second, Qt::Key_Return,
+                                              Qt::NoModifier, 0u);
+        QVERIFY(r.handled);
+        QCOMPARE(int(doc.iterateBlocks().size()), countBefore);  // no new item, no merge
+        QCOMPARE(doc.blockKind(second), BlockKind::ListItem);    // still a list item
+        QCOMPARE(std::get<int>(doc.blockAttrs(second).value(Markoff::AttrNames::IndentLevel)), 0);
+        QCOMPARE(r.caretBlock, second);
+        QCOMPARE(r.caretByteInBlock, 0u);
+    }
+
+    void listitem_enter_mid_split_ordered_list_renumbers() {
+        // CM insertNewlineContinueMarkup + renumberList: splitting item 2 of a
+        // 3-item ordered list must leave the list numbered 1,2,3,4 (not 1,2,2,3).
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("1. one\n2. two\n3. three\n"));
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(int(blocks.size()), 3);
+        const BlockId itemTwo = blocks[1];
+        // Split "two" after "tw" (byte 2).
+        auto r = StructuralKeyHandler::handle(doc, itemTwo, Qt::Key_Return,
+                                              Qt::NoModifier, 2u);
+        QVERIFY(r.handled);
+        const auto after = doc.iterateBlocks();
+        QCOMPARE(int(after.size()), 4);
+        for (auto id : after) QCOMPARE(doc.blockKind(id), BlockKind::ListItem);
+        QCOMPARE(doc.blockText(after[0]), QByteArrayLiteral("one"));
+        QCOMPARE(doc.blockText(after[1]), QByteArrayLiteral("tw"));
+        QCOMPARE(doc.blockText(after[2]), QByteArrayLiteral("o"));
+        QCOMPARE(doc.blockText(after[3]), QByteArrayLiteral("three"));
+        QCOMPARE(std::get<int>(doc.blockAttrs(after[0]).value(Markoff::AttrNames::MarkerNumber)), 1);
+        QCOMPARE(std::get<int>(doc.blockAttrs(after[1]).value(Markoff::AttrNames::MarkerNumber)), 2);
+        QCOMPARE(std::get<int>(doc.blockAttrs(after[2]).value(Markoff::AttrNames::MarkerNumber)), 3);
+        QCOMPARE(std::get<int>(doc.blockAttrs(after[3]).value(Markoff::AttrNames::MarkerNumber)), 4);
+        QCOMPARE(r.caretBlock, after[2]);
+        QCOMPARE(r.caretByteInBlock, 0u);
+    }
+
     void listitem_backspace_at_start_indent_gt0_outdents() {
         MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
