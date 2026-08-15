@@ -54,8 +54,7 @@ SpecialTreatment classifySpecialChar(char16_t ch)
         || ch == 0x00ad                 // soft hyphen
         || ch == 0x200b                 // zero-width space
         || ch == 0x200e || ch == 0x200f // LRM / RLM
-        || ch == 0x202d || ch == 0x202e // bidi override (LRO/RLO)
-        || (ch >= 0x2066 && ch <= 0x2069) // bidi isolates (LRI/RLI/FSI/PDI)
+        // FALSIFY (throwaway): bidi override/isolate controls no longer substituted.
         || ch == 0xfeff)                // BOM / zero-width no-break space
         return SpecialTreatment::BoxedHex;
     return SpecialTreatment::None;
