@@ -120,6 +120,13 @@ EditorWidget::EditorWidget(QWidget *parent)
     // path — View::titleEdited already carries the finished (post-edit)
     // string.
     QObject::connect(m_view, &View::titleEdited, this, &EditorWidget::titleEdited);
+
+    // File drop (P7.2): same bare-forward shape as titleEdited above —
+    // View::fileDropped already carries the finished payload (urls +
+    // viewport position); this wrapper is the MarkdownView contract
+    // surface Corbomite actually binds against, so the signal has to live
+    // here, not just on the composed View.
+    QObject::connect(m_view, &View::fileDropped, this, &EditorWidget::fileDropped);
 }
 
 EditorWidget::~EditorWidget()

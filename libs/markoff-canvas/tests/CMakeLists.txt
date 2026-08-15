@@ -159,6 +159,11 @@ add_test(NAME tst_canvas_concurrency COMMAND tst_canvas_concurrency)
 target_link_libraries(tst_canvas_concurrency PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
 set_tests_properties(tst_canvas_concurrency PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_canvas_drag_drop tst_canvas_drag_drop.cpp)
+add_test(NAME tst_canvas_drag_drop COMMAND tst_canvas_drag_drop)
+target_link_libraries(tst_canvas_drag_drop PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+set_tests_properties(tst_canvas_drag_drop PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # The constitution gate (spec §6, C1–C4) runs as a test so that
 # `scripts/run-tests.sh -R canvas` enforces it alongside the leaf's own
 # tests. Name carries "canvas" deliberately — that is the -R filter.

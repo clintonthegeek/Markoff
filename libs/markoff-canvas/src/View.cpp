@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/canvas/View.h>
 
+#include <QApplication>
 #include <QByteArrayList>
 #include <QClipboard>
 #include <QContextMenuEvent>
+#include <QDrag>
+#include <QDragEnterEvent>
+#include <QDragMoveEvent>
+#include <QDropEvent>
 #include <QFocusEvent>
 #include <QFontMetricsF>
 #include <QGuiApplication>
@@ -11,6 +16,7 @@
 #include <QKeyEvent>
 #include <QKeySequence>
 #include <QMenu>
+#include <QMimeData>
 #include <QMouseEvent>
 #include <QPaintEvent>
 #include <QPainter>
@@ -204,6 +210,11 @@ View::View(QWidget *parent)
     // widget via the event filter below.
     viewport()->setMouseTracking(true);
     viewport()->installEventFilter(this);
+    // P7.2: QAbstractScrollArea forwards its own AcceptDropsChange to the
+    // viewport (`d->viewport->setAcceptDrops(acceptDrops())`), so setting
+    // this on the View itself — not viewport() directly — is the correct
+    // call site (same pattern QAbstractItemView::setDragDropMode follows).
+    setAcceptDrops(true);
 }
 
 View::~View() = default;
@@ -2068,17 +2079,27 @@ void View::paste()
 {
     if (!m_doc || m_readOnly || m_caret.block.isNull())
         return;
+    insertText(QGuiApplication::clipboard()->text());
+}
 
-    QString text = QGuiApplication::clipboard()->text();
-    if (text.isEmpty())
+// P7.2: factored out of paste() so the drag-in drop handler and the
+// middle-click primary-selection paste share this exact insertion path
+// rather than growing a second, gesture-specific copy of it.
+void View::insertText(const QString &rawText)
+{
+    if (!m_doc || m_readOnly || m_caret.block.isNull())
+        return;
+    if (rawText.isEmpty())
         return;
 
     if (hasSelection())
         collapseSelection();
 
-    // Normalize line endings before splitting — clipboard text pasted from
-    // outside this process may carry CRLF/CR; a bare '\r' left in a line
-    // chunk would land as a literal control byte in the block buffer.
+    // Normalize line endings before splitting — text arriving from outside
+    // this process (clipboard, drag, primary selection) may carry CRLF/CR;
+    // a bare '\r' left in a line chunk would land as a literal control byte
+    // in the block buffer.
+    QString text = rawText;
     text.replace(QStringLiteral("\r\n"), QStringLiteral("\n"));
     text.replace(QLatin1Char('\r'), QLatin1Char('\n'));
     const QStringList lines = text.split(QLatin1Char('\n'));
@@ -2107,6 +2128,121 @@ void View::selectAll()
     const auto &last = m_cache->entries().back();
     m_selectionAnchor = CanvasCursor{first.id, 0};
     setCaret(CanvasCursor{last.id, int(m_doc->blockText(last.id).size())});
+}
+
+// ---- Drag-drop (P7.2) ------------------------------------------------------
+
+QMimeData *View::createMimeDataFromSelection() const
+{
+    if (!hasSelection())
+        return nullptr;
+    const QByteArray text = selectedText();
+    auto *data = new QMimeData;
+    data->setText(QString::fromUtf8(text));
+    // Same bytes under a second MIME type, not a second serialization —
+    // this leaf's markdown IS its plain-text form (no styled-rich-text
+    // round-trip the way live/styled would need).
+    data->setData(QStringLiteral("text/markdown"), text);
+    return data;
+}
+
+void View::startTextDrag()
+{
+    m_dragPending = false;
+    QMimeData *data = createMimeDataFromSelection();
+    if (!data)
+        return;
+
+    auto *drag = new QDrag(this);
+    drag->setMimeData(data);
+
+    // Copy-only while read-only (mirrors "copy keeps working" — spec
+    // §4.2); Move offered once editable. Shape follows
+    // qwidgettextcontrol.cpp's startDrag(): Move is the preferred/default
+    // action when editable, Copy otherwise.
+    Qt::DropActions actions = Qt::CopyAction;
+    Qt::DropAction defaultAction = Qt::CopyAction;
+    if (!m_readOnly) {
+        actions |= Qt::MoveAction;
+        defaultAction = Qt::MoveAction;
+    }
+    const Qt::DropAction action = drag->exec(actions, defaultAction);
+
+    // A Move that landed somewhere other than this view's own viewport is
+    // a real move: delete the source selection now that its bytes are
+    // safely elsewhere. A Move dropped back onto THIS view (self-drop) is
+    // deliberately left as a copy instead — see startTextDrag's header
+    // doc comment for why (stale-offset hazard after the drop's own
+    // insert already ran in the same document).
+    if (action == Qt::MoveAction && drag->target() != viewport()) {
+        collapseSelection();
+        ensureCaretVisible();
+        viewport()->update();
+    }
+}
+
+void View::dragEnterEvent(QDragEnterEvent *event)
+{
+    if (!m_doc || m_readOnly) {
+        event->ignore();
+        return;
+    }
+    const QMimeData *data = event->mimeData();
+    if (data->hasText() || data->hasUrls())
+        event->acceptProposedAction();
+    else
+        event->ignore();
+}
+
+void View::dragMoveEvent(QDragMoveEvent *event)
+{
+    if (!m_doc || m_readOnly) {
+        event->ignore();
+        return;
+    }
+    const QMimeData *data = event->mimeData();
+    if (data->hasText() || data->hasUrls())
+        event->acceptProposedAction();
+    else
+        event->ignore();
+}
+
+void View::dropEvent(QDropEvent *event)
+{
+    if (!m_doc || m_readOnly) {
+        event->ignore();
+        return;
+    }
+    const QMimeData *data = event->mimeData();
+
+    // File drops never become document text — embed-vs-link is the
+    // consumer's decision (Corbomite), not this leaf's (spec). Checked
+    // ahead of hasText() because some platforms attach a text/uri-list
+    // AND a text/plain fallback to the same file drag; the file path
+    // takes priority so a file icon drop never gets typed in as its own
+    // path string.
+    if (data->hasUrls()) {
+        emit fileDropped(data->urls(), event->position().toPoint());
+        event->acceptProposedAction();
+        return;
+    }
+
+    if (!data->hasText()) {
+        event->ignore();
+        return;
+    }
+
+    const CanvasCursor hit = hitTest(event->position().toPoint());
+    if (hit.block.isNull()) {
+        event->ignore();
+        return;
+    }
+
+    setFocus(Qt::MouseFocusReason);
+    m_selectionAnchor.reset();
+    setCaret(hit);
+    insertText(data->text());
+    event->acceptProposedAction();
 }
 
 // ---- Context menu (P4.4) ---------------------------------------------------
@@ -3553,6 +3689,28 @@ void View::mousePressEvent(QMouseEvent *event)
                 }
             }
 
+            // Drag-out candidate (P7.2): a plain (non-Shift) press landing
+            // INSIDE the existing selection is ambiguous until the next
+            // move — mouseMoveEvent starts a QDrag once it crosses
+            // QApplication::startDragDistance(), or mouseReleaseEvent
+            // treats it as an ordinary click (reposition caret, clear
+            // selection) if it never does. Same "wait for the next move"
+            // shape qwidgettextcontrol.cpp's `mightStartDrag` follows.
+            // Read-only still allows this (drag-out is copy-only there,
+            // same "copy keeps working" rule as Ctrl+C).
+            if (!event->modifiers().testFlag(Qt::ShiftModifier)) {
+                const auto sel = orderedSelection();
+                if (sel) {
+                    const auto &[selStart, selEnd] = *sel;
+                    if (!caretLessThan(hit, selStart) && !caretLessThan(selEnd, hit)) {
+                        m_dragPending = true;
+                        m_dragPressPos = event->pos();
+                        event->accept();
+                        return;
+                    }
+                }
+            }
+
             setFocus(Qt::MouseFocusReason);
             // Shift+click extends the existing (or a fresh) selection. A
             // plain click deliberately does NOT set an anchor here — only
@@ -3569,11 +3727,56 @@ void View::mousePressEvent(QMouseEvent *event)
             return;
         }
     }
+
+    // X11 primary-selection middle-click paste (P7.2). `supportsSelection()`
+    // is the mechanism's own capability gate — false on Wayland/Windows/
+    // macOS AND under the offscreen QPA this leaf's tests run under (no
+    // platform clipboard registered at all there), in which case this is a
+    // deliberate no-op, not a crash or a silent fallback to the regular
+    // Ctrl+V clipboard (Qt's own `Selection` mode is a distinct store from
+    // `Clipboard` mode — qwidgettextcontrol.cpp's own MiddleButton handling
+    // never conflates the two, and neither does this).
+    if (event->button() == Qt::MiddleButton && m_doc && !m_readOnly
+        && QGuiApplication::clipboard()->supportsSelection()) {
+        const CanvasCursor hit = hitTest(event->pos());
+        if (!hit.block.isNull()) {
+            setFocus(Qt::MouseFocusReason);
+            m_selectionAnchor.reset();
+            setCaret(hit);
+            const QMimeData *primary =
+                QGuiApplication::clipboard()->mimeData(QClipboard::Selection);
+            if (primary)
+                insertText(primary->text());
+            event->accept();
+            return;
+        }
+    }
+
     QAbstractScrollArea::mousePressEvent(event);
 }
 
 void View::mouseMoveEvent(QMouseEvent *event)
 {
+    // P7.2: a press inside the selection is pending-drag, not
+    // pending-selection-drag — the branch above (regular selection-drag)
+    // must not run for it, hence the early return either way once
+    // m_dragPending is set (mousePressEvent only sets it when the LeftButton
+    // press landed inside an existing selection).
+    if (m_dragPending) {
+        if (!event->buttons().testFlag(Qt::LeftButton)) {
+            // Button released without a move ever reaching mouseMoveEvent
+            // again (e.g. release delivered directly) — nothing to do here;
+            // mouseReleaseEvent resolves the plain-click fallback.
+            return;
+        }
+        if ((event->pos() - m_dragPressPos).manhattanLength()
+            >= QApplication::startDragDistance()) {
+            startTextDrag();
+        }
+        event->accept();
+        return;
+    }
+
     if (event->buttons().testFlag(Qt::LeftButton) && m_doc && !m_caret.block.isNull()) {
         const CanvasCursor hit = hitTest(event->pos());
         if (!hit.block.isNull()) {
@@ -3595,6 +3798,27 @@ void View::mouseMoveEvent(QMouseEvent *event)
 
 void View::mouseReleaseEvent(QMouseEvent *event)
 {
+    // P7.2: a press inside the selection that never crossed the drag
+    // threshold resolves here as an ordinary click — reposition the caret
+    // to the press point and clear the selection, same outcome a plain
+    // click elsewhere already gets from mousePressEvent/mouseMoveEvent.
+    // (If the threshold WAS crossed, startTextDrag() already cleared
+    // m_dragPending before its blocking QDrag::exec() — this branch does
+    // not run for that case, since the release that ends the drag is
+    // consumed by the drag's own event loop, not delivered here.)
+    if (m_dragPending) {
+        m_dragPending = false;
+        if (m_doc) {
+            const CanvasCursor hit = hitTest(m_dragPressPos);
+            if (!hit.block.isNull()) {
+                m_selectionAnchor.reset();
+                setCaret(hit);
+            }
+        }
+        event->accept();
+        return;
+    }
+
     // Caret/selection placement happens on press/move; nothing left to do
     // on release. Accept so it doesn't propagate as unhandled.
     event->accept();

@@ -238,6 +238,13 @@ signals:
     /// actually binds against.
     void titleEdited(const QString &title);
 
+    /// Forwarded from the composed `View::fileDropped` (P7.2, spec
+    /// "drag-drop"). This leaf never inserts dropped file content as text
+    /// and never decides embed-vs-link itself — that decision belongs to
+    /// the consumer (Corbomite), which is why this carries just the
+    /// dropped URLs and the viewport-local drop position, nothing more.
+    void fileDropped(const QList<QUrl> &urls, const QPoint &viewportPos);
+
 private:
     /// Recomputes `EditorContext` from the composed `View`'s caret block
     /// (kind + heading level + table row/col via `View::caretTableCell()`,

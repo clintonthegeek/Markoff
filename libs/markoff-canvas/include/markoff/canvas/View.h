@@ -11,6 +11,7 @@
 #include <QList>
 #include <QRectF>
 #include <QSet>
+#include <QUrl>
 #include <QVariant>
 
 #include <markoff/core/BlockId.h>
@@ -24,8 +25,12 @@
 #include <markoff/canvas/TableTypes.h>
 
 class QContextMenuEvent;
+class QDragEnterEvent;
+class QDragMoveEvent;
+class QDropEvent;
 class QInputMethodEvent;
 class QMenu;
+class QMimeData;
 class QPainter;
 class QTextLayout;
 
@@ -680,6 +685,15 @@ signals:
     /// itself.
     void readOnlyChanged(bool ro);
 
+    /// Fired when a drop carries one or more local-file URLs (P7.2, spec
+    /// "drag-drop"). This view has no opinion on embed-vs-link — that is
+    /// explicitly the consumer's decision (Corbomite) — so the payload is
+    /// just the dropped URLs and the viewport-local drop position; nothing
+    /// is inserted into the document by this leaf on a file drop. Text
+    /// drops (`text/plain`/`text/markdown`) are handled entirely inside
+    /// `dropEvent` instead and never reach this signal.
+    void fileDropped(const QList<QUrl> &urls, const QPoint &viewportPos);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
@@ -688,6 +702,19 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    /// P7.2: accepts a drag iff it carries `text/plain`, `text/markdown`,
+    /// or local file URLs — same acceptance test `dropEvent` re-checks (Qt
+    /// re-queries accept per drag-move, so there is no cached "will
+    /// accept" flag to keep in sync).
+    void dragEnterEvent(QDragEnterEvent *event) override;
+    void dragMoveEvent(QDragMoveEvent *event) override;
+    /// Text drops route the dropped string through the same `insertText`
+    /// helper `paste()` uses (line-split + `tryStructuralKey`/
+    /// `insertPrintable`), after moving the caret to the drop point via
+    /// `hitTest`. File drops (local `QUrl`s) never touch the document —
+    /// they surface as `fileDropped` for the consumer to decide
+    /// embed-vs-link (spec: this leaf has no such authority).
+    void dropEvent(QDropEvent *event) override;
     void focusInEvent(QFocusEvent *event) override;
     void focusOutEvent(QFocusEvent *event) override;
     void inputMethodEvent(QInputMethodEvent *event) override;
@@ -712,6 +739,16 @@ protected:
     /// close out an in-progress link hover when the pointer leaves the
     /// viewport without a `mouseMoveEvent` ever reporting "no link here".
     bool eventFilter(QObject *obj, QEvent *event) override;
+    /// Builds the `QMimeData` a text drag-out (`mouseMoveEvent`) carries:
+    /// `text/plain` (via `QMimeData::setText`) and `text/markdown` set to
+    /// the same bytes — both views of one `selectedText()` snapshot, not
+    /// two different serializations. Caller owns the returned object;
+    /// `nullptr` if there is no selection. Protected (not private) so it
+    /// is independently testable without driving a real, blocking
+    /// `QDrag::exec()` — same "expose the seam, don't fake the modal loop"
+    /// reasoning `buildContextMenu` already follows for the context-menu
+    /// tests.
+    QMimeData *createMimeDataFromSelection() const;
 
 private:
     void onDocumentChanged();
@@ -903,15 +940,42 @@ private:
     void copy();
     /// Inserts the system clipboard's text at the caret, replacing any
     /// active selection first. No-op while read-only, with no document/
-    /// caret, or with empty clipboard text. Multi-line text is split on
-    /// '\n' (CRLF normalized first): each line is inserted via
-    /// `insertPrintable`, with a synthesized Return key routed through
-    /// `tryStructuralKey` between lines — the same block-split path a real
-    /// Enter keystroke uses, not a second one built for paste.
+    /// caret, or with empty clipboard text. Delegates the actual insertion
+    /// to `insertText()` (P7.2 factor-out — see its doc comment).
     void paste();
     /// Selects the whole document (first block byte 0 through the last
     /// block's end). No-op with no document or no blocks.
     void selectAll();
+
+    // ---- Drag-drop + middle-click paste (P7.2) ----------------------------
+    // Text drag out reuses `selectedText()` (same bytes `copy()` already
+    // puts on the clipboard); text drag in, file drop, and X11
+    // primary-selection middle-click paste all reuse `insertText()` below
+    // rather than growing a second text-insertion path per gesture.
+
+    /// The shared body `paste()`, the drop handler, and middle-click paste
+    /// all call: normalizes line endings, splits on '\n', and routes each
+    /// line-break through `tryStructuralKey()` (the same path a real Enter
+    /// keystroke uses) with each line's content going through
+    /// `insertPrintable()`. Collapses any active selection first. No-op
+    /// while read-only, with no document/caret, or with empty `text`.
+    void insertText(const QString &text);
+    /// Builds a `QDrag` from `createMimeDataFromSelection()` and execs it
+    /// (`mouseMoveEvent`'s drag-threshold branch calls this once the press
+    /// starts moving). Copy-only while read-only; Copy+Move once editable
+    /// (`qwidgettextcontrol.cpp`'s `startDrag()` shape). Move decision
+    /// (P7.2 finding, logged in the plan): a successful Move whose target
+    /// is NOT this view's own viewport deletes the source selection —
+    /// crossing to another view/application is a real move. A Move
+    /// dropped back onto this SAME view's viewport is treated as a copy
+    /// instead (the source selection is left alone): deleting it would
+    /// require re-deriving the now-stale source byte range after the
+    /// insert already landed at a different point in the same block/
+    /// document, which is exactly the kind of cross-edit offset
+    /// invalidation this leaf's byte-offset model (C4) does not attempt
+    /// to solve for a single gesture — logged as a scoped limitation
+    /// rather than built around.
+    void startTextDrag();
 
     // ---- Format verbs (P4.3) ----------------------------------------------
 
@@ -1206,6 +1270,21 @@ private:
     /// always read fresh from `m_doc->frontmatterValue("raw")`, never
     /// cached here (see the frontmatterBandHeight() doc comment).
     bool m_frontmatterExpanded = false;
+
+    // ---- Drag-drop (P7.2) --------------------------------------------------
+    /// Set by `mousePressEvent` when a plain (non-Shift) press lands INSIDE
+    /// the existing selection: the gesture is ambiguous until the next
+    /// move — either it stays under `QApplication::startDragDistance()`
+    /// (a plain click that should reposition the caret and clear the
+    /// selection, `qwidgettextcontrol.cpp`'s own `mightStartDrag`
+    /// precedent) or it crosses the threshold and `mouseMoveEvent` starts
+    /// a `QDrag`. Cleared on release and once a drag actually starts.
+    bool m_dragPending = false;
+    /// The press position that armed `m_dragPending` — the threshold
+    /// origin `mouseMoveEvent` measures against, and the fallback caret
+    /// target if the press turns out to be a plain click instead of a
+    /// drag (see `m_dragPending`'s doc comment).
+    QPoint m_dragPressPos;
 };
 
 }  // namespace Markoff::Canvas
