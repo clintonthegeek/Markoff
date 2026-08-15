@@ -48,7 +48,8 @@ SpecialTreatment classifySpecialChar(char16_t ch)
 {
     if (ch == u'\t' || ch == u'\n')
         return SpecialTreatment::None;
-    // FALSIFY (throwaway): C0 controls/DEL no longer get a control-picture glyph.
+    if (ch <= 0x1f || ch == 0x7f)
+        return SpecialTreatment::ControlPicture;
     if ((ch >= 0x80 && ch <= 0x9f)     // C1 controls
         || ch == 0x00ad                 // soft hyphen
         || ch == 0x200b                 // zero-width space
