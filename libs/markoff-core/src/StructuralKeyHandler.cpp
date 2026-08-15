@@ -124,7 +124,7 @@ StructuralResult listItemEnter(MarkoffDocument &doc, BlockId block,
                           static_cast<uint32_t>(suffix.size()), QByteArray{}, t);
     const BlockId nb = Cmd::insertListItemAfter(doc, block, t);
     doc.d2ApplyBufferEdit(nb, 0, 0, suffix, t);
-    // FALSIFY: renumberRunStartingAt(doc, nb, t) intentionally omitted.
+    Cmd::renumberRunStartingAt(doc, nb, t);
     return {true, nb, 0};
 }
 
