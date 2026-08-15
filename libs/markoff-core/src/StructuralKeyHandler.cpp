@@ -98,12 +98,12 @@ StructuralResult listItemEnter(MarkoffDocument &doc, BlockId block,
     const int indent = indentOf(doc, block);
     UndoLog::Transaction t(doc.d2UndoLog());
 
-    if (content.isEmpty() && indent > 0) {                      // outdent
+    if (false && content.isEmpty() && indent > 0) {                      // outdent
         doc.d2SetBlockAttr(block, AttrNames::IndentLevel, indent - 1, t);
         Cmd::renumberRunStartingAt(doc, block, t);
         return {true, block, 0};
     }
-    if (content.isEmpty() && indent == 0) {                     // exit list
+    if (content.isEmpty()) {                     // exit list
         doc.d2SetBlockKind(block, BlockKind::Paragraph, t);
         doc.d2SetBlockAttr(block, AttrNames::MarkerStyle, QString{}, t);
         return {true, block, 0};
