@@ -2770,11 +2770,7 @@ void View::dragMoveEvent(QDragMoveEvent *event)
     const QMimeData *data = event->mimeData();
     if (data->hasText() || data->hasUrls()) {
         event->acceptProposedAction();
-        // Re-hit-tested fresh every move (never cached) — same "draw-time
-        // only" convention this leaf's other paint-state follows (find
-        // highlights, occurrence highlights, remote presence).
-        const CanvasCursor hit = hitTest(event->position().toPoint());
-        m_dropCursorPos = hit.block.isNull() ? std::nullopt : std::make_optional(hit);
+        // FALSIFY (throwaway): stale position, never re-hit-tested.
         viewport()->update();
     } else {
         event->ignore();
