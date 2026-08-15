@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 5 CLOSED, P5.7)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 6 opened, P6.0 landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -23,8 +23,9 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   P2.4 (perf re-baseline, all E9 budgets held); Phase 3 (MarkdownView
   contract v2) closed 2026-08-14 at P3.7; Phase 4 (inline/text parity)
   closed 2026-08-14 at P4.8; Phase 5 (block parity) closed 2026-08-14
-  at P5.7 (perf re-baseline held). Phase 6 (collaboration surface) is
-  next, starting at P6.1.
+  at P5.7 (perf re-baseline held). Phase 6 (collaboration surface)
+  opened 2026-08-14 with P6.0 (core anchor seam + fold retro-wire to
+  Session, reduced scope — see plan findings log); next is P6.1.
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -33,13 +34,14 @@ P2.1–P2.3 done).
 
 ## Test baseline
 
-**306/306 (100%)** on the full `scripts/run-tests.sh`, re-verified
-2026-08-14 at Phase 5 close (P5.7) — up from the 300/300 baseline at
-Phase 4 close via six new canvas executables registered this phase
-(`tst_canvas_table_wrap_nav` P5.1, `tst_canvas_table_ops` P5.2,
-`tst_canvas_math` P5.3, `tst_canvas_media_seams` P5.4,
-`tst_canvas_side_content` P5.5, `tst_canvas_folding` P5.6).
-`check-constitution.sh` clean (C1–C4) over 66 files. Perf re-baseline
+**307/307** on the full `scripts/run-tests.sh` (one new executable,
+`tst_d2_block_crdt_anchor`, registered at P6.0), verified 2026-08-14 —
+up from the 306/306 baseline at Phase 5 close via six new canvas
+executables registered that phase (`tst_canvas_table_wrap_nav` P5.1,
+`tst_canvas_table_ops` P5.2, `tst_canvas_math` P5.3,
+`tst_canvas_media_seams` P5.4, `tst_canvas_side_content` P5.5,
+`tst_canvas_folding` P5.6). `check-constitution.sh` clean (C1–C4) over
+66 files. Perf re-baseline
 (`build-perf`, `tst_canvas_perf_500` + `tst_canvas_perf_formatted`)
 held with folding + table wrap/ops in the y-position walk: load→paint
 188 ms/500 ms, p95 keystroke 1.38 ms/16 ms, scroll-realize
@@ -48,12 +50,20 @@ task; any drop is a regression (classify before fixing).
 
 ## Dormant items
 
-- **No D2-safe core accessor from `(BlockAnchor, offset)` to a
-  `CollabText::Crdt::Anchor`** (P5.6 finding): blocks genuinely wiring
-  `Session::foldedRegions`/`FoldRef` — canvas folding instead lives in
-  `View`'s own block-index scheme, same precedent P3.6 already set for
-  scroll/cursor. **Scheduled 2026-08-14: plan task P6.0** (Phase 6
-  opener) — no longer merely dormant; closes when P6.0 lands.
+- **CLOSED 2026-08-14 (P6.0, commit `f2e705d5`):** the D2-safe core
+  accessor now exists (`MarkoffDocument::blockCrdtAnchorAt`/
+  `resolveBlockCrdtAnchor`) and `View::toggleFold()` writes every fold
+  through to `Session::foldedRegions`/`FoldRef`. **New dormant item
+  opened in its place:** the reverse direction (rebuilding
+  `View::m_foldedHeads` FROM cold/restored `Session` state) is
+  unsound as designed — per-block CRDT buffers share one Lamport
+  clock seed (`Buffer(d->replicaId)`, no per-block offset), so
+  different foldable blocks' byte-0 anchors routinely collide and
+  `FoldRef::start` alone can't disambiguate which block a collided
+  anchor names. `m_foldedHeads` stays the View's own write authority;
+  Session is a write-through mirror only. Closing generally needs
+  `FoldRef` to carry a block identity (core schema change). Full
+  writeup: plan findings log, P6.0 entry.
 - **Inline math (`$...$`) renders as styled monospace, not real
   glyphs** (P5.3 finding) — **now a scheduled arrival, not a Qt
   limitation** (2026-08-14 investigation): standalone `QTextLayout`

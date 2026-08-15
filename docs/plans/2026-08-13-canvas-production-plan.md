@@ -143,7 +143,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P5.6 Folding via Session | ☑ (reduced scope — see finding) | `989c714d` | `1a4fd240` / `ef298d6a` |
 | P5.7 ⏸ phase close | ☑ | n/a | n/a |
 | **P6 — collaboration surface** | | | |
-| P6.0 Core anchor seam (BlockId,offset)→Crdt::Anchor + fold retro-wire | ☐ | | |
+| P6.0 Core anchor seam (BlockId,offset)→Crdt::Anchor + fold retro-wire | ☑ (reduced scope — see finding) | `f2e705d5` | A: `0ae44b21`/`a27055d0`; B: `2e115920`/`f0ac20a3` |
 | P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☐ | | |
 | P6.2 Remote presence rendering (carets, tints, flags) | ☐ | | |
 | P6.3 Remote-edit-mid-IME + concurrency torture tests | ☐ | | |
@@ -609,6 +609,39 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
 - Same investigation resolved the P5.6/P3.6 anchor-accessor question:
   promoted to plan task **P6.0** (new) so Phase 6 opens with the
   named core seam instead of a third Session bypass.
+
+**P6.0 (2026-08-14).**
+
+- Part A landed as designed: `MarkoffDocument::blockCrdtAnchorAt(BlockAnchor,
+  offset, Bias) -> Crdt::Anchor` + inverse `resolveBlockCrdtAnchor`,
+  promoted out of the D2 branches `textAnchorAt(BlockAnchor,...)`/
+  `offsetInBlock(...)` already had. `tst_d2_block_crdt_anchor` falsifies
+  against a block created after D2 load.
+- Part B (fold retro-wire) landed with **reduced scope**, same shape as
+  P5.6's own reduction: `View::toggleFold()` now pushes every fold
+  through to `Session::toggleFold()` (via a new `foldRefFor()` helper
+  built on the Part-A seam), so `session->foldedRegions()` is genuine
+  external-readable state — falsified by `tst_canvas_folding`'s new
+  `toggle_fold_writes_through_to_session()`. What did NOT land: reversing
+  the direction (rebuilding `View::m_foldedHeads` FROM
+  `session->foldedRegions()`, e.g. on session restore). Root cause: each
+  block's per-block CRDT buffer is constructed as `Buffer(d->replicaId)`
+  — no per-block offset seeds its Lamport clock — so two different
+  foldable blocks' byte-0 anchors routinely collide on
+  `(replica_id, char_value)` (reproduces on any two-heading document,
+  not a rare edge case). `FoldRef::start` carries no block identity to
+  disambiguate a collision, so a generic reverse-resolve is unsound as
+  designed. `m_foldedHeads` therefore stays authoritative for the View's
+  own writes; Session is a write-through mirror, not yet a restorable
+  source of truth for cold/remote fold state. Closing this generally
+  needs `FoldRef` to carry a block identity — a core schema change, out
+  of this task's named seam; logged here rather than improvised.
+  `headingPath` on the emitted `FoldRef` is also left empty (would need
+  new ancestor-heading-chain plumbing `Folding::resolveFoldable`'s
+  `FoldInfo` doesn't carry) — `headingLevel` alone is populated.
+- Full suite: 306/307 (one pre-existing `tst_gc` fuzz flake in the
+  collabtext submodule, untouched by this task; confirmed
+  non-reproducing across 3 reruns). Constitution clean (C1–C4).
 
 **P5.7 (2026-08-14) — phase close.**
 
