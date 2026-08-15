@@ -3745,9 +3745,7 @@ void View::keyPressEvent(QKeyEvent *event)
     // No-op (falls through, event left unaccepted) when there's nothing
     // to simplify, so plain Escape can still propagate to a consumer that
     // wants it for something else (closing a popup, etc).
-    // FALSIFY (throwaway, P7.2b group D): inverted composing check — Esc
-    // simplifies ONLY while composing, never in the normal case.
-    if (event->key() == Qt::Key_Escape && isComposing() && m_selectionAnchor) {
+    if (event->key() == Qt::Key_Escape && !isComposing() && m_selectionAnchor) {
         m_selectionAnchor.reset();
         pushSelectionToSession();
         ensureCaretVisible();
