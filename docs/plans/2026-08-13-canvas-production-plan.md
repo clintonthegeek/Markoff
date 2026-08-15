@@ -148,9 +148,9 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P6.2 Remote presence rendering (carets, tints, flags) | ☑ | `d920c694` (+ test fix `b8f2fff4`) | `df42c919`/`b11122fb` |
 | P6.3 Remote-edit-mid-IME + concurrency torture tests | ☑ | `1298488c` | A: `2ef531e6`/`5fbbc5c8`; B: `6fa35e12`/`321eb61f` |
 | P6.4 ⏸ phase close | ☑ | n/a | n/a |
-| **G1 — user gate: accessibility scope** | ☐ | — | — |
+| **G1 — user gate: accessibility scope** | ☑ deferred 2026-08-14 | — | — |
 | **P7 — polish + a11y** | | | |
-| P7.1 Accessibility (per G1) | ☐ | | |
+| P7.1 Accessibility (per G1) | ⏭ deferred — see G1 | n/a | n/a |
 | P7.2 Drag-drop + middle-click paste | ☐ | | |
 | P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☐ | | n/a |
 | **G2 — user gate: Corbomite adoption** (work lands in Corbomite repo) | ☐ | — | — |
@@ -518,8 +518,13 @@ fix-quietly.
 ## Phase 7 — polish + a11y (after gate G1)
 
 ### P7.1 — accessibility per G1 decision
-(scope set by the user at G1; budget order-weeks if full
-`QAccessibleTextInterface`).
+**G1 decided 2026-08-14: deferred.** User chose to skip P7.1 for this
+arc rather than build either the full `QAccessibleTextInterface` or a
+basic `QAccessibleWidget` stub — move straight to P7.2/P7.3. Canvas
+therefore ships this arc with **no accessibility support**, an
+explicit, logged gap (not an oversight) — carry this forward to any
+G2/G3 adoption or retirement decision, and revisit as its own future
+task if a11y is ever prioritized.
 ### P7.2 — drag-drop + middle-click paste
 Text drag in/out (plain text + `text/markdown`), file-drop → signal
 to consumer (Corbomite decides embed vs link), X11 primary-selection

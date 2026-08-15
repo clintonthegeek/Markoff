@@ -30,8 +30,11 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   caret bar, name flag, selection tint), P6.3 (IME-vs-concurrent-
   remote-edit + seeded gremlin fuzz convergence test — no C1/C2
   workaround needed, both tests passed on the first run), P6.4 (⏸
-  phase close, full suite 310/310). Phase 7 (polish + a11y) is next,
-  gated on user gate G1 (accessibility scope).
+  phase close, full suite 310/310). **G1 decided 2026-08-14: user
+  deferred accessibility** — P7.1 skipped for this arc, canvas ships
+  with no a11y support this arc (explicit, logged gap, not an
+  oversight). Phase 7 continues at P7.2 (drag-drop + middle-click
+  paste).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
