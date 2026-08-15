@@ -144,7 +144,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P5.7 ⏸ phase close | ☑ | n/a | n/a |
 | **P6 — collaboration surface** | | | |
 | P6.0 Core anchor seam (BlockId,offset)→Crdt::Anchor + fold retro-wire | ☑ (reduced scope — see finding) | `f2e705d5` | A: `0ae44b21`/`a27055d0`; B: `2e115920`/`f0ac20a3` |
-| P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☐ | | |
+| P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☑ | `f8b66807` | `4e1711df`/`f073658d` |
 | P6.2 Remote presence rendering (carets, tints, flags) | ☐ | | |
 | P6.3 Remote-edit-mid-IME + concurrency torture tests | ☐ | | |
 | P6.4 ⏸ phase close | ☐ | | n/a |
@@ -642,6 +642,95 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
 - Full suite: 306/307 (one pre-existing `tst_gc` fuzz flake in the
   collabtext submodule, untouched by this task; confirmed
   non-reproducing across 3 reruns). Constitution clean (C1–C4).
+
+**P6.1 (2026-08-14).**
+
+- **`setCaret()` does not cover every real caret move — the task's
+  initial framing (and that method's own doc comment) assumed it did.**
+  Arrow-key motion (`moveCaretHorizontally`/`moveCaretVertically`/
+  `moveCaretToLineEdge`), `deleteCluster()`, `insertPrintable()`,
+  `tryStructuralKey()`, and the IME commit branch of
+  `inputMethodEvent()` all mutate `m_caret` directly and never call
+  `setCaret()`. `View::pushSelectionToSession()` (new private helper —
+  builds an anchor-typed `Markoff::Selection` from
+  `m_caret`/`m_selectionAnchor`, Right bias on both ends per
+  `LiveCursorState.cpp:772`'s precedent) is therefore called from all of
+  those sites directly, not only from `setCaret()` and the
+  `m_selectionAnchor` mutation sites the task named. The falsification
+  break (disabling only `setCaret()`'s call) left 6/7 of the new test's
+  cases still passing — proof the other call sites are independently
+  load-bearing, not redundant. Full audit: every `m_selectionAnchor`
+  assignment/`.reset()` site in `View.cpp` was inspected; the ones
+  already followed by a same-step `setCaret()` call (format ops, table
+  Tab navigation, mouse press/drag, `selectAll()`) needed no separate
+  push — everything else (`collapseSelection()`'s two tails,
+  `tryTableTab()`'s no-op branch, the title-click selection-collapse in
+  `mousePressEvent()`, the undo/redo selection-collapse in
+  `keyPressEvent()`) got one.
+- **`MarkoffDocument::blockAt(const TextAnchor &)` is dead code — always
+  returns `nullopt`.** This is the accessor the task named for
+  `onDocumentChanged()`'s resolve-from-session step. Its implementation
+  (`MarkoffDocument.cpp:840`) walks `d->latestBlockRanges`/
+  `d->latestBlockAnchors`; grepping the whole `markoff-core/src` tree
+  shows those two `Private` members are read in exactly four functions
+  (`textAnchorAt(quint32,bool)`'s legacy fallback, `blockAnchorAt`,
+  `blockByteRange`, `blockAt`) and **never assigned anywhere** — not
+  merely "stale after D2 edits" the way `offsetInBlock()`'s neighboring
+  comment (`d2ApplyBufferEdit`, line 1384) describes its own legacy
+  path, but permanently empty on every document, D2-loaded or legacy,
+  from construction onward. `blockAt()` therefore cannot resolve
+  anything, ever, in the current codebase. `markoff-core/` is closed for
+  this task (P6.1 consumes P6.0's seam, doesn't add or fix one), so this
+  was worked around rather than fixed: `TextAnchor` already carries the
+  `BlockId` its per-block CRDT anchor was cut against
+  (`TextAnchor::block()`, a public accessor), and
+  `offsetInBlock(BlockAnchor, TextAnchor)` **does** correctly D2-dispatch
+  (confirmed by the P6.0 finding — it goes through
+  `resolveBlockCrdtAnchor` against the block's own buffer, never
+  `latestBlockRanges`). Checking `m_cache->indexOf(anchor.block())` is
+  still a live entry, then reading `offsetInBlock()`, gives the same
+  "resolves, or falls through if the content is gone" contract without
+  going near the broken function. This does not attempt to follow
+  content across a block *merge* (an anchor's `.block()` is the block it
+  was cut in, not wherever that content might have moved to) — no
+  working `blockAt()` exists to compare that case against either way.
+  **Flagging for whoever owns `markoff-core` next**: `blockAt()`,
+  `blockAnchorAt(int)`, and `blockByteRange(BlockAnchor)` are three
+  more public accessors than `blockAt()` alone silently returning
+  `nullopt`/empty on every call — worth a real look, not a P6.x
+  workaround, since other consumers may already be relying on them
+  believing they work.
+- `onDocumentChanged()`'s resolve-from-session step (using the
+  `TextAnchor::block()` workaround above) is additive over `clampCaret`,
+  exactly as specced: tried first for both the caret and (when the
+  Session holds a real range) the selection anchor, falling through to
+  the pre-P6.1 index-based/drop behavior unchanged when the Session
+  isn't attached or the anchor's block is no longer a live cache entry.
+- Undo/redo (guide §B.4): confirmed canvas carries the same honest gap
+  live/styled/source do. `undoD2()`/`redoD2()` mutate the document and
+  nothing else — no Selection is written back to the Session. A
+  pre-undo push's anchor can still resolve post-undo (if the undone edit
+  didn't touch the caret's own block's identity) but is not a promise of
+  restoring the pre-edit caret; the test
+  (`undo_falls_through_to_clamp_when_session_anchor_is_stale`) exercises
+  the case where it doesn't (types text, undoes it, and the anchor names
+  now-deleted content) and asserts the fall-through to `clampCaret`'s
+  plain byte-clamp lands cleanly rather than stranding the caret. Not
+  patched — out of this task's named scope, per the guide's own
+  instruction not to.
+- New test: `tests/tst_canvas_session_selection.cpp` (5 cases: typing,
+  arrow-key motion, shift-selection range, anchor-based re-resolve
+  across a front-of-block edit that shifts the caret's byte offset, and
+  the undo fallback). Falsification: disabled `setCaret()`'s
+  `pushSelectionToSession()` call — `4e1711df`/`f073658d` — 1 of 5 cases
+  failed (`model_change_reresolves_caret_from_session_anchor`, the one
+  whose only push comes from the initial `setCaretPosition()` →
+  `setCaret()` call), confirming that push site is load-bearing without
+  masking the others.
+- Canvas-scoped suite: 30/30 (added `tst_canvas_session_selection`, up
+  from 29). Constitution clean (C1–C4). Full suite not run per the
+  plan's own tier rule (diff stays inside `libs/markoff-canvas/`, no
+  core seam touched).
 
 **P5.7 (2026-08-14) — phase close.**
 
