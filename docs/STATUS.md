@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 7, P7.2 landed)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 7, P7.2a landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -42,8 +42,18 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   embed-vs-link), and X11 primary-selection middle-click paste
   (no-op under this leaf's offscreen test environment, which has no
   platform clipboard integration — real behavior can't be exercised
-  here, only the guard path). Phase 7 continues at P7.3 (⏸ arc close:
-  Obsidian parity audit + full audit).
+  here, only the guard path). User then directed F1 gap closure
+  (P7.2a-g, 2026-08-14): **P7.2a (undo-coalescing defect, F1 #3)**
+  landed same day — `View::insertPrintable` now routes each typed
+  character through `Cmd::insertCharacter`, so printable-only,
+  same-block runs within 1000ms coalesce into one undo entry
+  (`UndoLog::maybeCoalesceOrTransaction`) instead of one entry per
+  keystroke; surrogate-pair codepoints (emoji) fall back to a direct
+  `maybeCoalesceOrTransaction` call with `isPrintable=false` to avoid
+  the QChar-only signature's data-loss trap (see plan findings log).
+  No core change needed. Phase 7 continues at P7.2b (editing-command
+  floor) through P7.2g, then P7.3 (⏸ arc close: Obsidian parity audit
+  + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -78,6 +88,13 @@ file-drop signal shape, middle-click no-op-when-unsupported).
 plan's tier rule (P7.2's diff stays inside `libs/markoff-canvas/`, no
 core seam touched); the 310/310 full-suite figure above is still the
 last verified whole-tree number, from P6.4.
+
+P7.2a (2026-08-14) re-verified 33/33 on the same canvas-scoped suite —
+no new executable, `tst_canvas_undo` extended with
+`consecutive_printable_keys_coalesce_into_one_undo_entry`.
+`check-constitution.sh` clean. Full suite not re-run (diff stays
+inside `libs/markoff-canvas/`; the only core header touched,
+`Cmd/D2.h`, is pre-existing public API, no core seam changed).
 
 ## Dormant items
 

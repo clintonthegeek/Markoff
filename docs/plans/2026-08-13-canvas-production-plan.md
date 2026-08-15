@@ -152,7 +152,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | **P7 — polish + a11y** | | | |
 | P7.1 Accessibility (per G1) | ⏭ deferred — see G1 | n/a | n/a |
 | P7.2 Drag-drop + middle-click paste | ☑ | `565aeee1` (+ comment fix `2131929e`) | A: `056f9215`/`504fbc4f`; B: `67c2d433`/`1254a421`; C: `b285a6e7`/`f9e7e2c9` |
-| P7.2a F1#3 undo-coalescing defect fix | ☐ | | |
+| P7.2a F1#3 undo-coalescing defect fix | ☑ | `0ceceda0` | `44cc112d` / `be83a674` |
 | P7.2b F1#1 editing-command floor | ☐ | | |
 | P7.2c F1#4 auto-pairing / wrap-selection | ☐ | | |
 | P7.2d F1#5 Enter/Backspace semantics checklist | ☐ | | |
@@ -804,6 +804,47 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
   didn't add executables). Constitution clean (C1–C4). Full suite not
   run per the plan's own tier rule (diff stays inside
   `libs/markoff-canvas/`, no core seam touched).
+
+**P7.2a (2026-08-14).**
+
+- Straight defect fix, matched the plan's own diagnosis exactly:
+  `View::insertPrintable` now iterates the inserted text by Unicode
+  codepoint and calls `Cmd::insertCharacter` per BMP (single-QChar)
+  codepoint, which is what actually reaches
+  `UndoLog::maybeCoalesceOrTransaction`. No core change needed —
+  `Cmd::insertCharacter` and `UndoLog::maybeCoalesceOrTransaction`
+  already existed and were already public; canvas just wasn't calling
+  them.
+- **One real wrinkle the plan's write-up didn't anticipate:**
+  `Cmd::insertCharacter` takes a single `QChar`, but `insertPrintable`
+  is also the path multi-QChar-per-codepoint text takes (surrogate-
+  pair emoji — already covered by `tst_canvas_typing`, not new
+  coverage added here). Splitting a surrogate pair into two
+  `insertCharacter` calls would silently corrupt it:
+  `QString(loneSurrogateHalf).toUtf8()` yields **zero bytes**, not a
+  replacement character, verified with a throwaway standalone Qt
+  program before writing the fix. Surrogate-pair codepoints instead
+  call `UndoLog::maybeCoalesceOrTransaction` directly (same public API
+  `Cmd::insertCharacter` itself uses) with the full codepoint's correct
+  UTF-8 bytes and `isPrintable=false` — the `false` is deliberate: it
+  guarantees this insert never coalesces into a neighboring run, so a
+  bare-Transaction-shaped edge case never gets silently merged into an
+  adjacent printable character's undo entry.
+- IME commit (`View::inputMethodEvent`) does **not** call
+  `insertPrintable` — it already had its own direct
+  `d2ApplyBufferEdit` path (replacement + commit as one op) before
+  this task and is untouched; only the keypress and paste/drag-in/
+  middle-click-paste paths (all funneling through `insertPrintable` or
+  `insertText`'s per-line loop) changed.
+- Falsification: reverting to the bare-`Transaction`-per-call body
+  flips `tst_canvas_undo`'s new
+  `consecutive_printable_keys_coalesce_into_one_undo_entry` from 1
+  undo entry to 2, confirming the test actually depends on the fix.
+- Canvas-scoped suite: 33/33 (no new test executable —
+  `tst_canvas_undo` already existed; extended with the coalescing
+  case). Constitution clean (C1–C4). Full suite not run per the plan's
+  tier rule (diff stays inside `libs/markoff-canvas/`, no core seam
+  touched, core header included is pre-existing public API).
 
 **P6.3 (2026-08-14).**
 
