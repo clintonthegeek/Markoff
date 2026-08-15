@@ -17,6 +17,7 @@
 #include <markoff/core/FoldRef.h>
 #include <markoff/core/FormatOps.h>
 #include <markoff/core/LinkActivation.h>
+#include <markoff/core/Selection.h>
 #include <markoff/core/Theme.h>
 
 #include <markoff/canvas/MediaSeams.h>
@@ -69,6 +70,22 @@ struct FindHighlight {
     /// SearchActiveMatchBackground vs SearchMatchBackground) — the
     /// currently-selected match under FindController::currentMatchIndex.
     bool isCurrent = false;
+};
+
+/// A remote participant's cursor/selection to paint (P6.2, spec §5
+/// collaboration surface). Thin wrapper around `Markoff::Selection` rather
+/// than a separate flat `{Selection, displayName, QColor}` triple: Selection
+/// already carries `participantLabel`/`presenceColor`/`kind` (Selection.h),
+/// purpose-built for `Kind::Presence`, so a second copy of the same three
+/// fields would just be a second, potentially-conflicting source of truth
+/// for the exact same state (findings log, P6.2). `selection.kind` is
+/// expected to be `Selection::Kind::Presence`; `View` does not assume that
+/// from list membership — it checks the kind at paint time (F1a: multi-
+/// cursor readiness), so a later local multi-cursor list feeding
+/// `Selection::Kind::Secondary` entries through the same mechanism reuses
+/// this exact paint path instead of growing a second one.
+struct RemotePresence {
+    Markoff::Selection selection;
 };
 
 /// Content column width policy (contract-v2 P4.5, spec §5.2 "Word wrap"):
@@ -530,6 +547,31 @@ public:
     /// `id`, in the order last passed to `setFindHighlights`.
     QList<FindHighlight> findHighlightsForBlock(BlockId id) const;
 
+    // ---- Remote presence (contract-v2 P6.2) ------------------------------
+
+    /// Replace all remote-participant presences to paint: caret bar + name
+    /// flag (drawn by hand — `QTextLayout::drawCursor` only draws the LOCAL
+    /// caret, in the theme's own color, and takes no per-call color) plus a
+    /// selection tint in the participant's own color, all draw-time
+    /// `QTextLayout::FormatRange`s built fresh in `paintEvent` alongside the
+    /// local selection/find-highlight ranges (spec §3: the layout stays a
+    /// pure derived cache, never a `setFormats()` mutation). Resolved from
+    /// each `Selection`'s `TextAnchor`s against the CURRENT document on
+    /// every paint — never cached CanvasCursor state — so an anchor whose
+    /// block no longer exists (or was never realized) just fails to resolve
+    /// and is silently skipped; stale/departed-participant filtering
+    /// (collabtext `PresenceManager::is_live`) is the consumer's job, not
+    /// this leaf's. Passing an empty list clears all presence paint state.
+    void setRemotePresences(const QList<RemotePresence> &presences);
+
+    /// Test/inspection surface only — nothing here is authority (same rule
+    /// as `findHighlightsForBlock`). The subset of the last-set presences
+    /// (`Selection::Kind::Presence` only) whose resolved anchor/active range
+    /// touches block `id`, in the order last passed to `setRemotePresences`.
+    /// A presence whose anchor(s) don't currently resolve (block gone/never
+    /// realized) is omitted, same as it would be at paint time.
+    QList<RemotePresence> remotePresencesForBlock(BlockId id) const;
+
     // ---- Links (contract-v2 P4.2) ---------------------------------------
 
     /// Consumer-owned link resolution/activation authority (spec §5.2).
@@ -835,6 +877,17 @@ private:
     /// selection is cleared. No-op if there is no selection.
     void collapseSelection();
 
+    // ---- Remote presence (P6.2) -------------------------------------------
+
+    /// Resolves a Presence Selection's TextAnchor against the CURRENT
+    /// document: `{}` if the anchor is null or its origin block
+    /// (`TextAnchor::block()`) is not a live cache entry (departed/gone
+    /// content) — same "resolve, or nullopt" contract `onDocumentChanged`'s
+    /// P6.1 workaround uses (`MarkoffDocument::blockAt` is dead code — see
+    /// that finding), reused here rather than re-derived. Never cached;
+    /// called fresh every paint.
+    std::optional<CanvasCursor> resolvePresenceAnchor(const Markoff::TextAnchor &anchor) const;
+
     // ---- Cut/copy/paste/select-all (P4.4) --------------------------------
     // Shared by the keyboard shortcuts (keyPressEvent's existing
     // Ctrl+A/C/X, plus the Ctrl+V this task adds) and the context menu's
@@ -1070,6 +1123,14 @@ private:
     /// during `paintEvent`. Draw-time-only paint state — see
     /// `setFindHighlights`'s doc comment.
     QHash<BlockId, QList<FindHighlight>> m_findHighlightsByBlock;
+    /// Remote-participant presences (P6.2). Kept as a flat list, NOT grouped
+    /// by block the way `m_findHighlightsByBlock` is: a Presence Selection's
+    /// range is named by two `TextAnchor`s, which resolve to a block only by
+    /// re-consulting the document (`resolvePresenceAnchor`), so a per-block
+    /// index built at `setRemotePresences` time would itself be exactly the
+    /// kind of cached-resolved-position state the "never cached" rule (this
+    /// struct's own doc comment) rules out. Draw-time-only paint state.
+    QList<RemotePresence> m_remotePresences;
 
     // ---- Folding (P5.6, retro-wired to Session in P6.0) ------------------
     /// Fold heads currently toggled ON. Remains the authority for the

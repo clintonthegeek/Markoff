@@ -515,6 +515,13 @@ void EditorWidget::setEmbedRegistry(Markoff::EmbedRegistry *registry)
     if (m_view) m_view->setEmbedRegistry(registry);
 }
 
+// --- Remote presence (P6.2) ---
+
+void EditorWidget::setRemotePresences(const QList<Markoff::Canvas::RemotePresence> &presences)
+{
+    if (m_view) m_view->setRemotePresences(presences);
+}
+
 // --- Format verbs (contract-v2 P4.3) ---
 // Each verb delegates straight to the composed View's own method — no
 // second implementation, and no indirection through actionController()'s

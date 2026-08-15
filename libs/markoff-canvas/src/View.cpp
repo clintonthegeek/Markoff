@@ -1936,6 +1936,50 @@ QList<FindHighlight> View::findHighlightsForBlock(BlockId id) const
     return m_findHighlightsByBlock.value(id);
 }
 
+void View::setRemotePresences(const QList<RemotePresence> &presences)
+{
+    m_remotePresences = presences;
+    viewport()->update();
+}
+
+// Same "resolve, or nullopt" contract as onDocumentChanged()'s P6.1
+// workaround (see that function's comment): TextAnchor::block() names the
+// block the anchor was cut in directly, so checking it is still a live
+// cache entry and reading offsetInBlock() gets a resolved position without
+// going near the always-nullopt MarkoffDocument::blockAt(). Never cached —
+// called fresh every time (once per paint per presence, from paintEvent and
+// from remotePresencesForBlock's test-only mirror of it).
+std::optional<CanvasCursor> View::resolvePresenceAnchor(const Markoff::TextAnchor &anchor) const
+{
+    if (!m_doc || anchor.isNull())
+        return std::nullopt;
+    if (m_cache->indexOf(anchor.block()) < 0)
+        return std::nullopt;
+    return CanvasCursor{anchor.block(), m_doc->offsetInBlock(anchor.block(), anchor)};
+}
+
+QList<RemotePresence> View::remotePresencesForBlock(BlockId id) const
+{
+    QList<RemotePresence> out;
+    for (const RemotePresence &presence : m_remotePresences) {
+        if (presence.selection.kind != Markoff::Selection::Kind::Presence)
+            continue;
+        const auto start  = resolvePresenceAnchor(presence.selection.anchor);
+        const auto active = resolvePresenceAnchor(presence.selection.active);
+        if (!start || !active)
+            continue;
+        CanvasCursor a = *start, b = *active;
+        if (caretLessThan(b, a))
+            std::swap(a, b);
+        const int idx      = m_cache->indexOf(id);
+        const int firstIdx = m_cache->indexOf(a.block);
+        const int lastIdx  = m_cache->indexOf(b.block);
+        if (idx >= firstIdx && idx <= lastIdx)
+            out.append(presence);
+    }
+    return out;
+}
+
 void View::collapseSelection()
 {
     const auto sel = orderedSelection();
@@ -3967,6 +4011,42 @@ void View::paintEvent(QPaintEvent *event)
             }
         }
 
+        // Remote presence selection tint (P6.2): same draw-time FormatRange
+        // mechanism as the local selection/find-highlight ranges above,
+        // never a layout format mutation. Resolved fresh every paint from
+        // each presence's own TextAnchors (never cached CanvasCursor
+        // state) — an anchor whose block is gone/unrealized just fails to
+        // resolve and that presence is silently skipped here; a collapsed
+        // presence (anchor == active, a bare remote caret) gets no tint,
+        // only the caret bar + flag below. Kind-tagged (F1a): only
+        // Selection::Kind::Presence entries get this treatment, checked on
+        // the selection itself, not assumed from list membership.
+        for (const RemotePresence &presence : m_remotePresences) {
+            if (presence.selection.kind != Markoff::Selection::Kind::Presence)
+                continue;
+            const auto start  = resolvePresenceAnchor(presence.selection.anchor);
+            const auto active = resolvePresenceAnchor(presence.selection.active);
+            if (!start || !active || *start == *active)
+                continue;
+            CanvasCursor a = *start, b = *active;
+            if (caretLessThan(b, a))
+                std::swap(a, b);
+            const auto [fromByte, toByte] = selectedByteRangeInBlock(e.id, a, b);
+            if (toByte <= fromByte)
+                continue;
+            // Same snap-direction convention as local selection/find
+            // highlights (spec §4.2): start snaps Left, end snaps Right.
+            const int qFrom = e.projection.byteToLayoutQChar(
+                fromByte, ProjectionMap::SnapDirection::Left);
+            const int qTo = e.projection.byteToLayoutQChar(
+                toByte, ProjectionMap::SnapDirection::Right);
+            if (qTo > qFrom) {
+                QTextCharFormat fmt;
+                fmt.setBackground(presence.selection.presenceColor);
+                selections.push_back({qFrom, qTo - qFrom, fmt});
+            }
+        }
+
         p.setPen(e.style.foreground);
         e.layout->draw(&p, QPointF(contentX, contentY), selections);
 
@@ -3974,6 +4054,59 @@ void View::paintEvent(QPaintEvent *event)
             const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
             p.setPen(m_theme.color(Theme::Slot::CursorPrimary));
             e.layout->drawCursor(&p, QPointF(contentX, contentY), layoutPos);
+        }
+
+        // Remote caret bar + name flag (P6.2): QTextLayout::drawCursor()
+        // only draws the LOCAL caret, in the theme's fixed color, and takes
+        // no per-call color — so the bar/flag rect is computed by hand via
+        // lineForTextPosition()/cursorToX(), the same idiom the plan's
+        // G-Q612 task uses for its own custom-painted rect a few hundred
+        // lines below this one. No fade: the plan cites "fading like
+        // collabedit's", but collabedit (app/collabedit/CollabPane.cpp) has
+        // no visual caret/flag paint code at all to model it on (P6.2
+        // finding — see plan findings log), and Selection::cursorVersion is
+        // an opaque monotonic counter, not a timestamp, so an opacity decay
+        // has nothing real to decay against without timer plumbing this
+        // task doesn't add. Painted at full opacity; logged as a gap, not
+        // silently dropped.
+        for (const RemotePresence &presence : m_remotePresences) {
+            if (presence.selection.kind != Markoff::Selection::Kind::Presence)
+                continue;
+            const auto active = resolvePresenceAnchor(presence.selection.active);
+            if (!active || active->block != e.id)
+                continue;
+            const int layoutPos = e.projection.byteToLayoutQChar(active->byteOffset);
+            const QTextLine line = e.layout->lineForTextPosition(layoutPos);
+            if (!line.isValid())
+                continue;
+
+            const qreal caretX = contentX + line.cursorToX(layoutPos);
+            const qreal lineY  = contentY + line.y();
+            constexpr qreal kPresenceCaretWidth = 2.0;
+            p.fillRect(QRectF(caretX, lineY, kPresenceCaretWidth, line.height()),
+                       presence.selection.presenceColor);
+
+            const QString label = !presence.selection.participantLabel.isEmpty()
+                ? presence.selection.participantLabel
+                : presence.selection.participantId;
+            if (!label.isEmpty()) {
+                QFont flagFont = e.style.font;
+                flagFont.setPointSizeF(qMax(7.0, flagFont.pointSizeF() * 0.8));
+                const QFontMetricsF ffm(flagFont);
+                constexpr qreal kFlagPadX = 4.0;
+                const qreal flagW = ffm.horizontalAdvance(label) + 2 * kFlagPadX;
+                const qreal flagH = ffm.height() + 2.0;
+                // Flush with the top of the caret bar (plan: "top of
+                // caret"), sitting just above the current line.
+                const QRectF flagRect(caretX, lineY - flagH, flagW, flagH);
+                p.fillRect(flagRect, presence.selection.presenceColor);
+                // Theme has no contrast-color helper (checked Theme.h) —
+                // hardcoded white per the task's own fallback instruction;
+                // logged, not a silent choice.
+                p.setPen(Qt::white);
+                p.setFont(flagFont);
+                p.drawText(flagRect, Qt::AlignCenter, label);
+            }
         }
     }
 }

@@ -12,6 +12,7 @@
 #include <markoff/core/MarkdownView.h>
 
 #include <markoff/canvas/MediaSeams.h>
+#include <markoff/canvas/View.h>  // Markoff::Canvas::RemotePresence (P6.2)
 
 namespace Markoff {
 class Session;
@@ -221,6 +222,13 @@ public:
     void setImageResourceLookup(Markoff::Canvas::ImageResourceLookup lookup);
     void setMermaidRenderer(Markoff::Canvas::MermaidRenderer *renderer);
     void setEmbedRegistry(Markoff::EmbedRegistry *registry);
+
+    // ---- Remote presence (contract-v2 P6.2) -------------------------------
+    // Thin pass-through to the composed View — see View::setRemotePresences'
+    // own doc comment for the paint mechanism (draw-time FormatRanges,
+    // never cached) and RemotePresence's for the type-shape rationale.
+
+    void setRemotePresences(const QList<Markoff::Canvas::RemotePresence> &presences);
 
 signals:
     /// Forwarded from the composed `View::titleEdited` — the consumer turns
