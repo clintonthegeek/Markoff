@@ -2269,9 +2269,9 @@ void View::moveLine(bool down)
     const auto attrsA = m_doc->blockAttrs(a);
     const auto attrsB = m_doc->blockAttrs(b);
 
-    // FALSIFY (throwaway, P7.2b group C): move-line updates kind/attrs but
-    // "forgets" to actually swap the block text.
     UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(a, 0, uint32_t(textA.size()), textB, t);
+    m_doc->d2ApplyBufferEdit(b, 0, uint32_t(textB.size()), textA, t);
     m_doc->d2SetBlockKind(a, kindB, t);
     m_doc->d2SetBlockKind(b, kindA, t);
 
