@@ -3822,10 +3822,9 @@ void View::keyPressEvent(QKeyEvent *event)
         event->accept();
         return;
     case Qt::Key_Right:
-        if (ctrl)
-            moveCaretByWord(true);
-        else
-            moveCaretHorizontally(true);
+        // FALSIFY (throwaway, P7.2b group A): word motion silently falls
+        // back to plain char motion.
+        moveCaretHorizontally(true);
         pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
