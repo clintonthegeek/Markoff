@@ -2232,9 +2232,7 @@ void View::dropEvent(QDropEvent *event)
         return;
     }
 
-    // FALSIFY (throwaway): ignore the real drop position, always hit-test
-    // the top-left corner instead.
-    const CanvasCursor hit = hitTest(QPoint(0, 0));
+    const CanvasCursor hit = hitTest(event->position().toPoint());
     if (hit.block.isNull()) {
         event->ignore();
         return;
