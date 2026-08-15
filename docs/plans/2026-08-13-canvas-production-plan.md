@@ -146,7 +146,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P6.0 Core anchor seam (BlockId,offset)→Crdt::Anchor + fold retro-wire | ☑ (reduced scope — see finding) | `f2e705d5` | A: `0ae44b21`/`a27055d0`; B: `2e115920`/`f0ac20a3` |
 | P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☑ | `f8b66807` | `4e1711df`/`f073658d` |
 | P6.2 Remote presence rendering (carets, tints, flags) | ☑ | `d920c694` (+ test fix `b8f2fff4`) | `df42c919`/`b11122fb` |
-| P6.3 Remote-edit-mid-IME + concurrency torture tests | ☐ | | |
+| P6.3 Remote-edit-mid-IME + concurrency torture tests | ☑ | `1298488c` | A: `2ef531e6`/`5fbbc5c8`; B: `6fa35e12`/`321eb61f` |
 | P6.4 ⏸ phase close | ☐ | | n/a |
 | **G1 — user gate: accessibility scope** | ☐ | — | — |
 | **P7 — polish + a11y** | | | |
@@ -646,6 +646,106 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
   core seam touched — `markoff-core` was read-only for this task,
   consuming `Selection`/`TextAnchor`/`offsetInBlock` exactly as
   scoped).
+
+**P6.3 (2026-08-14).**
+
+- **No C1/C2 workaround was needed for either test — it just worked.**
+  Both the IME-vs-remote-edit test and the 300-iteration gremlin fuzz
+  passed on the FIRST run, with zero production-code changes. This is
+  itself the load-bearing finding for this task: P6.1's Session-anchor
+  caret resolution (`onDocumentChanged()`'s `caretResolvedFromSession`
+  branch) already gives IME commit-time positioning the exact
+  guarantee D5 promises — a concurrent remote edit to the composing
+  block shifts the caret's resolved byte offset correctly, with no
+  re-entrance guard, no `singleShot` deferral, nothing beyond what
+  P6.1 already landed. Falsification pair A (below) proves the test
+  actually depends on that mechanism, not on coincidence.
+- **A real (but narrowly-scoped, not test-blocking) gap found and
+  logged, not fixed:** `BlockLayoutCache`'s own `m_preeditByte` member
+  (the byte offset the projection splices the preedit run at,
+  `BlockLayoutCache.cpp` `setPreedit`/`rebuildInline`) is set once, at
+  `View::inputMethodEvent()` time, and is never re-synced when
+  `onDocumentChanged()` re-resolves `m_caret` from the Session anchor
+  after a remote edit. `m_caret`'s own byte offset (and the cache's
+  separate `m_caretByte`, resynced via `ensureCaretVisible()` ->
+  `setCaret()`) both track correctly; the preedit splice point does
+  not — so a remote edit landing before the caret during composition
+  visually splices the preedit text at the STALE pre-edit byte offset
+  for one paint, until the next real IME event calls `setPreedit()`
+  again with a fresh (correct) offset. This has **no effect on where
+  a commit lands** (`inputMethodEvent`'s commit path reads
+  `m_caret.byteOffset` directly, never the cache's `m_preeditByte`),
+  which is exactly why Test 1's assertions — as scoped by this task,
+  matching the plan's literal wording — pass without exposing it: the
+  task named "composition survives" (`isComposing()`/`preeditText()`,
+  neither of which touches the cache) and "commit lands at the right
+  anchor" (which doesn't route through the stale value either). No
+  public View/inspection surface exists to assert on the cache's
+  internal splice byte directly, so this is a logged, not a tested,
+  finding. Fix sketch for whoever picks this up: in
+  `onDocumentChanged()`, after the caret-resolve block, if
+  `isComposing()`, re-issue `m_cache->setPreedit(*m_doc, m_theme,
+  m_caret.block, m_caret.byteOffset, m_preeditText)` — a few lines,
+  `View.cpp`-only, but touches production code this TEST-ONLY task's
+  scope closes except for the "trivial in-scope fix" exception, and a
+  visual-only staleness window bounded to "between a remote edit and
+  the next IME event" did not meet this session's bar for that
+  exception. Reported rather than patched.
+- **Gremlin/fuzz design.** Fixed seed `0xC0FFEE42u` via
+  `QRandomGenerator` (not `std::random_device`, unlike collabtext's
+  `tst_gc.cpp`) so a failure reproduces byte-for-byte without needing
+  to capture a seed from a prior run first — logged via `qDebug()`
+  regardless, matching `tst_gc`'s convention. 300 iterations, ~0.2s
+  wall time. Each iteration picks one of six actions uniformly: type
+  one random ASCII letter at the caret (local, via a synthetic
+  `QKeyEvent` through `View`'s real `keyPressEvent`), arrow-left,
+  arrow-right, in-block backspace (skipped at byte 0), in-block
+  forward-delete (skipped on the block's trailing `\n`), or a remote
+  edit — a second replica (`docB`) inserts or deletes one ASCII byte
+  at a random position in ITS OWN current view of the shared block
+  (which has by design diverged from the local replica `docA`, since
+  `docB` never receives `docA`'s local edits — only the reverse, the
+  actual concurrent-editors-without-live-sync shape), with the
+  resulting ops fed into `docA` via `applyRemoteOps` +
+  `flushPendingD2Changed()`. **Deliberately scoped to a single,
+  pre-existing block — no structural split/merge/insert/remove is
+  scripted.** This is narrower than "concurrency tests" could mean in
+  general; logged as a deliberate simplification matching this task's
+  actual exit criterion (the IME/remote-edit interaction P6.3 exists
+  to prove out is inherently a same-block scenario) rather than an
+  oversight. A follow-up task name for multi-block/structural gremlin
+  coverage would be a reasonable but distinct addition.
+- **Convergence check took the plan's explicitly-sanctioned "simpler"
+  path**: rather than replaying replica A's full op history into a
+  fresh third replica after the fact, a third replica (`docC`) mirrors
+  live throughout the run — every op `docA`'s own local edits produce
+  (via `localOpsProduced`) AND every remote op fed into `docA` is
+  applied to `docC` in the same iteration. Equivalent end state,
+  simpler to wire (no history buffer to retain and replay), same
+  assertion at the end (`docA.blockText(block) ==
+  docC.blockText(block)`, plus a block-count check).
+  Falsification pair B (below) confirms the check is load-bearing:
+  starving `docC` of remote ops produces a sharp, easily-caught
+  mismatch (`"LELAqdwLe"` vs `"he quick fox\n"` in the actual run).
+- **Falsification pair A** (production code, `View.cpp`): forced
+  `caretResolvedFromSession` to always fail
+  (`if (false && m_session && m_doc)`), confirming Test 1's commit
+  falls back to `clampCaret`'s stale byte offset and lands wrong
+  (`"Oh, HXYello world\n"` instead of `"Oh, HelloXY world\n"`).
+  Break: `2ef531e6`. Revert: `5fbbc5c8`.
+- **Falsification pair B** (test-only): commented out the
+  `docC.applyRemoteOps(ops, meta)` call inside the gremlin loop's
+  remote-edit branch, confirming the end-of-run convergence
+  `QCOMPARE` catches the resulting divergence. Break: `6fa35e12`.
+  Revert: `321eb61f`.
+- Canvas-scoped suite: 32/32 (added `tst_canvas_concurrency`'s two
+  tests, up from 30/30 — P6.2's close count of 31/31 already included
+  `tst_canvas_remote_presence`; this task adds one new executable/CMake
+  test target, `tst_canvas_concurrency`, holding both new slots).
+  Constitution clean (C1–C4). Full suite not run per the plan's tier
+  rule — this task's only production-code touch was the throwaway
+  falsification break/revert pair above, not a landed change; the
+  real commit is tests-only inside `libs/markoff-canvas/tests/`.
 
 **2026-08-14 — inline-object investigation (post-P5.7, user-directed).**
 

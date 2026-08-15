@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 6, P6.2 landed)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 6, P6.3 landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -28,7 +28,9 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   Session, reduced scope — see plan findings log); P6.1 (Session caret
   authority closure) landed the same day; P6.2 (remote presence
   rendering — caret bar, name flag, selection tint) landed the same
-  day; next is P6.3.
+  day; P6.3 (IME-vs-concurrent-remote-edit + seeded gremlin fuzz
+  convergence test) landed the same day — no C1/C2 workaround needed,
+  both tests passed on the first run; next is P6.4 (⏸ phase close).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -51,19 +53,38 @@ was touched) and not yet root-caused. This currently blocks a clean
 next full-suite run until someone in the live/styled/source bug-fix
 lane looks at it. New dormant item below.
 
-**Canvas-scoped suite (`scripts/run-tests.sh -R canvas`): 31/31**,
-verified 2026-08-14 at P6.2 — up from 30/30 at P6.1 via one new
-executable, `tst_canvas_remote_presence`. `check-constitution.sh`
-clean (C1–C4) over 68 files (was 67 at P6.1; the new test file).
-Perf re-baseline not re-run this task (P6.2 is paint-time-only,
-touching neither the y-position walk nor realization); last held
-figures (P5.7):
+**Canvas-scoped suite (`scripts/run-tests.sh -R canvas`): 32/32**,
+verified 2026-08-14 at P6.3 — up from 31/31 at P6.2 via one new
+executable, `tst_canvas_concurrency` (two test slots: IME-vs-remote-
+edit, and a seeded 300-iteration gremlin fuzz convergence test).
+`check-constitution.sh` clean (C1–C4) over 69 files (was 68 at P6.2;
+the new test file). No production code landed this task — the only
+`libs/markoff-canvas/src/` touch was a throwaway falsification
+break/revert pair (plan findings log, P6.3 entry), so full suite was
+not re-run per the plan's tier rule. Perf re-baseline not re-run
+either (same reasoning); last held figures (P5.7):
 load→paint 188 ms/500 ms, p95 keystroke 1.38 ms/16 ms, scroll-realize
 11.6 %/30 %, RSS delta 0 KB/100 MB. The plan ratchets this up per
 task; any drop is a regression (classify before fixing).
 
 ## Dormant items
 
+- **`BlockLayoutCache::m_preeditByte` goes stale across a remote edit
+  mid-composition** (P6.3 finding, 2026-08-14) — cosmetic only,
+  bounded to the paint between a remote edit landing and the next real
+  IME event. `View::onDocumentChanged()` re-resolves the CARET's byte
+  offset from the Session anchor correctly (P6.1) and that IS what
+  commit-time positioning uses, so no functional bug results — but the
+  cache's own preedit splice point (`BlockLayoutCache::setPreedit`'s
+  stored offset) is never re-issued from `onDocumentChanged()`, so a
+  remote edit before the caret during composition visually splices the
+  preedit at the wrong position for one paint. Fix sketch: in
+  `onDocumentChanged()`, after caret resolution, re-call
+  `m_cache->setPreedit(...)` with the fresh `m_caret` when
+  `isComposing()`. Not fixed this task (production `View.cpp` change,
+  outside a tests-only task's scope, and no public inspection surface
+  exists to test it directly). Full writeup: plan findings log, P6.3
+  entry.
 - **Remote presence name flag has no fade** (P6.2, 2026-08-14) —
   `Selection::cursorVersion` is an opaque monotonic counter, not a
   timestamp, so a real "fade out N seconds since last move" needs
