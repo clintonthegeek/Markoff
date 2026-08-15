@@ -124,18 +124,20 @@ seam named), flagged for P7.3's audit. `check-constitution.sh` clean
 
 ## Dormant items
 
-- **`tst_canvas_concurrency`'s gremlin-fuzz convergence test fails
-  deterministically** (found during P7.2b, 2026-08-14, not caused by
-  it) — fixed seed `3237998146` diverges the same way every run;
-  confirmed pre-existing at the P7.2a baseline (`libs/markoff-canvas`
-  checked out at commit `32aab7ca` into an otherwise-unchanged tree,
-  rebuilt, reran: identical failure). P6.3's own findings-log entry
-  records this exact test passing on its first run with zero
-  workaround, so the regression landed sometime between P6.3 and
-  P7.2a. Not diagnosed here — no core seam named for this task, and
-  CRDT-convergence debugging is a real investigation, not a quick
-  read. Flagged for P7.3's audit or a dedicated session. Full writeup:
-  plan findings log, P7.2b entry.
+- **CORRECTION (orchestrator, 2026-08-14): pinned to commit `0ceceda0`
+  (P7.2a), not "pre-existing."** `tst_canvas_concurrency`'s gremlin-fuzz
+  convergence test (fixed seed `3237998146`) independently bisected:
+  **passes** at `7092a215` (P7.2, pre-P7.2a) — verified via `git
+  worktree` + full submodule init + clean rebuild — and **fails**
+  deterministically at `32aab7ca` (P7.2a). Only one commit separates
+  them, so P7.2a's `insertPrintable` → `Cmd::insertCharacter` routing
+  change is the cause, not an unrelated pre-existing bug. This is a
+  genuine document-divergence regression in the load-bearing
+  concurrency guarantee P6.3 established (its own findings entry
+  records this exact test passing clean on first run, zero workaround)
+  — treated as blocking, not deferred to P7.3's audit. Under active
+  investigation now. Full writeup: plan findings log, P7.2b entry
+  (original, since corrected) and the investigation entry once landed.
 - **Self-drop text-drag Move does not delete the source selection**
   (P7.2, 2026-08-14) — dragging a selection and dropping it back
   inside the SAME `View` duplicates the text instead of moving it
