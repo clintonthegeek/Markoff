@@ -1331,13 +1331,72 @@ void View::onDocumentChanged()
     // change what a fold head's body even IS — refresh before clampCaret so
     // a caret clamp never lands inside a range this pass just re-hid.
     refreshFoldedBlocks();
-    clampCaret(oldCaretIndex);
-    // No UndoLog selection state (T4/T5, queue #10 item 2): if the anchor's
-    // block didn't survive the edit there is nothing sound to clamp it to,
-    // so the selection is dropped rather than guessed at. Mirrors the
-    // undo/redo path, which does the same before mutating.
-    if (m_selectionAnchor && m_cache->indexOf(m_selectionAnchor->block) < 0)
-        m_selectionAnchor.reset();
+
+    // P6.1 (guide §B.1/B.2): re-resolve the caret from the Session's own
+    // stored anchor BEFORE falling back to clampCaret's plain "nearest
+    // surviving block by index" heuristic — the CRDT anchor names a
+    // *character*, which survives an edit that shifts bytes/blocks around
+    // it, strictly better information than "which index used to be here".
+    // This is additive, not a replacement: clampCaret still runs, unchanged,
+    // whenever there's no Session attached OR the anchor's own content is
+    // gone (a genuine "nothing sound to resolve to" case — same situation
+    // the pre-P6.1 selection-anchor drop below already handled).
+    //
+    // NOT using MarkoffDocument::blockAt(TextAnchor) here — P6.1 finding
+    // (see plan findings log): it resolves via
+    // d->latestBlockRanges/latestBlockAnchors, which this task discovered
+    // are never assigned ANYWHERE in markoff-core/src (grepped the whole
+    // tree) — not merely "stale after D2 edits" per offsetInBlock()'s own
+    // neighboring comment, but permanently empty, on every document, D2 or
+    // legacy. blockAt() therefore always returns nullopt. markoff-core is
+    // closed for this task (P6.1's named seam is consuming P6.0's already-
+    // landed accessors, not fixing unrelated ones), so this resolves the
+    // same "block still contains this content, or it's gone" question a
+    // different, already-D2-safe way instead: a TextAnchor already carries
+    // the BlockId its per-block CRDT anchor was cut against
+    // (TextAnchor::block()); checking that block is still a live cache
+    // entry, then reading the offset via offsetInBlock(BlockAnchor,
+    // TextAnchor) (P6.0-confirmed D2-safe — dispatches to
+    // resolveBlockCrdtAnchor against the block's own buffer, never
+    // latestBlockRanges), gives the identical resolve-or-nullopt contract
+    // for every case this task's own tests exercise (in-block edits before
+    // the caret; the anchor's own block untouched). It does not attempt to
+    // follow content across a block MERGE the way a working blockAt() in
+    // principle could — no such working version exists to compare against.
+    bool caretResolvedFromSession = false;
+    if (m_session && m_doc) {
+        const Markoff::TextAnchor active = m_session->primarySelection().active;
+        if (!active.isNull() && m_cache->indexOf(active.block()) >= 0) {
+            m_caret = CanvasCursor{active.block(), m_doc->offsetInBlock(active.block(), active)};
+            caretResolvedFromSession = true;
+        }
+    }
+    if (!caretResolvedFromSession)
+        clampCaret(oldCaretIndex);
+
+    // Selection-anchor side: same resolve-first strategy, only when the
+    // Session is actually holding a real range (anchor != active — a
+    // collapsed Selection has nothing more to reconstruct than the caret
+    // above already gave it). Falls through to the existing "block didn't
+    // survive -> drop it" rule when the anchor's content is gone or no
+    // Session is attached — unchanged from pre-P6.1 behavior.
+    bool selectionAnchorResolvedFromSession = false;
+    if (m_session && m_doc) {
+        const Markoff::Selection sel = m_session->primarySelection();
+        if (!sel.isEmpty() && !sel.anchor.isNull() && m_cache->indexOf(sel.anchor.block()) >= 0) {
+            m_selectionAnchor = CanvasCursor{sel.anchor.block(),
+                                             m_doc->offsetInBlock(sel.anchor.block(), sel.anchor)};
+            selectionAnchorResolvedFromSession = true;
+        }
+    }
+    if (!selectionAnchorResolvedFromSession) {
+        // No UndoLog selection state (T4/T5, queue #10 item 2): if the
+        // anchor's block didn't survive the edit there is nothing sound to
+        // clamp it to, so the selection is dropped rather than guessed at.
+        // Mirrors the undo/redo path, which does the same before mutating.
+        if (m_selectionAnchor && m_cache->indexOf(m_selectionAnchor->block) < 0)
+            m_selectionAnchor.reset();
+    }
     promoteCaretBlockKind();
     ensureLayoutForViewport();
     // A document-driven clamp (remote edit, undo/redo) can move the caret
@@ -1672,8 +1731,46 @@ void View::setCaret(const CanvasCursor &caret)
     // document caret change.
     m_titleCaretActive = false;
     m_caret = caret;
+    pushSelectionToSession();
     ensureCaretVisible();
     viewport()->update();
+}
+
+// P6.1 — Session caret authority closure (guide §B; VIEW-IMPLEMENTORS-GUIDE
+// §B.2 names exactly this direction as the missing half of styled/source's
+// own caret-authority wiring: "full parity awaits the local caret being
+// pushed TO the Session"). Builds a view-agnostic Markoff::Selection from
+// the current m_caret/m_selectionAnchor and writes it to the attached
+// Session, so an external reader — this task's falsification test, a
+// remote-presence consumer, P6.2's paint path — sees this view's selection
+// without touching CanvasCursor/BlockId internals.
+//
+// anchor = m_selectionAnchor if a real range is in progress, else m_caret
+// itself (a collapsed selection, matching Selection::isEmpty()'s contract
+// when anchor == active). active = m_caret always (T5's "active end" is
+// always the caret in this leaf — there is no independent "typing at the
+// anchor end" gesture).
+//
+// rightBias: Right (true) for both ends, matching the one other in-tree
+// caret-to-TextAnchor conversion for a live document caret,
+// LiveCursorState.cpp:772 (`doc->textAnchorAt(block, byteOff,
+// /*rightBias=*/true)`) — a caret conceptually sits just after the
+// preceding character, so binding to the character on its right survives
+// same-position concurrent inserts the way a typing caret should.
+void View::pushSelectionToSession()
+{
+    if (!m_session || !m_doc || m_caret.block.isNull())
+        return;
+
+    const CanvasCursor &anchorCursor = m_selectionAnchor ? *m_selectionAnchor : m_caret;
+
+    Markoff::Selection sel;
+    sel.kind = Markoff::Selection::Kind::Primary;
+    sel.anchor = m_doc->textAnchorAt(anchorCursor.block, anchorCursor.byteOffset,
+                                     /*rightBias=*/true);
+    sel.active = m_doc->textAnchorAt(m_caret.block, m_caret.byteOffset,
+                                     /*rightBias=*/true);
+    m_session->setPrimarySelection(sel);
 }
 
 void View::setCaretPosition(BlockId block, int byteOffset)
@@ -1886,12 +1983,14 @@ void View::collapseSelection()
             m_caret.block = r.caretBlock;
             m_caret.byteOffset = int(r.caretByteInBlock);
             m_selectionAnchor.reset();
+            pushSelectionToSession();
             return;
         }
     }
 
     m_caret = start;
     m_selectionAnchor.reset();
+    pushSelectionToSession();
 }
 
 // ---- Cut/copy/paste/select-all (P4.4) --------------------------------------
@@ -2238,6 +2337,13 @@ void View::insertPrintable(const QString &text)
     UndoLog::Transaction t(m_doc->d2UndoLog());
     m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0, insert, t);
     m_caret.byteOffset += insert.size();
+    // P6.1: does NOT funnel through setCaret() (a plain byteOffset bump,
+    // not a "placement") — pushed here directly, same reasoning as
+    // deleteCluster()/tryStructuralKey()/the arrow-key moveCaret* helpers
+    // below, none of which route through the nominal chokepoint either
+    // (see setCaret()'s own doc comment vs. this file's actual call
+    // graph — logged as a P6.1 finding).
+    pushSelectionToSession();
 }
 
 void View::deleteCluster(bool forward)
@@ -2278,6 +2384,9 @@ void View::deleteCluster(bool forward)
                                  uint32_t(removed), QByteArray(), t);
         m_caret.byteOffset = prevByte;
     }
+    // P6.1: see insertPrintable()'s comment — does not funnel through
+    // setCaret().
+    pushSelectionToSession();
 }
 
 bool View::tryStructuralKey(QKeyEvent *event)
@@ -2293,6 +2402,12 @@ bool View::tryStructuralKey(QKeyEvent *event)
 
     m_caret.block = r.caretBlock;
     m_caret.byteOffset = int(r.caretByteInBlock);
+    // P6.1: see insertPrintable()'s comment — does not funnel through
+    // setCaret(). StructuralKeyHandler never touches m_selectionAnchor
+    // itself (the selection-collapse-before-mutate step already ran in
+    // keyPressEvent, via collapseSelection(), which pushes on its own), so
+    // this call's only job is to publish the new post-split/merge caret.
+    pushSelectionToSession();
     return true;
 }
 
@@ -2605,6 +2720,7 @@ bool View::tryTableTab(bool shift)
     // Tab/Shift+Tab always collapses any selection to the destination
     // cell's start — there is no "extend selection with Tab" semantic.
     m_selectionAnchor.reset();
+    pushSelectionToSession();
 
     if (shift) {
         if (row == 0 && col == 0)
@@ -2968,6 +3084,16 @@ void View::keyPressEvent(QKeyEvent *event)
         // its own check, or Ctrl+Z would mutate a read-only document.
         if (m_doc && !m_readOnly) {
             m_selectionAnchor.reset();  // no UndoLog selection state (T4)
+            // P6.1/guide §B.4: publish the collapse before the edit, same
+            // as any other selection-finalizing reset. This does NOT give
+            // undo/redo a working "restore selection" seam — the anchor
+            // undoD2()/redoD2() leaves behind is just this pre-undo caret,
+            // stale the instant the edit removes the content it named. See
+            // onDocumentChanged()'s resolve-from-session step and the P6.1
+            // findings-log entry for the honest account of what this can
+            // and can't do (core's undoD2/redoD2 do not repopulate the
+            // Session's selection — out of this task's named scope).
+            pushSelectionToSession();
             if (event->matches(QKeySequence::Undo))
                 m_doc->undoD2();
             else
@@ -3093,39 +3219,50 @@ void View::keyPressEvent(QKeyEvent *event)
         break;
     }
 
+    // P6.1: the moveCaret*() helpers below mutate m_caret directly (many
+    // early-return branches, no single tail to push from — see their own
+    // definitions) and do not funnel through setCaret(), so each case here
+    // pushes explicitly after the move, same as deleteCluster()/
+    // insertPrintable() push from inside themselves.
     switch (event->key()) {
     case Qt::Key_Left:
         moveCaretHorizontally(false);
+        pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_Right:
         moveCaretHorizontally(true);
+        pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_Up:
         moveCaretVertically(false);
+        pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_Down:
         moveCaretVertically(true);
+        pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_Home:
         moveCaretToLineEdge(true);
+        pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_End:
         moveCaretToLineEdge(false);
+        pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
@@ -3287,6 +3424,11 @@ void View::mousePressEvent(QMouseEvent *event)
         if (hitTestTitle(event->pos(), &titleCharPos)) {
             setFocus(Qt::MouseFocusReason);
             m_selectionAnchor.reset();
+            // P6.1: collapses any in-progress document selection with no
+            // accompanying caret move (the caret stays put; only the
+            // title band takes over input) — pushes like any other
+            // selection-finalizing reset.
+            pushSelectionToSession();
             m_titleCaretActive = true;
             m_titleCaretPos = qBound(0, titleCharPos, m_inlineTitle.size());
             viewport()->update();
@@ -3465,6 +3607,12 @@ void View::inputMethodEvent(QInputMethodEvent *event)
         m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(fromByte),
                                  uint32_t(toByte - fromByte), commit, t);
         m_caret.byteOffset = fromByte + commit.size();
+        // P6.1: does not funnel through setCaret() — pushed directly,
+        // same reasoning as insertPrintable() (this IS the IME's version
+        // of a printable-key commit). Pushed BEFORE the flush below so
+        // onDocumentChanged()'s resolve-from-session step (P6.1) finds an
+        // up-to-date anchor rather than a stale one.
+        pushSelectionToSession();
         // Kind promotion (T6) must see the committed text before this
         // handler returns, same reasoning as the printable-key path.
         m_doc->flushPendingD2Changed();

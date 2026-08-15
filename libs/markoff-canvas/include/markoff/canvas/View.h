@@ -715,6 +715,22 @@ private:
     /// paintEvent's own locals.
     void paintTable(QPainter &p, int entryIndex, qreal blockTop, qreal contentX) const;
     void setCaret(const CanvasCursor &caret);
+    /// Session caret authority closure (P6.1, guide §B): pushes the
+    /// current `m_caret`/`m_selectionAnchor` to the attached Session as
+    /// an anchor-typed `Markoff::Selection` — the view-agnostic form
+    /// `Session::primarySelection()` exposes to external readers (a
+    /// remote-presence consumer, P6.2's paint path, or this task's own
+    /// falsification test). No-op if no Session is attached (bare `View`
+    /// in tests/spike-era consumers that never call `setSession`). Called
+    /// from `setCaret()` (the caret-move chokepoint) and from every
+    /// direct `m_selectionAnchor` mutation site that doesn't already
+    /// funnel through `setCaret()` in the same operation — see the
+    /// plan's P6.1 findings-log entry for the full call-site audit
+    /// (arrow-key motion, deleteCluster, insertPrintable, and
+    /// tryStructuralKey turned out NOT to funnel through `setCaret()`
+    /// either, contrary to that method's own doc comment — pushed from
+    /// directly).
+    void pushSelectionToSession();
     void moveCaretHorizontally(bool forward);
     void moveCaretVertically(bool forward);
     /// moveCaretVertically()'s Table-block branch (P5.1): Up/Down inside a
