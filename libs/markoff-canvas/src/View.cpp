@@ -787,7 +787,8 @@ void View::toggleFold(BlockId id)
     } else {
         m_foldedHeads.insert(id);
     }
-    // FALSIFY (throwaway): write-through to Session disabled.
+    if (m_session)
+        m_session->toggleFold(foldRefFor(id));
     refreshFoldedBlocks();
 
     // If the caret is now inside a body this just hid, it must not be left
