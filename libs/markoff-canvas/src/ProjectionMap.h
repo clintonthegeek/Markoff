@@ -67,6 +67,21 @@ public:
     /// an omitted run, so `dir` is inert for that caller.
     int fullQCharToLayoutQChar(int fullQChar, SnapDirection dir = SnapDirection::Left) const;
 
+    /// P7.2g (F1 #9): layout QChar positions (this block's LAYOUT space,
+    /// post-omission) that hold a "boxed hex" sentinel `build()` substituted
+    /// for a dangerous/invisible codepoint with no legible control-picture
+    /// glyph (C1 controls, soft hyphen, ZWSP, LRM/RLM, and the
+    /// safety-relevant bidi override/isolate controls), paired with the
+    /// ORIGINAL codepoint (for the box's hex label). C0 controls get their
+    /// own Control-Picture glyph substituted directly into `layoutText()`
+    /// instead — they render like ordinary text via the block's own
+    /// foreground format, so they need no entry here and no extra paint
+    /// pass. Consumed by `View::paintEvent` to draw the custom box; the
+    /// sentinel's own native glyph is suppressed via a transparent
+    /// `FormatRange` (`BlockLayoutCache::rebuildInline`) so nothing doubles
+    /// up with the font's own tofu/.notdef rendering of the sentinel.
+    const std::vector<std::pair<int, int>> &specialCharBoxes() const { return m_specialCharBoxes; }
+
 private:
     struct KeptRun {
         int fullStart   = 0;
@@ -78,6 +93,7 @@ private:
     QByteArray m_blockBytes;
     QString m_layoutText;
     std::vector<KeptRun> m_runs;  //!< sorted by fullStart (== sorted by layoutStart)
+    std::vector<std::pair<int, int>> m_specialCharBoxes;  //!< layoutQChar -> codepoint (P7.2g)
 };
 
 }  // namespace Markoff::Canvas

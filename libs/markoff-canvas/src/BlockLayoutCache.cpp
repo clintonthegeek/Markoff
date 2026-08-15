@@ -339,6 +339,25 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
         ranges += Detail::codeTokenFormatRanges(text, m_syntaxHighlighter, theme, e.projection);
     }
 
+    // Invisible/control-character rendering (P7.2g, F1 #9): the "boxed
+    // hex" sentinel ProjectionMap::build() substituted for each dangerous
+    // codepoint with no legible control-picture equivalent gets its native
+    // glyph made fully transparent here — the actual hex-labeled box is
+    // drawn separately, at paint time (View::paintEvent, from
+    // e.projection.specialCharBoxes()), so nothing doubles up with
+    // whatever tofu/.notdef glyph the active font happens to show for an
+    // unassigned Private-Use codepoint. Appended into the same `ranges`
+    // list feeding the one setFormats() call below (T7 trap rule, same
+    // reasoning as the code-token ranges just above).
+    for (const auto &[qPos, codepoint] : e.projection.specialCharBoxes()) {
+        Q_UNUSED(codepoint);
+        QTextLayout::FormatRange r;
+        r.start = qPos;
+        r.length = 1;
+        r.format.setForeground(Qt::transparent);
+        ranges.push_back(r);
+    }
+
     // Mermaid (P5.4): a fenced code block whose info-string language is
     // "mermaid" — same fence parse P4.6 already does for token coloring,
     // just keyed differently. Built only while the caret is NOT in this

@@ -32,6 +32,8 @@ private slots:
     void map_omits_and_round_trips();
     void map_seam_snaps_to_earlier_run_by_default();
     void reflow_is_real_not_cosmetic();
+    void control_and_invisible_chars_get_boxed_1to1(); // P7.2g, F1 #9
+    void bidi_override_chars_are_neutralized_not_just_hidden(); // P7.2g, F1 #9 (safety subset)
 };
 
 // "a **b** c": a=0, ' '=1, *=2, *=3, b=4, *=5, *=6, ' '=7, c=8 (9 bytes,
@@ -133,6 +135,113 @@ void TstCanvasProjection::reflow_is_real_not_cosmetic()
     QTest::keyClick(&view, Qt::Key_Home);
     QCOMPARE(view.caretByteOffset(), 0);
     QCOMPARE(view.lineNaturalWidth(block), hiddenWidth);
+}
+
+// P7.2g (F1 #9), cosmetic/invisible group: a C0 control (SOH, 0x01 — gets
+// a Control-Picture glyph, NOT a boxed-hex entry) and a soft hyphen
+// (U+00AD, 2 UTF-8 bytes — gets a boxed-hex entry) in the same fixture.
+// '\t'/'\n' are excluded from both treatments per the task's own note
+// (this leaf already allows them through); not exercised here since
+// neither appears in this fixture's text.
+void TstCanvasProjection::control_and_invisible_chars_get_boxed_1to1()
+{
+    // "a" + SOH(0x01) + "b" + U+00AD + "c": bytes a(1) SOH(1) b(1)
+    // AD-as-UTF8(2) c(1) = 6 bytes; QChars a,SOH,b,softhyphen,c = 5.
+    QByteArray bytes = "a";
+    bytes += char(0x01);
+    bytes += "b";
+    bytes += QString(QChar(0x00ad)).toUtf8();
+    bytes += "c";
+    QCOMPARE(bytes.size(), 6);
+
+    const ProjectionMap map = ProjectionMap::build(bytes, {});
+
+    QCOMPARE(map.layoutText().size(), 5);
+    // C0 control -> its Control Picture glyph (U+2400 + 0x01 = U+2401),
+    // rendered as an ordinary glyph — no boxed-hex entry for it.
+    QCOMPARE(map.layoutText().at(1), QChar(0x2401));
+    // Soft hyphen has no legible control-picture equivalent -> boxed-hex
+    // sentinel, with exactly one specialCharBoxes() entry recording its
+    // ORIGINAL codepoint for the paint-time hex label.
+    QCOMPARE(map.specialCharBoxes().size(), 1);
+    QCOMPARE(map.specialCharBoxes()[0].first, 3);
+    QCOMPARE(map.specialCharBoxes()[0].second, 0x00ad);
+    QVERIFY(map.layoutText().at(3) != QChar(0x00ad));  // not left as the raw invisible char
+
+    // Byte<->QChar projection stays exact across the substitution (C4):
+    // 1 QChar in, 1 QChar out, at every position including 'c' after the
+    // 2-byte soft hyphen.
+    QCOMPARE(map.byteToLayoutQChar(0), 0);  // 'a'
+    QCOMPARE(map.byteToLayoutQChar(1), 1);  // SOH
+    QCOMPARE(map.byteToLayoutQChar(2), 2);  // 'b'
+    QCOMPARE(map.byteToLayoutQChar(3), 3);  // soft hyphen (2 UTF-8 bytes start here)
+    QCOMPARE(map.byteToLayoutQChar(5), 4);  // 'c' (byte 5, after the 2-byte hyphen)
+    QCOMPARE(map.layoutQCharToByte(4), 5);
+    QCOMPARE(map.layoutQCharToByte(0), 0);
+
+    // Falsification target for this pair: BlockLayoutCache::rebuildInline
+    // stops appending the transparent FormatRange for specialCharBoxes()
+    // entries, OR ProjectionMap::build stops classifying these codepoints
+    // at all (reverting to bare QString::fromUtf8 + only the '\n'
+    // substitution) — either break collapses this test's
+    // specialCharBoxes()/layoutText() assertions back to the pre-P7.2g
+    // shape (empty list; raw soft hyphen present verbatim).
+}
+
+// P7.2g (F1 #9), the safety-relevant bidi-override/isolate subset — its
+// OWN falsification pair per the task's explicit instruction, kept
+// separate from the cosmetic group above. U+202E (RIGHT-TO-LEFT OVERRIDE)
+// is the exact "invoice.exe" filename-spoofing character; letting it
+// reach QTextLayout verbatim would let Qt's own bidi algorithm silently
+// reorder this block's visible text, independent of anything painted on
+// top of it.
+void TstCanvasProjection::bidi_override_chars_are_neutralized_not_just_hidden()
+{
+    // "a" + U+202E (3 UTF-8 bytes) + "b": bytes a(1) RLO(3) b(1) = 5 bytes;
+    // QChars a, sentinel, b = 3.
+    const QString src = QStringLiteral("a") + QChar(0x202e) + QStringLiteral("b");
+    const QByteArray bytes = src.toUtf8();
+    QCOMPARE(bytes.size(), 5);
+
+    const ProjectionMap map = ProjectionMap::build(bytes, {});
+
+    QCOMPARE(map.layoutText().size(), 3);
+    // The load-bearing safety assertion: the RAW override character must
+    // be ABSENT from the text a QTextLayout will ever see — not merely
+    // covered by paint, actually gone from the string Qt's bidi algorithm
+    // reorders on. A single boxed-hex entry records what it was, for the
+    // visible warning label.
+    QVERIFY(!map.layoutText().contains(QChar(0x202e)));
+    QCOMPARE(map.specialCharBoxes().size(), 1);
+    QCOMPARE(map.specialCharBoxes()[0].first, 1);
+    QCOMPARE(map.specialCharBoxes()[0].second, 0x202e);
+
+    // Byte<->QChar projection: 'b' after the 3-byte override lands at
+    // QChar 2, byte 4 — exact, despite the byte/QChar-width mismatch this
+    // substitution introduces (3 raw bytes -> 1 layout QChar).
+    QCOMPARE(map.byteToLayoutQChar(4), 2);
+    QCOMPARE(map.layoutQCharToByte(2), 4);
+
+    // Same coverage for the isolate range (U+2066 LRI) and the other
+    // override direction (U+202D LRO) — one assertion each, not full
+    // fixtures, since the mechanism is identical per-codepoint.
+    for (const char16_t cp : {char16_t(0x202d), char16_t(0x2066), char16_t(0x2067),
+                               char16_t(0x2068), char16_t(0x2069)}) {
+        const QString s2 = QStringLiteral("x") + QChar(cp) + QStringLiteral("y");
+        const ProjectionMap m2 = ProjectionMap::build(s2.toUtf8(), {});
+        QVERIFY2(!m2.layoutText().contains(QChar(cp)),
+                 qPrintable(QStringLiteral("U+%1 leaked into layout text")
+                                .arg(int(cp), 4, 16, QLatin1Char('0'))));
+        QCOMPARE(m2.specialCharBoxes().size(), 1);
+        QCOMPARE(m2.specialCharBoxes()[0].second, int(cp));
+    }
+
+    // Falsification target for THIS pair: ProjectionMap::build's
+    // classifySpecialChar() drops the BoxedHex branch for the bidi
+    // override/isolate range (e.g. narrows the check to C1-only) — the
+    // `!layoutText().contains(...)` assertions above fail because the raw
+    // U+202E/U+2066-9/U+202D characters survive into the layout text
+    // verbatim, exactly the spoofing-surface regression F1 flagged.
 }
 
 QTEST_MAIN(TstCanvasProjection)

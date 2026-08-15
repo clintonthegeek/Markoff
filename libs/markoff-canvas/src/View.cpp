@@ -5206,6 +5206,40 @@ void View::paintEvent(QPaintEvent *event)
         p.setPen(e.style.foreground);
         e.layout->draw(&p, QPointF(contentX, contentY), selections);
 
+        // Invisible/control-character boxes (P7.2g, F1 #9): a small
+        // custom-painted hex box for every "boxed hex"-class dangerous
+        // codepoint this block's projection substituted a sentinel QChar
+        // for — chief among them the bidi override/isolate controls (F1's
+        // own flag: a spoofing surface, not merely cosmetic, since letting
+        // the RAW character reach QTextLayout would let Qt's own bidi
+        // algorithm silently reorder the block's visible text; the
+        // sentinel substitution in ProjectionMap::build() already
+        // neutralizes that before layout ever sees it — this paint pass is
+        // purely the visible warning on top). Painted AFTER
+        // e.layout->draw() so it sits above the sentinel's own
+        // (transparent-formatted, otherwise invisible) glyph slot — the
+        // task checkboxes' "paint at this rect" idiom, not a FormatRange
+        // background tint, since a flat background fill cannot render a
+        // distinct hex label.
+        for (const auto &[qPos, codepoint] : e.projection.specialCharBoxes()) {
+            const QTextLine boxLine = e.layout->lineForTextPosition(qPos);
+            if (!boxLine.isValid())
+                continue;
+            const qreal x0 = contentX + boxLine.cursorToX(qPos);
+            const qreal x1 = contentX + boxLine.cursorToX(qPos + 1);
+            const QRectF box(x0, contentY + boxLine.y(),
+                              qMax(qreal(6), x1 - x0), boxLine.height());
+            p.setPen(QPen(m_theme.color(Theme::Slot::InvisibleCharBox), 1.0));
+            p.setBrush(Qt::NoBrush);
+            p.drawRoundedRect(box.adjusted(0.5, 1.0, -0.5, -1.0), 2.0, 2.0);
+            QFont hexFont = e.style.font;
+            hexFont.setPixelSize(qMax(6, int(hexFont.pixelSize() * 0.55)));
+            p.setFont(hexFont);
+            p.drawText(box, Qt::AlignCenter, QString::number(codepoint, 16).toUpper());
+        }
+        if (!e.projection.specialCharBoxes().empty())
+            p.setFont(e.style.font);
+
         // Empty-document placeholder (P7.2f, F1 #10): only the sole entry
         // of a document `isDocumentEmpty()` already confirmed is exactly
         // one empty Paragraph block — `e.layout` has no text to draw above,

@@ -176,6 +176,17 @@ Theme Theme::defaultLight()
     // that packed hex string (Qt's 8-digit `#RRGGBBAA`/`#AARRGGBB` hex forms
     // are easy to get backwards, an explicit QColor(r,g,b,a) is not).
     t.setColor(Slot::BracketMatchBackground, QColor(0x32, 0x8c, 0x82, 0x80));
+    // P7.2g (F1 #9) — invisible/control-character box: border + hex-label
+    // color for the custom-painted "boxed hex" glyph (View::paintEvent)
+    // substituted for dangerous codepoints with no legible control-picture
+    // equivalent (C1 controls, soft hyphen, ZWSP, LRM/RLM, and — the
+    // safety-relevant subset — the bidi override/isolate controls). A
+    // warm red, matching CM's own default `.cm-specialChar { color: red }`
+    // treatment (view/src/theme.ts is CSS-only, no exported constant to
+    // match verbatim) — deliberately attention-getting given the spoofing
+    // risk of the bidi subset, not just the muted-grey "cosmetic hint"
+    // treatment other decorations here use.
+    t.setColor(Slot::InvisibleCharBox, QColor("#c0392b"));
     t.setBold(Slot::Heading1, true);
     t.setBold(Slot::Heading2, true);
     t.setBold(Slot::Heading3, true);
@@ -220,6 +231,10 @@ Theme Theme::defaultDark()
     // the dark editor background, same "desaturated-for-dark" convention
     // the callout accents above already follow.
     t.setColor(Slot::BracketMatchBackground, QColor(0x4a, 0xb0, 0xa4, 0x90));
+    // Lighter red so it still reads against the dark editor background,
+    // same "desaturated/lightened-for-dark" convention as the other
+    // accent slots above.
+    t.setColor(Slot::InvisibleCharBox, QColor("#e0685c"));
     return t;
 }
 

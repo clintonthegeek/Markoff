@@ -31,6 +31,7 @@ public:
         SearchMatchBackground, SearchActiveMatchBackground,
         SelectionOccurrenceBackground,
         BracketMatchBackground,
+        InvisibleCharBox,
         EditorBackground, GutterBackground,
         CodeBlockBackground, QuoteBackground,
         CalloutNote, CalloutWarning, CalloutTip,
