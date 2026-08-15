@@ -24,8 +24,10 @@
 #include <QPainterPath>
 #include <QResizeEvent>
 #include <QScrollBar>
+#include <QTextBoundaryFinder>
 #include <QtMath>
 
+#include <algorithm>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -78,6 +80,54 @@ constexpr qreal kQuoteBarWidth = 3.0;
 // way the bullet/number marker's would. One function computes the rect;
 // paintEvent and taskCheckboxAt both call it, so the clickable area is
 // always exactly what got painted.
+// ---- Word boundaries (P7.2b, F1 #1) ----------------------------------------
+// Same QTextBoundaryFinder idiom `LiveNavigationController.cpp` already uses
+// for live's Ctrl+Left/Right (plan's own note: word boundaries route through
+// Qt, not a hand-rolled character-class scan). Operates on a layout entry's
+// REAL (reveal-aware, projection) text, same as `moveCaretHorizontally`/
+// `deleteCluster` — a hidden delimiter run is simply not present in that
+// QString, so word motion skips it the same one-step way character motion
+// already does.
+//
+// previousWordBoundary: start of the previous word (0 if already at/before
+// the first one). nextWordBoundary: end of the next word (`text.size()` if
+// already at/after the last one) — Qt's own WordRight semantics, trailing
+// whitespace counts as part of the word, matching QTextCursor::WordRight.
+int previousWordBoundary(const QString &text, int from)
+{
+    if (from <= 0)
+        return 0;
+    QTextBoundaryFinder bf(QTextBoundaryFinder::Word, text);
+    bf.setPosition(from);
+    while (true) {
+        const int p = bf.toPreviousBoundary();
+        if (p < 0)
+            return 0;
+        if (bf.boundaryReasons() & QTextBoundaryFinder::StartOfItem)
+            return p;
+        if (p == 0)
+            return 0;
+    }
+}
+
+int nextWordBoundary(const QString &text, int from)
+{
+    const int len = text.length();
+    if (from >= len)
+        return len;
+    QTextBoundaryFinder bf(QTextBoundaryFinder::Word, text);
+    bf.setPosition(from);
+    while (true) {
+        const int p = bf.toNextBoundary();
+        if (p < 0)
+            return len;
+        if (bf.boundaryReasons() & QTextBoundaryFinder::EndOfItem)
+            return p;
+        if (p == len)
+            return len;
+    }
+}
+
 QRectF taskCheckboxRect(const QFontMetricsF &fm, qreal contentX, qreal contentY)
 {
     const qreal side = fm.ascent() * 0.72;
@@ -2132,6 +2182,133 @@ void View::selectAll()
     setCaret(CanvasCursor{last.id, int(m_doc->blockText(last.id).size())});
 }
 
+// ---- Editing-command floor (P7.2b, F1 #1) ----------------------------------
+
+void View::selectLine()
+{
+    // CodeMirror's selectLine (Alt+L binding, keyPressEvent) — same
+    // "anchor at one end, setCaret() the other" shape selectAll() uses
+    // above, just scoped to the caret's own block instead of the whole
+    // document.
+    if (!m_doc || m_caret.block.isNull())
+        return;
+    const int size = m_doc->blockText(m_caret.block).size();
+    m_selectionAnchor = CanvasCursor{m_caret.block, 0};
+    setCaret(CanvasCursor{m_caret.block, size});
+}
+
+void View::deleteLine()
+{
+    // CodeMirror's deleteLine (Ctrl+Shift+K binding) — this task's spec
+    // reads "delete the entire current block's content", not "remove the
+    // block": the block survives, empty, caret at its start. (CodeMirror's
+    // own deleteLine removes the whole line including its terminator,
+    // which for us would mean removing the block — a bigger, structural
+    // op the plan bullet didn't ask for; the content-only reading is what
+    // got implemented.)
+    if (!m_doc || m_caret.block.isNull())
+        return;
+    const int size = m_doc->blockText(m_caret.block).size();
+    if (size == 0)
+        return;
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(m_caret.block, 0, uint32_t(size), QByteArray(), t);
+    m_caret.byteOffset = 0;
+    m_selectionAnchor.reset();
+    pushSelectionToSession();
+}
+
+void View::moveLine(bool down)
+{
+    // CodeMirror's moveLineUp/moveLineDown (Alt+Up/Alt+Down binding).
+    //
+    // Core's IdList has no block-reorder primitive (`StructuralOp` is
+    // Insert/Remove/ChangeKind only, spec-confirmed — see this task's
+    // findings-log entry) and core is CLOSED for this task (no seam
+    // named). Implemented instead as a CONTENT swap between the two
+    // already-adjacent BlockIds: buffer text, kind, and every known
+    // BlockAttrsMap key (AttrNames.h's full set) trade places, while the
+    // IdList order — and both BlockIds' identity — stay exactly where
+    // they were. Net visible effect is identical to a real reorder; the
+    // difference only matters to a consumer tracking BlockId identity
+    // across the move (e.g. remote presence), which is out of this leaf's
+    // single-user scope for this task (logged as a finding, not a defect
+    // — F1a's multi-cursor-readiness constraint is about not assuming
+    // "the caret" is singular, not about BlockId permanence across a
+    // move-line).
+    //
+    // Every known attr name is written on BOTH sides unconditionally
+    // (real value if the pre-swap block had it, else a type-appropriate
+    // default) rather than only the names actually present — there is no
+    // attr-removal primitive either, so leaving an untouched name alone
+    // would let a stale value (e.g. a Heading's `level`) survive on a
+    // block that swapped away from Heading kind and silently reappear if
+    // that block is later promoted back. Defaulting every key sidesteps
+    // needing removal at all.
+    if (!m_doc || m_caret.block.isNull())
+        return;
+
+    const auto blocks = m_doc->iterateBlocks();
+    const auto it = std::find(blocks.begin(), blocks.end(), m_caret.block);
+    if (it == blocks.end())
+        return;
+    const size_t idx = size_t(it - blocks.begin());
+    if (down && idx + 1 >= blocks.size())
+        return;
+    if (!down && idx == 0)
+        return;
+    const size_t otherIdx = down ? idx + 1 : idx - 1;
+
+    const BlockId a = blocks[idx];       // caret's block
+    const BlockId b = blocks[otherIdx];  // the sibling it trades content with
+
+    const QByteArray textA = m_doc->blockText(a);
+    const QByteArray textB = m_doc->blockText(b);
+    const Markoff::BlockKind kindA = m_doc->blockKind(a);
+    const Markoff::BlockKind kindB = m_doc->blockKind(b);
+    const auto attrsA = m_doc->blockAttrs(a);
+    const auto attrsB = m_doc->blockAttrs(b);
+
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(a, 0, uint32_t(textA.size()), textB, t);
+    m_doc->d2ApplyBufferEdit(b, 0, uint32_t(textB.size()), textA, t);
+    m_doc->d2SetBlockKind(a, kindB, t);
+    m_doc->d2SetBlockKind(b, kindA, t);
+
+    static const std::pair<Markoff::AttrName, Markoff::AttrValue> kKnownAttrs[] = {
+        {Markoff::AttrNames::Level,          1},
+        {Markoff::AttrNames::HeadingForm,    QStringLiteral("atx")},
+        {Markoff::AttrNames::InfoString,     QString()},
+        {Markoff::AttrNames::MarkerStyle,    QStringLiteral("-")},
+        {Markoff::AttrNames::MarkerNumber,   1},
+        {Markoff::AttrNames::IndentLevel,    0},
+        {Markoff::AttrNames::Checked,        false},
+        {Markoff::AttrNames::LooseRun,       false},
+        {Markoff::AttrNames::Src,            QString()},
+        {Markoff::AttrNames::Alt,            QString()},
+        {Markoff::AttrNames::Title,          QString()},
+        {Markoff::AttrNames::DisplayMode,    false},
+        {Markoff::AttrNames::BlockQuoteDepth, 1},
+        {Markoff::AttrNames::BlockQuoteRunId, 1},
+    };
+    for (const auto &[name, def] : kKnownAttrs) {
+        const auto itA = attrsA.constFind(name);
+        const auto itB = attrsB.constFind(name);
+        const Markoff::AttrValue valueForA = (itB != attrsB.constEnd()) ? itB.value() : def;
+        const Markoff::AttrValue valueForB = (itA != attrsA.constEnd()) ? itA.value() : def;
+        m_doc->d2SetBlockAttr(a, name, valueForA, t);
+        m_doc->d2SetBlockAttr(b, name, valueForB, t);
+    }
+
+    // The content the caret was on now lives in `b` (document position
+    // `otherIdx`, adjacent to where `a` still sits) — follow it there,
+    // same byte offset (the text itself didn't change length).
+    m_caret.block = b;
+    m_caret.byteOffset = qBound(0, m_caret.byteOffset, int(textA.size()));
+    m_selectionAnchor.reset();
+    pushSelectionToSession();
+}
+
 // ---- Drag-drop (P7.2) ------------------------------------------------------
 
 QMimeData *View::createMimeDataFromSelection() const
@@ -2596,6 +2773,55 @@ void View::deleteCluster(bool forward)
     pushSelectionToSession();
 }
 
+void View::deleteWordCluster(bool forward)
+{
+    // P7.2b (F1 #1): same shape as deleteCluster() above — word boundary
+    // instead of a single grapheme cluster, everything else (real/reveal-
+    // aware layout text, boundary-no-op convention) identical. At a block
+    // edge this is a no-op, same as deleteCluster(): tryStructuralKey()
+    // (called earlier in keyPressEvent, before either delete path is
+    // reached) already owns the boundary-merge case for Backspace/Delete
+    // regardless of the Ctrl modifier — StructuralKeyHandler::handle()
+    // dispatches purely on key code, not modifiers — so by the time this
+    // runs the caret is guaranteed interior to the block.
+    if (!m_doc || m_caret.block.isNull())
+        return;
+
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return;
+
+    const QString &text = e.projection.layoutText();
+    const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
+
+    if (forward) {
+        if (layoutPos >= text.size())
+            return;  // at block end: no-op, mirrors deleteCluster()
+        const int next = nextWordBoundary(text, layoutPos);
+        const int nextByte = e.projection.layoutQCharToByte(next);
+        const int removed = nextByte - m_caret.byteOffset;
+        UndoLog::Transaction t(m_doc->d2UndoLog());
+        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset),
+                                 uint32_t(removed), QByteArray(), t);
+    } else {
+        if (layoutPos <= 0)
+            return;  // at block start: no-op, mirrors deleteCluster()
+        const int prev = previousWordBoundary(text, layoutPos);
+        const int prevByte = e.projection.layoutQCharToByte(prev);
+        const int removed = m_caret.byteOffset - prevByte;
+        UndoLog::Transaction t(m_doc->d2UndoLog());
+        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(prevByte),
+                                 uint32_t(removed), QByteArray(), t);
+        m_caret.byteOffset = prevByte;
+    }
+    // P6.1: see insertPrintable()'s comment — does not funnel through
+    // setCaret().
+    pushSelectionToSession();
+}
+
 bool View::tryStructuralKey(QKeyEvent *event)
 {
     if (!m_doc || m_caret.block.isNull())
@@ -2696,6 +2922,79 @@ void View::moveCaretToLineEdge(bool home)
 
     const int edgeQChar = home ? line.textStart() : line.textStart() + line.textLength();
     m_caret.byteOffset = e.projection.layoutQCharToByte(edgeQChar);
+}
+
+void View::moveCaretByWord(bool forward)
+{
+    // P7.2b (F1 #1): identical shape to moveCaretHorizontally() above —
+    // same real/reveal-aware layout stepping, same "land at the adjacent
+    // visible block's own edge" cross-block convention (never a bare
+    // idx+-1 — folded ranges stay steppable-over, C4: no cross-block byte
+    // math) — the only difference is the per-step target: a word boundary
+    // (QTextBoundaryFinder, top-of-file helpers) instead of
+    // nextCursorPosition()/previousCursorPosition()'s single grapheme
+    // cluster.
+    if (!m_doc || m_caret.block.isNull())
+        return;
+
+    const int idx = m_cache->indexOf(m_caret.block);
+    if (idx < 0)
+        return;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return;
+
+    const QString &text = e.projection.layoutText();
+    const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
+
+    if (forward) {
+        if (layoutPos >= text.size()) {
+            const int nextIdx = nextVisibleEntryIndex(idx, /*forward=*/true);
+            if (nextIdx >= 0) {
+                m_caret.block = m_cache->entries()[size_t(nextIdx)].id;
+                m_caret.byteOffset = 0;
+            }
+            return;
+        }
+        const int next = nextWordBoundary(text, layoutPos);
+        m_caret.byteOffset = e.projection.layoutQCharToByte(next);
+    } else {
+        if (layoutPos <= 0) {
+            const int prevIdx = nextVisibleEntryIndex(idx, /*forward=*/false);
+            if (prevIdx >= 0) {
+                const auto &prevEntry = m_cache->entries()[size_t(prevIdx)];
+                m_caret.block = prevEntry.id;
+                m_caret.byteOffset = m_doc->blockText(prevEntry.id).size();
+            }
+            return;
+        }
+        const int prev = previousWordBoundary(text, layoutPos);
+        m_caret.byteOffset = e.projection.layoutQCharToByte(prev);
+    }
+}
+
+void View::moveCaretToDocumentStart()
+{
+    // P7.2b (F1 #1): CodeMirror's cursorDocStart. Same "front()/back() of
+    // the cache directly" convention selectAll() already uses (T5) — not
+    // fold-aware (a folded region at the very start/end of the document
+    // can still be the landing entry), consistent with that existing
+    // precedent rather than a new gap this task introduces.
+    if (!m_doc || m_cache->entries().empty())
+        return;
+    const auto &first = m_cache->entries().front();
+    m_caret.block = first.id;
+    m_caret.byteOffset = 0;
+}
+
+void View::moveCaretToDocumentEnd()
+{
+    // P7.2b (F1 #1): CodeMirror's cursorDocEnd. See moveCaretToDocumentStart.
+    if (!m_doc || m_cache->entries().empty())
+        return;
+    const auto &last = m_cache->entries().back();
+    m_caret.block = last.id;
+    m_caret.byteOffset = m_doc->blockText(last.id).size();
 }
 
 void View::moveCaretVertically(bool forward)
@@ -3248,18 +3547,24 @@ void View::keyPressEvent(QKeyEvent *event)
         event->accept();
         return;
     case Qt::Key_Home:
-        if (ctrl) {
+        // P7.2b (F1 #1): Ctrl+Home now ALSO moves the caret to document
+        // start (below, alongside the other movement keys) — this
+        // explicit scroll-to-minimum is KEPT rather than dropped in favor
+        // of relying on ensureCaretVisible() after the caret move: the
+        // latter only guarantees the caret's own line is visible, not
+        // that the viewport reaches the scrollbar's exact minimum (any
+        // top padding/leading band would leave a visible gap otherwise).
+        // No `return` here anymore — falls through to the normal
+        // caret-move dispatch below (case Qt::Key_Home in the final
+        // switch), so a null document/caret still gets the scroll (this
+        // block runs first) even though nothing else fires.
+        if (ctrl)
             vbar->setValue(vbar->minimum());
-            event->accept();
-            return;
-        }
         break;
     case Qt::Key_End:
-        if (ctrl) {
+        // See Key_Home's comment above — same reasoning, doc end.
+        if (ctrl)
             vbar->setValue(vbar->maximum());
-            event->accept();
-            return;
-        }
         break;
     default:
         break;
@@ -3351,11 +3656,22 @@ void View::keyPressEvent(QKeyEvent *event)
     // handling below runs at the post-collapse caret, same as typing at
     // any other empty-selection caret position.
     const bool isPrintable = Detail::isAcceptableTextInput(event);
+    // P7.2b (F1 #1): delete-line (Ctrl+Shift+K) and move-line (Alt+Up/
+    // Alt+Down) mutate the document too — folded into the same centralized
+    // read-only gate below rather than each growing its own m_readOnly
+    // check, same "the gate owns it, the op doesn't re-check" shape the
+    // rest of this switch already has.
+    const bool isDeleteLineKey = ctrl && event->modifiers().testFlag(Qt::ShiftModifier)
+                                && event->key() == Qt::Key_K;
+    const bool isMoveLineKey = event->modifiers() == Qt::AltModifier
+                              && (event->key() == Qt::Key_Up || event->key() == Qt::Key_Down);
     const bool isMutatingKey = event->key() == Qt::Key_Backspace
                              || event->key() == Qt::Key_Delete
                              || event->key() == Qt::Key_Return
                              || event->key() == Qt::Key_Enter
-                             || isPrintable;
+                             || isPrintable
+                             || isDeleteLineKey
+                             || isMoveLineKey;
     // Read-only gate (P3.3, spec §4.2): every remaining mutation ingress —
     // selection-collapse-on-type, StructuralKeyHandler (Enter split,
     // boundary Backspace/Delete merge, Tab/Shift+Tab list indent),
@@ -3410,6 +3726,66 @@ void View::keyPressEvent(QKeyEvent *event)
         }
     }
 
+    // ---- P7.2b: editing-command floor, non-motion keys (F1 #1) -----------
+    // Placed after the read-only gate / selection-collapse-on-mutate /
+    // structural-key / table-tab dispatch above (none of these four keys
+    // matches any of those — StructuralKeyHandler only owns Enter/
+    // Backspace/Delete/Tab, tryTableTab only owns Tab) and before the
+    // Shift-anchor + arrow-motion switches below, which DO share Key_Up/
+    // Key_Down with Alt+Up/Alt+Down — this block must return before
+    // reaching them or a move-line would also trigger a vertical caret
+    // move right after.
+
+    // Esc simplifies (collapses) an active selection to a bare caret at
+    // its active end (CodeMirror's simplifySelection) — but only when not
+    // composing: Escape mid-IME-preedit is the platform's own "cancel
+    // composition" gesture and is not ours to preempt (checked, per the
+    // task's own note, before choosing this binding: m_titleCaretActive's
+    // Escape handling already returned above and never reaches here).
+    // No-op (falls through, event left unaccepted) when there's nothing
+    // to simplify, so plain Escape can still propagate to a consumer that
+    // wants it for something else (closing a popup, etc).
+    if (event->key() == Qt::Key_Escape && !isComposing() && m_selectionAnchor) {
+        m_selectionAnchor.reset();
+        pushSelectionToSession();
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    }
+
+    // Alt+L: select-line (CodeMirror's own selectLine binding). Free in
+    // this leaf's keymap (checked: no existing Key_L binding anywhere in
+    // View.cpp).
+    if (event->modifiers() == Qt::AltModifier && event->key() == Qt::Key_L) {
+        selectLine();
+        event->accept();
+        return;
+    }
+
+    // Ctrl+Shift+K: delete-line (CodeMirror/Obsidian's own binding). Ctrl+K
+    // alone is already claimed by CanvasActionController's Insert Link
+    // QAction (checked before picking this) — the added Shift keeps the
+    // two combinations distinct.
+    if (isDeleteLineKey) {
+        deleteLine();
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    }
+
+    // Alt+Up/Alt+Down: move-line (CodeMirror's moveLineUp/moveLineDown
+    // binding). Free in this leaf's keymap (checked: no existing
+    // AltModifier binding anywhere in View.cpp).
+    if (isMoveLineKey) {
+        moveLine(event->key() == Qt::Key_Down);
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    }
+
     // Shift+move extends the selection (setting an anchor if there wasn't
     // one); plain move collapses any existing selection to a bare caret.
     switch (event->key()) {
@@ -3433,14 +3809,23 @@ void View::keyPressEvent(QKeyEvent *event)
     // insertPrintable() push from inside themselves.
     switch (event->key()) {
     case Qt::Key_Left:
-        moveCaretHorizontally(false);
+        // P7.2b (F1 #1): Ctrl+Left is word-wise motion; Ctrl+Shift+Left
+        // gets its anchor from the Shift-anchor switch just above (it
+        // doesn't check Ctrl) and its word-wise extension for free here.
+        if (ctrl)
+            moveCaretByWord(false);
+        else
+            moveCaretHorizontally(false);
         pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_Right:
-        moveCaretHorizontally(true);
+        if (ctrl)
+            moveCaretByWord(true);
+        else
+            moveCaretHorizontally(true);
         pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
@@ -3461,27 +3846,43 @@ void View::keyPressEvent(QKeyEvent *event)
         event->accept();
         return;
     case Qt::Key_Home:
-        moveCaretToLineEdge(true);
+        // P7.2b (F1 #1): Ctrl+Home is document-start (CodeMirror's
+        // cursorDocStart); Ctrl+Shift+Home gets its selection extension
+        // the same free way Ctrl+Shift+Left does above.
+        if (ctrl)
+            moveCaretToDocumentStart();
+        else
+            moveCaretToLineEdge(true);
         pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_End:
-        moveCaretToLineEdge(false);
+        if (ctrl)
+            moveCaretToDocumentEnd();
+        else
+            moveCaretToLineEdge(false);
         pushSelectionToSession();
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_Backspace:
-        deleteCluster(false);
+        // P7.2b (F1 #1): Ctrl+Backspace is word-wise delete.
+        if (ctrl)
+            deleteWordCluster(false);
+        else
+            deleteCluster(false);
         ensureCaretVisible();
         viewport()->update();
         event->accept();
         return;
     case Qt::Key_Delete:
-        deleteCluster(true);
+        if (ctrl)
+            deleteWordCluster(true);
+        else
+            deleteCluster(true);
         ensureCaretVisible();
         viewport()->update();
         event->accept();

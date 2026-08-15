@@ -826,8 +826,23 @@ private:
     /// rather than landing inside it.
     int nextVisibleEntryIndex(int idx, bool forward) const;
     void moveCaretToLineEdge(bool home);
+    /// P7.2b (F1 #1): word-wise motion (Ctrl+Left/Right), same real/
+    /// reveal-aware layout stepping and cross-block-landing convention as
+    /// moveCaretHorizontally() above, just stepping by QTextBoundaryFinder
+    /// word boundary instead of one grapheme cluster.
+    void moveCaretByWord(bool forward);
+    /// P7.2b (F1 #1): Ctrl+Home/End — caret to byte 0 of the first block /
+    /// end-of-text of the last block (CodeMirror's cursorDocStart/End).
+    void moveCaretToDocumentStart();
+    void moveCaretToDocumentEnd();
     void insertPrintable(const QString &text);
     void deleteCluster(bool forward);
+    /// P7.2b (F1 #1): Ctrl+Backspace/Delete — same shape as deleteCluster()
+    /// above, word boundary instead of a single grapheme cluster; no-op at
+    /// a block edge (tryStructuralKey() already owns the boundary-merge
+    /// case regardless of the Ctrl modifier — StructuralKeyHandler doesn't
+    /// key on modifiers).
+    void deleteWordCluster(bool forward);
     /// Route a key through StructuralKeyHandler (Enter split, boundary
     /// Backspace/Delete merge, Tab/Shift+Tab list indent) before any other
     /// handling. Returns true if the handler owned the key — it has
@@ -946,6 +961,26 @@ private:
     /// Selects the whole document (first block byte 0 through the last
     /// block's end). No-op with no document or no blocks.
     void selectAll();
+
+    // ---- Editing-command floor (P7.2b, F1 #1) -----------------------------
+
+    /// CodeMirror's selectLine (Alt+L). Selects the caret's entire block
+    /// (byte 0 through its end), same shape as selectAll() scoped to one
+    /// block. No-op with no document/caret.
+    void selectLine();
+    /// CodeMirror's deleteLine (Ctrl+Shift+K). Clears the caret's block's
+    /// content — the block itself is NOT removed (see .cpp doc comment for
+    /// why that reading was chosen over CodeMirror's own "remove the whole
+    /// line" semantics). No-op with no document/caret or an already-empty
+    /// block.
+    void deleteLine();
+    /// CodeMirror's moveLineUp/moveLineDown (Alt+Up/Alt+Down). Swaps the
+    /// caret's block's content (text/kind/attrs) with its previous (`down`
+    /// false) or next (`down` true) sibling in document order — a content
+    /// swap between existing BlockIds, not a real IdList reorder (core has
+    /// no reorder primitive; see .cpp doc comment). No-op at a document
+    /// edge or with no document/caret.
+    void moveLine(bool down);
 
     // ---- Drag-drop + middle-click paste (P7.2) ----------------------------
     // Text drag out reuses `selectedText()` (same bytes `copy()` already
