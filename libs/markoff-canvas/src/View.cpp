@@ -2139,10 +2139,7 @@ QMimeData *View::createMimeDataFromSelection() const
     const QByteArray text = selectedText();
     auto *data = new QMimeData;
     data->setText(QString::fromUtf8(text));
-    // Same bytes under a second MIME type, not a second serialization —
-    // this leaf's markdown IS its plain-text form (no styled-rich-text
-    // round-trip the way live/styled would need).
-    data->setData(QStringLiteral("text/markdown"), text);
+    // FALSIFY (throwaway): text/markdown omitted.
     return data;
 }
 
