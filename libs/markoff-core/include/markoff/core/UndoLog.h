@@ -135,13 +135,7 @@ public:
             // undo/redo granularity. Root-caused 2026-08-14 as a
             // convergence regression from P7.2a routing insertPrintable
             // through Cmd::insertCharacter's coalescing path.
-            if (m_onCommit && entry.targets.size() > targetsBefore) {
-                std::vector<CommittedOp> committed;
-                committed.reserve(entry.targets.size() - targetsBefore);
-                for (size_t i = targetsBefore; i < entry.targets.size(); ++i)
-                    committed.push_back({entry.targets[i].first, entry.targets[i].second});
-                m_onCommit(committed, entry.actionId);
-            }
+            // FALSIFY (throwaway): coalesced-in ops no longer reported to onCommit.
         } else {
             // m_pendingEntry == nullptr → Transaction ctor pushes new entry
             Transaction t(*this);
