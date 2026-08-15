@@ -15,6 +15,7 @@ bool isBackgroundSlot(Markoff::Theme::Slot s) {
     switch (s) {
         case S::SelectionBackground:
         case S::SearchMatchBackground: case S::SearchActiveMatchBackground:
+        case S::SelectionOccurrenceBackground:
         case S::EditorBackground: case S::GutterBackground:
         case S::CodeBlockBackground: case S::QuoteBackground:
             return true;
@@ -163,6 +164,11 @@ Theme Theme::defaultLight()
     t.setColor(Slot::SelectionBackground, QColor("#b0d0ff"));
     t.setColor(Slot::SearchMatchBackground, QColor("#ffe080"));
     t.setColor(Slot::SearchActiveMatchBackground, QColor("#ffb050"));
+    // P7.2e (F1 #7) — a third, distinct hue from both the active selection
+    // (blue) and find matches (orange), CM's own `highlightSelectionMatches`
+    // default theme uses a green ("#99ff7780" translucent) for the same
+    // "other occurrences of the selection" purpose.
+    t.setColor(Slot::SelectionOccurrenceBackground, QColor("#c3f0c3"));
     t.setBold(Slot::Heading1, true);
     t.setBold(Slot::Heading2, true);
     t.setBold(Slot::Heading3, true);
@@ -202,6 +208,7 @@ Theme Theme::defaultDark()
     t.setColor(Slot::CalloutImportant, QColor("#b183e0"));
     t.setColor(Slot::CalloutCaution,   QColor("#e0685c"));
     t.setColor(Slot::SelectionBackground, QColor("#264070"));
+    t.setColor(Slot::SelectionOccurrenceBackground, QColor("#2e4a2e"));
     return t;
 }
 
