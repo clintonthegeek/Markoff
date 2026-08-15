@@ -138,20 +138,16 @@ StructuralResult listItemBackspace(MarkoffDocument &doc, BlockId block,
         Cmd::renumberRunStartingAt(doc, block, t);
         return {true, block, 0};
     }
-    // indent == 0: de-list in place (CM `deleteMarkupBackward` parity,
-    // P7.2d addendum 2026-08-15 — user-approved behavior change). Never
-    // merge into the previous block; convert to a plain paragraph instead,
-    // same shape as listItemEnter's empty-at-indent0 "exit list" branch.
-    // No renumbering: de-listing can only ever SPLIT a contiguous ordered-
-    // run (never merge two runs the way Tab-outdent can), and a split-off
-    // tail's own first MarkerNumber is already the correct seed for its
-    // now-standalone run, so `renumberRunStartingAt` on it would be a
-    // verified no-op (see falsification test
-    // listitem_backspace_at_start_indent0_delists_tail_keeps_numbering).
-    UndoLog::Transaction t(doc.d2UndoLog());
-    doc.d2SetBlockKind(block, BlockKind::Paragraph, t);
-    doc.d2SetBlockAttr(block, AttrNames::MarkerStyle, QString{}, t);
-    return {true, block, 0};
+    // FALSIFY (throwaway): revert to old merge-into-previous behavior.
+    const auto blocks = doc.iterateBlocks();
+    if (indexOf(blocks, block) <= 0) return {};
+    auto res = Cmd::backspaceMerge(doc, block);
+    if (res.mergedInto.isNull()) return {};
+    {
+        UndoLog::Transaction t(doc.d2UndoLog());
+        Cmd::renumberRunStartingAt(doc, res.mergedInto, t);
+    }
+    return {true, res.mergedInto, res.cursorByteOffset};
 }
 
 StructuralResult listItemDelete(MarkoffDocument &doc, BlockId block,
