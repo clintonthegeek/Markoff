@@ -157,6 +157,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | *(out-of-band)* regression fix: coalesced ops never reached onCommit | ☑ | `623ed6ca` | `a6bcbd76`/`80dfc784` |
 | P7.2c F1#4 auto-pairing / wrap-selection | ☑ | `82f0c9d7` | A: `6c0fc4ea`/`b8a9d04f`; B: `1419d97f`/`d4b0d836` |
 | P7.2d F1#5 Enter/Backspace semantics checklist | ☑ | `8e56ab46` | A: `ed2f713c`/`be7938c1`; B: `c6c6a9d6`/`44780937` |
+| *(out-of-band)* P7.2d addendum: Backspace de-lists, never merges | ☑ | `fc7ea6fe` | `a48bdfa0`/`8e59beb4` |
 | P7.2e F1#7 highlight selection occurrences | ☐ | | |
 | P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☐ | | |
 | P7.2g F1#9 invisible/control-char rendering | ☐ | | |
@@ -956,7 +957,8 @@ case by case. Test-only task; no source change landed.
   are genuinely different products (backspace-merges-blocks is a
   reasonable, deliberate editor choice, not obviously a bug) — a call
   for the user, not an in-session judgment call. **Logged, not
-  fixed.**
+  fixed.** (**Addendum 2026-08-15: user decided — see the standalone
+  "P7.2d addendum" findings-log entry below for the resolution.**)
 - No falsifiable-but-trivial cases found; both new tests exercise real
   logic (`renumberRunStartingAt`'s actual numbering math; the
   indent>0-vs-==0 branch split), so both got the full protocol rather
@@ -996,6 +998,46 @@ case by case. Test-only task; no source change landed.
   out an exception for that): **313/313**, up from 312/312 at the
   regression-fix entry above. Constitution check not applicable (no
   canvas files touched this task).
+
+**P7.2d addendum (2026-08-15, out-of-band — not a plan task number).**
+Case 4's dormant item above ("logged as a dormant item... needs the
+user") is closed: the user was asked and **decided to switch to CM's
+de-list-in-place behavior.** `fix(core): Backspace de-lists indent-0
+ListItem, never merges` (commit `fc7ea6fe`). `listItemBackspace`'s
+indent==0 branch now converts the block to `Paragraph` and clears
+`MarkerStyle` (same shape as `listItemEnter`'s empty-at-indent0 "exit
+list" branch) instead of calling `Cmd::backspaceMerge`; the previous
+block is never touched. No renumbering call was added: de-listing can
+only ever *split* a contiguous ordered-list run (never merge two runs
+the way Tab-outdent can), and a split-off tail's own first
+`MarkerNumber` is already the correct seed for its new standalone run
+— verified, not assumed, by a new test
+(`listitem_backspace_at_start_indent0_delists_tail_keeps_numbering`)
+that loads a 3-item ordered list, de-lists the middle item, and
+confirms the tail item keeps its original number (3, not renumbered
+to 2). The pre-existing merge test was renamed
+`listitem_backspace_at_start_indent0_delists_not_merges` and rewritten
+to assert the new outcome. Cross-leaf check: no `markoff-live` or
+`markoff-source` test exercised indent-0 ListItem Backspace at all
+(confirmed by an Explore agent grep of both test directories, several
+independent grep passes, none matching). `markoff-styled` did —
+`backspace_at_list_start_merges_via_widget` routes Backspace through
+this same shared `StructuralKeyHandler` and failed under the full
+suite; renamed to `backspace_at_list_start_delists_via_widget` and
+rewritten to match (styled is bug-fix-only per the standstill, but
+this is exactly that: fixing a test to match a shared handler's
+now-changed, user-approved contract, not a styled-leaf feature
+change). No canvas files needed changes (`View::tryStructuralKey`
+calls the handler generically). Falsification: reverted the indent==0
+branch back to the old `Cmd::backspaceMerge` call as a throwaway
+break — all three new/rewritten tests failed as expected (core:
+`listitem_backspace_at_start_indent0_delists_not_merges` and
+`listitem_backspace_at_start_indent0_delists_tail_keeps_numbering`;
+styled: `backspace_at_list_start_delists_via_widget`), confirming they
+actually exercise the change. Throwaway break `a48bdfa0`, revert
+`8e59beb4`. Full suite **313/313** (unchanged count — no new test
+executables, only test-case renames/rewrites within existing
+binaries), re-verified after the revert.
 
 **Regression fix (2026-08-14/15, out-of-band — not a plan task number).**
 

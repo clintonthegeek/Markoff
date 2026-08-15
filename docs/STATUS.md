@@ -92,8 +92,10 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   regression, and changing it would flip a shared core handler's
   documented behavior against its own test's name — logged as a
   dormant item (below) rather than changed unilaterally. No core
-  source change landed. Phase 7 continues at P7.2e (highlight
-  selection occurrences) through P7.2g, then P7.3 (⏸ arc close:
+  source change landed. **User decided same day: switch to CM's
+  de-list-in-place semantics** — implemented and closed, see Dormant
+  items below. Phase 7 continues at P7.2e (highlight selection
+  occurrences) through P7.2g, then P7.3 (⏸ arc close:
   Obsidian parity audit + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
@@ -172,23 +174,17 @@ files touched, so `check-constitution.sh` not applicable this task.
 
 ## Dormant items
 
-- **`StructuralKeyHandler`'s indent-0 ListItem Backspace merges with
-  the previous block; CodeMirror's equivalent de-lists the line
-  in place instead** (P7.2d finding, 2026-08-15) — CM's
-  `deleteMarkupBackward` (`lang-markdown/src/commands.ts:240`) at a
-  list item's content-start deletes the marker and leaves the line as
-  an unmerged plain paragraph; ours calls `Cmd::backspaceMerge` and
-  joins it into the previous block. Not a fresh regression: existing,
-  deliberately-tested behavior
-  (`listitem_backspace_at_start_indent0_merges`, pre-existing test
-  name and all), most likely chosen to match old-leaf
-  backspace-at-block-start convention rather than CM's flat-text-
-  overlay one. `StructuralKeyHandler` is core-internal but
-  consumer-facing across all three view leaves (markoff-core
-  CLAUDE.md), so flipping this would mean rewriting an existing named
-  test to assert the opposite outcome and is a genuine product
-  decision (which convention canvas should follow), not an in-session
-  call — needs the user. Full writeup: plan findings log, P7.2d entry.
+- **CLOSED 2026-08-15 (commit `fc7ea6fe`):** `StructuralKeyHandler`'s
+  indent-0 ListItem Backspace previously merged into the previous
+  block (P7.2d finding); user decided to switch to CodeMirror's
+  de-list-in-place semantics instead. `listItemBackspace`'s indent==0
+  branch now converts the block to `Paragraph` + clears `MarkerStyle`
+  (mirrors `listItemEnter`'s exit-list branch), never touching the
+  previous block. No renumbering needed (de-listing only ever splits a
+  run, never merges two). Cross-leaf check caught a `markoff-styled`
+  test also asserting the old behavior (`markoff-live`/`markoff-source`
+  had none) — renamed and rewritten to match. Full suite 313/313. Full
+  writeup: plan findings log, "P7.2d addendum" entry.
 - **CLOSED 2026-08-15 (commit `623ed6ca`):** the P7.2a-introduced
   gremlin-fuzz convergence regression (fixed seed `3237998146`,
   bisected to exactly one commit — see the plan findings log's
