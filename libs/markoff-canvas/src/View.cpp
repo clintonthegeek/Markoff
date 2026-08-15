@@ -4042,7 +4042,7 @@ void View::paintEvent(QPaintEvent *event)
                 toByte, ProjectionMap::SnapDirection::Right);
             if (qTo > qFrom) {
                 QTextCharFormat fmt;
-                fmt.setBackground(presence.selection.presenceColor);
+                fmt.setBackground(m_theme.color(Theme::Slot::SelectionBackground));
                 selections.push_back({qFrom, qTo - qFrom, fmt});
             }
         }
