@@ -1408,7 +1408,7 @@ void View::updateScrollRange()
     // scroll range just because "viewport height minus one line" is a big
     // number in a tall window.
     int max = baseMax;
-    if (false && baseMax > 0) {
+    if (baseMax > 0) {
         const int oneLine = qMax(1, qRound(
             QFontMetricsF(m_theme.font(Theme::FontRole::Body)).lineSpacing()));
         max = baseMax + qMax(0, viewportH - oneLine);
