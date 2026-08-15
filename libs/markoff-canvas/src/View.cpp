@@ -4903,7 +4903,7 @@ void View::paintEvent(QPaintEvent *event)
     // `m_hasFocus` — see `isDocumentEmpty()`'s doc comment for why that
     // matches CM's actual placeholder.ts behavior rather than this file's
     // OWN (focus-gated) title-placeholder convention.
-    const bool paintPlaceholder = isDocumentEmpty();
+    const bool paintPlaceholder = isDocumentEmpty() && !m_hasFocus;
     const std::optional<BracketMatch> bracketMatch = bracketMatchAtCaret();
 
     for (size_t entryIndex = 0; entryIndex < m_cache->entries().size(); ++entryIndex) {
