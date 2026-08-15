@@ -147,7 +147,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P6.1 Caret/selection ↔ Session (B.2/B.4 closure) | ☑ | `f8b66807` | `4e1711df`/`f073658d` |
 | P6.2 Remote presence rendering (carets, tints, flags) | ☑ | `d920c694` (+ test fix `b8f2fff4`) | `df42c919`/`b11122fb` |
 | P6.3 Remote-edit-mid-IME + concurrency torture tests | ☑ | `1298488c` | A: `2ef531e6`/`5fbbc5c8`; B: `6fa35e12`/`321eb61f` |
-| P6.4 ⏸ phase close | ☐ | | n/a |
+| P6.4 ⏸ phase close | ☑ | n/a | n/a |
 | **G1 — user gate: accessibility scope** | ☐ | — | — |
 | **P7 — polish + a11y** | | | |
 | P7.1 Accessibility (per G1) | ☐ | | |
@@ -646,6 +646,35 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
   core seam touched — `markoff-core` was read-only for this task,
   consuming `Selection`/`TextAnchor`/`offsetInBlock` exactly as
   scoped).
+
+**P6.4 (2026-08-14) — phase close.**
+
+- Full suite: **310/310** (up from 307/307 at P6.0 open — three new
+  executables this phase: `tst_canvas_session_selection` P6.1,
+  `tst_canvas_remote_presence` P6.2, `tst_canvas_concurrency` P6.3).
+  `check-constitution.sh`: clean (C1–C4) over 69 files. Honest re-read
+  of the phase's diff (`git diff 6d969f2d..HEAD -- libs/markoff-canvas
+  libs/markoff-core`, grepped for the C1/C2 smell keywords the script
+  doesn't literally string-match): no hits outside a doc-comment
+  mention in `libs/markoff-canvas/CLAUDE.md` explaining why G-Q612 is
+  C3-safe — clean.
+- **Correction to a P6.1 finding:** the "pre-existing build break,
+  `tst_view_contract_live_caret_rect` fails to link" dormant item
+  (docs/STATUS.md) does **not** reproduce — a clean `cmake --build
+  build-dev -j 4` of the whole tree at P6.4 close built and ran it
+  successfully (4/4 passed). Almost certainly a stale/partial build
+  directory artifact at the time P6.1 observed it, not a real code
+  defect. Dormant item removed rather than left open on a
+  non-reproducing report.
+- Perf re-baseline **not** re-run this phase: P6.0–P6.3 touch caret/
+  selection/fold/presence bookkeping and paint-time-only additions,
+  none of the y-position walk perf budgets track (spec E9's block-
+  layout/scroll/keystroke-latency numbers) — same judgment call P3.7/
+  P4.8 made for their non-layout phases. Last-held figures (P5.7)
+  carried forward in STATUS.md unchanged.
+- Phase 6 (collaboration surface) closes here. Remaining before G1:
+  nothing — G1 (accessibility scope) is a user gate, not a task;
+  Phase 7 is next once the user opens it.
 
 **P6.3 (2026-08-14).**
 

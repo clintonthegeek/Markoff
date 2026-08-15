@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 6, P6.3 landed)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 6 CLOSED, P6.4)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -24,13 +24,14 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   contract v2) closed 2026-08-14 at P3.7; Phase 4 (inline/text parity)
   closed 2026-08-14 at P4.8; Phase 5 (block parity) closed 2026-08-14
   at P5.7 (perf re-baseline held). Phase 6 (collaboration surface)
-  opened 2026-08-14 with P6.0 (core anchor seam + fold retro-wire to
-  Session, reduced scope — see plan findings log); P6.1 (Session caret
-  authority closure) landed the same day; P6.2 (remote presence
-  rendering — caret bar, name flag, selection tint) landed the same
-  day; P6.3 (IME-vs-concurrent-remote-edit + seeded gremlin fuzz
-  convergence test) landed the same day — no C1/C2 workaround needed,
-  both tests passed on the first run; next is P6.4 (⏸ phase close).
+  opened and closed 2026-08-14: P6.0 (core anchor seam + fold retro-
+  wire to Session, reduced scope — see plan findings log), P6.1
+  (Session caret authority closure), P6.2 (remote presence rendering —
+  caret bar, name flag, selection tint), P6.3 (IME-vs-concurrent-
+  remote-edit + seeded gremlin fuzz convergence test — no C1/C2
+  workaround needed, both tests passed on the first run), P6.4 (⏸
+  phase close, full suite 310/310). Phase 7 (polish + a11y) is next,
+  gated on user gate G1 (accessibility scope).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -39,30 +40,20 @@ P2.1–P2.3 done).
 
 ## Test baseline
 
-**Full suite: 307/307**, last verified 2026-08-14 at P6.0 (one new
-executable that phase, `tst_d2_block_crdt_anchor`) — **not re-verified
-at P6.1** per the plan's own tier rule (P6.1's diff stays inside
-`libs/markoff-canvas/`, no core seam touched, so a canvas-scoped run is
-sufficient before commit). While incidentally building the whole tree
-to confirm this, P6.1 discovered a **pre-existing, unrelated build
-break**: `tst_view_contract_live_caret_rect`
-(`libs/markoff-live/tests/`) fails to link (`undefined reference to
-'main'`) — not caused by this task (nothing in `libs/markoff-live/`
-was touched) and not yet root-caused. This currently blocks a clean
-`cmake --build build-dev` for the whole tree, which in turn blocks the
-next full-suite run until someone in the live/styled/source bug-fix
-lane looks at it. New dormant item below.
-
-**Canvas-scoped suite (`scripts/run-tests.sh -R canvas`): 32/32**,
-verified 2026-08-14 at P6.3 — up from 31/31 at P6.2 via one new
-executable, `tst_canvas_concurrency` (two test slots: IME-vs-remote-
-edit, and a seeded 300-iteration gremlin fuzz convergence test).
-`check-constitution.sh` clean (C1–C4) over 69 files (was 68 at P6.2;
-the new test file). No production code landed this task — the only
-`libs/markoff-canvas/src/` touch was a throwaway falsification
-break/revert pair (plan findings log, P6.3 entry), so full suite was
-not re-run per the plan's tier rule. Perf re-baseline not re-run
-either (same reasoning); last held figures (P5.7):
+**Full suite: 310/310 (100%)**, re-verified 2026-08-14 at Phase 6
+close (P6.4) — up from the 307/307 baseline at P6.0 via three new
+canvas executables registered this phase (`tst_canvas_session_selection`
+P6.1, `tst_canvas_remote_presence` P6.2, `tst_canvas_concurrency` P6.3).
+`check-constitution.sh` clean (C1–C4) over 69 files. Honest re-read of
+the phase's diff for C1/C2 smells the script doesn't literally
+string-match: clean (plan findings log, P6.4 entry). The previously
+reported "pre-existing build break" in `tst_view_contract_live_caret_rect`
+(P6.1 finding) did **not** reproduce at P6.4's clean whole-tree
+rebuild — stale build-directory artifact, not a real defect; dormant
+item withdrawn. Perf re-baseline not re-run this phase (P6.0–P6.3 are
+caret/selection/fold/presence bookkeeping + paint-time-only additions,
+none of which touch the y-position walk E9 tracks — same judgment
+P3.7/P4.8 made for their non-layout phases); last-held figures (P5.7):
 load→paint 188 ms/500 ms, p95 keystroke 1.38 ms/16 ms, scroll-realize
 11.6 %/30 %, RSS delta 0 KB/100 MB. The plan ratchets this up per
 task; any drop is a regression (classify before fixing).
@@ -108,14 +99,6 @@ task; any drop is a regression (classify before fixing).
   either populate `latestBlockRanges`/`latestBlockAnchors` for real, or
   retire the three accessors and redirect any other silent callers to
   the D2-safe alternatives. Full writeup: plan findings log, P6.1 entry.
-- **Pre-existing build break, unrelated to canvas** (discovered
-  2026-08-14 building the whole tree for P6.1's full-suite sanity
-  check): `tst_view_contract_live_caret_rect`
-  (`libs/markoff-live/tests/`) fails to link — `undefined reference to
-  'main'`. Not caused by P6.1 (nothing in `libs/markoff-live/` was
-  touched) and not root-caused. Blocks a clean whole-tree build, which
-  blocks the next full-suite run, until someone in the live bug-fix
-  lane looks at it.
 - **CLOSED 2026-08-14 (P6.0, commit `f2e705d5`):** the D2-safe core
   accessor now exists (`MarkoffDocument::blockCrdtAnchorAt`/
   `resolveBlockCrdtAnchor`) and `View::toggleFold()` writes every fold
