@@ -154,6 +154,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P7.2 Drag-drop + middle-click paste | ☑ | `565aeee1` (+ comment fix `2131929e`) | A: `056f9215`/`504fbc4f`; B: `67c2d433`/`1254a421`; C: `b285a6e7`/`f9e7e2c9` |
 | P7.2a F1#3 undo-coalescing defect fix | ☑ | `0ceceda0` | `44cc112d` / `be83a674` |
 | P7.2b F1#1 editing-command floor | ☑ | `965b6aee` | A: `0d28bb61`/`1ab59f6e`; B: `745a5d10`/`45f3fe79`; C: `0c81115f`/`d7741e9a`; D: `4ee7eb1e`/`af73a63f` |
+| *(out-of-band)* regression fix: coalesced ops never reached onCommit | ☑ | `623ed6ca` | `a6bcbd76`/`80dfc784` |
 | P7.2c F1#4 auto-pairing / wrap-selection | ☐ | | |
 | P7.2d F1#5 Enter/Backspace semantics checklist | ☐ | | |
 | P7.2e F1#7 highlight selection occurrences | ☐ | | |
@@ -845,6 +846,57 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
   case). Constitution clean (C1–C4). Full suite not run per the plan's
   tier rule (diff stays inside `libs/markoff-canvas/`, no core seam
   touched, core header included is pre-existing public API).
+
+**Regression fix (2026-08-14/15, out-of-band — not a plan task number).**
+
+`fix(core): coalesced undo transactions never fired onCommit, ops
+silently dropped from collab peers` (commit `623ed6ca`).
+
+- P7.2b's agent found `tst_canvas_concurrency`'s gremlin fuzz test
+  (fixed seed `3237998146`, P6.3's load-bearing convergence guarantee)
+  failing deterministically and incorrectly logged it as "pre-existing,
+  not caused by this task." The orchestrator independently bisected via
+  `git worktree` (full submodule init + clean rebuild at each commit,
+  not just a canvas-subtree checkout): **passes** at `7092a215` (P7.2,
+  pre-P7.2a), **fails** at `32aab7ca` (P7.2a) — exactly one commit
+  apart, pinning the cause to P7.2a's `insertPrintable` →
+  `Cmd::insertCharacter` routing change. Treated as blocking (a
+  correctness bug in the collab path outranks closing remaining F1
+  gaps) — `libs/markoff-core/` opened for this one task specifically.
+- **Root cause:** `UndoLog::maybeCoalesceOrTransaction`'s "extend last
+  entry" branch marks its `Transaction` as inner (`m_pendingEntry` set)
+  so the destructor takes the non-outermost path and never calls
+  `m_onCommit` — reserved for an entry's first (outermost)
+  `Transaction`. `MarkoffDocument` wires `m_onCommit` to
+  `localOpsProduced` (the D5 collab hookup), so every coalesced-in op
+  after the FIRST keystroke of a coalescing run was applied to the
+  local document but silently never reported to collab peers. This gap
+  existed in `UndoLog` before P7.2a but was unreachable: `insertPrintable`
+  previously opened a bare per-keystroke `Transaction` (always
+  outermost, always fired `onCommit`) — P7.2a's routing through
+  `Cmd::insertCharacter` made the coalescing path (and this latent bug)
+  reachable from typing for the first time.
+- **Fix:** fire `onCommit` explicitly inside the coalesce-extend branch,
+  for exactly the ops that call's `body(t)` added (`targetsBefore..end`
+  of `entry.targets`) — preserves per-keystroke op reporting order to
+  collab peers while keeping the single-undo-entry coalescing behavior
+  P7.2a wanted. Both properties verified holding simultaneously: gremlin
+  fuzz passes **5/5** consecutive runs (was 0/5); `tst_canvas_undo`'s
+  `consecutive_printable_keys_coalesce_into_one_undo_entry` (P7.2a's own
+  falsification target) still passes.
+- **Falsification:** removing the `onCommit` call reproduces the exact
+  original divergence pattern (`"LELAqdwLe"` vs `"LELAGQL\n"`) —
+  `a6bcbd76` / `80dfc784`.
+- Full suite: **312/312** (up from 311/311 at P7.2 — no new executable,
+  this is a core bugfix). Constitution clean (C1–C4, 71 files).
+- This is the second time an agent's own bisection/causality claim
+  ("pre-existing," "not caused by this task") turned out to be wrong
+  on independent verification — worth remembering that "I checked and
+  it's unrelated" claims from a background agent warrant a real
+  re-derivation (full submodule init + clean rebuild at the actual
+  commit boundary), not just trust, when the claim is convenient
+  (lets the agent's own task close cleanly) and the stakes are real
+  (a correctness bug in the collab path, not a cosmetic gap).
 
 **P7.2b (2026-08-14).**
 

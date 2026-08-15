@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 7, P7.2b landed)
+**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2a/P7.2b's convergence regression fixed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -111,33 +111,31 @@ no new executable, `tst_canvas_undo` extended with
 inside `libs/markoff-canvas/`; the only core header touched,
 `Cmd/D2.h`, is pre-existing public API, no core seam changed).
 
-P7.2b (2026-08-14): canvas-scoped suite **34/34 excluding one
-pre-existing failure** — up from 33/33 via one new executable,
-`tst_canvas_editing_command_floor` (word motion/delete, doc start/
-end, delete/move/select-line, Esc-simplify; 4 falsification-backed
-groups). `tst_canvas_concurrency`'s gremlin-fuzz convergence test
-fails deterministically (fixed seed) and was confirmed pre-existing
-at the P7.2a baseline — not caused by this task, not fixed (no core
-seam named), flagged for P7.3's audit. `check-constitution.sh` clean
-(C1–C4, 71 files). Full suite not re-run per the plan's tier rule
-(diff stays inside `libs/markoff-canvas/`, no core seam touched).
+P7.2b (2026-08-14): canvas-scoped suite **34/34** — up from 33/33 via
+one new executable, `tst_canvas_editing_command_floor` (word motion/
+delete, doc start/end, delete/move/select-line, Esc-simplify; 4
+falsification-backed groups). `check-constitution.sh` clean (C1–C4,
+71 files). **Correction:** this task's agent flagged
+`tst_canvas_concurrency`'s gremlin-fuzz failure as "pre-existing" —
+independently re-bisected by the orchestrator and found to be a real
+regression introduced by P7.2a, one commit prior; fixed same day
+(`623ed6ca`, see Dormant items below and the plan findings log).
 
 ## Dormant items
 
-- **CORRECTION (orchestrator, 2026-08-14): pinned to commit `0ceceda0`
-  (P7.2a), not "pre-existing."** `tst_canvas_concurrency`'s gremlin-fuzz
-  convergence test (fixed seed `3237998146`) independently bisected:
-  **passes** at `7092a215` (P7.2, pre-P7.2a) — verified via `git
-  worktree` + full submodule init + clean rebuild — and **fails**
-  deterministically at `32aab7ca` (P7.2a). Only one commit separates
-  them, so P7.2a's `insertPrintable` → `Cmd::insertCharacter` routing
-  change is the cause, not an unrelated pre-existing bug. This is a
-  genuine document-divergence regression in the load-bearing
-  concurrency guarantee P6.3 established (its own findings entry
-  records this exact test passing clean on first run, zero workaround)
-  — treated as blocking, not deferred to P7.3's audit. Under active
-  investigation now. Full writeup: plan findings log, P7.2b entry
-  (original, since corrected) and the investigation entry once landed.
+- **CLOSED 2026-08-15 (commit `623ed6ca`):** the P7.2a-introduced
+  gremlin-fuzz convergence regression (fixed seed `3237998146`,
+  bisected to exactly one commit — see the plan findings log's
+  "Regression fix" entry, inserted between P7.2a and P7.2b, for the
+  full root-cause writeup). Root cause: `UndoLog::
+  maybeCoalesceOrTransaction`'s coalesce-extend branch never fired
+  `onCommit` for ops after the first keystroke of a coalescing run, so
+  they were applied locally but silently never sent to collab peers —
+  a latent bug in `UndoLog` made reachable for the first time by
+  P7.2a's `insertPrintable` → `Cmd::insertCharacter` routing. Fixed by
+  firing `onCommit` explicitly for the coalesced-in ops. Gremlin fuzz
+  now passes 5/5 consecutive runs; P7.2a's own coalescing test still
+  passes — both properties hold simultaneously. Full suite 312/312.
 - **Self-drop text-drag Move does not delete the source selection**
   (P7.2, 2026-08-14) — dragging a selection and dropping it back
   inside the SAME `View` duplicates the text instead of moving it
