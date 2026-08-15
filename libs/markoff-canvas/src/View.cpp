@@ -2527,23 +2527,12 @@ void View::insertPrintable(const QString &text)
     // isPrintable=false, which (a) preserves exact byte content and
     // (b) deliberately breaks any coalescing chain around it rather than
     // risk mis-grouping the surrounding keystrokes' undo entries.
-    int i = 0;
-    while (i < text.size()) {
-        const QChar ch = text.at(i);
-        if (ch.isHighSurrogate() && i + 1 < text.size() && text.at(i + 1).isLowSurrogate()) {
-            const QByteArray insert = text.mid(i, 2).toUtf8();
-            const CoalesceContext ctx{m_caret.block, false, QDateTime::currentMSecsSinceEpoch()};
-            m_doc->d2UndoLog().maybeCoalesceOrTransaction(ctx, [&](UndoLog::Transaction &t) {
-                m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0, insert, t);
-            });
-            m_caret.byteOffset += insert.size();
-            i += 2;
-        } else {
-            Cmd::insertCharacter(*m_doc, m_caret.block, uint32_t(m_caret.byteOffset), ch);
-            m_caret.byteOffset += QString(ch).toUtf8().size();
-            i += 1;
-        }
-    }
+    // FALSIFY (throwaway): revert to the pre-P7.2a bare-Transaction
+    // behavior to confirm the new coalescing test fails.
+    const QByteArray insert = text.toUtf8();
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0, insert, t);
+    m_caret.byteOffset += insert.size();
     // P6.1: does NOT funnel through setCaret() (a plain byteOffset bump,
     // not a "placement") — pushed here directly, same reasoning as
     // deleteCluster()/tryStructuralKey()/the arrow-key moveCaret* helpers
