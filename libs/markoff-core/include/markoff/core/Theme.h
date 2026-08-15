@@ -30,6 +30,7 @@ public:
         CursorPrimary, CursorSecondary, CursorPresence,
         SearchMatchBackground, SearchActiveMatchBackground,
         SelectionOccurrenceBackground,
+        BracketMatchBackground,
         EditorBackground, GutterBackground,
         CodeBlockBackground, QuoteBackground,
         CalloutNote, CalloutWarning, CalloutTip,

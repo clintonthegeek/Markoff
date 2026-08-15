@@ -16,6 +16,7 @@ bool isBackgroundSlot(Markoff::Theme::Slot s) {
         case S::SelectionBackground:
         case S::SearchMatchBackground: case S::SearchActiveMatchBackground:
         case S::SelectionOccurrenceBackground:
+        case S::BracketMatchBackground:
         case S::EditorBackground: case S::GutterBackground:
         case S::CodeBlockBackground: case S::QuoteBackground:
             return true;
@@ -169,6 +170,12 @@ Theme Theme::defaultLight()
     // default theme uses a green ("#99ff7780" translucent) for the same
     // "other occurrences of the selection" purpose.
     t.setColor(Slot::SelectionOccurrenceBackground, QColor("#c3f0c3"));
+    // P7.2f (F1 #10) — bracket-match highlight. CM's own base theme
+    // (`language/src/matchbrackets.ts` `baseTheme`) uses a translucent teal,
+    // `#328c8252` (32% alpha); matched here as an RGBA QColor rather than
+    // that packed hex string (Qt's 8-digit `#RRGGBBAA`/`#AARRGGBB` hex forms
+    // are easy to get backwards, an explicit QColor(r,g,b,a) is not).
+    t.setColor(Slot::BracketMatchBackground, QColor(0x32, 0x8c, 0x82, 0x80));
     t.setBold(Slot::Heading1, true);
     t.setBold(Slot::Heading2, true);
     t.setBold(Slot::Heading3, true);
@@ -209,6 +216,10 @@ Theme Theme::defaultDark()
     t.setColor(Slot::CalloutCaution,   QColor("#e0685c"));
     t.setColor(Slot::SelectionBackground, QColor("#264070"));
     t.setColor(Slot::SelectionOccurrenceBackground, QColor("#2e4a2e"));
+    // Lighter/more-opaque than light-mode so the teal still reads against
+    // the dark editor background, same "desaturated-for-dark" convention
+    // the callout accents above already follow.
+    t.setColor(Slot::BracketMatchBackground, QColor(0x4a, 0xb0, 0xa4, 0x90));
     return t;
 }
 
