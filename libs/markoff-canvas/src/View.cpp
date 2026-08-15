@@ -3736,17 +3736,15 @@ void View::mousePressEvent(QMouseEvent *event)
     // Ctrl+V clipboard (Qt's own `Selection` mode is a distinct store from
     // `Clipboard` mode — qwidgettextcontrol.cpp's own MiddleButton handling
     // never conflates the two, and neither does this).
-    // FALSIFY (throwaway): bypass the supportsSelection() guard AND
-    // conflate primary selection with the regular clipboard (the exact
-    // thing the real code's doc comment says never to do).
-    if (event->button() == Qt::MiddleButton && m_doc && !m_readOnly) {
+    if (event->button() == Qt::MiddleButton && m_doc && !m_readOnly
+        && QGuiApplication::clipboard()->supportsSelection()) {
         const CanvasCursor hit = hitTest(event->pos());
         if (!hit.block.isNull()) {
             setFocus(Qt::MouseFocusReason);
             m_selectionAnchor.reset();
             setCaret(hit);
             const QMimeData *primary =
-                QGuiApplication::clipboard()->mimeData(QClipboard::Clipboard);
+                QGuiApplication::clipboard()->mimeData(QClipboard::Selection);
             if (primary)
                 insertText(primary->text());
             event->accept();
