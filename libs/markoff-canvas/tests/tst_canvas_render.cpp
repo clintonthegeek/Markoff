@@ -286,9 +286,22 @@ void TstCanvasRender::scrolling_realizes_on_demand_and_stays_lazy()
         QTest::keyClick(&view, Qt::Key_PageDown);
     QVERIFY(view.verticalScrollBar()->value() > 0);
 
-    // Jump to the end.
+    // Jump to the end. `ensureCaretVisible()` only scrolls enough to bring
+    // the caret's own line into view — it does NOT chase the scrollbar's
+    // new, padded maximum, so post-P7.2f (F1 #8, scroll-past-end) the two
+    // are no longer expected to coincide: `maximum()` now sits one
+    // viewport-minus-one-line further out than "the last line is merely
+    // visible at the bottom edge" (updateScrollRange()'s own doc comment).
+    // Ctrl+End landing short of `maximum()` — with room still left to
+    // scroll further — is exactly that feature working, not a regression;
+    // this test only asserted exact equality because scroll-past-end did
+    // not exist yet when it was written.
     QTest::keyClick(&view, Qt::Key_End, Qt::ControlModifier);
-    QCOMPARE(view.verticalScrollBar()->value(), view.verticalScrollBar()->maximum());
+    QVERIFY2(view.verticalScrollBar()->value() <= view.verticalScrollBar()->maximum(),
+             "Ctrl+End must not overscroll past the scrollbar's own maximum");
+    QVERIFY2(view.verticalScrollBar()->maximum() > view.verticalScrollBar()->value(),
+             "a long document must still have scroll-past-end room beyond "
+             "where Ctrl+End lands");
     view.repaint();
 
     const int realizedAtEnd = view.realizedBlockCount();

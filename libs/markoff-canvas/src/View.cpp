@@ -552,6 +552,78 @@ qreal View::documentHeight() const
     return m_cache->totalHeight() + leadingBandHeight();
 }
 
+bool View::isDocumentEmpty() const
+{
+    if (!m_doc)
+        return true;
+    const auto blocks = m_doc->iterateBlocks();
+    if (blocks.empty())
+        return true;
+    if (blocks.size() != 1)
+        return false;
+    return m_doc->blockKind(blocks.front()) == Markoff::BlockKind::Paragraph
+        && m_doc->blockText(blocks.front()).isEmpty();
+}
+
+std::optional<BracketMatch> View::bracketMatchAtCaret() const
+{
+    if (!m_doc || m_caret.block.isNull() || hasSelection())
+        return std::nullopt;
+    // Immediately-before first, then immediately-after — same order CM's
+    // own bracketDeco() checks (matchBrackets(head, -1) before the
+    // after-cursor fallback).
+    if (m_caret.byteOffset > 0) {
+        if (auto m = findMatchingBracket(m_caret.block, m_caret.byteOffset - 1))
+            return m;
+    }
+    return findMatchingBracket(m_caret.block, m_caret.byteOffset);
+}
+
+std::optional<BracketMatch> View::findMatchingBracket(BlockId block, int pos) const
+{
+    if (!m_doc || block.isNull())
+        return std::nullopt;
+    const QByteArray text = m_doc->blockText(block);
+    if (pos < 0 || pos >= text.size())
+        return std::nullopt;
+
+    const char ch = text.at(pos);
+    // Only the plan's named pairs — no {}, no '' (same scope guard P7.2c's
+    // auto-pairing kPairs table uses for the same reason: these 2 are the
+    // ones named).
+    struct Pair { char open; char close; };
+    constexpr Pair kBracketPairs[] = { {'(', ')'}, {'[', ']'} };
+
+    for (const Pair &pair : kBracketPairs) {
+        if (ch == pair.open) {
+            int depth = 0;
+            for (int j = pos; j < text.size(); ++j) {
+                const char c = text.at(j);
+                if (c == pair.open) ++depth;
+                else if (c == pair.close && --depth == 0)
+                    return BracketMatch{block, pos, j};
+            }
+            return std::nullopt;  // unmatched: scanned to end, never closed
+        }
+        if (ch == pair.close) {
+            int depth = 0;
+            for (int j = pos; j >= 0; --j) {
+                const char c = text.at(j);
+                if (c == pair.close) ++depth;
+                else if (c == pair.open && --depth == 0)
+                    return BracketMatch{block, j, pos};
+            }
+            return std::nullopt;  // unmatched: scanned to start, never opened
+        }
+    }
+    return std::nullopt;  // pos is not a bracket byte at all
+}
+
+std::optional<CanvasCursor> View::dropCursorPosition() const
+{
+    return m_dropCursorPos;
+}
+
 QRectF View::blockRect(BlockId id) const
 {
     const int i = m_cache->indexOf(id);
@@ -1320,7 +1392,27 @@ void View::paintFrontmatter(QPainter &p) const
 void View::updateScrollRange()
 {
     const int viewportH = viewport()->height();
-    const int max = qMax(0, qCeil(m_cache->totalHeight() + leadingBandHeight()) - viewportH);
+    const int contentTotal = qCeil(m_cache->totalHeight() + leadingBandHeight());
+    const int baseMax = qMax(0, contentTotal - viewportH);
+
+    // Scroll-past-end (P7.2f, F1 #8). CM reference: view/src/scrollpastend.ts
+    // — bottom padding = viewport height minus one line height, so the last
+    // line can scroll all the way up to (near) the top of the viewport
+    // instead of stopping the moment it merely becomes visible at the
+    // bottom edge. Only added once the document already needs scrolling
+    // (baseMax > 0): CM's own doc comment on scrollPastEnd() says as much
+    // ("only meaningful when the editor is scrollable... should not be
+    // enabled in editors that take the size of their content") — applying
+    // the padding unconditionally would hand a short document (that
+    // already fits entirely within a tall viewport) a spurious non-zero
+    // scroll range just because "viewport height minus one line" is a big
+    // number in a tall window.
+    int max = baseMax;
+    if (baseMax > 0) {
+        const int oneLine = qMax(1, qRound(
+            QFontMetricsF(m_theme.font(Theme::FontRole::Body)).lineSpacing()));
+        max = baseMax + qMax(0, viewportH - oneLine);
+    }
 
     QScrollBar *vbar = verticalScrollBar();
 
@@ -2655,10 +2747,18 @@ void View::dragEnterEvent(QDragEnterEvent *event)
         return;
     }
     const QMimeData *data = event->mimeData();
-    if (data->hasText() || data->hasUrls())
+    if (data->hasText() || data->hasUrls()) {
         event->acceptProposedAction();
-    else
+        // P7.2f (F1 #10): seed the drop-cursor at the drag's entry point
+        // too, not just its first move — otherwise a drag that's dropped
+        // before any dragMoveEvent fires (small viewport, fast gesture)
+        // never shows an indicator at all.
+        const CanvasCursor hit = hitTest(event->position().toPoint());
+        m_dropCursorPos = hit.block.isNull() ? std::nullopt : std::make_optional(hit);
+        viewport()->update();
+    } else {
         event->ignore();
+    }
 }
 
 void View::dragMoveEvent(QDragMoveEvent *event)
@@ -2668,14 +2768,35 @@ void View::dragMoveEvent(QDragMoveEvent *event)
         return;
     }
     const QMimeData *data = event->mimeData();
-    if (data->hasText() || data->hasUrls())
+    if (data->hasText() || data->hasUrls()) {
         event->acceptProposedAction();
-    else
+        // Re-hit-tested fresh every move (never cached) — same "draw-time
+        // only" convention this leaf's other paint-state follows (find
+        // highlights, occurrence highlights, remote presence).
+        const CanvasCursor hit = hitTest(event->position().toPoint());
+        m_dropCursorPos = hit.block.isNull() ? std::nullopt : std::make_optional(hit);
+        viewport()->update();
+    } else {
         event->ignore();
+    }
+}
+
+void View::dragLeaveEvent(QDragLeaveEvent *event)
+{
+    Q_UNUSED(event);
+    m_dropCursorPos.reset();
+    viewport()->update();
 }
 
 void View::dropEvent(QDropEvent *event)
 {
+    // P7.2f (F1 #10): the indicator's job ends the instant the drop lands,
+    // on every exit path below (accepted or ignored) — cleared up front
+    // rather than duplicated at each `return`. CM's own drawDropCursor
+    // clears identically on its `drop` event observer.
+    m_dropCursorPos.reset();
+    viewport()->update();
+
     if (!m_doc || m_readOnly) {
         event->ignore();
         return;
@@ -4774,6 +4895,17 @@ void View::paintEvent(QPaintEvent *event)
     const auto  sel        = orderedSelection();
     const qreal titleH     = leadingBandHeight();
 
+    // Empty-document placeholder (P7.2f, F1 #10) and bracket-match
+    // highlight (same task, F1 #10 continued): both resolved once per
+    // paint, draw-time only — same convention as every other paint-state
+    // feature in this loop (find highlights, occurrence highlights, remote
+    // presence). `paintPlaceholder` gates on document emptiness alone, NOT
+    // `m_hasFocus` — see `isDocumentEmpty()`'s doc comment for why that
+    // matches CM's actual placeholder.ts behavior rather than this file's
+    // OWN (focus-gated) title-placeholder convention.
+    const bool paintPlaceholder = isDocumentEmpty();
+    const std::optional<BracketMatch> bracketMatch = bracketMatchAtCaret();
+
     for (size_t entryIndex = 0; entryIndex < m_cache->entries().size(); ++entryIndex) {
         const auto &e = m_cache->entries()[entryIndex];
         // Folding (P5.6): a folded entry contributes 0 to the y-layout
@@ -5016,6 +5148,25 @@ void View::paintEvent(QPaintEvent *event)
             }
         }
 
+        // Bracket-match highlight (P7.2f, F1 #10): same draw-time
+        // FormatRange mechanism, own Theme slot. Resolved once above
+        // (`bracketMatch`), painted here only for the block it names — C4
+        // scope means it is always exactly one block, never a cross-block
+        // pair, so at most one entry in this loop ever matches.
+        if (bracketMatch && bracketMatch->block == e.id) {
+            for (const int byteOffset : {bracketMatch->openByte, bracketMatch->closeByte}) {
+                const int qFrom = e.projection.byteToLayoutQChar(
+                    byteOffset, ProjectionMap::SnapDirection::Left);
+                const int qTo = e.projection.byteToLayoutQChar(
+                    byteOffset + 1, ProjectionMap::SnapDirection::Right);
+                if (qTo > qFrom) {
+                    QTextCharFormat fmt;
+                    fmt.setBackground(m_theme.color(Theme::Slot::BracketMatchBackground));
+                    selections.push_back({qFrom, qTo - qFrom, fmt});
+                }
+            }
+        }
+
         // Remote presence selection tint (P6.2): same draw-time FormatRange
         // mechanism as the local selection/find-highlight ranges above,
         // never a layout format mutation. Resolved fresh every paint from
@@ -5054,6 +5205,22 @@ void View::paintEvent(QPaintEvent *event)
 
         p.setPen(e.style.foreground);
         e.layout->draw(&p, QPointF(contentX, contentY), selections);
+
+        // Empty-document placeholder (P7.2f, F1 #10): only the sole entry
+        // of a document `isDocumentEmpty()` already confirmed is exactly
+        // one empty Paragraph block — `e.layout` has no text to draw above,
+        // so this paints into what would otherwise be a blank line. Reuses
+        // `Theme::Slot::Quote` (an existing muted grey, not a new slot) —
+        // logged reuse decision, not an oversight; no hardcoded/consumer-
+        // configurable text seam yet (v1 minor per the plan — a setter is
+        // a follow-up if a consumer wants one).
+        if (paintPlaceholder && entryIndex == 0) {
+            p.setPen(m_theme.color(Theme::Slot::Quote));
+            p.setFont(e.style.font);
+            const QFontMetricsF pfm(e.style.font);
+            p.drawText(QPointF(contentX, contentY + pfm.ascent()),
+                       tr("Start typing…"));
+        }
 
         if (m_hasFocus && e.id == m_caret.block) {
             const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
@@ -5111,6 +5278,28 @@ void View::paintEvent(QPaintEvent *event)
                 p.setPen(Qt::white);
                 p.setFont(flagFont);
                 p.drawText(flagRect, Qt::AlignCenter, label);
+            }
+        }
+
+        // Drag drop-cursor indicator (P7.2f, F1 #10): a thin dashed bar at
+        // the hit-tested drop position, updated every `dragMoveEvent`. CM
+        // reference `view/src/dropcursor.ts` reuses its own `.cm-cursor`
+        // styling verbatim for `.cm-dropCursor` (checked its base theme —
+        // no distinct default treatment there at all), but the task
+        // explicitly asked for a visually DISTINCT indicator here, not a
+        // second solid caret indistinguishable from the real one — dashed,
+        // rather than a new Theme slot, since `CursorPrimary` alone already
+        // reads as "a caret" and the shape difference is enough; no slot
+        // proliferation for a purely-stylistic distinction.
+        if (m_dropCursorPos && m_dropCursorPos->block == e.id) {
+            const int layoutPos = e.projection.byteToLayoutQChar(m_dropCursorPos->byteOffset);
+            const QTextLine line = e.layout->lineForTextPosition(layoutPos);
+            if (line.isValid()) {
+                const qreal dropX = contentX + line.cursorToX(layoutPos);
+                const qreal dropY = contentY + line.y();
+                QPen dropPen(m_theme.color(Theme::Slot::CursorPrimary), 2.0, Qt::DashLine);
+                p.setPen(dropPen);
+                p.drawLine(QPointF(dropX, dropY), QPointF(dropX, dropY + line.height()));
             }
         }
     }

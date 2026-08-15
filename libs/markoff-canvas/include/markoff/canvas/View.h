@@ -27,6 +27,7 @@
 class QContextMenuEvent;
 class QDragEnterEvent;
 class QDragMoveEvent;
+class QDragLeaveEvent;
 class QDropEvent;
 class QInputMethodEvent;
 class QMenu;
@@ -91,6 +92,18 @@ struct FindHighlight {
 /// this exact paint path instead of growing a second one.
 struct RemotePresence {
     Markoff::Selection selection;
+};
+
+/// A resolved bracket pair around the caret (P7.2f, F1 #10). Both offsets
+/// are block-relative UTF-8 byte offsets into `block`'s buffer (C4 — scoped
+/// to one block, never a cross-block search; see
+/// `View::bracketMatchAtCaret()`'s doc comment for why an unmatched or
+/// cross-block case never produces one of these). `openByte`/`closeByte`
+/// each name the bracket character's own single byte, not a range.
+struct BracketMatch {
+    BlockId block;
+    int openByte = -1;
+    int closeByte = -1;
 };
 
 /// Content column width policy (contract-v2 P4.5, spec §5.2 "Word wrap"):
@@ -591,6 +604,43 @@ public:
     /// realized) is omitted, same as it would be at paint time.
     QList<RemotePresence> remotePresencesForBlock(BlockId id) const;
 
+    // ---- Scroll past end, empty-doc placeholder, bracket-match, drop-
+    // cursor (P7.2f, F1 #8/#10) ---------------------------------------------
+
+    /// True with no document, no blocks, or exactly one block that is both
+    /// `BlockKind::Paragraph` and empty (`blockText().isEmpty()`) — the
+    /// shape a brand-new document loads as. CM `view/src/placeholder.ts`
+    /// reference: its `decorations` getter gates purely on
+    /// `view.state.doc.length`, nothing else — no focus check anywhere in
+    /// that source (verified by reading it, not assumed) — so
+    /// `paintEvent`'s placeholder paint is gated on this alone, independent
+    /// of `m_hasFocus`. That is a deliberate divergence from this same
+    /// file's title-band placeholder (`paintTitle`'s `m_titleCaretActive`
+    /// gate), which IS focus-gated — different feature, not a copy of it.
+    bool isDocumentEmpty() const;
+
+    /// Test/inspection surface only (same "nothing here is authority" rule
+    /// as `findHighlightsForBlock`/`remotePresencesForBlock`). Resolves the
+    /// bracket pair around the current caret, or `{}` if the caret is not
+    /// collapsed (an active selection), sits in no block, or is not
+    /// immediately adjacent to a bracket with a findable match. CM
+    /// reference: `language/src/matchbrackets.ts` `matchBrackets` — checks
+    /// the byte immediately before the caret first, then immediately after;
+    /// scans for the matching bracket accounting for nesting depth. Scoped
+    /// to `()`/`[]` only (the plan's named pairs, not CM's `{}` default) and
+    /// to ONE block (C4) — a caret next to a bracket with no findable match
+    /// within that same block's text (unbalanced, or the match would be in
+    /// a different block — impossible here since a block's own text can
+    /// never contain another block's bytes) resolves to `{}` rather than a
+    /// half-filled result; this leaf does not paint CM's own "non-matching"
+    /// visual style, logged simplification.
+    std::optional<BracketMatch> bracketMatchAtCaret() const;
+
+    /// Test/inspection surface only. The hit-tested caret the drop-cursor
+    /// indicator is currently painted at, or `{}` between drags / after
+    /// `dragLeaveEvent`/`dropEvent`. See `m_dropCursorPos`'s doc comment.
+    std::optional<CanvasCursor> dropCursorPosition() const;
+
     // ---- Links (contract-v2 P4.2) ---------------------------------------
 
     /// Consumer-owned link resolution/activation authority (spec §5.2).
@@ -721,7 +771,18 @@ protected:
     /// re-queries accept per drag-move, so there is no cached "will
     /// accept" flag to keep in sync).
     void dragEnterEvent(QDragEnterEvent *event) override;
+    /// P7.2f (F1 #10): also updates `m_dropCursorPos` to the hit-tested
+    /// caret under the pointer and repaints, so the drop-cursor indicator
+    /// tracks every move — CM reference `view/src/dropcursor.ts`
+    /// (`dragover` re-measures on every event; there is no cheaper "did it
+    /// actually move" gate in that source either).
     void dragMoveEvent(QDragMoveEvent *event) override;
+    /// P7.2f (F1 #10): clears `m_dropCursorPos` and repaints — CM's own
+    /// `dragleave` handler does the same (`dropcursor.ts`). `QAbstractScrollArea`
+    /// does not synthesize this from `dragMoveEvent` stopping; Qt fires it
+    /// independently when the pointer leaves the widget or the drag is
+    /// cancelled without a drop.
+    void dragLeaveEvent(QDragLeaveEvent *event) override;
     /// Text drops route the dropped string through the same `insertText`
     /// helper `paste()` uses (line-split + `tryStructuralKey`/
     /// `insertPrintable`), after moving the caret to the drop point via
@@ -966,6 +1027,17 @@ private:
     /// that finding), reused here rather than re-derived. Never cached;
     /// called fresh every paint.
     std::optional<CanvasCursor> resolvePresenceAnchor(const Markoff::TextAnchor &anchor) const;
+
+    // ---- Bracket-match highlight (P7.2f, F1 #10) --------------------------
+
+    /// Scans `block`'s own text (never a different block — C4) for the
+    /// bracket matching the one at byte `pos`, honoring nesting depth.
+    /// `pos` must itself be a bracket byte in `()`/`[]`; anything else
+    /// returns `{}`. Direction is inferred from which half of the pair
+    /// `pos` names: an opener scans forward, a closer scans backward — same
+    /// shape as CM's `matchPlainBrackets`, just without a syntax tree to
+    /// consult first (this leaf has none to offer it).
+    std::optional<BracketMatch> findMatchingBracket(BlockId block, int pos) const;
 
     // ---- Cut/copy/paste/select-all (P4.4) --------------------------------
     // Shared by the keyboard shortcuts (keyPressEvent's existing
@@ -1333,6 +1405,16 @@ private:
     /// kind of cached-resolved-position state the "never cached" rule (this
     /// struct's own doc comment) rules out. Draw-time-only paint state.
     QList<RemotePresence> m_remotePresences;
+
+    /// Drop-cursor indicator target (P7.2f, F1 #10). View state the
+    /// document has no concept of, same shape as `m_selectionAnchor`/
+    /// `m_preeditText`/`m_foldedHeads` before it: it exists only while a
+    /// drag is over this viewport. Set by `dragEnterEvent`/`dragMoveEvent`
+    /// (hit-tested fresh on every move — CM's own `dropcursor.ts` re-
+    /// measures on every `dragover` too, no caching), cleared by
+    /// `dragLeaveEvent` and `dropEvent`. Draw-time-only paint state, read
+    /// by `paintEvent` exactly like the remote-presence caret bar.
+    std::optional<CanvasCursor> m_dropCursorPos;
 
     // ---- Folding (P5.6, retro-wired to Session in P6.0) ------------------
     /// Fold heads currently toggled ON. Remains the authority for the
