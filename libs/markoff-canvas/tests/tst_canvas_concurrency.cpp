@@ -315,8 +315,7 @@ void TstCanvasConcurrency::concurrent_gremlin_fuzz_converges_without_workaround(
             if (!ops.isEmpty()) {
                 docA.applyRemoteOps(ops, meta);
                 docA.flushPendingD2Changed();
-                // FALSIFY (P6.3, throwaway): skip feeding remote ops to the
-                // comparison replica — docC.applyRemoteOps(ops, meta);
+                docC.applyRemoteOps(ops, meta);
             }
         }
 
