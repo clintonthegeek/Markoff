@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-14 (canvas production arc — Phase 7, P7.2a landed)
+**Last updated:** 2026-08-14 (canvas production arc — Phase 7, P7.2b landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -51,9 +51,24 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   keystroke; surrogate-pair codepoints (emoji) fall back to a direct
   `maybeCoalesceOrTransaction` call with `isPrintable=false` to avoid
   the QChar-only signature's data-loss trap (see plan findings log).
-  No core change needed. Phase 7 continues at P7.2b (editing-command
-  floor) through P7.2g, then P7.3 (⏸ arc close: Obsidian parity audit
-  + full audit).
+  No core change needed. **P7.2b (editing-command floor, F1 #1)**
+  landed same day: word-wise motion + selection (Ctrl+Left/Right,
+  Ctrl+Shift+Left/Right — `QTextBoundaryFinder`, same idiom
+  `markoff-live` already uses, not hand-rolled), word-wise delete
+  (Ctrl+Backspace/Delete), document start/end (Ctrl+Home/End, now
+  moving the caret in addition to the pre-existing scroll-to-extreme),
+  delete-line (Ctrl+Shift+K — clears the block's content), move-line
+  up/down (Alt+Up/Alt+Down — a content swap between adjacent
+  `BlockId`s, since core's `StructuralOp`/`IdList` has no reorder
+  primitive; logged, not a core change), select-line (Alt+L), and Esc
+  simplify-selection. New test `tst_canvas_editing_command_floor` (4
+  falsification-backed scenario groups). **Found, not caused by this
+  task:** `tst_canvas_concurrency`'s gremlin-fuzz convergence test now
+  fails deterministically — confirmed pre-existing at the P7.2a
+  baseline too (see plan findings log), flagged for P7.3's audit, not
+  diagnosed here (no core seam named). Phase 7 continues at P7.2c
+  (auto-pairing/wrap-selection) through P7.2g, then P7.3 (⏸ arc close:
+  Obsidian parity audit + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -96,8 +111,31 @@ no new executable, `tst_canvas_undo` extended with
 inside `libs/markoff-canvas/`; the only core header touched,
 `Cmd/D2.h`, is pre-existing public API, no core seam changed).
 
+P7.2b (2026-08-14): canvas-scoped suite **34/34 excluding one
+pre-existing failure** — up from 33/33 via one new executable,
+`tst_canvas_editing_command_floor` (word motion/delete, doc start/
+end, delete/move/select-line, Esc-simplify; 4 falsification-backed
+groups). `tst_canvas_concurrency`'s gremlin-fuzz convergence test
+fails deterministically (fixed seed) and was confirmed pre-existing
+at the P7.2a baseline — not caused by this task, not fixed (no core
+seam named), flagged for P7.3's audit. `check-constitution.sh` clean
+(C1–C4, 71 files). Full suite not re-run per the plan's tier rule
+(diff stays inside `libs/markoff-canvas/`, no core seam touched).
+
 ## Dormant items
 
+- **`tst_canvas_concurrency`'s gremlin-fuzz convergence test fails
+  deterministically** (found during P7.2b, 2026-08-14, not caused by
+  it) — fixed seed `3237998146` diverges the same way every run;
+  confirmed pre-existing at the P7.2a baseline (`libs/markoff-canvas`
+  checked out at commit `32aab7ca` into an otherwise-unchanged tree,
+  rebuilt, reran: identical failure). P6.3's own findings-log entry
+  records this exact test passing on its first run with zero
+  workaround, so the regression landed sometime between P6.3 and
+  P7.2a. Not diagnosed here — no core seam named for this task, and
+  CRDT-convergence debugging is a real investigation, not a quick
+  read. Flagged for P7.3's audit or a dedicated session. Full writeup:
+  plan findings log, P7.2b entry.
 - **Self-drop text-drag Move does not delete the source selection**
   (P7.2, 2026-08-14) — dragging a selection and dropping it back
   inside the SAME `View` duplicates the text instead of moving it

@@ -153,7 +153,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P7.1 Accessibility (per G1) | ⏭ deferred — see G1 | n/a | n/a |
 | P7.2 Drag-drop + middle-click paste | ☑ | `565aeee1` (+ comment fix `2131929e`) | A: `056f9215`/`504fbc4f`; B: `67c2d433`/`1254a421`; C: `b285a6e7`/`f9e7e2c9` |
 | P7.2a F1#3 undo-coalescing defect fix | ☑ | `0ceceda0` | `44cc112d` / `be83a674` |
-| P7.2b F1#1 editing-command floor | ☐ | | |
+| P7.2b F1#1 editing-command floor | ☑ | `965b6aee` | A: `0d28bb61`/`1ab59f6e`; B: `745a5d10`/`45f3fe79`; C: `0c81115f`/`d7741e9a`; D: `4ee7eb1e`/`af73a63f` |
 | P7.2c F1#4 auto-pairing / wrap-selection | ☐ | | |
 | P7.2d F1#5 Enter/Backspace semantics checklist | ☐ | | |
 | P7.2e F1#7 highlight selection occurrences | ☐ | | |
@@ -845,6 +845,95 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
   case). Constitution clean (C1–C4). Full suite not run per the plan's
   tier rule (diff stays inside `libs/markoff-canvas/`, no core seam
   touched, core header included is pre-existing public API).
+
+**P7.2b (2026-08-14).**
+
+- All 7 commands landed. **Keymap chosen (collisions checked against
+  the whole of `View.cpp` before picking each one):** Ctrl+Left/Right
+  word motion, Ctrl+Shift+Left/Right word-wise selection extend (free
+  from the existing Shift-anchor switch, which never checked Ctrl);
+  Ctrl+Backspace/Delete word-wise delete; Ctrl+Home/End document
+  start/end (Ctrl+Shift+Home/End selection-extend, same free-ride as
+  Left/Right); **Alt+L** select-line (CodeMirror's own binding — no
+  existing `Key_L` anywhere in `View.cpp`); **Ctrl+Shift+K** delete-
+  line (CodeMirror/Obsidian's own binding — `Ctrl+K` alone is
+  `CanvasActionController`'s Insert Link QAction, checked first; the
+  added Shift keeps them distinct); **Alt+Up/Alt+Down** move-line
+  (CodeMirror's own binding — no existing `AltModifier` use anywhere
+  in `View.cpp`); **Escape** simplify-selection (only when
+  `!isComposing()`; falls through unaccepted when there's nothing to
+  simplify, so a consumer can still bind it for something else).
+- **Word boundaries via `QTextBoundaryFinder`** (`QTextBoundaryFinder::
+  Word`, `EndOfItem`/`StartOfItem` reasons) — copied the exact idiom
+  `LiveNavigationController.cpp`'s `previousWordBoundary`/
+  `nextWordBoundary` already use for live's Ctrl+Left/Right, not
+  reinvented. Verified empirically against a standalone probe before
+  writing test assertions (`"Hello world foo."` forward stops: 5, 11,
+  15, 16 — excludes trailing whitespace/punctuation from the word
+  itself, matching Qt's own `WordRight`).
+- **Block-boundary-crossing convention:** word motion/delete reuse
+  `moveCaretHorizontally`/`deleteCluster`'s existing convention
+  exactly — land at byte 0 of the next visible block or the full
+  length of the previous one (via the existing `nextVisibleEntryIndex`,
+  fold-aware), never a cross-block byte sum (C4). Word-wise delete at
+  a block edge is a no-op, same as `deleteCluster()` — the earlier
+  `tryStructuralKey()` call already owns the boundary-merge case for
+  Backspace/Delete regardless of the Ctrl modifier, since
+  `StructuralKeyHandler::handle()` dispatches on key code only, never
+  modifiers (verified by reading it, not assumed).
+- **Core gap found, not fixed (in scope for this task, no core seam
+  named — logged instead of worked around):** `StructuralOp` (`Markoff::
+  StructuralOp`, `IdList`) has no block-reorder primitive — Insert/
+  Remove/ChangeKind only. Move-line is implemented instead as a
+  **content swap** between the two already-adjacent `BlockId`s (text +
+  kind + every known `AttrNames.h` key, written unconditionally on
+  both sides — real value if the pre-swap block had it, else a type-
+  appropriate default, since there is also no attr-removal primitive
+  and leaving an attr untouched would let a stale value like a
+  Heading's `level` survive on a block that swapped away from Heading
+  kind). Net visible effect matches a real reorder; `BlockId` identity
+  does not travel with the content (logged, not a defect for this
+  leaf's single-user scope — a future multi-cursor/remote-presence
+  consumer tracking `BlockId` identity across a move-line would need a
+  real core reorder primitive instead).
+- **Delete-line reads "clear the block's content", not "remove the
+  block"** — CodeMirror's own `deleteLine` removes the whole line
+  (block, for us); the plan bullet's wording ("delete the entire
+  current block's content") was read literally, giving a smaller,
+  non-structural op. Logged as a deliberate reading, not an oversight.
+- Ctrl+Home/End's pre-existing `vbar->setValue(minimum/maximum)`
+  scroll-to-extreme calls were **kept**, not replaced by relying on
+  `ensureCaretVisible()` alone: the latter only guarantees the caret's
+  own line is visible, not that the scrollbar reaches its exact edge
+  past any leading/trailing padding — dropping them risked a silent
+  visual regression the task's own "your call, log it" left open.
+- **Falsification: 4 grouped pairs** (word motion+delete, doc start/
+  end, delete/move/select-line, Esc-simplify) — matches the task's own
+  suggested grouping. New test `tst_canvas_editing_command_floor` (4
+  scenarios) backs all four; each break was confirmed to fail the
+  specific assertion it targeted before being reverted.
+- Spec §5.2 gets a new table row naming this floor + every binding
+  chosen (F1 #1's own instruction).
+- **Pre-existing test failure found, NOT caused by this task — logged,
+  not fixed (no core seam, out of this task's 7-item scope):**
+  `tst_canvas_concurrency`'s `concurrent_gremlin_fuzz_converges_
+  without_workaround` fails deterministically (fixed seed
+  `3237998146`, same divergent block text every run) at the P7.2a
+  baseline too — checked out `libs/markoff-canvas/` at commit
+  `32aab7ca` (P7.2a's own close) into the otherwise-unchanged working
+  tree, rebuilt, reran: identical failure, confirming it predates this
+  task entirely. P6.3's findings-log entry records this same test
+  passing on its first run with zero workaround; something between
+  P6.3 and P7.2a's landing broke CRDT convergence under the fuzz
+  harness's random concurrent-edit sequence. Not this task's to
+  diagnose (would need a core-level investigation, no seam named
+  here) — flagged for the next session/P7.3's audit.
+- Canvas-scoped suite: **34/34 excluding the pre-existing
+  `tst_canvas_concurrency` failure above** (33 prior + this task's new
+  `tst_canvas_editing_command_floor`); `tst_canvas_concurrency` itself
+  fails both before and after this task's diff. Constitution clean
+  (C1–C4). Full suite not run per the plan's tier rule (diff stays
+  inside `libs/markoff-canvas/`, no core seam touched).
 
 **P6.3 (2026-08-14).**
 
