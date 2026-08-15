@@ -2345,7 +2345,7 @@ void View::performAutoPair(QLatin1String openStr, QLatin1String closeStr)
     // equals QChar count throughout.
     insertPrintable(QString(openStr) + QString(closeStr));
     m_caret.byteOffset -= closeStr.size();
-    // FALSIFY (throwaway): never track the auto-inserted closer.
+    m_autoPairedClose = AutoPairedCloser{m_caret.block, m_caret.byteOffset, int(closeStr.size())};
     // P6.1: direct m_caret mutation after insertPrintable's own push —
     // same "push again after moving it further" convention deleteCluster/
     // insertPrintable already establish for multi-step caret adjustments.
