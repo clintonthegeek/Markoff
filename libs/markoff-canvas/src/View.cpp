@@ -2309,6 +2309,215 @@ void View::moveLine(bool down)
     pushSelectionToSession();
 }
 
+// ---- Auto-pairing / wrap-selection (P7.2c, F1 #4) --------------------------
+// CodeMirror reference: autocomplete/src/closebrackets.ts. Scope guard: the
+// 5 pairs the plan names only — no {}, no ''.
+
+namespace {
+/// One of the 5 named pairs. `open == close` for the 3 symmetric markers
+/// (quote, backtick, bold); `open != close` for the 2 bracket pairs.
+struct PairSpec {
+    QChar open;
+    QChar close;
+    QLatin1String openStr;
+    QLatin1String closeStr;
+};
+
+/// The 4 single-QChar-trigger pairs. Bold (`**`) is handled separately in
+/// tryAutoPairOrWrap() — its trigger is a single `*` keystroke but its
+/// markers are 2 bytes each, which doesn't fit this table's one-QChar-in/
+/// one-QChar-out shape (see that function's own comment for the exact
+/// two-keystroke heuristic).
+constexpr PairSpec kPairs[] = {
+    { QLatin1Char('('), QLatin1Char(')'), QLatin1String("("), QLatin1String(")") },
+    { QLatin1Char('['), QLatin1Char(']'), QLatin1String("["), QLatin1String("]") },
+    { QLatin1Char('"'), QLatin1Char('"'), QLatin1String("\""), QLatin1String("\"") },
+    { QLatin1Char('`'), QLatin1Char('`'), QLatin1String("`"), QLatin1String("`") },
+};
+}  // namespace
+
+void View::performAutoPair(QLatin1String openStr, QLatin1String closeStr)
+{
+    // Routes through insertPrintable() (Cmd::insertCharacter underneath) —
+    // NOT a bare Transaction — per this leaf's own P7.2a/regression-fix
+    // history: undo-coalescing and the onCommit-per-op collab contract both
+    // live in that exact machinery. All 5 markers are ASCII, so byte length
+    // equals QChar count throughout.
+    insertPrintable(QString(openStr) + QString(closeStr));
+    m_caret.byteOffset -= closeStr.size();
+    m_autoPairedClose = AutoPairedCloser{m_caret.block, m_caret.byteOffset, int(closeStr.size())};
+    // P6.1: direct m_caret mutation after insertPrintable's own push —
+    // same "push again after moving it further" convention deleteCluster/
+    // insertPrintable already establish for multi-step caret adjustments.
+    pushSelectionToSession();
+}
+
+void View::wrapSelectionInPair(QLatin1String openStr, QLatin1String closeStr)
+{
+    const auto sel = orderedSelection();
+    if (!sel)
+        return;
+    const auto &[start, end] = *sel;
+    if (start.block != end.block)
+        return;  // multi-block wrap: logged scope cut, see .h doc comment
+
+    const BlockId block = start.block;
+    const int from = start.byteOffset;
+    const int to = end.byteOffset;
+    const int openLen = int(openStr.size());
+
+    // Insert the CLOSE marker first (at the larger offset) so that insert
+    // doesn't shift `from`; insert the OPEN marker second, at `from` —
+    // that second insert shifts everything after it (including the just-
+    // inserted close run) forward by openLen, which is exactly why the
+    // final selection/caret math below adds openLen to both `from` and `to`
+    // rather than re-reading anything back off the document.
+    m_caret = CanvasCursor{block, to};
+    insertPrintable(QString(closeStr));
+    m_caret = CanvasCursor{block, from};
+    insertPrintable(QString(openStr));
+
+    // CodeMirror's own wrap behavior: the originally-selected text stays
+    // selected, now sitting between the two inserted marks (not collapsed
+    // to a caret after the close) — matched here since the single-block
+    // case makes it reasonably easy, per the task's own instruction.
+    m_selectionAnchor = CanvasCursor{block, from + openLen};
+    m_caret = CanvasCursor{block, to + openLen};
+    pushSelectionToSession();
+}
+
+bool View::tryDeleteFreshPair(const std::optional<AutoPairedCloser> &pendingClose)
+{
+    if (!m_doc || !pendingClose || hasSelection())
+        return false;
+    if (pendingClose->block != m_caret.block || pendingClose->byteOffset != m_caret.byteOffset)
+        return false;  // caret has moved since the pair was inserted: stale
+
+    const int closeLen = pendingClose->length;
+    const int openStart = m_caret.byteOffset - closeLen;
+    if (openStart < 0)
+        return false;  // defensive: shouldn't happen, the opener is always there
+
+    // One transaction, one op — deletes the opener immediately before the
+    // caret and the closer immediately after it together, per point 3
+    // ("not just the open one"). Bare Transaction, same shape deleteCluster()
+    // already uses for deletes (unlike insertion, deletion isn't subject to
+    // the Cmd::insertCharacter coalescing requirement — see the .h comment).
+    UndoLog::Transaction t(m_doc->d2UndoLog());
+    m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(openStart), uint32_t(closeLen * 2),
+                             QByteArray(), t);
+    m_caret.byteOffset = openStart;
+    pushSelectionToSession();
+    return true;
+}
+
+bool View::tryAutoPairOrWrap(QKeyEvent *event, const std::optional<AutoPairedCloser> &pendingClose)
+{
+    if (!m_doc || m_caret.block.isNull() || isComposing())
+        return false;
+    const QString text = event->text();
+    if (text.size() != 1)
+        return false;
+    const QChar ch = text.at(0);
+
+    const bool caretAtPendingClose = pendingClose
+        && pendingClose->block == m_caret.block
+        && pendingClose->byteOffset == m_caret.byteOffset;
+    // Position/length alone don't identify WHICH pair is tracked — e.g. a
+    // tracked single-byte ']' at this exact offset must not be treated as
+    // a type-through match for '"' just because both happen to be
+    // length-1. Verify the actual tracked bytes still read as the closer
+    // this keystroke is asking to type through.
+    const auto pendingCloserIs = [&](QLatin1String closer) {
+        if (!caretAtPendingClose || pendingClose->length != closer.size())
+            return false;
+        return m_doc->blockText(pendingClose->block)
+                   .mid(pendingClose->byteOffset, pendingClose->length)
+               == QByteArray(closer.data(), closer.size());
+    };
+
+    // ---- bold (**) — handled first: its trigger char (*) collides with
+    // nothing in kPairs, but its type-through/open-completion logic needs
+    // its own shape (2-byte marker from a 1-QChar keystroke). See the .h
+    // doc comment on tryAutoPairOrWrap for the exact behaviors.
+    if (ch == QLatin1Char('*')) {
+        if (hasSelection()) {
+            const auto sel = orderedSelection();
+            if (sel && sel->first.block == sel->second.block) {
+                wrapSelectionInPair(QLatin1String("**"), QLatin1String("**"));
+                return true;
+            }
+            return false;  // multi-block selection: fall through, plain replace
+        }
+        // Type-through: caret sits right before a tracked "**" close —
+        // typing '*' skips the whole 2-byte unit in one keystroke rather
+        // than needing a second '*' press (logged simplification: real
+        // CodeMirror would match byte-by-byte; treating the 2-byte
+        // Markdown-specific bold marker as one atomic unit here is simpler
+        // and matches how e.g. autoclosing IDEs skip multi-char closers).
+        if (pendingCloserIs(QLatin1String("**"))) {
+            m_caret.byteOffset += 2;
+            pushSelectionToSession();
+            return true;
+        }
+        // Bold-open completion: this '*' is the SECOND of two consecutive
+        // keystrokes (the first '*' was ordinary printable text — a lone
+        // '*' is never intercepted on its own, so plain italic typing is
+        // untouched). Detected by reading the byte immediately before the
+        // caret rather than tracking a second piece of "saw one star"
+        // state — stateless and self-correcting, at the cost of also
+        // firing after any pre-existing manually-typed '*' immediately
+        // before the caret (treated as a feature: "type ** for bold" is
+        // the intended shortcut regardless of how that first '*' arrived).
+        const QByteArray blockText = m_doc->blockText(m_caret.block);
+        if (m_caret.byteOffset > 0 && m_caret.byteOffset <= blockText.size()
+            && blockText.at(m_caret.byteOffset - 1) == '*') {
+            insertPrintable(QStringLiteral("***"));  // completes open + inserts close
+            m_caret.byteOffset -= 2;
+            m_autoPairedClose = AutoPairedCloser{m_caret.block, m_caret.byteOffset, 2};
+            pushSelectionToSession();
+            return true;
+        }
+        return false;  // a bare, unpaired '*': ordinary printable insert
+    }
+
+    for (const PairSpec &pair : kPairs) {
+        if (ch == pair.open) {
+            if (hasSelection()) {
+                const auto sel = orderedSelection();
+                if (sel && sel->first.block == sel->second.block) {
+                    wrapSelectionInPair(pair.openStr, pair.closeStr);
+                    return true;
+                }
+                return false;  // multi-block: fall through, plain replace
+            }
+            // Symmetric markers (quote, backtick): typing the SAME char
+            // that opens them, with the caret already sitting on a tracked
+            // closer, means "type through", not "open a new pair".
+            if (pair.open == pair.close && pendingCloserIs(pair.closeStr)) {
+                m_caret.byteOffset += 1;
+                pushSelectionToSession();
+                return true;
+            }
+            performAutoPair(pair.openStr, pair.closeStr);
+            return true;
+        }
+        if (pair.open != pair.close && ch == pair.close) {
+            // Distinct closer (')' or ']'): only ours if it types through a
+            // tracked matching closer; otherwise it's an ordinary character
+            // this function has no opinion on.
+            if (pendingCloserIs(pair.closeStr)) {
+                m_caret.byteOffset += 1;
+                pushSelectionToSession();
+                return true;
+            }
+            return false;
+        }
+    }
+
+    return false;
+}
+
 // ---- Drag-drop (P7.2) ------------------------------------------------------
 
 QMimeData *View::createMimeDataFromSelection() const
@@ -3532,6 +3741,16 @@ void View::scrollContentsBy(int dx, int dy)
 
 void View::keyPressEvent(QKeyEvent *event)
 {
+    // P7.2c (F1 #4): snapshot-then-clear m_autoPairedClose right at the top
+    // of every key event — see its own doc comment (View.h) for why this is
+    // the freshness mechanism: whatever this keystroke turns out to be, it
+    // consumes the PREVIOUS keystroke's tracked closer (if it matches) via
+    // `pendingAutoPairedClose` below; the member itself only comes back
+    // non-empty if THIS keystroke is itself a fresh auto-pair insert
+    // (performAutoPair sets it again, at the very end of that call).
+    const std::optional<AutoPairedCloser> pendingAutoPairedClose = m_autoPairedClose;
+    m_autoPairedClose.reset();
+
     QScrollBar *vbar = verticalScrollBar();
     const bool ctrl = event->modifiers().testFlag(Qt::ControlModifier);
 
@@ -3689,6 +3908,20 @@ void View::keyPressEvent(QKeyEvent *event)
         return;
     }
 
+    // P7.2c (F1 #4): auto-pair/wrap-selection interception, BEFORE the
+    // generic selection-collapse-on-mutate block just below — wrap needs
+    // the selection still intact to read its bounds. Not gated on
+    // isMutatingKey (it does its own event->text() check) but IS gated on
+    // !isComposing() internally, same reasoning isMutatingKey's own
+    // printable-detection shares with the rest of this switch: an IME
+    // preedit's composed characters are not ours to intercept.
+    if (tryAutoPairOrWrap(event, pendingAutoPairedClose)) {
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
+    }
+
     if (hasSelection() && isMutatingKey) {
         collapseSelection();
         if (event->key() == Qt::Key_Backspace || event->key() == Qt::Key_Delete) {
@@ -3697,6 +3930,22 @@ void View::keyPressEvent(QKeyEvent *event)
             event->accept();
             return;
         }
+    }
+
+    // P7.2c (F1 #4), point 3: Backspace between a JUST auto-inserted pair
+    // deletes both as one op. Only reachable here with no active selection
+    // (a Backspace on a selection already returned above) — exactly the
+    // condition tryDeleteFreshPair()/m_autoPairedClose's freshness rule is
+    // written for. Checked before tryStructuralKey(): a caret strictly
+    // between two bytes of the same block is never a StructuralKeyHandler
+    // boundary case (that handler owns byte-offset-0 merges), so there is
+    // no real ordering conflict, but this still runs first since it is the
+    // more specific rule.
+    if (event->key() == Qt::Key_Backspace && tryDeleteFreshPair(pendingAutoPairedClose)) {
+        ensureCaretVisible();
+        viewport()->update();
+        event->accept();
+        return;
     }
 
     // Structural keys (Enter split, boundary Backspace/Delete merge,
@@ -4027,6 +4276,13 @@ bool View::eventFilter(QObject *obj, QEvent *event)
 
 void View::mousePressEvent(QMouseEvent *event)
 {
+    // P7.2c (F1 #4): defensive clear — see m_autoPairedClose's doc comment.
+    // Not load-bearing for correctness (the position check in
+    // tryDeleteFreshPair()/tryAutoPairOrWrap() already makes a stale entry
+    // harmless), but keeps the state honestly empty across a click rather
+    // than relying on the coincidence never lining back up.
+    m_autoPairedClose.reset();
+
     if (event->button() == Qt::LeftButton) {
         int titleCharPos = 0;
         if (hitTestTitle(event->pos(), &titleCharPos)) {

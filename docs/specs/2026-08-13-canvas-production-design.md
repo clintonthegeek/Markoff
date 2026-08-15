@@ -220,7 +220,20 @@ rendered as a properties-style header block (read-only in-canvas is
 acceptable); full table editing (in-cell wrap, Tab/arrow cell nav,
 row/col insert/delete via context menu, alignment); heading/list/
 callout **folding** (`Session::foldedRegions`); drag-drop text +
-files; middle-click paste (X11 primary selection).
+files; middle-click paste (X11 primary selection); **auto-pairing /
+wrap-selection** (P7.2c, F1 #4) — typing `(`, `[`, `"`, `` ` ``, or the
+Markdown-specific bold marker `**` with an active single-block
+selection wraps it (the wrapped text stays selected, matching
+CodeMirror); the same keys with no selection auto-insert both halves
+of the pair, caret between; typing the matching closer immediately
+after types through instead of inserting a redundant one; Backspace
+immediately between a pair auto-inserted by the PRECEDING keystroke
+deletes both halves as one op (a manually-typed/pasted `()` does
+neither). Freshness is tracked as view-local state
+(`View::m_autoPairedClose`, valid for exactly one keystroke) — see
+that field's own doc comment for the spec §2 view-state justification.
+Multi-block-selection wrap is a logged scope cut (falls through to
+plain replace); only these 5 pairs are in scope, no `{}`/`''`.
 
 **Explicitly deferred out of this arc** (recorded so absence is a
 decision): vim mode, PDF export/printing, embedded-note transclusion

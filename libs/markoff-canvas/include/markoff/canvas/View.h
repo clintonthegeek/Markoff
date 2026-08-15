@@ -982,6 +982,73 @@ private:
     /// edge or with no document/caret.
     void moveLine(bool down);
 
+    // ---- Auto-pairing / wrap-selection (P7.2c, F1 #4) --------------------
+    // CodeMirror reference: autocomplete/src/closebrackets.ts
+    // (insertBracket/deleteBracketPair/closeBracketsKeymap). Scope guard:
+    // exactly the 5 pairs the plan names — (/), [/], "/", `/`, and the
+    // Markdown-specific bold wrap **/** — no {}, no ''. Insertion always
+    // routes through insertPrintable() (Cmd::insertCharacter underneath),
+    // never a parallel bare-Transaction insert path: P7.2a's fix and the
+    // out-of-band collab regression it exposed both live in that exact
+    // machinery, and a second insertion path here would bypass undo-
+    // coalescing and risk the same class of onCommit-drops-ops bug.
+    // Deletion (tryDeleteFreshPair) is not subject to that constraint —
+    // deleteCluster() itself already opens a bare UndoLog::Transaction for
+    // deletes, unrelated to the coalescing machinery, and this mirrors it.
+
+    /// One tracked "just auto-inserted" closer run: `byteOffset` is the
+    /// closer's first byte in `block`, `length` its byte count (1 for the
+    /// 4 single-char pairs, 2 for the bold `**` close — all 5 markers are
+    /// ASCII, so byte count == QChar count throughout this section). See
+    /// m_autoPairedClose's own doc comment for the view-state justification
+    /// (spec §2) and the freshness rule this type exists to encode.
+    struct AutoPairedCloser {
+        BlockId block;
+        int byteOffset = -1;
+        int length = 0;
+    };
+
+    /// Intercepts the printable-key path for the 5 named pair triggers
+    /// BEFORE the generic isPrintable dispatch reaches insertPrintable().
+    /// Returns true (and has already applied whatever mutation/caret-move
+    /// is appropriate) for: wrap-selection (a pair's open char typed with
+    /// an active single-block selection), auto-pair (a pair's open char
+    /// typed with no selection), and type-through (a pair's close char, or
+    /// `*` completing bold, typed with the caret immediately before a
+    /// tracked auto-inserted closer — see m_autoPairedClose). Returns false
+    /// for every other key (including a bare, untracked `*` or a closer
+    /// with nothing tracked at the caret), leaving the event to fall
+    /// through to the ordinary printable path unchanged. No-op (returns
+    /// false) while composing (IME preedit is not touched by this leaf's
+    /// own bracket logic) or read-only (caller only reaches this after the
+    /// read-only gate already passed, but composing is checked here since
+    /// nothing upstream does).
+    bool tryAutoPairOrWrap(QKeyEvent *event, const std::optional<AutoPairedCloser> &pendingClose);
+    /// Backspace special case (point 3): if `pendingClose` names a closer
+    /// run starting exactly at the caret's current position (i.e. the
+    /// caret sits immediately between an open/close pair that the
+    /// PRECEDING keystroke just auto-inserted — see m_autoPairedClose's
+    /// doc comment for why "preceding keystroke" is the exact freshness
+    /// test), deletes both the opener (immediately before the caret) and
+    /// the closer (immediately after) as one transaction, caret landing
+    /// where the opener's first byte was. Returns false (no-op) otherwise,
+    /// leaving Backspace to the ordinary deleteCluster()/tryStructuralKey()
+    /// handling.
+    bool tryDeleteFreshPair(const std::optional<AutoPairedCloser> &pendingClose);
+    /// Inserts `openStr` + `closeStr` at the caret via insertPrintable
+    /// (ASCII-only pair markers, so byte length == QChar count), then walks
+    /// the caret back to sit between them and records the closer's
+    /// position in m_autoPairedClose.
+    void performAutoPair(QLatin1String openStr, QLatin1String closeStr);
+    /// Wraps the current single-block selection in `openStr`/`closeStr`
+    /// (CodeMirror's own wrap behavior: the originally-selected text stays
+    /// selected, now sitting between the two inserted marks). Caller
+    /// (tryAutoPairOrWrap) has already confirmed the selection exists and
+    /// does not cross a block boundary — multi-block wrap is out of scope
+    /// this task (logged simplification; falls through to the ordinary
+    /// collapse-and-replace behavior instead).
+    void wrapSelectionInPair(QLatin1String openStr, QLatin1String closeStr);
+
     // ---- Drag-drop + middle-click paste (P7.2) ----------------------------
     // Text drag out reuses `selectedText()` (same bytes `copy()` already
     // puts on the clipboard); text drag in, file drop, and X11
@@ -1250,6 +1317,40 @@ private:
     // committed, at which point it becomes a real d2ApplyBufferEdit and
     // this reverts to empty.
     QString m_preeditText;
+
+    // ---- Auto-pairing / wrap-selection (P7.2c, F1 #4) ---------------------
+    // View-state justification (spec §2, same shape as m_selectionAnchor/
+    // m_preeditText/m_foldedHeads before it): the document has no concept
+    // of "this pair was auto-inserted" — a `()` the user typed manually one
+    // character at a time and a `()` this leaf auto-paired are byte-for-
+    // byte identical in the buffer, so the distinction point 3 needs
+    // (Backspace between a FRESH pair deletes both; between a manually-
+    // typed one it does not) cannot be re-derived from document content at
+    // all, the way fold SHAPE or delimiter-hiddenness can. The plan's F1
+    // note offered two options: track it as view state, or derive it from
+    // the undo entry. Derivation was rejected: UndoLog::Transaction/
+    // UndoLog::Entry (core, unexported here) does not currently record
+    // "this transaction was specifically an auto-pair insert" as a tagged
+    // fact distinct from any other coalesced-printable transaction — adding
+    // that tag would be a core change this task's scope guard rules out
+    // ("markoff-core/ should NOT need changes"). View state it is.
+    //
+    // Freshness rule (deliberately narrow, logged simplification vs. real
+    // CodeMirror's per-position StateField that survives cursor motion):
+    // this holds the ONE most recently auto-inserted closer, valid for
+    // exactly the next keystroke. keyPressEvent() snapshots-then-clears it
+    // at the very top of every key event, so ANY intervening key — arrow
+    // motion, another printable char, anything — invalidates it; only a
+    // successful auto-pair-creating keystroke re-arms it. This trades
+    // "survives caret round-trips away and back" (real CM) for "trivial to
+    // reason about and impossible to leave stale across an edit elsewhere
+    // in the block" — acceptable given the narrow, single-keystroke-window
+    // behaviors (type-through, Backspace-deletes-both) this exists to
+    // serve. mousePressEvent() also clears it defensively, though the
+    // position check in tryDeleteFreshPair()/tryAutoPairOrWrap() (caret
+    // must sit exactly at the tracked byte offset) already makes a stale
+    // entry harmless on its own.
+    std::optional<AutoPairedCloser> m_autoPairedClose;
 
     // ---- Links (P4.2) -------------------------------------------------
     // Consumer-owned; not linked, only observed via its own signals (see
