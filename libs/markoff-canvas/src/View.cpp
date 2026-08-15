@@ -1364,7 +1364,7 @@ void View::onDocumentChanged()
     // follow content across a block MERGE the way a working blockAt() in
     // principle could — no such working version exists to compare against.
     bool caretResolvedFromSession = false;
-    if (m_session && m_doc) {
+    if (false && m_session && m_doc) {  // FALSIFY (P6.3, throwaway)
         const Markoff::TextAnchor active = m_session->primarySelection().active;
         if (!active.isNull() && m_cache->indexOf(active.block()) >= 0) {
             m_caret = CanvasCursor{active.block(), m_doc->offsetInBlock(active.block(), active)};
