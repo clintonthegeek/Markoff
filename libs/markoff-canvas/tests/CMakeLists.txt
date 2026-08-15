@@ -89,6 +89,11 @@ add_test(NAME tst_canvas_find COMMAND tst_canvas_find)
 target_link_libraries(tst_canvas_find PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
 set_tests_properties(tst_canvas_find PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_canvas_selection_matches tst_canvas_selection_matches.cpp)
+add_test(NAME tst_canvas_selection_matches COMMAND tst_canvas_selection_matches)
+target_link_libraries(tst_canvas_selection_matches PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+set_tests_properties(tst_canvas_selection_matches PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_canvas_links tst_canvas_links.cpp)
 add_test(NAME tst_canvas_links COMMAND tst_canvas_links)
 target_link_libraries(tst_canvas_links PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)

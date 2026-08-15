@@ -1820,8 +1820,82 @@ void View::setCaret(const CanvasCursor &caret)
 // /*rightBias=*/true)`) — a caret conceptually sits just after the
 // preceding character, so binding to the character on its right survives
 // same-position concurrent inserts the way a typing caret should.
+namespace {
+// P7.2e (F1 #7) — CM `highlightSelectionMatches`' `minSelectionLength`
+// defaults to 1 (any non-empty selection). Task spec asks for a slightly
+// higher floor so a bare 1-char selection doesn't light up every instance
+// of a common letter; 2 is the smallest step up that still matches CM's
+// spirit (skip trivial selections, not short *words*).
+constexpr int kMinOccurrenceSelectionLength = 2;
+}  // namespace
+
+void View::recomputeOccurrenceHighlights()
+{
+    m_occurrenceHighlightsByBlock.clear();
+
+    const auto sel = orderedSelection();
+    if (!sel || !m_doc) {
+        viewport()->update();
+        return;
+    }
+    const auto &[start, end] = *sel;
+
+    // Collect the selected text across (possibly) multiple blocks the same
+    // way selectedText() does, but we only ever highlight occurrences that
+    // live entirely within a single block, so a multi-block selection's
+    // text (which selectedText() joins with "\n\n") can never recur inside
+    // a single block's plain text — nothing to search for. Restrict to the
+    // single-block case up front instead of building a query no block's
+    // text could ever contain.
+    if (start.block != end.block) {
+        viewport()->update();
+        return;
+    }
+    const QByteArray query = m_doc->blockText(start.block).mid(start.byteOffset,
+                                                                 end.byteOffset - start.byteOffset);
+    if (query.size() < kMinOccurrenceSelectionLength)
+        return;
+    if (query.trimmed().isEmpty())  // whitespace-only selection: CM skips these too
+        return;
+
+    // Realized-entries-only scope (not iterateBlocks()/whole document):
+    // matches how setFindHighlights' own consumer (EditorWidget's find
+    // controller) and every other paint-time highlight feature in this
+    // leaf already scope themselves — cheap, and Obsidian's own Live
+    // Preview only highlights within the rendered viewport too (CM's
+    // `view.visibleRanges`). Logged per task instructions rather than
+    // re-derived: whole-document walk via iterateBlocks()+blockText()
+    // would be correctness-equivalent but pays an unbounded-document cost
+    // this leaf's other draw-time features don't pay.
+    for (const auto &e : m_cache->entries()) {
+        const QByteArray text = m_doc->blockText(e.id);
+        int from = 0;
+        while (true) {
+            const int at = text.indexOf(query, from);
+            if (at < 0)
+                break;
+            // Exclude the active selection's own span from its own
+            // occurrence list.
+            const bool isActiveSelection =
+                (e.id == start.block) && (at == start.byteOffset) && (at + query.size() == end.byteOffset);
+            if (!isActiveSelection)
+                m_occurrenceHighlightsByBlock[e.id].append({at, query.size()});
+            from = at + 1;  // CM's SearchCursor allows overlapping matches too
+        }
+    }
+
+    viewport()->update();
+}
+
 void View::pushSelectionToSession()
 {
+    // Unconditional, ahead of the Session/doc gate below (see this
+    // function's own header-side doc comment): occurrence highlights are
+    // a purely view-local, Session-independent feature and must update
+    // even for a bare View with no Session attached (tests, spike-era
+    // consumers).
+    recomputeOccurrenceHighlights();
+
     if (!m_session || !m_doc || m_caret.block.isNull())
         return;
 
@@ -1997,6 +2071,11 @@ void View::setFindHighlights(const QList<FindHighlight> &highlights)
 QList<FindHighlight> View::findHighlightsForBlock(BlockId id) const
 {
     return m_findHighlightsByBlock.value(id);
+}
+
+QList<std::pair<int, int>> View::occurrenceHighlightsForBlock(BlockId id) const
+{
+    return m_occurrenceHighlightsByBlock.value(id);
 }
 
 void View::setRemotePresences(const QList<RemotePresence> &presences)
@@ -4914,6 +4993,24 @@ void View::paintEvent(QPaintEvent *event)
                     fmt.setBackground(m_theme.color(h.isCurrent
                         ? Theme::Slot::SearchActiveMatchBackground
                         : Theme::Slot::SearchMatchBackground));
+                    selections.push_back({qFrom, qTo - qFrom, fmt});
+                }
+            }
+        }
+
+        // Selection-occurrence highlights (P7.2e, F1 #7): same draw-time
+        // FormatRange mechanism again, own Theme slot distinct from both
+        // the active selection and find-match highlights (task spec).
+        if (const auto it = m_occurrenceHighlightsByBlock.constFind(e.id);
+            it != m_occurrenceHighlightsByBlock.constEnd()) {
+            for (const auto &[byteOffset, byteLength] : it.value()) {
+                const int qFrom = e.projection.byteToLayoutQChar(
+                    byteOffset, ProjectionMap::SnapDirection::Left);
+                const int qTo = e.projection.byteToLayoutQChar(
+                    byteOffset + byteLength, ProjectionMap::SnapDirection::Right);
+                if (qTo > qFrom) {
+                    QTextCharFormat fmt;
+                    fmt.setBackground(m_theme.color(Theme::Slot::SelectionOccurrenceBackground));
                     selections.push_back({qFrom, qTo - qFrom, fmt});
                 }
             }

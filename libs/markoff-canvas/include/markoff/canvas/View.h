@@ -552,6 +552,20 @@ public:
     /// `id`, in the order last passed to `setFindHighlights`.
     QList<FindHighlight> findHighlightsForBlock(BlockId id) const;
 
+    // ---- Selection-occurrence highlights (P7.2e, F1 #7) -------------------
+
+    /// Test/inspection surface only — nothing here is authority (same rule
+    /// as `findHighlightsForBlock`). The block-relative byte ranges of
+    /// OTHER occurrences of the current selection's text currently
+    /// highlighted in `id` — recomputed automatically by
+    /// `recomputeOccurrenceHighlights()` (called from
+    /// `pushSelectionToSession()`, the existing selection-change
+    /// chokepoint); there is no public setter, unlike `setFindHighlights`,
+    /// because this feature is entirely view-local/selection-derived
+    /// rather than something an external controller (`FindController`)
+    /// drives. Never includes the active selection's own span.
+    QList<std::pair<int, int>> occurrenceHighlightsForBlock(BlockId id) const;
+
     // ---- Remote presence (contract-v2 P6.2) ------------------------------
 
     /// Replace all remote-participant presences to paint: caret bar + name
@@ -810,6 +824,19 @@ private:
     /// either, contrary to that method's own doc comment — pushed from
     /// directly).
     void pushSelectionToSession();
+    /// P7.2e (F1 #7): rebuilds `m_occurrenceHighlightsByBlock` from the
+    /// current selection's text — every OTHER occurrence of that exact
+    /// text in the realized entries (`m_cache->entries()`; matches
+    /// `setFindHighlights`'/other paint-time features' own realized-only
+    /// scoping, spec §4/§5.3 note), case-sensitive, whole-word NOT
+    /// required (CM `highlightSelectionMatches` defaults), skipping
+    /// selections shorter than `kMinOccurrenceSelectionLength` or that are
+    /// whitespace-only. Called from `pushSelectionToSession()` — the
+    /// existing chokepoint every selection-changing call site in this file
+    /// already funnels through — unconditionally, ahead of that function's
+    /// own `m_session`-gated early return, so occurrence highlights update
+    /// even in bare-`View` (no-Session) test/spike-era consumers.
+    void recomputeOccurrenceHighlights();
     void moveCaretHorizontally(bool forward);
     void moveCaretVertically(bool forward);
     /// moveCaretVertically()'s Table-block branch (P5.1): Up/Down inside a
@@ -1289,6 +1316,15 @@ private:
     /// during `paintEvent`. Draw-time-only paint state — see
     /// `setFindHighlights`'s doc comment.
     QHash<BlockId, QList<FindHighlight>> m_findHighlightsByBlock;
+    /// Selection-occurrence highlights (P7.2e, F1 #7), grouped by block for
+    /// O(1) lookup during `paintEvent`, same convention as
+    /// `m_findHighlightsByBlock`. Draw-time-only paint state, rebuilt by
+    /// `recomputeOccurrenceHighlights()` every time the selection changes —
+    /// never independently authoritative. Value is the block-relative
+    /// `{byteOffset, byteLength}` pair; a bare pair (not a whole
+    /// `FindHighlight`) because this feature has no "current" distinction
+    /// to carry the way find-matches do.
+    QHash<BlockId, QList<std::pair<int, int>>> m_occurrenceHighlightsByBlock;
     /// Remote-participant presences (P6.2). Kept as a flat list, NOT grouped
     /// by block the way `m_findHighlightsByBlock` is: a Presence Selection's
     /// range is named by two `TextAnchor`s, which resolve to a block only by
