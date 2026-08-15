@@ -159,7 +159,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P7.2d F1#5 Enter/Backspace semantics checklist | ☑ | `8e56ab46` | A: `ed2f713c`/`be7938c1`; B: `c6c6a9d6`/`44780937` |
 | *(out-of-band)* P7.2d addendum: Backspace de-lists, never merges | ☑ | `fc7ea6fe` | `a48bdfa0`/`8e59beb4` |
 | P7.2e F1#7 highlight selection occurrences | ☑ | `003b3191` (+ core `da910863`) | `90bb7c0b`/`80cfd222` |
-| P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☐ | | |
+| P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☑ | `f722216b` (+ core `3f8cafb1`) | A: `1736c414`/`5a8725b1`; B: `4c54a080`/`33fd6383`; C: `4758653b`/`8aa40cf7`; D: `fc19e0b7`/`d6eee01f` |
 | P7.2g F1#9 invisible/control-char rendering | ☐ | | |
 | P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☐ | | n/a |
 | **G2 — user gate: Corbomite adoption** (work lands in Corbomite repo) | ☐ | — | — |
@@ -654,6 +654,114 @@ compiles below it — never a pre-6.12 shim, spec §4.5):
 
 > One line minimum per surprise: constraints that bit, Qt quirks,
 > core gaps discovered, perf numbers at phase closes.
+
+**P7.2f (2026-08-15).**
+
+- **Scroll-past-end padding, guarded on "already needs scrolling."**
+  CM's `view/src/scrollpastend.ts` formula is `editorHeight -
+  defaultLineHeight - documentPadding.top - 0.5`, applied
+  unconditionally (its own doc comment says the extension itself is
+  "only meaningful when the editor is scrollable" — i.e. its CALLERS
+  are expected not to enable it otherwise). This leaf has no such
+  opt-in seam — `updateScrollRange()` runs for every document — so the
+  padding is applied only when `baseMax > 0` (the document already
+  needs scrolling without it); applying "viewport height minus one
+  line" unconditionally would hand a short document that already fits
+  entirely inside a tall viewport a spurious non-zero scroll range,
+  since that quantity is just a large positive number in a tall
+  window. Logged as a deliberate addition to CM's own literal formula,
+  not a misreading of it.
+- **`ensureCaretVisible()` does not chase the new, padded maximum —
+  found via a real test failure, not predicted up front.**
+  `tst_canvas_render.cpp`'s `scrolling_realizes_on_demand_and_stays_lazy`
+  asserted `Ctrl+End` lands exactly at `verticalScrollBar()->maximum()`;
+  that assumption broke the moment scroll-past-end existed, because
+  `ensureCaretVisible()` (the function `Ctrl+End`'s caret-move actually
+  drives) only scrolls enough to bring the caret's own line into view —
+  it has no reason to know about, or chase, a padding term that exists
+  purely to let a human scroll further by hand. Classified as the
+  test's assertion needing to change to match an intentionally changed
+  contract (session protocol: "fix the code, not the test, unless the
+  contract is being explicitly changed" — scroll-past-end IS that
+  explicit change), not a code regression: real CM's own Ctrl+End-
+  equivalent behaves the same way (brings the caret into view, doesn't
+  scroll to the document's absolute scrollable limit). Rewritten to
+  assert `value <= maximum` plus `maximum > value` (room still left to
+  scroll further) instead of exact equality.
+- **Placeholder gate: focus-independent, confirmed against CM's actual
+  source rather than assumed from this same file's own precedent.**
+  This file already has a focus-gated placeholder — the title band's
+  "Untitled" text (`paintTitle`'s `m_titleCaretActive` check) — which
+  would be the natural pattern to copy. Read CM's real
+  `view/src/placeholder.ts` instead: its `decorations` getter is
+  `this.view.state.doc.length ? Decoration.none : this.placeholder` —
+  no focus check anywhere in that file. The empty-document placeholder
+  here is gated on `isDocumentEmpty()` alone, independent of
+  `m_hasFocus`, matching CM's real behavior over this file's own
+  sibling-feature convention. Text reused `Theme::Slot::Quote` (an
+  existing muted grey) rather than adding a slot just for this;
+  hardcoded `tr("Start typing…")`, no consumer-configurable setter yet
+  — logged as a v1 minor follow-up if a consumer wants one, per the
+  task's own "keep it simple" note.
+- **Bracket-match: a small hand-rolled nesting-depth scan, not a reuse
+  of P7.2c's auto-pair tracking.** Checked first, per the task's own
+  instruction: `m_autoPairedClose` only remembers the ONE most-recently
+  auto-inserted closer's position — it has no concept of "find the
+  bracket that matches this arbitrary existing one," which is a
+  different problem (matching real content vs. tracking a fresh
+  insertion). `View::findMatchingBracket()` is a small from-scratch
+  forward/backward scan with a depth counter, scoped to `()`/`[]` only
+  (P7.2c's own named-pairs scope guard) and to one block's own
+  `blockText()` (C4) — never a cross-block search, which is moot in
+  practice since a block's own byte text can never contain another
+  block's bytes anyway. No "non-matching" visual style (real CM paints
+  unmatched/mismatched brackets in a second color) — logged
+  simplification for this v1 minor task; unmatched resolves to no
+  highlight at all rather than a half state.
+- **New `Theme::Slot::BracketMatchBackground`**, core touch named
+  in-scope by this task (same pattern P7.2e's
+  `SelectionOccurrenceBackground` used): light
+  `QColor(0x32,0x8c,0x82,0x80)`, dark `QColor(0x4a,0xb0,0xa4,0x90)` —
+  CM's own base theme constant (`#328c8252`, translucent teal) matched
+  as an explicit RGBA `QColor` rather than the packed hex-alpha string.
+- **Drop-cursor: dashed, not a new Theme slot.** CM's own
+  `view/src/dropcursor.ts` reuses `.cm-cursor`'s exact CSS for
+  `.cm-dropCursor` — checked its `theme.ts`, there is no distinct
+  default visual treatment there at all. The task explicitly asked for
+  something visually distinct here, though, so the indicator paints in
+  `Theme::Slot::CursorPrimary` with a dashed `QPen` rather than a solid
+  one — the shape difference alone reads as "not the real caret"
+  without growing the slot list for a purely stylistic distinction.
+  Hit-tested fresh on every `dragEnterEvent`/`dragMoveEvent` (never
+  cached), cleared on `dragLeaveEvent` and `dropEvent`.
+- Falsification (4 pairs — one per feature, per the task's own grouping
+  guidance): (A) scroll-past-end — disable the padding term in
+  `updateScrollRange()` → `maximum()` collapses back to exactly where
+  Ctrl+End already lands, "room to scroll further" assertion fails as
+  expected. (B) placeholder — gate the paint on `!m_hasFocus` in
+  addition to `isDocumentEmpty()` → both the unfocused-visibility and
+  typing-clears-it assertions fail (the unfocused check happens to
+  fail too, since the test's own earlier `Backspace` keystroke already
+  left the view focused by that point — not a test bug, just a
+  reminder that "unfocused" here was never rigorously isolated from
+  "never explicitly focused"). (C) bracket-match — drop the
+  `--depth == 0` check in the forward-scan branch (first `)` wins
+  regardless of nesting) → the nested-brackets test
+  (`"(a(b)c)"`, caret after the first `(`) reports `closeByte=4`
+  (the inner `)`) instead of `6` (the outer one), exactly as predicted.
+  (D) drop-cursor — stop re-hit-testing in `dragMoveEvent` (keep
+  whatever `dragEnterEvent` set) → the indicator stays parked on the
+  first block hit-tested instead of following the pointer to the
+  second, "must track drag move" assertion fails. New test
+  `tst_canvas_p72f` (9 cases: the 4 pairs above are exercised by 7 of
+  them; 2 more — `short_document_gets_no_spurious_scroll_range` and
+  `bracket_match_is_absent_with_an_active_selection_or_no_pair` — are
+  non-falsification guard-rail cases for edge conditions the task
+  named but that don't need their own throwaway break).
+- Canvas-scoped suite: **37/37** (up from 36/36). Full suite: **315/315**
+  (up from 314/314 at P7.2e) — required by the plan's tier rule (new
+  core `Theme.h` slot). `check-constitution.sh` clean (C1–C4, 74
+  files).
 
 **P7.2e (2026-08-15).**
 

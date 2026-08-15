@@ -242,6 +242,23 @@ gets every OTHER exact-text occurrence within the realized entries
 painted with `Theme::Slot::SelectionOccurrenceBackground`, distinct
 from both the active selection and find-match highlights; the active
 selection's own span is never counted as an occurrence of itself.
+**Scroll past end, empty-document placeholder, bracket-match
+highlight, drag drop-cursor indicator** (P7.2f, F1 #8/#10) — 4 small,
+independent additions. Scroll-past-end: `updateScrollRange()` adds
+bottom padding (viewport height minus one line) once the document
+already needs scrolling, so the last line can reach the top of the
+viewport instead of stopping the moment it merely becomes visible at
+the bottom edge. Empty-document placeholder: `tr("Start typing…")`
+painted in the reused `Theme::Slot::Quote` when the document has no
+blocks or exactly one empty Paragraph block, gated on document
+emptiness alone — **not** view focus (CM's own `placeholder.ts` gates
+purely on document length; confirmed by reading it). Bracket-match
+highlight: the caret-adjacent bracket and its nesting-aware match
+(scoped to `()`/`[]`, one block only per C4) painted in the new
+`Theme::Slot::BracketMatchBackground`. Drag drop-cursor indicator: a
+dashed vertical bar in `Theme::Slot::CursorPrimary`, hit-tested fresh
+on every `dragEnterEvent`/`dragMoveEvent`, cleared on
+`dragLeaveEvent`/`dropEvent`.
 
 **Explicitly deferred out of this arc** (recorded so absence is a
 decision): vim mode, PDF export/printing, embedded-note transclusion

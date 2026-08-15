@@ -5,7 +5,7 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2e landed)
+**Last updated:** 2026-08-15 (canvas production arc — Phase 7, P7.2f landed)
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -104,10 +104,26 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   `QTextLayout::FormatRange` mechanism `setFindHighlights` established.
   Realized-entries-only scope (matches every other paint-time
   highlight feature in this leaf); case-sensitive, no whole-word
-  requirement (CM `highlightSelectionMatches` defaults). Phase 7
-  continues at P7.2f (scroll-past-end + placeholder + bracket-match +
-  drop-cursor) through P7.2g, then P7.3 (⏸ arc close: Obsidian parity
-  audit + full audit).
+  requirement (CM `highlightSelectionMatches` defaults). **P7.2f
+  (scroll-past-end + placeholder + bracket-match + drop-cursor, F1
+  #8/#10)** landed 2026-08-15: 4 small, independent visual additions.
+  Scroll-past-end adds bottom scroll padding (viewport height minus
+  one line) once a document already needs scrolling, so the last line
+  can reach the viewport's top instead of stopping at its bottom edge
+  — guarded so a short, already-fully-visible document gains no
+  spurious scroll range. The empty-document placeholder
+  (`tr("Start typing…")`, reused `Theme::Slot::Quote`) is gated on
+  document emptiness alone, deliberately **not** view focus — CM's own
+  `placeholder.ts` source gates purely on document length, confirmed
+  by reading it rather than copying this same file's own
+  focus-gated title-band placeholder convention. Bracket-match
+  highlight scans the caret's own block only (C4) for the bracket
+  matching the one adjacent to the caret, honoring nesting depth, in a
+  new `Theme::Slot::BracketMatchBackground`. The P7.2 drag-drop
+  handlers gained a dashed drop-cursor indicator (`Theme::Slot::
+  CursorPrimary`, re-hit-tested on every drag move, never cached).
+  Phase 7 continues at P7.2g (invisible/control-char rendering), then
+  P7.3 (⏸ arc close: Obsidian parity audit + full audit).
 
 Standstill after this opening (spec §7): canvas active; `markoff-core`
 open **only** for plan-named seams; live/styled bug-fix-only until G3;
@@ -192,6 +208,16 @@ highlights its other occurrences, not its own span; sub-minimum-length
 and whitespace-only selections highlight nothing; collapsing the
 selection clears all highlights). `check-constitution.sh` clean
 (C1–C4, 73 files).
+
+P7.2f (2026-08-15): **full suite 315/315** (up from 314/314 at P7.2e)
+— required by the plan's tier rule since this task added
+`Theme::Slot::BracketMatchBackground` (a new, additive core `Theme.h`
+enumerator + light/dark default colors). Canvas-scoped suite **37/37**
+(up from 36/36), one new executable, `tst_canvas_p72f` (9 cases across
+4 falsification pairs: scroll-past-end room-to-scroll, placeholder
+focus-independence + typing-clears-it, bracket-match nesting depth,
+drop-cursor drag-move tracking). `check-constitution.sh` clean
+(C1–C4, 74 files).
 
 ## Dormant items
 
