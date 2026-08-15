@@ -112,11 +112,36 @@ public:
             // itself as inner (no new entry pushed, no entry popped on dtor).
             // The body must not push new entries — asserted after.
             const size_t sizeBefore = m_entries.size();
-            m_pendingEntry = &m_entries.back();
+            UndoEntry &entry = m_entries.back();
+            const size_t targetsBefore = entry.targets.size();
+            m_pendingEntry = &entry;
             Transaction t(*this);  // sees m_pendingEntry != nullptr → inner
             body(t);
             Q_ASSERT(m_entries.size() == sizeBefore); // body must not push entries
             m_pendingEntry = nullptr;
+
+            // Because this Transaction is seen as inner, its destructor
+            // takes the non-outermost branch and never calls m_onCommit —
+            // that path is reserved for the entry's first (outermost)
+            // Transaction. Left alone, every coalesced-in op after the
+            // first would be applied to the local document but never
+            // reported to onCommit, which is what MarkoffDocument wires to
+            // localOpsProduced (see MarkoffDocument.cpp's D5 onCommit
+            // hookup) — collab peers would silently never receive those
+            // ops. Fire onCommit here for exactly the ops THIS call added
+            // (targetsBefore..end), so each keystroke's op is still
+            // reported individually and in order, even though it lands in
+            // the same undo entry as the previous keystroke for coalesced
+            // undo/redo granularity. Root-caused 2026-08-14 as a
+            // convergence regression from P7.2a routing insertPrintable
+            // through Cmd::insertCharacter's coalescing path.
+            if (m_onCommit && entry.targets.size() > targetsBefore) {
+                std::vector<CommittedOp> committed;
+                committed.reserve(entry.targets.size() - targetsBefore);
+                for (size_t i = targetsBefore; i < entry.targets.size(); ++i)
+                    committed.push_back({entry.targets[i].first, entry.targets[i].second});
+                m_onCommit(committed, entry.actionId);
+            }
         } else {
             // m_pendingEntry == nullptr → Transaction ctor pushes new entry
             Transaction t(*this);
