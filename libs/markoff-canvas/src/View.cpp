@@ -600,7 +600,7 @@ std::optional<BracketMatch> View::findMatchingBracket(BlockId block, int pos) co
             for (int j = pos; j < text.size(); ++j) {
                 const char c = text.at(j);
                 if (c == pair.open) ++depth;
-                else if (c == pair.close && --depth == 0)
+                else if (c == pair.close)
                     return BracketMatch{block, pos, j};
             }
             return std::nullopt;  // unmatched: scanned to end, never closed
