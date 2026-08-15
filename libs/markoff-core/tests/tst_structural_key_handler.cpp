@@ -226,17 +226,57 @@ private Q_SLOTS:
         QCOMPARE(std::get<int>(doc.blockAttrs(second).value(Markoff::AttrNames::IndentLevel)), 0);
     }
 
-    void listitem_backspace_at_start_indent0_merges() {
+    void listitem_backspace_at_start_indent0_delists_not_merges() {
+        // CM `deleteMarkupBackward` parity (P7.2d addendum, 2026-08-15
+        // user-approved behavior change): Backspace at content-start of an
+        // indent-0 ListItem de-lists it in place. It must NOT merge into
+        // the previous block.
         MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
         const auto blocks = doc.iterateBlocks();
-        auto r = StructuralKeyHandler::handle(doc, blocks[1], Qt::Key_Backspace,
+        const BlockId first = blocks[0];
+        const BlockId second = blocks[1];
+        auto r = StructuralKeyHandler::handle(doc, second, Qt::Key_Backspace,
                                               Qt::NoModifier, 0u);
         QVERIFY(r.handled);
-        QCOMPARE(int(doc.iterateBlocks().size()), 1);
-        const auto merged = doc.iterateBlocks();
-        QCOMPARE(r.caretBlock, merged[0]);
-        QCOMPARE(r.caretByteInBlock, 3u);  // end of "one"
+        const auto after = doc.iterateBlocks();
+        QCOMPARE(int(after.size()), 2);           // no merge: still two blocks
+        QCOMPARE(after[0], first);
+        QCOMPARE(after[1], second);
+        QCOMPARE(doc.blockKind(second), BlockKind::Paragraph);   // de-listed
+        QCOMPARE(doc.blockText(second), QByteArrayLiteral("two"));
+        const auto secondAttrs = doc.blockAttrs(second);
+        auto msIt = secondAttrs.find(AttrNames::MarkerStyle);
+        if (msIt != secondAttrs.end())
+            QVERIFY(std::get<QString>(msIt.value()).isEmpty());
+        QCOMPARE(doc.blockKind(first), BlockKind::ListItem);      // previous block untouched
+        QCOMPARE(doc.blockText(first), QByteArrayLiteral("one"));
+        QCOMPARE(r.caretBlock, second);
+        QCOMPARE(r.caretByteInBlock, 0u);
+    }
+
+    void listitem_backspace_at_start_indent0_delists_tail_keeps_numbering() {
+        // De-listing an item can only ever SPLIT a contiguous ordered-list
+        // run, never merge two runs (unlike Tab-outdent). The split-off
+        // tail's own first MarkerNumber is already the correct seed for its
+        // now-standalone run, so no renumbering is needed/performed.
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("1. one\n2. two\n3. three\n"));
+        const auto blocks = doc.iterateBlocks();
+        const BlockId first = blocks[0];
+        const BlockId second = blocks[1];
+        const BlockId third = blocks[2];
+        auto r = StructuralKeyHandler::handle(doc, second, Qt::Key_Backspace,
+                                              Qt::NoModifier, 0u);
+        QVERIFY(r.handled);
+        QCOMPARE(doc.blockKind(second), BlockKind::Paragraph);
+        QCOMPARE(doc.blockKind(first), BlockKind::ListItem);
+        QCOMPARE(std::get<int>(doc.blockAttrs(first).value(AttrNames::MarkerNumber)), 1);
+        QCOMPARE(doc.blockKind(third), BlockKind::ListItem);
+        // Tail item keeps its own original number — it's now a standalone
+        // one-item run, and CommonMark takes an ordered list's start number
+        // from its own first item, so "3." is correct, not "2.".
+        QCOMPARE(std::get<int>(doc.blockAttrs(third).value(AttrNames::MarkerNumber)), 3);
     }
 
     void listitem_delete_at_end_merges_next() {

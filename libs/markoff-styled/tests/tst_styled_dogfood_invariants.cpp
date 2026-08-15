@@ -583,7 +583,14 @@ private Q_SLOTS:
         QCOMPARE(std::get<int>(*it), 1);
     }
 
-    void backspace_at_list_start_merges_via_widget() {
+    void backspace_at_list_start_delists_via_widget() {
+        // CM `deleteMarkupBackward` parity (P7.2d addendum, 2026-08-15
+        // user-approved behavior change): the shared core
+        // StructuralKeyHandler now de-lists an indent-0 ListItem in place
+        // on Backspace-at-start instead of merging it into the previous
+        // block. The styled leaf routes Backspace through that same
+        // handler (see this file's CLAUDE.md, "Structural-key authority"),
+        // so it inherits the new behavior.
         Markoff::Styled::Editor e;
         Markoff::MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
@@ -604,10 +611,11 @@ private Q_SLOTS:
         QTest::qWait(100);
 
         const auto blocks = doc.iterateBlocks();
-        QCOMPARE(int(blocks.size()), 1);  // merged
-        QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("onetwo"));
-        // The merged block keeps ListItem kind (backspaceMerge doesn't change kind).
-        QCOMPARE(doc.blockKind(blocks[0]), Markoff::BlockKind::ListItem);
+        QCOMPARE(int(blocks.size()), 2);  // no merge: still two blocks
+        QCOMPARE(doc.blockText(blocks[0]), QByteArrayLiteral("one"));
+        QCOMPARE(doc.blockKind(blocks[0]), Markoff::BlockKind::ListItem);  // untouched
+        QCOMPARE(doc.blockText(blocks[1]), QByteArrayLiteral("two"));
+        QCOMPARE(doc.blockKind(blocks[1]), Markoff::BlockKind::Paragraph);  // de-listed
     }
 
     void ctrl_z_undoes_structural_edit_via_widget() {
