@@ -1003,6 +1003,14 @@ private:
     /// load-bearing again in T4).
     void clampCaret(int oldCaretIndexHint);
     void ensureCaretVisible();
+    /// The scrollbar-clamp half of `ensureCaretVisible()`, split out
+    /// (F3/find-next fix, punch-list [cluster-k]) so `ensureLayoutForViewport()`'s
+    /// fixed-point loop can re-run it after `realizeRange()` turns estimated
+    /// block heights into real ones, without also re-restyling the caret's
+    /// delimiter visibility or re-emitting `caretChanged()` on every paint —
+    /// see the call site's comment for the estimate-vs-real-height mechanism
+    /// this closes.
+    void scrollCaretIntoView();
     /// Shared math behind `caretRect()` and `inputMethodQuery`'s
     /// `Qt::ImCursorRectangle` case — viewport-local pixel rect of the
     /// caret in the realized entry's layout. Invalid QRect if unrealized.
@@ -1421,6 +1429,17 @@ private:
     quint64 m_paintCount = 0;
     CanvasCursor m_caret;
     std::optional<CanvasCursor> m_selectionAnchor;
+    /// F3/find-next fix (punch-list [cluster-k]): set by `ensureCaretVisible()`
+    /// whenever it scrolls the caret into view, since that scroll target can
+    /// be based on an unrealized block's ESTIMATED y. Consumed by
+    /// `ensureLayoutForViewport()`'s fixed-point loop, which re-clamps the
+    /// scrollbar to the caret on each pass that realizes new layout until
+    /// the caret's own entry is confirmed realized — closing the gap over a
+    /// few paints for a deep jump. `setScrollAnchor()` clears it unconditionally
+    /// so an explicit scroll restore (`EditorWidget::restoreEphemeralState()`'s
+    /// documented "scroll always wins over the caret's auto-scroll" contract)
+    /// is never fought on a later paint.
+    bool m_caretVisibilityPending = false;
     bool m_hasFocus = false;
     /// Read-only gate authority (P3.3). See `setReadOnly`'s doc comment.
     bool m_readOnly = false;

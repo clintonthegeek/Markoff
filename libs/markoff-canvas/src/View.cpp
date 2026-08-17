@@ -1501,6 +1501,43 @@ void View::ensureLayoutForViewport()
         const bool realized = m_cache->realizeRange(*m_doc, m_theme, cacheTop - height,
                                                     cacheTop + 2 * height);
         updateScrollRange();
+        // Caret re-pin (F3/find-next fix, punch-list [cluster-k]): a jump
+        // to a caret far outside the previously-realized range (find-next
+        // landing on a match many blocks below/above the viewport) is
+        // targeted by ensureCaretVisible() *before* this function ever
+        // runs, so it can only aim at ESTIMATED y positions for every block
+        // between the old viewport and the target (BlockLayoutCache::
+        // estimateHeight()'s doc comment: wrapped lines are under-
+        // estimated). realizeRange() above just replaced some of those
+        // estimates with real heights and recomputePositions() shifted
+        // everything after them, which can walk the caret's block out of
+        // the viewport again (typically further away, since estimates
+        // under-count wrapped content). Without this, nothing ever re-
+        // checks — the scrollbar sits wherever the first, estimate-based
+        // guess left it, which reads as "F3 does nothing" once that guess
+        // is off by more than a line.
+        //
+        // Gated on m_caretVisibilityPending, NOT run unconditionally: a
+        // bare `if (realized) scrollCaretIntoView();` here would also fire
+        // on realize passes that have nothing to do with a caret jump —
+        // in particular EditorWidget::restoreEphemeralState()'s scroll
+        // restore, which calls setCaretPosition() (caret) THEN
+        // setScrollAnchor() (scroll) *by design* so an independently-saved
+        // scroll position always wins over the caret's own auto-scroll
+        // (see that function's own comment). setScrollAnchor() clears this
+        // flag for exactly that reason — an unconditional repin here would
+        // silently undo it on the very next paint. Cleared once the
+        // caret's own entry is confirmed realized (its y is no longer an
+        // estimate, so there is nothing left to correct); until then it
+        // survives across passes/paints so a deep jump gets the multi-paint
+        // convergence it needs (see BlockLayoutCache::estimateHeight()'s
+        // "cheap, corrected as it comes into view" design).
+        if (m_caretVisibilityPending && realized) {
+            scrollCaretIntoView();
+            const int caretIdx = m_cache->indexOf(m_caret.block);
+            if (caretIdx >= 0 && m_cache->entries()[size_t(caretIdx)].realized)
+                m_caretVisibilityPending = false;
+        }
         if (!realized && verticalScrollBar()->value() == top)
             break;
     }
@@ -2126,6 +2163,16 @@ void View::setScrollAnchor(int blockIndex, float fraction)
     blockIndex = qBound(0, blockIndex, int(m_cache->entries().size()) - 1);
     const auto &e = m_cache->entries()[size_t(blockIndex)];
     const qreal target = e.y + leadingBandHeight() + qBound(0.0f, fraction, 1.0f) * e.height;
+    // An explicit scroll target always wins over a pending caret-follow —
+    // see ensureLayoutForViewport()'s m_caretVisibilityPending comment and
+    // EditorWidget::restoreEphemeralState()'s "cursor restore BEFORE scroll
+    // restore" ordering, which relies on this call being the last word.
+    // Without clearing this, a caret set moments earlier via
+    // setCaretPosition() (which flags a pending repin so a find-next jump
+    // can converge over a few paints) would win back the scrollbar on the
+    // very next paint, silently undoing the explicit restore this call is
+    // making.
+    m_caretVisibilityPending = false;
     // setValue() fires valueChanged -> scrollContentsBy(), which only
     // marks the viewport dirty (deliberately does not realize, per its own
     // comment) — paintEvent is what turns the newly-visible range's
@@ -2144,6 +2191,22 @@ void View::ensureCaretVisible()
     // the cache learns the caret moved and restyles the (at most two)
     // affected blocks' delimiter visibility — not a full-document restyle.
     m_cache->setCaret(*m_doc, m_theme, m_caret.block, m_caret.byteOffset);
+    scrollCaretIntoView();
+    // Arms ensureLayoutForViewport()'s multi-pass repin (see its comment):
+    // this call's own scrollCaretIntoView() above can only aim at whatever
+    // y the caret's block currently has, which is an ESTIMATE if it has
+    // never been realized (e.g. a find-next jump to a match many wrapped
+    // paragraphs below the viewport). Left set until a later paint
+    // confirms the caret's entry is realized, or until something more
+    // authoritative (setScrollAnchor()) explicitly overrides it.
+    m_caretVisibilityPending = true;
+    emit caretChanged();
+}
+
+void View::scrollCaretIntoView()
+{
+    if (m_caret.block.isNull())
+        return;
     const int idx = m_cache->indexOf(m_caret.block);
     if (idx < 0)
         return;
@@ -2157,8 +2220,6 @@ void View::ensureCaretVisible()
         vbar->setValue(qFloor(docY));
     else if (docY + e.height > vbar->value() + viewportH)
         vbar->setValue(qCeil(docY + e.height - viewportH));
-
-    emit caretChanged();
 }
 
 // ---- Selection (T5) -------------------------------------------------------
