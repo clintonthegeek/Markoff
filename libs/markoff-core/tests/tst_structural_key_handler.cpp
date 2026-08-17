@@ -466,7 +466,33 @@ private Q_SLOTS:
     // typed "$$" display-math line could take further keystrokes but never
     // be split, merged, or backspaced away (canvas's View reported "Enter
     // does nothing" and "can't backspace to erase that line").
-    void math_enter_inserts_literal_newline_not_split() {
+    void math_enter_mid_formula_inserts_literal_newline_not_split() {
+        // Interior Enter (mid-formula) must stay a literal newline — display
+        // math can legitimately span lines (e.g. an `aligned` environment).
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("x\n"));
+        BlockId first = doc.iterateBlocks()[0];
+        BlockId math;
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            math = doc.d2InsertBlock(first, BlockKind::Math, t);
+            doc.d2ApplyBufferEdit(math, 0, 0, QByteArrayLiteral("$$ab$$"), t);
+        }
+        const int countBefore = int(doc.iterateBlocks().size());
+        auto r = StructuralKeyHandler::handle(doc, math, Qt::Key_Return,
+                                              Qt::NoModifier, 4u);  // after "$$ab"
+        QVERIFY(r.handled);
+        QCOMPARE(int(doc.iterateBlocks().size()), countBefore);  // no split
+        QCOMPARE(r.caretBlock, math);
+        QCOMPARE(doc.blockText(math), QByteArrayLiteral("$$ab\n$$"));
+    }
+
+    void math_enter_at_end_exits_to_new_paragraph() {
+        // Enter at the end of the formula must NOT be a permanent trap:
+        // it splits into a fresh Paragraph after the math block, same
+        // shape as paragraphEnter's end-of-text case (Cluster K: "enter no
+        // longer makes new paragraphs... they're all still folded into the
+        // rendered latex").
         MarkoffDocument doc(1);
         doc.loadFromMarkdown(QByteArrayLiteral("x\n"));
         BlockId first = doc.iterateBlocks()[0];
@@ -481,9 +507,30 @@ private Q_SLOTS:
         auto r = StructuralKeyHandler::handle(doc, math, Qt::Key_Return,
                                               Qt::NoModifier, endByte);
         QVERIFY(r.handled);
-        QCOMPARE(int(doc.iterateBlocks().size()), countBefore);  // no split
-        QCOMPARE(r.caretBlock, math);
-        QCOMPARE(doc.blockText(math), QByteArrayLiteral("$$ab$$\n"));
+        QCOMPARE(int(doc.iterateBlocks().size()), countBefore + 1);  // split
+        QCOMPARE(doc.blockText(math), QByteArrayLiteral("$$ab$$"));  // unchanged
+        QCOMPARE(doc.blockKind(r.caretBlock), BlockKind::Paragraph);
+        QCOMPARE(r.caretByteInBlock, 0u);
+    }
+
+    void math_enter_on_empty_block_exits_to_new_paragraph() {
+        // An empty math block (caretByte == 0 == size) is the "at end"
+        // case too — Enter must exit it rather than insert a newline into
+        // nothing, mirroring blockQuoteEnter's empty-exit behavior.
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("x\n"));
+        BlockId first = doc.iterateBlocks()[0];
+        BlockId math;
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            math = doc.d2InsertBlock(first, BlockKind::Math, t);
+        }
+        const int countBefore = int(doc.iterateBlocks().size());
+        auto r = StructuralKeyHandler::handle(doc, math, Qt::Key_Return,
+                                              Qt::NoModifier, 0u);
+        QVERIFY(r.handled);
+        QCOMPARE(int(doc.iterateBlocks().size()), countBefore + 1);
+        QCOMPARE(doc.blockKind(r.caretBlock), BlockKind::Paragraph);
     }
 
     void math_backspace_at_start_merges_with_previous() {

@@ -763,6 +763,15 @@ protected:
     void resizeEvent(QResizeEvent *event) override;
     void scrollContentsBy(int dx, int dy) override;
     void keyPressEvent(QKeyEvent *event) override;
+    /// QWidget::event() intercepts a plain Tab/Backtab QKeyEvent and calls
+    /// focusNextPrevChild() BEFORE keyPressEvent() ever runs — so without
+    /// this override, keyPressEvent's own Tab handling (literal tab
+    /// insertion / list indent / table-cell nav) is unreachable whenever
+    /// there's another widget to focus, e.g. the toolbar. Always returning
+    /// false here is the standard "this widget owns Tab" technique (same
+    /// effect as QPlainTextEdit::setTabChangesFocus(false)), so control
+    /// always reaches keyPressEvent instead.
+    bool focusNextPrevChild(bool next) override;
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;

@@ -213,6 +213,30 @@ StructuralResult codeBlockTab(MarkoffDocument &doc, BlockId block,
     return {true, block, caretByte + 4};
 }
 
+// --- Math ----------------------------------------------------------------
+
+StructuralResult mathEnter(MarkoffDocument &doc, BlockId block,
+                           uint32_t caretByte) {
+    const QByteArray text = doc.blockText(block);
+    // At the end of the formula (including an empty block): behave like a
+    // normal paragraph split, exiting the math block into a fresh Paragraph
+    // after it — same "enterAtEnd" shape paragraphEnter uses. Without this,
+    // Math was permanent: every "$$"-block's Enter always inserted a
+    // literal newline (see the interior branch below, needed so a display
+    // formula can legitimately span lines, e.g. an `aligned` environment),
+    // and there was no way to leave the block and start a different kind of
+    // paragraph after it — reported as Corbomite Cluster K: "enter no
+    // longer makes new paragraphs which can be different block types;
+    // they're all still folded into the rendered latex."
+    if (caretByte == static_cast<uint32_t>(text.size())) {
+        const BlockId nb = Cmd::enterAtEnd(doc, block);
+        return {true, nb, 0};
+    }
+    // Interior: literal newline, no split.
+    Cmd::insertSoftBreak(doc, block, caretByte);
+    return {true, block, caretByte + 1};
+}
+
 // --- BlockQuote --------------------------------------------------------------
 
 StructuralResult blockQuoteEnter(MarkoffDocument &doc, BlockId block,
@@ -269,17 +293,20 @@ StructuralResult StructuralKeyHandler::handle(MarkoffDocument &doc, BlockId bloc
         if (isEnter) { const BlockId nb = Cmd::enterAtEnd(doc, block); return {true, nb, 0}; }
         return {};
     case BlockKind::Math:
-        // Same shape as CodeBlock: a passthrough buffer that may legitimately
-        // span multiple lines (a display-math block, e.g. an `aligned`
-        // environment), so Enter inserts a literal newline rather than
-        // splitting the block — and Backspace/Delete at a boundary still need
-        // to merge with the neighbour, same as every other kind. Before this
-        // case existed, Math fell through to `default:` below, which handles
+        // A passthrough buffer that may legitimately span multiple lines (a
+        // display-math block, e.g. an `aligned` environment) — mathEnter
+        // inserts a literal newline mid-formula, but (unlike CodeBlock)
+        // splits into a new Paragraph when Enter is pressed at the end, so
+        // the block isn't a one-way trap (Cluster K: "enter no longer makes
+        // new paragraphs... they're all still folded into the rendered
+        // latex"). Backspace/Delete at a boundary still need to merge with
+        // the neighbour, same as every other kind. Before this case
+        // existed, Math fell through to `default:` below, which handles
         // NONE of Enter/Backspace/Delete — reported as Corbomite Cluster K's
         // "$$ locks up the line: Enter does nothing, Backspace can't erase it"
         // (the boundary-merge no-op leaves an unremovable line once its
         // content is fully backspaced to empty).
-        if (isEnter)                      return codeBlockEnter(doc, block, caretByteInBlock);
+        if (isEnter)                      return mathEnter(doc, block, caretByteInBlock);
         if (normKey == Qt::Key_Backspace) return paragraphBackspace(doc, block, caretByteInBlock);
         if (normKey == Qt::Key_Delete)    return paragraphDelete(doc, block, caretByteInBlock);
         return {};

@@ -3983,6 +3983,16 @@ void View::scrollContentsBy(int dx, int dy)
     viewport()->update();
 }
 
+bool View::focusNextPrevChild(bool /*next*/)
+{
+    // See the declaration's doc comment (View.h): without this, plain
+    // Tab/Backtab never reach keyPressEvent() at all whenever there's
+    // another widget to focus — QWidget::event() claims it first. Reported
+    // as a Corbomite Cluster K bug: "the tab-key literally tabs the
+    // interface input focus out of the Markoff widget, into the toolbar."
+    return false;
+}
+
 void View::keyPressEvent(QKeyEvent *event)
 {
     // P7.2c (F1 #4): snapshot-then-clear m_autoPairedClose right at the top
