@@ -23,6 +23,21 @@ struct MARKOFF_CORE_EXPORT LinkActivation {
     QString  blockRef;
     QString  alias;
     Qt::KeyboardModifiers modifiers = Qt::NoModifier;
+
+    // [cluster-k] P2 addition: middle-click-on-a-link "open in a new tab"
+    // intent. `modifiers` is Qt::KeyboardModifiers — it can carry Ctrl/
+    // Shift/Alt but has no way to represent WHICH MOUSE BUTTON triggered
+    // the activation, so a middle-click can't be told apart from a plain
+    // click by inspecting `modifiers` alone. Default false so every
+    // existing producer/consumer of LinkActivation (aggregate-initialized
+    // or field-by-field) is unaffected; a producer that knows the click
+    // was a middle-click sets this explicitly (see
+    // markoff-canvas/src/View.cpp's `mousePressEvent` MiddleButton branch).
+    // Consumers that don't care about new-tab semantics yet (Corbomite's
+    // NoteEditorWidget::onLinkActivated does not, as of this addition) are
+    // free to ignore the field entirely — it is additive, not a behavior
+    // change for anyone not reading it.
+    bool openInNewTab = false;
 };
 
 }  // namespace Markoff

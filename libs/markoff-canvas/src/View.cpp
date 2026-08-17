@@ -4632,22 +4632,37 @@ void View::mousePressEvent(QMouseEvent *event)
 
         const CanvasCursor hit = hitTest(event->pos());
         if (!hit.block.isNull()) {
-            // Link activation (P4.2, spec §5.2): plain click while
-            // read-only, Ctrl+click while editing — editing mode needs
-            // plain click free for caret placement, read-only mode has no
-            // conflicting use for it (navigation/selection still work via
+            // Link activation (P4.2, spec §5.2; caret-line-awareness
+            // updated [cluster-k] P2 for Obsidian Live Preview parity):
+            // read-only mode always activates on plain click — no caret
+            // there to compete with (navigation/selection still work via
             // drag, matching live/styled's read-only-keeps-working rule).
-            // A miss (no link under the point) falls through to normal
-            // caret placement either way.
+            // In edit mode, Obsidian's own rule is "is the caret already
+            // on this line": while the caret sits on the link's block, the
+            // link is showing its raw markdown for editing (same
+            // mechanism `isDelimiterHiddenAt` above uses for bold/italic
+            // delimiter reveal — `id == m_caret.block` — link text is just
+            // another span whose reveal state tracks the caret's block),
+            // so a plain click there places the caret like any other text
+            // rather than following the link. Once the caret is on a
+            // DIFFERENT block, the link is showing its rendered pill and a
+            // plain click navigates directly, no Ctrl needed. Ctrl+click
+            // remains an explicit override in both states — including
+            // when the caret happens to already be on the link's own line
+            // but the user wants to follow it without clicking away
+            // first, which is exactly the old Ctrl-only behavior this
+            // update is additive to, not a replacement of.
+            const auto act = linkActivationAt(hit, event->modifiers());
+            const bool caretOnLinkBlock = !m_readOnly && hit.block == m_caret.block;
             const bool activationGesture =
-                m_readOnly || event->modifiers().testFlag(Qt::ControlModifier);
-            if (activationGesture) {
-                if (const auto act = linkActivationAt(hit, event->modifiers())) {
-                    if (m_linkService)
-                        m_linkService->activate(*act);
-                    event->accept();
-                    return;
-                }
+                m_readOnly
+                || event->modifiers().testFlag(Qt::ControlModifier)
+                || !caretOnLinkBlock;
+            if (act && activationGesture) {
+                if (m_linkService)
+                    m_linkService->activate(*act);
+                event->accept();
+                return;
             }
 
             // Drag-out candidate (P7.2): a plain (non-Shift) press landing
@@ -4689,6 +4704,30 @@ void View::mousePressEvent(QMouseEvent *event)
         }
     }
 
+    // Middle-click on a link ([cluster-k] P2): opens the target instead of
+    // falling through to the X11 primary-selection paste below — checked
+    // FIRST and independent of `!m_readOnly`/`supportsSelection()` (a
+    // link's middle-click semantics don't depend on either), so a link hit
+    // never reaches the paste path at all. `openInNewTab` is this leaf's
+    // way of telling the consumer-owned `LinkService` which mouse button
+    // triggered the activation — `LinkActivation::modifiers` (Ctrl/Shift/
+    // Alt) can't represent that on its own (see the field's own doc
+    // comment in LinkActivation.h). No downstream consumer is required to
+    // act on it; ignoring it just means "middle-click behaves like a plain
+    // click," never a paste into link text.
+    if (event->button() == Qt::MiddleButton && m_doc) {
+        const CanvasCursor hit = hitTest(event->pos());
+        if (!hit.block.isNull()) {
+            if (auto act = linkActivationAt(hit, event->modifiers())) {
+                act->openInNewTab = true;
+                if (m_linkService)
+                    m_linkService->activate(*act);
+                event->accept();
+                return;
+            }
+        }
+    }
+
     // X11 primary-selection middle-click paste (P7.2). `supportsSelection()`
     // is the mechanism's own capability gate — false on Wayland/Windows/
     // macOS AND under the offscreen QPA this leaf's tests run under (no
@@ -4696,7 +4735,8 @@ void View::mousePressEvent(QMouseEvent *event)
     // deliberate no-op, not a crash or a silent fallback to the regular
     // Ctrl+V clipboard (Qt's own `Selection` mode is a distinct store from
     // `Clipboard` mode — qwidgettextcontrol.cpp's own MiddleButton handling
-    // never conflates the two, and neither does this).
+    // never conflates the two, and neither does this). Guarded to non-link
+    // hits by construction — the branch above already returned for a link.
     if (event->button() == Qt::MiddleButton && m_doc && !m_readOnly
         && QGuiApplication::clipboard()->supportsSelection()) {
         const CanvasCursor hit = hitTest(event->pos());

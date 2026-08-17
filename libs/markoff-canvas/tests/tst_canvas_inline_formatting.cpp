@@ -273,11 +273,21 @@ void TstCanvasInlineFormatting::wikilink_delimiter_hides_per_span()
     QCOMPARE(view.caretBlock(), other);
     QVERIFY(view.isDelimiterHiddenAt(wiki, 0));
 
-    // Click into the wikilink block: reveals (caret lands inside the
-    // parent range's -1/+1 tolerance for the whole "[[Target]]" span).
-    const QRectF wikiRect = view.blockRect(wiki);
-    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
-                      QPoint(int(wikiRect.x()) + 1, int(wikiRect.y()) + 8));
+    // Move the caret into the wikilink block: reveals (caret lands inside
+    // the parent range's -1/+1 tolerance for the whole "[[Target]]" span).
+    // `setCaretPosition`, not a mouse click: since [cluster-k] P2, a plain
+    // click on a link whose block differs from the caret's CURRENT block
+    // is an activation gesture (Obsidian Live Preview parity — the link
+    // shows its rendered pill, not raw markdown, until the caret is
+    // already on its own line), so simulating "caret arrives on this
+    // block" via a click would either navigate (no linkService attached
+    // here, so it would just swallow the click and never move the caret)
+    // or need Ctrl, which ALWAYS activates regardless of caret block and
+    // so can't be used to test the caret-placement path either. Direct
+    // caret placement is exactly what a keyboard Left/Right/Up/Down out of
+    // the "Other" block would produce — this is that, without coupling an
+    // unrelated delimiter-reveal test to click-vs-link click semantics.
+    view.setCaretPosition(wiki, 0);
     QCOMPARE(view.caretBlock(), wiki);
     QVERIFY(!view.isDelimiterHiddenAt(wiki, 0));
 

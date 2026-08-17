@@ -95,6 +95,13 @@ private slots:
     void activation_hits_first_and_last_qchar_of_span();
     void hover_emits_signal_sets_cursor_and_caches_shape();
     void hover_leaves_on_move_off_link();
+
+    // [cluster-k] P2: caret-line-aware activation + middle-click new-tab.
+    void plain_click_activates_link_when_caret_is_on_a_different_block();
+    void plain_click_still_places_caret_when_caret_is_on_the_link_block();
+    void ctrl_click_activates_even_when_caret_is_on_the_link_block();
+    void middle_click_activates_link_with_new_tab_flag();
+    void middle_click_elsewhere_still_does_primary_paste();
 };
 
 // "[link](http://example.com)": '[' at byte 0, link_text "link" bytes 1-4,
@@ -347,6 +354,157 @@ void TstCanvasLinks::hover_leaves_on_move_off_link()
     // arrow", not a text-editing cursor (a leaf-local choice; nothing this
     // task's scope covers changes it).
     QCOMPARE(view.viewport()->cursor().shape(), Qt::ArrowCursor);
+}
+
+// [cluster-k] P2: Obsidian Live Preview parity — while editing, a link on
+// a DIFFERENT block than the caret is showing its rendered pill, so a
+// plain click navigates directly (no Ctrl needed). Two-block doc: link on
+// block 0, plain paragraph on block 1; caret parked on block 1 via
+// setCaretPosition before the click.
+void TstCanvasLinks::plain_click_activates_link_when_caret_is_on_a_different_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("[link](http://example.com)\n\nsecond block\n");
+    DefaultLinkService svc;
+    QSignalSpy activated(&svc, &Markoff::LinkService::linkActivated);
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.setLinkService(&svc);
+    view.setReadOnly(false);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), 2);
+    const BlockId linkBlock = blocks.front();
+    const BlockId otherBlock = blocks.back();
+
+    view.setCaretPosition(otherBlock, 0);
+    QCOMPARE(view.caretBlock(), otherBlock);
+
+    const QPoint p = pointForFullQChar(doc, view, linkBlock, 2);  // middle of "link"
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, p);
+
+    QCOMPARE(activated.count(), 1);
+    const auto a = qvariant_cast<LinkActivation>(activated.at(0).at(0));
+    QCOMPARE(a.kind, LinkKind::External);
+    QCOMPARE(a.rawText, QStringLiteral("http://example.com"));
+}
+
+// Complement: caret already on the link's OWN block (raw markdown showing,
+// same "editing this line" rule bold/italic delimiter reveal already
+// follows) — a plain click there still just places the caret, unchanged
+// from the pre-existing Ctrl-only behavior.
+void TstCanvasLinks::plain_click_still_places_caret_when_caret_is_on_the_link_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("[link](http://example.com)\n\nsecond block\n");
+    DefaultLinkService svc;
+    QSignalSpy activated(&svc, &Markoff::LinkService::linkActivated);
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.setLinkService(&svc);
+    view.setReadOnly(false);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId linkBlock = doc.iterateBlocks().front();
+    view.setCaretPosition(linkBlock, 0);  // caret starts on the link's own block
+
+    const QPoint p = pointForFullQChar(doc, view, linkBlock, 2);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier, p);
+
+    QCOMPARE(activated.count(), 0);
+    QCOMPARE(view.caretBlock(), linkBlock);  // click placed the caret, as before
+}
+
+// Ctrl+click remains an explicit override even when the caret is already
+// on the link's own block — this is the pre-existing behavior the P2 fix
+// is additive to, not a replacement of.
+void TstCanvasLinks::ctrl_click_activates_even_when_caret_is_on_the_link_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("[link](http://example.com)\n\nsecond block\n");
+    DefaultLinkService svc;
+    QSignalSpy activated(&svc, &Markoff::LinkService::linkActivated);
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.setLinkService(&svc);
+    view.setReadOnly(false);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId linkBlock = doc.iterateBlocks().front();
+    view.setCaretPosition(linkBlock, 0);
+
+    const QPoint p = pointForFullQChar(doc, view, linkBlock, 2);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::ControlModifier, p);
+
+    QCOMPARE(activated.count(), 1);
+}
+
+// [cluster-k] P2: middle-click on a link activates it (openInNewTab set)
+// instead of falling through to the X11 primary-selection paste path.
+void TstCanvasLinks::middle_click_activates_link_with_new_tab_flag()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("[link](http://example.com)\n");
+    DefaultLinkService svc;
+    QSignalSpy activated(&svc, &Markoff::LinkService::linkActivated);
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.setLinkService(&svc);
+    view.setReadOnly(false);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId block = doc.iterateBlocks().front();
+    const QPoint p = pointForFullQChar(doc, view, block, 2);
+
+    QTest::mouseClick(view.viewport(), Qt::MiddleButton, Qt::NoModifier, p);
+
+    QCOMPARE(activated.count(), 1);
+    const auto a = qvariant_cast<LinkActivation>(activated.at(0).at(0));
+    QCOMPARE(a.kind, LinkKind::External);
+    QCOMPARE(a.rawText, QStringLiteral("http://example.com"));
+    QVERIFY(a.openInNewTab);
+}
+
+// Guard: a middle-click that does NOT land on a link must not be swallowed
+// by the new link-activation branch — it still reaches the pre-existing
+// primary-selection-paste path below (verified indirectly here by
+// confirming no link activation fires; the X11 selection itself is not
+// available in the offscreen QPA these tests run under, matching the
+// existing paste-path tests' own constraints elsewhere in this suite).
+void TstCanvasLinks::middle_click_elsewhere_still_does_primary_paste()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("plain text, no link here\n");
+    DefaultLinkService svc;
+    QSignalSpy activated(&svc, &Markoff::LinkService::linkActivated);
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.setLinkService(&svc);
+    view.setReadOnly(false);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId block = doc.iterateBlocks().front();
+    const QPoint p = pointForFullQChar(doc, view, block, 2);
+
+    QTest::mouseClick(view.viewport(), Qt::MiddleButton, Qt::NoModifier, p);
+
+    QCOMPARE(activated.count(), 0);
 }
 
 QTEST_MAIN(TstCanvasLinks)
