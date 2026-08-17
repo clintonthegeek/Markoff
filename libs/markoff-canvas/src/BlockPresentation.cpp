@@ -94,13 +94,41 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
         // `[^label]` back-reference, and the block's own text renders in
         // Link-slot color/italic so it reads as distinct from a plain
         // paragraph at a glance, without a second paint code path.
+        const QByteArray text = doc.blockText(id);
         const Detail::FootnoteDefInfo fn =
-            Detail::parseFootnoteDef(QString::fromUtf8(doc.blockText(id)));
+            Detail::parseFootnoteDef(QString::fromUtf8(text));
         if (fn.isFootnoteDef) {
             s.isFootnoteDef = true;
             s.marker        = QStringLiteral("[^%1]").arg(fn.label);
             s.foreground    = theme.color(Theme::Slot::Link);
             s.font.setItalic(true);
+            break;
+        }
+
+        // Image/Embed shape, still tagged Paragraph (punch-list [cluster-k],
+        // "empty-alt embeds render blank until clicked into"): kind
+        // promotion to BlockKind::Image only happens interactively
+        // (View::promoteCaretBlockKind, fired from an actual document EDIT
+        // with the caret in this exact block — see its own doc comment).
+        // A block loaded from disk and never typed into (the common case
+        // for every image in a real vault note) therefore stays
+        // BlockKind::Paragraph forever, which used to fall through to
+        // ordinary paragraph text-layout rendering below — and since the
+        // "for link-type parents" delimiter-hiding rule in
+        // TreeSitterParser.cpp hides an image span's ENTIRE byte range
+        // (there's no `image_description`-is-visible-text carve-out the
+        // way `link_text` gets one), that ordinary rendering path shows
+        // NOTHING at all for ANY still-Paragraph image line — with or
+        // without alt text; verified empirically, not just for the empty-
+        // alt case the finding first reported. Sniffing the shape here
+        // mirrors the footnote-def carve-out just above (a real Paragraph
+        // block content-sniffed into a different presentation, with no
+        // document mutation) rather than requiring a load-time or click-
+        // time kind promotion, which would be a markoff-core change.
+        if (text.startsWith("![")) {
+            const Detail::ImageBlockInfo info = Detail::parseImageBlock(text);
+            s.isEmbedBlock = info.isEmbed;
+            s.isImageBlock = !info.isEmbed;
         }
         break;
     }

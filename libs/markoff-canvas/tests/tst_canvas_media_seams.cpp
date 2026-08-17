@@ -75,6 +75,7 @@ private slots:
     void image_block_with_no_lookup_or_miss_paints_placeholder();
     void mermaid_block_paints_renderer_pixmap_only_while_caret_is_outside();
     void embed_block_renders_placeholder_via_embed_registry();
+    void unpromoted_paragraph_image_shapes_still_paint_placeholder();
 };
 
 void TstCanvasMediaSeams::image_block_paints_resource_lookup_result()
@@ -217,6 +218,61 @@ void TstCanvasMediaSeams::embed_block_renders_placeholder_via_embed_registry()
     QVERIFY(registeredLabel.contains(QStringLiteral("Embed:")));
     QVERIFY(!registeredLabel.contains(QStringLiteral("no factory")));
     QVERIFY(registeredLabel != unregisteredLabel);
+}
+
+void TstCanvasMediaSeams::unpromoted_paragraph_image_shapes_still_paint_placeholder()
+{
+    // Punch-list [cluster-k]: "some remote image embeds render as an empty/
+    // invisible line until clicked into". Reproduced with an actual
+    // multi-block document (not a single-block doc, where the default
+    // caret-on-load landing on the one and only block would mask this):
+    // BlockKind promotion (View::promoteCaretBlockKind) only fires from an
+    // actual document EDIT with the caret in that exact block
+    // (onDocumentChanged's own call site) — never from a plain caret move
+    // (View::setCaret has no such hook) and never from load alone (the
+    // load-time caret only ever lands on block 0). So EVERY still-
+    // BlockKind::Paragraph image/embed line — with alt text, without alt
+    // text, or a wikilink embed — is equally unpromoted here; verified
+    // this is NOT an empty-alt-specific gap before fixing it as one.
+    Markoff::MarkoffDocument doc;
+    doc.loadFromMarkdown(
+        "First paragraph, so block 0 is not one of the images below.\n\n"
+        "![alt text](https://example.com/a.jpg)\n\n"
+        "![](https://example.com/b.jpg)\n\n"
+        "![[wikitarget]]\n");
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), 4);
+    const BlockId withAlt   = blocks[1];
+    const BlockId noAlt     = blocks[2];
+    const BlockId wikilink  = blocks[3];
+
+    // None of these were ever visited by the caret: still Paragraph, not
+    // promoted to BlockKind::Image — the presentation fix must not mutate
+    // the document to make the placeholder show.
+    QCOMPARE(doc.blockKind(withAlt), BlockKind::Paragraph);
+    QCOMPARE(doc.blockKind(noAlt), BlockKind::Paragraph);
+    QCOMPARE(doc.blockKind(wikilink), BlockKind::Paragraph);
+
+    // All three now paint a placeholder (no lookup wired) with a non-empty
+    // label, matching the already-promoted-BlockKind::Image behavior the
+    // other tests in this file cover.
+    QVERIFY(view.isImagePlaceholderActive(withAlt));
+    QVERIFY(!view.mediaLabelFor(withAlt).isEmpty());
+
+    QVERIFY(view.isImagePlaceholderActive(noAlt));
+    const QString noAltLabel = view.mediaLabelFor(noAlt);
+    QVERIFY(!noAltLabel.isEmpty());
+    QCOMPARE(noAltLabel, QStringLiteral("https://example.com/b.jpg"));
+
+    QVERIFY(view.isEmbedPlaceholderActive(wikilink));
+    QVERIFY(!view.mediaLabelFor(wikilink).isEmpty());
 }
 
 QTEST_MAIN(TstCanvasMediaSeams)
