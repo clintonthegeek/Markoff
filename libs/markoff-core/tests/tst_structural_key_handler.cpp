@@ -460,6 +460,50 @@ private Q_SLOTS:
         QCOMPARE(doc.blockKind(r.caretBlock), BlockKind::Paragraph);
         QCOMPARE(r.caretByteInBlock, 0u);
     }
+
+    // Corbomite Cluster K regression: Math previously fell through to the
+    // `default:` case, which handles none of Enter/Backspace/Delete, so a
+    // typed "$$" display-math line could take further keystrokes but never
+    // be split, merged, or backspaced away (canvas's View reported "Enter
+    // does nothing" and "can't backspace to erase that line").
+    void math_enter_inserts_literal_newline_not_split() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("x\n"));
+        BlockId first = doc.iterateBlocks()[0];
+        BlockId math;
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            math = doc.d2InsertBlock(first, BlockKind::Math, t);
+            doc.d2ApplyBufferEdit(math, 0, 0, QByteArrayLiteral("$$ab$$"), t);
+        }
+        const uint32_t endByte = static_cast<uint32_t>(doc.blockText(math).size());
+        const int countBefore = int(doc.iterateBlocks().size());
+        auto r = StructuralKeyHandler::handle(doc, math, Qt::Key_Return,
+                                              Qt::NoModifier, endByte);
+        QVERIFY(r.handled);
+        QCOMPARE(int(doc.iterateBlocks().size()), countBefore);  // no split
+        QCOMPARE(r.caretBlock, math);
+        QCOMPARE(doc.blockText(math), QByteArrayLiteral("$$ab$$\n"));
+    }
+
+    void math_backspace_at_start_merges_with_previous() {
+        MarkoffDocument doc(1);
+        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n"));
+        BlockId alpha = doc.iterateBlocks()[0];
+        BlockId math;
+        {
+            Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+            math = doc.d2InsertBlock(alpha, BlockKind::Math, t);
+        }
+        // Empty math block, caret at start: Backspace must merge with the
+        // previous block, not no-op — previously the only way this ever
+        // returned {} unhandled, leaving the line stuck forever.
+        auto r = StructuralKeyHandler::handle(doc, math, Qt::Key_Backspace,
+                                              Qt::NoModifier, 0u);
+        QVERIFY(r.handled);
+        QCOMPARE(int(doc.iterateBlocks().size()), 1);
+        QCOMPARE(r.caretBlock, alpha);
+    }
 };
 
 QTEST_MAIN(TstStructuralKeyHandler)

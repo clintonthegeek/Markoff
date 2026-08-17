@@ -268,6 +268,21 @@ StructuralResult StructuralKeyHandler::handle(MarkoffDocument &doc, BlockId bloc
     case BlockKind::HorizontalRule:
         if (isEnter) { const BlockId nb = Cmd::enterAtEnd(doc, block); return {true, nb, 0}; }
         return {};
+    case BlockKind::Math:
+        // Same shape as CodeBlock: a passthrough buffer that may legitimately
+        // span multiple lines (a display-math block, e.g. an `aligned`
+        // environment), so Enter inserts a literal newline rather than
+        // splitting the block — and Backspace/Delete at a boundary still need
+        // to merge with the neighbour, same as every other kind. Before this
+        // case existed, Math fell through to `default:` below, which handles
+        // NONE of Enter/Backspace/Delete — reported as Corbomite Cluster K's
+        // "$$ locks up the line: Enter does nothing, Backspace can't erase it"
+        // (the boundary-merge no-op leaves an unremovable line once its
+        // content is fully backspaced to empty).
+        if (isEnter)                      return codeBlockEnter(doc, block, caretByteInBlock);
+        if (normKey == Qt::Key_Backspace) return paragraphBackspace(doc, block, caretByteInBlock);
+        if (normKey == Qt::Key_Delete)    return paragraphDelete(doc, block, caretByteInBlock);
+        return {};
     default:
         return {};
     }

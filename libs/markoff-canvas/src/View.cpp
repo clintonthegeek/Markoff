@@ -22,6 +22,7 @@
 #include <QPaintEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QRegularExpression>
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QTextBoundaryFinder>
@@ -1641,6 +1642,49 @@ void View::promoteCaretBlockKind()
         } else if (inferred.kind == Markoff::BlockKind::Math) {
             m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::DisplayMode,
                                   inferred.mathDisplay, t);
+        } else if (inferred.kind == Markoff::BlockKind::ListItem) {
+            // ListItem is content-narrowed (buffer convention table,
+            // markoff-core/CLAUDE.md): unlike Heading/CodeBlock, the typed
+            // marker must NOT stay in the buffer — listItemDisplayMarker()
+            // reconstructs it from attrs at paint time, so leaving it in
+            // place doubles it (Corbomite Cluster K punch-list finding:
+            // "spurious extra '-' at the start of a new list item"). Mirrors
+            // markoff-live's LiveListModelBinding promotion parse.
+            static const QRegularExpression kPromoteMarker(
+                QStringLiteral(R"(^([ \t]{0,3})(\d{1,9})([.)]) (.*)$|^([ \t]{0,3})([-*+]) (.*)$)"));
+            const auto pm = kPromoteMarker.match(QString::fromUtf8(text));
+            if (pm.hasMatch()) {
+                QString style;
+                int number = 0;
+                QString content;
+                int leadingSpaces = 0;
+                if (!pm.captured(2).isEmpty()) {
+                    leadingSpaces = pm.captured(1).size();
+                    number        = pm.captured(2).toInt();
+                    style         = (pm.captured(3) == QStringLiteral("."))
+                                        ? QStringLiteral("dot") : QStringLiteral("paren");
+                    content = pm.captured(4);
+                } else {
+                    leadingSpaces = pm.captured(5).size();
+                    const QString c = pm.captured(6);
+                    style   = (c == QStringLiteral("-")) ? QStringLiteral("minus")
+                            : (c == QStringLiteral("*")) ? QStringLiteral("star")
+                                                          : QStringLiteral("plus");
+                    content = pm.captured(7);
+                }
+                m_doc->d2ApplyBufferEdit(m_caret.block, 0, uint32_t(text.size()),
+                                         content.toUtf8(), t);
+                m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::IndentLevel,
+                                      leadingSpaces / 2, t);
+                m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::MarkerStyle,
+                                      style, t);
+                if (style == QStringLiteral("dot") || style == QStringLiteral("paren"))
+                    m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::MarkerNumber,
+                                          number, t);
+                m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::LooseRun,
+                                      false, t);
+                Markoff::Cmd::renumberRunStartingAt(*m_doc, m_caret.block, t);
+            }
         }
     }
 
@@ -4173,6 +4217,29 @@ void View::keyPressEvent(QKeyEvent *event)
             event->accept();
             return;
         }
+        // Generic fallback (Corbomite Cluster K finding): neither
+        // StructuralKeyHandler nor table-cell-nav claimed this Tab/Backtab —
+        // e.g. a plain paragraph, not in a list or table. Previously this
+        // fell all the way through keyPressEvent unaccepted, so Qt's default
+        // QWidget::event() Tab handling took over and moved keyboard focus
+        // out of the editor into the surrounding app chrome (reported:
+        // "the tab-key... literally tabs the interface input focus out of
+        // the Markoff widget"). Every other Tab-consuming case above already
+        // accepts and returns, so reaching here means truly nothing claimed
+        // it — insert a literal tab character (CodeMirror/Obsidian's own
+        // plain-paragraph behavior) and always accept, never let it escape
+        // to the focus chain. Shift+Tab has nothing to outdent outside a
+        // list/table; still accept so it doesn't leak either.
+        if (!shift && !m_readOnly && !isComposing()) {
+            UndoLog::Transaction t(m_doc->d2UndoLog());
+            m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0,
+                                     QByteArrayLiteral("\t"), t);
+            m_caret.byteOffset += 1;
+            ensureCaretVisible();
+            viewport()->update();
+        }
+        event->accept();
+        return;
     }
 
     // ---- P7.2b: editing-command floor, non-motion keys (F1 #1) -----------
