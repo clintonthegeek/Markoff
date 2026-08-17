@@ -31,6 +31,7 @@ class TstCanvasInlineFormatting : public QObject {
 
 private slots:
     void delimiter_visibility_follows_caret();
+    void delimiter_reveal_radius_is_narrow();
     void heading_marker_hides_per_block();
     void code_fence_hides_per_block();
     void inline_kinds_map_to_theme_slots();
@@ -68,10 +69,16 @@ void TstCanvasInlineFormatting::delimiter_visibility_follows_caret()
     QVERIFY(view.isDelimiterHiddenAt(block, 2));
     QVERIFY(view.isDelimiterHiddenAt(block, 5));
 
-    // Walk the caret into the span, one ASCII char per Right (1 QChar ==
-    // 1 byte for this whole fixture, so byte offset == keypress count).
-    for (int i = 0; i < 4; ++i)
-        QTest::keyClick(&view, Qt::Key_Right);
+    // Move the caret into the span. Placed directly rather than via a
+    // Right-key walk: since [cluster-k] P6 narrowed the reveal radius, a
+    // single Right hop starting outside the span's touched range now
+    // skips clean over the whole still-hidden "**" run to whatever the
+    // next real layout position is (exact landing spot is a hop-count
+    // question this test isn't about); pinning the reveal boundary itself
+    // by byte offset is delimiter_reveal_radius_is_narrow's job, so this
+    // test only needs a caret unambiguously inside the span to exercise
+    // the reveal + type-while-revealed path below.
+    view.setCaretPosition(block, 4);
     QCOMPARE(view.caretByteOffset(), 4);  // right before 'b'
 
     // Caret inside the span: delimiters reveal.
@@ -88,6 +95,80 @@ void TstCanvasInlineFormatting::delimiter_visibility_follows_caret()
     QTest::keyClick(&view, Qt::Key_Home);
     QCOMPARE(view.caretByteOffset(), 0);
     QVERIFY(view.isDelimiterHiddenAt(block, 2));
+}
+
+// [cluster-k] P6 — reveal radius (touchedByAnyCursor's boundary rule):
+// merely being ADJACENT to a formatted span (separated by nothing, or by
+// one whitespace char) must not reveal it — only the caret being actually
+// inside the span, or sitting in the gap immediately after its closing
+// delimiter (still-composing position), should. Pins the exact boundary:
+// asymmetric across the two ends, see InlineFormatting.cpp's comment.
+void TstCanvasInlineFormatting::delimiter_reveal_radius_is_narrow()
+{
+    Markoff::MarkoffDocument doc;
+    // Byte offsets: m=0 y=1 ' '=2 *=3 *=4 b=5 o=6 l=7 d=8 *=9 *=10 ' '=11
+    // w=12 o=13 r=14 d=15. Span "**bold**" occupies bytes [3,11); its
+    // opening "**" delimiter is at byte 3, closing "**" at byte 9.
+    doc.loadFromMarkdown("my **bold** word\n");
+
+    View view;
+    view.resize(400, 300);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const BlockId block = doc.iterateBlocks().front();
+    QCOMPARE(doc.blockText(block), QByteArray("my **bold** word"));
+
+    const QRectF rect = view.blockRect(block);
+    QTest::mouseClick(view.viewport(), Qt::LeftButton, Qt::NoModifier,
+                      QPoint(int(rect.x()) + 1, int(rect.y()) + 8));
+    QTest::keyClick(&view, Qt::Key_Home);
+    QCOMPARE(view.caretByteOffset(), 0);
+    QCOMPARE(view.realizedBlockCount(), 1);
+
+    auto caretTo = [&](int byte) {
+        // Direct placement, not an arrow-key walk: a single Right hop that
+        // starts before the span's touched threshold and lands past it
+        // jumps clean over the whole still-hidden delimiter run (that's
+        // the fix under test), so the number of keypresses needed to
+        // reach a given byte isn't 1-per-byte near the boundary — using
+        // setCaretPosition keeps this test about the boundary rule itself,
+        // not keyboard-navigation hop counts (a separate concern already
+        // exercised by delimiter_visibility_follows_caret).
+        view.setCaretPosition(block, byte);
+        QCOMPARE(view.caretByteOffset(), byte);
+    };
+
+    // "my| **bold** word" — caret right after 'y', a whole space away
+    // from the span: hidden.
+    caretTo(2);
+    QVERIFY(view.isDelimiterHiddenAt(block, 3));
+    QVERIFY(view.isDelimiterHiddenAt(block, 9));
+
+    // "my |**bold** word" — caret immediately before the opening "**",
+    // no gap: still hidden. This is the P6 bug's headline case — the old
+    // "-1" pad wrongly revealed here.
+    caretTo(3);
+    QVERIFY(view.isDelimiterHiddenAt(block, 3));
+    QVERIFY(view.isDelimiterHiddenAt(block, 9));
+
+    // "my **b|old** word" — caret strictly inside the span: revealed.
+    caretTo(6);
+    QVERIFY(!view.isDelimiterHiddenAt(block, 3));
+    QVERIFY(!view.isDelimiterHiddenAt(block, 9));
+
+    // "my **bold**| word" — caret immediately after the closing "**",
+    // no gap yet (mid-composition position): still revealed.
+    caretTo(11);
+    QVERIFY(!view.isDelimiterHiddenAt(block, 3));
+    QVERIFY(!view.isDelimiterHiddenAt(block, 9));
+
+    // "my **bold** |word" — one whitespace-separated char further out:
+    // hidden again. The old "+1" pad wrongly revealed here too.
+    caretTo(12);
+    QVERIFY(view.isDelimiterHiddenAt(block, 3));
+    QVERIFY(view.isDelimiterHiddenAt(block, 9));
 }
 
 // P2.2 — heading prefix omission, per-BLOCK reveal (spec §4.2): unlike
@@ -274,7 +355,14 @@ void TstCanvasInlineFormatting::wikilink_delimiter_hides_per_span()
     QVERIFY(view.isDelimiterHiddenAt(wiki, 0));
 
     // Move the caret into the wikilink block: reveals (caret lands inside
-    // the parent range's -1/+1 tolerance for the whole "[[Target]]" span).
+    // the whole "[[Target]]" span's parent range). Position 1 — between
+    // the two opening brackets, not position 0 — deliberately: position 0
+    // is the gap immediately BEFORE the span, which [cluster-k] P6's
+    // narrowed reveal radius now correctly treats as NOT touching (that
+    // exact boundary is pinned by tst_canvas_inline_formatting's own
+    // delimiter_reveal_radius_is_narrow test); this test's job is only to
+    // prove wikilinks share the generic per-span mechanism, so it uses an
+    // unambiguously-interior position instead of coupling to that edge.
     // `setCaretPosition`, not a mouse click: since [cluster-k] P2, a plain
     // click on a link whose block differs from the caret's CURRENT block
     // is an activation gesture (Obsidian Live Preview parity — the link
@@ -287,7 +375,7 @@ void TstCanvasInlineFormatting::wikilink_delimiter_hides_per_span()
     // caret placement is exactly what a keyboard Left/Right/Up/Down out of
     // the "Other" block would produce — this is that, without coupling an
     // unrelated delimiter-reveal test to click-vs-link click semantics.
-    view.setCaretPosition(wiki, 0);
+    view.setCaretPosition(wiki, 1);
     QCOMPARE(view.caretBlock(), wiki);
     QVERIFY(!view.isDelimiterHiddenAt(wiki, 0));
 

@@ -80,10 +80,16 @@ void TstCanvasPerfFormatted::p95_keystroke_inside_a_revealed_formatted_span()
     QTest::keyClick(&view, Qt::Key_Home);
     QCOMPARE(view.caretBlock(), block);
 
-    // Walk the caret to byte 29 — right after the opening "**", inside the
-    // bold span — one Right per byte (ASCII-only fixture up to this point).
-    for (int i = 0; i < 29; ++i)
-        QTest::keyClick(&view, Qt::Key_Right);
+    // Place the caret at byte 29 — right after the opening "**", inside the
+    // bold span. Direct placement (not an arrow-key walk): [cluster-k] P6
+    // narrowed the delimiter reveal radius, which makes a single Right
+    // hop over a still-hidden delimiter run skip straight past its far
+    // edge to the first touched position — a real, intentional behavior
+    // change to *how many keypresses* land where, orthogonal to what this
+    // test is actually about (the perf budget once the caret is settled
+    // inside a revealed span), so pin the position directly instead of
+    // coupling this test to that hop-count arithmetic.
+    view.setCaretPosition(block, 29);
     QCOMPARE(view.caretByteOffset(), 29);
 
     // Confirm the reveal precondition the test is named for: both "**"

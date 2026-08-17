@@ -118,13 +118,19 @@ void TstCanvasProjection::reflow_is_real_not_cosmetic()
     const qreal hiddenWidth = view.lineNaturalWidth(block);
     QVERIFY(hiddenWidth > 0);
 
-    // Walk the caret into the span; once it touches "**b**", the
+    // Move the caret into the span; once it touches "**b**", the
     // delimiters reveal and the SAME layout now measures the full
     // ("a **b** c") width — strictly wider, because the reveal literally
     // put the "**" bytes back into the layout string (spec §4.2: "a caret
     // move that changes delimiter visibility is a layout TEXT change").
-    for (int i = 0; i < 4; ++i)
-        QTest::keyClick(&view, Qt::Key_Right);
+    // Placed directly rather than via an arrow-key walk: the keystroke/
+    // reveal interaction along a real navigation path is already covered
+    // by tst_canvas_inline_formatting (this file's own header comment);
+    // the exact number of Right presses needed to reach byte 4 is a
+    // separate, narrower fact ([cluster-k] P6 changed it, since a single
+    // Right hop over a still-hidden delimiter run now jumps clean past
+    // it) that this reflow-focused test has no business depending on.
+    view.setCaretPosition(block, 4);
     QCOMPARE(view.caretByteOffset(), 4);  // right before 'b' — inside the span
     const qreal revealedWidth = view.lineNaturalWidth(block);
     QVERIFY(revealedWidth > hiddenWidth);

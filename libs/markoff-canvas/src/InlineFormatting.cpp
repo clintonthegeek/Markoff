@@ -7,10 +7,39 @@ namespace Markoff::Canvas::Detail {
 
 namespace {
 
+// Boundary rule (fixes [cluster-k] P6 "reveal radius too wide"): a caret
+// position `c` is a GAP index (QTextCursor convention — c chars precede
+// it), so the span's own gaps run from parentCharStart (immediately
+// before its first char) to parentCharEnd (immediately after its last
+// char, i.e. parentCharStart + charLength-of-parent). "Touched" is
+// deliberately asymmetric across those two gaps, not a symmetric ±1 pad:
+//
+//   - c == parentCharStart (caret sits in the gap just BEFORE the span,
+//     e.g. "my|**bold**") is NOT touched. That gap belongs to the
+//     preceding text, not the token — hiding here is what let the old
+//     code's "-1" reveal an untouched span merely adjacent on the left.
+//   - parentCharStart < c <= parentCharEnd (anywhere from just inside the
+//     opening delimiter through the gap immediately after the closing
+//     delimiter, e.g. "my **bold|** word" or "my **bold**| word") IS
+//     touched. The end-of-span gap is intentionally included (not just
+//     "< parentCharEnd"): a caret that has just typed/landed on the
+//     closing delimiter is still actively composing the token and should
+//     keep seeing raw markup, matching CodeMirror/Obsidian Live Preview.
+//   - Anything further out — one more whitespace-separated character on
+//     either side ("my |**bold** word" already covered above; "my
+//     **bold** |word" on the right) — is NOT touched. Reveal only
+//     follows the caret while it is actually inside or immediately
+//     trailing the token, never merely adjacent across a gap character.
+//
+// This intentionally does NOT special-case the left side the way the end
+// is special-cased on the right: entering a token from the left starts a
+// fresh edit (still "outside" until the caret passes the first char),
+// whereas the position right after the closing delimiter is where the
+// caret naturally sits mid-composition immediately after typing it.
 bool touchedByAnyCursor(const SourceSpan &span, const QList<int> &cursorsInBlock)
 {
     for (const int c : cursorsInBlock) {
-        if (c >= span.parentCharStart - 1 && c <= span.parentCharEnd + 1)
+        if (c > span.parentCharStart && c <= span.parentCharEnd)
             return true;
     }
     return false;
