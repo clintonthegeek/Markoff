@@ -773,6 +773,14 @@ signals:
     /// trigger's discrete-step shape.
     void fontScaleStepRequested(int steps);
 
+    /// Ctrl+0 reset-zoom (follow-up to the Ctrl+Scroll/[cluster-k] P3
+    /// fix): same ask-upward shape as `fontScaleStepRequested` and for the
+    /// same reason (no local `fontScale` authority to reset in place) —
+    /// kept as its own signal rather than overloading
+    /// `fontScaleStepRequested(0)` so a `steps == 0` call can never be
+    /// mistaken for "reset" by a future connection.
+    void fontScaleResetRequested();
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;

@@ -142,6 +142,11 @@ EditorWidget::EditorWidget(QWidget *parent)
                           setFontScale(steps > 0 ? fontScale() * kZoomStep
                                                   : fontScale() / kZoomStep);
                       });
+
+    // Ctrl+0 reset-zoom: same reasoning as the step connection just above,
+    // matching MainWindow's onZoomReset() (`leaf->setFontScale(1.0)`).
+    QObject::connect(m_view, &View::fontScaleResetRequested, this,
+                      [this]() { setFontScale(1.0); });
 }
 
 EditorWidget::~EditorWidget()

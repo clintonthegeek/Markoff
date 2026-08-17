@@ -4101,6 +4101,36 @@ void View::keyPressEvent(QKeyEvent *event)
     QScrollBar *vbar = verticalScrollBar();
     const bool ctrl = event->modifiers().testFlag(Qt::ControlModifier);
 
+    // Ctrl+=/Ctrl+Plus/Ctrl+-/Ctrl+0 zoom ([cluster-k] follow-up to P3's
+    // Ctrl+Scroll fix): the QML Live leaf's own window-level QML Shortcut
+    // items already own these keys (MainWindow.cpp's zoom-action wiring
+    // deliberately has NO setDefaultShortcut() for this exact reason — a
+    // KAction binding here would collide/be ambiguous with them), so this
+    // leaf has to claim the same keys itself rather than relying on a
+    // KAction ever reaching it. Reuses the same ask-upward shape
+    // `wheelEvent` established: `fontScaleStepRequested`/
+    // `fontScaleResetRequested` land in `EditorWidget`'s single
+    // `setFontScale()` chokepoint, so keyboard, wheel, and the View-menu
+    // actions can never drift into different clamped baselines. Qt_Key_Equal
+    // covers the un-shifted US-layout "=/+" key (the common case for
+    // Ctrl+Plus without needing Shift); Key_Plus is kept too for layouts/
+    // numpads that produce it directly.
+    if (ctrl && (event->key() == Qt::Key_Equal || event->key() == Qt::Key_Plus)) {
+        Q_EMIT fontScaleStepRequested(1);
+        event->accept();
+        return;
+    }
+    if (ctrl && event->key() == Qt::Key_Minus) {
+        Q_EMIT fontScaleStepRequested(-1);
+        event->accept();
+        return;
+    }
+    if (ctrl && event->key() == Qt::Key_0) {
+        Q_EMIT fontScaleResetRequested();
+        event->accept();
+        return;
+    }
+
     // Page/document-jump keys stay scroll actions even with a caret in
     // play; T1's un-modified Up/Down/Home/End become caret motion below.
     switch (event->key()) {
