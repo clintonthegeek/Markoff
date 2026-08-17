@@ -104,6 +104,11 @@ add_test(NAME tst_canvas_click_select COMMAND tst_canvas_click_select)
 target_link_libraries(tst_canvas_click_select PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
 set_tests_properties(tst_canvas_click_select PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_canvas_wheel_zoom tst_canvas_wheel_zoom.cpp)
+add_test(NAME tst_canvas_wheel_zoom COMMAND tst_canvas_wheel_zoom)
+target_link_libraries(tst_canvas_wheel_zoom PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+set_tests_properties(tst_canvas_wheel_zoom PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_canvas_inline_title tst_canvas_inline_title.cpp)
 add_test(NAME tst_canvas_inline_title COMMAND tst_canvas_inline_title)
 target_link_libraries(tst_canvas_inline_title PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)

@@ -26,6 +26,7 @@
 #include <QResizeEvent>
 #include <QScrollBar>
 #include <QTextBoundaryFinder>
+#include <QWheelEvent>
 #include <QtMath>
 
 #include <algorithm>
@@ -4868,6 +4869,24 @@ void View::mouseDoubleClickEvent(QMouseEvent *event)
     m_pendingTripleClickBlock = hit.block;
 
     event->accept();
+}
+
+void View::wheelEvent(QWheelEvent *event)
+{
+    // Ctrl+Scroll-to-zoom ([cluster-k] P3) — see the `fontScaleStepRequested`
+    // signal's own doc comment (View.h) for why this can't just mutate
+    // `m_fontScale` in place. `angleDelta().y()`'s SIGN, not its magnitude,
+    // decides the step direction: one wheel "notch" is one zoom step,
+    // matching the discrete-step shape of every other zoom trigger
+    // (View-menu Zoom In/Out, the QML leaf's Ctrl+=/Ctrl+- shortcuts).
+    if (event->modifiers().testFlag(Qt::ControlModifier)) {
+        const int dy = event->angleDelta().y();
+        if (dy != 0)
+            Q_EMIT fontScaleStepRequested(dy > 0 ? 1 : -1);
+        event->accept();
+        return;
+    }
+    QAbstractScrollArea::wheelEvent(event);
 }
 
 void View::mouseMoveEvent(QMouseEvent *event)

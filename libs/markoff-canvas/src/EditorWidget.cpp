@@ -127,6 +127,21 @@ EditorWidget::EditorWidget(QWidget *parent)
     // surface Corbomite actually binds against, so the signal has to live
     // here, not just on the composed View.
     QObject::connect(m_view, &View::fileDropped, this, &EditorWidget::fileDropped);
+
+    // Ctrl+Scroll zoom ([cluster-k] P3): View has no `fontScale` authority
+    // of its own (see `View::fontScaleStepRequested`'s doc comment) — it
+    // just asks. This applies the exact same `fontScale() * kZoomStep`
+    // step Corbomite's MainWindow View-menu Zoom In/Out actions use
+    // (kZoomStep = 1.10 there), through `setFontScale()` so the base
+    // MarkdownView's clamp-to-[0.25,4.0] + `fontScaleChanged` stay
+    // authoritative — Ctrl+Scroll, the menu, and any future keyboard
+    // shortcut all land in the same state instead of drifting apart.
+    QObject::connect(m_view, &View::fontScaleStepRequested, this,
+                      [this](int steps) {
+                          constexpr qreal kZoomStep = 1.10;
+                          setFontScale(steps > 0 ? fontScale() * kZoomStep
+                                                  : fontScale() / kZoomStep);
+                      });
 }
 
 EditorWidget::~EditorWidget()

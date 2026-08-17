@@ -758,6 +758,21 @@ signals:
     /// `dropEvent` instead and never reach this signal.
     void fileDropped(const QList<QUrl> &urls, const QPoint &viewportPos);
 
+    /// Ctrl+Scroll-to-zoom (P7.3/[cluster-k] P3): `View` has no `fontScale`
+    /// authority of its own — that's owned by the composed `MarkdownView`
+    /// wrapper (`EditorWidget`) per contract-v2, the same seam
+    /// MainWindow's View-menu Zoom In/Out actions and the QML leaf's
+    /// window-level Ctrl+=/Ctrl+- shortcuts already drive via
+    /// `setFontScale(fontScale() * kZoomStep)`. `wheelEvent` can't just
+    /// mutate `m_fontScale` in place the way `setFontScale()` does — doing
+    /// so would leave the wrapper's own clamped `fontScale()` state stale,
+    /// so the NEXT menu/keyboard zoom would jump from the wrong baseline.
+    /// It asks upward instead; `steps` is `+1`/`-1` (the sign of
+    /// `QWheelEvent::angleDelta().y()`), never a raw pixel/angle delta —
+    /// one wheel "notch" is one zoom step, matching every other zoom
+    /// trigger's discrete-step shape.
+    void fontScaleStepRequested(int steps);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
     void resizeEvent(QResizeEvent *event) override;
@@ -785,6 +800,12 @@ protected:
     /// triple-click event, so `mousePressEvent` is what actually turns the
     /// THIRD physical click into a paragraph-select.
     void mouseDoubleClickEvent(QMouseEvent *event) override;
+    /// Ctrl+Scroll-to-zoom (P7.3/[cluster-k] P3): Ctrl held routes through
+    /// `fontScaleStepRequested` (see its own doc comment for why this view
+    /// can't just call `setFontScale` on itself) and consumes the event;
+    /// otherwise falls through to `QAbstractScrollArea`'s normal wheel
+    /// scrolling, unchanged.
+    void wheelEvent(QWheelEvent *event) override;
     /// P7.2: accepts a drag iff it carries `text/plain`, `text/markdown`,
     /// or local file URLs — same acceptance test `dropEvent` re-checks (Qt
     /// re-queries accept per drag-move, so there is no cached "will
