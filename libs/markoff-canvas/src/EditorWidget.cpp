@@ -525,6 +525,18 @@ bool EditorWidget::inlineTitleVisible() const
     return m_view && m_view->inlineTitleVisible();
 }
 
+// --- Content width (readable-line-width) ---
+
+void EditorWidget::setContentWidthPolicy(ContentWidthPolicy policy)
+{
+    if (m_view) m_view->setContentWidthPolicy(policy);
+}
+
+ContentWidthPolicy EditorWidget::contentWidthPolicy() const
+{
+    return m_view ? m_view->contentWidthPolicy() : ContentWidthPolicy::fullWidth();
+}
+
 // --- Image / Mermaid / Embed seams (P5.4) ---
 
 void EditorWidget::setImageResourceLookup(Markoff::Canvas::ImageResourceLookup lookup)

@@ -213,6 +213,12 @@ public:
     void setInlineTitleVisible(bool visible);
     bool inlineTitleVisible() const;
 
+    // ---- Content width (readable-line-width, punch-list [cluster-k] P5) --
+    // Thin pass-through, same shape as inline title above. FullWidth by
+    // construction (View's own default) until a consumer opts in.
+    void setContentWidthPolicy(ContentWidthPolicy policy);
+    ContentWidthPolicy contentWidthPolicy() const;
+
     // ---- Image / Mermaid / Embed seams (P5.4) -----------------------------
     // Thin pass-throughs to the composed View — the leaf-specific escape
     // hatch this wrapper already follows for view()/actionController(), not
