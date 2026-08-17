@@ -129,6 +129,37 @@ int nextWordBoundary(const QString &text, int from)
     }
 }
 
+/// [start, end) `QTextBoundaryFinder::Word` range under `pos` in `text`
+/// (P7.3, [cluster-k] P3 — double-click word-select), or `std::nullopt` if
+/// `pos` sits in an inter-word gap (whitespace run) with nothing to select
+/// — a double-click landing on whitespace should behave like a plain
+/// click, not select the nearest unrelated word. Reuses the
+/// `QTextBoundaryFinder::Word` idiom `previousWordBoundary`/
+/// `nextWordBoundary` above already commit to (plan's own "route through
+/// Qt, not a hand-rolled character-class scan" note) rather than a second
+/// mechanism: probing one QChar EARLIER when `pos` itself lands on
+/// whitespace (a click right at a word's trailing edge is a common real
+/// position) before giving up.
+std::optional<std::pair<int, int>> wordRangeAt(const QString &text, int pos)
+{
+    if (text.isEmpty())
+        return std::nullopt;
+    pos = qBound(0, pos, text.size());
+
+    if (pos >= text.size() || text.at(pos).isSpace()) {
+        if (pos > 0 && !text.at(pos - 1).isSpace())
+            --pos;
+        else
+            return std::nullopt;
+    }
+
+    const int start = previousWordBoundary(text, pos + 1);
+    const int end = nextWordBoundary(text, pos);
+    if (start >= end)
+        return std::nullopt;
+    return std::make_pair(start, end);
+}
+
 QRectF taskCheckboxRect(const QFontMetricsF &fm, qreal contentX, qreal contentY)
 {
     const qreal side = fm.ascent() * 0.72;
@@ -4560,6 +4591,39 @@ void View::mousePressEvent(QMouseEvent *event)
     // than relying on the coincidence never lining back up.
     m_autoPairedClose.reset();
 
+    // Triple-click paragraph-select (P7.3/[cluster-k] P3): checked before
+    // anything else a left-button press does. See
+    // `m_pendingTripleClickBlock`'s doc comment for why this can't be a
+    // native event — this is the "third click" half of the mechanism,
+    // `mouseDoubleClickEvent` is the half that arms it.
+    if (event->button() == Qt::LeftButton && m_doc && !m_pendingTripleClickBlock.isNull()) {
+        const CanvasCursor hit = hitTest(event->pos());
+        // Wall-clock (QDateTime), not `event->timestamp()`: the latter is
+        // the PLATFORM's own event timestamp, which synthetic QTest events
+        // (this leaf's whole test suite) don't reliably advance in step
+        // with real elapsed time the way genuine X11/Wayland events do —
+        // using it here would make the interval check untestable without
+        // actually being wrong on a real desktop. QDateTime is real time
+        // either way, so this behaves identically in both contexts.
+        const qint64 now = QDateTime::currentMSecsSinceEpoch();
+        const qint64 elapsed =
+            now >= m_pendingTripleClickTimestamp ? now - m_pendingTripleClickTimestamp : 0;
+        const qint64 interval = qint64(qMax(0, QApplication::doubleClickInterval()));
+        if (!hit.block.isNull() && hit.block == m_pendingTripleClickBlock && elapsed <= interval) {
+            const QByteArray blockText = m_doc->blockText(hit.block);
+            setFocus(Qt::MouseFocusReason);
+            m_selectionAnchor = CanvasCursor{hit.block, 0};
+            setCaret(CanvasCursor{hit.block, int(blockText.size())});
+            m_pendingTripleClickTimestamp = 0;
+            m_pendingTripleClickBlock = BlockId{};
+            event->accept();
+            return;
+        }
+        // Broken sequence (different block, or too slow) — don't let a
+        // stale double-click arm an unrelated later press.
+        m_pendingTripleClickBlock = BlockId{};
+    }
+
     if (event->button() == Qt::LeftButton) {
         int titleCharPos = 0;
         if (hitTestTitle(event->pos(), &titleCharPos)) {
@@ -4754,6 +4818,56 @@ void View::mousePressEvent(QMouseEvent *event)
     }
 
     QAbstractScrollArea::mousePressEvent(event);
+}
+
+void View::mouseDoubleClickEvent(QMouseEvent *event)
+{
+    if (event->button() != Qt::LeftButton || !m_doc) {
+        QAbstractScrollArea::mouseDoubleClickEvent(event);
+        return;
+    }
+
+    const CanvasCursor hit = hitTest(event->pos());
+    if (hit.block.isNull()) {
+        QAbstractScrollArea::mouseDoubleClickEvent(event);
+        return;
+    }
+
+    const int idx = m_cache->indexOf(hit.block);
+    const bool haveLayout = idx >= 0 && m_cache->entries()[size_t(idx)].layout;
+    std::optional<std::pair<int, int>> range;
+    if (haveLayout) {
+        const auto &e = m_cache->entries()[size_t(idx)];
+        const QString &text = e.projection.layoutText();
+        const int layoutPos = e.projection.byteToLayoutQChar(hit.byteOffset);
+        range = wordRangeAt(text, layoutPos);
+    }
+
+    setFocus(Qt::MouseFocusReason);
+    if (range) {
+        const auto &e = m_cache->entries()[size_t(idx)];
+        const int startByte = e.projection.layoutQCharToByte(range->first);
+        const int endByte = e.projection.layoutQCharToByte(range->second);
+        m_selectionAnchor = CanvasCursor{hit.block, startByte};
+        setCaret(CanvasCursor{hit.block, endByte});
+    } else {
+        // No word under the click (whitespace, or an unrealized/empty
+        // entry) — behaves like a plain click: just place the caret, no
+        // selection. The triple-click detector still arms below, matching
+        // most desktop editors: double-clicking whitespace and then
+        // clicking again on the same block still selects the paragraph.
+        m_selectionAnchor.reset();
+        setCaret(hit);
+    }
+
+    // Arms the triple-click detector — see `m_pendingTripleClickBlock`'s
+    // doc comment. The NEXT press, if it lands on this same block within
+    // `QApplication::doubleClickInterval()`, upgrades to a whole-block
+    // selection (mousePressEvent's own triple-click branch).
+    m_pendingTripleClickTimestamp = QDateTime::currentMSecsSinceEpoch();
+    m_pendingTripleClickBlock = hit.block;
+
+    event->accept();
 }
 
 void View::mouseMoveEvent(QMouseEvent *event)

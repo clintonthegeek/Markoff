@@ -775,6 +775,16 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    /// Word-select (P7.3/[cluster-k] P3): a hit on an actual word selects
+    /// its `QTextBoundaryFinder::Word` range (see `wordRangeAt` at the top
+    /// of View.cpp — the same boundary-finder idiom `moveCaretByWord`
+    /// already commits to, not a hand-rolled char-class scan); a hit on
+    /// whitespace/an empty region just places the caret, matching a plain
+    /// click. Either way it arms the triple-click detector
+    /// (`m_pendingTripleClickBlock`'s own doc comment) — Qt has no native
+    /// triple-click event, so `mousePressEvent` is what actually turns the
+    /// THIRD physical click into a paragraph-select.
+    void mouseDoubleClickEvent(QMouseEvent *event) override;
     /// P7.2: accepts a drag iff it carries `text/plain`, `text/markdown`,
     /// or local file URLs — same acceptance test `dropEvent` re-checks (Qt
     /// re-queries accept per drag-move, so there is no cached "will
@@ -1548,6 +1558,24 @@ private:
     /// target if the press turns out to be a plain click instead of a
     /// drag (see `m_dragPending`'s doc comment).
     QPoint m_dragPressPos;
+
+    // ---- Double/triple-click select (P7.3, [cluster-k] P3) -----------------
+    /// Wall-clock timestamp (`QDateTime::currentMSecsSinceEpoch()` — see
+    /// `mousePressEvent`'s triple-click branch for why not
+    /// `QMouseEvent::timestamp()`) of the last `mouseDoubleClickEvent`,
+    /// and the block it landed on. Qt only ever synthesizes ONE
+    /// `mouseDoubleClickEvent` per click-pair — its own double-click state
+    /// machine resets immediately afterward, so the THIRD physical click
+    /// arrives back at `mousePressEvent` as an ordinary press,
+    /// indistinguishable from an unrelated first click unless something
+    /// remembers the double-click that just happened. `mousePressEvent`
+    /// compares its own press against these two fields — same block, and
+    /// within `QApplication::doubleClickInterval()` — and promotes it to a
+    /// whole-block (paragraph) selection when both hold. Reset to a null
+    /// block once consumed, or once any OTHER press breaks the sequence,
+    /// so a fourth click doesn't spuriously re-trigger.
+    qint64 m_pendingTripleClickTimestamp = 0;
+    BlockId m_pendingTripleClickBlock;
 };
 
 }  // namespace Markoff::Canvas
