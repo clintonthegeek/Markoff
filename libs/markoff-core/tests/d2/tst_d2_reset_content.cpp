@@ -22,7 +22,7 @@ using namespace Markoff;
 class TstD2ResetContent : public QObject {
     Q_OBJECT
 private Q_SLOTS:
-    void firstOpen_emptyContent_zeroBlocks();
+    void firstOpen_emptyContent_oneEmptyParagraphBlock();
     void firstOpen_singleParagraph_oneBlock();
     void firstOpen_headingAndParagraph_twoBlocksWithCorrectKinds();
     void testFixture_buildsD2Blocks();
@@ -41,11 +41,14 @@ private Q_SLOTS:
     void reset_clearsLinkRefsFromPrior();
 };
 
-void TstD2ResetContent::firstOpen_emptyContent_zeroBlocks()
+void TstD2ResetContent::firstOpen_emptyContent_oneEmptyParagraphBlock()
 {
+    // A genuinely empty file (e.g. a freshly created note) must still
+    // produce one block so a caret has somewhere to live (Corbomite Cluster
+    // K P0 — see materializeBlocksFromParsedDoc's empty-document fallback).
     MarkoffDocument doc(1);
     doc.resetContent(QByteArray{}, Origin::FirstOpen);
-    QCOMPARE(doc.iterateBlocks().size(), static_cast<size_t>(0));
+    QCOMPARE(doc.iterateBlocks().size(), static_cast<size_t>(1));
 }
 
 void TstD2ResetContent::firstOpen_singleParagraph_oneBlock()

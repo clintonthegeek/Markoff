@@ -10,7 +10,7 @@ using namespace Markoff;
 class TstD2Load : public QObject {
     Q_OBJECT
 private Q_SLOTS:
-    void emptyDoc_loadEmpty_zeroBlocks();
+    void emptyDoc_loadEmpty_oneEmptyParagraphBlock();
     void singleParagraph_loadProducesOneBlock();
     void singleParagraph_blockKindIsParagraph();
     void singleParagraph_blockTextMatchesSource();
@@ -41,11 +41,19 @@ private Q_SLOTS:
     void heading_atx_doesNotSetHeadingFormAttr();
 };
 
-void TstD2Load::emptyDoc_loadEmpty_zeroBlocks()
+void TstD2Load::emptyDoc_loadEmpty_oneEmptyParagraphBlock()
 {
+    // A genuinely empty file (e.g. a freshly created note) must still
+    // produce one block so a caret has somewhere to live — a zero-block
+    // document leaves every view's caret null and swallows all keystrokes
+    // (Corbomite Cluster K P0: canvas's View::keyPressEvent bails whenever
+    // m_caret.block.isNull()). See buildD2FromBytes/materializeBlocksFromParsedDoc.
     MarkoffDocument doc(1);
     doc.loadFromMarkdown("");
-    QCOMPARE(doc.iterateBlocks().size(), static_cast<size_t>(0));
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), static_cast<size_t>(1));
+    QCOMPARE(doc.blockKind(blocks.front()), BlockKind::Paragraph);
+    QCOMPARE(doc.blockText(blocks.front()), QByteArray());
 }
 
 void TstD2Load::singleParagraph_loadProducesOneBlock()
@@ -219,9 +227,15 @@ void TstD2Load::orderedList_startNumber_inAttrs()
 void TstD2Load::linkRefDef_populatesLinkRefMap_notIdList()
 {
     MarkoffDocument doc(1);
-    // A link reference definition should not appear in the block list
+    // A link reference definition should not appear in the block list itself
+    // — but a document made of nothing else still needs the empty-document
+    // synthesized block (see emptyDoc_loadEmpty_oneEmptyParagraphBlock) so a
+    // caret has somewhere to live.
     doc.loadFromMarkdown("[foo]: https://example.com\n");
-    QCOMPARE(doc.iterateBlocks().size(), static_cast<size_t>(0));
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), static_cast<size_t>(1));
+    QCOMPARE(doc.blockKind(blocks.front()), BlockKind::Paragraph);
+    QCOMPARE(doc.blockText(blocks.front()), QByteArray());
 }
 
 // ── Task 7.6 ────────────────────────────────────────────────────────────────

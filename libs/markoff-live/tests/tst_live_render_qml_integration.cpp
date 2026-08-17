@@ -85,26 +85,27 @@ class TestLiveRenderQmlIntegration : public QObject {
 private Q_SLOTS:
 
     /// Smoke: loads empty doc against production Main.qml, window exposes,
-    /// model has zero rows (per tst_live_render_empty_doc_focus: empty markdown
-    /// produces zero blocks; the host is responsible for handling the 0-row case).
+    /// model has one row — empty markdown now synthesizes one empty
+    /// Paragraph block (Corbomite Cluster K P0: a genuinely zero-block
+    /// document left every view's caret null and swallowed all keystrokes;
+    /// see materializeBlocksFromParsedDoc's empty-document fallback).
     void loads_production_main_against_empty_doc() {
-        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/0);
+        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/1);
         QVERIFY(fix.window() != nullptr);
         QVERIFY(fix.window()->isExposed() || fix.window()->isVisible());
         QVERIFY(fix.model() != nullptr);
-        QCOMPARE(fix.model()->rowCount(), 0);
+        QCOMPARE(fix.model()->rowCount(), 1);
     }
 
     /// Three-layer convention smoke: after load, all three layers agree on
     /// the empty-paragraph text. No edits driven; this guards the accessors.
     void three_layer_accessors_agree_after_load() {
-        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/0);
+        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/1);
 
         const auto blockIds = fix.document()->iterateBlocks();
-        QCOMPARE(blockIds.size(), 0u);
+        QCOMPARE(blockIds.size(), 1u);
 
-        // With 0 blocks there is nothing to assert on the three layers;
-        // switch to a one-block doc to exercise the accessors.
+        // Switch to a one-block doc with real text to exercise the accessors.
         QmlIntegrationFixture fix2(/*markdown=*/"hello", /*expectedRowCount=*/1);
 
         const auto blockIds2 = fix2.document()->iterateBlocks();
@@ -327,21 +328,15 @@ private Q_SLOTS:
     /// auto-focused empty paragraph; all three layers must agree
     /// on "abc" with cursor at position 3.
     void typing_preserves_insertion_order() {
-        // Start from scratch with an empty doc (0 blocks). Insert one
-        // empty paragraph block programmatically before the QML runs —
-        // the production architecture requires a block to be present for
-        // typing to land. The regression being guarded is char-reversal
-        // during sequential keystroke processing, which can only manifest
-        // once a block exists and receives focus.
-        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/0);
-
-        // Insert a fresh empty paragraph block so the ListView has something
-        // to render and focus.
-        {
-            Markoff::UndoLog::Transaction t(fix.document()->d2UndoLog());
-            fix.document()->d2InsertBlock(Markoff::BlockId{},
-                                          Markoff::BlockKind::Paragraph, t);
-        }
+        // An empty-markdown load now synthesizes one empty Paragraph block
+        // on its own (Corbomite Cluster K P0 — see
+        // materializeBlocksFromParsedDoc's empty-document fallback), so the
+        // fixture already has something for the ListView to render and
+        // focus; no manual d2InsertBlock needed anymore. The regression
+        // being guarded is char-reversal during sequential keystroke
+        // processing, which can only manifest once a block exists and
+        // receives focus.
+        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/1);
 
         QVERIFY(fix.waitForRowCount(1, 2000));
         QVERIFY(fix.waitForDelegateAt(0, 2000));
@@ -824,14 +819,10 @@ private Q_SLOTS:
     /// not paragraph size. Closes the dogfood "cross-block paste loses
     /// header styling" regression.
     void paste_heading_into_paragraph_renders_as_heading() {
-        // Setup: one empty paragraph block.
-        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/0);
-
-        {
-            Markoff::UndoLog::Transaction t(fix.document()->d2UndoLog());
-            fix.document()->d2InsertBlock(Markoff::BlockId{},
-                                          Markoff::BlockKind::Paragraph, t);
-        }
+        // Setup: one empty paragraph block — an empty-markdown load now
+        // synthesizes this on its own (Corbomite Cluster K P0), so no manual
+        // d2InsertBlock is needed anymore.
+        QmlIntegrationFixture fix(/*markdown=*/"", /*expectedRowCount=*/1);
 
         QVERIFY(fix.waitForRowCount(1, 2000));
         QVERIFY(fix.waitForDelegateAt(0, 2000));

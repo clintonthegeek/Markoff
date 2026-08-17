@@ -7,16 +7,18 @@
 class TestEmptyDocFocus : public QObject {
     Q_OBJECT
 private slots:
-    void empty_doc_loads_zero_blocks() {
-        // An empty markdown load produces zero blocks in the document and
-        // consequently zero rows in the model.  The binding correctly reflects
-        // the underlying document state; a host editor must handle the 0-row
-        // case when presenting an empty document to the user.
+    void empty_doc_loads_one_empty_paragraph_block() {
+        // An empty markdown load now synthesizes one empty Paragraph block
+        // (Corbomite Cluster K P0: a genuinely zero-block document left every
+        // view's caret null and swallowed all keystrokes — canvas's
+        // View::keyPressEvent bails whenever m_caret.block.isNull(); a
+        // brand-new note was unusable). The binding reflects that one row;
+        // a host editor no longer needs a 0-row special case.
         Markoff::MarkoffDocument doc(quint16(42));
         Markoff::Live::LiveListModelBinding binding;
         binding.setDocument(&doc);
         doc.loadFromMarkdown("");
-        QCOMPARE(binding.model()->rowCount(), 0);
+        QCOMPARE(binding.model()->rowCount(), 1);
     }
 
     void edit_into_empty_block_lands_correctly() {

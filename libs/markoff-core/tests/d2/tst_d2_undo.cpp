@@ -16,6 +16,8 @@ private Q_SLOTS:
     void canUndoForBlock_returns_false_when_no_history();
     void canUndoForBlock_returns_true_after_edit();
     void undoForBlock_via_anchor_undoes_edit();
+    void undo_bumpsBlockEditSequence();
+    void redo_bumpsBlockEditSequence();
 };
 
 void TstD2Undo::undoUndoesLastEdit()
@@ -79,6 +81,34 @@ void TstD2Undo::undoForBlock_via_anchor_undoes_edit()
     doc.undoForBlock(anchorA);
     QCOMPARE(doc.blockText(blkA), QByteArray("hello"));
     QCOMPARE(doc.blockText(blkB), QByteArray("world?"));
+}
+
+void TstD2Undo::undo_bumpsBlockEditSequence()
+{
+    // The undo dispatcher mutates the CRDT Buffer directly (BufferT branch),
+    // bypassing applyBlockEdit/d2ApplyBufferEdit entirely — those are the
+    // only other places blockEditSequence normally advances. Without this,
+    // any consumer keyed on (BlockId, blockEditSequence) — namely
+    // InlineParseCache — would see no change and keep serving spans parsed
+    // from the pre-undo text (Corbomite Cluster K: phantom link styling
+    // survived an undo until an unrelated edit finally bumped the sequence).
+    MarkoffDocument doc(1);
+    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
+    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
+    const quint64 seqBeforeUndo = doc.blockEditSequence(blk);
+    doc.undoD2();
+    QVERIFY(doc.blockEditSequence(blk) > seqBeforeUndo);
+}
+
+void TstD2Undo::redo_bumpsBlockEditSequence()
+{
+    MarkoffDocument doc(1);
+    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
+    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
+    doc.undoD2();
+    const quint64 seqBeforeRedo = doc.blockEditSequence(blk);
+    doc.redoD2();
+    QVERIFY(doc.blockEditSequence(blk) > seqBeforeRedo);
 }
 
 QTEST_GUILESS_MAIN(TstD2Undo)

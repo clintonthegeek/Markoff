@@ -233,6 +233,17 @@ MarkoffDocument::MarkoffDocument(quint16 replicaId,
                 if (it == d->blockBuffers.end()) return;
                 if (forward) it->second->redo();
                 else         it->second->undo();
+                // This bypasses applyBlockEdit/d2ApplyBufferEdit entirely (it
+                // mutates the CRDT Buffer directly via the undo stack), so it
+                // must repeat their "++blockEditSequences[block]" bookkeeping
+                // itself — otherwise InlineParseCache (keyed on (BlockId,
+                // blockEditSequence)) sees no change and keeps serving spans
+                // parsed from the PRE-undo text. Reported as a Corbomite
+                // Cluster K bug: undoing a paste left the following plain
+                // text still styled as a link, hover naming the now-gone
+                // pasted content, until an unrelated edit to the same block
+                // finally bumped the sequence and forced a re-parse.
+                ++d->blockEditSequences[t.blockId];
             } else if constexpr (std::is_same_v<T, UndoCrdtTarget::IdListT>) {
                 if (forward) d->idList.redo();
                 else         d->idList.undo();
@@ -2109,6 +2120,24 @@ void MarkoffDocument::materializeBlocksFromParsedDoc(const Markoff::Document &pa
             buf->apply_local_edit({{0, 0}}, {content.toStdString()});
         d->blockBuffers.emplace(newId, std::move(buf));
         d->blockLoadTimeBytes[newId] = content;
+        d->bufferProxies[newId] = new BufferProxy(newId, this);
+    }
+
+    // If the parsed body produced zero blocks (a genuinely empty file, e.g.
+    // a freshly created note), synthesize one empty Paragraph block. Callers
+    // throughout the view layer assume a document always has at least one
+    // block to place a caret in; without this, a brand-new empty note loads
+    // with a null caret and swallows every keystroke (canvas's
+    // View::keyPressEvent bails whenever m_caret.block.isNull()). Mirrors
+    // applyFlatEdit's own "auto-create one paragraph block" handling of the
+    // empty-document edge case, just on the load ingress instead of the
+    // interactive one.
+    if (d->idList.size() == 0) {
+        BlockId newId = allocateD2BlockId();
+        d->idList.insert_after(lastAnchor, newId.raw());
+        d->kindTagMap.setWithNextStamp(newId, BlockKind::Paragraph);
+        d->blockBuffers.emplace(newId, std::make_unique<CollabText::Crdt::Buffer>(d->replicaId));
+        d->blockLoadTimeBytes[newId] = QByteArray();
         d->bufferProxies[newId] = new BufferProxy(newId, this);
     }
 }
