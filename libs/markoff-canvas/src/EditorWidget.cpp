@@ -205,11 +205,14 @@ void EditorWidget::setDocument(Markoff::MarkoffDocument *doc)
     if (doc) {
         m_docDestroyedCon = QObject::connect(doc, &QObject::destroyed, this, [this] {
             // Retire-on-destroy (INVARIANTS #3): don't dereference a freed
-            // document from any base accessor. Qualified call avoids
-            // re-entering our own setDocument (which would touch the dying
-            // document's session).
+            // document from any base accessor OR the composed View (which
+            // holds its own raw pointer — resize/paint after destroy was a
+            // UAF). Qualified MarkdownView::setDocument avoids re-entering
+            // our override (which would touch the dying document's session).
             m_session = nullptr;
             m_view->setSession(nullptr);
+            m_view->setDocument(nullptr);
+            m_actionController->setDocument(nullptr);
             Markoff::MarkdownView::setDocument(nullptr);
         });
         m_session = doc->createSession();

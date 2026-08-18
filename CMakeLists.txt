@@ -68,11 +68,17 @@ if(NOT TARGET collabtext)
 endif()
 
 add_subdirectory(libs/markoff-core)
-# jkqtmathtext — LaTeX math rendering for Math blocks in markoff-live.
+# jkqtmathtext — LaTeX math rendering for Math blocks (canvas / styled / live).
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)
 endif()
-add_subdirectory(libs/markoff-live)
+# MARKOFF_BUILD_LIVE — QML LivePreview leaf. Corbomite sets this OFF
+# (Cluster K Phase 5: canvas is the sole LivePreview engine). Standalone
+# Markoff builds keep the default ON so the leaf remains available there.
+option(MARKOFF_BUILD_LIVE "Build markoff-live (QML LivePreview leaf)" ON)
+if(MARKOFF_BUILD_LIVE)
+    add_subdirectory(libs/markoff-live)
+endif()
 add_subdirectory(libs/markoff-source)
 add_subdirectory(libs/markoff-styled)
 add_subdirectory(libs/markoff-canvas)
@@ -87,8 +93,11 @@ else()
     set(_MARKOFF_BUILD_APPS_DEFAULT OFF)
 endif()
 option(MARKOFF_BUILD_APPS "Build Markoff demo apps (markoff-collab-testapp, etc.)" ${_MARKOFF_BUILD_APPS_DEFAULT})
-if(MARKOFF_BUILD_APPS)
+# Demo apps currently link markoff_live; skip them when LIVE is OFF.
+if(MARKOFF_BUILD_APPS AND MARKOFF_BUILD_LIVE)
     add_subdirectory(apps)
+elseif(MARKOFF_BUILD_APPS AND NOT MARKOFF_BUILD_LIVE)
+    message(STATUS "MARKOFF_BUILD_APPS ignored because MARKOFF_BUILD_LIVE=OFF")
 endif()
 unset(_MARKOFF_BUILD_APPS_DEFAULT)
 
