@@ -17,7 +17,8 @@ private:
     uint64_t m_raw = 0;
 };
 
-inline size_t qHash(const BlockId &id, size_t seed) noexcept {
+// seed defaults to 0 so Qt 6.9+ qHashMulti (1-arg qHash calls) still compiles.
+inline size_t qHash(const BlockId &id, size_t seed = 0) noexcept {
     return ::qHash(id.raw(), seed);
 }
 

@@ -18,7 +18,8 @@ struct BlockAttrKey {
     bool operator==(const BlockAttrKey &) const = default;
 };
 
-inline size_t qHash(const BlockAttrKey &k, size_t seed) noexcept {
+// seed defaults to 0 so Qt 6.9+ qHashMulti (1-arg qHash calls) still compiles.
+inline size_t qHash(const BlockAttrKey &k, size_t seed = 0) noexcept {
     return qHashMulti(seed, k.block, k.name);
 }
 
