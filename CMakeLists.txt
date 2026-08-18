@@ -55,7 +55,7 @@ endif()
 
 add_subdirectory(libs/markoff-parser)
 
-# collabtext — CRDT engine, vendored as a git submodule (git@codeberg.org:clintonthegeek/collabtext.git).
+# collabtext — CRDT engine, vendored as a git submodule (git@github.com:clintonthegeek/collabtext.git).
 # Defensive guard against double-add by parent projects.
 if(NOT TARGET collabtext)
     if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/collabtext/CMakeLists.txt")

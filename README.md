@@ -7,7 +7,7 @@ editing the same document object, swappable at runtime through a common
 `Markoff::MarkdownView` base.
 
 Extracted from, and primarily consumed by, the
-[Corbomite](https://codeberg.org/clintonthegeek/Corbomite) note-taking
+[Corbomite](https://github.com/clintonthegeek/Corbomite) note-taking
 app, but designed as a reusable widget library.
 
 ## What's novel here
