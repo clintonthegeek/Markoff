@@ -17,7 +17,17 @@ Goal: make `Markoff::Canvas::View` usable with a screen reader.
 
 - **Spec (normative):**
   [`specs/2026-08-19-g1-canvas-accessibility-design.md`](specs/2026-08-19-g1-canvas-accessibility-design.md)
-- **Plan:** not yet written — next session's task.
+- **Plan (do the topmost unchecked task):**
+  [`plans/2026-08-19-g1-canvas-accessibility.md`](plans/2026-08-19-g1-canvas-accessibility.md)
+  — phases A1 (tree/roles/registration), A2 (text interface),
+  A3 (notifications), A4 (folding/actions), A5 (acceptance); user
+  gate A-G1 = when to run the Orca pass. First task is **A1.0**, a
+  throwaway probe settling whether `QAccessible::Attribute::Level`
+  survives Qt's AT-SPI bridge.
+- **Platform notes (spec §4.6):** the AT-SPI bridge lives inside
+  `libQt6Gui` (no plugin to install); Orca is not installed yet
+  (`extra/orca 50.2-1`); `ROLE_BLOCK_QUOTE` and `ROLE_MATH` are
+  unreachable from Qt — stated limitations.
 - **Scope decision (user, 2026-08-19):** per-block accessibility tree
   (`View` as `QAccessible::Document` container, one text-interface
   child per block over its own buffer) — chosen over a monolithic

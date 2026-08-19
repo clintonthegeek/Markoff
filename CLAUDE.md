@@ -32,8 +32,10 @@ exactly what **C4 forbids** — it would have needed a constitutional
 amendment, not just more weeks. Acceptance: in-process offscreen
 tests (the ratchet) plus one manual Orca pass at arc close (needs
 `--direct` permission). Tables and theme-side a11y are decided out
-(spec §6, §1). **No plan exists yet — writing it is the next
-session's task** before any implementation starts.
+(spec §6, §1). Plan:
+[`docs/plans/2026-08-19-g1-canvas-accessibility.md`](docs/plans/2026-08-19-g1-canvas-accessibility.md)
+— phases A1–A5, gate A-G1. **Start at A1.0** (throwaway probe: does
+`QAccessible::Attribute::Level` survive Qt's AT-SPI bridge?).
 
 **Standstill:** with the canvas production arc closed, `markoff-core`
 and `libs/markoff-canvas/` are open again for ordinary work (not

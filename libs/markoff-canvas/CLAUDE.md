@@ -31,8 +31,11 @@ constitution clean.
 [`docs/specs/2026-08-19-g1-canvas-accessibility-design.md`](../../docs/specs/2026-08-19-g1-canvas-accessibility-design.md)
 — per-block a11y tree, not a flat `QAccessibleTextInterface` (the
 flat one's whole-document offset space violates **C4**; see spec §2).
-Plan not yet written. The four hard rules below still govern; a11y
-work needs no exception to any of them.
+Plan (do the topmost unchecked task):
+[`docs/plans/2026-08-19-g1-canvas-accessibility.md`](../../docs/plans/2026-08-19-g1-canvas-accessibility.md).
+The four hard rules below still govern — and a11y work needs **no**
+exception to any of them. If a task seems to, you are doing it wrong:
+stop and log.
 
 ## The four hard rules (constitution — now permanent law, spec §3)
 

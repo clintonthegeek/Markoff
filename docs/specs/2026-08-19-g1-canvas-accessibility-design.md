@@ -10,7 +10,8 @@ task decomposition deferred to the plan.
 spike spec ([`2026-08-13-markoff-canvas-spike-design.md`](2026-08-13-markoff-canvas-spike-design.md))
 §5 and §9 — "the largest unpriced item", "no accessibility work of any
 kind exists in this tree".
-**Plan:** not yet written. This spec is the input to it.
+**Plan:** [`../plans/2026-08-19-g1-canvas-accessibility.md`](../plans/2026-08-19-g1-canvas-accessibility.md)
+— phases A1–A5, user gate A-G1 (when to run the Orca pass).
 
 ---
 
@@ -56,9 +57,12 @@ urgent in principle:
   Gaps found here are bugs against existing contracts, not this arc.
 - **i18n / `tr()` beyond existing convention.** Accessible names use
   `tr()` like everything else; no new i18n machinery.
-- **A public a11y API for embedders.** The `QAccessible` factory is
-  registered internally; consumers get it by using the widget. No new
-  header in `include/markoff/canvas/`.
+- **A public a11y API for embedders** — with **one deliberate
+  exception** (user decision 2026-08-19, see §9 Q2): `View` /
+  `EditorWidget` gain an `accessibleDocumentName` property pair, because
+  only the embedder knows what the document is called. No new header
+  in `include/markoff/canvas/`; the `QAccessible` factory stays
+  internal and consumers otherwise get a11y just by using the widget.
 
 ## 2. The constitutional problem, and why it decides the shape
 
@@ -151,21 +155,28 @@ Two accessible classes, both new, both private to the leaf
 
 ### 4.2 `BlockKind` → `QAccessible::Role`
 
-`BlockKind` (core, 11 values) maps as:
+`BlockKind` (core, 11 values) maps as below. The third column is what
+Qt's AT-SPI bridge actually puts on the wire — verified against
+`qspiaccessiblebridge.cpp`'s mapping table upstream (see §4.6), not
+assumed:
 
-| `BlockKind` | Role | Notes |
-|---|---|---|
-| `Paragraph` | `Paragraph` | |
-| `Heading` | `Heading` | level from the block's `Level` attr → `QAccessible::Level`-equivalent via attributes |
-| `CodeBlock` | `EditableText` | no dedicated code role in Qt; language goes in the description |
-| `ListItem` | `ListItem` | checked state from the `Checked` attr → `state().checkable`/`checked` |
-| `BlockQuote` | `Section` | |
-| `HorizontalRule` | `Separator` | no text interface |
-| `Image` | `Graphic` | name from `View::mediaLabelFor(id)`; no text interface |
-| `Math` | `StaticText` | name is the source; rendered glyph is not readable |
-| `Mermaid` | `Graphic` | name from `mediaLabelFor(id)` |
-| `HtmlBlock` | `EditableText` | raw source is what the user edits |
-| `Table` | `Table` | **see §6 — deferred** |
+| `BlockKind` | `QAccessible::Role` | → AT-SPI | Notes |
+|---|---|---|---|
+| `Paragraph` | `Paragraph` | `ROLE_PARAGRAPH` | |
+| `Heading` | `Heading` | `ROLE_HEADING` | level: see §4.6, **does not reach Orca as an attribute** |
+| `CodeBlock` | `EditableText` | `ROLE_TEXT` | no code role in Qt; language goes in the description |
+| `ListItem` | `ListItem` | `ROLE_LIST_ITEM` | checked state from the `Checked` attr → `state().checkable`/`checked` |
+| `BlockQuote` | `Section` | `ROLE_SECTION` | `ROLE_BLOCK_QUOTE` exists in AT-SPI but is **unreachable from Qt** (§4.6) |
+| `HorizontalRule` | `Separator` | `ROLE_SEPARATOR` | no text interface |
+| `Image` | `Graphic` | `ROLE_IMAGE` | name from `View::mediaLabelFor(id)`; no text interface |
+| `Math` | `StaticText` | `ROLE_LABEL` | `ROLE_MATH` is **unreachable from Qt** (§4.6); name is the source |
+| `Mermaid` | `Graphic` | `ROLE_IMAGE` | name from `mediaLabelFor(id)` |
+| `HtmlBlock` | `EditableText` | `ROLE_TEXT` | raw source is what the user edits |
+| `Table` | `Table` | `ROLE_TABLE` | **see §6 — deferred** |
+| *(footnote def)* | `Section` | `ROLE_SECTION` | `ROLE_FOOTNOTE` has no Qt role either |
+
+Container: `QAccessible::Document` → `ROLE_DOCUMENT_FRAME`, which is
+what Orca treats as a navigable document. Correct choice, confirmed.
 
 Blocks with no text interface (`HorizontalRule`, `Image`, `Mermaid`)
 implement `QAccessibleInterface` only and return `nullptr` from
@@ -210,6 +221,51 @@ per-block children follows Qt's `QAccessibleCache` convention: block
 accessibles are created on demand and keyed by `BlockId`, and
 `QAccessible::deleteAccessibleInterface` is called when a block is
 removed from the document.
+
+### 4.6 Platform findings (researched 2026-08-19, local Qt 6.11.1 / at-spi2-core 2.60.6)
+
+Checked against the installed system and Qt's upstream bridge sources
+rather than assumed. Four results, two of which constrain the design:
+
+1. **The AT-SPI bridge is compiled into `libQt6Gui`, not shipped as a
+   plugin.** There is no `plugins/accessiblebridge/` directory on this
+   machine, which initially looked like a missing dependency; but
+   `QSpiAccessibleBridge::*` symbols are exported from
+   `/usr/lib/libQt6Gui.so.6`. **Nothing needs installing for the
+   bridge to work** — do not go hunting for a plugin package.
+2. **Orca is not installed** (`extra/orca 50.2-1` is available).
+   The arc-close manual pass needs `pacman -S orca` first. Not a
+   blocker, just a prerequisite to schedule.
+3. **⚠ `QAccessible::Attribute::Level` appears not to reach AT-SPI.**
+   The enum exists in Qt 6.11 (`qaccessible_base.h:381`, values
+   `Custom`/`Level`/`Locale`/`Orientation`), so the obvious answer to
+   "how do we expose heading level" is `QAccessibleAttributesInterface`.
+   But reading `atspiadaptor.cpp` upstream, only `Orientation` and
+   `Locale` appear to be converted to AT-SPI object attributes —
+   `Level` seems to be silently dropped on this platform.
+   **This is not yet confirmed** (the source read was indirect and one
+   earlier pass over the same file returned a wrong answer), so it is
+   written here as a *suspicion with a cheap empirical test*, not a
+   fact. Plan task **A1.0** settles it by probing a real bridge. If
+   confirmed: implement `attributesInterface()` anyway (correct, and
+   it works on other platforms), **and** carry the level in the
+   accessible description so Orca users still hear it. A Qt upstream
+   bug is worth filing either way.
+4. **Two AT-SPI roles Markdown wants are unreachable from Qt:**
+   `ROLE_BLOCK_QUOTE` and `ROLE_MATH` both exist in
+   `atspi-constants.h` but no `QAccessible::Role` maps to them, so
+   `Section` and `StaticText`(→`ROLE_LABEL`) are the best available.
+   Stated limitation, not a defect in this design; also worth an
+   upstream report.
+
+**What at-spi2-core did and did not answer.** Its headers are the
+authoritative role and interface list (used above), and confirm which
+roles exist. It does *not* describe what Orca chooses to announce —
+that lives in Orca's own source. The practical consequence: the role
+and interface choices here can be settled statically, but "does a
+screen reader actually read this usefully" cannot, which is precisely
+why §3 keeps a real Orca pass in the acceptance criteria rather than
+relying on protocol conformance alone.
 
 ## 5. Realization and cost
 
@@ -309,16 +365,20 @@ it should pin down.
    delete a block while an AT client holds its interface. Qt's cache
    handles the pointer, but the eviction *trigger* needs picking —
    most likely `View::onDocumentChanged` diffing the id list.
-2. **Accessible name for untitled documents.** `inlineTitle()` is
-   optional and Corbomite may not set it. Fall back to the file name?
-   Canvas does not know one. Probably a generic `tr()` string plus a
-   settable property — but adding a property contradicts §1's "no new
-   public API", so this needs a call.
-3. **Heading level exposure.** Qt has no first-class heading-level
-   accessor on `QAccessibleInterface`; it goes through
-   `QAccessibleAttributesInterface` (Qt 6.8+) or the role hierarchy.
-   Confirm what Orca actually reads before picking. (Local Qt is
-   6.11.1, so the attributes interface is available.)
+2. ~~**Accessible name for untitled documents.**~~ **Resolved by user
+   2026-08-19: extend the public API.** `View` (and `EditorWidget`)
+   gain `setAccessibleDocumentName(const QString &)` /
+   `accessibleDocumentName()`. Resolution order for the container's
+   `QAccessible::Name`: explicit `accessibleDocumentName()` →
+   `inlineTitle()` → a generic `tr("Markdown document")`. This
+   **amends §1's "no new public API" non-goal**, deliberately: the
+   embedder is the only party that knows the document's identity, so
+   there has to be a way to tell us. Scoped to that one property pair
+   — it is not licence for a broader a11y API.
+3. **Heading level exposure.** Partially answered — see §4.6 finding
+   3. `QAccessible::Attribute::Level` is the right mechanism and
+   exists in Qt 6.11, but the AT-SPI bridge appears to drop it.
+   Task A1.0 confirms empirically and picks the fallback.
 4. **Phase count.** Provisionally: A1 tree + roles + registration,
    A2 text interface, A3 notifications, A4 folding + actions,
    A5 realization-bound test + Orca pass. The plan decides.
