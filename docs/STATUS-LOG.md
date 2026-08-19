@@ -9,6 +9,171 @@ their banner, not the present.
 
 ---
 
+> **2026-08-19 — canvas production arc board (CLOSED), moved off the live board.**
+>
+> Verbatim STATUS.md workfront section for the canvas production
+> arc (D5 part 1), moved here when the board was reset for the G1
+> accessibility arc. All three gates decided: G1 deferred then
+> reopened (see the 2026-08-19 a11y spec), G2 done 2026-08-18, G3
+> retired `markoff-live`. Arc-close baseline 315/315. Claims below
+> reflect 2026-08-15, not the present.
+
+## Workfront (CLOSED) — canvas production arc (D5 part 1)
+
+User-opened 2026-08-13, same day the spike closed PASS. Goal: take
+`libs/markoff-canvas` to feature parity (Corbomite contract v2, old-leaf
+parity, Obsidian Live Preview benchmark, collab rendering surface).
+
+- **Spec (normative):**
+  [`specs/2026-08-13-canvas-production-design.md`](specs/2026-08-13-canvas-production-design.md)
+- **Plan (do the topmost unchecked task):**
+  [`plans/2026-08-13-canvas-production-plan.md`](plans/2026-08-13-canvas-production-plan.md)
+  — phases P1–P7, user gates G1 (a11y scope), G2 (Corbomite adoption),
+  G3 (retirement decision). Phase 1 (core promotions) closed
+  2026-08-13 at P1.5; Phase 2 (projection map) closed 2026-08-14 at
+  P2.4 (perf re-baseline, all E9 budgets held); Phase 3 (MarkdownView
+  contract v2) closed 2026-08-14 at P3.7; Phase 4 (inline/text parity)
+  closed 2026-08-14 at P4.8; Phase 5 (block parity) closed 2026-08-14
+  at P5.7 (perf re-baseline held). Phase 6 (collaboration surface)
+  opened and closed 2026-08-14: P6.0 (core anchor seam + fold retro-
+  wire to Session, reduced scope — see plan findings log), P6.1
+  (Session caret authority closure), P6.2 (remote presence rendering —
+  caret bar, name flag, selection tint), P6.3 (IME-vs-concurrent-
+  remote-edit + seeded gremlin fuzz convergence test — no C1/C2
+  workaround needed, both tests passed on the first run), P6.4 (⏸
+  phase close, full suite 310/310). **G1 decided 2026-08-14: user
+  deferred accessibility** — P7.1 skipped for this arc, canvas ships
+  with no a11y support this arc (explicit, logged gap, not an
+  oversight). P7.2 (drag-drop + middle-click paste) landed the same
+  day: text drag out (Copy while read-only, Copy+Move once editable —
+  self-drop Move is treated as a copy, logged decision, see plan
+  findings log), text/file drag in (text routes through the same
+  `insertText()` `paste()` uses; file drops emit
+  `EditorWidget::fileDropped(urls, viewportPos)`, Corbomite decides
+  embed-vs-link), and X11 primary-selection middle-click paste
+  (no-op under this leaf's offscreen test environment, which has no
+  platform clipboard integration — real behavior can't be exercised
+  here, only the guard path). User then directed F1 gap closure
+  (P7.2a-g, 2026-08-14): **P7.2a (undo-coalescing defect, F1 #3)**
+  landed same day — `View::insertPrintable` now routes each typed
+  character through `Cmd::insertCharacter`, so printable-only,
+  same-block runs within 1000ms coalesce into one undo entry
+  (`UndoLog::maybeCoalesceOrTransaction`) instead of one entry per
+  keystroke; surrogate-pair codepoints (emoji) fall back to a direct
+  `maybeCoalesceOrTransaction` call with `isPrintable=false` to avoid
+  the QChar-only signature's data-loss trap (see plan findings log).
+  No core change needed. **P7.2b (editing-command floor, F1 #1)**
+  landed same day: word-wise motion + selection (Ctrl+Left/Right,
+  Ctrl+Shift+Left/Right — `QTextBoundaryFinder`, same idiom
+  `markoff-live` already uses, not hand-rolled), word-wise delete
+  (Ctrl+Backspace/Delete), document start/end (Ctrl+Home/End, now
+  moving the caret in addition to the pre-existing scroll-to-extreme),
+  delete-line (Ctrl+Shift+K — clears the block's content), move-line
+  up/down (Alt+Up/Alt+Down — a content swap between adjacent
+  `BlockId`s, since core's `StructuralOp`/`IdList` has no reorder
+  primitive; logged, not a core change), select-line (Alt+L), and Esc
+  simplify-selection. New test `tst_canvas_editing_command_floor` (4
+  falsification-backed scenario groups). P7.2b's agent found
+  `tst_canvas_concurrency`'s gremlin-fuzz convergence test failing
+  deterministically and mis-logged it as pre-existing; independently
+  re-bisected and **fixed same day**: a latent `UndoLog` bug (coalesced
+  transactions never fired `onCommit`, silently dropping ops to collab
+  peers after a run's first keystroke) made reachable for the first
+  time by P7.2a's routing change (commit `623ed6ca`; see Dormant items
+  and the plan findings log's "Regression fix" entry for the full
+  writeup). **P7.2c (auto-pairing/wrap-selection, F1 #4)** landed
+  2026-08-15: 5 named pairs, view-local freshness tracking
+  (`m_autoPairedClose`), insertion routed through the same
+  `insertPrintable`/`Cmd::insertCharacter` machinery the regression
+  fix lives in (deliberately, to not reintroduce that bug class) — see
+  plan findings log. **P7.2d (Enter/Backspace semantics checklist,
+  F1 #5)** landed 2026-08-15, test-only: diffed `StructuralKeyHandler`
+  against CodeMirror lang-markdown's `insertNewlineContinueMarkup`/
+  `deleteMarkupBackward` case by case. 3 of 4 documented cases already
+  correct — 2 had no direct regression test (ordered-list renumber on
+  mid-split; empty-nested-item outdent) and got one each; the 3rd
+  (blockquote continuation losing quote depth) is a pre-existing,
+  already-logged follow-up (`docs/plans/2026-05-29-styled-structural-
+  key-authority.md:670`), re-confirmed not re-fixed. The 4th case is a
+  **real, found gap left unfixed on purpose**: CM's Backspace at an
+  indent-0 list item's content-start de-lists the line without
+  touching the previous block; ours instead merges into the previous
+  block via `Cmd::backspaceMerge` — existing, deliberately-tested
+  behavior (`listitem_backspace_at_start_indent0_merges`), not a fresh
+  regression, and changing it would flip a shared core handler's
+  documented behavior against its own test's name — logged as a
+  dormant item (below) rather than changed unilaterally. No core
+  source change landed. **User decided same day: switch to CM's
+  de-list-in-place semantics** — implemented and closed, see Dormant
+  items below. **P7.2e (highlight selection occurrences, F1 #7)**
+  landed 2026-08-15: a non-trivial (min length 2), non-whitespace-only
+  selection gets every OTHER exact-text occurrence in the realized
+  entries painted with a new `Theme::Slot::SelectionOccurrenceBackground`
+  (green, distinct from both the active selection's blue and find's
+  orange), via `View::recomputeOccurrenceHighlights()` hooked into the
+  existing `pushSelectionToSession()` chokepoint — same draw-time
+  `QTextLayout::FormatRange` mechanism `setFindHighlights` established.
+  Realized-entries-only scope (matches every other paint-time
+  highlight feature in this leaf); case-sensitive, no whole-word
+  requirement (CM `highlightSelectionMatches` defaults). **P7.2f
+  (scroll-past-end + placeholder + bracket-match + drop-cursor, F1
+  #8/#10)** landed 2026-08-15: 4 small, independent visual additions.
+  Scroll-past-end adds bottom scroll padding (viewport height minus
+  one line) once a document already needs scrolling, so the last line
+  can reach the viewport's top instead of stopping at its bottom edge
+  — guarded so a short, already-fully-visible document gains no
+  spurious scroll range. The empty-document placeholder
+  (`tr("Start typing…")`, reused `Theme::Slot::Quote`) is gated on
+  document emptiness alone, deliberately **not** view focus — CM's own
+  `placeholder.ts` source gates purely on document length, confirmed
+  by reading it rather than copying this same file's own
+  focus-gated title-band placeholder convention. Bracket-match
+  highlight scans the caret's own block only (C4) for the bracket
+  matching the one adjacent to the caret, honoring nesting depth, in a
+  new `Theme::Slot::BracketMatchBackground`. The P7.2 drag-drop
+  handlers gained a dashed drop-cursor indicator (`Theme::Slot::
+  CursorPrimary`, re-hit-tested on every drag move, never cached).
+  **P7.2g (invisible/control-char rendering, F1 #9)** landed 2026-08-15
+  — the last of the 7 user-directed F1 gap-closure sub-tasks (all now
+  ☑). C0 controls/DEL get Unicode Control Picture glyphs; C1 controls,
+  soft hyphen, ZWSP, LRM/RLM, BOM, and the safety-relevant bidi
+  override/isolate controls (U+202D/E, U+2066–9) get a boxed-hex
+  Private-Use sentinel (U+E000, new `Theme::Slot::InvisibleCharBox`).
+  The bidi subset is **neutralized at the substitution point**, not
+  merely painted over — U+E000 defaults to bidi class L, so it never
+  reaches `QTextLayout`'s bidi algorithm; the boxed label is the
+  visible warning on top of an already-safe substitution. Phase 7
+  continues at P7.3 (⏸ arc close). **P7.3 closed 2026-08-15**: full
+  suite 315/315, perf budgets held (build-perf: load→paint 128ms/500ms,
+  p95 keystroke 0.64ms/16ms, scroll-realize 9%/30%, RSS delta 0KB/100MB
+  — no regression despite P7.2a-g's typing/paint-path churn), whole-leaf
+  constitution honest read clean, F1 parity audit done (all 12 gaps
+  closed, not waived). **The canvas production arc (D5 part 1) closed
+  pending G2** — see the one-page summary delivered alongside this
+  close. **G2 UPDATE (2026-08-19):** Corbomite's Cluster K Phase 5
+  (2026-08-18, their commit `7a6f18a4`) made
+  `Markoff::Canvas::EditorWidget` the sole LivePreview engine and force-
+  disabled `MARKOFF_BUILD_LIVE` from their build — G2 is done, recorded
+  here a day late per their handoff
+  (`docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md`).
+  **G3 decided the same day, scoped to `markoff-live` only:** retired
+  (zero downstream consumers left); `MARKOFF_BUILD_LIVE` now defaults
+  OFF, source stays in-tree build-fix-only, tag
+  `archive/markoff-live-final` marks the last default-ON commit;
+  `markoff-styled` is untouched by this decision (still backs
+  Corbomite's Reading mode). The arc is now fully closed; the whole
+  tree is out of standstill and open for self-directed work again
+  (see CLAUDE.md).
+
+Standstill from this opening is now lifted (arc closed 2026-08-19,
+see above): `markoff-core` and `markoff-canvas` are open for ordinary
+work again, not restricted to plan-named seams. `markoff-styled` stays
+bug-fix-only (backs Corbomite Reading mode); `markoff-source` stays
+untouched, permanently; `markoff-live` is retired (G3, above). Queue
+**#18** is absorbed into the plan (P1.1, P2.1–P2.3 done).
+
+
+
 > **2026-08-13 — Contract-v2 arc + Corbomite adoption closed; canvas spike opens.**
 >
 > Superseded STATUS.md body, moved here when the board was reset for the

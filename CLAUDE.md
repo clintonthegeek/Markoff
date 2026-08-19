@@ -86,8 +86,9 @@ explicitly changed.
 
 ## Layout (one line each)
 
-- `libs/markoff-canvas` — **ACTIVE:** projection view spike. Own
-  `CLAUDE.md`.
+- `libs/markoff-canvas` — **ACTIVE:** the primary editing leaf
+  (production arc closed 2026-08-15; current workfront is G1
+  accessibility). Own `CLAUDE.md`.
 - `libs/markoff-core` — foundation: `MarkoffDocument` (per-block CRDT
   buffers + `IdList` order + LWW maps), `Cmd::*`, `UndoLog`,
   `StructuralKeyHandler` (pure), `FindController`, `Theme`,

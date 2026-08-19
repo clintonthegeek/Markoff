@@ -1,10 +1,16 @@
 # Work queue
 
 > Dormant work items + the append-only Discipline Log. **The active
-> workfront (canvas spike) is NOT tracked here** — see
-> [`docs/plans/2026-08-13-markoff-canvas-spike.md`](plans/2026-08-13-markoff-canvas-spike.md).
-> Nothing in this file is to be worked while the spike standstill is in
-> effect, except bug fixes that a failing test forces.
+> workfront is NOT tracked here** — it is G1 canvas accessibility, see
+> [`docs/plans/2026-08-19-g1-canvas-accessibility.md`](plans/2026-08-19-g1-canvas-accessibility.md)
+> and [`docs/STATUS.md`](STATUS.md).
+>
+> **Standstill (updated 2026-08-19):** the canvas-spike/production
+> standstill that used to gate this file is **lifted** — `markoff-core`
+> and `markoff-canvas` are open for ordinary work. Items here are still
+> dormant by default (the a11y arc is the priority), but they are no
+> longer forbidden. `markoff-styled` remains bug-fix-only,
+> `markoff-source` untouched, `markoff-live` retired.
 >
 > **Trimmed 2026-08-13** for the canvas-spike reset: all struck
 > Discipline-Log entries and closed items #8/#10/#11/#12/#14/#15/#16
