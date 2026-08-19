@@ -148,7 +148,7 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P6.2 Remote presence rendering (carets, tints, flags) | ☑ | `d920c694` (+ test fix `b8f2fff4`) | `df42c919`/`b11122fb` |
 | P6.3 Remote-edit-mid-IME + concurrency torture tests | ☑ | `1298488c` | A: `2ef531e6`/`5fbbc5c8`; B: `6fa35e12`/`321eb61f` |
 | P6.4 ⏸ phase close | ☑ | n/a | n/a |
-| **G1 — user gate: accessibility scope** | ☑ deferred 2026-08-14 | — | — |
+| **G1 — user gate: accessibility scope** | ☑ deferred 2026-08-14; **reopened + decided 2026-08-19** — per-block a11y tree, own arc, see [`../specs/2026-08-19-g1-canvas-accessibility-design.md`](../specs/2026-08-19-g1-canvas-accessibility-design.md) | — | — |
 | **P7 — polish + a11y** | | | |
 | P7.1 Accessibility (per G1) | ⏭ deferred — see G1 | n/a | n/a |
 | P7.2 Drag-drop + middle-click paste | ☑ | `565aeee1` (+ comment fix `2131929e`) | A: `056f9215`/`504fbc4f`; B: `67c2d433`/`1254a421`; C: `b285a6e7`/`f9e7e2c9` |

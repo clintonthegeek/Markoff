@@ -20,13 +20,20 @@ untouched by that decision. Full context on both gates:
 [`docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md`](docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md)
 (Corbomite's handoff that prompted recording them).
 
-**Next workfront: G1, the deferred accessibility scope for
-`libs/markoff-canvas`.** The open question per spec §8 is unchanged
-since deferral: full `QAccessibleTextInterface` support vs. basic
-role/name only. No spec or plan exists yet for this — drafting one
-(scope decision first, via `superpowers:brainstorming` per this
-repo's convention for new spec work) is the next session's task
-before any implementation starts.
+**Current workfront: G1 accessibility for `libs/markoff-canvas`.**
+Gate decided 2026-08-19; spec drafted:
+[`docs/specs/2026-08-19-g1-canvas-accessibility-design.md`](docs/specs/2026-08-19-g1-canvas-accessibility-design.md).
+**Shape: a per-block accessibility tree** — `View` is a
+`QAccessible::Document` container, each block a child implementing
+`QAccessibleTextInterface` over its own buffer. This was chosen over
+the monolithic flat `QAccessibleTextInterface` the old §8 framing
+implied, because that interface's whole-document offset space is
+exactly what **C4 forbids** — it would have needed a constitutional
+amendment, not just more weeks. Acceptance: in-process offscreen
+tests (the ratchet) plus one manual Orca pass at arc close (needs
+`--direct` permission). Tables and theme-side a11y are decided out
+(spec §6, §1). **No plan exists yet — writing it is the next
+session's task** before any implementation starts.
 
 **Standstill:** with the canvas production arc closed, `markoff-core`
 and `libs/markoff-canvas/` are open again for ordinary work (not

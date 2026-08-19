@@ -7,10 +7,32 @@
 
 **Last updated:** 2026-08-19 (canvas production arc CLOSED: G2 recorded
 done 2026-08-18, G3 decided for `markoff-live` — retired; E-arc
-formally closed; next workfront TBD — see CLAUDE.md "Current
-workfront")
+formally closed. **New workfront opened: G1 canvas accessibility**,
+spec drafted, plan pending.)
 
-## Workfront — canvas production arc (D5 part 1)
+## Workfront — G1 canvas accessibility
+
+User-opened 2026-08-19. G1 (deferred 2026-08-14) reopened and decided.
+Goal: make `Markoff::Canvas::View` usable with a screen reader.
+
+- **Spec (normative):**
+  [`specs/2026-08-19-g1-canvas-accessibility-design.md`](specs/2026-08-19-g1-canvas-accessibility-design.md)
+- **Plan:** not yet written — next session's task.
+- **Scope decision (user, 2026-08-19):** per-block accessibility tree
+  (`View` as `QAccessible::Document` container, one text-interface
+  child per block over its own buffer) — chosen over a monolithic
+  flat `QAccessibleTextInterface`, which would have required a **C4
+  amendment** for a whole-document offset space. Acceptance is
+  in-process offscreen tests plus one manual Orca pass at arc close.
+  Driver is Markoff's own roadmap, not a Corbomite deadline.
+- **Motivating gap:** canvas has zero a11y; source/styled inherit
+  Qt's for free, so G2 (canvas as Corbomite's sole LivePreview
+  engine) regressed Corbomite's editing surface.
+- **Decided out:** `QAccessibleTableInterface` (spec §6), theme-side
+  a11y — contrast/motion/font preferences (spec §1).
+- **Baseline:** 315/315, unchanged. Core is expected to need nothing.
+
+## Workfront (CLOSED) — canvas production arc (D5 part 1)
 
 User-opened 2026-08-13, same day the spike closed PASS. Goal: take
 `libs/markoff-canvas` to feature parity (Corbomite contract v2, old-leaf

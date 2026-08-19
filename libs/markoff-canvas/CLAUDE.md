@@ -21,11 +21,18 @@ Everything you need is in two files — read them in this order:
 Spike record (verdict + findings the plan cites):
 [`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](../../docs/specs/2026-08-13-markoff-canvas-spike-design.md).
 
-**Status (2026-08-15):** Phases P1–P6 closed; Phase 7 closing at
-P7.3 (arc close) — G1 (accessibility) deferred by user decision, all
-7 F1 CodeMirror-parity gaps (P7.2a–g) closed. Full suite 315/315,
-perf budgets held, constitution clean. G2 (Corbomite adoption) is the
-next open question, for the user.
+**Status (2026-08-19):** the production arc is **CLOSED** — P1–P7
+done, all three gates decided (G2 done 2026-08-18, G3 retired
+`markoff-live` 2026-08-19). Full suite 315/315, perf budgets held,
+constitution clean.
+
+**Current workfront: G1 accessibility.** Gate reopened and decided
+2026-08-19. Spec (normative for this arc):
+[`docs/specs/2026-08-19-g1-canvas-accessibility-design.md`](../../docs/specs/2026-08-19-g1-canvas-accessibility-design.md)
+— per-block a11y tree, not a flat `QAccessibleTextInterface` (the
+flat one's whole-document offset space violates **C4**; see spec §2).
+Plan not yet written. The four hard rules below still govern; a11y
+work needs no exception to any of them.
 
 ## The four hard rules (constitution — now permanent law, spec §3)
 
