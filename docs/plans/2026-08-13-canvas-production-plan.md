@@ -162,14 +162,26 @@ cases; license rule in the spike plan applies to any copied snippet).
 | P7.2f F1#8/#10 scroll-past-end + placeholder + bracket-match + drop-cursor | ☑ | `f722216b` (+ core `3f8cafb1`) | A: `1736c414`/`5a8725b1`; B: `4c54a080`/`33fd6383`; C: `4758653b`/`8aa40cf7`; D: `fc19e0b7`/`d6eee01f` |
 | P7.2g F1#9 invisible/control-char rendering | ☑ | `fca7a800` | A: `63bdcda5`/`8743e417`; B: `d409f7f2`/`fa7c2c4b` |
 | P7.3 ⏸ arc close: Obsidian parity audit + full audit | ☑ | n/a | n/a |
-| **G2 — user gate: Corbomite adoption** (work lands in Corbomite repo) | ☐ | — | — |
-| **G3 — user gate: retirement decision** (successor spec) | ☐ | — | — |
+| **G2 — user gate: Corbomite adoption** (work lands in Corbomite repo) | ☑ done 2026-08-18 (recorded 2026-08-19) | Corbomite `7a6f18a4` | — |
+| **G3 — user gate: retirement decision** (successor spec) | ☑ decided 2026-08-19, scoped to `markoff-live` only | Markoff `CMakeLists.txt` `MARKOFF_BUILD_LIVE` default → OFF | — |
 
-Floating task (do in any session once `~/src/codemirror` exists):
-**F1 — CodeMirror parity audit.** Diff spec §5.3's benchmark list
-against `@codemirror/*` + Obsidian-observable behavior; append
-gaps/corrections to the findings log; propose spec §5.3 edits rather
-than silently implementing extras.
+`markoff-live` retired 2026-08-19: zero downstream consumers left
+(Corbomite fully unlinked it in Cluster K Phase 5). Tag
+`archive/markoff-live-final` marks the last commit with the leaf in
+its normal default-ON state. Source stays in-tree, build-fix-only, as
+Markoff's own QML demo/regression surface — full deletion from
+`master` is a separate future decision, not made here.
+`markoff-styled` is explicitly **not** part of this decision — it
+still backs Corbomite's Reading mode and stays bug-fix-only pending
+its own, separate retirement question. See the Corbomite handoff
+`docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md`
+(mirrored from their repo) for the full case.
+
+Floating task (was: "do in any session once `~/src/codemirror`
+exists" — the tree now exists, and the audit already ran and closed):
+**F1 — CodeMirror parity audit.** ☑ CLOSED 2026-08-15. All 12 gaps
+found, closed via P7.2a–g (table above), not waived; see P7.3's arc
+close and `docs/STATUS.md`.
 
 ---
 

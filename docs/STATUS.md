@@ -5,7 +5,10 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-15 (canvas production arc — Phase 7 CLOSED, P7.3 arc close; G2 pending the user)
+**Last updated:** 2026-08-19 (canvas production arc CLOSED: G2 recorded
+done 2026-08-18, G3 decided for `markoff-live` — retired; E-arc
+formally closed; next workfront TBD — see CLAUDE.md "Current
+workfront")
 
 ## Workfront — canvas production arc (D5 part 1)
 
@@ -137,14 +140,29 @@ parity, Obsidian Live Preview benchmark, collab rendering surface).
   p95 keystroke 0.64ms/16ms, scroll-realize 9%/30%, RSS delta 0KB/100MB
   — no regression despite P7.2a-g's typing/paint-path churn), whole-leaf
   constitution honest read clean, F1 parity audit done (all 12 gaps
-  closed, not waived). **The canvas production arc (D5 part 1) is
-  complete pending the user's G2 (Corbomite adoption) decision** — see
-  the one-page summary delivered alongside this close.
+  closed, not waived). **The canvas production arc (D5 part 1) closed
+  pending G2** — see the one-page summary delivered alongside this
+  close. **G2 UPDATE (2026-08-19):** Corbomite's Cluster K Phase 5
+  (2026-08-18, their commit `7a6f18a4`) made
+  `Markoff::Canvas::EditorWidget` the sole LivePreview engine and force-
+  disabled `MARKOFF_BUILD_LIVE` from their build — G2 is done, recorded
+  here a day late per their handoff
+  (`docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md`).
+  **G3 decided the same day, scoped to `markoff-live` only:** retired
+  (zero downstream consumers left); `MARKOFF_BUILD_LIVE` now defaults
+  OFF, source stays in-tree build-fix-only, tag
+  `archive/markoff-live-final` marks the last default-ON commit;
+  `markoff-styled` is untouched by this decision (still backs
+  Corbomite's Reading mode). The arc is now fully closed; the whole
+  tree is out of standstill and open for self-directed work again
+  (see CLAUDE.md).
 
-Standstill after this opening (spec §7): canvas active; `markoff-core`
-open **only** for plan-named seams; live/styled bug-fix-only until G3;
-source untouched. Queue **#18** is absorbed into the plan (P1.1,
-P2.1–P2.3 done).
+Standstill from this opening is now lifted (arc closed 2026-08-19,
+see above): `markoff-core` and `markoff-canvas` are open for ordinary
+work again, not restricted to plan-named seams. `markoff-styled` stays
+bug-fix-only (backs Corbomite Reading mode); `markoff-source` stays
+untouched, permanently; `markoff-live` is retired (G3, above). Queue
+**#18** is absorbed into the plan (P1.1, P2.1–P2.3 done).
 
 ## Test baseline
 
@@ -241,6 +259,17 @@ tier rule same as P7.2e/P7.2f, but no new test executable — extended
 `tst_canvas_projection` with 2 cases). Canvas-scoped suite still
 37/37. `check-constitution.sh` clean (C1–C4, 74 files). All 7 F1
 gap-closure sub-tasks (P7.2a–g) now complete.
+
+**Baseline reset 2026-08-19 (G3, `markoff-live` retired):**
+`MARKOFF_BUILD_LIVE` now defaults OFF, so the default
+`scripts/run-tests.sh` run no longer builds/registers the
+`markoff-live` test executables. Re-verified same day: **207/207
+(100%)** on a from-scratch `cmake -S . -B build-dev` + full build +
+full suite, default config. The 315/315 figure above remains accurate
+for a `-DMARKOFF_BUILD_LIVE=ON` build (source unchanged, build-fix-
+only) but is no longer the default-config baseline; future baseline
+figures in this doc are the default-config (LIVE-OFF) count unless
+stated otherwise.
 
 ## Dormant items
 
@@ -364,7 +393,8 @@ gap-closure sub-tasks (P7.2a–g) now complete.
   styled; frozen until then).
 - Release scaffolding — install/export rules + header tiering for a
   non-submodule consumer.
-- E-arc — dormant since 2026-05-25 (`docs/e-arc/`, closed board).
+- E-arc — CLOSED 2026-08-19 (formally retired, not merely dormant;
+  scope shipped under canvas Phase 5 — `docs/archive/e-arc/`).
 - Discipline-Log open smells — `docs/queue.md`.
 
 ## Corbomite pin

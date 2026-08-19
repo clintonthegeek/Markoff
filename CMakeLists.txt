@@ -72,10 +72,13 @@ add_subdirectory(libs/markoff-core)
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)
 endif()
-# MARKOFF_BUILD_LIVE — QML LivePreview leaf. Corbomite sets this OFF
-# (Cluster K Phase 5: canvas is the sole LivePreview engine). Standalone
-# Markoff builds keep the default ON so the leaf remains available there.
-option(MARKOFF_BUILD_LIVE "Build markoff-live (QML LivePreview leaf)" ON)
+# MARKOFF_BUILD_LIVE — QML LivePreview leaf. Retired 2026-08-19 (G3):
+# zero downstream consumers since Corbomite's Cluster K Phase 5 made canvas
+# the sole LivePreview engine. Default flipped OFF; the leaf's source stays
+# in-tree (build-fix-only, no new feature work) until a future session
+# deletes it outright — see docs/plans/2026-08-13-canvas-production-plan.md
+# G3 and tag archive/markoff-live-final for the last default-ON state.
+option(MARKOFF_BUILD_LIVE "Build markoff-live (QML LivePreview leaf, retired)" OFF)
 if(MARKOFF_BUILD_LIVE)
     add_subdirectory(libs/markoff-live)
 endif()

@@ -1,5 +1,23 @@
-# E-arc — Status Board
+# E-arc — Status Board (ARCHIVED)
 
+> **CLOSED 2026-08-19: E-arc formally retired, not merely dormant.**
+> Its remaining named scope — E3 (Obsidian affordances: wikilinks,
+> embeds, tags, callouts) and E5 (math/mermaid Live-mode parity) —
+> shipped instead under the canvas production arc's Phase 5
+> (P5.3 math, P5.4 image/embed/mermaid seams, P5.5 callouts/
+> frontmatter/footnote-defs, all closed 2026-08-15), under different
+> phase names, so "dormant, might resume" stopped being accurate the
+> moment that phase closed. Flagged by Corbomite's 2026-08-19 handoff
+> (`docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md`)
+> after their own punch-list was found citing this board's E3/E5 as
+> live blockers when the work was already shipped. E1–E2.6 and E4
+> remain complete+shipped per the 2026-06-09 disposition below (E3a's
+> `v0.7.0-e3a` and E4's `v0.7.0-e4` tags were never cut — not worth
+> retro-tagging now that the arc is closed). E6 (the distillation
+> phase) never started and never will under this name. This directory
+> moved from `docs/e-arc/` to `docs/archive/e-arc/` at closure; see
+> [`../../STATUS.md`](../../STATUS.md) for current status.
+>
 > **DISPOSITION — 2026-06-09: board closed; E-arc dormant.**
 > This board froze 2026-05-23 on the (now-deleted) `exploration/new-foundation`
 > branch and missed every commit since the 2026-05-25 master merge. Recorded
@@ -9,8 +27,8 @@
 > "quite usable") but the Phase H checklist was never executed and
 > `v0.7.0-e4` was never created.** E3b+/E5/E6 never started. The workfront
 > moved to the styled leaf / WP unification / flat-view binding 2026-05-26;
-> E-arc resumes only if live-leaf feature pressure returns. Live status:
-> [`../STATUS.md`](../STATUS.md). Everything below is historical.
+> E-arc resumes only if live-leaf feature pressure returns. Everything below
+> is historical.
 
 
 **Live status of the E (live-render maximalist prototype) arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**

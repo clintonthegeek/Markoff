@@ -4,40 +4,43 @@ Qt6/C++ markdown editor widget family: a CRDT-backed foundation
 (`markoff-core` + `markoff-parser`) plus view leaves. Primary consumer:
 Corbomite (submodules this repo at `libs/markoff-family`).
 
-## Current workfront — 2026-08-13: canvas production arc (D5 part 1)
+## Current workfront — 2026-08-19: G1 accessibility (canvas)
 
-The canvas spike closed PASS on 2026-08-13 (verdict: spike spec §10),
-and the user opened the production arc the same day: build
-`libs/markoff-canvas/` out to feature parity — Corbomite contract v2,
-old-leaf parity, Obsidian Live Preview benchmark, and the collab
-rendering surface the projection architecture was chosen for.
+The canvas production arc (D5 part 1) is **CLOSED** — full history in
+[`docs/plans/2026-08-13-canvas-production-plan.md`](docs/plans/2026-08-13-canvas-production-plan.md)
+and [`docs/STATUS.md`](docs/STATUS.md). All three of its gates are now
+decided: **G1** was deferred 2026-08-14, then reopened and chosen as
+the next workfront 2026-08-19 (below). **G2** (Corbomite adoption) is
+done — Corbomite's Cluster K Phase 5 (2026-08-18) made
+`Markoff::Canvas::EditorWidget` its sole LivePreview engine. **G3**
+(retirement) was decided 2026-08-19, scoped to `markoff-live` only:
+retired, zero downstream consumers left (`MARKOFF_BUILD_LIVE` now
+defaults OFF; tag `archive/markoff-live-final`); `markoff-styled` is
+untouched by that decision. Full context on both gates:
+[`docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md`](docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md)
+(Corbomite's handoff that prompted recording them).
 
-- **Plan (do the topmost unchecked task in the current phase):**
-  [`docs/plans/2026-08-13-canvas-production-plan.md`](docs/plans/2026-08-13-canvas-production-plan.md)
-- **Spec (normative):**
-  [`docs/specs/2026-08-13-canvas-production-design.md`](docs/specs/2026-08-13-canvas-production-design.md)
-  — constitution C1–C4 now permanent (§3), architecture deltas (§4),
-  parity contract (§5), user gates G1–G3 (§8).
-- Spike record (findings referenced throughout):
-  [`docs/specs/2026-08-13-markoff-canvas-spike-design.md`](docs/specs/2026-08-13-markoff-canvas-spike-design.md);
-  direction rationale:
-  [`docs/specs/2026-08-13-view-authority-direction-decision.md`](docs/specs/2026-08-13-view-authority-direction-decision.md).
+**Next workfront: G1, the deferred accessibility scope for
+`libs/markoff-canvas`.** The open question per spec §8 is unchanged
+since deferral: full `QAccessibleTextInterface` support vs. basic
+role/name only. No spec or plan exists yet for this — drafting one
+(scope decision first, via `superpowers:brainstorming` per this
+repo's convention for new spec work) is the next session's task
+before any implementation starts.
 
-**Standstill (spec §7):** canvas is the active workfront;
-`markoff-core` is open **only** for plan-named seams (P1 promotions
-and later named APIs); markoff-live/styled are **bug-fix-only** until
-gate G3 (retirement — a user decision); markoff-source is untouched,
-permanently. Test baseline: **288/288** (full `scripts/run-tests.sh`)
-at arc open, ratcheted to **315/315** by Phase 7 close — the plan
-ratchets it upward; any drop is a regression.
+**Standstill:** with the canvas production arc closed, `markoff-core`
+and `libs/markoff-canvas/` are open again for ordinary work (not
+gated to plan-named seams anymore — that restriction was specific to
+the closed arc). `markoff-styled` stays bug-fix-only (backs
+Corbomite's Reading mode); `markoff-source` stays untouched,
+permanently; `markoff-live` is retired (see G3 above). Test baseline:
+**315/315** (full `scripts/run-tests.sh`) at arc close — any drop is
+a regression.
 
-**Status (2026-08-15):** Phases P1–P6 closed; Phase 7 closing at
-P7.3 (arc close). G1 (accessibility) deferred by user decision; all
-7 F1 CodeMirror-parity gaps closed (P7.2a–g), including a real
-document-convergence regression found and fixed mid-arc (`623ed6ca`)
-and one user-approved behavior change (`StructuralKeyHandler`
-Backspace-at-list-start, `fc7ea6fe`). G2 (Corbomite adoption) is
-next, pending the user.
+**Status (2026-08-15, arc close):** all 7 F1 CodeMirror-parity gaps
+closed (P7.2a–g), including a real document-convergence regression
+found and fixed mid-arc (`623ed6ca`) and one user-approved behavior
+change (`StructuralKeyHandler` Backspace-at-list-start, `fc7ea6fe`).
 
 ## Building
 
@@ -82,7 +85,10 @@ explicitly changed.
   `MarkdownView` base. Own `CLAUDE.md`.
 - `libs/markoff-parser` — tree-sitter Markdown; load-time +
   per-block on-demand only (`inlineSpansFor`, cached).
-- `libs/markoff-live` — QML live-preview leaf (frozen; bug-fix only).
+- `libs/markoff-live` — QML live-preview leaf, **retired 2026-08-19**
+  (G3): zero downstream consumers, `MARKOFF_BUILD_LIVE` defaults OFF.
+  Source stays in-tree build-fix-only; full deletion is a future
+  decision. Tag `archive/markoff-live-final` for the last normal state.
 - `libs/markoff-source` — QPlainTextEdit source leaf (permanent;
   bug-fix only).
 - `libs/markoff-styled` — QTextEdit styled leaf (frozen; bug-fix
@@ -107,4 +113,5 @@ not cover it.
 - [`docs/queue.md`](docs/queue.md) — dormant items + Discipline Log.
 - History: `docs/STATUS-LOG.md` (dated banners),
   `docs/archive/` (retired arcs, pre-canvas snapshots of this file,
-  the queue, and the closed d-arc/e-arc boards).
+  the queue, and the closed d-arc board and e-arc board — the latter
+  formally closed 2026-08-19, `docs/archive/e-arc/`).

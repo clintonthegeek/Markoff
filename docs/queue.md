@@ -96,7 +96,8 @@ for why. Source mode is the escape hatch.
   source-reveal flip (seam landed 2026-05-30).
 - Release scaffolding: install/export rules + header tiering for a
   non-submodule consumer (LICENSE/README landed 2026-06-09).
-- E-arc: dormant since 2026-05-25 (`docs/e-arc/`, closed board).
+- E-arc: CLOSED 2026-08-19, not merely dormant — scope (E3/E5) shipped
+  under canvas Phase 5 (`docs/archive/e-arc/`, closed board).
 
 ---
 
