@@ -107,8 +107,8 @@ QString CanvasAccessible::text(QAccessible::Text t) const
         // QObject (QAccessibleWidget wraps one, isn't one), so it has no
         // translation context of its own; reusing View's is the same choice
         // the "Untitled" placeholder inside View itself already makes.
-        if (!m_view->accessibleDocumentName().isEmpty())
-            return m_view->accessibleDocumentName();
+        // FALSIFICATION PROBE (A1.3, throwaway): accessibleDocumentName()
+        // level dropped from the resolution chain.
         if (!m_view->inlineTitle().isEmpty())
             return m_view->inlineTitle();
         return m_view->tr("Markdown document");
