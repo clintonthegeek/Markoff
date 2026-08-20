@@ -98,6 +98,24 @@ QAccessible::State CanvasAccessible::state() const
     return s;
 }
 
+QString CanvasAccessible::text(QAccessible::Text t) const
+{
+    if (t == QAccessible::Name) {
+        // Resolution order per spec §9 Q2 / A1.3: explicit embedder-set name
+        // -> the (also embedder-set, but rendered) inline title -> a generic
+        // fallback. `tr()` goes through `m_view` — this class isn't a
+        // QObject (QAccessibleWidget wraps one, isn't one), so it has no
+        // translation context of its own; reusing View's is the same choice
+        // the "Untitled" placeholder inside View itself already makes.
+        if (!m_view->accessibleDocumentName().isEmpty())
+            return m_view->accessibleDocumentName();
+        if (!m_view->inlineTitle().isEmpty())
+            return m_view->inlineTitle();
+        return m_view->tr("Markdown document");
+    }
+    return QAccessibleWidget::text(t);
+}
+
 int CanvasAccessible::childCount() const
 {
     return m_view->blockCount();

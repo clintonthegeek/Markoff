@@ -47,6 +47,11 @@ public:
 
     QAccessible::Role role() const override;
     QAccessible::State state() const override;
+    /// `QAccessible::Name` resolution (spec §9 Q2, A1.3):
+    /// `View::accessibleDocumentName()` -> `View::inlineTitle()` -> a
+    /// generic `tr()`'d fallback. All other `QAccessible::Text` values
+    /// fall through to `QAccessibleWidget`'s default.
+    QString text(QAccessible::Text t) const override;
 
     int childCount() const override;
     QAccessibleInterface *child(int index) const override;

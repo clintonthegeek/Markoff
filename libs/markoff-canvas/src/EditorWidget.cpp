@@ -528,6 +528,18 @@ bool EditorWidget::inlineTitleVisible() const
     return m_view && m_view->inlineTitleVisible();
 }
 
+// --- Accessible document name (G1 spec §9 Q2) ---
+
+void EditorWidget::setAccessibleDocumentName(const QString &name)
+{
+    if (m_view) m_view->setAccessibleDocumentName(name);
+}
+
+QString EditorWidget::accessibleDocumentName() const
+{
+    return m_view ? m_view->accessibleDocumentName() : QString();
+}
+
 // --- Content width (readable-line-width) ---
 
 void EditorWidget::setContentWidthPolicy(ContentWidthPolicy policy)

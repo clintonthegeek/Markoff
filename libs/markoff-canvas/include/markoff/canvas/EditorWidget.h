@@ -213,6 +213,16 @@ public:
     void setInlineTitleVisible(bool visible);
     bool inlineTitleVisible() const;
 
+    // ---- Accessible document name (G1 spec §9 Q2) --------------------------
+    /// Thin pass-through to the composed View, same shape as the inline
+    /// title above. Exists because only the embedder (Corbomite, or any
+    /// other consumer) knows the open document's identity — the a11y
+    /// container's `QAccessible::Name` falls back to `inlineTitle()` and
+    /// then a generic string when this is unset. See `View::setAccessibleDocumentName`'s
+    /// doc comment for the full resolution order.
+    void setAccessibleDocumentName(const QString &name);
+    QString accessibleDocumentName() const;
+
     // ---- Content width (readable-line-width, punch-list [cluster-k] P5) --
     // Thin pass-through, same shape as inline title above. FullWidth by
     // construction (View's own default) until a consumer opts in.

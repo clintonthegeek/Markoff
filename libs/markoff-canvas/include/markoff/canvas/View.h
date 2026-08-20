@@ -723,6 +723,18 @@ public:
     void setInlineTitleVisible(bool visible);
     bool inlineTitleVisible() const { return m_inlineTitleVisible; }
 
+    // ---- Accessible document name (G1 spec §9 Q2) -------------------------
+    // The ONE deliberate exception to the a11y arc's "no new public API"
+    // non-goal: only the embedder knows what the open document is actually
+    // called (file name, note title, …), and the a11y container's
+    // `QAccessible::Name` needs *something* to say. Purely a name-resolution
+    // input — not rendered anywhere in the view, not persisted, not the same
+    // thing as the inline title band above (that IS rendered). Resolution
+    // order, implemented in `Detail::CanvasAccessible::text()`:
+    // `accessibleDocumentName()` -> `inlineTitle()` -> a generic fallback.
+    void setAccessibleDocumentName(const QString &name);
+    QString accessibleDocumentName() const { return m_accessibleDocumentName; }
+
 signals:
     /// Fired only on a user edit made directly in the title band (typing,
     /// Backspace/Delete) — never from `setInlineTitle`. The consumer turns
@@ -1573,6 +1585,11 @@ private:
     // readOnly/theme/fontScale already follow).
     QString m_inlineTitle;
     bool m_inlineTitleVisible = false;
+    /// Accessible document name (G1 spec §9 Q2) — set-only-by-embedder input
+    /// to `CanvasAccessible::text(QAccessible::Name)`'s resolution chain.
+    /// Empty by default, same "off unless the consumer opts in" shape as
+    /// the inline title above.
+    QString m_accessibleDocumentName;
     /// Whether keyboard input is currently routed into the title band
     /// rather than the document (mouse click in the band, or Up/no-op from
     /// it, sets/clears this — see `handleTitleKeyPress`/`mousePressEvent`).

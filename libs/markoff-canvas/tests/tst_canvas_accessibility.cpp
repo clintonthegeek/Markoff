@@ -53,6 +53,11 @@ private Q_SLOTS:
     void child_indices_round_trip();
     void child_count_tracks_document_reload();
 
+    // ---- A1.3: container Name resolution (spec §9 Q2) ----
+    void name_falls_back_to_generic_when_unset();
+    void name_falls_back_to_inline_title_when_set();
+    void name_prefers_accessible_document_name_over_inline_title();
+
     // ---- A1.2: role mapping (spec §4.2), one case per BlockKind row ----
     void role_paragraph();
     void role_heading_has_level_attribute();
@@ -143,6 +148,57 @@ void TstCanvasAccessibility::child_count_tracks_document_reload()
     doc.loadFromMarkdown("A\n\nB\n\nC\n\nD\n\nE\n");
     QCoreApplication::processEvents();
     QCOMPARE(iface->childCount(), 5);
+}
+
+// ---- A1.3: container Name resolution (spec §9 Q2) ------------------------
+
+void TstCanvasAccessibility::name_falls_back_to_generic_when_unset()
+{
+    Markoff::MarkoffDocument doc(1);
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    view.setDocument(&doc);
+
+    QVERIFY(view.accessibleDocumentName().isEmpty());
+    QVERIFY(view.inlineTitle().isEmpty());
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QVERIFY(iface);
+    QCOMPARE(iface->text(QAccessible::Name), QStringLiteral("Markdown document"));
+}
+
+void TstCanvasAccessibility::name_falls_back_to_inline_title_when_set()
+{
+    Markoff::MarkoffDocument doc(1);
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    view.setDocument(&doc);
+    view.setInlineTitle(QStringLiteral("My Note"));
+
+    QVERIFY(view.accessibleDocumentName().isEmpty());
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QVERIFY(iface);
+    QCOMPARE(iface->text(QAccessible::Name), QStringLiteral("My Note"));
+}
+
+void TstCanvasAccessibility::name_prefers_accessible_document_name_over_inline_title()
+{
+    Markoff::MarkoffDocument doc(1);
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    view.setDocument(&doc);
+    view.setInlineTitle(QStringLiteral("My Note"));
+    view.setAccessibleDocumentName(QStringLiteral("project-plan.md"));
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QVERIFY(iface);
+    QCOMPARE(iface->text(QAccessible::Name), QStringLiteral("project-plan.md"));
+    QCOMPARE(view.accessibleDocumentName(), QStringLiteral("project-plan.md"));
+
+    // Clearing it back to empty falls through to inline title again.
+    view.setAccessibleDocumentName(QString());
+    QCOMPARE(iface->text(QAccessible::Name), QStringLiteral("My Note"));
 }
 
 // ---- A1.2: role mapping -------------------------------------------------

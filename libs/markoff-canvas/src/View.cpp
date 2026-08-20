@@ -1169,6 +1169,16 @@ void View::setInlineTitleVisible(bool visible)
     viewport()->update();
 }
 
+void View::setAccessibleDocumentName(const QString &name)
+{
+    // No-op-if-unchanged, same guard shape as setInlineTitle above — but no
+    // visual update: this is purely a11y-name-resolution input (spec §9 Q2),
+    // never rendered, so there is nothing to repaint or reflow.
+    if (m_accessibleDocumentName == name)
+        return;
+    m_accessibleDocumentName = name;
+}
+
 bool View::hitTestTitle(const QPoint &viewportPos, int *outCharPos) const
 {
     if (!m_inlineTitleVisible)
