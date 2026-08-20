@@ -27,6 +27,8 @@ add_library(markoff_canvas STATIC
     include/markoff/canvas/CanvasActionController.h
     src/CanvasActionController.cpp
     include/markoff/canvas/TableTypes.h
+    src/Accessibility.h
+    src/Accessibility.cpp
     src/BlockLayoutCache.h
     src/BlockLayoutCache.cpp
     src/BlockPresentation.h

@@ -70,8 +70,8 @@ Push.
 | Task | Status | Commit | Falsification (break/revert) |
 |---|---|---|---|
 | **A1 — tree, roles, registration** | | | |
-| A1.0 Bridge probe + `Attribute::Level` verdict (spike, throwaway) | ☐ | | exempt |
-| A1.1 `CanvasAccessible` container + factory registration | ☐ | | |
+| A1.0 Bridge probe + `Attribute::Level` verdict (spike, throwaway) | ☑ | — | exempt |
+| A1.1 `CanvasAccessible` container + factory registration | ☑ | pending | n/a (tree-shape task, not a falsifiable behavior change) |
 | A1.2 `CanvasBlockAccessible` skeleton + role/state mapping | ☐ | | |
 | A1.3 `accessibleDocumentName` public property + name resolution | ☐ | | |
 | A1.4 ⏸ phase close (full suite) | ☐ | | exempt |
@@ -356,4 +356,21 @@ record the final baseline.
 
 (One line minimum per task. Append; never rewrite.)
 
-- *(A1.0 onward — nothing yet.)*
+- **A1.0 (2026-08-19): `Attribute::Level` DOES reach AT-SPI — spec §4.6
+  finding 3's suspicion was wrong.** Probe: scratch `QApplication`
+  (Qt 6.11.1, Wayland session) with a `QLabel` wrapped by a
+  `QAccessibleWidget` subclass implementing
+  `QAccessibleAttributesInterface::attributeValue(Level) == 2`,
+  factory-installed, run with `QT_ACCESSIBILITY=1` and
+  `QT_LINUX_ACCESSIBILITY_ALWAYS_ON=1`. Dumped from a second process
+  via `busctl --address="unix:path=$XDG_RUNTIME_DIR/at-spi/bus_1" call
+  <app-bus-name> <object-path> org.a11y.atspi.Accessible
+  GetAttributes` (the AT-SPI bus is separate from the session bus;
+  its address comes from `org.a11y.Bus /org/a11y/bus GetAddress` on
+  the session bus). Result: `a{ss} 1 "level" "2"` — present and
+  correct. Decision: implement `attributesInterface()` in A1.2/A1.4
+  as planned, and **skip the redundant description-text fallback**
+  the spec pre-authorized for the no-answer case — it is not needed.
+  File nothing upstream (no bug exists). Scratch probe lived at
+  `/tmp/.../scratchpad/a11y_probe/`, not committed, deleted after the
+  probe.

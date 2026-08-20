@@ -163,7 +163,7 @@ assumed:
 | `BlockKind` | `QAccessible::Role` | → AT-SPI | Notes |
 |---|---|---|---|
 | `Paragraph` | `Paragraph` | `ROLE_PARAGRAPH` | |
-| `Heading` | `Heading` | `ROLE_HEADING` | level: see §4.6, **does not reach Orca as an attribute** |
+| `Heading` | `Heading` | `ROLE_HEADING` | level: see §4.6 — **confirmed to reach AT-SPI** as the `level` object attribute (A1.0) |
 | `CodeBlock` | `EditableText` | `ROLE_TEXT` | no code role in Qt; language goes in the description |
 | `ListItem` | `ListItem` | `ROLE_LIST_ITEM` | checked state from the `Checked` attr → `state().checkable`/`checked` |
 | `BlockQuote` | `Section` | `ROLE_SECTION` | `ROLE_BLOCK_QUOTE` exists in AT-SPI but is **unreachable from Qt** (§4.6) |
@@ -236,21 +236,16 @@ rather than assumed. Four results, two of which constrain the design:
 2. **Orca is not installed** (`extra/orca 50.2-1` is available).
    The arc-close manual pass needs `pacman -S orca` first. Not a
    blocker, just a prerequisite to schedule.
-3. **⚠ `QAccessible::Attribute::Level` appears not to reach AT-SPI.**
-   The enum exists in Qt 6.11 (`qaccessible_base.h:381`, values
-   `Custom`/`Level`/`Locale`/`Orientation`), so the obvious answer to
-   "how do we expose heading level" is `QAccessibleAttributesInterface`.
-   But reading `atspiadaptor.cpp` upstream, only `Orientation` and
-   `Locale` appear to be converted to AT-SPI object attributes —
-   `Level` seems to be silently dropped on this platform.
-   **This is not yet confirmed** (the source read was indirect and one
-   earlier pass over the same file returned a wrong answer), so it is
-   written here as a *suspicion with a cheap empirical test*, not a
-   fact. Plan task **A1.0** settles it by probing a real bridge. If
-   confirmed: implement `attributesInterface()` anyway (correct, and
-   it works on other platforms), **and** carry the level in the
-   accessible description so Orca users still hear it. A Qt upstream
-   bug is worth filing either way.
+3. **`QAccessible::Attribute::Level` reaches AT-SPI — confirmed by
+   probe, A1.0 (2026-08-19).** The earlier suspicion (a source read of
+   `atspiadaptor.cpp` that only `Orientation`/`Locale` convert) was
+   wrong. A scratch `QAccessibleAttributesInterface` returning
+   `Level: 2`, dumped from a second process via
+   `org.a11y.atspi.Accessible.GetAttributes` on the real AT-SPI bus,
+   returned `{"level": "2"}` — present and correct. **Decision:**
+   implement `attributesInterface()` in A1.2 as the sole mechanism;
+   no description-text fallback needed (the spec's pre-authorized
+   fallback for a no-answer is moot). No Qt upstream bug exists here.
 4. **Two AT-SPI roles Markdown wants are unreachable from Qt:**
    `ROLE_BLOCK_QUOTE` and `ROLE_MATH` both exist in
    `atspi-constants.h` but no `QAccessible::Role` maps to them, so

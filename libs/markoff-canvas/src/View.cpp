@@ -46,6 +46,7 @@
 
 #include <markoff/canvas/CanvasActionController.h>
 
+#include "Accessibility.h"
 #include "BlockLayoutCache.h"
 #include "Folding.h"
 #include "FrontmatterBlock.h"
@@ -286,6 +287,7 @@ View::View(QWidget *parent)
     , m_theme(Theme::defaultLight())
     , m_cache(std::make_unique<BlockLayoutCache>())
 {
+    Detail::installAccessibilityFactory();
     viewport()->setFocusPolicy(Qt::NoFocus);
     setFocusPolicy(Qt::StrongFocus);
     setAttribute(Qt::WA_InputMethodEnabled);
