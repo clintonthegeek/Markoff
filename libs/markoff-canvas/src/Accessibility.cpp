@@ -381,9 +381,8 @@ int CanvasBlockAccessible::characterCount() const
     if (!doc)
         return 0;
     const QByteArray raw = doc->blockText(m_id);
-    // QChar count, NOT byte count (A2.1 done-when) — coords::byteToQtPos
-    // walking the full buffer is exactly that.
-    return int(coords::byteToQtPos(raw, raw.size()));
+    // BREAK (falsification, throwaway): byte count instead of QChar count.
+    return int(raw.size());
 }
 
 QString CanvasBlockAccessible::textBeforeOffset(int offset, QAccessible::TextBoundaryType boundaryType,
