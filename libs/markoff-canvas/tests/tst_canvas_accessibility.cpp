@@ -77,6 +77,17 @@ private Q_SLOTS:
     void state_focusable_and_focused_tracks_caret();
     void state_editable_tracks_read_only();
     void state_invisible_for_folded_hidden_block();
+
+    // ---- A2.1: QAccessibleTextInterface core ----
+    void text_interface_absent_for_no_text_kinds();
+    void text_interface_present_for_text_kinds();
+    void text_and_character_count_ascii();
+    void text_and_character_count_multibyte_utf8();
+    void char_boundary_at_offset();
+    void word_boundary_at_offset();
+    void paragraph_boundary_is_whole_block();
+    void paragraph_boundary_whole_block_with_embedded_newlines_in_codeblock();
+    void paragraph_before_after_boundary_report_no_item();
 };
 
 void TstCanvasAccessibility::container_role_is_document()
@@ -508,6 +519,238 @@ void TstCanvasAccessibility::state_invisible_for_folded_hidden_block()
     QVERIFY(iface->child(int(view.blockIndexOf(p2)))->state().invisible);
     QVERIFY(!iface->child(int(view.blockIndexOf(h1)))->state().invisible);
     QVERIFY(!iface->child(int(view.blockIndexOf(h2)))->state().invisible);
+}
+
+// ---- A2.1: QAccessibleTextInterface core --------------------------------
+
+void TstCanvasAccessibility::text_interface_absent_for_no_text_kinds()
+{
+    // Spec §4.2: HorizontalRule, Image, Mermaid have no text interface at
+    // all — interface_cast(TextInterface) must return nullptr for them,
+    // not a vacuous implementation.
+    {
+        MarkoffDocument doc;
+        doc.loadFromMarkdown("text\n\n---\n\nmore\n");
+        View view;
+        attachAndExpose(view, doc);
+        QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(doc.blockKind(blocks[1]), BlockKind::HorizontalRule);
+        QVERIFY(!iface->child(1)->textInterface());
+    }
+    {
+        MarkoffDocument doc;
+        doc.loadFromMarkdown("![a cat](cat.png)\n");
+        View view;
+        attachAndExpose(view, doc);
+        QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+        QCOMPARE(doc.blockKind(doc.iterateBlocks().front()), BlockKind::Image);
+        QVERIFY(!iface->child(0)->textInterface());
+    }
+    {
+        MarkoffDocument doc;
+        const BlockId id = doc.testInsertBlock(BlockKind::Mermaid, "graph TD; A-->B;");
+        View view;
+        attachAndExpose(view, doc);
+        QCOMPARE(doc.blockKind(id), BlockKind::Mermaid);
+        QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+        QVERIFY(!iface->child(0)->textInterface());
+    }
+}
+
+void TstCanvasAccessibility::text_interface_present_for_text_kinds()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+    QCOMPARE(text->characterCount(), int(QStringLiteral("First paragraph.").size()));
+}
+
+void TstCanvasAccessibility::text_and_character_count_ascii()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("Hello world.\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+
+    const QString expected = QStringLiteral("Hello world.");
+    QCOMPARE(text->characterCount(), expected.size());
+    QCOMPARE(text->text(0, text->characterCount()), expected);
+    QCOMPARE(text->text(0, 5), QStringLiteral("Hello"));
+    QCOMPARE(text->text(6, 11), QStringLiteral("world"));
+}
+
+void TstCanvasAccessibility::text_and_character_count_multibyte_utf8()
+{
+    // "café 日本語 😀!" — accents (2-byte UTF-8, 1 QChar), CJK (3-byte
+    // UTF-8, 1 QChar each), and an emoji requiring a UTF-16 surrogate pair
+    // (4-byte UTF-8, 2 QChars). This is the QChar/byte mix-up break point
+    // the plan calls out explicitly.
+    const QString fixture = QString::fromUtf8("caf\xc3\xa9 \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e \xf0\x9f\x98\x80!");
+    QCOMPARE(fixture, QStringLiteral(u"café 日本語 😀!"));
+    // Sanity on the fixture's own shape before trusting the assertions
+    // below: 12 QChars (the emoji is a surrogate pair), well under its
+    // UTF-8 byte length.
+    QCOMPARE(fixture.size(), 12);
+    QVERIFY(fixture.toUtf8().size() > fixture.size());
+
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(fixture.toUtf8() + "\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QCOMPARE(doc.blockKind(doc.iterateBlocks().front()), BlockKind::Paragraph);
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+
+    // characterCount() is a QChar count, NOT a byte count (A2.1 done-when).
+    QCOMPARE(text->characterCount(), 12);
+    QCOMPARE(text->text(0, text->characterCount()), fixture);
+
+    // Slice out just the CJK run: QChar indices 5..8.
+    QCOMPARE(text->text(5, 8), QStringLiteral(u"日本語"));
+
+    // Slice out just the emoji (occupies QChar indices 9..11, a surrogate
+    // pair) — this is the exact boundary a byte-offset/QChar-offset
+    // mix-up would get wrong silently (e.g. it would land mid-surrogate or
+    // include/exclude the wrong number of trailing bytes).
+    QCOMPARE(text->text(9, 11), QStringLiteral(u"😀"));
+
+    // The trailing "!" is the last QChar, at index 11.
+    QCOMPARE(text->text(11, 12), QStringLiteral("!"));
+}
+
+void TstCanvasAccessibility::char_boundary_at_offset()
+{
+    const QString fixture = QStringLiteral(u"café 😀!");
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(fixture.toUtf8() + "\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+
+    // "café " is QChars 0..4 ('c','a','f','é',' '); the accented 'é'
+    // grapheme is a single QChar at offset 3.
+    int s = -1, e = -1;
+    QCOMPARE(text->textAtOffset(3, QAccessible::CharBoundary, &s, &e), QStringLiteral(u"é"));
+    QCOMPARE(s, 3);
+    QCOMPARE(e, 4);
+
+    // The emoji (surrogate pair) is one grapheme spanning QChars 5..6.
+    s = e = -1;
+    QCOMPARE(text->textAtOffset(5, QAccessible::CharBoundary, &s, &e), QStringLiteral(u"😀"));
+    QCOMPARE(s, 5);
+    QCOMPARE(e, 7);
+}
+
+void TstCanvasAccessibility::word_boundary_at_offset()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("Hello world.\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+
+    int s = -1, e = -1;
+    QCOMPARE(text->textAtOffset(0, QAccessible::WordBoundary, &s, &e), QStringLiteral("Hello"));
+    QCOMPARE(s, 0);
+    QCOMPARE(e, 5);
+
+    s = e = -1;
+    QCOMPARE(text->textAtOffset(6, QAccessible::WordBoundary, &s, &e), QStringLiteral("world"));
+    QCOMPARE(s, 6);
+    QCOMPARE(e, 11);
+}
+
+void TstCanvasAccessibility::paragraph_boundary_is_whole_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("Hello world.\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+
+    // A block IS a paragraph (spec §4.1/A2.1 task description) — the
+    // paragraph at ANY in-range offset is the whole block.
+    for (int offset : {0, 5, 12}) {
+        int s = -1, e = -1;
+        QCOMPARE(text->textAtOffset(offset, QAccessible::ParagraphBoundary, &s, &e),
+                 QStringLiteral("Hello world."));
+        QCOMPARE(s, 0);
+        QCOMPARE(e, text->characterCount());
+    }
+}
+
+void TstCanvasAccessibility::paragraph_boundary_whole_block_with_embedded_newlines_in_codeblock()
+{
+    // CodeBlock buffers keep their fence AND interior newlines inline
+    // (markoff-core CLAUDE.md's buffer-convention table) — this is the
+    // case that actually exercises the override: the base
+    // QAccessibleTextInterface::textAtOffset default treats
+    // ParagraphBoundary as a line-break search and would incorrectly stop
+    // at the first embedded '\n'.
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("```python\ndef foo():\n    return 1\n```\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QCOMPARE(doc.blockKind(doc.iterateBlocks().front()), BlockKind::CodeBlock);
+    const QByteArray raw = doc.blockText(doc.iterateBlocks().front());
+    QVERIFY(raw.contains('\n'));  // sanity: the buffer really has embedded newlines.
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+
+    const QString whole = QString::fromUtf8(raw);
+    int s = -1, e = -1;
+    QCOMPARE(text->textAtOffset(0, QAccessible::ParagraphBoundary, &s, &e), whole);
+    QCOMPARE(s, 0);
+    QCOMPARE(e, text->characterCount());
+    QCOMPARE(text->characterCount(), whole.size());
+}
+
+void TstCanvasAccessibility::paragraph_before_after_boundary_report_no_item()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("Hello world.\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+
+    // A block is exactly one paragraph — there is no paragraph before or
+    // after it within the block's own buffer.
+    int s = 0, e = 0;
+    QCOMPARE(text->textBeforeOffset(5, QAccessible::ParagraphBoundary, &s, &e), QString());
+    QCOMPARE(s, -1);
+    QCOMPARE(e, -1);
+
+    s = e = 0;
+    QCOMPARE(text->textAfterOffset(5, QAccessible::ParagraphBoundary, &s, &e), QString());
+    QCOMPARE(s, -1);
+    QCOMPARE(e, -1);
 }
 
 QTEST_MAIN(TstCanvasAccessibility)

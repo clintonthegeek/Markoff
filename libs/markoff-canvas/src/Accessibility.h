@@ -71,8 +71,8 @@ private:
 
 /// One per `BlockId` (spec §4.1/§4.2), implementing `QAccessibleInterface`
 /// directly (not `QAccessibleWidget` — a block is not a `QWidget`) plus
-/// `QAccessibleAttributesInterface` (heading level only, exposed via
-/// `interface_cast`).
+/// `QAccessibleAttributesInterface` (heading level only) and, since A2.1,
+/// `QAccessibleTextInterface` — both exposed via `interface_cast`.
 ///
 /// **A1.1 status:** skeleton — superseded. `rect()` is real (maps
 /// `View::blockRect()` through the viewport to global coordinates).
@@ -85,8 +85,32 @@ private:
 /// AT-SPI by A1.0's probe, so this is the sole mechanism (no description
 /// fallback). `text()` is still the `QAccessible::Text` (name/
 /// description/…) surface, not block *content* — that is
-/// `QAccessibleTextInterface`, added in A2 via `interface_cast`.
-class CanvasBlockAccessible final : public QAccessibleInterface, public QAccessibleAttributesInterface {
+/// `QAccessibleTextInterface`.
+///
+/// **A2.1:** `QAccessibleTextInterface` core — `text()`, `characterCount()`,
+/// and `textAtOffset`/`textBeforeOffset`/`textAfterOffset` for
+/// `CharBoundary`/`WordBoundary`/`ParagraphBoundary` all operate on
+/// `document()->blockText(id)`, converted byte<->QChar with `coords::`
+/// (spec §4.1). **Every offset here is scoped to this block's own buffer —
+/// never summed across blocks (C4).** `Char`/`WordBoundary` reuse the base
+/// class's default `QTextBoundaryFinder`-driven implementation (it already
+/// operates purely in QChar space via `text()`/`characterCount()`, so no
+/// override is needed); `ParagraphBoundary` IS overridden because the base
+/// default treats it as a line-break search, which would be wrong for a
+/// `CodeBlock` buffer (its buffer keeps embedded `\n`s, spec §4.2's kind
+/// table) — a block is always exactly one paragraph, full stop, per this
+/// task's contract. The remaining pure virtuals
+/// (`selection`/`selectionCount`/`addSelection`/`removeSelection`/
+/// `setSelection`/`cursorPosition`/`setCursorPosition` — A2.2's job;
+/// `characterRect`/`offsetAtPoint` — A2.3's job) are compile-complete
+/// placeholder stubs, documented at each definition, following A1.1's
+/// "compile-complete but explicitly-placeholder" precedent for `role()`/
+/// `state()`. `scrollToSubstring` is a no-op stub (no task claims it yet);
+/// `attributes()` returns an empty string with `startOffset`/`endOffset`
+/// set to the queried offset (same placeholder shape).
+class CanvasBlockAccessible final : public QAccessibleInterface,
+                                     public QAccessibleAttributesInterface,
+                                     public QAccessibleTextInterface {
 public:
     CanvasBlockAccessible(View *view, CanvasAccessible *container, BlockId id);
 
@@ -111,9 +135,47 @@ public:
     QList<QAccessible::Attribute> attributeKeys() const override;
     QVariant attributeValue(QAccessible::Attribute key) const override;
 
+    // ---- QAccessibleTextInterface (A2.1: text/characterCount/offsets) ----
+    // text/cursor
+    QString text(int startOffset, int endOffset) const override;
+    QString textBeforeOffset(int offset, QAccessible::TextBoundaryType boundaryType,
+                              int *startOffset, int *endOffset) const override;
+    QString textAfterOffset(int offset, QAccessible::TextBoundaryType boundaryType,
+                             int *startOffset, int *endOffset) const override;
+    QString textAtOffset(int offset, QAccessible::TextBoundaryType boundaryType,
+                          int *startOffset, int *endOffset) const override;
+    int characterCount() const override;
+
+    // selection — A2.2 placeholder stubs (this block never reports a
+    // selection yet).
+    void selection(int selectionIndex, int *startOffset, int *endOffset) const override;
+    int selectionCount() const override;
+    void addSelection(int startOffset, int endOffset) override;
+    void removeSelection(int selectionIndex) override;
+    void setSelection(int selectionIndex, int startOffset, int endOffset) override;
+
+    // cursor — A2.2 placeholder stubs (this block never reports a caret
+    // yet).
+    int cursorPosition() const override;
+    void setCursorPosition(int position) override;
+
+    // character <-> geometry — A2.3 placeholder stubs (need a QTextLayout,
+    // spec §5).
+    QRect characterRect(int offset) const override;
+    int offsetAtPoint(const QPoint &point) const override;
+
+    // Not claimed by any task yet; safe no-op / minimal placeholders.
+    void scrollToSubstring(int startIndex, int endIndex) override;
+    QString attributes(int offset, int *startOffset, int *endOffset) const override;
+
     BlockId blockId() const { return m_id; }
 
 private:
+    /// Blocks with no text content (`HorizontalRule`, `Image`, `Mermaid` —
+    /// spec §4.2) return `nullptr` for `QAccessible::TextInterface` from
+    /// `interface_cast` rather than implementing it vacuously.
+    bool hasTextContent() const;
+
     View *m_view;
     CanvasAccessible *m_container;
     BlockId m_id;

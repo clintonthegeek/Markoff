@@ -10,6 +10,9 @@
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/TextUnits.h>
+
+namespace coords = Markoff::TextUnits;
 
 namespace Markoff::Canvas::Detail {
 
@@ -306,7 +309,25 @@ void *CanvasBlockAccessible::interface_cast(QAccessible::InterfaceType t)
 {
     if (t == QAccessible::AttributesInterface)
         return static_cast<QAccessibleAttributesInterface *>(this);
+    if (t == QAccessible::TextInterface && hasTextContent())
+        return static_cast<QAccessibleTextInterface *>(this);
     return nullptr;
+}
+
+bool CanvasBlockAccessible::hasTextContent() const
+{
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return false;
+    // Spec §4.2: these three kinds have no text interface at all.
+    switch (doc->blockKind(m_id)) {
+    case BlockKind::HorizontalRule:
+    case BlockKind::Image:
+    case BlockKind::Mermaid:
+        return false;
+    default:
+        return true;
+    }
 }
 
 QList<QAccessible::Attribute> CanvasBlockAccessible::attributeKeys() const
@@ -324,6 +345,166 @@ QVariant CanvasBlockAccessible::attributeValue(QAccessible::Attribute key) const
     if (!doc)
         return {};
     return QVariant(intAttr(doc, m_id, AttrNames::Level, 1));
+}
+
+// ---- CanvasBlockAccessible :: QAccessibleTextInterface (A2.1) ----------
+//
+// All offsets below are QChar (UTF-16 code-unit) indices into this block's
+// own `document()->blockText(m_id)` buffer, converted from/to UTF-8 byte
+// offsets with `coords::` — the same helpers `View.cpp` already uses
+// everywhere it straddles the two text units. Never cross-block (C4): a
+// block's text interface only ever sees its own buffer.
+
+QString CanvasBlockAccessible::text(int startOffset, int endOffset) const
+{
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return {};
+    const QByteArray raw = doc->blockText(m_id);
+    const int count = int(coords::byteToQtPos(raw, raw.size()));
+
+    if (startOffset < 0)
+        startOffset = 0;
+    if (endOffset < 0 || endOffset > count)
+        endOffset = count;
+    if (startOffset >= endOffset)
+        return {};
+
+    const qsizetype startByte = coords::qtPosToByte(raw, startOffset);
+    const qsizetype endByte = coords::qtPosToByte(raw, endOffset);
+    return QString::fromUtf8(raw.mid(startByte, endByte - startByte));
+}
+
+int CanvasBlockAccessible::characterCount() const
+{
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return 0;
+    const QByteArray raw = doc->blockText(m_id);
+    // QChar count, NOT byte count (A2.1 done-when) — coords::byteToQtPos
+    // walking the full buffer is exactly that.
+    return int(coords::byteToQtPos(raw, raw.size()));
+}
+
+QString CanvasBlockAccessible::textBeforeOffset(int offset, QAccessible::TextBoundaryType boundaryType,
+                                                 int *startOffset, int *endOffset) const
+{
+    // A block is exactly one paragraph (spec §4.2/A2.1's task description):
+    // there is no *previous* paragraph within this block's own buffer, so
+    // "the paragraph before offset" is always "no such item" here — the
+    // base class's line-break-search default would instead go hunting for
+    // an embedded '\n' (wrong for e.g. a CodeBlock buffer, which keeps its
+    // fence + interior newlines inline per the buffer-convention table).
+    if (boundaryType == QAccessible::ParagraphBoundary) {
+        *startOffset = *endOffset = -1;
+        return {};
+    }
+    // CharBoundary/WordBoundary: the base implementation already operates
+    // purely in QChar space via this class's own text()/characterCount(),
+    // so no override is needed for those.
+    return QAccessibleTextInterface::textBeforeOffset(offset, boundaryType, startOffset, endOffset);
+}
+
+QString CanvasBlockAccessible::textAfterOffset(int offset, QAccessible::TextBoundaryType boundaryType,
+                                                int *startOffset, int *endOffset) const
+{
+    // Symmetric with textBeforeOffset() above: no *next* paragraph within
+    // this block either.
+    if (boundaryType == QAccessible::ParagraphBoundary) {
+        *startOffset = *endOffset = -1;
+        return {};
+    }
+    return QAccessibleTextInterface::textAfterOffset(offset, boundaryType, startOffset, endOffset);
+}
+
+QString CanvasBlockAccessible::textAtOffset(int offset, QAccessible::TextBoundaryType boundaryType,
+                                             int *startOffset, int *endOffset) const
+{
+    if (boundaryType == QAccessible::ParagraphBoundary) {
+        // A block IS a paragraph — the paragraph at any in-range offset is
+        // the whole block, full stop (spec §4.1, A2.1 task description).
+        const int count = characterCount();
+        const int at = (offset == -1) ? count : offset;
+        if (at < 0 || at > count) {
+            *startOffset = *endOffset = -1;
+            return {};
+        }
+        *startOffset = 0;
+        *endOffset = count;
+        return text(0, count);
+    }
+    return QAccessibleTextInterface::textAtOffset(offset, boundaryType, startOffset, endOffset);
+}
+
+void CanvasBlockAccessible::selection(int, int *startOffset, int *endOffset) const
+{
+    // A2.2's job (caret + selection, cross-block presentation, spec §4.1).
+    // Placeholder: this block never reports a selection yet.
+    *startOffset = *endOffset = -1;
+}
+
+int CanvasBlockAccessible::selectionCount() const
+{
+    // A2.2 placeholder.
+    return 0;
+}
+
+void CanvasBlockAccessible::addSelection(int, int)
+{
+    // A2.2 placeholder — no-op until selection routes through View.
+}
+
+void CanvasBlockAccessible::removeSelection(int)
+{
+    // A2.2 placeholder — no-op.
+}
+
+void CanvasBlockAccessible::setSelection(int, int, int)
+{
+    // A2.2 placeholder — no-op.
+}
+
+int CanvasBlockAccessible::cursorPosition() const
+{
+    // A2.2's job (`View::caretByteOffset()` converted, only when
+    // `View::caretBlock() == id`). Placeholder: no caret reported yet.
+    return -1;
+}
+
+void CanvasBlockAccessible::setCursorPosition(int)
+{
+    // A2.2 placeholder — no-op until routed to `View::setCaretPosition()`.
+}
+
+QRect CanvasBlockAccessible::characterRect(int) const
+{
+    // A2.3's job (needs a QTextLayout, spec §5 — geometry queries are the
+    // one path allowed to force realization). Placeholder: null rect.
+    return {};
+}
+
+int CanvasBlockAccessible::offsetAtPoint(const QPoint &) const
+{
+    // A2.3 placeholder.
+    return -1;
+}
+
+void CanvasBlockAccessible::scrollToSubstring(int, int)
+{
+    // Not claimed by any task yet; a no-op is safe here (nothing currently
+    // calls it, and there's no scroll-to-block-substring seam to route
+    // through until one is needed).
+}
+
+QString CanvasBlockAccessible::attributes(int offset, int *startOffset, int *endOffset) const
+{
+    // Not claimed by any task yet. Following A1.1's "compile-complete but
+    // explicitly-placeholder" precedent: no text attribute runs are
+    // reported, and the queried offset is echoed back as a zero-length
+    // range (rather than -1/-1) since `offset` itself is a valid position,
+    // just one with no attribute run info to report.
+    *startOffset = *endOffset = offset;
+    return {};
 }
 
 // ---- Factory registration ----------------------------------------------
