@@ -73,7 +73,7 @@ Push.
 | A1.0 Bridge probe + `Attribute::Level` verdict (spike, throwaway) | ☑ | — | exempt |
 | A1.1 `CanvasAccessible` container + factory registration | ☑ | `48c5ac1d` | break `7117c023` / revert `8c54a2e3` |
 | A1.2 `CanvasBlockAccessible` skeleton + role/state mapping | ☑ | `21c371c8` | break `e4915b30` / revert `7e11e4ec` |
-| A1.3 `accessibleDocumentName` public property + name resolution | ☐ | | |
+| A1.3 `accessibleDocumentName` public property + name resolution | ☑ | `893f68ef` | break `39e02ea6` / revert `7a2a30b1` |
 | A1.4 ⏸ phase close (full suite) | ☐ | | exempt |
 | **A2 — text interface** | | | |
 | A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☐ | | |
@@ -447,3 +447,41 @@ record the final baseline.
   existing test binary); full suite target count holds at
   **208/208** (same as A1.1's ending baseline — A1.2 added no new
   test *executable*, only cases within the existing one).
+- **A1.3 (2026-08-19): `accessibleDocumentName` property + container
+  Name resolution landed.** `View::setAccessibleDocumentName(const
+  QString &)`/`accessibleDocumentName()` — no-op-if-unchanged setter,
+  same shape as `setInlineTitle`, but no repaint (pure a11y-name-
+  resolution input, spec §9 Q2, never rendered). `EditorWidget` gets
+  the same thin pass-through every other `View` forward already uses.
+  `CanvasAccessible::text(QAccessible::Text)` implements the
+  container's `QAccessible::Name` resolution chain:
+  `accessibleDocumentName()` → `inlineTitle()` →
+  `tr("Markdown document")`; every other `Text` value falls through
+  to `QAccessibleWidget`'s default. Three new tests cover all three
+  fallback levels plus a clear-falls-back-through round trip
+  (22 → 25 accessibility test cases). No core change needed (spec §8
+  held). Falsification: dropped the `accessibleDocumentName()` level
+  from the resolution chain (`39e02ea6`), 1 of 25 tests failed as
+  expected, reverted (`7a2a30b1`) — confirmed byte-identical to the
+  real commit's file (`git diff 893f68ef 7a2a30b1` empty). Full suite
+  target count holds at **208/208**.
+  **Process note (not a product finding):** this task's own
+  falsification step went wrong twice before landing cleanly — worth
+  recording so a future session recognizes the failure mode instead
+  of re-discovering it. First, the real implementation and the
+  falsification break were committed together as a single commit
+  (same mistake A1.2's session caught and fixed the same way: `git
+  reset --soft` back to the prior real commit, then commit the real
+  work and the break separately). Second, after `git revert --no-edit
+  HEAD` correctly un-broke the file, a second, unintended `revert`
+  landed on top (reflog shows a "Reapply" commit undoing the revert)
+  — cause not fully isolated, but the working tree ended up back in
+  the broken state despite `git status` reporting clean, because a
+  `git reset --soft` earlier in the same recovery had moved HEAD
+  without touching the working tree/index (soft reset's documented
+  behavior, but easy to misapply when the goal is "make the files
+  match commit X" — that needs `--hard` or `git checkout <commit> --
+  <path>`, not `--soft`). Recovered by reverting via `git checkout
+  893f68ef -- Accessibility.cpp` (content-addressed, not history-
+  addressed) and diffing the two commits' trees directly to confirm
+  byte-identity before trusting the test run.
