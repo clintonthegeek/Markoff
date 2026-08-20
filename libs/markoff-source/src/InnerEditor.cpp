@@ -1,11 +1,63 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "InnerEditor.h"
 
+#include <QClipboard>
+#include <QGuiApplication>
+#include <QKeyEvent>
+#include <QMimeData>
 #include <QPainter>
 #include <QPaintEvent>
 #include <QTextBlock>
+#include <QTextCursor>
 
 namespace Markoff::Source::Detail {
+
+namespace {
+
+bool mimeOffersPaste(const QMimeData *mime)
+{
+    if (!mime)
+        return false;
+    using namespace Markoff::ClipboardCodec;
+    return mime->hasText() || mime->hasHtml()
+        || mime->hasFormat(QString::fromUtf8(kMarkdownMime))
+        || mime->hasFormat(QString::fromUtf8(kRtfMime))
+        || mime->hasFormat(QStringLiteral("application/rtf"))
+        || mime->hasFormat(QString::fromUtf8(kBlocksMime));
+}
+
+}  // namespace
+
+InnerEditor::InnerEditor(QWidget *parent) : QPlainTextEdit(parent) {}
+
+QByteArray InnerEditor::selectedMarkdown() const
+{
+    QString sel = textCursor().selectedText();
+    sel.replace(QChar(0x2029), QLatin1Char('\n'));
+    return sel.toUtf8();
+}
+
+void InnerEditor::copyWithFlavor(Markoff::ClipboardCodec::Flavor flavor)
+{
+    const QByteArray md = selectedMarkdown();
+    if (md.isEmpty())
+        return;
+    QGuiApplication::clipboard()->setMimeData(
+        Markoff::ClipboardCodec::mimeFromMarkdown(md, {}, flavor));
+}
+
+void InnerEditor::pasteWithMode(Markoff::ClipboardCodec::PasteMode mode)
+{
+    if (isReadOnly())
+        return;
+    const QMimeData *mime = QGuiApplication::clipboard()->mimeData();
+    if (!mime)
+        return;
+    const QByteArray md = Markoff::ClipboardCodec::markdownFromMime(mime, mode);
+    if (md.isEmpty())
+        return;
+    textCursor().insertText(QString::fromUtf8(md));
+}
 
 void InnerEditor::paintEvent(QPaintEvent *event)
 {
@@ -40,6 +92,45 @@ void InnerEditor::paintEvent(QPaintEvent *event)
         bottom = top + blockBoundingRect(block).height();
         ++blockNumber;
     }
+}
+
+QMimeData *InnerEditor::createMimeDataFromSelection() const
+{
+    const QByteArray md = selectedMarkdown();
+    if (md.isEmpty())
+        return nullptr;
+    return Markoff::ClipboardCodec::mimeFromMarkdown(
+        md, {}, Markoff::ClipboardCodec::Flavor::All);
+}
+
+bool InnerEditor::canInsertFromMimeData(const QMimeData *source) const
+{
+    return mimeOffersPaste(source);
+}
+
+void InnerEditor::insertFromMimeData(const QMimeData *source)
+{
+    if (isReadOnly() || !source)
+        return;
+    const QByteArray md = Markoff::ClipboardCodec::markdownFromMime(
+        source, Markoff::ClipboardCodec::PasteMode::Smart);
+    if (md.isEmpty())
+        return;
+    textCursor().insertText(QString::fromUtf8(md));
+}
+
+void InnerEditor::keyPressEvent(QKeyEvent *e)
+{
+    // Obsidian-faithful Paste as Plain (Ctrl+Shift+V).
+    if (e->key() == Qt::Key_V
+        && (e->modifiers() & Qt::ControlModifier)
+        && (e->modifiers() & Qt::ShiftModifier)
+        && !(e->modifiers() & Qt::AltModifier)) {
+        pasteWithMode(Markoff::ClipboardCodec::PasteMode::Plain);
+        e->accept();
+        return;
+    }
+    QPlainTextEdit::keyPressEvent(e);
 }
 
 } // namespace Markoff::Source::Detail

@@ -90,6 +90,18 @@ public:
     /// hashes + a space. Operates on the line containing the cursor.
     Q_INVOKABLE void setHeadingLevel(int level) override;
 
+    // Clipboard verbs (MarkdownView contract — Cluster N). Default Copy is
+    // multi-flavor via InnerEditor::createMimeDataFromSelection; exclusive
+    // Copy-as / Paste-as-Plain land here for the host Edit menu.
+    void copy() override;
+    void copyAsPlain() override;
+    void copyAsMarkdown() override;
+    void copyAsHtml() override;
+    void copyAsRtf() override;
+    void cut() override;
+    void paste() override;
+    void pasteAsPlain() override;
+
     /// Test-only accessor: the raw-markdown ListItem marker string
     /// currently painted for the QTextBlock at `blockNumber` (queue #8.3).
     /// Empty for non-ListItem blocks and once no document is set.
