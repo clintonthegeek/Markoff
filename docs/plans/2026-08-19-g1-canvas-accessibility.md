@@ -72,7 +72,7 @@ Push.
 | **A1 — tree, roles, registration** | | | |
 | A1.0 Bridge probe + `Attribute::Level` verdict (spike, throwaway) | ☑ | — | exempt |
 | A1.1 `CanvasAccessible` container + factory registration | ☑ | `48c5ac1d` | break `7117c023` / revert `8c54a2e3` |
-| A1.2 `CanvasBlockAccessible` skeleton + role/state mapping | ☐ | | |
+| A1.2 `CanvasBlockAccessible` skeleton + role/state mapping | ☑ | `21c371c8` | break `e4915b30` / revert `7e11e4ec` |
 | A1.3 `accessibleDocumentName` public property + name resolution | ☐ | | |
 | A1.4 ⏸ phase close (full suite) | ☐ | | exempt |
 | **A2 — text interface** | | | |
@@ -401,3 +401,49 @@ record the final baseline.
   `QCoreApplication::processEvents()` before `childCount()` reflects
   it, since `View::onDocumentChanged()` is wired to that signal, not
   the synchronous `documentChanged()`.
+- **A1.2 (2026-08-19): `CanvasBlockAccessible` role/state mapping
+  landed.** `role()` switches on `MarkoffDocument::blockKind()` per
+  spec §4.2's table, with two special cases: footnote-def paragraphs
+  (`View::isFootnoteDefBlock()`) map to `Section`, and the two spec
+  §4.6 finding-4 limitations (`BlockQuote` → `Section`, not
+  `ROLE_BLOCK_QUOTE`; `Math` → `StaticText`, not `ROLE_MATH` — neither
+  reachable from Qt) are recorded as comments at the mapping site.
+  `state()` sets `focusable` (always true), `focused`
+  (`View::caretBlock() == id`), `editable` (`!View::isReadOnly()`),
+  `checkable`/`checked` (task `ListItem`s — `MarkerStyle == "task"` +
+  the `Checked` attr), and `invisible`
+  (`View::isBlockHidden()`). `CanvasBlockAccessible` gained
+  `QAccessibleAttributesInterface` via `interface_cast`, exposing
+  `Attribute::Level` for `Heading` blocks only (empty `attributeKeys()`
+  otherwise) — A1.0's probe already confirmed this reaches AT-SPI, so
+  no description-text fallback was implemented.
+  **Fixture-design finding (not a product bug):** `BlockKind::Math` and
+  `BlockKind::Mermaid` are **never** produced by `loadFromMarkdown` —
+  confirmed by grep (`MarkoffDocument.cpp`'s `mapTopLevelKind` switch
+  has no case for either; `BlockPresentation.cpp`'s own comment: "
+  `BlockKind::Mermaid` itself is never assigned by the load path").
+  `Math` is reachable only via live typed inference (`$$…$$`
+  promotion); `Mermaid` is reachable through **no path in canvas at
+  all** — a mermaid fence always loads as `CodeBlock` with
+  `infoString == "mermaid"`. Both role-mapping test rows use
+  `MarkoffDocument::testInsertBlock(kind, content)` (a document-level
+  test helper, unconditionally compiled, not previously used outside
+  `markoff-core`'s own D2 tests) followed by `View::setDocument()` —
+  `setDocument()` primes the block-index cache synchronously at attach
+  time (`onDocumentChanged()` called directly, not via the debounced
+  `d2DocumentChanged` signal `testInsertBlock` never emits anyway), so
+  no `processEvents()` spin is needed. `HtmlBlock`, by contrast,
+  **does** load correctly via a plain `loadFromMarkdown("<div>\n…\n</div>\n")`
+  fixture — confirmed empirically; `MarkoffDocument.cpp`'s top-level
+  kind map has a direct, unconditional `Kind::HtmlBlock` →
+  `BlockKind::HtmlBlock` case (unlike `Image`, which needs a load-time
+  caret-block promotion pass — also exercised, and also just worked).
+  16 new test cases added to `tst_canvas_accessibility.cpp` (13 role
+  rows + 3 state groups), all passing on first run; no core change
+  needed (spec §8 held). Falsification: broke the `Heading` role
+  mapping to return `Paragraph` (`e4915b30`), 1 of 22 accessibility
+  tests failed as expected, reverted (`7e11e4ec`). Canvas suite
+  unaffected in target count (still 40 targets — A1.2 only grew an
+  existing test binary); full suite target count holds at
+  **208/208** (same as A1.1's ending baseline — A1.2 added no new
+  test *executable*, only cases within the existing one).
