@@ -354,6 +354,13 @@ QString markdownToHtml(const QByteArray &markdown)
     const QByteArray body = bodyUtf8(*doc);
     QString html;
     enum { NoList, Ul, Ol } openList = NoList;
+    // Parser emits quoted paragraphs as Kind::Paragraph with
+    // blockQuoteDepth > 0 (Kind::BlockQuote is not used for normal `>`
+    // lines). Group consecutive siblings of one block_quote run into a
+    // single <blockquote> so LibreOffice maps them to Block Quote /
+    // Quotations instead of Body Text.
+    int openQuoteRunId = 0;
+    int openQuoteDepth = 0;
 
     auto closeList = [&]() {
         if (openList == Ul)
@@ -363,8 +370,34 @@ QString markdownToHtml(const QByteArray &markdown)
         openList = NoList;
     };
 
+    auto closeQuote = [&]() {
+        closeList();
+        while (openQuoteDepth > 0) {
+            html += QStringLiteral("</blockquote>");
+            --openQuoteDepth;
+        }
+        openQuoteRunId = 0;
+    };
+
+    auto syncQuote = [&](const TopLevelBlock &block) {
+        const int depth = qMax(0, block.blockQuoteDepth);
+        const int runId = block.blockQuoteRunId;
+        if (depth == 0) {
+            closeQuote();
+            return;
+        }
+        if (runId != openQuoteRunId || depth != openQuoteDepth) {
+            closeQuote();
+            for (int d = 0; d < depth; ++d)
+                html += QStringLiteral("<blockquote>");
+            openQuoteDepth = depth;
+            openQuoteRunId = runId;
+        }
+    };
+
     for (const TopLevelBlock &block : doc->topLevelBlocks()) {
         const QByteArray slice = blockSlice(body, block);
+        syncQuote(block);
         if (block.kind == TopLevelBlock::Kind::ListItem) {
             const auto want = isOrderedList(block) ? Ol : Ul;
             if (openList != want) {
@@ -405,9 +438,12 @@ QString markdownToHtml(const QByteArray &markdown)
             html += QStringLiteral("<hr>");
             break;
         case TopLevelBlock::Kind::BlockQuote: {
-            html += QStringLiteral("<blockquote>");
-            html += inlinesToHtml(slice, spansFor(block, slice));
-            html += QStringLiteral("</blockquote>");
+            // Legacy/standalone BlockQuote kind (not emitted for normal
+            // `>` lines post-#8.1). Still wrap content in <p> for LO.
+            const QString inner = inlinesToHtml(slice, spansFor(block, slice));
+            html += QStringLiteral("<blockquote><p>");
+            html += inner;
+            html += QStringLiteral("</p></blockquote>");
             break;
         }
         default: {
@@ -421,7 +457,7 @@ QString markdownToHtml(const QByteArray &markdown)
         }
         }
     }
-    closeList();
+    closeQuote();
     return html;
 }
 
@@ -435,13 +471,24 @@ QByteArray markdownToRtf(const QByteArray &markdown)
     if (!doc)
         return {};
     const QByteArray body = bodyUtf8(*doc);
-    QString rtf = QStringLiteral("{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Times;}{\\f1 Courier;}}");
+    // \li720/\ri720 (~0.5") is the common Word/LibreOffice quotation indent.
+    QString rtf = QStringLiteral(
+        "{\\rtf1\\ansi\\deff0"
+        "{\\fonttbl{\\f0 Times;}{\\f1 Courier;}}"
+        "{\\stylesheet{\\s0 Normal;}{\\s1\\li720\\ri720 Quotations;}}");
     bool first = true;
     for (const TopLevelBlock &block : doc->topLevelBlocks()) {
         if (!first)
-            rtf += QStringLiteral("\\par ");
+            rtf += QStringLiteral("\\par\n");
         first = false;
         const QByteArray slice = blockSlice(body, block);
+        const int quoteDepth = qMax(0, block.blockQuoteDepth);
+        const int indent = 720 * qMax(1, quoteDepth);
+        if (quoteDepth > 0)
+            rtf += QStringLiteral("\\pard\\s1\\li%1\\ri%1 ").arg(indent);
+        else
+            rtf += QStringLiteral("\\pard\\s0 ");
+
         if (block.kind == TopLevelBlock::Kind::AtxHeading
             || block.kind == TopLevelBlock::Kind::SetextHeading) {
             rtf += QStringLiteral("{\\b ");

@@ -16,7 +16,10 @@ private slots:
     void markdownToPlain_stripsBoldItalicStrikeCodeHeadings();
     void markdownToPlain_keepsListMarkersAndLinkText();
     void markdownToHtml_emitsSemanticTagsNotThemedCss();
+    void markdownToHtml_blockquoteWrapsQuotedParagraph();
+    void markdownToHtml_blockquoteGroupsSameRun();
     void markdownToRtf_roundTripsBoldItalicViaQTextDocument();
+    void markdownToRtf_blockquoteIndentsQuotedParagraph();
     void htmlToMarkdown_boldItalicLinkListHeading();
     void htmlToMarkdown_tableToGfmPipes();
     void htmlToMarkdown_stripsScriptAndStyle();
@@ -77,6 +80,30 @@ void TstClipboardCodec::markdownToHtml_emitsSemanticTagsNotThemedCss()
     QVERIFY2(!html.contains(QStringLiteral("QFont")), qPrintable(html));
 }
 
+void TstClipboardCodec::markdownToHtml_blockquoteWrapsQuotedParagraph()
+{
+    // Parser emits quoted lines as Paragraph + blockQuoteDepth>0, not
+    // Kind::BlockQuote. Export must still wrap them for LibreOffice.
+    const QString html = markdownToHtml(QByteArray("> a quoted line\n\nbody\n"));
+    QVERIFY2(html.contains(QStringLiteral("<blockquote>")), qPrintable(html));
+    QVERIFY2(html.contains(QStringLiteral("</blockquote>")), qPrintable(html));
+    QVERIFY2(html.contains(QStringLiteral("<p>")), qPrintable(html));
+    QVERIFY2(html.contains(QStringLiteral("quoted line")), qPrintable(html));
+    // Unquoted body stays outside the blockquote.
+    const int close = html.indexOf(QStringLiteral("</blockquote>"));
+    QVERIFY(close >= 0);
+    QVERIFY2(html.mid(close).contains(QStringLiteral("body")), qPrintable(html));
+}
+
+void TstClipboardCodec::markdownToHtml_blockquoteGroupsSameRun()
+{
+    const QString html = markdownToHtml(QByteArray("> p1\n>\n> p2\n"));
+    QCOMPARE(html.count(QStringLiteral("<blockquote>")), 1);
+    QCOMPARE(html.count(QStringLiteral("</blockquote>")), 1);
+    QVERIFY2(html.contains(QStringLiteral("p1")), qPrintable(html));
+    QVERIFY2(html.contains(QStringLiteral("p2")), qPrintable(html));
+}
+
 void TstClipboardCodec::markdownToRtf_roundTripsBoldItalicViaQTextDocument()
 {
     const QByteArray rtf = markdownToRtf(QByteArray("**bold** and *italic*\n"));
@@ -86,6 +113,17 @@ void TstClipboardCodec::markdownToRtf_roundTripsBoldItalicViaQTextDocument()
              rtf.constData());
     QVERIFY2(lower.contains("bold"), rtf.constData());
     QVERIFY2(lower.contains("italic"), rtf.constData());
+}
+
+void TstClipboardCodec::markdownToRtf_blockquoteIndentsQuotedParagraph()
+{
+    const QByteArray rtf = markdownToRtf(QByteArray("> a quoted line\n\nbody\n"));
+    const QByteArray lower = rtf.toLower();
+    QVERIFY2(lower.contains("\\li720") || lower.contains("\\li1440"),
+             rtf.constData());
+    QVERIFY2(lower.contains("quotations") || lower.contains("\\s1"),
+             rtf.constData());
+    QVERIFY2(lower.contains("quoted"), rtf.constData());
 }
 
 void TstClipboardCodec::htmlToMarkdown_boldItalicLinkListHeading()
