@@ -74,7 +74,7 @@ Push.
 | A1.1 `CanvasAccessible` container + factory registration | ☑ | `48c5ac1d` | break `7117c023` / revert `8c54a2e3` |
 | A1.2 `CanvasBlockAccessible` skeleton + role/state mapping | ☑ | `21c371c8` | break `e4915b30` / revert `7e11e4ec` |
 | A1.3 `accessibleDocumentName` public property + name resolution | ☑ | `893f68ef` | break `39e02ea6` / revert `7a2a30b1` |
-| A1.4 ⏸ phase close (full suite) | ☑ | `PENDING_SHA` | exempt |
+| A1.4 ⏸ phase close (full suite) | ☑ | `85b70046` | exempt |
 | **A2 — text interface** | | | |
 | A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☐ | | |
 | A2.2 Caret + selection, including cross-block presentation | ☐ | | |
