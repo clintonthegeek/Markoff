@@ -74,7 +74,7 @@ Push.
 | A1.1 `CanvasAccessible` container + factory registration | ☑ | `48c5ac1d` | break `7117c023` / revert `8c54a2e3` |
 | A1.2 `CanvasBlockAccessible` skeleton + role/state mapping | ☑ | `21c371c8` | break `e4915b30` / revert `7e11e4ec` |
 | A1.3 `accessibleDocumentName` public property + name resolution | ☑ | `893f68ef` | break `39e02ea6` / revert `7a2a30b1` |
-| A1.4 ⏸ phase close (full suite) | ☐ | | exempt |
+| A1.4 ⏸ phase close (full suite) | ☑ | `PENDING_SHA` | exempt |
 | **A2 — text interface** | | | |
 | A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☐ | | |
 | A2.2 Caret + selection, including cross-block presentation | ☐ | | |
@@ -485,3 +485,23 @@ record the final baseline.
   893f68ef -- Accessibility.cpp` (content-addressed, not history-
   addressed) and diffing the two commits' trees directly to confirm
   byte-identity before trusting the test run.
+- **A1.4 (2026-08-19): Phase A1 closed — verification only, no code
+  changes.** Confirmed A1.0–A1.3 all ☑ with findings-log entries
+  matching what's actually in `src/Accessibility.{h,cpp}` (container +
+  per-block tree, role/state mapping incl. `Attribute::Level` on
+  headings, `accessibleDocumentName` + three-level Name resolution).
+  Clean rebuild (`cmake --build build-dev -j 4`, no warnings of note).
+  Full suite via `scripts/run-tests.sh`: **208/208**, same target
+  count as A1.1's ending baseline — A1.2/A1.3 grew test *cases* inside
+  the existing `tst_canvas_accessibility` binary, not new executables,
+  so the target count never moved across A1. `tst_realistic` (105.67s)
+  and `tst_benchmark` (307.76s) both passed.
+  `libs/markoff-canvas/tests/check-constitution.sh`: clean (C1–C4)
+  over 79 files. Both remotes (`codeberg` primary, `origin` GitHub
+  mirror) were already in sync with `HEAD` before this task started —
+  nothing to pull. Nothing surfaced needing a fix; per the plan's task
+  description ("no code changes beyond what the close reveals") this
+  session made **docs-only** changes: canvas `CLAUDE.md` status
+  section rewritten to describe A1 as closed and point at A2.1 as the
+  next task; root `CLAUDE.md`'s "Current workfront" section updated
+  the same way (was still saying "Start at A1.0", now stale).

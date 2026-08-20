@@ -34,8 +34,12 @@ tests (the ratchet) plus one manual Orca pass at arc close (needs
 `--direct` permission). Tables and theme-side a11y are decided out
 (spec §6, §1). Plan:
 [`docs/plans/2026-08-19-g1-canvas-accessibility.md`](docs/plans/2026-08-19-g1-canvas-accessibility.md)
-— phases A1–A5, gate A-G1. **Start at A1.0** (throwaway probe: does
-`QAccessible::Attribute::Level` survive Qt's AT-SPI bridge?).
+— phases A1–A5, gate A-G1. **Phase A1 (tree, roles, registration)
+CLOSED 2026-08-19** (A1.0–A1.4): container + per-block accessibility
+tree landed, role/state mapping per spec §4.2, `accessibleDocumentName`
++ Name resolution, full suite 208/208, constitution clean. **Start at
+A2.1** (`QAccessibleTextInterface` core: text/characterCount/offsets,
+per-block UTF-8 byte↔QChar, never cross-block per C4).
 
 **Standstill:** with the canvas production arc closed, `markoff-core`
 and `libs/markoff-canvas/` are open again for ordinary work (not

@@ -37,6 +37,25 @@ The four hard rules below still govern — and a11y work needs **no**
 exception to any of them. If a task seems to, you are doing it wrong:
 stop and log.
 
+**Phase A1 (tree, roles, registration) CLOSED 2026-08-19** (A1.4
+phase close, exempt from falsification). Landed:
+`src/Accessibility.{h,cpp}` — `CanvasAccessible : QAccessibleWidget`
+(container, role `Document`, child list backed by `View::blockCount`/
+`blockIdAt`/`blockIndexOf`/`blockRect`, factory installed once per
+`View` ctor) and `CanvasBlockAccessible` (per-block role/state per
+spec §4.2, `Attribute::Level` on `Heading` blocks via
+`QAccessibleAttributesInterface` — confirmed reaching AT-SPI by
+A1.0's probe, so no description-text fallback needed). `View`/
+`EditorWidget` gained `accessibleDocumentName` with container `Name`
+resolution `accessibleDocumentName()` → `inlineTitle()` →
+`tr("Markdown document")`. Two roles remain unreachable from Qt
+(`BlockQuote`→`Section`, `Math`→`StaticText`) — logged at the mapping
+site, not fixed. No `markoff-core` change needed anywhere in A1
+(spec §8 held); constitution clean throughout. Full suite **208/208**
+at close. **Next: Phase A2 (text interface), start at A2.1**
+(`QAccessibleTextInterface` core — text/characterCount/offsets,
+per-block UTF-8 byte↔QChar via `coords::`, never cross-block per C4).
+
 ## The four hard rules (constitution — now permanent law, spec §3)
 
 - **C1** no re-entrance guards (`m_applying*`, `isApplying*`, …).
