@@ -71,7 +71,7 @@ Push.
 |---|---|---|---|
 | **A1 — tree, roles, registration** | | | |
 | A1.0 Bridge probe + `Attribute::Level` verdict (spike, throwaway) | ☑ | — | exempt |
-| A1.1 `CanvasAccessible` container + factory registration | ☑ | pending | n/a (tree-shape task, not a falsifiable behavior change) |
+| A1.1 `CanvasAccessible` container + factory registration | ☑ | `48c5ac1d` | break `7117c023` / revert `8c54a2e3` |
 | A1.2 `CanvasBlockAccessible` skeleton + role/state mapping | ☐ | | |
 | A1.3 `accessibleDocumentName` public property + name resolution | ☐ | | |
 | A1.4 ⏸ phase close (full suite) | ☐ | | exempt |
@@ -374,3 +374,30 @@ record the final baseline.
   File nothing upstream (no bug exists). Scratch probe lived at
   `/tmp/.../scratchpad/a11y_probe/`, not committed, deleted after the
   probe.
+- **A1.1 (2026-08-19): `CanvasAccessible` container landed.** New
+  `src/Accessibility.{h,cpp}`: `CanvasAccessible : QAccessibleWidget`
+  (role `Document`, `childCount()`/`child()`/`childAt()`/
+  `indexOfChild()` backed by `View::blockCount()`/`blockIdAt()`/
+  `blockIndexOf()`/`blockRect()`, `state().editable` tracking
+  `isReadOnly()`) and a `CanvasBlockAccessible` skeleton implementing
+  bare `QAccessibleInterface` (real `rect()` — maps
+  `View::blockRect()` through the scroll offset and viewport to
+  global coords; placeholder `role()`/`state()`, replaced by A1.2).
+  Factory installed once from `View`'s constructor via a static-bool
+  guard. Block-accessible cache is `std::unordered_map<BlockId, …>`,
+  not `QHash` — `QHash`'s copy-on-write `Node` requires a copyable
+  value and rejects `std::unique_ptr` (compile error, not a runtime
+  finding); `BlockId` needed a local `std::hash` shim (`BlockIdHash`)
+  since it only defines Qt's `qHash`. `iterateBlocks()`/`blockCount()`
+  already track the FULL document (not `realizedBlockCount()`) via
+  `BlockLayoutCache::entries()` — confirmed by reading
+  `BlockLayoutCache.h`, no core change needed, spec §8 holds.
+  Falsification: broke `childCount()` to return a hardcoded `0`
+  (`7117c023`), 3 of 4 new test cases failed as expected, reverted
+  (`8c54a2e3`). Full suite 207/207 → **208/208**. Test-design note
+  (not a product finding): `MarkoffDocument::loadFromMarkdown()`'s
+  `d2DocumentChanged` is one-event-loop-spin deferred (core's own doc
+  comment) — a *second* load on an already-attached `View` needs
+  `QCoreApplication::processEvents()` before `childCount()` reflects
+  it, since `View::onDocumentChanged()` is wired to that signal, not
+  the synchronous `documentChanged()`.
