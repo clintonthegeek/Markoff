@@ -55,7 +55,7 @@ QAccessible::State CanvasAccessible::state() const
 
 int CanvasAccessible::childCount() const
 {
-    return 0;  // FALSIFICATION PROBE — deliberately wrong, throwaway.
+    return m_view->blockCount();
 }
 
 QAccessibleInterface *CanvasAccessible::child(int index) const
