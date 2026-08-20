@@ -35,8 +35,11 @@
 #include <vector>
 
 #include <markoff/core/AttrNames.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/ClipboardCodec.h>
 #include <markoff/core/Cmd/D2.h>
 #include <markoff/core/KindInference.h>
+#include <markoff/core/Origin.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
@@ -2281,7 +2284,12 @@ QByteArray View::selectedText() const
                 parts << cellText;
             continue;
         }
-        parts << m_doc->blockText(e.id).mid(from, to - from);
+        QByteArray slice = m_doc->blockText(e.id).mid(from, to - from);
+        // ListItem buffers are content-only; restore the marker when the
+        // selection includes the start of the item so Copy round-trips.
+        if (from == 0 && m_doc->blockKind(e.id) == Markoff::BlockKind::ListItem)
+            slice.prepend(m_doc->listItemDisplayMarker(e.id));
+        parts << slice;
     }
     return parts.join("\n\n");
 }
@@ -2414,6 +2422,43 @@ void View::collapseSelection()
 // explains why paste routes newlines through tryStructuralKey rather than a
 // second block-split implementation).
 
+namespace {
+
+uint32_t flatByteOffset(Markoff::MarkoffDocument *doc, Markoff::BlockId block, int byteOffset)
+{
+    uint32_t cursor = 0;
+    for (const Markoff::BlockId id : doc->iterateBlocks()) {
+        const int size = doc->blockText(id).size();
+        if (id == block)
+            return cursor + uint32_t(qBound(0, byteOffset, size));
+        cursor += uint32_t(size);
+    }
+    return cursor;
+}
+
+bool mimeOffersPaste(const QMimeData *mime)
+{
+    if (!mime)
+        return false;
+    using namespace Markoff::ClipboardCodec;
+    return mime->hasText() || mime->hasHtml()
+        || mime->hasFormat(QString::fromUtf8(kMarkdownMime))
+        || mime->hasFormat(QString::fromUtf8(kRtfMime))
+        || mime->hasFormat(QStringLiteral("application/rtf"))
+        || mime->hasFormat(QString::fromUtf8(kBlocksMime));
+}
+
+void copySelectionToClipboard(const QByteArray &markdown,
+                              Markoff::ClipboardCodec::Flavor flavor)
+{
+    if (markdown.isEmpty())
+        return;
+    QGuiApplication::clipboard()->setMimeData(
+        Markoff::ClipboardCodec::mimeFromMarkdown(markdown, {}, flavor));
+}
+
+}  // namespace
+
 void View::cut()
 {
     // Read-only gate (P3.3, spec §4.2): Cut is disabled in its entirety
@@ -2422,7 +2467,7 @@ void View::cut()
     // enabled below).
     if (m_readOnly || !hasSelection())
         return;
-    QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
+    copy();
     collapseSelection();
     ensureCaretVisible();
     viewport()->update();
@@ -2432,14 +2477,84 @@ void View::copy()
 {
     if (!hasSelection())
         return;
-    QGuiApplication::clipboard()->setText(QString::fromUtf8(selectedText()));
+    copySelectionToClipboard(selectedText(), Markoff::ClipboardCodec::Flavor::All);
+}
+
+void View::copyAsPlain()
+{
+    if (!hasSelection())
+        return;
+    copySelectionToClipboard(selectedText(), Markoff::ClipboardCodec::Flavor::Plain);
+}
+
+void View::copyAsMarkdown()
+{
+    if (!hasSelection())
+        return;
+    copySelectionToClipboard(selectedText(), Markoff::ClipboardCodec::Flavor::Markdown);
+}
+
+void View::copyAsHtml()
+{
+    if (!hasSelection())
+        return;
+    copySelectionToClipboard(selectedText(), Markoff::ClipboardCodec::Flavor::Html);
+}
+
+void View::copyAsRtf()
+{
+    if (!hasSelection())
+        return;
+    copySelectionToClipboard(selectedText(), Markoff::ClipboardCodec::Flavor::Rtf);
 }
 
 void View::paste()
 {
-    if (!m_doc || m_readOnly || m_caret.block.isNull())
+    pasteConverted(QGuiApplication::clipboard()->mimeData(), false);
+}
+
+void View::pasteAsPlain()
+{
+    pasteConverted(QGuiApplication::clipboard()->mimeData(), true);
+}
+
+void View::pasteConverted(const QMimeData *mime, bool asPlain)
+{
+    if (!m_doc || m_readOnly || m_caret.block.isNull() || !mime)
         return;
-    insertText(QGuiApplication::clipboard()->text());
+    const auto mode = asPlain ? Markoff::ClipboardCodec::PasteMode::Plain
+                              : Markoff::ClipboardCodec::PasteMode::Smart;
+    const QByteArray md = Markoff::ClipboardCodec::markdownFromMime(mime, mode);
+    if (md.isEmpty())
+        return;
+
+    uint32_t lo = 0;
+    uint32_t hi = 0;
+    if (const auto sel = orderedSelection()) {
+        const auto &[start, end] = *sel;
+        lo = flatByteOffset(m_doc, start.block, start.byteOffset);
+        hi = flatByteOffset(m_doc, end.block, end.byteOffset);
+        if (lo > hi)
+            std::swap(lo, hi);
+    } else {
+        lo = hi = flatByteOffset(m_doc, m_caret.block, m_caret.byteOffset);
+    }
+
+    m_doc->applyFlatEdit(lo, hi, md, Markoff::Origin::UserEdit);
+    m_doc->flushPendingD2Changed();
+
+    const uint32_t target = lo + uint32_t(md.size());
+    uint32_t cursor = 0;
+    for (const BlockId id : m_doc->iterateBlocks()) {
+        const uint32_t size = uint32_t(m_doc->blockText(id).size());
+        if (target <= cursor + size) {
+            setCaretPosition(id, int(target - cursor));
+            break;
+        }
+        cursor += size;
+    }
+    ensureCaretVisible();
+    viewport()->update();
 }
 
 // P7.2: factored out of paste() so the drag-in drop handler and the
@@ -2833,13 +2948,11 @@ QMimeData *View::createMimeDataFromSelection() const
     if (!hasSelection())
         return nullptr;
     const QByteArray text = selectedText();
-    auto *data = new QMimeData;
-    data->setText(QString::fromUtf8(text));
-    // Same bytes under a second MIME type, not a second serialization —
-    // this leaf's markdown IS its plain-text form (no styled-rich-text
-    // round-trip the way live/styled would need).
-    data->setData(QStringLiteral("text/markdown"), text);
-    return data;
+    if (text.isEmpty())
+        return nullptr;
+    // Multi-flavor (markdown + HTML + RTF), same snapshot copy() uses.
+    return Markoff::ClipboardCodec::mimeFromMarkdown(
+        text, {}, Markoff::ClipboardCodec::Flavor::All);
 }
 
 void View::startTextDrag()
@@ -3000,7 +3113,8 @@ void View::contextMenuEvent(QContextMenuEvent *event)
 void View::buildContextMenu(QMenu &menu)
 {
     const bool hasDoc = m_doc && !m_caret.block.isNull();
-    const bool clipboardHasText = !QGuiApplication::clipboard()->text().isEmpty();
+    const bool clipboardHasText =
+        mimeOffersPaste(QGuiApplication::clipboard()->mimeData());
 
     QAction *cutAction = menu.addAction(tr("Cut"), this, &View::cut);
     cutAction->setShortcut(QKeySequence::Cut);
@@ -3010,6 +3124,13 @@ void View::buildContextMenu(QMenu &menu)
     copyAction->setShortcut(QKeySequence::Copy);
     copyAction->setEnabled(hasSelection());
 
+    QMenu *copyAsMenu = menu.addMenu(tr("Copy as"));
+    copyAsMenu->setEnabled(hasSelection());
+    copyAsMenu->addAction(tr("Markdown"), this, &View::copyAsMarkdown);
+    copyAsMenu->addAction(tr("Plain Text"), this, &View::copyAsPlain);
+    copyAsMenu->addAction(tr("HTML"), this, &View::copyAsHtml);
+    copyAsMenu->addAction(tr("RTF"), this, &View::copyAsRtf);
+
     // The falsification target named by the plan (P4.4): Paste must be
     // disabled while read-only. Gated on clipboard content too (mirrors
     // QPlainTextEdit's own canPaste()-driven Paste action) so an empty
@@ -3017,6 +3138,11 @@ void View::buildContextMenu(QMenu &menu)
     QAction *pasteAction = menu.addAction(tr("Paste"), this, &View::paste);
     pasteAction->setShortcut(QKeySequence::Paste);
     pasteAction->setEnabled(!m_readOnly && hasDoc && clipboardHasText);
+
+    QAction *pastePlainAction =
+        menu.addAction(tr("Paste as Plain Text"), this, &View::pasteAsPlain);
+    pastePlainAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
+    pastePlainAction->setEnabled(!m_readOnly && hasDoc && clipboardHasText);
 
     QAction *selectAllAction = menu.addAction(tr("Select All"), this, &View::selectAll);
     selectAllAction->setShortcut(QKeySequence::SelectAll);
@@ -4241,7 +4367,10 @@ void View::keyPressEvent(QKeyEvent *event)
         // paste() carries its own read-only/empty-clipboard/no-caret checks
         // (P4.4) — same "the op checks itself, the shortcut just calls it"
         // shape as cut()/copy()/selectAll() above.
-        paste();
+        if (event->modifiers().testFlag(Qt::ShiftModifier))
+            pasteAsPlain();
+        else
+            paste();
         event->accept();
         return;
     }

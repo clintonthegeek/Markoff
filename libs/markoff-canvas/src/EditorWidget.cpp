@@ -603,6 +603,39 @@ void EditorWidget::setHeadingLevel(int level)
     if (m_view) m_view->setHeadingLevel(level);
 }
 
+void EditorWidget::copy()
+{
+    if (m_view) m_view->copy();
+}
+void EditorWidget::copyAsPlain()
+{
+    if (m_view) m_view->copyAsPlain();
+}
+void EditorWidget::copyAsMarkdown()
+{
+    if (m_view) m_view->copyAsMarkdown();
+}
+void EditorWidget::copyAsHtml()
+{
+    if (m_view) m_view->copyAsHtml();
+}
+void EditorWidget::copyAsRtf()
+{
+    if (m_view) m_view->copyAsRtf();
+}
+void EditorWidget::cut()
+{
+    if (m_view) m_view->cut();
+}
+void EditorWidget::paste()
+{
+    if (m_view) m_view->paste();
+}
+void EditorWidget::pasteAsPlain()
+{
+    if (m_view) m_view->pasteAsPlain();
+}
+
 void EditorWidget::setReadOnly(bool ro)
 {
     Markoff::MarkdownView::setReadOnly(ro);
