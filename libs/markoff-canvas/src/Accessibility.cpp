@@ -226,7 +226,7 @@ QAccessible::Role CanvasBlockAccessible::role() const
         // BlockQuote below.
         return m_view->isFootnoteDefBlock(m_id) ? QAccessible::Section : QAccessible::Paragraph;
     case BlockKind::Heading:
-        return QAccessible::Heading;
+        return QAccessible::Paragraph;  // FALSIFICATION PROBE (A1.2, throwaway)
     case BlockKind::CodeBlock:
         // No dedicated "code" role in Qt's QAccessible::Role enum — the
         // language is carried in the description instead (spec §4.2).
