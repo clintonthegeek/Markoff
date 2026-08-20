@@ -76,7 +76,7 @@ Push.
 | A1.3 `accessibleDocumentName` public property + name resolution | ☑ | `893f68ef` | break `39e02ea6` / revert `7a2a30b1` |
 | A1.4 ⏸ phase close (full suite) | ☑ | `85b70046` | exempt |
 | **A2 — text interface** | | | |
-| A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☐ | | |
+| A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☑ | `f4cb40ab` | break `f8f03ff8` / revert `0bae686e` |
 | A2.2 Caret + selection, including cross-block presentation | ☐ | | |
 | A2.3 Geometry: `characterRect`, `offsetAtPoint`, line boundaries | ☐ | | |
 | A2.4 ⏸ phase close (full suite) | ☐ | | exempt |
@@ -505,3 +505,36 @@ record the final baseline.
   section rewritten to describe A1 as closed and point at A2.1 as the
   next task; root `CLAUDE.md`'s "Current workfront" section updated
   the same way (was still saying "Start at A1.0", now stale).
+- **A2.1 (2026-08-19): `QAccessibleTextInterface` core landed.**
+  `CanvasBlockAccessible` now implements the interface via
+  `interface_cast` (mirroring the existing `AttributesInterface`
+  dispatch), `nullptr` for `HorizontalRule`/`Image`/`Mermaid` per
+  spec §4.2 (no text content). `text()`/`characterCount()` operate on
+  `document()->blockText(id)`, converted byte↔QChar with `coords::`
+  (per-block only, never cross-block — C4). `CharBoundary`/
+  `WordBoundary` reuse the base class's default `QTextBoundaryFinder`
+  implementation as-is (already QChar-space correct once `text()`/
+  `characterCount()` are right); `ParagraphBoundary` is overridden
+  explicitly because a block is always exactly one paragraph even
+  when its own buffer has embedded newlines (`CodeBlock` fences),
+  which would otherwise fool the base class's line-break-search
+  default into reporting sub-block paragraphs. The remaining pure
+  virtuals outside this task's scope — `selection`/`cursorPosition`
+  (A2.2), `characterRect`/`offsetAtPoint` (A2.3) — are documented
+  placeholder stubs, same "compile-complete but explicitly not yet
+  correct" precedent A1.1 set for `role()`/`state()`;
+  `scrollToSubstring`/`attributes()` get minimal safe stubs (no task
+  currently owns them). 9 new test cases including an explicit UTF-8
+  multibyte fixture (accents, CJK, emoji surrogate pairs) proving
+  `characterCount()` is a QChar count, not a byte count. Falsification:
+  broke `characterCount()` to return the raw byte count instead of the
+  QChar count (`f8f03ff8`), the multibyte test failed as expected,
+  reverted (`0bae686e`). Full suite (per this task's own tier —
+  `scripts/run-tests.sh`, not just `-R canvas`, since `coords::` is
+  shared with every leaf): **208/208**, constitution clean. Real
+  commit `f4cb40ab`. Session interrupted by a usage-limit reset right
+  after this commit landed but before the checklist/findings-log
+  update was written; verified on resume (2026-08-20) that the
+  working tree matched the last real commit exactly (clean rebuild,
+  canvas suite 40/40 including `tst_canvas_constitution`) before
+  writing this entry and pushing — nothing was lost or needed redoing.
