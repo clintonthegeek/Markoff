@@ -1,11 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// KNOWN BUG PINS (Cluster N N5 / canvas BlockQuote asymmetry) — these
-// assert today's broken loaded-vs-typed behavior so a fix has to flip them:
-//   - load → content-only buffer (correct)
-//   - selectedText-like copy of loaded quote → no <blockquote> in HTML
-//   - kind=BlockQuote with "> " still in buffer → serialize doubles to "> >"
-// Canvas fix: strip on promote + restore marker in selectedText (ListItem).
-// See Corbomite punch-list "BlockQuote typed-vs-loaded buffer asymmetry".
+// Codec-level characterization for the "BlockQuote typed-vs-loaded buffer
+// asymmetry" bug (Cluster N N5 finding; Corbomite punch-list). The actual
+// fix lives in markoff-canvas's View.cpp (promoteCaretBlockKind strips the
+// typed "> " + sets BlockQuoteDepth on promotion; selectedText() restores
+// the marker via the new MarkoffDocument::blockQuoteDisplayMarker(), mirror
+// of listItemDisplayMarker()) and is covered by
+// tst_canvas_rich_clipboard::copy_loadedBlockQuote_includesMarkerAndExportsHtml
+// / typedBlockQuote_bufferHasNoMarker_andCopyRoundTrips — this file can't
+// reach View (markoff-core has no markoff-canvas dependency), so it only
+// pins the underlying core/codec building blocks the fix depends on:
+//   - load → content-only buffer (correct, unaffected by the fix)
+//   - a content-only (unprefixed) selection correctly does NOT read as a
+//     blockquote to the codec — confirms *why* selectedText() must
+//     prepend the marker, not a claim that it doesn't
+//   - a buffer that still has "> " AND kind=BlockQuote doubles on
+//     serialize — this is the shape promoteCaretBlockKind's strip now
+//     prevents from ever occurring, not a currently-reachable bug
 #include <QTest>
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/BlockKind.h>

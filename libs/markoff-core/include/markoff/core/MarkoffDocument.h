@@ -269,6 +269,16 @@ public:
     /// NOT part of the edited flat-view byte space.
     QByteArray listItemDisplayMarker(BlockId id) const;
 
+    /// Same idea as listItemDisplayMarker() for BlockQuote: returns
+    /// `depth × "> "` (BlockQuoteDepth attr, default/minimum 1) — the exact
+    /// prefix serializeBlockQuote() reconstructs from a content-only
+    /// buffer, single source of truth. Empty for any non-BlockQuote block.
+    /// Intended for a selection-copy caller to restore the `> ` marker the
+    /// same way listItemDisplayMarker() lets ListItem callers restore `-`/
+    /// `1.` (buffers for both kinds are marker-stripped content — see the
+    /// buffer-convention table in markoff-core/CLAUDE.md).
+    QByteArray blockQuoteDisplayMarker(BlockId id) const;
+
     /// Structure-aware paste. Serializes `blocks` (a QJsonArray of block
     /// objects with "kind", "text", and optional "attrs") to flat markdown
     /// and calls applyFlatEdit on the byte range [startByte, endByte).

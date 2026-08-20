@@ -59,9 +59,18 @@ MARKOFF_CORE_EXPORT void changeKind(MarkoffDocument &doc,
                                            const QList<AttrValue>  &attrValues = {});
 
 /// Paste markdown source at byteOffset within targetBlock.
-/// Parses source synchronously. Splits targetBlock at the offset, inserts
-/// parsed blocks after the split, appends the tail to the last inserted block.
-MARKOFF_CORE_EXPORT void pasteMarkdown(MarkoffDocument &doc,
+/// Parses source synchronously (kept as typed blocks — Table, Heading,
+/// ListItem, etc. — not flattened to Paragraph the way applyFlatEdit would).
+/// Splits targetBlock at the offset, inserts parsed blocks after the split,
+/// appends the tail to the last inserted block.
+/// Returns the caret position immediately after the pasted content (before
+/// the reappended tail), so a block-local caller (e.g. the canvas leaf,
+/// which may not do cross-block byte arithmetic) can reposition its caret
+/// without walking iterateBlocks() itself. No-op (returns
+/// {targetBlock, byteOffset}) if `source` is empty/whitespace-only or fails
+/// to parse.
+struct PasteMarkdownResult { BlockId caretBlock; uint32_t caretByteOffset; };
+MARKOFF_CORE_EXPORT PasteMarkdownResult pasteMarkdown(MarkoffDocument &doc,
                                               BlockId targetBlock,
                                               uint32_t byteOffset,
                                               const QByteArray &source);

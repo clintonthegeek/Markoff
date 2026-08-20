@@ -1775,6 +1775,27 @@ void View::promoteCaretBlockKind()
                                       false, t);
                 Markoff::Cmd::renumberRunStartingAt(*m_doc, m_caret.block, t);
             }
+        } else if (inferred.kind == Markoff::BlockKind::BlockQuote) {
+            // BlockQuote is content-narrowed like ListItem (buffer
+            // convention table): the typed "> " must NOT stay in the
+            // buffer — blockQuoteDisplayMarker()/serializeBlockQuote()
+            // reconstruct it from BlockQuoteDepth, so leaving it in place
+            // doubles it on save ("> > text") and shows a literal ">"
+            // glyph plus the quote bar on screen (punch-list "BlockQuote
+            // typed-vs-loaded buffer asymmetry"). inferBlockKind only ever
+            // matches a single "> " (or bare ">") prefix — no nested-quote
+            // typing inference — so depth is always 1 here; RunId is left
+            // at its absent/0 default ("not part of a multi-paragraph
+            // quote run", serializeForSave's own convention), which is
+            // correct for a freshly-promoted solitary quote block and
+            // matches ListItem's sibling branch in never needing a fresh
+            // id allocated for the single-block case.
+            const QString qtext = QString::fromUtf8(text);
+            const int stripLen = qtext.startsWith(QStringLiteral("> ")) ? 2 : 1;
+            m_doc->d2ApplyBufferEdit(m_caret.block, 0, uint32_t(stripLen),
+                                     QByteArray(), t);
+            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::BlockQuoteDepth,
+                                  1, t);
         }
     }
 
@@ -2303,10 +2324,17 @@ QByteArray View::selectedText() const
             continue;
         }
         QByteArray slice = m_doc->blockText(e.id).mid(from, to - from);
-        // ListItem buffers are content-only; restore the marker when the
-        // selection includes the start of the item so Copy round-trips.
+        // ListItem/BlockQuote buffers are content-only; restore the marker
+        // when the selection includes the start of the block so Copy
+        // round-trips (punch-list "BlockQuote typed-vs-loaded buffer
+        // asymmetry" — without this, copying a *loaded* quote put
+        // content-only bytes on the clipboard, so Copy as HTML/RTF
+        // re-parsed them as a plain paragraph and pasted into LibreOffice
+        // as Body Text instead of a Block Quote).
         if (from == 0 && m_doc->blockKind(e.id) == Markoff::BlockKind::ListItem)
             slice.prepend(m_doc->listItemDisplayMarker(e.id));
+        else if (from == 0 && m_doc->blockKind(e.id) == Markoff::BlockKind::BlockQuote)
+            slice.prepend(m_doc->blockQuoteDisplayMarker(e.id));
         parts << slice;
     }
     return parts.join("\n\n");
@@ -2442,18 +2470,6 @@ void View::collapseSelection()
 
 namespace {
 
-uint32_t flatByteOffset(Markoff::MarkoffDocument *doc, Markoff::BlockId block, int byteOffset)
-{
-    uint32_t cursor = 0;
-    for (const Markoff::BlockId id : doc->iterateBlocks()) {
-        const int size = doc->blockText(id).size();
-        if (id == block)
-            return cursor + uint32_t(qBound(0, byteOffset, size));
-        cursor += uint32_t(size);
-    }
-    return cursor;
-}
-
 bool mimeOffersPaste(const QMimeData *mime)
 {
     if (!mime)
@@ -2546,31 +2562,30 @@ void View::pasteConverted(const QMimeData *mime, bool asPlain)
     if (md.isEmpty())
         return;
 
-    uint32_t lo = 0;
-    uint32_t hi = 0;
-    if (const auto sel = orderedSelection()) {
-        const auto &[start, end] = *sel;
-        lo = flatByteOffset(m_doc, start.block, start.byteOffset);
-        hi = flatByteOffset(m_doc, end.block, end.byteOffset);
-        if (lo > hi)
-            std::swap(lo, hi);
-    } else {
-        lo = hi = flatByteOffset(m_doc, m_caret.block, m_caret.byteOffset);
+    if (asPlain) {
+        // Plain-mode content is literal text, not markdown source (it must
+        // NOT be reinterpreted — e.g. a line starting "# " should stay
+        // text, not become a heading), so it goes through insertText()
+        // (block-local, no reparse) — the same path drag-drop and
+        // middle-click primary-selection paste already share.
+        insertText(QString::fromUtf8(md));
+        return;
     }
 
-    m_doc->applyFlatEdit(lo, hi, md, Markoff::Origin::UserEdit);
+    // Smart-mode paste re-parses `md` so its structure (tables, headings,
+    // lists, block quotes, ...) survives as typed blocks. Cmd::pasteMarkdown
+    // takes a single block-local target, so collapse any selection first;
+    // this also keeps the leaf off applyFlatEdit / cross-block byte math
+    // (constitution C4) the way the old flatByteOffset()-based
+    // implementation didn't.
+    if (hasSelection())
+        collapseSelection();
+
+    const auto result = Markoff::Cmd::pasteMarkdown(
+        *m_doc, m_caret.block, uint32_t(m_caret.byteOffset), md);
     m_doc->flushPendingD2Changed();
 
-    const uint32_t target = lo + uint32_t(md.size());
-    uint32_t cursor = 0;
-    for (const BlockId id : m_doc->iterateBlocks()) {
-        const uint32_t size = uint32_t(m_doc->blockText(id).size());
-        if (target <= cursor + size) {
-            setCaretPosition(id, int(target - cursor));
-            break;
-        }
-        cursor += size;
-    }
+    setCaretPosition(result.caretBlock, int(result.caretByteOffset));
     ensureCaretVisible();
     viewport()->update();
 }
