@@ -200,6 +200,11 @@ add_test(NAME tst_clipboard_codec COMMAND tst_clipboard_codec)
 target_link_libraries(tst_clipboard_codec PRIVATE Qt6::Test Qt6::Gui markoff_core)
 set_tests_properties(tst_clipboard_codec PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_quote_buffer_asymmetry tst_quote_buffer_asymmetry.cpp)
+add_test(NAME tst_quote_buffer_asymmetry COMMAND tst_quote_buffer_asymmetry)
+target_link_libraries(tst_quote_buffer_asymmetry PRIVATE Qt6::Test Qt6::Gui markoff_core)
+set_tests_properties(tst_quote_buffer_asymmetry PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # MarkdownView contract v2: widget-free format ops (spec §5)
 add_executable(tst_format_ops tst_format_ops.cpp)
 add_test(NAME tst_format_ops COMMAND tst_format_ops)
