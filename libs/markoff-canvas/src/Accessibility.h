@@ -4,7 +4,10 @@
 #include <memory>
 #include <unordered_map>
 
+#include <QAccessible>
 #include <QAccessibleWidget>
+#include <QList>
+#include <QVariant>
 
 #include <markoff/core/BlockId.h>
 
@@ -62,16 +65,23 @@ private:
 };
 
 /// One per `BlockId` (spec §4.1/§4.2), implementing `QAccessibleInterface`
-/// directly (not `QAccessibleWidget` — a block is not a `QWidget`).
+/// directly (not `QAccessibleWidget` — a block is not a `QWidget`) plus
+/// `QAccessibleAttributesInterface` (heading level only, exposed via
+/// `interface_cast`).
 ///
-/// **A1.1 status:** skeleton. `rect()` is real (maps `View::blockRect()`
-/// through the viewport to global coordinates); `role()` is a placeholder
-/// constant, not yet the per-`BlockKind` table — **A1.2 replaces role()**
-/// with the real mapping (spec §4.2) and adds real `state()`. `text()` is
-/// the `QAccessible::Text` (name/description/…) surface, not block
-/// *content* — that is `QAccessibleTextInterface`, added in A2 via
-/// `interface_cast`.
-class CanvasBlockAccessible final : public QAccessibleInterface {
+/// **A1.1 status:** skeleton — superseded. `rect()` is real (maps
+/// `View::blockRect()` through the viewport to global coordinates).
+/// **A1.2:** `role()` implements the real spec §4.2 `BlockKind` → `Role`
+/// table; `state()` sets `focusable`/`focused` (caret block),
+/// `editable` (`View::isReadOnly()`), `checkable`/`checked` (task
+/// `ListItem`s, from the `Checked` attr), and `invisible` (folded-hidden
+/// blocks, `View::isBlockHidden()`). `attributeKeys()`/`attributeValue()`
+/// implement `Attribute::Level` for `Heading` blocks — confirmed to reach
+/// AT-SPI by A1.0's probe, so this is the sole mechanism (no description
+/// fallback). `text()` is still the `QAccessible::Text` (name/
+/// description/…) surface, not block *content* — that is
+/// `QAccessibleTextInterface`, added in A2 via `interface_cast`.
+class CanvasBlockAccessible final : public QAccessibleInterface, public QAccessibleAttributesInterface {
 public:
     CanvasBlockAccessible(View *view, CanvasAccessible *container, BlockId id);
 
@@ -89,6 +99,12 @@ public:
     QRect rect() const override;
     QAccessible::Role role() const override;
     QAccessible::State state() const override;
+    void *interface_cast(QAccessible::InterfaceType t) override;
+
+    // ---- QAccessibleAttributesInterface (heading level only, spec §4.6
+    // finding 3 / A1.0) --------------------------------------------------
+    QList<QAccessible::Attribute> attributeKeys() const override;
+    QVariant attributeValue(QAccessible::Attribute key) const override;
 
     BlockId blockId() const { return m_id; }
 

@@ -1,10 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Accessibility.h"
 
+#include <variant>
+
 #include <QScrollBar>
 #include <QWidget>
 
 #include <markoff/canvas/View.h>
+#include <markoff/core/AttrNames.h>
+#include <markoff/core/BlockKind.h>
+#include <markoff/core/MarkoffDocument.h>
 
 namespace Markoff::Canvas::Detail {
 
@@ -27,6 +32,46 @@ QRect blockGlobalRect(View *view, BlockId id)
     const QPoint topLeftViewport(qRound(doc.x()), qRound(doc.y() - scrollY));
     const QPoint topLeftGlobal = view->viewport()->mapToGlobal(topLeftViewport);
     return QRect(topLeftGlobal, QSize(qRound(doc.width()), qRound(doc.height())));
+}
+
+/// Reads a `bool`-typed attr off `id`, defaulting to `false` if the attr is
+/// absent or holds a different alternative — same `constFind` +
+/// `std::get_if` idiom every other reader in this leaf uses
+/// (`BlockPresentation.cpp`, `View.cpp`, …), never a wrapper of its own.
+bool boolAttr(MarkoffDocument *doc, BlockId id, const QByteArray &name)
+{
+    const auto attrs = doc->blockAttrs(id);
+    const auto it = attrs.constFind(name);
+    if (it == attrs.cend())
+        return false;
+    const bool *v = std::get_if<bool>(&it.value());
+    return v && *v;
+}
+
+/// Reads a `QString`-typed attr off `id`, or an empty string if absent /
+/// wrong-typed.
+QString stringAttr(MarkoffDocument *doc, BlockId id, const QByteArray &name)
+{
+    const auto attrs = doc->blockAttrs(id);
+    const auto it = attrs.constFind(name);
+    if (it == attrs.cend())
+        return {};
+    const QString *v = std::get_if<QString>(&it.value());
+    return v ? *v : QString();
+}
+
+/// Reads an `int`-typed attr off `id`, defaulting to `def` if absent /
+/// wrong-typed. Mirrors `intAttr()` in `BlockPresentation.cpp`/`Folding.cpp`
+/// (private to those files; duplicated here rather than shared across a
+/// leaf-internal boundary for one three-line helper).
+int intAttr(MarkoffDocument *doc, BlockId id, const QByteArray &name, int def)
+{
+    const auto attrs = doc->blockAttrs(id);
+    const auto it = attrs.constFind(name);
+    if (it == attrs.cend())
+        return def;
+    const int *v = std::get_if<int>(&it.value());
+    return v ? *v : def;
 }
 
 }  // namespace
@@ -166,16 +211,101 @@ QRect CanvasBlockAccessible::rect() const
 
 QAccessible::Role CanvasBlockAccessible::role() const
 {
-    // A1.1 placeholder — every block reports the same role regardless of
-    // BlockKind. A1.2 replaces this with the real §4.2 mapping table.
-    return QAccessible::StaticText;
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return QAccessible::NoRole;
+
+    switch (doc->blockKind(m_id)) {
+    case BlockKind::Paragraph:
+        // Footnote-definition paragraphs (`[^label]: ...`) are, per the
+        // document model, completely ordinary Paragraph blocks (spec §4.2
+        // *(footnote def)* row) — View::isFootnoteDefBlock() is the only
+        // place that distinguishes them (presentation-layer detection over
+        // the realized entry). No Qt role exists for AT-SPI's ROLE_FOOTNOTE
+        // either, so Section is the same best-available choice as
+        // BlockQuote below.
+        return m_view->isFootnoteDefBlock(m_id) ? QAccessible::Section : QAccessible::Paragraph;
+    case BlockKind::Heading:
+        return QAccessible::Heading;
+    case BlockKind::CodeBlock:
+        // No dedicated "code" role in Qt's QAccessible::Role enum — the
+        // language is carried in the description instead (spec §4.2).
+        return QAccessible::EditableText;
+    case BlockKind::ListItem:
+        return QAccessible::ListItem;
+    case BlockKind::BlockQuote:
+        // LIMITATION (spec §4.6 finding 4): AT-SPI's ROLE_BLOCK_QUOTE
+        // exists but no QAccessible::Role maps to it — Section is the best
+        // available. Do not "fix" this by hunting for a better Qt role;
+        // there isn't one as of Qt 6.11.
+        return QAccessible::Section;
+    case BlockKind::HorizontalRule:
+        return QAccessible::Separator;
+    case BlockKind::Image:
+        return QAccessible::Graphic;
+    case BlockKind::Math:
+        // LIMITATION (spec §4.6 finding 4): AT-SPI's ROLE_MATH exists but
+        // no QAccessible::Role maps to it — StaticText (→ ROLE_LABEL) is
+        // the best available; the math source is exposed as the name.
+        // Do not "fix" this by hunting for a better Qt role; there isn't
+        // one as of Qt 6.11.
+        return QAccessible::StaticText;
+    case BlockKind::Mermaid:
+        return QAccessible::Graphic;
+    case BlockKind::HtmlBlock:
+        // Raw HTML source is what the user actually edits here.
+        return QAccessible::EditableText;
+    case BlockKind::Table:
+        // QAccessibleTableInterface is explicitly deferred (spec §6) — role
+        // only; a screen reader announces "table" and reads it linearly.
+        return QAccessible::Table;
+    }
+    return QAccessible::NoRole;
 }
 
 QAccessible::State CanvasBlockAccessible::state() const
 {
-    // A1.1 placeholder — no state bits set. A1.2 adds focusable/focused/
-    // editable/checkable/invisible per §4.2/§4.3.
+    QAccessible::State s{};
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return s;
+
+    s.focusable = true;
+    s.focused = (m_view->caretBlock() == m_id);
+    s.editable = !m_view->isReadOnly();
+    s.invisible = m_view->isBlockHidden(m_id);
+
+    if (doc->blockKind(m_id) == BlockKind::ListItem
+        && stringAttr(doc, m_id, AttrNames::MarkerStyle) == QStringLiteral("task")) {
+        s.checkable = true;
+        s.checked = boolAttr(doc, m_id, AttrNames::Checked);
+    }
+
+    return s;
+}
+
+void *CanvasBlockAccessible::interface_cast(QAccessible::InterfaceType t)
+{
+    if (t == QAccessible::AttributesInterface)
+        return static_cast<QAccessibleAttributesInterface *>(this);
+    return nullptr;
+}
+
+QList<QAccessible::Attribute> CanvasBlockAccessible::attributeKeys() const
+{
+    if (role() == QAccessible::Heading)
+        return {QAccessible::Attribute::Level};
     return {};
+}
+
+QVariant CanvasBlockAccessible::attributeValue(QAccessible::Attribute key) const
+{
+    if (key != QAccessible::Attribute::Level || role() != QAccessible::Heading)
+        return {};
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return {};
+    return QVariant(intAttr(doc, m_id, AttrNames::Level, 1));
 }
 
 // ---- Factory registration ----------------------------------------------
