@@ -18,10 +18,13 @@ private slots:
     void markdownToHtml_emitsSemanticTagsNotThemedCss();
     void markdownToHtml_blockquoteWrapsQuotedParagraph();
     void markdownToHtml_blockquoteGroupsSameRun();
+    void markdownToHtml_tableEmitsTableElement();
     void markdownToRtf_roundTripsBoldItalicViaQTextDocument();
     void markdownToRtf_blockquoteIndentsQuotedParagraph();
+    void markdownToRtf_tableEmitsTrowd();
     void htmlToMarkdown_boldItalicLinkListHeading();
     void htmlToMarkdown_tableToGfmPipes();
+    void htmlToMarkdown_pipeParagraphsStayAdjacent();
     void htmlToMarkdown_stripsScriptAndStyle();
     void rtfToMarkdown_boldItalicPar();
     void markdownFromMime_prefersMarkoffBlocksThenMarkdownThenHtmlThenRtfThenPlain();
@@ -104,6 +107,21 @@ void TstClipboardCodec::markdownToHtml_blockquoteGroupsSameRun()
     QVERIFY2(html.contains(QStringLiteral("p2")), qPrintable(html));
 }
 
+void TstClipboardCodec::markdownToHtml_tableEmitsTableElement()
+{
+    const QByteArray md =
+        "| Col A | Col B |\n"
+        "|------:|:-----:|\n"
+        "| left  | mid   |\n";
+    const QString html = markdownToHtml(md);
+    QVERIFY2(html.contains(QStringLiteral("<table>")), qPrintable(html));
+    QVERIFY2(html.contains(QStringLiteral("<th>")), qPrintable(html));
+    QVERIFY2(html.contains(QStringLiteral("<td>")), qPrintable(html));
+    QVERIFY2(html.contains(QStringLiteral("Col A")), qPrintable(html));
+    QVERIFY2(html.contains(QStringLiteral("left")), qPrintable(html));
+    QVERIFY2(!html.contains(QStringLiteral("| ---")), qPrintable(html));
+}
+
 void TstClipboardCodec::markdownToRtf_roundTripsBoldItalicViaQTextDocument()
 {
     const QByteArray rtf = markdownToRtf(QByteArray("**bold** and *italic*\n"));
@@ -113,6 +131,19 @@ void TstClipboardCodec::markdownToRtf_roundTripsBoldItalicViaQTextDocument()
              rtf.constData());
     QVERIFY2(lower.contains("bold"), rtf.constData());
     QVERIFY2(lower.contains("italic"), rtf.constData());
+}
+
+void TstClipboardCodec::markdownToRtf_tableEmitsTrowd()
+{
+    const QByteArray md =
+        "| A | B |\n"
+        "| --- | --- |\n"
+        "| 1 | 2 |\n";
+    const QByteArray rtf = markdownToRtf(md);
+    const QByteArray lower = rtf.toLower();
+    QVERIFY2(lower.contains("\\trowd"), rtf.constData());
+    QVERIFY2(lower.contains("\\cell"), rtf.constData());
+    QVERIFY2(lower.contains("\\row"), rtf.constData());
 }
 
 void TstClipboardCodec::markdownToRtf_blockquoteIndentsQuotedParagraph()
@@ -164,6 +195,21 @@ void TstClipboardCodec::htmlToMarkdown_tableToGfmPipes()
     QVERIFY2(s.contains(QStringLiteral("1")), qPrintable(s));
     QVERIFY2(s.contains(QStringLiteral("2")), qPrintable(s));
     QVERIFY2(s.contains(QStringLiteral("---")), qPrintable(s));
+    // Rows must be adjacent — a blank line between them breaks GFM tables.
+    QVERIFY2(!s.contains(QStringLiteral("|\n\n|")), qPrintable(s));
+}
+
+void TstClipboardCodec::htmlToMarkdown_pipeParagraphsStayAdjacent()
+{
+    // LibreOffice sometimes pastes tables as <p> lines of pipes, not
+    // QTextTable. Those must still become a single GFM table (single \n).
+    const QString html = QStringLiteral(
+        "<p>| A | B |</p><p>| --- | --- |</p><p>| 1 | 2 |</p>");
+    const QByteArray md = htmlToMarkdown(html);
+    const QString s = QString::fromUtf8(md);
+    QVERIFY2(s.contains(QStringLiteral("| A | B |")), qPrintable(s));
+    QVERIFY2(s.contains(QStringLiteral("| 1 | 2 |")), qPrintable(s));
+    QVERIFY2(!s.contains(QStringLiteral("|\n\n|")), qPrintable(s));
 }
 
 void TstClipboardCodec::htmlToMarkdown_stripsScriptAndStyle()

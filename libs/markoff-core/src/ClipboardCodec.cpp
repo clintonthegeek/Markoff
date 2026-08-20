@@ -10,6 +10,7 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QMimeData>
+#include <QRegularExpression>
 #include <QSet>
 #include <QStack>
 #include <QTextBlock>
@@ -323,6 +324,136 @@ QString blockToPlain(const TopLevelBlock &block, const QByteArray &slice)
     return inner;
 }
 
+/// Split a GFM pipe-table line into cell texts (trimmed; outer pipes dropped).
+QStringList splitGfmRow(const QString &line)
+{
+    QString t = line.trimmed();
+    if (t.startsWith(QLatin1Char('|')))
+        t = t.mid(1);
+    if (t.endsWith(QLatin1Char('|')))
+        t.chop(1);
+    const QStringList raw = t.split(QLatin1Char('|'));
+    QStringList cells;
+    cells.reserve(raw.size());
+    for (QString c : raw)
+        cells << c.trimmed();
+    return cells;
+}
+
+bool isGfmSeparatorRow(const QString &line)
+{
+    const QStringList cells = splitGfmRow(line);
+    if (cells.isEmpty())
+        return false;
+    for (const QString &c : cells) {
+        if (c.isEmpty())
+            return false;
+        for (QChar ch : c) {
+            if (ch != QLatin1Char('-') && ch != QLatin1Char(':')
+                && ch != QLatin1Char(' '))
+                return false;
+        }
+        if (!c.contains(QLatin1Char('-')))
+            return false;
+    }
+    return true;
+}
+
+bool looksLikeGfmTableRow(const QString &line)
+{
+    const QString t = line.trimmed();
+    if (t.isEmpty())
+        return false;
+    // At least one pipe; prefer rows that look like GFM (leading/trailing |).
+    if (t.count(QLatin1Char('|')) < 1)
+        return false;
+    if (t.startsWith(QLatin1Char('|')) || t.endsWith(QLatin1Char('|')))
+        return true;
+    return t.count(QLatin1Char('|')) >= 2;
+}
+
+QList<QStringList> parseGfmTableRows(const QByteArray &slice)
+{
+    QList<QStringList> rows;
+    const QString text = QString::fromUtf8(slice);
+    const QStringList lines = text.split(QRegularExpression(QStringLiteral("\\r?\\n")));
+    for (const QString &line : lines) {
+        if (line.trimmed().isEmpty())
+            continue;
+        if (!looksLikeGfmTableRow(line))
+            continue;
+        if (isGfmSeparatorRow(line))
+            continue;  // alignment row — structural only
+        rows << splitGfmRow(line);
+    }
+    return rows;
+}
+
+QString gfmTableToHtml(const QByteArray &slice)
+{
+    const QList<QStringList> rows = parseGfmTableRows(slice);
+    if (rows.isEmpty())
+        return {};
+    QString html = QStringLiteral("<table>");
+    for (int r = 0; r < rows.size(); ++r) {
+        html += (r == 0) ? QStringLiteral("<thead><tr>")
+                         : (r == 1 ? QStringLiteral("<tbody><tr>")
+                                   : QStringLiteral("<tr>"));
+        const QString tag = (r == 0) ? QStringLiteral("th") : QStringLiteral("td");
+        for (const QString &cell : rows[r]) {
+            html += QLatin1Char('<');
+            html += tag;
+            html += QLatin1Char('>');
+            html += htmlEscape(cell);
+            html += QStringLiteral("</");
+            html += tag;
+            html += QLatin1Char('>');
+        }
+        html += QStringLiteral("</tr>");
+        if (r == 0)
+            html += QStringLiteral("</thead>");
+    }
+    if (rows.size() > 1)
+        html += QStringLiteral("</tbody>");
+    html += QStringLiteral("</table>");
+    return html;
+}
+
+QString gfmTableToRtf(const QByteArray &slice)
+{
+    const QList<QStringList> rows = parseGfmTableRows(slice);
+    if (rows.isEmpty())
+        return {};
+    int cols = 0;
+    for (const QStringList &row : rows)
+        cols = qMax(cols, row.size());
+    if (cols <= 0)
+        return {};
+    // Simple Word/LibreOffice-compatible row: fixed 1440-twip cells.
+    QString rtf;
+    for (int r = 0; r < rows.size(); ++r) {
+        rtf += QStringLiteral("\\trowd\\trgaph108\\trleft0");
+        for (int c = 0; c < cols; ++c)
+            rtf += QStringLiteral("\\cellx%1").arg((c + 1) * 1440);
+        rtf += QLatin1Char('\n');
+        const QStringList &row = rows[r];
+        for (int c = 0; c < cols; ++c) {
+            const QString cell = (c < row.size()) ? row[c] : QString();
+            if (r == 0)
+                rtf += QStringLiteral("\\intbl{\\b ");
+            else
+                rtf += QStringLiteral("\\intbl ");
+            rtf += rtfEscape(cell);
+            if (r == 0)
+                rtf += QLatin1Char('}');
+            rtf += QStringLiteral("\\cell\n");
+        }
+        rtf += QStringLiteral("\\row\n");
+    }
+    rtf += QStringLiteral("\\pard\n");
+    return rtf;
+}
+
 }  // namespace
 
 QString markdownToPlain(const QByteArray &markdown)
@@ -446,7 +577,22 @@ QString markdownToHtml(const QByteArray &markdown)
             html += QStringLiteral("</p></blockquote>");
             break;
         }
+        case TopLevelBlock::Kind::Table: {
+            html += gfmTableToHtml(slice);
+            break;
+        }
         default: {
+            // Pipe-table source sometimes arrives as a Paragraph when the
+            // selection omitted the separator row — still emit a real table
+            // if the slice looks like GFM pipes.
+            if (looksLikeGfmTableRow(QString::fromUtf8(slice))
+                && QString::fromUtf8(slice).contains(QLatin1Char('\n'))) {
+                const QString table = gfmTableToHtml(slice);
+                if (!table.isEmpty()) {
+                    html += table;
+                    break;
+                }
+            }
             const QString inner = inlinesToHtml(slice, spansFor(block, slice));
             if (!inner.isEmpty()) {
                 html += QStringLiteral("<p>");
@@ -504,6 +650,14 @@ QByteArray markdownToRtf(const QByteArray &markdown)
             rtf += QLatin1Char('}');
         } else if (block.kind == TopLevelBlock::Kind::ThematicBreak) {
             rtf += QStringLiteral("\\emdash\\emdash\\emdash");
+        } else if (block.kind == TopLevelBlock::Kind::Table
+                   || (looksLikeGfmTableRow(QString::fromUtf8(slice))
+                       && QString::fromUtf8(slice).contains(QLatin1Char('\n')))) {
+            const QString table = gfmTableToRtf(slice);
+            if (!table.isEmpty())
+                rtf += table;
+            else
+                rtf += inlinesToRtf(slice, spansFor(block, slice));
         } else {
             rtf += inlinesToRtf(slice, spansFor(block, slice));
         }
@@ -635,11 +789,24 @@ QByteArray htmlToMarkdown(const QString &html)
     doc.setHtml(html);
     QString md;
     QSet<int> skipBlocks;
+    // LibreOffice sometimes pastes tables as consecutive <p>|…|</p> lines
+    // rather than a QTextTable. GFM pipe tables require single newlines
+    // between rows (a blank line breaks the table into paragraphs).
+    bool inPipeTableRun = false;
+    auto endPipeTableRun = [&]() {
+        if (!inPipeTableRun)
+            return;
+        if (!md.endsWith(QLatin1Char('\n')))
+            md += QLatin1Char('\n');
+        md += QLatin1Char('\n');
+        inPipeTableRun = false;
+    };
     for (QTextBlock block = doc.begin(); block.isValid(); block = block.next()) {
         if (skipBlocks.contains(block.blockNumber()))
             continue;
         QTextCursor cur(block);
         if (QTextTable *table = cur.currentTable()) {
+            endPipeTableRun();
             md += tableToGfm(table);
             if (!md.endsWith(QLatin1Char('\n')))
                 md += QLatin1Char('\n');
@@ -649,12 +816,14 @@ QByteArray htmlToMarkdown(const QString &html)
         }
         const QTextBlockFormat bf = block.blockFormat();
         if (bf.hasProperty(QTextFormat::BlockTrailingHorizontalRulerWidth)) {
+            endPipeTableRun();
             md += QStringLiteral("---\n\n");
             continue;
         }
         const bool isHeading = bf.headingLevel() > 0;
         QString inner = blockInnerMarkdown(block, isHeading);
         if (QTextList *list = block.textList()) {
+            endPipeTableRun();
             const QTextListFormat lf = list->format();
             const bool ordered =
                 lf.style() == QTextListFormat::ListDecimal
@@ -677,6 +846,7 @@ QByteArray htmlToMarkdown(const QString &html)
         }
         const int heading = bf.headingLevel();
         if (heading > 0) {
+            endPipeTableRun();
             md += QString(heading, QLatin1Char('#'));
             md += QLatin1Char(' ');
             md += inner.trimmed();
@@ -684,13 +854,26 @@ QByteArray htmlToMarkdown(const QString &html)
             continue;
         }
         if (inner.trimmed().isEmpty()) {
+            // Blank lines end a pipe-table run (GFM requires adjacency).
+            endPipeTableRun();
             if (!md.isEmpty() && !md.endsWith(QStringLiteral("\n\n")))
                 md += QLatin1Char('\n');
             continue;
         }
+        const QString trimmed = inner.trimmed();
+        if (looksLikeGfmTableRow(trimmed) || isGfmSeparatorRow(trimmed)) {
+            if (!inPipeTableRun && !md.isEmpty() && !md.endsWith(QStringLiteral("\n\n")))
+                md += QLatin1Char('\n');
+            md += trimmed;
+            md += QLatin1Char('\n');
+            inPipeTableRun = true;
+            continue;
+        }
+        endPipeTableRun();
         md += inner;
         md += QStringLiteral("\n\n");
     }
+    endPipeTableRun();
     return md.trimmed().toUtf8();
 }
 

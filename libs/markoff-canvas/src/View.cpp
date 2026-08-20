@@ -255,23 +255,24 @@ std::pair<int, int> coveredCellRange(const BlockLayoutCache::Entry &e, int fromB
     return {lo, hi};
 }
 
-/// Serializes the [lo, hi] covered cells (plan P2.3) row-major, pipe-
-/// separated within a row, '\n' between rows — the clipboard format for a
-/// selection that touches a table, in place of a raw byte-range dump (which
-/// would include pipes, alignment-row leftovers, and padding).
+/// Serializes the [lo, hi] covered cells (plan P2.3) as a GFM pipe table:
+/// leading/trailing `|`, separator row after the first data row, single
+/// `\n` between rows (blank lines would break GFM table parsing). Used for
+/// clipboard instead of a raw byte-range dump (which would include pipes,
+/// alignment-row leftovers, and padding).
 QByteArray serializeTableCells(const MarkoffDocument &doc, const BlockLayoutCache::Entry &e,
                                int lo, int hi)
 {
     if (lo < 0 || hi < 0 || e.tableCols <= 0)
         return {};
     const QByteArray text = doc.blockText(e.id);
-    QByteArrayList rows;
+    QList<QByteArrayList> grid;
     QByteArrayList row;
     int curRow = lo / e.tableCols;
     for (int i = lo; i <= hi; ++i) {
         const int rowIdx = i / e.tableCols;
         if (rowIdx != curRow) {
-            rows << row.join(" | ");
+            grid << row;
             row.clear();
             curRow = rowIdx;
         }
@@ -279,8 +280,25 @@ QByteArray serializeTableCells(const MarkoffDocument &doc, const BlockLayoutCach
         row << text.mid(cell.startByte, cell.endByte - cell.startByte).trimmed();
     }
     if (!row.isEmpty())
-        rows << row.join(" | ");
-    return rows.join("\n");
+        grid << row;
+    if (grid.isEmpty())
+        return {};
+
+    auto formatRow = [](const QByteArrayList &cells) {
+        return QByteArray("| ") + cells.join(" | ") + " |";
+    };
+    QByteArrayList lines;
+    lines.reserve(grid.size() + 1);
+    for (int r = 0; r < grid.size(); ++r) {
+        lines << formatRow(grid[r]);
+        if (r == 0) {
+            QByteArray sep = "|";
+            for (int c = 0; c < grid[0].size(); ++c)
+                sep += " --- |";
+            lines << sep;
+        }
+    }
+    return lines.join("\n");
 }
 }  // namespace
 
