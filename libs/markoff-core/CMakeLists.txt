@@ -111,6 +111,8 @@ add_library(markoff_core STATIC
     #     verbs hoisted from markoff-source's Editor ---
     include/markoff/core/FormatOps.h
     src/FormatOps.cpp
+    include/markoff/core/ClipboardCodec.h
+    src/ClipboardCodec.cpp
     # --- MarkdownView polymorphic base (Task 4.5) ---
     include/markoff/core/MarkdownView.h
     src/MarkdownView.cpp

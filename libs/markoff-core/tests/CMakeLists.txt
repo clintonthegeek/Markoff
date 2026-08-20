@@ -195,6 +195,11 @@ add_test(NAME tst_binding_structural_key COMMAND tst_binding_structural_key)
 target_link_libraries(tst_binding_structural_key PRIVATE Qt6::Test Qt6::Gui Qt6::Widgets markoff_core)
 set_tests_properties(tst_binding_structural_key PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_clipboard_codec tst_clipboard_codec.cpp)
+add_test(NAME tst_clipboard_codec COMMAND tst_clipboard_codec)
+target_link_libraries(tst_clipboard_codec PRIVATE Qt6::Test Qt6::Gui markoff_core)
+set_tests_properties(tst_clipboard_codec PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 # MarkdownView contract v2: widget-free format ops (spec §5)
 add_executable(tst_format_ops tst_format_ops.cpp)
 add_test(NAME tst_format_ops COMMAND tst_format_ops)
