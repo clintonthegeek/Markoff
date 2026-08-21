@@ -7,7 +7,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(markoff_styled STATIC
+add_library(markoff_styled SHARED
     include/markoff/styled/Editor.h
     include/markoff/styled/MarkoffStyledExport.h
     src/Editor.cpp
@@ -33,6 +33,8 @@ add_library(markoff_styled STATIC
     src/StructuralTextEdit.cpp
 )
 
+set_target_properties(markoff_styled PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(markoff_styled
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -44,6 +46,14 @@ target_link_libraries(markoff_styled
 )
 
 add_library(Markoff::Styled ALIAS markoff_styled)
+
+if(DEFINED KDE_INSTALL_LIBDIR)
+    install(TARGETS markoff_styled
+        RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+endif()
 
 if(NOT DEFINED MARKOFF_STYLED_BUILD_TESTS)
     set(MARKOFF_STYLED_BUILD_TESTS ON)

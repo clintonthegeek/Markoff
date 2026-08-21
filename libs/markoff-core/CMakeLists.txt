@@ -8,10 +8,13 @@ set(CMAKE_AUTOMOC ON)
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 find_package(KF6SyntaxHighlighting REQUIRED)
 
-# Library target: STATIC so it can be embedded in test apps + future views.
-# Sources are added incrementally as tasks land. Initial skeleton is just
-# the export header so the target builds.
-add_library(markoff_core STATIC
+# SHARED (Cluster P Phase P6, Corbomite-side plan): a STATIC markoff_core
+# gets a private copy of Qt metaobjects/RTTI in every consumer, so a host
+# and a dlopen()'d plugin that both touch a markoff_core type end up with
+# two distinct QMetaObjects and qobject_cast silently fails across that
+# boundary. No -fvisibility=hidden is set anywhere in this tree, so the
+# existing no-op MARKOFF_CORE_EXPORT macro needs no changes.
+add_library(markoff_core SHARED
     include/markoff/core/MarkoffCoreExport.h
     include/markoff/core/Origin.h
     include/markoff/core/AnchorJson.h
@@ -129,6 +132,8 @@ add_library(markoff_core STATIC
     include/markoff/core/Cursor.h
 )
 
+set_target_properties(markoff_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(markoff_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -146,6 +151,18 @@ target_link_libraries(markoff_core
 
 # Alias under the Markoff:: namespace for consumers.
 add_library(Markoff::Core ALIAS markoff_core)
+
+# Install rules — only meaningful when built as a Corbomite subdirectory
+# (KDEInstallDirs is included by the parent tree before add_subdirectory).
+# A standalone Markoff build skips this, same as before this library was
+# SHARED (it had no install rule at all).
+if(DEFINED KDE_INSTALL_LIBDIR)
+    install(TARGETS markoff_core
+        RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+endif()
 
 # Tests.
 if(NOT DEFINED MARKOFF_CORE_BUILD_TESTS)

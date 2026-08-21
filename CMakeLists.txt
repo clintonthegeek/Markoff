@@ -23,6 +23,18 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
 
+# Cluster P Phase P6 (Corbomite-side plan): markoff_core/canvas/source/styled,
+# markoff-parser, ts-markdown-parser and collabtext are all SHARED now, each
+# with its own explicit POSITION_INDEPENDENT_CODE. Vendored STATIC deps they
+# still link (rapidyaml's ryml/c4core) need PIC too or the final .so link
+# fails. Corbomite already sets this globally when Markoff builds as its
+# subdirectory (CMakeLists.txt top-level); set it here too so a standalone
+# Markoff build (this repo's own primary use case) doesn't need it supplied
+# by a parent.
+if(NOT DEFINED CMAKE_POSITION_INDEPENDENT_CODE)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 if(NOT DEFINED CMAKE_EXPORT_COMPILE_COMMANDS)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 endif()

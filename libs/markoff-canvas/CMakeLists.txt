@@ -19,7 +19,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(markoff_canvas STATIC
+add_library(markoff_canvas SHARED
     include/markoff/canvas/View.h
     src/View.cpp
     include/markoff/canvas/EditorWidget.h
@@ -58,6 +58,8 @@ add_library(markoff_canvas STATIC
     src/TableGeometry.cpp
 )
 
+set_target_properties(markoff_canvas PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 target_include_directories(markoff_canvas
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -71,6 +73,14 @@ target_link_libraries(markoff_canvas
 )
 
 add_library(Markoff::Canvas ALIAS markoff_canvas)
+
+if(DEFINED KDE_INSTALL_LIBDIR)
+    install(TARGETS markoff_canvas
+        RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+endif()
 
 if(NOT DEFINED MARKOFF_CANVAS_BUILD_TESTS)
     set(MARKOFF_CANVAS_BUILD_TESTS ON)

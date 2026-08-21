@@ -13,7 +13,7 @@ pkg_check_modules(TREESITTER REQUIRED IMPORTED_TARGET tree-sitter)
 
 # Tree-sitter markdown grammar (vendored)
 set(TS_MD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/src/vendor/tree-sitter-markdown)
-add_library(ts-markdown-parser STATIC
+add_library(ts-markdown-parser SHARED
     ${TS_MD_DIR}/tree-sitter-markdown/src/parser.c
     ${TS_MD_DIR}/tree-sitter-markdown/src/scanner.c
     ${TS_MD_DIR}/tree-sitter-markdown-inline/src/parser.c
@@ -28,9 +28,16 @@ target_compile_definitions(ts-markdown-parser PRIVATE
     EXTENSION_TAGS
 )
 set_target_properties(ts-markdown-parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
+if(DEFINED KDE_INSTALL_LIBDIR)
+    install(TARGETS ts-markdown-parser
+        RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+endif()
 
 # Markoff::Parser library
-add_library(markoff-parser STATIC
+add_library(markoff-parser SHARED
     src/TreeSitterParser.cpp
     src/SourceSpan.cpp
     src/MarkdownSplitter.cpp
@@ -59,6 +66,14 @@ target_link_libraries(markoff-parser
         ts-markdown-parser
         ryml::ryml
 )
+
+if(DEFINED KDE_INSTALL_LIBDIR)
+    install(TARGETS markoff-parser
+        RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+endif()
 
 enable_testing()
 add_subdirectory(tests)

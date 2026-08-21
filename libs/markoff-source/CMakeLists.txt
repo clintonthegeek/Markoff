@@ -8,7 +8,7 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_library(markoff_source STATIC
+add_library(markoff_source SHARED
     src/Editor.cpp
     src/Gutter.cpp
     src/InnerEditor.cpp
@@ -18,6 +18,8 @@ add_library(markoff_source STATIC
     src/Gutter.h
     src/InnerEditor.h
 )
+
+set_target_properties(markoff_source PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(markoff_source
     PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -31,6 +33,14 @@ target_link_libraries(markoff_source
 )
 
 add_library(Markoff::Source ALIAS markoff_source)
+
+if(DEFINED KDE_INSTALL_LIBDIR)
+    install(TARGETS markoff_source
+        RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+endif()
 
 if(NOT DEFINED MARKOFF_SOURCE_BUILD_TESTS)
     set(MARKOFF_SOURCE_BUILD_TESTS ON)
