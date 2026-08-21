@@ -519,11 +519,7 @@ QString CanvasBlockAccessible::textAtOffset(int offset, QAccessible::TextBoundar
         // clamp into the last valid character rather than one past it.
         const int clampedAt = count > 0 ? qMin(at, count - 1) : 0;
         const int byteOffset = int(coords::qtPosToByte(raw, clampedAt));
-        // FALSIFICATION PROBE (A2.3, throwaway): pretend the whole block is
-        // one line, like the base class's '\n'-splitting default would for
-        // a wrapped paragraph with no embedded '\n'.
-        const auto fromByte = 0;
-        const auto toByte = raw.size();
+        const auto [fromByte, toByte] = m_view->lineByteRangeAt(m_id, byteOffset);
         if (fromByte < 0) {
             *startOffset = *endOffset = -1;
             return {};
