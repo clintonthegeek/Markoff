@@ -547,8 +547,8 @@ void CanvasBlockAccessible::setSelection(int, int, int)
 
 int CanvasBlockAccessible::cursorPosition() const
 {
-    // A2.2: only the block currently holding the caret reports a position.
-    if (m_view->caretBlock() != m_id)
+    // FALSIFICATION PROBE (A2.2, throwaway): caret-block gate dropped.
+    if (false)
         return -1;
     MarkoffDocument *doc = m_view->document();
     if (!doc)
