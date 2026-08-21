@@ -115,10 +115,27 @@ private:
 /// edited only through real input events), and A2.2's done-when doesn't
 /// claim them — logged, not an oversight.
 ///
-/// `characterRect`/`offsetAtPoint` (A2.3's job) are still compile-complete
-/// placeholder stubs, documented at each definition, following A1.1's
-/// "compile-complete but explicitly-placeholder" precedent for `role()`/
-/// `state()`. `scrollToSubstring` is a no-op stub (no task claims it yet);
+/// **A2.3:** `characterRect()`/`offsetAtPoint()` and
+/// `textAtOffset(…, LineBoundary)` are real — all three need a realized
+/// `QTextLayout`, so they call the new `View::ensureBlockRealized()` first
+/// (spec §5: a geometry query is the one path allowed to force realization,
+/// bounded to exactly the queried block). `characterRect()`/
+/// `offsetAtPoint()` are in GLOBAL screen coordinates (same convention
+/// `rect()` already uses via `blockGlobalRect()`), built on two new `View`
+/// geometry accessors (`characterRectInViewport()`, and
+/// `byteOffsetAtPoint()` for the point->offset direction — `hitTest()`
+/// itself is private and does a whole-document Y-dispatch this class
+/// doesn't need; `offsetAtPoint()` here gates on `rect().contains(point)`
+/// first to reject a point belonging to some OTHER block). `textAtOffset(…,
+/// LineBoundary)` uses a third new
+/// accessor, `View::lineByteRangeAt()`, which reads the actual WRAPPED
+/// visual line off the layout — deliberately not the base class's default
+/// (literal `\n`-splitting the plain string, wrong for a wrapped paragraph
+/// with no embedded `\n` at all). `textBeforeOffset`/`textAfterOffset` for
+/// `LineBoundary` are NOT overridden — outside this task's named scope
+/// (plan: "…and `textAtOffset(…, LineBoundary)`" only) — so they still fall
+/// through to the base class's `\n`-based approximation; logged, not an
+/// oversight. `scrollToSubstring` is a no-op stub (no task claims it yet);
 /// `attributes()` returns an empty string with `startOffset`/`endOffset`
 /// set to the queried offset (same placeholder shape).
 class CanvasBlockAccessible final : public QAccessibleInterface,
@@ -175,8 +192,8 @@ public:
     int cursorPosition() const override;
     void setCursorPosition(int position) override;
 
-    // character <-> geometry — A2.3 placeholder stubs (need a QTextLayout,
-    // spec §5).
+    // character <-> geometry (A2.3) — force realization of this block via
+    // View::ensureBlockRealized() first (spec §5), global screen coords.
     QRect characterRect(int offset) const override;
     int offsetAtPoint(const QPoint &point) const override;
 

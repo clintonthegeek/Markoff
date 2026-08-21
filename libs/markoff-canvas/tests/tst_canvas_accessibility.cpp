@@ -96,6 +96,13 @@ private Q_SLOTS:
     void selection_partial_range_within_block();
     void selection_spans_multiple_blocks();
     void no_selection_reports_empty();
+
+    // ---- A2.3: geometry and line boundaries ----
+    void character_rect_offset_at_point_round_trip();
+    void character_rect_unrealized_block_realizes_just_that_one();
+    void character_rect_no_text_kind_returns_null();
+    void offset_at_point_outside_block_returns_negative_one();
+    void line_boundary_reports_wrapped_visual_line();
 };
 
 void TstCanvasAccessibility::container_role_is_document()
@@ -905,6 +912,142 @@ void TstCanvasAccessibility::no_selection_reports_empty()
         QCOMPARE(start, -1);
         QCOMPARE(end, -1);
     }
+}
+
+// ---- A2.3: geometry and line boundaries -----------------------------------
+
+void TstCanvasAccessibility::character_rect_offset_at_point_round_trip()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("Hello world, this is a paragraph.\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+
+    // Round trip (A2.3 done-when): offsetAtPoint(characterRect(n).center())
+    // == n, for every offset in a realized block — within a ±1 tolerance.
+    // A `QRectF` narrower than ~2px rounds through `.toRect()`/`.center()`
+    // to an integer point that can sit exactly on the boundary between two
+    // characters, which `xToCursor()` (Qt's own nearest-cursor rounding)
+    // can legitimately resolve to either neighbor — the same ambiguity a
+    // real mouse click has at a sub-pixel character boundary, not a bug in
+    // either direction of the conversion.
+    const int count = text->characterCount();
+    QVERIFY(count > 0);
+    for (int n = 0; n < count; ++n) {
+        const QRect r = text->characterRect(n);
+        QVERIFY2(r.isValid(), qPrintable(QString("offset %1").arg(n)));
+        const int roundTripped = text->offsetAtPoint(r.center());
+        QVERIFY2(qAbs(roundTripped - n) <= 1,
+                 qPrintable(QString("offset %1 round-tripped to %2").arg(n).arg(roundTripped)));
+    }
+}
+
+void TstCanvasAccessibility::character_rect_unrealized_block_realizes_just_that_one()
+{
+    QByteArray src;
+    for (int i = 0; i < 60; ++i)
+        src += "Paragraph number " + QByteArray::number(i) + " with some words.\n\n";
+
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(src);
+    View view;
+    view.resize(400, 200);  // small viewport: only the first few blocks realize
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(60));
+
+    const int before = view.realizedBlockCount();
+    QVERIFY(before < view.blockCount());
+
+    // A block far below the viewport is not yet realized.
+    const BlockId farBlock = blocks[50];
+    QVERIFY(view.blockRect(farBlock).isNull() || !view.characterRectInViewport(farBlock, 0).isValid());
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *farText = iface->child(50)->textInterface();
+    QVERIFY(farText);
+    const QRect r = farText->characterRect(0);
+    QVERIFY(r.isValid());
+
+    // Realizing to answer the query touched exactly this one block, not the
+    // whole document (spec §5's bounded-cost argument for the tree shape).
+    QCOMPARE(view.realizedBlockCount(), before + 1);
+}
+
+void TstCanvasAccessibility::character_rect_no_text_kind_returns_null()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("text\n\n---\n\nmore\n");
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(doc.blockKind(blocks[1]), BlockKind::HorizontalRule);
+    // No text interface at all for a kind with no text content (A2.1).
+    QVERIFY(!iface->child(1)->textInterface());
+}
+
+void TstCanvasAccessibility::offset_at_point_outside_block_returns_negative_one()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *block0 = iface->child(0);
+    QAccessibleInterface *block1 = iface->child(1);
+    QAccessibleTextInterface *text0 = block0->textInterface();
+    QVERIFY(text0);
+
+    // A point inside block 1's rect is not a valid offset for block 0's
+    // text interface (C4's per-block discipline extended to geometry).
+    const QPoint pointInBlock1 = block1->rect().center();
+    QCOMPARE(text0->offsetAtPoint(pointInBlock1), -1);
+}
+
+void TstCanvasAccessibility::line_boundary_reports_wrapped_visual_line()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(
+        "This paragraph has enough words in it that it should wrap onto "
+        "more than one visual line once the view is narrow enough to "
+        "force it, without any embedded newline characters at all.\n");
+    View view;
+    view.resize(180, 400);  // narrow: forces wrapping
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text = iface->child(0)->textInterface();
+    QVERIFY(text);
+    const int count = text->characterCount();
+
+    int start = -2, end = -2;
+    const QString firstLine = text->textAtOffset(0, QAccessible::LineBoundary, &start, &end);
+    QVERIFY(!firstLine.isEmpty());
+    QCOMPARE(start, 0);
+    // The first visual LINE is a strict prefix of the whole block — proof
+    // this is real wrapped-line detection, not the base class's literal
+    // '\n'-splitting default (which has no '\n' to find here at all and
+    // would report the whole block as one "line", end == count).
+    QVERIFY(end < count);
+
+    // A later offset (well past the first line) reports a DIFFERENT range.
+    int start2 = -2, end2 = -2;
+    const QString laterLine = text->textAtOffset(count - 1, QAccessible::LineBoundary, &start2, &end2);
+    QVERIFY(!laterLine.isEmpty());
+    QVERIFY(start2 >= end);
+    QCOMPARE(end2, count);
 }
 
 QTEST_MAIN(TstCanvasAccessibility)

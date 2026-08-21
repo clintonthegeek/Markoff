@@ -676,6 +676,93 @@ QRectF View::blockRect(BlockId id) const
     return QRectF(pageMargin(), e.y + leadingBandHeight(), textWidth(), h);
 }
 
+bool View::ensureBlockRealized(BlockId id)
+{
+    const int i = m_cache->indexOf(id);
+    if (i < 0)
+        return false;
+    const auto &e = m_cache->entries()[size_t(i)];
+    if (e.realized)
+        return true;
+    // Bound the range to exactly this entry's own y-span — realizeRange()
+    // includes an entry when `e.y < bottom && e.y + e.height > top`, so
+    // [e.y, e.y + max(e.height, 1)) always covers it, even a zero-height
+    // (folded-away) entry.
+    const bool changed = m_cache->realizeRange(*m_doc, m_theme, e.y, e.y + qMax(e.height, qreal(1)));
+    if (changed)
+        updateScrollRange();
+    return changed;
+}
+
+QRect View::characterRectInViewport(BlockId id, int byteOffset) const
+{
+    if (!m_doc)
+        return {};
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return {};
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return {};
+    const int layoutPos = e.projection.byteToLayoutQChar(byteOffset);
+    const QTextLine line = e.layout->lineForTextPosition(layoutPos);
+    if (!line.isValid())
+        return {};
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal contentX = pageMargin() + e.style.leftIndent;
+    const qreal contentY = (e.y + leadingBandHeight() - scrollY) + e.style.topMargin;
+    const qreal x0 = line.cursorToX(layoutPos);
+    const qreal x1 = line.cursorToX(layoutPos + 1);
+    const qreal w = qMax(qreal(1), x1 - x0);
+    return QRectF(contentX + x0, contentY + line.y(), w, line.height()).toRect();
+}
+
+std::pair<int, int> View::lineByteRangeAt(BlockId id, int byteOffset) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return {-1, -1};
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return {-1, -1};
+    const int layoutPos = e.projection.byteToLayoutQChar(byteOffset);
+    const QTextLine line = e.layout->lineForTextPosition(layoutPos);
+    if (!line.isValid())
+        return {-1, -1};
+    const int startByte = e.projection.layoutQCharToByte(line.textStart());
+    const int endByte = e.projection.layoutQCharToByte(line.textStart() + line.textLength());
+    return {startByte, endByte};
+}
+
+int View::byteOffsetAtPoint(BlockId id, const QPoint &viewportPos) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return -1;
+    const auto &e = m_cache->entries()[size_t(idx)];
+    if (!e.layout)
+        return -1;
+
+    const qreal scrollY = verticalScrollBar()->value();
+    const qreal contentX = pageMargin() + e.style.leftIndent;
+    const qreal contentY = (e.y + leadingBandHeight() - scrollY) + e.style.topMargin;
+    const qreal localX = viewportPos.x() - contentX;
+    const qreal localY = viewportPos.y() - contentY;
+
+    // Same nearest-line-by-Y search hitTest() uses for its per-entry branch.
+    QTextLine line = e.layout->lineAt(0);
+    for (int i = 0; i < e.layout->lineCount(); ++i) {
+        QTextLine l = e.layout->lineAt(i);
+        line = l;
+        if (localY < l.y() + l.height())
+            break;
+    }
+    if (!line.isValid())
+        return -1;
+    const int qcharPos = line.xToCursor(localX);
+    return e.projection.layoutQCharToByte(qcharPos);
+}
+
 QRectF View::taskCheckboxRectFor(BlockId id) const
 {
     const int i = m_cache->indexOf(id);

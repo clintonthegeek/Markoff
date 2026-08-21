@@ -488,6 +488,46 @@ QString CanvasBlockAccessible::textAtOffset(int offset, QAccessible::TextBoundar
         *endOffset = count;
         return text(0, count);
     }
+    if (boundaryType == QAccessible::LineBoundary) {
+        // A2.3: the actual WRAPPED visual line (View::lineByteRangeAt(),
+        // which needs a realized QTextLayout — the block realizes here),
+        // never the base class's literal-'\n'-splitting default (wrong for
+        // a wrapped paragraph, which has no embedded '\n' at all).
+        // textBeforeOffset/textAfterOffset for LineBoundary are NOT
+        // overridden here — out of this task's named scope (plan: "…and
+        // textAtOffset(…, LineBoundary)" only) — so they still fall
+        // through to the base class's '\n'-based approximation. Logged,
+        // not an oversight.
+        if (!hasTextContent() || !m_view->ensureBlockRealized(m_id)) {
+            *startOffset = *endOffset = -1;
+            return {};
+        }
+        MarkoffDocument *doc = m_view->document();
+        if (!doc) {
+            *startOffset = *endOffset = -1;
+            return {};
+        }
+        const QByteArray raw = doc->blockText(m_id);
+        const int count = int(coords::byteToQtPos(raw, raw.size()));
+        const int at = (offset == -1) ? count : offset;
+        if (at < 0 || at > count) {
+            *startOffset = *endOffset = -1;
+            return {};
+        }
+        // Qt's own base-class convention (qaccessible.cpp's textLineBoundary):
+        // querying exactly at the end asks about the line ending there, so
+        // clamp into the last valid character rather than one past it.
+        const int clampedAt = count > 0 ? qMin(at, count - 1) : 0;
+        const int byteOffset = int(coords::qtPosToByte(raw, clampedAt));
+        const auto [fromByte, toByte] = m_view->lineByteRangeAt(m_id, byteOffset);
+        if (fromByte < 0) {
+            *startOffset = *endOffset = -1;
+            return {};
+        }
+        *startOffset = int(coords::byteToQtPos(raw, fromByte));
+        *endOffset = int(coords::byteToQtPos(raw, toByte));
+        return text(*startOffset, *endOffset);
+    }
     return QAccessibleTextInterface::textAtOffset(offset, boundaryType, startOffset, endOffset);
 }
 
@@ -569,17 +609,54 @@ void CanvasBlockAccessible::setCursorPosition(int position)
     m_view->setCaretPosition(m_id, int(coords::qtPosToByte(raw, clamped)));
 }
 
-QRect CanvasBlockAccessible::characterRect(int) const
+QRect CanvasBlockAccessible::characterRect(int offset) const
 {
-    // A2.3's job (needs a QTextLayout, spec §5 — geometry queries are the
-    // one path allowed to force realization). Placeholder: null rect.
-    return {};
+    // A2.3: needs a QTextLayout — the one path allowed to force realization
+    // of the queried block (spec §5), via View::ensureBlockRealized().
+    if (!hasTextContent())
+        return {};
+    if (!m_view->ensureBlockRealized(m_id))
+        return {};
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return {};
+    const QByteArray raw = doc->blockText(m_id);
+    const int count = int(coords::byteToQtPos(raw, raw.size()));
+    if (offset < 0 || offset > count)
+        return {};
+    const int byteOffset = int(coords::qtPosToByte(raw, offset));
+    const QRect viewportRect = m_view->characterRectInViewport(m_id, byteOffset);
+    if (viewportRect.isNull())
+        return {};
+    // Global screen coordinates, same convention rect() already uses
+    // (blockGlobalRect() above) — QAccessibleTextInterface::characterRect's
+    // contract.
+    return QRect(m_view->viewport()->mapToGlobal(viewportRect.topLeft()), viewportRect.size());
 }
 
-int CanvasBlockAccessible::offsetAtPoint(const QPoint &) const
+int CanvasBlockAccessible::offsetAtPoint(const QPoint &point) const
 {
-    // A2.3 placeholder.
-    return -1;
+    // A2.3: `point` is in global screen coordinates (same convention
+    // characterRect() above returns). Reject a point outside this block's
+    // own rect first — a block's text interface only ever answers for its
+    // own buffer/geometry (C4's per-block discipline extended to the
+    // geometry surface) — then force realization of this block, otherwise
+    // there is no layout to measure a column against.
+    if (!hasTextContent())
+        return -1;
+    if (!rect().contains(point))
+        return -1;
+    if (!m_view->ensureBlockRealized(m_id))
+        return -1;
+    const QPoint viewportPoint = m_view->viewport()->mapFromGlobal(point);
+    const int byteOffset = m_view->byteOffsetAtPoint(m_id, viewportPoint);
+    if (byteOffset < 0)
+        return -1;
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return -1;
+    const QByteArray raw = doc->blockText(m_id);
+    return int(coords::byteToQtPos(raw, byteOffset));
 }
 
 void CanvasBlockAccessible::scrollToSubstring(int, int)

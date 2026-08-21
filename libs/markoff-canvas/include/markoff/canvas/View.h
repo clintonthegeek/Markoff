@@ -284,6 +284,51 @@ public:
     /// the viewport top). Null rect if the id is not in the document.
     QRectF blockRect(BlockId id) const;
 
+    /// Ensures `id`'s cache entry has a realized `QTextLayout` (G1 a11y
+    /// A2.3, spec §5): calls the cache's existing `realizeRange()` but
+    /// bounded to exactly this one entry's y-span, never the viewport ±
+    /// page-height range the scroll-driven realize pass uses — a
+    /// geometry query realizes the ONE block it asked about, nothing else.
+    /// Returns false (no-op) if `id` is not in the current document.
+    /// `characterRectInViewport()`/`offsetAtPoint`-style callers must call
+    /// this first; nothing else in this file forces realization on their
+    /// behalf, same as `blockRect()` et al. staying silent (null rect) on
+    /// an unrealized entry.
+    bool ensureBlockRealized(BlockId id);
+
+    /// Viewport-local rect of the character at `byteOffset` in `id`'s
+    /// realized layout (G1 a11y A2.3) — same math as `caretRectInViewport`
+    /// generalized to an arbitrary block/offset instead of only the
+    /// current caret, and a full character-advance width instead of a 1px
+    /// caret line. Null rect if `id` isn't realized (call
+    /// `ensureBlockRealized()` first) or `byteOffset` doesn't resolve to a
+    /// valid line. Test/inspection surface only — nothing here is
+    /// authority.
+    QRect characterRectInViewport(BlockId id, int byteOffset) const;
+
+    /// The visual (wrapped) line's byte range `[start, end)` in `id`'s own
+    /// buffer, for the line containing `byteOffset` in its realized layout
+    /// (G1 a11y A2.3). Deliberately NOT the same thing as
+    /// `QAccessibleTextInterface`'s own default `LineBoundary` handling
+    /// (literal `\n`-splitting the plain string) — a wrapped paragraph has
+    /// multiple visual lines with no embedded `\n` at all, so that default
+    /// would report the whole block as one "line". `{-1, -1}` if `id` isn't
+    /// realized (call `ensureBlockRealized()` first) or `byteOffset` is out
+    /// of range. Test/inspection surface only — nothing here is authority.
+    std::pair<int, int> lineByteRangeAt(BlockId id, int byteOffset) const;
+
+    /// The byte offset in `id`'s own buffer nearest `viewportPos` within
+    /// its realized layout (G1 a11y A2.3) — same per-block line/column
+    /// math `hitTest()` (private, whole-document Y-dispatch) uses
+    /// internally, but scoped to one already-known block rather than
+    /// searching the whole document by Y. -1 if `id` isn't realized (call
+    /// `ensureBlockRealized()` first). Does not itself check whether
+    /// `viewportPos` actually falls within `id`'s vertical extent — callers
+    /// that need that (e.g. rejecting a point that belongs to some OTHER
+    /// block) gate on `blockRect()`/`rect()` first, same as this class's
+    /// other geometry accessors leave range-membership to the caller.
+    int byteOffsetAtPoint(BlockId id, const QPoint &viewportPos) const;
+
     /// Table cell bounds in document coordinates (T9, exit E8), or a null
     /// rect if `id` is not a realized Table block or (row, col) is out of
     /// range. row 0 is the header row. Test/inspection surface only —
