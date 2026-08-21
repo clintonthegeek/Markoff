@@ -5,24 +5,24 @@
 #include <QPlainTextEdit>
 #include <QString>
 
+#include <markoff/core/ClipboardCodec.h>
+
+class QKeyEvent;
+class QMimeData;
+class QPaintEvent;
+
 namespace Markoff::Source {
 namespace Detail {
 
 /// Thin QPlainTextEdit subclass that promotes protected geometry accessors
 /// to public so Gutter can call them without being a QPlainTextEdit subclass,
-/// and paints ListItem raw-markdown marker decorations (queue #8.3; spec
-/// docs/specs/2026-06-16-source-listitem-marker-decoration-design.md).
-///
-/// The markers are paint-time-only: they are NOT inserted into the
-/// QTextDocument. Editor reserves left-margin space per ListItem
-/// QTextBlockFormat (applyListItemMarkerDecorations()) and hands this class
-/// the marker string to paint into that reserved gap — same visible-block
-/// walk Gutter uses, just drawn into the viewport instead of the side
-/// gutter.
+/// paints ListItem raw-markdown marker decorations (queue #8.3), and routes
+/// clipboard through ClipboardCodec (Cluster N) so Copy emits multi-flavor
+/// mime and Paste converts HTML/RTF → markdown.
 class InnerEditor : public QPlainTextEdit {
     Q_OBJECT
 public:
-    explicit InnerEditor(QWidget *parent = nullptr) : QPlainTextEdit(parent) {}
+    explicit InnerEditor(QWidget *parent = nullptr);
 
     // Promote protected QPlainTextEdit/QAbstractScrollArea methods to public.
     using QPlainTextEdit::firstVisibleBlock;
@@ -41,8 +41,18 @@ public:
         return m_listItemMarkers.value(blockNumber);
     }
 
+    /// Selection as markdown bytes (U+2029 paragraph separators → `\n`).
+    QByteArray selectedMarkdown() const;
+
+    void copyWithFlavor(Markoff::ClipboardCodec::Flavor flavor);
+    void pasteWithMode(Markoff::ClipboardCodec::PasteMode mode);
+
 protected:
     void paintEvent(QPaintEvent *event) override;
+    QMimeData *createMimeDataFromSelection() const override;
+    void insertFromMimeData(const QMimeData *source) override;
+    bool canInsertFromMimeData(const QMimeData *source) const override;
+    void keyPressEvent(QKeyEvent *e) override;
 
 private:
     QHash<int, QString> m_listItemMarkers;

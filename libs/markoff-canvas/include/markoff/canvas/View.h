@@ -931,6 +931,7 @@ protected:
     QMimeData *createMimeDataFromSelection() const;
 
 private:
+    void pasteConverted(const QMimeData *mime, bool asPlain);
     void onDocumentChanged();
     /// Realize whatever the current viewport needs and refresh the scroll
     /// range. Safe to call repeatedly; realization is monotonic.
@@ -1152,6 +1153,7 @@ private:
     /// consult first (this leaf has none to offer it).
     std::optional<BracketMatch> findMatchingBracket(BlockId block, int pos) const;
 
+public:
     // ---- Cut/copy/paste/select-all (P4.4) --------------------------------
     // Shared by the keyboard shortcuts (keyPressEvent's existing
     // Ctrl+A/C/X, plus the Ctrl+V this task adds) and the context menu's
@@ -1163,13 +1165,18 @@ private:
     /// mirrors Qt's own disabled-Cut-action convention).
     void cut();
     /// No-op with no selection. Unaffected by read-only (spec §4.2: copy
-    /// keeps working).
+    /// keeps working). Writes markdown + HTML + RTF + text/markdown.
     void copy();
-    /// Inserts the system clipboard's text at the caret, replacing any
-    /// active selection first. No-op while read-only, with no document/
-    /// caret, or with empty clipboard text. Delegates the actual insertion
-    /// to `insertText()` (P7.2 factor-out — see its doc comment).
+    void copyAsPlain();
+    void copyAsMarkdown();
+    void copyAsHtml();
+    void copyAsRtf();
+    /// Smart paste: markoff-blocks / markdown / HTML→MD / RTF→MD / plain.
+    /// Replaces any active selection. No-op while read-only, with no
+    /// document/caret, or with empty convertible clipboard content.
     void paste();
+    /// Paste as visible text, ignoring HTML/RTF structure (Ctrl+Shift+V).
+    void pasteAsPlain();
     /// Selects the whole document (first block byte 0 through the last
     /// block's end). No-op with no document or no blocks.
     void selectAll();

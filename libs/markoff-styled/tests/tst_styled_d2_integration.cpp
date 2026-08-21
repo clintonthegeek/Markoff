@@ -79,7 +79,11 @@ private Q_SLOTS:
         e.setDocument(&doc);
         QTRY_COMPARE(e.textEdit()->toPlainText(), QStringLiteral("first"));
 
-        doc.resetContent(QByteArrayLiteral("second"), Markoff::Origin::UserEdit);
+        // TestFixture, not UserEdit: resetContent's UserEdit branch is
+        // Q_UNREACHABLE() (that origin is reserved for applyFlatEdit); a
+        // full-content reset from test setup is exactly TestFixture's
+        // documented purpose.
+        doc.resetContent(QByteArrayLiteral("second"), Markoff::Origin::TestFixture);
         QTRY_COMPARE(e.textEdit()->toPlainText(), QStringLiteral("second"));
         // Must not be "secondsecond" or "first\n\nsecond".
         QCOMPARE(e.textEdit()->toPlainText().count('\n'), 0);

@@ -10,6 +10,7 @@
 
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/BlockKind.h>
+#include <markoff/core/ClipboardCodec.h>
 #include <markoff/core/Detail/FlatBlockResolve.h>
 #include <markoff/core/EditorContext.h>
 #include <markoff/core/FormatOps.h>
@@ -384,6 +385,66 @@ void Editor::toggleBold()          { if (isReadOnly()) return; wrapToggle(m_edit
 void Editor::toggleItalic()        { if (isReadOnly()) return; wrapToggle(m_editor, m_binding, "_");  }
 void Editor::toggleStrikethrough() { if (isReadOnly()) return; wrapToggle(m_editor, m_binding, "~~"); }
 void Editor::toggleInlineCode()    { if (isReadOnly()) return; wrapToggle(m_editor, m_binding, "`");  }
+
+// --- Clipboard verbs (Cluster N) ------------------------------------------
+
+void Editor::copy()
+{
+    if (!m_editor) return;
+    static_cast<InnerEditor *>(m_editor)->copyWithFlavor(
+        Markoff::ClipboardCodec::Flavor::All);
+}
+
+void Editor::copyAsPlain()
+{
+    if (!m_editor) return;
+    static_cast<InnerEditor *>(m_editor)->copyWithFlavor(
+        Markoff::ClipboardCodec::Flavor::Plain);
+}
+
+void Editor::copyAsMarkdown()
+{
+    if (!m_editor) return;
+    static_cast<InnerEditor *>(m_editor)->copyWithFlavor(
+        Markoff::ClipboardCodec::Flavor::Markdown);
+}
+
+void Editor::copyAsHtml()
+{
+    if (!m_editor) return;
+    static_cast<InnerEditor *>(m_editor)->copyWithFlavor(
+        Markoff::ClipboardCodec::Flavor::Html);
+}
+
+void Editor::copyAsRtf()
+{
+    if (!m_editor) return;
+    static_cast<InnerEditor *>(m_editor)->copyWithFlavor(
+        Markoff::ClipboardCodec::Flavor::Rtf);
+}
+
+void Editor::cut()
+{
+    if (isReadOnly() || !m_editor) return;
+    auto *inner = static_cast<InnerEditor *>(m_editor);
+    if (inner->selectedMarkdown().isEmpty()) return;
+    inner->copyWithFlavor(Markoff::ClipboardCodec::Flavor::All);
+    inner->textCursor().removeSelectedText();
+}
+
+void Editor::paste()
+{
+    if (isReadOnly() || !m_editor) return;
+    static_cast<InnerEditor *>(m_editor)->pasteWithMode(
+        Markoff::ClipboardCodec::PasteMode::Smart);
+}
+
+void Editor::pasteAsPlain()
+{
+    if (isReadOnly() || !m_editor) return;
+    static_cast<InnerEditor *>(m_editor)->pasteWithMode(
+        Markoff::ClipboardCodec::PasteMode::Plain);
+}
 
 void Editor::insertLink() {
     if (isReadOnly()) return;

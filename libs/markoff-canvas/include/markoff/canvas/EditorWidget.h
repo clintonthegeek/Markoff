@@ -194,6 +194,15 @@ public:
     void insertLink() override;
     void setHeadingLevel(int level) override;
 
+    void copy() override;
+    void copyAsPlain() override;
+    void copyAsMarkdown() override;
+    void copyAsHtml() override;
+    void copyAsRtf() override;
+    void cut() override;
+    void paste() override;
+    void pasteAsPlain() override;
+
     /// QActions for the format-verb set (P4.3) — Corbomite binds its KF6
     /// shortcuts to these. Non-owning; valid for the widget's lifetime,
     /// same role as `view()`.

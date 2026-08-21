@@ -2554,6 +2554,19 @@ QByteArray MarkoffDocument::listItemDisplayMarker(BlockId id) const
     return indentAndMarkerForListItem(blockAttrs(id));
 }
 
+QByteArray MarkoffDocument::blockQuoteDisplayMarker(BlockId id) const
+{
+    if (blockKind(id) != BlockKind::BlockQuote) return {};
+    const auto attrs = blockAttrs(id);
+    int depth = 1;
+    auto it = attrs.constFind(AttrNames::BlockQuoteDepth);
+    if (it != attrs.cend())
+        depth = std::max(1, std::get<int>(it.value()));
+    QByteArray prefix;
+    for (int i = 0; i < depth; ++i) prefix += "> ";
+    return prefix;
+}
+
 bool MarkoffDocument::save(const QString &path)
 {
     QSaveFile f(path);

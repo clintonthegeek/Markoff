@@ -80,6 +80,19 @@ public:
     virtual void insertLink() {}
     virtual void setHeadingLevel(int level) { Q_UNUSED(level); }
 
+    // --- Clipboard. Default no-op; leaves that edit override. ---
+    // Default Copy is multi-flavor (markdown/plain/html/rtf); copyAs*
+    // writes a single flavor. paste() is smart (HTML/RTF → markdown);
+    // pasteAsPlain() is Ctrl+Shift+V.
+    virtual void copy() {}
+    virtual void copyAsPlain() {}
+    virtual void copyAsMarkdown() {}
+    virtual void copyAsHtml() {}
+    virtual void copyAsRtf() {}
+    virtual void cut() {}
+    virtual void paste() {}
+    virtual void pasteAsPlain() {}
+
 signals:
     void documentChanged(Markoff::MarkoffDocument *doc);
     void cursorPositionChanged(int line, int column);

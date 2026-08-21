@@ -4,15 +4,27 @@
 //
 // A selection touching a Table block walks its row-major cell-ordered
 // sequence, not raw bytes: Ctrl+C over a within-table drag serializes the
-// covered cells pipe-separated, one row per line, trimmed of source
-// padding — not a literal substring of the pipe-table markdown (which
-// would include stray pipes/padding, and for a range crossing rows would
-// even include the alignment-row leftovers). A selection that spans the
-// whole table (as one of several selected blocks) serializes the whole
-// grid the same way.
+// covered cells as a full GFM pipe table (leading/trailing `|`, a
+// synthetic `| --- |` separator after the first covered row) — not a
+// literal substring of the source markdown (which would include stray
+// pipes/padding, and for a range crossing rows would even include the
+// alignment-row leftovers). Emitting real GFM syntax (not bare
+// `a0 | a1`-style text) is deliberate as of `34a463f0` ("round-trip GFM
+// tables through HTML/RTF clipboard") — text/plain is documented as "raw
+// markdown of the selection" (plan §1), and a foreign markdown editor or
+// the codec's own markdownToHtml/markdownToRtf can only render this back
+// as a real table if it is syntactically one. When the covered range
+// doesn't include the table's real header (as in the first test below),
+// the synthesized separator necessarily promotes the first *selected* row
+// to look like a header on paste — an accepted lossy edge (GFM has no way
+// to express "body rows, no header"; same class of tradeoff the plan's
+// smart-paste priority section calls "lossy, acknowledged"). A selection
+// that spans the whole table (as one of several selected blocks)
+// serializes the whole grid the same way.
 
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QMimeData>
 #include <QTest>
 
 #include <markoff/canvas/View.h>
@@ -83,7 +95,7 @@ void TstCanvasTableSelection::within_table_drag_copies_covered_cells_row_major()
 
     QTest::keyClick(&view, Qt::Key_C, Qt::ControlModifier);
     QCOMPARE(QGuiApplication::clipboard()->text().toUtf8(),
-             QByteArray("a0 | a1\nb0 | b1"));
+             QByteArray("| a0 | a1 |\n| --- | --- |\n| b0 | b1 |"));
 }
 
 void TstCanvasTableSelection::whole_table_selection_copies_full_grid()
@@ -119,9 +131,19 @@ void TstCanvasTableSelection::whole_table_selection_copies_full_grid()
 
     QTest::keyClick(&view, Qt::Key_C, Qt::ControlModifier);
     const QByteArray expected = doc.blockText(beforeId).mid(bBefore) + "\n\n"
-                               + "h0 | h1\na0 | a1\nb0 | b1" + "\n\n"
+                               + "| h0 | h1 |\n| --- | --- |\n| a0 | a1 |\n| b0 | b1 |" + "\n\n"
                                + doc.blockText(afterId).left(bAfter);
     QCOMPARE(QGuiApplication::clipboard()->text().toUtf8(), expected);
+
+    // The whole point of 34a463f0: this must also round-trip as a real
+    // <table>, not literal pipes in a <p>, so foreign apps (LibreOffice,
+    // browsers) render it as a table on paste.
+    const QMimeData *mime = QGuiApplication::clipboard()->mimeData();
+    QVERIFY(mime);
+    const QString html = mime->html().isEmpty()
+        ? QString::fromUtf8(mime->data(QStringLiteral("text/html")))
+        : mime->html();
+    QVERIFY2(html.contains(QStringLiteral("<table")), qPrintable(html));
 }
 
 QTEST_MAIN(TstCanvasTableSelection)

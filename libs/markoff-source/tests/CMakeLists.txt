@@ -50,3 +50,10 @@ target_link_libraries(tst_source_dogfood_invariants
     PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
 set_tests_properties(tst_source_dogfood_invariants
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+add_executable(tst_source_rich_clipboard tst_source_rich_clipboard.cpp)
+add_test(NAME tst_source_rich_clipboard COMMAND tst_source_rich_clipboard)
+target_link_libraries(tst_source_rich_clipboard
+    PRIVATE Qt6::Test Qt6::Widgets markoff_source markoff_core)
+set_tests_properties(tst_source_rich_clipboard
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

@@ -5,6 +5,7 @@
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/Coordinates.h>
 
+#include <markoff/core/ClipboardCodec.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
 #include <markoff/core/PasteMeta.h>
@@ -169,11 +170,11 @@ void LiveClipboardController::copy()
     payload["sourceReplicaId"] = static_cast<qint64>(m_document->replicaId());
     payload["blocks"]          = blocks;
 
-    auto *mime = new QMimeData();
-    mime->setText(joinPlain(blocks));
-    mime->setData(kBlocksMime,
-                  QJsonDocument(payload).toJson(QJsonDocument::Compact));
-    QApplication::clipboard()->setMimeData(mime);
+    QApplication::clipboard()->setMimeData(
+        Markoff::ClipboardCodec::mimeFromMarkdown(
+            joinPlain(blocks).toUtf8(),
+            QJsonDocument(payload),
+            Markoff::ClipboardCodec::Flavor::All));
 }
 
 void LiveClipboardController::cut()
@@ -204,11 +205,11 @@ void LiveClipboardController::cut()
     payload["cutSequenceNumber"]   = static_cast<qint64>(cutSeq);
     payload["blocks"]              = blocks;
 
-    auto *mime = new QMimeData();
-    mime->setText(joinPlain(blocks));
-    mime->setData(kBlocksMime,
-                  QJsonDocument(payload).toJson(QJsonDocument::Compact));
-    QApplication::clipboard()->setMimeData(mime);
+    QApplication::clipboard()->setMimeData(
+        Markoff::ClipboardCodec::mimeFromMarkdown(
+            joinPlain(blocks).toUtf8(),
+            QJsonDocument(payload),
+            Markoff::ClipboardCodec::Flavor::All));
 
     // Delete the selection (applies the flat edit, clears selection).
     m_selection->deleteSelection();
@@ -299,7 +300,8 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
     if (!m_selection || !m_document || !m_model) return;
     const auto mode = static_cast<QClipboard::Mode>(clipboardMode);
     const QMimeData *mime = QApplication::clipboard()->mimeData(mode);
-    if (!mime || (!mime->hasText() && !mime->hasFormat(kBlocksMime))) return;
+    if (!mime)
+        return;
 
     uint32_t startByte = 0, endByte = 0;
     int firstRow = -1, firstQtPos = 0, lastRow = -1;
@@ -329,9 +331,12 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
         }
     }
 
-    // Flat text fallback.
-    if (mime->hasText()) {
-        const QString insertedText = mime->text();
+    // Smart conversion (HTML/RTF → markdown) then the existing flat insert.
+    const QByteArray converted =
+        Markoff::ClipboardCodec::markdownFromMime(
+            mime, Markoff::ClipboardCodec::PasteMode::Smart);
+    if (!converted.isEmpty()) {
+        const QString insertedText = QString::fromUtf8(converted);
         insertAtOrReplace(startByte, endByte, firstRow, lastRow, firstQtPos,
                           insertedText);
         advanceCaretPastPaste(firstRow, lastRow, firstQtPos, insertedText);

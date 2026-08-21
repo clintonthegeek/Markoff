@@ -124,6 +124,11 @@ add_test(NAME tst_canvas_context_menu COMMAND tst_canvas_context_menu)
 target_link_libraries(tst_canvas_context_menu PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
 set_tests_properties(tst_canvas_context_menu PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_canvas_rich_clipboard tst_canvas_rich_clipboard.cpp)
+add_test(NAME tst_canvas_rich_clipboard COMMAND tst_canvas_rich_clipboard)
+target_link_libraries(tst_canvas_rich_clipboard PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+set_tests_properties(tst_canvas_rich_clipboard PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_canvas_layout_width tst_canvas_layout_width.cpp)
 add_test(NAME tst_canvas_layout_width COMMAND tst_canvas_layout_width)
 target_link_libraries(tst_canvas_layout_width PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)

@@ -112,14 +112,52 @@ void changeKind(MarkoffDocument &doc, BlockId block, BlockKind newKind,
         doc.d2SetBlockAttr(block, attrNames[i], attrValues[i], t);
 }
 
-void pasteMarkdown(MarkoffDocument &doc, BlockId targetBlock,
+PasteMarkdownResult pasteMarkdown(MarkoffDocument &doc, BlockId targetBlock,
                    uint32_t byteOffset, const QByteArray &source)
 {
-    // Parse synchronously
-    auto parsedDoc = Markoff::Document::fromMarkdown(QString::fromUtf8(source));
-    if (!parsedDoc) return;
+    const PasteMarkdownResult noop{targetBlock, byteOffset};
+
+    // Strip clipboard NULs (LibreOffice's text/markdown mime appends one)
+    // before parsing — a trailing NUL would otherwise survive into the
+    // last pasted block's buffer.
+    QByteArray cleaned;
+    cleaned.reserve(source.size());
+    for (char c : source) {
+        if (c != '\0')
+            cleaned.append(c);
+    }
+    cleaned = cleaned.trimmed();
+    if (cleaned.isEmpty())
+        return noop;
+
+    // Parse synchronously — same TLB pipeline loadFromMarkdown uses, so
+    // pipe tables / headings / lists keep their kinds (applyFlatEdit would
+    // naively split on newlines into Paragraphs and lose Table).
+    auto parsedDoc = Markoff::Document::fromMarkdown(QString::fromUtf8(cleaned));
+    if (!parsedDoc) return noop;
     auto pastedBlocks = parsedDoc->topLevelBlocks();
-    if (pastedBlocks.empty()) return;
+    if (pastedBlocks.empty()) return noop;
+
+    // TLB byte offsets are body-relative; `cleaned` == the parsed body as
+    // long as it carries no YAML frontmatter (paste sources never do).
+    const QByteArray &parseBody = cleaned;
+
+    auto mapKind = [](Markoff::TopLevelBlock::Kind k) -> BlockKind {
+        using K = Markoff::TopLevelBlock::Kind;
+        switch (k) {
+        case K::Paragraph:         return BlockKind::Paragraph;
+        case K::AtxHeading:
+        case K::SetextHeading:     return BlockKind::Heading;
+        case K::FencedCodeBlock:
+        case K::IndentedCodeBlock: return BlockKind::CodeBlock;
+        case K::BlockQuote:        return BlockKind::BlockQuote;
+        case K::ThematicBreak:     return BlockKind::HorizontalRule;
+        case K::HtmlBlock:         return BlockKind::HtmlBlock;
+        case K::Table:             return BlockKind::Table;
+        case K::ListItem:          return BlockKind::ListItem;
+        default:                   return BlockKind::Paragraph;
+        }
+    };
 
     UndoLog::Transaction t(doc.d2UndoLog());
 
@@ -129,28 +167,84 @@ void pasteMarkdown(MarkoffDocument &doc, BlockId targetBlock,
         doc.d2ApplyBufferEdit(targetBlock, byteOffset,
                               static_cast<uint32_t>(tail.size()), {}, t);
 
-    // Insert each parsed block after the last known position
+    // Reuse an empty target block for the first pasted TLB so we don't leave
+    // a blank paragraph above a pasted table.
+    bool reuseTarget = (byteOffset == 0 && doc.blockText(targetBlock).isEmpty());
+
     BlockId after = targetBlock;
+    bool first = true;
     for (const auto &pb : pastedBlocks) {
-        // Simplified kind mapping; Phase 7 has the full mapping
-        BlockKind kind = BlockKind::Paragraph;
+        if (pb.kind == Markoff::TopLevelBlock::Kind::LinkReferenceDefinition)
+            continue;
 
-        BlockId newId = doc.d2InsertBlock(after, kind, t);
+        BlockKind kind = mapKind(pb.kind);
+        // Quoted paragraphs arrive as Paragraph + blockQuoteDepth > 0.
+        if (pb.blockQuoteDepth > 0 && kind == BlockKind::Paragraph)
+            kind = BlockKind::BlockQuote;
 
-        // Populate buffer with parsed block content (body-relative byte offsets)
+        BlockId newId;
+        if (first && reuseTarget) {
+            newId = targetBlock;
+            doc.d2SetBlockKind(newId, kind, t);
+            // Clear any leftover buffer before writing content.
+            const QByteArray cur = doc.blockText(newId);
+            if (!cur.isEmpty())
+                doc.d2ApplyBufferEdit(newId, 0, uint32_t(cur.size()), {}, t);
+        } else {
+            newId = doc.d2InsertBlock(after, kind, t);
+        }
+        first = false;
+
+        if (kind == BlockKind::Heading) {
+            doc.d2SetBlockAttr(newId, AttrNames::Level,
+                               qBound(1, pb.headingLevel, 6), t);
+            doc.d2SetBlockAttr(newId, AttrNames::HeadingForm,
+                               pb.kind == Markoff::TopLevelBlock::Kind::SetextHeading
+                                   ? QStringLiteral("setext")
+                                   : QStringLiteral("atx"),
+                               t);
+        } else if (kind == BlockKind::ListItem) {
+            if (!pb.markerStyle.isEmpty())
+                doc.d2SetBlockAttr(newId, AttrNames::MarkerStyle, pb.markerStyle, t);
+            if (pb.markerNumber > 0)
+                doc.d2SetBlockAttr(newId, AttrNames::MarkerNumber, pb.markerNumber, t);
+            doc.d2SetBlockAttr(newId, AttrNames::IndentLevel, pb.indentDepth, t);
+            doc.d2SetBlockAttr(newId, AttrNames::LooseRun, pb.looseRun, t);
+            if (pb.markerStyle == QStringLiteral("task"))
+                doc.d2SetBlockAttr(newId, AttrNames::Checked, pb.checked, t);
+        } else if (kind == BlockKind::BlockQuote) {
+            doc.d2SetBlockAttr(newId, AttrNames::BlockQuoteDepth,
+                               qMax(1, pb.blockQuoteDepth), t);
+            if (pb.blockQuoteRunId > 0)
+                doc.d2SetBlockAttr(newId, AttrNames::BlockQuoteRunId,
+                                   pb.blockQuoteRunId, t);
+        } else if (kind == BlockKind::CodeBlock) {
+            if (!pb.codeLanguage.isEmpty())
+                doc.d2SetBlockAttr(newId, AttrNames::InfoString, pb.codeLanguage, t);
+        }
+
+        // Populate buffer with parsed block content (body-relative bytes).
         int contentLen = pb.byteEnd - pb.byteStart;
         if (contentLen > 0) {
-            QByteArray content = source.mid(pb.byteStart, contentLen);
+            QByteArray content = parseBody.mid(pb.byteStart, contentLen);
+            // Table / code blocks keep their source shape (incl. internal \n).
+            if (kind == BlockKind::CodeBlock && !pb.codeText.isEmpty())
+                content = pb.codeText.toUtf8();
             doc.d2ApplyBufferEdit(newId, 0, 0, content, t);
         }
         after = newId;
     }
+
+    // Caret lands right after the pasted content, before the tail below.
+    const PasteMarkdownResult result{after, uint32_t(doc.blockText(after).size())};
 
     // Append original tail to last pasted block
     if (!tail.isEmpty())
         doc.d2ApplyBufferEdit(after,
                               static_cast<uint32_t>(doc.blockText(after).size()),
                               0, tail, t);
+
+    return result;
 }
 
 BlockId insertListItemAfter(MarkoffDocument &doc, BlockId currentItem,

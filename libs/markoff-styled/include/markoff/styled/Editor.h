@@ -71,6 +71,17 @@ public:
     void insertLink() override;
     void setHeadingLevel(int level) override;
 
+    // Clipboard verbs (MarkdownView contract — Cluster N). Reading-mode
+    // Copy must emit markdown-faithful mime, not themed Qt HTML.
+    void copy() override;
+    void copyAsPlain() override;
+    void copyAsMarkdown() override;
+    void copyAsHtml() override;
+    void copyAsRtf() override;
+    void cut() override;
+    void paste() override;
+    void pasteAsPlain() override;
+
     // Session
     Markoff::Session *session() const;
     void              setSession(Markoff::Session *);
