@@ -61,7 +61,7 @@ add_library(markoff_canvas SHARED
 set_target_properties(markoff_canvas PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(markoff_canvas
-    PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 

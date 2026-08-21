@@ -36,7 +36,7 @@ add_library(markoff_styled SHARED
 set_target_properties(markoff_styled PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(markoff_styled
-    PUBLIC  ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
