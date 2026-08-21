@@ -36,6 +36,7 @@ add_library(Markoff::Source ALIAS markoff_source)
 
 if(DEFINED KDE_INSTALL_LIBDIR)
     install(TARGETS markoff_source
+        EXPORT CorbomiteTargets
         RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}

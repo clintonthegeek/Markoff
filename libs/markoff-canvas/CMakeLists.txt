@@ -76,6 +76,7 @@ add_library(Markoff::Canvas ALIAS markoff_canvas)
 
 if(DEFINED KDE_INSTALL_LIBDIR)
     install(TARGETS markoff_canvas
+        EXPORT CorbomiteTargets
         RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}

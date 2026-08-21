@@ -157,7 +157,16 @@ add_library(Markoff::Core ALIAS markoff_core)
 # A standalone Markoff build skips this, same as before this library was
 # SHARED (it had no install rule at all).
 if(DEFINED KDE_INSTALL_LIBDIR)
+    # EXPORT CorbomiteTargets: Corbomite's own corbomite-vault privately
+    # links Markoff::Parser, and CMake's install(EXPORT) validation
+    # requires every target an exported SHARED library links — public or
+    # private — to itself be in an export set (or IMPORTED). Since Markoff
+    # is only ever installed as part of Corbomite (this block is inert
+    # standalone, gated on KDE_INSTALL_LIBDIR existing at all), joining
+    # Corbomite's own export set is the correct scope, not a layering
+    # violation — there is no separate MarkoffTargets consumer to protect.
     install(TARGETS markoff_core
+        EXPORT CorbomiteTargets
         RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}

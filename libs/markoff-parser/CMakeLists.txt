@@ -30,6 +30,7 @@ target_compile_definitions(ts-markdown-parser PRIVATE
 set_target_properties(ts-markdown-parser PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(DEFINED KDE_INSTALL_LIBDIR)
     install(TARGETS ts-markdown-parser
+        EXPORT CorbomiteTargets
         RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
@@ -69,6 +70,7 @@ target_link_libraries(markoff-parser
 
 if(DEFINED KDE_INSTALL_LIBDIR)
     install(TARGETS markoff-parser
+        EXPORT CorbomiteTargets
         RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
