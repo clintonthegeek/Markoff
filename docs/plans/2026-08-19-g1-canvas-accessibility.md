@@ -77,7 +77,7 @@ Push.
 | A1.4 ⏸ phase close (full suite) | ☑ | `85b70046` | exempt |
 | **A2 — text interface** | | | |
 | A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☑ | `f4cb40ab` | break `f8f03ff8` / revert `0bae686e` |
-| A2.2 Caret + selection, including cross-block presentation | ☐ | | |
+| A2.2 Caret + selection, including cross-block presentation | ☑ | `f37f7e72` | break `d6f21914` / revert `3251b5ba` |
 | A2.3 Geometry: `characterRect`, `offsetAtPoint`, line boundaries | ☐ | | |
 | A2.4 ⏸ phase close (full suite) | ☐ | | exempt |
 | **A3 — notifications** | | | |
@@ -538,3 +538,44 @@ record the final baseline.
   working tree matched the last real commit exactly (clean rebuild,
   canvas suite 40/40 including `tst_canvas_constitution`) before
   writing this entry and pushing — nothing was lost or needed redoing.
+- **A2.2 (2026-08-20): caret + selection landed.** `cursorPosition()`
+  reports a position only when `View::caretBlock() == id`;
+  `setCursorPosition()` routes to `View::setCaretPosition()`.
+  `selection()`/`selectionCount()` are backed by a new
+  `blockSelectedByteRange()` helper (anonymous namespace,
+  `Accessibility.cpp`) built **entirely from `View`'s public
+  inspection surface** — `hasSelection()`, `selectionAnchorBlock()`/
+  `ByteOffset()`, `caretBlock()`/`ByteOffset()`, `blockIndexOf()` —
+  deliberately not the private `orderedSelection()`/
+  `selectedByteRangeInBlock()` pair `View.cpp` uses internally for the
+  same job: A2.2 has no spec authorization to grow the public surface
+  or add a friend declaration, and re-deriving the per-block
+  intersection from already-public block-index comparisons is a
+  handful of lines. Cross-block selections present as a selection on
+  each spanned block (spec §4.1) — confirmed by a 3-block test
+  (`selection_spans_multiple_blocks`) built via `Ctrl+Shift+End` key
+  simulation rather than mouse-drag pixel geometry, for exact,
+  reproducible byte offsets.
+  **Scope decision (logged, not an oversight):** `addSelection`/
+  `removeSelection`/`setSelection` stay no-op placeholders — `View`
+  has no public API to programmatically *set* a selection (its
+  selection model is edited only through real input events, same rule
+  the header's own "Selection (T5)" comment already states for the
+  caret), and A2.2's own done-when list (plan, above) only names
+  `cursorPosition`/`selectionCount`/`selection`/`setCursorPosition`,
+  not these three. Adding a `View` selection-setter to unblock them
+  would be a public-API growth beyond spec §9 Q2's one authorized
+  exception (`accessibleDocumentName`) — out of scope for this task,
+  not attempted.
+  6 new test cases (caret-only-on-its-block, `setCursorPosition`
+  round trip, single-block selection, a partial mid-block range, the
+  3-block-spanning case, and the no-selection-at-all case), all
+  passing on first run. No core change needed (spec §8 held).
+  Falsification: dropped the caret-block gate from `cursorPosition()`
+  (`d6f21914`), 1 of 40 accessibility tests failed as expected,
+  reverted via `git checkout f37f7e72 -- Accessibility.cpp` +
+  commit (`3251b5ba`) — confirmed byte-identical to the real commit
+  (`git diff f37f7e72 3251b5ba` empty), following A1.3's
+  content-addressed-revert recovery pattern from the start rather
+  than `git revert`. Full suite target count holds at **208/208**;
+  canvas suite 40/40, constitution clean.
