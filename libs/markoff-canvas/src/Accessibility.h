@@ -99,10 +99,23 @@ private:
 /// default treats it as a line-break search, which would be wrong for a
 /// `CodeBlock` buffer (its buffer keeps embedded `\n`s, spec §4.2's kind
 /// table) — a block is always exactly one paragraph, full stop, per this
-/// task's contract. The remaining pure virtuals
-/// (`selection`/`selectionCount`/`addSelection`/`removeSelection`/
-/// `setSelection`/`cursorPosition`/`setCursorPosition` — A2.2's job;
-/// `characterRect`/`offsetAtPoint` — A2.3's job) are compile-complete
+/// task's contract.
+///
+/// **A2.2:** `cursorPosition()`/`setCursorPosition()` and
+/// `selection()`/`selectionCount()` are real — caret only reported by the
+/// block `View::caretBlock()` currently holds; selection is this block's
+/// intersection with the view's single anchor+caret selection, computed
+/// entirely from `View`'s PUBLIC inspection surface (`hasSelection()`,
+/// `selectionAnchorBlock()`/`ByteOffset()`, `caretBlock()`/`ByteOffset()`,
+/// `blockIndexOf()`) — never the private `orderedSelection()`/
+/// `selectedByteRangeInBlock()` pair `View.cpp` uses internally, since
+/// growing the public surface or adding a friend isn't spec-authorized for
+/// this task. `addSelection`/`removeSelection`/`setSelection` stay no-op
+/// placeholders: `View` has no public selection-*setting* API (selection is
+/// edited only through real input events), and A2.2's done-when doesn't
+/// claim them — logged, not an oversight.
+///
+/// `characterRect`/`offsetAtPoint` (A2.3's job) are still compile-complete
 /// placeholder stubs, documented at each definition, following A1.1's
 /// "compile-complete but explicitly-placeholder" precedent for `role()`/
 /// `state()`. `scrollToSubstring` is a no-op stub (no task claims it yet);
@@ -146,16 +159,19 @@ public:
                           int *startOffset, int *endOffset) const override;
     int characterCount() const override;
 
-    // selection — A2.2 placeholder stubs (this block never reports a
-    // selection yet).
+    // selection (A2.2) — this block's intersection with the view's single
+    // anchor+caret selection. add/remove/setSelection stay no-op: no public
+    // View API to route a programmatic selection-set through (see class
+    // doc comment).
     void selection(int selectionIndex, int *startOffset, int *endOffset) const override;
     int selectionCount() const override;
     void addSelection(int startOffset, int endOffset) override;
     void removeSelection(int selectionIndex) override;
     void setSelection(int selectionIndex, int startOffset, int endOffset) override;
 
-    // cursor — A2.2 placeholder stubs (this block never reports a caret
-    // yet).
+    // cursor (A2.2) — only the block View::caretBlock() currently holds
+    // reports a position; setCursorPosition() routes to
+    // View::setCaretPosition().
     int cursorPosition() const override;
     void setCursorPosition(int position) override;
 

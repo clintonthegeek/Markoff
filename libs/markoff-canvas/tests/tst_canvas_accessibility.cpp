@@ -88,6 +88,14 @@ private Q_SLOTS:
     void paragraph_boundary_is_whole_block();
     void paragraph_boundary_whole_block_with_embedded_newlines_in_codeblock();
     void paragraph_before_after_boundary_report_no_item();
+
+    // ---- A2.2: caret + selection ----
+    void cursor_position_only_on_caret_block();
+    void set_cursor_position_routes_to_view_caret();
+    void selection_within_single_block();
+    void selection_partial_range_within_block();
+    void selection_spans_multiple_blocks();
+    void no_selection_reports_empty();
 };
 
 void TstCanvasAccessibility::container_role_is_document()
@@ -751,6 +759,152 @@ void TstCanvasAccessibility::paragraph_before_after_boundary_report_no_item()
     QCOMPARE(text->textAfterOffset(5, QAccessible::ParagraphBoundary, &s, &e), QString());
     QCOMPARE(s, -1);
     QCOMPARE(e, -1);
+}
+
+// ---- A2.2: caret + selection ----------------------------------------------
+
+void TstCanvasAccessibility::cursor_position_only_on_caret_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+
+    view.setCaretPosition(blocks[0], 3);
+    QCOMPARE(iface->child(0)->textInterface()->cursorPosition(), 3);
+    QCOMPARE(iface->child(1)->textInterface()->cursorPosition(), -1);
+
+    view.setCaretPosition(blocks[1], 5);
+    QCOMPARE(iface->child(0)->textInterface()->cursorPosition(), -1);
+    QCOMPARE(iface->child(1)->textInterface()->cursorPosition(), 5);
+}
+
+void TstCanvasAccessibility::set_cursor_position_routes_to_view_caret()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+
+    iface->child(1)->textInterface()->setCursorPosition(6);
+    QCOMPARE(view.caretBlock(), blocks[1]);
+    QCOMPARE(view.caretByteOffset(), 6);
+    // Round trip.
+    QCOMPARE(iface->child(1)->textInterface()->cursorPosition(), 6);
+}
+
+void TstCanvasAccessibility::selection_within_single_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    const auto blocks = doc.iterateBlocks();
+    view.setCaretPosition(blocks[0], 0);
+    for (int i = 0; i < 5; ++i)
+        QTest::keyClick(&view, Qt::Key_Right, Qt::ShiftModifier);
+    QVERIFY(view.hasSelection());
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text0 = iface->child(0)->textInterface();
+    QCOMPARE(text0->selectionCount(), 1);
+    int start = -2, end = -2;
+    text0->selection(0, &start, &end);
+    QCOMPARE(start, 0);
+    QCOMPARE(end, 5);
+
+    // No other block is touched by a same-block selection.
+    QAccessibleTextInterface *text1 = iface->child(1)->textInterface();
+    QCOMPARE(text1->selectionCount(), 0);
+}
+
+void TstCanvasAccessibility::selection_partial_range_within_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    const auto blocks = doc.iterateBlocks();
+    view.setCaretPosition(blocks[0], 4);
+    for (int i = 0; i < 4; ++i)
+        QTest::keyClick(&view, Qt::Key_Right, Qt::ShiftModifier);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleTextInterface *text0 = iface->child(0)->textInterface();
+    int start = -2, end = -2;
+    text0->selection(0, &start, &end);
+    // A selection ending mid-block reports the right partial range, not the
+    // whole block (A2.2's done-when).
+    QCOMPARE(start, 4);
+    QCOMPARE(end, 8);
+}
+
+void TstCanvasAccessibility::selection_spans_multiple_blocks()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(blocks.size(), size_t(3));
+    const int len0 = doc.blockText(blocks[0]).size();
+    const int len1 = doc.blockText(blocks[1]).size();
+    const int len2 = doc.blockText(blocks[2]).size();
+
+    // Anchor 6 bytes into block 0, extend selection to the end of the
+    // document — spans all three blocks.
+    view.setCaretPosition(blocks[0], 6);
+    QTest::keyClick(&view, Qt::Key_End, Qt::ControlModifier | Qt::ShiftModifier);
+    QVERIFY(view.hasSelection());
+    QCOMPARE(view.selectionAnchorBlock(), blocks[0]);
+    QCOMPARE(view.caretBlock(), blocks[2]);
+
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    int start = -2, end = -2;
+
+    // Cross-block selections present as a per-block selection on each
+    // spanned block (spec §4.1) — first block partial (from the anchor to
+    // its end), middle block whole, last block whole (up to the caret,
+    // which landed at its end).
+    iface->child(0)->textInterface()->selection(0, &start, &end);
+    QCOMPARE(start, 6);
+    QCOMPARE(end, len0);
+
+    iface->child(1)->textInterface()->selection(0, &start, &end);
+    QCOMPARE(start, 0);
+    QCOMPARE(end, len1);
+
+    iface->child(2)->textInterface()->selection(0, &start, &end);
+    QCOMPARE(start, 0);
+    QCOMPARE(end, len2);
+}
+
+void TstCanvasAccessibility::no_selection_reports_empty()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    QVERIFY(!view.hasSelection());
+    QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
+    for (int i = 0; i < iface->childCount(); ++i) {
+        QAccessibleTextInterface *text = iface->child(i)->textInterface();
+        QCOMPARE(text->selectionCount(), 0);
+        int start = -2, end = -2;
+        text->selection(0, &start, &end);
+        QCOMPARE(start, -1);
+        QCOMPARE(end, -1);
+    }
 }
 
 QTEST_MAIN(TstCanvasAccessibility)

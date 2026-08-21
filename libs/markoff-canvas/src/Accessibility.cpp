@@ -77,6 +77,61 @@ int intAttr(MarkoffDocument *doc, BlockId id, const QByteArray &name, int def)
     return v ? *v : def;
 }
 
+/// This block's byte sub-range covered by the view's current selection, or
+/// `{-1, -1}` if `id` isn't selected at all (no selection active, or the
+/// selection doesn't reach this block). Built entirely from `View`'s public
+/// inspection surface — `hasSelection()`/`selectionAnchorBlock()`/
+/// `selectionAnchorByteOffset()`/`caretBlock()`/`caretByteOffset()`/
+/// `blockIndexOf()` — deliberately never the private `orderedSelection()`/
+/// `selectedByteRangeInBlock()` pair `View.cpp` uses internally: A2.2 has no
+/// spec-authorized reason to grow the public surface or add a friend, and
+/// re-deriving this from already-public per-block-index comparisons is a
+/// handful of lines, not a second coordinate space (C4 stays about
+/// cross-block BYTE sums, never index comparisons — `CanvasAccessible`
+/// itself already orders children by index the same way).
+std::pair<int, int> blockSelectedByteRange(View *view, BlockId id)
+{
+    if (!view->hasSelection())
+        return {-1, -1};
+
+    const BlockId anchorBlock = view->selectionAnchorBlock();
+    const int anchorByte = view->selectionAnchorByteOffset();
+    const BlockId caretBlock = view->caretBlock();
+    const int caretByte = view->caretByteOffset();
+
+    const int anchorIndex = view->blockIndexOf(anchorBlock);
+    const int caretIndex = view->blockIndexOf(caretBlock);
+    if (anchorIndex < 0 || caretIndex < 0)
+        return {-1, -1};
+
+    // Order the two endpoints into document order (start <= end).
+    BlockId startBlock = anchorBlock, endBlock = caretBlock;
+    int startIndex = anchorIndex, endIndex = caretIndex;
+    int startByte = anchorByte, endByte = caretByte;
+    if (caretIndex < anchorIndex || (caretIndex == anchorIndex && caretByte < anchorByte)) {
+        startBlock = caretBlock; endBlock = anchorBlock;
+        startIndex = caretIndex; endIndex = anchorIndex;
+        startByte = caretByte; endByte = anchorByte;
+    }
+    Q_UNUSED(startBlock);
+    Q_UNUSED(endBlock);
+
+    const int index = view->blockIndexOf(id);
+    if (index < startIndex || index > endIndex)
+        return {-1, -1};
+
+    MarkoffDocument *doc = view->document();
+    if (!doc)
+        return {-1, -1};
+    const int blockLen = doc->blockText(id).size();
+
+    const int from = (index == startIndex) ? startByte : 0;
+    const int to = (index == endIndex) ? endByte : blockLen;
+    if (from >= to)
+        return {-1, -1};
+    return {from, to};
+}
+
 }  // namespace
 
 // ---- CanvasAccessible ------------------------------------------------
@@ -436,44 +491,82 @@ QString CanvasBlockAccessible::textAtOffset(int offset, QAccessible::TextBoundar
     return QAccessibleTextInterface::textAtOffset(offset, boundaryType, startOffset, endOffset);
 }
 
-void CanvasBlockAccessible::selection(int, int *startOffset, int *endOffset) const
+void CanvasBlockAccessible::selection(int selectionIndex, int *startOffset, int *endOffset) const
 {
-    // A2.2's job (caret + selection, cross-block presentation, spec §4.1).
-    // Placeholder: this block never reports a selection yet.
-    *startOffset = *endOffset = -1;
+    // A2.2: this block's intersection with the view's (single, anchor+caret)
+    // selection — spec §4.1's "cross-block selections appear as a selection
+    // on each spanned block". There is exactly one selection to report
+    // (index 0); View has no multi-range selection model.
+    if (selectionIndex != 0) {
+        *startOffset = *endOffset = -1;
+        return;
+    }
+    const auto [fromByte, toByte] = blockSelectedByteRange(m_view, m_id);
+    if (fromByte < 0) {
+        *startOffset = *endOffset = -1;
+        return;
+    }
+    MarkoffDocument *doc = m_view->document();
+    const QByteArray raw = doc ? doc->blockText(m_id) : QByteArray();
+    *startOffset = int(coords::byteToQtPos(raw, fromByte));
+    *endOffset = int(coords::byteToQtPos(raw, toByte));
 }
 
 int CanvasBlockAccessible::selectionCount() const
 {
-    // A2.2 placeholder.
-    return 0;
+    // A2.2: 0 or 1 — same "one selection, possibly spanning this block or
+    // not" model as selection() above.
+    return blockSelectedByteRange(m_view, m_id).first >= 0 ? 1 : 0;
 }
 
 void CanvasBlockAccessible::addSelection(int, int)
 {
-    // A2.2 placeholder — no-op until selection routes through View.
+    // Not implemented: `View` has no public API to programmatically set a
+    // selection (its selection model is edited only through real input
+    // events — mouse drag, Shift+move, Ctrl+A — same rule the header's own
+    // "Selection (T5)" comment states for the caret). A2.2's own done-when
+    // only requires cursorPosition()/selectionCount()/selection()/
+    // setCursorPosition() to work; it does not claim addSelection/
+    // removeSelection/setSelection. Adding a View setter to unblock these
+    // would grow the public API beyond spec §9 Q2's one authorized
+    // exception (accessibleDocumentName) — logged as a decision, not an
+    // oversight (plan findings log, A2.2).
 }
 
 void CanvasBlockAccessible::removeSelection(int)
 {
-    // A2.2 placeholder — no-op.
+    // See addSelection() above — same reasoning, no View setter to route
+    // through.
 }
 
 void CanvasBlockAccessible::setSelection(int, int, int)
 {
-    // A2.2 placeholder — no-op.
+    // See addSelection() above — same reasoning, no View setter to route
+    // through.
 }
 
 int CanvasBlockAccessible::cursorPosition() const
 {
-    // A2.2's job (`View::caretByteOffset()` converted, only when
-    // `View::caretBlock() == id`). Placeholder: no caret reported yet.
-    return -1;
+    // A2.2: only the block currently holding the caret reports a position.
+    if (m_view->caretBlock() != m_id)
+        return -1;
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return -1;
+    const QByteArray raw = doc->blockText(m_id);
+    return int(coords::byteToQtPos(raw, m_view->caretByteOffset()));
 }
 
-void CanvasBlockAccessible::setCursorPosition(int)
+void CanvasBlockAccessible::setCursorPosition(int position)
 {
-    // A2.2 placeholder — no-op until routed to `View::setCaretPosition()`.
+    // A2.2: routes to View::setCaretPosition() — the one real caret-moving
+    // chokepoint (spec §4.1).
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return;
+    const QByteArray raw = doc->blockText(m_id);
+    const int clamped = qBound(0, position, int(coords::byteToQtPos(raw, raw.size())));
+    m_view->setCaretPosition(m_id, int(coords::qtPosToByte(raw, clamped)));
 }
 
 QRect CanvasBlockAccessible::characterRect(int) const
