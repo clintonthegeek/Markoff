@@ -233,7 +233,7 @@ Push.
 | **H2 — navigation / find / selection seams** | | | |
 | H2.1 `setCaretPosition` redirect + doc start + selectAll | ☑ | `9b0138f8` | break `87386788` / revert `d5ea8197` |
 | H2.2 a11y-tree + find-navigation tests | ☑ | `9b0138f8` | — (covered by H1.4's union break) |
-| H2.3 ⏸ arc close (full suite, docs, consumer answer note) | ☑ | `…` | exempt |
+| H2.3 ⏸ arc close (full suite, docs, consumer answer note) | ☑ | `744ef8b9` | exempt |
 
 ---
 
@@ -503,7 +503,8 @@ wiring the flag.
   `git revert --no-edit HEAD` without the flag instead.
 - **H2.3 (2026-08-30): arc closed.** Full default-config suite re-run
   after all falsification reverts: **213/213**, canvas-scoped 41/41,
-  `check-constitution.sh` clean (C1–C4, 80 files). Docs updated:
+  `check-constitution.sh` clean (C1–C4, 80 files). Docs updated
+  (commit `744ef8b9`):
   `docs/STATUS.md` (workfront + baseline correction), root `CLAUDE.md`
   and canvas `CLAUDE.md` (H-arc status lines), this plan's checklist +
   findings log, and the consumer answer note
