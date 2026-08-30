@@ -540,6 +540,18 @@ QString EditorWidget::accessibleDocumentName() const
     return m_view ? m_view->accessibleDocumentName() : QString();
 }
 
+// --- Hide matching first heading as title (H arc) ---
+
+void EditorWidget::setHideMatchingFirstHeadingAsTitle(bool hide)
+{
+    if (m_view) m_view->setHideMatchingFirstHeadingAsTitle(hide);
+}
+
+bool EditorWidget::hideMatchingFirstHeadingAsTitle() const
+{
+    return m_view && m_view->hideMatchingFirstHeadingAsTitle();
+}
+
 // --- Content width (readable-line-width) ---
 
 void EditorWidget::setContentWidthPolicy(ContentWidthPolicy policy)

@@ -780,6 +780,22 @@ public:
     void setAccessibleDocumentName(const QString &name);
     QString accessibleDocumentName() const { return m_accessibleDocumentName; }
 
+    // ---- Hide matching first heading as title (H arc, Hologram) ------------
+    // Opt-in "first heading is the document title" projection. When on, the
+    // FIRST block in document order is treated as the document title when it
+    // is a level-1 Heading whose plain text (ATX marker stripped; setext
+    // buffer already content-only) equals `inlineTitle()` — and is hidden
+    // from the body: zero-height y-layout, not a caret target,
+    // `isBlockHidden()` true, `blockRect()` a zero-height rect at its y. The
+    // block STAYS in the block-index space (`blockCount`/`blockIdAt`/
+    // `blockIndexOf` are unchanged — document order intact) and stays in the
+    // document (serialize/undo/round-trip untouched); only the projection
+    // changes. Never hides the document's only block. The match is
+    // re-derived continuously (document edit, title change, flag flip), so
+    // hiding toggles as the heading or the title changes. Off by default.
+    void setHideMatchingFirstHeadingAsTitle(bool hide);
+    bool hideMatchingFirstHeadingAsTitle() const { return m_hideMatchingFirstHeadingAsTitle; }
+
 signals:
     /// Fired only on a user edit made directly in the title band (typing,
     /// Backspace/Delete) — never from `setInlineTitle`. The consumer turns
@@ -1439,6 +1455,30 @@ public:
     /// `toggleFold()` itself.
     void refreshFoldedBlocks();
 
+    /// H arc (H1.1): re-derives `m_hiddenTitleBlock` from the flag +
+    /// document + `m_inlineTitle` (D3's match rule). Called BEFORE
+    /// `refreshFoldedBlocks()` from `onDocumentChanged()`, and directly
+    /// from `setInlineTitle()`/`setHideMatchingFirstHeadingAsTitle()`, so
+    /// the union `refreshFoldedBlocks()` feeds the cache is always current.
+    /// Nulls `m_hiddenTitleBlock` when the flag is off, the title is empty,
+    /// the first block isn't a level-1 Heading matching `inlineTitle()`, or
+    /// hiding would leave the document with zero visible blocks.
+    void refreshHiddenTitleBlock();
+    /// The current document title block, or a null `BlockId` when nothing
+    /// is hidden (flag off, no match, sole-block guard, …). Read by
+    /// `refreshFoldedBlocks()` (projection union) and by every caret-ingress
+    /// seam that must never land inside the hidden title.
+    BlockId hiddenTitleBlock() const { return m_hiddenTitleBlock; }
+    /// H arc (H1.1): the "never strand the caret" rule applied to the hidden
+    /// title — if the caret currently sits in `m_hiddenTitleBlock` (this
+    /// pass's re-derivation just hid its block), move it to the first
+    /// visible entry byte 0 (or clear it if nothing visible remains, e.g.
+    /// everything after the title is fold-hidden). Also drops a selection
+    /// anchor now pointing at the invisible title. Called from
+    /// `onDocumentChanged()` and the flag/title setters after
+    /// `refreshHiddenTitleBlock()`.
+    void unstrandCaretFromHiddenTitle();
+
     /// P6.0: builds the `Markoff::FoldRef` that identifies `id` as a fold
     /// head — `kind` (canvas's `LongList`/`Callout` both map to core's
     /// generic `FoldRef::Kind::Block`; `Heading` maps directly), `start`
@@ -1637,6 +1677,16 @@ public:
     // readOnly/theme/fontScale already follow).
     QString m_inlineTitle;
     bool m_inlineTitleVisible = false;
+    /// H arc (H1.1): the derived document-title block currently hidden from
+    /// the body projection — null when nothing is hidden. Never written
+    /// directly by callers; `refreshHiddenTitleBlock()` owns it. Deliberately
+    /// NOT in `m_foldedHeads` (fold STATE is user-toggled and mirrored to the
+    /// Session; this is a permanent projection the user cannot unfold, and it
+    /// must not leak into `foldedHeadIndices()`'s persisted set).
+    BlockId m_hiddenTitleBlock;
+    /// H arc (H1.2): the opt-in flag. See
+    /// `setHideMatchingFirstHeadingAsTitle`'s doc comment.
+    bool m_hideMatchingFirstHeadingAsTitle = false;
     /// Accessible document name (G1 spec §9 Q2) — set-only-by-embedder input
     /// to `CanvasAccessible::text(QAccessible::Name)`'s resolution chain.
     /// Empty by default, same "off unless the consumer opts in" shape as

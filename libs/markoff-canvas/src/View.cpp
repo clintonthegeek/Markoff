@@ -301,6 +301,36 @@ QByteArray serializeTableCells(const MarkoffDocument &doc, const BlockLayoutCach
     }
     return lines.join("\n");
 }
+
+// ---- H arc (H1.1): heading plain text -------------------------------------
+// The "does this heading equal the document title" comparison operates on the
+// heading's PLAIN text (marker stripped), matching Hologram's own
+// `HologramDocument::firstHeading()` strip rule bit-for-bit so the view's
+// hide predicate and the consumer's "is this the title" predicate can never
+// disagree (plan D3): ATX strips the leading `#` run plus one optional space,
+// and does NOT strip trailing closing hashes (`# notes #` reads as "notes #",
+// exactly as Hologram reads it); setext buffers are already content-only by
+// core's buffer convention, so they are used as-is.
+QString headingPlainText(const MarkoffDocument &doc, BlockId id)
+{
+    const QByteArray buf = doc.blockText(id);
+    const auto attrs = doc.blockAttrs(id);
+    const auto formIt = attrs.constFind(AttrNames::HeadingForm);
+    const bool setext = formIt != attrs.constEnd()
+        && std::holds_alternative<QString>(formIt.value())
+        && std::get<QString>(formIt.value()) == QLatin1String("setext");
+    if (setext)
+        return QString::fromUtf8(buf);
+
+    const QString text = QString::fromUtf8(buf);
+    const int hashes = countLeadingHashes(text);
+    if (hashes <= 0)
+        return text;
+    int offset = hashes;
+    if (offset < text.size() && text.at(offset) == u' ')
+        ++offset;
+    return text.mid(offset);
+}
 }  // namespace
 
 View::View(QWidget *parent)
@@ -988,7 +1018,64 @@ void View::refreshFoldedBlocks()
         }
         m_foldedHeads.subtract(stale);
     }
-    m_cache->setFoldedBlocks(hiddenBlocksFromFolds());
+    // H arc (H1.1): the hidden document title rides the same
+    // `setFoldedBlocks` projection the fold bodies use (zero-height
+    // y-layout, `Entry::folded` → `isBlockHidden`/a11y `invisible`,
+    // caret-motion skip via `nextVisibleEntryIndex`). Callers must have run
+    // `refreshHiddenTitleBlock()` first (onDocumentChanged does, before this;
+    // the flag/title setters call both) so `m_hiddenTitleBlock` is current
+    // when this union is computed — the title is never a fold head, so
+    // `m_foldedHeads` has no opinion about it and would otherwise re-show it.
+    QSet<BlockId> hidden = hiddenBlocksFromFolds();
+    if (!m_hiddenTitleBlock.isNull())
+        hidden.insert(m_hiddenTitleBlock);
+    m_cache->setFoldedBlocks(hidden);
+}
+
+void View::refreshHiddenTitleBlock()
+{
+    // Plan D3's match rule, all four gates:
+    //  - flag on, a document attached, and a non-empty title to match;
+    //  - more than one block (D4 — never hide the document's ONLY block,
+    //    which would leave it with no visible caret target at all);
+    //  - the first block in document order is a Heading with level == 1;
+    //  - its plain text equals the current inline title.
+    if (!m_doc || !m_hideMatchingFirstHeadingAsTitle || m_inlineTitle.isEmpty()
+        || m_cache->entries().size() < 2) {
+        m_hiddenTitleBlock = {};
+        return;
+    }
+    const BlockId first = m_cache->entries().front().id;
+    int level = 0;
+    const auto attrs = m_doc->blockAttrs(first);
+    if (const auto it = attrs.constFind(AttrNames::Level); it != attrs.cend()) {
+        if (const int *v = std::get_if<int>(&it.value()))
+            level = *v;
+    }
+    if (m_doc->blockKind(first) != Markoff::BlockKind::Heading || level != 1) {
+        m_hiddenTitleBlock = {};
+        return;
+    }
+    m_hiddenTitleBlock =
+        (headingPlainText(*m_doc, first) == m_inlineTitle) ? first : BlockId{};
+}
+
+void View::unstrandCaretFromHiddenTitle()
+{
+    if (m_caret.block != m_hiddenTitleBlock) {
+        // Anchor drop still applies when the ANCHOR (not the caret) now
+        // references the invisible title — a selection whose anchor points
+        // at hidden content is dropped, same "block didn't survive -> drop
+        // it" rule the selection-anchor handling in onDocumentChanged uses.
+        if (m_selectionAnchor && m_selectionAnchor->block == m_hiddenTitleBlock)
+            m_selectionAnchor.reset();
+        return;
+    }
+    const int firstVisible = nextVisibleEntryIndex(0, true);
+    m_caret = (firstVisible >= 0)
+        ? CanvasCursor{m_cache->entries()[size_t(firstVisible)].id, 0}
+        : CanvasCursor{};
+    m_selectionAnchor.reset();
 }
 
 Markoff::FoldRef View::foldRefFor(BlockId id) const
@@ -1029,6 +1116,16 @@ Markoff::FoldRef View::foldRefFor(BlockId id) const
 bool View::isBlockFoldable(BlockId id) const
 {
     if (!m_doc)
+        return false;
+    // H arc (H1.3): the hidden document title is never foldable — it is a
+    // permanent projection (the user cannot unfold it), so it must not look
+    // foldable to toggleFold() (no-op), foldAffordanceRectFor() (no arrow),
+    // setFoldedHeadIndices() (a persisted fold index on it is dropped), or
+    // G1's pending A4.1 a11y state (never expandable). The guard is on
+    // m_hiddenTitleBlock only — the underlying heading shape
+    // (Folding::resolveFoldable) is untouched, so fold SHAPE for every other
+    // block is unaffected.
+    if (id == m_hiddenTitleBlock)
         return false;
     return Detail::resolveFoldable(*m_doc, id).kind != Detail::FoldKind::None;
 }
@@ -1260,6 +1357,25 @@ void View::setInlineTitle(const QString &title)
         return;
     m_inlineTitle = title;
     m_titleCaretPos = qBound(0, m_titleCaretPos, m_inlineTitle.size());
+    // H arc (H1.1): the title is an input to the hide predicate — a rename
+    // (or its clearing) can newly hide or un-hide block 0, so re-derive the
+    // projection and un-strand the caret if this change just hid its block.
+    refreshHiddenTitleBlock();
+    refreshFoldedBlocks();
+    unstrandCaretFromHiddenTitle();
+    viewport()->update();
+}
+
+void View::setHideMatchingFirstHeadingAsTitle(bool hide)
+{
+    if (m_hideMatchingFirstHeadingAsTitle == hide)
+        return;
+    m_hideMatchingFirstHeadingAsTitle = hide;
+    // Same re-derivation + un-strand as setInlineTitle — flipping the flag
+    // on can hide the caret's own block, flipping it off re-shows it.
+    refreshHiddenTitleBlock();
+    refreshFoldedBlocks();
+    unstrandCaretFromHiddenTitle();
     viewport()->update();
 }
 
@@ -1674,7 +1790,10 @@ void View::onDocumentChanged()
     // Folding (P5.6): sync() rebuilds every entry (Entry::folded resets to
     // false along with everything else), and a structural edit can also
     // change what a fold head's body even IS — refresh before clampCaret so
-    // a caret clamp never lands inside a range this pass just re-hid.
+    // a caret clamp never lands inside a range this pass just re-hid. The
+    // H-arc title hide re-derives BEFORE the fold refresh so the union
+    // refreshFoldedBlocks() feeds the cache is current this very pass.
+    refreshHiddenTitleBlock();
     refreshFoldedBlocks();
 
     // P6.1 (guide §B.1/B.2): re-resolve the caret from the Session's own
@@ -1742,6 +1861,11 @@ void View::onDocumentChanged()
         if (m_selectionAnchor && m_cache->indexOf(m_selectionAnchor->block) < 0)
             m_selectionAnchor.reset();
     }
+    // H arc (H1.1): this pass's re-derivation may have newly hidden the
+    // caret's own block as the document title (typed `# <title>` as block 0,
+    // title renamed to match block 0, flag flipped on) — never strand it in
+    // now-invisible content, same rule toggleFold() applies to a fold body.
+    unstrandCaretFromHiddenTitle();
     promoteCaretBlockKind();
     ensureLayoutForViewport();
     // A document-driven clamp (remote edit, undo/redo) can move the caret
@@ -2275,6 +2399,19 @@ void View::setCaretPosition(BlockId block, int byteOffset)
         index = int(m_cache->entries().size()) - 1;
         block = m_cache->entries()[size_t(index)].id;
     }
+    // H arc (H2.1): never land the caret inside the hidden document title —
+    // this chokepoint is the ingress for every programmatic placement
+    // (EditorWidget::setCursorPosition, a11y setCursorPosition, find-next
+    // via onFindNavigationRequested, exitTitleEditingToBlockZero), so
+    // redirecting HERE covers all of them at once. Land on the first visible
+    // entry byte 0.
+    if (block == m_hiddenTitleBlock) {
+        const int firstVisible = nextVisibleEntryIndex(0, true);
+        if (firstVisible >= 0) {
+            block = m_cache->entries()[size_t(firstVisible)].id;
+            index = firstVisible;
+        }
+    }
 
     const int size = m_doc ? m_doc->blockText(block).size() : 0;
     setCaret(CanvasCursor{block, qBound(0, byteOffset, size)});
@@ -2731,7 +2868,13 @@ void View::selectAll()
 {
     if (!m_doc || m_cache->entries().empty())
         return;
-    const auto &first = m_cache->entries().front();
+    // H arc (H2.1): when the document title is hidden, Ctrl+A excludes it —
+    // anchoring at the hidden block would pull its (invisible) text into
+    // the selection and into any copy. Anchor at the first VISIBLE entry
+    // instead; the last entry is never the title when a hide is active.
+    const auto &first = (m_cache->entries().front().id == m_hiddenTitleBlock)
+        ? m_cache->entries()[size_t(1)]
+        : m_cache->entries().front();
     const auto &last = m_cache->entries().back();
     m_selectionAnchor = CanvasCursor{first.id, 0};
     setCaret(CanvasCursor{last.id, int(m_doc->blockText(last.id).size())});
@@ -3783,10 +3926,24 @@ void View::moveCaretToDocumentStart()
     // the cache directly" convention selectAll() already uses (T5) — not
     // fold-aware (a folded region at the very start/end of the document
     // can still be the landing entry), consistent with that existing
-    // precedent rather than a new gap this task introduces.
+    // precedent rather than a new gap this task introduces. H arc (H2.1)
+    // exception: the hidden document title is not a "folded region" the
+    // user can unfold — it is permanently invisible, so Ctrl+Home skips it
+    // and lands on the first visible entry (always entry 1 when a hide is
+    // active, per the H1.3 foldability guard's reasoning).
     if (!m_doc || m_cache->entries().empty())
         return;
     const auto &first = m_cache->entries().front();
+    if (first.id == m_hiddenTitleBlock) {
+        // The hidden title is never the caret's landing spot — jump to the
+        // first visible entry (always entry 1 when a hide is active: entry 1
+        // cannot be fold-hidden, since the only fold head above it is the
+        // title, which the H1.3 guard made non-foldable).
+        const int firstVisible = nextVisibleEntryIndex(0, true);
+        m_caret.block = m_cache->entries()[size_t(qMax(0, firstVisible))].id;
+        m_caret.byteOffset = 0;
+        return;
+    }
     m_caret.block = first.id;
     m_caret.byteOffset = 0;
 }

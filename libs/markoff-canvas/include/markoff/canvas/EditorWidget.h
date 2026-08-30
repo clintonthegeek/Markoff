@@ -232,6 +232,15 @@ public:
     void setAccessibleDocumentName(const QString &name);
     QString accessibleDocumentName() const;
 
+    // ---- Hide matching first heading as title (H arc, Hologram) -------------
+    /// Thin pass-through to the composed View, same shape as the inline
+    /// title above. Off by default. When on, the first block is hidden from
+    /// the body when it is a level-1 Heading matching `inlineTitle()` —
+    /// see `View::setHideMatchingFirstHeadingAsTitle`'s doc comment for the
+    /// full match rule and the index-space/documents notes.
+    void setHideMatchingFirstHeadingAsTitle(bool hide);
+    bool hideMatchingFirstHeadingAsTitle() const;
+
     // ---- Content width (readable-line-width, punch-list [cluster-k] P5) --
     // Thin pass-through, same shape as inline title above. FullWidth by
     // construction (View's own default) until a consumer opts in.
