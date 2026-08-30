@@ -1041,7 +1041,7 @@ void View::refreshHiddenTitleBlock()
     //  - the first block in document order is a Heading with level == 1;
     //  - its plain text equals the current inline title.
     if (!m_doc || !m_hideMatchingFirstHeadingAsTitle || m_inlineTitle.isEmpty()
-        || false) {  // FALSIFICATION: drop the sole-block guard
+        || m_cache->entries().size() < 2) {
         m_hiddenTitleBlock = {};
         return;
     }
