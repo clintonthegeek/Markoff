@@ -5,12 +5,27 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-19 — **new workfront: G1 canvas
-accessibility**, spec + plan both written, ready to start at task
-A1.0. The canvas production arc is closed (all three gates decided)
-and its board body moved to [`STATUS-LOG.md`](STATUS-LOG.md); the
-E-arc is formally closed. No code has been written for the a11y arc
-yet; baseline stands at 315/315.
+**Last updated:** 2026-08-30 — **H arc landed** (Hologram's
+title-hide feature, `canvas(H1)` `9b0138f8`); measured default-config
+full-suite baseline at current HEAD corrected to **213/213** (the
+handoff/pin figure "208/208" predates the rich-clipboard merge at
+`5d885036`, which added five test executables). G1 workfront note below
+remains the active arc. (Context: the canvas production arc is closed —
+all three gates decided — and its board body lives in
+`STATUS-LOG.md`; the E-arc is formally closed.)
+
+## Workfront — H arc (Hologram: hide matching first heading as title) — CLOSED 2026-08-30
+
+Hologram (new `EditorWidget` consumer) asked for an opt-in flag so a
+first-line heading matching the title band stops rendering in the body.
+Plan: [`plans/2026-08-30-hide-first-heading-as-title.md`](plans/2026-08-30-hide-first-heading-as-title.md).
+Landed in `9b0138f8`: `View::setHideMatchingFirstHeadingAsTitle(bool)` +
+`EditorWidget` pass-through; the hidden title reuses the fold-hidden
+projection (zero-height, a11y `invisible`, caret-step skip) and **stays
+in the block-index space** (D2 — a divergence from the handoff's literal
+ask, reasoned in the plan). Full suite **213/213**, canvas 41/41,
+constitution clean. Consumer answer note:
+[`handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md`](handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md).
 
 ## Workfront — G1 canvas accessibility
 

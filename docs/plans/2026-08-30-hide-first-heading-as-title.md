@@ -5,12 +5,15 @@ single-document Markdown wordpad; submodules this repo).
 **Consumer handoff (normative-ish ask):**
 `/home/clinton/dev/Hologram/docs/handoff/2026-08-27-to-markoff-hide-first-heading-as-title.md`.
 **Date:** 2026-08-30.
-**Status:** new — no code written yet. Sits alongside the G1 a11y arc
-(current workfront); does not depend on it and is not blocked by it.
-**Pin at handoff:** `5d885036` (current HEAD). Baselines: default-config
-(LIVE-OFF) full suite **208/208** (the handoff's "315/315" is the
-pre-G3-retirement live-ON figure; live retired 2026-08-19); canvas-scoped
-run 40/40. Both must hold — any drop is a regression.
+**Status:** CLOSED (2026-08-30, `9b0138f8` + docs). Sat alongside the G1
+a11y arc (current workfront); no dependency either way.
+**Pin at handoff:** `5d885036` (current HEAD). Baselines (measured at
+this pin before this arc, not the handoff's cited figures — its "canvas
+208/208 / full 315/315" predates the rich-clipboard merge that landed
+five new test executables at this very HEAD, and the 315/315 figure is
+pre-G3-retirement live-ON): default-config (LIVE-OFF) full suite
+**213/213**, canvas-scoped run **41/41**. Both must hold — any drop is a
+regression.
 
 This plan is written for **consecutive fresh agent sessions** (same
 protocol as the G1 plan). Each task is sized for one session. Do the
@@ -223,14 +226,14 @@ Push.
 | Task | Status | Commit | Falsification (break/revert) |
 |---|---|---|---|
 | **H1 — hide primitive + public flag** | | | |
-| H1.1 `refreshHiddenTitleBlock()` + projection union | ☐ | | |
-| H1.2 Public `setHideMatchingFirstHeadingAsTitle` + `EditorWidget` pass-through | ☐ | | |
-| H1.3 Foldability guard (`isBlockFoldable`) | ☐ | | |
-| H1.4 ⏸ tests for H1 + falsification | ☐ | | |
+| H1.1 `refreshHiddenTitleBlock()` + projection union | ☑ | `9b0138f8` | break `bfdaa3f4` / revert `9c72a185` |
+| H1.2 Public `setHideMatchingFirstHeadingAsTitle` + `EditorWidget` pass-through | ☑ | `9b0138f8` | — (covered by H1.4's union break) |
+| H1.3 Foldability guard (`isBlockFoldable`) | ☑ | `9b0138f8` | break `364b0a43` / revert `679eda35` (sole-block guard) |
+| H1.4 ⏸ tests for H1 + falsification | ☑ | `9b0138f8` | break `606ccab1` / revert `37d540d5` (level gate) |
 | **H2 — navigation / find / selection seams** | | | |
-| H2.1 `setCaretPosition` redirect + doc start + selectAll | ☐ | | |
-| H2.2 a11y-tree + find-navigation tests | ☐ | | |
-| H2.3 ⏸ arc close (full suite, docs, consumer answer note) | ☐ | | |
+| H2.1 `setCaretPosition` redirect + doc start + selectAll | ☑ | `9b0138f8` | break `87386788` / revert `d5ea8197` |
+| H2.2 a11y-tree + find-navigation tests | ☑ | `9b0138f8` | — (covered by H1.4's union break) |
+| H2.3 ⏸ arc close (full suite, docs, consumer answer note) | ☑ | `…` | exempt |
 
 ---
 
@@ -440,3 +443,72 @@ wiring the flag.
 ## Findings log
 
 (One line minimum per task. Append; never rewrite.)
+
+- **H1.1–H1.4 / H2.1–H2.2 (2026-08-30, one implementation session
+  covering the whole arc): feature landed in commit `9b0138f8`.**
+  `refreshHiddenTitleBlock()` derives `m_hiddenTitleBlock` (flag + doc +
+  inlineTitle + D3 level-1 rule + D4 sole-block guard) and
+  `refreshFoldedBlocks()` feeds it into `BlockLayoutCache::setFoldedBlocks`
+  as a union with the fold bodies — the hidden title reuses the entire
+  fold-hidden projection (zero-height y-layout, `isBlockHidden`, a11y
+  `invisible`, `nextVisibleEntryIndex` caret-step skip) with zero new
+  projection code. Public `setHideMatchingFirstHeadingAsTitle(bool)` on
+  `View` + `EditorWidget` pass-through; `isBlockFoldable()` guard so the
+  title is never foldable; `unstrandCaretFromHiddenTitle()` at every
+  re-derivation site (`onDocumentChanged`, `setInlineTitle`, the flag
+  setter); `setCaretPosition` redirects a hidden-title target to the first
+  visible entry (covers find-next, a11y setCursorPosition, EditorWidget
+  cursor, title-band Down/Enter seam), `moveCaretToDocumentStart` skips it,
+  `selectAll`/copy exclude it. 14 new test slots in
+  `tst_canvas_inline_title` (6 → 20). No `markoff-core` change (D6 held);
+  constitution clean (C1–C4, 80 files). Full suite **213/213**, canvas
+  suite 41/41.
+  **Baseline correction (not a finding against the handoff, just a
+  measurement):** the handoff's "canvas 208/208 / full 315/315 at pin
+  `5d885036`" figures are stale for this HEAD — the rich-clipboard merge
+  at `5d885036` itself added five test executables (`tst_canvas_rich_clipboard`,
+  `tst_clipboard_codec`, `tst_quote_buffer_asymmetry`,
+  `tst_source_rich_clipboard`, + styled/table additions), so the
+  measured default-config full-suite count at this pin is **213/213**, not
+  208/208; the 315/315 figure is the pre-G3 (live-ON) count. This arc
+  holds the measured 213/213.
+  **Falsification:** four probes, all single-test failures as expected:
+  (1) union — dropped `m_hiddenTitleBlock` from `setFoldedBlocks`
+  (`bfdaa3f4`/`9c72a185`), 4 tests failed; (2) level gate — removed
+  `|| level != 1` (`606ccab1`/`37d540d5`), `no_hide_for_level_two_heading`
+  failed; (3) sole-block guard — removed `entries().size() < 2`
+  (`364b0a43`/`679eda35`), `no_hide_for_sole_block` failed; (4)
+  `setCaretPosition` redirect — disabled the hidden-title redirect
+  (`87386788`/`d5ea8197`), `find_navigation_lands_on_first_visible`
+  failed. All four reverts verified byte-identical to `9b0138f8`
+  (`git diff 9b0138f8 HEAD` empty) before the full suite ran.
+  **Design notes (decided, logged):** (a) the hidden title is entry 0 by
+  construction, and entry 1 can never be fold-hidden (the only fold head
+  above it is the title, which the H1.3 guard made non-foldable), so
+  `nextVisibleEntryIndex(0, true)` always resolves to ≥ 1 wherever the
+  redirect runs — the `firstVisible < 0` fallbacks are defensive only.
+  (b) `refreshHiddenTitleBlock` reads the `HeadingForm` attr to
+  distinguish ATX (strip leading hashes via `countLeadingHashes` + one
+  space) from setext (buffer already content-only); a loaded ATX heading
+  has NO `HeadingForm` attr (core sets it only for setext at load), which
+  is fine — the strip path is the default. (c) Selection-anchor dropped
+  by `unstrandCaretFromHiddenTitle` when it references the newly-hidden
+  title, mirroring the existing "block didn't survive -> drop" rule in
+  `onDocumentChanged` (one extra edge beyond the plan's caret-only
+  wording, added for the same reason). (d) `selectAll` indexes
+  `entries()[1]` when the title is hidden — safe because the D4 guard
+  guarantees ≥ 2 entries whenever `m_hiddenTitleBlock` is non-null.
+  (e) `git revert --no-edit HEAD -q` failed to parse (usage error) — the
+  `-q` flag must come after `--no-edit HEAD` for this git; used
+  `git revert --no-edit HEAD` without the flag instead.
+- **H2.3 (2026-08-30): arc closed.** Full default-config suite re-run
+  after all falsification reverts: **213/213**, canvas-scoped 41/41,
+  `check-constitution.sh` clean (C1–C4, 80 files). Docs updated:
+  `docs/STATUS.md` (workfront + baseline correction), root `CLAUDE.md`
+  and canvas `CLAUDE.md` (H-arc status lines), this plan's checklist +
+  findings log, and the consumer answer note
+  `docs/handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md`
+  (D1–D5 verdicts, the D2 index-space divergence prominently — Hologram
+  must read it before wiring the flag on re-pin). No Corbomite handoff
+  needed (D7): purely additive, off by default, no existing contract
+  touched. This plan moved to CLOSED.

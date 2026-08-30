@@ -6,6 +6,15 @@ Corbomite (submodules this repo at `libs/markoff-family`).
 
 ## Current workfront — 2026-08-19: G1 accessibility (canvas)
 
+**Also landed 2026-08-30 — H arc (Hologram, new consumer):** opt-in
+`View::setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget`
+pass-through) hides the first body block when it is a level-1 Heading
+whose plain text equals `inlineTitle()` — the title band stops
+duplicating the body heading. Hidden via the existing fold-hidden
+projection; **stays in the block-index space** (D2) and in the
+document. Plan: `docs/plans/2026-08-30-hide-first-heading-as-title.md`
+(CLOSED, `9b0138f8`); consumer answer note in `docs/handoff/`.
+
 The canvas production arc (D5 part 1) is **CLOSED** — full history in
 [`docs/plans/2026-08-13-canvas-production-plan.md`](docs/plans/2026-08-13-canvas-production-plan.md)
 and [`docs/STATUS.md`](docs/STATUS.md). All three of its gates are now

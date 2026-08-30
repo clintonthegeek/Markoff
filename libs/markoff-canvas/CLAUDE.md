@@ -56,6 +56,18 @@ at close. **Next: Phase A2 (text interface), start at A2.1**
 (`QAccessibleTextInterface` core — text/characterCount/offsets,
 per-block UTF-8 byte↔QChar via `coords::`, never cross-block per C4).
 
+**H arc CLOSED 2026-08-30 (`9b0138f8`, Hologram feature):** opt-in
+`setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget` pass-through)
+hides the first block when it is a level-1 Heading matching
+`inlineTitle()` — reuse of the fold-hidden projection (union fed to
+`BlockLayoutCache::setFoldedBlocks`), title stays in the block-index
+space (D2), never foldable, never a caret target. Plan:
+`docs/plans/2026-08-30-hide-first-heading-as-title.md` (CLOSED). No core
+change; constitution clean. Measured default-config full-suite baseline
+at this HEAD is **213/213** (canvas-scoped 41/41), not the handoff's
+stale 208/208 — see the H plan's findings log entry for the count
+reconciliation.
+
 ## The four hard rules (constitution — now permanent law, spec §3)
 
 - **C1** no re-entrance guards (`m_applying*`, `isApplying*`, …).
