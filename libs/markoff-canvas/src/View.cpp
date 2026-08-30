@@ -1027,8 +1027,7 @@ void View::refreshFoldedBlocks()
     // when this union is computed — the title is never a fold head, so
     // `m_foldedHeads` has no opinion about it and would otherwise re-show it.
     QSet<BlockId> hidden = hiddenBlocksFromFolds();
-    Q_UNUSED(m_hiddenTitleBlock);  // FALSIFICATION
-    if (false && !m_hiddenTitleBlock.isNull())
+    if (!m_hiddenTitleBlock.isNull())
         hidden.insert(m_hiddenTitleBlock);
     m_cache->setFoldedBlocks(hidden);
 }
