@@ -1052,9 +1052,11 @@ void View::refreshHiddenTitleBlock()
         if (const int *v = std::get_if<int>(&it.value()))
             level = *v;
     }
-    if (m_doc->blockKind(first) != Markoff::BlockKind::Heading || level != 1) {
-        m_hiddenTitleBlock = {};
-        return;
+    if (m_doc->blockKind(first) != Markoff::BlockKind::Heading || level != 1) {  // FALSIFICATION: drop level gate
+        if (m_doc->blockKind(first) != Markoff::BlockKind::Heading) {
+            m_hiddenTitleBlock = {};
+            return;
+        }
     }
     m_hiddenTitleBlock =
         (headingPlainText(*m_doc, first) == m_inlineTitle) ? first : BlockId{};
