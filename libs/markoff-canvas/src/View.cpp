@@ -2405,7 +2405,7 @@ void View::setCaretPosition(BlockId block, int byteOffset)
     // via onFindNavigationRequested, exitTitleEditingToBlockZero), so
     // redirecting HERE covers all of them at once. Land on the first visible
     // entry byte 0.
-    if (block == m_hiddenTitleBlock) {
+    if (false && block == m_hiddenTitleBlock) {  // FALSIFICATION: drop redirect
         const int firstVisible = nextVisibleEntryIndex(0, true);
         if (firstVisible >= 0) {
             block = m_cache->entries()[size_t(firstVisible)].id;
