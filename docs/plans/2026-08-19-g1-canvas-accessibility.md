@@ -79,7 +79,7 @@ Push.
 | A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☑ | `f4cb40ab` | break `f8f03ff8` / revert `0bae686e` |
 | A2.2 Caret + selection, including cross-block presentation | ☑ | `f37f7e72` | break `d6f21914` / revert `3251b5ba` |
 | A2.3 Geometry: `characterRect`, `offsetAtPoint`, line boundaries | ☑ | `0c6f76a9` | break `be8488d5` / revert `52b6c278` |
-| A2.4 ⏸ phase close (full suite) | ☑ | `pending` | exempt |
+| A2.4 ⏸ phase close (full suite) | ☑ | `e50f2d48` | exempt |
 | **A3 — notifications** | | | |
 | A3.1 Event spy test harness | ☐ | | |
 | A3.2 Caret/selection/focus events | ☐ | | |
