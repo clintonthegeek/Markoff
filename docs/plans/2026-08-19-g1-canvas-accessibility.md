@@ -78,7 +78,7 @@ Push.
 | **A2 — text interface** | | | |
 | A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☑ | `f4cb40ab` | break `f8f03ff8` / revert `0bae686e` |
 | A2.2 Caret + selection, including cross-block presentation | ☑ | `f37f7e72` | break `d6f21914` / revert `3251b5ba` |
-| A2.3 Geometry: `characterRect`, `offsetAtPoint`, line boundaries | ☐ | | |
+| A2.3 Geometry: `characterRect`, `offsetAtPoint`, line boundaries | ☑ | `0c6f76a9` | break `be8488d5` / revert `52b6c278` |
 | A2.4 ⏸ phase close (full suite) | ☐ | | exempt |
 | **A3 — notifications** | | | |
 | A3.1 Event spy test harness | ☐ | | |
@@ -579,3 +579,59 @@ record the final baseline.
   content-addressed-revert recovery pattern from the start rather
   than `git revert`. Full suite target count holds at **208/208**;
   canvas suite 40/40, constitution clean.
+- **A2.3 (2026-08-20): geometry — `characterRect`, `offsetAtPoint`,
+  `textAtOffset(…, LineBoundary)` landed.** Three new `View` geometry
+  accessors, same "test/inspection surface only" convention as
+  `blockRect()`/`taskCheckboxRectFor()`: `ensureBlockRealized(id)`
+  (forces realization of exactly the queried block via the cache's
+  existing `realizeRange()`, not the viewport-driven scroll pass —
+  spec §5's bound holds), `characterRectInViewport(id, byteOffset)`
+  (generalizes `caretRectInViewport()`'s math to an arbitrary
+  block/offset with a full character-advance width), and
+  `byteOffsetAtPoint(id, viewportPos)` (per-block point→byte-offset,
+  reusing `hitTest()`'s per-entry line/column math without its
+  whole-document Y-dispatch, which this class doesn't need). A fourth,
+  `lineByteRangeAt(id, byteOffset)`, reads the actual WRAPPED visual
+  line off the realized `QTextLayout` — deliberately not
+  `QAccessibleTextInterface`'s own default `LineBoundary` handling
+  (literal `\n`-splitting the plain string, which is wrong for a
+  wrapped paragraph with no embedded `\n` at all).
+  `CanvasBlockAccessible::characterRect()`/`offsetAtPoint()` are
+  global screen coordinates (`rect()`'s existing convention);
+  `offsetAtPoint()` gates on `rect().contains(point)` first to reject
+  a point belonging to some other block (C4's per-block discipline
+  extended to geometry). `textBeforeOffset`/`textAfterOffset` for
+  `LineBoundary` were left on the base class's `\n`-based default —
+  outside this task's named scope (plan text names only
+  `textAtOffset(…, LineBoundary)`), logged, not an oversight.
+  5 new test cases: a per-character `offsetAtPoint(characterRect(n)
+  .center()) == n` round-trip (±1 tolerance for sub-pixel rounding),
+  an off-screen block realizing exactly one entry (not the whole
+  document — the spec §5 bound, actually asserted), a no-text-kind
+  block having no text interface at all, a point outside the block
+  returning -1, and a wrapped (no `\n`) paragraph's `LineBoundary`
+  reporting a strict-prefix first line. No core change needed (spec
+  §8 held). Falsification: made `textAtOffset(…, LineBoundary)`
+  pretend the whole block is one line (`be8488d5`), the wrapped-line
+  test failed as expected, reverted (`52b6c278`) — confirmed
+  byte-identical (`git diff 0c6f76a9 52b6c278` empty). Full suite
+  target count holds at **208/208**; canvas suite 40/40 → accessibility
+  binary 40 → 45 cases; constitution clean.
+- **Process note (2026-08-20 → resumed 2026-09-06, this entry):** the
+  background session that did A2.1–A2.3 committed and pushed all
+  three tasks' real work + falsification pairs correctly, but was
+  interrupted before writing A2.3's own checklist tick/findings-log
+  entry (this entry). In the interim (unrelated to this arc), a
+  `feature/rich-clipboard` merge, three build-system generator-
+  expression commits, and the full H arc (Hologram consumer support,
+  closed `9b0138f8`…`744ef8b9`) landed on top via ordinary session
+  work — none of it touched `Accessibility.{h,cpp}` or this plan.
+  Confirmed on resume: full rebuild clean; full suite **213/213**
+  (up from 208/208 — the rise is `feature/rich-clipboard`'s and the H
+  arc's own new tests, unrelated to this arc, not a regression check
+  false-positive); canvas suite **41/41** (`tst_canvas_accessibility`
+  still 45/45 internally); `check-constitution.sh` clean. Nothing was
+  lost; this entry and the checklist tick above are the only catch-up
+  needed. Canvas `CLAUDE.md`'s G1 status paragraph is stale (still
+  reads "Next: Phase A2, start at A2.1") — left as-is pending A2.4
+  (phase close), which is the task that owns updating it.
