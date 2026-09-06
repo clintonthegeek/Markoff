@@ -79,7 +79,7 @@ Push.
 | A2.1 `QAccessibleTextInterface` core: text/characterCount/offsets | ☑ | `f4cb40ab` | break `f8f03ff8` / revert `0bae686e` |
 | A2.2 Caret + selection, including cross-block presentation | ☑ | `f37f7e72` | break `d6f21914` / revert `3251b5ba` |
 | A2.3 Geometry: `characterRect`, `offsetAtPoint`, line boundaries | ☑ | `0c6f76a9` | break `be8488d5` / revert `52b6c278` |
-| A2.4 ⏸ phase close (full suite) | ☐ | | exempt |
+| A2.4 ⏸ phase close (full suite) | ☑ | `pending` | exempt |
 | **A3 — notifications** | | | |
 | A3.1 Event spy test harness | ☐ | | |
 | A3.2 Caret/selection/focus events | ☐ | | |
@@ -635,3 +635,23 @@ record the final baseline.
   needed. Canvas `CLAUDE.md`'s G1 status paragraph is stale (still
   reads "Next: Phase A2, start at A2.1") — left as-is pending A2.4
   (phase close), which is the task that owns updating it.
+- **A2.4 (2026-09-06): Phase A2 closed — verification only, no code
+  changes.** Confirmed A2.1–A2.3 all ☑ with findings-log entries
+  matching `src/Accessibility.{h,cpp}`/`View.{h,cpp}` as they stand.
+  Clean rebuild in `build-dev`. Full suite via `scripts/run-tests.sh`:
+  **213/213**, canvas suite **41/41**
+  (`libs/markoff-canvas/tests/check-constitution.sh` clean, C1–C4).
+  Additionally — this phase's own done-when, beyond A1.4's template —
+  a **perf re-run in `build-perf` (Release)**: `tst_canvas_perf_500`'s
+  four E9 budgets all held (load→first paint 242ms; keystroke→paint
+  p50 0.57ms / p95 0.74ms, well inside the 16ms budget; scroll
+  realized 45/500 blocks, 9%; RSS delta 0 KB) — confirms the spec §5
+  claim that a11y adds nothing per-keystroke: no
+  `updateAccessibility()` call landed on a hot path. Docs updated:
+  canvas `CLAUDE.md` status section rewritten with a "Phase A2
+  (text interface) CLOSED" paragraph (A2.1–A2.3 summary, 213/213,
+  pointing at A3.1 next); root `CLAUDE.md`'s "Current workfront"
+  section updated the same way, and its stale `315/315`
+  pre-live-retirement baseline line corrected to the current
+  `213/213`. Both remotes (`codeberg` primary, `origin` GitHub
+  mirror) pushed and in sync.

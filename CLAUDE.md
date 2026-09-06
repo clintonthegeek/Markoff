@@ -46,9 +46,18 @@ tests (the ratchet) plus one manual Orca pass at arc close (needs
 — phases A1–A5, gate A-G1. **Phase A1 (tree, roles, registration)
 CLOSED 2026-08-19** (A1.0–A1.4): container + per-block accessibility
 tree landed, role/state mapping per spec §4.2, `accessibleDocumentName`
-+ Name resolution, full suite 208/208, constitution clean. **Start at
-A2.1** (`QAccessibleTextInterface` core: text/characterCount/offsets,
-per-block UTF-8 byte↔QChar, never cross-block per C4).
++ Name resolution, full suite 208/208, constitution clean. **Phase A2
+(text interface) CLOSED 2026-08-20** (A2.1–A2.4): `QAccessibleTextInterface`
+on every text-bearing block — text/characterCount/boundary types
+(A2.1), caret + cross-block selection presentation (A2.2), geometry
+incl. the bounded-realization `characterRect`/`offsetAtPoint`/wrapped
+`LineBoundary` (A2.3) — every offset per-block via `coords::`, never
+cross-block (C4 held throughout, no core change needed). Full suite
+213/213 at close (see canvas leaf's own `CLAUDE.md` for the 208→213
+count reconciliation — unrelated work, not a regression). **Start at
+A3.1** (event spy test harness over `QAccessible::installUpdateHandler`,
+reusable by A3.2 caret/selection/focus events and A3.3 text/structure
+events — see the plan's Phase A3 section for the full event table).
 
 **Standstill:** with the canvas production arc closed, `markoff-core`
 and `libs/markoff-canvas/` are open again for ordinary work (not
@@ -56,8 +65,8 @@ gated to plan-named seams anymore — that restriction was specific to
 the closed arc). `markoff-styled` stays bug-fix-only (backs
 Corbomite's Reading mode); `markoff-source` stays untouched,
 permanently; `markoff-live` is retired (see G3 above). Test baseline:
-**315/315** (full `scripts/run-tests.sh`) at arc close — any drop is
-a regression.
+**213/213** (full `scripts/run-tests.sh`) as of the A2 close above —
+any drop is a regression.
 
 **Status (2026-08-15, arc close):** all 7 F1 CodeMirror-parity gaps
 closed (P7.2a–g), including a real document-convergence regression

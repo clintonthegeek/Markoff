@@ -52,9 +52,34 @@ resolution `accessibleDocumentName()` → `inlineTitle()` →
 (`BlockQuote`→`Section`, `Math`→`StaticText`) — logged at the mapping
 site, not fixed. No `markoff-core` change needed anywhere in A1
 (spec §8 held); constitution clean throughout. Full suite **208/208**
-at close. **Next: Phase A2 (text interface), start at A2.1**
-(`QAccessibleTextInterface` core — text/characterCount/offsets,
-per-block UTF-8 byte↔QChar via `coords::`, never cross-block per C4).
+at close.
+
+**Phase A2 (text interface) CLOSED 2026-08-20** (A2.4 phase close,
+exempt from falsification). Landed on `CanvasBlockAccessible` via
+`QAccessibleTextInterface` (`interface_cast`, `nullptr` for
+`HorizontalRule`/`Image`/`Mermaid` per spec §4.2): A2.1
+`text()`/`characterCount()`/boundary types (Char/Word reuse the base
+class's `QTextBoundaryFinder` default, Paragraph overridden — a block
+is always exactly one paragraph even with embedded newlines in
+`CodeBlock` fences); A2.2 caret (`cursorPosition()` only on the
+caret's own block) and selection (cross-block selection presents as a
+per-block intersection on each spanned block, spec §4.1); A2.3
+geometry (`characterRect`/`offsetAtPoint` in global screen
+coordinates, `textAtOffset(…, LineBoundary)` reading the real wrapped
+visual line off the realized `QTextLayout` — new `View::
+ensureBlockRealized()` bounds this to exactly the queried block, spec
+§5's realization cost bound held and is actually asserted by a test).
+Every byte↔QChar conversion goes through `coords::`, scoped to one
+block's own buffer, never cross-block (C4). No `markoff-core` change
+needed anywhere in A2 (spec §8 held); constitution clean throughout.
+Full suite **213/213** at close (count includes unrelated
+`rich-clipboard`/H-arc work that landed in the same window — see the
+G1 plan's A2.3 findings-log entry for the reconciliation), canvas
+suite **41/41**, `tst_canvas_accessibility` internally at 45 cases.
+**Next: Phase A3 (notifications), start at A3.1** (event spy test
+harness over `QAccessible::installUpdateHandler`, reusable by A3.2/
+A3.3 — see plan §"Phase A3" for the full event table this phase
+wires up).
 
 **H arc CLOSED 2026-08-30 (`9b0138f8`, Hologram feature):** opt-in
 `setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget` pass-through)
