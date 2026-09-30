@@ -16,6 +16,9 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/TextUnits.h>
 
+#include "CodeHighlighting.h"
+#include "MediaBlocks.h"
+
 namespace coords = Markoff::TextUnits;
 
 namespace Markoff::Canvas::Detail {
@@ -662,14 +665,57 @@ int CanvasBlockAccessible::indexOfChild(const QAccessibleInterface *) const
     return -1;
 }
 
-QString CanvasBlockAccessible::text(QAccessible::Text) const
+QString CanvasBlockAccessible::text(QAccessible::Text t) const
 {
-    // A1.1 skeleton — no name/description surface yet. A1.2 fills in
-    // role-appropriate description text (spec §4.2's per-kind notes, e.g.
-    // CodeBlock language, Math source); the container's Name resolution
-    // (accessibleDocumentName -> inlineTitle -> generic) is A1.3's, and is
-    // a CanvasAccessible concern, not this class's.
-    return {};
+    // Spec §4.2 per-kind notes + §6 (A5.2 audit: this was an empty stub).
+    // Block CONTENT is the text interface's job; Name/Description carry only
+    // what the role alone cannot say. Text/paragraph/heading/list blocks
+    // deliberately have neither (the content is the name).
+    MarkoffDocument *doc = m_view->document();
+    if (!doc || (t != QAccessible::Name && t != QAccessible::Description))
+        return {};
+    const bool name = (t == QAccessible::Name);
+
+    switch (doc->blockKind(m_id)) {
+    case BlockKind::Image: {
+        if (!name)
+            return {};
+        // View::mediaLabelFor() is layout-derived (empty until the block has
+        // been realized); parse the buffer instead when it is empty so the
+        // answer never depends on viewport position and never realizes (§5).
+        const QString label = m_view->mediaLabelFor(m_id);
+        if (!label.isEmpty())
+            return label;
+        const Detail::ImageBlockInfo info = Detail::parseImageBlock(doc->blockText(m_id));
+        const QString display = info.altOrAlias.isEmpty() ? info.target : info.altOrAlias;
+        return display.isEmpty() ? m_view->tr("Image") : display;
+    }
+    case BlockKind::Mermaid:
+        return name ? m_view->tr("Mermaid diagram") : QString();
+    case BlockKind::Math:
+        // Role is StaticText (no Qt math role, spec §4.6 finding 4), so the
+        // TeX source is the name.
+        return name ? QString::fromUtf8(doc->blockText(m_id)) : QString();
+    case BlockKind::CodeBlock: {
+        // No code role in Qt: the fence language goes in the description.
+        if (name)
+            return {};
+        const QString lang = Detail::parseCodeFence(doc->blockText(m_id)).language;
+        return lang.isEmpty() ? QString() : m_view->tr("Code, language %1").arg(lang);
+    }
+    case BlockKind::Table: {
+        // §6: role Table + usable name/description (no table interface).
+        if (name)
+            return m_view->tr("Table");
+        // Rows = non-empty lines minus the delimiter row.
+        int lines = 0;
+        for (const QByteArray &l : doc->blockText(m_id).split('\n'))
+            lines += l.trimmed().isEmpty() ? 0 : 1;
+        return m_view->tr("%n row(s)", nullptr, qMax(0, lines - 1));
+    }
+    default:
+        return {};
+    }
 }
 
 void CanvasBlockAccessible::setText(QAccessible::Text, const QString &)

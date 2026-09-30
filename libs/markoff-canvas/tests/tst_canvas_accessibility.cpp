@@ -76,6 +76,7 @@ private Q_SLOTS:
     void role_htmlblock();
     void role_table();
     void role_footnote_def_paragraph_is_section();
+    void name_description_per_kind();
 
     // ---- A1.2: state mapping (spec §4.2/§4.3) ----
     void state_focusable_and_focused_tracks_caret();
@@ -490,6 +491,45 @@ void TstCanvasAccessibility::role_table()
     QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
     // QAccessibleTableInterface is explicitly deferred (spec §6) — role only.
     QCOMPARE(iface->child(0)->role(), QAccessible::Table);
+}
+
+void TstCanvasAccessibility::name_description_per_kind()
+{
+    // Spec §4.2 notes + §6 (A5.2 audit: Name/Description were an empty stub).
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(
+        "![a cat](cat.png)\n\n"
+        "```python\nx = 1\n```\n\n"
+        "| h0 | h1 |\n|----|----|\n| a0 | a1 |\n\n"
+        "plain paragraph\n");
+    doc.testInsertBlock(BlockKind::Math, "$$x^2$$");
+    doc.testInsertBlock(BlockKind::Mermaid, "graph TD; A-->B;");
+    View view;
+    attachAndExpose(view, doc);
+    QAccessibleInterface *c = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *code = nullptr, *img = nullptr, *tbl = nullptr, *para = nullptr,
+                         *math = nullptr, *mer = nullptr;
+    for (int i = 0; i < c->childCount(); ++i) {
+        QAccessibleInterface *b = c->child(i);
+        switch (doc.blockKind(doc.iterateBlocks()[size_t(i)])) {
+        case BlockKind::CodeBlock: code = b; break;
+        case BlockKind::Image: img = b; break;
+        case BlockKind::Table: tbl = b; break;
+        case BlockKind::Paragraph: para = b; break;
+        case BlockKind::Math: math = b; break;
+        case BlockKind::Mermaid: mer = b; break;
+        default: break;
+        }
+    }
+    QVERIFY2(code && img && tbl && para && math && mer, qPrintable(QStringLiteral("%1 %2 %3 %4 %5 %6").arg(!!code).arg(!!img).arg(!!tbl).arg(!!para).arg(!!math).arg(!!mer)));
+    QVERIFY(code->text(QAccessible::Description).contains(QStringLiteral("python")));
+    QCOMPARE(img->text(QAccessible::Name), QStringLiteral("a cat"));
+    QCOMPARE(tbl->text(QAccessible::Name), QStringLiteral("Table"));
+    QCOMPARE(tbl->text(QAccessible::Description), QStringLiteral("2 row(s)"));
+    QCOMPARE(math->text(QAccessible::Name), QStringLiteral("$$x^2$$"));
+    QCOMPARE(mer->text(QAccessible::Name), QStringLiteral("Mermaid diagram"));
+    QVERIFY(para->text(QAccessible::Name).isEmpty());
+    QVERIFY(para->text(QAccessible::Description).isEmpty());
 }
 
 void TstCanvasAccessibility::role_footnote_def_paragraph_is_section()
