@@ -102,6 +102,17 @@ for why. Source mode is the escape hatch.
   source-reveal flip (seam landed 2026-05-30).
 - Release scaffolding: install/export rules + header tiering for a
   non-submodule consumer (LICENSE/README landed 2026-06-09).
+- **Canvas: remote CRDT edit leaves an already-measured block's layout
+  stale (found by the a11y arc, A3.4 probe 2026-09-29; pre-existing,
+  not a11y-specific).** `BlockLayoutCache::sync` decides staleness from
+  `doc.blockEditSequence(id)` (plus structural seq), which does not bump
+  on `applyRemoteOps` buffer edits. Repro: two replicas, realize block,
+  apply a remote insert of `"XYZ\n\n\n\n"` at 0 -> `blockText` updates but
+  `View::blockRect` height stays 33.3 (local edit: 113.3) and the realized
+  layout keeps its old line ranges (paint/hit-test/caret geometry wrong
+  until a local edit). Fix sketch: fold `bufferProxy(id)->editSequence()`
+  into the token (as `Accessibility.cpp` already does). Touches
+  canvas only, but verify against core's seq semantics first.
 - E-arc: CLOSED 2026-08-19, not merely dormant — scope (E3/E5) shipped
   under canvas Phase 5 (`docs/archive/e-arc/`, closed board).
 

@@ -54,10 +54,13 @@ incl. the bounded-realization `characterRect`/`offsetAtPoint`/wrapped
 `LineBoundary` (A2.3) — every offset per-block via `coords::`, never
 cross-block (C4 held throughout, no core change needed). Full suite
 213/213 at close (see canvas leaf's own `CLAUDE.md` for the 208→213
-count reconciliation — unrelated work, not a regression). **Start at
-A3.1** (event spy test harness over `QAccessible::installUpdateHandler`,
-reusable by A3.2 caret/selection/focus events and A3.3 text/structure
-events — see the plan's Phase A3 section for the full event table).
+count reconciliation — unrelated work, not a regression). **Phase A3
+(notifications) CLOSED 2026-09-29** (A3.1–A3.4): event spy harness;
+caret/selection/focus, text insert/remove and block create/destroy
+events + eviction, all hooked from existing View chokepoints (no new
+View API, no core change). Full suite 213/213, perf held. Also found
+a pre-existing stale-layout-on-remote-edit bug (`docs/queue.md`).
+**Start at A4.1** (folding state + expand/collapse action).
 
 **Standstill:** with the canvas production arc closed, `markoff-core`
 and `libs/markoff-canvas/` are open again for ordinary work (not

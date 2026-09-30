@@ -76,10 +76,21 @@ Full suite **213/213** at close (count includes unrelated
 `rich-clipboard`/H-arc work that landed in the same window — see the
 G1 plan's A2.3 findings-log entry for the reconciliation), canvas
 suite **41/41**, `tst_canvas_accessibility` internally at 45 cases.
-**Next: Phase A3 (notifications), start at A3.1** (event spy test
-harness over `QAccessible::installUpdateHandler`, reusable by A3.2/
-A3.3 — see plan §"Phase A3" for the full event table this phase
-wires up).
+**Phase A3 (notifications) CLOSED 2026-09-29** (A3.4 phase close,
+exempt from falsification). A3.1 event spy harness (test-only, over
+`QAccessible::installUpdateHandler`); A3.2 caret/selection/focus
+events via hooks in `Accessibility.{h,cpp}` called from existing View
+chokepoints (no new View API); A3.3 text insert/remove +
+`ObjectCreated`/`ObjectDestroyed` + eviction from one
+`onDocumentChanged` hook (`notifyDocumentChanged`), blocks owned by
+Qt's cache and released via `deleteAccessibleInterface`; remote/CRDT
+edit path covered. No core change (spec §8 held); constitution clean.
+Full suite **213/213**, `tst_canvas_accessibility` 69 cases; perf held
+(keystroke p50 0.63ms / p95 1.08ms, load->paint 162ms, scroll 45/500,
+RSS +0). A3.4 also confirmed a pre-existing stale-layout-on-remote-edit
+issue (queue.md, not a11y-specific).
+**Next: Phase A4 (folding, actions, editable text), start at A4.1**
+(folding state + expand/collapse action).
 
 **H arc CLOSED 2026-08-30 (`9b0138f8`, Hologram feature):** opt-in
 `setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget` pass-through)

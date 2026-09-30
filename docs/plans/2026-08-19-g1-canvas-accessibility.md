@@ -84,7 +84,7 @@ Push.
 | A3.1 Event spy test harness | ☑ | `60a4c63e` | break `8da7ade9` / revert `8a2e4af1` |
 | A3.2 Caret/selection/focus events | ☑ | `9377d4a0` | break `6dfc613f` / revert `9cf383a8` |
 | A3.3 Text insert/remove + block create/destroy events | ☑ | `61f6cece` | break `7c942d3e` / revert `11b97d32` |
-| A3.4 ⏸ phase close (full suite) | ☐ | | exempt |
+| A3.4 ⏸ phase close (full suite) | ☑ | see A3.4 docs commit on master | exempt |
 | **A4 — folding, actions, editable text** | | | |
 | A4.1 Hidden/folded state + expand-collapse action | ☐ | | |
 | A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☐ | | |
@@ -795,3 +795,21 @@ record the final baseline.
   0 KB. Tests: canvas 41/41, fast full tier 211/211 (excludes
   tst_realistic/tst_benchmark; full baseline 213), constitution clean (81
   files).
+- **A3.4 (2026-09-29): Phase A3 closed (phase close, exempt).** Full suite
+  **213/213** (tst_realistic 75s, tst_benchmark 308s), constitution clean
+  (81 files), no code changes. **Perf** (`build-perf`, no AT client):
+  load->paint 162ms; keystroke p50 0.63ms / p95 1.08ms (budget 16ms);
+  scroll realized 45/500 (9%); RSS delta 0 KB — a11y adds nothing
+  per-keystroke.
+  **A3.3 suspicion: CONFIRMED (pre-existing canvas/core-seam issue, not
+  fixed, not touched).** Throwaway probe (uncommitted; two replicas A/B,
+  block "Hello world" realized in A's View via `ensureBlockRealized`; B
+  inserts `"XYZ\n\n\n\n"` at 0; ops applied to A via `applyRemoteOps` +
+  `flushPendingD2Changed`). `blockText` updated, but `View::blockRect`
+  height stayed 33.33 (before and after re-realize) and the a11y
+  `LineBoundary` line 0 came back `"XYZ\n\n\n\nHell"` (old 11-char line
+  range applied to the new text) — layout not rebuilt. Control: the same
+  edit made LOCALLY on A gave height 113.33 and line0 `"XYZ\n"`. Cause:
+  `BlockLayoutCache::sync` stales on `blockEditSequence`, which remote
+  ops do not bump. Logged in `docs/queue.md` (Other dormant). The a11y
+  text events are unaffected (they use the summed token).
