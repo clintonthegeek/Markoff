@@ -133,6 +133,17 @@ private Q_SLOTS:
     void fold_hidden_title_invisible_never_expandable();
     void fold_edit_changing_foldability_announces_expandable();
 
+    // ---- A4.2: QAccessibleEditableTextInterface ----
+    void editable_insert_mid_block();
+    void editable_delete_range();
+    void editable_replace_multibyte_offsets();
+    void editable_read_only_rejects_all_three();
+    void editable_one_undo_step_each();
+    void editable_events_fire_once_with_payload();
+    void editable_invalid_ranges_rejected();
+    void editable_newline_rejected_outside_code_block();
+    void editable_interface_absent_for_no_text_kinds();
+
     // ---- A3.3: text insert/remove, block create/destroy, eviction ----
     void text_typing_emits_insert();
     void text_backspace_and_delete_emit_remove();
@@ -2094,6 +2105,202 @@ void TstCanvasAccessibility::fold_edit_changing_foldability_announces_expandable
     } else {
         QSKIP("typed '# ' did not promote to a foldable heading in this build");
     }
+}
+
+void TstCanvasAccessibility::editable_insert_mid_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    QAccessibleEditableTextInterface *ed = b1->editableTextInterface();
+    QVERIFY(ed != nullptr);
+    ed->insertText(6, QStringLiteral("XY"));
+    QCOMPARE(doc.blockText(blocks[1]), QByteArray("SecondXY paragraph."));
+    QCOMPARE(doc.blockText(blocks[0]), QByteArray("First paragraph."));
+    // Caret ends after the inserted text, in this block.
+    QCOMPARE(view.caretBlock(), blocks[1]);
+    QCOMPARE(b1->textInterface()->cursorPosition(), 8);
+}
+
+void TstCanvasAccessibility::editable_delete_range()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    b1->editableTextInterface()->deleteText(0, 7);  // "Second "
+    QCOMPARE(doc.blockText(blocks[1]), QByteArray("paragraph."));
+    QCOMPARE(b1->textInterface()->cursorPosition(), 0);
+}
+
+void TstCanvasAccessibility::editable_replace_multibyte_offsets()
+{
+    // "a" + emoji (2 QChars, 4 bytes) + "é" (1 QChar, 2 bytes) + "z".
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(QString::fromUtf8("a\xF0\x9F\x98\x80\xC3\xA9z\n").toUtf8());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    QCOMPARE(b0->textInterface()->characterCount(), 5);
+    QAccessibleEditableTextInterface *ed = b0->editableTextInterface();
+    ed->replaceText(1, 3, QStringLiteral("X"));  // the emoji
+    QCOMPARE(QString::fromUtf8(doc.blockText(blocks[0])), QString::fromUtf8("aX\xC3\xA9z"));
+    ed->insertText(3, QString::fromUtf8("\xF0\x9F\x98\x80"));  // after "é"
+    QCOMPARE(QString::fromUtf8(doc.blockText(blocks[0])),
+             QString::fromUtf8("aX\xC3\xA9\xF0\x9F\x98\x80z"));
+    ed->deleteText(3, 5);  // remove the emoji again
+    QCOMPARE(QString::fromUtf8(doc.blockText(blocks[0])), QString::fromUtf8("aX\xC3\xA9z"));
+}
+
+void TstCanvasAccessibility::editable_read_only_rejects_all_three()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    view.setCaretPosition(blocks[0], 2);
+    view.setReadOnly(true);
+    MarkoffTest::A11yEventSpy spy;
+    QAccessibleEditableTextInterface *ed = b1->editableTextInterface();
+    QVERIFY(ed != nullptr);
+    ed->insertText(2, QStringLiteral("XX"));
+    ed->deleteText(0, 3);
+    ed->replaceText(0, 3, QStringLiteral("QQ"));
+    doc.flushPendingD2Changed();
+    QCOMPARE(doc.blockText(blocks[1]), QByteArray("Second paragraph."));
+    QCOMPARE(spy.countOfType(QAccessible::TextInserted, b1), 0);
+    QCOMPARE(spy.countOfType(QAccessible::TextRemoved, b1), 0);
+    QCOMPARE(view.caretBlock(), blocks[0]);   // rejected before any caret move
+    view.setReadOnly(false);
+    ed->insertText(0, QStringLiteral("ok "));
+    QCOMPARE(doc.blockText(blocks[1]), QByteArray("ok Second paragraph."));
+}
+
+void TstCanvasAccessibility::editable_one_undo_step_each()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleEditableTextInterface *ed = blockOf(view, 1)->editableTextInterface();
+    const QByteArray orig = doc.blockText(blocks[1]);
+
+    ed->insertText(6, QStringLiteral("XYZ"));   // multi-char: still one step
+    QVERIFY(doc.blockText(blocks[1]) != orig);
+    doc.d2UndoLog().undo();
+    doc.flushPendingD2Changed();
+    QCOMPARE(doc.blockText(blocks[1]), orig);
+
+    ed->deleteText(0, 6);
+    doc.d2UndoLog().undo();
+    doc.flushPendingD2Changed();
+    QCOMPARE(doc.blockText(blocks[1]), orig);
+
+    ed->replaceText(0, 6, QStringLiteral("Other"));
+    QCOMPARE(doc.blockText(blocks[1]), QByteArray("Other paragraph."));
+    doc.d2UndoLog().undo();
+    doc.flushPendingD2Changed();
+    QCOMPARE(doc.blockText(blocks[1]), orig);
+}
+
+void TstCanvasAccessibility::editable_events_fire_once_with_payload()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    QAccessibleEditableTextInterface *ed = b1->editableTextInterface();
+    {
+        MarkoffTest::A11yEventSpy spy;
+        ed->insertText(6, QStringLiteral("XY"));
+        const auto ins = typed(spy, QAccessible::TextInserted, b1);
+        QCOMPARE(ins.size(), 1);
+        QCOMPARE(ins[0].a, 6);
+        QCOMPARE(ins[0].text, QStringLiteral("XY"));
+        QCOMPARE(spy.countOfType(QAccessible::TextRemoved, b1), 0);
+    }
+    {
+        MarkoffTest::A11yEventSpy spy;
+        ed->deleteText(6, 8);
+        const auto rem = typed(spy, QAccessible::TextRemoved, b1);
+        QCOMPARE(rem.size(), 1);
+        QCOMPARE(rem[0].a, 6);
+        QCOMPARE(rem[0].text, QStringLiteral("XY"));
+        QCOMPARE(spy.countOfType(QAccessible::TextInserted, b1), 0);
+    }
+    {
+        MarkoffTest::A11yEventSpy spy;
+        ed->replaceText(0, 6, QStringLiteral("Other"));
+        const auto rem = typed(spy, QAccessible::TextRemoved, b1);
+        const auto ins = typed(spy, QAccessible::TextInserted, b1);
+        QCOMPARE(rem.size(), 1);
+        QCOMPARE(rem[0].text, QStringLiteral("Second"));
+        QCOMPARE(ins.size(), 1);
+        QCOMPARE(ins[0].text, QStringLiteral("Other"));
+    }
+}
+
+void TstCanvasAccessibility::editable_invalid_ranges_rejected()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleEditableTextInterface *ed = blockOf(view, 1)->editableTextInterface();
+    const QByteArray orig = doc.blockText(blocks[1]);
+    ed->insertText(-1, QStringLiteral("X"));
+    ed->insertText(999, QStringLiteral("X"));
+    ed->deleteText(3, 2);                 // inverted
+    ed->deleteText(0, 999);
+    ed->replaceText(-5, 2, QStringLiteral("X"));
+    ed->insertText(2, QString());         // empty no-op
+    doc.flushPendingD2Changed();
+    QCOMPARE(doc.blockText(blocks[1]), orig);
+    QCOMPARE(doc.blockText(blocks[0]), QByteArray("First paragraph."));
+    // Boundary offsets are valid: insert at 0 and at the end.
+    ed->insertText(0, QStringLiteral(">"));
+    ed->insertText(int(orig.size()) + 1, QStringLiteral("<"));
+    QCOMPARE(doc.blockText(blocks[1]), QByteArray(">Second paragraph.<"));
+}
+
+void TstCanvasAccessibility::editable_newline_rejected_outside_code_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("para\n\n```\ncode\n```\n");
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleEditableTextInterface *p = blockOf(view, 0)->editableTextInterface();
+    p->insertText(2, QStringLiteral("a\nb"));
+    QCOMPARE(doc.blockText(blocks[0]), QByteArray("para"));
+    QCOMPARE(doc.blockKind(blocks[1]), BlockKind::CodeBlock);
+    QAccessibleEditableTextInterface *c = blockOf(view, 1)->editableTextInterface();
+    QVERIFY(c != nullptr);
+    c->insertText(0, QStringLiteral("x\n"));
+    QVERIFY(doc.blockText(blocks[1]).startsWith("x\n"));
+}
+
+void TstCanvasAccessibility::editable_interface_absent_for_no_text_kinds()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("para\n\n---\n\nafter\n");
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QCOMPARE(doc.blockKind(blocks[1]), BlockKind::HorizontalRule);
+    QVERIFY(blockOf(view, 1)->editableTextInterface() == nullptr);
+    QVERIFY(blockOf(view, 0)->editableTextInterface() != nullptr);
 }
 
 QTEST_MAIN(TstCanvasAccessibility)

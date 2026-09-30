@@ -4,6 +4,8 @@
 #include <climits>
 #include <variant>
 
+#include <QCoreApplication>
+#include <QInputMethodEvent>
 #include <QScrollBar>
 #include <QWidget>
 
@@ -751,9 +753,68 @@ void *CanvasBlockAccessible::interface_cast(QAccessible::InterfaceType t)
         return static_cast<QAccessibleAttributesInterface *>(this);
     if (t == QAccessible::TextInterface && hasTextContent())
         return static_cast<QAccessibleTextInterface *>(this);
+    if (t == QAccessible::EditableTextInterface && hasTextContent())
+        return static_cast<QAccessibleEditableTextInterface *>(this);
     if (t == QAccessible::ActionInterface && m_view->isBlockFoldable(m_id))
         return static_cast<QAccessibleActionInterface *>(this);
     return nullptr;
+}
+
+// ---- A4.2 editable text -------------------------------------------------
+// Routing decision: an AT edit is at an arbitrary (block, offset), while
+// View's edit helpers act on the caret. The clean route needing NO new View
+// API is the IME-commit path: (1) place the caret at the range start with
+// the public setCaretPosition(), (2) deliver a QInputMethodEvent whose
+// replacementStart/Length + commitString describe the replace. View::
+// inputMethodEvent already does exactly "one d2ApplyBufferEdit in one
+// UndoLog::Transaction at the caret, then flush so kind promotion sees the
+// text", owns the read-only gate, and converts QChar->byte with coords::
+// inside its own block. No buffer is touched here, no logic duplicated.
+// Consequences (deliberate): the caret ends after the inserted text (what
+// Qt's own editable widgets do); the edit is one undo step; auto-pairing
+// (a key-typing feature) does not apply; an in-flight preedit is cancelled.
+
+void CanvasBlockAccessible::replaceRange(int startOffset, int endOffset, const QString &text)
+{
+    MarkoffDocument *doc = m_view->document();
+    if (!doc || m_view->isReadOnly() || !hasTextContent())
+        return;
+    const QByteArray raw = doc->blockText(m_id);
+    const int count = int(coords::byteToQtPos(raw, raw.size()));
+    if (startOffset < 0 || endOffset < startOffset || endOffset > count)
+        return;  // out of range / inverted: reject, never guess
+    if (startOffset == endOffset && text.isEmpty())
+        return;
+    // A block is one paragraph: a line break in the payload would land as a
+    // raw newline in a non-code block's buffer (paste/typing split blocks
+    // through the structural-key path instead). Only code fences hold them.
+    if (doc->blockKind(m_id) != BlockKind::CodeBlock
+        && (text.contains(QLatin1Char('\n')) || text.contains(QLatin1Char('\r'))))
+        return;
+
+    const int startByte = int(coords::qtPosToByte(raw, startOffset));
+    m_view->setCaretPosition(m_id, startByte);
+    if (m_view->caretBlock() != m_id || m_view->caretByteOffset() != startByte)
+        return;  // caret could not land here (e.g. redirected): don't edit elsewhere
+
+    QInputMethodEvent ev(QString(), {});
+    ev.setCommitString(text, 0, endOffset - startOffset);
+    QCoreApplication::sendEvent(m_view, &ev);
+}
+
+void CanvasBlockAccessible::deleteText(int startOffset, int endOffset)
+{
+    replaceRange(startOffset, endOffset, QString());
+}
+
+void CanvasBlockAccessible::insertText(int offset, const QString &text)
+{
+    replaceRange(offset, offset, text);
+}
+
+void CanvasBlockAccessible::replaceText(int startOffset, int endOffset, const QString &text)
+{
+    replaceRange(startOffset, endOffset, text);
 }
 
 // ---- A4.1 actions -------------------------------------------------------

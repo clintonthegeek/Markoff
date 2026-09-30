@@ -219,6 +219,7 @@ private:
 class CanvasBlockAccessible final : public QAccessibleInterface,
                                      public QAccessibleAttributesInterface,
                                      public QAccessibleTextInterface,
+                                     public QAccessibleEditableTextInterface,
                                      public QAccessibleActionInterface {
 public:
     CanvasBlockAccessible(View *view, CanvasAccessible *container, BlockId id);
@@ -280,6 +281,15 @@ public:
     void scrollToSubstring(int startIndex, int endIndex) override;
     QString attributes(int offset, int *startOffset, int *endOffset) const override;
 
+    // ---- QAccessibleEditableTextInterface (A4.2) -------------------------
+    // Present exactly where the text interface is. Every method is one
+    // block-scoped replace (offsets are this block's QChar offsets) routed
+    // through View's IME-commit path — see replaceRange() in the .cpp.
+    // Read-only mode and out-of-range/invalid input reject with no effect.
+    void deleteText(int startOffset, int endOffset) override;
+    void insertText(int offset, const QString &text) override;
+    void replaceText(int startOffset, int endOffset, const QString &text) override;
+
     // ---- QAccessibleActionInterface (A4.1) -------------------------------
     // Only a fold head (`View::isBlockFoldable`) has actions: a single
     // `toggleAction()` wired to `View::toggleFold()`. Any other block has
@@ -293,6 +303,8 @@ public:
     BlockId blockId() const { return m_id; }
 
 private:
+    void replaceRange(int startOffset, int endOffset, const QString &text);
+
     /// Blocks with no text content (`HorizontalRule`, `Image`, `Mermaid` —
     /// spec §4.2) return `nullptr` for `QAccessible::TextInterface` from
     /// `interface_cast` rather than implementing it vacuously.
