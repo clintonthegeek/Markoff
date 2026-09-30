@@ -695,7 +695,7 @@ QString CanvasBlockAccessible::text(QAccessible::Text t) const
     case BlockKind::Math:
         // Role is StaticText (no Qt math role, spec §4.6 finding 4), so the
         // TeX source is the name.
-        return {};
+        return name ? QString::fromUtf8(doc->blockText(m_id)) : QString();
     case BlockKind::CodeBlock: {
         // No code role in Qt: the fence language goes in the description.
         if (name)
