@@ -81,7 +81,7 @@ Push.
 | A2.3 Geometry: `characterRect`, `offsetAtPoint`, line boundaries | ☑ | `0c6f76a9` | break `be8488d5` / revert `52b6c278` |
 | A2.4 ⏸ phase close (full suite) | ☑ | `e50f2d48` | exempt |
 | **A3 — notifications** | | | |
-| A3.1 Event spy test harness | ☐ | | |
+| A3.1 Event spy test harness | ☑ | `60a4c63e` | break `8da7ade9` / revert `8a2e4af1` |
 | A3.2 Caret/selection/focus events | ☐ | | |
 | A3.3 Text insert/remove + block create/destroy events | ☐ | | |
 | A3.4 ⏸ phase close (full suite) | ☐ | | exempt |
@@ -655,3 +655,36 @@ record the final baseline.
   pre-live-retirement baseline line corrected to the current
   `213/213`. Both remotes (`codeberg` primary, `origin` GitHub
   mirror) pushed and in sync.
+- **A3.1 (2026-09-29): event spy harness landed.** New test-only header
+  `tests/A11yEventSpy.h` (`MarkoffTest::A11yEventSpy`), chosen over
+  inlining in `tst_canvas_accessibility.cpp` so A3.2/A3.3 (and any other
+  test binary) can include it. Scope-based RAII: the ctor saves
+  `isActive()`, installs a handler via `installUpdateHandler`, and calls
+  `setActive(true)`; the dtor restores active state and the previous
+  handler. `UpdateHandler` is a plain function pointer, so delivery goes
+  through a static current-spy pointer; nested spies restore LIFO.
+  Events are snapshotted at delivery into `A11yEventRecord` (type,
+  QPointer object, child, and payload ints/text/changedStates for
+  TextCaretMoved/Inserted/Removed/SelectionChanged/StateChanged) because
+  the caller destroys the event right after `updateAccessibility()`.
+  Helpers: `events()`, `count()`, `clear()`, `eventsOfType(type, obj)`,
+  `countOfType`. Qt 6.11 source check (`qaccessible.cpp`):
+  `updateAccessibility()` calls the installed update handler
+  UNCONDITIONALLY (isActive() only gates a TableModelChanged side path),
+  so a spy sees events even when inactive; `setActive(true)` is still
+  forced so View-side emit code that gates on `isActive()` (A3.2/A3.3)
+  is observable, and `setActive` merely forwards to the platform
+  accessibility (a no-op without one; the restore is symmetrical either
+  way). `QAccessible::NullEvent` does not exist; the default is
+  `InvalidEvent`. 4 new self-tests (hand-fired events with payload,
+  handler + active-state restore via a sentinel handler, no stale events
+  in a following case, nested LIFO); no View events wired. Falsification:
+  dtor stops restoring the previous handler (`8da7ade9`) -> the restore
+  test failed; reverted (`8a2e4af1`), `git diff 60a4c63e 8a2e4af1` empty.
+  **Environment note:** system Qt was upgraded to 6.11.2 since the last
+  session, leaving `build-dev` with link errors and then SIGSEGVs in
+  every test (stale ABI-inline objects, e.g. `SourceSpan` copy ctor); a
+  `cmake --build build-dev --clean-first -j 4` (~8 min) fixed it. Not a
+  product issue. No core change; constitution clean (81 files); canvas
+  suite 41/41 (accessibility binary 45 -> 49 cases); full suite not
+  re-run (tier is canvas-only; baseline 213/213).
