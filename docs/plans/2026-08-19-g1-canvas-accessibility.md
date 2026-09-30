@@ -83,7 +83,7 @@ Push.
 | **A3 — notifications** | | | |
 | A3.1 Event spy test harness | ☑ | `60a4c63e` | break `8da7ade9` / revert `8a2e4af1` |
 | A3.2 Caret/selection/focus events | ☑ | `9377d4a0` | break `6dfc613f` / revert `9cf383a8` |
-| A3.3 Text insert/remove + block create/destroy events | ☐ | | |
+| A3.3 Text insert/remove + block create/destroy events | ☑ | `61f6cece` | break `7c942d3e` / revert `11b97d32` |
 | A3.4 ⏸ phase close (full suite) | ☐ | | exempt |
 | **A4 — folding, actions, editable text** | | | |
 | A4.1 Hidden/folded state + expand-collapse action | ☐ | | |
@@ -735,3 +735,63 @@ record the final baseline.
   reconfigure (cached paths to Qt 6.11.1 libs) plus clean rebuild after
   the 6.11.2 upgrade. Canvas suite 41/41, constitution clean (81 files);
   full suite not run (canvas tier; baseline 213/213).
+- **A3.3 (2026-09-29): text insert/remove, block create/destroy, eviction landed.**
+  One hook, `Detail::notifyDocumentChanged(view)` in `View::onDocumentChanged`
+  (right after `refreshFoldedBlocks`, before caret/selection sync so a block
+  created here exists before a Focus targets it) -> `CanvasAccessible::
+  syncStructure()`; plus `notifyDocumentReplaced` in `setDocument`. Synchronous,
+  no deferral (C2), no core change, no new View API.
+  **Lookup:** a leaked static `View* -> CanvasAccessible*` registry (ctor/dtor
+  maintained) reaches an EXISTING container without
+  `queryAccessibleInterface()`, which would create one per View; a non-a11y
+  app pays one empty-map check per doc change.
+  **Text payloads:** each created block keeps `{token, QString text}` in its
+  `Child`; per change only blocks whose token moved are re-read and diffed
+  (QChar common prefix/suffix, surrogate pairs never split) -> `TextRemoved`
+  then `TextInserted` at the QChar offset. Per block only (C4). Snapshots are
+  taken at accessible creation and refreshed on every doc change, ACTIVE OR
+  NOT (cost is proportional to created children = 0 with no AT client), so
+  the A3.2 "tracker only updates while active" limit does NOT apply here: the
+  first edit after activation reports only its own delta (tested). Events are
+  gated on `isActive()`.
+  **Change token (finding):** no single core counter covers all paths:
+  `blockEditSequence` bumps on local edits + undo/redo but NOT on remote CRDT
+  ops (`applyRemoteBufferOp`); `bufferProxy(id)->editSequence()` bumps on
+  local + remote but NOT on undo/redo. Token = their sum. **Suspected core
+  issue, UNVERIFIED, not touched:** `BlockLayoutCache::sync` keys staleness on
+  `blockEditSequence` alone, so a remote edit to an already-measured block may
+  leave its cached layout/height stale until a local edit; worth a probe.
+  **Structure:** ids diffed against `m_knownIds` (elementwise compare, no set
+  unless the list changed); new ids get an accessible + `ObjectCreated` (only
+  while active). Reorder-only changes emit nothing. Removed blocks: only
+  CREATED accessibles are announced/evicted (an AT client can only hold refs
+  to blocks it queried). **Eviction (§9 Q1)** on the same diff, always (also
+  inactive): erase from `m_children` first, then
+  `QAccessible::deleteAccessibleInterface(id)`. Qt's cache itself emits
+  `ObjectDestroyed` (while active) from that call — emitting our own doubled
+  it (seen: 2 per removal), so we rely on Qt's. `blockAccessible(id)` now
+  refuses ids not in the document, so a stale id cannot re-create an entry
+  nothing would evict. **Doc swap:** BlockIds are only unique per document
+  (two docs collided in the test), so `setDocument` releases every created
+  block (`resetForNewDocument`) and re-primes the id list silently (no
+  ObjectCreated flood).
+  **Tests (+13, accessibility binary 56 -> 69):** typing, backspace/delete,
+  replace-selection, mid-string document replace, astral surrogate pair,
+  undo, split (Created + head Remove), merge (Destroyed + Insert + Qt cache
+  gone), remote insert/remove/create/destroy via second replica +
+  `applyRemoteOps`, eviction/no-dangling (+undo resurrects a fresh
+  interface), inactive eviction + snapshot currency, doc swap, View
+  destruction after churn. Note key-driven Backspace/Enter defer the view
+  refresh to core's own d2DocumentChanged debounce, so tests call
+  `doc.flushPendingD2Changed()`.
+  **Falsification:** one break commit (`7c942d3e`) skipped
+  `deleteAccessibleInterface` and dropped the insert emit -> 9 tests failed;
+  reverted (`11b97d32`), `git diff 61f6cece 11b97d32` empty. (Process slip: my
+  first revert attempt silently failed and an `--amend` briefly relabeled the
+  break commit; restored its message and reverted properly, so the break SHA
+  differs from the first one printed.)
+  **Perf** (`build-perf`, Release, no AT client): load->paint 150ms; keystroke
+  p50 0.55ms / p95 0.78ms (budget 16ms); scroll realized 45/500; RSS delta
+  0 KB. Tests: canvas 41/41, fast full tier 211/211 (excludes
+  tst_realistic/tst_benchmark; full baseline 213), constitution clean (81
+  files).
