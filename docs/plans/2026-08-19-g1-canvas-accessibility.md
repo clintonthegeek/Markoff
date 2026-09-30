@@ -87,7 +87,7 @@ Push.
 | A3.4 ⏸ phase close (full suite) | ☑ | `e8d3ccf6` | exempt |
 | **A4 — folding, actions, editable text** | | | |
 | A4.1 Hidden/folded state + expand-collapse action | ☑ | `36890b82` | break `64ccfa40` / revert `01eec6e3` |
-| A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☐ | | |
+| A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☑ | `08a6ba68` | break `c7211e34` / revert `6a7b05e2` |
 | A4.3 ⏸ phase close (full suite) | ☐ | | exempt |
 | **A5 — acceptance** | | | |
 | A5.1 Realization-bound test (spec §5) | ☐ | | exempt |
@@ -856,3 +856,48 @@ record the final baseline.
   log`), `git diff 36890b82 01eec6e3` empty. Canvas suite 41/41. Perf not
   re-run: the only hot-path addition is one `isActive()` check per
   `refreshFoldedBlocks` (same short-circuit A3.2 measured).
+- **A4.2 (2026-09-29): IMPLEMENTED `QAccessibleEditableTextInterface`
+  (a clean route exists).** **Inspected:** `View::insertText`/
+  `insertPrintable`/`deleteCluster`/`inputMethodEvent` and `setCaretPosition`.
+  All keyboard helpers (`insertPrintable` via `Cmd::insertCharacter` +
+  coalescing, `deleteCluster`, auto-pair) act on the CARET and, for typing,
+  carry key-specific behavior (coalescing, auto-pair, layout-cluster
+  stepping) that an AT edit should not inherit. `inputMethodEvent` is the
+  one caret-relative path that already expresses "replace N QChars at
+  caret-relative offset with a string" as ONE `d2ApplyBufferEdit` inside one
+  bare `UndoLog::Transaction`, converts QChar->byte with `coords::` within
+  its own block, owns the read-only gate, updates the caret and calls
+  `flushPendingD2Changed()` so kind promotion (`promoteCaretBlockKind`) sees
+  the text. **Route:** `CanvasBlockAccessible::replaceRange` (private; all
+  three methods delegate) validates, calls the public
+  `View::setCaretPosition(id, startByte)`, verifies the caret really landed
+  there, then delivers a `QInputMethodEvent` (commit string +
+  `replacementStart 0`/length = QChars removed) to the View via
+  `QCoreApplication::sendEvent`. No new View API (spec §1), no buffer
+  access, no duplicated edit logic, no deferral, no core change; constitution
+  clean (81 files). **Behavior decisions:** (1) read-only rejected up front
+  (before the caret moves; View's own IME gate is the backstop); (2) offsets
+  outside [0,count], inverted ranges, and empty-insert are rejected, not
+  clamped (an AT client's stale offset should not edit a surprise place);
+  (3) text containing CR/LF is rejected except in `CodeBlock` - a raw newline
+  in a paragraph buffer would be a corrupt block, and block splitting is the
+  structural-key path's job (`View::insertText` does it per line), out of
+  scope for a block-scoped API; (4) caret ends after inserted text, selection
+  collapses, an in-flight preedit is cancelled (all inherent to the IME
+  commit path and to moving the caret); (5) auto-pair does not apply, one
+  undo step per call regardless of payload length. Interface present exactly
+  where the text interface is (null for HorizontalRule/Image/Mermaid).
+  **Tests (+9, accessibility binary 77 -> 86):** insert mid-block, delete
+  range, replace with emoji/accent offsets (QChar != byte), read-only
+  rejection of all three (bytes, events, caret unchanged), one undo step
+  each, exactly-one TextInserted/TextRemoved with payloads (replace = one
+  Removed + one Inserted), invalid/inverted/out-of-range rejected +
+  boundary offsets valid, newline rule, null for no-text kinds.
+  **Falsification:** break commit `c7211e34` dropped the read-only gate and
+  the range check -> `editable_read_only_rejects_all_three` and
+  `editable_invalid_ranges_rejected` failed; `git revert` `6a7b05e2` (in
+  `git log`), `git diff 08a6ba68 6a7b05e2` empty. (Process slip: my first
+  revert invocation had a bad flag and failed; a message `--amend` briefly
+  rewrote the break commit, so its SHA is `c7211e34`, not the first one
+  printed; then reverted properly.) Canvas suite 41/41; full suite not run
+  (canvas tier; A4.3 owns it, baseline 213/213).
