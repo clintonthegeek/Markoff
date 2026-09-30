@@ -86,7 +86,7 @@ Push.
 | A3.3 Text insert/remove + block create/destroy events | ☑ | `61f6cece` | break `7c942d3e` / revert `11b97d32` |
 | A3.4 ⏸ phase close (full suite) | ☑ | `e8d3ccf6` | exempt |
 | **A4 — folding, actions, editable text** | | | |
-| A4.1 Hidden/folded state + expand-collapse action | ☐ | | |
+| A4.1 Hidden/folded state + expand-collapse action | ☑ | `36890b82` | break `64ccfa40` / revert `01eec6e3` |
 | A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☐ | | |
 | A4.3 ⏸ phase close (full suite) | ☐ | | exempt |
 | **A5 — acceptance** | | | |
@@ -813,3 +813,46 @@ record the final baseline.
   `BlockLayoutCache::sync` stales on `blockEditSequence`, which remote
   ops do not bump. Logged in `docs/queue.md` (Other dormant). The a11y
   text events are unaffected (they use the summed token).
+- **A4.1 (2026-09-29): fold state + toggle action + StateChange events landed.**
+  **State:** A1.2 already set `invisible` from `isBlockHidden`; verified and
+  kept. The H-arc hidden title rides the same projection, so it reports
+  `invisible` and (because `isBlockFoldable` is false for it) is never
+  `expandable` and has no action interface - sensible, tested (setting the
+  flag/title fires `invisible` + `expandable` events on it). Fold heads
+  (`isBlockFoldable`) get `expandable`, `expanded = !isBlockFolded`,
+  `collapsed = isBlockFolded` (the bridge maps `collapsed` too). Hidden
+  bodies stay in the child list; `childCount()` and child identity/indices
+  are asserted stable across toggle/untoggle/restore.
+  **Action naming decision:** a single `QAccessibleActionInterface::
+  toggleAction()` ("Toggle"), wired to `View::toggleFold(id)`. Checked Qt
+  6.11 source: there is no stock expand/collapse action; the AT-SPI bridge
+  (`atspiadaptor.cpp`, `effectiveActionNames`) forwards Qt action names
+  verbatim as the `org.a11y.atspi.Action` name, and Qt's own tree-item
+  accessibles use `toggleAction()`, so a custom string would only be an
+  unrecognized name to Orca. `increase/decreaseAction` are for value widgets
+  (bridge synthesizes them from ValueInterface) - not used. Localized name
+  `tr("Toggle fold")`; description direction-aware via `tr()` ("Collapses/
+  Expands this section"). Only fold heads expose the interface
+  (`interface_cast(ActionInterface)` is nullptr otherwise). Read-only does
+  NOT block folding (view state; `toggleFold` has no RO gate) - tested.
+  **Detection:** one funnel, `View::refreshFoldedBlocks()` (called by
+  `toggleFold`, `setFoldedHeadIndices`, `onDocumentChanged`, title/flag
+  setters, scale/theme rebuild) now ends with `Detail::notifyFoldState(this)`
+  -> `CanvasAccessible::syncFoldNotifications()`, an idempotent diff of
+  per-created-child last-announced bits {expandable, expanded, invisible}
+  (stored in `Child::foldBits`, initialised from current state at creation
+  so no spurious event). One `StateChanged` event per changed FLAG, because
+  the Qt bridge handles only one flag per event (else-if chain). Returns at
+  once when `!isActive()`; cost is proportional to CREATED children (0 with
+  no AT client). Known limit (same as A3.2): bits are not refreshed while
+  inactive, so the first sync after activation may emit a harmless extra
+  event. Synchronous (C2), no core change, no new View API, constitution
+  clean (81 files). Event ordering on `toggleFold`: fold StateChange events
+  fire inside `refreshFoldedBlocks`, before the caret-relocation (existing
+  behavior) fires its A3.2 TextCaretMoved on the head - tested.
+  8 new tests (accessibility binary 69 -> 77). Falsification: break commit
+  (`64ccfa40`) dropped the action's `toggleFold` call and inverted
+  `expanded` -> 3 tests failed; `git revert` (`01eec6e3`, verified in `git
+  log`), `git diff 36890b82 01eec6e3` empty. Canvas suite 41/41. Perf not
+  re-run: the only hot-path addition is one `isActive()` check per
+  `refreshFoldedBlocks` (same short-circuit A3.2 measured).
