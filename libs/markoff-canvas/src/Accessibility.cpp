@@ -301,7 +301,7 @@ void CanvasAccessible::syncTextNotifications(bool viewHasFocus)
                 QAccessibleEvent focus(b, QAccessible::Focus);
                 QAccessible::updateAccessibility(&focus);
             }
-            if (false && caretMoved && b->interface_cast(QAccessible::TextInterface)) {
+            if (caretMoved && b->interface_cast(QAccessible::TextInterface)) {
                 const QByteArray raw = doc->blockText(caretBlock);
                 QAccessibleTextCursorEvent ev(b, int(coords::byteToQtPos(raw, caretByte)));
                 QAccessible::updateAccessibility(&ev);
