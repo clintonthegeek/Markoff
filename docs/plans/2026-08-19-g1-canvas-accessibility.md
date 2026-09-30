@@ -90,7 +90,7 @@ Push.
 | A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☑ | `08a6ba68` | break `c7211e34` / revert `6a7b05e2` |
 | A4.3 ⏸ phase close (full suite) | ☑ | `06a5dfbc` | exempt |
 | **A5 — acceptance** | | | |
-| A5.1 Realization-bound test (spec §5) | ☐ | | exempt |
+| A5.1 Realization-bound test (spec §5) | ☑ | `SHA_PLACEHOLDER` | exempt |
 | A5.2 Audit pass: role table, event table, limitations log | ☐ | | exempt |
 | **A-G1 — user gate: run the Orca pass now or defer?** | ☐ | — | — |
 | A5.3 Manual Orca pass (`--direct`, needs permission) | ☐ | | exempt |
@@ -916,3 +916,25 @@ record the final baseline.
   the possibly-dead View) and calls `deleteAccessibleInterface` per child,
   which is a no-op for ids Qt's cache already dropped - no crash path found.
   No sanitizer/valgrind run (valgrind not installed, no ASan build present).
+- **A5.1 (2026-09-29): realization-bound test landed; no defects found.**
+  Two new cases in `tst_canvas_accessibility.cpp` (86 -> 88).
+  **Fixture:** `largeMixedFixture(40)` = 40 x 9 kinds (heading, multi-byte
+  paragraph with accent/CJK/emoji, 2 task items, code block, table, image,
+  HR, html block) = 360 blocks; 500x400 offscreen view, exposed; 23 blocks
+  realized at rest; the first section folded via `toggleFold` so hidden/
+  collapsed state paths run. **Walk (every block via `child(i)`):**
+  `indexOfChild`/`parent`/`childCount`, `role`, full `state()` bits, all
+  six `text(Text)` kinds, heading `Attribute::Level` (+ every attribute key
+  elsewhere), action names/localized name/description/key bindings (no
+  `doAction`), and on text blocks `characterCount`, `text(0,count)`,
+  `cursorPosition`, `selectionCount`/`selection`, `textAt/Before/AfterOffset`
+  for Char/Word/Paragraph at offsets 0/mid/end (NOT LineBoundary; editable
+  interface checked for presence only). Vacuity guards assert >200 text
+  blocks, >=40 headings/expandable, >=80 checkable, >=1 invisible. Asserts
+  `realizedBlockCount()` unchanged. **Complement:** `rect()` on four far
+  blocks realizes nothing; `characterRect` on a far text block realizes
+  exactly +1, and a repeat query adds 0. **Sanity break (exempt task,
+  local uncommitted edit, reverted via `git checkout`):** made
+  `characterCount()` call `ensureBlockRealized()` -> walk test failed with
+  realized 322 vs expected 23. **Defects:** none - no non-geometry
+  accessor realizes. No core change; constitution clean.

@@ -158,6 +158,10 @@ private Q_SLOTS:
     void eviction_runs_while_inactive_and_emits_nothing();
     void eviction_document_swap_releases_every_block();
     void eviction_view_destruction_after_churn_is_clean();
+
+    // ---- A5.1: realization bound (spec §5) ----
+    void realization_walk_of_every_block_realizes_nothing();
+    void realization_geometry_query_realizes_one_and_rect_none();
 };
 
 void TstCanvasAccessibility::container_role_is_document()
@@ -2301,6 +2305,163 @@ void TstCanvasAccessibility::editable_interface_absent_for_no_text_kinds()
     QCOMPARE(doc.blockKind(blocks[1]), BlockKind::HorizontalRule);
     QVERIFY(blockOf(view, 1)->editableTextInterface() == nullptr);
     QVERIFY(blockOf(view, 0)->editableTextInterface() != nullptr);
+}
+
+
+namespace {
+
+/// Large mixed fixture for the A5.1 realization-bound tests: `groups` x a
+/// 9-block group (heading, paragraph with multi-byte text, task items,
+/// code block, table, image, HR, html block). Several hundred blocks.
+QByteArray largeMixedFixture(int groups)
+{
+    QByteArray src;
+    for (int i = 0; i < groups; ++i) {
+        const QByteArray n = QByteArray::number(i);
+        src += "# Section " + n + "\n\n";
+        src += "Paragraph " + n + " caf\xc3\xa9 \xe6\x97\xa5\xe6\x9c\xac\xe8\xaa\x9e "
+               "\xf0\x9f\x98\x80 with several ordinary words to wrap.\n\n";
+        src += "- [ ] todo " + n + "\n- [x] done " + n + "\n\n";
+        src += "```cpp\nint x" + n + " = 0;\nreturn x" + n + ";\n```\n\n";
+        src += "| h0 | h1 |\n|----|----|\n| a" + n + " | b |\n\n";
+        src += "![pic " + n + "](pic" + n + ".png)\n\n";
+        src += "---\n\n";
+        src += "<div>\nhtml " + n + "\n</div>\n\n";
+    }
+    return src;
+}
+
+}  // namespace
+
+void TstCanvasAccessibility::realization_walk_of_every_block_realizes_nothing()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(largeMixedFixture(40));
+    View view;
+    view.resize(500, 400);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    const auto blocks = doc.iterateBlocks();
+    QVERIFY(blocks.size() >= 300);
+    // A folded section so fold-hidden/expanded/collapsed state code runs.
+    view.toggleFold(blocks[0]);
+    QVERIFY(view.isBlockFolded(blocks[0]));
+    QVERIFY(view.isBlockHidden(blocks[1]));
+
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QVERIFY(root);
+    const int total = root->childCount();
+    QCOMPARE(total, view.blockCount());
+
+    const int before = view.realizedBlockCount();
+    QVERIFY(before > 0);
+    QVERIFY2(before < total / 4, "fixture must be far larger than the viewport");
+
+    int textBlocks = 0, expandable = 0, checkable = 0, invisible = 0, headings = 0;
+    for (int i = 0; i < total; ++i) {
+        QAccessibleInterface *b = root->child(i);
+        QVERIFY(b);
+        QCOMPARE(root->indexOfChild(b), i);
+        QCOMPARE(b->parent(), root);
+        QCOMPARE(b->childCount(), 0);
+        (void)b->role();
+        const QAccessible::State st = b->state();
+        expandable += st.expandable;
+        checkable += st.checkable;
+        invisible += st.invisible;
+        (void)st.focused; (void)st.editable; (void)st.checked;
+        (void)st.expanded; (void)st.collapsed; (void)st.focusable;
+        for (auto t : {QAccessible::Name, QAccessible::Description, QAccessible::Value,
+                       QAccessible::Help, QAccessible::Accelerator, QAccessible::DebugDescription})
+            (void)b->text(t);
+
+        if (b->role() == QAccessible::Heading) {
+            ++headings;
+            QAccessibleAttributesInterface *attrs = b->attributesInterface();
+            QVERIFY(attrs);
+            QVERIFY(attrs->attributeKeys().contains(QAccessible::Attribute::Level));
+            QVERIFY(attrs->attributeValue(QAccessible::Attribute::Level).isValid());
+        } else if (QAccessibleAttributesInterface *attrs = b->attributesInterface()) {
+            for (auto k : attrs->attributeKeys())
+                (void)attrs->attributeValue(k);
+        }
+
+        if (QAccessibleActionInterface *act = b->actionInterface()) {
+            for (const QString &name : act->actionNames()) {
+                (void)act->localizedActionName(name);
+                (void)act->localizedActionDescription(name);
+            }
+            (void)act->keyBindingsForAction(QAccessibleActionInterface::toggleAction());
+        }
+
+        QAccessibleTextInterface *t = b->textInterface();
+        if (!t)
+            continue;
+        ++textBlocks;
+        const int count = t->characterCount();
+        const QString all = t->text(0, count);
+        QCOMPARE(all.size(), count);
+        (void)t->cursorPosition();
+        const int selN = t->selectionCount();
+        for (int s = 0; s < selN; ++s) {
+            int a = 0, e = 0;
+            t->selection(s, &a, &e);
+        }
+        for (int off : {0, count / 2, count}) {
+            for (auto bt : {QAccessible::CharBoundary, QAccessible::WordBoundary,
+                            QAccessible::ParagraphBoundary}) {
+                int s = 0, e = 0;
+                (void)t->textAtOffset(off, bt, &s, &e);
+                (void)t->textBeforeOffset(off, bt, &s, &e);
+                (void)t->textAfterOffset(off, bt, &s, &e);
+            }
+        }
+        if (QAccessibleEditableTextInterface *ed = b->editableTextInterface())
+            (void)ed;  // presence only: every mutator would edit the document
+    }
+
+    // Guard against a vacuous walk.
+    QVERIFY(textBlocks > 200);
+    QVERIFY(headings >= 40);
+    QVERIFY(expandable >= 40);
+    QVERIFY(checkable >= 80);
+    QVERIFY(invisible >= 1);
+
+    // Spec §5: text/count/role/state need no layout. Nothing realized.
+    QCOMPARE(view.realizedBlockCount(), before);
+}
+
+void TstCanvasAccessibility::realization_geometry_query_realizes_one_and_rect_none()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(largeMixedFixture(40));
+    View view;
+    view.resize(500, 400);
+    view.setDocument(&doc);
+    view.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&view));
+
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    const int before = view.realizedBlockCount();
+
+    // rect() of far-off (unrealized) blocks: no realization.
+    for (int i : {200, 250, 300, 340})
+        (void)root->child(i)->rect();
+    QCOMPARE(view.realizedBlockCount(), before);
+
+    // A geometry query on a far, text-bearing block realizes exactly one.
+    int far = 300;
+    while (!root->child(far)->textInterface())
+        ++far;
+    QAccessibleTextInterface *t = root->child(far)->textInterface();
+    QVERIFY(t->characterRect(0).isValid());
+    QCOMPARE(view.realizedBlockCount(), before + 1);
+
+    // Asking again (already realized) adds nothing.
+    (void)t->characterRect(1);
+    QCOMPARE(view.realizedBlockCount(), before + 1);
 }
 
 QTEST_MAIN(TstCanvasAccessibility)
