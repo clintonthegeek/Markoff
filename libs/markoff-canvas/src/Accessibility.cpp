@@ -759,7 +759,7 @@ QAccessible::Role CanvasBlockAccessible::role() const
         // best available - hence the version guard. Callouts are also
         // BlockQuote blocks and share this role.
 #if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
-        return QAccessible::Section;
+        return QAccessible::BlockQuote;
 #else
         return QAccessible::Section;
 #endif
