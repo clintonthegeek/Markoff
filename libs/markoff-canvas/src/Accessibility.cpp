@@ -254,6 +254,27 @@ int CanvasAccessible::indexOfChild(const QAccessibleInterface *child) const
     return m_view->blockIndexOf(block->blockId());
 }
 
+namespace {
+// A4.1: fold-derived state bits, the unit of the last-announced diff.
+constexpr quint8 kFoldExpandable = 1;
+constexpr quint8 kFoldExpanded = 2;
+constexpr quint8 kFoldInvisible = 4;
+
+quint8 foldBitsFor(const View *view, BlockId id)
+{
+    quint8 bits = 0;
+    if (view->isBlockFoldable(id)) {
+        bits |= kFoldExpandable;
+        // `expanded` = the fold head's body is visible = NOT folded.
+        if (!view->isBlockFolded(id))
+            bits |= kFoldExpanded;
+    }
+    if (view->isBlockHidden(id))
+        bits |= kFoldInvisible;
+    return bits;
+}
+}  // namespace
+
 CanvasBlockAccessible *CanvasAccessible::blockAccessible(BlockId id) const
 {
     if (id.isNull())
@@ -268,7 +289,7 @@ CanvasBlockAccessible *CanvasAccessible::blockAccessible(BlockId id) const
         return nullptr;
     auto *block = new CanvasBlockAccessible(m_view, const_cast<CanvasAccessible *>(this), id);
     const QAccessible::Id qid = QAccessible::registerAccessibleInterface(block);
-    Child c{block, qid, 0, {}};
+    Child c{block, qid, 0, {}, foldBitsFor(m_view, id)};
     if (MarkoffDocument *doc = m_view->document()) {
         c.seq = bufferChangeToken(doc, id);
         c.text = QString::fromUtf8(doc->blockText(id));
@@ -518,6 +539,35 @@ void CanvasAccessible::syncStructure()
         evict(id);
 }
 
+void CanvasAccessible::syncFoldNotifications()
+{
+    if (!QAccessible::isActive())
+        return;
+    for (auto &[id, child] : m_children) {
+        if (m_view->blockIndexOf(id) < 0)
+            continue;  // leaving the document; syncStructure() evicts it
+        const quint8 now = foldBitsFor(m_view, id);
+        const quint8 diff = now ^ child.foldBits;
+        if (!diff)
+            continue;
+        child.foldBits = now;
+        // One event per flag: the AT-SPI bridge handles only one changed
+        // flag per StateChange event (else-if chain in atspiadaptor.cpp).
+        auto emitFlag = [&](auto setter) {
+            QAccessible::State changed;
+            setter(changed);
+            QAccessibleStateChangeEvent ev(child.iface, changed);
+            QAccessible::updateAccessibility(&ev);
+        };
+        if (diff & kFoldExpandable)
+            emitFlag([](QAccessible::State &s) { s.expandable = true; });
+        if (diff & kFoldExpanded)
+            emitFlag([](QAccessible::State &s) { s.expanded = true; });
+        if (diff & kFoldInvisible)
+            emitFlag([](QAccessible::State &s) { s.invisible = true; });
+    }
+}
+
 void CanvasAccessible::evict(BlockId id)
 {
     auto it = m_children.find(id);
@@ -675,6 +725,16 @@ QAccessible::State CanvasBlockAccessible::state() const
     s.focused = (m_view->caretBlock() == m_id);
     s.editable = !m_view->isReadOnly();
     s.invisible = m_view->isBlockHidden(m_id);
+    // A4.1 (spec §4.3): a fold head is expandable; expanded = body visible
+    // (NOT folded), collapsed = folded. The H-arc hidden title is never
+    // foldable (isBlockFoldable is false for it) so it is never expandable,
+    // only invisible (it rides the fold-hidden projection).
+    if (m_view->isBlockFoldable(m_id)) {
+        s.expandable = true;
+        const bool folded = m_view->isBlockFolded(m_id);
+        s.expanded = !folded;
+        s.collapsed = folded;
+    }
 
     if (doc->blockKind(m_id) == BlockKind::ListItem
         && stringAttr(doc, m_id, AttrNames::MarkerStyle) == QStringLiteral("task")) {
@@ -691,7 +751,52 @@ void *CanvasBlockAccessible::interface_cast(QAccessible::InterfaceType t)
         return static_cast<QAccessibleAttributesInterface *>(this);
     if (t == QAccessible::TextInterface && hasTextContent())
         return static_cast<QAccessibleTextInterface *>(this);
+    if (t == QAccessible::ActionInterface && m_view->isBlockFoldable(m_id))
+        return static_cast<QAccessibleActionInterface *>(this);
     return nullptr;
+}
+
+// ---- A4.1 actions -------------------------------------------------------
+// Action naming: Qt's stock `toggleAction()` ("Toggle") — the same action
+// Qt's own tree-item accessibles use for expand/collapse-like state flips.
+// The AT-SPI bridge forwards Qt action names verbatim as the
+// org.a11y.atspi.Action name, and there is no Qt-stock expand/collapse
+// action, so a custom name would only be an unrecognized string to Orca.
+// Fold is VIEW state, not a document mutation, so read-only mode does not
+// block it (View::toggleFold has no read-only gate either).
+
+QStringList CanvasBlockAccessible::actionNames() const
+{
+    if (!m_view->isBlockFoldable(m_id))
+        return {};
+    return {QAccessibleActionInterface::toggleAction()};
+}
+
+QString CanvasBlockAccessible::localizedActionName(const QString &name) const
+{
+    if (name == QAccessibleActionInterface::toggleAction())
+        return m_view->tr("Toggle fold");
+    return QAccessibleActionInterface::localizedActionName(name);
+}
+
+QString CanvasBlockAccessible::localizedActionDescription(const QString &name) const
+{
+    if (name == QAccessibleActionInterface::toggleAction()) {
+        return m_view->isBlockFolded(m_id) ? m_view->tr("Expands this section")
+                                           : m_view->tr("Collapses this section");
+    }
+    return QAccessibleActionInterface::localizedActionDescription(name);
+}
+
+void CanvasBlockAccessible::doAction(const QString &actionName)
+{
+    if (actionName == QAccessibleActionInterface::toggleAction())
+        m_view->toggleFold(m_id);  // no-op if no longer foldable
+}
+
+QStringList CanvasBlockAccessible::keyBindingsForAction(const QString &) const
+{
+    return {};
 }
 
 bool CanvasBlockAccessible::hasTextContent() const
@@ -1057,6 +1162,15 @@ void notifyDocumentReplaced(View *view)
     auto &reg = containerRegistry();
     if (auto it = reg.find(view); it != reg.end())
         it->second->resetForNewDocument();
+}
+
+void notifyFoldState(View *view)
+{
+    if (!QAccessible::isActive())
+        return;
+    auto &reg = containerRegistry();
+    if (auto it = reg.find(view); it != reg.end())
+        it->second->syncFoldNotifications();
 }
 
 void notifyFocusChange(View *view, bool gained)

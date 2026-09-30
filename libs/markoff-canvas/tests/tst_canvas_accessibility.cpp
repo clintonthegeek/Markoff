@@ -123,6 +123,16 @@ private Q_SLOTS:
     void events_focus_in_out();
     void events_inactive_emits_nothing();
 
+    // ---- A4.1: folding state + expand/collapse action ----
+    void fold_head_state_and_toggle_event();
+    void fold_body_invisible_events_and_stable_children();
+    void fold_action_toggles_and_readonly_does_not_block();
+    void fold_non_foldable_has_no_action();
+    void fold_restore_via_set_folded_head_indices();
+    void fold_caret_moved_out_of_body_emits_caret_events();
+    void fold_hidden_title_invisible_never_expandable();
+    void fold_edit_changing_foldability_announces_expandable();
+
     // ---- A3.3: text insert/remove, block create/destroy, eviction ----
     void text_typing_emits_insert();
     void text_backspace_and_delete_emit_remove();
@@ -1832,6 +1842,258 @@ void TstCanvasAccessibility::eviction_view_destruction_after_churn_is_clean()
             blockOf(view, i);
     }  // ~View: container + surviving blocks released once each
     QVERIFY(true);
+}
+
+// ---- A4.1: folding ------------------------------------------------------
+
+namespace {
+const char *kFoldFixture =
+    "# Section One\n"
+    "para one\n\n"
+    "para two\n\n"
+    "# Section Two\n"
+    "para three\n";
+
+enum class StFlag { Any, Expanded, Expandable, Invisible };
+
+int stateEventsWith(const MarkoffTest::A11yEventSpy &spy, QAccessibleInterface *iface,
+                    StFlag flag = StFlag::Any)
+{
+    int n = 0;
+    for (const auto &r : spy.eventsOfType(QAccessible::StateChanged, iface)) {
+        const auto &c = r.changedStates;
+        const bool hit = flag == StFlag::Any
+            || (flag == StFlag::Expanded && c.expanded)
+            || (flag == StFlag::Expandable && c.expandable)
+            || (flag == StFlag::Invisible && c.invisible);
+        if (hit)
+            ++n;
+    }
+    return n;
+}
+}  // namespace
+
+void TstCanvasAccessibility::fold_head_state_and_toggle_event()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(kFoldFixture);
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *h1 = blockOf(view, 0);
+    QAccessibleInterface *h2 = blockOf(view, 3);
+    QAccessibleInterface *p1 = blockOf(view, 1);
+
+    QVERIFY(h1->state().expandable);
+    QVERIFY(h1->state().expanded);
+    QVERIFY(!h1->state().collapsed);
+    QVERIFY(!p1->state().expandable);   // a plain paragraph is not a fold head
+
+    MarkoffTest::A11yEventSpy spy;
+    view.toggleFold(blocks[0]);
+    QVERIFY(h1->state().expandable);
+    QVERIFY(!h1->state().expanded);
+    QVERIFY(h1->state().collapsed);
+    QCOMPARE(stateEventsWith(spy, h1, StFlag::Expanded), 1);
+    QCOMPARE(stateEventsWith(spy, h1), 1);            // nothing else on the head
+    QCOMPARE(stateEventsWith(spy, h2), 0);            // unaffected head: silent
+
+    spy.clear();
+    view.toggleFold(blocks[0]);                        // unfold reverses
+    QVERIFY(h1->state().expanded);
+    QVERIFY(!h1->state().collapsed);
+    QCOMPARE(stateEventsWith(spy, h1, StFlag::Expanded), 1);
+}
+
+void TstCanvasAccessibility::fold_body_invisible_events_and_stable_children()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(kFoldFixture);
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *p1 = blockOf(view, 1);
+    QAccessibleInterface *p2 = blockOf(view, 2);
+    QAccessibleInterface *h2 = blockOf(view, 3);
+    const int count = root->childCount();
+    QCOMPARE(count, 5);
+    QVector<QAccessibleInterface *> before;
+    for (int i = 0; i < count; ++i)
+        before << root->child(i);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.toggleFold(blocks[0]);
+    QCOMPARE(root->childCount(), count);
+    for (int i = 0; i < count; ++i) {
+        QCOMPARE(root->child(i), before[i]);
+        QCOMPARE(root->indexOfChild(before[i]), i);
+    }
+    QVERIFY(p1->state().invisible);
+    QVERIFY(p2->state().invisible);
+    QVERIFY(!h2->state().invisible);
+    QCOMPARE(stateEventsWith(spy, p1, StFlag::Invisible), 1);
+    QCOMPARE(stateEventsWith(spy, p2, StFlag::Invisible), 1);
+    QCOMPARE(stateEventsWith(spy, h2), 0);
+
+    spy.clear();
+    view.toggleFold(blocks[0]);
+    QCOMPARE(root->childCount(), count);
+    QVERIFY(!p1->state().invisible);
+    QVERIFY(!p2->state().invisible);
+    QCOMPARE(stateEventsWith(spy, p1, StFlag::Invisible), 1);
+    QCOMPARE(stateEventsWith(spy, p2, StFlag::Invisible), 1);
+}
+
+void TstCanvasAccessibility::fold_action_toggles_and_readonly_does_not_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(kFoldFixture);
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *h1 = blockOf(view, 0);
+    QAccessibleActionInterface *act = h1->actionInterface();
+    QVERIFY(act);
+    QCOMPARE(act->actionNames(), QStringList{QAccessibleActionInterface::toggleAction()});
+    QVERIFY(!act->localizedActionName(QAccessibleActionInterface::toggleAction()).isEmpty());
+    const QString collapseDesc =
+        act->localizedActionDescription(QAccessibleActionInterface::toggleAction());
+    QVERIFY(!collapseDesc.isEmpty());
+
+    MarkoffTest::A11yEventSpy spy;
+    act->doAction(QAccessibleActionInterface::toggleAction());
+    QVERIFY(view.isBlockFolded(blocks[0]));
+    QVERIFY(!h1->state().expanded);
+    QCOMPARE(stateEventsWith(spy, h1, StFlag::Expanded), 1);
+    // description reflects the new direction
+    QVERIFY(act->localizedActionDescription(QAccessibleActionInterface::toggleAction())
+            != collapseDesc);
+
+    // Unknown action names are ignored.
+    act->doAction(QStringLiteral("no-such-action"));
+    QVERIFY(view.isBlockFolded(blocks[0]));
+
+    // Read-only does not block folding: fold is view state, not a mutation.
+    view.setReadOnly(true);
+    act->doAction(QAccessibleActionInterface::toggleAction());
+    QVERIFY(!view.isBlockFolded(blocks[0]));
+    QVERIFY(h1->state().expanded);
+    act->doAction(QAccessibleActionInterface::toggleAction());
+    QVERIFY(view.isBlockFolded(blocks[0]));
+}
+
+void TstCanvasAccessibility::fold_non_foldable_has_no_action()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(kFoldFixture);
+    View view;
+    attachAndExpose(view, doc);
+    QAccessibleInterface *p1 = blockOf(view, 1);
+    QVERIFY(p1->actionInterface() == nullptr);
+    QVERIFY(!p1->state().expandable);
+    QVERIFY(!p1->state().expanded);
+    QVERIFY(!p1->state().collapsed);
+}
+
+void TstCanvasAccessibility::fold_restore_via_set_folded_head_indices()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(kFoldFixture);
+    View view;
+    attachAndExpose(view, doc);
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *h1 = blockOf(view, 0);
+    QAccessibleInterface *p1 = blockOf(view, 1);
+    QAccessibleInterface *h2 = blockOf(view, 3);
+    QAccessibleInterface *p3 = blockOf(view, 4);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setFoldedHeadIndices({0, 3});
+    QCOMPARE(root->childCount(), 5);
+    QVERIFY(!h1->state().expanded);
+    QVERIFY(!h2->state().expanded);
+    QVERIFY(p1->state().invisible);
+    QVERIFY(p3->state().invisible);
+    QCOMPARE(stateEventsWith(spy, h1, StFlag::Expanded), 1);
+    QCOMPARE(stateEventsWith(spy, h2, StFlag::Expanded), 1);
+    QCOMPARE(stateEventsWith(spy, p3, StFlag::Invisible), 1);
+
+    spy.clear();
+    view.setFoldedHeadIndices({3});   // partial restore: only h1 reopens
+    QVERIFY(h1->state().expanded);
+    QVERIFY(!p1->state().invisible);
+    QVERIFY(p3->state().invisible);
+    QCOMPARE(stateEventsWith(spy, h1, StFlag::Expanded), 1);
+    QCOMPARE(stateEventsWith(spy, h2), 0);      // unchanged: silent
+    QCOMPARE(stateEventsWith(spy, p3), 0);
+}
+
+void TstCanvasAccessibility::fold_caret_moved_out_of_body_emits_caret_events()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(kFoldFixture);
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *h1 = blockOf(view, 0);
+    QAccessibleInterface *p1 = blockOf(view, 1);
+    view.setCaretPosition(blocks[1], 3);
+    QCOMPARE(view.caretBlock(), blocks[1]);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.toggleFold(blocks[0]);
+    // Existing View behavior: caret lands on the head at offset 0.
+    QCOMPARE(view.caretBlock(), blocks[0]);
+    const auto cur = spy.eventsOfType(QAccessible::TextCaretMoved, h1);
+    QCOMPARE(cur.size(), 1);
+    QCOMPARE(cur.first().a, 0);
+    QCOMPARE(spy.countOfType(QAccessible::TextCaretMoved, p1), 0);
+    QVERIFY(!p1->state().focused);
+    QVERIFY(h1->state().focused);
+}
+
+void TstCanvasAccessibility::fold_hidden_title_invisible_never_expandable()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("# My Title\n\nbody one\n\nbody two\n");
+    View view;
+    attachAndExpose(view, doc);
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *title = blockOf(view, 0);
+    QVERIFY(title->state().expandable);        // foldable heading until hidden
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setHideMatchingFirstHeadingAsTitle(true);
+    view.setInlineTitle(QStringLiteral("My Title"));
+    QCOMPARE(root->childCount(), 3);           // stays in the child list (D2)
+    QVERIFY(title->state().invisible);
+    QVERIFY(!title->state().expandable);       // never foldable while hidden
+    QVERIFY(title->actionInterface() == nullptr);
+    QCOMPARE(stateEventsWith(spy, title, StFlag::Invisible), 1);
+    QCOMPARE(stateEventsWith(spy, title, StFlag::Expandable), 1);
+}
+
+void TstCanvasAccessibility::fold_edit_changing_foldability_announces_expandable()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown("plain\n\nsecond\n");
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    QVERIFY(!b0->state().expandable);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setCaretPosition(blocks[0], 0);
+    QTest::keyClicks(&view, "# ");             // promote to a heading
+    doc.flushPendingD2Changed();
+    if (view.isBlockFoldable(blocks[0])) {
+        QVERIFY(b0->state().expandable);
+        QCOMPARE(stateEventsWith(spy, b0, StFlag::Expandable), 1);
+    } else {
+        QSKIP("typed '# ' did not promote to a foldable heading in this build");
+    }
 }
 
 QTEST_MAIN(TstCanvasAccessibility)

@@ -97,6 +97,16 @@ public:
     /// (no `ObjectCreated` flood for a freshly loaded document).
     void resetForNewDocument();
 
+    /// A4.1 (spec §4.3/§4.4): diff every CREATED block's fold-derived state
+    /// (`expandable`, `expanded`, `invisible`) against what was last
+    /// announced and emit one `QAccessibleStateChangeEvent` per changed
+    /// flag. Called from `View::refreshFoldedBlocks()` — the single place
+    /// every fold-state or hidden-projection change funnels through
+    /// (`toggleFold`, `setFoldedHeadIndices`, document edits, the H-arc
+    /// title hide) — so no path is missed. Synchronous (C2); a no-op unless
+    /// `QAccessible::isActive()`. `childCount()` is never affected.
+    void syncFoldNotifications();
+
 private:
     void evict(BlockId id);
 
@@ -122,6 +132,8 @@ private:
         /// A3.3: last-seen buffer state, for text insert/remove payloads.
         quint64 seq = 0;
         QString text;
+        /// A4.1: last-announced fold-derived state bits (see foldBits()).
+        quint8 foldBits = 0;
     };
     mutable std::unordered_map<BlockId, Child, BlockIdHash> m_children;
 
@@ -206,7 +218,8 @@ private:
 /// set to the queried offset (same placeholder shape).
 class CanvasBlockAccessible final : public QAccessibleInterface,
                                      public QAccessibleAttributesInterface,
-                                     public QAccessibleTextInterface {
+                                     public QAccessibleTextInterface,
+                                     public QAccessibleActionInterface {
 public:
     CanvasBlockAccessible(View *view, CanvasAccessible *container, BlockId id);
 
@@ -267,6 +280,16 @@ public:
     void scrollToSubstring(int startIndex, int endIndex) override;
     QString attributes(int offset, int *startOffset, int *endOffset) const override;
 
+    // ---- QAccessibleActionInterface (A4.1) -------------------------------
+    // Only a fold head (`View::isBlockFoldable`) has actions: a single
+    // `toggleAction()` wired to `View::toggleFold()`. Any other block has
+    // no action interface (interface_cast returns nullptr).
+    QStringList actionNames() const override;
+    QString localizedActionName(const QString &name) const override;
+    QString localizedActionDescription(const QString &name) const override;
+    void doAction(const QString &actionName) override;
+    QStringList keyBindingsForAction(const QString &actionName) const override;
+
     BlockId blockId() const { return m_id; }
 
 private:
@@ -290,6 +313,12 @@ void installAccessibilityFactory();
 /// `QAccessible::isActive()`, and both emit synchronously (C2).
 void notifyTextState(View *view, bool viewHasFocus);
 void notifyFocusChange(View *view, bool gained);
+
+/// A4.1: called at the end of `View::refreshFoldedBlocks()` — fold /
+/// hidden-projection state may have changed (see
+/// `CanvasAccessible::syncFoldNotifications`). Returns at once unless
+/// `QAccessible::isActive()`.
+void notifyFoldState(View *view);
 
 /// A3.3: called from `View::onDocumentChanged()` — text insert/remove events,
 /// block ObjectCreated/ObjectDestroyed, and eviction of removed blocks'

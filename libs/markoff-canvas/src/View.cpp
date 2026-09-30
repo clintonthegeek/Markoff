@@ -1031,6 +1031,9 @@ void View::refreshFoldedBlocks()
     if (!m_hiddenTitleBlock.isNull())
         hidden.insert(m_hiddenTitleBlock);
     m_cache->setFoldedBlocks(hidden);
+    // A4.1 (spec §4.4): the one funnel every fold / hidden-projection
+    // change passes through — announce expandable/expanded/invisible diffs.
+    Detail::notifyFoldState(this);
 }
 
 void View::refreshHiddenTitleBlock()
