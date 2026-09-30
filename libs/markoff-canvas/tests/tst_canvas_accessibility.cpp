@@ -68,7 +68,7 @@ private Q_SLOTS:
     void role_codeblock();
     void role_listitem_plain();
     void role_listitem_task_checkable_and_checked_states();
-    void role_blockquote_is_section_limitation();
+    void role_blockquote();
     void role_horizontalrule();
     void role_image();
     void role_math_limitation();
@@ -377,7 +377,7 @@ void TstCanvasAccessibility::role_listitem_task_checkable_and_checked_states()
     QVERIFY(checked->state().checked);
 }
 
-void TstCanvasAccessibility::role_blockquote_is_section_limitation()
+void TstCanvasAccessibility::role_blockquote()
 {
     MarkoffDocument doc;
     doc.loadFromMarkdown("> quoted text\n");
@@ -386,9 +386,13 @@ void TstCanvasAccessibility::role_blockquote_is_section_limitation()
 
     QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
     QCOMPARE(doc.blockKind(doc.iterateBlocks().front()), BlockKind::BlockQuote);
-    // LIMITATION (spec §4.6 finding 4): ROLE_BLOCK_QUOTE is unreachable from
-    // Qt — Section is the best available role, not a bug to "fix".
+    // A5.2: spec §4.6 finding 4 was wrong for this row - QAccessible::BlockQuote
+    // (-> ATSPI_ROLE_BLOCK_QUOTE) exists since Qt 6.9.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+    QCOMPARE(iface->child(0)->role(), QAccessible::BlockQuote);
+#else
     QCOMPARE(iface->child(0)->role(), QAccessible::Section);
+#endif
 }
 
 void TstCanvasAccessibility::role_horizontalrule()
@@ -553,7 +557,7 @@ void TstCanvasAccessibility::role_footnote_def_paragraph_is_section()
     QAccessibleInterface *iface = QAccessible::queryAccessibleInterface(&view);
     QCOMPARE(iface->child(0)->role(), QAccessible::Paragraph);
     // LIMITATION (spec §4.6 finding 4 area — no ROLE_FOOTNOTE in Qt either):
-    // Section, same best-available choice as BlockQuote.
+    // Section, the best available.
     QCOMPARE(iface->child(1)->role(), QAccessible::Section);
 }
 

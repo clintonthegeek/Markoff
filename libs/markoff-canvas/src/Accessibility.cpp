@@ -741,8 +741,7 @@ QAccessible::Role CanvasBlockAccessible::role() const
         // *(footnote def)* row) — View::isFootnoteDefBlock() is the only
         // place that distinguishes them (presentation-layer detection over
         // the realized entry). No Qt role exists for AT-SPI's ROLE_FOOTNOTE
-        // either, so Section is the same best-available choice as
-        // BlockQuote below.
+        // either (also true on 6.11.2), so Section is the best available.
         return m_view->isFootnoteDefBlock(m_id) ? QAccessible::Section : QAccessible::Paragraph;
     case BlockKind::Heading:
         return QAccessible::Heading;
@@ -753,18 +752,25 @@ QAccessible::Role CanvasBlockAccessible::role() const
     case BlockKind::ListItem:
         return QAccessible::ListItem;
     case BlockKind::BlockQuote:
-        // LIMITATION (spec §4.6 finding 4): AT-SPI's ROLE_BLOCK_QUOTE
-        // exists but no QAccessible::Role maps to it — Section is the best
-        // available. Do not "fix" this by hunting for a better Qt role;
-        // there isn't one as of Qt 6.11.
+        // A5.2 correction of spec §4.2/§4.6 finding 4: `QAccessible::BlockQuote`
+        // (-> ATSPI_ROLE_BLOCK_QUOTE) exists since Qt 6.9 (qtbase commit
+        // 0b5874bc96f, verified in the 6.11.2 headers and the bridge table).
+        // This leaf's floor is Qt 6.8, where Section (-> ROLE_SECTION) is the
+        // best available - hence the version guard. Callouts are also
+        // BlockQuote blocks and share this role.
+#if QT_VERSION >= QT_VERSION_CHECK(6, 9, 0)
+        return QAccessible::BlockQuote;
+#else
         return QAccessible::Section;
+#endif
     case BlockKind::HorizontalRule:
         return QAccessible::Separator;
     case BlockKind::Image:
         return QAccessible::Graphic;
     case BlockKind::Math:
-        // LIMITATION (spec §4.6 finding 4): AT-SPI's ROLE_MATH exists but
-        // no QAccessible::Role maps to it — StaticText (→ ROLE_LABEL) is
+        // LIMITATION (spec §4.6 finding 4, still true on 6.11.2 and qtbase
+        // dev - only ROLE_BLOCK_QUOTE turned out reachable): AT-SPI's
+        // ROLE_MATH exists but no QAccessible::Role maps to it — StaticText (→ ROLE_LABEL) is
         // the best available; the math source is exposed as the name.
         // Do not "fix" this by hunting for a better Qt role; there isn't
         // one as of Qt 6.11.
@@ -775,8 +781,11 @@ QAccessible::Role CanvasBlockAccessible::role() const
         // Raw HTML source is what the user actually edits here.
         return QAccessible::EditableText;
     case BlockKind::Table:
-        // QAccessibleTableInterface is explicitly deferred (spec §6) — role
-        // only; a screen reader announces "table" and reads it linearly.
+        // LIMITATION (spec §6, logged in docs/queue.md): no
+        // QAccessibleTableInterface - a screen reader announces "table" and
+        // reads it linearly. Additive later: View::tableCellRect /
+        // caretTableCell / caretTableContext already exist. Name and
+        // Description come from text().
         return QAccessible::Table;
     }
     return QAccessible::NoRole;
