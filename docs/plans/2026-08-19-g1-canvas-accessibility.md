@@ -91,7 +91,7 @@ Push.
 | A4.3 ⏸ phase close (full suite) | ☑ | `06a5dfbc` | exempt |
 | **A5 — acceptance** | | | |
 | A5.1 Realization-bound test (spec §5) | ☑ | `b83bad91` | exempt |
-| A5.2 Audit pass: role table, event table, limitations log | ☐ | | exempt |
+| A5.2 Audit pass: role table, event table, limitations log | ☑ | audit docs commit (see log); code fixes `91a7f180`, `cde62f75`, `01a3779e` | audit exempt; 3 fixes each with break/revert: `fefb7aad`/`50afde3c`, `4db8e6ac`/`4ce4415e`, `720cbd1e`/`e17d5349` |
 | **A-G1 — user gate: run the Orca pass now or defer?** | ☐ | — | — |
 | A5.3 Manual Orca pass (`--direct`, needs permission) | ☐ | | exempt |
 | A5.4 ⏸ arc close | ☐ | | exempt |
@@ -938,3 +938,50 @@ record the final baseline.
   `characterCount()` call `ensureBlockRealized()` -> walk test failed with
   realized 322 vs expected 23. **Defects:** none - no non-geometry
   accessor realizes. No core change; constitution clean.
+- **A5.2 (2026-09-29): audit pass - 3 deviations found and fixed, rest verified/logged.**
+  Read `Accessibility.{h,cpp}` and the View/EditorWidget hooks against spec §4 as prose.
+  **(a) Role table (§4.2), verdict per `BlockKind`:** Paragraph OK; footnote-def paragraph ->
+  Section OK (via `isFootnoteDefBlock`); Heading OK (+Level attr); CodeBlock -> EditableText OK;
+  ListItem OK (task -> checkable/checked); **BlockQuote: DEVIATION - spec said Section (claimed
+  ROLE_BLOCK_QUOTE unreachable), but `QAccessible::BlockQuote` exists since Qt 6.9 and maps to
+  ROLE_BLOCK_QUOTE (qtbase `0b5874bc96f`; verified in installed 6.11.2 header and bridge table).
+  FIXED** (`01a3779e`, `#if QT_VERSION >= 6.9`, Section below; test renamed `role_blockquote`;
+  spec erratum added; callouts share the role); HorizontalRule -> Separator OK; Image -> Graphic OK;
+  Math -> StaticText OK (ROLE_MATH still unreachable; `QAccessible::Equation` exists but maps to
+  ROLE_TEXT - evaluate in the Orca pass, queued); Mermaid -> Graphic OK; HtmlBlock ->
+  EditableText OK; Table -> Table OK. Container Document OK. Limitations are recorded in code
+  comments at the mapping sites (BlockQuote note, Math, footnote def, Table-without-interface -
+  the last comment was refreshed).
+  **States (§4.2/4.3):** container `editable` tracks read-only OK, focusable/focused from
+  QAccessibleWidget; blocks: focusable, focused (caret block), editable, invisible (hidden),
+  checkable/checked, expandable/expanded/collapsed all OK.
+  **(b) Event table (§4.4):** caret -> `TextCaretMoved` (`ensureCaretVisible`/
+  `pushSelectionToSession`, A3.2) OK; selection -> `TextSelectionChanged` OK; text edit ->
+  Insert/Remove via `notifyDocumentChanged` OK; create/destroy OK (Qt's cache emits Destroyed);
+  focus in/out OK; fold toggled -> `StateChanged` per flag OK; **read-only flipped: DEVIATION -
+  never implemented (no `readOnlyChanged` hook anywhere in the a11y code). FIXED** (`91a7f180`):
+  `View::setReadOnly` -> `Detail::notifyReadOnlyChanged` -> `StateChanged{editable}` on the
+  container and each created block; synchronous, `isActive()`-gated, no-flip no-event; test
+  `events_read_only_flip`.
+  **Name/Description (§4.2 notes, §6): DEVIATION - `CanvasBlockAccessible::text()` was an empty
+  stub since A1.1** (comment said "A1.2 fills in"; it never did). FIXED (`cde62f75`): Image Name =
+  `mediaLabelFor` (falls back to parsing the buffer when the block is unrealized, so no
+  realization, spec §5), Mermaid Name "Mermaid diagram", Math Name = source, CodeBlock Description
+  = "Code, language X" (via `parseCodeFence`), Table Name "Table" + Description "N row(s)"; text
+  kinds have none by design. Test `name_description_per_kind`. Container Name resolution (§9 Q2)
+  already tested (A1.3), OK.
+  **Other promised items:** hidden -> invisible OK; child list stable OK (A4.1).
+  **(c) Logged, not fixed** (all in `docs/queue.md` "Canvas a11y limitations", no dupes of the A3.4
+  stale-layout item): no `QAccessibleTableInterface` (§6, inputs exist); ROLE_MATH/ROLE_FOOTNOTE
+  unreachable (+ Equation->ROLE_TEXT candidate); LineBoundary before/after use Qt's `\n`
+  approximation (A2.3); IME-route side effects of the editable interface (A4.2); no-op
+  add/remove/setSelection, `scrollToSubstring`, run `attributes()`; trackers not refreshed while
+  inactive (extra first event); toggle-only fold action; no sanitizer run on teardown.
+  **Upstream:** Level: no bug (A1.0). Nothing filed. Drafts (math role, footnote role,
+  expand/collapse action names) in `docs/handoff/2026-09-qt-accessibility-upstream-notes.md` -
+  **drafted, not filed - awaiting user decision** (outward-facing). Facts checked against installed
+  6.11.2 and `/home/clinton/src/qtbase` (dev, 6.13 alpha).
+  **Tests:** `tst_canvas_accessibility` 88 -> 90 cases (+`events_read_only_flip`,
+  +`name_description_per_kind`); `-R canvas` 41/41; constitution clean (81 files); no core
+  change (spec §8 held). Full suite not re-run (canvas tier; A5.4 owns it, baseline 213/213).
+  CLAUDE.md untouched (A5.4). Next: gate A-G1 (user).

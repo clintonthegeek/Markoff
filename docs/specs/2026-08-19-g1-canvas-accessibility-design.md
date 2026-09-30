@@ -166,7 +166,7 @@ assumed:
 | `Heading` | `Heading` | `ROLE_HEADING` | level: see §4.6 — **confirmed to reach AT-SPI** as the `level` object attribute (A1.0) |
 | `CodeBlock` | `EditableText` | `ROLE_TEXT` | no code role in Qt; language goes in the description |
 | `ListItem` | `ListItem` | `ROLE_LIST_ITEM` | checked state from the `Checked` attr → `state().checkable`/`checked` |
-| `BlockQuote` | `Section` | `ROLE_SECTION` | `ROLE_BLOCK_QUOTE` exists in AT-SPI but is **unreachable from Qt** (§4.6) |
+| `BlockQuote` | `Section` | `ROLE_SECTION` | *Erratum A5.2:* Qt >= 6.9 has `QAccessible::BlockQuote` -> `ROLE_BLOCK_QUOTE`; that is what the code uses (Section only below 6.9) |
 | `HorizontalRule` | `Separator` | `ROLE_SEPARATOR` | no text interface |
 | `Image` | `Graphic` | `ROLE_IMAGE` | name from `View::mediaLabelFor(id)`; no text interface |
 | `Math` | `StaticText` | `ROLE_LABEL` | `ROLE_MATH` is **unreachable from Qt** (§4.6); name is the source |
@@ -252,6 +252,11 @@ rather than assumed. Four results, two of which constrain the design:
    `Section` and `StaticText`(→`ROLE_LABEL`) are the best available.
    Stated limitation, not a defect in this design; also worth an
    upstream report.
+   **Erratum (A5.2, 2026-09-29):** the `ROLE_BLOCK_QUOTE` half is wrong.
+   `QAccessible::BlockQuote` (Qt >= 6.9) maps to it; canvas now uses it
+   for `BlockQuote` blocks (guarded for the Qt 6.8 floor). `ROLE_MATH`
+   and `ROLE_FOOTNOTE` remain unreachable. Upstream drafts:
+   `docs/handoff/2026-09-qt-accessibility-upstream-notes.md`.
 
 **What at-spi2-core did and did not answer.** Its headers are the
 authoritative role and interface list (used above), and confirm which

@@ -113,6 +113,38 @@ for why. Source mode is the escape hatch.
   until a local edit). Fix sketch: fold `bufferProxy(id)->editSequence()`
   into the token (as `Accessibility.cpp` already does). Touches
   canvas only, but verify against core's seq semantics first.
+- **Canvas a11y limitations (G1 arc, A5.2 audit 2026-09-29; all decided-out
+  or logged, none an oversight; plan findings log has the detail):**
+  - Tables get role `Table` + Name/Description but **no
+    `QAccessibleTableInterface`** (spec §6): a screen reader reads a table
+    linearly. Additive later - inputs `View::tableCellRect`,
+    `caretTableCell`, `caretTableContext` already exist; needs a cell-level
+    accessible class with its own coordinate story.
+  - Two AT-SPI roles unreachable from Qt (6.11.2 and qtbase dev):
+    `ROLE_MATH` (Math blocks fall back to `StaticText`/LABEL, source as
+    name; candidate to evaluate in the Orca pass: `QAccessible::Equation`
+    exists but the bridge maps it to `ROLE_TEXT`, with localized role name
+    "equation", which Orca may treat as an edit field) and `ROLE_FOOTNOTE` (footnote defs fall back to `Section`).
+    (`ROLE_BLOCK_QUOTE` IS reachable via `QAccessible::BlockQuote`, Qt>=6.9 -
+    spec §4.6 finding 4 was wrong for it; fixed in A5.2.) Upstream text
+    drafted, not filed: `docs/handoff/2026-09-qt-accessibility-upstream-notes.md`.
+  - `textBeforeOffset`/`textAfterOffset` for `LineBoundary` use Qt's base
+    class `\n` approximation, not the wrapped visual line (only
+    `textAtOffset` was overridden, A2.3). Wrong for wrapped paragraphs.
+  - `QAccessibleEditableTextInterface` goes through View's IME-commit route
+    (A4.2): caret ends after the inserted text, selection collapses, an
+    in-flight preedit is cancelled, no auto-pair, CR/LF rejected outside
+    code blocks, invalid/out-of-range offsets rejected (not clamped).
+  - `addSelection`/`removeSelection`/`setSelection` are no-ops (View has no
+    public selection setter); `scrollToSubstring` is a no-op and
+    `attributes(offset,...)` (text-run attributes) returns empty.
+  - Event trackers (caret/selection A3.2, fold bits A4.1) are not refreshed
+    while `QAccessible` is inactive, so the first sync after AT activation
+    may emit one harmless extra event.
+  - Fold toggle exposes only Qt's generic `toggleAction()`; Qt has no
+    expand/collapse action names (drafted in the upstream notes).
+  - Teardown/eviction has no sanitizer/valgrind coverage (neither was
+    available in A4.3); worth an ASan run when a build exists.
 - E-arc: CLOSED 2026-08-19, not merely dormant — scope (E3/E5) shipped
   under canvas Phase 5 (`docs/archive/e-arc/`, closed board).
 
