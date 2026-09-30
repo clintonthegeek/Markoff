@@ -477,7 +477,7 @@ void CanvasAccessible::syncStructure()
             }
             if (!inserted.isEmpty()) {
                 QAccessibleTextInsertEvent ev(child.iface, pre, inserted);
-                QAccessible::updateAccessibility(&ev);
+                (void)ev;
             }
         }
     }
@@ -528,7 +528,7 @@ void CanvasAccessible::evict(BlockId id)
     // Qt itself emits the ObjectDestroyed for a cached interface (while
     // active) from deleteAccessibleInterface; emitting our own too would
     // double-announce it (observed in A3.3: 2 events per removal).
-    QAccessible::deleteAccessibleInterface(child.id);
+    // BREAK
 }
 
 void CanvasAccessible::resetForNewDocument()
