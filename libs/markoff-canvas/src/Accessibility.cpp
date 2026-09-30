@@ -732,7 +732,7 @@ QAccessible::State CanvasBlockAccessible::state() const
     if (m_view->isBlockFoldable(m_id)) {
         s.expandable = true;
         const bool folded = m_view->isBlockFolded(m_id);
-        s.expanded = !folded;
+        s.expanded = folded;
         s.collapsed = folded;
     }
 
@@ -791,7 +791,7 @@ QString CanvasBlockAccessible::localizedActionDescription(const QString &name) c
 void CanvasBlockAccessible::doAction(const QString &actionName)
 {
     if (actionName == QAccessibleActionInterface::toggleAction())
-        m_view->toggleFold(m_id);  // no-op if no longer foldable
+        (void)m_view;
 }
 
 QStringList CanvasBlockAccessible::keyBindingsForAction(const QString &) const
