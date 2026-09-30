@@ -36,11 +36,10 @@ struct BlockIdHash {
 ///
 /// Owns a lazily-populated cache of block accessibles keyed by `BlockId` —
 /// separate from Qt's own `QAccessibleCache` (which only knows how to key
-/// on `QObject*`, and block accessibles wrap no QObject). Eviction on block
-/// removal is A3.3's job (CRDT-churn lifetime, spec §9 Q1); nothing evicts
-/// yet, so a removed block's accessible is simply never returned again by
-/// `child()`/`childAt()`, but its entry stays in `m_children` until that
-/// task lands.
+/// on `QObject*`, and block accessibles wrap no QObject). Blocks removed
+/// from the document are evicted by `syncStructure()` (A3.3, CRDT-churn
+/// lifetime, spec §9 Q1): `ObjectDestroyed` while active, dropped from
+/// `m_children`, released from Qt's cache.
 class CanvasAccessible final : public QAccessibleWidget {
 public:
     explicit CanvasAccessible(View *view);
@@ -152,8 +151,8 @@ private:
 /// `QAccessibleAttributesInterface` (heading level only) and, since A2.1,
 /// `QAccessibleTextInterface` — both exposed via `interface_cast`.
 ///
-/// **A1.1 status:** skeleton — superseded. `rect()` is real (maps
-/// `View::blockRect()` through the viewport to global coordinates).
+/// **A1.1:** `rect()` maps `View::blockRect()` through the viewport to
+/// global coordinates.
 /// **A1.2:** `role()` implements the real spec §4.2 `BlockKind` → `Role`
 /// table; `state()` sets `focusable`/`focused` (caret block),
 /// `editable` (`View::isReadOnly()`), `checkable`/`checked` (task
@@ -216,6 +215,12 @@ private:
 /// oversight. `scrollToSubstring` is a no-op stub (no task claims it yet);
 /// `attributes()` returns an empty string with `startOffset`/`endOffset`
 /// set to the queried offset (same placeholder shape).
+///
+/// **A4.1/A4.2:** `QAccessibleActionInterface` (fold heads only: one
+/// `toggleAction()` -> `View::toggleFold()`; `expandable`/`expanded`/
+/// `collapsed` state) and `QAccessibleEditableTextInterface` (block-scoped
+/// replace via View's IME-commit path; read-only and invalid ranges
+/// rejected). See the per-section comments below.
 class CanvasBlockAccessible final : public QAccessibleInterface,
                                      public QAccessibleAttributesInterface,
                                      public QAccessibleTextInterface,

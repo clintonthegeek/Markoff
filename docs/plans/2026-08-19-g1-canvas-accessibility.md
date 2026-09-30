@@ -88,7 +88,7 @@ Push.
 | **A4 — folding, actions, editable text** | | | |
 | A4.1 Hidden/folded state + expand-collapse action | ☑ | `36890b82` | break `64ccfa40` / revert `01eec6e3` |
 | A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☑ | `08a6ba68` | break `c7211e34` / revert `6a7b05e2` |
-| A4.3 ⏸ phase close (full suite) | ☐ | | exempt |
+| A4.3 ⏸ phase close (full suite) | ☑ | see commit `canvas(A4.3)` | exempt |
 | **A5 — acceptance** | | | |
 | A5.1 Realization-bound test (spec §5) | ☐ | | exempt |
 | A5.2 Audit pass: role table, event table, limitations log | ☐ | | exempt |
@@ -901,3 +901,18 @@ record the final baseline.
   rewrote the break commit, so its SHA is `c7211e34`, not the first one
   printed; then reverted properly.) Canvas suite 41/41; full suite not run
   (canvas tier; A4.3 owns it, baseline 213/213).
+- **A4.3 (2026-09-29): Phase A4 closed (phase close, exempt).** Full suite
+  **213/213** (tst_realistic 81s, tst_benchmark 330s), constitution clean
+  (81 files), `tst_canvas_accessibility` 86/86. **Perf** (`build-perf`, no AT
+  client): load->paint 141ms; keystroke p50 0.56ms / p95 0.92ms (budget
+  16ms); scroll realized 45/500 (9%); RSS delta 0 KB. **Read-through:**
+  `Accessibility.{h,cpp}` skimmed end to end. Comment-only fixes in
+  `Accessibility.h`: `CanvasAccessible` doc said eviction was "A3.3's job,
+  nothing evicts yet" (stale; now describes `syncStructure()` eviction);
+  dropped "A1.1 status: skeleton - superseded" wording; added an A4.1/A4.2
+  summary to the `CanvasBlockAccessible` class doc. No code changes.
+  **Teardown review:** `containerRegistry()` is a deliberately leaked heap
+  map; `~CanvasAccessible` only erases its own registry entry (never touches
+  the possibly-dead View) and calls `deleteAccessibleInterface` per child,
+  which is a no-op for ids Qt's cache already dropped - no crash path found.
+  No sanitizer/valgrind run (valgrind not installed, no ASan build present).

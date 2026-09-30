@@ -89,8 +89,20 @@ Full suite **213/213**, `tst_canvas_accessibility` 69 cases; perf held
 (keystroke p50 0.63ms / p95 1.08ms, load->paint 162ms, scroll 45/500,
 RSS +0). A3.4 also confirmed a pre-existing stale-layout-on-remote-edit
 issue (queue.md, not a11y-specific).
-**Next: Phase A4 (folding, actions, editable text), start at A4.1**
-(folding state + expand/collapse action).
+**Phase A4 (folding, actions, editable text) CLOSED 2026-09-29** (A4.3
+phase close, exempt from falsification). A4.1: fold heads report
+`expandable`/`expanded`/`collapsed`, hidden blocks stay in the child list
+as `invisible`, one "Toggle fold" action (`toggleAction()` ->
+`View::toggleFold()`), `StateChanged` events via
+`Detail::notifyFoldState` from `refreshFoldedBlocks`. A4.2:
+`QAccessibleEditableTextInterface` implemented via View's IME-commit
+route (read-only and invalid ranges rejected, one undo step per call, no
+new View API). No core change; constitution clean. Full suite **213/213**,
+`tst_canvas_accessibility` 86 cases; perf held (keystroke p50 0.56ms /
+p95 0.92ms, load->paint 141ms, scroll 45/500, RSS +0).
+**Next: Phase A5 (acceptance), start at A5.1** (realization-bound
+test), then A5.2 audit, then user gate A-G1 (manual Orca pass — needs
+`--direct` permission; the user must be asked).
 
 **H arc CLOSED 2026-08-30 (`9b0138f8`, Hologram feature):** opt-in
 `setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget` pass-through)

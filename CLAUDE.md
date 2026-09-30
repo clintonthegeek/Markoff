@@ -60,7 +60,12 @@ caret/selection/focus, text insert/remove and block create/destroy
 events + eviction, all hooked from existing View chokepoints (no new
 View API, no core change). Full suite 213/213, perf held. Also found
 a pre-existing stale-layout-on-remote-edit bug (`docs/queue.md`).
-**Start at A4.1** (folding state + expand/collapse action).
+**Phase A4 (folding, actions, editable text) CLOSED 2026-09-29**
+(A4.1–A4.3): fold state (`expandable`/`expanded`/`invisible`) + "Toggle
+fold" action + StateChange events; `QAccessibleEditableTextInterface` via
+the IME-commit route (read-only rejected, no new View API). Full suite
+213/213, perf held. **Start at A5.1** (realization-bound test), then A5.2
+audit, then user gate A-G1 (Orca pass; needs `--direct` permission — ask).
 
 **Standstill:** with the canvas production arc closed, `markoff-core`
 and `libs/markoff-canvas/` are open again for ordinary work (not
