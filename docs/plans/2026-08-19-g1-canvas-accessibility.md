@@ -82,7 +82,7 @@ Push.
 | A2.4 ⏸ phase close (full suite) | ☑ | `e50f2d48` | exempt |
 | **A3 — notifications** | | | |
 | A3.1 Event spy test harness | ☑ | `60a4c63e` | break `8da7ade9` / revert `8a2e4af1` |
-| A3.2 Caret/selection/focus events | ☐ | | |
+| A3.2 Caret/selection/focus events | ☑ | `9377d4a0` | break `6dfc613f` / revert `9cf383a8` |
 | A3.3 Text insert/remove + block create/destroy events | ☐ | | |
 | A3.4 ⏸ phase close (full suite) | ☐ | | exempt |
 | **A4 — folding, actions, editable text** | | | |
@@ -688,3 +688,50 @@ record the final baseline.
   product issue. No core change; constitution clean (81 files); canvas
   suite 41/41 (accessibility binary 45 -> 49 cases); full suite not
   re-run (tier is canvas-only; baseline 213/213).
+- **A3.2 (2026-09-29): caret/selection/focus events landed.**
+  **Emit sites:** `View::pushSelectionToSession()` (top, before the
+  Session gate — the P6.1-audited selection-mutation chokepoint that
+  every site incl. the ones bypassing `setCaret()` already calls) and
+  `View::ensureCaretVisible()` (the `caretChanged` point), plus
+  `focusInEvent`/`focusOutEvent`. All three call `Detail::notifyTextState`
+  / `notifyFocusChange` (Accessibility.cpp), which return at once unless
+  `QAccessible::isActive()`. Rather than a parallel path, the emit logic
+  is an **idempotent diff** (`CanvasAccessible::syncTextNotifications`)
+  against last-announced caret + selection, so calling from two points
+  cannot double-fire and a mutation site that reaches only one is still
+  caught. Synchronous, no deferral (C2), no core change, no new View
+  public API. **Decisions:** (1) caret event goes only to the block that
+  NOW holds the caret; the old block gets no "cursor lost" event (its
+  `cursorPosition()` turns -1; -1 is not a defined AT-SPI caret payload,
+  and the new holder's event + Focus carry the move). (2) Selection: one
+  `TextSelectionChanged` per block whose per-block intersection changed;
+  blocks whose intersection shrank to empty get `(-1,-1)` (Qt's spelling
+  of cleared). Interior blocks are compared by index membership only (no
+  buffer read) so growing a huge selection is O(span) int compares.
+  (3) Focus in -> `Focus` on the caret's block (container if no caret);
+  focus out -> `StateChanged{focused}` on same; a caret move into a new
+  block while the view has focus also emits `Focus` on the new block.
+  **Surprise / ownership fix:** an interface-built `QAccessibleEvent`
+  calls `QAccessible::uniqueId(iface)`, registering the block in Qt's
+  `QAccessibleCache`, which then `delete`s it at teardown -> would
+  double-delete against the container's `unique_ptr`. Blocks are now
+  registered with Qt at creation (`registerAccessibleInterface`) and Qt
+  owns them; `~CanvasAccessible` calls `deleteAccessibleInterface` per
+  child (no-op for ids the cache already dropped). This is also the hook
+  A3.3 eviction needs. Known limit: tracker only updates while active, so
+  the first event after AT activation diffs against empty (harmless
+  extra event). Spy gained `iface` (event target for interface-built
+  events) + `countOfType/eventsOfType(type, iface)`. 7 new tests (caret
+  within/across blocks, no-change no-event, selection start/extend/
+  collapse, cross-block grow + shrink-to-cleared, focus in/out + focus
+  follows caret, inactive emits nothing); accessibility binary 49 -> 56.
+  Falsification: disabled the cursor-event emit (`6dfc613f`) -> 4 tests
+  failed; `git revert` (`9cf383a8`), `git diff 9377d4a0 9cf383a8` empty.
+  **Perf** (`build-perf`, Release, no AT active so this measures the
+  isActive short-circuit): load->first paint 158ms; keystroke p50 0.65ms
+  / p95 1.09ms (budget 16ms; A2.4's 0.74ms p95 was a different build,
+  run-to-run noise on a fresh build); scroll realized 45/500; RSS delta
+  0 KB. **Env:** `build-perf` also needed a `cmake -S . -B build-perf`
+  reconfigure (cached paths to Qt 6.11.1 libs) plus clean rebuild after
+  the 6.11.2 upgrade. Canvas suite 41/41, constitution clean (81 files);
+  full suite not run (canvas tier; baseline 213/213).
