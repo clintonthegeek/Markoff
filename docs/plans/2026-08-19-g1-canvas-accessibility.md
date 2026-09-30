@@ -90,7 +90,7 @@ Push.
 | A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☑ | `08a6ba68` | break `c7211e34` / revert `6a7b05e2` |
 | A4.3 ⏸ phase close (full suite) | ☑ | `06a5dfbc` | exempt |
 | **A5 — acceptance** | | | |
-| A5.1 Realization-bound test (spec §5) | ☑ | `SHA_PLACEHOLDER` | exempt |
+| A5.1 Realization-bound test (spec §5) | ☑ | `b83bad91` | exempt |
 | A5.2 Audit pass: role table, event table, limitations log | ☐ | | exempt |
 | **A-G1 — user gate: run the Orca pass now or defer?** | ☐ | — | — |
 | A5.3 Manual Orca pass (`--direct`, needs permission) | ☐ | | exempt |
