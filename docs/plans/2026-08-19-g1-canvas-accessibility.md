@@ -88,7 +88,7 @@ Push.
 | **A4 — folding, actions, editable text** | | | |
 | A4.1 Hidden/folded state + expand-collapse action | ☑ | `36890b82` | break `64ccfa40` / revert `01eec6e3` |
 | A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☑ | `08a6ba68` | break `c7211e34` / revert `6a7b05e2` |
-| A4.3 ⏸ phase close (full suite) | ☑ | see commit `canvas(A4.3)` | exempt |
+| A4.3 ⏸ phase close (full suite) | ☑ | `06a5dfbc` | exempt |
 | **A5 — acceptance** | | | |
 | A5.1 Realization-bound test (spec §5) | ☐ | | exempt |
 | A5.2 Audit pass: role table, event table, limitations log | ☐ | | exempt |
