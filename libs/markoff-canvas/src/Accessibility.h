@@ -106,6 +106,12 @@ public:
     /// `QAccessible::isActive()`. `childCount()` is never affected.
     void syncFoldNotifications();
 
+    /// A5.2 (spec §4.4 "read-only flipped"): `StateChanged{editable}` on the
+    /// container and on every CREATED block. Called from
+    /// `View::setReadOnly()` (only on an actual flip). Synchronous (C2); a
+    /// no-op unless `QAccessible::isActive()`.
+    void notifyReadOnlyChanged();
+
 private:
     void evict(BlockId id);
 
@@ -336,6 +342,11 @@ void notifyFocusChange(View *view, bool gained);
 /// `CanvasAccessible::syncFoldNotifications`). Returns at once unless
 /// `QAccessible::isActive()`.
 void notifyFoldState(View *view);
+
+/// A5.2: called from `View::setReadOnly()` after a real flip (see
+/// `CanvasAccessible::notifyReadOnlyChanged`). Returns at once unless
+/// `QAccessible::isActive()`.
+void notifyReadOnlyChanged(View *view);
 
 /// A3.3: called from `View::onDocumentChanged()` — text insert/remove events,
 /// block ObjectCreated/ObjectDestroyed, and eviction of removed blocks'

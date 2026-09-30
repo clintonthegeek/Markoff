@@ -122,6 +122,7 @@ private Q_SLOTS:
     void events_selection_cross_block_and_shrink();
     void events_focus_in_out();
     void events_inactive_emits_nothing();
+    void events_read_only_flip();
 
     // ---- A4.1: folding state + expand/collapse action ----
     void fold_head_state_and_toggle_event();
@@ -1399,6 +1400,46 @@ void TstCanvasAccessibility::events_focus_in_out()
     spy.clear();
     view.setCaretPosition(blocks[2], 1);
     QCOMPARE(spy.countOfType(QAccessible::Focus, blockOf(view, 2)), 1);
+}
+
+void TstCanvasAccessibility::events_read_only_flip()
+{
+    // Spec §4.4 "read-only flipped" -> StateChanged{editable} on the
+    // container and on every created block (A5.2 audit found this row
+    // unimplemented).
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    QAccessibleInterface *container = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    QAccessibleInterface *b2 = blockOf(view, 2);
+    QVERIFY(b0->state().editable);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setReadOnly(true);
+    QVERIFY(!b0->state().editable);
+    QVERIFY(!container->state().editable);
+    auto editableEvents = [&](QAccessibleInterface *i) {
+        int n = 0;
+        for (const auto &r : spy.eventsOfType(QAccessible::StateChanged, i))
+            n += r.changedStates.editable ? 1 : 0;
+        return n;
+    };
+    QCOMPARE(editableEvents(b0), 1);
+    QCOMPARE(editableEvents(b2), 1);
+    QCOMPARE(spy.eventsOfType(QAccessible::StateChanged, &view).size(), 1);
+    QVERIFY(spy.eventsOfType(QAccessible::StateChanged, &view).first().changedStates.editable);
+
+    // No flip, no event.
+    spy.clear();
+    view.setReadOnly(true);
+    QCOMPARE(spy.count(), 0);
+
+    // Flip back.
+    view.setReadOnly(false);
+    QCOMPARE(editableEvents(b0), 1);
+    QVERIFY(b0->state().editable);
 }
 
 void TstCanvasAccessibility::events_inactive_emits_nothing()

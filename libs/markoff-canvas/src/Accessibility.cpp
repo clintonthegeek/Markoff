@@ -570,6 +570,26 @@ void CanvasAccessible::syncFoldNotifications()
     }
 }
 
+void CanvasAccessible::notifyReadOnlyChanged()
+{
+    if (!QAccessible::isActive())
+        return;
+    // Spec §4.4 "read-only flipped": `state().editable` on the container and
+    // on every block (CanvasBlockAccessible::state() derives it from
+    // View::isReadOnly()). Only CREATED blocks are announced - an AT client
+    // can only hold references to blocks it has queried.
+    QAccessible::State changed;
+    changed.editable = true;
+    QAccessibleStateChangeEvent containerEv(m_view, changed);
+    QAccessible::updateAccessibility(&containerEv);
+    for (auto &[id, child] : m_children) {
+        if (m_view->blockIndexOf(id) < 0)
+            continue;  // leaving the document; syncStructure() evicts it
+        QAccessibleStateChangeEvent ev(child.iface, changed);
+        QAccessible::updateAccessibility(&ev);
+    }
+}
+
 void CanvasAccessible::evict(BlockId id)
 {
     auto it = m_children.find(id);
@@ -1232,6 +1252,15 @@ void notifyFoldState(View *view)
     auto &reg = containerRegistry();
     if (auto it = reg.find(view); it != reg.end())
         it->second->syncFoldNotifications();
+}
+
+void notifyReadOnlyChanged(View *view)
+{
+    if (!QAccessible::isActive())
+        return;
+    auto &reg = containerRegistry();
+    if (auto it = reg.find(view); it != reg.end())
+        it->second->notifyReadOnlyChanged();
 }
 
 void notifyFocusChange(View *view, bool gained)

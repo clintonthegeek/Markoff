@@ -580,6 +580,7 @@ void View::setReadOnly(bool ro)
     if (m_readOnly == ro)
         return;
     m_readOnly = ro;
+    Detail::notifyReadOnlyChanged(this);
     emit readOnlyChanged(ro);
 }
 
