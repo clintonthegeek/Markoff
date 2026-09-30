@@ -1,8 +1,9 @@
 # markoff-canvas accessibility — G1 design
 
 **Date:** 2026-08-19
-**Status:** DRAFT — scope decided (§3), normative shape settled;
-task decomposition deferred to the plan.
+**Status:** IMPLEMENTED / CLOSED 2026-09-30 (arc close A5.4; see the
+[plan](../plans/2026-08-19-g1-canvas-accessibility.md)). Manual Orca pass
+deferred by the user. Errata below (Level, BlockQuote) stand.
 **Gate closed:** G1 of the canvas production arc
 ([`2026-08-13-canvas-production-design.md`](2026-08-13-canvas-production-design.md)
 §8) — deferred 2026-08-14, reopened and answered 2026-08-19.

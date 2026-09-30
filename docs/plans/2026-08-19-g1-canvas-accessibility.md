@@ -1,5 +1,12 @@
 # Plan — markoff-canvas accessibility (G1 arc)
 
+**Status:** CLOSED (2026-09-30, `canvas(A5.4)`). Final baseline: full suite
+**213/213**, `tst_canvas_accessibility` **90** cases, constitution clean
+(81 files), perf budgets held. **One acceptance item outstanding: the
+manual Orca pass (A5.3), deferred by the user at gate A-G1 2026-09-30**
+to a later dogfood session (needs `sudo pacman -S orca` and explicit
+per-task permission for `--direct`).
+
 **Spec (normative — read §2, §3, §4 before Task A1.0):**
 [`../specs/2026-08-19-g1-canvas-accessibility-design.md`](../specs/2026-08-19-g1-canvas-accessibility-design.md)
 **Platform findings you will need (do not re-derive):** spec §4.6 —
@@ -92,9 +99,9 @@ Push.
 | **A5 — acceptance** | | | |
 | A5.1 Realization-bound test (spec §5) | ☑ | `b83bad91` | exempt |
 | A5.2 Audit pass: role table, event table, limitations log | ☑ | audit docs commit (see log); code fixes `91a7f180`, `cde62f75`, `01a3779e` | audit exempt; 3 fixes each with break/revert: `fefb7aad`/`50afde3c`, `4db8e6ac`/`4ce4415e`, `720cbd1e`/`e17d5349` |
-| **A-G1 — user gate: run the Orca pass now or defer?** | ☐ | — | — |
-| A5.3 Manual Orca pass (`--direct`, needs permission) | ☐ | | exempt |
-| A5.4 ⏸ arc close | ☐ | | exempt |
+| **A-G1 — user gate: run the Orca pass now or defer?** | ☑ decided: deferred (user, 2026-09-30) | — | — |
+| A5.3 Manual Orca pass (`--direct`, needs permission) | ⏸ DEFERRED (not done) - needs `sudo pacman -S orca` + user permission for `--direct`; checklist in the A5.3 section below | — | exempt |
+| A5.4 ⏸ arc close | ☑ | A5.4 commit (see `git log`, `canvas(A5.4)`) | exempt |
 
 ---
 
@@ -331,6 +338,8 @@ Run the Orca pass now, or defer it to a later dogfood session? Either
 way it needs `--direct` permission. **Stop here and ask.**
 
 ### A5.3 — manual Orca pass (`--direct`, per-task permission)
+
+**DEFERRED 2026-09-30 (user, gate A-G1): not done; run in a later dogfood session.**
 
 Prerequisite: `sudo pacman -S orca` (spec §4.6 finding 2).
 
@@ -985,3 +994,28 @@ record the final baseline.
   +`name_description_per_kind`); `-R canvas` 41/41; constitution clean (81 files); no core
   change (spec §8 held). Full suite not re-run (canvas tier; A5.4 owns it, baseline 213/213).
   CLAUDE.md untouched (A5.4). Next: gate A-G1 (user).
+- **A5.4 (2026-09-30): arc close; gate A-G1 decided - Orca pass DEFERRED (user).**
+  **Verification:** full suite 213/213 (baseline 213/213), `tst_canvas_accessibility` 90/90,
+  `check-constitution.sh` clean (81 files), perf (`tst_canvas_perf_500`): load->paint 319-341ms, keystroke p50 1.12-1.52ms / p95 1.99-2.33ms, scroll 45/500 realized, RSS +0 (two runs; machine load avg ~7.8 from other processes so slower than A4 numbers 0.56/0.92ms, all within budgets, p95 < 16ms).
+  No code changes; no core change in the whole arc (spec §8 held).
+  **Shipped per phase:** A1 per-block tree (`CanvasAccessible` Document container +
+  `CanvasBlockAccessible`, role/state per §4.2, `Attribute::Level` on headings,
+  `accessibleDocumentName`); A2 `QAccessibleTextInterface` on text blocks (per-block offsets via
+  `coords::`, caret/selection presentation, geometry with bounded realization via
+  `View::ensureBlockRealized`, wrapped `LineBoundary` for `textAtOffset`); A3 events (caret,
+  selection, focus, text insert/remove, create/destroy with Qt-cache ownership and eviction,
+  remote/CRDT path) via hooks from existing View chokepoints; A4 fold state + toggle action,
+  `QAccessibleEditableTextInterface` over the IME-commit route; A5 realization-bound test (walk
+  of 360 blocks realizes nothing) and audit (3 deviations fixed: BlockQuote role, read-only
+  event, Name/Description).
+  **Spec corrections found:** `Attribute::Level` DOES reach AT-SPI (§4.6 finding 3 wrong, A1.0);
+  `ROLE_BLOCK_QUOTE` IS reachable via `QAccessible::BlockQuote`, Qt>=6.9 (§4.6 finding 4 wrong
+  for it; erratum in spec). ROLE_MATH/ROLE_FOOTNOTE remain unreachable.
+  **Pre-existing bug found:** stale layout after a remote edit (`BlockLayoutCache::sync`
+  staleness token; A3.4 probe) - queued in `docs/queue.md`, not a11y-specific, not fixed.
+  **Follow-ups queued** (`docs/queue.md` "Canvas a11y limitations"): table interface, Math/
+  Equation role evaluation, LineBoundary before/after, no-op selection setters, toggle-only fold
+  action, ASan run on teardown; Qt upstream notes drafted, not filed
+  (`docs/handoff/2026-09-qt-accessibility-upstream-notes.md`).
+  **Outstanding:** A5.3 Orca pass - see the checklist in the A5.3 section; results become
+  follow-up tasks or logged limitations, never retroactive failures.

@@ -4,7 +4,7 @@ Qt6/C++ markdown editor widget family: a CRDT-backed foundation
 (`markoff-core` + `markoff-parser`) plus view leaves. Primary consumer:
 Corbomite (submodules this repo at `libs/markoff-family`).
 
-## Current workfront — 2026-08-19: G1 accessibility (canvas)
+## Current workfront — none (G1 accessibility closed 2026-09-30)
 
 **Also landed 2026-08-30 — H arc (Hologram, new consumer):** opt-in
 `View::setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget`
@@ -29,43 +29,22 @@ untouched by that decision. Full context on both gates:
 [`docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md`](docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md)
 (Corbomite's handoff that prompted recording them).
 
-**Current workfront: G1 accessibility for `libs/markoff-canvas`.**
-Gate decided 2026-08-19; spec drafted:
-[`docs/specs/2026-08-19-g1-canvas-accessibility-design.md`](docs/specs/2026-08-19-g1-canvas-accessibility-design.md).
-**Shape: a per-block accessibility tree** — `View` is a
-`QAccessible::Document` container, each block a child implementing
-`QAccessibleTextInterface` over its own buffer. This was chosen over
-the monolithic flat `QAccessibleTextInterface` the old §8 framing
-implied, because that interface's whole-document offset space is
-exactly what **C4 forbids** — it would have needed a constitutional
-amendment, not just more weeks. Acceptance: in-process offscreen
-tests (the ratchet) plus one manual Orca pass at arc close (needs
-`--direct` permission). Tables and theme-side a11y are decided out
-(spec §6, §1). Plan:
-[`docs/plans/2026-08-19-g1-canvas-accessibility.md`](docs/plans/2026-08-19-g1-canvas-accessibility.md)
-— phases A1–A5, gate A-G1. **Phase A1 (tree, roles, registration)
-CLOSED 2026-08-19** (A1.0–A1.4): container + per-block accessibility
-tree landed, role/state mapping per spec §4.2, `accessibleDocumentName`
-+ Name resolution, full suite 208/208, constitution clean. **Phase A2
-(text interface) CLOSED 2026-08-20** (A2.1–A2.4): `QAccessibleTextInterface`
-on every text-bearing block — text/characterCount/boundary types
-(A2.1), caret + cross-block selection presentation (A2.2), geometry
-incl. the bounded-realization `characterRect`/`offsetAtPoint`/wrapped
-`LineBoundary` (A2.3) — every offset per-block via `coords::`, never
-cross-block (C4 held throughout, no core change needed). Full suite
-213/213 at close (see canvas leaf's own `CLAUDE.md` for the 208→213
-count reconciliation — unrelated work, not a regression). **Phase A3
-(notifications) CLOSED 2026-09-29** (A3.1–A3.4): event spy harness;
-caret/selection/focus, text insert/remove and block create/destroy
-events + eviction, all hooked from existing View chokepoints (no new
-View API, no core change). Full suite 213/213, perf held. Also found
-a pre-existing stale-layout-on-remote-edit bug (`docs/queue.md`).
-**Phase A4 (folding, actions, editable text) CLOSED 2026-09-29**
-(A4.1–A4.3): fold state (`expandable`/`expanded`/`invisible`) + "Toggle
-fold" action + StateChange events; `QAccessibleEditableTextInterface` via
-the IME-commit route (read-only rejected, no new View API). Full suite
-213/213, perf held. **Start at A5.1** (realization-bound test), then A5.2
-audit, then user gate A-G1 (Orca pass; needs `--direct` permission — ask).
+**G1 accessibility arc CLOSED 2026-09-30 — no active workfront.**
+Gate A-G1 decided 2026-09-30: the manual Orca pass (A5.3) is **deferred**
+by the user to a later dogfood session (needs `sudo pacman -S orca` and
+explicit permission for a `--direct` run; checklist in the plan's A5.3).
+It is the one outstanding acceptance item. Shape: a per-block
+accessibility tree — `View` is a `QAccessible::Document` container, each
+block a child with `QAccessibleTextInterface` (and editable text, fold
+state/action, events) over its own buffer; chosen over a flat interface
+because that whole-document offset space is what **C4 forbids**. Phases
+A1–A5 all closed; no `markoff-core` change; constitution clean; perf held;
+`tst_canvas_accessibility` 90 cases. Spec:
+[`docs/specs/2026-08-19-g1-canvas-accessibility-design.md`](docs/specs/2026-08-19-g1-canvas-accessibility-design.md),
+plan + findings log:
+[`docs/plans/2026-08-19-g1-canvas-accessibility.md`](docs/plans/2026-08-19-g1-canvas-accessibility.md),
+limitations/follow-ups: `docs/queue.md` "Canvas a11y limitations" (also
+holds the pre-existing stale-layout-on-remote-edit bug found in A3.4).
 
 **Standstill:** with the canvas production arc closed, `markoff-core`
 and `libs/markoff-canvas/` are open again for ordinary work (not
@@ -73,7 +52,7 @@ gated to plan-named seams anymore — that restriction was specific to
 the closed arc). `markoff-styled` stays bug-fix-only (backs
 Corbomite's Reading mode); `markoff-source` stays untouched,
 permanently; `markoff-live` is retired (see G3 above). Test baseline:
-**213/213** (full `scripts/run-tests.sh`) as of the A2 close above —
+**213/213** (full `scripts/run-tests.sh`) as of the G1 close above —
 any drop is a regression.
 
 **Status (2026-08-15, arc close):** all 7 F1 CodeMirror-parity gaps
@@ -117,8 +96,8 @@ explicitly changed.
 ## Layout (one line each)
 
 - `libs/markoff-canvas` — **ACTIVE:** the primary editing leaf
-  (production arc closed 2026-08-15; current workfront is G1
-  accessibility). Own `CLAUDE.md`.
+  (production arc closed 2026-08-15; G1
+  accessibility closed 2026-09-30, no active arc). Own `CLAUDE.md`.
 - `libs/markoff-core` — foundation: `MarkoffDocument` (per-block CRDT
   buffers + `IdList` order + LWW maps), `Cmd::*`, `UndoLog`,
   `StructuralKeyHandler` (pure), `FindController`, `Theme`,

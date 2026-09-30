@@ -1,7 +1,7 @@
 # Work queue
 
 > Dormant work items + the append-only Discipline Log. **The active
-> workfront is NOT tracked here** — it is G1 canvas accessibility, see
+> workfront is NOT tracked here** — it was G1 canvas accessibility (CLOSED 2026-09-30, no active arc), see
 > [`docs/plans/2026-08-19-g1-canvas-accessibility.md`](plans/2026-08-19-g1-canvas-accessibility.md)
 > and [`docs/STATUS.md`](STATUS.md).
 >
@@ -128,6 +128,7 @@ for why. Source mode is the escape hatch.
     (`ROLE_BLOCK_QUOTE` IS reachable via `QAccessible::BlockQuote`, Qt>=6.9 -
     spec §4.6 finding 4 was wrong for it; fixed in A5.2.) Upstream text
     drafted, not filed: `docs/handoff/2026-09-qt-accessibility-upstream-notes.md`.
+  - Orca pass (A5.3) outstanding - needs `pacman -S orca` + user permission for `--direct`; checklist in plan A5.3.
   - `textBeforeOffset`/`textAfterOffset` for `LineBoundary` use Qt's base
     class `\n` approximation, not the wrapped visual line (only
     `textAtOffset` was overridden, A2.3). Wrong for wrapped paragraphs.

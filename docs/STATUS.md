@@ -5,32 +5,20 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-08-30 — **H arc landed** (Hologram's
-title-hide feature, `canvas(H1)` `9b0138f8`); measured default-config
-full-suite baseline at current HEAD corrected to **213/213** (the
-handoff/pin figure "208/208" predates the rich-clipboard merge at
-`5d885036`, which added five test executables). G1 workfront note below
-remains the active arc. (Context: the canvas production arc is closed —
-all three gates decided — and its board body lives in
-`STATUS-LOG.md`; the E-arc is formally closed.)
+**Last updated:** 2026-09-30 — **G1 canvas accessibility arc CLOSED**
+(A5.4); no active workfront. Full-suite baseline **213/213**. Manual Orca
+pass (A5.3) deferred by the user, the one outstanding acceptance item.
+(Earlier: H arc landed 2026-08-30, `9b0138f8`; the canvas production
+arc is closed and its board body lives in `STATUS-LOG.md`; the E-arc is
+formally closed.)
 
-## Workfront — H arc (Hologram: hide matching first heading as title) — CLOSED 2026-08-30
-
-Hologram (new `EditorWidget` consumer) asked for an opt-in flag so a
-first-line heading matching the title band stops rendering in the body.
-Plan: [`plans/2026-08-30-hide-first-heading-as-title.md`](plans/2026-08-30-hide-first-heading-as-title.md).
-Landed in `9b0138f8`: `View::setHideMatchingFirstHeadingAsTitle(bool)` +
-`EditorWidget` pass-through; the hidden title reuses the fold-hidden
-projection (zero-height, a11y `invisible`, caret-step skip) and **stays
-in the block-index space** (D2 — a divergence from the handoff's literal
-ask, reasoned in the plan). Full suite **213/213**, canvas 41/41,
-constitution clean. Consumer answer note:
 [`handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md`](handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md).
 
-## Workfront — G1 canvas accessibility
+## Workfront — none (G1 canvas accessibility CLOSED 2026-09-30)
 
-User-opened 2026-08-19. G1 (deferred 2026-08-14) reopened and decided.
-Goal: make `Markoff::Canvas::View` usable with a screen reader.
+User-opened 2026-08-19, closed 2026-09-30 at A5.4. Orca pass (A5.3)
+deferred by the user (needs `pacman -S orca` + `--direct` permission).
+Goal was: make `Markoff::Canvas::View` usable with a screen reader.
 
 - **Spec (normative):**
   [`specs/2026-08-19-g1-canvas-accessibility-design.md`](specs/2026-08-19-g1-canvas-accessibility-design.md)
@@ -57,7 +45,7 @@ Goal: make `Markoff::Canvas::View` usable with a screen reader.
   engine) regressed Corbomite's editing surface.
 - **Decided out:** `QAccessibleTableInterface` (spec §6), theme-side
   a11y — contrast/motion/font preferences (spec §1).
-- **Baseline:** 315/315, unchanged. Core is expected to need nothing.
+- **Baseline:** 213/213 (`tst_canvas_accessibility` 90 cases). Core needed nothing.
 
 ## Previous workfront (CLOSED) — canvas production arc (D5 part 1)
 

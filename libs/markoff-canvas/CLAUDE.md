@@ -26,83 +26,38 @@ done, all three gates decided (G2 done 2026-08-18, G3 retired
 `markoff-live` 2026-08-19). Full suite 315/315, perf budgets held,
 constitution clean.
 
-**Current workfront: G1 accessibility.** Gate reopened and decided
-2026-08-19. Spec (normative for this arc):
-[`docs/specs/2026-08-19-g1-canvas-accessibility-design.md`](../../docs/specs/2026-08-19-g1-canvas-accessibility-design.md)
-— per-block a11y tree, not a flat `QAccessibleTextInterface` (the
-flat one's whole-document offset space violates **C4**; see spec §2).
-Plan (do the topmost unchecked task):
-[`docs/plans/2026-08-19-g1-canvas-accessibility.md`](../../docs/plans/2026-08-19-g1-canvas-accessibility.md).
-The four hard rules below still govern — and a11y work needs **no**
-exception to any of them. If a task seems to, you are doing it wrong:
-stop and log.
-
-**Phase A1 (tree, roles, registration) CLOSED 2026-08-19** (A1.4
-phase close, exempt from falsification). Landed:
-`src/Accessibility.{h,cpp}` — `CanvasAccessible : QAccessibleWidget`
-(container, role `Document`, child list backed by `View::blockCount`/
-`blockIdAt`/`blockIndexOf`/`blockRect`, factory installed once per
-`View` ctor) and `CanvasBlockAccessible` (per-block role/state per
-spec §4.2, `Attribute::Level` on `Heading` blocks via
-`QAccessibleAttributesInterface` — confirmed reaching AT-SPI by
-A1.0's probe, so no description-text fallback needed). `View`/
-`EditorWidget` gained `accessibleDocumentName` with container `Name`
-resolution `accessibleDocumentName()` → `inlineTitle()` →
-`tr("Markdown document")`. Two roles remain unreachable from Qt
-(`BlockQuote`→`Section`, `Math`→`StaticText`) — logged at the mapping
-site, not fixed. No `markoff-core` change needed anywhere in A1
-(spec §8 held); constitution clean throughout. Full suite **208/208**
-at close.
-
-**Phase A2 (text interface) CLOSED 2026-08-20** (A2.4 phase close,
-exempt from falsification). Landed on `CanvasBlockAccessible` via
-`QAccessibleTextInterface` (`interface_cast`, `nullptr` for
-`HorizontalRule`/`Image`/`Mermaid` per spec §4.2): A2.1
-`text()`/`characterCount()`/boundary types (Char/Word reuse the base
-class's `QTextBoundaryFinder` default, Paragraph overridden — a block
-is always exactly one paragraph even with embedded newlines in
-`CodeBlock` fences); A2.2 caret (`cursorPosition()` only on the
-caret's own block) and selection (cross-block selection presents as a
-per-block intersection on each spanned block, spec §4.1); A2.3
-geometry (`characterRect`/`offsetAtPoint` in global screen
-coordinates, `textAtOffset(…, LineBoundary)` reading the real wrapped
-visual line off the realized `QTextLayout` — new `View::
-ensureBlockRealized()` bounds this to exactly the queried block, spec
-§5's realization cost bound held and is actually asserted by a test).
-Every byte↔QChar conversion goes through `coords::`, scoped to one
-block's own buffer, never cross-block (C4). No `markoff-core` change
-needed anywhere in A2 (spec §8 held); constitution clean throughout.
-Full suite **213/213** at close (count includes unrelated
-`rich-clipboard`/H-arc work that landed in the same window — see the
-G1 plan's A2.3 findings-log entry for the reconciliation), canvas
-suite **41/41**, `tst_canvas_accessibility` internally at 45 cases.
-**Phase A3 (notifications) CLOSED 2026-09-29** (A3.4 phase close,
-exempt from falsification). A3.1 event spy harness (test-only, over
-`QAccessible::installUpdateHandler`); A3.2 caret/selection/focus
-events via hooks in `Accessibility.{h,cpp}` called from existing View
-chokepoints (no new View API); A3.3 text insert/remove +
-`ObjectCreated`/`ObjectDestroyed` + eviction from one
-`onDocumentChanged` hook (`notifyDocumentChanged`), blocks owned by
-Qt's cache and released via `deleteAccessibleInterface`; remote/CRDT
-edit path covered. No core change (spec §8 held); constitution clean.
-Full suite **213/213**, `tst_canvas_accessibility` 69 cases; perf held
-(keystroke p50 0.63ms / p95 1.08ms, load->paint 162ms, scroll 45/500,
-RSS +0). A3.4 also confirmed a pre-existing stale-layout-on-remote-edit
-issue (queue.md, not a11y-specific).
-**Phase A4 (folding, actions, editable text) CLOSED 2026-09-29** (A4.3
-phase close, exempt from falsification). A4.1: fold heads report
-`expandable`/`expanded`/`collapsed`, hidden blocks stay in the child list
-as `invisible`, one "Toggle fold" action (`toggleAction()` ->
-`View::toggleFold()`), `StateChanged` events via
-`Detail::notifyFoldState` from `refreshFoldedBlocks`. A4.2:
-`QAccessibleEditableTextInterface` implemented via View's IME-commit
-route (read-only and invalid ranges rejected, one undo step per call, no
-new View API). No core change; constitution clean. Full suite **213/213**,
-`tst_canvas_accessibility` 86 cases; perf held (keystroke p50 0.56ms /
-p95 0.92ms, load->paint 141ms, scroll 45/500, RSS +0).
-**Next: Phase A5 (acceptance), start at A5.1** (realization-bound
-test), then A5.2 audit, then user gate A-G1 (manual Orca pass — needs
-`--direct` permission; the user must be asked).
+**G1 accessibility arc CLOSED 2026-09-30. Canvas has no active arc.**
+Spec (normative): [`docs/specs/2026-08-19-g1-canvas-accessibility-design.md`](../../docs/specs/2026-08-19-g1-canvas-accessibility-design.md);
+plan + findings log: [`docs/plans/2026-08-19-g1-canvas-accessibility.md`](../../docs/plans/2026-08-19-g1-canvas-accessibility.md).
+The four hard rules below governed it and needed no exception.
+- **Shape:** per-block tree in `src/Accessibility.{h,cpp}` — `CanvasAccessible`
+  (`QAccessible::Document` container over `View`'s block list) with a
+  `CanvasBlockAccessible` child per block. Chosen over a flat
+  `QAccessibleTextInterface` because that interface's whole-document
+  offset space violates **C4**; every offset here is per-block via `coords::`.
+- **Interfaces:** roles/states per spec §4.2 (BlockQuote -> `QAccessible::BlockQuote`
+  on Qt>=6.9; `Attribute::Level` on headings reaches AT-SPI);
+  `QAccessibleTextInterface` on text-bearing blocks (bounded realization via
+  `View::ensureBlockRealized`, asserted by a test); `QAccessibleEditableTextInterface`
+  via View's IME-commit route; fold state + one "Toggle fold" action;
+  `accessibleDocumentName` on `View`/`EditorWidget`.
+- **Ownership/eviction:** block interfaces are owned by Qt's cache and released
+  via `deleteAccessibleInterface`; eviction and `ObjectCreated`/`ObjectDestroyed`
+  come from one `onDocumentChanged` hook (`notifyDocumentChanged`).
+- **Events:** caret/selection/focus, text insert/remove, fold and read-only
+  state changes, all from hooks at existing View chokepoints (no new View API,
+  synchronous, `isActive()`-gated).
+- **No `markoff-core` change** (spec §8 held). Counts at close: full suite
+  **213/213**, canvas `-R canvas` 41/41, `tst_canvas_accessibility` 90 cases,
+  constitution clean (81 files), perf held.
+- **Outstanding: manual Orca pass (A5.3), deferred by the user 2026-09-30.**
+  To run it: `sudo pacman -S orca`, get explicit user permission for a
+  `--direct` run, then follow the checklist in plan A5.3 (document navigation,
+  heading + level, caret/selection, task checked state, fold, table).
+  Findings become follow-ups, not retroactive failures.
+- **Known limitations / follow-ups:** `docs/queue.md` "Canvas a11y limitations"
+  (no table interface, Math/footnote roles unreachable, etc.) and the
+  pre-existing stale-layout-on-remote-edit bug (queue.md).
 
 **H arc CLOSED 2026-08-30 (`9b0138f8`, Hologram feature):** opt-in
 `setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget` pass-through)
