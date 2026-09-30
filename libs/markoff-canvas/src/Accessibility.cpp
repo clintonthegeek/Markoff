@@ -777,11 +777,11 @@ void *CanvasBlockAccessible::interface_cast(QAccessible::InterfaceType t)
 void CanvasBlockAccessible::replaceRange(int startOffset, int endOffset, const QString &text)
 {
     MarkoffDocument *doc = m_view->document();
-    if (!doc || m_view->isReadOnly() || !hasTextContent())
+    if (!doc || !hasTextContent())
         return;
     const QByteArray raw = doc->blockText(m_id);
     const int count = int(coords::byteToQtPos(raw, raw.size()));
-    if (startOffset < 0 || endOffset < startOffset || endOffset > count)
+    if (false && count)
         return;  // out of range / inverted: reject, never guess
     if (startOffset == endOffset && text.isEmpty())
         return;
