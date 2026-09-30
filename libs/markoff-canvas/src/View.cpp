@@ -367,6 +367,7 @@ void View::setDocument(MarkoffDocument *doc)
 
     m_doc = doc;
     m_cache->clear();
+    Detail::notifyDocumentReplaced(this);  // A3.3: ids don't survive a doc swap
     m_caret = {};
     m_selectionAnchor.reset();
     // Folding (P5.6): fold state is keyed by THIS document's BlockIds — a
@@ -1795,6 +1796,10 @@ void View::onDocumentChanged()
     // refreshFoldedBlocks() feeds the cache is current this very pass.
     refreshHiddenTitleBlock();
     refreshFoldedBlocks();
+    // A3.3 (spec §4.4/§9 Q1): text insert/remove + ObjectCreated/Destroyed +
+    // eviction of removed blocks' accessibles. Before the caret/selection
+    // events (which may target a block created here). Synchronous (C2).
+    Detail::notifyDocumentChanged(this);
 
     // P6.1 (guide §B.1/B.2): re-resolve the caret from the Session's own
     // stored anchor BEFORE falling back to clampCaret's plain "nearest

@@ -19,6 +19,8 @@
 #include <markoff/canvas/View.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/MarkoffOp.h>
+#include <markoff/core/UndoLog.h>
 
 using Markoff::BlockId;
 using Markoff::BlockKind;
@@ -120,6 +122,21 @@ private Q_SLOTS:
     void events_selection_cross_block_and_shrink();
     void events_focus_in_out();
     void events_inactive_emits_nothing();
+
+    // ---- A3.3: text insert/remove, block create/destroy, eviction ----
+    void text_typing_emits_insert();
+    void text_backspace_and_delete_emit_remove();
+    void text_replace_selection_emits_remove_then_insert();
+    void text_document_replace_edit_emits_remove_then_insert();
+    void text_astral_char_keeps_surrogate_pair_whole();
+    void text_undo_emits_remove();
+    void structure_split_emits_created_and_head_remove();
+    void structure_merge_emits_destroyed_and_insert_and_evicts();
+    void structure_remote_edit_insert_remove_create_destroy();
+    void eviction_no_dangling_interface_after_removal();
+    void eviction_runs_while_inactive_and_emits_nothing();
+    void eviction_document_swap_releases_every_block();
+    void eviction_view_destruction_after_churn_is_clean();
 };
 
 void TstCanvasAccessibility::container_role_is_document()
@@ -1374,6 +1391,447 @@ void TstCanvasAccessibility::events_inactive_emits_nothing()
     view.setCaretPosition(blocks[1], 2);
     QTest::keyClick(&view, Qt::Key_Right, Qt::ShiftModifier);
     QCOMPARE(spy.count(), 0);
+}
+
+// ---- A3.3 ---------------------------------------------------------------
+
+namespace {
+QList<MarkoffTest::A11yEventRecord> typed(const MarkoffTest::A11yEventSpy &spy,
+                                          QAccessible::Event t, const QAccessibleInterface *i)
+{
+    return spy.eventsOfType(t, i);
+}
+}  // namespace
+
+void TstCanvasAccessibility::text_typing_emits_insert()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    view.setCaretPosition(blocks[1], 6);
+
+    MarkoffTest::A11yEventSpy spy;
+    QTest::keyClicks(&view, "XY");
+    const auto ins = typed(spy, QAccessible::TextInserted, b1);
+    QCOMPARE(ins.size(), 2);
+    QCOMPARE(ins[0].a, 6);
+    QCOMPARE(ins[0].text, QStringLiteral("X"));
+    QCOMPARE(ins[1].a, 7);
+    QCOMPARE(ins[1].text, QStringLiteral("Y"));
+    QCOMPARE(spy.countOfType(QAccessible::TextRemoved, b1), 0);
+    // Other blocks hear nothing about it.
+    QCOMPARE(spy.countOfType(QAccessible::TextInserted, b0), 0);
+    QCOMPARE(b1->textInterface()->text(0, 20), QStringLiteral("SecondXY paragraph."));
+}
+
+void TstCanvasAccessibility::text_backspace_and_delete_emit_remove()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    view.setCaretPosition(blocks[1], 3);  // "Sec|ond paragraph."
+
+    MarkoffTest::A11yEventSpy spy;
+    QTest::keyClick(&view, Qt::Key_Backspace);
+    doc.flushPendingD2Changed();  // the doc's own debounce, not a view deferral
+    auto rem = typed(spy, QAccessible::TextRemoved, b1);
+    QCOMPARE(rem.size(), 1);
+    QCOMPARE(rem[0].a, 2);
+    QCOMPARE(rem[0].text, QStringLiteral("c"));
+
+    spy.clear();
+    QTest::keyClick(&view, Qt::Key_Delete);
+    doc.flushPendingD2Changed();
+    rem = typed(spy, QAccessible::TextRemoved, b1);
+    QCOMPARE(rem.size(), 1);
+    QCOMPARE(rem[0].a, 2);
+    QCOMPARE(rem[0].text, QStringLiteral("o"));
+    QCOMPARE(spy.countOfType(QAccessible::TextInserted, b1), 0);
+}
+
+void TstCanvasAccessibility::text_replace_selection_emits_remove_then_insert()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    view.setCaretPosition(blocks[1], 0);
+    for (int i = 0; i < 6; ++i)  // select "Second"
+        QTest::keyClick(&view, Qt::Key_Right, Qt::ShiftModifier);
+
+    MarkoffTest::A11yEventSpy spy;
+    QTest::keyClick(&view, 'Z');
+    const auto rem = typed(spy, QAccessible::TextRemoved, b1);
+    const auto ins = typed(spy, QAccessible::TextInserted, b1);
+    QCOMPARE(rem.size(), 1);
+    QCOMPARE(rem[0].a, 0);
+    QCOMPARE(rem[0].text, QStringLiteral("Second"));
+    QCOMPARE(ins.size(), 1);
+    QCOMPARE(ins[0].a, 0);
+    QCOMPARE(ins[0].text, QStringLiteral("Z"));
+    // Remove is announced before insert.
+    int remAt = -1, insAt = -1;
+    for (int i = 0; i < spy.events().size(); ++i) {
+        if (spy.events()[i].type == QAccessible::TextRemoved) remAt = i;
+        if (spy.events()[i].type == QAccessible::TextInserted) insAt = i;
+    }
+    QVERIFY(remAt >= 0 && remAt < insAt);
+}
+
+void TstCanvasAccessibility::text_document_replace_edit_emits_remove_then_insert()
+{
+    // A non-typing path (paste/programmatic): one buffer edit that replaces
+    // a range with different text. Middle-of-string diff: "Second paragraph."
+    // -> "Second sentence." changes only "paragraph" -> "sentence".
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b1 = blockOf(view, 1);
+
+    MarkoffTest::A11yEventSpy spy;
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2ApplyBufferEdit(blocks[1], 7, 9, QByteArrayLiteral("sentence"), t);
+    }
+    doc.flushPendingD2Changed();
+    const auto rem = typed(spy, QAccessible::TextRemoved, b1);
+    const auto ins = typed(spy, QAccessible::TextInserted, b1);
+    QCOMPARE(b1->textInterface()->text(0, 40), QStringLiteral("Second sentence."));
+    // The diff is minimal (shared prefix/suffix trimmed), so the payload is
+    // a sub-range of the replaced/inserted text, anchored at the same start.
+    QCOMPARE(rem.size(), 1);
+    QCOMPARE(ins.size(), 1);
+    QCOMPARE(rem[0].a, ins[0].a);
+    QVERIFY(QStringLiteral("paragraph").contains(rem[0].text));
+    QVERIFY(QStringLiteral("sentence").contains(ins[0].text));
+    QVERIFY(rem[0].a >= 7);
+}
+
+void TstCanvasAccessibility::text_astral_char_keeps_surrogate_pair_whole()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    // U+1F600 = F0 9F 98 80, inserted at byte 0 of "First paragraph.".
+    MarkoffTest::A11yEventSpy spy;
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2ApplyBufferEdit(blocks[0], 0, 0, QByteArray("\xF0\x9F\x98\x80"), t);
+    }
+    doc.flushPendingD2Changed();
+    const auto ins = typed(spy, QAccessible::TextInserted, b0);
+    QCOMPARE(ins.size(), 1);
+    QCOMPARE(ins[0].a, 0);
+    QCOMPARE(ins[0].text.size(), 2);  // whole pair, QChar offsets
+    QVERIFY(ins[0].text.at(0).isHighSurrogate());
+}
+
+void TstCanvasAccessibility::text_undo_emits_remove()
+{
+    // Undo mutates the buffer without touching the block's proxy counter —
+    // the change token has to catch it via blockEditSequence.
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    view.setCaretPosition(blocks[1], 6);
+    QTest::keyClicks(&view, "Q");
+    doc.flushPendingD2Changed();
+
+    MarkoffTest::A11yEventSpy spy;
+    doc.d2UndoLog().undo();
+    doc.flushPendingD2Changed();
+    const auto rem = typed(spy, QAccessible::TextRemoved, b1);
+    QCOMPARE(rem.size(), 1);
+    QCOMPARE(rem[0].a, 6);
+    QCOMPARE(rem[0].text, QStringLiteral("Q"));
+}
+
+void TstCanvasAccessibility::structure_split_emits_created_and_head_remove()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    QCOMPARE(root->childCount(), 3);
+    view.setCaretPosition(blocks[1], 6);  // "Second| paragraph."
+
+    MarkoffTest::A11yEventSpy spy;
+    QTest::keyClick(&view, Qt::Key_Return);
+    doc.flushPendingD2Changed();
+    QCOMPARE(root->childCount(), 4);
+    // Exactly one new block, announced with ObjectCreated.
+    const auto created = spy.eventsOfType(QAccessible::ObjectCreated);
+    QCOMPARE(created.size(), 1);
+    QAccessibleInterface *newBlock = root->child(2);
+    QVERIFY(newBlock);
+    QCOMPARE(created[0].iface, newBlock);
+    QCOMPARE(newBlock->textInterface()->text(0, 40), QStringLiteral(" paragraph."));
+    // The head lost its tail.
+    const auto rem = typed(spy, QAccessible::TextRemoved, b1);
+    QCOMPARE(rem.size(), 1);
+    QCOMPARE(rem[0].a, 6);
+    QCOMPARE(rem[0].text, QStringLiteral(" paragraph."));
+    QCOMPARE(b1->textInterface()->text(0, 40), QStringLiteral("Second"));
+    QCOMPARE(spy.countOfType(QAccessible::ObjectDestroyed), 0);
+    QCOMPARE(root->indexOfChild(newBlock), 2);
+}
+
+void TstCanvasAccessibility::structure_merge_emits_destroyed_and_insert_and_evicts()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    const QAccessible::Id b1Id = QAccessible::uniqueId(b1);
+    view.setCaretPosition(blocks[1], 0);
+
+    MarkoffTest::A11yEventSpy spy;
+    QTest::keyClick(&view, Qt::Key_Backspace);  // merge block 1 into block 0
+    doc.flushPendingD2Changed();
+    QCOMPARE(root->childCount(), 2);
+    const auto destroyed = spy.eventsOfType(QAccessible::ObjectDestroyed);
+    QCOMPARE(destroyed.size(), 1);
+    QCOMPARE(destroyed[0].iface, b1);  // pointer compare only; it is gone now
+    const auto ins = typed(spy, QAccessible::TextInserted, b0);
+    QCOMPARE(ins.size(), 1);
+    QCOMPARE(ins[0].a, 16);
+    QCOMPARE(ins[0].text, QStringLiteral("Second paragraph."));
+    QCOMPARE(b0->textInterface()->text(0, 60),
+             QStringLiteral("First paragraph.Second paragraph."));
+    // b1's interface is gone from Qt's cache.
+    QVERIFY(!QAccessible::accessibleInterface(b1Id));
+    for (int i = 0; i < root->childCount(); ++i)
+        QVERIFY(root->child(i) != b1);
+}
+
+void TstCanvasAccessibility::structure_remote_edit_insert_remove_create_destroy()
+{
+    // Two replicas; B edits, its ops are applied to A (whose View is under
+    // test) through applyRemoteOps — no local-input path involved.
+    MarkoffDocument docA(quint16(301));
+    MarkoffDocument docB(quint16(302));
+    QList<Markoff::MarkoffOp> ops;
+    Markoff::MarkoffBundleMeta meta;
+    auto capture = QObject::connect(&docA, &MarkoffDocument::localOpsProduced, &docB,
+        [&docB](QList<Markoff::MarkoffOp> o, Markoff::MarkoffBundleMeta m) {
+            docB.applyRemoteOps(std::move(o), std::move(m));
+        });
+    BlockId first, second;
+    {
+        Markoff::UndoLog::Transaction t(docA.d2UndoLog());
+        first = docA.d2InsertBlock(BlockId{}, BlockKind::Paragraph, t);
+        docA.d2ApplyBufferEdit(first, 0, 0, QByteArrayLiteral("Hello world"), t);
+        second = docA.d2InsertBlock(first, BlockKind::Paragraph, t);
+        docA.d2ApplyBufferEdit(second, 0, 0, QByteArrayLiteral("Tail"), t);
+    }
+    docA.flushPendingD2Changed();
+    QObject::disconnect(capture);
+    QCOMPARE(docB.blockText(second), QByteArray("Tail"));
+
+    View view;
+    attachAndExpose(view, docA);
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *bFirst = blockOf(view, 0);
+    QAccessibleInterface *bSecond = blockOf(view, 1);
+    QCOMPARE(root->childCount(), 2);
+
+    auto fromB = [&](auto &&edit) {
+        ops.clear();
+        auto c = QObject::connect(&docB, &MarkoffDocument::localOpsProduced,
+            [&](QList<Markoff::MarkoffOp> o, Markoff::MarkoffBundleMeta m) {
+                ops = std::move(o);
+                meta = std::move(m);
+            });
+        {
+            Markoff::UndoLog::Transaction t(docB.d2UndoLog());
+            edit(t);
+        }
+        docB.flushPendingD2Changed();
+        QObject::disconnect(c);
+        QVERIFY(!ops.isEmpty());
+        docA.applyRemoteOps(ops, meta);
+        docA.flushPendingD2Changed();
+    };
+
+    MarkoffTest::A11yEventSpy spy;
+    // Remote insert.
+    fromB([&](Markoff::UndoLog::Transaction &t) {
+        docB.d2ApplyBufferEdit(first, 5, 0, QByteArrayLiteral(","), t);
+    });
+        auto ins = typed(spy, QAccessible::TextInserted, bFirst);
+    QCOMPARE(ins.size(), 1);
+    QCOMPARE(ins[0].a, 5);
+    QCOMPARE(ins[0].text, QStringLiteral(","));
+    // Remote remove.
+    spy.clear();
+    fromB([&](Markoff::UndoLog::Transaction &t) {
+        docB.d2ApplyBufferEdit(first, 0, 1, QByteArray(), t);
+    });
+    auto rem = typed(spy, QAccessible::TextRemoved, bFirst);
+    QCOMPARE(rem.size(), 1);
+    QCOMPARE(rem[0].a, 0);
+    QCOMPARE(rem[0].text, QStringLiteral("H"));
+    // Remote block create.
+    spy.clear();
+    BlockId third;
+    fromB([&](Markoff::UndoLog::Transaction &t) {
+        third = docB.d2InsertBlock(second, BlockKind::Paragraph, t);
+        docB.d2ApplyBufferEdit(third, 0, 0, QByteArrayLiteral("More"), t);
+    });
+    QCOMPARE(root->childCount(), 3);
+    QCOMPARE(spy.eventsOfType(QAccessible::ObjectCreated).size(), 1);
+    QCOMPARE(spy.eventsOfType(QAccessible::ObjectCreated)[0].iface, root->child(2));
+    // Remote block destroy.
+    spy.clear();
+    const QAccessible::Id secondId = QAccessible::uniqueId(bSecond);
+    fromB([&](Markoff::UndoLog::Transaction &t) { docB.d2RemoveBlock(second, t); });
+    QCOMPARE(root->childCount(), 2);
+    const auto gone = spy.eventsOfType(QAccessible::ObjectDestroyed);
+    QCOMPARE(gone.size(), 1);
+    QCOMPARE(gone[0].iface, bSecond);
+    QVERIFY(!QAccessible::accessibleInterface(secondId));
+}
+
+void TstCanvasAccessibility::eviction_no_dangling_interface_after_removal()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    QAccessibleInterface *b2 = blockOf(view, 2);
+    const QAccessible::Id id1 = QAccessible::uniqueId(b1);
+    QVERIFY(QAccessible::accessibleInterface(id1) == b1);
+
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2RemoveBlock(blocks[1], t);
+    }
+    doc.flushPendingD2Changed();
+
+    QCOMPARE(root->childCount(), 2);
+    QVERIFY(!QAccessible::accessibleInterface(id1));       // Qt's cache
+    QCOMPARE(root->indexOfChild(b0), 0);
+    QCOMPARE(root->indexOfChild(b2), 1);                    // survivors intact, same objects
+    QCOMPARE(root->child(0), b0);
+    QCOMPARE(root->child(1), b2);
+    for (int i = -1; i < 4; ++i)
+        QVERIFY(root->child(i) != b1);
+    // Undo brings the block back: a FRESH accessible, not the freed one.
+    doc.d2UndoLog().undo();
+    doc.flushPendingD2Changed();
+    QCOMPARE(root->childCount(), 3);
+    QVERIFY(root->child(1));
+    QVERIFY(root->child(1)->isValid());
+}
+
+void TstCanvasAccessibility::eviction_runs_while_inactive_and_emits_nothing()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    const QAccessible::Id id1 = QAccessible::uniqueId(b1);
+    view.setCaretPosition(blocks[0], 0);
+
+    MarkoffTest::A11yEventSpy spy;
+    QAccessible::setActive(false);
+    if (QAccessible::isActive())
+        QSKIP("platform keeps QAccessible active; cannot test the inactive path");
+    {
+        Markoff::UndoLog::Transaction t(doc.d2UndoLog());
+        doc.d2RemoveBlock(blocks[1], t);
+    }
+    doc.flushPendingD2Changed();
+    QCOMPARE(spy.count(), 0);
+    QCOMPARE(root->childCount(), 2);
+    QVERIFY(!QAccessible::accessibleInterface(id1));  // still evicted
+
+    // Text edits while inactive: snapshots stay current, so the first edit
+    // after re-activation reports only ITS delta.
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    view.setCaretPosition(blocks[0], 0);
+    QTest::keyClick(&view, 'a');
+    doc.flushPendingD2Changed();
+    QCOMPARE(spy.count(), 0);
+    QAccessible::setActive(true);
+    QTest::keyClick(&view, 'b');
+    doc.flushPendingD2Changed();
+    const auto ins = typed(spy, QAccessible::TextInserted, b0);
+    QCOMPARE(ins.size(), 1);
+    QCOMPARE(ins[0].a, 1);
+    QCOMPARE(ins[0].text, QStringLiteral("b"));
+}
+
+void TstCanvasAccessibility::eviction_document_swap_releases_every_block()
+{
+    MarkoffDocument docA, docB;
+    docA.loadFromMarkdown(threeParagraphFixture());
+    docB.loadFromMarkdown("One.\n\nTwo.\n");
+    View view;
+    attachAndExpose(view, docA);
+    QAccessibleInterface *root = QAccessible::queryAccessibleInterface(&view);
+    QList<QAccessible::Id> ids;
+    for (int i = 0; i < 3; ++i)
+        ids << QAccessible::uniqueId(blockOf(view, i));
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setDocument(&docB);
+    QCOMPARE(spy.eventsOfType(QAccessible::ObjectDestroyed).size(), 3);
+    for (QAccessible::Id id : ids)
+        QVERIFY(!QAccessible::accessibleInterface(id));
+    QCOMPARE(root->childCount(), 2);
+    view.setDocument(nullptr);
+    QCOMPARE(root->childCount(), 0);
+}
+
+void TstCanvasAccessibility::eviction_view_destruction_after_churn_is_clean()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    {
+        View view;
+        attachAndExpose(view, doc);
+        const auto blocks = doc.iterateBlocks();
+        for (int i = 0; i < 3; ++i)
+            blockOf(view, i);
+        view.setCaretPosition(blocks[1], 0);
+        QTest::keyClick(&view, Qt::Key_Backspace);  // merge
+        QTest::keyClick(&view, Qt::Key_Return);     // split
+        for (int i = 0; i < 3; ++i)
+            blockOf(view, i);
+    }  // ~View: container + surviving blocks released once each
+    QVERIFY(true);
 }
 
 QTEST_MAIN(TstCanvasAccessibility)

@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <unordered_map>
+#include <vector>
 
 #include <QAccessible>
 #include <QAccessibleWidget>
@@ -77,7 +78,28 @@ public:
     /// effective focus holder — the caret's block, else this container.
     void notifyFocusChange(bool gained);
 
+    /// A3.3 (spec §4.4/§4.5/§9 Q1): reconcile this container against the
+    /// view's CURRENT block list after a document change. (1) Per created
+    /// block whose edit sequence moved: diff its last-seen text snapshot
+    /// against the buffer (QChar common prefix/suffix, per block only, C4)
+    /// and emit `TextRemoved` then `TextInserted`. (2) Blocks new to the id
+    /// list get an accessible + `ObjectCreated`. (3) Created blocks no
+    /// longer in the list get `ObjectDestroyed`, are dropped from
+    /// `m_children` and released from Qt's cache. Snapshots/eviction always
+    /// run (cheap, proportional to CREATED children — zero without an AT
+    /// client); events are emitted only while `QAccessible::isActive()`.
+    void syncStructure();
+
+    /// A3.3: `View::setDocument()` swapped the document. BlockIds are only
+    /// unique within one document (two docs can mint the same id), so id
+    /// membership cannot tell old from new: release EVERY created block
+    /// (`ObjectDestroyed` while active) and re-prime the id list silently
+    /// (no `ObjectCreated` flood for a freshly loaded document).
+    void resetForNewDocument();
+
 private:
+    void evict(BlockId id);
+
     /// A per-block selection intersection (bytes in the block's own buffer),
     /// `{-1,-1}` = none. Ordered document-space endpoints of the selection.
     struct SelSnapshot {
@@ -97,8 +119,15 @@ private:
     struct Child {
         CanvasBlockAccessible *iface = nullptr;
         QAccessible::Id id = 0;
+        /// A3.3: last-seen buffer state, for text insert/remove payloads.
+        quint64 seq = 0;
+        QString text;
     };
     mutable std::unordered_map<BlockId, Child, BlockIdHash> m_children;
+
+    // A3.3: block ids as of the last syncStructure() (document order).
+    std::vector<BlockId> m_knownIds;
+    bool m_primeSilently = false;
 
     // A3.2: last-announced state (see syncTextNotifications()).
     BlockId m_notifiedCaretBlock;
@@ -261,5 +290,15 @@ void installAccessibilityFactory();
 /// `QAccessible::isActive()`, and both emit synchronously (C2).
 void notifyTextState(View *view, bool viewHasFocus);
 void notifyFocusChange(View *view, bool gained);
+
+/// A3.3: called from `View::onDocumentChanged()` — text insert/remove events,
+/// block ObjectCreated/ObjectDestroyed, and eviction of removed blocks'
+/// accessibles. Returns at once if `view` has no container (no AT client has
+/// ever touched it), so a plain non-a11y app pays one hash lookup.
+void notifyDocumentChanged(View *view);
+
+/// A3.3: `View::setDocument()` swapped documents (see
+/// `CanvasAccessible::resetForNewDocument`).
+void notifyDocumentReplaced(View *view);
 
 }  // namespace Markoff::Canvas::Detail

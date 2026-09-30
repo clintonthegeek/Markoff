@@ -10,6 +10,7 @@
 #include <markoff/canvas/View.h>
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/BlockKind.h>
+#include <markoff/core/CrdtProxies.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/TextUnits.h>
 
@@ -137,14 +138,51 @@ std::pair<int, int> blockSelectedByteRange(View *view, BlockId id)
 
 // ---- CanvasAccessible ------------------------------------------------
 
+namespace {
+/// A3.3: cheap "did this block's buffer change" token. NO single core
+/// counter covers every mutation path: `blockEditSequence` bumps on local
+/// edits and undo/redo but NOT on remote CRDT ops; the block's
+/// `BufferProxy::editSequence` bumps on local and remote edits but NOT on
+/// undo/redo. Both are monotonic, so their sum changes on every path.
+quint64 bufferChangeToken(MarkoffDocument *doc, BlockId id)
+{
+    quint64 t = doc->blockEditSequence(id);
+    if (const auto *proxy = doc->bufferProxy(id))
+        t += proxy->editSequence();
+    return t;
+}
+
+// A3.3: View* -> its container, so View::onDocumentChanged() can reach an
+// EXISTING container without QAccessible::queryAccessibleInterface() (which
+// would create one for every View, AT client or not). Populated by the
+// container ctor/dtor only; the dtor never touches the (possibly already
+// destroyed) View.
+std::unordered_map<const View *, CanvasAccessible *> &containerRegistry()
+{
+    // Leaked on purpose: Qt's accessible cache may destroy a container after
+    // static destruction has begun.
+    static auto *r = new std::unordered_map<const View *, CanvasAccessible *>;
+    return *r;
+}
+}  // namespace
+
 CanvasAccessible::CanvasAccessible(View *view)
     : QAccessibleWidget(view, QAccessible::Document)
     , m_view(view)
 {
+    containerRegistry()[view] = this;
+    const int n = view->blockCount();
+    m_knownIds.reserve(size_t(n));
+    for (int i = 0; i < n; ++i)
+        m_knownIds.push_back(view->blockIdAt(i));
 }
 
 CanvasAccessible::~CanvasAccessible()
 {
+    auto &reg = containerRegistry();
+    if (auto it = reg.find(m_view); it != reg.end() && it->second == this)
+        reg.erase(it);
+
     // Qt's cache owns the block accessibles (see m_children's comment);
     // deleteAccessibleInterface is a no-op for an id the cache already
     // dropped (e.g. cache-destructor teardown order).
@@ -223,9 +261,19 @@ CanvasBlockAccessible *CanvasAccessible::blockAccessible(BlockId id) const
     auto it = m_children.find(id);
     if (it != m_children.end())
         return it->second.iface;
+    // Only ids in the current document get an accessible: a stale id (a
+    // removed block a caller still holds) must never be resurrected into
+    // m_children, where nothing would ever evict it.
+    if (m_view->blockIndexOf(id) < 0)
+        return nullptr;
     auto *block = new CanvasBlockAccessible(m_view, const_cast<CanvasAccessible *>(this), id);
     const QAccessible::Id qid = QAccessible::registerAccessibleInterface(block);
-    m_children.emplace(id, Child{block, qid});
+    Child c{block, qid, 0, {}};
+    if (MarkoffDocument *doc = m_view->document()) {
+        c.seq = bufferChangeToken(doc, id);
+        c.text = QString::fromUtf8(doc->blockText(id));
+    }
+    m_children.emplace(id, std::move(c));
     return block;
 }
 
@@ -380,6 +428,122 @@ void CanvasAccessible::notifyFocusChange(bool gained)
         QAccessibleStateChangeEvent ev(m_view, changed);
         QAccessible::updateAccessibility(&ev);
     }
+}
+
+// ---- A3.3 text + structure events (spec §4.4, §4.5, §9 Q1) ---------------
+
+void CanvasAccessible::syncStructure()
+{
+    MarkoffDocument *doc = m_view->document();
+    const bool active = QAccessible::isActive();
+
+    // 1. Text: only created blocks whose edit sequence moved. Per block, per
+    // QChar (C4) — the buffer is read whole and diffed against this block's
+    // own snapshot, never against a cross-block offset.
+    if (doc) {
+        for (auto &[id, child] : m_children) {
+            if (m_view->blockIndexOf(id) < 0)
+                continue;  // being removed; evicted in step 3
+            const quint64 seq = bufferChangeToken(doc, id);
+            if (seq == child.seq)
+                continue;
+            child.seq = seq;
+            const QString now = QString::fromUtf8(doc->blockText(id));
+            if (now == child.text)
+                continue;
+            const QString old = std::move(child.text);
+            child.text = now;
+            if (!active || !child.iface->interface_cast(QAccessible::TextInterface))
+                continue;
+            // Common prefix / suffix, never splitting a surrogate pair.
+            const int minLen = qMin(old.size(), now.size());
+            int pre = 0;
+            while (pre < minLen && old.at(pre) == now.at(pre))
+                ++pre;
+            if (pre > 0 && ((pre < old.size() && old.at(pre).isLowSurrogate())
+                            || (pre < now.size() && now.at(pre).isLowSurrogate())))
+                --pre;
+            int suf = 0;
+            while (suf < minLen - pre
+                   && old.at(old.size() - 1 - suf) == now.at(now.size() - 1 - suf))
+                ++suf;
+            if (suf > 0 && old.at(old.size() - suf).isLowSurrogate())
+                --suf;
+            const QString removed = old.mid(pre, old.size() - pre - suf);
+            const QString inserted = now.mid(pre, now.size() - pre - suf);
+            if (!removed.isEmpty()) {
+                QAccessibleTextRemoveEvent ev(child.iface, pre, removed);
+                QAccessible::updateAccessibility(&ev);
+            }
+            if (!inserted.isEmpty()) {
+                QAccessibleTextInsertEvent ev(child.iface, pre, inserted);
+                QAccessible::updateAccessibility(&ev);
+            }
+        }
+    }
+
+    // 2. New blocks. Diff the id list against the last-seen one; typing
+    // (same list) is a straight elementwise compare, no set built.
+    const int n = m_view->blockCount();
+    bool same = size_t(n) == m_knownIds.size();
+    for (int i = 0; same && i < n; ++i)
+        same = m_knownIds[size_t(i)] == m_view->blockIdAt(i);
+    if (!same) {
+        std::unordered_map<BlockId, char, BlockIdHash> oldSet;
+        oldSet.reserve(m_knownIds.size());
+        for (BlockId id : m_knownIds)
+            oldSet.emplace(id, 0);
+        std::vector<BlockId> fresh;
+        fresh.reserve(size_t(n));
+        for (int i = 0; i < n; ++i) {
+            const BlockId id = m_view->blockIdAt(i);
+            fresh.push_back(id);
+            if (active && !m_primeSilently && !id.isNull() && oldSet.find(id) == oldSet.end()) {
+                if (CanvasBlockAccessible *b = blockAccessible(id)) {
+                    QAccessibleEvent ev(b, QAccessible::ObjectCreated);
+                    QAccessible::updateAccessibility(&ev);
+                }
+            }
+        }
+        m_knownIds = std::move(fresh);
+    }
+    m_primeSilently = false;
+
+    // 3. Eviction (spec §9 Q1): every created block that left the document.
+    std::vector<BlockId> gone;
+    for (const auto &[id, child] : m_children)
+        if (m_view->blockIndexOf(id) < 0)
+            gone.push_back(id);
+    for (BlockId id : gone)
+        evict(id);
+}
+
+void CanvasAccessible::evict(BlockId id)
+{
+    auto it = m_children.find(id);
+    if (it == m_children.end())
+        return;
+    const Child child = it->second;
+    m_children.erase(it);  // unreachable from child()/indexOfChild() from here on
+    // Qt itself emits the ObjectDestroyed for a cached interface (while
+    // active) from deleteAccessibleInterface; emitting our own too would
+    // double-announce it (observed in A3.3: 2 events per removal).
+    QAccessible::deleteAccessibleInterface(child.id);
+}
+
+void CanvasAccessible::resetForNewDocument()
+{
+    std::vector<BlockId> all;
+    all.reserve(m_children.size());
+    for (const auto &[id, child] : m_children)
+        all.push_back(id);
+    for (BlockId id : all)
+        evict(id);
+    m_knownIds.clear();
+    m_primeSilently = true;
+    m_notifiedCaretBlock = {};
+    m_notifiedCaretByte = -1;
+    m_notifiedSel = {};
 }
 
 // ---- CanvasBlockAccessible ---------------------------------------------
@@ -877,6 +1041,22 @@ void notifyTextState(View *view, bool viewHasFocus)
         return;
     if (CanvasAccessible *c = containerFor(view))
         c->syncTextNotifications(viewHasFocus);
+}
+
+void notifyDocumentChanged(View *view)
+{
+    auto &reg = containerRegistry();
+    if (reg.empty())
+        return;
+    if (auto it = reg.find(view); it != reg.end())
+        it->second->syncStructure();
+}
+
+void notifyDocumentReplaced(View *view)
+{
+    auto &reg = containerRegistry();
+    if (auto it = reg.find(view); it != reg.end())
+        it->second->resetForNewDocument();
 }
 
 void notifyFocusChange(View *view, bool gained)
