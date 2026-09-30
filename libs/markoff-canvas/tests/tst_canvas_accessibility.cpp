@@ -14,6 +14,8 @@
 #include <QCoreApplication>
 #include <QTest>
 
+#include "A11yEventSpy.h"
+
 #include <markoff/canvas/View.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
@@ -103,6 +105,12 @@ private Q_SLOTS:
     void character_rect_no_text_kind_returns_null();
     void offset_at_point_outside_block_returns_negative_one();
     void line_boundary_reports_wrapped_visual_line();
+
+    // ---- A3.1: event spy harness self-tests ----
+    void spy_captures_hand_fired_events_with_payload();
+    void spy_restores_previous_handler_and_active_state();
+    void spy_second_case_sees_no_stale_events();
+    void spy_nested_restores_in_lifo_order();
 };
 
 void TstCanvasAccessibility::container_role_is_document()
@@ -1048,6 +1056,114 @@ void TstCanvasAccessibility::line_boundary_reports_wrapped_visual_line()
     QVERIFY(!laterLine.isEmpty());
     QVERIFY(start2 >= end);
     QCOMPARE(end2, count);
+}
+
+namespace {
+int g_sentinelHits = 0;
+void sentinelHandler(QAccessibleEvent *) { ++g_sentinelHits; }
+}  // namespace
+
+void TstCanvasAccessibility::spy_captures_hand_fired_events_with_payload()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+
+    MarkoffTest::A11yEventSpy spy;
+    QCOMPARE(spy.count(), 0);
+
+    QAccessibleEvent focus(&view, QAccessible::Focus);
+    QAccessible::updateAccessibility(&focus);
+    QAccessibleTextCursorEvent cursor(&view, 7);
+    QAccessible::updateAccessibility(&cursor);
+    QAccessibleTextInsertEvent ins(&view, 3, QStringLiteral("abc"));
+    QAccessible::updateAccessibility(&ins);
+    QAccessibleTextSelectionEvent sel(&view, 2, 5);
+    QAccessible::updateAccessibility(&sel);
+
+    QCOMPARE(spy.count(), 4);
+    QCOMPARE(spy.countOfType(QAccessible::Focus, &view), 1);
+    const auto cur = spy.eventsOfType(QAccessible::TextCaretMoved, &view);
+    QCOMPARE(cur.size(), 1);
+    QCOMPARE(cur.first().a, 7);
+    const auto in = spy.eventsOfType(QAccessible::TextInserted);
+    QCOMPARE(in.size(), 1);
+    QCOMPARE(in.first().a, 3);
+    QCOMPARE(in.first().text, QStringLiteral("abc"));
+    const auto se = spy.eventsOfType(QAccessible::TextSelectionChanged);
+    QCOMPARE(se.first().a, 2);
+    QCOMPARE(se.first().b, 5);
+    // Records are snapshots: still valid after the hand-fired events died.
+    spy.clear();
+    QCOMPARE(spy.count(), 0);
+}
+
+void TstCanvasAccessibility::spy_restores_previous_handler_and_active_state()
+{
+    const bool activeBefore = QAccessible::isActive();
+    g_sentinelHits = 0;
+    QAccessible::UpdateHandler orig = QAccessible::installUpdateHandler(&sentinelHandler);
+    {
+        MarkoffTest::A11yEventSpy spy;
+        // While the spy lives it, not the sentinel, receives events, and the
+        // platform reports active if it has an accessibility integration.
+        QObject probe;
+        QAccessibleEvent ev(&probe, QAccessible::Focus);
+        QAccessible::updateAccessibility(&ev);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(g_sentinelHits, 0);
+    }
+    // Spy gone: the sentinel is the installed handler again...
+    QObject probe;
+    QAccessibleEvent ev(&probe, QAccessible::Focus);
+    QAccessible::updateAccessibility(&ev);
+    QCOMPARE(g_sentinelHits, 1);
+    // ...and active state is back to what it was.
+    QCOMPARE(QAccessible::isActive(), activeBefore);
+    // Put the process back the way we found it.
+    QVERIFY(QAccessible::installUpdateHandler(orig) == &sentinelHandler);
+}
+
+void TstCanvasAccessibility::spy_second_case_sees_no_stale_events()
+{
+    // Case one leaves events behind in its spy, which is then destroyed...
+    {
+        MarkoffTest::A11yEventSpy first;
+        QObject o;
+        QAccessibleEvent ev(&o, QAccessible::ObjectCreated);
+        QAccessible::updateAccessibility(&ev);
+        QCOMPARE(first.count(), 1);
+    }
+    // ...a fresh spy starts empty, and an event fired with no spy alive is
+    // not retroactively delivered to it either.
+    QObject o;
+    QAccessibleEvent unobserved(&o, QAccessible::ObjectDestroyed);
+    QAccessible::updateAccessibility(&unobserved);
+    MarkoffTest::A11yEventSpy second;
+    QCOMPARE(second.count(), 0);
+    QAccessibleEvent seen(&o, QAccessible::ObjectShow);
+    QAccessible::updateAccessibility(&seen);
+    QCOMPARE(second.count(), 1);
+    QCOMPARE(second.events().first().type, QAccessible::ObjectShow);
+}
+
+void TstCanvasAccessibility::spy_nested_restores_in_lifo_order()
+{
+    QObject o;
+    MarkoffTest::A11yEventSpy outer;
+    {
+        MarkoffTest::A11yEventSpy inner;
+        QAccessibleEvent ev(&o, QAccessible::Focus);
+        QAccessible::updateAccessibility(&ev);
+        QCOMPARE(inner.count(), 1);
+        QCOMPARE(outer.count(), 0);
+    }
+    // Inner gone: outer receives events again (handler is a shared function
+    // pointer, so this exercises the static current-spy chain).
+    QAccessibleEvent ev(&o, QAccessible::Focus);
+    QAccessible::updateAccessibility(&ev);
+    QCOMPARE(outer.count(), 1);
 }
 
 QTEST_MAIN(TstCanvasAccessibility)
