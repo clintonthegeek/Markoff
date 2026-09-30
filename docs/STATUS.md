@@ -12,6 +12,11 @@ pass (A5.3) deferred by the user, the one outstanding acceptance item.
 arc is closed and its board body lives in `STATUS-LOG.md`; the E-arc is
 formally closed.)
 
+**H arc (Hologram) — CLOSED 2026-08-30.** Opt-in
+`View::setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget`
+pass-through, `9b0138f8`); plan
+[`plans/2026-08-30-hide-first-heading-as-title.md`](plans/2026-08-30-hide-first-heading-as-title.md);
+consumer answer note:
 [`handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md`](handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md).
 
 ## Workfront — none (G1 canvas accessibility CLOSED 2026-09-30)
@@ -22,7 +27,7 @@ Goal was: make `Markoff::Canvas::View` usable with a screen reader.
 
 - **Spec (normative):**
   [`specs/2026-08-19-g1-canvas-accessibility-design.md`](specs/2026-08-19-g1-canvas-accessibility-design.md)
-- **Plan (do the topmost unchecked task):**
+- **Plan (CLOSED):**
   [`plans/2026-08-19-g1-canvas-accessibility.md`](plans/2026-08-19-g1-canvas-accessibility.md)
   — phases A1 (tree/roles/registration), A2 (text interface),
   A3 (notifications), A4 (folding/actions), A5 (acceptance); user
