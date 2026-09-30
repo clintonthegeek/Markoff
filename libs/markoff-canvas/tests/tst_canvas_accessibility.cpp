@@ -111,6 +111,15 @@ private Q_SLOTS:
     void spy_restores_previous_handler_and_active_state();
     void spy_second_case_sees_no_stale_events();
     void spy_nested_restores_in_lifo_order();
+
+    // ---- A3.2: caret / selection / focus events (spec §4.4) ----
+    void events_caret_move_within_block();
+    void events_caret_move_across_blocks();
+    void events_no_change_no_event();
+    void events_selection_extend_and_collapse_single_block();
+    void events_selection_cross_block_and_shrink();
+    void events_focus_in_out();
+    void events_inactive_emits_nothing();
 };
 
 void TstCanvasAccessibility::container_role_is_document()
@@ -1164,6 +1173,207 @@ void TstCanvasAccessibility::spy_nested_restores_in_lifo_order()
     QAccessibleEvent ev(&o, QAccessible::Focus);
     QAccessible::updateAccessibility(&ev);
     QCOMPARE(outer.count(), 1);
+}
+
+
+namespace {
+/// Priming: the a11y-side "last announced" state starts empty when the spy
+/// (which forces QAccessible active) is created, so put the view in the
+/// state under test, then drop the events that priming itself produced.
+QAccessibleInterface *blockOf(View &view, int i)
+{
+    return QAccessible::queryAccessibleInterface(&view)->child(i);
+}
+}  // namespace
+
+void TstCanvasAccessibility::events_caret_move_within_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b0 = blockOf(view, 0);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setCaretPosition(blocks[0], 2);
+    spy.clear();
+
+    view.setCaretPosition(blocks[0], 7);
+    const auto cur = spy.eventsOfType(QAccessible::TextCaretMoved, b0);
+    QCOMPARE(cur.size(), 1);
+    QCOMPARE(cur.first().a, 7);
+    // Nothing for the other blocks.
+    QCOMPARE(spy.count(), 1);
+}
+
+void TstCanvasAccessibility::events_caret_move_across_blocks()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    QAccessibleInterface *b1 = blockOf(view, 1);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setCaretPosition(blocks[0], 3);
+    spy.clear();
+
+    view.setCaretPosition(blocks[1], 4);
+    // Event on the NEW block, with the per-block QChar offset...
+    const auto cur = spy.eventsOfType(QAccessible::TextCaretMoved, b1);
+    QCOMPARE(cur.size(), 1);
+    QCOMPARE(cur.first().a, 4);
+    // ...and, by decision (A3.2 log), none on the old block: it just
+    // reports cursorPosition() == -1 when asked.
+    QCOMPARE(spy.countOfType(QAccessible::TextCaretMoved, b0), 0);
+    QCOMPARE(b0->textInterface()->cursorPosition(), -1);
+}
+
+void TstCanvasAccessibility::events_no_change_no_event()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b0 = blockOf(view, 0);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setCaretPosition(blocks[0], 3);
+    spy.clear();
+    view.setCaretPosition(blocks[0], 3);
+    QCOMPARE(spy.countOfType(QAccessible::TextCaretMoved, b0), 0);
+    QCOMPARE(spy.countOfType(QAccessible::TextSelectionChanged, b0), 0);
+}
+
+void TstCanvasAccessibility::events_selection_extend_and_collapse_single_block()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    QAccessibleInterface *b0 = blockOf(view, 0);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setCaretPosition(blocks[0], 2);
+    spy.clear();
+
+    // Start.
+    QTest::keyClick(&view, Qt::Key_Right, Qt::ShiftModifier);
+    auto sel = spy.eventsOfType(QAccessible::TextSelectionChanged, b0);
+    QCOMPARE(sel.size(), 1);
+    QCOMPARE(sel.last().a, 2);
+    QCOMPARE(sel.last().b, 3);
+    // Extend.
+    QTest::keyClick(&view, Qt::Key_Right, Qt::ShiftModifier);
+    sel = spy.eventsOfType(QAccessible::TextSelectionChanged, b0);
+    QCOMPARE(sel.size(), 2);
+    QCOMPARE(sel.last().a, 2);
+    QCOMPARE(sel.last().b, 4);
+    // Collapse (plain move): selection cleared -> (-1,-1).
+    spy.clear();
+    QTest::keyClick(&view, Qt::Key_Right);
+    sel = spy.eventsOfType(QAccessible::TextSelectionChanged, b0);
+    QCOMPARE(sel.size(), 1);
+    QCOMPARE(sel.last().a, -1);
+    QCOMPARE(sel.last().b, -1);
+    QCOMPARE(spy.countOfType(QAccessible::TextCaretMoved, b0), 1);
+}
+
+void TstCanvasAccessibility::events_selection_cross_block_and_shrink()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    const int len0 = doc.blockText(blocks[0]).size();
+    const int len1 = doc.blockText(blocks[1]).size();
+    const int len2 = doc.blockText(blocks[2]).size();
+    QAccessibleInterface *b0 = blockOf(view, 0);
+    QAccessibleInterface *b1 = blockOf(view, 1);
+    QAccessibleInterface *b2 = blockOf(view, 2);
+
+    MarkoffTest::A11yEventSpy spy;
+    view.setCaretPosition(blocks[0], 6);
+    spy.clear();
+
+    // Grow across all three blocks.
+    QTest::keyClick(&view, Qt::Key_End, Qt::ControlModifier | Qt::ShiftModifier);
+    auto ev = [&](QAccessibleInterface *b) {
+        const auto l = spy.eventsOfType(QAccessible::TextSelectionChanged, b);
+        return l.isEmpty() ? MarkoffTest::A11yEventRecord() : l.last();
+    };
+    QCOMPARE(spy.countOfType(QAccessible::TextSelectionChanged, b0), 1);
+    QCOMPARE(ev(b0).a, 6);
+    QCOMPARE(ev(b0).b, len0);
+    QCOMPARE(ev(b1).a, 0);
+    QCOMPARE(ev(b1).b, len1);
+    QCOMPARE(ev(b2).a, 0);
+    QCOMPARE(ev(b2).b, len2);
+    // Caret moved to the last block.
+    QCOMPARE(spy.countOfType(QAccessible::TextCaretMoved, b2), 1);
+
+    // Shrink: caret back into block 0 (Ctrl+Shift+Home would flip; use Up
+    // twice from the end). The blocks that fall out of the selection get
+    // an explicit "cleared" (-1,-1) event.
+    spy.clear();
+    view.setCaretPosition(blocks[0], 0);  // collapses everything
+    QCOMPARE(ev(b0).a, -1);
+    QCOMPARE(ev(b1).a, -1);
+    QCOMPARE(ev(b1).b, -1);
+    QCOMPARE(ev(b2).a, -1);
+}
+
+void TstCanvasAccessibility::events_focus_in_out()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+    view.setCaretPosition(blocks[1], 0);
+    QAccessibleInterface *b1 = blockOf(view, 1);
+
+    MarkoffTest::A11yEventSpy spy;
+    QFocusEvent in(QEvent::FocusIn, Qt::OtherFocusReason);
+    QCoreApplication::sendEvent(&view, &in);
+    // Focus lands on the caret's block (the effective focus holder).
+    QCOMPARE(spy.countOfType(QAccessible::Focus, b1), 1);
+
+    spy.clear();
+    QFocusEvent out(QEvent::FocusOut, Qt::OtherFocusReason);
+    QCoreApplication::sendEvent(&view, &out);
+    const auto st = spy.eventsOfType(QAccessible::StateChanged, b1);
+    QCOMPARE(st.size(), 1);
+    QVERIFY(st.first().changedStates.focused);
+
+    // While focused, a caret move into another block also moves a11y focus.
+    QCoreApplication::sendEvent(&view, &in);
+    spy.clear();
+    view.setCaretPosition(blocks[2], 1);
+    QCOMPARE(spy.countOfType(QAccessible::Focus, blockOf(view, 2)), 1);
+}
+
+void TstCanvasAccessibility::events_inactive_emits_nothing()
+{
+    MarkoffDocument doc;
+    doc.loadFromMarkdown(threeParagraphFixture());
+    View view;
+    attachAndExpose(view, doc);
+    const auto blocks = doc.iterateBlocks();
+
+    MarkoffTest::A11yEventSpy spy;
+    QAccessible::setActive(false);
+    if (QAccessible::isActive())
+        QSKIP("platform keeps QAccessible active; cannot test the inactive path");
+    view.setCaretPosition(blocks[1], 2);
+    QTest::keyClick(&view, Qt::Key_Right, Qt::ShiftModifier);
+    QCOMPARE(spy.count(), 0);
 }
 
 QTEST_MAIN(TstCanvasAccessibility)

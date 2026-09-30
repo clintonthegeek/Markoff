@@ -2359,6 +2359,12 @@ void View::recomputeOccurrenceHighlights()
 
 void View::pushSelectionToSession()
 {
+    // G1 a11y (A3.2, spec §4.4): the selection-mutation chokepoint (every
+    // P6.1-audited site that changes m_caret/m_selectionAnchor calls this,
+    // incl. the ones that bypass setCaret()). Idempotent diff inside;
+    // returns at once unless QAccessible::isActive().
+    Detail::notifyTextState(this, m_hasFocus);
+
     // Unconditional, ahead of the Session/doc gate below (see this
     // function's own header-side doc comment): occurrence highlights are
     // a purely view-local, Session-independent feature and must update
@@ -2478,6 +2484,9 @@ void View::ensureCaretVisible()
     // confirms the caret's entry is realized, or until something more
     // authoritative (setScrollAnchor()) explicitly overrides it.
     m_caretVisibilityPending = true;
+    // A3.2: the caretChanged signal point — same idempotent diff as
+    // pushSelectionToSession(), so a caret move that bypassed it is caught.
+    Detail::notifyTextState(this, m_hasFocus);
     emit caretChanged();
 }
 
@@ -5471,6 +5480,7 @@ void View::focusInEvent(QFocusEvent *event)
 {
     QAbstractScrollArea::focusInEvent(event);
     m_hasFocus = true;
+    Detail::notifyFocusChange(this, true);
     viewport()->update();
 }
 
@@ -5478,6 +5488,7 @@ void View::focusOutEvent(QFocusEvent *event)
 {
     QAbstractScrollArea::focusOutEvent(event);
     m_hasFocus = false;
+    Detail::notifyFocusChange(this, false);
     viewport()->update();
 }
 

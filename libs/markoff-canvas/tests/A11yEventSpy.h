@@ -28,6 +28,11 @@ struct A11yEventRecord {
     QAccessible::Event type = QAccessible::InvalidEvent;
     QPointer<QObject> object;  // event->object(); null if built from an interface
     int child = 0;             // event->child()
+    // A3.2: block accessibles wrap no QObject, so their events are built from
+    // an interface (object() == nullptr, the union slot holds a uniqueId).
+    // Resolved at delivery via event->accessibleInterface(); a raw pointer,
+    // compare it only, and only while the interface is alive.
+    QAccessibleInterface *iface = nullptr;
     // Payload, by event type (unused fields stay at defaults):
     //   TextCaretMoved   : a = cursorPosition
     //   TextInserted     : a = cursorPosition (insert start), text = inserted text
@@ -78,6 +83,20 @@ public:
                 out.append(r);
         return out;
     }
+    /// Events of one type targeting one interface-built target (a block).
+    QList<A11yEventRecord> eventsOfType(QAccessible::Event type,
+                                        const QAccessibleInterface *iface) const
+    {
+        QList<A11yEventRecord> out;
+        for (const A11yEventRecord &r : m_events)
+            if (r.type == type && r.iface == iface)
+                out.append(r);
+        return out;
+    }
+    int countOfType(QAccessible::Event type, const QAccessibleInterface *iface) const
+    {
+        return eventsOfType(type, iface).size();
+    }
     int countOfType(QAccessible::Event type, const QObject *object = nullptr) const
     {
         return eventsOfType(type, object).size();
@@ -98,6 +117,7 @@ private:
         r.type = event->type();
         r.object = event->object();
         r.child = event->child();
+        r.iface = event->object() ? nullptr : event->accessibleInterface();
         switch (event->type()) {
         case QAccessible::TextCaretMoved: {
             auto *e = static_cast<QAccessibleTextCursorEvent *>(event);

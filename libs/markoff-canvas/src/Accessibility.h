@@ -64,9 +64,46 @@ public:
     /// round trip back through this container.
     CanvasBlockAccessible *blockAccessible(BlockId id) const;
 
+    /// A3.2 (spec §4.4): diff `View`'s caret/selection against what was last
+    /// announced and emit `Focus` (caret entered a new block while the view
+    /// has focus), `TextCaretMoved` (on the caret's block) and
+    /// `TextSelectionChanged` (on each block whose per-block selection
+    /// intersection changed, incl. shrinking to empty as `(-1,-1)`).
+    /// Synchronous, idempotent (a repeated call with no change emits
+    /// nothing), and a no-op unless `QAccessible::isActive()`.
+    void syncTextNotifications(bool viewHasFocus);
+
+    /// A3.2: `Focus` (gained) or `StateChanged{focused}` (lost) on the
+    /// effective focus holder — the caret's block, else this container.
+    void notifyFocusChange(bool gained);
+
 private:
+    /// A per-block selection intersection (bytes in the block's own buffer),
+    /// `{-1,-1}` = none. Ordered document-space endpoints of the selection.
+    struct SelSnapshot {
+        bool valid = false;
+        BlockId startBlock, endBlock;
+        int startByte = 0, endByte = 0;
+    };
+    SelSnapshot currentSelection() const;
+
     View *m_view;
-    mutable std::unordered_map<BlockId, std::unique_ptr<CanvasBlockAccessible>, BlockIdHash> m_children;
+    /// Block accessibles have no QObject, so Qt's cache cannot key them
+    /// off one; but an interface-built `QAccessibleEvent` registers its
+    /// target in Qt's cache (`QAccessible::uniqueId`), and the cache then
+    /// owns/`delete`s it. So blocks are registered with Qt at creation and
+    /// Qt owns them (no unique_ptr — that would double-delete at shutdown);
+    /// this container deletes them via `QAccessible::deleteAccessibleInterface`.
+    struct Child {
+        CanvasBlockAccessible *iface = nullptr;
+        QAccessible::Id id = 0;
+    };
+    mutable std::unordered_map<BlockId, Child, BlockIdHash> m_children;
+
+    // A3.2: last-announced state (see syncTextNotifications()).
+    BlockId m_notifiedCaretBlock;
+    int m_notifiedCaretByte = -1;
+    SelSnapshot m_notifiedSel;
 };
 
 /// One per `BlockId` (spec §4.1/§4.2), implementing `QAccessibleInterface`
@@ -219,5 +256,10 @@ private:
 /// `View` constructor (spec §4.5: repeated `View` construction must not
 /// re-register).
 void installAccessibilityFactory();
+
+/// A3.2: `View`'s emit hooks (spec §4.4). Both return immediately unless
+/// `QAccessible::isActive()`, and both emit synchronously (C2).
+void notifyTextState(View *view, bool viewHasFocus);
+void notifyFocusChange(View *view, bool gained);
 
 }  // namespace Markoff::Canvas::Detail

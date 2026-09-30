@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "Accessibility.h"
 
+#include <climits>
 #include <variant>
 
 #include <QScrollBar>
@@ -142,7 +143,14 @@ CanvasAccessible::CanvasAccessible(View *view)
 {
 }
 
-CanvasAccessible::~CanvasAccessible() = default;
+CanvasAccessible::~CanvasAccessible()
+{
+    // Qt's cache owns the block accessibles (see m_children's comment);
+    // deleteAccessibleInterface is a no-op for an id the cache already
+    // dropped (e.g. cache-destructor teardown order).
+    for (auto &[id, child] : m_children)
+        QAccessible::deleteAccessibleInterface(child.id);
+}
 
 QAccessible::Role CanvasAccessible::role() const
 {
@@ -214,11 +222,164 @@ CanvasBlockAccessible *CanvasAccessible::blockAccessible(BlockId id) const
         return nullptr;
     auto it = m_children.find(id);
     if (it != m_children.end())
-        return it->second.get();
-    auto block = std::make_unique<CanvasBlockAccessible>(m_view, const_cast<CanvasAccessible *>(this), id);
-    auto *raw = block.get();
-    m_children.emplace(id, std::move(block));
-    return raw;
+        return it->second.iface;
+    auto *block = new CanvasBlockAccessible(m_view, const_cast<CanvasAccessible *>(this), id);
+    const QAccessible::Id qid = QAccessible::registerAccessibleInterface(block);
+    m_children.emplace(id, Child{block, qid});
+    return block;
+}
+
+// ---- A3.2 notifications (spec §4.4) ------------------------------------
+
+CanvasAccessible::SelSnapshot CanvasAccessible::currentSelection() const
+{
+    SelSnapshot s;
+    if (!m_view->hasSelection())
+        return s;
+    const BlockId ab = m_view->selectionAnchorBlock();
+    const int aByte = m_view->selectionAnchorByteOffset();
+    const BlockId cb = m_view->caretBlock();
+    const int cByte = m_view->caretByteOffset();
+    const int ai = m_view->blockIndexOf(ab);
+    const int ci = m_view->blockIndexOf(cb);
+    if (ai < 0 || ci < 0)
+        return s;
+    const bool caretFirst = ci < ai || (ci == ai && cByte < aByte);
+    s.valid = true;
+    s.startBlock = caretFirst ? cb : ab;
+    s.startByte = caretFirst ? cByte : aByte;
+    s.endBlock = caretFirst ? ab : cb;
+    s.endByte = caretFirst ? aByte : cByte;
+    return s;
+}
+
+namespace {
+
+/// Per-block byte intersection of an ordered selection, {-1,-1} if none.
+/// Same semantics as blockSelectedByteRange() (A2.2), but over a snapshot so
+/// the OLD selection can be compared against the new one. Indices are
+/// block-index comparisons only (C4: never cross-block byte sums).
+std::pair<int, int> intersectSel(bool valid, int startIdx, int startByte, int endIdx, int endByte,
+                                 int index, int blockLen)
+{
+    if (!valid || index < startIdx || index > endIdx)
+        return {-1, -1};
+    const int from = (index == startIdx) ? startByte : 0;
+    const int to = (index == endIdx) ? endByte : blockLen;
+    if (from >= to)
+        return {-1, -1};
+    return {from, to};
+}
+
+}  // namespace
+
+void CanvasAccessible::syncTextNotifications(bool viewHasFocus)
+{
+    MarkoffDocument *doc = m_view->document();
+    if (!doc)
+        return;
+
+    const BlockId caretBlock = m_view->caretBlock();
+    const int caretByte = m_view->caretByteOffset();
+    const bool blockMoved = caretBlock != m_notifiedCaretBlock;
+    const bool caretMoved = blockMoved || caretByte != m_notifiedCaretByte;
+    const SelSnapshot old = m_notifiedSel;
+    const SelSnapshot now = currentSelection();
+    m_notifiedCaretBlock = caretBlock;
+    m_notifiedCaretByte = caretByte;
+    m_notifiedSel = now;
+
+    // Caret. Decision (A3.2): notify only the block that NOW holds the
+    // caret. The old block is not sent a "cursor lost" event — its
+    // cursorPosition() simply turns -1, AT-SPI clients track the caret via
+    // the new holder's event, and the Focus event below moves the a11y
+    // focus. (An event with position -1 is not a defined AT-SPI shape.)
+    if (!caretBlock.isNull()) {
+        CanvasBlockAccessible *b = blockAccessible(caretBlock);
+        if (b) {
+            if (blockMoved && viewHasFocus) {
+                QAccessibleEvent focus(b, QAccessible::Focus);
+                QAccessible::updateAccessibility(&focus);
+            }
+            if (caretMoved && b->interface_cast(QAccessible::TextInterface)) {
+                const QByteArray raw = doc->blockText(caretBlock);
+                QAccessibleTextCursorEvent ev(b, int(coords::byteToQtPos(raw, caretByte)));
+                QAccessible::updateAccessibility(&ev);
+            }
+        }
+    }
+
+    // Selection: one event per block whose per-block intersection changed,
+    // including blocks whose intersection shrank to empty (event with
+    // (-1,-1) — how Qt's QAccessibleTextSelectionEvent spells "cleared").
+    const int oldSi = old.valid ? m_view->blockIndexOf(old.startBlock) : -1;
+    const int oldEi = old.valid ? m_view->blockIndexOf(old.endBlock) : -1;
+    const int newSi = now.valid ? m_view->blockIndexOf(now.startBlock) : -1;
+    const int newEi = now.valid ? m_view->blockIndexOf(now.endBlock) : -1;
+    const bool oldOk = old.valid && oldSi >= 0 && oldEi >= 0;
+    const bool newOk = now.valid && newSi >= 0 && newEi >= 0;
+    if (!oldOk && !newOk)
+        return;
+
+    int lo = INT_MAX, hi = -1;
+    if (oldOk) { lo = qMin(lo, oldSi); hi = qMax(hi, oldEi); }
+    if (newOk) { lo = qMin(lo, newSi); hi = qMax(hi, newEi); }
+
+    for (int i = lo; i <= hi; ++i) {
+        const bool endpoint = (oldOk && (i == oldSi || i == oldEi)) || (newOk && (i == newSi || i == newEi));
+        if (!endpoint) {
+            // Strict interior of either range = fully selected. Cheap
+            // membership compare, no buffer read, so a huge
+            // select-all-then-extend stays O(span) integer compares.
+            const bool oldIn = oldOk && i > oldSi && i < oldEi;
+            const bool newIn = newOk && i > newSi && i < newEi;
+            if (oldIn == newIn)
+                continue;
+        }
+        const BlockId id = m_view->blockIdAt(i);
+        if (id.isNull())
+            continue;
+        CanvasBlockAccessible *b = blockAccessible(id);
+        if (!b || !b->interface_cast(QAccessible::TextInterface))
+            continue;
+        const QByteArray raw = doc->blockText(id);
+        const int len = raw.size();
+        const auto o = intersectSel(oldOk, oldSi, old.startByte, oldEi, old.endByte, i, len);
+        const auto n = intersectSel(newOk, newSi, now.startByte, newEi, now.endByte, i, len);
+        if (o == n)
+            continue;
+        int s = -1, e = -1;
+        if (n.first >= 0) {
+            s = int(coords::byteToQtPos(raw, n.first));
+            e = int(coords::byteToQtPos(raw, n.second));
+        }
+        QAccessibleTextSelectionEvent ev(b, s, e);
+        QAccessible::updateAccessibility(&ev);
+    }
+}
+
+void CanvasAccessible::notifyFocusChange(bool gained)
+{
+    CanvasBlockAccessible *b = blockAccessible(m_view->caretBlock());
+    if (gained) {
+        if (b) {
+            QAccessibleEvent ev(b, QAccessible::Focus);
+            QAccessible::updateAccessibility(&ev);
+        } else {
+            QAccessibleEvent ev(m_view, QAccessible::Focus);
+            QAccessible::updateAccessibility(&ev);
+        }
+        return;
+    }
+    QAccessible::State changed;
+    changed.focused = true;
+    if (b) {
+        QAccessibleStateChangeEvent ev(b, changed);
+        QAccessible::updateAccessibility(&ev);
+    } else {
+        QAccessibleStateChangeEvent ev(m_view, changed);
+        QAccessible::updateAccessibility(&ev);
+    }
 }
 
 // ---- CanvasBlockAccessible ---------------------------------------------
@@ -699,6 +860,31 @@ void installAccessibilityFactory()
         return;
     installed = true;
     QAccessible::installFactory(canvasAccessibleFactory);
+}
+
+namespace {
+CanvasAccessible *containerFor(View *view)
+{
+    return dynamic_cast<CanvasAccessible *>(QAccessible::queryAccessibleInterface(view));
+}
+}  // namespace
+
+void notifyTextState(View *view, bool viewHasFocus)
+{
+    // Spec §4.4: isActive() short-circuit — nothing runs, nothing is
+    // allocated, when no AT client is attached.
+    if (!QAccessible::isActive())
+        return;
+    if (CanvasAccessible *c = containerFor(view))
+        c->syncTextNotifications(viewHasFocus);
+}
+
+void notifyFocusChange(View *view, bool gained)
+{
+    if (!QAccessible::isActive())
+        return;
+    if (CanvasAccessible *c = containerFor(view))
+        c->notifyFocusChange(gained);
 }
 
 }  // namespace Markoff::Canvas::Detail
