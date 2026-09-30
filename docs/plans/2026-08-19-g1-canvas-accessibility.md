@@ -84,7 +84,7 @@ Push.
 | A3.1 Event spy test harness | ☑ | `60a4c63e` | break `8da7ade9` / revert `8a2e4af1` |
 | A3.2 Caret/selection/focus events | ☑ | `9377d4a0` | break `6dfc613f` / revert `9cf383a8` |
 | A3.3 Text insert/remove + block create/destroy events | ☑ | `61f6cece` | break `7c942d3e` / revert `11b97d32` |
-| A3.4 ⏸ phase close (full suite) | ☑ | see A3.4 docs commit on master | exempt |
+| A3.4 ⏸ phase close (full suite) | ☑ | `e8d3ccf6` | exempt |
 | **A4 — folding, actions, editable text** | | | |
 | A4.1 Hidden/folded state + expand-collapse action | ☐ | | |
 | A4.2 `QAccessibleEditableTextInterface` (decide in-task, see notes) | ☐ | | |
