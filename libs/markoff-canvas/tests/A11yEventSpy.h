@@ -58,7 +58,7 @@ public:
     {
         QAccessible::setActive(m_wasActive);
         s_current = m_previousSpy;
-        // BREAK: handler not restored
+        QAccessible::installUpdateHandler(m_previousHandler);
     }
 
     A11yEventSpy(const A11yEventSpy &) = delete;
