@@ -4,6 +4,7 @@
 #include <markoff/source/Editor.h>
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
+#include "CandidateDocumentFixture.h"
 
 class TestSourceEditorViewContract : public QObject {
     Q_OBJECT
@@ -26,7 +27,8 @@ private slots:
     }
     void setDocument_emits_documentChanged() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(QByteArrayLiteral(""));
+        auto& doc = *fixture.document;
         QSignalSpy spy(&e, &Markoff::MarkdownView::documentChanged);
         e.setDocument(&doc);
         QCOMPARE(e.document(), &doc);
@@ -34,8 +36,9 @@ private slots:
     }
     void cursor_position_round_trips() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("# A\n\n# B\n\n# C\n"));
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(
+            QByteArrayLiteral("# A\n\n# B\n\n# C\n"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         // The binding seeds the inner QPlainTextEdit synchronously; no wait needed.
         QTRY_VERIFY(!e.plainTextEdit()->toPlainText().isEmpty());

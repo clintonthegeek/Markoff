@@ -8,14 +8,16 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/source/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 class TstSourceParagraphMargins : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void margins_present_on_every_block() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(
+            QByteArrayLiteral("Alpha\n\nBravo"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         e.resize(400, 200);
         e.show();

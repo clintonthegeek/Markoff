@@ -8,6 +8,7 @@
 #include <markoff/core/ClipboardCodec.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/source/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 using Markoff::ClipboardCodec::kMarkdownMime;
 using Markoff::ClipboardCodec::kRtfMime;
@@ -45,8 +46,8 @@ private slots:
 
 void TstSourceRichClipboard::copy_writesHtmlAndMarkdownMime()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("Hello **world**\n");
+    auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument("Hello **world**\n");
+    auto& doc = *fixtureDocument.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();
@@ -72,8 +73,8 @@ void TstSourceRichClipboard::copy_writesHtmlAndMarkdownMime()
 
 void TstSourceRichClipboard::copyAsPlain_stripsMarkers()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("Hello **world**\n");
+    auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument("Hello **world**\n");
+    auto& doc = *fixtureDocument.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();
@@ -93,8 +94,8 @@ void TstSourceRichClipboard::copyAsPlain_stripsMarkers()
 
 void TstSourceRichClipboard::copyAsHtml_exclusiveNoPlain()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("**bold**\n");
+    auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument("**bold**\n");
+    auto& doc = *fixtureDocument.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();
@@ -113,8 +114,8 @@ void TstSourceRichClipboard::copyAsHtml_exclusiveNoPlain()
 
 void TstSourceRichClipboard::paste_htmlBecomesMarkdown()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("X\n");
+    auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument("X\n");
+    auto& doc = *fixtureDocument.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();
@@ -140,8 +141,8 @@ void TstSourceRichClipboard::paste_htmlBecomesMarkdown()
 
 void TstSourceRichClipboard::pasteAsPlain_stripsIncomingHtml()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("X\n");
+    auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument("X\n");
+    auto& doc = *fixtureDocument.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();

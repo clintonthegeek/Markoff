@@ -9,6 +9,31 @@
 #include <QTextCursor>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
+namespace {
+struct CandidateDocument {
+    std::unique_ptr<Markoff::VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<Markoff::MarkoffDocument> document;
+};
+CandidateDocument openDocument(const QByteArray& markdown)
+{
+    static int serial = 0;
+    auto provider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!provider.ok()) throw std::runtime_error("provider creation failed");
+    CandidateDocument fixture{std::move(provider).value(), {}};
+    auto opened = Markoff::MarkoffDocument::open(*fixture.provider,
+        {QStringLiteral("source-widget-%1").arg(++serial), 1},
+        Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    const auto imported = fixture.document->importInitialMarkdown(markdown);
+    if (imported.state != Markoff::VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial import failed");
+    return fixture;
+}
+}
 #include <markoff/source/Editor.h>
 
 class TstSourceFormatOps : public QObject {
@@ -34,8 +59,8 @@ private Q_SLOTS:
 
     void toggleBold_wraps_selection() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("hello world"));
+        auto fixture = openDocument(QByteArrayLiteral("hello world"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -47,8 +72,8 @@ private Q_SLOTS:
 
     void toggleBold_unwraps_when_surrounded() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("**hello** world"));
+        auto fixture = openDocument(QByteArrayLiteral("**hello** world"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -60,8 +85,8 @@ private Q_SLOTS:
 
     void toggleItalic_wraps_with_underscores() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("hello world"));
+        auto fixture = openDocument(QByteArrayLiteral("hello world"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -73,8 +98,8 @@ private Q_SLOTS:
 
     void toggleStrikethrough_wraps_with_tildes() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("hello"));
+        auto fixture = openDocument(QByteArrayLiteral("hello"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -90,8 +115,8 @@ private Q_SLOTS:
         // boundary used to trip applyFlatEdit's cross-block branch via the
         // QTextCursor-mediated path. Now block-aware.
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("para text\n\nhello world"));
+        auto fixture = openDocument(QByteArrayLiteral("para text\n\nhello world"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -114,8 +139,8 @@ private Q_SLOTS:
 
     void toggleInlineCode_wraps_with_backticks() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("call foo() here"));
+        auto fixture = openDocument(QByteArrayLiteral("call foo() here"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -127,8 +152,8 @@ private Q_SLOTS:
 
     void insertLink_at_cursor_inserts_template() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("hello"));
+        auto fixture = openDocument(QByteArrayLiteral("hello"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -140,8 +165,8 @@ private Q_SLOTS:
 
     void insertLink_wraps_selection_with_brackets() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("see hello world"));
+        auto fixture = openDocument(QByteArrayLiteral("see hello world"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -159,8 +184,8 @@ private Q_SLOTS:
         // step (cursor-insert forward-bias hid it today). Block-aware port
         // matches the heading + wrap pattern.
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("para text\n\nhello world"));
+        auto fixture = openDocument(QByteArrayLiteral("para text\n\nhello world"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -181,8 +206,8 @@ private Q_SLOTS:
 
     void setHeadingLevel_promotes_paragraph_line() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("Hello world"));
+        auto fixture = openDocument(QByteArrayLiteral("Hello world"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -194,8 +219,8 @@ private Q_SLOTS:
 
     void setHeadingLevel_changes_existing_level() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("# Hello"));
+        auto fixture = openDocument(QByteArrayLiteral("# Hello"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -207,8 +232,8 @@ private Q_SLOTS:
 
     void setHeadingLevel_zero_strips_markers() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("### Hello"));
+        auto fixture = openDocument(QByteArrayLiteral("### Hello"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -225,8 +250,8 @@ private Q_SLOTS:
         // cross-block-edit branch (the Qt range edit started at the
         // markoff-block boundary; sep→no-sep translation lost direction).
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("para text\n\nHello"));
+        auto fixture = openDocument(QByteArrayLiteral("para text\n\nHello"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -250,13 +275,8 @@ private Q_SLOTS:
 
     void setHeadingLevel_only_affects_current_line() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // Three separate paragraph blocks ("\n\n"-delimited in source). Pre-WP
-        // this used single '\n's, but buildD2FromBytes now collapses soft line
-        // breaks within a paragraph to spaces, so single-'\n'-joined lines load
-        // as ONE block. widgetFlatView() then renders the three blocks
-        // single-'\n'-joined, which is what toPlainText() shows.
-        doc.loadFromMarkdown(QByteArray("first line\n\nsecond line\n\nthird line"));
+        auto fixture = openDocument(QByteArrayLiteral("first line\n\nsecond line\n\nthird line"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 

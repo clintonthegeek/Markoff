@@ -7,14 +7,15 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/source/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 class TstSourceDogfoodInvariants : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void enter_at_paragraph_end_creates_block_and_places_caret() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         e.resize(400, 200);
         e.show();
@@ -35,8 +36,8 @@ private Q_SLOTS:
 
     void enter_at_document_end_creates_block() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha"));
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(QByteArrayLiteral("Alpha"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         e.resize(400, 200);
         e.show();
@@ -57,8 +58,8 @@ private Q_SLOTS:
 
     void enter_mid_paragraph_splits_with_caret_at_new_block() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("AlphaBravo"));
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(QByteArrayLiteral("AlphaBravo"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         e.resize(400, 200);
         e.show();
@@ -79,8 +80,8 @@ private Q_SLOTS:
 
     void backspace_at_block_start_merges_with_caret_at_join() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         e.resize(400, 200);
         e.show();

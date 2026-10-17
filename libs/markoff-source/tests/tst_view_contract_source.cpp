@@ -8,22 +8,28 @@
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/source/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 #include "../../markoff-core/tests/ViewContractChecks.h"
 
 class TstViewContractSource : public QObject {
     Q_OBJECT
     Markoff::MarkoffDocument *m_doc = nullptr;
+    Markoff::Source::Tests::CandidateDocumentFixture m_fixture;
     Markoff::Source::Editor  *m_ed  = nullptr;
 private Q_SLOTS:
     void init() {
-        m_doc = new Markoff::MarkoffDocument(1);
-        m_doc->loadFromMarkdown(ViewContract::fixture());
+        m_fixture = Markoff::Source::Tests::openCandidateDocument(ViewContract::fixture());
+        m_doc = m_fixture.document.get();
         m_ed  = new Markoff::Source::Editor;
         m_ed->setDocument(m_doc);
         QTest::qWait(50);
     }
-    void cleanup() { delete m_ed; delete m_doc; }
+    void cleanup() {
+        delete m_ed;
+        m_fixture = {};
+        m_doc = nullptr;
+    }
 
     void cursor_round_trip()            { ViewContract::checkCursorRoundTrip(m_ed); }
     void read_only_blocks()             { ViewContract::checkReadOnlyBlocksUndoAndKeepsBytes(m_ed, m_doc); }
@@ -105,12 +111,12 @@ private Q_SLOTS:
     // emit scrollPositionChanged unconditionally.
     void scrollPositionChanged_fires_on_native_scroll() {
         // Use a fresh editor + tall document so the scrollbar has range.
-        Markoff::MarkoffDocument doc(2);
         // 30 paragraphs is tall enough for any reasonable default font.
         QByteArray md;
         for (int i = 0; i < 30; ++i)
             md += QByteArrayLiteral("Paragraph line ") + QByteArray::number(i) + "\n\n";
-        doc.loadFromMarkdown(md);
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(md);
+        auto& doc = *fixture.document;
 
         Markoff::Source::Editor ed;
         ed.resize(400, 200);
@@ -164,8 +170,9 @@ private Q_SLOTS:
     // editor, and track the cursor downward as the caret moves to a later line.
     void caretRect_validAfterAttach_tracksCursor()
     {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha one.\n\nBeta two.\n\nGamma three.\n"));
+        auto fixture = Markoff::Source::Tests::openCandidateDocument(
+            QByteArrayLiteral("Alpha one.\n\nBeta two.\n\nGamma three.\n"));
+        auto& doc = *fixture.document;
         Markoff::Source::Editor ed;
         ed.resize(600, 400);
         ed.show();

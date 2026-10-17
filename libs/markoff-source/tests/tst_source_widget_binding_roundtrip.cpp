@@ -8,6 +8,36 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
+namespace {
+struct CandidateDocument {
+    std::unique_ptr<Markoff::VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<Markoff::MarkoffDocument> document;
+};
+CandidateDocument openDocument(const QByteArray& markdown)
+{
+    static int serial = 0;
+    auto provider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!provider.ok()) throw std::runtime_error("provider creation failed");
+    CandidateDocument fixture{std::move(provider).value(), {}};
+    auto opened = Markoff::MarkoffDocument::open(*fixture.provider,
+        {QStringLiteral("source-binding-%1").arg(++serial), 1},
+        Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    const auto imported = fixture.document->importInitialMarkdown(markdown);
+    if (imported.state != Markoff::VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial import failed");
+    if (!fixture.document->canStartOrdinaryAction())
+        throw std::runtime_error("initial import did not open ordinary edits; provider state "
+            + std::to_string(static_cast<int>(fixture.document->providerState()))
+            + (imported.diagnostic ? "; " + std::string(imported.diagnostic->message())
+                                   : std::string{}));
+    return fixture;
+}
+}
 
 namespace {
 // Read the D2 flat view: concatenation of per-block buffers.
@@ -25,9 +55,8 @@ class TstSourceWidgetBindingRoundtrip : public QObject {
 private Q_SLOTS:
     void typing_propagates_to_markoff_document() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // D2: document must have at least one block before edits can land.
-        doc.loadFromMarkdown(QByteArray());
+        auto fixture = openDocument(QByteArrayLiteral(""));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         e.show();
         // Key events must target the inner QPlainTextEdit where text input lands.
@@ -37,12 +66,15 @@ private Q_SLOTS:
 
     void external_doc_edit_propagates_to_editor() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // D2: document must have at least one block before edits can land.
-        doc.loadFromMarkdown(QByteArray());
+        auto fixture = openDocument(QByteArrayLiteral(""));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
 
-        doc.applyFlatEdit(0, 0, QByteArray("hello"), Markoff::Origin::UserEdit);
+        const auto result = doc.applyBlockEdit({doc.iterateBlocks().front(), 0, 0,
+                                                QByteArrayLiteral("hello")});
+        QVERIFY2(result.state == Markoff::VNext::ActionPublicationState::committed,
+                 result.diagnostic ? result.diagnostic->message().data()
+                                   : "candidate edit was not committed");
         // d2DocumentChanged is deferred (QTimer::singleShot(0)); let it settle.
         QCoreApplication::processEvents();
         QTRY_COMPARE(e.toPlainText(), QStringLiteral("hello"));
@@ -58,9 +90,8 @@ private Q_SLOTS:
         // Auto-coalescing of adjacent inserts is a foundation concern (not
         // yet implemented), not a widget concern.
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // D2: document must have at least one block before edits can land.
-        doc.loadFromMarkdown(QByteArray());
+        auto fixture = openDocument(QByteArrayLiteral(""));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         e.show();
         // Key events must target the inner QPlainTextEdit where text input lands.
@@ -79,8 +110,8 @@ private Q_SLOTS:
         // the character in the correct (preceding) block, not the following
         // one, and must not create a spurious third block.
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("alpha\n\nbeta"));
+        auto fixture = openDocument(QByteArrayLiteral("alpha\n\nbeta"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         e.show();
         // End of "alpha" = qtPos 5 (before the "\n\n").

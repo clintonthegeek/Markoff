@@ -13,14 +13,15 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/source/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 class TstSourceListItemMarker : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void bullet_marker_painted_for_listitem_block() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("- foo\n"));
+        auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument(QByteArrayLiteral("- foo\n"));
+        auto& doc = *fixtureDocument.document;
         e.setDocument(&doc);
         e.resize(400, 200);
         e.show();
@@ -43,8 +44,8 @@ private Q_SLOTS:
 
     void non_listitem_block_has_no_marker() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument(QByteArrayLiteral("Alpha\n\nBravo"));
+        auto& doc = *fixtureDocument.document;
         e.setDocument(&doc);
         e.resize(400, 200);
         e.show();
@@ -58,8 +59,8 @@ private Q_SLOTS:
 
     void ordered_marker_reflects_number() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("1. one\n2. two\n"));
+        auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument(QByteArrayLiteral("1. one\n2. two\n"));
+        auto& doc = *fixtureDocument.document;
         e.setDocument(&doc);
         e.resize(400, 200);
         e.show();

@@ -17,6 +17,7 @@
 #include <markoff/core/FindController.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/source/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 using Markoff::FindController;
 
@@ -46,8 +47,8 @@ class TstSourceFindAdapter : public QObject {
 private Q_SLOTS:
     void highlights_align_with_visible_text_across_blocks() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(fixture());
+        auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument(fixture());
+        auto& doc = *fixtureDocument.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -73,8 +74,8 @@ private Q_SLOTS:
 
     void navigation_places_caret_at_visible_match() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(fixture());
+        auto fixtureDocument = Markoff::Source::Tests::openCandidateDocument(fixture());
+        auto& doc = *fixtureDocument.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 

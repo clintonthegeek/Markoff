@@ -4,6 +4,31 @@
 
 #include <markoff/source/Editor.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
+namespace {
+struct CandidateDocument {
+    std::unique_ptr<Markoff::VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<Markoff::MarkoffDocument> document;
+};
+CandidateDocument openDocument(const QByteArray& markdown)
+{
+    static int serial = 0;
+    auto provider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!provider.ok()) throw std::runtime_error("provider creation failed");
+    CandidateDocument fixture{std::move(provider).value(), {}};
+    auto opened = Markoff::MarkoffDocument::open(*fixture.provider,
+        {QStringLiteral("source-widget-%1").arg(++serial), 1},
+        Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    const auto imported = fixture.document->importInitialMarkdown(markdown);
+    if (imported.state != Markoff::VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial import failed");
+    return fixture;
+}
+}
 #include <markoff/core/Theme.h>
 
 class TstSourceWidgetEditor : public QObject {
@@ -16,10 +41,8 @@ private Q_SLOTS:
 
     void setDocument_attaches_and_seed_text_appears() {
         Markoff::Source::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // D2: loadFromMarkdown populates the per-block structure the binding
-        // reads; resetContent writes only to the legacy flat buffer.
-        doc.loadFromMarkdown(QByteArray("hello world"));
+        auto fixture = openDocument(QByteArrayLiteral("hello world"));
+        auto& doc = *fixture.document;
         e.setDocument(&doc);
         // setDocument triggers syncQtDocumentFromMarkoff synchronously;
         // d2DocumentChanged is deferred — let it settle.

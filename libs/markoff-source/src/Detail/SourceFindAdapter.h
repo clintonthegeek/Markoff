@@ -16,7 +16,7 @@ class Editor;
 namespace Detail {
 
 /// Internal. Subscribes to a Markoff::FindController and translates
-/// (BlockAnchor, byteOffset, byteLength) matches into flat
+/// (BlockId, byteOffset, byteLength) matches into flat
 /// QTextEdit::ExtraSelections rendered on the underlying
 /// QPlainTextEdit, plus a non-focus-stealing setTextCursor on
 /// navigationRequested.

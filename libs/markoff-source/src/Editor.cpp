@@ -91,6 +91,10 @@ Editor::Editor(QWidget *parent)
     // QPlainTextEdit::cursorPositionChanged is itself change-driven, so no
     // extra gating is needed.
     connect(m_editor, &QPlainTextEdit::cursorPositionChanged, this, [this]() {
+        if (m_binding) {
+            const auto cursor = m_editor->textCursor();
+            m_binding->captureViewSelection(cursor.anchor(), cursor.position());
+        }
         const Markoff::CursorPos p = cursorPosition();
         Q_EMIT cursorPositionChanged(p.line, p.column);
     });
@@ -306,6 +310,14 @@ bool Editor::eventFilter(QObject *watched, QEvent *event) {
         auto *e = static_cast<QKeyEvent *>(event);
         const auto m = e->modifiers();
         auto *doc = Markoff::MarkdownView::document();
+        if (doc && (e->key() == Qt::Key_Return || e->key() == Qt::Key_Enter
+                    || e->key() == Qt::Key_Backspace || e->key() == Qt::Key_Delete
+                    || e->key() == Qt::Key_Tab || e->key() == Qt::Key_Backtab)) {
+            const auto cursor = m_editor->textCursor();
+            if (m_binding->handleStructuralKey(e->key(), int(m),
+                                               cursor.position(), cursor.anchor()))
+                return true;
+        }
         if (doc && (m & Qt::ControlModifier)) {
             if (e->key() == Qt::Key_Z && !(m & Qt::ShiftModifier)) {
                 doc->undoD2();
