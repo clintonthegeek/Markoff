@@ -12,15 +12,15 @@
 #include <QApplication>
 #include <QFile>
 #include <QTextStream>
+#include <QUuid>
 
 #include <markoff/canvas/EditorWidget.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
 
 int main(int argc, char **argv)
 {
     QApplication app(argc, argv);
-
-    Markoff::MarkoffDocument doc;
 
     const QStringList args = app.arguments();
     QString source;
@@ -54,10 +54,22 @@ int main(int argc, char **argv)
             "A closing paragraph long enough to wrap across more than one line "
             "so that word wrapping is visible in the grab as well.\n");
     }
-    doc.loadFromMarkdown(source.toUtf8());
+    auto providerResult = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!providerResult.ok()) return 1;
+    auto provider = std::move(providerResult).value();
+    const Markoff::VNext::DocumentStorageScope scope{
+        QStringLiteral("canvas-%1").arg(
+            QUuid::createUuid().toString(QUuid::WithoutBraces)), 1};
+    auto documentResult = Markoff::MarkoffDocument::open(
+        *provider, scope, Markoff::VNext::StorageMode::ephemeral);
+    if (!documentResult.ok()) return 1;
+    auto document = std::move(documentResult).value();
+    if (document->importInitialMarkdown(source.toUtf8()).state
+        != Markoff::VNext::ActionPublicationState::committed) return 1;
+    auto *documentPtr = document.get();
 
     Markoff::Canvas::EditorWidget view;
-    view.setDocument(&doc);
+    view.setDocument(documentPtr);
     view.setWindowTitle(QStringLiteral("markoff-canvas (spike)"));
     const int w = qEnvironmentVariableIntValue("MARKOFF_CANVAS_W") > 0
                 ? qEnvironmentVariableIntValue("MARKOFF_CANVAS_W") : 800;

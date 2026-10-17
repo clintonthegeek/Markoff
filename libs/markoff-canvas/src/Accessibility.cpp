@@ -152,8 +152,6 @@ namespace {
 quint64 bufferChangeToken(MarkoffDocument *doc, BlockId id)
 {
     quint64 t = doc->blockEditSequence(id);
-    if (const auto *proxy = doc->bufferProxy(id))
-        t += proxy->editSequence();
     return t;
 }
 

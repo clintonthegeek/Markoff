@@ -4,6 +4,20 @@ set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if(MARKOFF_USE_COLLABTEXT_VNEXT)
+    add_executable(tst_canvas_vnext_session_positions
+        tst_canvas_vnext_session_positions.cpp)
+    target_link_libraries(tst_canvas_vnext_session_positions
+        PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core
+                Markoff::CollabTextVNext)
+    target_include_directories(tst_canvas_vnext_session_positions PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/../../markoff-collabtext-vnext/src)
+    add_test(NAME tst_canvas_vnext_session_positions
+        COMMAND tst_canvas_vnext_session_positions)
+    set_tests_properties(tst_canvas_vnext_session_positions
+        PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+else()
+
 add_executable(tst_canvas_render tst_canvas_render.cpp)
 add_test(NAME tst_canvas_render COMMAND tst_canvas_render)
 target_link_libraries(tst_canvas_render PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
@@ -161,7 +175,7 @@ set_tests_properties(tst_canvas_side_content PROPERTIES ENVIRONMENT "QT_QPA_PLAT
 
 add_executable(tst_canvas_folding tst_canvas_folding.cpp)
 add_test(NAME tst_canvas_folding COMMAND tst_canvas_folding)
-target_link_libraries(tst_canvas_folding PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+target_link_libraries(tst_canvas_folding PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core collabtext)
 set_tests_properties(tst_canvas_folding PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_canvas_session_selection tst_canvas_session_selection.cpp)
@@ -209,3 +223,5 @@ set_tests_properties(tst_canvas_accessibility PROPERTIES ENVIRONMENT "QT_QPA_PLA
 # tests. Name carries "canvas" deliberately — that is the -R filter.
 add_test(NAME tst_canvas_constitution
          COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check-constitution.sh)
+
+endif()

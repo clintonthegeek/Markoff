@@ -63,6 +63,12 @@ namespace coords = Markoff::TextUnits;
 namespace Markoff::Canvas {
 
 namespace {
+bool publicationCommitted(const Markoff::VNext::ActionPublicationResult& result)
+{
+    using State = Markoff::VNext::ActionPublicationState;
+    return result.state == State::committed || result.state == State::committedHistoryPending;
+}
+
 /// Page margin, in device-independent pixels, either side of the text
 /// column. Widened from 16 to 28 in P5.6 to make room for the fold
 /// affordance (below) alongside the marker/checkbox decoration slot that
@@ -362,6 +368,7 @@ void View::setDocument(MarkoffDocument *doc)
     if (m_doc == doc)
         return;
 
+    setPublicationPending(false);
     if (m_doc)
         m_doc->disconnect(this);
 
@@ -386,11 +393,29 @@ void View::setDocument(MarkoffDocument *doc)
         // cheat sheet.
         connect(m_doc, &MarkoffDocument::d2DocumentChanged,
                 this, &View::onDocumentChanged);
-        connect(m_doc, &MarkoffDocument::documentReloaded,
-                this, &View::onDocumentChanged);
+        setPublicationPending(m_doc->providerState()
+            == Markoff::VNext::ProviderDocumentState::recoveryRequired);
+        connect(m_doc, &MarkoffDocument::tentativeBlockChanged, this,
+            [this](BlockId) { setPublicationPending(true); });
+        connect(m_doc, &MarkoffDocument::tentativeBlockCommitted, this,
+            [this](BlockId) {
+                setPublicationPending(m_doc->providerState()
+                    == Markoff::VNext::ProviderDocumentState::recoveryRequired);
+            });
+        connect(m_doc, &MarkoffDocument::tentativeBlockReverted, this,
+            [this](BlockId) {
+                setPublicationPending(m_doc->providerState()
+                    == Markoff::VNext::ProviderDocumentState::recoveryRequired);
+            });
+        connect(m_doc, &MarkoffDocument::providerStateChanged, this, [this] {
+            setPublicationPending(m_doc->providerState()
+                == Markoff::VNext::ProviderDocumentState::recoveryRequired);
+            syncReadOnlyState();
+        });
     }
 
     onDocumentChanged();
+    syncFoldedHeadsFromSession();
 }
 
 MarkoffDocument *View::document() const
@@ -403,34 +428,35 @@ void View::setSession(Session *session)
     if (m_session == session)
         return;
 
+    QObject::disconnect(m_sessionFoldConnection);
     m_session = session;
+    if (m_session) {
+        m_sessionFoldConnection = connect(m_session,
+            &Session::foldedRegionsChanged, this,
+            &View::syncFoldedHeadsFromSession);
+    }
+    syncFoldedHeadsFromSession();
+}
 
-    // NOTE (P6.0 finding, see plan findings log): a generic "rebuild
-    // m_foldedHeads FROM m_session->foldedRegions()" step is deliberately
-    // NOT implemented here. FoldRef::start is a raw per-block
-    // CollabText::Crdt::Anchor with no block identity attached, and
-    // per-block CRDT buffers each run their OWN Lamport clock seeded only
-    // by the shared document replica id (MarkoffDocument constructs every
-    // block's Buffer as Buffer(d->replicaId), no per-block offset) — so
-    // two different foldable blocks' byte-0 anchors routinely collide on
-    // (replica_id, char_value) (confirmed: both come out {replicaId, 1}
-    // whenever both blocks' first characters were authored by the same
-    // replica, the common case for a freshly loaded/typed document).
-    // Reverse-resolving an arbitrary FoldRef to "the" BlockId it names is
-    // therefore ambiguous whenever more than one foldable block collides
-    // this way — this is NOT a rare edge case, it reproduces on any
-    // two-heading document. `toggleFold()` below instead keeps
-    // m_foldedHeads authoritative for ITS OWN writes (it always knows the
-    // exact BlockId at the point it pushes a FoldRef to the Session) and
-    // pushes through to the Session so external readers (falsification:
-    // reading `session->foldedRegions()` after `toggleFold()`) see real
-    // state — Session genuinely receives every fold, it just isn't (yet)
-    // resolvable back into a BlockId set from cold session state alone.
-    // A session created fresh by EditorWidget::setDocument() always
-    // starts with empty foldedRegions(), so this gap does not affect any
-    // currently-exercised code path; it would need FoldRef to carry a
-    // block identity (a core schema change beyond this task's named
-    // seam) to close generally.
+void View::syncFoldedHeadsFromSession()
+{
+    QSet<BlockId> restored;
+    if (m_session && m_doc) {
+        for (const Markoff::FoldRef &fold : m_session->foldedRegions()) {
+            if (!fold.startPosition || !fold.startPosition->isValid()) continue;
+            const BlockId id = fold.startPosition->block;
+            const auto resolved = m_doc->resolveBoundaryToken(
+                id, fold.startPosition->boundaryToken);
+            if (!resolved.ok()) continue;
+            if (!id.isNull() && isBlockFoldable(id))
+                restored.insert(id);
+        }
+    }
+    if (restored == m_foldedHeads) return;
+    m_foldedHeads = std::move(restored);
+    refreshFoldedBlocks();
+    ensureLayoutForViewport();
+    viewport()->update();
 }
 
 Session *View::session() const
@@ -580,13 +606,33 @@ void View::setReadOnly(bool ro)
     if (m_readOnly == ro)
         return;
     m_readOnly = ro;
-    Detail::notifyReadOnlyChanged(this);
-    emit readOnlyChanged(ro);
+    syncReadOnlyState();
 }
 
 bool View::isReadOnly() const
 {
-    return m_readOnly;
+    if (m_readOnly || m_publicationPending)
+        return true;
+    return m_doc && !m_doc->canStartOrdinaryAction();
+}
+
+void View::setPublicationPending(bool pending)
+{
+    if (m_publicationPending == pending)
+        return;
+    m_publicationPending = pending;
+    emit publicationPendingChanged(pending);
+    syncReadOnlyState();
+}
+
+void View::syncReadOnlyState()
+{
+    const bool current = isReadOnly();
+    if (m_reportedReadOnly != current) {
+        m_reportedReadOnly = current;
+        Detail::notifyReadOnlyChanged(this);
+        emit readOnlyChanged(current);
+    }
 }
 
 QRect View::caretRectInViewport() const
@@ -1098,8 +1144,10 @@ Markoff::FoldRef View::foldRefFor(BlockId id) const
     ref.kind = (info.kind == Detail::FoldKind::Heading)
                    ? Markoff::FoldRef::Kind::Heading
                    : Markoff::FoldRef::Kind::Block;
-    // D2-safe raw anchor at the head block's byte 0 — the P6.0 core seam.
-    ref.start = m_doc->blockCrdtAnchorAt(id, 0, CollabText::Crdt::Bias::Left);
+    // Store a provider-scoped position; candidate views never retain engine anchors.
+    const auto token = m_doc->boundaryTokenAt(id, 0, false);
+    if (!token.ok()) return ref;
+    ref.startPosition = Markoff::ScopedTextPosition{id, token.value()};
 
     if (info.kind == Detail::FoldKind::Heading) {
         const auto attrs = m_doc->blockAttrs(id);
@@ -1153,12 +1201,10 @@ void View::toggleFold(BlockId id)
     if (!m_doc || !isBlockFoldable(id))
         return;
 
-    // P6.0: m_foldedHeads stays authoritative for the View's OWN writes —
-    // at this exact call site the BlockId <-> FoldRef correspondence is
-    // known exactly (see foldRefFor()'s and setSession()'s doc comments
-    // for why a *generic* reverse resolution from Session state alone is
-    // NOT sound and is therefore not attempted). When a Session is
-    // attached, the same toggle is pushed through to it so external
+    // m_foldedHeads is the rendering projection. When a Session is
+    // attached, the exact block-qualified state is also updated there so
+    // it can be restored when the session is attached again. The same
+    // toggle is pushed through so external
     // readers (falsification: `session->foldedRegions()` after this call)
     // see real state — Session is a genuine second writer target, not
     // just decoration.
@@ -1786,6 +1832,10 @@ void View::ensureLayoutForViewport()
 
 void View::onDocumentChanged()
 {
+    setPublicationPending(m_doc
+        && m_doc->providerState()
+            == Markoff::VNext::ProviderDocumentState::recoveryRequired);
+    syncReadOnlyState();
     const int oldCaretIndex = m_cache->indexOf(m_caret.block);
 
     if (m_doc) {
@@ -1805,43 +1855,21 @@ void View::onDocumentChanged()
     // events (which may target a block created here). Synchronous (C2).
     Detail::notifyDocumentChanged(this);
 
-    // P6.1 (guide §B.1/B.2): re-resolve the caret from the Session's own
-    // stored anchor BEFORE falling back to clampCaret's plain "nearest
-    // surviving block by index" heuristic — the CRDT anchor names a
-    // *character*, which survives an edit that shifts bytes/blocks around
-    // it, strictly better information than "which index used to be here".
-    // This is additive, not a replacement: clampCaret still runs, unchanged,
-    // whenever there's no Session attached OR the anchor's own content is
-    // gone (a genuine "nothing sound to resolve to" case — same situation
-    // the pre-P6.1 selection-anchor drop below already handled).
-    //
-    // NOT using MarkoffDocument::blockAt(TextAnchor) here — P6.1 finding
-    // (see plan findings log): it resolves via
-    // d->latestBlockRanges/latestBlockAnchors, which this task discovered
-    // are never assigned ANYWHERE in markoff-core/src (grepped the whole
-    // tree) — not merely "stale after D2 edits" per offsetInBlock()'s own
-    // neighboring comment, but permanently empty, on every document, D2 or
-    // legacy. blockAt() therefore always returns nullopt. markoff-core is
-    // closed for this task (P6.1's named seam is consuming P6.0's already-
-    // landed accessors, not fixing unrelated ones), so this resolves the
-    // same "block still contains this content, or it's gone" question a
-    // different, already-D2-safe way instead: a TextAnchor already carries
-    // the BlockId its per-block CRDT anchor was cut against
-    // (TextAnchor::block()); checking that block is still a live cache
-    // entry, then reading the offset via offsetInBlock(BlockAnchor,
-    // TextAnchor) (P6.0-confirmed D2-safe — dispatches to
-    // resolveBlockCrdtAnchor against the block's own buffer, never
-    // latestBlockRanges), gives the identical resolve-or-nullopt contract
-    // for every case this task's own tests exercise (in-block edits before
-    // the caret; the anchor's own block untouched). It does not attempt to
-    // follow content across a block MERGE the way a working blockAt() in
-    // principle could — no such working version exists to compare against.
+    // Re-resolve the caret from the Session's block-qualified anchor before
+    // falling back to the nearest surviving block by index. The anchor keeps
+    // the actual block identity and its per-block CRDT position across edits.
     bool caretResolvedFromSession = false;
     if (m_session && m_doc) {
-        const Markoff::TextAnchor active = m_session->primarySelection().active;
-        if (!active.isNull() && m_cache->indexOf(active.block()) >= 0) {
-            m_caret = CanvasCursor{active.block(), m_doc->offsetInBlock(active.block(), active)};
-            caretResolvedFromSession = true;
+        const auto active = m_session->primarySelection().activePosition;
+        if (active && active->isValid()
+            && m_cache->indexOf(active->block) >= 0) {
+            const auto offset = m_doc->resolveBoundaryToken(
+                active->block, active->boundaryToken);
+            if (offset.ok()) {
+                m_caret = CanvasCursor{active->block,
+                                       static_cast<int>(offset.value())};
+                caretResolvedFromSession = true;
+            }
         }
     }
     if (!caretResolvedFromSession)
@@ -1856,10 +1884,17 @@ void View::onDocumentChanged()
     bool selectionAnchorResolvedFromSession = false;
     if (m_session && m_doc) {
         const Markoff::Selection sel = m_session->primarySelection();
-        if (!sel.isEmpty() && !sel.anchor.isNull() && m_cache->indexOf(sel.anchor.block()) >= 0) {
-            m_selectionAnchor = CanvasCursor{sel.anchor.block(),
-                                             m_doc->offsetInBlock(sel.anchor.block(), sel.anchor)};
-            selectionAnchorResolvedFromSession = true;
+        if (!sel.isEmpty() && sel.anchorPosition
+            && sel.anchorPosition->isValid()
+            && m_cache->indexOf(sel.anchorPosition->block) >= 0) {
+            const auto offset = m_doc->resolveBoundaryToken(
+                sel.anchorPosition->block,
+                sel.anchorPosition->boundaryToken);
+            if (offset.ok()) {
+                m_selectionAnchor = CanvasCursor{sel.anchorPosition->block,
+                    static_cast<int>(offset.value())};
+                selectionAnchorResolvedFromSession = true;
+            }
         }
     }
     if (!selectionAnchorResolvedFromSession) {
@@ -1938,98 +1973,69 @@ void View::promoteCaretBlockKind()
     // The kind-defining attrs go in the *same* transaction as the kind
     // (P1.1): a Heading whose level lands in a second transaction renders
     // as H1 for one paint and undoes in two steps.
-    {
-        UndoLog::Transaction t(m_doc->d2UndoLog());
-        m_doc->d2SetBlockKind(m_caret.block, inferred.kind, t);
-        if (inferred.kind == Markoff::BlockKind::Heading) {
-            // Setext is the one promotion that DOES edit the buffer: the
-            // load path drops the underline and `serializeHeading` rebuilds
-            // it from `level`, so keeping the typed underline would double
-            // it on save.
-            if (inferred.setextHeading) {
-                int end = text.size();
-                while (end > 0 && text[end - 1] == '\n') --end;
-                const int underlineNl = text.lastIndexOf('\n', end - 1);
-                if (underlineNl >= 0)
-                    m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(underlineNl),
-                                             uint32_t(text.size() - underlineNl),
-                                             QByteArray(), t);
-            }
-            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::Level,
-                                  inferred.headingLevel, t);
-            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::HeadingForm,
-                                  inferred.setextHeading ? QStringLiteral("setext")
-                                                         : QStringLiteral("atx"),
-                                  t);
-        } else if (inferred.kind == Markoff::BlockKind::Math) {
-            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::DisplayMode,
-                                  inferred.mathDisplay, t);
-        } else if (inferred.kind == Markoff::BlockKind::ListItem) {
-            // ListItem is content-narrowed (buffer convention table,
-            // markoff-core/CLAUDE.md): unlike Heading/CodeBlock, the typed
-            // marker must NOT stay in the buffer — listItemDisplayMarker()
-            // reconstructs it from attrs at paint time, so leaving it in
-            // place doubles it (Corbomite Cluster K punch-list finding:
-            // "spurious extra '-' at the start of a new list item"). Mirrors
-            // markoff-live's LiveListModelBinding promotion parse.
-            static const QRegularExpression kPromoteMarker(
-                QStringLiteral(R"(^([ \t]{0,3})(\d{1,9})([.)]) (.*)$|^([ \t]{0,3})([-*+]) (.*)$)"));
-            const auto pm = kPromoteMarker.match(QString::fromUtf8(text));
-            if (pm.hasMatch()) {
-                QString style;
-                int number = 0;
-                QString content;
-                int leadingSpaces = 0;
-                if (!pm.captured(2).isEmpty()) {
-                    leadingSpaces = pm.captured(1).size();
-                    number        = pm.captured(2).toInt();
-                    style         = (pm.captured(3) == QStringLiteral("."))
-                                        ? QStringLiteral("dot") : QStringLiteral("paren");
-                    content = pm.captured(4);
-                } else {
-                    leadingSpaces = pm.captured(5).size();
-                    const QString c = pm.captured(6);
-                    style   = (c == QStringLiteral("-")) ? QStringLiteral("minus")
-                            : (c == QStringLiteral("*")) ? QStringLiteral("star")
-                                                          : QStringLiteral("plus");
-                    content = pm.captured(7);
-                }
-                m_doc->d2ApplyBufferEdit(m_caret.block, 0, uint32_t(text.size()),
-                                         content.toUtf8(), t);
-                m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::IndentLevel,
-                                      leadingSpaces / 2, t);
-                m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::MarkerStyle,
-                                      style, t);
-                if (style == QStringLiteral("dot") || style == QStringLiteral("paren"))
-                    m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::MarkerNumber,
-                                          number, t);
-                m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::LooseRun,
-                                      false, t);
-                Markoff::Cmd::renumberRunStartingAt(*m_doc, m_caret.block, t);
-            }
-        } else if (inferred.kind == Markoff::BlockKind::BlockQuote) {
-            // BlockQuote is content-narrowed like ListItem (buffer
-            // convention table): the typed "> " must NOT stay in the
-            // buffer — blockQuoteDisplayMarker()/serializeBlockQuote()
-            // reconstruct it from BlockQuoteDepth, so leaving it in place
-            // doubles it on save ("> > text") and shows a literal ">"
-            // glyph plus the quote bar on screen (punch-list "BlockQuote
-            // typed-vs-loaded buffer asymmetry"). inferBlockKind only ever
-            // matches a single "> " (or bare ">") prefix — no nested-quote
-            // typing inference — so depth is always 1 here; RunId is left
-            // at its absent/0 default ("not part of a multi-paragraph
-            // quote run", serializeForSave's own convention), which is
-            // correct for a freshly-promoted solitary quote block and
-            // matches ListItem's sibling branch in never needing a fresh
-            // id allocated for the single-block case.
-            const QString qtext = QString::fromUtf8(text);
-            const int stripLen = qtext.startsWith(QStringLiteral("> ")) ? 2 : 1;
-            m_doc->d2ApplyBufferEdit(m_caret.block, 0, uint32_t(stripLen),
-                                     QByteArray(), t);
-            m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::BlockQuoteDepth,
-                                  1, t);
+    QByteArray promotedText = text;
+    QList<Markoff::AttrName> attrNames;
+    QList<Markoff::AttrValue> attrValues;
+    const auto addAttr = [&](const Markoff::AttrName& name, const Markoff::AttrValue& value) {
+        attrNames.append(name);
+        attrValues.append(value);
+    };
+    if (inferred.kind == Markoff::BlockKind::Heading) {
+        if (inferred.setextHeading) {
+            int end = promotedText.size();
+            while (end > 0 && promotedText[end - 1] == '\n') --end;
+            const int underlineNl = promotedText.lastIndexOf('\n', end - 1);
+            if (underlineNl >= 0)
+                promotedText.truncate(underlineNl);
         }
+        addAttr(Markoff::AttrNames::Level, inferred.headingLevel);
+        addAttr(Markoff::AttrNames::HeadingForm,
+            inferred.setextHeading ? QStringLiteral("setext") : QStringLiteral("atx"));
+    } else if (inferred.kind == Markoff::BlockKind::Math) {
+        addAttr(Markoff::AttrNames::DisplayMode, inferred.mathDisplay);
+    } else if (inferred.kind == Markoff::BlockKind::ListItem) {
+        static const QRegularExpression marker(
+            QStringLiteral(R"(^([ \t]{0,3})(\d{1,9})([.)]) (.*)$|^([ \t]{0,3})([-*+]) (.*)$)"));
+        const auto match = marker.match(QString::fromUtf8(text));
+        if (match.hasMatch()) {
+            QString style;
+            int number = 0;
+            QString content;
+            int spaces = 0;
+            if (!match.captured(2).isEmpty()) {
+                spaces = match.captured(1).size();
+                number = match.captured(2).toInt();
+                style = match.captured(3) == QStringLiteral(".")
+                    ? QStringLiteral("dot") : QStringLiteral("paren");
+                content = match.captured(4);
+            } else {
+                spaces = match.captured(5).size();
+                const QString bullet = match.captured(6);
+                style = bullet == QStringLiteral("-") ? QStringLiteral("minus")
+                    : bullet == QStringLiteral("*") ? QStringLiteral("star")
+                    : QStringLiteral("plus");
+                content = match.captured(7);
+            }
+            promotedText = content.toUtf8();
+            addAttr(Markoff::AttrNames::IndentLevel, spaces / 2);
+            addAttr(Markoff::AttrNames::MarkerStyle, style);
+            if (number) addAttr(Markoff::AttrNames::MarkerNumber, number);
+            addAttr(Markoff::AttrNames::LooseRun, false);
+        }
+    } else if (inferred.kind == Markoff::BlockKind::BlockQuote) {
+        const QString qtext = QString::fromUtf8(text);
+        const int prefix = qtext.startsWith(QStringLiteral("> ")) ? 2 : 1;
+        promotedText = text.mid(prefix);
+        addAttr(Markoff::AttrNames::BlockQuoteDepth, 1);
     }
+    if (promotedText != text) {
+        const auto edit = m_doc->applyBlockEdit({m_caret.block, 0,
+            quint32(text.size()), promotedText});
+        if (!publicationCommitted(edit)) return;
+    }
+    const auto changed = m_doc->changeBlockKind(m_caret.block, inferred.kind,
+        attrNames, attrValues);
+    if (!publicationCommitted(changed)) return;
 
     // The setext trim shortens the block under the caret, which sits past
     // the new end (the user just typed the underline). This runs inside the
@@ -2062,8 +2068,7 @@ void View::updateCaretHeadingLevel()
     if (newLevel <= 0 || newLevel == level)
         return;
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::Level, newLevel, t);
+    (void)m_doc->setBlockAttribute(m_caret.block, Markoff::AttrNames::Level, newLevel);
 }
 
 void View::updateCaretMathDisplayMode()
@@ -2084,8 +2089,7 @@ void View::updateCaretMathDisplayMode()
     if (inferred.kind != Markoff::BlockKind::Math || !inferred.mathDisplay)
         return;
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2SetBlockAttr(m_caret.block, Markoff::AttrNames::DisplayMode, true, t);
+    (void)m_doc->setBlockAttribute(m_caret.block, Markoff::AttrNames::DisplayMode, true);
 }
 
 // ---- Caret / editing (T2) ------------------------------------------------
@@ -2388,10 +2392,15 @@ void View::pushSelectionToSession()
 
     Markoff::Selection sel;
     sel.kind = Markoff::Selection::Kind::Primary;
-    sel.anchor = m_doc->textAnchorAt(anchorCursor.block, anchorCursor.byteOffset,
-                                     /*rightBias=*/true);
-    sel.active = m_doc->textAnchorAt(m_caret.block, m_caret.byteOffset,
-                                     /*rightBias=*/true);
+    const auto anchorToken = m_doc->boundaryTokenAt(
+        anchorCursor.block, static_cast<quint32>(anchorCursor.byteOffset), false);
+    const auto activeToken = m_doc->boundaryTokenAt(
+        m_caret.block, static_cast<quint32>(m_caret.byteOffset), false);
+    if (!anchorToken.ok() || !activeToken.ok()) return;
+    sel.anchorPosition = Markoff::ScopedTextPosition{
+        anchorCursor.block, anchorToken.value()};
+    sel.activePosition = Markoff::ScopedTextPosition{
+        m_caret.block, activeToken.value()};
     m_session->setPrimarySelection(sel);
 }
 
@@ -2621,20 +2630,18 @@ void View::setRemotePresences(const QList<RemotePresence> &presences)
     viewport()->update();
 }
 
-// Same "resolve, or nullopt" contract as onDocumentChanged()'s P6.1
-// workaround (see that function's comment): TextAnchor::block() names the
-// block the anchor was cut in directly, so checking it is still a live
-// cache entry and reading offsetInBlock() gets a resolved position without
-// going near the always-nullopt MarkoffDocument::blockAt(). Never cached —
-// called fresh every time (once per paint per presence, from paintEvent and
-// from remotePresencesForBlock's test-only mirror of it).
-std::optional<CanvasCursor> View::resolvePresenceAnchor(const Markoff::TextAnchor &anchor) const
+// Presence positions are scoped to provider text streams and are resolved
+// fresh on every paint. Deleted blocks and detached boundaries are skipped.
+std::optional<CanvasCursor> View::resolvePresenceAnchor(
+    const Markoff::ScopedTextPosition &position) const
 {
-    if (!m_doc || anchor.isNull())
+    if (!m_doc || !position.isValid()
+        || m_cache->indexOf(position.block) < 0)
         return std::nullopt;
-    if (m_cache->indexOf(anchor.block()) < 0)
-        return std::nullopt;
-    return CanvasCursor{anchor.block(), m_doc->offsetInBlock(anchor.block(), anchor)};
+    const auto offset = m_doc->resolveBoundaryToken(
+        position.block, position.boundaryToken);
+    if (!offset.ok()) return std::nullopt;
+    return CanvasCursor{position.block, static_cast<int>(offset.value())};
 }
 
 QList<RemotePresence> View::remotePresencesForBlock(BlockId id) const
@@ -2643,8 +2650,12 @@ QList<RemotePresence> View::remotePresencesForBlock(BlockId id) const
     for (const RemotePresence &presence : m_remotePresences) {
         if (presence.selection.kind != Markoff::Selection::Kind::Presence)
             continue;
-        const auto start  = resolvePresenceAnchor(presence.selection.anchor);
-        const auto active = resolvePresenceAnchor(presence.selection.active);
+        const auto start = presence.selection.anchorPosition
+            ? resolvePresenceAnchor(*presence.selection.anchorPosition)
+            : std::optional<CanvasCursor>{};
+        const auto active = presence.selection.activePosition
+            ? resolvePresenceAnchor(*presence.selection.activePosition)
+            : std::optional<CanvasCursor>{};
         if (!start || !active)
             continue;
         CanvasCursor a = *start, b = *active;
@@ -2677,38 +2688,31 @@ void View::collapseSelection()
             middles.push_back(e.id);
     }
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-
     if (start.block == end.block) {
-        m_doc->d2ApplyBufferEdit(start.block, uint32_t(start.byteOffset),
-                                 uint32_t(end.byteOffset - start.byteOffset),
-                                 QByteArray(), t);
-    } else {
-        const int startSize = m_doc->blockText(start.block).size();
-        m_doc->d2ApplyBufferEdit(start.block, uint32_t(start.byteOffset),
-                                 uint32_t(startSize - start.byteOffset),
-                                 QByteArray(), t);
-        m_doc->d2ApplyBufferEdit(end.block, 0, uint32_t(end.byteOffset),
-                                 QByteArray(), t);
-        for (BlockId mid : middles)
-            m_doc->d2RemoveBlock(mid, t);
-
-        // Merge the (now content-adjacent) boundary blocks via the same
-        // structural path T3 routes keys through — no cross-block byte
-        // math (C4): this is Backspace at byte 0 of `end.block`, which
-        // StructuralKeyHandler already knows how to merge into its
-        // document-order predecessor (start.block, once the middles are
-        // gone). The nested Transaction it opens joins this one (UndoLog
-        // supports nesting), so the whole collapse is one undo step.
-        const StructuralResult r = StructuralKeyHandler::handle(
-            *m_doc, end.block, Qt::Key_Backspace, Qt::NoModifier, 0);
-        if (r.handled) {
-            m_caret.block = r.caretBlock;
-            m_caret.byteOffset = int(r.caretByteInBlock);
-            m_selectionAnchor.reset();
-            pushSelectionToSession();
+        const auto result = m_doc->applyBlockEdit({start.block,
+            static_cast<uint32_t>(start.byteOffset),
+            static_cast<uint32_t>(end.byteOffset - start.byteOffset), {}});
+        if (result.state != Markoff::VNext::ActionPublicationState::committed
+            && result.state != Markoff::VNext::ActionPublicationState::committedHistoryPending)
             return;
+    } else {
+        const auto endText = m_doc->blockText(end.block);
+        QList<BlockId> removed;
+        bool afterStart = false;
+        for (const auto& entry : m_cache->entries()) {
+            if (entry.id == start.block) { afterStart = true; continue; }
+            if (!afterStart) continue;
+            removed.append(entry.id);
+            if (entry.id == end.block) break;
         }
+        const auto startText = m_doc->blockText(start.block);
+        const auto result = m_doc->applyBlockMerge({start.block,
+            static_cast<uint32_t>(start.byteOffset),
+            static_cast<uint32_t>(startText.size() - start.byteOffset),
+            endText.mid(end.byteOffset)}, removed);
+        if (result.state != Markoff::VNext::ActionPublicationState::committed
+            && result.state != Markoff::VNext::ActionPublicationState::committedHistoryPending)
+            return;
     }
 
     m_caret = start;
@@ -2753,7 +2757,7 @@ void View::cut()
     // while read-only — including the copy-to-clipboard half — mirroring
     // Qt's own QAction-disabled convention for Cut (unlike Copy, which stays
     // enabled below).
-    if (m_readOnly || !hasSelection())
+    if (isReadOnly() || !hasSelection())
         return;
     copy();
     collapseSelection();
@@ -2808,7 +2812,7 @@ void View::pasteAsPlain()
 
 void View::pasteConverted(const QMimeData *mime, bool asPlain)
 {
-    if (!m_doc || m_readOnly || m_caret.block.isNull() || !mime)
+    if (!m_doc || isReadOnly() || m_caret.block.isNull() || !mime)
         return;
     const auto mode = asPlain ? Markoff::ClipboardCodec::PasteMode::Plain
                               : Markoff::ClipboardCodec::PasteMode::Smart;
@@ -2849,7 +2853,7 @@ void View::pasteConverted(const QMimeData *mime, bool asPlain)
 // rather than growing a second, gesture-specific copy of it.
 void View::insertText(const QString &rawText)
 {
-    if (!m_doc || m_readOnly || m_caret.block.isNull())
+    if (!m_doc || isReadOnly() || m_caret.block.isNull())
         return;
     if (rawText.isEmpty())
         return;
@@ -2927,8 +2931,10 @@ void View::deleteLine()
     const int size = m_doc->blockText(m_caret.block).size();
     if (size == 0)
         return;
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(m_caret.block, 0, uint32_t(size), QByteArray(), t);
+    const auto result = m_doc->applyBlockEdit({m_caret.block, 0, quint32(size), {}});
+    if (result.state != Markoff::VNext::ActionPublicationState::committed
+        && result.state != Markoff::VNext::ActionPublicationState::committedHistoryPending)
+        return;
     m_caret.byteOffset = 0;
     m_selectionAnchor.reset();
     pushSelectionToSession();
@@ -2985,12 +2991,6 @@ void View::moveLine(bool down)
     const auto attrsA = m_doc->blockAttrs(a);
     const auto attrsB = m_doc->blockAttrs(b);
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(a, 0, uint32_t(textA.size()), textB, t);
-    m_doc->d2ApplyBufferEdit(b, 0, uint32_t(textB.size()), textA, t);
-    m_doc->d2SetBlockKind(a, kindB, t);
-    m_doc->d2SetBlockKind(b, kindA, t);
-
     static const std::pair<Markoff::AttrName, Markoff::AttrValue> kKnownAttrs[] = {
         {Markoff::AttrNames::Level,          1},
         {Markoff::AttrNames::HeadingForm,    QStringLiteral("atx")},
@@ -3007,14 +3007,10 @@ void View::moveLine(bool down)
         {Markoff::AttrNames::BlockQuoteDepth, 1},
         {Markoff::AttrNames::BlockQuoteRunId, 1},
     };
-    for (const auto &[name, def] : kKnownAttrs) {
-        const auto itA = attrsA.constFind(name);
-        const auto itB = attrsB.constFind(name);
-        const Markoff::AttrValue valueForA = (itB != attrsB.constEnd()) ? itB.value() : def;
-        const Markoff::AttrValue valueForB = (itA != attrsA.constEnd()) ? itA.value() : def;
-        m_doc->d2SetBlockAttr(a, name, valueForA, t);
-        m_doc->d2SetBlockAttr(b, name, valueForB, t);
-    }
+    QHash<Markoff::AttrName, Markoff::AttrValue> defaults;
+    for (const auto &[name, value] : kKnownAttrs) defaults.insert(name, value);
+    if (!publicationCommitted(m_doc->swapBlockPayload(a, b, defaults)))
+        return;
 
     // The content the caret was on now lives in `b` (document position
     // `otherIdx`, adjacent to where `a` still sits) — follow it there,
@@ -3119,9 +3115,8 @@ bool View::tryDeleteFreshPair(const std::optional<AutoPairedCloser> &pendingClos
     // ("not just the open one"). Bare Transaction, same shape deleteCluster()
     // already uses for deletes (unlike insertion, deletion isn't subject to
     // the Cmd::insertCharacter coalescing requirement — see the .h comment).
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(openStart), uint32_t(closeLen * 2),
-                             QByteArray(), t);
+    if (!publicationCommitted(m_doc->applyBlockEdit({m_caret.block, quint32(openStart),
+            quint32(closeLen * 2), {}}))) return false;
     m_caret.byteOffset = openStart;
     pushSelectionToSession();
     return true;
@@ -3264,7 +3259,7 @@ void View::startTextDrag()
     // action when editable, Copy otherwise.
     Qt::DropActions actions = Qt::CopyAction;
     Qt::DropAction defaultAction = Qt::CopyAction;
-    if (!m_readOnly) {
+    if (!isReadOnly()) {
         actions |= Qt::MoveAction;
         defaultAction = Qt::MoveAction;
     }
@@ -3285,7 +3280,7 @@ void View::startTextDrag()
 
 void View::dragEnterEvent(QDragEnterEvent *event)
 {
-    if (!m_doc || m_readOnly) {
+    if (!m_doc || isReadOnly()) {
         event->ignore();
         return;
     }
@@ -3306,7 +3301,7 @@ void View::dragEnterEvent(QDragEnterEvent *event)
 
 void View::dragMoveEvent(QDragMoveEvent *event)
 {
-    if (!m_doc || m_readOnly) {
+    if (!m_doc || isReadOnly()) {
         event->ignore();
         return;
     }
@@ -3340,7 +3335,7 @@ void View::dropEvent(QDropEvent *event)
     m_dropCursorPos.reset();
     viewport()->update();
 
-    if (!m_doc || m_readOnly) {
+    if (!m_doc || isReadOnly()) {
         event->ignore();
         return;
     }
@@ -3411,7 +3406,7 @@ void View::buildContextMenu(QMenu &menu)
 
     QAction *cutAction = menu.addAction(tr("Cut"), this, &View::cut);
     cutAction->setShortcut(QKeySequence::Cut);
-    cutAction->setEnabled(!m_readOnly && hasSelection());
+    cutAction->setEnabled(!isReadOnly() && hasSelection());
 
     QAction *copyAction = menu.addAction(tr("Copy"), this, &View::copy);
     copyAction->setShortcut(QKeySequence::Copy);
@@ -3430,12 +3425,12 @@ void View::buildContextMenu(QMenu &menu)
     // clipboard doesn't offer a dead menu item.
     QAction *pasteAction = menu.addAction(tr("Paste"), this, &View::paste);
     pasteAction->setShortcut(QKeySequence::Paste);
-    pasteAction->setEnabled(!m_readOnly && hasDoc && clipboardHasText);
+    pasteAction->setEnabled(!isReadOnly() && hasDoc && clipboardHasText);
 
     QAction *pastePlainAction =
         menu.addAction(tr("Paste as Plain Text"), this, &View::pasteAsPlain);
     pastePlainAction->setShortcut(QKeySequence(Qt::CTRL | Qt::SHIFT | Qt::Key_V));
-    pastePlainAction->setEnabled(!m_readOnly && hasDoc && clipboardHasText);
+    pastePlainAction->setEnabled(!isReadOnly() && hasDoc && clipboardHasText);
 
     QAction *selectAllAction = menu.addAction(tr("Select All"), this, &View::selectAll);
     selectAllAction->setShortcut(QKeySequence::SelectAll);
@@ -3508,9 +3503,9 @@ void View::buildContextMenu(QMenu &menu)
 
 // ---- Format verbs (P4.3) --------------------------------------------------
 
-void View::applyFormatOp(const FormatOpFn &applyOne)
+void View::applyFormatOp(FormatVerb verb, const FormatOpFn &applyOne)
 {
-    if (!m_doc || m_readOnly || m_caret.block.isNull())
+    if (!m_doc || isReadOnly() || m_caret.block.isNull())
         return;
 
     using Markoff::FormatOps::ByteRange;
@@ -3572,15 +3567,24 @@ void View::applyFormatOp(const FormatOpFn &applyOne)
 
     BlockId lastBlock;
     std::optional<ByteRange> lastResult;
-    {
-        Markoff::UndoLog::Transaction t(m_doc->d2UndoLog());
-        for (const auto &[id, range] : covered) {
-            const auto result = applyOne(id, range);
-            if (result) {
-                lastBlock = id;
-                lastResult = result;
-            }
-        }
+    QList<Markoff::FormatOps::BlockByteRange> ranges;
+    for (const auto& item : covered) ranges.append({item.first, item.second});
+    std::optional<QList<ByteRange>> results;
+    switch (verb) {
+    case FormatVerb::Bold:
+        results = Markoff::FormatOps::wrapToggleAcrossBlocks(m_doc, ranges, "**"); break;
+    case FormatVerb::Italic:
+        results = Markoff::FormatOps::wrapToggleAcrossBlocks(m_doc, ranges, "_"); break;
+    case FormatVerb::Strike:
+        results = Markoff::FormatOps::wrapToggleAcrossBlocks(m_doc, ranges, "~~"); break;
+    case FormatVerb::InlineCode:
+        results = Markoff::FormatOps::wrapToggleAcrossBlocks(m_doc, ranges, "`"); break;
+    case FormatVerb::Link:
+        results = Markoff::FormatOps::insertLinkAcrossBlocks(m_doc, ranges); break;
+    }
+    if (results && !results->isEmpty()) {
+        lastResult = results->back();
+        lastBlock = covered[static_cast<size_t>(results->size() - 1)].first;
     }
 
     m_selectionAnchor.reset();
@@ -3597,42 +3601,42 @@ void View::applyFormatOp(const FormatOpFn &applyOne)
 
 void View::toggleBold()
 {
-    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+    applyFormatOp(FormatVerb::Bold, [this](BlockId b, Markoff::FormatOps::ByteRange r) {
         return Markoff::FormatOps::wrapToggleInBlock(m_doc, b, r, "**");
     });
 }
 
 void View::toggleItalic()
 {
-    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+    applyFormatOp(FormatVerb::Italic, [this](BlockId b, Markoff::FormatOps::ByteRange r) {
         return Markoff::FormatOps::wrapToggleInBlock(m_doc, b, r, "_");
     });
 }
 
 void View::toggleStrikethrough()
 {
-    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+    applyFormatOp(FormatVerb::Strike, [this](BlockId b, Markoff::FormatOps::ByteRange r) {
         return Markoff::FormatOps::wrapToggleInBlock(m_doc, b, r, "~~");
     });
 }
 
 void View::toggleInlineCode()
 {
-    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+    applyFormatOp(FormatVerb::InlineCode, [this](BlockId b, Markoff::FormatOps::ByteRange r) {
         return Markoff::FormatOps::wrapToggleInBlock(m_doc, b, r, "`");
     });
 }
 
 void View::insertLink()
 {
-    applyFormatOp([this](BlockId b, Markoff::FormatOps::ByteRange r) {
+    applyFormatOp(FormatVerb::Link, [this](BlockId b, Markoff::FormatOps::ByteRange r) {
         return Markoff::FormatOps::insertLinkInBlock(m_doc, b, r);
     });
 }
 
 void View::setHeadingLevel(int level)
 {
-    if (!m_doc || m_readOnly || m_caret.block.isNull())
+    if (!m_doc || isReadOnly() || m_caret.block.isNull())
         return;
     if (level < 0 || level > 6)
         return;
@@ -3657,35 +3661,13 @@ void View::insertPrintable(const QString &text)
     if (!m_doc || m_caret.block.isNull() || text.isEmpty())
         return;
 
-    // P7.2a: route each character through Cmd::insertCharacter so
-    // printable-only, same-block, <1000ms runs coalesce into one undo
-    // entry (UndoLog::maybeCoalesceOrTransaction) instead of opening a
-    // bare Transaction per keystroke (F1 gap #3). insertCharacter takes a
-    // single QChar, so a surrogate-pair codepoint (e.g. an emoji, already
-    // covered by tst_canvas_typing) can't go through it without data loss
-    // — QString::toUtf8() on a lone unpaired surrogate half silently
-    // yields zero bytes. Those fall back to a direct
-    // maybeCoalesceOrTransaction call with the full codepoint's bytes and
-    // isPrintable=false, which (a) preserves exact byte content and
-    // (b) deliberately breaks any coalescing chain around it rather than
-    // risk mis-grouping the surrounding keystrokes' undo entries.
-    int i = 0;
-    while (i < text.size()) {
-        const QChar ch = text.at(i);
-        if (ch.isHighSurrogate() && i + 1 < text.size() && text.at(i + 1).isLowSurrogate()) {
-            const QByteArray insert = text.mid(i, 2).toUtf8();
-            const CoalesceContext ctx{m_caret.block, false, QDateTime::currentMSecsSinceEpoch()};
-            m_doc->d2UndoLog().maybeCoalesceOrTransaction(ctx, [&](UndoLog::Transaction &t) {
-                m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0, insert, t);
-            });
-            m_caret.byteOffset += insert.size();
-            i += 2;
-        } else {
-            Cmd::insertCharacter(*m_doc, m_caret.block, uint32_t(m_caret.byteOffset), ch);
-            m_caret.byteOffset += QString(ch).toUtf8().size();
-            i += 1;
-        }
-    }
+    const QByteArray insert = text.toUtf8();
+    const int oldOffset = m_caret.byteOffset;
+    const auto result = m_doc->applyBlockEdit({m_caret.block, quint32(oldOffset), 0, insert});
+    if (result.state != Markoff::VNext::ActionPublicationState::committed
+        && result.state != Markoff::VNext::ActionPublicationState::committedHistoryPending)
+        return;
+    m_caret.byteOffset += insert.size();
     // P6.1: does NOT funnel through setCaret() (a plain byteOffset bump,
     // not a "placement") — pushed here directly, same reasoning as
     // deleteCluster()/tryStructuralKey()/the arrow-key moveCaret* helpers
@@ -3714,23 +3696,21 @@ void View::deleteCluster(bool forward)
     const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
 
     if (forward) {
-        if (layoutPos >= int(e.projection.layoutText().size()))
-            return;  // at block end: T3's job (merge with next block)
+        if (layoutPos >= int(e.projection.layoutText().size())) return;
         const int next = e.layout->nextCursorPosition(layoutPos);
-        const int nextByte = e.projection.layoutQCharToByte(next);
-        const int removed = nextByte - m_caret.byteOffset;
-        UndoLog::Transaction t(m_doc->d2UndoLog());
-        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset),
-                                 uint32_t(removed), QByteArray(), t);
+        const int endByte = e.projection.layoutQCharToByte(next);
+        const auto r = m_doc->applyBlockEdit({m_caret.block, quint32(m_caret.byteOffset),
+            quint32(endByte - m_caret.byteOffset), {}});
+        if (r.state != Markoff::VNext::ActionPublicationState::committed
+            && r.state != Markoff::VNext::ActionPublicationState::committedHistoryPending) return;
     } else {
-        if (layoutPos <= 0)
-            return;  // at block start: T3's job (merge with previous block)
+        if (layoutPos <= 0) return;
         const int prev = e.layout->previousCursorPosition(layoutPos);
         const int prevByte = e.projection.layoutQCharToByte(prev);
-        const int removed = m_caret.byteOffset - prevByte;
-        UndoLog::Transaction t(m_doc->d2UndoLog());
-        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(prevByte),
-                                 uint32_t(removed), QByteArray(), t);
+        const auto r = m_doc->applyBlockEdit({m_caret.block, quint32(prevByte),
+            quint32(m_caret.byteOffset - prevByte), {}});
+        if (r.state != Markoff::VNext::ActionPublicationState::committed
+            && r.state != Markoff::VNext::ActionPublicationState::committedHistoryPending) return;
         m_caret.byteOffset = prevByte;
     }
     // P6.1: see insertPrintable()'s comment — does not funnel through
@@ -3763,23 +3743,19 @@ void View::deleteWordCluster(bool forward)
     const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
 
     if (forward) {
-        if (layoutPos >= text.size())
-            return;  // at block end: no-op, mirrors deleteCluster()
-        const int next = nextWordBoundary(text, layoutPos);
-        const int nextByte = e.projection.layoutQCharToByte(next);
-        const int removed = nextByte - m_caret.byteOffset;
-        UndoLog::Transaction t(m_doc->d2UndoLog());
-        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset),
-                                 uint32_t(removed), QByteArray(), t);
+        if (layoutPos >= text.size()) return;
+        const int endByte = e.projection.layoutQCharToByte(nextWordBoundary(text, layoutPos));
+        const auto r = m_doc->applyBlockEdit({m_caret.block, quint32(m_caret.byteOffset),
+            quint32(endByte - m_caret.byteOffset), {}});
+        if (r.state != Markoff::VNext::ActionPublicationState::committed
+            && r.state != Markoff::VNext::ActionPublicationState::committedHistoryPending) return;
     } else {
-        if (layoutPos <= 0)
-            return;  // at block start: no-op, mirrors deleteCluster()
-        const int prev = previousWordBoundary(text, layoutPos);
-        const int prevByte = e.projection.layoutQCharToByte(prev);
-        const int removed = m_caret.byteOffset - prevByte;
-        UndoLog::Transaction t(m_doc->d2UndoLog());
-        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(prevByte),
-                                 uint32_t(removed), QByteArray(), t);
+        if (layoutPos <= 0) return;
+        const int prevByte = e.projection.layoutQCharToByte(previousWordBoundary(text, layoutPos));
+        const auto r = m_doc->applyBlockEdit({m_caret.block, quint32(prevByte),
+            quint32(m_caret.byteOffset - prevByte), {}});
+        if (r.state != Markoff::VNext::ActionPublicationState::committed
+            && r.state != Markoff::VNext::ActionPublicationState::committedHistoryPending) return;
         m_caret.byteOffset = prevByte;
     }
     // P6.1: see insertPrintable()'s comment — does not funnel through
@@ -4175,8 +4151,7 @@ void View::appendTableRow(BlockId block, int cols)
     QByteArray row = "\n|";
     for (int c = 0; c < cols; ++c)
         row += "  |";
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(block, uint32_t(text.size()), 0, row, t);
+    (void)m_doc->applyBlockEdit({block, quint32(text.size()), 0, row});
 }
 
 bool View::tryTableTab(bool shift)
@@ -4262,7 +4237,7 @@ void View::repositionCaretInTable(BlockId block, int row, int col)
 
 void View::insertTableRowAbove()
 {
-    if (!m_doc || m_readOnly)
+    if (!m_doc || isReadOnly())
         return;
     const auto ctx = caretTableContext();
     if (!ctx || ctx->row <= 0)  // nothing sensible above the header
@@ -4282,15 +4257,14 @@ void View::insertTableRowAbove()
     QByteArray rowBytes = "|";
     for (int c = 0; c < parsed.cols; ++c) rowBytes += "  |";
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(block, uint32_t(pos), 0, "\n" + rowBytes, t);
+    (void)m_doc->applyBlockEdit({block, quint32(pos), 0, QByteArray("\n") + rowBytes});
 
     repositionCaretInTable(block, ctx->row + 1, ctx->col);
 }
 
 void View::insertTableRowBelow()
 {
-    if (!m_doc || m_readOnly)
+    if (!m_doc || isReadOnly())
         return;
     const auto ctx = caretTableContext();
     if (!ctx)
@@ -4312,15 +4286,14 @@ void View::insertTableRowBelow()
     QByteArray rowBytes = "|";
     for (int c = 0; c < parsed.cols; ++c) rowBytes += "  |";
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(block, uint32_t(pos), 0, "\n" + rowBytes, t);
+    (void)m_doc->applyBlockEdit({block, quint32(pos), 0, QByteArray("\n") + rowBytes});
 
     repositionCaretInTable(block, ctx->row, ctx->col);
 }
 
 void View::deleteTableRow()
 {
-    if (!m_doc || m_readOnly)
+    if (!m_doc || isReadOnly())
         return;
     const auto ctx = caretTableContext();
     if (!ctx || ctx->row <= 0)  // the header isn't deletable
@@ -4336,8 +4309,7 @@ void View::deleteTableRow()
     const int from = parsed.lines[size_t(rowLineIdx - 1)].lineEnd;
     const int to   = parsed.lines[size_t(rowLineIdx)].lineEnd;
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(block, uint32_t(from), uint32_t(to - from), QByteArray(), t);
+    if (!publicationCommitted(m_doc->applyBlockEdit({block, quint32(from), quint32(to-from), {}}))) return;
 
     // The deleted row's slot is now occupied by what used to be the next
     // row (or the previous one, if it was the last row) — land there.
@@ -4347,7 +4319,7 @@ void View::deleteTableRow()
 
 void View::insertTableColumnLeft()
 {
-    if (!m_doc || m_readOnly)
+    if (!m_doc || isReadOnly())
         return;
     const auto ctx = caretTableContext();
     if (!ctx)
@@ -4357,7 +4329,7 @@ void View::insertTableColumnLeft()
     if (!parsed.ok || ctx->col < 0 || ctx->col >= parsed.cols)
         return;
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
+    QList<Markoff::BlockEdit> edits;
     // Reverse line order (last physical line first): each insert position
     // below is taken from the frozen `parsed` snapshot, and d2ApplyBufferEdit
     // applies synchronously, so an edit on a LATER line must land first —
@@ -4369,15 +4341,16 @@ void View::insertTableColumnLeft()
         const int pos = line.cells[size_t(ctx->col)].start;  // right after the preceding '|'
         const QByteArray newCell =
             (li == 1) ? (alignmentCellText(TableAlign::None) + "|") : QByteArray("  |");
-        m_doc->d2ApplyBufferEdit(block, uint32_t(pos), 0, newCell, t);
+        edits.append({block, quint32(pos), 0, newCell});
     }
+    if (!edits.isEmpty() && !publicationCommitted(m_doc->applyBlockEdits(edits))) return;
 
     repositionCaretInTable(block, ctx->row, ctx->col + 1);
 }
 
 void View::insertTableColumnRight()
 {
-    if (!m_doc || m_readOnly)
+    if (!m_doc || isReadOnly())
         return;
     const auto ctx = caretTableContext();
     if (!ctx)
@@ -4387,7 +4360,7 @@ void View::insertTableColumnRight()
     if (!parsed.ok || ctx->col < 0 || ctx->col >= parsed.cols)
         return;
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
+    QList<Markoff::BlockEdit> edits;
     for (int li = int(parsed.lines.size()) - 1; li >= 0; --li) {
         const TableLine &line = parsed.lines[size_t(li)];
         if (ctx->col >= int(line.cells.size()))
@@ -4395,15 +4368,16 @@ void View::insertTableColumnRight()
         const int pos = line.cells[size_t(ctx->col)].end + 1;  // right after the following '|'
         const QByteArray newCell =
             (li == 1) ? (alignmentCellText(TableAlign::None) + "|") : QByteArray("  |");
-        m_doc->d2ApplyBufferEdit(block, uint32_t(pos), 0, newCell, t);
+        edits.append({block, quint32(pos), 0, newCell});
     }
+    if (!edits.isEmpty() && !publicationCommitted(m_doc->applyBlockEdits(edits))) return;
 
     repositionCaretInTable(block, ctx->row, ctx->col);
 }
 
 void View::deleteTableColumn()
 {
-    if (!m_doc || m_readOnly)
+    if (!m_doc || isReadOnly())
         return;
     const auto ctx = caretTableContext();
     if (!ctx || ctx->colCount <= 1)  // the table's last column isn't deletable
@@ -4413,7 +4387,7 @@ void View::deleteTableColumn()
     if (!parsed.ok || parsed.cols <= 1 || ctx->col < 0 || ctx->col >= parsed.cols)
         return;
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
+    QList<Markoff::BlockEdit> edits;
     for (int li = int(parsed.lines.size()) - 1; li >= 0; --li) {
         const TableLine &line = parsed.lines[size_t(li)];
         if (ctx->col >= int(line.cells.size()))
@@ -4426,8 +4400,9 @@ void View::deleteTableColumn()
         const int to   = cell.end;
         if (from < line.lineStart)
             continue;  // defensive; shouldn't happen for a well-formed line
-        m_doc->d2ApplyBufferEdit(block, uint32_t(from), uint32_t(to - from), QByteArray(), t);
+        edits.append({block, quint32(from), quint32(to-from), {}});
     }
+    if (!edits.isEmpty() && !publicationCommitted(m_doc->applyBlockEdits(edits))) return;
 
     const int newCol = (ctx->col < parsed.cols - 1) ? ctx->col : ctx->col - 1;
     repositionCaretInTable(block, ctx->row, newCol);
@@ -4435,7 +4410,7 @@ void View::deleteTableColumn()
 
 void View::setTableColumnAlignment(TableAlign align)
 {
-    if (!m_doc || m_readOnly)
+    if (!m_doc || isReadOnly())
         return;
     const auto ctx = caretTableContext();
     if (!ctx)
@@ -4449,9 +4424,8 @@ void View::setTableColumnAlignment(TableAlign align)
         return;
     const TableCellRange &cell = alignLine.cells[size_t(ctx->col)];
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    m_doc->d2ApplyBufferEdit(block, uint32_t(cell.start), uint32_t(cell.end - cell.start),
-                             alignmentCellText(align), t);
+    if (!publicationCommitted(m_doc->applyBlockEdit({block, quint32(cell.start),
+            quint32(cell.end-cell.start), alignmentCellText(align)}))) return;
 
     // The caret's own row/col don't move, but the delimiter row (always
     // physically before every body row) just changed size, which shifts
@@ -4462,7 +4436,7 @@ void View::setTableColumnAlignment(TableAlign align)
 
 void View::insertTable()
 {
-    if (!m_doc || m_readOnly || m_caret.block.isNull())
+    if (!m_doc || isReadOnly() || m_caret.block.isNull())
         return;
 
     static const QByteArray kTemplate =
@@ -4470,9 +4444,17 @@ void View::insertTable()
         "| --- | --- |\n"
         "|  |  |";
 
-    UndoLog::Transaction t(m_doc->d2UndoLog());
-    const BlockId newId = m_doc->d2InsertBlock(m_caret.block, Markoff::BlockKind::Table, t);
-    m_doc->d2ApplyBufferEdit(newId, 0, 0, kTemplate, t);
+    const auto oldBlocks = m_doc->iterateBlocks();
+    const auto oldIt = std::find(oldBlocks.begin(), oldBlocks.end(), m_caret.block);
+    if (oldIt == oldBlocks.end()) return;
+    const auto split = m_doc->applyBlockSplit({m_caret.block,
+        quint32(m_doc->blockText(m_caret.block).size()), 0, {}},
+        Markoff::BlockKind::Table, kTemplate);
+    if (!publicationCommitted(split)) return;
+    const auto newBlocks = m_doc->iterateBlocks();
+    const size_t insertIndex = size_t(oldIt - oldBlocks.begin()) + 1;
+    if (insertIndex >= newBlocks.size()) return;
+    const BlockId newId = newBlocks[insertIndex];
 
     repositionCaretInTable(newId, 0, 0);
 }
@@ -4623,7 +4605,7 @@ void View::keyPressEvent(QKeyEvent *event)
         // redoD2 directly and bypasses MarkdownView::undo()/redo() (which
         // already no-ops while read-only over the base store) — it needs
         // its own check, or Ctrl+Z would mutate a read-only document.
-        if (m_doc && !m_readOnly) {
+        if (m_doc && !isReadOnly()) {
             m_selectionAnchor.reset();  // no UndoLog selection state (T4)
             // P6.1/guide §B.4: publish the collapse before the edit, same
             // as any other selection-finalizing reset. This does NOT give
@@ -4715,7 +4697,7 @@ void View::keyPressEvent(QKeyEvent *event)
     // Navigation (arrow keys, Home/End, PageUp/Down, handled above/below
     // this point) and selection-extension (Shift+move, Ctrl+A, handled
     // above) are untouched: this block only ever matches keys that mutate.
-    if (m_readOnly && (isMutatingKey || event->key() == Qt::Key_Tab
+    if (isReadOnly() && (isMutatingKey || event->key() == Qt::Key_Tab
                        || event->key() == Qt::Key_Backtab)) {
         event->accept();
         return;
@@ -4799,13 +4781,14 @@ void View::keyPressEvent(QKeyEvent *event)
         // plain-paragraph behavior) and always accept, never let it escape
         // to the focus chain. Shift+Tab has nothing to outdent outside a
         // list/table; still accept so it doesn't leak either.
-        if (!shift && !m_readOnly && !isComposing()) {
-            UndoLog::Transaction t(m_doc->d2UndoLog());
-            m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(m_caret.byteOffset), 0,
-                                     QByteArrayLiteral("\t"), t);
-            m_caret.byteOffset += 1;
-            ensureCaretVisible();
-            viewport()->update();
+        if (!shift && !isReadOnly() && !isComposing()) {
+            const auto result = m_doc->applyBlockEdit({m_caret.block,
+                quint32(m_caret.byteOffset), 0, QByteArrayLiteral("\t")});
+            if (publicationCommitted(result)) {
+                m_caret.byteOffset += 1;
+                ensureCaretVisible();
+                viewport()->update();
+            }
         }
         event->accept();
         return;
@@ -5214,7 +5197,7 @@ void View::mousePressEvent(QMouseEvent *event)
         // paste, format verbs): a plain click on a read-only document's
         // checkbox is a no-op, not a caret jump into the gutter.
         if (const auto taskId = taskCheckboxAt(event->pos())) {
-            if (!m_readOnly) {
+            if (!isReadOnly()) {
                 m_doc->toggleListItemChecked(*taskId);
                 viewport()->update();
             }
@@ -5245,9 +5228,9 @@ void View::mousePressEvent(QMouseEvent *event)
             // first, which is exactly the old Ctrl-only behavior this
             // update is additive to, not a replacement of.
             const auto act = linkActivationAt(hit, event->modifiers());
-            const bool caretOnLinkBlock = !m_readOnly && hit.block == m_caret.block;
+            const bool caretOnLinkBlock = !isReadOnly() && hit.block == m_caret.block;
             const bool activationGesture =
-                m_readOnly
+                isReadOnly()
                 || event->modifiers().testFlag(Qt::ControlModifier)
                 || !caretOnLinkBlock;
             if (act && activationGesture) {
@@ -5329,7 +5312,7 @@ void View::mousePressEvent(QMouseEvent *event)
     // `Clipboard` mode — qwidgettextcontrol.cpp's own MiddleButton handling
     // never conflates the two, and neither does this). Guarded to non-link
     // hits by construction — the branch above already returned for a link.
-    if (event->button() == Qt::MiddleButton && m_doc && !m_readOnly
+    if (event->button() == Qt::MiddleButton && m_doc && !isReadOnly()
         && QGuiApplication::clipboard()->supportsSelection()) {
         const CanvasCursor hit = hitTest(event->pos());
         if (!hit.block.isNull()) {
@@ -5514,7 +5497,7 @@ void View::inputMethodEvent(QInputMethodEvent *event)
     // composition run and only blocking the eventual commit — a live
     // composition that can never commit is a worse UX than none at all,
     // and matches "cut disabled in its entirety" above.
-    if (m_readOnly) {
+    if (isReadOnly()) {
         event->accept();
         return;
     }
@@ -5534,10 +5517,10 @@ void View::inputMethodEvent(QInputMethodEvent *event)
         const int toByte = int(coords::qtPosToByte(text, replEndQ));
         const QByteArray commit = event->commitString().toUtf8();
 
-        UndoLog::Transaction t(m_doc->d2UndoLog());
-        m_doc->d2ApplyBufferEdit(m_caret.block, uint32_t(fromByte),
-                                 uint32_t(toByte - fromByte), commit, t);
-        m_caret.byteOffset = fromByte + commit.size();
+        const auto result = m_doc->applyBlockEdit({m_caret.block, quint32(fromByte),
+            quint32(toByte - fromByte), commit});
+        if (publicationCommitted(result))
+            m_caret.byteOffset = fromByte + commit.size();
         // P6.1: does not funnel through setCaret() — pushed directly,
         // same reasoning as insertPrintable() (this IS the IME's version
         // of a printable-key commit). Pushed BEFORE the flush below so
@@ -5959,8 +5942,12 @@ void View::paintEvent(QPaintEvent *event)
         for (const RemotePresence &presence : m_remotePresences) {
             if (presence.selection.kind != Markoff::Selection::Kind::Presence)
                 continue;
-            const auto start  = resolvePresenceAnchor(presence.selection.anchor);
-            const auto active = resolvePresenceAnchor(presence.selection.active);
+            const auto start = presence.selection.anchorPosition
+                ? resolvePresenceAnchor(*presence.selection.anchorPosition)
+                : std::optional<CanvasCursor>{};
+            const auto active = presence.selection.activePosition
+                ? resolvePresenceAnchor(*presence.selection.activePosition)
+                : std::optional<CanvasCursor>{};
             if (!start || !active || *start == *active)
                 continue;
             CanvasCursor a = *start, b = *active;
@@ -6057,7 +6044,9 @@ void View::paintEvent(QPaintEvent *event)
         for (const RemotePresence &presence : m_remotePresences) {
             if (presence.selection.kind != Markoff::Selection::Kind::Presence)
                 continue;
-            const auto active = resolvePresenceAnchor(presence.selection.active);
+            const auto active = presence.selection.activePosition
+                ? resolvePresenceAnchor(*presence.selection.activePosition)
+                : std::optional<CanvasCursor>{};
             if (!active || active->block != e.id)
                 continue;
             const int layoutPos = e.projection.byteToLayoutQChar(active->byteOffset);

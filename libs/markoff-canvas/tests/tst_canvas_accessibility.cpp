@@ -1813,6 +1813,7 @@ void TstCanvasAccessibility::structure_remote_edit_insert_remove_create_destroy(
         docB.d2ApplyBufferEdit(third, 0, 0, QByteArrayLiteral("More"), t);
     });
     QCOMPARE(root->childCount(), 3);
+    QVERIFY(third != first && third != second);
     QCOMPARE(spy.eventsOfType(QAccessible::ObjectCreated).size(), 1);
     QCOMPARE(spy.eventsOfType(QAccessible::ObjectCreated)[0].iface, root->child(2));
     // Remote block destroy.

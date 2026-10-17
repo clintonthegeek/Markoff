@@ -5,25 +5,9 @@
 // section / long list / callout — see Folding.h's own doc comment for the
 // exact per-kind body computation).
 //
-// Session/FoldRef finding (see the plan's findings log, P5.6 entry): the
-// core seam this task names, `Session::foldedRegions()` (`FoldRef`,
-// `<markoff/core/FoldRef.h>`), stores its fold anchor as a raw
-// `CollabText::Crdt::Anchor`. The only PUBLIC way to construct one of
-// those, `MarkoffDocument::anchorAt(quint32 byteOffset, Bias)`, is backed
-// by the LEGACY flat buffer (`d->buffer.anchor_at` in
-// MarkoffDocument.cpp), which core's own CLAUDE.md documents as stale/
-// unreliable once a document is D2-loaded (per-block CRDT buffers) — canvas
-// is D2-only. The D2-aware, per-block anchor constructors that DO exist
-// publicly (`textAnchorAt(BlockAnchor, offset, rightBias)`) return
-// `Markoff::TextAnchor`, not the raw `Crdt::Anchor` `FoldRef::start`
-// needs, and the private conversion (`Detail::toCrdtAnchor`,
-// AnchorConversion.h) lives in markoff-core's src/, not its public
-// include/. This is exactly why `EditorWidget::saveEphemeralState`'s
-// scroll/cursor keys (P3.6) already bypass `Session::topVisibleAnchor`/
-// `primarySelection` for the same block-index scheme this task's fold
-// persistence uses below — Session's own fold accessors are left
-// unwired, same as its scroll/selection accessors already are, pending a
-// D2-safe public core accessor that doesn't exist yet.
+// Session::foldedRegions() stores FoldRef anchors as raw CRDT anchors.
+// MarkoffDocument now provides block-scoped raw-anchor conversion, but this
+// canvas-local fold state still does not exercise session fold persistence.
 //
 // "Long lists" interpretation (task text names the shape, not a
 // threshold): a foldable list head is the FIRST item of a maximal
@@ -466,7 +450,12 @@ void TstCanvasFolding::toggle_fold_writes_through_to_session()
     const QList<FoldRef> regions = session->foldedRegions();
     QCOMPARE(regions.size(), 1);
     QCOMPARE(regions.first().kind, FoldRef::Kind::Heading);
-    QVERIFY(!(regions.first().start == CollabText::Crdt::Anchor{}));
+    QVERIFY(!regions.first().start.isNull());
+
+    View restoredView;
+    restoredView.setDocument(doc);
+    restoredView.setSession(session);
+    QVERIFY(restoredView.isBlockFolded(heading));
 
     // Toggling again removes it from the Session too (not merely from
     // View's local cache) — a real write-through, not a one-shot append.

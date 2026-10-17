@@ -24,7 +24,7 @@ class CanvasBlockAccessible;
 /// qHash (used by QHash), and QHash's copy-on-write Node type can't hold a
 /// move-only std::unique_ptr value (see m_children's own doc comment).
 struct BlockIdHash {
-    size_t operator()(BlockId id) const noexcept { return size_t(id.raw()); }
+    size_t operator()(BlockId id) const noexcept { return id.identityHash(); }
 };
 
 /// `View`'s document-container accessible (spec §4.1, A1 — the per-block

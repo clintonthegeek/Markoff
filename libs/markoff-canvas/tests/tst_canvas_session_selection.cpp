@@ -75,13 +75,7 @@ void TstCanvasSessionSelection::typing_pushes_caret_to_session()
 
     // Read straight off the Session's own accessor — an external reader,
     // never through View — to prove the write-through actually happened.
-    // NOTE: verified via TextAnchor::block() + offsetInBlock(), not
-    // MarkoffDocument::blockAt() — see the P6.1 findings-log entry:
-    // blockAt() resolves via latestBlockRanges/latestBlockAnchors, which
-    // are never populated anywhere in markoff-core/src and so always
-    // return nullopt; TextAnchor already carries its own origin block,
-    // and offsetInBlock(BlockAnchor, TextAnchor) is the confirmed-D2-safe
-    // accessor (P6.0 finding) that actually works here.
+    // Verify through the block-qualified TextAnchor and its per-block buffer.
     const Selection sel = session->primarySelection();
     QVERIFY(sel.isEmpty());  // no selection in play, just a caret
     QVERIFY(!sel.active.isNull());

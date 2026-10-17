@@ -164,6 +164,8 @@ struct ContentWidthPolicy {
  */
 class View : public QAbstractScrollArea {
     Q_OBJECT
+    Q_PROPERTY(bool publicationPending READ publicationPending
+               NOTIFY publicationPendingChanged)
 public:
     explicit View(QWidget *parent = nullptr);
     ~View() override;
@@ -171,18 +173,18 @@ public:
     /// Non-owning. Null is legal (an unbound view paints an empty page).
     void setDocument(MarkoffDocument *doc);
     MarkoffDocument *document() const;
+    /// True while a tentative document publication has not resolved or the
+    /// attached provider-backed document requires recovery. Hosts can surface
+    /// this without treating tentative bytes as committed content.
+    bool publicationPending() const noexcept { return m_publicationPending; }
 
     /// P6.0: non-owning reference to the current document's per-view
     /// Session (owned by `EditorWidget`, threaded in right after it calls
     /// `doc->createSession()`; cleared to null wherever the owner nulls or
     /// destroys its session). When set, `toggleFold()` additionally
-    /// writes every fold through to `session->toggleFold()` — so an
-    /// external reader of `session->foldedRegions()` sees real state — on
-    /// top of its unconditional local `m_foldedHeads` update (see
-    /// `toggleFold()`'s doc comment for why a *generic* reverse
-    /// resolution of Session state back into `m_foldedHeads` is not
-    /// attempted: it is unsound under D2's per-block CRDT buffers, a
-    /// P6.0 finding). Null is legal — every existing direct-`View` test
+    /// restores full block-qualified fold positions from
+    /// `session->foldedRegions()` and writes later toggles through to the
+    /// session. Null is legal — every existing direct-`View` test
     /// that never attaches a Session keeps working unchanged.
     void setSession(Session *session);
     Session *session() const;
@@ -633,10 +635,11 @@ public:
     /// `QTextLayout::FormatRange`s built fresh in `paintEvent` alongside the
     /// local selection/find-highlight ranges (spec §3: the layout stays a
     /// pure derived cache, never a `setFormats()` mutation). Resolved from
-    /// each `Selection`'s `TextAnchor`s against the CURRENT document on
-    /// every paint — never cached CanvasCursor state — so an anchor whose
-    /// block no longer exists (or was never realized) just fails to resolve
-    /// and is silently skipped; stale/departed-participant filtering
+    /// each `Selection`'s scoped positions in candidate builds or TextAnchors
+    /// in legacy builds against the CURRENT document on every paint — never
+    /// cached CanvasCursor state — so an endpoint whose block no longer exists
+    /// (or was never realized) just fails to resolve and is silently skipped;
+    /// stale/departed-participant filtering
     /// (collabtext `PresenceManager::is_live`) is the consumer's job, not
     /// this leaf's. Passing an empty list clears all presence paint state.
     void setRemotePresences(const QList<RemotePresence> &presences);
@@ -822,6 +825,10 @@ signals:
     /// itself.
     void readOnlyChanged(bool ro);
 
+    /// Changes when the attached document enters/leaves an unresolved
+    /// tentative publication. The document's commit/revert signal resolves it.
+    void publicationPendingChanged(bool pending);
+
     /// Fired when a drop carries one or more local-file URLs (P7.2, spec
     /// "drag-drop"). This view has no opinion on embed-vs-link — that is
     /// explicitly the consumer's decision (Corbomite) — so the payload is
@@ -947,6 +954,9 @@ protected:
     QMimeData *createMimeDataFromSelection() const;
 
 private:
+    void setPublicationPending(bool pending);
+    void syncReadOnlyState();
+
     void pasteConverted(const QMimeData *mime, bool asPlain);
     void onDocumentChanged();
     /// Realize whatever the current viewport needs and refresh the scroll
@@ -1152,11 +1162,11 @@ private:
     /// Resolves a Presence Selection's TextAnchor against the CURRENT
     /// document: `{}` if the anchor is null or its origin block
     /// (`TextAnchor::block()`) is not a live cache entry (departed/gone
-    /// content) — same "resolve, or nullopt" contract `onDocumentChanged`'s
-    /// P6.1 workaround uses (`MarkoffDocument::blockAt` is dead code — see
-    /// that finding), reused here rather than re-derived. Never cached;
+    /// content) — the anchor carries its actual block identity and local
+    /// position. Never cached;
     /// called fresh every paint.
-    std::optional<CanvasCursor> resolvePresenceAnchor(const Markoff::TextAnchor &anchor) const;
+    std::optional<CanvasCursor> resolvePresenceAnchor(
+        const Markoff::ScopedTextPosition &position) const;
 
     // ---- Bracket-match highlight (P7.2f, F1 #10) --------------------------
 
@@ -1329,7 +1339,8 @@ public:
     /// multi-slice tail behavior.
     using FormatOpFn = std::function<std::optional<Markoff::FormatOps::ByteRange>(
         BlockId, Markoff::FormatOps::ByteRange)>;
-    void applyFormatOp(const FormatOpFn &applyOne);
+    enum class FormatVerb { Bold, Italic, Strike, InlineCode, Link };
+    void applyFormatOp(FormatVerb verb, const FormatOpFn &applyOne);
 
     // ---- Links (P4.2) -----------------------------------------------------
 
@@ -1454,6 +1465,7 @@ public:
     /// resets every entry's `folded` flag to false — and from
     /// `toggleFold()` itself.
     void refreshFoldedBlocks();
+    void syncFoldedHeadsFromSession();
 
     /// H arc (H1.1): re-derives `m_hiddenTitleBlock` from the flag +
     /// document + `m_inlineTitle` (D3's match rule). Called BEFORE
@@ -1482,9 +1494,8 @@ public:
     /// P6.0: builds the `Markoff::FoldRef` that identifies `id` as a fold
     /// head — `kind` (canvas's `LongList`/`Callout` both map to core's
     /// generic `FoldRef::Kind::Block`; `Heading` maps directly), `start`
-    /// (the raw `CollabText::Crdt::Anchor` at `id`'s byte 0, via
-    /// `MarkoffDocument::blockCrdtAnchorAt` — the D2-safe seam this task
-    /// added to core), and `headingLevel` for the Heading case (read off
+    /// (the block-qualified `TextAnchor` at `id`'s byte 0), and
+    /// `headingLevel` for the Heading case (read off
     /// the same `AttrNames::Level` attribute `Folding::resolveFoldable`
     /// already reads). `headingPath` is left empty — see the P6.0 findings
     /// log entry. Caller must already know `id` is foldable
@@ -1555,6 +1566,8 @@ public:
     bool m_hasFocus = false;
     /// Read-only gate authority (P3.3). See `setReadOnly`'s doc comment.
     bool m_readOnly = false;
+    bool m_publicationPending = false;
+    bool m_reportedReadOnly = false;
     /// Find-match highlights (P3.4), grouped by block for O(1) lookup
     /// during `paintEvent`. Draw-time-only paint state — see
     /// `setFindHighlights`'s doc comment.
@@ -1587,17 +1600,14 @@ public:
     /// by `paintEvent` exactly like the remote-presence caret bar.
     std::optional<CanvasCursor> m_dropCursorPos;
 
-    // ---- Folding (P5.6, retro-wired to Session in P6.0) ------------------
-    /// Fold heads currently toggled ON. Remains the authority for the
-    /// View's own writes (see `toggleFold()`'s doc comment for why a
-    /// Session-state-derived cache is not attempted); when a Session is
-    /// attached, every write here is mirrored to it via
-    /// `Session::toggleFold()` so it stays a genuine second reader
-    /// surface — see the private "Folding" section's doc comment for why
-    /// fold SHAPE is never stored here.
+    // ---- Folding (P5.6, session persistence) -----------------------------
+    /// Fold heads currently projected into this view. Full block-qualified
+    /// positions are persisted by Session; this set is rebuilt when a
+    /// session is attached and mirrored on each local toggle.
     QSet<BlockId> m_foldedHeads;
-    /// P6.0: non-owning, see `setSession()`.
+    /// Non-owning, see `setSession()`.
     Session *m_session = nullptr;
+    QMetaObject::Connection m_sessionFoldConnection;
 
     // ---- IME (T8) ---------------------------------------------------------
     // Composition state the document doesn't know about (same exception as
