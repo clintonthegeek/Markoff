@@ -64,7 +64,6 @@ public:
     };
 
     using Dispatcher = std::function<void(const UndoCrdtTarget &, OpId, bool forward)>;
-    using IsCollapsedQuery = std::function<bool(const UndoCrdtTarget &, OpId)>;
 
     size_t entryCount() const noexcept { return m_entries.size(); }
     const UndoEntry &lastEntry() const { return m_entries.back(); }
@@ -95,7 +94,6 @@ public:
     void undo();
     void redo();
     void undoForBlock(BlockId block);
-    void compact(IsCollapsedQuery query);
 
     template <typename Body>
     void maybeCoalesceOrTransaction(const CoalesceContext &ctx, Body &&body) {

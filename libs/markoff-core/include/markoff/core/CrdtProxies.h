@@ -9,7 +9,7 @@
 
 namespace Markoff {
 
-/// Lightweight QObject proxy wrapping a single block's CollabText::Crdt::Buffer.
+/// Lightweight QObject proxy for one block's text-change notifications.
 /// Connect to its signals to track per-block text changes without including CRDT headers.
 /// Created and owned exclusively by MarkoffDocument — do not construct directly.
 class MARKOFF_CORE_EXPORT BufferProxy : public QObject {

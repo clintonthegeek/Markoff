@@ -80,14 +80,4 @@ void UndoLog::undoForBlock(BlockId block) {
     m_redoStack.push_back(std::move(e));
 }
 
-void UndoLog::compact(IsCollapsedQuery query) {
-    m_entries.erase(
-        std::remove_if(m_entries.begin(), m_entries.end(), [&](const UndoEntry &e) {
-            return std::all_of(e.targets.begin(), e.targets.end(),
-                [&](const auto &p) { return query(p.first, p.second); });
-        }),
-        m_entries.end()
-    );
-}
-
 }  // namespace Markoff

@@ -6,6 +6,7 @@
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffCoreExport.h>
 #include <markoff/core/UndoLog.h>
+#include <markoff/vnext/ActionPublicationCoordinator.h>
 
 #include <QByteArray>
 #include <QChar>
@@ -52,7 +53,7 @@ MARKOFF_CORE_EXPORT void deleteMerge(MarkoffDocument &doc, BlockId currentBlock)
 
 /// Change the block's kind and optionally set attributes.
 /// attrNames and attrValues are parallel arrays; lengths must match.
-MARKOFF_CORE_EXPORT void changeKind(MarkoffDocument &doc,
+MARKOFF_CORE_EXPORT VNext::ActionPublicationResult changeKind(MarkoffDocument &doc,
                                            BlockId block,
                                            BlockKind newKind,
                                            const QList<QByteArray> &attrNames = {},

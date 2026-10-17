@@ -6,11 +6,50 @@
 #include <QJsonArray>
 #include <QUuid>
 
-#include <markoff/core/AnchorJson.h>
+#include <array>
+#include <algorithm>
 #include <markoff/core/MarkoffDocument.h>
 #include "SessionPrivate.h"
 
 namespace Markoff {
+
+namespace {
+QJsonObject positionToJson(const ScopedTextPosition &position)
+{
+    QJsonObject encoded;
+    const QByteArray actor(reinterpret_cast<const char *>(position.block.actorBytes().data()),
+                           qsizetype(position.block.actorBytes().size()));
+    encoded.insert("version", 1);
+    encoded.insert("actor", QString::fromLatin1(actor.toHex()));
+    encoded.insert("counter", QString::number(position.block.counter()));
+    encoded.insert("token", QString::fromLatin1(position.boundaryToken.toBase64(
+        QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals)));
+    return encoded;
+}
+
+std::optional<ScopedTextPosition> positionFromJson(const QJsonValue &value)
+{
+    if (!value.isObject()) return std::nullopt;
+    const auto encoded = value.toObject();
+    const QByteArray actorHex = encoded.value("actor").toString().toLatin1();
+    const QByteArray actor = QByteArray::fromHex(actorHex);
+    if (encoded.value("version").toInt() != 1 || actor.size() != 16
+        || actor.toHex() != actorHex) return std::nullopt;
+    std::array<uint8_t, 16> actorBytes{};
+    std::copy(actor.cbegin(), actor.cend(), actorBytes.begin());
+    bool counterOk = false;
+    const auto counter = encoded.value("counter").toString().toULongLong(&counterOk);
+    const auto block = counterOk ? BlockId::fromStructuralIdentity(actorBytes, counter)
+                                 : std::optional<BlockId>{};
+    const QByteArray tokenText = encoded.value("token").toString().toLatin1();
+    const QByteArray token = QByteArray::fromBase64(tokenText,
+        QByteArray::Base64UrlEncoding | QByteArray::AbortOnBase64DecodingErrors);
+    if (!block || token.isEmpty() || token.toBase64(
+            QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals) != tokenText)
+        return std::nullopt;
+    return ScopedTextPosition{*block, token};
+}
+}
 
 Session::Session(MarkoffDocument *doc, const SessionParams &params)
     : QObject(doc)
@@ -36,9 +75,9 @@ Selection Session::primarySelection() const { return d->primary; }
 void Session::setPrimarySelection(const Selection &sel)
 {
     const Selection &cur = d->primary;
-    if (cur.anchor == sel.anchor
-        && cur.active == sel.active
-        && cur.kind   == sel.kind)
+    if (cur.anchorPosition == sel.anchorPosition
+        && cur.activePosition == sel.activePosition
+        && cur.kind == sel.kind)
     {
         return;
     }
@@ -71,14 +110,14 @@ void Session::clearSecondarySelectionsOfKind(Selection::Kind kind)
     Q_EMIT secondarySelectionsChanged();
 }
 
-CollabText::Crdt::Anchor Session::topVisibleAnchor() const { return d->topAnchor; }
+std::optional<ScopedTextPosition> Session::topVisiblePosition() const { return d->topPosition; }
 qreal                    Session::topVisibleFraction() const { return d->topFraction; }
 
-void Session::setTopVisible(CollabText::Crdt::Anchor a, qreal fraction)
+void Session::setTopVisible(ScopedTextPosition position, qreal fraction)
 {
-    d->topAnchor   = a;
+    d->topPosition = std::move(position);
     d->topFraction = fraction;
-    Q_EMIT scrollChanged(a, fraction);
+    Q_EMIT scrollPositionChanged(*d->topPosition, fraction);
 }
 
 const QList<FoldRef> &Session::foldedRegions() const { return d->folds; }
@@ -91,12 +130,11 @@ void Session::setFoldedRegions(QList<FoldRef> folds)
 
 void Session::toggleFold(const FoldRef &f)
 {
-    // Match by start anchor identity (replica + char_value) — ignores
+    // Match by block-qualified text position — ignores
     // ephemeral heading-path drift across parses.
     const auto matches = [&](const FoldRef &x) {
-        return x.start.replica_id == f.start.replica_id
-            && x.start.char_value == f.start.char_value
-            && x.kind             == f.kind;
+        return x.startPosition == f.startPosition
+            && x.kind == f.kind;
     };
     const auto it = std::find_if(d->folds.begin(), d->folds.end(), matches);
     if (it == d->folds.end()) {
@@ -111,12 +149,12 @@ void Session::copyStateFrom(const Session &other)
 {
     d->primary     = other.d->primary;
     d->secondaries = other.d->secondaries;
-    d->topAnchor   = other.d->topAnchor;
+    d->topPosition = other.d->topPosition;
     d->topFraction = other.d->topFraction;
     d->folds       = other.d->folds;
     Q_EMIT primarySelectionChanged(d->primary);
     Q_EMIT secondarySelectionsChanged();
-    Q_EMIT scrollChanged(d->topAnchor, d->topFraction);
+    if (d->topPosition) Q_EMIT scrollPositionChanged(*d->topPosition, d->topFraction);
     Q_EMIT foldedRegionsChanged();
 }
 
@@ -133,7 +171,7 @@ QJsonObject Session::toJson() const
     for (const Selection &s : d->secondaries) sec.append(s.toJson());
     obj.insert("secondaries", sec);
 
-    obj.insert("topAnchor",   anchorToJson(d->topAnchor));
+    if (d->topPosition) obj.insert("topPosition", positionToJson(*d->topPosition));
     obj.insert("topFraction", d->topFraction);
 
     QJsonArray folds;
@@ -154,7 +192,7 @@ void Session::fromJson(const QJsonObject &obj)
     for (const QJsonValue &v : obj.value("secondaries").toArray())
         d->secondaries << Selection::fromJson(v.toObject());
 
-    d->topAnchor   = anchorFromJson(obj.value("topAnchor").toObject());
+    d->topPosition = positionFromJson(obj.value("topPosition"));
     d->topFraction = obj.value("topFraction").toDouble();
 
     d->folds.clear();
@@ -163,7 +201,7 @@ void Session::fromJson(const QJsonObject &obj)
 
     Q_EMIT primarySelectionChanged(d->primary);
     Q_EMIT secondarySelectionsChanged();
-    Q_EMIT scrollChanged(d->topAnchor, d->topFraction);
+    if (d->topPosition) Q_EMIT scrollPositionChanged(*d->topPosition, d->topFraction);
     Q_EMIT foldedRegionsChanged();
 }
 

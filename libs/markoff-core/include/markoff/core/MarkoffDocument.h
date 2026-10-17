@@ -15,52 +15,127 @@
 #include <utility>
 #include <vector>
 
-#include <crdt/Anchor.h>
-#include <crdt/Clock.h>
-#include <crdt/Operations.h>
-
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/core/SearchEngine.h>
 #include <markoff/core/BlockSerializerRegistry.h>
-#include <markoff/core/Cursor.h>
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/core/BlockAttrsMap.h>
+#include <markoff/core/LinkRefMap.h>
 #include <markoff/core/BlockEdit.h>
 #include <markoff/core/BlockKind.h>
-#include <markoff/core/CrdtProxies.h>
-#include <markoff/core/Origin.h>
-#include <markoff/core/PasteMeta.h>
 #include <markoff/core/StructuralOp.h>
-#include <markoff/core/TextAnchor.h>
 #include <markoff/core/MarkoffCoreExport.h>
-#include <markoff/core/MarkoffOp.h>
 #include <markoff/core/SessionParams.h>
-#include <markoff/core/UndoLog.h>
+
+#include <collabtext/ActorId.h>
+#include <markoff/vnext/ProviderBackedDocumentState.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
 
 namespace Markoff {
+
+enum class RemoteActionRouteState { committed, deferred, backpressured, quarantined, rejected, uncertain };
+
+struct RemoteActionQueueBudget {
+    size_t maxActions = 4096;
+    size_t maxBytes = 32U * 1024U * 1024U;
+};
+
+struct RemoteActionReceipt {
+    QByteArray actionId;
+    Markoff::VNext::AcceptedRevision acceptedRevision;
+};
+
+struct RemoteActionQuarantine {
+    QByteArray actionId;
+    QByteArray originalMab;
+    CollabText::Error reason;
+};
+
+struct RemoteActionRouteResult {
+    RemoteActionRouteState state = RemoteActionRouteState::rejected;
+    std::optional<CollabText::Error> diagnostic;
+    /// Receipts for the offered MAB and any older deferred MABs made ready by
+    /// this commit. A transport may acknowledge only these exact action IDs.
+    std::vector<RemoteActionReceipt> committed;
+    /// Action IDs whose rejected envelopes were durably retained by the
+    /// document provider during this offer or a deferred-queue drain.
+    std::vector<QByteArray> quarantined;
+};
 
 class Document;       // markoff-parser
 class Session;        // forward; defined in Session.h after this task
 
-/// Canonical text + AST + sessions. Owns a CollabText::Crdt::Buffer
-/// internally; views are subscribers to this object's signals.
+struct BlockPasteResult {
+    Markoff::VNext::ActionPublicationResult publication;
+    BlockId caretBlock;
+    uint32_t caretByteOffset = 0;
+};
+
+/// Canonical text + AST + sessions. Views subscribe to this document's
+/// block, structure and metadata signals.
 class MARKOFF_CORE_EXPORT MarkoffDocument : public QObject {
     Q_OBJECT
     Q_DISABLE_COPY_MOVE(MarkoffDocument)
 public:
-    /// Single-user mode constructor. Uses replica ID sentinel 0x0001.
-    /// isCollabConfigured() returns false.
-    explicit MarkoffDocument(QObject *parent = nullptr);
+    struct ExportSnapshot {
+        QByteArray markdown;
+        Markoff::VNext::AcceptedRevision revision;
+    };
 
-    /// Construct an empty document with the given replica ID. ReplicaId is
-    /// the CRDT identity for this MarkoffDocument instance; for single-user
-    /// use, a random quint16 is fine. An optional BlockSerializerRegistry
-    /// may be passed in for host-provided serializers (view layer injection);
-    /// nullptr means "use BuiltinBlockSerializerRegistry only".
-    /// isCollabConfigured() returns true.
-    explicit MarkoffDocument(quint16 replicaId,
-                             const Markoff::BlockSerializerRegistry *registry = nullptr,
-                             QObject *parent = nullptr);
+    /// Open a document only after provider recovery and accepted-prefix replay
+    /// complete. Storage and scope remain caller-owned; the returned document
+    /// owns its lifecycle session and candidate projection.
+    [[nodiscard]] static CollabText::Result<std::unique_ptr<MarkoffDocument>> open(
+        Markoff::VNext::DocumentStorageProvider &provider,
+        const Markoff::VNext::DocumentStorageScope &scope,
+        Markoff::VNext::StorageMode mode,
+        const Markoff::BlockSerializerRegistry *registry = nullptr);
+
+    [[nodiscard]] Markoff::VNext::ProviderDocumentState providerState() const noexcept;
+    [[nodiscard]] bool canStartOrdinaryAction() const noexcept;
+    /// Rebuilds accepted state after a proven-absent publication and records
+    /// terminal coverage for every remaining local allocation reservation.
+    [[nodiscard]] CollabText::Result<void> recoverPendingAllocations();
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult importInitialMarkdown(
+        const QByteArray& source);
+    /// Validate, durably accept and replay one complete remote MAB action.
+    /// A caller may advance its transport receipt only for a committed result.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult acceptRemoteAction(
+        const QByteArray& mabBytes);
+    /// Offer a complete MAB to the bounded, owner-thread remote router.
+    /// Causally deferred and unknown-target MABs are retained without a receipt
+    /// and retried after commits.
+    [[nodiscard]] Markoff::RemoteActionRouteResult routeRemoteAction(
+        const QByteArray& mabBytes);
+    /// Retry durably retained causal waits after startup or an external stream
+    /// registration. Committed actions in the result are receipt eligible.
+    [[nodiscard]] Markoff::RemoteActionRouteResult retryDeferredRemoteActions();
+    /// Read locally committed MABs that still need to be sent after startup or
+    /// reconnect. A host must authenticate receipt delivery before acknowledging.
+    [[nodiscard]] CollabText::Result<std::vector<Markoff::VNext::PendingOutboundAction>>
+    pendingOutboundActions() const;
+    [[nodiscard]] CollabText::Result<void> acknowledgeOutboundActionReceipt(
+        const QByteArray& actionId, const QByteArray& acceptedRevision);
+    /// Recover whole-action quarantine records after provider reopen. Records
+    /// written by primitive routers without an enclosing MAB are omitted.
+    [[nodiscard]] CollabText::Result<std::vector<Markoff::RemoteActionQuarantine>>
+    quarantinedRemoteActions() const;
+    [[nodiscard]] size_t pendingRemoteActionCount() const noexcept;
+    /// Set owner-thread routing limits. The update is rejected if the current
+    /// deferred queue would exceed the new bounds; zero disables retention.
+    [[nodiscard]] CollabText::Result<void> setRemoteActionQueueBudget(
+        RemoteActionQueueBudget budget);
+    /// Publish external/plugin Markdown bytes as one accepted replacement
+    /// action. Replacement retains the registered document history but creates
+    /// fresh block identities for the replacement projection.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult replaceMarkdown(
+        const QByteArray& source);
+    [[nodiscard]] CollabText::Result<ExportSnapshot> snapshotForExport() const;
+    [[nodiscard]] CollabText::Result<void> acknowledgeExport(
+        const ExportSnapshot& snapshot);
+
+    /// A provider and document scope are required to open a document.
+    explicit MarkoffDocument(QObject *parent = nullptr) = delete;
     ~MarkoffDocument() override;
 
     /// Returns the BlockSerializerRegistry passed at construction, or nullptr
@@ -68,119 +143,13 @@ public:
     const Markoff::BlockSerializerRegistry *serializerRegistry() const;
 
     // ===== Reads =====
-    /// \deprecated Reads the legacy `d->buffer` text store. `loadFromMarkdown()`
-    /// and all D2 edits (`d2ApplyBufferEdit`, `applyFlatEdit`, block-level
-    /// commands) do **not** update this store, so on a D2-loaded document
-    /// these accessors return stale-or-empty content. Used as a save source
-    /// they silently write empty files (surfaced 2026-05-21 by Corbomite Vault;
-    /// see `docs/handoff/2026-05-21-save-path-data-loss.md`). For canonical
-    /// disk bytes use `serializeForSave()`. The legacy buffer remains a real
-    /// store for now — `resetContent()` populates it, `undo()`/`redo()` mutate
-    /// it, `version()` reads it — but it is no longer the source of truth for
-    /// the document's text content.
-    [[deprecated("Use serializeForSave() — toMarkdownUtf8() reads the legacy buffer which D2 edits do not update")]]
-    QByteArray toMarkdownUtf8() const;
-    [[deprecated("Use serializeForSave() — toMarkdown() reads the legacy buffer which D2 edits do not update")]]
-    QString    toMarkdown() const;
-    quint32    visibleLength() const;         ///< UTF-8 byte length
-
-    /// Returns the most-recently parsed Document (from markoff-parser),
-    /// or nullptr if no parse has completed yet.
-    const Markoff::Document *parsedDocument() const;
-
-    // ===== CRDT identity =====
-    quint16 replicaId() const noexcept;
-    bool isCollabConfigured() const noexcept;
-    CollabText::Crdt::Global version() const;
-
-    // ===== Sequence accessors (CRDT-free, public-boundary friendly) =====
-    /// Locally-monotonic edit-sequence number. Increments on every state-change
-    /// op (undo, redo, applyRemoteOps, resetContent, applyFlatEdit, etc.).
-    /// Used for dirty-tracking without holding a Crdt::Global.
-    quint64 editSequence() const noexcept;
-
-    // ===== Undo / redo =====
-    std::optional<CollabText::Crdt::Operation> undo();
-    std::optional<CollabText::Crdt::Operation> redo();
-    int  undoDepth() const;
-    bool coalesceLastUndo();
-
-    // ===== Remote ops =====
-    void applyRemoteOps(const std::vector<CollabText::Crdt::Operation> &ops);
-
-    /// Apply remote ops in arrival order. Dispatches by CrdtTarget.
-    /// See D5 spec §2.4.
-    void applyRemoteOps(QList<Markoff::MarkoffOp> ops,
-                        Markoff::MarkoffBundleMeta meta);
-
-    // ===== Wholesale reload =====
-    void resetContent(const QByteArray &newContent, Origin origin);
-
-    // ===== Anchors =====
-    CollabText::Crdt::Anchor
-        anchorAt(quint32 byteOffset, CollabText::Crdt::Bias bias) const;
-    quint32 resolveAnchor(const CollabText::Crdt::Anchor &) const;
-
-    /// TextAnchor-typed companion to anchorAt(quint32, Crdt::Bias). Same
-    /// semantics; view-layer-friendly because it doesn't require including
-    /// <crdt/Anchor.h>.
-    TextAnchor textAnchorAt(quint32 byteOffset, bool rightBias) const;
-
-    /// Resolve a TextAnchor to its current byte offset. Companion to
-    /// resolveAnchor(const Crdt::Anchor &).
-    quint32 resolveTextAnchor(const TextAnchor &) const;
-
-    // ===== Block-aware queries =====
-    /// Returns the BlockAnchor for the top-level block at index `i` in
-    /// the most-recent parse. Out-of-range returns std::nullopt.
-    std::optional<BlockAnchor> blockAnchorAt(int blockIndex) const;
-
-    /// Returns the byte range [start, end) of the BlockAnchor's block in
-    /// the current parse. End is exclusive of any structural separator
-    /// to the next block (parser/scanner-reported AST node range).
-    std::optional<std::pair<quint32, quint32>>
-        blockByteRange(const BlockAnchor &) const;
-
-    /// Returns the BlockAnchor for the top-level block containing the
-    /// given TextAnchor's resolved byte position. Returns std::nullopt
-    /// if the resolved byte falls outside any top-level block (e.g.
-    /// inside an inter-block separator, before the first block, or
-    /// past the last block).
-    std::optional<BlockAnchor> blockAt(const TextAnchor &) const;
-
-    /// Returns the offset (in UTF-8 bytes) of the given TextAnchor's
-    /// resolved byte relative to the BlockAnchor's first byte. Clamps:
-    /// resolved-byte below block-start returns 0; resolved-byte past
-    /// block-end returns block byte length.
-    int offsetInBlock(const BlockAnchor &, const TextAnchor &) const;
-
-    /// Returns a TextAnchor at `offset` UTF-8 bytes from the
-    /// BlockAnchor's first-byte position. Block-local companion to
-    /// textAnchorAt(quint32, bool).
-    TextAnchor textAnchorAt(const BlockAnchor &, int offset, bool rightBias) const;
-
-    /// D2-safe companion to anchorAt()/resolveAnchor() for consumers that
-    /// need the raw CRDT anchor type on a block that may not exist in the
-    /// legacy flat buffer (e.g. a block created after D2 load). Unlike
-    /// anchorAt(quint32, Crdt::Bias), which is backed by the legacy flat
-    /// buffer and is stale on such blocks, this resolves directly against
-    /// the block's own per-block CRDT buffer (falling back to the legacy
-    /// flat-buffer path only when no D2 buffer exists for the block).
-    /// textAnchorAt(BlockAnchor, int, bool) wraps this in the public
-    /// TextAnchor type; use this overload directly when the raw
-    /// CollabText::Crdt::Anchor type is what the caller needs (see
-    /// FoldRef::start / Session::topVisibleAnchor for the established
-    /// precedent of raw-typed accessors at this boundary).
-    CollabText::Crdt::Anchor
-        blockCrdtAnchorAt(const BlockAnchor &, int offset,
-                          CollabText::Crdt::Bias bias) const;
-
-    /// Inverse of blockCrdtAnchorAt(): resolves a raw CollabText::Crdt::Anchor
-    /// to its block-local UTF-8 byte offset, against the BlockAnchor's own
-    /// per-block CRDT buffer. D2-safe companion to offsetInBlock(BlockAnchor,
-    /// TextAnchor) for callers holding the raw anchor type.
-    int resolveBlockCrdtAnchor(const BlockAnchor &,
-                                const CollabText::Crdt::Anchor &) const;
+    /// Mint and resolve opaque, stream-scoped position tokens for candidate
+    /// consumers. Tokens are encoded by CollabText and cannot be interpreted
+    /// as engine replica/character coordinates.
+    [[nodiscard]] CollabText::Result<QByteArray> boundaryTokenAt(
+        BlockId block, quint32 byteOffset, bool rightAffinity) const;
+    [[nodiscard]] CollabText::Result<quint32> resolveBoundaryToken(
+        BlockId block, const QByteArray& token) const;
 
     // ===== Sessions (filled in Task 23) =====
     Session *createSession(const SessionParams &params = {});
@@ -188,57 +157,55 @@ public:
     QList<Session *> sessions() const;
     Session *sessionForParticipant(const QString &participantId) const;
 
-    // ===== Garbage collection =====
-    qsizetype collectGarbage();
-    qsizetype compact(const CollabText::Crdt::Global &watermark);
+    // ===== Provider-backed block edits =====
+    /// Apply a local edit as one durably published, undoable document action.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult applyBlockEdit(
+        const Markoff::BlockEdit &edit);
+    /// Publish non-overlapping block-local edits as one durable action.
+    /// Offsets refer to the pre-action text in each block.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult applyBlockEdits(
+        const QList<Markoff::BlockEdit>& edits);
+    /// Atomically replace part of one block and remove subsequent blocks in
+    /// the same accepted text/list/kind-map action. The first block survives.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult applyBlockMerge(
+        const Markoff::BlockEdit& survivorEdit,
+        const QList<BlockId>& removedBlocks);
+    /// Atomically split a block into its retained prefix and a new block whose
+    /// text begins with `newBlockPrefix` followed by the removed suffix.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult applyBlockSplit(
+        const Markoff::BlockEdit& prefixEdit, BlockKind newBlockKind,
+        const QByteArray& newBlockPrefix = {});
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult changeBlockKind(
+        BlockId block, BlockKind kind,
+        const QList<AttrName>& attrNames = {},
+        const QList<AttrValue>& attrValues = {});
+    /// Atomically exchange the visible text, kind, and attribute payloads of
+    /// two blocks in one accepted action. Missing known attributes are
+    /// written using the caller-provided defaults so stale values do not
+    /// survive a kind swap.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult swapBlockPayload(
+        BlockId first, BlockId second,
+        const QHash<AttrName, AttrValue>& defaults);
+    [[nodiscard]] BlockPasteResult pasteMarkdownAt(
+        BlockId target, uint32_t byteOffset, const QByteArray& markdown);
+    /// Replace a block-local source range, including any complete intervening
+    /// blocks, with parsed Markdown in one accepted action.
+    [[nodiscard]] BlockPasteResult pasteMarkdownReplacingRange(
+        BlockId startBlock, uint32_t startByteOffset,
+        BlockId endBlock, uint32_t endByteOffset,
+        const QByteArray& markdown);
 
-    // ===== D2 per-block edit API =====
-    /// Apply a local edit to a single block's CRDT buffer. The edit is
-    /// recorded in the UndoLog as a single undoable action.
-    void applyBlockEdit(const Markoff::BlockEdit &edit);
-
-    /// Apply a flat (source-widget) edit expressed as global UTF-8 byte
-    /// offsets across the concatenated block buffers. Opens an UndoLog
-    /// transaction and decomposes the edit into per-block d2ApplyBufferEdit
-    /// calls + structural ops (d2InsertBlock, d2RemoveBlock). The entire
-    /// edit lands in one transaction so a single undoD2() reverses it.
-    /// Coordinate space: no-separator concatenation of `blockText(id)` for
-    /// each block in `iterateBlocks()` order. See `flatView()` for the
-    /// separator-bearing source-markdown representation.
-    void applyFlatEdit(uint32_t oldStart,
-                       uint32_t oldEnd,
-                       const QByteArray &newText,
-                       Origin origin);
-
-    /// Replace each match's byte span with literal `replacement`, as ONE undo
-    /// transaction. `matches` carry block-local byte offsets (SearchEngine
-    /// coordinate space); they are mapped to global no-separator flat offsets
-    /// and applied descending-by-start so earlier-applied edits never shift
-    /// later ones. Stale matches (block no longer present) are skipped. Empty
-    /// list is a no-op. Ends with a synchronous d2DocumentChanged flush so an
-    /// active FindController has recomputed by the time this returns.
-    void replaceMatches(const QList<SearchHit> &matches,
-                        const QString &replacement);
-
-    /// Interactive ingress (WYSIWYG Enter): split the block containing the
-    /// no-separator global byte offset `atByte` on a single newline. The head
-    /// stays in the current block; the tail moves into a NEW Paragraph block
-    /// inserted immediately after. The tail MAY be empty — this is the
-    /// deliberate exception to the no-empty-block canonical rule that
-    /// `applyFlatEdit` enforces (see binding-robustness spec). Performs NO
-    /// newline-run collapsing. Interior-boundary bias is previous-block:
-    /// `atByte` at the end of block N resolves to (N, end), not (N+1, 0).
-    /// Returns the BlockId the caret should occupy at offset 0 (the new block).
-    BlockId applyInteractiveNewline(uint32_t atByte, Origin origin);
+    /// Replace each match's byte span with literal `replacement` in one
+    /// durable action. Matches use SearchEngine's block-local byte offsets.
+    /// Stale matches are skipped; an empty list is a no-op.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult replaceMatches(
+        const QList<SearchHit> &matches, const QString &replacement);
 
     /// Source-view representation of the document: per-block content joined
     /// by `interBlockSeparator()` (`"\n\n"`). No final document terminator —
     /// a source widget should not render a phantom empty line at the end;
     /// the trailing `"\n"` is `serializeForSave()`'s file-on-disk concern.
-    /// This is the representation a source-view widget should display so
-    /// that line/column positions correspond to logical lines in the saved
-    /// file. The `applyFlatEdit` coordinate space (no-separator) is a
-    /// different view; consumers translate between the two as needed.
+    /// This is the Markdown representation used for source display and export.
     QByteArray flatView() const;
 
     /// Runtime flat view for the WP-rendered flat-text widget views
@@ -279,51 +246,40 @@ public:
     /// buffer-convention table in markoff-core/CLAUDE.md).
     QByteArray blockQuoteDisplayMarker(BlockId id) const;
 
-    /// Structure-aware paste. Serializes `blocks` (a QJsonArray of block
-    /// objects with "kind", "text", and optional "attrs") to flat markdown
-    /// and calls applyFlatEdit on the byte range [startByte, endByte).
-    /// If meta.reuseBlockIds is true and meta.cutSeq matches a cached recent
-    /// cut, the cache entry is consumed (BlockId reuse is a TODO for a future
-    /// remap pass; correctness is unaffected). All work lands in one UndoLog
-    /// transaction; a single undoD2() reverses it.
-    void applyStructuredPaste(quint32 startByte, quint32 endByte,
-                              const QJsonArray &blocks,
-                              const Markoff::PasteMeta &meta);
+    /// Parse a clipboard payload and publish the selected text/list/kind/
+    /// attribute changes as one action. Offsets use concatenated block text.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult applyStructuredPaste(
+        quint32 startByte, quint32 endByte, const QJsonArray &blocks);
 
-    /// Serialise a clipboard JSON block payload (as produced by
-    /// LiveClipboardController) back to flat markdown text. Reconstructs the
+    /// Serialise a clipboard JSON block payload back to Markdown text. Reconstructs the
     /// kind-specific markdown prefix (heading `#`, list marker `-`/`1.`/etc.,
     /// blockquote `>`, code-fence) from the per-block "kind" + "attrs" fields,
-    /// and joins blocks with `\n\n`. Used both by applyStructuredPaste (which
-    /// then calls applyFlatEdit) and by LiveClipboardController's plain-text
-    /// fallback so the markdown going to other apps round-trips correctly.
+    /// and joins blocks with `\n\n`. Used by clipboard plain-text fallback.
     static QByteArray reconstructFlatMarkdown(const QJsonArray &blocks);
 
-    /// Apply a structural operation (insert/remove/change-kind) to the
-    /// IdList and related CRDTs. Recorded in the UndoLog.
-    void applyStructural(const Markoff::StructuralOp &op);
+    /// Apply a structural operation as one durably published document action.
+    Markoff::VNext::ActionPublicationResult applyStructural(
+        const Markoff::StructuralOp &op);
 
-    // ===== D2 undo/redo =====
-    /// Undo the last D2 action recorded in the UndoLog. Does NOT affect
-    /// the legacy single-buffer undo stack.
+    // ===== Durable undo/redo =====
+    /// Undo the most recent accepted local document action.
     void undoD2();
 
-    /// Redo the last undone D2 action. Does NOT affect the legacy stack.
+    /// Redo the most recently undone local document action.
     void redoD2();
 
-    /// Undo the most recent D2 action that touched the given block.
-    /// BlockAnchor is a type alias for BlockId; Q_INVOKABLE for QML/signal access.
+    /// Undo the most recent local document action that touched the given block.
     Q_INVOKABLE void undoForBlock(Markoff::BlockId block);
+    /// Redo the most recent durable action undone for the given block.
+    Q_INVOKABLE void redoForBlock(Markoff::BlockId block);
 
-    /// Returns true if the UndoLog contains at least one entry that touched
-    /// the given block, i.e. whether undoForBlock(blockAnchor) would do
-    /// anything useful. View-layer code uses this to enable/disable undo UI.
-    /// BlockAnchor is a type alias for BlockId.
-    Q_INVOKABLE bool canUndoForBlock(Markoff::BlockAnchor blockAnchor) const;
+    /// Returns whether an accepted local action touching this block can be
+    /// undone. View code uses this to enable or disable its undo control.
+    Q_INVOKABLE bool canUndoForBlock(Markoff::BlockId blockAnchor) const;
 
     /// Toggle the Checked attr on a ListItem block. No-op if the block is not
     /// a ListItem or does not have a Checked attr. Q_INVOKABLE for QML use.
-    Q_INVOKABLE void toggleListItemChecked(Markoff::BlockAnchor anchor);
+    Q_INVOKABLE void toggleListItemChecked(Markoff::BlockId anchor);
 
     // ===== D2 block accessors =====
     /// Returns the current ordered list of block IDs from the IdList CRDT.
@@ -341,122 +297,49 @@ public:
     /// Increments each time applyBlockEdit touches that block.
     quint64 blockEditSequence(Markoff::BlockId id) const;
 
-    /// D2: sum of all per-block edit sequences (rough document-level dirty
-    /// tracker for D2 internals).
+    /// Sum of the per-block edit sequences for document-level change tracking.
     quint64 d2EditSequence() const noexcept;
 
-    /// D2: increments on block Insert/Remove/ChangeKind only — NOT on
-    /// per-block content edits (`d2ApplyBufferEdit`). Use to distinguish a
-    /// structural change (e.g. a programmatic `Cmd::changeKind`) from a
-    /// content-only or format-only `d2DocumentChanged` emission. Queue #15.
+    /// Increments on structural block changes, separately from per-block
+    /// content edits.
     quint64 structuralEditSequence() const noexcept;
 
-    /// Save-watermark API. The view-layer / host calls markSaved with the
-    /// d2EditSequence captured immediately before its file write started;
-    /// dirty() returns whether subsequent edits have advanced the sequence.
-    /// dirtyChanged fires only on transitions (false→true and true→false),
-    /// not on every edit.
-    quint64 savedSequence() const noexcept;
-    void    markSaved(quint64 seq);
-    bool    dirty() const noexcept;
-
-    /// Record the BlockIds removed in a Cut so a subsequent local Paste
-    /// can reuse them (preserving CRDT identity for cut→paste-back).
-    /// `cutSeq` is the d2EditSequence captured immediately before the cut.
-    /// FIFO-capped at 8 entries.
-    void recordRecentCut(quint64 cutSeq, std::vector<BlockId> ids);
-
-    /// Returns the cached BlockIds for `cutSeq` if still present, else empty.
-    std::vector<BlockId> takeRecentCut(quint64 cutSeq);
-
-    /// Test helper: insert a block with the given kind and content directly
-    /// into D2 internals. Callable from test code; do not call in production.
-    Markoff::BlockId testInsertBlock(Markoff::BlockKind kind, const QByteArray &content);
-
-    // ===== D2 internal helpers (Cmd layer; do not call from view code) =====
-
-    /// Returns the D2 UndoLog for transaction grouping and coalescing.
-    Markoff::UndoLog &d2UndoLog() noexcept;
-
-    /// Apply a buffer edit within an existing transaction.
-    /// Same semantics as applyBlockEdit() but uses caller's transaction.
-    void d2ApplyBufferEdit(BlockId block, uint32_t offset, uint32_t removedBytes,
-                           const QByteArray &insert, UndoLog::Transaction &t);
-
-    /// Insert a new block after `afterBlock` (null BlockId = insert at start).
-    /// Creates a Buffer for the new block; registers IdList + KindTag ops with t.
-    /// Returns the new BlockId.
-    BlockId d2InsertBlock(BlockId afterBlock, BlockKind kind, UndoLog::Transaction &t);
-
-    /// Remove `block` from the IdList and KindTagMap. Buffer retained for GC (Phase 9).
-    /// Registers IdList + KindTag ops with t.
-    void d2RemoveBlock(BlockId block, UndoLog::Transaction &t);
-
-    /// Update the kind of `block`. Registers KindTag op with t.
-    void d2SetBlockKind(BlockId block, BlockKind newKind, UndoLog::Transaction &t);
-
-    /// Set a block attribute. Registers BlockAttrs op with t.
-    void d2SetBlockAttr(BlockId block, const QByteArray &attrName,
-                        const AttrValue &value, UndoLog::Transaction &t);
-
-    // ===== D2 CRDT proxies (fine-grained change notifications) =====
-    /// Returns the BufferProxy for the given block, or nullptr if not found.
-    /// Views connect to its signals to detect per-block text changes.
-    Markoff::BufferProxy   *bufferProxy(Markoff::BlockId id) const;
-
-    /// Returns the IdList proxy. Views connect to structureChanged() to detect
-    /// block insertion/removal.
-    Markoff::IdListProxy   *idListProxy() const;
-
-    /// Returns the KindTagMap proxy. Views connect to mapChanged() to detect
-    /// block kind changes.
-    Markoff::SiblingMapProxy *kindTagMapProxy() const;
-
-    // ===== D2 inline cache (Phase 10) =====
+    // ===== Inline formatting cache =====
     /// Returns inline formatting spans for block `id`, computed on first access
     /// and cached until the block's edit sequence increments.
     QList<Markoff::SourceSpan> inlineSpansFor(Markoff::BlockId id) const;
 
-    // ===== D2 load =====
-    /// Parse `src` as UTF-8 Markdown, populate frontmatter, footnote defs,
-    /// and all D2 CRDT internals (IdList, per-block Buffers, KindTagMap,
-    /// BlockAttrsMap). Emits documentLoaded() on success.
-    void loadFromMarkdown(const QByteArray &src);
-
-    /// Returns the raw bytes stored for `id` at load time (from
-    /// loadFromMarkdown). Returns an empty QByteArray if `id` was not
-    /// materialised from a load or has no content. Used by Phase 8
-    /// touch-test to detect whether a block has been edited since load.
-    QByteArray blockLoadTimeBytes(BlockId id) const;
-
     /// Returns the value stored for `key` in the frontmatter map, or
-    /// std::nullopt if `key` is absent. In Phase 7 the map contains a
-    /// single "raw" entry whose value is the raw frontmatter string.
+    /// std::nullopt if `key` is absent.
     std::optional<QByteArray> frontmatterValue(const QByteArray &key) const;
 
     // ===== D2 save (Phase 8) =====
 
     /// Returns all non-tombstoned attrs for the given block as a QHash.
     QHash<Markoff::AttrName, Markoff::AttrValue> blockAttrs(Markoff::BlockId id) const;
+    /// Publish one block attribute value through its owner-held sibling map.
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult setBlockAttribute(
+        Markoff::BlockId id, const Markoff::AttrName& name,
+        const Markoff::AttrValue& value);
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult removeBlockAttribute(
+        Markoff::BlockId id, const Markoff::AttrName& name);
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult setFrontmatterValue(
+        const QByteArray& key, const QByteArray& value);
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult removeFrontmatterValue(
+        const QByteArray& key);
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult setLinkReference(
+        const Markoff::LinkRefId& id, const Markoff::LinkRefValue& value);
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult removeLinkReference(
+        const Markoff::LinkRefId& id);
+    [[nodiscard]] std::optional<Markoff::LinkRefValue> linkReference(
+        const Markoff::LinkRefId& id) const;
 
-    /// Returns true if the block has been modified since the last loadFromMarkdown:
-    ///   - born after load (no load-time bytes)
-    ///   - content edited (blockEditSequence > 0)
-    ///   - kind or attrs changed (d2SetBlockKind / d2SetBlockAttr called)
-    bool isBlockTouched(Markoff::BlockId id) const;
-
-    /// Serialise the document to UTF-8 Markdown bytes ready for writing to disk.
-    /// For untouched blocks uses the original load-time bytes; for touched blocks
-    /// calls the registered BlockSerializer for that block's kind.
+    /// Serialise the current document snapshot to UTF-8 Markdown bytes.
     QByteArray serializeForSave() const;
 
     /// Atomically write serializeForSave() to `path` via QSaveFile.
     /// Returns true on success, false on any I/O error.
     bool save(const QString &path);
-
-    // ===== Garbage collection (Phase 9) =====
-    /// Trigger GC manually (e.g. after save). Returns false if a transaction is open.
-    bool triggerGc();
 
     /// If a `d2DocumentChanged` is queued (via `scheduleD2Changed`), emit it
     /// synchronously now and cancel the deferred fire. Used by the typing
@@ -468,21 +351,16 @@ public:
     void flushPendingD2Changed();
 
 Q_SIGNALS:
-    void documentReloaded();
     void sessionCreated(Markoff::Session *);
     void sessionDestroyed(Markoff::Session *);
 
-    /// Consumer-facing no-arg signal. Emitted whenever the document content
-    /// changes: on loadFromMarkdown(), on every debounced D2 CRDT edit cycle,
-    /// and on resetContent(). Views that only need "something changed" connect
-    /// here instead of the more granular d2DocumentChanged().
+    /// Consumer-facing signal emitted after an accepted document change.
     void documentChanged();
 
-    /// Emitted (debounced: once per event-loop spin) whenever any D2 CRDT
-    /// changes (applyBlockEdit or applyStructural).
+    /// Emitted after document projection changes have been applied.
     void d2DocumentChanged();
 
-    /// Emitted when loadFromMarkdown() completes successfully.
+    /// Emitted after initial Markdown import completes successfully.
     void documentLoaded();
 
     // Targeted block-update signals (v1.0). Subscribers can react to specific
@@ -492,6 +370,18 @@ Q_SIGNALS:
     /// in-place, carrying the IDs of the touched blocks.
     void blocksChanged(QList<Markoff::BlockId> ids);
 
+    /// Tentative candidate projection update, emitted before synchronous
+    /// provider publication. `blocksChanged` and `documentChanged` report only
+    /// a committed document action; definite rollback has its own signal.
+    void tentativeBlockChanged(Markoff::BlockId id);
+    void tentativeBlockReverted(Markoff::BlockId id);
+    void tentativeBlockCommitted(Markoff::BlockId id);
+    /// Emitted after in-session reservation recovery may have changed whether
+    /// ordinary local actions are permitted.
+    void providerStateChanged();
+    /// Exact local MAB/3 bytes, emitted only after provider acceptance and projection refresh.
+    void localActionEnvelopeCommitted(QByteArray actionId, QByteArray mabBytes);
+
     /// Emitted synchronously when a new block is structurally inserted,
     /// carrying its ID and its row index in the post-insertion block list.
     void blockInserted(Markoff::BlockId id, int row);
@@ -500,111 +390,16 @@ Q_SIGNALS:
     /// carrying its ID and its former row index.
     void blockRemoved(Markoff::BlockId id, int row);
 
-    /// Emitted on dirty-state transitions: true when the document becomes
-    /// dirty (d2EditSequence diverges from savedSequence), false when
-    /// markSaved() is called with the current sequence. Fires only on
-    /// transitions, not on every edit.
-    void dirtyChanged(bool dirty);
-
-    /// Emitted once per UndoLog::Transaction commit with all ops the
-    /// transaction produced. Only emitted when isCollabConfigured() is true.
-    /// See D5 spec §2.2.
-    void localOpsProduced(QList<Markoff::MarkoffOp> ops,
-                          Markoff::MarkoffBundleMeta meta);
-
-    /// Emitted after each save when the document advances its local watermark.
-    /// W is the max Lamport counter produced so far. Consumer uses this to
-    /// know "I've committed state up to W" for downstream ack tracking.
-    void localWatermarkAdvanced(quint64 watermark);
-
-    /// Emitted after save in collab mode when the document wants to compact
-    /// but is gated on peer acks. Consumer calls notifyAcksAtWatermark(W)
-    /// once all peers confirm they've seen ops ≤ W.
-    void wantsAcksAtWatermark(quint64 snapshotWatermark);
-
-    /// Emitted after compaction actually runs (either immediately on save
-    /// when ackedWatermark ≥ W, or deferred after notifyAcksAtWatermark).
-    void watermarkCompacted(quint64 watermark);
-
-public:
-    /// Tell the document all known peers have ack'd up to W. Monotonic.
-    /// Triggers deferred compaction if the current snapshot watermark ≤ W.
-    void notifyAcksAtWatermark(quint64 watermark);
-
-    /// Test hook: pretend a save just succeeded, triggering the
-    /// watermark-gate logic. Production code calls this via save().
-    /// Always compiled (same pattern as testInsertBlock) so test
-    /// executables can link against the library.
-    void simulateSaveSucceeded();
-
-public:
-    // ===== D5 remote cursor state (Phase 7) =====
-
-    /// Store a remote peer's cursor and notify the view layer.
-    void setRemoteCursor(quint16 replicaId,
-                         Markoff::Cursor cursor,
-                         QColor color,
-                         QString label);
-
-    /// Remove a remote peer's cursor and notify the view layer.
-    void clearRemoteCursor(quint16 replicaId);
-
-    /// Remove all remote cursors and emit remoteCursorCleared for each.
-    void clearAllRemoteCursors();
-
-    /// Test inspection: returns the stored cursor for the given replica,
-    /// or NoCursor{} if not present.
-    Markoff::Cursor remoteCursorOf(quint16 replicaId) const;
-
-Q_SIGNALS:
-    void remoteCursorChanged(quint16 replicaId,
-                             Markoff::Cursor cursor,
-                             QColor color,
-                             QString label);
-    void remoteCursorCleared(quint16 replicaId);
 
 private:
-    friend class WatermarkCoordinator;
-
-    void scheduleD2Changed();
-    void maybeEmitDirtyChanged();
-    void onSaveComplete();
-    void materializeBlocksFromParsedDoc(const Markoff::Document &parsed,
-                                        const QString &body);
-    /// Extract frontmatter + footnotes from `src`, parse the body, and
-    /// materialize D2 per-block state. Resets load-baseline trackers
-    /// (`blockEditSequences`, `structuralEditSequence`, `touchedSinceLoad`,
-    /// `inlineCache`). Does NOT emit signals — callers do that. Does NOT
-    /// touch the legacy `d->buffer`.
-    ///
-    /// Callers are responsible for calling `wipeD2State()` first to drop any
-    /// pre-existing D2 state. Both current call sites (`resetContent`,
-    /// `loadFromMarkdown`) do this unconditionally. Calling this without a
-    /// prior `wipeD2State()` on a non-fresh document will append the new
-    /// content on top of the old, doubling the document.
-    void buildD2FromBytes(const QByteArray &src);
-    BlockId allocateD2BlockId() noexcept;
-    void applyRemoteBufferOp(Markoff::BlockId blockId, const QByteArray &payload);
-    void applyRemoteIdListOp(const QByteArray &payload);
-    void applyRemoteKindTagMapOp(const QByteArray &payload);
-    void applyRemoteBlockAttrsMapOp(const QByteArray &payload);
-    void applyRemoteFrontmatterMapOp(const QByteArray &payload);
-    void applyRemoteLinkRefMapOp(const QByteArray &payload);
-    void applyRemoteFootnoteDefMapOp(const QByteArray &payload);
-    /// Reset all D2 in-memory state to the post-construction shape
-    /// (block IdList, all sibling maps, per-block buffers, proxies,
-    /// inline cache, blockLoadTimeBytes, edit-sequence tracking)
-    /// without disturbing replica id, the legacy buffer, the undo log,
-    /// or external signal connections. Used by resetContent() and
-    /// loadFromMarkdown() before they rebuild D2 from new bytes; safe
-    /// to call on a fresh document (every container is already empty).
-    ///
-    /// Single-replica only: this does NOT emit remote ops. A connected
-    /// collab peer would not see the wipe. See spec
-    /// docs/specs/2026-05-25-d2-reset-clear-design.md §6.2.
-    void wipeD2State();
-
     struct Private;
+    explicit MarkoffDocument(std::unique_ptr<Private> state);
+    [[nodiscard]] Markoff::VNext::ActionPublicationResult applyMarkdownSource(
+        const QByteArray& source, bool replacement);
+    void compensateReplacementAction(
+        const Markoff::VNext::ActionHistoryEvent& target, bool redo);
+    void compensateTextGroups(
+        const Markoff::VNext::ActionHistoryEvent& target, bool redo);
     std::unique_ptr<Private> d;
 };
 

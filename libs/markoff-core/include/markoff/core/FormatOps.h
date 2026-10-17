@@ -4,6 +4,7 @@
 #include <optional>
 
 #include <QByteArray>
+#include <QList>
 #include <QString>
 
 #include <markoff/core/BlockId.h>
@@ -68,6 +69,13 @@ MARKOFF_CORE_EXPORT std::optional<QtRange> setHeadingLevel(
 /// UTF-8 byte positions within a single block's own buffer. `start == end`
 /// is a caret.
 struct ByteRange { int start = 0; int end = 0; };
+
+struct BlockByteRange { BlockId block; ByteRange range; };
+MARKOFF_CORE_EXPORT std::optional<QList<ByteRange>> wrapToggleAcrossBlocks(
+        MarkoffDocument *doc, const QList<BlockByteRange>& ranges,
+        const QByteArray& delim);
+MARKOFF_CORE_EXPORT std::optional<QList<ByteRange>> insertLinkAcrossBlocks(
+        MarkoffDocument *doc, const QList<BlockByteRange>& ranges);
 
 MARKOFF_CORE_EXPORT std::optional<ByteRange> wrapToggleInBlock(
         MarkoffDocument *doc,

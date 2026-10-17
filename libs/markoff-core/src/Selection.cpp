@@ -1,28 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/core/Selection.h>
 
-#include <markoff/core/AnchorJson.h>
-#include <markoff/core/BlockId.h>
-
-#include "AnchorConversion.h"
+#include <array>
+#include <algorithm>
 
 namespace Markoff {
 
 bool Selection::isEmpty() const
 {
-    return anchor == active;
-}
-
-bool Selection::isReversed() const
-{
-    // Without a Buffer to resolve to byte offsets, we can't deterministically
-    // order anchors. This returns whether the cursor head sits "before" the
-    // anchor in lexicographic (charValue, replicaId) order — a coarse
-    // proxy. Callers that need byte-offset semantics should resolve via the
-    // Buffer and compare byte offsets directly.
-    if (active.charValue() != anchor.charValue())
-        return active.charValue() < anchor.charValue();
-    return active.replicaId() < anchor.replicaId();
+    if (anchorPosition && activePosition)
+        return *anchorPosition == *activePosition;
+    return true;
 }
 
 namespace {
@@ -49,8 +37,19 @@ Selection::Kind kindFromString(const QString &s)
 QJsonObject Selection::toJson() const
 {
     QJsonObject obj;
-    obj.insert("anchor", anchorToJson(Detail::toCrdtAnchor(anchor)));
-    obj.insert("active", anchorToJson(Detail::toCrdtAnchor(active)));
+    const auto positionToJson = [](const ScopedTextPosition& position) {
+        QJsonObject encoded;
+        QByteArray actor(reinterpret_cast<const char*>(position.block.actorBytes().data()),
+                         qsizetype(position.block.actorBytes().size()));
+        encoded.insert("version", 1);
+        encoded.insert("actor", QString::fromLatin1(actor.toHex()));
+        encoded.insert("counter", QString::number(position.block.counter()));
+        encoded.insert("token", QString::fromLatin1(position.boundaryToken.toBase64(
+            QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals)));
+        return encoded;
+    };
+    if (anchorPosition) obj.insert("anchorPosition", positionToJson(*anchorPosition));
+    if (activePosition) obj.insert("activePosition", positionToJson(*activePosition));
     obj.insert("kind", QString::fromLatin1(kindToString(kind)));
     if (kind == Kind::Presence) {
         obj.insert("participantId", participantId);
@@ -64,8 +63,35 @@ QJsonObject Selection::toJson() const
 Selection Selection::fromJson(const QJsonObject &obj)
 {
     Selection s;
-    s.anchor = Detail::toTextAnchor(BlockId{}, anchorFromJson(obj.value("anchor").toObject()));
-    s.active = Detail::toTextAnchor(BlockId{}, anchorFromJson(obj.value("active").toObject()));
+    const auto positionFromJson = [](const QJsonValue& value)
+        -> std::optional<ScopedTextPosition> {
+        if (!value.isObject()) return std::nullopt;
+        const auto encoded = value.toObject();
+        if (encoded.value("version").toInt() != 1) return std::nullopt;
+        const QByteArray actorHex = encoded.value("actor").toString().toLatin1();
+        const QByteArray actor = QByteArray::fromHex(actorHex);
+        if (actor.size() != 16 || actor.toHex() != actorHex) return std::nullopt;
+        std::array<uint8_t, 16> actorBytes{};
+        std::copy(actor.cbegin(), actor.cend(), actorBytes.begin());
+        bool counterOk = false;
+        const auto counter = encoded.value("counter").toString().toULongLong(&counterOk);
+        const auto block = counterOk
+            ? BlockId::fromStructuralIdentity(actorBytes, counter)
+            : std::optional<BlockId>{};
+        if (!block) return std::nullopt;
+        const QByteArray tokenText = encoded.value("token").toString().toLatin1();
+        const QByteArray token = QByteArray::fromBase64(tokenText,
+            QByteArray::Base64UrlEncoding | QByteArray::AbortOnBase64DecodingErrors);
+        if (token.isEmpty() || token.toBase64(
+                QByteArray::Base64UrlEncoding | QByteArray::OmitTrailingEquals)
+                != tokenText)
+            return std::nullopt;
+        return ScopedTextPosition{*block, token};
+    };
+    if (obj.contains("anchorPosition"))
+        s.anchorPosition = positionFromJson(obj.value("anchorPosition"));
+    if (obj.contains("activePosition"))
+        s.activePosition = positionFromJson(obj.value("activePosition"));
     s.kind = kindFromString(obj.value("kind").toString());
     if (s.kind == Kind::Presence) {
         s.participantId = obj.value("participantId").toString();

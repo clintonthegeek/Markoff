@@ -1,25 +1,65 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
+
+#include <array>
+#include <algorithm>
 #include <cstdint>
+#include <optional>
+
 #include <QHashFunctions>
+#include <QList>
+#include <QMetaType>
 
 namespace Markoff {
 
+/// Lossless identity of a block insertion, formed by the creating actor and
+/// that actor's list-operation counter. Application values are never identity.
 class BlockId {
 public:
     BlockId() noexcept = default;
-    static BlockId fromRaw(uint64_t raw) noexcept { BlockId b; b.m_raw = raw; return b; }
-    bool isNull() const noexcept { return m_raw == 0; }
-    uint64_t raw() const noexcept { return m_raw; }
-    bool operator==(const BlockId &o) const noexcept { return m_raw == o.m_raw; }
-    bool operator!=(const BlockId &o) const noexcept { return m_raw != o.m_raw; }
+
+    static std::optional<BlockId> fromStructuralIdentity(
+        const std::array<uint8_t, 16> &actor, uint64_t counter) noexcept
+    {
+        if (counter == 0 || std::all_of(actor.begin(), actor.end(),
+                                        [](uint8_t byte) { return byte == 0; }))
+            return std::nullopt;
+        BlockId id;
+        id.m_actor = actor;
+        id.m_counter = counter;
+        return id;
+    }
+
+    bool isNull() const noexcept { return m_counter == 0; }
+    const std::array<uint8_t, 16> &actorBytes() const noexcept { return m_actor; }
+    uint64_t counter() const noexcept { return m_counter; }
+
+    bool operator==(const BlockId &) const noexcept = default;
+    bool operator!=(const BlockId &other) const noexcept { return !(*this == other); }
+    bool operator<(const BlockId &other) const noexcept
+    {
+        return m_actor != other.m_actor ? m_actor < other.m_actor
+                                        : m_counter < other.m_counter;
+    }
+
+    size_t identityHash(size_t seed = 0) const noexcept
+    {
+        for (uint8_t byte : m_actor)
+            seed = ::qHash(byte, seed);
+        return ::qHash(m_counter, seed);
+    }
+
 private:
-    uint64_t m_raw = 0;
+    std::array<uint8_t, 16> m_actor{};
+    uint64_t m_counter = 0;
 };
 
-// seed defaults to 0 so Qt 6.9+ qHashMulti (1-arg qHash calls) still compiles.
-inline size_t qHash(const BlockId &id, size_t seed = 0) noexcept {
-    return ::qHash(id.raw(), seed);
+inline size_t qHash(const BlockId &id, size_t seed = 0) noexcept
+{
+    return id.identityHash(seed);
 }
 
-}  // namespace Markoff
+} // namespace Markoff
+
+Q_DECLARE_METATYPE(Markoff::BlockId)
+Q_DECLARE_METATYPE(QList<Markoff::BlockId>)

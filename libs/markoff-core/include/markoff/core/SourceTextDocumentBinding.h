@@ -78,6 +78,10 @@ public:
     /// Setting a renderer re-seeds the document opaque-aware.
     void setOpaqueRenderer(Markoff::OpaqueBlockRenderer *r);
 
+    /// Save the current view selection as scoped provider boundary tokens so
+    /// a later accepted remote edit can restore it against the new projection.
+    void captureViewSelection(int anchorQtPosition, int activeQtPosition);
+
     /// Apply a structural key (Enter/Backspace/Delete/Tab/Backtab) at the
     /// given QTextDocument caret. `qtPos`/`qtAnchor` are sep-view UTF-16
     /// positions. A non-empty selection (qtPos != qtAnchor) is collapsed
@@ -105,6 +109,11 @@ private Q_SLOTS:
 
 private:
     struct PendingCaret { Markoff::BlockId block; int offsetInBlock = 0; };
+    struct SavedViewSelection {
+        Markoff::ScopedTextPosition anchor;
+        Markoff::ScopedTextPosition active;
+    };
+    std::optional<SavedViewSelection> m_savedViewSelection;
 
     /// Called whenever the document or text-document pointer changes.
     /// Disables QTextDocument's own undo stack and (re)wires its
@@ -169,10 +178,10 @@ private:
     bool m_applyingRemoteEdit     = false;  ///< T13: set during reverse edit application
 
     Markoff::OpaqueBlockRenderer *m_opaqueRenderer = nullptr;
-    /// Snapshot of each opaque block's buffer at last render, keyed by
-    /// BlockId.raw(). reverseSyncPerBlock re-renders a frame only when its
+    /// Snapshot of each opaque block's buffer at last render, keyed by its
+    /// complete BlockId. reverseSyncPerBlock re-renders a frame only when its
     /// buffer diverges from this snapshot (or the frame set changes).
-    QHash<quint64, QByteArray> m_opaqueSnapshots;
+    QHash<BlockId, QByteArray> m_opaqueSnapshots;
 
     /// Set by a structural op to declare the intended post-edit caret; resolved
     /// + emitted at the tail of onD2DocumentChanged once the reverse diff settles.

@@ -5,7 +5,7 @@
 #include <QObject>
 #include <QString>
 
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/core/MarkoffCoreExport.h>
 #include <markoff/core/SearchEngine.h>
 
@@ -35,7 +35,7 @@ public:
     /// View-agnostic match descriptor. Byte offsets within the block's
     /// current text — same units as SearchEngine::SearchHit.
     struct Match {
-        Markoff::BlockAnchor block;
+        Markoff::BlockId block;
         quint32              byteOffset = 0;
         quint32              byteLength = 0;
     };
@@ -66,7 +66,7 @@ public:
     /// (block, offset) in document order, wrapping to index 0 if none.
     /// Mutation-free: touches only currentMatchIndex (emits currentMatchChanged).
     /// Never touches the document, focus, cursor, or scroll (invariant D3).
-    void selectMatchAtOrAfter(Markoff::BlockAnchor block, quint32 offset);
+    void selectMatchAtOrAfter(Markoff::BlockId block, quint32 offset);
 
 Q_SIGNALS:
     void needleChanged();

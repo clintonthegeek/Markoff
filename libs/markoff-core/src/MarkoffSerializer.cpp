@@ -4,11 +4,14 @@
 #include <QDataStream>
 #include <QIODevice>
 
+#include <algorithm>
+#include <array>
+
 namespace Markoff::MarkoffSerializer {
 
 namespace {
 constexpr quint32 kMagic = 0x4D4B4F46u;   // 'MKOF'
-constexpr quint16 kSchemaVersion = 1;
+constexpr quint16 kSchemaVersion = 2;
 }
 
 QByteArray encode(const QList<MarkoffOp> &ops, const MarkoffBundleMeta &meta)
@@ -17,6 +20,15 @@ QByteArray encode(const QList<MarkoffOp> &ops, const MarkoffBundleMeta &meta)
     QDataStream ds(&bytes, QIODevice::WriteOnly);
     ds.setByteOrder(QDataStream::LittleEndian);
     ds.setVersion(QDataStream::Qt_6_8);
+
+    if (ops.size() != meta.opCountInBundle) return {};
+    for (const MarkoffOp& op : ops) {
+        if (quint8(op.target) > quint8(CrdtTarget::FootnoteDefMap)) return {};
+        const bool isBuffer = op.target == CrdtTarget::Buffer;
+        if ((isBuffer && op.blockId.isNull())
+            || (!isBuffer && !op.blockId.isNull()))
+            return {};
+    }
 
     ds << kMagic
        << kSchemaVersion
@@ -27,13 +39,14 @@ QByteArray encode(const QList<MarkoffOp> &ops, const MarkoffBundleMeta &meta)
        << meta.producerLamport;
 
     for (const MarkoffOp &op : ops) {
-        ds << quint8(op.target)
-           << op.blockId
-           << op.producerReplicaId
-           << quint32(op.payload.size());
+        ds << quint8(op.target);
+        const auto& actor = op.blockId.actorBytes();
+        ds.writeRawData(reinterpret_cast<const char*>(actor.data()), int(actor.size()));
+        ds << quint64(op.blockId.counter());
+        ds << op.producerReplicaId << quint32(op.payload.size());
         ds.writeRawData(op.payload.constData(), op.payload.size());
     }
-    return bytes;
+    return ds.status() == QDataStream::Ok ? bytes : QByteArray{};
 }
 
 bool decode(const QByteArray &bytes, QList<MarkoffOp> *outOps, MarkoffBundleMeta *outMeta)
@@ -62,9 +75,27 @@ bool decode(const QByteArray &bytes, QList<MarkoffOp> *outOps, MarkoffBundleMeta
         quint8 targetRaw = 0;
         quint32 payloadLen = 0;
         MarkoffOp op;
-        ds >> targetRaw >> op.blockId >> op.producerReplicaId >> payloadLen;
+        ds >> targetRaw;
+        std::array<uint8_t, 16> actor{};
+        if (ds.readRawData(reinterpret_cast<char*>(actor.data()), int(actor.size()))
+            != int(actor.size())) return false;
+        quint64 counter = 0;
+        ds >> counter;
+        if (ds.status() != QDataStream::Ok) return false;
+        if (counter == 0 && std::all_of(actor.cbegin(), actor.cend(), [](uint8_t b) { return b == 0; })) {
+            op.blockId = BlockId{};
+        } else {
+            const auto identity = BlockId::fromStructuralIdentity(actor, counter);
+            if (!identity) return false;
+            op.blockId = *identity;
+        }
+        ds >> op.producerReplicaId >> payloadLen;
         if (ds.status() != QDataStream::Ok) return false;
         op.target = static_cast<CrdtTarget>(targetRaw);
+        const bool isBuffer = op.target == CrdtTarget::Buffer;
+        if (targetRaw > quint8(CrdtTarget::FootnoteDefMap)
+            || (isBuffer && op.blockId.isNull())
+            || (!isBuffer && !op.blockId.isNull())) return false;
         QByteArray payload(int(payloadLen), Qt::Uninitialized);
         if (payloadLen > 0) {
             const int read = ds.readRawData(payload.data(), int(payloadLen));
@@ -73,7 +104,7 @@ bool decode(const QByteArray &bytes, QList<MarkoffOp> *outOps, MarkoffBundleMeta
         op.payload = payload;
         outOps->append(op);
     }
-    return ds.status() == QDataStream::Ok;
+    return ds.status() == QDataStream::Ok && ds.atEnd();
 }
 
 }  // namespace Markoff::MarkoffSerializer

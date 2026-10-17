@@ -5,13 +5,12 @@
 #include <QString>
 #include <QStringList>
 
-#include <crdt/Anchor.h>
-
 #include <markoff/core/MarkoffCoreExport.h>
+#include <markoff/core/Selection.h>
 
 namespace Markoff {
 
-/// An anchor-bound fold reference. Survives concurrent CRDT edits and
+/// A scoped-position fold reference. Survives concurrent edits and
 /// arbitrary parse drift. Replaces the lossy (line, level) FoldSpec
 /// from the existing Markoff family (audit §3.6).
 struct MARKOFF_CORE_EXPORT FoldRef {
@@ -21,7 +20,7 @@ struct MARKOFF_CORE_EXPORT FoldRef {
     };
 
     Kind                      kind = Kind::Heading;
-    CollabText::Crdt::Anchor  start;        ///< anchor at the fold start
+    std::optional<ScopedTextPosition> startPosition;
     QStringList               headingPath;  ///< for Heading kind
     int                       headingLevel = 0;
 

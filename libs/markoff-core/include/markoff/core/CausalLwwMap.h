@@ -144,15 +144,6 @@ public:
         }
     }
 
-    // Remove undo entries at or below watermark (they are permanently committed).
-    void compact(CausalStamp watermark) {
-        m_undoStack.erase(
-            std::remove_if(m_undoStack.begin(), m_undoStack.end(),
-                [&](const UndoOp &op) { return op.after.stamp <= watermark; }),
-            m_undoStack.end()
-        );
-    }
-
     /// Iterate all non-tombstoned entries. Calls fn(key, value) for each live entry.
     /// Order is unspecified (QHash iteration order).
     template <typename F>

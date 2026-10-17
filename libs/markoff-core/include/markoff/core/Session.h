@@ -8,8 +8,7 @@
 #include <QString>
 
 #include <memory>
-
-#include <crdt/Anchor.h>
+#include <optional>
 
 #include <markoff/core/FoldRef.h>
 #include <markoff/core/MarkoffCoreExport.h>
@@ -45,9 +44,9 @@ public:
     void addSecondarySelection(Selection);
     void clearSecondarySelectionsOfKind(Selection::Kind);
 
-    CollabText::Crdt::Anchor topVisibleAnchor() const;
+    std::optional<ScopedTextPosition> topVisiblePosition() const;
     qreal                    topVisibleFraction() const;
-    void setTopVisible(CollabText::Crdt::Anchor, qreal fraction);
+    void setTopVisible(ScopedTextPosition, qreal fraction);
 
     const QList<FoldRef> &foldedRegions() const;
     void                  setFoldedRegions(QList<FoldRef>);
@@ -61,7 +60,7 @@ public:
 Q_SIGNALS:
     void primarySelectionChanged(const Markoff::Selection &);
     void secondarySelectionsChanged();
-    void scrollChanged(CollabText::Crdt::Anchor, qreal fraction);
+    void scrollPositionChanged(const Markoff::ScopedTextPosition &, qreal fraction);
     void foldedRegionsChanged();
 
 private:

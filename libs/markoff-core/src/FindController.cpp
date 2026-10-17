@@ -69,7 +69,7 @@ void FindController::findPrevious()
     Q_EMIT navigationRequested(m_matches[m_currentIndex]);
 }
 
-void FindController::selectMatchAtOrAfter(Markoff::BlockAnchor block,
+void FindController::selectMatchAtOrAfter(Markoff::BlockId block,
                                           quint32 offset)
 {
     if (m_matches.isEmpty() || !m_doc)

@@ -2,6 +2,7 @@
 #pragma once
 
 #include <markoff/core/ActionId.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/core/MarkoffCoreExport.h>
 
 #include <QByteArray>
@@ -26,7 +27,7 @@ enum class CrdtTarget : quint8 {
 /// A single op crossing the boundary. Opaque payload.
 struct MARKOFF_CORE_EXPORT MarkoffOp {
     CrdtTarget  target            = CrdtTarget::IdList;
-    quint64     blockId           = 0;     // valid iff target==Buffer
+    BlockId     blockId;                   // full structural identity iff target==Buffer
     QByteArray  payload;
     quint16     producerReplicaId = 0;
 };

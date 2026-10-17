@@ -17,7 +17,6 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 add_library(markoff_core SHARED
     include/markoff/core/MarkoffCoreExport.h
     include/markoff/core/Origin.h
-    include/markoff/core/AnchorJson.h
     include/markoff/core/Selection.h
     include/markoff/core/FoldRef.h
     include/markoff/core/MarkoffDocument.h
@@ -57,27 +56,19 @@ add_library(markoff_core SHARED
     include/markoff/core/Cmd.h
     include/markoff/core/Cmd/Edit.h
     include/markoff/core/Cmd/D2.h
-    src/MarkoffDocumentPrivate.h
     src/SessionPrivate.h
-    src/AnchorConversion.cpp
-    src/BlockAnchorComputation.cpp
-    src/AnchorJson.cpp
     src/Selection.cpp
     src/FoldRef.cpp
-    src/MarkoffDocument.cpp
     src/Session.cpp
     src/Theme.cpp
     src/LinkService.cpp
     src/DefaultLinkService.cpp
     src/SyntaxHighlightService.cpp
     src/Kf6SyntaxHighlightService.cpp
-    src/SourceTextDocumentBinding.cpp
     include/markoff/core/StructuralKeyHandler.h
-    src/StructuralKeyHandler.cpp
     include/markoff/core/KindInference.h
-    src/KindInference.cpp
     include/markoff/core/TextUnits.h
-    src/TextUnits.cpp
+    src/KindInference.cpp
     src/SearchEngine.cpp
     src/FindController.cpp
     src/CodeBlockProcessorRegistry.cpp
@@ -98,22 +89,17 @@ add_library(markoff_core SHARED
     # --- Save (Phase 8) ---
     include/markoff/core/BlockSerializer.h
     src/BlockSerializers.cpp
-    # --- GC / WatermarkCoordinator (Phase 9) ---
-    include/markoff/core/WatermarkCoordinator.h
-    src/WatermarkCoordinator.cpp
     # --- InlineParseCache (Phase 10) ---
     include/markoff/core/InlineParseCache.h
     src/InlineParseCache.cpp
     # --- Cmd/ (impl) ---
     src/Cmd/Edit.cpp
-    src/Cmd/D2.cpp
     # --- Detail/ (shared internal helpers) ---
     include/markoff/core/Detail/FlatBlockResolve.h
     src/Detail/FlatBlockResolve.cpp
     # --- FormatOps (MarkdownView contract v2 §5) — widget-free format
     #     verbs hoisted from markoff-source's Editor ---
     include/markoff/core/FormatOps.h
-    src/FormatOps.cpp
     include/markoff/core/ClipboardCodec.h
     src/ClipboardCodec.cpp
     # --- MarkdownView polymorphic base (Task 4.5) ---
@@ -131,14 +117,20 @@ add_library(markoff_core SHARED
     include/markoff/core/MarkoffOp.h
     # --- Cursor types (D5 phase 7) — moved from markoff-live to markoff-core
     #     so MarkoffDocument can hold/emit Cursor values.
-    include/markoff/core/Cursor.h
 )
 
 set_target_properties(markoff_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
+target_sources(markoff_core PRIVATE src/MarkoffDocumentVNext.cpp)
+target_sources(markoff_core PRIVATE src/FormatOpsVNext.cpp)
+target_sources(markoff_core PRIVATE src/Cmd/D2VNext.cpp)
+target_sources(markoff_core PRIVATE src/SourceTextDocumentBindingVNext.cpp)
+target_sources(markoff_core PRIVATE src/StructuralKeyHandlerVNext.cpp)
+
 target_include_directories(markoff_core
     PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
 )
 
 target_link_libraries(markoff_core
@@ -147,9 +139,11 @@ target_link_libraries(markoff_core
         Qt6::Gui
         Qt6::Widgets
         KF6::SyntaxHighlighting
-        collabtext
         Markoff::Parser
+        Markoff::TextUnits
 )
+target_compile_definitions(markoff_core PUBLIC MARKOFF_USE_COLLABTEXT_VNEXT=1)
+    target_link_libraries(markoff_core PUBLIC Markoff::CollabTextVNext)
 
 # Alias under the Markoff:: namespace for consumers.
 add_library(Markoff::Core ALIAS markoff_core)
@@ -159,6 +153,16 @@ add_library(Markoff::Core ALIAS markoff_core)
 # A standalone Markoff build skips this, same as before this library was
 # SHARED (it had no install rule at all).
 if(DEFINED KDE_INSTALL_LIBDIR)
+    if(APPLE)
+        set(_markoff_core_install_rpath "@loader_path")
+    elseif(UNIX)
+        set(_markoff_core_install_rpath "$ORIGIN")
+    endif()
+    if(_markoff_core_install_rpath)
+        set_target_properties(markoff_core PROPERTIES
+            INSTALL_RPATH "${_markoff_core_install_rpath}"
+        )
+    endif()
     # EXPORT CorbomiteTargets: Corbomite's own corbomite-vault privately
     # links Markoff::Parser, and CMake's install(EXPORT) validation
     # requires every target an exported SHARED library links — public or
@@ -172,6 +176,12 @@ if(DEFINED KDE_INSTALL_LIBDIR)
         RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+    install(DIRECTORY include/markoff
+        DESTINATION ${KDE_INSTALL_INCLUDEDIR}
+        PATTERN "TextAnchor.h" EXCLUDE
+        PATTERN "Cursor.h" EXCLUDE
+        PATTERN "AnchorJson.h" EXCLUDE
     )
 endif()
 

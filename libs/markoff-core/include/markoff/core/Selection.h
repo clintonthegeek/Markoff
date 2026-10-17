@@ -2,23 +2,33 @@
 #pragma once
 
 #include <QColor>
+#include <QByteArray>
 #include <QJsonObject>
 #include <QString>
 #include <QtGlobal>
 
+#include <optional>
+
 #include <markoff/core/MarkoffCoreExport.h>
-#include <markoff/core/TextAnchor.h>
+#include <markoff/core/BlockId.h>
 
 namespace Markoff {
 
-/// A kinded selection between two anchors. Foundation tracks zero or
+/// A portable position within one provider-owned text stream. The token is
+/// opaque; BlockId supplies the scope required to resolve it.
+struct MARKOFF_CORE_EXPORT ScopedTextPosition {
+    BlockId block;
+    QByteArray boundaryToken;
+
+    bool isValid() const noexcept
+    { return !block.isNull() && !boundaryToken.isEmpty(); }
+    bool operator==(const ScopedTextPosition &) const noexcept = default;
+};
+
+/// A kinded selection between two scoped positions. Foundation tracks zero or
 /// more on each Session: one Primary, plus any number of Secondary,
 /// SearchMatch, or Presence selections.
 ///
-/// `anchor` and `active` are TextAnchors — opaque view-layer-safe
-/// wrappers around CRDT byte anchors. They survive concurrent edits
-/// (the underlying CRDT identity is preserved); translation back to
-/// byte offsets goes through MarkoffDocument::resolveTextAnchor.
 struct MARKOFF_CORE_EXPORT Selection {
     enum class Kind {
         Primary,        ///< editable, the typing one (one per session)
@@ -27,8 +37,8 @@ struct MARKOFF_CORE_EXPORT Selection {
         Presence,       ///< not editable, remote-session indicator
     };
 
-    TextAnchor anchor;
-    TextAnchor active;
+    std::optional<ScopedTextPosition> anchorPosition;
+    std::optional<ScopedTextPosition> activePosition;
     Kind       kind = Kind::Primary;
 
     // Only meaningful for Kind::Presence
@@ -38,8 +48,6 @@ struct MARKOFF_CORE_EXPORT Selection {
     quint64 cursorVersion = 0;
 
     bool isEmpty() const;
-    bool isReversed() const;
-
     QJsonObject toJson() const;
     static Selection fromJson(const QJsonObject &);
 };

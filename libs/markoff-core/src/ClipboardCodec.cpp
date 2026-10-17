@@ -568,15 +568,6 @@ QString markdownToHtml(const QByteArray &markdown)
         case TopLevelBlock::Kind::ThematicBreak:
             html += QStringLiteral("<hr>");
             break;
-        case TopLevelBlock::Kind::BlockQuote: {
-            // Legacy/standalone BlockQuote kind (not emitted for normal
-            // `>` lines post-#8.1). Still wrap content in <p> for LO.
-            const QString inner = inlinesToHtml(slice, spansFor(block, slice));
-            html += QStringLiteral("<blockquote><p>");
-            html += inner;
-            html += QStringLiteral("</p></blockquote>");
-            break;
-        }
         case TopLevelBlock::Kind::Table: {
             html += gfmTableToHtml(slice);
             break;

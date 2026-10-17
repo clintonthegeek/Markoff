@@ -2,6 +2,8 @@
 #pragma once
 
 #include <QTextFormat>
+#include <QString>
+#include <QByteArray>
 
 #include <markoff/core/BlockId.h>
 #include <markoff/core/BlockKind.h>
@@ -10,11 +12,20 @@ class QTextCursor;
 
 namespace Markoff {
 
-/// Frame-format property carrying the source `BlockId.raw()` of an opaque frame
+/// Frame-format property carrying a complete identity key for an opaque frame
 /// (e.g. a QTextTable). The reverse path reads it to match an existing frame to
 /// its model block. Qt has no `comment` on QTextTableFormat; we use a custom
 /// UserProperty string instead.
 inline constexpr int OpaqueBlockKeyProperty = QTextFormat::UserProperty + 17;
+
+/// Stable view-local key that preserves every BlockId component.
+inline QString opaqueBlockIdentityKey(BlockId id)
+{
+    return QString::fromLatin1(QByteArray(
+               reinterpret_cast<const char *>(id.actorBytes().data()),
+               qsizetype(id.actorBytes().size())).toHex())
+        + QLatin1Char(':') + QString::number(id.counter());
+}
 
 /// View-supplied hook letting SourceTextDocumentBinding render selected blocks
 /// as opaque document objects (e.g. a QTextTable frame) instead of flat text.

@@ -6,8 +6,6 @@
 #include <QString>
 #include <QtGlobal>
 
-#include <crdt/Anchor.h>
-
 #include <markoff/core/FoldRef.h>
 #include <markoff/core/Selection.h>
 
@@ -24,7 +22,7 @@ struct Session::Private {
 
     Selection                primary;
     QList<Selection>         secondaries;
-    CollabText::Crdt::Anchor topAnchor;
+    std::optional<ScopedTextPosition> topPosition;
     qreal                    topFraction = 0.0;
     QList<FoldRef>           folds;
 };
