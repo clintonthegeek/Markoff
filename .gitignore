@@ -12,6 +12,7 @@ compile_commands.json
 selection*.txt
 .scratch/
 wherewasi.txt
+/buffer
 
 # Claude Code machine-specific settings
 .claude/
