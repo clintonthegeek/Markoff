@@ -1,17 +1,15 @@
 cmake_minimum_required(VERSION 3.19)
 # Version tracks the v0.7.x tag series (see git tags v0.7.0-*).
-# Markoff::Live::version() derives from PROJECT_VERSION — keep in sync.
 project(Markoff VERSION 0.7.0 LANGUAGES CXX)
 
 # Markoff-family libraries:
 #   - libs/rapidyaml          (ryml::ryml — YAML parser, vendored)
 #   - libs/markoff-parser     (Markoff::Parser — tree-sitter Markdown AST + YAML frontmatter)
-#   - libs/collabtext         (CRDT text engine, git submodule)
 #   - libs/markoff-core       (Markoff::Core — MarkoffDocument + Sessions + flat-view binding)
-#   - libs/markoff-live       (QML live-preview view leaf + Markoff::Live::EditorWidget)
+#   - libs/markoff-canvas     (primary block-projection editor)
 #   - libs/markoff-source     (QPlainTextEdit-based source widget)
 #   - libs/markoff-styled     (QTextEdit-based inline-styled editor)
-#   - libs/markoff-canvas     (Markoff::Canvas — projection view spike, QTextLayout per block)
+#   - libs/markoff-live       (retired QML view; not part of the supported build)
 #   - libs/jkqtmathtext       (LaTeX math rendering, vendored)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project.
@@ -22,6 +20,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTOUIC ON)
+
+# Source and Core publicly link this imported target. Discover it in the root
+# directory so Qt's deferred target finalizers in app/test subdirectories can
+# also resolve the dependency while collecting plugin and QML requirements.
+find_package(KF6SyntaxHighlighting REQUIRED)
 
 # Cluster P Phase P6 (Corbomite-side plan): markoff_core/canvas/source/styled,
 # markoff-parser, ts-markdown-parser and collabtext are all SHARED now, each
@@ -66,57 +69,64 @@ if(TARGET c4core)
 endif()
 
 add_subdirectory(libs/markoff-parser)
+add_subdirectory(libs/markoff-text-units)
 
-# collabtext — CRDT engine, vendored as a git submodule (git@github.com:clintonthegeek/collabtext.git).
-# Defensive guard against double-add by parent projects.
-if(NOT TARGET collabtext)
-    if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/libs/collabtext/CMakeLists.txt")
-        message(FATAL_ERROR
-            "libs/collabtext is empty — the collabtext submodule has not been initialized.\n"
-            "Run: git submodule update --init --recursive\n"
-            "(Requires SSH access to Codeberg; see ~/dev/CLAUDE.md.)")
-    endif()
-    add_subdirectory(libs/collabtext)
+# Markoff has one document engine: the provider-backed CollabText Core
+# candidate. Host builds must provide the installed package before adding this
+# project; Markoff never falls back to its retired pinned submodule/API.
+if(DEFINED MARKOFF_USE_COLLABTEXT_VNEXT AND NOT MARKOFF_USE_COLLABTEXT_VNEXT)
+    message(FATAL_ERROR
+        "Pinned-engine builds have been removed; Markoff always requires the installed CollabText Core package")
 endif()
+if(DEFINED MARKOFF_BUILD_LIVE AND MARKOFF_BUILD_LIVE)
+    message(FATAL_ERROR
+        "The retired markoff-live target has been removed from the supported build")
+endif()
+set(MARKOFF_USE_COLLABTEXT_VNEXT ON)
+if(TARGET collabtext)
+    message(FATAL_ERROR
+        "Markoff requires the installed CollabText Core package and cannot share a target graph with the retired pinned collabtext target")
+endif()
+find_package(collabtext CONFIG REQUIRED COMPONENTS core)
+add_subdirectory(libs/markoff-collabtext-vnext)
 
 add_subdirectory(libs/markoff-core)
 # jkqtmathtext — LaTeX math rendering for Math blocks (canvas / styled / live).
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)
 endif()
-# MARKOFF_BUILD_LIVE — QML LivePreview leaf. Retired 2026-08-19 (G3):
-# zero downstream consumers since Corbomite's Cluster K Phase 5 made canvas
-# the sole LivePreview engine. Default flipped OFF; the leaf's source stays
-# in-tree (build-fix-only, no new feature work) until a future session
-# deletes it outright — see docs/plans/2026-08-13-canvas-production-plan.md
-# G3 and tag archive/markoff-live-final for the last default-ON state.
-option(MARKOFF_BUILD_LIVE "Build markoff-live (QML LivePreview leaf, retired)" OFF)
-if(MARKOFF_BUILD_LIVE)
-    add_subdirectory(libs/markoff-live)
-endif()
 add_subdirectory(libs/markoff-source)
 add_subdirectory(libs/markoff-styled)
 add_subdirectory(libs/markoff-canvas)
 
-# Apps (markoff-collab-testapp, future scene-demo) are demo binaries that link
-# Qt::QuickWidgets and other extra components. Default-ON for standalone builds,
-# default-OFF when consumed as a subdirectory so parent projects don't have to
-# pull QuickWidgets just to satisfy the demo app's link line.
+# Demo apps are default-ON for standalone builds and default-OFF when consumed
+# as a subdirectory. The collaboration test app exercises the provider-backed
+# Canvas consumer.
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(_MARKOFF_BUILD_APPS_DEFAULT ON)
 else()
     set(_MARKOFF_BUILD_APPS_DEFAULT OFF)
 endif()
 option(MARKOFF_BUILD_APPS "Build Markoff demo apps (markoff-collab-testapp, etc.)" ${_MARKOFF_BUILD_APPS_DEFAULT})
-# Demo apps currently link markoff_live; skip them when LIVE is OFF.
-if(MARKOFF_BUILD_APPS AND MARKOFF_BUILD_LIVE)
+# The collaboration test app exercises the provider-backed document path.
+if(MARKOFF_BUILD_APPS)
     add_subdirectory(apps)
-elseif(MARKOFF_BUILD_APPS AND NOT MARKOFF_BUILD_LIVE)
-    message(STATUS "MARKOFF_BUILD_APPS ignored because MARKOFF_BUILD_LIVE=OFF")
 endif()
 unset(_MARKOFF_BUILD_APPS_DEFAULT)
 
 option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
 if(MARKOFF_BUILD_TESTS)
     enable_testing()
+endif()
+
+# Provider consumer tests are separate executables from markoff_core. They
+# link the installed CollabText::Core package through Markoff::CollabTextVNext.
+# CMAKE_PREFIX_PATH must include the selected installation.
+option(MARKOFF_BUILD_COLLABTEXT_VNEXT_TESTS
+    "Build installed-package consumer tests for the CollabText Core adapter" ON)
+if(MARKOFF_BUILD_COLLABTEXT_VNEXT_TESTS)
+    if(NOT MARKOFF_BUILD_TESTS)
+        message(FATAL_ERROR "MARKOFF_BUILD_COLLABTEXT_VNEXT_TESTS requires MARKOFF_BUILD_TESTS=ON")
+    endif()
+    add_subdirectory(tests/collabtext-vnext)
 endif()

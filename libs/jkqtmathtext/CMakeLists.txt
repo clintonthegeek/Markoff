@@ -81,3 +81,12 @@ target_include_directories(jkqtmathtext
 target_link_libraries(jkqtmathtext
     PUBLIC  Qt6::Core Qt6::Gui Qt6::Widgets
 )
+
+if(DEFINED KDE_INSTALL_LIBDIR)
+    install(TARGETS jkqtmathtext
+        EXPORT CorbomiteTargets
+        RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
+        LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
+        ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+endif()
