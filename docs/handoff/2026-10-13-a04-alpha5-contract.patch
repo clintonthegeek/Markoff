@@ -1,0 +1,96 @@
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -13,7 +13,7 @@
+ # COLLABTEXT_PRERELEASE must equal the one in libs/collabtext/CMakeLists.txt.
+ # tools/prepare-integration-alpha.sh refuses a candidate when they disagree.
+ project(collabtext VERSION 0.2.0 LANGUAGES CXX)
+-set(COLLABTEXT_PRERELEASE "alpha.4")
++set(COLLABTEXT_PRERELEASE "alpha.5")
+ set(COLLABTEXT_VERSION_STRING "${PROJECT_VERSION}-${COLLABTEXT_PRERELEASE}")
+ 
+ set(CMAKE_CXX_STANDARD 20)
+--- a/libs/collabtext/CMakeLists.txt
++++ b/libs/collabtext/CMakeLists.txt
+@@ -14,7 +14,7 @@
+ # "0.2.0", not "0.2.0-alpha.1", so a find_package request cannot name the
+ # prerelease. COLLABTEXT_VERSION_STRING carries the full label.
+ project(collabtext-lib VERSION 0.2.0 LANGUAGES CXX)
+-set(COLLABTEXT_PRERELEASE "alpha.4")
++set(COLLABTEXT_PRERELEASE "alpha.5")
+ set(COLLABTEXT_VERSION_STRING "${PROJECT_VERSION}-${COLLABTEXT_PRERELEASE}")
+ set(CMAKE_CXX_STANDARD 20)
+ set(CMAKE_CXX_STANDARD_REQUIRED ON)
+--- a/libs/collabtext/include/collabtext/ALPHA_CAPABILITIES.md
++++ b/libs/collabtext/include/collabtext/ALPHA_CAPABILITIES.md
+@@ -1,7 +1,7 @@
+ # Collabtext alpha capability manifest
+ 
+-**Version:** 16
+-**Package:** `0.2.0-alpha.4`
++**Version:** 17
++**Package:** `0.2.0-alpha.5`
+ **Branch:** `feat/fuguemax-placement`
+ **Status:** local adoption candidate; not published. C++ API/ABI remains alpha.
+ Pin the exact candidate SHA and rebuild. CMake numeric package comparison uses
+@@ -23,7 +23,7 @@
+ | Typed zero-width inline text markers with explicit before/after insertion, removal, detachment and undo restoration | Available through CrdtEngine; `tst_wave_core`, `tst_text_markers`, independent `tst_marker_model`, installed `consumer_wave_core` |
+ | Marker operations in ordinary causal stream, preserved by adjacent/whole-body text deletion | Available; Unicode and both delivery orders in `tst_wave_core`; seeded independent-tree histories in `tst_text_markers` |
+ | Checked shared undo/redo and bounded actor-local history | Available; `tst_persistent_undo`, `tst_idlist_undo`, `tst_wave_core` |
+-| Core text history snapshots/restore, coalescing, next groups and retirement acknowledgments | Available; `tst_wave_core` public replay/restore/compensation trace. Consumer owns durable metadata; replay alone never reconstructs the local stack |
++| Core text and IdList history snapshots/restore, coalescing, next groups, selective historical-group compensation and retirement acknowledgments | Available; `tst_crdtengine_op_api`, `tst_idlist_undo`. Consumer owns durable metadata; replay alone never reconstructs the local stack |
+ | Deterministic disposable projection actor/allocator | Available through ProjectionAllocator; frozen derivation golden and 600 independently translated transitions in `tst_wave_core`/installed consumer |
+ | Permanent CTBO/0002 archive reader | Available; retained literal insert/undo plus identity, attachment and canonical-byte checks in installed `consumer_wave_core`; existing operation-codec goldens retained |
+ | File-backed session replay and persistent local undo | Available with FileTransport; `tst_session_recovery`, `tst_editor_recovery`, `tst_persistent_undo`. Does not certify a consumer's EventStore transactions |
+--- a/docs/specs/vnext-public-api.md
++++ b/docs/specs/vnext-public-api.md
+@@ -412,6 +412,16 @@
+ `IdListEngine::try_undo()` and `try_redo()` return
+ `Result<std::optional<IdListOperation>>`: an empty optional means the relevant
+ history stack is empty, and an error reports a refused identity reservation.
++Both `CrdtEngine` and `IdListEngine` also expose `try_undo_group(group_id)` and
++`try_redo_group(group_id)`. These compensate the exact local-history group named
++by its full identity, even when it is below newer active groups or behind other
++redo entries. A missing or wrong-state group returns `history_unavailable`
++without consuming an identity. The resulting compensation is an ordinary
++replicated operation. The history snapshot keeps its existing vector/cursor
++shape: entries before the cursor are active in undo order; entries from the
++cursor onward are available in redo order, with normal redo selecting the first
++entry. Selective undo moves its group to the cursor, and selective redo moves its
++group to the active boundary. New local edits still discard the redo suffix.
+ The legacy `undo()` and `redo()` wrappers remain available and return an empty
+ optional for either condition.
+ 
+--- a/docs/USING_VNEXT.md
++++ b/docs/USING_VNEXT.md
+@@ -8,7 +8,7 @@
+ `.worktrees/reliability-v2`. The annotated adoption tag is
+ **`collabtext-wave-core-2026-10-11`**. Pin its resolved commit SHA, rather than a
+ moving branch or the package label alone. This is an adoption snapshot; the
+-package still reports **`0.2.0-alpha.4`**, and its C++ API/ABI remains alpha.
++package candidate now reports **`0.2.0-alpha.5`**, and its C++ API/ABI remains alpha.
+ A local tag must be distributed separately before other repositories can fetch it.
+ 
+ The [installed capability manifest](../libs/collabtext/include/collabtext/ALPHA_CAPABILITIES.md)
+@@ -97,4 +97,4 @@
+ are executable references. Their volatile Core allocators are test helpers,
+ not production durability implementations.
+ 
+-Current Markoff adoption: [ordered list identities, durable counter gaps and CTLO readers](handoff/markoff-core-response.md). Candidate `collabtext-markoff-core-2026-10-11`, manifest v16; previous Wave candidate remains immutable.
++Current Markoff adoption: [ordered list identities, durable counter gaps and CTLO readers](handoff/markoff-core-response.md). Alpha.4 candidate `collabtext-markoff-core-2026-10-11` remains immutable; alpha.5 adds selective local-history group compensation.
+--- a/README.md
++++ b/README.md
+@@ -5,7 +5,7 @@
+ are opaque public values; consumers own authorization and transport.
+ 
+ The active branch is `feat/fuguemax-placement`, in the reliability-v2 worktree.
+-Current adoption work targets `0.2.0-alpha.4`. Read the
++Current adoption work targets `0.2.0-alpha.5`. Read the
+ [consumer handoff](docs/handoff/consumer-adoption.md) and
+ [Wave Core response](docs/handoff/wave-core-response.md) before integration.
+ The earlier adoption tag is preserved; candidate tags identify exact source,
+@@ -57,4 +57,4 @@
+ [wave-core-adoption.md](docs/specs/wave-core-adoption.md). They supersede the
+ historical API examples and earlier capability limits.
+ 
+-Current Markoff adoption: [ordered list identities, durable counter gaps and CTLO readers](docs/handoff/markoff-core-response.md). Candidate `collabtext-markoff-core-2026-10-11`, manifest v16; previous Wave candidate remains immutable.
++Current Markoff adoption: [ordered list identities, durable counter gaps and CTLO readers](docs/handoff/markoff-core-response.md). Alpha.4 candidate `collabtext-markoff-core-2026-10-11` remains immutable; alpha.5 adds selective local-history group compensation.

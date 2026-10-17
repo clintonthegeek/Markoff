@@ -9,6 +9,13 @@
 **Authoritative parent:** `docs/handoff/2026-05-07-pivot-to-d5-first.md` §4.3.
 **Audience:** Markoff agents implementing D5 under pivot-doc §4.4.
 
+> **Current adoption status:** the numeric `MarkoffOp::blockId` and `MKOF/1`
+> wire format described below have been superseded by A07 in
+> [the 2026-10-12 adoption execution plan](../plans/2026-10-12-collabtext-adoption-execution.md).
+> The active boundary uses one full structural block identity and `MKOF/2`;
+> there is no backward reader or numeric-ID encoding. This older design remains
+> as historical context for the original D5 implementation.
+
 ---
 
 ## 0. TL;DR
