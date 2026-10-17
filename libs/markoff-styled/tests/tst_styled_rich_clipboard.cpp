@@ -8,6 +8,7 @@
 #include <markoff/core/ClipboardCodec.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 using Markoff::ClipboardCodec::kMarkdownMime;
 using Markoff::ClipboardCodec::kRtfMime;
@@ -47,8 +48,8 @@ private slots:
 
 void TstStyledRichClipboard::copy_writesMarkdownNotThemedOnly()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("Hello **world**\n");
+  auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument("Hello **world**\n");
+  auto& doc = *fixture_doc.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();
@@ -77,8 +78,8 @@ void TstStyledRichClipboard::copy_writesMarkdownNotThemedOnly()
 
 void TstStyledRichClipboard::copyAsPlain_stripsMarkers()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("Hello **world**\n");
+  auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument("Hello **world**\n");
+  auto& doc = *fixture_doc.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();
@@ -95,8 +96,8 @@ void TstStyledRichClipboard::copyAsPlain_stripsMarkers()
 
 void TstStyledRichClipboard::readingMode_copyStillWorks()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("Read **me**\n");
+  auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument("Read **me**\n");
+  auto& doc = *fixture_doc.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.setReadOnly(true);
@@ -123,8 +124,8 @@ void TstStyledRichClipboard::readingMode_copyStillWorks()
 
 void TstStyledRichClipboard::paste_htmlBecomesMarkdown()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("X\n");
+  auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument("X\n");
+  auto& doc = *fixture_doc.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();
@@ -149,8 +150,8 @@ void TstStyledRichClipboard::paste_htmlBecomesMarkdown()
 
 void TstStyledRichClipboard::pasteAsPlain_stripsIncomingHtml()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("X\n");
+  auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument("X\n");
+  auto& doc = *fixture_doc.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.show();
@@ -183,8 +184,8 @@ void TstStyledRichClipboard::copy_loadedBlockQuote_includesMarkerAndExportsHtml(
     // "Reading-mode copy is markdown-faithful" eyeball claim for quotes.
     // Fixed in StructuralTextEdit::selectedMarkdown() (marker restore via
     // MarkoffDocument::blockQuoteDisplayMarker(), same fix shape as canvas).
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("> a quoted line\n");
+  auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument("> a quoted line\n");
+  auto& doc = *fixture_doc.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.setReadOnly(true);  // matches Corbomite's actual Reading-mode usage
@@ -212,8 +213,8 @@ void TstStyledRichClipboard::copy_listItem_includesMarker()
     // also content-only for this kind (Styled had neither the ListItem
     // nor the BlockQuote marker-restore canvas already had for the
     // former) — same fix, same StructuralTextEdit::selectedMarkdown().
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown("- first item\n- second item\n");
+  auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument("- first item\n- second item\n");
+  auto& doc = *fixture_doc.document;
     Editor ed;
     ed.setDocument(&doc);
     ed.setReadOnly(true);

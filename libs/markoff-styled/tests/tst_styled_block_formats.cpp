@@ -9,6 +9,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 namespace {
 QTextBlock blockN(QTextDocument *doc, int n) {
@@ -21,8 +22,8 @@ class TstStyledBlockFormats : public QObject {
 private Q_SLOTS:
     void heading_level_1_gets_largest_size() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("# H1 title"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("# H1 title"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -35,9 +36,9 @@ private Q_SLOTS:
 
     void heading_levels_descend_in_size() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("# H1\n\n## H2\n\n### H3\n\n#### H4\n\n##### H5\n\n###### H6"));
+        auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -63,8 +64,8 @@ private Q_SLOTS:
 
     void paragraph_keeps_default_size() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Just a paragraph."));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Just a paragraph."));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -76,8 +77,8 @@ private Q_SLOTS:
 
     void code_block_uses_monospace_and_background() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("```\ncode line\n```"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("```\ncode line\n```"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -92,8 +93,8 @@ private Q_SLOTS:
 
     void blockquote_has_left_margin() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("> quoted text"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("> quoted text"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -108,8 +109,8 @@ private Q_SLOTS:
         // ordered numbering stays continuous. The visible indent now derives from
         // the list's indent level, not a block left-margin.
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("- first item"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("- first item"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -121,10 +122,9 @@ private Q_SLOTS:
 
     void horizontal_rule_uses_monospace() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // Use a thematic break preceded by a paragraph so tree-sitter
-        // unambiguously classifies the "---" line as ThematicBreak.
-        doc.loadFromMarkdown(QByteArrayLiteral("before\n\n---\n"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("before\n\n---\n"));
+        auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);

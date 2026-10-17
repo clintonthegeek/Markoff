@@ -7,6 +7,7 @@
 #include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 namespace {
 QByteArray fullText(Markoff::MarkoffDocument &doc) {
@@ -26,8 +27,8 @@ class TstStyledBindingRoundtrip : public QObject {
 private Q_SLOTS:
     void typing_propagates_to_markoff_document() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray());
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArray());
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -38,15 +39,16 @@ private Q_SLOTS:
 
     void external_doc_edit_propagates_to_editor() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("initial"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("initial"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
         QTRY_COMPARE(e.textEdit()->toPlainText(),
                      QStringLiteral("initial"));
-        doc.applyFlatEdit(7, 7, QByteArrayLiteral(" tail"),
-                          Markoff::Origin::UserEdit);
+        QCOMPARE(doc.applyBlockEdit({doc.iterateBlocks().front(), 7, 0,
+                                     QByteArrayLiteral(" tail")}).state,
+                 Markoff::VNext::ActionPublicationState::committed);
         QTRY_COMPARE(e.textEdit()->toPlainText(),
                      QStringLiteral("initial tail"));
     }
@@ -54,21 +56,22 @@ private Q_SLOTS:
     void document_change_rewires_binding_cleanly() {
         Markoff::Styled::Editor e;
 
-        Markoff::MarkoffDocument docA(1);
-        docA.loadFromMarkdown(QByteArrayLiteral("first"));
+    auto fixture_docA = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("first"));
+    auto& docA = *fixture_docA.document;
         auto *s = docA.createSession();
         e.setSession(s);
         e.setDocument(&docA);
         QTRY_COMPARE(e.textEdit()->toPlainText(), QStringLiteral("first"));
 
-        Markoff::MarkoffDocument docB(1);
-        docB.loadFromMarkdown(QByteArrayLiteral("second"));
+    auto fixture_docB = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("second"));
+    auto& docB = *fixture_docB.document;
         e.setDocument(&docB);
         QTRY_COMPARE(e.textEdit()->toPlainText(), QStringLiteral("second"));
 
         // Edits to docA must NOT propagate to the editor.
-        docA.applyFlatEdit(5, 5, QByteArrayLiteral("X"),
-                           Markoff::Origin::UserEdit);
+        QCOMPARE(docA.applyBlockEdit({docA.iterateBlocks().front(), 5, 0,
+                                      QByteArrayLiteral("X")}).state,
+                 Markoff::VNext::ActionPublicationState::committed);
         QTest::qWait(50);
         QCOMPARE(e.textEdit()->toPlainText(), QStringLiteral("second"));
     }

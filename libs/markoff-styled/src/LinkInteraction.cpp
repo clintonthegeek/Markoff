@@ -10,6 +10,7 @@
 #include <markoff/core/LinkKind.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Detail/FlatBlockResolve.h>
 #include <markoff/parser/SourceSpan.h>
 
 namespace Markoff::Styled {
@@ -55,23 +56,14 @@ LinkInteraction::resolveLinkAt(int charPos, Qt::KeyboardModifiers mods) const {
     const QByteArray prefix = plain.left(charPos).toUtf8();
     const quint32 byteOffset = static_cast<quint32>(prefix.size());
 
-    // Bisect to the containing block via the CRDT index.
-    // textAnchorAt()'s D2 path walks per-block CRDT buffers, accumulating
-    // byte counts, and tags the returned anchor with the block's ID.
-    // anchor.block() gives us the block ID directly — O(blocks) but with
-    // early termination, which is still far cheaper than the old O(blocks +
-    // all_spans) approach for documents where the target is not the last block.
-    // blockAt(TextAnchor) is not used here because it relies on
-    // latestBlockRanges, which is only populated in the legacy (pre-D2) path.
-    const Markoff::TextAnchor anchor =
-        m_doc->textAnchorAt(byteOffset, /*rightBias=*/false);
-    const Markoff::BlockId id = anchor.block();
-    if (id.isNull()) return std::nullopt;
-
-    // Offset within the block, in UTF-8 bytes.
-    // offsetInBlock()'s D2 path resolves directly against the per-block
-    // CRDT buffer, bypassing latestBlockRanges.
-    const int blockByteOffset = m_doc->offsetInBlock(id, anchor);
+    // Resolve the current flat-view byte offset directly to its visible block
+    // and block-local byte offset. This is a transient hit test, so it needs no
+    // persisted causal position token.
+    const auto hit = Markoff::Detail::findBlockAtSepByte(
+        m_doc, byteOffset, /*biasForward=*/false);
+    if (!hit) return std::nullopt;
+    const Markoff::BlockId id = hit->blockId;
+    const int blockByteOffset = static_cast<int>(hit->byteInBlock);
 
     // Convert block-byte-offset to UTF-16 char offset within the
     // block by converting the block-text prefix. Block text is

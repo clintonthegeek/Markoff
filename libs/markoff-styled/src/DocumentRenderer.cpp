@@ -9,6 +9,8 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <QUuid>
 
 #include "FormatPass.h"
 
@@ -40,9 +42,19 @@ void DocumentRenderer::renderInto(QTextDocument *target,
 void DocumentRenderer::renderInto(QTextDocument *target,
                                   const QByteArray &markdownUtf8) const {
     if (!target) return;
-    Markoff::MarkoffDocument doc(1);
-    doc.loadFromMarkdown(markdownUtf8);
-    renderInto(target, &doc);
+    auto providerResult = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!providerResult.ok()) return;
+    auto provider = std::move(providerResult).value();
+    const Markoff::VNext::DocumentStorageScope scope{
+        QStringLiteral("styled-render-%1").arg(
+            QUuid::createUuid().toString(QUuid::WithoutBraces)), 1};
+    auto opened = Markoff::MarkoffDocument::open(
+        *provider, scope, Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) return;
+    auto document = std::move(opened).value();
+    if (document->importInitialMarkdown(markdownUtf8).state
+        != Markoff::VNext::ActionPublicationState::committed) return;
+    renderInto(target, document.get());
 }
 
 qreal DocumentRenderer::idealHeight(const Markoff::MarkoffDocument *source,

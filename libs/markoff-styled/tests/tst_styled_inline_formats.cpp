@@ -9,6 +9,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 namespace {
 QTextCharFormat formatAtChar(QTextDocument *doc, int charPos) {
@@ -24,8 +25,8 @@ class TstStyledInlineFormats : public QObject {
 private Q_SLOTS:
     void bold_span_sets_bold_weight() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("**bold** word"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("**bold** word"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -36,8 +37,8 @@ private Q_SLOTS:
 
     void italic_span_sets_italic() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("*em* word"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("*em* word"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -47,8 +48,8 @@ private Q_SLOTS:
 
     void strikethrough_span_sets_strikeout() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("~~struck~~ word"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("~~struck~~ word"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -58,8 +59,8 @@ private Q_SLOTS:
 
     void plain_text_has_no_emphasis() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("plain words"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("plain words"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -71,8 +72,8 @@ private Q_SLOTS:
 
     void inline_code_uses_monospace() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("a `inline` b"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("a `inline` b"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -83,8 +84,8 @@ private Q_SLOTS:
 
     void highlight_span_sets_background() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("==hl== word"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("==hl== word"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -94,8 +95,8 @@ private Q_SLOTS:
 
     void tag_span_distinct_foreground() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("a #tag b"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("a #tag b"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -106,8 +107,8 @@ private Q_SLOTS:
 
     void footnote_ref_distinct_foreground() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("a [^1] b"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("a [^1] b"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -117,8 +118,8 @@ private Q_SLOTS:
 
     void link_span_is_anchored_and_underlined() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("[text](http://x) more"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("[text](http://x) more"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -131,8 +132,8 @@ private Q_SLOTS:
 
     void wikilink_span_is_anchored_and_underlined() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("[[target]] more"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("[[target]] more"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);

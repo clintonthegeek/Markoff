@@ -9,14 +9,15 @@
 #include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 class TstStyledD2Integration : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void typing_applies_formats_after_d2_cycle() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("# starts h1"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("# starts h1"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -28,16 +29,19 @@ private Q_SLOTS:
 
     void remote_edit_replays_text_and_restyles() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("paragraph"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("paragraph"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
 
         // Replace the whole content with a heading.
-        doc.applyFlatEdit(0, doc.flatView().size(),
-                          QByteArrayLiteral("## h2 line"),
-                          Markoff::Origin::UserEdit);
+        const auto block = doc.iterateBlocks().front();
+        const auto oldText = doc.blockText(block);
+        const auto publication = doc.applyBlockEdit({block, 0,
+            static_cast<uint32_t>(oldText.size()), QByteArrayLiteral("## h2 line")});
+        QVERIFY(publication.state == Markoff::VNext::ActionPublicationState::committed
+                || publication.state == Markoff::VNext::ActionPublicationState::committedHistoryPending);
 
         // Text propagation works.
         QTRY_COMPARE(e.textEdit()->toPlainText(), QStringLiteral("## h2 line"));
@@ -51,15 +55,18 @@ private Q_SLOTS:
 
     void undo_via_d2_restores_text_and_formats() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("# h1 original"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("# h1 original"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
 
-        doc.applyFlatEdit(0, doc.flatView().size(),
-                          QByteArrayLiteral("paragraph only"),
-                          Markoff::Origin::UserEdit);
+        const auto block = doc.iterateBlocks().front();
+        const auto oldText = doc.blockText(block);
+        const auto publication = doc.applyBlockEdit({block, 0,
+            static_cast<uint32_t>(oldText.size()), QByteArrayLiteral("paragraph only")});
+        QVERIFY(publication.state == Markoff::VNext::ActionPublicationState::committed
+                || publication.state == Markoff::VNext::ActionPublicationState::committedHistoryPending);
         QTRY_COMPARE(e.textEdit()->toPlainText(),
                      QStringLiteral("paragraph only"));
 
@@ -72,8 +79,8 @@ private Q_SLOTS:
 
     void reset_content_does_not_double_blocks() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("first"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("first"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -83,7 +90,9 @@ private Q_SLOTS:
         // Q_UNREACHABLE() (that origin is reserved for applyFlatEdit); a
         // full-content reset from test setup is exactly TestFixture's
         // documented purpose.
-        doc.resetContent(QByteArrayLiteral("second"), Markoff::Origin::TestFixture);
+        const auto publication = doc.replaceMarkdown(QByteArrayLiteral("second"));
+        QVERIFY(publication.state == Markoff::VNext::ActionPublicationState::committed
+                || publication.state == Markoff::VNext::ActionPublicationState::committedHistoryPending);
         QTRY_COMPARE(e.textEdit()->toPlainText(), QStringLiteral("second"));
         // Must not be "secondsecond" or "first\n\nsecond".
         QCOMPARE(e.textEdit()->toPlainText().count('\n'), 0);

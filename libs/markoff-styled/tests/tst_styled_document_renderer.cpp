@@ -12,6 +12,7 @@
 #include <markoff/core/Session.h>
 #include <markoff/styled/DocumentRenderer.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 namespace {
 QTextBlock blockN(const QTextDocument *doc, int n) {
@@ -25,8 +26,8 @@ private Q_SLOTS:
     // ---- T1: renderInto correctness (oracle = explicit expectations) ------
 
     void heading_is_bold_and_nonempty() {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("# Title\n\nbody"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("# Title\n\nbody"));
+    auto& doc = *fixture_doc.document;
         QTextDocument target;
         Markoff::Styled::DocumentRenderer r;
         r.renderInto(&target, &doc);
@@ -37,8 +38,8 @@ private Q_SLOTS:
     }
 
     void code_block_is_monospace_with_background() {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("```\ncode line\n```"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("```\ncode line\n```"));
+    auto& doc = *fixture_doc.document;
         QTextDocument target;
         Markoff::Styled::DocumentRenderer r;
         r.renderInto(&target, &doc);
@@ -50,8 +51,9 @@ private Q_SLOTS:
     }
 
     void blockquote_left_margin_and_list_membership() {
-        Markoff::MarkoffDocument q(1);
-        q.loadFromMarkdown(QByteArrayLiteral("> quoted text"));
+        auto quoteFixture = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("> quoted text"));
+        auto& q = *quoteFixture.document;
         QTextDocument tq;
         Markoff::Styled::DocumentRenderer r;
         r.renderInto(&tq, &q);
@@ -59,16 +61,17 @@ private Q_SLOTS:
 
         // List items indent via QTextList membership (not blockFormat
         // leftMargin) since the em-spacing rework.
-        Markoff::MarkoffDocument l(1);
-        l.loadFromMarkdown(QByteArrayLiteral("- first item"));
+        auto listFixture = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("- first item"));
+        auto& l = *listFixture.document;
         QTextDocument tl;
         r.renderInto(&tl, &l);
         QVERIFY(blockN(&tl, 0).textList() != nullptr);
     }
 
     void inline_bold_and_italic_applied() {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("normal **bold** _italic_ text"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("normal **bold** _italic_ text"));
+    auto& doc = *fixture_doc.document;
         QTextDocument target;
         Markoff::Styled::DocumentRenderer r;
         r.renderInto(&target, &doc);
@@ -103,15 +106,15 @@ private Q_SLOTS:
         const QByteArray md = QByteArrayLiteral(
             "# H1\n\n## H2\n\npara **b**\n\n> quote\n\n- item\n\n```\ncode\n```");
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument wdoc(1);
-        wdoc.loadFromMarkdown(md);
+        auto widgetFixture = Markoff::Styled::Tests::openCandidateDocument(md);
+        auto& wdoc = *widgetFixture.document;
         auto *s = wdoc.createSession();
         e.setSession(s);
         e.setDocument(&wdoc);
         const QTextDocument *wq = e.textEdit()->document();
 
-        Markoff::MarkoffDocument hdoc(1);
-        hdoc.loadFromMarkdown(md);
+        auto headlessFixture = Markoff::Styled::Tests::openCandidateDocument(md);
+        auto& hdoc = *headlessFixture.document;
         QTextDocument hq;
         Markoff::Styled::DocumentRenderer r;
         r.renderInto(&hq, &hdoc);
@@ -129,10 +132,10 @@ private Q_SLOTS:
     // ---- T2: idealHeight / paint -----------------------------------------
 
     void ideal_height_positive_and_grows_when_narrow() {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "This is a fairly long paragraph that should wrap onto several "
-            "lines once the available width becomes small enough to force it."));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("This is a fairly long paragraph that should wrap onto several "
+                              "lines once the available width becomes small enough to force it."));
+        auto& doc = *fixture_doc.document;
         Markoff::Styled::DocumentRenderer r;
         const qreal wide   = r.idealHeight(&doc, 600);
         const qreal narrow = r.idealHeight(&doc, 120);
@@ -141,8 +144,8 @@ private Q_SLOTS:
     }
 
     void paint_draws_something() {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("# Heading\n\nbody text here"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("# Heading\n\nbody text here"));
+    auto& doc = *fixture_doc.document;
         Markoff::Styled::DocumentRenderer r;
         const qreal h = r.idealHeight(&doc, 300);
         QVERIFY(h > 0);

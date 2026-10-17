@@ -12,6 +12,7 @@
 #include <QTextDocument>
 
 #include <markoff/core/MarkoffDocument.h>
+#include "CandidateDocumentFixture.h"
 #include <markoff/core/Selection.h>
 #include <markoff/core/Session.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
@@ -22,8 +23,8 @@ class TstStyledBindingCaret : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void enter_at_paragraph_end_resolves_caret_to_new_block() {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Hello\n\nWorld"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Hello\n\nWorld"));
+    auto& doc = *fixture_doc.document;
         QPlainTextEdit edit;
         SourceTextDocumentBinding b;
         b.setMarkoffDocument(&doc);
@@ -33,9 +34,7 @@ private Q_SLOTS:
         QSignalSpy spy(&b, &SourceTextDocumentBinding::caretResolved);
 
         // Caret at end of "Hello" (sep-view pos 5), press Enter.
-        QTextCursor c(edit.document());
-        c.setPosition(5);
-        c.insertText(QStringLiteral("\n"));  // fires contentsChange
+        QVERIFY(b.handleStructuralKey(Qt::Key_Return, Qt::NoModifier, 5, 5));
 
         QTRY_COMPARE(spy.count(), 1);
         // WP runtime view: blocks joined by single '\n', so the new empty
@@ -46,8 +45,8 @@ private Q_SLOTS:
     }
 
     void session_selection_change_resolves_caret_in_sep_view() {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Hello\n\nWorld"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Hello\n\nWorld"));
+    auto& doc = *fixture_doc.document;
         // Drive the existing QPlainTextEdit pattern used elsewhere in this file.
         QPlainTextEdit edit;
         SourceTextDocumentBinding b;
@@ -61,10 +60,13 @@ private Q_SLOTS:
         // Place a collapsed selection at the start of "World" (no-sep byte 5).
         // In sep-view that is position 6 ("Hello\n" = 6, WP unification: single '\n').
         // The OLD no-separator concatenation would have wrongly returned 5.
-        const auto anchor = doc.textAnchorAt(5, /*rightBias*/ false);
         Markoff::Selection sel;
-        sel.anchor = anchor;
-        sel.active = anchor;
+        const auto block = doc.iterateBlocks()[1];
+        const auto token = doc.boundaryTokenAt(block, 0, false);
+        QVERIFY(token.ok());
+        const Markoff::ScopedTextPosition position{block, token.value()};
+        sel.anchorPosition = position;
+        sel.activePosition = position;
         sel.kind   = Markoff::Selection::Kind::Primary;
         session->setPrimarySelection(sel);
 
@@ -75,8 +77,8 @@ private Q_SLOTS:
     }
 
     void ordinary_typing_does_not_resolve_caret() {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Hello\n\nWorld"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Hello\n\nWorld"));
+    auto& doc = *fixture_doc.document;
         QPlainTextEdit edit;
         SourceTextDocumentBinding b;
         b.setMarkoffDocument(&doc);

@@ -134,16 +134,11 @@ No KF6, no QML, no `markoff-live`.
   `QTimer::singleShot(0)` AFTER `endEditBlock` so Qt's layout signals
   settle first. Structural edits let Qt's natural "ensure cursor
   visible" behavior position the viewport.
-- **D2-broken core APIs to avoid.** `MarkoffDocument::blockAt(TextAnchor)`
-  and `MarkoffDocument::blockByteRange(BlockId)` both depend on
-  `latestBlockRanges`, which is NEVER populated by the D2 load path —
-  they return `std::nullopt` for any D2-loaded document. The styled
-  leaf works around both: `StyleApplier::applyFormats` reconstructs
-  byte ranges by walking `blockText(id).size() + interBlockSeparator`
-  for each block; `LinkInteraction::resolveLinkAt` uses
-  `textAnchorAt(byteOffset).block()` to extract the containing
-  BlockId from the anchor itself. When in doubt about a core API,
-  search `latestBlockRanges` first.
+- **Block identity and ranges.** Text anchors carry their block's
+  `BlockId`; resolve their local byte positions with
+  `MarkoffDocument::offsetInBlock`. `StyleApplier::applyFormats`
+  reconstructs source ranges by walking `blockText(id).size()` and
+  `interBlockSeparator()` for each block.
 - **WP unification (2026-05-28).** The Editor's QTextDocument is seeded
   from `widgetFlatView()` (single-`\n` separator). Each model block →
   one QTextBlock; the visible inter-paragraph gap comes from per-kind
@@ -203,8 +198,8 @@ and reverse path (incremental prefix/suffix text-diff instead of
 `setPlainText`). Reference spec:
 `docs/specs/2026-05-27-markoff-core-binding-robustness-design.md`.
 
-The existing **D2-broken core APIs** caveat below still applies (`blockAt`
-/ `blockByteRange` → `latestBlockRanges` not populated by D2 load path).
+Block lookup uses the block identity carried by `TextAnchor`; source ranges
+are reconstructed by walking the document's block texts and separators.
 
 ## Structural-key authority (queue #8.8, 2026-05-29)
 

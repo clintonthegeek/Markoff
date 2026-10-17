@@ -103,6 +103,11 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     if (!m_binding) {
         m_binding = new Markoff::SourceTextDocumentBinding(this);
         m_binding->setTextDocument(m_editor->document());
+        connect(m_editor, &QTextEdit::cursorPositionChanged, this, [this]() {
+            if (!m_binding) return;
+            const auto cursor = m_editor->textCursor();
+            m_binding->captureViewSelection(cursor.anchor(), cursor.position());
+        });
         connect(m_binding, &Markoff::SourceTextDocumentBinding::caretResolved,
                 this, [this](int start, int active) {
                     QTextCursor c(m_editor->document());

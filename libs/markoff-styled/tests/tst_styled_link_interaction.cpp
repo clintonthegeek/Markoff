@@ -7,8 +7,12 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
 
 #include "support/RecordingLinkService.h"
+
+#include <memory>
+#include <stdexcept>
 
 namespace {
 QPoint pointForChar(QTextEdit *edit, int charPos) {
@@ -18,6 +22,26 @@ QPoint pointForChar(QTextEdit *edit, int charPos) {
     const QRect r = edit->cursorRect();
     return r.center() + QPoint(3, 0);
 }
+
+struct CandidateDocument {
+    std::unique_ptr<Markoff::VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<Markoff::MarkoffDocument> document;
+};
+
+CandidateDocument openCandidate(const QString& key, const QByteArray& markdown)
+{
+    auto provider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!provider.ok()) throw std::runtime_error("provider creation failed");
+    CandidateDocument fixture{std::move(provider).value(), {}};
+    auto opened = Markoff::MarkoffDocument::open(*fixture.provider,
+        {key, 1}, Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    if (fixture.document->importInitialMarkdown(markdown).state
+        != Markoff::VNext::ActionPublicationState::committed)
+        throw std::runtime_error("document import failed");
+    return fixture;
+}
 }  // namespace
 
 class TstStyledLinkInteraction : public QObject {
@@ -25,8 +49,9 @@ class TstStyledLinkInteraction : public QObject {
 private Q_SLOTS:
     void click_inside_link_calls_activate() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("a [text](http://x.test) b"));
+        auto fixture = openCandidate(QStringLiteral("link-click"),
+            QByteArrayLiteral("a [text](http://x.test) b"));
+        auto& doc = *fixture.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -46,8 +71,9 @@ private Q_SLOTS:
 
     void click_outside_link_does_not_activate() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("just plain text"));
+        auto fixture = openCandidate(QStringLiteral("link-outside"),
+            QByteArrayLiteral("just plain text"));
+        auto& doc = *fixture.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -67,8 +93,9 @@ private Q_SLOTS:
 
     void editor_provides_default_link_service_when_none_set() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("a [text](http://x.test) b"));
+        auto fixture = openCandidate(QStringLiteral("link-default"),
+            QByteArrayLiteral("a [text](http://x.test) b"));
+        auto& doc = *fixture.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -90,8 +117,9 @@ private Q_SLOTS:
 
     void hover_inside_link_calls_notify_hover() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("a [text](http://x.test) b"));
+        auto fixture = openCandidate(QStringLiteral("link-hover"),
+            QByteArrayLiteral("a [text](http://x.test) b"));
+        auto& doc = *fixture.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -109,8 +137,9 @@ private Q_SLOTS:
 
     void hover_idempotent_within_same_link() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("a [text](http://x.test) b"));
+        auto fixture = openCandidate(QStringLiteral("link-hover-idempotent"),
+            QByteArrayLiteral("a [text](http://x.test) b"));
+        auto& doc = *fixture.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -133,9 +162,9 @@ private Q_SLOTS:
 
     void hover_off_link_then_on_emits_left_and_new_hover() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "a [first](http://1.test) b [second](http://2.test) c"));
+        auto fixture = openCandidate(QStringLiteral("link-hover-transition"),
+            QByteArrayLiteral("a [first](http://1.test) b [second](http://2.test) c"));
+        auto& doc = *fixture.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -159,8 +188,9 @@ private Q_SLOTS:
 
     void leave_event_clears_hover() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("a [text](http://x.test) b"));
+        auto fixture = openCandidate(QStringLiteral("link-hover-leave"),
+            QByteArrayLiteral("a [text](http://x.test) b"));
+        auto& doc = *fixture.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);

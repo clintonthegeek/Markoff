@@ -16,6 +16,7 @@
 #include <markoff/core/OpaqueBlockRenderer.h>  // OpaqueBlockKeyProperty
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 #include "support/TableTestHelpers.h"
 
@@ -41,9 +42,9 @@ class TstStyledTableRender : public QObject {
     Q_OBJECT
 private slots:
     void table_renders_as_frame_in_editor() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "intro\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\noutro"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("intro\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\noutro"));
+        auto& doc = *fixture_doc.document;
         Styled::Editor editor;
         auto *s = doc.createSession();
         editor.setSession(s);
@@ -71,8 +72,8 @@ private slots:
     void materialization_does_not_mutate_model() {
         const QByteArray src = QByteArrayLiteral(
             "intro\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\noutro");
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(src);
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(src);
+    auto& doc = *fixture_doc.document;
         const quint64 seqBefore = doc.d2EditSequence();
 
         Styled::Editor editor;
@@ -98,10 +99,10 @@ private slots:
     // production layout (docs/phase-c-status.md). Must not crash; the list must
     // render and content after the table must be intact + correctly positioned.
     void list_after_table_does_not_crash_and_renders() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "intro\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n"
-            "- one\n- two\n\ntail **bold** end"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("intro\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\n"
+                             "- one\n- two\n\ntail **bold** end"));
+        auto& doc = *fixture_doc.document;
         Styled::Editor editor;
         auto *s = doc.createSession();
         editor.setSession(s);
@@ -131,15 +132,12 @@ private slots:
         QCOMPARE(c.charFormat().fontWeight(), int(QFont::Bold));
     }
 
-    // Bug #2 (latent): the frame key the renderer WRITES must match what the
-    // binding READS (stringProperty(...).toULongLong()). Production wrote a
-    // "markoff-table:<n>" prefix that parses to 0 → the binding never matched a
-    // frame to its model block and re-seeded the whole doc on every edit. Pin
-    // the writer/reader contract: the key parses to the block's raw id (≠ 0).
+    // The frame and model compare the complete opaque identity key, preserving
+    // actor/counter identity when structural IDs reach this view.
     void frame_key_matches_block_id() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "| A | B |\n|---|---|\n| 1 | 2 |"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("| A | B |\n|---|---|\n| 1 | 2 |"));
+        auto& doc = *fixture_doc.document;
         Styled::Editor editor;
         auto *s = doc.createSession();
         editor.setSession(s);
@@ -148,14 +146,13 @@ private slots:
 
         QTextTable *t = firstTable(editor.textEdit()->document());
         QVERIFY(t != nullptr);
-        const quint64 key = t->frameFormat()
-            .stringProperty(OpaqueBlockKeyProperty).toULongLong();
-        QVERIFY2(key != 0, "frame key parses to 0 — writer/reader format mismatch");
-        // It must equal the Table model block's raw id.
-        quint64 tableRaw = 0;
+        const QString key = t->frameFormat().stringProperty(OpaqueBlockKeyProperty);
+        QVERIFY(!key.isEmpty());
+        QString tableKey;
         for (BlockId id : doc.iterateBlocks())
-            if (doc.blockKind(id) == BlockKind::Table) tableRaw = id.raw();
-        QCOMPARE(key, tableRaw);
+            if (doc.blockKind(id) == BlockKind::Table)
+                tableKey = opaqueBlockIdentityKey(id);
+        QCOMPARE(key, tableKey);
     }
 
     // Queue #16: Editor::setFontScale forwards to StyledTableRenderer (no
@@ -166,9 +163,9 @@ private slots:
     // rather than via StyleApplier's hash-gate (Table blocks are skipped
     // by FormatPass, so a restyle pass alone doesn't touch the frame).
     void set_font_scale_reaches_table_renderer_before_document_load() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "| A | B |\n|---|---|\n| 1 | 2 |"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("| A | B |\n|---|---|\n| 1 | 2 |"));
+        auto& doc = *fixture_doc.document;
         Styled::Editor editor;
         editor.setFontScale(1.5);
         auto *s = doc.createSession();

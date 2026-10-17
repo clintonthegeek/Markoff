@@ -6,7 +6,34 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/core/Theme.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
 #include <markoff/styled/Editor.h>
+
+namespace {
+struct StyledFixture {
+    std::unique_ptr<Markoff::VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<Markoff::MarkoffDocument> document;
+};
+StyledFixture openDocument()
+{
+    static int serial = 0;
+    auto provider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!provider.ok()) throw std::runtime_error("provider creation failed");
+    StyledFixture fixture{std::move(provider).value(), {}};
+    auto opened = Markoff::MarkoffDocument::open(*fixture.provider,
+        {QStringLiteral("styled-construction-%1").arg(++serial), 1},
+        Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    const auto imported = fixture.document->importInitialMarkdown(QByteArrayLiteral(""));
+    if (imported.state != Markoff::VNext::ActionPublicationState::committed
+        || !fixture.document->canStartOrdinaryAction())
+        throw std::runtime_error("initial import failed");
+    return fixture;
+}
+}
 
 class TstStyledEditorConstruction : public QObject {
     Q_OBJECT
@@ -21,8 +48,8 @@ private Q_SLOTS:
 
     void document_setter_round_trips_and_signals() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray());
+        auto fixture = openDocument();
+        auto& doc = *fixture.document;
         QSignalSpy spy(&e, &Markoff::MarkdownView::documentChanged);
         e.setDocument(&doc);
         QCOMPARE(e.document(), &doc);
@@ -31,8 +58,8 @@ private Q_SLOTS:
 
     void session_setter_round_trips() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray());
+        auto fixture = openDocument();
+        auto& doc = *fixture.document;
         Markoff::Session *s = doc.createSession();
         e.setSession(s);
         QCOMPARE(e.session(), s);

@@ -7,14 +7,15 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 class TstStyledDelimiterVisibility : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void delimiters_render_visible_in_v0() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("**bold** text"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("**bold** text"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);

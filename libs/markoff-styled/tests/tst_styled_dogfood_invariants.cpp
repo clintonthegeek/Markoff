@@ -14,16 +14,16 @@
 #include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 class TstStyledDogfoodInvariants : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void hash_gate_skips_unchanged_blocks() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // 10 paragraph blocks separated by blank lines.
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "a\n\nb\n\nc\n\nd\n\ne\n\nf\n\ng\n\nh\n\ni\n\nj"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("a\n\nb\n\nc\n\nd\n\ne\n\nf\n\ng\n\nh\n\ni\n\nj"));
+        auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -35,8 +35,10 @@ private Q_SLOTS:
         Q_UNUSED(skipsBefore);
 
         // Append "X" to the first block (block 0 byte range is [0,1)).
-        doc.applyFlatEdit(1, 1, QByteArrayLiteral("X"),
-                          Markoff::Origin::UserEdit);
+        const auto publication = doc.applyBlockEdit(
+            {doc.iterateBlocks().front(), 1, 0, QByteArrayLiteral("X")});
+        QVERIFY(publication.state == Markoff::VNext::ActionPublicationState::committed
+                || publication.state == Markoff::VNext::ActionPublicationState::committedHistoryPending);
 
         // Spin the event loop so the debounced d2DocumentChanged fires
         // and StyleApplier::applyFormats runs.
@@ -47,8 +49,8 @@ private Q_SLOTS:
 
     void kind_transition_paragraph_to_heading() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("plain"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("plain"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -61,8 +63,10 @@ private Q_SLOTS:
         QCOMPARE(doc.blockKind(id), Markoff::BlockKind::Paragraph);
 
         // Prepend "## " to the block content, turning it into a heading.
-        doc.applyFlatEdit(0, 0, QByteArrayLiteral("## "),
-                          Markoff::Origin::UserEdit);
+        const auto publication = doc.applyBlockEdit(
+            {id, 0, 0, QByteArrayLiteral("## ")});
+        QVERIFY(publication.state == Markoff::VNext::ActionPublicationState::committed
+                || publication.state == Markoff::VNext::ActionPublicationState::committedHistoryPending);
 
         // StyleApplier should infer Heading and emit Cmd::changeKind
         // on the next event-loop tick. Wait for the model to update.
@@ -76,9 +80,8 @@ private Q_SLOTS:
 
     void scroll_preserved_on_inplace_edit() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // Build a 50-block document so scrolling matters.
         QByteArray src;
+        // Build a 50-block document so scrolling matters.
         for (int i = 0; i < 50; ++i) {
             src += QByteArrayLiteral("paragraph ");
             src += QByteArray::number(i);
@@ -86,7 +89,8 @@ private Q_SLOTS:
         }
         // Drop the final separator.
         src.chop(2);
-        doc.loadFromMarkdown(src);
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(src);
+        auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -104,8 +108,11 @@ private Q_SLOTS:
         // Append a char to the first block via flat edit at position 1
         // (mid-block on the first block). In-place edit, no structural
         // change.
-        doc.applyFlatEdit(1, 1, QByteArrayLiteral("X"),
-                          Markoff::Origin::UserEdit);
+        const auto first = doc.iterateBlocks().front();
+        const auto publication = doc.applyBlockEdit(
+            {first, 1, 0, QByteArrayLiteral("X")});
+        QVERIFY(publication.state == Markoff::VNext::ActionPublicationState::committed
+                || publication.state == Markoff::VNext::ActionPublicationState::committedHistoryPending);
 
         // Spin the event loop for the d2 cycle.
         QTest::qWait(50);
@@ -118,12 +125,9 @@ private Q_SLOTS:
 
     void heading_chars_render_at_heading_size() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // Trailing context required: tree-sitter parses a bare "# x" with no
-        // following newline as a Paragraph, not an ATX Heading (same quirk as
-        // bare "---"). A heading in a real document always has surrounding
-        // structure.
-        doc.loadFromMarkdown(QByteArrayLiteral("# Heading\n\nbody text"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("# Heading\n\nbody text"));
+        auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -152,8 +156,8 @@ private Q_SLOTS:
         // incremental reverse sync) fixed the root causes; this slot proves
         // the fix holds at the widget level.
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("# Heading\n\nbody one\n\nbody two"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("# Heading\n\nbody one\n\nbody two"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -188,8 +192,8 @@ private Q_SLOTS:
 
     void enter_at_paragraph_end_creates_block_and_places_caret() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Alpha\n\nBravo"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -218,8 +222,8 @@ private Q_SLOTS:
 
     void enter_at_document_end_creates_block() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Alpha"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -241,8 +245,8 @@ private Q_SLOTS:
 
     void enter_mid_paragraph_splits_with_caret_at_new_block() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("AlphaBravo"));  // one block
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("AlphaBravo"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -266,8 +270,8 @@ private Q_SLOTS:
 
     void paragraph_margins_present_on_every_block() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Alpha\n\nBravo"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -294,8 +298,8 @@ private Q_SLOTS:
 
     void backspace_at_block_start_merges_with_caret_at_join() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha\n\nBravo"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Alpha\n\nBravo"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -324,8 +328,8 @@ private Q_SLOTS:
     // Unchecked.
     void attr_toggle_re_renders_task_marker() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("- [ ] task\n"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("- [ ] task\n"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -345,7 +349,7 @@ private Q_SLOTS:
                  QTextBlockFormat::MarkerType::Unchecked);
 
         // Toggle the Checked attr — no buffer change, only the attr flips.
-        doc.toggleListItemChecked(Markoff::BlockAnchor(id));
+        doc.toggleListItemChecked(Markoff::BlockId(id));
         QTest::qWait(80);
 
         // After the cascade the marker must be Checked. Without attrs in
@@ -362,8 +366,8 @@ private Q_SLOTS:
     // QTextList so ListDecimal numbers them 1, 2, 3 rather than 1, 1, 1.
     void ordered_list_items_share_one_list_with_continuous_numbering() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("1. one\n2. two\n3. three\n"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("1. one\n2. two\n3. three\n"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -386,8 +390,8 @@ private Q_SLOTS:
 
     void paragraph_between_items_breaks_list() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("1. one\n\nbreak\n\n2. two\n"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("1. one\n\nbreak\n\n2. two\n"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -408,11 +412,9 @@ private Q_SLOTS:
 
     void nested_list_then_outer_resumes() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // "1. outer\n   1. nested\n2. outer-two\n" — outer items at depth 0,
-        // nested at depth 1, all dot style.
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "1. outer\n   1. nested\n2. outer-two\n"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("1. outer\n   1. nested\n2. outer-two\n"));
+        auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -440,8 +442,8 @@ private Q_SLOTS:
 
     void blockquote_depth_1_has_left_margin() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("> quoted line\n"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("> quoted line\n"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -460,8 +462,8 @@ private Q_SLOTS:
 
     void blockquote_depth_2_has_double_left_margin() {
         Markoff::Styled::Editor e1;
-        Markoff::MarkoffDocument doc1(1);
-        doc1.loadFromMarkdown(QByteArrayLiteral("> one\n"));
+    auto fixture_doc1 = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("> one\n"));
+    auto& doc1 = *fixture_doc1.document;
         auto *s1 = doc1.createSession();
         e1.setSession(s1);
         e1.setDocument(&doc1);
@@ -469,8 +471,8 @@ private Q_SLOTS:
         e1.show();
 
         Markoff::Styled::Editor e2;
-        Markoff::MarkoffDocument doc2(1);
-        doc2.loadFromMarkdown(QByteArrayLiteral("> > two\n"));
+    auto fixture_doc2 = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("> > two\n"));
+    auto& doc2 = *fixture_doc2.document;
         auto *s2 = doc2.createSession();
         e2.setSession(s2);
         e2.setDocument(&doc2);
@@ -490,8 +492,8 @@ private Q_SLOTS:
 
     void heading_inside_quote_renders_with_left_margin_overlay() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("> # Quoted heading\n"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("> # Quoted heading\n"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -516,9 +518,9 @@ private Q_SLOTS:
     //    (heading gains the bullet body + a duplicated first char). ──
     void enter_at_end_of_bullet_under_heading_keeps_structure() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral(
-            "### C1 seam\n\n- Replace the option with injection.\n- Retire the shim.\n"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("### C1 seam\n\n- Replace the option with injection.\n- Retire the shim.\n"));
+        auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -555,8 +557,8 @@ private Q_SLOTS:
 
     void tab_in_list_indents_via_widget() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("- one\n- two\n"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -592,8 +594,8 @@ private Q_SLOTS:
         // handler (see this file's CLAUDE.md, "Structural-key authority"),
         // so it inherits the new behavior.
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("- one\n- two\n"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("- one\n- two\n"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -620,8 +622,8 @@ private Q_SLOTS:
 
     void ctrl_z_undoes_structural_edit_via_widget() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Alpha"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -648,8 +650,8 @@ private Q_SLOTS:
 
     void selection_enter_collapses_via_widget() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("oneXXXtwo"));  // single paragraph
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("oneXXXtwo"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);

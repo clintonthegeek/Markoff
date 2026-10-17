@@ -37,6 +37,7 @@ set_target_properties(markoff_styled PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 target_include_directories(markoff_styled
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:include>
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
@@ -54,6 +55,9 @@ if(DEFINED KDE_INSTALL_LIBDIR)
         LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
     )
+    install(DIRECTORY include/markoff
+        DESTINATION ${KDE_INSTALL_INCLUDEDIR}
+    )
 endif()
 
 if(NOT DEFINED MARKOFF_STYLED_BUILD_TESTS)
@@ -64,4 +68,6 @@ if(MARKOFF_STYLED_BUILD_TESTS)
     add_subdirectory(tests)
 endif()
 
-add_subdirectory(app)
+if(MARKOFF_BUILD_APPS)
+    add_subdirectory(app)
+endif()

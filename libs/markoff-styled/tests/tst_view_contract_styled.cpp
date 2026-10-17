@@ -9,6 +9,7 @@
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 #include "../../markoff-core/tests/ViewContractChecks.h"
 #include "support/TableTestHelpers.h"
@@ -16,16 +17,21 @@
 class TstViewContractStyled : public QObject {
     Q_OBJECT
     Markoff::MarkoffDocument *m_doc = nullptr;
+    Markoff::Styled::Tests::CandidateDocumentFixture m_fixture;
     Markoff::Styled::Editor  *m_ed  = nullptr;
 private Q_SLOTS:
     void init() {
-        m_doc = new Markoff::MarkoffDocument(1);
-        m_doc->loadFromMarkdown(ViewContract::fixture());
+        m_fixture = Markoff::Styled::Tests::openCandidateDocument(ViewContract::fixture());
+        m_doc = m_fixture.document.get();
         m_ed  = new Markoff::Styled::Editor;
         m_ed->setDocument(m_doc);
         QTest::qWait(50);
     }
-    void cleanup() { delete m_ed; delete m_doc; }
+    void cleanup() {
+        delete m_ed;
+        m_fixture = {};
+        m_doc = nullptr;
+    }
 
     void cursor_round_trip()            { ViewContract::checkCursorRoundTrip(m_ed); }
     void read_only_blocks()             { ViewContract::checkReadOnlyBlocksUndoAndKeepsBytes(m_ed, m_doc); }
@@ -65,8 +71,8 @@ private Q_SLOTS:
         // Table fixture: caret inside the rendered QTextTable frame; verbs
         // must not mutate (the frame's character stream is not the block's
         // flat bytes — coordinate space is untrustworthy there).
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown("| A | B |\n| --- | --- |\n| x | y |\n\ntail");
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument("| A | B |\n| --- | --- |\n| x | y |\n\ntail");
+    auto& doc = *fixture_doc.document;
         Markoff::Styled::Editor ed;
         ed.setDocument(&doc);
         QTest::qWait(50);
@@ -127,12 +133,12 @@ private Q_SLOTS:
     // emit scrollPositionChanged unconditionally.
     void scrollPositionChanged_fires_on_native_scroll() {
         // Use a fresh editor + tall document so the scrollbar has range.
-        Markoff::MarkoffDocument doc(2);
         // 30 paragraphs is tall enough for any reasonable default font.
         QByteArray md;
         for (int i = 0; i < 30; ++i)
             md += QByteArrayLiteral("Paragraph line ") + QByteArray::number(i) + "\n\n";
-        doc.loadFromMarkdown(md);
+        auto fixture = Markoff::Styled::Tests::openCandidateDocument(md);
+        auto& doc = *fixture.document;
 
         Markoff::Styled::Editor ed;
         ed.resize(400, 200);
@@ -186,8 +192,8 @@ private Q_SLOTS:
     // editor, and track the cursor downward as the caret moves to a later line.
     void caretRect_validAfterAttach_tracksCursor()
     {
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("Alpha one.\n\nBeta two.\n\nGamma three.\n"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("Alpha one.\n\nBeta two.\n\nGamma three.\n"));
+    auto& doc = *fixture_doc.document;
         Markoff::Styled::Editor ed;
         ed.resize(600, 400);
         ed.show();

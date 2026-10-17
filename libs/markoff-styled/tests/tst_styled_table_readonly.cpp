@@ -15,6 +15,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 #include "support/TableTestHelpers.h"
 
@@ -33,8 +34,8 @@ private:
 
 private slots:
     void typing_in_cell_does_not_mutate_model() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("| A | B |\n|---|---|\n| 1 | 2 |"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("| A | B |\n|---|---|\n| 1 | 2 |"));
+    auto& doc = *fixture_doc.document;
         Styled::Editor editor;
         auto *s = doc.createSession();
         editor.setSession(s);
@@ -61,8 +62,8 @@ private slots:
     }
 
     void backspace_delete_enter_in_cell_inert() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("| A | B |\n|---|---|\n| 1 | 2 |"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("| A | B |\n|---|---|\n| 1 | 2 |"));
+    auto& doc = *fixture_doc.document;
         Styled::Editor editor;
         auto *s = doc.createSession();
         editor.setSession(s);
@@ -91,8 +92,8 @@ private slots:
     }
 
     void arrow_keys_still_move_caret() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArrayLiteral("| A | B |\n|---|---|\n| 1 | 2 |"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArrayLiteral("| A | B |\n|---|---|\n| 1 | 2 |"));
+    auto& doc = *fixture_doc.document;
         Styled::Editor editor;
         auto *s = doc.createSession();
         editor.setSession(s);

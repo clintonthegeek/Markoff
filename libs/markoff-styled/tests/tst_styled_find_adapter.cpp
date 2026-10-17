@@ -16,6 +16,7 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
+#include "CandidateDocumentFixture.h"
 
 #include "support/TableTestHelpers.h"
 
@@ -38,10 +39,8 @@ class TstStyledFindAdapter : public QObject {
 private Q_SLOTS:
     void highlights_align_without_tables() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // First block carries a non-ASCII char so UTF-8 byte offsets and
-        // QChar positions diverge ahead of the first match.
-        doc.loadFromMarkdown(QByteArray("caf\xC3\xA9 target alpha\n\nbravo target middle"));
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArray("caf\xC3\xA9 target alpha\n\nbravo target middle"));
+        auto& doc = *fixture_doc.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -66,9 +65,9 @@ private Q_SLOTS:
 
     void match_after_table_lands_at_visible_position() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray(
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArray(
             "| A | B |\n| --- | --- |\n| x | y |\n\nafter target end"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -93,9 +92,9 @@ private Q_SLOTS:
 
     void match_inside_table_is_skipped_without_crash() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray(
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArray(
             "| A | B |\n| --- | --- |\n| target | y |"));
+    auto& doc = *fixture_doc.document;
         auto *s = doc.createSession();
         e.setSession(s);
         e.setDocument(&doc);
@@ -128,11 +127,9 @@ private Q_SLOTS:
 
     void match_in_multiline_code_block_lands_at_visible_position() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        // CodeBlock buffers keep internal '\n' — the model block spans
-        // multiple top-level QTextBlocks; the match is on the second line.
-        doc.loadFromMarkdown(QByteArray(
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArray(
             "intro\n\n```\nline one\nfoo target bar\n```\n\ntail"));
+        auto& doc = *fixture_doc.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -153,8 +150,8 @@ private Q_SLOTS:
 
     void navigation_places_caret_without_focus_steal() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("first target\n\nsecond target"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArray("first target\n\nsecond target"));
+    auto& doc = *fixture_doc.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
@@ -177,8 +174,8 @@ private Q_SLOTS:
 
     void detach_clears_highlights() {
         Markoff::Styled::Editor e;
-        Markoff::MarkoffDocument doc(1);
-        doc.loadFromMarkdown(QByteArray("one target"));
+    auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArray("one target"));
+    auto& doc = *fixture_doc.document;
         e.setDocument(&doc);
         QTest::qWait(50);
 
