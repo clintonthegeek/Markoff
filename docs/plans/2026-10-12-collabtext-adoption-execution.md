@@ -24,7 +24,9 @@ The remaining Markoff work is a short tail:
 3. **A11 with A15.** Turn the reference provider's outbox, quarantine, and
    receipt behavior into checks a host provider must pass, and assemble the
    transition package.
-4. **A14.** Re-run acceptance on the sources you are finishing and record it here.
+4. **A14, done.** Debug, Release, and ASan/UBSan each passed 93/93.
+   Installed Core and view consumers passed 2/2. The responsiveness probe
+   missed some provisional budgets; those budgets stay as written.
 5. **A16.** Signal Corbomite. That signal is the last task, and nothing before
    it invites Corbomite to start.
 
@@ -160,8 +162,8 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 | A11 | Later | Host-provider conformance checks. Fold them into A15. |
 | A12 | Done | Remote carets are ephemeral MPR/1 messages, not document actions. |
 | A13 | Done | Retired engine, live leaf, and unbuilt legacy branches are gone. |
-| A14 | **Now** | Acceptance record on the sources you are finishing. |
-| A15 | Later | Transition package for a Corbomite agent. |
+| A14 | Done | Acceptance recorded on `41544118`. Some probe budgets missed. |
+| A15 | **Now** | Transition package for a Corbomite agent. |
 | A16 | Later | Readiness signal. Requires A13–A15 done. |
 
 Done means the recorded behavior is in the tree. Reopen a done task only when
@@ -239,31 +241,61 @@ that part of A15.
 
 ### A14 — acceptance on current sources
 
-Debug 93/93, earlier Release and ASan/UBSan runs, installed consumers, and
-repository-corpus timings are in the archive log. They belong to the dates
-written there. This doc reset did not re-run them.
+Done 2026-10-17 on git `41544118`. Candidate
+`e8a8e7d1a95dd50e23f38d6727921b47b814e44b`, package `0.2.0-alpha.5`,
+manifest v17, prefix `build-collabtext-alpha5/install`. Each suite was
+configured twice with `-DMARKOFF_BUILD_APPS=ON` so `markoff-canvas-app-smoke`
+is registered. A first configure of a fresh tree registers 92 tests because
+the app and test options are declared after the canvas subdirectory.
 
-**Do this after A13, A10, and A12.** On the revision you are finishing, record:
+Offscreen `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`:
 
-- Debug offscreen CTest, command and count.
-- Release configure, build, and CTest.
-- An ASan/UBSan run, or a one-line statement of the runner limit and the
-  command you used instead. Leak detection may stay off when ptrace blocks it.
-- Installed Core and view consumers.
-- These behaviors in `tst_provider_backed_document`: untouched setext,
-  blockquote, CRLF, trailing whitespace, and missing final newline survive
-  export and reopen; two-document text convergence; multi-block paste;
-  absent-append rollback; uncertain-append reopen. Do not look for
-  `tst_block_buffer_invariant`. The current root build does not register it.
-- Responsiveness. Re-run the existing probe when publication changed.
-  Otherwise cite the 2026-10-14 archive figures and the provisional local
-  budgets already recorded there (import ≤1 s, token resolution ≤250 ms,
-  each local action ≤100 ms, reopen ≤2 s, RSS ≤128 MiB on that machine).
-  Do not tighten the budgets in this task.
+- Debug, `/tmp/markoff-a14-debug`, 93/93 in 25.94 s.
+- Release, `/tmp/markoff-a14-release`, 93/93 in 12.53 s.
+- RelWithDebInfo with `-fsanitize=address,undefined -fno-omit-frame-pointer`,
+  `/tmp/markoff-a14-asan`, 93/93 in 47.02 s.
+  `ASAN_OPTIONS=detect_leaks=0` because ptrace blocks leak detection.
+  `UBSAN_OPTIONS=print_stacktrace=1`.
 
-**Exit.** This section lists the commands, counts, git revision, candidate
-commit, and prefix identity. Known limits are written down: reference
-provider, collection disabled, Orca pass still deferred, host storage unbuilt.
+Installed consumers, Release, offscreen, 2/2 in 0.14 s. The harness README
+commands, plus a `c4core` build before install, because the four library
+targets do not produce the RapidYAML archive the install step copies.
+Prefix `/tmp/markoff-core-install-harness/prefix`. This is not Corbomite's
+package or production storage.
+
+`markoff_provider_backed_document_test` passed in each suite. It covers
+untouched setext, blockquote, CRLF, trailing whitespace, and a missing final
+newline through export and reopen; `runTwoWriterConvergence`; a two-block
+paste; absent-append rollback through `recoverPendingAllocations`; and
+uncertain-append reopen.
+
+Release `perf_load_bench` on the same three inputs as 2026-10-14, reference
+ephemeral provider, Manjaro 6.18.49, GCC 16.2.1. Provisional budgets stay
+import ≤1 s, token resolution ≤250 ms, each local action ≤100 ms, reopen
+≤2 s, RSS ≤128 MiB. This run:
+
+- Typing corpus, 60,836 bytes, 1,000 blocks, SHA-256
+  `9d9c827a4eaaa9f7d7924f53819f86abea45a58764414556afafbb0f17e4a18d`:
+  import 2455 ms, spans 265 ms, edit/paste/structure 329/331/318 ms,
+  reopen 3289 ms, RSS 75,908 KB.
+- Table dogfood, 6,723 bytes, 69 blocks, SHA-256
+  `4597fe9ff1e1f2e2647c7c49d239bdcfc16081014600a5904ddae4cfaf3ef92b`:
+  import 85 ms, spans 7 ms, actions 23/25/27 ms, reopen 84 ms, RSS 46,316 KB.
+- Canvas production plan, 187,514 bytes, 480 blocks, SHA-256
+  `8f43f49ccc76813bb284f681120531209508ad706b031ca09e3d993cde9835a9`:
+  import 1469 ms, spans 221 ms, actions 204/208/202 ms, reopen 1648 ms,
+  RSS 96,892 KB.
+
+The two larger inputs miss import and per-action budgets. The typing corpus
+also misses span resolution and reopen. RSS stayed inside the budget. The
+probe binary SHA-256 is
+`9267a702c1e362d60ebd0fc055b9434ba9a0392a5db1729558751deb333c7d47`.
+The two deleted live fixtures were read from git `6e4e0acd` into `/tmp` and
+were not restored.
+
+Known limits: reference provider, physical collection disabled, manual Orca
+pass deferred, host journal and production network unbuilt. The missed probe
+budgets are recorded and are not waived.
 
 ### A15 — transition package
 

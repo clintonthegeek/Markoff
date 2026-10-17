@@ -11,10 +11,13 @@ CollabText vNext adoption. The document and the Source, Styled, and Canvas
 views already use the installed provider-backed engine. Corbomite stays
 paused until A16.
 
-**Current task: A14.** Acceptance record. Then A15 transition package and
-the A16 signal. A12 sends remote carets as ephemeral `MPR/1` messages.
-A10 keeps 100 undoable actions per actor. A13 removed the vendored engine,
-the live leaf, and the unbuilt legacy branches.
+**Current task: A15.** Transition package, including the A11 provider
+checks. Then the A16 signal. A14 recorded Debug, Release, and ASan/UBSan
+at 93/93 and installed consumers at 2/2. The responsiveness probe missed
+some provisional budgets; those budgets stay as written. A12 sends remote
+carets as ephemeral `MPR/1` messages. A10 keeps 100 undoable actions per
+actor. A13 removed the vendored engine, the live leaf, and the unbuilt
+legacy branches.
 
 ## Pin
 
@@ -26,12 +29,12 @@ the candidate's `docs/USING_VNEXT.md`. The last machine-local prefix was
 
 ## Latest verification
 
-2026-10-17, A12, parent `0a0b500f`: offscreen
-`./build-dev/bin/tst_vnext_action_consumer` (6 passed) and
-`./build-dev/bin/tst_canvas_vnext_session_positions` (12 passed).
-Package `0.2.0-alpha.5`, manifest v17, prefix
-`build-collabtext-alpha5/install`. The full suite and the installed-consumer
-2/2 run are A14.
+2026-10-17, A14, git `41544118`: offscreen Debug 93/93 (25.94 s),
+Release 93/93 (12.53 s), ASan/UBSan 93/93 (47.02 s, leaks off),
+installed Core and view consumers 2/2 (0.14 s). Package `0.2.0-alpha.5`,
+manifest v17, prefix `build-collabtext-alpha5/install`. Release
+`perf_load_bench` missed provisional import and per-action budgets on the
+1,000-block and 480-block inputs. Budgets were not changed.
 
 ## Leaves
 
