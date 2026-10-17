@@ -8,17 +8,21 @@ Core reading: [Shared Editing Manifesto](docs/EDITING-MANIFESTO.md).
 Use it to guide CRDT integration, ownership boundaries, development priorities,
 and the evidence required for editing behavior.
 
-## Current workfront — CollabText vNext adoption
+## Current workfront
 
-Read [`docs/STATUS.md`](docs/STATUS.md), then the task marked **Now** on
-the [task board](docs/plans/2026-10-12-collabtext-adoption-execution.md).
-Follow the session routine in [`AGENTS.md`](AGENTS.md): one task, test it,
-update the board, commit.
+The CollabText vNext adoption board is closed. There is no task marked
+**Now**. Read [`docs/STATUS.md`](docs/STATUS.md). The readiness signal is
+[`docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md).
+Corbomite may begin its transition. Host storage, lease integration,
+application wiring, and production acceptance stay in Corbomite. Do not
+edit that checkout from this repository.
 
-Corbomite stays paused until A16. Use the reference provider and
-host-shaped fixtures in this repository. Every build requires the installed
-candidate `collabtext-markoff-core-2026-10-13-alpha5`
+For a later change here, follow the session routine in
+[`AGENTS.md`](AGENTS.md): one task, test it, update the status note, commit.
+Every build requires the installed candidate
+`collabtext-markoff-core-2026-10-13-alpha5`
 (`e8a8e7d1a95dd50e23f38d6727921b47b814e44b`, 0.2.0-alpha.5, manifest v17).
+The prefix used for the acceptance runs is `build-collabtext-alpha5/install`.
 
 Keep D2 per-block streams, Markoff-owned actions, and history with physical
 collection disabled. Design rationale:
@@ -36,7 +40,7 @@ submodule were removed in A13. A historical test count is not a current result.
 
 ```bash
 cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-  -DCMAKE_PREFIX_PATH=/tmp/collabtext-alpha5-prefix-b
+  -DCMAKE_PREFIX_PATH="$PWD/build-collabtext-alpha5/install"
 cmake --build build-dev -j 4     # never more than -j 4 (machine-wide rule)
 ```
 

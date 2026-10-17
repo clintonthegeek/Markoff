@@ -1,8 +1,9 @@
 # CollabText transition package
 
-Date: 2026-10-17. Audience: a Corbomite agent starting after the A16 signal.
-This package is the implementation brief. It does not authorize Corbomite
-work. The readiness signal is a separate file written by A16.
+Date: 2026-10-17. Audience: a Corbomite agent.
+This package is the implementation brief. The readiness signal that
+authorizes the work is
+[`2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](2026-10-17-to-corbomite-ready-for-collabtext-transition.md).
 
 ## Candidate
 
@@ -16,7 +17,9 @@ a new tag and a new Markoff acceptance record.
 
 ## Markoff build
 
-The Markoff revision is the commit that contains this file. Standalone
+The Markoff sources this package describes are commit `281e3bc1`.
+The readiness signal is a later commit and does not change those sources.
+Standalone
 configure and build, at most four jobs:
 
 ```sh

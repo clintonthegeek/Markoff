@@ -1,14 +1,17 @@
 # Agents working in Markoff
 
-You are here to advance one task on the CollabText adoption board. The
-documents below are the whole orientation. Read them in this order, then edit.
+The CollabText adoption board is closed. There is no task marked **Now**.
+The readiness signal is
+[`docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md).
+For a later change in this repository, read these in order, then edit.
 
 1. [`docs/STATUS.md`](docs/STATUS.md) — what is current. One screen.
-2. The task marked **Now** in
-   [`docs/plans/2026-10-12-collabtext-adoption-execution.md`](docs/plans/2026-10-12-collabtext-adoption-execution.md).
-3. The spec that task names, if it names one. Byte layout and provider call
-   meaning live in `docs/specs/`. The task board wins when they disagree
-   about whether work is still open.
+2. The closed record on
+   [`docs/plans/2026-10-12-collabtext-adoption-execution.md`](docs/plans/2026-10-12-collabtext-adoption-execution.md)
+   when the change touches an adoption behavior.
+3. The spec for that behavior. Byte layout and provider call meaning live
+   in `docs/specs/`. The task board wins when they disagree about whether
+   work is still open.
 4. [`docs/EDITING-MANIFESTO.md`](docs/EDITING-MANIFESTO.md) when the change
    affects identity, undo, recovery, or what a person sees.
 
@@ -21,7 +24,9 @@ edit.
 A Qt6/C++ markdown editor family. `markoff-core` holds the provider-backed
 document. Canvas is the primary editor. Source and Styled are the other
 supported views. Corbomite is the host and submodules this repo at
-`libs/markoff-family`. Corbomite development is paused until task A16.
+`libs/markoff-family`. The A16 readiness signal has been sent. Corbomite
+may begin its transition. Do not edit the Corbomite checkout from this
+repository.
 
 The supported path is the installed CollabText alpha.5 candidate named in
 `docs/STATUS.md`. There is no second engine, no compatibility shim, and no
@@ -61,8 +66,11 @@ does not close a task. Record the revision you ran.
 
 ## Boundaries
 
-- Do not message Corbomite, and do not write the A16 handoff, before A15
-  is done. Host storage and production network acceptance follow the signal.
+- The readiness signal is
+  `docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`.
+  Do not edit the Corbomite checkout from this repository. Host storage,
+  lease integration, and production network acceptance are Corbomite's
+  work after that signal.
 - Do not swap the CollabText candidate for a local checkout. A Core behavior
   change needs a new immutable tag and a new acceptance record.
 - Candidate and reference-provider tests do not prove Corbomite's journal
@@ -76,8 +84,7 @@ does not close a task. Record the revision you ran.
 
 ## Finish line
 
-A16 is the readiness signal. Before that, Markoff needs a single clean
-engine tree (A13), bounded history retirement (A10), ephemeral presence
-(A12), a signed acceptance record (A14), and a transition package a
-Corbomite agent can implement against (A15). The task board has the exit
-for each.
+A16 sent the readiness signal on 2026-10-17. The adoption board has no
+open task. A13, A10, A12, A14, and A15 are recorded on that board. Host
+journal, lease, application wiring, and production acceptance follow in
+Corbomite. Wave Q06 stays a separate release obligation.

@@ -15,7 +15,7 @@ record codecs, Markdown import and replacement, revision-bound export,
 selective cross-stream undo, scoped positions, and in-memory remote routing
 with receipts are in the tree.
 
-The remaining Markoff work is a short tail:
+The Markoff tail is closed. There is no open adoption task.
 
 1. **A10, done.** One actor keeps 100 undoable actions. The action that would
    pass that depth records retirement of the oldest one.
@@ -27,16 +27,19 @@ The remaining Markoff work is a short tail:
 4. **A14, done.** Debug, Release, and ASan/UBSan each passed 93/93.
    Installed Core and view consumers passed 2/2. The responsiveness probe
    missed some provisional budgets; those budgets stay as written.
-5. **A16.** Signal Corbomite. That signal is the last task, and nothing before
-   it invites Corbomite to start.
+5. **A16, done.** The readiness signal is
+   `docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`.
+   Corbomite may begin its transition.
 
 ## Standing rules
 
-- Corbomite development stays paused until A16. Work in this repository with
-  the reference provider and host-shaped fixtures. Do not send a readiness note
-  early. Corbomite's journal, lease, and application wiring are its work after
-  the signal. Wave's Q06 acceptance and any CollabText merge or publication
-  stay separate release obligations.
+- The A16 signal was sent on 2026-10-17. Corbomite may begin its transition.
+  The signal is
+  `docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`.
+  Do not edit the Corbomite checkout from this repository. Corbomite's
+  journal, lease, application wiring, and production network remain its
+  work. Wave's Q06 acceptance and any CollabText merge or publication stay
+  separate release obligations.
 - There is no legacy install to preserve. Each Markoff record family has one
   writer version, and readers refuse every other version. Reference-provider
   files are `MREF/5`. Quarantine records are `MQR/2`. Markdown is the
@@ -48,7 +51,7 @@ The remaining Markoff work is a short tail:
   commit `e8a8e7d1a95dd50e23f38d6727921b47b814e44b`, package `0.2.0-alpha.5`,
   manifest v17. A behavior change in Core needs a new tag and a new acceptance
   record. Do not point CMake at an arbitrary CollabText checkout.
-- The machine-local prefix last used was `/tmp/collabtext-alpha5-prefix-b`.
+- The prefix used for the acceptance runs is `build-collabtext-alpha5/install`.
   Recreate it from that candidate's `docs/USING_VNEXT.md` when it is missing.
   Do not commit prefixes or build directories.
 - Classify a failing test before changing it. A product-behavior change needs
@@ -58,9 +61,10 @@ The remaining Markoff work is a short tail:
 
 Do this every time you start in this directory.
 
-1. Read [`docs/STATUS.md`](../STATUS.md) and the task marked **Now** below.
-   Open the archive diary only when this board cites a decision in it.
-2. Work on that one task. Leave the later tasks alone.
+1. Read [`docs/STATUS.md`](../STATUS.md). The adoption board has no task
+   marked **Now**. Open the archive diary only when this board cites a
+   decision in it.
+2. Work on one change. Leave unrelated behavior alone.
 3. Before editing, name the task id and the command that will show the slice worked.
 4. Build with at most four jobs: `cmake --build build-dev -j 4`.
    Run the focused offscreen test for the slice. When the change touches
@@ -85,7 +89,7 @@ Record the revision you actually tested.
 
 ```sh
 cmake -S . -B build-dev -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
-  -DCMAKE_PREFIX_PATH=/tmp/collabtext-alpha5-prefix-b
+  -DCMAKE_PREFIX_PATH="$PWD/build-collabtext-alpha5/install"
 cmake --build build-dev -j 4
 ```
 
@@ -99,7 +103,8 @@ Contracts to read when the task touches them:
   `libs/markoff-collabtext-vnext/include/markoff/vnext/DocumentStorageProvider.h`.
 - [Shared Editing Manifesto](../EDITING-MANIFESTO.md).
 - [Provider reply to Corbomite](../handoff/2026-10-12-to-corbomite-provider-contract.md),
-  as the host's accepted direction. Corbomite stays paused.
+  the earlier contract note. The readiness signal is
+  [`../handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](../handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md).
 
 If a spec's opening status disagrees with this board about whether a task is
 open, this board wins for task status. The spec wins for byte layout and
@@ -164,7 +169,7 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 | A13 | Done | Retired engine, live leaf, and unbuilt legacy branches are gone. |
 | A14 | Done | Acceptance recorded on `41544118`. Some probe budgets missed. |
 | A15 | Done | Transition package for a Corbomite agent. |
-| A16 | **Now** | Readiness signal. Requires A13–A15 done. |
+| A16 | Done | Readiness signal sent 2026-10-17. Corbomite may begin. |
 
 Done means the recorded behavior is in the tree. Reopen a done task only when
 a current test fails or a named command on its exit list is missing. Say which.
@@ -308,15 +313,14 @@ manifest v17, prefix `build-collabtext-alpha5/install`.
 
 ### A16 — signal Corbomite
 
-**Do this last.** After A15, write
-`docs/handoff/YYYY-MM-DD-to-corbomite-ready-for-collabtext-transition.md`
-and give the user the handoff path in the completion message. Update
-`docs/STATUS.md`, `CLAUDE.md`, and this board to say the signal was sent.
-
-The handoff states that Corbomite may begin its transition. It includes the
-revisions, build commands, provider API, acceptance results, conformance
-harness, and the host tasks that follow (storage, lease, application wiring,
-production acceptance). A draft file with no delivery note does not close A16.
+Done 2026-10-17. The delivered signal is
+`docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`.
+It states that Corbomite may begin. It names the candidate, Markoff
+`281e3bc1`, the build, the provider API, the A14 acceptance results, the
+A15 94/94 run, the conformance harness, and the host tasks that follow:
+storage, lease, application wiring, and production acceptance. This commit
+is the delivery. `docs/STATUS.md`, `CLAUDE.md`, and `AGENTS.md` say the
+signal was sent. The suite was not re-run; A15's 94/94 stands.
 
 ## Keeping this board usable
 
