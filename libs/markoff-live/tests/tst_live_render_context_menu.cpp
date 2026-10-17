@@ -15,7 +15,7 @@ private Q_SLOTS:
         doc.loadFromMarkdown("hello");
         const auto ids = doc.iterateBlocks();
         QVERIFY(!ids.empty());
-        Markoff::BlockAnchor anchor = ids[0];
+        Markoff::BlockId anchor = ids[0];
         QVERIFY(!doc.canUndoForBlock(anchor));
     }
 
@@ -23,7 +23,7 @@ private Q_SLOTS:
         Markoff::MarkoffDocument doc(1);
         doc.loadFromMarkdown("hello");
         const auto ids = doc.iterateBlocks();
-        const Markoff::BlockAnchor anchor = ids[0];
+        const Markoff::BlockId anchor = ids[0];
         Cmd::insertCharacter(doc, anchor, 5, QChar('!'));
         QVERIFY(doc.canUndoForBlock(anchor));
     }
@@ -32,7 +32,7 @@ private Q_SLOTS:
         Markoff::MarkoffDocument doc(1);
         doc.loadFromMarkdown("hello");
         const auto ids = doc.iterateBlocks();
-        const Markoff::BlockAnchor anchor = ids[0];
+        const Markoff::BlockId anchor = ids[0];
         Cmd::insertCharacter(doc, anchor, 5, QChar('!'));
         QCOMPARE(QString::fromUtf8(doc.blockText(ids[0])), QStringLiteral("hello!"));
         doc.undoForBlock(anchor);

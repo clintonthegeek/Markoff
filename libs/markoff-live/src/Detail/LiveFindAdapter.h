@@ -43,13 +43,13 @@ private slots:
     void onCurrentMatchChanged();
 
 private:
-    int  resolveByteToQtPos(const Markoff::BlockAnchor &block, quint32 byteOffset) const;
+    int  resolveByteToQtPos(const Markoff::BlockId &block, quint32 byteOffset) const;
     void rebuildAndPushSpans();
 
     LiveBlockModel                       *m_model       = nullptr;
     LiveCursorState                      *m_cursorState = nullptr;
     QPointer<Markoff::FindController>     m_controller;
-    QHash<Markoff::BlockAnchor, QList<Markoff::Live::FindSpan>> m_lastPushed;
+    QHash<Markoff::BlockId, QList<Markoff::Live::FindSpan>> m_lastPushed;
 };
 
 }  // namespace Detail

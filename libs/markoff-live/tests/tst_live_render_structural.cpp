@@ -16,7 +16,7 @@
 #include <markoff/live/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/CrdtProxies.h>
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/core/UndoLog.h>
 
 using namespace Markoff::Live;
@@ -483,7 +483,7 @@ private Q_SLOTS:
                      LiveBlockModel::KindRole).toString(), QStringLiteral("math"));
 
         // Set BlockSelected cursor on the math block
-        const Markoff::Live::BlockSelected sel{
+        const Markoff::BlockSelected sel{
             binding.model()->recordAt(0).blockAnchor
         };
         binding.cursorState()->request(sel);

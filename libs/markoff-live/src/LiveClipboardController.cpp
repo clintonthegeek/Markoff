@@ -3,12 +3,11 @@
 
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveCursorState.h>
-#include <markoff/live/Coordinates.h>
+#include <markoff/core/TextUnits.h>
 
 #include <markoff/core/ClipboardCodec.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
-#include <markoff/core/PasteMeta.h>
 
 #include <QApplication>
 #include <QClipboard>
@@ -21,7 +20,7 @@
 
 namespace Markoff::Live {
 
-namespace coords = Detail::Coordinates;
+namespace coords = ::Markoff::TextUnits;
 
 LiveClipboardController::LiveClipboardController(QObject *parent) : QObject(parent) {}
 
@@ -167,7 +166,6 @@ void LiveClipboardController::copy()
 
     QJsonObject payload;
     payload["version"]         = 1;
-    payload["sourceReplicaId"] = static_cast<qint64>(m_document->replicaId());
     payload["blocks"]          = blocks;
 
     QApplication::clipboard()->setMimeData(
@@ -183,26 +181,10 @@ void LiveClipboardController::cut()
     if (!m_selection || !m_model || !m_document) return;
     if (!m_selection->hasSelection()) return;
 
-    // Capture cutSeq = d2EditSequence + 1, the sequence the deletion will use.
-    const quint64 cutSeq = m_document->d2EditSequence() + 1;
-
-    // Collect the BlockIds of all selected blocks (for the recent-cuts cache).
-    std::vector<Markoff::BlockId> affected;
-    const auto allIds  = m_document->iterateBlocks();
-    const int rc       = m_model->rowCount();
-    for (int i = 0; i < rc; ++i) {
-        const QPoint r = m_selection->rangeForBlock(i);
-        if (r.x() < 0) continue;
-        if (i < static_cast<int>(allIds.size()))
-            affected.push_back(allIds[i]);
-    }
-
-    // Build clipboard payload (same as copy, plus cutSequenceNumber).
+    // Build the same structured clipboard payload as Copy.
     const QJsonArray blocks = serializeSelection(*m_selection, *m_model);
     QJsonObject payload;
     payload["version"]             = 1;
-    payload["sourceReplicaId"]     = static_cast<qint64>(m_document->replicaId());
-    payload["cutSequenceNumber"]   = static_cast<qint64>(cutSeq);
     payload["blocks"]              = blocks;
 
     QApplication::clipboard()->setMimeData(
@@ -213,9 +195,6 @@ void LiveClipboardController::cut()
 
     // Delete the selection (applies the flat edit, clears selection).
     m_selection->deleteSelection();
-
-    // Register the BlockIds in the recent-cuts cache.
-    m_document->recordRecentCut(cutSeq, std::move(affected));
 }
 
 void LiveClipboardController::paste()
@@ -315,17 +294,7 @@ void LiveClipboardController::pasteFrom(int clipboardMode)
         if (jdoc.isObject() && jdoc.object().value("version").toInt() == 1) {
             const QJsonObject obj    = jdoc.object();
             const QJsonArray  bArr   = obj.value("blocks").toArray();
-            const quint16 srcReplica =
-                static_cast<quint16>(obj.value("sourceReplicaId").toInt(0));
-
-            Markoff::PasteMeta meta;
-            if (srcReplica == m_document->replicaId()
-                && obj.contains("cutSequenceNumber")) {
-                meta.reuseBlockIds = true;
-                meta.cutSeq = static_cast<quint64>(
-                    obj.value("cutSequenceNumber").toDouble());
-            }
-            m_document->applyStructuredPaste(startByte, endByte, bArr, meta);
+            m_document->applyStructuredPaste(startByte, endByte, bArr);
             m_selection->clearSelection();
             return;
         }

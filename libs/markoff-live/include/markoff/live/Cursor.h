@@ -6,16 +6,6 @@
 
 namespace Markoff::Live {
 
-/// Opaque block identity (backward-compat alias).
-using BlockId = Markoff::BlockAnchor;
-
-// Backward-compatible type aliases — live code can still use Markoff::Live::TextCaret etc.
-using TextCaret        = Markoff::TextCaret;
-using BlockSelected    = Markoff::BlockSelected;
-using BlockInternalEdit = Markoff::BlockInternalEdit;
-using NoCursor         = Markoff::NoCursor;
-using Cursor           = Markoff::Cursor;
-
 /// View-layer selection: two Cursor endpoints. Collapsed when anchor == active.
 /// Spec §3.1 Selection.
 struct MARKOFF_LIVE_EXPORT LiveRenderSelection {

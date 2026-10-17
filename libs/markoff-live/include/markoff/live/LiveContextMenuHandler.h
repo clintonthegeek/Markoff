@@ -2,7 +2,7 @@
 #pragma once
 
 #include <markoff/live/MarkoffLiveExport.h>
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 
 #include <QObject>
 #include <QVariant>
@@ -40,7 +40,7 @@ public:
     void setDocument(Markoff::MarkoffDocument *doc);
 
     /// Pop up at the given global screen coordinates. `blockAnchor` (a
-    /// `Markoff::BlockAnchor` wrapped in a QVariant) scopes the per-block
+    /// `Markoff::BlockId` wrapped in a QVariant) scopes the per-block
     /// "Undo in this block" item; pass an invalid QVariant for non-block
     /// contexts and the item will be disabled.
     Q_INVOKABLE void popup(qreal globalX, qreal globalY,
@@ -53,7 +53,7 @@ private:
     QAction                  *m_undoBlockAction = nullptr;
     LiveActionController     *m_actionController = nullptr;
     Markoff::MarkoffDocument *m_document = nullptr;
-    Markoff::BlockAnchor      m_currentAnchor;
+    Markoff::BlockId      m_currentAnchor;
 };
 
 }  // namespace Markoff::Live

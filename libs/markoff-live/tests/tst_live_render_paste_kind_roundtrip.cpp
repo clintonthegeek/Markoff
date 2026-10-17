@@ -135,7 +135,6 @@ private Q_SLOTS:
         // Build a clipboard payload manually, kind=heading, text="# H".
         QJsonObject payload;
         payload["version"]         = 1;
-        payload["sourceReplicaId"] = 42;
         QJsonArray blocks;
         QJsonObject b;
         b["kind"] = BlockKind::Heading;

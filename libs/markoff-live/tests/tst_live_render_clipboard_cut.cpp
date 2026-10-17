@@ -41,32 +41,6 @@ private slots:
         QVERIFY(!sv->hasSelection());
     }
 
-    void cut_records_in_recent_cuts() {
-        // Cut "beta" from "alpha\n\nbeta"; takeRecentCut(cutSeq) should return non-empty.
-        Markoff::MarkoffDocument doc(quint16(42));
-        Markoff::Live::LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("alpha\n\nbeta\n");
-        QCOMPARE(binding.model()->rowCount(), 2);
-
-        auto *sv = binding.cursorState();
-        sv->begin(1, 0);
-        sv->extend(1, 4);  // "beta"
-
-        Markoff::Live::LiveClipboardController cc;
-        cc.setDocument(&doc);
-        cc.setSelectionView(sv);
-        cc.setModel(binding.model());
-
-        const quint64 preSeq = doc.d2EditSequence();
-        cc.cut();
-
-        // The cut should have been recorded at cutSeq == preSeq + 1 (the
-        // sequence number used by the deletion).  takeRecentCut consumes the
-        // entry, so a second call returns empty.
-        const auto cached = doc.takeRecentCut(preSeq + 1);
-        QVERIFY(!cached.empty());
-    }
 };
 
 QTEST_MAIN(TestClipboardCut)

@@ -358,7 +358,7 @@ Markoff::CursorPos EditorWidget::cursorPosition() const
     // Read the canonical cursor (L3: LiveCursorState is authoritative;
     // 2026-05-22-cursor-authority-decision.md). Non-TextCaret variants
     // report the block's first line, column 1 (spec §4.1).
-    Markoff::BlockAnchor block;
+    Markoff::BlockId block;
     int qtPos = 0;
     if (const auto caret = cs->currentTextCaret()) {
         block = caret->block;
@@ -415,7 +415,7 @@ void EditorWidget::recomputeContext()
 
     // Read the canonical cursor (L3: LiveCursorState is authoritative).
     // Non-TextCaret and NoCursor states → no meaningful context update.
-    Markoff::BlockAnchor block;
+    Markoff::BlockId block;
     if (const auto caret = cs->currentTextCaret()) {
         block = caret->block;
     } else {
@@ -428,10 +428,10 @@ void EditorWidget::recomputeContext()
             return;  // NoCursor — no block to report
     }
 
-    // Resolve BlockAnchor → block id via the document's block list (same
+    // Resolve BlockId → block id via the document's block list (same
     // id-equality pattern as cursorPosition(); O(blocks), uncached).
     const auto ids = doc->iterateBlocks();
-    Markoff::BlockAnchor blockId;
+    Markoff::BlockId blockId;
     bool found = false;
     for (std::size_t i = 0; i < ids.size(); ++i) {
         if (ids[i] == block) { blockId = ids[i]; found = true; break; }

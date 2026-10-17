@@ -9,14 +9,14 @@
 #include <markoff/live/BlockKind.h>
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/LiveBlockModel.h>
-#include <markoff/live/Coordinates.h>
+#include <markoff/core/TextUnits.h>
 
 #include <algorithm>
 #include <climits>
 
 namespace Markoff::Live {
 
-namespace coords = Detail::Coordinates;
+namespace coords = ::Markoff::TextUnits;
 
 LiveFormatController::LiveFormatController(QObject *parent) : QObject(parent) {}
 

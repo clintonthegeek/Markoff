@@ -80,18 +80,18 @@ public:
     /// No-op (no signal) if the block is unknown or the list is identical
     /// to the current value. Empty list clears any prior matches and
     /// emits dataChanged so renderers can vanish highlights.
-    void setFindSpans(const Markoff::BlockAnchor &anchor,
+    void setFindSpans(const Markoff::BlockId &anchor,
                       const QList<FindSpan> &spans);
 
     /// Spec 2026-05-11-focus-chokepoint-design.md §5.1.1. Returns the kind
     /// of the block with the given anchor, or empty string if not found.
     /// Used by LiveCursorState's stale-registration check.
-    QString kindFor(Markoff::BlockAnchor anchor) const;
+    QString kindFor(Markoff::BlockId anchor) const;
 
     /// Test-only helper: append a minimal row with the given anchor/kind/text.
     /// Does not emit model signals. Only for unit tests that need to populate
     /// the model without going through applyOps.
-    void insertTestRow(Markoff::BlockAnchor anchor, const QString &kind, const QString &text);
+    void insertTestRow(Markoff::BlockId anchor, const QString &kind, const QString &text);
 
     // ---- R4 freshness tracking (spec §4.2/§4.3). ----
     // Set by LiveEditBinding on each local keystroke. Read by

@@ -2,7 +2,7 @@
 #pragma once
 
 #include <markoff/live/MarkoffLiveExport.h>
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 
 #include <QHash>
 #include <QObject>
@@ -46,7 +46,7 @@ public:
         LiveCursorState          *cursorState;
 
         int                       blockIndex;       ///< model row
-        Markoff::BlockAnchor      blockAnchor;      ///< == BlockId in D2
+        Markoff::BlockId      blockAnchor;      ///< == BlockId in D2
         int                       qtPos;
         int                       modifiers;        ///< Qt::KeyboardModifiers
         QString                   blockText;
@@ -82,11 +82,11 @@ public:
                                const QString &blockText);
 
     /// Update the info-string (language tag) of a CodeBlock.
-    Q_INVOKABLE void changeCodeLanguage(Markoff::BlockAnchor anchor,
+    Q_INVOKABLE void changeCodeLanguage(Markoff::BlockId anchor,
                                         const QString &lang);
 
     /// Update the alt-text attribute of an Image block.
-    Q_INVOKABLE void changeImageAlt(Markoff::BlockAnchor anchor, const QString &alt);
+    Q_INVOKABLE void changeImageAlt(Markoff::BlockId anchor, const QString &alt);
 
 private:
     void registerBuiltins();

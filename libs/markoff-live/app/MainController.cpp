@@ -42,12 +42,7 @@ QString MainController::filePath() const
 void MainController::save()
 {
     const quint64 seq = m_doc->d2EditSequence();
-    // `toMarkdownUtf8()` reads the legacy buffer that D2 edits don't
-    // populate — using it as a save source silently zeros files. Use
-    // the D2-aware `serializeForSave()` (per markoff-core CLAUDE.md +
-    // docs/handoff/2026-05-21-save-path-data-loss.md). Corbomite's
-    // Vault was migrated 2026-05-21; this app's MainController was
-    // missed at the time.
+    // `serializeForSave()` is the document's sole Markdown export path.
     const QByteArray bytes = m_doc->serializeForSave();
 
     QSaveFile f(m_filePath);

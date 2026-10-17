@@ -19,7 +19,7 @@
 #include <qqmlintegration.h>
 
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/core/Session.h>
 #include <markoff/core/Theme.h>
 #include <markoff/core/LinkService.h>

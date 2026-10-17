@@ -24,7 +24,7 @@ class LiveBlockModel;
 ///   - text/plain                       — plain-text fallback
 ///   - application/x-markoff-blocks     — structured JSON payload
 ///
-/// Cut = Copy + deleteSelection + recordRecentCut.
+/// Cut copies the selection to the system clipboard, then deletes it.
 ///
 /// Paste routes through the structured path when the clipboard carries
 /// application/x-markoff-blocks with version==1; falls back to

@@ -84,8 +84,8 @@ private Q_SLOTS:
 
     void copy_writes_markoff_mime_payload() {
         // LiveClipboardController::copy() must write both text/plain and
-        // application/x-markoff-blocks with version==1, sourceReplicaId,
-        // and a blocks array of size 1 when one block is (partially) selected.
+        // application/x-markoff-blocks with version==1 and a blocks array of
+        // size 1 when one block is (partially) selected.
         Markoff::MarkoffDocument doc(/*replicaId=*/42);
         LiveListModelBinding binding;
         binding.setDocument(&doc);
@@ -110,7 +110,7 @@ private Q_SLOTS:
             mime->data(LiveClipboardController::kBlocksMime));
         QVERIFY(jdoc.isObject());
         QCOMPARE(jdoc.object().value("version").toInt(), 1);
-        QCOMPARE(jdoc.object().value("sourceReplicaId").toInt(), 42);
+        QCOMPARE(jdoc.object().keys().size(), 2);
         QCOMPARE(jdoc.object().value("blocks").toArray().size(), 1);
         QCOMPARE(jdoc.object().value("blocks").toArray().at(0)
                      .toObject().value("text").toString(),

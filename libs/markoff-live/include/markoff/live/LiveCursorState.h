@@ -28,12 +28,12 @@ class LiveListModelBinding;
 
 /// Selection anchor — the "other end" of a text selection. The active
 /// end is `m_cursor` (variant: TextCaret). When a selection is active,
-/// `m_selectionAnchor` holds the BlockAnchor + qtPos where the selection
+/// `m_selectionAnchor` holds the BlockId + qtPos where the selection
 /// started (anchored by Click, Shift+Click `begin`, or session-incoming).
-/// Identity is by `BlockAnchor` (stable across structural edits); the
+/// Identity is by `BlockId` (stable across structural edits); the
 /// inner-row index is derived on demand. Tier 4c canonical store.
 struct SelectionAnchor {
-    Markoff::BlockAnchor block;
+    Markoff::BlockId block;
     quint32              qtPos;
     bool operator==(const SelectionAnchor &other) const noexcept {
         return block == other.block && qtPos == other.qtPos;
@@ -56,10 +56,10 @@ struct SelectionAnchor {
 /// `requestTextCaretAtRow` is a row-keyed convenience wrapper over
 /// `establishFocus`: it flushes any pending document changes (via
 /// `LiveListModelBinding::flushPendingDocumentChanges`), resolves the
-/// row to a `BlockAnchor` via `recordAt(row).blockAnchor`, and stages
+/// row to a `BlockId` via `recordAt(row).blockAnchor`, and stages
 /// the chokepoint pending. Out-of-range rows are rejected synchronously.
 /// `establishFocus` is the canonical entry for callers that already
-/// hold a `BlockAnchor` (e.g. `LiveStructuralKeyHandler` consuming
+/// hold a `BlockId` (e.g. `LiveStructuralKeyHandler` consuming
 /// `Cmd::*` return values). Spec
 /// `docs/specs/2026-05-16-tier-4b-pending-slot-consolidation-design.md` §3.
 class MARKOFF_LIVE_EXPORT LiveCursorState : public QObject {
@@ -132,7 +132,7 @@ public:
     void request(const Cursor &newCursor, bool preserveSelectionAnchor = false);
     void clear();
 
-    int rowForBlock(const Markoff::BlockAnchor &block) const;
+    int rowForBlock(const Markoff::BlockId &block) const;
 
     /// Request a TextCaret at `qtPos` of the row at `expectedRow` once it
     /// exists. If the row already exists, equivalent to constructing a
@@ -157,7 +157,7 @@ public:
     /// `(anchor, qtPos)`. Deliberately does NOT reset `m_pendingFocus` — a
     /// pending chokepoint request must survive incidental TextEdit cursor
     /// moves until its delegate-registration event arrives.
-    Q_INVOKABLE void syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos);
+    Q_INVOKABLE void syncFromTextEdit(Markoff::BlockId anchor, int qtPos);
 
     /// Sets the canonical cursor state to a TextCaret at the given
     /// block + qtPos. Does NOT take focus and does NOT notify the matched
@@ -167,7 +167,7 @@ public:
     ///
     /// L4 authority: model wins on canonical cursor state (m_cursor);
     /// delegate is not notified. See docs/INVARIANTS.md invariant 2.
-    Q_INVOKABLE void setCaretWithoutFocus(Markoff::BlockAnchor block, int qtPos);
+    Q_INVOKABLE void setCaretWithoutFocus(Markoff::BlockId block, int qtPos);
 
     // --- §5.1 focus-chokepoint additions (tier 1) ---
 
@@ -175,14 +175,14 @@ public:
     /// pending; resolution attempted at safe points (after delegate
     /// registration, at cascade end). Never dispatches synchronously
     /// from this call — see spec §5.1.2.
-    Q_INVOKABLE void establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos);
+    Q_INVOKABLE void establishFocus(Markoff::BlockId blockAnchor, int qtPos);
 
     /// Promote the cursor to `BlockSelected{anchor}` — the block-as-a-unit
     /// state. Used by delegates that want to leave their internal text
     /// editing mode and become focusable as a whole (e.g. Table's Esc-out
     /// of cell-editing). The target block's descriptor must include
     /// `"BlockSelected"` in `supportedCursorVariants`. No-op otherwise.
-    Q_INVOKABLE void requestBlockSelected(Markoff::BlockAnchor blockAnchor);
+    Q_INVOKABLE void requestBlockSelected(Markoff::BlockId blockAnchor);
 
     /// Spec §5.1. Called by LiveListModelBinding at the top of
     /// onD2Changed, before any structural mutation. Suppresses
@@ -197,7 +197,7 @@ public:
     /// Spec §5.1. Each text-bearing delegate calls this from
     /// Component.onCompleted. `kind` is validated against the model
     /// on every resolution attempt (spec §5.1.1).
-    Q_INVOKABLE void delegateAvailable(Markoff::BlockAnchor blockAnchor,
+    Q_INVOKABLE void delegateAvailable(Markoff::BlockId blockAnchor,
                                        const QString &kind,
                                        QQuickItem *delegateRoot);
 
@@ -205,10 +205,9 @@ public:
     /// dying delegate's root; when a DelegateChooser kind-swap fires the new
     /// delegate's onCompleted *before* the old's onDestruction, the entry
     /// stored against `blockAnchor` already belongs to the replacement —
-    /// passing the root lets the chokepoint skip the stale remove. May be
-    /// `nullptr` from older callers (unconditional remove, legacy behaviour).
-    Q_INVOKABLE void delegateGoingAway(Markoff::BlockAnchor blockAnchor,
-                                       QQuickItem *delegateRoot = nullptr);
+    /// passing the root lets the chokepoint skip the stale remove.
+    Q_INVOKABLE void delegateGoingAway(Markoff::BlockId blockAnchor,
+                                       QQuickItem *delegateRoot);
 
     /// Returns the bound model (may be null before wiring). Used by
     /// LiveSelectionView facade to validate block indices without keeping
@@ -218,8 +217,8 @@ public:
     /// Synchronous document-based block anchor lookup. Unlike the model
     /// (which is populated via debounced onD2Changed), MarkoffDocument::blockAnchorAt
     /// is available immediately after loadFromMarkdown. Returns a null
-    /// BlockAnchor if the document is unavailable or blockIndex is out of range.
-    Markoff::BlockAnchor blockAnchorAt(int blockIndex) const;
+    /// BlockId if the document is unavailable or blockIndex is out of range.
+    Markoff::BlockId blockAnchorAt(int blockIndex) const;
 
     // --- test-only helpers ---
     /// Attaches (or replaces) the LiveBlockModel used for kindFor lookups.
@@ -230,7 +229,7 @@ public:
     bool hasPendingFocus() const noexcept { return m_pendingFocus.has_value(); }
 
     /// Returns true if the anchor has a record in m_delegates. Test-only.
-    bool isDelegateRegistered(Markoff::BlockAnchor anchor) const {
+    bool isDelegateRegistered(Markoff::BlockId anchor) const {
         return m_delegates.contains(anchor);
     }
 
@@ -365,7 +364,7 @@ private:
         QPointer<QQuickItem> root;
     };
     struct PendingFocus {
-        Markoff::BlockAnchor target;
+        Markoff::BlockId target;
         int qtPos;
         qint64 enqueuedMs;
     };
@@ -374,7 +373,7 @@ private:
     void expireIfTimedOut(PendingFocus &p);  // body in Task 7
 
     std::optional<PendingFocus>                 m_pendingFocus;
-    QHash<Markoff::BlockAnchor, DelegateRecord> m_delegates;
+    QHash<Markoff::BlockId, DelegateRecord> m_delegates;
     bool                                        m_inStructuralCascade = false;
 
     static constexpr qint64 kPendingFocusTimeoutMs = 500;

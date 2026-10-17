@@ -2,9 +2,9 @@
 #include <QTest>
 #include <QByteArray>
 
-#include <markoff/live/Coordinates.h>
+#include <markoff/core/TextUnits.h>
 
-using namespace Markoff::Live::Detail::Coordinates;
+using namespace Markoff::TextUnits;
 
 class TstLiveRenderCoords : public QObject {
     Q_OBJECT

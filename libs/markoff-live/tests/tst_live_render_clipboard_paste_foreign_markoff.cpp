@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// C5: Foreign-Markoff-MIME paste — a payload with sourceReplicaId != ours
-// should take the structured path (version==1) but NOT set reuseBlockIds.
-// No crash; content is inserted.
+// Structured Markoff MIME paste imports block content without carrying source
+// document identity.
 #include <QTest>
 #include <QApplication>
 #include <QClipboard>
@@ -18,11 +17,7 @@
 class TestPasteForeignMarkoff : public QObject {
     Q_OBJECT
 private slots:
-    void foreign_replica_uses_structured_path_without_id_reuse() {
-        // Our document has replicaId=42. The clipboard payload says
-        // sourceReplicaId=7 — a different peer. paste() should go through the
-        // structured path (version==1) without setting reuseBlockIds. No crash;
-        // "Foreign" text inserted.
+    void structured_payload_uses_only_version_and_blocks() {
         Markoff::MarkoffDocument doc(quint16(42));
         Markoff::Live::LiveListModelBinding binding;
         binding.setDocument(&doc);
@@ -39,8 +34,7 @@ private slots:
         cc.setModel(binding.model());
 
         QJsonObject payload;
-        payload["version"]         = 1;
-        payload["sourceReplicaId"] = 7;  // not our replica (42)
+        payload["version"] = 1;
         QJsonArray blocks;
         QJsonObject b;
         b["kind"] = QStringLiteral("Paragraph");
@@ -63,48 +57,6 @@ private slots:
                  "Expected 'Foreign' in block text after foreign-replica paste");
     }
 
-    void foreign_payload_with_cutSequenceNumber_does_not_reuse() {
-        // Even if the foreign payload carries a cutSequenceNumber, reuseBlockIds
-        // must NOT be set (the IDs belong to a different replica's namespace).
-        Markoff::MarkoffDocument doc(quint16(42));
-        Markoff::Live::LiveListModelBinding binding;
-        binding.setDocument(&doc);
-        doc.loadFromMarkdown("A\n");
-        QCOMPARE(binding.model()->rowCount(), 1);
-
-        auto *sv = binding.cursorState();
-        sv->begin(0, 1);
-        sv->extend(0, 1);
-
-        Markoff::Live::LiveClipboardController cc;
-        cc.setDocument(&doc);
-        cc.setSelectionView(sv);
-        cc.setModel(binding.model());
-
-        QJsonObject payload;
-        payload["version"]           = 1;
-        payload["sourceReplicaId"]   = 99;     // foreign
-        payload["cutSequenceNumber"] = 12345;  // should be ignored
-        QJsonArray blocks;
-        QJsonObject b;
-        b["kind"] = QStringLiteral("Paragraph");
-        b["text"] = QStringLiteral("B");
-        blocks.append(b);
-        payload["blocks"] = blocks;
-
-        auto *mime = new QMimeData();
-        mime->setData(Markoff::Live::LiveClipboardController::kBlocksMime,
-                      QJsonDocument(payload).toJson(QJsonDocument::Compact));
-        mime->setText(QStringLiteral("B"));
-        QApplication::clipboard()->setMimeData(mime);
-
-        cc.paste();
-
-        const auto ids = doc.iterateBlocks();
-        QVERIFY(!ids.empty());
-        QVERIFY2(doc.blockText(ids[0]).contains("B"),
-                 "Expected 'B' in block text after foreign-replica paste with cutSeq");
-    }
 };
 
 QTEST_MAIN(TestPasteForeignMarkoff)

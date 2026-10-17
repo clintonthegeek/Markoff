@@ -59,7 +59,7 @@ void LiveFindAdapter::onCurrentMatchChanged()
 void LiveFindAdapter::rebuildAndPushSpans()
 {
     if (!m_model) return;
-    QHash<Markoff::BlockAnchor, QList<Markoff::Live::FindSpan>> nextByBlock;
+    QHash<Markoff::BlockId, QList<Markoff::Live::FindSpan>> nextByBlock;
     if (m_controller) {
         const QList<Markoff::FindController::Match> &matches = m_controller->matches();
         const int currentIdx = m_controller->currentMatchIndex();
@@ -75,12 +75,12 @@ void LiveFindAdapter::rebuildAndPushSpans()
     }
     // Push to model for every block whose list changed, plus blocks that
     // previously had matches and no longer do (drop to empty list).
-    QSet<Markoff::BlockAnchor> touched;
+    QSet<Markoff::BlockId> touched;
     for (auto it = nextByBlock.constBegin(); it != nextByBlock.constEnd(); ++it)
         touched.insert(it.key());
     for (auto it = m_lastPushed.constBegin(); it != m_lastPushed.constEnd(); ++it)
         touched.insert(it.key());
-    for (const Markoff::BlockAnchor &anchor : std::as_const(touched)) {
+    for (const Markoff::BlockId &anchor : std::as_const(touched)) {
         const auto &newSpans = nextByBlock.value(anchor);
         const auto &oldSpans = m_lastPushed.value(anchor);
         if (newSpans != oldSpans) {
@@ -101,7 +101,7 @@ void LiveFindAdapter::onNavigationRequested(Markoff::FindController::Match m)
     // have a consumer driving the controller.
 }
 
-int LiveFindAdapter::resolveByteToQtPos(const Markoff::BlockAnchor &block,
+int LiveFindAdapter::resolveByteToQtPos(const Markoff::BlockId &block,
                                        quint32 byteOffset) const
 {
     if (!m_model) return 0;

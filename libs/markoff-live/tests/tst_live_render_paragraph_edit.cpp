@@ -22,7 +22,6 @@
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/BlockKind.h>
-#include <markoff/live/Coordinates.h>
 #include <markoff/live/LiveCursorState.h>
 
 #include <markoff/core/MarkoffDocument.h>

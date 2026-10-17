@@ -250,7 +250,7 @@ private Q_SLOTS:
         BlockRecord rec;
         rec.kind = "paragraph";
         rec.text = "hello";
-        rec.blockAnchor = Markoff::BlockAnchor{};
+        rec.blockAnchor = Markoff::BlockId{};
         Markoff::SourceSpan span{};
         span.charOffset = 0; span.charLength = 5; span.bold = true;
         rec.inlineSpans = {span};
@@ -311,7 +311,7 @@ private Q_SLOTS:
         BlockRecord rec1;
         rec1.kind = "paragraph";
         rec1.text = "hello";
-        rec1.blockAnchor = Markoff::BlockAnchor{};
+        rec1.blockAnchor = Markoff::BlockId{};
         rec1.inlineSpans = {};
         QList<BlockKey> keys1 = { keyOf(rec1) };
         m.applyOps(AstBlockDiff::diff({}, keys1), {rec1});
@@ -349,7 +349,7 @@ private Q_SLOTS:
 
     void setFindSpans_emitsDataChangedForRoleOnly() {
         LiveBlockModel m;
-        Markoff::BlockAnchor a = Markoff::BlockAnchor::fromRaw(42);
+        Markoff::BlockId a = Markoff::BlockId::fromRaw(42);
         m.insertTestRow(a, "paragraph", "the quick brown fox");
 
         QSignalSpy spy(&m, &QAbstractItemModel::dataChanged);

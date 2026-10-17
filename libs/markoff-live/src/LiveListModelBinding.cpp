@@ -13,7 +13,7 @@
 #include "LiveListModelBinding_links.h"
 
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/CrdtProxies.h>
 #include <markoff/core/Session.h>
@@ -471,7 +471,7 @@ void LiveListModelBinding::onD2Changed()
     records.reserve(static_cast<int>(blockIds.size()));
     for (const auto &id : blockIds) {
         BlockRecord r;
-        r.blockAnchor = id;   // BlockAnchor == BlockId
+        r.blockAnchor = id;   // BlockId == BlockId
         r.kind        = blockKindToString(doc->blockKind(id));
         r.delegateClass = Markoff::Live::delegateClassFor(r.kind);
 
@@ -710,7 +710,7 @@ void LiveListModelBinding::onD2Changed()
             // land the caret there so typing continues.
             Markoff::BlockId newPara = Markoff::Cmd::enterAtEnd(
                 *doc, Markoff::BlockId(rec.blockAnchor));
-            d->cursorState->establishFocus(Markoff::BlockAnchor(newPara), 0);
+            d->cursorState->establishFocus(Markoff::BlockId(newPara), 0);
         }
         // changeKind will schedule another d2DocumentChanged; return to let
         // the next spin re-run onD2Changed with the corrected kind.
@@ -768,7 +768,7 @@ void LiveListModelBinding::onD2Changed()
     // surviving text-bearing row to the block's old position. This is a
     // fallback landing spot, not exact caret-position restoration.
     if (!d->cursorState->hasPendingFocus()) {
-        Markoff::BlockAnchor curBlock;
+        Markoff::BlockId curBlock;
         bool hasCursor = false;
         std::visit([&](auto &&c) {
             using T = std::decay_t<decltype(c)>;
@@ -781,7 +781,7 @@ void LiveListModelBinding::onD2Changed()
         if (hasCursor) {
             bool stillExists = false;
             for (const auto &id : blockIds) {
-                if (Markoff::BlockAnchor(id) == curBlock) { stillExists = true; break; }
+                if (Markoff::BlockId(id) == curBlock) { stillExists = true; break; }
             }
             if (!stillExists) {
                 int oldIdx = -1;
@@ -799,7 +799,7 @@ void LiveListModelBinding::onD2Changed()
                 // `row` is available without touching the document again.
                 if (row >= 0 && row < static_cast<int>(blockIds.size()))
                     d->cursorState->establishFocus(
-                        Markoff::BlockAnchor(blockIds[static_cast<std::size_t>(row)]), 0);
+                        Markoff::BlockId(blockIds[static_cast<std::size_t>(row)]), 0);
             }
         }
     }

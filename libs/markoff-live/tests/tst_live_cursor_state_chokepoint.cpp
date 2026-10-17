@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveCursorState.h>
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 
 #include <QQuickItem>
 #include <QSignalSpy>
@@ -57,8 +57,8 @@ void TestLiveCursorStateChokepoint::cleanup() {
 
 void TestLiveCursorStateChokepoint::pending_supersession() {
     // §7.1 — latest establishFocus wins.
-    const auto a = Markoff::BlockAnchor::fromRaw(1);
-    const auto b = Markoff::BlockAnchor::fromRaw(2);
+    const auto a = Markoff::BlockId::fromRaw(1);
+    const auto b = Markoff::BlockId::fromRaw(2);
     m_model->insertTestRow(a, "paragraph", "text a");
     m_model->insertTestRow(b, "paragraph", "text b");
 
@@ -76,7 +76,7 @@ void TestLiveCursorStateChokepoint::pending_supersession() {
 
 void TestLiveCursorStateChokepoint::pending_survives_delegate_destruction() {
     // §7.2 — pending request survives a delegate being destroyed.
-    const auto a = Markoff::BlockAnchor::fromRaw(1);
+    const auto a = Markoff::BlockId::fromRaw(1);
 
     auto *dOld = new MockDelegate;
     // Register while model has no row → kindFor returns "" → the
@@ -87,7 +87,7 @@ void TestLiveCursorStateChokepoint::pending_survives_delegate_destruction() {
     m_state->delegateAvailable(a, "heading", dOld);
     m_state->establishFocus(a, 3);
 
-    m_state->delegateGoingAway(a);
+    m_state->delegateGoingAway(a, dOld);
     delete dOld;
 
     // Now add the row to the model and register with matching kind.
@@ -99,16 +99,16 @@ void TestLiveCursorStateChokepoint::pending_survives_delegate_destruction() {
 }
 
 void TestLiveCursorStateChokepoint::bad_blockid_drops_silently() {
-    // §7.3 — establishFocus for a BlockAnchor not in the model and
+    // §7.3 — establishFocus for a BlockId not in the model and
     // not registered is dropped silently. No assert, no signal.
-    const auto unknown = Markoff::BlockAnchor::fromRaw(9999);
+    const auto unknown = Markoff::BlockId::fromRaw(9999);
     m_state->establishFocus(unknown, 0);
     QVERIFY(!m_state->hasPendingFocus());
 }
 
 void TestLiveCursorStateChokepoint::pending_times_out_after_500ms() {
     // §7.4 — pending request expires after kPendingFocusTimeoutMs.
-    const auto a = Markoff::BlockAnchor::fromRaw(1);
+    const auto a = Markoff::BlockId::fromRaw(1);
     m_model->insertTestRow(a, "paragraph", "text");
 
     m_state->establishFocus(a, 5);
@@ -116,14 +116,14 @@ void TestLiveCursorStateChokepoint::pending_times_out_after_500ms() {
 
     QTest::qWait(600);
     // A delegateAvailable call triggers tryResolvePending → expiry check.
-    m_state->delegateAvailable(Markoff::BlockAnchor::fromRaw(42), "paragraph", nullptr);
+    m_state->delegateAvailable(Markoff::BlockId::fromRaw(42), "paragraph", nullptr);
     QVERIFY(!m_state->hasPendingFocus());
 }
 
 void TestLiveCursorStateChokepoint::delegate_arrives_without_pending() {
     // §7.5 — delegateAvailable with no pending request is a no-op for
     // focus dispatch, but registers the delegate in m_delegates.
-    const auto a = Markoff::BlockAnchor::fromRaw(1);
+    const auto a = Markoff::BlockId::fromRaw(1);
     MockDelegate d;
     m_state->delegateAvailable(a, "paragraph", &d);
     QCOMPARE(d.takeFocusCalls(), QList<int>{});
@@ -138,7 +138,7 @@ void TestLiveCursorStateChokepoint::stale_registration_holds_pending() {
     // the same UnifiedInlineTextDelegate, so dispatch on a "stale" entry
     // in that class is correct. Use code-block (its own delegateClass)
     // to exercise the genuine stale-cross-class path.
-    const auto a = Markoff::BlockAnchor::fromRaw(1);
+    const auto a = Markoff::BlockId::fromRaw(1);
 
     // Register stale delegate with cross-class kind ("code-block") before
     // the row exists.
@@ -154,7 +154,7 @@ void TestLiveCursorStateChokepoint::stale_registration_holds_pending() {
     QCOMPARE(dStale.takeFocusCalls(), QList<int>{});
 
     // After the stale delegate goes away and a matching one arrives → dispatch.
-    m_state->delegateGoingAway(a);
+    m_state->delegateGoingAway(a, &dStale);
     MockDelegate dFresh;
     m_state->delegateAvailable(a, "paragraph", &dFresh);
     QCOMPARE(dFresh.takeFocusCalls(), QList<int>{5});
@@ -170,8 +170,8 @@ void TestLiveCursorStateChokepoint::syncFromTextEdit_rejects_crossblock()
     // refresh, ListView rebind, setPlainText cursor reset) and must
     // not move m_cursor. Cross-block moves go through request() /
     // begin() / establishFocus() — paths the chokepoint initiates.
-    const auto a = Markoff::BlockAnchor::fromRaw(1);
-    const auto b = Markoff::BlockAnchor::fromRaw(2);
+    const auto a = Markoff::BlockId::fromRaw(1);
+    const auto b = Markoff::BlockId::fromRaw(2);
     m_model->insertTestRow(a, "paragraph", "text a");
     m_model->insertTestRow(b, "paragraph", "text b");
 
@@ -198,7 +198,7 @@ void TestLiveCursorStateChokepoint::syncFromTextEdit_accepts_sameblock()
     // §6.1 companion — same-block syncFromTextEdit DOES update qtPos.
     // This is the legitimate path (user keyboard arrow within the
     // focused TextEdit).
-    const auto a = Markoff::BlockAnchor::fromRaw(1);
+    const auto a = Markoff::BlockId::fromRaw(1);
     m_model->insertTestRow(a, "paragraph", "text a");
 
     MockDelegate dA;
@@ -223,8 +223,8 @@ void TestLiveCursorStateChokepoint::anchor_clears_on_crossblock_request()
     // The unit-test harness has no document, so begin() (which uses
     // blockAnchorAt → iterateBlocks) can't be used. Set the anchor + cursor
     // directly via the public APIs.
-    const auto a = Markoff::BlockAnchor::fromRaw(1);
-    const auto b = Markoff::BlockAnchor::fromRaw(2);
+    const auto a = Markoff::BlockId::fromRaw(1);
+    const auto b = Markoff::BlockId::fromRaw(2);
     m_model->insertTestRow(a, "paragraph", "text a");
     m_model->insertTestRow(b, "paragraph", "text b");
 

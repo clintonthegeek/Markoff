@@ -2,7 +2,7 @@
 #include <markoff/live/LiveCursorState.h>
 #include <markoff/live/BlockKind.h>
 #include <markoff/live/BlockKindRegistry.h>
-#include <markoff/live/Coordinates.h>
+#include <markoff/core/TextUnits.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveListModelBinding.h>
 
@@ -22,7 +22,7 @@ Q_LOGGING_CATEGORY(lcCursor, "markoff.live.cursor", QtWarningMsg)
 
 namespace Markoff::Live {
 
-namespace coords = Detail::Coordinates;
+namespace coords = ::Markoff::TextUnits;
 
 LiveCursorState::LiveCursorState(const BlockKindRegistry *registry,
                                  const LiveBlockModel    *model,
@@ -166,7 +166,7 @@ void LiveCursorState::emitSelectionChanged()
     m_applyingSelectionEmit = false;
 }
 
-int LiveCursorState::rowForBlock(const Markoff::BlockAnchor &block) const
+int LiveCursorState::rowForBlock(const Markoff::BlockId &block) const
 {
     for (int i = 0; i < m_model->rowCount(); ++i) {
         if (m_model->recordAt(i).blockAnchor == block)
@@ -187,14 +187,14 @@ void LiveCursorState::requestTextCaretAtRow(int expectedRow, int qtPos)
     // (queue #2 concern #5).
     if (m_binding)
         m_binding->flushPendingDocumentChanges();
-    const Markoff::BlockAnchor anchor = m_model->recordAt(expectedRow).blockAnchor;
-    if (anchor == Markoff::BlockAnchor{}) return;
+    const Markoff::BlockId anchor = m_model->recordAt(expectedRow).blockAnchor;
+    if (anchor == Markoff::BlockId{}) return;
     establishFocus(anchor, qtPos);
 }
 
-void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
+void LiveCursorState::syncFromTextEdit(Markoff::BlockId anchor, int qtPos)
 {
-    if (anchor == Markoff::BlockAnchor{}) return;
+    if (anchor == Markoff::BlockId{}) return;
     if (qtPos < 0) return;
 
     // L3 cursor-authority invariant — same-block contract.
@@ -232,9 +232,9 @@ void LiveCursorState::syncFromTextEdit(Markoff::BlockAnchor anchor, int qtPos)
     Q_EMIT cursorChanged();
 }
 
-void LiveCursorState::requestBlockSelected(Markoff::BlockAnchor blockAnchor)
+void LiveCursorState::requestBlockSelected(Markoff::BlockId blockAnchor)
 {
-    if (blockAnchor == Markoff::BlockAnchor{}) return;
+    if (blockAnchor == Markoff::BlockId{}) return;
     BlockSelected sel;
     sel.block = blockAnchor;
     request(sel);
@@ -250,9 +250,9 @@ void LiveCursorState::requestBlockSelected(Markoff::BlockAnchor blockAnchor)
     }
 }
 
-void LiveCursorState::setCaretWithoutFocus(Markoff::BlockAnchor block, int qtPos)
+void LiveCursorState::setCaretWithoutFocus(Markoff::BlockId block, int qtPos)
 {
-    if (block == Markoff::BlockAnchor{}) return;
+    if (block == Markoff::BlockId{}) return;
     if (qtPos < 0) qtPos = 0;
 
     TextCaret tc;
@@ -286,7 +286,7 @@ void LiveCursorState::clearDesiredVisualX()
     setDesiredVisualX(-1.0);
 }
 
-Markoff::BlockAnchor LiveCursorState::blockAnchorAt(int blockIndex) const
+Markoff::BlockId LiveCursorState::blockAnchorAt(int blockIndex) const
 {
     if (!m_binding || !m_binding->document()) return {};
     if (blockIndex < 0) return {};
@@ -363,7 +363,7 @@ void LiveCursorState::attachModel(const LiveBlockModel *model) {
 
 // --- §5.1 focus-chokepoint implementation ---
 
-void LiveCursorState::establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos) {
+void LiveCursorState::establishFocus(Markoff::BlockId blockAnchor, int qtPos) {
     // §7.3 — drop silently if the anchor is unknown to model, delegates,
     // AND the underlying CRDT document. A block just created by enterAtEnd
     // etc. is in the document but not yet in m_model (onD2Changed hasn't
@@ -373,7 +373,7 @@ void LiveCursorState::establishFocus(Markoff::BlockAnchor blockAnchor, int qtPos
         bool inDoc = false;
         if (m_binding && m_binding->document()) {
             for (const auto &id : m_binding->document()->iterateBlocks()) {
-                if (Markoff::BlockAnchor(id) == blockAnchor) { inDoc = true; break; }
+                if (Markoff::BlockId(id) == blockAnchor) { inDoc = true; break; }
             }
         }
         if (!inDoc) return;
@@ -397,7 +397,7 @@ void LiveCursorState::endStructuralCascade() {
     tryResolvePending();
 }
 
-void LiveCursorState::delegateAvailable(Markoff::BlockAnchor blockAnchor,
+void LiveCursorState::delegateAvailable(Markoff::BlockId blockAnchor,
                                         const QString &kind,
                                         QQuickItem *delegateRoot) {
     // Check BEFORE insert: a pre-existing entry means a kind-transition
@@ -429,7 +429,7 @@ void LiveCursorState::delegateAvailable(Markoff::BlockAnchor blockAnchor,
     }
 }
 
-void LiveCursorState::delegateGoingAway(Markoff::BlockAnchor blockAnchor,
+void LiveCursorState::delegateGoingAway(Markoff::BlockId blockAnchor,
                                         QQuickItem *delegateRoot) {
     // Kind-transition replacement ordering: when DelegateChooser swaps the
     // delegate for a row whose `kind` role changed (Paragraph → HR via typed
@@ -712,7 +712,7 @@ void LiveCursorState::deleteSelectionRange()
     // Remember the collapse target before applyFlatEdit — the surviving
     // block is the first-corner block (fb) and the cursor lands at the
     // first-corner offset (fo) inside it.
-    const Markoff::BlockAnchor collapseAnchor = m_model->recordAt(fb).blockAnchor;
+    const Markoff::BlockId collapseAnchor = m_model->recordAt(fb).blockAnchor;
     const int collapseQtPos = fo;
 
     doc->applyFlatEdit(static_cast<uint32_t>(startByte),
@@ -762,7 +762,7 @@ void LiveCursorState::syncSelectionToSession()
     if (aRow < 0 || xRow < 0) return;
 
     auto *doc = m_binding->document();
-    const auto makeAnchor = [&](Markoff::BlockAnchor block, int qtPos)
+    const auto makeAnchor = [&](Markoff::BlockId block, int qtPos)
                                   -> Markoff::TextAnchor {
         const int row = rowForBlock(block);
         if (row < 0) return Markoff::TextAnchor{};
@@ -789,7 +789,7 @@ void LiveCursorState::onSessionPrimarySelectionChanged(const Markoff::Selection 
     const auto resolveAnchor = [&](const Markoff::TextAnchor &ta)
                                       -> std::optional<SelectionAnchor> {
         if (ta.isNull()) return std::nullopt;
-        const Markoff::BlockAnchor ba = ta.block();
+        const Markoff::BlockId ba = ta.block();
         if (rowForBlock(ba) < 0) return std::nullopt;  // not in model
         const int byteOff = doc->offsetInBlock(ba, ta);
         const int row = rowForBlock(ba);
@@ -809,7 +809,7 @@ void LiveCursorState::onSessionPrimarySelectionChanged(const Markoff::Selection 
     }
 
     // Equality short-circuit (supersedes the m_applyingSessionSelection guard).
-    // Compares derived (BlockAnchor, qtPos) pairs — intentionally looser than
+    // Compares derived (BlockId, qtPos) pairs — intentionally looser than
     // TextAnchor identity, per spec §4.3 / §11. Stable across CRDT edits that
     // preserve visual position.
     const auto currentActive = currentTextCaret();

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live/LiveBlockModel.h>
 
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/core/AttrNames.h>
 
 #include <QVariantMap>
@@ -211,7 +211,7 @@ QList<Markoff::SourceSpan> LiveBlockModel::spansAtRow(int row) const
     return m_rows[row].inlineSpans;
 }
 
-void LiveBlockModel::insertTestRow(Markoff::BlockAnchor anchor,
+void LiveBlockModel::insertTestRow(Markoff::BlockId anchor,
                                    const QString &kind,
                                    const QString &text)
 {
@@ -223,14 +223,14 @@ void LiveBlockModel::insertTestRow(Markoff::BlockAnchor anchor,
     m_rowEditSequences.append(0);
 }
 
-QString LiveBlockModel::kindFor(Markoff::BlockAnchor anchor) const
+QString LiveBlockModel::kindFor(Markoff::BlockId anchor) const
 {
     for (const auto &r : m_rows)
         if (r.blockAnchor == anchor) return r.kind;
     return {};
 }
 
-void LiveBlockModel::setFindSpans(const Markoff::BlockAnchor &anchor,
+void LiveBlockModel::setFindSpans(const Markoff::BlockId &anchor,
                                   const QList<FindSpan> &spans)
 {
     for (int row = 0; row < m_rows.size(); ++row) {

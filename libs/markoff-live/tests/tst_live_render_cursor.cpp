@@ -63,7 +63,7 @@ private Q_SLOTS:
         BlockKindRegistry reg;
         LiveBlockModel model;
         LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
-        QVERIFY(std::holds_alternative<NoCursor>(cs.cursor()));
+        QVERIFY(std::holds_alternative<Markoff::NoCursor>(cs.cursor()));
         QCOMPARE(cs.cursorKind(), QStringLiteral("none"));
     }
 
@@ -76,13 +76,13 @@ private Q_SLOTS:
         LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
 
-        TextCaret tc;
+        Markoff::TextCaret tc;
         tc.block = recs[0].blockAnchor;
         tc.cachedQtPos = 0;
         cs.request(tc);
 
         QCOMPARE(spy.count(), 1);
-        QVERIFY(std::holds_alternative<TextCaret>(cs.cursor()));
+        QVERIFY(std::holds_alternative<Markoff::TextCaret>(cs.cursor()));
         QCOMPARE(cs.cursorKind(), QStringLiteral("TextCaret"));
     }
 
@@ -103,8 +103,8 @@ private Q_SLOTS:
         cs.setCaretWithoutFocus(recs[1].blockAnchor, 3);
 
         QCOMPARE(spy.count(), 1);
-        QVERIFY(std::holds_alternative<TextCaret>(cs.cursor()));
-        const auto &tc = std::get<TextCaret>(cs.cursor());
+        QVERIFY(std::holds_alternative<Markoff::TextCaret>(cs.cursor()));
+        const auto &tc = std::get<Markoff::TextCaret>(cs.cursor());
         QCOMPARE(tc.block, recs[1].blockAnchor);
         QCOMPARE(static_cast<int>(tc.cachedQtPos), 3);
     }
@@ -131,12 +131,12 @@ private Q_SLOTS:
         LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
 
-        BlockSelected bs;
+        Markoff::BlockSelected bs;
         bs.block = recs[0].blockAnchor;
         cs.request(bs);
 
         QCOMPARE(spy.count(), 1);
-        QVERIFY(std::holds_alternative<BlockSelected>(cs.cursor()));
+        QVERIFY(std::holds_alternative<Markoff::BlockSelected>(cs.cursor()));
         QCOMPARE(cs.cursorKind(), QStringLiteral("BlockSelected"));
     }
 
@@ -149,12 +149,12 @@ private Q_SLOTS:
         LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
         QSignalSpy spy(&cs, &LiveCursorState::cursorChanged);
 
-        BlockSelected bs;
+        Markoff::BlockSelected bs;
         bs.block = recs[0].blockAnchor;
         cs.request(bs);  // BlockSelected on paragraph = invalid
 
         QCOMPARE(spy.count(), 0);
-        QVERIFY(std::holds_alternative<NoCursor>(cs.cursor()));
+        QVERIFY(std::holds_alternative<Markoff::NoCursor>(cs.cursor()));
     }
 
     void request_same_cursor_emits_no_signal() {
@@ -164,7 +164,7 @@ private Q_SLOTS:
         model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]) }), recs);
 
         LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
-        TextCaret tc;
+        Markoff::TextCaret tc;
         tc.block = recs[0].blockAnchor;
         tc.cachedQtPos = 0;
         cs.request(tc);
@@ -181,19 +181,19 @@ private Q_SLOTS:
         model.applyOps(AstBlockDiff::diff({}, { keyOf(recs[0]) }), recs);
 
         LiveCursorState cs(&reg, &model, /*binding=*/nullptr);
-        TextCaret tc;
+        Markoff::TextCaret tc;
         tc.block = recs[0].blockAnchor;
         cs.request(tc);
-        QVERIFY(!std::holds_alternative<NoCursor>(cs.cursor()));
+        QVERIFY(!std::holds_alternative<Markoff::NoCursor>(cs.cursor()));
 
         cs.clear();
-        QVERIFY(std::holds_alternative<NoCursor>(cs.cursor()));
+        QVERIFY(std::holds_alternative<Markoff::NoCursor>(cs.cursor()));
     }
 
     // ---- LiveRenderSelection type tests ----
 
     void selection_collapsed_caret() {
-        TextCaret tc;
+        Markoff::TextCaret tc;
         tc.cachedQtPos = 3;
         LiveRenderSelection sel;
         sel.anchor = tc;
@@ -203,7 +203,7 @@ private Q_SLOTS:
     }
 
     void selection_non_collapsed() {
-        TextCaret a, b;
+        Markoff::TextCaret a, b;
         a.cachedQtPos = 0;
         b.cachedQtPos = 5;
         LiveRenderSelection sel;
@@ -265,12 +265,12 @@ private Q_SLOTS:
 
         cs.clear();
         QCOMPARE(spy.count(), 0);
-        QVERIFY(std::holds_alternative<NoCursor>(cs.cursor()));
+        QVERIFY(std::holds_alternative<Markoff::NoCursor>(cs.cursor()));
     }
 
     void enterAtEnd_landsFocusOnNewRowViaChokepoint() {
         // Production path: structural-key handler calls Cmd::enterAtEnd, then
-        // calls LiveCursorState::establishFocus on the newly-created BlockAnchor.
+        // calls LiveCursorState::establishFocus on the newly-created BlockId.
         // The chokepoint stages the pending and tryResolvePending picks the
         // correct delegate once it registers. Pre-tier-4b this lived under
         // requestTextCaretAtNewRow, which had its own pending slot (m_pendingRow)
@@ -290,7 +290,7 @@ private Q_SLOTS:
         Markoff::Cmd::enterAtEnd(document, block0);
         QTRY_COMPARE(binding.model()->rowCount(), 2);
 
-        // Resolve the new row's BlockAnchor and stage focus through the chokepoint.
+        // Resolve the new row's BlockId and stage focus through the chokepoint.
         const Markoff::BlockId block1 = binding.model()->recordAt(1).blockAnchor;
         binding.cursorState()->establishFocus(block1, /*qtPos=*/0);
 

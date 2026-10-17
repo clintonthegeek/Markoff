@@ -3,7 +3,7 @@
 
 #include <markoff/live/MarkoffLiveExport.h>
 #include <markoff/live/FindSpan.h>
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/core/BlockAttrsMap.h>
 #include <markoff/parser/SourceSpan.h>
 
@@ -32,7 +32,7 @@ struct MARKOFF_LIVE_EXPORT BlockRecord {
     int                  headingLevel = 0;  ///< 1–6 if kind=="heading"; else 0.
     QString              codeLanguage;      ///< Fence info-string if kind=="code-block".
     QString              headingForm;       ///< "atx" / "setext" if kind=="heading"; else empty.
-    Markoff::BlockAnchor blockAnchor;       ///< CRDT-stable identity (block's first byte).
+    Markoff::BlockId blockAnchor;       ///< CRDT-stable identity (block's first byte).
     /// Per-block inline-format spans (bold/italic/code/link/wikilink/tag/
     /// strikethrough/highlight) populated from the parsed AST and consumed
     /// by `InlineHighlighter` (E1). Load-bearing — do not strip.
@@ -66,7 +66,7 @@ struct MARKOFF_LIVE_EXPORT BlockRecord {
 /// (paragraph→hr) produce Delete+Insert. See Markoff::Live::delegateClassFor.
 struct MARKOFF_LIVE_EXPORT BlockKey {
     QString              delegateClass;
-    Markoff::BlockAnchor anchor;
+    Markoff::BlockId anchor;
     bool operator==(const BlockKey &o) const noexcept {
         return delegateClass == o.delegateClass && anchor == o.anchor;
     }

@@ -16,7 +16,7 @@
 // E. session_round_trip_no_echo
 //    syncSelectionToSession emits once; equality short-circuit prevents echo.
 // F. selection_survives_structural_edit_above
-//    BlockAnchor identity survives insertion of a block above the selection.
+//    BlockId identity survives insertion of a block above the selection.
 // G. selection_cleared_on_orphaned_anchor
 //    Deleting the selected block clears the selection anchor.
 
@@ -61,9 +61,9 @@ private slots:
     //    onSessionPrimarySelectionChanged and does NOT trigger selectionChanged.
     void session_round_trip_no_echo();
 
-    // F. The BlockAnchor identity of the selection anchor survives structural
+    // F. The BlockId identity of the selection anchor survives structural
     //    edits above the selected row (block insertion shifts row indices but
-    //    BlockAnchor is stable).
+    //    BlockId is stable).
     void selection_survives_structural_edit_above();
 
     // G. When the anchored block is deleted, the session round-trip resolves
@@ -308,9 +308,9 @@ void TestSelectionCursorUnification::session_round_trip_no_echo()
 
 void TestSelectionCursorUnification::selection_survives_structural_edit_above()
 {
-    // BlockAnchor identity is stable across structural edits.
+    // BlockId identity is stable across structural edits.
     // When a new block is inserted above the selected row, the row index
-    // shifts but the BlockAnchor of the selection anchor is unchanged.
+    // shifts but the BlockId of the selection anchor is unchanged.
     Markoff::MarkoffDocument doc(quint16(42));
     Markoff::Live::LiveListModelBinding binding;
     binding.setDocument(&doc);
@@ -334,7 +334,7 @@ void TestSelectionCursorUnification::selection_survives_structural_edit_above()
         QTest::qWait(10);
     QCOMPARE(binding.model()->rowCount(), 5);
 
-    // The selection anchor BlockAnchor is unchanged.
+    // The selection anchor BlockId is unchanged.
     QVERIFY(cs->selectionAnchor().has_value());
     QCOMPARE(cs->selectionAnchor()->block, anchorBefore);
 

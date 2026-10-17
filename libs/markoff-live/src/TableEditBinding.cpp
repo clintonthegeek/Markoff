@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/live/TableEditBinding.h>
 #include <markoff/live/LiveBlockModel.h>
-#include <markoff/live/Coordinates.h>
+#include <markoff/core/TextUnits.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Theme.h>
@@ -16,7 +16,7 @@
 
 namespace Markoff::Live {
 
-namespace coords = ::Markoff::Live::Detail::Coordinates;
+namespace coords = ::Markoff::TextUnits;
 
 TableEditBinding::TableEditBinding(QObject *parent)
     : QObject(parent) {}

@@ -229,7 +229,7 @@ bool LiveStructuralKeyHandler::tryHandle(int key,
     return keyIt.value()(ctx) == HandleResult::Handled;
 }
 
-void LiveStructuralKeyHandler::changeCodeLanguage(Markoff::BlockAnchor anchor,
+void LiveStructuralKeyHandler::changeCodeLanguage(Markoff::BlockId anchor,
                                                     const QString &lang)
 {
     if (!m_document) return;
@@ -238,7 +238,7 @@ void LiveStructuralKeyHandler::changeCodeLanguage(Markoff::BlockAnchor anchor,
     m_document->d2SetBlockAttr(id, Markoff::AttrNames::InfoString, lang, t);
 }
 
-void LiveStructuralKeyHandler::changeImageAlt(Markoff::BlockAnchor anchor,
+void LiveStructuralKeyHandler::changeImageAlt(Markoff::BlockId anchor,
                                                const QString &alt)
 {
     if (!m_document) return;
@@ -291,7 +291,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             // EOB Enter: create a new paragraph block after the current one.
             // D2: use Cmd::enterAtEnd.
             Markoff::BlockId newBlock = Markoff::Cmd::enterAtEnd(*c.document, c.blockAnchor);
-            c.cursorState->establishFocus(Markoff::BlockAnchor(newBlock), 0);
+            c.cursorState->establishFocus(Markoff::BlockId(newBlock), 0);
             return HR::Handled;
         }
 
@@ -302,7 +302,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             // use d2InsertBlock at the head.
             Markoff::BlockId newBlock;
             if (c.blockIndex > 0) {
-                const Markoff::BlockAnchor prevAnchor =
+                const Markoff::BlockId prevAnchor =
                     c.model->recordAt(c.blockIndex - 1).blockAnchor;
                 newBlock = Markoff::Cmd::enterAtEnd(*c.document, prevAnchor);
             } else {
@@ -312,7 +312,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
                 newBlock = c.document->d2InsertBlock(Markoff::BlockId{},
                                                      Markoff::BlockKind::Paragraph, t);
             }
-            c.cursorState->establishFocus(Markoff::BlockAnchor(newBlock), 0);
+            c.cursorState->establishFocus(Markoff::BlockId(newBlock), 0);
             return HR::Handled;
         }
 
@@ -341,7 +341,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             // 3. Set new block's text to suffix.
             c.document->d2ApplyBufferEdit(newBlock, 0, 0, suffixUtf8, t);
 
-            c.cursorState->establishFocus(Markoff::BlockAnchor(newBlock), 0);
+            c.cursorState->establishFocus(Markoff::BlockId(newBlock), 0);
         }
         return HR::Handled;
     };
@@ -447,7 +447,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
     auto blockOnlyEnter = [](const Ctx &c) -> HR {
         const Markoff::BlockId newBlock =
             Markoff::Cmd::enterAtEnd(*c.document, c.blockAnchor);
-        c.cursorState->establishFocus(Markoff::BlockAnchor(newBlock), 0);
+        c.cursorState->establishFocus(Markoff::BlockId(newBlock), 0);
         return HR::Handled;
     };
 
@@ -504,7 +504,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             const Markoff::BlockId newId = Markoff::Cmd::insertListItemBefore(*c.document, id, t);
             Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
             // Follow the original (content-bearing) item, now at blockIndex+1.
-            c.cursorState->establishFocus(Markoff::BlockAnchor(id), 0);
+            c.cursorState->establishFocus(Markoff::BlockId(id), 0);
             return HR::Handled;
         }
 
@@ -513,7 +513,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             Markoff::BlockId newId =
                 Markoff::Cmd::insertListItemAfter(*c.document, id, t);
             Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
-            c.cursorState->establishFocus(Markoff::BlockAnchor(newId), 0);
+            c.cursorState->establishFocus(Markoff::BlockId(newId), 0);
             return HR::Handled;
         }
 
@@ -530,7 +530,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
             Markoff::Cmd::insertListItemAfter(*c.document, id, t);
         c.document->d2ApplyBufferEdit(newId, 0, 0, suffixUtf8, t);
         Markoff::Cmd::renumberRunStartingAt(*c.document, newId, t);
-        c.cursorState->establishFocus(Markoff::BlockAnchor(newId), 0);
+        c.cursorState->establishFocus(Markoff::BlockId(newId), 0);
         return HR::Handled;
     };
 
@@ -650,7 +650,7 @@ void LiveStructuralKeyHandler::registerBuiltins()
         UndoLog::Transaction t(c.document->d2UndoLog());
         const Markoff::BlockId newId =
             c.document->d2InsertBlock(id, Markoff::BlockKind::BlockQuote, t);
-        c.cursorState->establishFocus(Markoff::BlockAnchor(newId), 0);
+        c.cursorState->establishFocus(Markoff::BlockId(newId), 0);
         return HR::Handled;
     };
 

@@ -3,7 +3,7 @@
 #include <markoff/live/LiveListModelBinding.h>
 #include <markoff/live/LiveBlockModel.h>
 #include <markoff/live/LiveCursorState.h>
-#include <markoff/live/Coordinates.h>
+#include <markoff/core/TextUnits.h>
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/UndoLog.h>
@@ -18,7 +18,7 @@ Q_LOGGING_CATEGORY(lcEdit, "markoff.live.edit", QtWarningMsg)
 
 namespace Markoff::Live {
 
-namespace coords = Detail::Coordinates;
+namespace coords = ::Markoff::TextUnits;
 
 LiveEditBinding::LiveEditBinding(QObject *parent) : QObject(parent) {}
 LiveEditBinding::~LiveEditBinding() = default;

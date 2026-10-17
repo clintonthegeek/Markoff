@@ -25,7 +25,7 @@ class TestLiveFindAdapter : public QObject {
     Q_OBJECT
 private slots:
     void initTestCase() {
-        qRegisterMetaType<Markoff::BlockAnchor>("Markoff::BlockAnchor");
+        qRegisterMetaType<Markoff::BlockId>("Markoff::BlockId");
         qRegisterMetaType<Markoff::Live::FindSpan>("Markoff::Live::FindSpan");
         qRegisterMetaType<Markoff::FindController::Match>(
             "Markoff::FindController::Match");

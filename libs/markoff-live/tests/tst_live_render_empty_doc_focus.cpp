@@ -24,7 +24,7 @@ private slots:
     void edit_into_empty_block_lands_correctly() {
         Markoff::MarkoffDocument doc(quint16(42));
         doc.loadFromMarkdown("");
-        // NOTE: toMarkdownUtf8() is NOT updated by D2 edits.
+        // Markdown export is driven by the D2 document projection.
         // Check blockText() instead.
         doc.applyFlatEdit(0, 0, "X", Markoff::Origin::UserEdit);
         const auto ids = doc.iterateBlocks();

@@ -54,10 +54,10 @@ void LiveContextMenuHandler::buildMenu()
 void LiveContextMenuHandler::popup(qreal globalX, qreal globalY,
                                    const QVariant &blockAnchor)
 {
-    if (blockAnchor.isValid() && blockAnchor.canConvert<Markoff::BlockAnchor>())
-        m_currentAnchor = blockAnchor.value<Markoff::BlockAnchor>();
+    if (blockAnchor.isValid() && blockAnchor.canConvert<Markoff::BlockId>())
+        m_currentAnchor = blockAnchor.value<Markoff::BlockId>();
     else
-        m_currentAnchor = Markoff::BlockAnchor{};
+        m_currentAnchor = Markoff::BlockId{};
 
     const bool canUndo = m_document && m_document->canUndoForBlock(m_currentAnchor);
     m_undoBlockAction->setEnabled(canUndo);

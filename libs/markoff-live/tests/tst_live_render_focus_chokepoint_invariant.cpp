@@ -2,7 +2,7 @@
 #include "LiveRealisticInputHarness.h"
 #include "QmlIntegrationFixture.h"
 
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
 #include <markoff/live/LiveCursorState.h>
 
 #include <QQuickItem>
@@ -1071,9 +1071,9 @@ void TestFocusChokepointInvariant::table_delegate_registers_with_cursor_state()
              qPrintable("delegate at row 1 is not TableDelegate: " + className));
 
     const QVariant anchorVar = table->property("blockAnchor");
-    QVERIFY2(anchorVar.isValid() && anchorVar.canConvert<Markoff::BlockAnchor>(),
+    QVERIFY2(anchorVar.isValid() && anchorVar.canConvert<Markoff::BlockId>(),
              "TableDelegate.blockAnchor not set after Component.onCompleted");
-    const Markoff::BlockAnchor anchor = anchorVar.value<Markoff::BlockAnchor>();
+    const Markoff::BlockId anchor = anchorVar.value<Markoff::BlockId>();
 
     QObject *csObj = fx.binding()->property("cursorState").value<QObject *>();
     auto *cs = qobject_cast<LiveCursorState *>(csObj);
