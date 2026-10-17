@@ -20,7 +20,7 @@ Cluster A uses this for:
 - Round-trip equality checks in tests.
 - Computing the `ContentStart` offset (first character after the closing `---` line) so mutations don't corrupt body text.
 
-**Not the same as** the current `frontmatter()` method if that one normalises whitespace. If the current method already returns byte-exact raw, rename is optional.
+`frontmatterRaw()` is the sole raw-text accessor; the deprecated `frontmatter()` alias has been removed.
 
 ### 1.2 `Document::frontmatterSpan() -> std::optional<SourceSpan>`
 
@@ -30,9 +30,9 @@ Cluster A uses this for:
 - `FrontMatterWriter::process()` — splice a new frontmatter block into the file without re-tokenising the body.
 - EOF-close detection: if `endByte == fileSize`, we know the frontmatter closed at EOF with no trailing newline (Obsidian's `Qx` regex case).
 
-### 1.3 `Document::parsedFrontmatter() -> YamlValue` (REPLACES current `QList<FrontmatterProperty>`)
+### 1.3 `Document::parsedFrontmatter() -> YamlValue`
 
-Drop the flattened key/value list. Return a **ryml::Tree** (owned) or a thin Corbomite wrapper around it — call it `Markoff::YamlValue`. Requirements:
+Return the structured `Markoff::YamlValue`; the flattened `QList<FrontmatterProperty>` API and its `QVariant` conversion have been removed. Requirements:
 
 - **Preserves key order** exactly as it appears on disk.
 - **Preserves node styles**: flow vs. block, single-quoted vs. double-quoted vs. unquoted, folded vs. literal scalars. Round-tripping an unchanged document through `parse → stringify` must be a byte-exact no-op (modulo newline-at-EOF normalisation — see §2.4).
@@ -189,7 +189,7 @@ When the port is done, Cluster A expects this checklist green:
 - [ ] `find_package(yaml-cpp)` removed from `libs/markoff-parser/CMakeLists.txt`.
 - [ ] ryml vendored or `FetchContent`-fetched; pinned to a specific tag.
 - [ ] `#include <yaml-cpp/yaml.h>` gone from `src/Document.cpp`; replaced with ryml include.
-- [ ] Old `QList<FrontmatterProperty> parsedFrontmatter()` deprecated or removed; new `YamlValue parsedFrontmatter()` in place.
+- [x] Flattened `FrontmatterProperty`/`QVariant` conversion path removed; `YamlValue parsedFrontmatter()` is the sole structured frontmatter API.
 - [ ] `frontmatterRaw()`, `frontmatterSpan()`, `frontmatterHasEofClose()` exposed per §1.
 - [ ] `stringifyFrontmatter()` and `withFrontmatter()` exposed per §2.
 - [ ] Round-trip test (§2.4) passes on the full `testvaults/` corpus.

@@ -176,9 +176,14 @@ void TestDocumentTopLevelBlocks::htmlBlock()
 
 void TestDocumentTopLevelBlocks::linkReferenceDefinition()
 {
-    auto blocks = blocksOf(QStringLiteral("[label]: http://example.com\n"));
+    auto blocks = blocksOf(QStringLiteral(
+        "[long\nlabel]:\n <http://example.com/path>\n \"a title\"\n"));
     QCOMPARE(blocks.size(), 1);
     QCOMPARE(blocks[0].kind, Kind::LinkReferenceDefinition);
+    QCOMPARE(blocks[0].linkReferenceLabel, QStringLiteral("long\nlabel"));
+    QCOMPARE(blocks[0].linkReferenceDestination,
+             QStringLiteral("http://example.com/path"));
+    QCOMPARE(blocks[0].linkReferenceTitle, QStringLiteral("a title"));
 }
 
 void TestDocumentTopLevelBlocks::pipeTable()

@@ -7,7 +7,6 @@
 #include <utility>
 #include <QString>
 #include <QList>
-#include <QVariant>
 #include <markoff/parser/LinkTarget.h>
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/parser/YamlValue.h>
@@ -50,12 +49,6 @@ struct FootnoteRefInfo {
     int     sourceOffset; // QString char offset of '[' in body.
 };
 
-/// @deprecated Use YamlValue-based parsedFrontmatter() instead.
-struct FrontmatterProperty {
-    QString key;
-    QVariant value;
-};
-
 /// A single top-level block in the parsed Markdown body, with its
 /// kind, byte range, and a few kind-specific extras (heading level,
 /// fenced-code language/body, etc.).
@@ -83,7 +76,6 @@ struct TopLevelBlock {
         SetextHeading,              // ==== / ---- underline headings
         FencedCodeBlock,
         IndentedCodeBlock,
-        BlockQuote,
         ListItem,                   // emitted per list_item node
         ThematicBreak,              // <hr> / horizontal rule
         HtmlBlock,
@@ -121,6 +113,12 @@ struct TopLevelBlock {
     QString imageSrc;
     QString imageAlt;
     QString imageTitle;
+
+    /// For LinkReferenceDefinition: raw CommonMark label, destination and
+    /// optional title, with their syntax delimiters removed.
+    QString linkReferenceLabel;
+    QString linkReferenceDestination;
+    QString linkReferenceTitle;
 
     /// True if the block's source has any nested children that the
     /// consumer might care about (e.g. inline code, formatting).
@@ -227,9 +225,6 @@ public:
     /// Raw YAML text between the --- delimiters (byte-exact, no normalization).
     QString frontmatterRaw() const;
 
-    /// @deprecated Alias for frontmatterRaw() for backward compatibility.
-    QString frontmatter() const;
-
     /// Byte span {startByte, endByte} of the complete frontmatter block
     /// including both delimiter lines. nullopt if no frontmatter present.
     std::optional<std::pair<int,int>> frontmatterSpan() const;
@@ -248,9 +243,6 @@ public:
     /// given value. If the document had no frontmatter and value is non-empty,
     /// a new block is prepended. If value is null/empty, frontmatter is stripped.
     QString withFrontmatter(const YamlValue &value) const;
-
-    /// @deprecated Use YamlValue-based parsedFrontmatter() instead.
-    QList<FrontmatterProperty> parsedFrontmatterLegacy() const;
 
     // Returns the markdown content without frontmatter
     QString markdownContent() const;

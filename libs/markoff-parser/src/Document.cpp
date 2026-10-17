@@ -159,11 +159,6 @@ bool Document::isEmpty() const
     return d->source.isEmpty();
 }
 
-QString Document::frontmatter() const
-{
-    return d->frontmatter;
-}
-
 QString Document::frontmatterRaw() const
 {
     return d->frontmatter;
@@ -412,63 +407,6 @@ QString Document::withFrontmatter(const YamlValue &value) const
     QString yamlBody = value.stringify();
     QString newFm = QStringLiteral("---\n") + yamlBody + QStringLiteral("\n---\n");
     return newFm + body;
-}
-
-// --- Legacy compatibility (deprecated) ---
-
-static QVariant yamlValueToVariant(const YamlValue &val)
-{
-    switch (val.kind()) {
-    case YamlValue::Kind::Null:
-        return {};
-    case YamlValue::Kind::Bool:
-        return val.asBool();
-    case YamlValue::Kind::Int:
-        return static_cast<int>(val.asInt());
-    case YamlValue::Kind::Double:
-        return val.asDouble();
-    case YamlValue::Kind::String:
-        return val.asString();
-    case YamlValue::Kind::Seq:
-        return val.asStringList();
-    case YamlValue::Kind::Map: {
-        QVariantMap map;
-        val.forEach([&](const QString &k, const YamlValue &v) {
-            map.insert(k, yamlValueToVariant(v));
-        });
-        return map;
-    }
-    }
-    return {};
-}
-
-static QVariant normalizeListValue(const QString &key, const QVariant &value)
-{
-    if ((key == QStringLiteral("tags") || key == QStringLiteral("aliases"))
-        && value.typeId() == QMetaType::QString) {
-        QStringList parts;
-        for (const auto &s : value.toString().split(QLatin1Char(','),
-                                                      Qt::SkipEmptyParts))
-            parts.append(s.trimmed());
-        return parts;
-    }
-    return value;
-}
-
-QList<FrontmatterProperty> Document::parsedFrontmatterLegacy() const
-{
-    YamlValue fm = parsedFrontmatter();
-    if (!fm.isMap())
-        return {};
-
-    QList<FrontmatterProperty> result;
-    fm.forEach([&](const QString &key, const YamlValue &val) {
-        FrontmatterProperty prop;
-        prop.key = key;
-        prop.value = normalizeListValue(key, yamlValueToVariant(val));
-        result.append(prop);
-    });
-    return result;
 }
 
 } // namespace Markoff

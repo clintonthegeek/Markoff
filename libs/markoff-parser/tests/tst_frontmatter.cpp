@@ -34,9 +34,6 @@ private slots:
     void unicodeKeysAndValues();
     void roundTrip();
 
-    // Legacy compatibility
-    void legacyApi();
-
     // setChildFrom tests
     void testSetChildFromCopiesNestedMapVerbatim();
     void testSetChildFromReplacesExistingKey();
@@ -79,7 +76,8 @@ void TestFrontmatter::commaStyleTags()
 {
     // "tags: alpha, beta" is a plain scalar in YAML — Obsidian treats it as
     // comma-separated. The new API preserves raw YAML semantics (it's a string).
-    // Comma-splitting is the caller's responsibility (libs/core normalizeListValue).
+    // The structured API preserves YAML scalar semantics; callers choose any
+    // application-specific interpretation.
     auto doc = Document::fromMarkdown(QStringLiteral(
         "---\ntags: alpha, beta\n---\nBody"));
     auto fm = doc->parsedFrontmatter();
@@ -312,18 +310,6 @@ void TestFrontmatter::roundTrip()
     QCOMPARE(fm2.get(QStringLiteral("weight")).asInt(), int64_t(42));
     QCOMPARE(fm2.get(QStringLiteral("tags")).asStringList(),
              QStringList({QStringLiteral("a"), QStringLiteral("b")}));
-}
-
-void TestFrontmatter::legacyApi()
-{
-    auto doc = Document::fromMarkdown(QStringLiteral(
-        "---\ntitle: My Note\ntags:\n  - foo\n  - bar\n---\nBody"));
-    auto props = doc->parsedFrontmatterLegacy();
-    QCOMPARE(props.size(), 2);
-    QCOMPARE(props[0].key, QStringLiteral("title"));
-    QCOMPARE(props[0].value.toString(), QStringLiteral("My Note"));
-    QCOMPARE(props[1].key, QStringLiteral("tags"));
-    QCOMPARE(props[1].value.toStringList(), QStringList({QStringLiteral("foo"), QStringLiteral("bar")}));
 }
 
 void TestFrontmatter::testSetChildFromCopiesNestedMapVerbatim()

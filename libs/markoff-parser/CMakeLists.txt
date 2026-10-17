@@ -53,6 +53,7 @@ add_library(Markoff::Parser ALIAS markoff-parser)
 
 target_include_directories(markoff-parser
     PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<INSTALL_INTERFACE:include>
     PRIVATE ${TS_MD_DIR}/tree-sitter-markdown/bindings/c
             ${TS_MD_DIR}/tree-sitter-markdown-inline/bindings/c
 )
@@ -69,11 +70,24 @@ target_link_libraries(markoff-parser
 )
 
 if(DEFINED KDE_INSTALL_LIBDIR)
+    if(APPLE)
+        set(_markoff_install_rpath "@loader_path")
+    elseif(UNIX)
+        set(_markoff_install_rpath "$ORIGIN")
+    endif()
+    if(_markoff_install_rpath)
+        set_target_properties(ts-markdown-parser markoff-parser PROPERTIES
+            INSTALL_RPATH "${_markoff_install_rpath}"
+        )
+    endif()
     install(TARGETS markoff-parser
         EXPORT CorbomiteTargets
         RUNTIME DESTINATION ${KDE_INSTALL_BINDIR}
         LIBRARY DESTINATION ${KDE_INSTALL_LIBDIR}
         ARCHIVE DESTINATION ${KDE_INSTALL_LIBDIR}
+    )
+    install(DIRECTORY include/markoff
+        DESTINATION ${KDE_INSTALL_INCLUDEDIR}
     )
 endif()
 

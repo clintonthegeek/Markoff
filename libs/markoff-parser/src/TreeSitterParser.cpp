@@ -1126,13 +1126,35 @@ static TopLevelBlock::Kind classifyTopLevelKind(const char *type)
     if (strcmp(type, "setext_heading") == 0)            return TopLevelBlock::Kind::SetextHeading;
     if (strcmp(type, "fenced_code_block") == 0)         return TopLevelBlock::Kind::FencedCodeBlock;
     if (strcmp(type, "indented_code_block") == 0)       return TopLevelBlock::Kind::IndentedCodeBlock;
-    if (strcmp(type, "block_quote") == 0)               return TopLevelBlock::Kind::BlockQuote;
     if (strcmp(type, "list_item") == 0)                 return TopLevelBlock::Kind::ListItem;
     if (strcmp(type, "thematic_break") == 0)            return TopLevelBlock::Kind::ThematicBreak;
     if (strcmp(type, "html_block") == 0)                return TopLevelBlock::Kind::HtmlBlock;
     if (strcmp(type, "link_reference_definition") == 0) return TopLevelBlock::Kind::LinkReferenceDefinition;
     if (strcmp(type, "pipe_table") == 0)                return TopLevelBlock::Kind::Table;
     return TopLevelBlock::Kind::Other;
+}
+
+static void fillLinkReferenceFields(TSNode node, const QByteArray &utf8,
+                                    TopLevelBlock &block)
+{
+    for (uint32_t i = 0; i < ts_node_named_child_count(node); ++i) {
+        const TSNode child = ts_node_named_child(node, i);
+        const char *type = ts_node_type(child);
+        const int start = static_cast<int>(ts_node_start_byte(child));
+        const int length = static_cast<int>(ts_node_end_byte(child)) - start;
+        QByteArray value = utf8.mid(start, length);
+        if (strcmp(type, "link_label") == 0) {
+            if (value.size() >= 2) value = value.mid(1, value.size() - 2);
+            block.linkReferenceLabel = QString::fromUtf8(value);
+        } else if (strcmp(type, "link_destination") == 0) {
+            if (value.size() >= 2 && value.front() == '<' && value.back() == '>')
+                value = value.mid(1, value.size() - 2);
+            block.linkReferenceDestination = QString::fromUtf8(value);
+        } else if (strcmp(type, "link_title") == 0) {
+            if (value.size() >= 2) value = value.mid(1, value.size() - 2);
+            block.linkReferenceTitle = QString::fromUtf8(value);
+        }
+    }
 }
 
 // Returns true if the list node contains a blank line between items
@@ -1399,6 +1421,9 @@ static void collectTopLevelBlocks(TSNode node, const QByteArray &utf8,
         break;
     case TopLevelBlock::Kind::FencedCodeBlock:
         fillFencedCodeFields(node, utf8, b);
+        break;
+    case TopLevelBlock::Kind::LinkReferenceDefinition:
+        fillLinkReferenceFields(node, utf8, b);
         break;
     case TopLevelBlock::Kind::IndentedCodeBlock:
         // v1: surface raw block source. Consumers de-indent if needed.
