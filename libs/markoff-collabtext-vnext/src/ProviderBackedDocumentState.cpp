@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/vnext/ProviderBackedDocumentState.h>
+#include <markoff/vnext/HistoryRetirement.h>
 #include <markoff/vnext/ActionBundleCodec.h>
 
 #include <algorithm>
@@ -313,6 +314,16 @@ ActionPublicationResult ProviderBackedDocumentState::publishAction(
                 auto advanced = m_projection->acceptStagedLocalCommit(
                     accepted, *result.committedRevision, *stagedOwnerHistory);
                 advancedStagedProjection = advanced.ok();
+                if (advancedStagedProjection) {
+                    auto acked = acknowledgeDurableRetirements(
+                        *m_projection, *stagedOwnerHistory);
+                    if (!acked.ok()) {
+                        setState(ProviderDocumentState::recoveryRequired);
+                        result.diagnostic = acked.error();
+                        result.state = ActionPublicationState::committedHistoryPending;
+                        return result;
+                    }
+                }
             }
         }
     }
@@ -510,8 +521,22 @@ ActionPublicationResult ProviderBackedDocumentState::publishStagedAction(
             Error(ErrorCode::awaiting_state,
                   "document must be ready or have an authorized initial import")};
 
+    OwnerHistorySnapshot history = ownerHistory;
+    if (!history.actionIndex.events.empty()) {
+        auto enforced = enforceActorUndoDepth(*m_projection, history);
+        if (!enforced.ok()) {
+            auto restored = restoreAcceptedProjection();
+            if (!restored.ok()) {
+                setState(ProviderDocumentState::recoveryRequired);
+                return {ActionPublicationState::rejected, std::nullopt, restored.error()};
+            }
+            if (m_coordinator->blocked())
+                setState(ProviderDocumentState::recoveryRequired);
+            return {ActionPublicationState::rejected, std::nullopt, enforced.error()};
+        }
+    }
     auto transaction = ActionTransactionBuilder::build(
-        *m_storage, stager.bundle(), ownerHistory, stager.operationReservations());
+        *m_storage, stager.bundle(), history, stager.operationReservations());
     if (!transaction.ok()) {
         auto restored = restoreAcceptedProjection();
         if (!restored.ok()) {
@@ -522,7 +547,7 @@ ActionPublicationResult ProviderBackedDocumentState::publishStagedAction(
             setState(ProviderDocumentState::recoveryRequired);
         return {ActionPublicationState::rejected, std::nullopt, transaction.error()};
     }
-    return publishAction(transaction.value(), &ownerHistory);
+    return publishAction(transaction.value(), &history);
 }
 
 ActionPublicationResult ProviderBackedDocumentState::recoverActionAndRebuild(

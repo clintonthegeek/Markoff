@@ -19,6 +19,7 @@ add_library(markoff_collabtext_vnext STATIC
     include/markoff/vnext/CounterGapCodec.h
     include/markoff/vnext/CrossStreamHistoryCodec.h
     include/markoff/vnext/DocumentStorageProvider.h
+    include/markoff/vnext/HistoryRetirement.h
     include/markoff/vnext/LocalHistoryCodec.h
     include/markoff/vnext/OwnerHistoryCodec.h
     include/markoff/vnext/ProviderBackedDocumentState.h
@@ -34,6 +35,7 @@ add_library(markoff_collabtext_vnext STATIC
     include/markoff/vnext/ScopedTextStream.h
     include/markoff/vnext/SourceSnapshotCodec.h
     include/markoff/vnext/StreamNames.h
+    include/markoff/vnext/UndoDepth.h
     src/AcceptedPrefixProjection.cpp
     src/ActionBundleCodec.cpp
     src/ActionPublicationCoordinator.cpp
@@ -42,6 +44,7 @@ add_library(markoff_collabtext_vnext STATIC
     src/CounterGapCodec.cpp
     src/CrossStreamHistoryCodec.cpp
     src/DocumentStorageProvider.cpp
+    src/HistoryRetirement.cpp
     src/LocalHistoryCodec.cpp
     src/OwnerHistoryCodec.cpp
     src/ProviderBackedDocumentState.cpp

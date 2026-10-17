@@ -17,9 +17,9 @@ with receipts are in the tree.
 
 The remaining Markoff work is a short tail:
 
-1. **A10, now.** Give local history an explicit retirement bound and enforce
-   it when a new action would exceed that bound.
-2. **A12.** Carry remote carets as ephemeral presence, separate from document history.
+1. **A10, done.** One actor keeps 100 undoable actions. The action that would
+   pass that depth records retirement of the oldest one.
+2. **A12, now.** Carry remote carets as ephemeral presence, separate from document history.
 3. **A11 with A15.** Turn the reference provider's outbox, quarantine, and
    receipt behavior into checks a host provider must pass, and assemble the
    transition package.
@@ -124,8 +124,8 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
   file.
 - `undoForBlock` publishes `undoGroup` for that block's action.
   `tst_provider_backed_document.cpp` undoes block A and checks block B still
-  reads `Block B B` after reopen. `MarkoffDocumentVNext.cpp` does not emit
-  `RetiredHistoryAssociation`. That remains A10.
+  reads `Block B B` after reopen. A10 records retirement once an actor passes
+  100 undoable actions.
 - `ActionBundleCodec` accepts MAB version 3 only. Cross-stream history accepts
   version 3 only. The publication coordinator's `recoverAndRebuild` and
   `publishGap` are what the document lifecycle calls.
@@ -149,15 +149,15 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 | A01 | Done | Provider lifecycle and fallible edits are what `MarkoffDocument` uses. Host chrome and host storage are A15/A16. |
 | A02 | Done | Reference provider: leases, reservations, reopen, injected sync faults. |
 | A03 | Done | Provider-backed text, map, and list allocation. |
-| A04 | Done | Selective undo of action A while action B remains. Retirement is A10. |
+| A04 | Done | Selective undo of action A while action B remains. Depth retirement is A10. |
 | A05 | Done | Canonical codecs. Do not add a second version of a record family. |
 | A06 | Done | Local publication and recovery coordinator. Remote delivery stays A11/A12. |
 | A07 | Done | Installed Core/Source/Styled/Canvas on composite `BlockId`. |
 | A08 | Done | Provider-backed block, map, structural, paste, and format edits. A missing command is a new bug with a test. |
 | A09 | Done | Import, replacement, reopen, and revision-bound export. |
-| A10 | **Now** | History retirement and backpressure. |
+| A10 | Done | Retire undo history past 100 actions per actor. |
 | A11 | Later | Host-provider conformance checks. Fold them into A15. |
-| A12 | Later | Ephemeral remote presence. |
+| A12 | **Now** | Ephemeral remote presence. |
 | A13 | Done | Retired engine, live leaf, and unbuilt legacy branches are gone. |
 | A14 | Later | Acceptance record on the sources you are finishing. |
 | A15 | Later | Transition package for a Corbomite agent. |
@@ -189,23 +189,18 @@ the 2026-10-16 baseline.
 
 ### A10 — history retirement and backpressure
 
-Selective undo, redo, reopen, and compensation failure rollback are already
-covered. `MarkoffDocument` restores local ancestry and does not emit
-`RetiredHistoryAssociation` records. The MAI/MAH codecs can validate a
-retirement. Nothing in the document decides when a group becomes eligible.
+Done 2026-10-17. One actor keeps 100 undoable `edit` or `replacement` actions.
+The initial import is not one of them. The action that would pass that depth
+records `RetiredHistoryAssociation` for the oldest excess action, and for
+redo groups the engines have already trimmed. The retired action can no longer
+be undone. If that record cannot be attached, the new action is not appended;
+a counter it already reserved stays unresolved until allocation-gap recovery.
+Save, export, and garbage collection do not retire history. Engines stay at
+Core's 100,000-group ceiling. The reader stays `MAI/3`. A04 stays closed.
 
-**Do this.** Read the retirement rules in the persistence spec. Choose an
-explicit per-actor undo depth, write that number into the spec and into this
-task, and only then implement it. When a newly committed action would exceed
-the depth, that same action records retirement of the oldest undoable group,
-and the retired group can no longer be undone. If the retirement record cannot
-be attached, the new action does not commit. Add a regression for the bound,
-for refusal when retirement cannot be recorded, and for reopen after a
-retirement. Do not retire history from save, export, or garbage collection.
-
-**Exit.** A test crosses the recorded depth, proves the oldest group is gone
-after reopen, proves a younger group still undoes, and proves a failed
-retirement leaves the previous accepted state in place. A04 stays closed.
+The depth, reopen, younger-undo, and refusal checks are
+`runActorUndoDepth` in `tst_provider_backed_document.cpp`. Verification is
+recorded on `docs/STATUS.md`.
 
 ### A12 — ephemeral presence
 

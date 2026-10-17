@@ -282,8 +282,10 @@ integer bounds, snapshot budget and actor/stream ownership before restore. Do
 not serialize the C++ structs by memory layout. The codec rejects records over
 8 MiB, scope strings over 256 bytes, more than 100,000 combined history groups,
 more than 400,000 identities, unsupported versions, truncated records, and
-trailing bytes. Retired groups are not acknowledged until a durable host event
-records their retirement handling.
+trailing bytes. The owner-history snapshot stored with the committing
+action still lists trimmed groups in `retired_entries`. Live engines
+acknowledge those groups only after that action commits, and replay
+acknowledges a restored group only when the MAI index already names it.
 
 Replay all accepted shared bundles into fresh engines first. Then restore the
 matching actor's private `MAH` snapshots, followed by Markoff's cross-stream
@@ -300,8 +302,8 @@ shared operations, restores the snapshot, and applies its resulting undo and
 redo compensations on a peer. This proves the codec and engine restore seam;
 host file/DB write atomicity remains unverified.
 
-The action-to-engine-group index and consistent cursor/compensation commit
-policy are M8. `MAH/1` does not claim multi-stream undo atomicity is solved.
+The action-to-engine-group index and the actor undo depth are specified below.
+`MAH/1` does not by itself make a multi-stream undo atomic.
 
 `MAI/1` is the original owner-private cross-stream index stored beside the per-stream
 MAH snapshots. It binds one document/epoch/owner and the accepted-prefix token
@@ -310,10 +312,12 @@ event records an action ID and kind, its undo/redo parent when applicable, and
 each affected stream's primitive, engine group ID,
 and operation identities. Markoff map operations use their operation identity
 as the group identity. Retirement associations name the group, stream, primitive
-and accepted action that records the retirement. The reader rejects duplicate
-actions, duplicate per-action group or operation claims, unknown parents,
-orphan retirements, foreign actors/routes, unsupported versions, truncation and
-trailing bytes. `MAI/1` and `MAI/2` are historical and are rejected by the
+and the later accepted action that records the retirement. The recording
+action's event must come after the group's origin. The creating action cannot
+retire its own group, and an earlier action cannot retire a later group. The
+reader rejects duplicate actions, duplicate per-action group or operation
+claims, unknown parents, orphan retirements, foreign actors/routes, unsupported
+versions, truncation and trailing bytes. `MAI/1` and `MAI/2` are historical and are rejected by the
 current reader. The only accepted format is `MAI/3`, which adds
 owner-private prior map state to each map operation's singleton history group:
 whether the key previously existed and, when it did, its exact prior value. The
@@ -324,72 +328,65 @@ undo can restore the prior export bytes after restart. MAI/3 is bounded to
 8 MiB, 100,000 actions, 200,000 group references and 400,000 combined
 identities/retirements; each `MAI/3` map prior value is limited to 1 MiB and a
 replacement source snapshot is limited to 16 MiB. New map actions require this
-prior-state record. Capture and restoration from live
-actions remain coordinator work.
+prior-state record. Live actions capture that prior state, and replay
+restores it.
 
 `MOH/1` composes those per-stream MAH snapshots with the MAI index into one
 bounded owner-history value. It binds the prepared transaction ID and expected
 accepted-prior token, and requires the MAI event list to end at that transaction.
 After shared commit, `PrivateHistoryRecord` separately binds these exact bytes to
 the provider's returned committed revision. This avoids predicting opaque
-revision tokens during preparation. The composite codec is implemented;
-capturing it from production actions and restoring it remain coordinator work.
+revision tokens during preparation. The composite codec is implemented. Production actions capture it and replay
+restores it.
 
-## Markoff action grouping and selective undo (M8 gate)
+## Actor undo depth
 
-Markoff's `UndoLog::undoForBlock` selects the newest document action whose
-targets include the requested block, then dispatches that action's full target
-list in reverse order. The current `MarkoffDocument` dispatcher invokes
-stack-based `undo()`/`redo()` on Buffer, IdList and sibling-map engines and
-discards the logged `opId`. The selected Markoff action therefore is not
-necessarily the group those shared engines undo when later actions on other
-blocks touched them in the meantime.
+One actor keeps 100 undoable actions. An undoable action is an accepted `edit`
+or `replacement` that is not currently undone and is not already retired. The
+initial import is not undoable: its text history is cleared when that import
+commits, and its order-list history is cleared before the import snapshot is
+saved. A replacement stays undoable.
 
-The alpha.4 API provides stack `try_undo()`/`try_redo()`, group inspection and
-snapshots, but no selective historical-group compensation. The pinned alpha.5
-Core candidate adds checked `try_undo_group(group_id)` and
-`try_redo_group(group_id)` for text and IdList. The operation refuses unknown,
-retired or wrong-state groups without reserving an identity. It moves the exact
-group across the existing snapshot cursor while preserving normal undo/redo
-ordering, including after replay and restore; new edits still truncate the redo
-suffix. Regression tests cover an older group selected under a newer active
-group and verify operation replay plus history restore.
+Text and order engines are created at Core's group ceiling of 100,000. That
+ceiling is not the undo policy. One action may contain more groups than 100.
+Markoff does not retire history because an engine byte budget was crossed.
+Physical collection and log pruning stay off.
 
-Those Core semantics are now available for shared structural order and block
-text streams. Markoff's selected per-block action must map to the full
-`(canonical stream, primitive, group_id)` tuple for each touched stream. The
-consumer trace now demonstrates selective A/B behavior across the shared order
-stream and separate text streams. It is still an adapter regression: the durable
-action-to-group index, atomic multi-stream publication, Markoff-owned map
-compensation, and allocation-failure rebuild are not implemented. Preserve
-existing per-block behavior; do not silently replace it with document-wide LIFO.
+When a new action would make the undoable set larger than 100, that same
+action records a `RetiredHistoryAssociation` for every text, order-list, and
+Markoff-map group of each oldest excess action. Redo-branch groups already
+waiting in an engine's `retired_entries` are recorded by that same action.
+The creating action cannot retire its own groups. The stored owner-history
+snapshot is the post-trim snapshot, still listing those groups as pending.
+After the durable commit, the live engines acknowledge them. Reopen
+acknowledges a pending group only when the MAI index already names it.
 
-For the first path, Markoff's durable action index maps each action ID to the
-exact engine group identity for every touched stream. Document undo uses the
-global action stack; per-block undo selects the latest action containing that
-block and requests exactly its mapped group on each stream. Markoff assembles
-the returned compensations into one durable action bundle. If a later stream
-cannot allocate a compensation after earlier engines mutated, discard and
-rebuild the disposable projection from the unchanged durable prefix, restore
-private history, then resume. Do not publish a partial multi-stream undo.
+`undoD2` and `undoForBlock` skip an action that has any retired group. They
+still compensate the selected action through `undoGroup`. Selective undo of
+one block's action while another block's later action remains is unchanged.
 
-Acceptance requires an interleaving trace where action A affects block A and a
-shared stream, action B later affects block B and the same stream, and
-`undoForBlock(A)` leaves B's work visible while publishing only A's inverse;
-then verify redo, restart-restored action mapping, and failure recovery. Global
-LIFO undo/redo and per-block selective undo are separate cases.
+If the retirement record cannot be attached, the new action is not appended.
+Accepted text and the prior accepted prefix stay. A counter the refused edit
+already reserved remains unresolved and follows the existing allocation-gap
+recovery before another ordinary action can start. `save()`,
+`snapshotForExport()`, `acknowledgeMarkdownExport`, and garbage collection do
+not retire history.
 
-Regression trace: start with blocks A and B and a shared order/map state. Commit
-action A that edits A's text and changes a shared order/map group. Commit action
-B that edits B's text and later changes that same shared group. Selectively undo
-A. The accepted compensation bundle must name only A's recorded groups; B's text,
-position and shared-map effect must remain. Ordinary undo then targets the newest
-still-active user action; redo of A restores A without hiding or reordering B.
-Close/reopen and repeat using persisted group-to-action mappings. Inject an
-allocator refusal on the second affected stream and require the Markoff projection
-to rebuild from the unchanged accepted prefix before any partial compensation is
-published. Until CollabText exposes and tests this selective-group primitive,
-this trace is a required regression, not a behavior Markoff can claim to pass.
+## Markoff action grouping and selective undo
+
+`undoForBlock` selects the newest document action whose targets include the
+requested block and that action is not retired or currently undone. It
+publishes that action's compensations as one bundle. Each action in the
+durable index maps to the engine group on every stream it touched. Per-block
+undo asks for those groups. Document `undoD2` walks the newest undoable
+action. Core `try_undo_group` and `try_redo_group` refuse an unknown, retired,
+or wrong-state group and do not reserve an identity.
+
+If a later stream cannot allocate a compensation after earlier engines
+mutated, discard and rebuild the projection from the unchanged durable prefix,
+restore private history, then resume. Do not publish a partial multi-stream
+undo. A selective undo of action A leaves a later action B's text, position,
+and shared effect in place. Redo of A restores A without hiding B.
 
 ## Reader and upgrade policy
 

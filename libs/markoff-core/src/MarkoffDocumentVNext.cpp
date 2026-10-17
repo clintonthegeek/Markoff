@@ -476,6 +476,23 @@ bool actionIsCurrentlyUndone(const std::vector<VNext::ActionHistoryEvent>& event
     return undone;
 }
 
+bool actionIsRetired(const VNext::CrossStreamHistoryIndex& index,
+                     const VNext::ActionHistoryEvent& event)
+{
+    for (const auto& group : event.groups) {
+        const bool named = std::any_of(index.retirements.begin(), index.retirements.end(),
+            [&](const VNext::RetiredHistoryAssociation& retired) {
+                return retired.stream == group.stream
+                    && retired.primitive == group.primitive
+                    && retired.groupId.actor == group.groupId.actor
+                    && retired.groupId.counter == group.groupId.counter;
+            });
+        if (named)
+            return true;
+    }
+    return false;
+}
+
 VNext::ActionPublicationResult publishDocumentMapCompensation(
     VNext::ProviderBackedDocumentState& lifecycle,
     const VNext::StorageRecoveryState& recovery,
@@ -1100,7 +1117,8 @@ void MarkoffDocument::undoD2()
     for (auto it = history.value().actionIndex.events.rbegin();
          it != history.value().actionIndex.events.rend(); ++it) {
         if ((it->kind != ActionKind::edit && it->kind != ActionKind::replacement)
-            || actionIsCurrentlyUndone(history.value().actionIndex.events, it->actionId))
+            || actionIsCurrentlyUndone(history.value().actionIndex.events, it->actionId)
+            || actionIsRetired(history.value().actionIndex, *it))
             continue;
         if (it->kind == ActionKind::replacement) {
             compensateReplacementAction(*it, false);
@@ -1243,6 +1261,7 @@ bool MarkoffDocument::canUndoForBlock(BlockId block) const
          it != history.value().actionIndex.events.rend(); ++it) {
         if (it->kind != ActionKind::edit) continue;
         if (actionIsCurrentlyUndone(history.value().actionIndex.events, it->actionId)) continue;
+        if (actionIsRetired(history.value().actionIndex, *it)) continue;
         const bool hasList = std::any_of(it->groups.begin(), it->groups.end(), isOrderListGroup);
         const bool pairedMap = hasList && it->groups.size() == 2
             && std::any_of(it->groups.begin(), it->groups.end(),
@@ -1293,6 +1312,7 @@ void MarkoffDocument::undoForBlock(BlockId block)
          it != history.value().actionIndex.events.rend() && !target; ++it) {
         if (it->kind != ActionKind::edit) continue;
         if (actionIsCurrentlyUndone(history.value().actionIndex.events, it->actionId)) continue;
+        if (actionIsRetired(history.value().actionIndex, *it)) continue;
         const bool hasList = std::any_of(it->groups.begin(), it->groups.end(), isOrderListGroup);
         const bool pairedMap = hasList && it->groups.size() == 2
             && std::any_of(it->groups.begin(), it->groups.end(),
@@ -2555,6 +2575,14 @@ VNext::ActionPublicationResult MarkoffDocument::applyMarkdownSource(
         if (found == ownerHistory.streams.end()) ownerHistory.streams.push_back(record);
         else found->snapshot = record.snapshot;
     };
+    if (!replacement) {
+        // The initial import is not an undoable action. Leaving its order
+        // groups on the list engine would sit in front of later edits and
+        // block retirement of those edits.
+        auto cleared = list->restoreLocalHistory({});
+        if (!cleared.ok())
+            return {ActionPublicationState::rejected, std::nullopt, cleared.error()};
+    }
     saveStreamHistory({list->scope(), d->lifecycle->storage().actor(),
                        list->localHistorySnapshot()});
     // Record text history only for streams represented by an operation in

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/vnext/ScopedIdListStream.h>
 #include <markoff/vnext/StreamNames.h>
+#include <markoff/vnext/UndoDepth.h>
 
 #include <collabtext/Serialization.h>
 
@@ -120,6 +121,8 @@ CollabText::Result<std::unique_ptr<ScopedIdListStream>> ScopedIdListStream::crea
     auto allocator = std::make_shared<Allocator>(session, scope);
     auto engine = IdListEngine::create(allocator, scope);
     if (!engine.ok()) return engine.error();
+    auto bounded = engine.value()->set_max_undo_depth(kEngineUndoGroupCeiling);
+    if (!bounded.ok()) return bounded.error();
     return std::unique_ptr<ScopedIdListStream>(new ScopedIdListStream(
         session, std::move(scope), std::move(allocator), std::move(engine).value()));
 }
@@ -244,6 +247,37 @@ CollabText::Result<void> ScopedIdListStream::restoreLocalHistory(
     const CollabText::Crdt::LocalHistorySnapshot& snapshot)
 {
     return m_engine->restore_local_history(snapshot);
+}
+
+CollabText::Result<void> ScopedIdListStream::retireOldestUndoGroups(std::size_t count)
+{
+    using namespace CollabText;
+    if (count == 0)
+        return {};
+    const auto before = m_engine->local_history_snapshot();
+    if (count > before.entries.size())
+        return Error(ErrorCode::history_unavailable,
+                     "undo retirement exceeds the recorded group prefix");
+    auto lowered = m_engine->set_max_undo_depth(before.entries.size() - count);
+    if (!lowered.ok())
+        return lowered.error();
+    auto raised = m_engine->set_max_undo_depth(kEngineUndoGroupCeiling);
+    if (!raised.ok())
+        return raised.error();
+    const auto after = m_engine->local_history_snapshot();
+    if (after.entries.size() + count != before.entries.size()
+        || after.retired_entries.size() < before.retired_entries.size() + count)
+        return Error(ErrorCode::history_unavailable,
+                     "undo retirement did not record the oldest groups");
+    return {};
+}
+
+CollabText::Result<void> ScopedIdListStream::acknowledgeUndoRetirements(
+    const std::vector<CollabText::Crdt::Identity>& groupIds)
+{
+    if (groupIds.empty())
+        return {};
+    return m_engine->acknowledge_undo_retirements(groupIds);
 }
 
 CollabText::Result<CollabText::Crdt::Anchor> ScopedIdListStream::anchorOf(

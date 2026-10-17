@@ -34,6 +34,7 @@ namespace {
 std::atomic<ReferenceProviderFaultPoint> g_referenceProviderFault{
     ReferenceProviderFaultPoint::none};
 std::atomic<unsigned> g_referenceProviderCommitsToSkip{0};
+std::atomic<bool> g_failNextHistoryRetirement{false};
 }
 
 void failNextReferenceProviderCommitAt(ReferenceProviderFaultPoint point) noexcept
@@ -48,6 +49,16 @@ void failReferenceProviderCommitAfter(ReferenceProviderFaultPoint point,
     g_referenceProviderCommitsToSkip.store(matchingCommitsToSkip,
                                            std::memory_order_release);
     g_referenceProviderFault.store(point, std::memory_order_release);
+}
+
+void failNextHistoryRetirement() noexcept
+{
+    g_failNextHistoryRetirement.store(true, std::memory_order_release);
+}
+
+bool consumeHistoryRetirementFailure() noexcept
+{
+    return g_failNextHistoryRetirement.exchange(false, std::memory_order_acq_rel);
 }
 
 bool consumeReferenceProviderFault(ReferenceProviderFaultPoint point) noexcept

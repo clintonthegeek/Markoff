@@ -1234,7 +1234,22 @@ void runCrossStreamHistoryCodec()
     auto retirementByEdit = index;
     retirementByEdit.retirements.front().retirementActionId = QByteArrayLiteral("A");
     require(!CrossStreamHistoryCodec::encode(retirementByEdit).ok(),
-            "cross-stream history allowed an edit action to retire a redoable group");
+            "cross-stream history allowed an action to retire its own group");
+    auto retiredByLaterEdit = index;
+    retiredByLaterEdit.events.push_back({QByteArrayLiteral("B"), ActionKind::edit, {}, {
+        {std::string(kOrderStreamName), OperationPrimitive::idList, {owner, 30},
+         {{owner, 31}}}}});
+    retiredByLaterEdit.events.push_back({QByteArrayLiteral("C"), ActionKind::edit, {}, {
+        {std::string(kOrderStreamName), OperationPrimitive::idList, {owner, 32},
+         {{owner, 33}}}}});
+    retiredByLaterEdit.retirements.push_back({std::string(kOrderStreamName),
+        OperationPrimitive::idList, {owner, 30}, QByteArrayLiteral("C")});
+    require(CrossStreamHistoryCodec::encode(retiredByLaterEdit).ok(),
+            "cross-stream history rejected a later edit retiring an older group");
+    auto retiredByEarlierEdit = retiredByLaterEdit;
+    retiredByEarlierEdit.retirements.back().retirementActionId = QByteArrayLiteral("A");
+    require(!CrossStreamHistoryCodec::encode(retiredByEarlierEdit).ok(),
+            "cross-stream history allowed an earlier action to retire a later group");
     QByteArray unsupported = encoded;
     unsupported[3] = char(4);
     require(!CrossStreamHistoryCodec::decode(

@@ -24,4 +24,9 @@ void failNextReferenceProviderCommitAt(ReferenceProviderFaultPoint point) noexce
 void failReferenceProviderCommitAfter(ReferenceProviderFaultPoint point,
                                       unsigned matchingCommitsToSkip) noexcept;
 
+/// The next action that must record a history retirement is rejected before
+/// commit. An action that retires nothing does not consume this fault.
+void failNextHistoryRetirement() noexcept;
+[[nodiscard]] bool consumeHistoryRetirementFailure() noexcept;
+
 } // namespace Markoff::VNext::Testing

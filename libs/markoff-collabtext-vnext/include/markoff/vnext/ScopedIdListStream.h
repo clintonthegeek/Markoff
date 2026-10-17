@@ -11,6 +11,7 @@
 
 #include <QByteArray>
 
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -65,6 +66,11 @@ public:
     [[nodiscard]] CollabText::Crdt::LocalHistorySnapshot localHistorySnapshot() const;
     [[nodiscard]] CollabText::Result<void> restoreLocalHistory(
         const CollabText::Crdt::LocalHistorySnapshot& snapshot);
+    /// Move `count` oldest undo entries into the pending retirement queue,
+    /// then restore the engine's group ceiling.
+    [[nodiscard]] CollabText::Result<void> retireOldestUndoGroups(std::size_t count);
+    [[nodiscard]] CollabText::Result<void> acknowledgeUndoRetirements(
+        const std::vector<CollabText::Crdt::Identity>& groupIds);
     [[nodiscard]] CollabText::Result<CollabText::Crdt::Anchor> anchorOf(
         const BlockIdentity& identity,
         CollabText::Crdt::Bias bias = CollabText::Crdt::Bias::Left) const;

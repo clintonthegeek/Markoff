@@ -171,27 +171,25 @@ bool validIndex(const CrossStreamHistoryIndex& index, bool requireMapPriorState 
         const auto event = eventsById.find(item.retirementActionId);
         const auto origin = groupOrigins.find(groupKey);
         if (!validRoute(item.stream, item.primitive) || !validId(item.groupId, index.owner)
-            || event == eventsById.end() || event->second->kind != ActionKind::redo
-            || origin == groupOrigins.end() || !knownGroups.contains(groupKey)
+            || event == eventsById.end() || origin == groupOrigins.end()
+            || !knownGroups.contains(groupKey)
             || !retired.emplace(item.stream, item.primitive,
                                 item.groupId.actor, item.groupId.counter).second)
             return false;
 
-        // A retirement is part of the redo branch that restores the original
-        // action. Merely naming an existing action ID is insufficient: an
-        // unrelated redo must not retire another branch's undo group.
-        const ActionHistoryEvent* ancestor = event->second;
-        bool reachesOrigin = false;
-        while (ancestor) {
-            if (ancestor->actionId == origin->second) {
-                reachesOrigin = true;
-                break;
-            }
-            if (ancestor->parentActionId.isEmpty()) break;
-            const auto parent = eventsById.find(ancestor->parentActionId);
-            ancestor = parent == eventsById.end() ? nullptr : parent->second;
+        // The action that records the retirement must be a later event in this
+        // index. The creating action cannot retire its own group, and an
+        // earlier action cannot retire a group that does not exist yet.
+        size_t retirementIndex = index.events.size();
+        size_t originEventIndex = index.events.size();
+        for (size_t i = 0; i < index.events.size(); ++i) {
+            if (index.events[i].actionId == item.retirementActionId)
+                retirementIndex = i;
+            if (index.events[i].actionId == origin->second)
+                originEventIndex = i;
         }
-        if (!reachesOrigin) return false;
+        if (retirementIndex <= originEventIndex)
+            return false;
     }
     return identityCount + index.retirements.size() <= kMaxIdentities;
 }

@@ -13,6 +13,7 @@
 #include <markoff/vnext/MarkoffMapValueCodec.h>
 #include <markoff/vnext/QuarantineRecordCodec.h>
 #include <markoff/vnext/StreamNames.h>
+#include <markoff/vnext/UndoDepth.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -562,11 +563,188 @@ void runDeferredRemoteActionRouting()
             "unknown-target MAB was lost across provider reopen");
 }
 
+const ActionHistoryEvent* firstTextEdit(const CrossStreamHistoryIndex& index)
+{
+    for (const auto& event : index.events) {
+        if (event.kind != ActionKind::edit)
+            continue;
+        if (std::any_of(event.groups.begin(), event.groups.end(),
+                [](const HistoryGroupAssociation& group) {
+                    return group.primitive == OperationPrimitive::text;
+                }))
+            return &event;
+    }
+    return nullptr;
+}
+
+const ActionHistoryEvent* lastTextEdit(const CrossStreamHistoryIndex& index)
+{
+    const ActionHistoryEvent* last = nullptr;
+    for (const auto& event : index.events) {
+        if (event.kind != ActionKind::edit)
+            continue;
+        if (std::any_of(event.groups.begin(), event.groups.end(),
+                [](const HistoryGroupAssociation& group) {
+                    return group.primitive == OperationPrimitive::text;
+                }))
+            last = &event;
+    }
+    return last;
+}
+
+const HistoryGroupAssociation* textGroup(const ActionHistoryEvent& event)
+{
+    for (const auto& group : event.groups)
+        if (group.primitive == OperationPrimitive::text)
+            return &group;
+    return nullptr;
+}
+
+void runActorUndoDepth()
+{
+    auto provider = take(makeEphemeralDocumentStorageProvider());
+    const DocumentStorageScope scope{QStringLiteral("actor-undo-depth"), 1};
+    auto document = take(Markoff::MarkoffDocument::open(
+        *provider, scope, StorageMode::ephemeral));
+    const auto imported = document->importInitialMarkdown(QByteArrayLiteral("base\n"));
+    require(imported.state == ActionPublicationState::committed,
+            "undo-depth fixture could not import its base paragraph");
+    const auto blocks = document->iterateBlocks();
+    require(blocks.size() == 1, "undo-depth fixture did not import one block");
+    const Markoff::BlockId block = blocks.front();
+    const QByteArray base = document->blockText(block);
+    require(!base.isEmpty(), "undo-depth fixture imported an empty paragraph");
+
+    for (size_t i = 0; i < kActorUndoDepth + 1; ++i) {
+        const auto text = document->blockText(block);
+        const auto published = document->applyBlockEdit(
+            {block, uint32_t(text.size()), 0, QByteArrayLiteral("x")});
+        require(published.state == ActionPublicationState::committed,
+                "undo-depth fixture could not publish the next text edit");
+    }
+    const QByteArray full = document->blockText(block);
+    require(full == base + QByteArray(int(kActorUndoDepth + 1), 'x'),
+            "undo-depth fixture did not retain every committed character");
+    const auto exported = document->snapshotForExport();
+    require(exported.ok() && document->blockText(block) == full,
+            "export changed the document while reading a revision-bound snapshot");
+
+    document.reset();
+    {
+        auto session = take(provider->open(scope, StorageMode::ephemeral));
+        const auto recovery = take(session->readRecoveryState());
+        require(recovery.localHistory.has_value(),
+                "undo-depth fixture committed no owner history");
+        const auto committed = std::find_if(recovery.acceptedRecords.cbegin(),
+            recovery.acceptedRecords.cend(), [&](const AcceptedStorageRecord& record) {
+                return record.transactionId == recovery.localHistory->committedTransactionId
+                    && record.committedRevision == recovery.localHistory->acceptedRevision;
+            });
+        require(committed != recovery.acceptedRecords.cend(),
+                "undo-depth owner history does not name its committed action");
+        const std::string documentName = scope.documentKey.toUtf8().toStdString();
+        const auto history = take(OwnerHistoryCodec::decode(
+            recovery.localHistory->bytes, documentName, scope.epoch, session->actor(),
+            recovery.localHistory->committedTransactionId, committed->priorRevision.token));
+        const auto* oldest = firstTextEdit(history.actionIndex);
+        const auto* retiring = lastTextEdit(history.actionIndex);
+        require(oldest && retiring && oldest != retiring
+                    && history.actionIndex.events.back().actionId == retiring->actionId,
+                "undo-depth history did not end on the action that crossed the bound");
+        const auto* oldestGroup = textGroup(*oldest);
+        require(oldestGroup != nullptr, "oldest text edit has no text group");
+        const bool recorded = std::any_of(history.actionIndex.retirements.begin(),
+            history.actionIndex.retirements.end(), [&](const RetiredHistoryAssociation& item) {
+                return item.stream == oldestGroup->stream
+                    && item.primitive == oldestGroup->primitive
+                    && item.groupId.actor == oldestGroup->groupId.actor
+                    && item.groupId.counter == oldestGroup->groupId.counter
+                    && item.retirementActionId == retiring->actionId;
+            });
+        require(recorded,
+                "the action that crossed the undo depth did not record retirement of the oldest group");
+        const auto* retiringGroup = textGroup(*retiring);
+        const bool retiredItself = retiringGroup && std::any_of(
+            history.actionIndex.retirements.begin(), history.actionIndex.retirements.end(),
+            [&](const RetiredHistoryAssociation& item) {
+                return item.groupId.actor == retiringGroup->groupId.actor
+                    && item.groupId.counter == retiringGroup->groupId.counter
+                    && item.stream == retiringGroup->stream;
+            });
+        require(!retiredItself, "the newest edit retired its own group");
+    }
+
+    document = take(Markoff::MarkoffDocument::open(
+        *provider, scope, StorageMode::ephemeral));
+    const auto reopenedBlocks = document->iterateBlocks();
+    require(reopenedBlocks.size() == 1 && document->blockText(reopenedBlocks.front()) == full,
+            "reopen after history retirement changed the accepted text");
+    const Markoff::BlockId reopened = reopenedBlocks.front();
+    require(document->canUndoForBlock(reopened),
+            "a younger edit was not undoable after reopen");
+    document->undoD2();
+    require(document->blockText(reopened) == full.left(full.size() - 1),
+            "undo after retirement did not remove the youngest edit");
+    int undos = 1;
+    while (document->canUndoForBlock(reopened) && undos <= int(kActorUndoDepth) + 2) {
+        const auto before = document->blockText(reopened);
+        document->undoD2();
+        ++undos;
+        require(document->blockText(reopened) == before.left(before.size() - 1),
+                "an in-window undo removed more than its own edit");
+    }
+    require(undos == int(kActorUndoDepth)
+                && document->blockText(reopened) == base + QByteArrayLiteral("x")
+                && !document->canUndoForBlock(reopened),
+            "the oldest edit was still undoable after the depth retirement");
+    document->undoD2();
+    require(document->blockText(reopened) == base + QByteArrayLiteral("x"),
+            "undo of a retired group changed the accepted text");
+
+    const DocumentStorageScope refusalScope{QStringLiteral("actor-undo-depth-refusal"), 1};
+    auto refusal = take(Markoff::MarkoffDocument::open(
+        *provider, refusalScope, StorageMode::ephemeral));
+    require(refusal->importInitialMarkdown(QByteArrayLiteral("base\n")).state
+                == ActionPublicationState::committed,
+            "retirement-refusal fixture could not import its base paragraph");
+    const auto refusalBlocks = refusal->iterateBlocks();
+    require(refusalBlocks.size() == 1, "retirement-refusal fixture did not import one block");
+    const Markoff::BlockId refusalBlock = refusalBlocks.front();
+    for (size_t i = 0; i < kActorUndoDepth + 1; ++i) {
+        const auto text = refusal->blockText(refusalBlock);
+        require(refusal->applyBlockEdit(
+                    {refusalBlock, uint32_t(text.size()), 0, QByteArrayLiteral("x")}).state
+                    == ActionPublicationState::committed,
+                "retirement-refusal fixture could not fill the undo window");
+    }
+    const QByteArray beforeRefusal = refusal->blockText(refusalBlock);
+    require(refusal->canUndoForBlock(refusalBlock),
+            "retirement-refusal fixture has no younger undo before the failed action");
+    Testing::failNextHistoryRetirement();
+    const auto refused = refusal->applyBlockEdit(
+        {refusalBlock, uint32_t(beforeRefusal.size()), 0, QByteArrayLiteral("z")});
+    require(refused.state == ActionPublicationState::rejected
+                && refused.diagnostic
+                && std::string(refused.diagnostic->message())
+                    == "retirement record could not be attached"
+                && refusal->blockText(refusalBlock) == beforeRefusal
+                && !refusal->canStartOrdinaryAction(),
+            "a failed retirement committed the new action or changed accepted text");
+    require(refusal->recoverPendingAllocations().ok()
+                && refusal->canStartOrdinaryAction()
+                && refusal->blockText(refusalBlock) == beforeRefusal,
+            "gapping the refused edit's reservation did not restore the previous writable state");
+    refusal->undoD2();
+    require(refusal->blockText(refusalBlock) == beforeRefusal.left(beforeRefusal.size() - 1),
+            "a failed retirement left the previous undo unable to remove the younger edit");
+}
+
 } // namespace
 
 int main()
 {
     try {
+        runActorUndoDepth();
         runLifecycleRemoteAcceptance();
         runTwoWriterConvergence();
         runRemoteInitialImportConsumer();

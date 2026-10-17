@@ -11,9 +11,10 @@ CollabText vNext adoption. The document and the Source, Styled, and Canvas
 views already use the installed provider-backed engine. Corbomite stays
 paused until A16.
 
-**Current task: A10.** Local-history retirement and backpressure. Then A12
-presence, A14 acceptance, A15 transition package, A16 signal. A13 removed the
-vendored engine, the live leaf, and the unbuilt legacy branches.
+**Current task: A12.** Ephemeral remote presence. Then A14 acceptance, A15
+transition package, A16 signal. A10 keeps 100 undoable actions per actor.
+A13 removed the vendored engine, the live leaf, and the unbuilt legacy
+branches.
 
 ## Pin
 
@@ -25,7 +26,7 @@ the candidate's `docs/USING_VNEXT.md`. The last machine-local prefix was
 
 ## Latest verification
 
-2026-10-17, A13, parent `6e4e0acd`: `cmake --build build-dev -j 4`, then
+2026-10-17, A10, parent `748cd2d2`: `cmake --build build-dev -j 4`, then
 `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`, offscreen 93/93.
 Package `0.2.0-alpha.5`, manifest v17, prefix
 `build-collabtext-alpha5/install` (`/tmp/collabtext-alpha5-prefix-b` was

@@ -12,6 +12,7 @@
 
 #include <QByteArray>
 
+#include <cstddef>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -95,6 +96,13 @@ public:
     [[nodiscard]] CollabText::Crdt::LocalHistorySnapshot localHistorySnapshot() const;
     [[nodiscard]] CollabText::Result<void> restoreLocalHistory(
         const CollabText::Crdt::LocalHistorySnapshot& snapshot);
+    /// Move `count` oldest undo entries into the pending retirement queue,
+    /// then restore the engine's group ceiling. The caller records the
+    /// durable association before the action commits.
+    [[nodiscard]] CollabText::Result<void> retireOldestUndoGroups(std::size_t count);
+    [[nodiscard]] CollabText::Result<void> acknowledgeUndoRetirements(
+        const std::vector<CollabText::Crdt::Identity>& groupIds);
+    [[nodiscard]] bool initialImportPending() const noexcept;
     [[nodiscard]] const CollabText::ActorId& actor() const noexcept;
 
     /// Applies only after scope and operation identity validation. Durable

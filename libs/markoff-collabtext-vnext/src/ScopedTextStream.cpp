@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/vnext/ScopedTextStream.h>
 #include <markoff/vnext/StreamNames.h>
+#include <markoff/vnext/UndoDepth.h>
 
 #include <collabtext/Serialization.h>
 
@@ -133,6 +134,8 @@ CollabText::Result<std::unique_ptr<ScopedTextStream>> ScopedTextStream::create(
     if (!allocator.ok()) return allocator.error();
     auto engine = CrdtEngine::create(allocator.value(), scope);
     if (!engine.ok()) return engine.error();
+    auto bounded = engine.value()->set_max_undo_depth(kEngineUndoGroupCeiling);
+    if (!bounded.ok()) return bounded.error();
     return std::unique_ptr<ScopedTextStream>(new ScopedTextStream(
         std::move(scope), std::move(allocator).value(),
         std::move(engine).value()));
@@ -314,6 +317,45 @@ CollabText::Result<void> ScopedTextStream::restoreLocalHistory(
     auto restored = m_engine->restore_local_history(snapshot);
     if (restored.ok()) m_touched = true;
     return restored;
+}
+
+CollabText::Result<void> ScopedTextStream::retireOldestUndoGroups(std::size_t count)
+{
+    using namespace CollabText;
+    if (m_initialImportPending)
+        return Error(ErrorCode::awaiting_state,
+                     "initial import must be committed before history retirement");
+    if (count == 0)
+        return {};
+    const auto before = m_engine->local_history_snapshot();
+    if (count > before.entries.size())
+        return Error(ErrorCode::history_unavailable,
+                     "undo retirement exceeds the recorded group prefix");
+    auto lowered = m_engine->set_max_undo_depth(before.entries.size() - count);
+    if (!lowered.ok())
+        return lowered.error();
+    auto raised = m_engine->set_max_undo_depth(kEngineUndoGroupCeiling);
+    if (!raised.ok())
+        return raised.error();
+    const auto after = m_engine->local_history_snapshot();
+    if (after.entries.size() + count != before.entries.size()
+        || after.retired_entries.size() < before.retired_entries.size() + count)
+        return Error(ErrorCode::history_unavailable,
+                     "undo retirement did not record the oldest groups");
+    return {};
+}
+
+CollabText::Result<void> ScopedTextStream::acknowledgeUndoRetirements(
+    const std::vector<CollabText::Crdt::Identity>& groupIds)
+{
+    if (groupIds.empty())
+        return {};
+    return m_engine->acknowledge_undo_retirements(groupIds);
+}
+
+bool ScopedTextStream::initialImportPending() const noexcept
+{
+    return m_initialImportPending;
 }
 
 const CollabText::ActorId& ScopedTextStream::actor() const noexcept

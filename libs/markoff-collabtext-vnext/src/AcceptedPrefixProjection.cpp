@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include <markoff/vnext/AcceptedPrefixProjection.h>
+#include <markoff/vnext/HistoryRetirement.h>
 
 #include <markoff/vnext/ActionBundleCodec.h>
 #include <markoff/vnext/ActionPublicationCoordinator.h>
@@ -289,6 +290,10 @@ Result<std::unique_ptr<AcceptedPrefixProjection>> AcceptedPrefixProjection::repl
             }
         }
         projection->m_ownerHistory = std::move(ownerHistory).value();
+        auto acked = acknowledgeDurableRetirements(
+            *projection, *projection->m_ownerHistory);
+        if (!acked.ok())
+            return acked.error();
     }
     return projection;
 }
