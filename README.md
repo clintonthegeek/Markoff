@@ -79,8 +79,8 @@ scripts/run-tests.sh                                   # full suite, offscreen
 scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'  # fast inner loop
 ```
 
-~260 test binaries run headless under `QT_QPA_PLATFORM=offscreen`.
-Current baseline is documented in `docs/STATUS.md`.
+Tests run headless under `QT_QPA_PLATFORM=offscreen`.
+The latest recorded result is in `docs/STATUS.md`.
 
 ## Status
 
@@ -91,9 +91,10 @@ for current status and open work.
 
 ## For contributors / AI agents
 
-Start with `CLAUDE.md` (orientation + engineering discipline), then
-`docs/VIEW-IMPLEMENTORS-GUIDE.md` and `docs/INVARIANTS.md`. Design
-history is under `docs/specs/` and `docs/plans/`.
+Start with `AGENTS.md` and `docs/STATUS.md`. The task list is
+`docs/plans/2026-10-12-collabtext-adoption-execution.md`. `CLAUDE.md`
+holds build rules and leaf layout. Design history is under `docs/specs/`
+and `docs/plans/`.
 
 ## License
 

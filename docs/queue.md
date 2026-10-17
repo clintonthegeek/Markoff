@@ -1,22 +1,17 @@
 # Work queue
 
-> Dormant work items + the append-only Discipline Log. **The active
-> workfront is NOT tracked here** — it was G1 canvas accessibility (CLOSED 2026-09-30, no active arc), see
-> [`docs/plans/2026-08-19-g1-canvas-accessibility.md`](plans/2026-08-19-g1-canvas-accessibility.md)
-> and [`docs/STATUS.md`](STATUS.md).
->
-> **Standstill (updated 2026-08-19):** the canvas-spike/production
-> standstill that used to gate this file is **lifted** — `markoff-core`
-> and `markoff-canvas` are open for ordinary work. Items here are still
-> dormant by default (the a11y arc is the priority), but they are no
-> longer forbidden. `markoff-styled` remains bug-fix-only,
-> `markoff-source` untouched, `markoff-live` retired.
->
-> **Trimmed 2026-08-13** for the canvas-spike reset: all struck
-> Discipline-Log entries and closed items #8/#10/#11/#12/#14/#15/#16
-> (with their full closure records) moved verbatim to
-> [`docs/archive/2026-08-13-queue-pre-canvas-snapshot.md`](archive/2026-08-13-queue-pre-canvas-snapshot.md).
-> Earlier snapshot (items #1–#7, #9): `docs/archive/2026-06-09-queue-closed-items.md`.
+Dormant items and the old Discipline Log. **Not the active task list.**
+Current work is [`STATUS.md`](STATUS.md) and the
+[CollabText task board](plans/2026-10-12-collabtext-adoption-execution.md).
+
+`markoff-core` and `markoff-canvas` are open for that board.
+`markoff-styled` is bug-fix-only outside it, `markoff-source` stays
+untouched, and `markoff-live` is retired. Smells below that name
+`libs/markoff-live` are frozen with that retired leaf.
+
+Closed queue items through the canvas reset:
+[`archive/2026-08-13-queue-pre-canvas-snapshot.md`](archive/2026-08-13-queue-pre-canvas-snapshot.md)
+and [`archive/2026-06-09-queue-closed-items.md`](archive/2026-06-09-queue-closed-items.md).
 
 ---
 
@@ -67,20 +62,13 @@ when next touching the source view — *after* the spike closes.
 
 ## #17 — markoff-canvas spike *(CLOSED 2026-08-13 — PASS)*
 
-Decision record `docs/specs/2026-08-13-view-authority-direction-decision.md`
-(qtbase fork rejected permanently; spike authorized). Spec
-`docs/specs/2026-08-13-markoff-canvas-spike-design.md` (constitution
-C1–C4, exit criteria E1–E10, findings §9, verdict §10). Plan with the
-completed task checklist + SHAs:
-`docs/plans/2026-08-13-markoff-canvas-spike.md` — T0–T11 all done.
+Decision record `docs/specs/2026-08-13-view-authority-direction-decision.md`.
+Spec `docs/specs/2026-08-13-markoff-canvas-spike-design.md`. Plan
+`docs/plans/2026-08-13-markoff-canvas-spike.md` — T0–T11 done.
 
-All ten exit criteria met with falsification proof; constitution
-intact end to end. Per the decision record §6 the pass consequence —
-opening the **D5 design** (candidate architecture + contingent
-retirement of markoff-live/styled, §5.3) — is a **user decision, not
-an implementer default**. Until D5 opens, the whole tree including
-`libs/markoff-canvas/` is bug-fix-only. Post-spike findings from
-hands-on use: **#18** below.
+D5 opened, shipped, and closed after this item was written. The sentence
+that used to freeze the tree until D5 opened is void. Current work is the
+CollabText task board.
 
 ## #18 — canvas: findings from first hands-on use *(CLOSED 2026-08-13 — absorbed into the production arc)*
 

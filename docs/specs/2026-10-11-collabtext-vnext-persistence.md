@@ -1,15 +1,15 @@
 # Markoff CollabText vNext persistence boundary
 
-Status: M3 design with partial `MAH/1`, `MAB/3`, `MMP/1`, `MTG/1`, `MMG/1`,
-`MDS/1` and typed map value codecs; shared-log integration and host storage
-acceptance remain open. Relocated-package probes cover round-trip and refusal
-paths for the source and terminal-gap records. The original alpha.3 design targeted
-`ffe9875ee35a525f422eff3c1aaee2841f55d962`. The current alpha.4 candidate is
-`1399e9533c9cfc1006854487af4e71b8b79989fd`; its Core gap API and durable CTLO
-reader supersede the original upstream limitations. The
-[provider contract](2026-10-12-document-storage-provider.md) incorporates
-Corbomite's host response and governs the proposed storage interface. Neither
-document changes the current Markoff save format or dependency pin.
+This file is the byte-layout contract. Task status lives on the
+[task board](../plans/2026-10-12-collabtext-adoption-execution.md). Where an
+older paragraph says a codec or replay path is still open, believe the board.
+
+Canonical Markoff record versions are the ones the board's done tasks name
+(`MAB/3`, `MAH`, `MAI/3`, `MOH/1`, `MMP`, `MTG/1`, `MMG/1`, `MDS/1`). Refuse
+older experimental versions. The candidate is alpha.5, pinned on the board.
+Markdown export is the visible-text save. Accepted actions are the recovery
+history. The [provider contract](2026-10-12-document-storage-provider.md)
+governs storage.
 
 ## Ownership
 
@@ -18,8 +18,9 @@ action grouping and stream routing. The host owns the durable shared operation
 log/transaction and supplies its append/recovery interface. CollabText supplies
 checked CTBO/CTLO operation codecs and in-memory scoped engines; it is not a
 canonical event store. Each device owns one private `ReplicaState` outside
-shared document storage. The shared document key, stream naming and block ID
-allocation still require M1 host decisions.
+shared document storage. Document identity, stream names, and composite block
+identity follow the provider contract and the alpha.5 `BlockId` form. The
+2026-10-11 note that those M1 decisions were still open is historical.
 
 `serializeForSave()` remains an export of canonical Markdown bytes. It is not a
 replica snapshot: reconstructing a populated engine from that text loses
@@ -266,8 +267,8 @@ Markoff-owned map streams do not use a Core gap primitive. `MMG/1` binds the
 full actor interval to document, map name, epoch and accepted-prefix revision.
 Replay must retain this terminal coverage, refuse later operations inside the
 interval, and advance durable counter observation before allowing that actor's
-next map write. Its wire codec exists; this replay/application enforcement
-remains open.
+next map write. The wire codec and projection application are part of the
+closed A05 work on the task board. Do not add a second map-gap path.
 
 Actor-local undo snapshots use a separate Markoff-owned binary versioned record
 (`MAH`, version 1), keyed by document, epoch, actor and stream. The

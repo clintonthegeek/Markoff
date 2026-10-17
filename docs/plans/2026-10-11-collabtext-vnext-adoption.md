@@ -1,34 +1,17 @@
 # Markoff adoption of Collabtext vNext
 
-Prepared 2026-10-11. Status: migration in progress; the installed-package
-adapters and checked coordinate seam are partial implementation slices, while
-production engine ownership and actual consumer acceptance remain open. The
-CollabText submodule pin is unchanged.
+Prepared 2026-10-11. **Design rationale, not the task list.** Current work
+is the [task board](2026-10-12-collabtext-adoption-execution.md). Read this
+file when a task needs the original ownership decision. Do not update task
+status here.
 
-**Implementation task authority:** the
-[2026-10-12 execution roadmap](2026-10-12-collabtext-adoption-execution.md)
-contains the current A01–A16 dependencies, implementation details and exit
-evidence. This document retains milestone summaries and historical rationale.
-Fresh agents start with the execution roadmap, then consult the sections here.
+The sections below record the 2026-10-11 architecture and the milestone
+notes written while the port was opening. Several of those notes still say
+a seam is open that the task board has since closed. The board wins.
 
-**User coordination rule (2026-10-12):** Corbomite development stays paused
-until final task A16 / milestone M12 signals readiness to begin its transition.
-Markoff completes its own work with reference providers and host-shaped fixtures.
-Earlier parallel-work suggestions are superseded. Actual Corbomite storage and
-application acceptance follow that signal; they are not its prerequisites.
-
-**Candidate update (2026-10-12):** CollabText prepared alpha.4 specifically for
-Markoff adoption. The initial alpha.3 review below is historical. The current
-candidate and Markoff's remaining consumer work are recorded separately below.
-
-**Host-response update (2026-10-12):** Corbomite accepts lifecycle/storage
-ownership and proposes shared UUID/history metadata, device-local authority,
-first-import serialization and an explicit provider. Markoff accepts those
-design directions and has drafted the compiled
-[provider API](../../libs/markoff-collabtext-vnext/include/markoff/vnext/DocumentStorageProvider.h)
-and [provider contract](../specs/2026-10-12-document-storage-provider.md).
-See the [reply to Corbomite](../handoff/2026-10-12-to-corbomite-provider-contract.md).
-Storage implementations and production acceptance remain open.
+Corbomite stays paused until A16. The candidate pin and the host direction
+are on the task board. The compiled provider API is
+[DocumentStorageProvider.h](../../libs/markoff-collabtext-vnext/include/markoff/vnext/DocumentStorageProvider.h).
 
 ## Baseline and source documents
 
@@ -48,8 +31,8 @@ The historical alpha.4 Markoff candidate tag `collabtext-markoff-core-2026-10-11
 to `1399e9533c9cfc1006854487af4e71b8b79989fd`, package `0.2.0-alpha.4`,
 manifest v16. Its final executable implementation is
 `c0a0ef55ea9b6a3e448b9ef5c258f09933ebb127`; the tag's successor adds finalized
-evidence and handoff documentation. Markoff's submodule pin remains on the
-legacy SHA pending M10/M11 acceptance and authorization.
+evidence and handoff documentation. The root build no longer uses that
+legacy submodule pin; it requires the installed alpha.5 package named above.
 The root Collabtext master has unrelated uncommitted work; inspect the isolated
 worktree and use the immutable candidate. Local availability does not establish
 that downstream hosts can fetch this SHA.
@@ -131,49 +114,19 @@ and malformed/deferred-operation policy on the new Core.
 
 ## Implementation sequence and exit gates
 
-### Task checklist
+The M0–M12 checklist that used to sit here was a second status board. It
+disagreed with the engine cutover. A01–A16 on the
+[task board](2026-10-12-collabtext-adoption-execution.md) replaced it on
+2026-10-17. The milestone notes under this heading are historical.
 
-Complete in dependency order; a completed documentation task does not imply
-consumer acceptance. Fill in the candidate SHA and verification record as gates
-are met.
-
-Status key: ☑ implemented and verified; ◐ partial/design slice; ☐ open.
-
-| ID | Task | Status |
-| --- | --- | --- |
-| M0 | Pin candidate provenance and run a Markoff-owned installed Core probe | ☑ |
-| M1 | Specify stable document/block identity, stream naming and operation envelope | ◐ host design directions accepted; concrete provider draft awaiting integration/review |
-| M2 | Add checked UTF-8/UTF-16 conversion contract and tests | ☑ |
-| M3 | Define and implement versioned Markoff persistence for operations, identity and history | ◐ MAH/MAB/MMP + LWW map slice; host gap log/recovery open |
-| M4 | Port one block text path to scoped `CrdtEngine`; retain exact Markdown bytes | ◐ isolated adapter |
-| M5 | Port structural order to scoped `IdListEngine`; settle CTLO archive policy | ◐ alpha.4 identity API/reader delivered; Markoff port open |
-| M6 | Port remote routing, outcomes, bounds and recovery behavior | ◐ isolated text/map/list routers and accepted-prefix replay; production integration open |
-| M7 | Port caret, selection, scroll and fold positions to scoped tokens | ◐ token adapter |
-| M8 | Preserve per-block and document undo with durable multi-stream publication | ◐ durable selective cross-stream adapter trace; production dispatch open |
-| M9 | Remove old save/explicit physical compaction paths; retain history | ◐ obsolete save/GC removed; Release root-default configure/build now succeeds with apps, Live and tests enabled; 323/324 root CTest exposes the legacy test-app consumer still sending raw block IDs rejected by canonical MKOF/2; coordinated consumer cutover and production persistence/build acceptance remain open |
-| M10 | Complete actual Markoff relocated-package consumer acceptance | ☐ |
-| M11 | Freeze verified Markoff readiness package and exact candidate; track external release gates | ☐ |
-| M12 | Final signal: Corbomite may begin its transition | ☐ last Markoff task; requires A01–A15 evidence |
-
-**Current next task (2026-10-13): production identity/engine cutover.**
-A02 reference providers and A03 provider-backed allocation are complete at the
-isolated-adapter boundary. Alpha.5 consumer checks pass 3/3; the former private
-lease-key failure is resolved and direct ReplicaState constructors are removed.
-Proceed through A01's production API boundary and the coordinated A07/A08 port,
-then lifecycle/undo/routing/view integration and acceptance. The execution
-roadmap's immediate execution order and known failures are authoritative.
-Corbomite remains paused through A16; external release gates remain separate.
-
-### M5 CTLO archive-reader gate — upstream policy delivered; Markoff port open
+### M5 CTLO archive-reader gate — historical; the structural port has landed
 
 The initial alpha.3 candidate labeled CTLO/0002 checked alpha interchange and
-did not declare a durable-reader obligation. Alpha.4 now promises the
-CTLO/0002 reader indefinitely and records literal insert/remove/undo identity
-fixtures in its capability manifest and Markoff-core candidate report. This
-closes the upstream reader-policy choice for that candidate; it does not itself
-complete Markoff's structural port or M10 acceptance. Keep MAB structural writes
-gated until Markoff's installed-package trace accepts that exact reader and
-identity API. The prior alternatives were:
+did not declare a durable-reader obligation. Alpha.4 promised the CTLO/0002
+reader and recorded literal insert/remove/undo identity fixtures. The Markoff
+structural port later landed on alpha.5; see the task board. The instructions
+below that tell a host to withhold CTLO bundles describe this gate before that
+port. They are not a current prohibition. The prior alternatives were:
 
 - a CollabText release/capability promise that retains the CTLO/0002 reader and
   semantics for old durable archives, backed by literal insert/remove/undo
@@ -181,10 +134,8 @@ identity API. The prior alternatives were:
 - a Markoff-owned independent CTLO/0002 archival decoder/application path with
   the same fixture and replay evidence.
 
-Until Markoff accepts the alpha.4 reader in its relocated consumer, production
-hosts must not append CTLO bundles. Keep physical pruning and
-checkpoint-based replacement disabled while replay from the complete original
-structural operation prefix is the recovery path.
+Physical pruning and checkpoint-based replacement stay disabled. Replay from
+the accepted operation prefix remains the recovery path.
 
 **M0 evidence (2026-10-11):** candidate
 `ffe9875ee35a525f422eff3c1aaee2841f55d962`; Release Core package verifier passed
@@ -782,9 +733,7 @@ a new candidate tag rather than moving this one. Update Markoff's dependency pin
 only as part of the validated migration. Collabtext master merge, publication and
 downstream host rollout are distinct release actions under the shared handoff.
 
-Current implementation order and finish line are A01–A16 in the execution
-roadmap. Markoff readiness precedes the final M12 signal; Corbomite then begins
-its provider/service/application migration and supplies later host acceptance.
-The highest-risk design slice remains cross-stream/selective undo and durable
-publication; settle it before broad view plumbing. Global same-candidate release
-checks and explicit merge/publication authorization remain separate obligations.
+Current order and the finish line are A01–A16 on the task board. Selective
+undo and durable publication have landed; the open tail is listed there.
+Global same-candidate release checks and explicit merge or publication
+authorization remain separate obligations.

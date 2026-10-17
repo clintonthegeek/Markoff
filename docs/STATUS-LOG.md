@@ -9,6 +9,17 @@ their banner, not the present.
 
 ---
 
+> **2026-10-17 — live board reset for the CollabText tail.**
+>
+> `docs/STATUS.md` was rewritten to one screen. The previous board is
+> `docs/archive/collabtext-adoption/2026-10-16-status-board.md`. The
+> A01–A16 progress diary is
+> `docs/archive/collabtext-adoption/2026-10-16-execution-progress-log.md`.
+> The task list remains
+> `docs/plans/2026-10-12-collabtext-adoption-execution.md`.
+
+---
+
 > **2026-08-19 — canvas production arc board (CLOSED), moved off the live board.**
 >
 > Verbatim STATUS.md workfront section for the canvas production

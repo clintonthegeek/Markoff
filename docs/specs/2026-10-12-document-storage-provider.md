@@ -2,10 +2,11 @@
 
 Prepared 2026-10-12 from the
 [Corbomite host response](../../../Corbomite/docs/handoff/2026-10-12-to-markoff-collabtext-host-response.md).
-Status: concrete API proposal, compiled in the isolated adapter. The
-restartable local reference provider is implemented for development and
-conformance tests; production session orchestration and Corbomite storage remain
-unimplemented.
+Status: this is the host storage contract. Markoff's reference provider and
+`MarkoffDocument` lifecycle implement it for development and conformance.
+Corbomite's own storage is unimplemented until after A16. The header is the
+API a host provider implements; A15 freezes the transition package. It is
+not a stable ABI before that package.
 
 User coordination update: Corbomite development remains paused until the final
 A16/M12 readiness signal in the [execution roadmap](../plans/2026-10-12-collabtext-adoption-execution.md).

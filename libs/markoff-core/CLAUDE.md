@@ -65,12 +65,12 @@ view paths; new editing and persistence code should use checked conversions and
 handle refusal explicitly. Live and Canvas include `<markoff/core/TextUnits.h>`
 directly; there is no Live coordinate alias.
 
-Build the core with `cmake --build build-dev --target markoff_core -j2`. Run
-focused root tests with `QT_QPA_PLATFORM=offscreen ctest --test-dir build-dev
---output-on-failure -R '<test-name>'`. The installed-candidate consumer suite is
-an opt-in root target configured with `MARKOFF_BUILD_COLLABTEXT_VNEXT_TESTS=ON`
-and the selected installed package in `CMAKE_PREFIX_PATH`; those tests prove the
-adapter contract only, not production Markoff integration.
+Build the core with `cmake --build build-dev --target markoff_core -j 4`.
+Run focused root tests with `QT_QPA_PLATFORM=offscreen ctest --test-dir build-dev
+--output-on-failure -R '<test-name>'`. The root build already is the
+provider-backed engine. Session routine and the current task:
+[`AGENTS.md`](../../AGENTS.md),
+[`docs/STATUS.md`](../../docs/STATUS.md).
 
 ## Related contracts
 
