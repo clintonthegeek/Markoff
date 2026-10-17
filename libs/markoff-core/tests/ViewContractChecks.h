@@ -50,7 +50,11 @@ inline void checkReadOnlyBlocksUndoAndKeepsBytes(Markoff::MarkdownView *v,
 inline void checkUndoRedoViaBase(Markoff::MarkdownView *v,
                                  Markoff::MarkoffDocument *doc) {
     const QByteArray before = doc->serializeForSave();
-    doc->applyFlatEdit(0, 0, QByteArray("X"), Markoff::Origin::UserEdit);
+    const auto block = doc->iterateBlocks().front();
+    const auto published = doc->applyBlockEdit(
+        {block, 0, 0, QByteArrayLiteral("X")});
+    QVERIFY(published.state == Markoff::VNext::ActionPublicationState::committed
+            || published.state == Markoff::VNext::ActionPublicationState::committedHistoryPending);
     const QByteArray after = doc->serializeForSave();
     QVERIFY(after != before);
     v->undo();

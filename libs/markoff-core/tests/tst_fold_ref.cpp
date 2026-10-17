@@ -3,11 +3,19 @@
 #include <QStringList>
 
 #include <markoff/core/FoldRef.h>
-#include <crdt/Anchor.h>
 
+#include <array>
+#include <cstdint>
 using namespace Markoff;
-using CollabText::Crdt::Anchor;
-using CollabText::Crdt::Bias;
+
+namespace {
+BlockId testBlockId(uint64_t counter)
+{
+    std::array<uint8_t, 16> actor{};
+    actor.back() = 1;
+    return *BlockId::fromStructuralIdentity(actor, counter);
+}
+}
 
 class TstFoldRef : public QObject {
     Q_OBJECT
@@ -21,7 +29,7 @@ private Q_SLOTS:
     void heading_with_path() {
         FoldRef f;
         f.kind = FoldRef::Kind::Heading;
-        f.start = Anchor(1, 50, Bias::Left);
+        f.startPosition = ScopedTextPosition{testBlockId(17), QByteArrayLiteral("h")};
         f.headingPath = QStringList { "Intro", "Chapter 1", "Section A" };
         f.headingLevel = 3;
         QCOMPARE(f.headingPath.size(), 3);
@@ -31,22 +39,21 @@ private Q_SLOTS:
     void block_kind() {
         FoldRef f;
         f.kind = FoldRef::Kind::Block;
-        f.start = Anchor(2, 200, Bias::Left);
+        f.startPosition = ScopedTextPosition{testBlockId(18), QByteArrayLiteral("b")};
         QCOMPARE(f.kind, FoldRef::Kind::Block);
     }
 
     void json_roundtrip_heading() {
         FoldRef a;
         a.kind = FoldRef::Kind::Heading;
-        a.start = Anchor(1, 50, Bias::Left);
+        a.startPosition = ScopedTextPosition{testBlockId(17), QByteArrayLiteral("heading")};
         a.headingPath = QStringList { "Intro", "Chapter 1" };
         a.headingLevel = 2;
 
         const QJsonObject json = a.toJson();
         const FoldRef b = FoldRef::fromJson(json);
         QCOMPARE(b.kind, a.kind);
-        QCOMPARE(b.start.replica_id, a.start.replica_id);
-        QCOMPARE(b.start.char_value, a.start.char_value);
+        QCOMPARE(b.startPosition, a.startPosition);
         QCOMPARE(b.headingPath, a.headingPath);
         QCOMPARE(b.headingLevel, a.headingLevel);
     }
@@ -54,13 +61,25 @@ private Q_SLOTS:
     void json_roundtrip_block() {
         FoldRef a;
         a.kind = FoldRef::Kind::Block;
-        a.start = Anchor(3, 300, Bias::Right);
+        a.startPosition = ScopedTextPosition{testBlockId(19), QByteArrayLiteral("block")};
 
         const QJsonObject json = a.toJson();
         const FoldRef b = FoldRef::fromJson(json);
         QCOMPARE(b.kind, a.kind);
-        QCOMPARE(b.start.replica_id, a.start.replica_id);
-        QCOMPARE(b.start.char_value, a.start.char_value);
+        QCOMPARE(b.startPosition, a.startPosition);
+    }
+
+    void malformed_scoped_position_is_rejected()
+    {
+        FoldRef a;
+        a.kind = FoldRef::Kind::Heading;
+        a.startPosition = ScopedTextPosition{
+            testBlockId(23), QByteArray::fromHex("01020300ff")};
+        auto malformed = a.toJson();
+        auto position = malformed.value("startPosition").toObject();
+        position.insert("token", QStringLiteral("%%"));
+        malformed.insert("startPosition", position);
+        QVERIFY(!FoldRef::fromJson(malformed).startPosition.has_value());
     }
 };
 

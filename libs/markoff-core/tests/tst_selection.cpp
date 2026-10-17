@@ -3,15 +3,17 @@
 #include <QColor>
 
 #include <markoff/core/Selection.h>
-#include <markoff/core/TextAnchor.h>
+#include <array>
 
 using namespace Markoff;
 
 // Helper: construct a TextAnchor with explicit field values (replaces old
 // aggregate-init now that TextAnchor is a class with private fields).
-static TextAnchor ta(uint16_t replicaId, uint64_t charValue, bool rightBias = false)
+static ScopedTextPosition pos(quint8 id, const char *token)
 {
-    return TextAnchor::make(BlockId{}, replicaId, charValue, rightBias);
+    std::array<uint8_t, 16> actor{};
+    actor[0] = id;
+    return {*BlockId::fromStructuralIdentity(actor, 1), QByteArray(token)};
 }
 
 class TstSelection : public QObject {
@@ -19,15 +21,15 @@ class TstSelection : public QObject {
 private Q_SLOTS:
     void empty_when_anchor_equals_active() {
         Selection s;
-        s.anchor = ta(1, 10);
-        s.active = ta(1, 10);
+        s.anchorPosition = pos(1, "same");
+        s.activePosition = pos(1, "same");
         QVERIFY(s.isEmpty());
     }
 
     void not_empty_when_different() {
         Selection s;
-        s.anchor = ta(1, 10);
-        s.active = ta(1, 12, /*rightBias=*/true);
+        s.anchorPosition = pos(1, "a");
+        s.activePosition = pos(1, "b");
         QVERIFY(!s.isEmpty());
     }
 
@@ -50,22 +52,21 @@ private Q_SLOTS:
 
     void json_roundtrip_primary() {
         Selection s;
-        s.anchor = ta(2, 100);
-        s.active = ta(2, 105, /*rightBias=*/true);
+        s.anchorPosition = pos(2, "a");
+        s.activePosition = pos(2, "b");
         s.kind = Selection::Kind::Primary;
         const QJsonObject json = s.toJson();
         const Selection r = Selection::fromJson(json);
-        QCOMPARE(r.anchor.replicaId(), s.anchor.replicaId());
-        QCOMPARE(r.anchor.charValue(), s.anchor.charValue());
-        QCOMPARE(r.active.replicaId(), s.active.replicaId());
-        QCOMPARE(r.active.charValue(), s.active.charValue());
+        QCOMPARE(r.anchorPosition, s.anchorPosition);
+        QCOMPARE(r.activePosition, s.activePosition);
+        QVERIFY(!json.contains("anchor"));
         QCOMPARE(r.kind, s.kind);
     }
 
     void json_roundtrip_presence() {
         Selection s;
-        s.anchor = ta(7, 50);
-        s.active = ta(7, 50);
+        s.anchorPosition = pos(7, "presence");
+        s.activePosition = pos(7, "presence");
         s.kind = Selection::Kind::Presence;
         s.participantId = QStringLiteral("bob");
         s.participantLabel = QStringLiteral("Bob");
@@ -78,6 +79,22 @@ private Q_SLOTS:
         QCOMPARE(r.participantLabel, s.participantLabel);
         QCOMPARE(r.presenceColor.name(), s.presenceColor.name());
         QCOMPARE(r.cursorVersion, s.cursorVersion);
+    }
+
+    void legacy_anchor_json_is_not_accepted() {
+        const QJsonObject legacy{
+            {"anchor", QJsonObject{{"version", 1}, {"replica", "1"},
+                                    {"character", "12"}}},
+            {"active", QJsonObject{{"version", 1}, {"replica", "1"},
+                                    {"character", "12"}}},
+        };
+        const Selection restored = Selection::fromJson(legacy);
+        QVERIFY(!restored.anchorPosition);
+        QVERIFY(!restored.activePosition);
+        QVERIFY(restored.isEmpty());
+        const QJsonObject encoded = restored.toJson();
+        QVERIFY(!encoded.contains("anchor"));
+        QVERIFY(!encoded.contains("active"));
     }
 };
 

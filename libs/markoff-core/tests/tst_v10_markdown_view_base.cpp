@@ -3,6 +3,9 @@
 #include <QSignalSpy>
 #include <markoff/core/MarkdownView.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
 
 namespace {
 class StubView : public Markoff::MarkdownView {
@@ -33,10 +36,17 @@ private slots:
     }
     void setDocument_emits_documentChanged() {
         StubView v;
-        Markoff::MarkoffDocument doc(1);
+        auto providerResult = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+        QVERIFY(providerResult.ok());
+        auto provider = std::move(providerResult).value();
+        auto opened = Markoff::MarkoffDocument::open(*provider,
+            {QStringLiteral("markdown-view-base"), 1},
+            Markoff::VNext::StorageMode::ephemeral);
+        QVERIFY(opened.ok());
+        auto doc = std::move(opened).value();
         QSignalSpy spy(&v, &Markoff::MarkdownView::documentChanged);
-        v.setDocument(&doc);
-        QCOMPARE(v.document(), &doc);
+        v.setDocument(doc.get());
+        QCOMPARE(v.document(), doc.get());
         QCOMPARE(spy.count(), 1);
     }
 };

@@ -5,8 +5,38 @@
 #include <markoff/core/FindController.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
 
 using namespace Markoff;
+
+namespace {
+class DocumentFixture {
+public:
+    DocumentFixture(const QString& key, const QByteArray& source)
+    {
+        auto providerResult = VNext::makeEphemeralDocumentStorageProvider();
+        if (!providerResult.ok()) throw std::runtime_error("provider creation failed");
+        m_provider = std::move(providerResult).value();
+        auto opened = MarkoffDocument::open(*m_provider, {key, 1}, VNext::StorageMode::ephemeral);
+        if (!opened.ok()) throw std::runtime_error("document open failed");
+        m_document = std::move(opened).value();
+        if (m_document->importInitialMarkdown(source).state
+            != VNext::ActionPublicationState::committed)
+            throw std::runtime_error("initial Markdown import failed");
+    }
+
+    MarkoffDocument& document()
+    {
+        return *m_document;
+    }
+
+private:
+    std::unique_ptr<VNext::DocumentStorageProvider> m_provider;
+    std::unique_ptr<MarkoffDocument> m_document;
+};
+}
 
 class TstFoundationFindController : public QObject {
     Q_OBJECT
@@ -17,8 +47,8 @@ private slots:
     }
 
     void inactive_setNeedle_does_not_compute_matches() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("Find me here\n");
+        DocumentFixture fixture(QStringLiteral("find-inactive"), QByteArrayLiteral("Find me here\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         fc.setNeedle("Find");
         QCOMPARE(fc.matchCount(), 0);
@@ -26,8 +56,8 @@ private slots:
     }
 
     void activate_with_empty_needle_emits_no_matches() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("hello\n");
+        DocumentFixture fixture(QStringLiteral("find-empty"), QByteArrayLiteral("hello\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         QSignalSpy matchesSpy(&fc, &FindController::matchesChanged);
         fc.activate();
@@ -38,8 +68,8 @@ private slots:
     }
 
     void setNeedle_while_active_populates_matches_case_insensitively() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("Foo FOO foo bar foo\n");
+        DocumentFixture fixture(QStringLiteral("find-case"), QByteArrayLiteral("Foo FOO foo bar foo\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         fc.activate();
         fc.setNeedle("foo");
@@ -48,11 +78,11 @@ private slots:
     }
 
     void matches_span_multiple_blocks_in_document_order() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(
+        DocumentFixture fixture(QStringLiteral("find-blocks"), QByteArrayLiteral(
             "First paragraph has find here.\n\n"
             "Second paragraph has find twice find.\n\n"
-            "Third paragraph: nothing.\n");
+            "Third paragraph: nothing.\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         fc.activate();
         fc.setNeedle("find");
@@ -60,8 +90,8 @@ private slots:
     }
 
     void findNext_wraps() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("alpha alpha alpha\n");
+        DocumentFixture fixture(QStringLiteral("find-next"), QByteArrayLiteral("alpha alpha alpha\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         fc.activate();
         fc.setNeedle("alpha");
@@ -72,8 +102,8 @@ private slots:
     }
 
     void findPrevious_wraps() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("beta beta beta\n");
+        DocumentFixture fixture(QStringLiteral("find-prev"), QByteArrayLiteral("beta beta beta\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         fc.activate();
         fc.setNeedle("beta");
@@ -82,8 +112,8 @@ private slots:
     }
 
     void deactivate_clears_matches_and_index() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("gamma gamma\n");
+        DocumentFixture fixture(QStringLiteral("find-deactivate"), QByteArrayLiteral("gamma gamma\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         fc.activate();
         fc.setNeedle("gamma");
@@ -95,8 +125,8 @@ private slots:
     }
 
     void setNeedle_emits_no_navigationRequested() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("zeta zeta\n");
+        DocumentFixture fixture(QStringLiteral("find-no-navigation"), QByteArrayLiteral("zeta zeta\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         QSignalSpy navSpy(&fc, &FindController::navigationRequested);
         fc.activate();
@@ -105,8 +135,8 @@ private slots:
     }
 
     void findNext_emits_navigationRequested_with_match() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("eta eta eta\n");
+        DocumentFixture fixture(QStringLiteral("find-nav"), QByteArrayLiteral("eta eta eta\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         QSignalSpy navSpy(&fc, &FindController::navigationRequested);
         fc.activate();
@@ -117,8 +147,8 @@ private slots:
     }
 
     void selectMatchAtOrAfter_lands_on_first_at_or_after() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("aa bb aa bb aa\n");  // "aa" at byte 0, 6, 12
+        DocumentFixture fixture(QStringLiteral("find-select"), QByteArrayLiteral("aa bb aa bb aa\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         fc.activate();
         fc.setNeedle("aa");
@@ -130,8 +160,8 @@ private slots:
         QCOMPARE(fc.currentMatchIndex(), 2);
     }
     void selectMatchAtOrAfter_wraps_to_zero() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("aa aa\n");
+        DocumentFixture fixture(QStringLiteral("find-wrap"), QByteArrayLiteral("aa aa\n"));
+        auto& doc = fixture.document();
         FindController fc(&doc);
         fc.activate();
         fc.setNeedle("aa");

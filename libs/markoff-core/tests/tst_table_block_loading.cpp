@@ -11,6 +11,9 @@
 
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
 
 using namespace Markoff;
 
@@ -26,6 +29,26 @@ private Q_SLOTS:
 };
 
 namespace {
+
+struct DocumentFixture {
+    std::unique_ptr<VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<MarkoffDocument> document;
+};
+
+DocumentFixture openDocument(const QByteArray& source)
+{
+    auto providerResult = VNext::makeEphemeralDocumentStorageProvider();
+    if (!providerResult.ok()) throw std::runtime_error("provider creation failed");
+    DocumentFixture fixture{std::move(providerResult).value(), {}};
+    auto opened = MarkoffDocument::open(*fixture.provider,
+        {QStringLiteral("table-block-loading"), 1}, VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    if (fixture.document->importInitialMarkdown(source).state
+        != VNext::ActionPublicationState::committed)
+        throw std::runtime_error("table fixture import failed");
+    return fixture;
+}
 
 QByteArray makeDocWithTable()
 {
@@ -56,8 +79,8 @@ QByteArray tableSource()
 
 void TstTableBlockLoading::load_single_table_produces_one_table_block()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown(makeDocWithTable());
+    auto fixture = openDocument(makeDocWithTable());
+    auto& doc = *fixture.document;
 
     int tableCount = 0;
     for (BlockId id : doc.iterateBlocks()) {
@@ -69,8 +92,8 @@ void TstTableBlockLoading::load_single_table_produces_one_table_block()
 
 void TstTableBlockLoading::table_block_buffer_matches_source_bytes()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown(makeDocWithTable());
+    auto fixture = openDocument(makeDocWithTable());
+    auto& doc = *fixture.document;
 
     BlockId tableId{};
     bool found = false;
@@ -96,8 +119,8 @@ void TstTableBlockLoading::table_block_buffer_matches_source_bytes()
 
 void TstTableBlockLoading::surrounding_paragraphs_are_their_own_blocks()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown(makeDocWithTable());
+    auto fixture = openDocument(makeDocWithTable());
+    auto& doc = *fixture.document;
 
     int paragraphCount = 0;
     int tableCount = 0;
@@ -119,16 +142,16 @@ void TstTableBlockLoading::surrounding_paragraphs_are_their_own_blocks()
 
 void TstTableBlockLoading::empty_doc_has_no_tables()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown(QByteArray{});
+    auto fixture = openDocument({});
+    auto& doc = *fixture.document;
     for (BlockId id : doc.iterateBlocks())
         QVERIFY(doc.blockKind(id) != BlockKind::Table);
 }
 
 void TstTableBlockLoading::table_only_doc_has_one_table_block()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown(tableSource());
+    auto fixture = openDocument(tableSource());
+    auto& doc = *fixture.document;
 
     int total = 0;
     int tableCount = 0;
@@ -151,13 +174,12 @@ void TstTableBlockLoading::table_only_doc_has_one_table_block()
 // Cited by docs/superpowers/specs/2026-05-30-styled-table-rendering-design.md §1.2.
 void TstTableBlockLoading::blank_body_row_does_not_split_table()
 {
-    MarkoffDocument doc(1);
-    doc.loadFromMarkdown(QByteArrayLiteral(
+    auto fixture = openDocument(QByteArrayLiteral(
         "| A | B |\n"
         "|---|---|\n"
         "|   |   |\n"
-        "| 1 | 2 |"
-    ));
+        "| 1 | 2 |"));
+    auto& doc = *fixture.document;
     int tableCount = 0;
     for (BlockId id : doc.iterateBlocks()) {
         if (doc.blockKind(id) == BlockKind::Table)

@@ -1,6 +1,17 @@
 # D2 test executables. Each tst_* target is added by its respective phase task.
 # Keep this file minimal; tasks add their own targets.
 
+if(MARKOFF_USE_COLLABTEXT_VNEXT)
+    foreach(test_name IN ITEMS
+            tst_causal_lww_map tst_block_id tst_block_types tst_undo_log
+            tst_d2_apply_block_edit tst_d2_apply_structural tst_d2_undo
+            tst_d2_sibling_maps tst_d2_save_history)
+        qt_add_executable(${test_name} ${test_name}.cpp)
+        target_link_libraries(${test_name} PRIVATE Qt6::Test markoff_core)
+        add_test(NAME ${test_name} COMMAND ${test_name})
+    endforeach()
+else()
+
 qt_add_executable(tst_causal_lww_map tst_causal_lww_map.cpp)
 target_link_libraries(tst_causal_lww_map PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_causal_lww_map COMMAND tst_causal_lww_map)
@@ -29,17 +40,21 @@ qt_add_executable(tst_d2_undo tst_d2_undo.cpp)
 target_link_libraries(tst_d2_undo PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_undo COMMAND tst_d2_undo)
 
-qt_add_executable(tst_d2_signals tst_d2_signals.cpp)
-target_link_libraries(tst_d2_signals PRIVATE Qt6::Test markoff_core)
-add_test(NAME tst_d2_signals COMMAND tst_d2_signals)
+if(NOT MARKOFF_USE_COLLABTEXT_VNEXT)
+    qt_add_executable(tst_d2_signals tst_d2_signals.cpp)
+    target_link_libraries(tst_d2_signals PRIVATE Qt6::Test markoff_core)
+    add_test(NAME tst_d2_signals COMMAND tst_d2_signals)
+endif()
 
 qt_add_executable(tst_d2_sibling_maps tst_d2_sibling_maps.cpp)
 target_link_libraries(tst_d2_sibling_maps PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_sibling_maps COMMAND tst_d2_sibling_maps)
 
-qt_add_executable(tst_d2_cmd_decomposition tst_d2_cmd_decomposition.cpp)
-target_link_libraries(tst_d2_cmd_decomposition PRIVATE Qt6::Test markoff_core)
-add_test(NAME tst_d2_cmd_decomposition COMMAND tst_d2_cmd_decomposition)
+if(NOT MARKOFF_USE_COLLABTEXT_VNEXT)
+    qt_add_executable(tst_d2_cmd_decomposition tst_d2_cmd_decomposition.cpp)
+    target_link_libraries(tst_d2_cmd_decomposition PRIVATE Qt6::Test markoff_core)
+    add_test(NAME tst_d2_cmd_decomposition COMMAND tst_d2_cmd_decomposition)
+endif()
 
 qt_add_executable(tst_block_buffer_invariant
     tst_block_buffer_invariant.cpp)
@@ -59,6 +74,8 @@ add_test(NAME tst_d2_load COMMAND tst_d2_load)
 qt_add_executable(tst_d2_block_crdt_anchor tst_d2_block_crdt_anchor.cpp)
 target_link_libraries(tst_d2_block_crdt_anchor PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_block_crdt_anchor COMMAND tst_d2_block_crdt_anchor)
+set_tests_properties(tst_d2_block_crdt_anchor
+    PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 # resetContent must populate D2 per-block state (port-first fix 2026-05-20)
 qt_add_executable(tst_d2_reset_content tst_d2_reset_content.cpp)
@@ -82,10 +99,10 @@ target_compile_definitions(tst_d2_roundtrip PRIVATE
     CORPUS_PATH="${CMAKE_CURRENT_SOURCE_DIR}/roundtrip/corpus")
 add_test(NAME tst_d2_roundtrip COMMAND tst_d2_roundtrip)
 
-# Phase 9: Garbage Collection / WatermarkCoordinator
-qt_add_executable(tst_d2_gc tst_d2_gc.cpp)
-target_link_libraries(tst_d2_gc PRIVATE Qt6::Test markoff_core)
-add_test(NAME tst_d2_gc COMMAND tst_d2_gc)
+# Saving must retain D2 history and removed blocks for undo.
+qt_add_executable(tst_d2_save_history tst_d2_save_history.cpp)
+target_link_libraries(tst_d2_save_history PRIVATE Qt6::Test markoff_core)
+add_test(NAME tst_d2_save_history COMMAND tst_d2_save_history)
 
 # Phase 10: InlineParseCache
 qt_add_executable(tst_d2_inline_cache tst_d2_inline_cache.cpp)
@@ -94,7 +111,7 @@ add_test(NAME tst_d2_inline_cache COMMAND tst_d2_inline_cache)
 
 # Phase 13: Convergence tests (CRDT primitive level — IdList + Buffer)
 qt_add_executable(tst_d2_convergence tst_d2_convergence.cpp)
-target_link_libraries(tst_d2_convergence PRIVATE Qt6::Test markoff_core)
+target_link_libraries(tst_d2_convergence PRIVATE Qt6::Test markoff_core collabtext)
 add_test(NAME tst_d2_convergence COMMAND tst_d2_convergence)
 
 # D3-correction Task 5: per-item ListItem materialization roundtrip (TDD red)
@@ -125,3 +142,5 @@ add_test(NAME tst_d2_interactive_newline COMMAND tst_d2_interactive_newline)
 qt_add_executable(tst_d2_widget_flat_view tst_d2_widget_flat_view.cpp)
 target_link_libraries(tst_d2_widget_flat_view PRIVATE Qt6::Test markoff_core)
 add_test(NAME tst_d2_widget_flat_view COMMAND tst_d2_widget_flat_view)
+
+endif()

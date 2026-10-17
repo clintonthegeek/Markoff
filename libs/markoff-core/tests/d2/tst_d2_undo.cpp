@@ -3,7 +3,29 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/BlockEdit.h>
 #include <markoff/core/BlockKind.h>
-#include <markoff/core/BlockAnchor.h>
+#include <markoff/core/BlockId.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
+
+namespace {
+struct CandidateFixture { std::unique_ptr<Markoff::VNext::DocumentStorageProvider> provider;
+                          std::unique_ptr<Markoff::MarkoffDocument> document; };
+CandidateFixture openCandidate(const QByteArray& source, const QString& key)
+{
+    auto provider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!provider.ok()) throw std::runtime_error("provider creation failed");
+    CandidateFixture fixture{std::move(provider).value(), {}};
+    auto opened = Markoff::MarkoffDocument::open(*fixture.provider, {key, 1},
+        Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    if (fixture.document->importInitialMarkdown(source).state
+        != Markoff::VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial import failed");
+    return fixture;
+}
+}
 
 using namespace Markoff;
 
@@ -22,9 +44,11 @@ private Q_SLOTS:
 
 void TstD2Undo::undoUndoesLastEdit()
 {
-    MarkoffDocument doc(1);
-    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
-    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
+    auto fixture = openCandidate(QByteArrayLiteral("hello"), QStringLiteral("undo-basic"));
+    MarkoffDocument& doc = *fixture.document;
+    const BlockId blk = doc.iterateBlocks().front();
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"}).state,
+             VNext::ActionPublicationState::committed);
     QCOMPARE(doc.blockText(blk), QByteArray("hello!"));
     doc.undoD2();
     QCOMPARE(doc.blockText(blk), QByteArray("hello"));
@@ -32,9 +56,11 @@ void TstD2Undo::undoUndoesLastEdit()
 
 void TstD2Undo::redoRestoresEdit()
 {
-    MarkoffDocument doc(1);
-    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
-    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
+    auto fixture = openCandidate(QByteArrayLiteral("hello"), QStringLiteral("undo-redo"));
+    MarkoffDocument& doc = *fixture.document;
+    const BlockId blk = doc.iterateBlocks().front();
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"}).state,
+             VNext::ActionPublicationState::committed);
     doc.undoD2();
     doc.redoD2();
     QCOMPARE(doc.blockText(blk), QByteArray("hello!"));
@@ -42,11 +68,14 @@ void TstD2Undo::redoRestoresEdit()
 
 void TstD2Undo::undoForBlock_picksRecentBlockEntry()
 {
-    MarkoffDocument doc(1);
-    BlockId blkA = doc.testInsertBlock(BlockKind::Paragraph, "hello");
-    BlockId blkB = doc.testInsertBlock(BlockKind::Paragraph, "world");
-    doc.applyBlockEdit(BlockEdit{blkA, 5, 0, "!"});
-    doc.applyBlockEdit(BlockEdit{blkB, 5, 0, "?"});
+    auto fixture = openCandidate(QByteArrayLiteral("hello\n\nworld"), QStringLiteral("undo-block"));
+    MarkoffDocument& doc = *fixture.document;
+    const auto blocks = doc.iterateBlocks();
+    const BlockId blkA = blocks[0], blkB = blocks[1];
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blkA, 5, 0, "!"}).state,
+             VNext::ActionPublicationState::committed);
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blkB, 5, 0, "?"}).state,
+             VNext::ActionPublicationState::committed);
     // Undo only blkA's last edit
     doc.undoForBlock(blkA);
     QCOMPARE(doc.blockText(blkA), QByteArray("hello"));
@@ -55,29 +84,35 @@ void TstD2Undo::undoForBlock_picksRecentBlockEntry()
 
 void TstD2Undo::canUndoForBlock_returns_false_when_no_history()
 {
-    MarkoffDocument doc(1);
-    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
-    BlockAnchor anchor = blk;
+    auto fixture = openCandidate(QByteArrayLiteral("hello"), QStringLiteral("undo-none"));
+    MarkoffDocument& doc = *fixture.document;
+    const BlockId blk = doc.iterateBlocks().front();
+    BlockId anchor = blk;
     QVERIFY(!doc.canUndoForBlock(anchor));
 }
 
 void TstD2Undo::canUndoForBlock_returns_true_after_edit()
 {
-    MarkoffDocument doc(1);
-    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
-    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
-    BlockAnchor anchor = blk;
+    auto fixture = openCandidate(QByteArrayLiteral("hello"), QStringLiteral("undo-can"));
+    MarkoffDocument& doc = *fixture.document;
+    const BlockId blk = doc.iterateBlocks().front();
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"}).state,
+             VNext::ActionPublicationState::committed);
+    BlockId anchor = blk;
     QVERIFY(doc.canUndoForBlock(anchor));
 }
 
 void TstD2Undo::undoForBlock_via_anchor_undoes_edit()
 {
-    MarkoffDocument doc(1);
-    BlockId blkA = doc.testInsertBlock(BlockKind::Paragraph, "hello");
-    BlockId blkB = doc.testInsertBlock(BlockKind::Paragraph, "world");
-    doc.applyBlockEdit(BlockEdit{blkA, 5, 0, "!"});
-    doc.applyBlockEdit(BlockEdit{blkB, 5, 0, "?"});
-    BlockAnchor anchorA = blkA;
+    auto fixture = openCandidate(QByteArrayLiteral("hello\n\nworld"), QStringLiteral("undo-anchor"));
+    MarkoffDocument& doc = *fixture.document;
+    const auto blocks = doc.iterateBlocks();
+    const BlockId blkA = blocks[0], blkB = blocks[1];
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blkA, 5, 0, "!"}).state,
+             VNext::ActionPublicationState::committed);
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blkB, 5, 0, "?"}).state,
+             VNext::ActionPublicationState::committed);
+    BlockId anchorA = blkA;
     doc.undoForBlock(anchorA);
     QCOMPARE(doc.blockText(blkA), QByteArray("hello"));
     QCOMPARE(doc.blockText(blkB), QByteArray("world?"));
@@ -92,9 +127,11 @@ void TstD2Undo::undo_bumpsBlockEditSequence()
     // InlineParseCache — would see no change and keep serving spans parsed
     // from the pre-undo text (Corbomite Cluster K: phantom link styling
     // survived an undo until an unrelated edit finally bumped the sequence).
-    MarkoffDocument doc(1);
-    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
-    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
+    auto fixture = openCandidate(QByteArrayLiteral("hello"), QStringLiteral("undo-sequence"));
+    MarkoffDocument& doc = *fixture.document;
+    const BlockId blk = doc.iterateBlocks().front();
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"}).state,
+             VNext::ActionPublicationState::committed);
     const quint64 seqBeforeUndo = doc.blockEditSequence(blk);
     doc.undoD2();
     QVERIFY(doc.blockEditSequence(blk) > seqBeforeUndo);
@@ -102,9 +139,11 @@ void TstD2Undo::undo_bumpsBlockEditSequence()
 
 void TstD2Undo::redo_bumpsBlockEditSequence()
 {
-    MarkoffDocument doc(1);
-    BlockId blk = doc.testInsertBlock(BlockKind::Paragraph, "hello");
-    doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"});
+    auto fixture = openCandidate(QByteArrayLiteral("hello"), QStringLiteral("redo-sequence"));
+    MarkoffDocument& doc = *fixture.document;
+    const BlockId blk = doc.iterateBlocks().front();
+    QCOMPARE(doc.applyBlockEdit(BlockEdit{blk, 5, 0, "!"}).state,
+             VNext::ActionPublicationState::committed);
     doc.undoD2();
     const quint64 seqBeforeRedo = doc.blockEditSequence(blk);
     doc.redoD2();

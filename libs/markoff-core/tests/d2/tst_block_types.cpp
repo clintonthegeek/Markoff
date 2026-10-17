@@ -5,6 +5,15 @@
 #include <markoff/core/BlockKind.h>
 #include <variant>
 
+namespace {
+Markoff::BlockId structuralBlockId(uint64_t counter)
+{
+    std::array<uint8_t, 16> actor{};
+    actor[0] = 1;
+    return *Markoff::BlockId::fromStructuralIdentity(actor, counter);
+}
+}
+
 class TstBlockTypes : public QObject {
     Q_OBJECT
 private slots:
@@ -19,9 +28,9 @@ void TstBlockTypes::blockKind_paragraphAndHeadingDistinct() {
 
 void TstBlockTypes::blockEdit_constructionAndAccess() {
     Markoff::BlockEdit edit{
-        Markoff::BlockId::fromRaw(1), /*offset=*/3u, /*removed=*/0u, /*inserted=*/QByteArray("x")
+        structuralBlockId(1), /*offset=*/3u, /*removed=*/0u, /*inserted=*/QByteArray("x")
     };
-    QCOMPARE(edit.blockId, Markoff::BlockId::fromRaw(1));
+    QCOMPARE(edit.blockId, structuralBlockId(1));
     QCOMPARE(edit.withinBlockByteOffset, 3u);
     QCOMPARE(edit.removedBytes, 0u);
     QCOMPARE(edit.insertedUtf8, QByteArray("x"));
@@ -30,7 +39,7 @@ void TstBlockTypes::blockEdit_constructionAndAccess() {
 void TstBlockTypes::structuralOp_insertEntryVariant() {
     Markoff::StructuralOp op;
     op.payload = Markoff::StructuralOp::InsertEntry{
-        Markoff::BlockId::fromRaw(1), Markoff::BlockKind::Paragraph
+        structuralBlockId(1), Markoff::BlockKind::Paragraph
     };
     QVERIFY(std::holds_alternative<Markoff::StructuralOp::InsertEntry>(op.payload));
 }

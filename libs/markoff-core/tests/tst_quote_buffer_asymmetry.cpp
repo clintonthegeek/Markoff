@@ -23,6 +23,30 @@
 #include <markoff/core/KindInference.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/UndoLog.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
+
+namespace {
+struct CandidateFixture {
+    std::unique_ptr<Markoff::VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<Markoff::MarkoffDocument> document;
+};
+CandidateFixture openCandidate(const QByteArray& source, const QString& key)
+{
+    auto provider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!provider.ok()) throw std::runtime_error("provider creation failed");
+    CandidateFixture fixture{std::move(provider).value(), {}};
+    auto opened = Markoff::MarkoffDocument::open(*fixture.provider, {key, 1},
+        Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    if (fixture.document->importInitialMarkdown(source).state
+        != Markoff::VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial import failed");
+    return fixture;
+}
+}
 
 using namespace Markoff;
 
@@ -31,8 +55,9 @@ class TstQuoteBufferAsymmetry : public QObject {
 private slots:
     void load_stripsMarker_contentOnly()
     {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("> Single-paragraph quote — hello\n");
+        auto fixture = openCandidate(QByteArrayLiteral("> Single-paragraph quote — hello\n"),
+                                     QStringLiteral("quote-load"));
+        MarkoffDocument& doc = *fixture.document;
         const auto ids = doc.iterateBlocks();
         QCOMPARE(ids.size(), size_t(1));
         QCOMPARE(doc.blockKind(ids[0]), BlockKind::BlockQuote);
@@ -45,8 +70,9 @@ private slots:
     {
         // Mimic View::selectedText for BlockQuote: raw buffer, no "> " prepend
         // (ListItem gets marker restore; BlockQuote does not).
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("> a quoted line\n");
+        auto fixture = openCandidate(QByteArrayLiteral("> a quoted line\n"),
+                                     QStringLiteral("quote-copy"));
+        MarkoffDocument& doc = *fixture.document;
         const QByteArray sel = doc.blockText(doc.iterateBlocks()[0]);
         const QString html = ClipboardCodec::markdownToHtml(sel + "\n");
         QVERIFY2(!html.contains(QStringLiteral("<blockquote>")),
@@ -56,18 +82,17 @@ private slots:
     void serialize_withMarkerStillInBuffer_doubles()
     {
         // Mimic typed promotion: kind=BlockQuote but buffer still has "> ".
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("para\n");
+        auto fixture = openCandidate(QByteArrayLiteral("para\n"),
+                                     QStringLiteral("quote-typed"));
+        MarkoffDocument& doc = *fixture.document;
         const auto id = doc.iterateBlocks()[0];
-        {
-            UndoLog::Transaction t(doc.d2UndoLog());
-            doc.d2ApplyBufferEdit(id, 0, uint32_t(doc.blockText(id).size()),
-                                  QByteArray("> typed quote"), t);
-            doc.d2SetBlockKind(id, BlockKind::BlockQuote, t);
-            doc.d2SetBlockAttr(id, AttrNames::BlockQuoteDepth, 1, t);
-            doc.d2SetBlockAttr(id, AttrNames::BlockQuoteRunId, 1, t);
-        }
-        doc.flushPendingD2Changed();
+        QCOMPARE(doc.applyBlockEdit({id, 0,
+            static_cast<quint32>(doc.blockText(id).size()),
+            QByteArrayLiteral("> typed quote")}).state,
+            VNext::ActionPublicationState::committed);
+        QCOMPARE(doc.changeBlockKind(id, BlockKind::BlockQuote,
+            {AttrNames::BlockQuoteDepth, AttrNames::BlockQuoteRunId}, {1, 1}).state,
+            VNext::ActionPublicationState::committed);
         QCOMPARE(doc.blockText(id), QByteArray("> typed quote"));
         const QByteArray saved = doc.serializeForSave();
         QVERIFY2(saved.startsWith(">>") || saved.startsWith("> >"),

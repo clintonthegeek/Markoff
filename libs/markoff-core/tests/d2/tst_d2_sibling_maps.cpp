@@ -10,6 +10,15 @@
 
 using namespace Markoff;
 
+namespace {
+BlockId structuralBlockId(uint64_t counter)
+{
+    std::array<uint8_t, 16> actor{};
+    actor[0] = 1;
+    return *BlockId::fromStructuralIdentity(actor, counter);
+}
+}
+
 class TstD2SiblingMaps : public QObject {
     Q_OBJECT
 private Q_SLOTS:
@@ -34,7 +43,7 @@ private Q_SLOTS:
 void TstD2SiblingMaps::kindTagMap_setAndGet()
 {
     KindTagMap m(/*replicaId=*/1);
-    BlockId id = BlockId::fromRaw(42);
+    BlockId id = structuralBlockId(42);
     m.setWithNextStamp(id, BlockKind::Heading);
     QCOMPARE(m.get(id).value(), BlockKind::Heading);
 }
@@ -43,7 +52,7 @@ void TstD2SiblingMaps::kindTagMap_latterStampWins()
 {
     // Two replicas set conflicting kinds; the one with the later stamp wins.
     KindTagMap m(/*replicaId=*/1);
-    BlockId id = BlockId::fromRaw(1);
+    BlockId id = structuralBlockId(1);
     CausalStamp early{1, 10};
     CausalStamp late{2, 20};
     m.set(id, BlockKind::Paragraph, early);
@@ -59,7 +68,7 @@ void TstD2SiblingMaps::kindTagMap_latterStampWins()
 void TstD2SiblingMaps::blockAttrsMap_setAndGet()
 {
     BlockAttrsMap m(1);
-    BlockId id = BlockId::fromRaw(7);
+    BlockId id = structuralBlockId(7);
     BlockAttrKey key{id, "level"};
     m.setWithNextStamp(key, AttrValue{1});
     auto val = m.get(key);
@@ -70,8 +79,8 @@ void TstD2SiblingMaps::blockAttrsMap_setAndGet()
 void TstD2SiblingMaps::blockAttrsMap_differentBlocksDontCollide()
 {
     BlockAttrsMap m(1);
-    BlockId idA = BlockId::fromRaw(1);
-    BlockId idB = BlockId::fromRaw(2);
+    BlockId idA = structuralBlockId(1);
+    BlockId idB = structuralBlockId(2);
     m.setWithNextStamp({idA, "level"}, AttrValue{1});
     m.setWithNextStamp({idB, "level"}, AttrValue{2});
     QCOMPARE(std::get<int>(*m.get({idA, "level"})), 1);

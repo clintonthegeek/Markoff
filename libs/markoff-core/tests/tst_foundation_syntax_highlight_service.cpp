@@ -3,8 +3,32 @@
 
 #include <markoff/core/Kf6SyntaxHighlightService.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
 
 using namespace Markoff;
+
+namespace {
+struct CandidateDocument {
+    std::unique_ptr<VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<MarkoffDocument> document;
+};
+
+CandidateDocument openCandidate(const QString& key, const QByteArray& source)
+{
+    auto providerResult = VNext::makeEphemeralDocumentStorageProvider();
+    if (!providerResult.ok()) throw std::runtime_error("provider creation failed");
+    CandidateDocument result{std::move(providerResult).value(), {}};
+    auto opened = MarkoffDocument::open(*result.provider, {key, 1}, VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    result.document = std::move(opened).value();
+    if (result.document->importInitialMarkdown(source).state
+        != VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial Markdown import failed");
+    return result;
+}
+}
 
 class TstFoundationSyntaxHighlightService : public QObject {
     Q_OBJECT
@@ -50,8 +74,9 @@ private Q_SLOTS:
     // D2: verify that doc.inlineSpansFor(blockId) is accessible from view
     // code and returns a result without crashing (even if empty for plain text).
     void inline_spans_for_block_does_not_crash() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown("# Heading\n\nSome `code` here.\n");
+        auto fixture = openCandidate(QStringLiteral("inline-spans"),
+            QByteArrayLiteral("# Heading\n\nSome `code` here.\n"));
+        auto& doc = *fixture.document;
 
         const auto blocks = doc.iterateBlocks();
         QVERIFY(!blocks.empty());

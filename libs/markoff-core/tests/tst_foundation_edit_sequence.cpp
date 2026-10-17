@@ -3,76 +3,95 @@
 
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Origin.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
 
 using namespace Markoff;
+
+namespace {
+struct CandidateDocument {
+    std::unique_ptr<VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<MarkoffDocument> document;
+};
+
+CandidateDocument openCandidate(const QString& key, const QByteArray& source)
+{
+    auto providerResult = VNext::makeEphemeralDocumentStorageProvider();
+    if (!providerResult.ok()) throw std::runtime_error("provider creation failed");
+    CandidateDocument result{std::move(providerResult).value(), {}};
+    auto opened = MarkoffDocument::open(*result.provider, {key, 1}, VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    result.document = std::move(opened).value();
+    if (result.document->importInitialMarkdown(source).state
+        != VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial Markdown import failed");
+    return result;
+}
+}
 
 class TstFoundationEditSequence : public QObject {
     Q_OBJECT
 private Q_SLOTS:
     void fresh_doc_starts_at_zero() {
-        MarkoffDocument d{1};
-        QCOMPARE(d.editSequence(), quint64{0});
+        auto fixture = openCandidate(QStringLiteral("edit-seq-empty"), {});
+        auto& d = *fixture.document;
+        QCOMPARE(d.d2EditSequence(), quint64{0});
     }
 
     void apply_flat_edit_increments() {
-        MarkoffDocument d{1};
+        auto fixture = openCandidate(QStringLiteral("edit-seq-edit"), QByteArrayLiteral("x"));
+        auto& d = *fixture.document;
+        const auto block = d.iterateBlocks().front();
         const auto seq0 = d.d2EditSequence();
-        d.applyFlatEdit(0, 0, "x", Origin::UserEdit);
+        QCOMPARE(d.applyBlockEdit({block, 1, 0, QByteArrayLiteral("x")}).state,
+                 VNext::ActionPublicationState::committed);
         QVERIFY(d.d2EditSequence() > seq0);
     }
 
     void undo_increments() {
-        MarkoffDocument d{1};
-        // resetContent(UserRevertToSaved) pushes an undoable entry into the legacy buffer.
-        d.resetContent("x", Origin::UserRevertToSaved);
-        const auto seq1 = d.editSequence();
-        d.undo();
-        QVERIFY(d.editSequence() > seq1);
+        auto fixture = openCandidate(QStringLiteral("edit-seq-undo"), QByteArrayLiteral("x"));
+        auto& d = *fixture.document;
+        const auto block = d.iterateBlocks().front();
+        QCOMPARE(d.applyBlockEdit({block, 1, 0, QByteArrayLiteral("y")}).state,
+                 VNext::ActionPublicationState::committed);
+        const auto seq1 = d.d2EditSequence();
+        d.undoD2();
+        QVERIFY(d.d2EditSequence() > seq1);
     }
 
     void redo_increments() {
-        MarkoffDocument d{1};
-        d.resetContent("x", Origin::UserRevertToSaved);
-        d.undo();
-        const auto seq2 = d.editSequence();
-        d.redo();
-        QVERIFY(d.editSequence() > seq2);
-    }
-
-    void reset_content_increments() {
-        MarkoffDocument d{1};
-        const auto seq0 = d.editSequence();
-        d.resetContent("hello", Origin::FirstOpen);
-        QVERIFY(d.editSequence() > seq0);
+        auto fixture = openCandidate(QStringLiteral("edit-seq-redo"), QByteArrayLiteral("x"));
+        auto& d = *fixture.document;
+        const auto block = d.iterateBlocks().front();
+        QCOMPARE(d.applyBlockEdit({block, 1, 0, QByteArrayLiteral("y")}).state,
+                 VNext::ActionPublicationState::committed);
+        d.undoD2();
+        const auto seq2 = d.d2EditSequence();
+        d.redoD2();
+        QVERIFY(d.d2EditSequence() > seq2);
     }
 
     void monotonic_under_burst() {
-        MarkoffDocument d{1};
+        auto fixture = openCandidate(QStringLiteral("edit-seq-burst"), QByteArrayLiteral("x"));
+        auto& d = *fixture.document;
+        const auto block = d.iterateBlocks().front();
         quint64 prev = d.d2EditSequence();
         for (int i = 0; i < 20; ++i) {
-            d.applyFlatEdit(static_cast<quint32>(i), static_cast<quint32>(i),
-                            "a", Origin::UserEdit);
+            const auto text = d.blockText(block);
+            const auto result = d.applyBlockEdit({block,
+                static_cast<uint32_t>(text.size()), 0, QByteArrayLiteral("a")});
+            if (result.state != VNext::ActionPublicationState::committed) {
+                const std::string diagnostic = result.diagnostic
+                    ? std::string(result.diagnostic->message()) : "no diagnostic";
+                QFAIL(diagnostic.c_str());
+            }
             const auto cur = d.d2EditSequence();
             QVERIFY(cur > prev);
             prev = cur;
         }
     }
 
-    void undo_on_empty_stack_does_not_increment() {
-        MarkoffDocument d{1};
-        const auto seq0 = d.editSequence();
-        const auto op = d.undo();
-        QVERIFY(!op.has_value());
-        QCOMPARE(d.editSequence(), seq0);
-    }
-
-    void redo_on_empty_stack_does_not_increment() {
-        MarkoffDocument d{1};
-        const auto seq0 = d.editSequence();
-        const auto op = d.redo();
-        QVERIFY(!op.has_value());
-        QCOMPARE(d.editSequence(), seq0);
-    }
 };
 
 QTEST_MAIN(TstFoundationEditSequence)

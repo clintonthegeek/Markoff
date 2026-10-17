@@ -22,7 +22,6 @@ private slots:
     void undo_revertsLastWrite();
     void redo_replaysAfterUndo();
     void undo_acrossMultipleKeys();
-    void compact_dropsEntriesBelowWatermark();
     void applyRemote_acceptsForeignWrite();
     void applyRemote_doesNotEnterLocalUndoStack();
     // local_clear() — non-emitting single-replica reset (spec §3.2)
@@ -121,25 +120,6 @@ void TstCausalLwwMap::undo_acrossMultipleKeys() {
     map.undo();  // undoes set(2, "b")
     QCOMPARE(map.get(2).has_value(), false);
     QCOMPARE(map.get(1).value(), QStringLiteral("a"));
-}
-
-void TstCausalLwwMap::compact_dropsEntriesBelowWatermark() {
-    Markoff::CausalLwwMap<int, QString> map(1);
-    map.set(1, QStringLiteral("a"), {1, 1});
-    map.set(2, QStringLiteral("b"), {1, 5});
-    map.set(3, QStringLiteral("c"), {1, 10});
-    map.compact(Markoff::CausalStamp{1, 5});
-
-    // State is preserved
-    QCOMPARE(map.get(1).value(), QStringLiteral("a"));
-    QCOMPARE(map.get(2).value(), QStringLiteral("b"));
-    QCOMPARE(map.get(3).value(), QStringLiteral("c"));
-
-    // Only stamp-10 op survives on the undo stack
-    map.undo();
-    QCOMPARE(map.get(3).has_value(), false);
-    map.undo();
-    QCOMPARE(map.get(2).value(), QStringLiteral("b")); // can't undo further
 }
 
 void TstCausalLwwMap::applyRemote_acceptsForeignWrite() {

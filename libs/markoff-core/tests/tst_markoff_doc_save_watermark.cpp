@@ -2,64 +2,59 @@
 #include <QTest>
 #include <QSignalSpy>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
+
+namespace {
+struct CandidateDocument {
+    std::unique_ptr<Markoff::VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<Markoff::MarkoffDocument> document;
+};
+
+CandidateDocument openCandidate(const QString& key)
+{
+    auto providerResult = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+    if (!providerResult.ok()) throw std::runtime_error("provider creation failed");
+    CandidateDocument fixture{std::move(providerResult).value(), {}};
+    auto opened = Markoff::MarkoffDocument::open(*fixture.provider,
+        {key, 1}, Markoff::VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    if (fixture.document->importInitialMarkdown(QByteArrayLiteral("hello")).state
+        != Markoff::VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial import failed");
+    return fixture;
+}
+}
 
 class TestSaveWatermark : public QObject {
     Q_OBJECT
 private slots:
-    void initially_clean_after_load() {
-        Markoff::MarkoffDocument doc(quint16(42));
-        doc.loadFromMarkdown("hello");
-        // Caller is expected to mark saved at startup; verify that path:
-        doc.markSaved(doc.d2EditSequence());
-        QVERIFY(!doc.dirty());
-        QCOMPARE(doc.savedSequence(), doc.d2EditSequence());
+    void initial_export_is_revision_bound() {
+        auto fixture = openCandidate(QStringLiteral("save-revision"));
+        auto snapshot = fixture.document->snapshotForExport();
+        QVERIFY(snapshot.ok());
+        QCOMPARE(snapshot.value().markdown, QByteArrayLiteral("hello"));
+        QVERIFY(fixture.document->acknowledgeExport(snapshot.value()).ok());
     }
 
-    void becomes_dirty_after_edit() {
-        Markoff::MarkoffDocument doc(quint16(42));
-        doc.loadFromMarkdown("hello");
-        doc.markSaved(doc.d2EditSequence());
-        QSignalSpy spy(&doc, &Markoff::MarkoffDocument::dirtyChanged);
-        doc.applyFlatEdit(5, 5, " world", Markoff::Origin::UserEdit);
-        QVERIFY(doc.dirty());
-        QCOMPARE(spy.count(), 1);
-        QCOMPARE(spy.takeFirst().at(0).toBool(), true);
-    }
-
-    void becomes_clean_after_marksaved() {
-        Markoff::MarkoffDocument doc(quint16(42));
-        doc.loadFromMarkdown("hello");
-        doc.markSaved(doc.d2EditSequence());
-        doc.applyFlatEdit(5, 5, " world", Markoff::Origin::UserEdit);
-        QSignalSpy spy(&doc, &Markoff::MarkoffDocument::dirtyChanged);
-        doc.markSaved(doc.d2EditSequence());
-        QVERIFY(!doc.dirty());
-        QCOMPARE(spy.count(), 1);
-        QCOMPARE(spy.takeFirst().at(0).toBool(), false);
-    }
-
-    void dirtychanged_fires_only_on_transitions() {
-        Markoff::MarkoffDocument doc(quint16(42));
-        doc.loadFromMarkdown("hello");
-        doc.markSaved(doc.d2EditSequence());
-        QSignalSpy spy(&doc, &Markoff::MarkoffDocument::dirtyChanged);
-        doc.applyFlatEdit(5, 5, " a", Markoff::Origin::UserEdit);
-        doc.applyFlatEdit(7, 7, " b", Markoff::Origin::UserEdit);
-        doc.applyFlatEdit(9, 9, " c", Markoff::Origin::UserEdit);
-        QCOMPARE(spy.count(), 1);  // one transition only
-    }
-
-    void marksaved_with_old_seq_during_edit_race() {
-        Markoff::MarkoffDocument doc(quint16(42));
-        doc.loadFromMarkdown("hello");
-        doc.markSaved(doc.d2EditSequence());
-        const quint64 captured = doc.d2EditSequence();
-        doc.applyFlatEdit(5, 5, " world", Markoff::Origin::UserEdit);
-        // Save started before edit; markSaved with stale seq → still dirty.
-        doc.markSaved(captured);
-        QVERIFY(doc.dirty());
+    void stale_export_cannot_acknowledge_later_edit() {
+        auto fixture = openCandidate(QStringLiteral("save-stale"));
+        const auto before = fixture.document->snapshotForExport();
+        QVERIFY(before.ok());
+        const auto block = fixture.document->iterateBlocks().front();
+        QCOMPARE(fixture.document->applyBlockEdit(
+            {block, 5, 0, QByteArrayLiteral("!")}).state,
+            Markoff::VNext::ActionPublicationState::committed);
+        QVERIFY(!fixture.document->acknowledgeExport(before.value()).ok());
+        auto current = fixture.document->snapshotForExport();
+        QVERIFY(current.ok());
+        QCOMPARE(current.value().markdown, QByteArrayLiteral("hello!"));
+        QVERIFY(fixture.document->acknowledgeExport(current.value()).ok());
     }
 };
 
 QTEST_MAIN(TestSaveWatermark)
+
 #include "tst_markoff_doc_save_watermark.moc"

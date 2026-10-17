@@ -1,16 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // (c) 2026 Markoff contributors, GPL-3.0-or-later.
 //
-// Asserts that MarkoffDocument::resetContent populates D2 per-block state
-// (not just the legacy d->buffer). Surfaced 2026-05-20 by Corbomite Vault's
+// Asserts that MarkoffDocument::resetContent populates D2 per-block state.
+// Surfaced 2026-05-20 by Corbomite Vault's
 // first-open path: resetContent left the document with visibleLength>0 but
 // iterateBlocks() empty, so the live view had no rows to render.
 //
-// Port-first session recap §"Open Markoff-side issues" #1:
-// "Either resetContent should also build D2 (likely the right fix —
-// Origin enum then drives only undo-stack handling) or it should be
-// documented as legacy-buffer-only and consumers always use
-// loadFromMarkdown."
+// Both resetContent and loadFromMarkdown materialize the same D2 document.
 //
 #include <QTest>
 #include <QSignalSpy>

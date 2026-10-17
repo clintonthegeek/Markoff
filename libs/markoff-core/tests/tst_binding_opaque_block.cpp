@@ -27,7 +27,9 @@
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/OpaqueBlockRenderer.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
-#include <markoff/core/UndoLog.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
 
 using namespace Markoff;
 
@@ -58,7 +60,7 @@ public:
         const int before = at.position();
         QTextTableFormat tf;
         tf.setBorder(1);
-        tf.setProperty(OpaqueBlockKeyProperty, QString::number(id.raw()));
+        tf.setProperty(OpaqueBlockKeyProperty, opaqueBlockIdentityKey(id));
         QTextTable *t = at.insertTable(2, 2, tf);
         t->cellAt(0, 0).firstCursorPosition().insertText(QStringLiteral("a"));
         t->cellAt(0, 1).firstCursorPosition().insertText(QStringLiteral("b"));
@@ -71,6 +73,26 @@ public:
 constexpr const char *kFixture =
     "para A\n\n| a | b |\n|---|---|\n| c | d |\n\npara B";
 
+struct CandidateFixture {
+    std::unique_ptr<VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<MarkoffDocument> document;
+};
+
+CandidateFixture openCandidate()
+{
+    auto providerResult = VNext::makeEphemeralDocumentStorageProvider();
+    if (!providerResult.ok()) throw std::runtime_error("provider creation failed");
+    CandidateFixture fixture{std::move(providerResult).value(), {}};
+    auto opened = MarkoffDocument::open(*fixture.provider,
+        {QStringLiteral("opaque-binding"), 1}, VNext::StorageMode::ephemeral);
+    if (!opened.ok()) throw std::runtime_error("document open failed");
+    fixture.document = std::move(opened).value();
+    if (fixture.document->importInitialMarkdown(QByteArray(kFixture)).state
+        != VNext::ActionPublicationState::committed)
+        throw std::runtime_error("initial import failed");
+    return fixture;
+}
+
 }  // namespace
 
 class TstBindingOpaqueBlock : public QObject {
@@ -79,8 +101,8 @@ private slots:
     // The opaque-aware seed builds a real frame with intact cells and no raw
     // pipe text, with the surrounding paragraphs preserved.
     void seed_renders_table_as_frame() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(kFixture);
+        auto fixture = openCandidate();
+        MarkoffDocument& doc = *fixture.document;
         QPlainTextEdit edit;
         QTextDocument *qdoc = edit.document();
         SourceTextDocumentBinding binding;
@@ -109,8 +131,8 @@ private slots:
     // (== whole-doc diff) this FAILS; the real per-block reconciliation makes
     // it pass. Falsifiability proof for the opaque seam.
     void frame_survives_unrelated_edit() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(kFixture);
+        auto fixture = openCandidate();
+        MarkoffDocument& doc = *fixture.document;
         QPlainTextEdit edit;
         QTextDocument *qdoc = edit.document();
         SourceTextDocumentBinding binding;
@@ -123,8 +145,9 @@ private slots:
         // Edit para A (the first block): prepend 'X'.
         const auto blocks = doc.iterateBlocks();
         {
-            UndoLog::Transaction t(doc.d2UndoLog());
-            doc.d2ApplyBufferEdit(blocks.front(), 0, 0, QByteArray("X"), t);
+            const auto result = doc.applyBlockEdit({blocks.front(), 0, 0,
+                                                     QByteArrayLiteral("X")});
+            QCOMPARE(result.state, VNext::ActionPublicationState::committed);
         }
         pumpEvents();  // debounced d2DocumentChanged → reverse pass
 
@@ -143,8 +166,8 @@ private slots:
     // Editing the block AFTER the frame (the region carrying Qt's trailing
     // structural empty block) must update that block and leave the frame intact.
     void edit_after_frame_preserves_frame() {
-        MarkoffDocument doc(1);
-        doc.loadFromMarkdown(kFixture);
+        auto fixture = openCandidate();
+        MarkoffDocument& doc = *fixture.document;
         QPlainTextEdit edit;
         QTextDocument *qdoc = edit.document();
         SourceTextDocumentBinding binding;
@@ -157,9 +180,10 @@ private slots:
         const auto blocks = doc.iterateBlocks();
         const BlockId last = blocks.back();
         {
-            UndoLog::Transaction t(doc.d2UndoLog());
-            doc.d2ApplyBufferEdit(last, quint32(doc.blockText(last).size()),
-                                  0, QByteArray("!"), t);
+            const auto result = doc.applyBlockEdit({last,
+                static_cast<quint32>(doc.blockText(last).size()), 0,
+                QByteArrayLiteral("!")});
+            QCOMPARE(result.state, VNext::ActionPublicationState::committed);
         }
         pumpEvents();
 

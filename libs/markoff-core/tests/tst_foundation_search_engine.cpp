@@ -5,8 +5,32 @@
 #include <markoff/core/Origin.h>
 #include <markoff/core/SearchEngine.h>
 #include <markoff/core/Session.h>
+#include <markoff/vnext/DocumentStorageProvider.h>
+#include <memory>
+#include <stdexcept>
 
 using namespace Markoff;
+
+namespace {
+struct CandidateDocument {
+    std::unique_ptr<VNext::DocumentStorageProvider> provider;
+    std::unique_ptr<MarkoffDocument> document;
+};
+
+CandidateDocument openCandidate(const QString &key)
+{
+    auto providerResult = VNext::makeEphemeralDocumentStorageProvider();
+    if (!providerResult.ok())
+        throw std::runtime_error("could not create ephemeral provider");
+    CandidateDocument result{std::move(providerResult).value(), {}};
+    auto documentResult = MarkoffDocument::open(*result.provider,
+        {key, 1}, VNext::StorageMode::ephemeral);
+    if (!documentResult.ok())
+        throw std::runtime_error("could not open provider-backed document");
+    result.document = std::move(documentResult).value();
+    return result;
+}
+}
 
 class TstFoundationSearchEngine : public QObject {
     Q_OBJECT
@@ -16,14 +40,14 @@ private Q_SLOTS:
     // #11) — populate a SearchMatch selection directly rather than via the
     // deleted legacy-buffer search.
     void clear_matches_removes_search_kind() {
-        MarkoffDocument doc(1);
-        doc.resetContent("abc", Origin::TestFixture);
+        auto fixture = openCandidate(QStringLiteral("clear-matches"));
+        auto &doc = *fixture.document;
+        QCOMPARE(doc.importInitialMarkdown(QByteArrayLiteral("abc")).state,
+                 VNext::ActionPublicationState::committed);
 
         Session *sess = doc.createSession();
         Selection x;
         x.kind = Selection::Kind::SearchMatch;
-        x.anchor = doc.textAnchorAt(0, /*rightBias*/ false);
-        x.active = doc.textAnchorAt(1, /*rightBias*/ true);
         sess->addSecondarySelection(x);
 
         SearchEngine s;
@@ -34,10 +58,12 @@ private Q_SLOTS:
 
     // D2: per-block search finds matches in multiple blocks
     void search_findsMatchAcrossBlocks() {
-        MarkoffDocument doc(1);
+        auto fixture = openCandidate(QStringLiteral("search-blocks"));
+        auto &doc = *fixture.document;
         // Two paragraphs separated by a blank line: block 0 = "foo bar",
         // block 1 = "baz foo".
-        doc.loadFromMarkdown("foo bar\n\nbaz foo\n");
+        QCOMPARE(doc.importInitialMarkdown(QByteArrayLiteral("foo bar\n\nbaz foo\n")).state,
+                 VNext::ActionPublicationState::committed);
 
         const auto hits = SearchEngine::findByBlock(doc, "foo");
         QCOMPARE(hits.size(), 2);
