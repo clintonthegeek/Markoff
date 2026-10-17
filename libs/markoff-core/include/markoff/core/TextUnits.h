@@ -4,6 +4,8 @@
 #include <QByteArray>
 #include <QtGlobal>
 
+#include <optional>
+
 #include <markoff/core/MarkoffCoreExport.h>
 
 /// Conversions between the two text units every view has to straddle: the
@@ -36,5 +38,17 @@ qsizetype byteToQtPos(const QByteArray &utf8, qsizetype byteOffset);
 /// land between them.
 MARKOFF_CORE_EXPORT
 qsizetype qtPosToByte(const QByteArray &utf8, qsizetype qtPos);
+
+/// Checked conversions for CRDT/editor boundaries. They reject malformed
+/// UTF-8, out-of-range positions, byte offsets inside a scalar and UTF-16
+/// offsets between the surrogates of a non-BMP scalar. Unlike the legacy
+/// helpers above, they never clamp or approximate invalid input.
+MARKOFF_CORE_EXPORT
+std::optional<qsizetype> checkedByteToQtPos(const QByteArray &utf8,
+                                            qsizetype byteOffset);
+
+MARKOFF_CORE_EXPORT
+std::optional<qsizetype> checkedQtPosToByte(const QByteArray &utf8,
+                                            qsizetype qtPos);
 
 }  // namespace Markoff::TextUnits
