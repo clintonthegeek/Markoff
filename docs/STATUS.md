@@ -5,9 +5,21 @@
 > [`STATUS-LOG.md`](STATUS-LOG.md); closed-item detail lives in
 > `docs/archive/`.
 
-**Last updated:** 2026-09-30 — **G1 canvas accessibility arc CLOSED**
-(A5.4); no active workfront. Full-suite baseline **213/213**. Manual Orca
-pass (A5.3) deferred by the user, the one outstanding acceptance item.
+**Last updated:** 2026-10-16 — **single-engine CollabText adoption in progress**.
+Root CMake now requires the installed provider-backed CollabText Core package
+for standalone and embedded Markoff builds. It no longer offers the pinned
+engine or retired Live leaf as build choices. The full Debug build succeeds and
+the offscreen candidate suite passes 93/93, including reconnect replay: queued
+action envelopes retain their stream and exact bytes, and a provider-backed
+consumer delivers a disconnected initial import and persists the returned
+receipt. The two installed Markoff consumers pass against the fresh package;
+the clean install omits `TextAnchor`, `Cursor` and `AnchorJson`. These checks
+use Markoff's reference provider, so production host storage and real network
+transport remain separate acceptance work. Core `Selection` and `FoldRef`
+now expose scoped positions only; their legacy anchor fields and JSON readers
+are gone. Focused selection/session/fold/Canvas tests and both installed
+consumers pass after the API cleanup. The A01–A16 roadmap remains authoritative;
+Corbomite stays paused until A16.
 (Earlier: H arc landed 2026-08-30, `9b0138f8`; the canvas production
 arc is closed and its board body lives in `STATUS-LOG.md`; the E-arc is
 formally closed.)
@@ -19,7 +31,285 @@ pass-through, `9b0138f8`); plan
 consumer answer note:
 [`handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md`](handoff/2026-08-30-to-hologram-hide-first-heading-as-title.md).
 
-## Workfront — none (G1 canvas accessibility CLOSED 2026-09-30)
+## Workfront — Collabtext vNext adoption planning
+
+User goal: migrate Markoff's CRDT integration to Collabtext's
+`feat/fuguemax-placement` candidate. The latest Markoff candidate tag is
+`collabtext-markoff-core-2026-10-13-alpha5` at
+`e8a8e7d1a95dd50e23f38d6727921b47b814e44b` (0.2.0-alpha.5, manifest v17).
+The alpha.4 candidate remains immutable; Markoff's current submodule pin remains
+unchanged until the production cutover is ready.
+
+- **Plan:** [`plans/2026-10-11-collabtext-vnext-adoption.md`](plans/2026-10-11-collabtext-vnext-adoption.md)
+- **Execution task authority:** [A01–A16 roadmap](plans/2026-10-12-collabtext-adoption-execution.md),
+  with dependencies, implementation surfaces, acceptance evidence and startup
+  commands. Parent milestones M0–M12 remain summarized in the adoption plan.
+- **Coordination:** Corbomite development stays paused by user direction until
+  final A16/M12 delivers the readiness handoff. Markoff completes its own path
+  using reference providers; Corbomite's production storage/application gates
+  follow its transition and are not prerequisites for starting it.
+- **A13 clean break in progress:** removed MarkoffDocument's disconnected
+  flat-buffer APIs and storage, raw unqualified anchors, save-triggered GC,
+  local watermark/ack protocol, WatermarkCoordinator and D2 history-compaction
+  APIs, plus the duplicate `BlockAnchor`, `Markoff::Live` cursor alias and
+  `Markoff::Live::Detail::Coordinates` alias. Live and its coordinate tests now
+  use Core's `Markoff::TextUnits` directly; the QML module no longer exports the
+  removed header. `delegateGoingAway` now requires the delegate root, removing
+  its unconditional one-argument behavior; QML and tests pass the dying root so
+  a stale destruction callback cannot remove a replacement registration.
+  Also removed the unpopulated parsed-block cache and its always-empty lookup
+  APIs; anchors now resolve through their actual block identity.
+  Saves retain D2 undo history and removed-block content; focused root tests
+  pass 6/6 and optional live tests pass 3/3. Production CollabText wiring and
+  broader A13 persistence/build acceptance remain open.
+- **Milestones:** M0's relocated Core probe and M2's checked
+  coordinate contract pass. M3 has a binary local-history codec/reopen probe
+  and compile-checked MAB envelope, MMP map codec, typed MBK/MAV/MLR values and
+  isolated durable-counter `ReplicatedMapStream`; fixed typed-value wire fixtures
+  and malformed UTF-8/version/truncation refusals now pass in the relocated
+  consumer probe. The Markoff-owned `MTG/1` envelope now binds CTGP intervals
+  to full stream scope and accepted-prefix tokens; the list adapter validates
+  both before gap apply. `MMG/1` now defines terminal counter coverage for
+  Markoff map streams without introducing a Core primitive; replay enforcement
+  remains open. The codec supports carrying `MDS/1` exact Markdown bytes,
+  separator slices and source/cache-digested disposable parser caches atomically
+  in `MAB/3`; import orchestration remains open. `MAI/2` defines the
+  owner-private action-to-group, undo/redo ancestry, retirement associations
+  and bounded prior map values. The earlier MAI/1 format is rejected;
+  `MOH/1` composes that index and per-stream MAH snapshots while binding
+  the prepared transaction and prior revision. A05 remains partial until these
+  records are captured and restored by production recovery.
+  MAB validates `kind-tag`,
+  `block-attrs` and `link-ref` payload semantics. Its LWW projection is keyed by
+  both target block and map key. `ScopedTextStream` and `ReplicatedMapStream`
+  now apply accepted MTG/1 and MMG/1 intervals through scoped projection APIs,
+  reject wrong-prior/covered identities and advance same-actor local allocation
+  beyond terminal coverage; production accepted-prefix replay and map wiring
+  remain open. M4 has an isolated
+  `ScopedTextStream` adapter and per-stream initial-import slice; the
+  2026-10-14 status still described production `MarkoffDocument` on the pinned
+  engine. The 2026-10-15 root cutover now requires the installed candidate.
+  M6 has bounded list, text and map
+  stream routers with export/ack quarantine seams. The list router now retains
+  unknown-order envelopes and retries structural dependencies after registration
+  or arrival. The reference provider keeps
+  an accepted identity-owner index for local preparations, and fresh accepted-
+  prefix replay rejects repeated `(stream, actor, counter)` identities before
+  applying records, with a restart regression. The accepted-prefix projection
+  can now retrieve the exact operation payload and MAB envelope/revision by
+  scoped identity on demand, without a second payload cache. Text/list/map
+  routers check Core duplicate outcomes against that record and quarantine a
+  changed accepted envelope; a durable consumer trace covers all three.
+  Candidate `MarkoffDocument::acceptRemoteAction()` now accepts complete MABs,
+  replays the accepted prefix before returning committed, and updates block and
+  document notifications. Lifecycle preflight also rejects unresolved candidate
+  operations and targets absent from the resulting IdList before provider commit;
+  the unknown-target regression leaves the accepted prefix unchanged. Empty
+  documents can register peer initial-import and replacement MABs, then publish
+  and recover receiver-local history; replacement preflight accepts targets
+  visible before or after the action. Two replicas also converge after
+  opposite-order concurrent text MAB delivery. `MarkoffDocument::routeRemoteAction()`
+  now bounds complete causally deferred MABs, drains them after dependencies
+  arrive, leaves envelopes caller-owned on configured backpressure, and returns
+  action-ID/revision receipts only after accepted projection updates. Permanent
+  remote-action rejections now persist MQR/2 records with each operation and
+  the exact enclosing MAB before returning a quarantined outcome; the decoder
+  remains compatible with existing MQR/1 records. A provider close/reopen test
+  verifies a changed accepted action-ID retry is durable and leaves the
+  projection unchanged. Reopened documents can retrieve whole-action
+  quarantines as exact MABs with validated scope, IDs and reason. Unknown-target
+  waits remain in the bounded route and retry after accepted dependencies.
+  MQR/2 wait records now persist before deferred acknowledgment and reload on
+  document reopen; accepted and permanently rejected actions are filtered from
+  recovered waits. The in-memory action transport now routes accepted receipts
+  to the peer that offered each MAB, including deferred actions drained by a
+  different peer; the action-mode `CollabConsumer` uses `routeRemoteAction()`.
+  The provider lifecycle now emits exact local MAB bytes after acceptance and
+  projection refresh, and action-mode `CollabConsumer` automatically submits
+  them through the in-memory transport. A candidate integration test verifies
+  two-way initial-import/replacement delivery and action-ID/revision receipts.
+  Durable transport state, automatic quarantine retry and production network
+  receipt dispatch remain open. M7
+  has a CTPT boundary-token slice, not view integration.
+  The vNext adapter now owns its CMake library target, consumed by the isolated
+  package probe; at that earlier status point the normal build still used the
+  pinned engine. Root CMake now requires the installed candidate in every build.
+  M1's former IdList API blocker is resolved upstream in alpha.4 with ordered
+  full entry identities; Core also now applies committed terminal gaps, and
+  CTLO/0002 has a durable-reader promise. Corbomite has now supplied document
+  UUID/copy/fork, shared-history and private-state design directions, accepted
+  in Markoff's provider reply. M1 has a compiled provider API draft; production
+  ownership/storage integration remains open. M3 still lacks
+  Markoff's durable gap record/log/recovery integration. M5's upstream reader
+  gate is closed, but Markoff's structural IdList port remains open. The
+  candidate `BlockIdentity` now orders and hashes the complete actor/counter
+  pair, with a consumer collision regression and a three-replica offline
+  same-value insertion convergence test. The isolated package now has a
+  provider-backed document lifecycle owner that opens, reconciles unresolved
+  transactions, replays and gates first import/recovery before exposing writes;
+  it retains the publication coordinator across recovery-gap publication, and
+  its reopen traces finish committed private history or keep absent reservations
+  gated until terminal coverage. Candidate `MarkoffDocument` now uses this
+  lifecycle for provider-backed imports, edits, undo and remote MAB acceptance;
+  app startup and durable host-provider acceptance remain open. Production
+  `Markoff::BlockId` now has
+  an additive full actor/counter identity form with complete equality, ordering
+  and hashes, covered by `tst_block_id`. The unused MBI1 identity token codec
+  has been removed; the opaque-frame key derives directly from actor bytes and
+  counter. This structural form remains scaffolding because `MarkoffDocument`
+  still owns the current numeric `IdList`. The unused candidate-to-`BlockId` conversion bridge
+  was removed so the adapter exposes only its full actor/counter identity.
+  The pending publication cache now keys on full `BlockId`,
+  with same-counter/different-actor coverage. `MarkoffOp` and `MKOF` now use a
+  single full-identity schema, with numeric schema 1 removed. Remote list
+  allocation and production build integration remain open; current document
+  buffer ops still originate from numeric IDs and cannot yet be serialized.
+  Source/styled frame snapshots now key by full `BlockId`, QTextFrame matching
+  uses the complete identity key, and Canvas accessibility hashes no longer
+  narrow identities; focused root tests pass 3/3.
+  Markoff CTest passed 213/213 excluding `tst_benchmark` after the wire change;
+  strict count, target and trailing-byte validation was then added and the
+  serializer test passed again.
+- **M10 current finding:** both fixture streams use `blockTextStreamName()`.
+  Text and map adapters now accept only an open provider session; the earlier
+  direct ReplicaState constructors and MPSK/1 workaround are removed. The
+  relocated alpha.5 Release consumer build and CTest pass 3/3, including exact
+  full-route reservations, provider reopen, document/epoch separation and
+  wrong-session refusal. This remains isolated adapter evidence, not production
+  Markoff acceptance.
+- **A02 reference provider — COMPLETE:** the isolated MREF/4 provider now has
+  scope and process leases, exact reservations, crash reopen, corruption/authority
+  refusal, pre-commit failure handling and post-rename/file-sync/directory-sync
+  uncertainty injection with exact transaction reconciliation. The A06
+  `ActionPublicationCoordinator` now validates MAB/MOH bindings and recovers a
+  uncertain append after reopen; when persistence may have atomically replaced
+  the durable file, the live session is poisoned until reopen. A definitively absent preparation
+  is durably retired and its reservations can be covered by an MMG/1 map gap;
+  this survives provider reopen and prevents later append of the retired action.
+  Text/list MTG/1 publication and reopen reconciliation also pass. The
+  coordinator refuses gap publication until `recoverAndRebuild()` succeeds;
+  its test rebuilds a fresh map projection from a previously accepted MAB import
+  and verifies the accepted value before MMG coverage. An MMG append made
+  uncertain after atomic rename is recovered after reopen with the same gap ID,
+  covering the full reservation once. Production Markoff
+  private-history completion now also injects a definite pre-rename write
+  failure after MAB commit, retains the preparation and write barrier, then
+  recovers the exact MOH bytes after reopen without duplicating the action.
+  Recovery snapshots now include per-record prior/committed revision tokens
+  derived from the provider transaction index. A reopened action-to-MMG prefix
+  verifies adjacent token continuity, giving Markoff replay an exact gap-scope
+  binding point. The coordinator rejects discontinuous chains, reused revision
+  tokens and heads that do not match the prefix before publication/gap/recovery;
+  `AcceptedPrefixProjection` now rebuilds fresh list/text/map adapters from the
+  complete prefix, checks operation routes and identities, requires exactly one
+  valid MAB/3 initial import matching its durable source intent before accepted
+  edits, and applies MTG/MMG against their exact prior tokens. It validates the
+  committed owner-history action groups against their MAB, restores actor-local
+  list/text undo snapshots, and retains the map compensation index. The durable
+  cross-stream undo reopen trace and absent-map gap test use this replay path.
+  A zero-operation initial-import absence trace now confirms proven-absent
+  preparations are retired and the write barrier is held through rebuild, then
+  released when no gaps remain. The lifecycle owner can rebind the same exact
+  source to a new transaction ID after provider-proven absence, and the retry
+  reaches ready state after lifecycle reopen; relocated consumer CTest passes
+  3/3. The lifecycle owner also exposes live absent-action recovery: it rebuilds
+  the accepted projection before publishing an MMG/1 gap, discards the tentative
+  map write, and only returns to ready after gap commit. It also recovers a
+  committed map MAB with pending private history and refreshes the accepted map
+  projection after inspection. Candidate document/lifecycle wiring now covers
+  provider-backed edits and complete remote MAB replay; app startup, bounded
+  router delivery and host-provider acceptance remain open. Corbomite's
+  production journal is a later acceptance gate.
+- **Host boundary:** [provider contract](specs/2026-10-12-document-storage-provider.md)
+  and [Corbomite reply](handoff/2026-10-12-to-corbomite-provider-contract.md).
+  The draft covers leases, prefix revisions, reservations, explicit publication
+  outcomes, commit-associated undo metadata and export revisions. It compiles;
+  the session can now persist a first-import intent and the coordinator binds
+  initial MAB source bytes to it before allowing that action. After definitive
+  absence and complete gap coverage, the same source can be retried under a new
+  transaction ID, and the retry MAB/private history commits after provider
+  reopen;
+  explicit in-memory and restartable local reference providers now pass their
+  installed consumer checks, including reopen across prepared and accepted
+  transaction states. Text, map and structural IdList provider-session
+  allocation paths pass the consumer checks; repeated list values retain
+  distinct structural identities and anchors. A single durable MAB action with
+  text/map/list writes also survives provider reopen and replays into fresh
+  projections with the same list identity and rendered text/map values. A fixed
+  CTGP archive fixture round-trips and applies only after the provider accepts
+  its gap transaction, preventing counter reuse. A
+  child-process abrupt exit/reopen check preserves
+  actor and reservation state, a competing process receives `writer_conflict`,
+  corrupt MREF is refused, missing private identity is rejected against existing
+  document state, and a forced pre-commit reservation write failure preserves
+  prior counters. A pre-rename preparation failure also preserves the exact
+  unattached reservation and prior accepted revision across reopen, then allows
+  an identical retry. The relocated alpha.5 consumer now injects post-rename,
+  file-sync and directory-sync failures; reopen reconciles the exact reservation
+  and committed transaction without counter reuse or duplicate acceptance. The
+  reference provider is not Corbomite's journal; broad recovery coordination and
+  its production storage acceptance remain open.
+- **CollabText adoption A03:** provider-backed text, map and structural IdList
+  adapters pass the relocated alpha.5 consumer baseline. A durable mixed MAB
+  action survives reopen and replays into fresh projections; repeated list
+  values retain structural identity, and a fixed CTGP archive is applied only
+  after provider commit. A reservation write failure also leaves a text edit
+  unmodified and its stream counter/reservation unchanged before retry. A03 is
+  complete at the isolated-adapter baseline.
+- **Selective undo A04:** the production dispatcher still discards logged opIds
+  and invokes stack undo on shared engines. Alpha.5 Core adds selective text/IdList
+  group compensation, now exposed by isolated adapters. A relocated consumer trace
+  proves A then B on shared order: selectively undo A, preserve B, replay/restore,
+  and redo both exact block identities. The coordinator now rejects MAB actions
+  whose owner-history index omits or misroutes operation identities. New MAI/2
+  owner records persist each map write's prior key state; the map adapter emits
+  a fresh inverse, refuses to overwrite a later same-key LWW head, and can
+  compensate after replay from MAI/2. A durable adapter regression now
+  publishes A and B, then one undo MAB across list, text and map, reopens and
+  verifies B remains. The undo append injects uncertainty after its atomic
+  rename; recovery after provider reopen inspects the exact undo transaction and
+  persists its private history. The same coordinator rejects another write
+  while that undo is unresolved.
+  The absent-action test injects a pre-rename append failure, retires the exact
+  preparation, rebuilds from the accepted prefix and commits its map gap.
+  The initial-import path also covers coordinator prepare failure, reopen,
+  rebuild and terminal gap; absent transaction IDs are durably tombstoned,
+  including transactions whose preparation never reached atomic rename. The
+  provider-backed adapter covers reservation failure atomicity. A validated
+  transaction builder binds each MAB op to its adapter-reported reservation and
+  the live accepted prefix; it rejects omitted staged ops, stale history and
+  incomplete bindings. `ActionStager` provides the single typed conversion path
+  from list/text/map adapter results to a MAB and reservation bindings; the
+  provider test exercises that path. Map encoding now precedes counter
+  reservation, with a regression proving rejected values consume no counter.
+  Production MarkoffDocument group capture, publication and undo dispatch remain
+  open. See the
+  [A04 handoff](handoff/2026-10-13-a04-selective-history.md).
+- **Architecture:** retain D2 per-block streams and Markoff-owned document,
+  transport, structural maps and cross-stream action semantics. Integrate via
+  public Core APIs with consumer-owned durable identity/history.
+- **Gates:** settle multi-stream undo/publication before claiming parity; keep
+  physical collection and log pruning disabled; integrate durable gap events,
+  host absence proofs and accepted-prefix recovery before enabling writes after
+  failed appends; finish Markoff and Wave acceptance against one immutable
+  candidate. The candidate adds the Core gap apply path and durable CTLO reader;
+  Markoff must still adopt and verify both.
+- **M1 host findings:** Corbomite currently uses replica ID `1` and has no
+  stable document ID separate from its renameable relative path. Markoff's
+  current block counters do not establish uniqueness across devices. The plan
+  recommends deriving composite BlockId from the structural insert identity
+  and alpha.4 now supplies its ordered IdList identity API. Inspection of
+  Corbomite's `NoteDocument`, Vault path-keyed
+  cache and rename path handling confirms the document ID must be persisted
+  with shared document metadata, while private `ReplicaState` stays in local
+  application data. Corbomite's response defines proposed copy/fork and state
+  policies; their implementations and provider acceptance remain open.
+- **Candidate source:** `/home/clinton/dev/collabtext/.worktrees/reliability-v2`.
+  Candidate report and response are linked from the adoption plan. Wave's Q06
+  production acceptance remains external and open.
+
+The G1 canvas accessibility arc closed 2026-09-30 (A5.4). Its manual Orca pass
+(A5.3) remains deferred by the user and is separate from this workfront.
 
 User-opened 2026-08-19, closed 2026-09-30 at A5.4. Orca pass (A5.3)
 deferred by the user (needs `pacman -S orca` + `--direct` permission).
@@ -75,9 +365,10 @@ into the closed plan.
 
 ## Test baseline
 
-> **Current baseline: 315/315 (100%)**, last verified 2026-08-15 at
-> the canvas production arc close (P7.2g). `check-constitution.sh`
-> clean. **This is the number to beat — any drop is a regression.**
+> **Historical baseline: 315/315**, recorded 2026-08-15 at the canvas
+> production arc close (P7.2g); a later 213/213 baseline was recorded at G1
+> close. Current migration evidence is tracked in the execution roadmap.
+> Neither historical count establishes a passing result for current sources.
 > The entries below are the chronological accretion that got us here
 > (oldest first); read them for history, not for the current figure.
 
@@ -252,12 +543,12 @@ stated otherwise.
   (`MarkoffDocumentPrivate.h`), which are never assigned anywhere in
   `markoff-core/src` (confirmed by a whole-tree grep) — not "stale
   after D2 edits" as a neighboring comment on `offsetInBlock()`
-  suggests, but permanently empty on every document, D2 or legacy.
-  `blockAnchorAt(int)` and `blockByteRange(BlockAnchor)` share the same
+  suggests, but permanently empty on every document and edit path.
+  `blockAnchorAt(int)` and `blockByteRange(BlockId)` share the same
   dead-data dependency and are equally non-functional. P6.1 needed
   `blockAt()` for its Session-anchor resolve step and worked around it
   (`TextAnchor::block()` + the confirmed-D2-safe
-  `offsetInBlock(BlockAnchor, TextAnchor)`) rather than fix it —
+  `offsetInBlock(BlockId, TextAnchor)`) rather than fix it —
   `markoff-core/` was closed for that task. Worth a real core session:
   either populate `latestBlockRanges`/`latestBlockAnchors` for real, or
   retire the three accessors and redirect any other silent callers to

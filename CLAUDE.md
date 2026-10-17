@@ -4,7 +4,35 @@ Qt6/C++ markdown editor widget family: a CRDT-backed foundation
 (`markoff-core` + `markoff-parser`) plus view leaves. Primary consumer:
 Corbomite (submodules this repo at `libs/markoff-family`).
 
-## Current workfront — none (G1 accessibility closed 2026-09-30)
+Core reading: [Shared Editing Manifesto](docs/EDITING-MANIFESTO.md).
+Use it to guide CRDT integration, ownership boundaries, development priorities,
+and the evidence required for editing behavior.
+
+## Current workfront — Collabtext vNext adoption planning (opened 2026-10-11)
+
+Start with the authoritative [execution roadmap and A01–A16 task board](docs/plans/2026-10-12-collabtext-adoption-execution.md).
+Milestone summaries and historical findings: [adoption plan](docs/plans/2026-10-11-collabtext-vnext-adoption.md).
+**User coordination rule:** Corbomite development stays paused until final
+task A16 / milestone M12 delivers the readiness signal to begin its transition.
+Implement and verify Markoff using reference providers and host-shaped fixtures.
+Do not depend on paused Corbomite code or send an earlier readiness signal.
+Current Core candidate: `collabtext-markoff-core-2026-10-13-alpha5` at
+`e8a8e7d1a95dd50e23f38d6727921b47b814e44b` (0.2.0-alpha.5, manifest v17);
+the alpha.4 tag remains immutable. Markoff now requires the installed candidate
+for standalone and embedded builds; the pinned engine is no longer a build
+choice and the retired Live leaf is excluded from the root build.
+Core supplies ordered list identities, scoped gap application, durable CTLO
+readers and selective local-history groups for text/IdList. The Corbomite host
+design directions are accepted; Markoff's reference provider and isolated
+provider-backed adapters pass their current consumer checks. A02 is complete at
+the reference-provider boundary. The provider-backed `MarkoffDocument`, its
+active Source/Styled/Canvas views and installed consumers now use one engine.
+Continue closing the remaining production routing, history-retirement,
+responsiveness and transition-evidence work on the A01–A16 board.
+Preserve D2 per-block ownership, retain history with collection disabled, and
+require A01–A15 evidence before A16. Corbomite production acceptance follows its
+transition; Wave Q06/global merge and publication gates remain separate release
+obligations.
 
 **Also landed 2026-08-30 — H arc (Hologram, new consumer):** opt-in
 `View::setHideMatchingFirstHeadingAsTitle(bool)` (+ `EditorWidget`
@@ -23,13 +51,14 @@ the next workfront 2026-08-19 (below). **G2** (Corbomite adoption) is
 done — Corbomite's Cluster K Phase 5 (2026-08-18) made
 `Markoff::Canvas::EditorWidget` its sole LivePreview engine. **G3**
 (retirement) was decided 2026-08-19, scoped to `markoff-live` only:
-retired, zero downstream consumers left (`MARKOFF_BUILD_LIVE` now
-defaults OFF; tag `archive/markoff-live-final`); `markoff-styled` is
-untouched by that decision. Full context on both gates:
+retired with zero downstream consumers and excluded from the supported root
+build (tag `archive/markoff-live-final`); `markoff-styled` is untouched by
+that decision. Full context on both gates:
 [`docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md`](docs/handoff/2026-08-19-to-markoff-retire-live-close-e-arc-regroup.md)
 (Corbomite's handoff that prompted recording them).
 
-**G1 accessibility arc CLOSED 2026-09-30 — no active workfront.**
+**G1 accessibility arc CLOSED 2026-09-30.** The current workfront is the
+CollabText adoption roadmap above.
 Gate A-G1 decided 2026-09-30: the manual Orca pass (A5.3) is **deferred**
 by the user to a later dogfood session (needs `sudo pacman -S orca` and
 explicit permission for a `--direct` run; checklist in the plan's A5.3).
@@ -51,9 +80,10 @@ and `libs/markoff-canvas/` are open again for ordinary work (not
 gated to plan-named seams anymore — that restriction was specific to
 the closed arc). `markoff-styled` stays bug-fix-only (backs
 Corbomite's Reading mode); `markoff-source` stays untouched,
-permanently; `markoff-live` is retired (see G3 above). Test baseline:
-**213/213** (full `scripts/run-tests.sh`) as of the G1 close above —
-any drop is a regression.
+permanently; `markoff-live` is retired (see G3 above). Historical baseline:
+**213/213** (full `scripts/run-tests.sh`) at the G1 close. Record current
+migration evidence and any explained test-inventory changes in the execution
+roadmap; a historical count is not a current passing result.
 
 **Status (2026-08-15, arc close):** all 7 F1 CodeMirror-parity gaps
 closed (P7.2a–g), including a real document-convergence regression
@@ -105,15 +135,14 @@ explicitly changed.
 - `libs/markoff-parser` — tree-sitter Markdown; load-time +
   per-block on-demand only (`inlineSpansFor`, cached).
 - `libs/markoff-live` — QML live-preview leaf, **retired 2026-08-19**
-  (G3): zero downstream consumers, `MARKOFF_BUILD_LIVE` defaults OFF.
-  Source stays in-tree build-fix-only; full deletion is a future
-  decision. Tag `archive/markoff-live-final` for the last normal state.
+  (G3): zero downstream consumers and excluded from the supported root build.
+  Its source remains only for repository cleanup; it is not a Markoff consumer.
+  Tag `archive/markoff-live-final` records its last supported state.
 - `libs/markoff-source` — QPlainTextEdit source leaf (permanent;
   bug-fix only).
 - `libs/markoff-styled` — QTextEdit styled leaf (frozen; bug-fix
   only).
-- `libs/collabtext` — CRDT engine, **git submodule**.
-  `libs/rapidyaml`, `libs/jkqtmathtext` — vendored.
+- `libs/rapidyaml`, `libs/jkqtmathtext` — vendored third-party libraries.
 
 ## Working on the OLD leaves (standstill bug fixes only)
 

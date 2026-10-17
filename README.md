@@ -1,10 +1,8 @@
 # Markoff
 
-A Qt6/C++20 Markdown **editor widget family**: one CRDT-backed document
-model, three interchangeable view widgets. Live-preview (Obsidian-style
-inline rendering), inline-styled rich editing, and raw source — all
-editing the same document object, swappable at runtime through a common
-`Markoff::MarkdownView` base.
+A Qt6/C++20 Markdown editor library with a shared provider-backed document
+model and three view widgets: Canvas, inline-styled rich editing, and raw
+source. Canvas is the primary live-preview editor.
 
 Extracted from, and primarily consumed by, the
 [Corbomite](https://github.com/clintonthegeek/Corbomite) note-taking
@@ -17,11 +15,10 @@ app, but designed as a reusable widget library.
   collaborative text buffer; block order, kinds, and attributes are
   CRDT maps. Typing mutates the per-block buffer directly — no
   whole-document reparse on the hot path.
-- **Three real views over one model**, not three serializations:
-  - `Markoff::Live::EditorWidget` (`libs/markoff-live`) — QML
-    live-preview leaf: inline-format rendering with cursor-aware
-    delimiter visibility, wikilinks, editable tables with smart column
-    widths, LaTeX math, theming + zoom.
+- **Three views over one document model:**
+  - `Markoff::Canvas::EditorWidget` (`libs/markoff-canvas`) — the primary
+    block-projection editor, with inline formatting, tables, accessibility,
+    folding, media seams, and LaTeX math.
   - `Markoff::Styled::Editor` (`libs/markoff-styled`) — QWidget/
     QTextEdit inline-styled editor; word-processor feel, native
     QTextTable rendering for tables; plus a headless
@@ -39,14 +36,15 @@ app, but designed as a reusable widget library.
 
 | Path | What |
 |---|---|
-| `libs/markoff-core` | `Markoff::MarkoffDocument` (the CRDT document), command set + undo, sessions, find, themes, the shared flat-view text binding, `MarkdownView` base |
+| `libs/markoff-core` | `Markoff::MarkoffDocument`, command set and undo, sessions, find, themes, text bindings, and `MarkdownView` base |
 | `libs/markoff-parser` | Tree-sitter Markdown AST + YAML frontmatter (`Markoff::Document` value snapshot) |
-| `libs/markoff-live` | QML live-preview view leaf |
+| `libs/markoff-canvas` | Primary block-projection editor and live-preview view |
 | `libs/markoff-styled` | QTextEdit inline-styled view leaf |
 | `libs/markoff-source` | QPlainTextEdit source view leaf |
-| `libs/collabtext` | CRDT text engine (git submodule) |
+| `libs/markoff-live` | Retired QML view; excluded from the supported build |
+| `libs/markoff-collabtext-vnext` | Adapter to the installed provider-backed CollabText Core package |
 | `libs/rapidyaml`, `libs/jkqtmathtext` | vendored third-party (YAML, LaTeX rendering) |
-| `apps/` | demo / dogfood apps (`markoff-live-app`, `markoff-styled-app`, …) — skip with `-DMARKOFF_BUILD_APPS=OFF` |
+| `apps/` | Provider-backed collaboration app |
 
 ## Building
 
@@ -54,19 +52,25 @@ Requires Qt ≥ 6.8, CMake ≥ 3.19, a C++20 compiler. The source widget
 additionally uses KF6SyntaxHighlighting.
 
 ```bash
-git clone --recurse-submodules <this-repo>
-cmake -S . -B build-dev
+git clone <this-repo>
+cmake -S . -B build-dev -DCMAKE_PREFIX_PATH=/path/to/collabtext-core
 cmake --build build-dev -j 8
 ```
 
-Consume as a submodule (the supported mode today — no install/export
-story yet):
+Every Markoff build requires the selected installed CollabText Core package.
+Markoff has no pinned-engine fallback, and the retired Live leaf is not part
+of the supported build.
+
+Consume as a subdirectory:
 
 ```cmake
-add_subdirectory(libs/markoff-family)   # your submodule path
-target_link_libraries(myapp PRIVATE Markoff::Core Markoff::Styled
-                                    Markoff::Source Markoff::Live)
+add_subdirectory(path/to/Markoff)
+target_link_libraries(myapp PRIVATE Markoff::Core Markoff::Canvas
+                                    Markoff::Styled Markoff::Source)
 ```
+
+The libraries provide install rules for a parent project's target export; a
+standalone `find_package(Markoff)` config is not provided yet.
 
 ## Testing
 
@@ -80,11 +84,10 @@ Current baseline is documented in `docs/STATUS.md`.
 
 ## Status
 
-Pre-1.0, under active development (v0.7.x series). The live and source
-leaves are mature; the styled leaf is newest (tables render read-only;
-in-grid editing is on the roadmap). API is not yet frozen — see
-`docs/STATUS.md` for the live status board and `docs/queue.md` for
-open work.
+Pre-1.0, under active development (v0.7.x series). Canvas is the primary
+editing view; Source and Styled remain available. The API is not frozen. See
+`docs/STATUS.md` and `docs/plans/2026-10-12-collabtext-adoption-execution.md`
+for current status and open work.
 
 ## For contributors / AI agents
 
