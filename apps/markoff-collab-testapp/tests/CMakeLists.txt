@@ -12,12 +12,27 @@ qt_add_executable(tst_d5_in_memory_transport
 target_link_libraries(tst_d5_in_memory_transport PRIVATE Qt6::Test Qt6::Core markoff_core)
 target_include_directories(tst_d5_in_memory_transport PRIVATE ..)
 add_test(NAME tst_d5_in_memory_transport COMMAND tst_d5_in_memory_transport)
+set_tests_properties(tst_d5_in_memory_transport PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
-qt_add_executable(tst_d5_testapp_convergence
-    tst_d5_testapp_convergence.cpp
-    ../InMemoryTransport.cpp
-    ../CollabConsumer.cpp)
-target_link_libraries(tst_d5_testapp_convergence PRIVATE
-    Qt6::Test Qt6::Core markoff_core)
-target_include_directories(tst_d5_testapp_convergence PRIVATE ..)
-add_test(NAME tst_d5_testapp_convergence COMMAND tst_d5_testapp_convergence)
+if(NOT MARKOFF_USE_COLLABTEXT_VNEXT)
+    qt_add_executable(tst_d5_legacy_identity_rejection
+        tst_d5_legacy_identity_rejection.cpp)
+    target_link_libraries(tst_d5_legacy_identity_rejection PRIVATE
+        Qt6::Test Qt6::Core markoff_core)
+    add_test(NAME tst_d5_legacy_identity_rejection
+        COMMAND tst_d5_legacy_identity_rejection)
+endif()
+
+if(MARKOFF_USE_COLLABTEXT_VNEXT)
+    qt_add_executable(tst_vnext_action_consumer
+        tst_vnext_action_consumer.cpp
+        ../InMemoryTransport.cpp
+        ../CollabConsumer.cpp)
+    target_link_libraries(tst_vnext_action_consumer PRIVATE
+        Qt6::Test Qt6::Core markoff_core)
+    target_include_directories(tst_vnext_action_consumer PRIVATE ..)
+    add_test(NAME tst_vnext_action_consumer COMMAND tst_vnext_action_consumer)
+    set_tests_properties(tst_vnext_action_consumer PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+endif()
