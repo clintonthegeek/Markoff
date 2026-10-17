@@ -5,13 +5,13 @@ project(markoff_canvas LANGUAGES CXX)
 #
 # Constitution C3 (spec §6): this target links Qt6::Widgets, markoff_core
 # and Markoff::Parser and NOTHING ELSE from the Markoff family. No
-# Qt6::Quick / Qt6::QuickWidgets, no markoff_live / markoff_styled /
+# Qt6::Quick / Qt6::QuickWidgets, no markoff_styled /
 # markoff_source. Adding one of those to the link line below is a
 # constitution violation, not a build fix.
 #
 # jkqtmathtext (P5.3) is a vendored third-party library, not a Markoff
 # family member — linking it renders LaTeX math to a QPixmap synchronously
-# from C++, same library markoff-live's (unused) MathRenderer wraps.
+# from C++.
 
 find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Widgets)
 

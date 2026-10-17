@@ -22,7 +22,6 @@
 #include <markoff/core/ClipboardCodec.h>
 #include <markoff/core/KindInference.h>
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/core/UndoLog.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
 #include <memory>
 #include <stdexcept>

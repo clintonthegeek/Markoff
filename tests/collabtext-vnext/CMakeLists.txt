@@ -30,7 +30,7 @@ add_executable(markoff_provider_scope_test tst_provider_scope.cpp)
 target_link_libraries(markoff_provider_scope_test PRIVATE Markoff::CollabTextVNext)
 add_test(NAME markoff_provider_scope_test COMMAND markoff_provider_scope_test)
 
-if(TARGET Markoff::Core AND MARKOFF_USE_COLLABTEXT_VNEXT)
+if(TARGET Markoff::Core)
     add_executable(markoff_provider_backed_document_test
         tst_provider_backed_document.cpp
     )

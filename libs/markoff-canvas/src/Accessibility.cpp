@@ -12,7 +12,6 @@
 #include <markoff/canvas/View.h>
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/BlockKind.h>
-#include <markoff/core/CrdtProxies.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/TextUnits.h>
 
@@ -144,11 +143,8 @@ std::pair<int, int> blockSelectedByteRange(View *view, BlockId id)
 // ---- CanvasAccessible ------------------------------------------------
 
 namespace {
-/// A3.3: cheap "did this block's buffer change" token. NO single core
-/// counter covers every mutation path: `blockEditSequence` bumps on local
-/// edits and undo/redo but NOT on remote CRDT ops; the block's
-/// `BufferProxy::editSequence` bumps on local and remote edits but NOT on
-/// undo/redo. Both are monotonic, so their sum changes on every path.
+/// Cheap "did this block's buffer change" token. `blockEditSequence`
+/// advances on local edits and on undo/redo.
 quint64 bufferChangeToken(MarkoffDocument *doc, BlockId id)
 {
     quint64 t = doc->blockEditSequence(id);
@@ -839,8 +835,8 @@ void *CanvasBlockAccessible::interface_cast(QAccessible::InterfaceType t)
 // API is the IME-commit path: (1) place the caret at the range start with
 // the public setCaretPosition(), (2) deliver a QInputMethodEvent whose
 // replacementStart/Length + commitString describe the replace. View::
-// inputMethodEvent already does exactly "one d2ApplyBufferEdit in one
-// UndoLog::Transaction at the caret, then flush so kind promotion sees the
+// inputMethodEvent already does exactly "one block edit in one
+// published action at the caret, then flush so kind promotion sees the
 // text", owns the read-only gate, and converts QChar->byte with coords::
 // inside its own block. No buffer is touched here, no logic duplicated.
 // Consequences (deliberate): the caret ends after the inserted text (what

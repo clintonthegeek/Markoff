@@ -384,7 +384,7 @@ CollabText::Result<EphemeralDocument> decodeReferenceDocument(
     in >> document.revisionNumber;
     quint32 count = 0;
     if (in.status() != QDataStream::Ok || magic != QByteArrayLiteral("MREF")
-        || (version != 4 && version != 5) || storedScope != expectedScope || !actorRead
+        || version != 5 || storedScope != expectedScope || !actorRead
         || storedActor != actor
         || !readCount(in, count))
         return Error(ErrorCode::corrupt_record,

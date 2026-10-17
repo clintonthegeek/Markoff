@@ -76,10 +76,6 @@ add_library(markoff_core SHARED
     src/CompletionRegistry.cpp
     src/EmojiCompletionProvider.cpp
     src/EmojiData.h
-    include/markoff/core/UndoLog.h
-    src/UndoLog.cpp
-    include/markoff/core/CrdtProxies.h
-    src/CrdtProxies.cpp
     # --- Sibling map public headers (Phase 5) ---
     include/markoff/core/KindTagMap.h
     include/markoff/core/BlockAttrsMap.h
@@ -105,18 +101,8 @@ add_library(markoff_core SHARED
     # --- MarkdownView polymorphic base (Task 4.5) ---
     include/markoff/core/MarkdownView.h
     src/MarkdownView.cpp
-    # --- Sibling-map op wire envelope (D5 §3.1) ---
-    include/markoff/core/SiblingMapOpHeader.h
-    src/SiblingMapOpHeader.cpp
-    # --- Bundle encode/decode (D5 §3.2) ---
-    include/markoff/core/MarkoffSerializer.h
-    src/MarkoffSerializer.cpp
-    # --- Collab boundary types (D5) — must be in SOURCES so AUTOMOC compiles
-    #     moc_ActionId.cpp (defines Markoff::staticMetaObject from Q_NAMESPACE).
+    # ActionId is a Q_NAMESPACE. Listing the header compiles moc_ActionId.cpp.
     include/markoff/core/ActionId.h
-    include/markoff/core/MarkoffOp.h
-    # --- Cursor types (D5 phase 7) — moved from markoff-live to markoff-core
-    #     so MarkoffDocument can hold/emit Cursor values.
 )
 
 set_target_properties(markoff_core PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -142,8 +128,7 @@ target_link_libraries(markoff_core
         Markoff::Parser
         Markoff::TextUnits
 )
-target_compile_definitions(markoff_core PUBLIC MARKOFF_USE_COLLABTEXT_VNEXT=1)
-    target_link_libraries(markoff_core PUBLIC Markoff::CollabTextVNext)
+target_link_libraries(markoff_core PUBLIC Markoff::CollabTextVNext)
 
 # Alias under the Markoff:: namespace for consumers.
 add_library(Markoff::Core ALIAS markoff_core)
@@ -179,9 +164,6 @@ if(DEFINED KDE_INSTALL_LIBDIR)
     )
     install(DIRECTORY include/markoff
         DESTINATION ${KDE_INSTALL_INCLUDEDIR}
-        PATTERN "TextAnchor.h" EXCLUDE
-        PATTERN "Cursor.h" EXCLUDE
-        PATTERN "AnchorJson.h" EXCLUDE
     )
 endif()
 

@@ -128,7 +128,7 @@ CollabText::Result<QuarantineRecord> QuarantineRecordCodec::decode(
     in >> magic >> version >> document >> epoch >> stream >> primitive;
     QuarantineRecord record;
     if (in.status() != QDataStream::Ok || magic != QByteArrayLiteral("MQR")
-        || (version != 1 && version != 2)
+        || version != 2
         || !validUtf8(document, 256) || document.isEmpty()
         || !validUtf8(stream, 256) || stream.isEmpty())
         return Error(ErrorCode::corrupt_record,
@@ -152,11 +152,10 @@ CollabText::Result<QuarantineRecord> QuarantineRecordCodec::decode(
                          "quarantine target identity is invalid");
         record.targetBlock = BlockIdentity{targetActor, targetCounter};
     }
-    in >> payload >> deliverySequence >> actionId;
-    if (version == 2) in >> record.originalActionEnvelope;
+    in >> payload >> deliverySequence >> actionId >> record.originalActionEnvelope;
     in >> bundleIndex >> bundleOperationCount >> errorCode >> message >> hasContext;
     if (in.status() != QDataStream::Ok || hasContext > 1
-        || (version != 1 && version != 2)
+        || version != 2
         || payload.size() > kMaximumPayloadBytes || actionId.size() > kMaximumActionIdBytes
         || record.originalActionEnvelope.size() > kMaximumActionEnvelopeBytes
         || message.isEmpty() || message.size() > kMaximumMessageBytes)

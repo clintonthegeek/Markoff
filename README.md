@@ -41,7 +41,6 @@ app, but designed as a reusable widget library.
 | `libs/markoff-canvas` | Primary block-projection editor and live-preview view |
 | `libs/markoff-styled` | QTextEdit inline-styled view leaf |
 | `libs/markoff-source` | QPlainTextEdit source view leaf |
-| `libs/markoff-live` | Retired QML view; excluded from the supported build |
 | `libs/markoff-collabtext-vnext` | Adapter to the installed provider-backed CollabText Core package |
 | `libs/rapidyaml`, `libs/jkqtmathtext` | vendored third-party (YAML, LaTeX rendering) |
 | `apps/` | Provider-backed collaboration app |

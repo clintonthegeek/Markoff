@@ -5,9 +5,10 @@ Current work is [`STATUS.md`](STATUS.md) and the
 [CollabText task board](plans/2026-10-12-collabtext-adoption-execution.md).
 
 `markoff-core` and `markoff-canvas` are open for that board.
-`markoff-styled` is bug-fix-only outside it, `markoff-source` stays
-untouched, and `markoff-live` is retired. Smells below that name
-`libs/markoff-live` are frozen with that retired leaf.
+`markoff-styled` is bug-fix-only outside it, and `markoff-source` stays
+untouched. A13 removed `libs/markoff-live`. Smells below that name that
+path are historical; the last supported snapshot is tag
+`archive/markoff-live-final`.
 
 Closed queue items through the canvas reset:
 [`archive/2026-08-13-queue-pre-canvas-snapshot.md`](archive/2026-08-13-queue-pre-canvas-snapshot.md)

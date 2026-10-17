@@ -17,16 +17,14 @@ with receipts are in the tree.
 
 The remaining Markoff work is a short tail:
 
-1. **A13, now.** Remove retired engine branches from the libraries the root
-   build compiles, so the next agent does not port code the build no longer uses.
-2. **A10, next.** Give local history an explicit retirement bound and enforce
+1. **A10, now.** Give local history an explicit retirement bound and enforce
    it when a new action would exceed that bound.
-3. **A12.** Carry remote carets as ephemeral presence, separate from document history.
-4. **A11 with A15.** Turn the reference provider's outbox, quarantine, and
+2. **A12.** Carry remote carets as ephemeral presence, separate from document history.
+3. **A11 with A15.** Turn the reference provider's outbox, quarantine, and
    receipt behavior into checks a host provider must pass, and assemble the
    transition package.
-5. **A14.** Re-run acceptance on the sources you are finishing and record it here.
-6. **A16.** Signal Corbomite. That signal is the last task, and nothing before
+4. **A14.** Re-run acceptance on the sources you are finishing and record it here.
+5. **A16.** Signal Corbomite. That signal is the last task, and nothing before
    it invites Corbomite to start.
 
 ## Standing rules
@@ -37,9 +35,8 @@ The remaining Markoff work is a short tail:
   the signal. Wave's Q06 acceptance and any CollabText merge or publication
   stay separate release obligations.
 - There is no legacy install to preserve. Each Markoff record family has one
-  writer version. Readers refuse other versions, with two recovery exceptions
-  already in the tree: reference-provider files write `MREF/5` and still read
-  `MREF/4`; quarantine writes `MQR/2` and still reads `MQR/1`. Markdown is the
+  writer version, and readers refuse every other version. Reference-provider
+  files are `MREF/5`. Quarantine records are `MQR/2`. Markdown is the
   import/export format. Accepted actions are the recovery history.
 - Keep D2: one text stream per block, one structural IdList, Markoff-owned
   maps, and Markoff-owned cross-stream actions. Physical collection, log
@@ -119,10 +116,9 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 - `MarkoffDocument::open` is the only constructor. Edits return
   `ActionPublicationResult`. `providerStateChanged` updates Canvas
   `publicationPending`, and that flag gates `isReadOnly()`.
-- The reference provider writes `MREF/5`, reads `MREF/4` and `MREF/5`, takes
-  a `QLockFile` lease, reserves counters on the session, and has injected
-  rename and sync faults. `tst_document_storage_provider.cpp` starts a child
-  process for reopen.
+- The reference provider writes and reads `MREF/5` only, takes a `QLockFile`
+  lease, reserves counters on the session, and has injected rename and sync
+  faults. `tst_document_storage_provider.cpp` starts a child process for reopen.
 - Text allocation goes through `ScopedTextStream::create(session)` and
   `session.reserve`. `ReplicaState` is only the provider's private identity
   file.
@@ -143,9 +139,8 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 - Import, `replaceMarkdown`, and `save()` (revision-bound `QSaveFile`, then
   `acknowledgeExport`) are implemented. Untouched setext, blockquote, CRLF,
   trailing whitespace, and missing-final-newline bytes are asserted in
-  `tst_provider_backed_document.cpp`, then again after reopen. The older
-  `tst_block_buffer_invariant` target is inside the CMake branch the root
-  build does not take.
+  `tst_provider_backed_document.cpp`, then again after reopen. A13 removed
+  `tst_block_buffer_invariant` with the other unbuilt legacy tests.
 
 ## Tasks
 
@@ -160,10 +155,10 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 | A07 | Done | Installed Core/Source/Styled/Canvas on composite `BlockId`. |
 | A08 | Done | Provider-backed block, map, structural, paste, and format edits. A missing command is a new bug with a test. |
 | A09 | Done | Import, replacement, reopen, and revision-bound export. |
-| A10 | Next | History retirement and backpressure. Starts when A13 is done. |
+| A10 | **Now** | History retirement and backpressure. |
 | A11 | Later | Host-provider conformance checks. Fold them into A15. |
 | A12 | Later | Ephemeral remote presence. |
-| A13 | **Now** | Delete dead legacy branches in the libraries the root build compiles. |
+| A13 | Done | Retired engine, live leaf, and unbuilt legacy branches are gone. |
 | A14 | Later | Acceptance record on the sources you are finishing. |
 | A15 | Later | Transition package for a Corbomite agent. |
 | A16 | Later | Readiness signal. Requires A13–A15 done. |
@@ -171,30 +166,26 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 Done means the recorded behavior is in the tree. Reopen a done task only when
 a current test fails or a named command on its exit list is missing. Say which.
 
-### A13 — remove dead legacy source
+### A13 — retired engine removed
 
-The single-engine cutover left inactive branches, tests, and comments that
-still describe the pinned engine, numeric replica ids, and the deleted anchor
-types (`TextAnchor`, `Cursor`, `AnchorJson`, `AnchorConversion`).
+Done 2026-10-17 on top of `6e4e0acd`. The supported tree has one document
+implementation.
 
-**Do this.** In the libraries the root build compiles (`markoff-core`,
-`markoff-parser`, `markoff-source`, `markoff-styled`, `markoff-canvas`,
-`markoff-collabtext-vnext`), delete source that the candidate build does not
-compile, and delete references to those removed types. The `else()` branches
-of `MARKOFF_USE_COLLABTEXT_VNEXT` still contain tests that call removed APIs
-such as `d2UndoLog()` and `MarkoffDocument(replicaId)`. Those files are not
-part of the current suite. Search for the old engine switch and the deleted
-type names after each batch. Build and run the focused tests, then the
-offscreen suite excluding `tst_realistic` and `tst_benchmark`.
+Removed the vendored `libs/collabtext` submodule, the whole `libs/markoff-live`
+tree, the unbuilt `MARKOFF_USE_COLLABTEXT_VNEXT` test branches, and the core
+types those branches were the last callers of: `UndoLog`, `CrdtProxies`,
+`MarkoffSerializer`, `SiblingMapOpHeader`, and `MarkoffOp`. Readers accept
+`MREF/5` and `MQR/2` only. Canvas, Source, Styled, the parser, provider-backed
+editing, undo through `undoGroup`, import/export, and the widget collaboration
+test app stay. The live leaf's last supported snapshot is git tag
+`archive/markoff-live-final`.
 
-Leave `libs/markoff-live` and the vendored CollabText tree in place. Both are
-already outside the supported root build. Deleting either is a separate
-explicit cleanup.
-
-**Exit.** The supported build has one document implementation. A search of
-those libraries finds no editable legacy engine branch and no use of the
-deleted anchor types. The offscreen suite passes, and this board records the
-command and count.
+`cmake --build build-dev -j 4`, then
+`scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`: 93/93 offscreen.
+The configured package was `0.2.0-alpha.5`, manifest v17, from
+`build-collabtext-alpha5/install`. `/tmp/collabtext-alpha5-prefix-b` was not
+on this machine. The deleted tests were not registered, so the count matches
+the 2026-10-16 baseline.
 
 ### A10 — history retirement and backpressure
 

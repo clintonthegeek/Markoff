@@ -11,9 +11,9 @@ CollabText vNext adoption. The document and the Source, Styled, and Canvas
 views already use the installed provider-backed engine. Corbomite stays
 paused until A16.
 
-**Current task: A13.** Remove dead legacy engine branches from the libraries
-the root build compiles. Next is A10, local-history retirement. Then A12
-presence, A14 acceptance, A15 transition package, A16 signal.
+**Current task: A10.** Local-history retirement and backpressure. Then A12
+presence, A14 acceptance, A15 transition package, A16 signal. A13 removed the
+vendored engine, the live leaf, and the unbuilt legacy branches.
 
 ## Pin
 
@@ -25,10 +25,11 @@ the candidate's `docs/USING_VNEXT.md`. The last machine-local prefix was
 
 ## Latest verification
 
-2026-10-16, at `6fbe26f0`: candidate Debug build, offscreen CTest 93/93;
-installed Core and view consumers 2/2. A 2026-10-17 source read confirmed
-A01–A09 against the tree and did not re-run the suite. The next code change
-records a new result on the task board.
+2026-10-17, A13, parent `6e4e0acd`: `cmake --build build-dev -j 4`, then
+`scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`, offscreen 93/93.
+Package `0.2.0-alpha.5`, manifest v17, prefix
+`build-collabtext-alpha5/install` (`/tmp/collabtext-alpha5-prefix-b` was
+absent). The 2026-10-16 installed-consumer 2/2 result was not repeated.
 
 ## Leaves
 
@@ -37,7 +38,8 @@ records a new result on the task board.
 - `markoff-parser` — load-time and per-block parsing.
 - `markoff-source` — permanent, bug-fix only outside this migration.
 - `markoff-styled` — bug-fix only; backs Corbomite reading mode.
-- `markoff-live` — retired 2026-08-19, excluded from the root build. Ignore it.
+- `markoff-live` — removed in A13. Tag `archive/markoff-live-final` keeps the
+  last supported snapshot.
 
 ## Not this workfront
 

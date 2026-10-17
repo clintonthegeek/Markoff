@@ -45,7 +45,6 @@
 #include <markoff/core/Session.h>
 #include <markoff/core/StructuralKeyHandler.h>
 #include <markoff/core/TextUnits.h>
-#include <markoff/core/UndoLog.h>
 
 #include <markoff/canvas/CanvasActionController.h>
 
@@ -1898,7 +1897,7 @@ void View::onDocumentChanged()
         }
     }
     if (!selectionAnchorResolvedFromSession) {
-        // No UndoLog selection state (T4/T5, queue #10 item 2): if the
+        // The document does not store selection state: if the
         // anchor's block didn't survive the edit there is nothing sound to
         // clamp it to, so the selection is dropped rather than guessed at.
         // Mirrors the undo/redo path, which does the same before mutating.
@@ -2297,10 +2296,7 @@ void View::setCaret(const CanvasCursor &caret)
 // always the caret in this leaf — there is no independent "typing at the
 // anchor end" gesture).
 //
-// rightBias: Right (true) for both ends, matching the one other in-tree
-// caret-to-TextAnchor conversion for a live document caret,
-// LiveCursorState.cpp:772 (`doc->textAnchorAt(block, byteOff,
-// /*rightBias=*/true)`) — a caret conceptually sits just after the
+// rightBias: Right (true) for both ends. A caret sits just after the
 // preceding character, so binding to the character on its right survives
 // same-position concurrent inserts the way a typing caret should.
 namespace {
@@ -3545,8 +3541,8 @@ void View::applyFormatOp(FormatVerb verb, const FormatOpFn &applyOne)
 
     // Multi-block selection: apply to each covered block's own local byte
     // range (never a cross-block sum, C4) inside one outer transaction so
-    // the whole gesture is one undo step (UndoLog transactions nest — same
-    // pattern collapseSelection's structural-merge tail relies on).
+    // the whole gesture is one undo step (the same pattern
+    // collapseSelection's structural-merge tail relies on).
     //
     // Read the covered (block, range) list FIRST, before any mutation —
     // same discipline as collapseSelection's `middles` collection. Each
@@ -4592,8 +4588,8 @@ void View::keyPressEvent(QKeyEvent *event)
     }
 
     // Undo/redo are document-level actions, not caret motion — they run
-    // even before the caret-null bail below. There is no UndoLog
-    // selection/caret state (plan T4, queue #10 item 2): undoD2()/redoD2()
+    // even before the caret-null bail below. The document does not store
+    // selection or caret state: undoD2()/redoD2()
     // mutate the document and nothing else, so the caret is left where it
     // was and clampCaret (already wired generically through
     // onDocumentChanged) is the entire "never strand it" mechanism. Flush
@@ -4606,7 +4602,7 @@ void View::keyPressEvent(QKeyEvent *event)
         // already no-ops while read-only over the base store) — it needs
         // its own check, or Ctrl+Z would mutate a read-only document.
         if (m_doc && !isReadOnly()) {
-            m_selectionAnchor.reset();  // no UndoLog selection state (T4)
+            m_selectionAnchor.reset();  // selection is view state (T4)
             // P6.1/guide §B.4: publish the collapse before the edit, same
             // as any other selection-finalizing reset. This does NOT give
             // undo/redo a working "restore selection" seam — the anchor
@@ -5932,7 +5928,7 @@ void View::paintEvent(QPaintEvent *event)
         // Remote presence selection tint (P6.2): same draw-time FormatRange
         // mechanism as the local selection/find-highlight ranges above,
         // never a layout format mutation. Resolved fresh every paint from
-        // each presence's own TextAnchors (never cached CanvasCursor
+        // each presence's own scoped positions (never cached CanvasCursor
         // state) — an anchor whose block is gone/unrealized just fails to
         // resolve and that presence is silently skipped here; a collapsed
         // presence (anchor == active, a bare remote caret) gets no tint,

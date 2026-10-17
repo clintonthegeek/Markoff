@@ -7,8 +7,7 @@
 
 using namespace Markoff;
 
-// Helper: construct a TextAnchor with explicit field values (replaces old
-// aggregate-init now that TextAnchor is a class with private fields).
+// Helper: construct a scoped position with an explicit actor and token.
 static ScopedTextPosition pos(quint8 id, const char *token)
 {
     std::array<uint8_t, 16> actor{};

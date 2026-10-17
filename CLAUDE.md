@@ -29,8 +29,8 @@ Progress diary through 2026-10-16:
 Canvas production, G1 accessibility, and the Hologram title-hide arc are
 closed. The manual Orca pass stays deferred until the user asks.
 `markoff-styled` is bug-fix-only outside this migration.
-`markoff-source` stays untouched. `markoff-live` is retired and excluded
-from the root build. A historical test count is not a current result.
+`markoff-source` stays untouched. The live leaf and the vendored CollabText
+submodule were removed in A13. A historical test count is not a current result.
 
 ## Building
 
@@ -75,15 +75,11 @@ explicitly changed.
   (production arc closed 2026-08-15; G1
   accessibility closed 2026-09-30, no active arc). Own `CLAUDE.md`.
 - `libs/markoff-core` — foundation: `MarkoffDocument` (per-block CRDT
-  buffers + `IdList` order + LWW maps), `Cmd::*`, `UndoLog`,
+  buffers + `IdList` order + LWW maps), `Cmd::*`,
   `StructuralKeyHandler` (pure), `FindController`, `Theme`,
   `MarkdownView` base. Own `CLAUDE.md`.
 - `libs/markoff-parser` — tree-sitter Markdown; load-time +
   per-block on-demand only (`inlineSpansFor`, cached).
-- `libs/markoff-live` — QML live-preview leaf, **retired 2026-08-19**
-  (G3): zero downstream consumers and excluded from the supported root build.
-  Its source remains only for repository cleanup; it is not a Markoff consumer.
-  Tag `archive/markoff-live-final` records its last supported state.
 - `libs/markoff-source` — QPlainTextEdit source leaf (permanent;
   bug-fix only).
 - `libs/markoff-styled` — QTextEdit styled leaf (frozen; bug-fix
@@ -92,7 +88,7 @@ explicitly changed.
 
 ## Working on the OLD leaves (standstill bug fixes only)
 
-The live/styled/source seam has its own discipline: read
+The styled/source seam has its own discipline: read
 [`docs/INVARIANTS.md`](docs/INVARIANTS.md) (eight rules),
 [`docs/VIEW-IMPLEMENTORS-GUIDE.md`](docs/VIEW-IMPLEMENTORS-GUIDE.md),
 and the per-lib `libs/*/CLAUDE.md` before touching it, and log smells in

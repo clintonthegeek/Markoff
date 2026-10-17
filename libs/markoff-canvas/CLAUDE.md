@@ -23,8 +23,9 @@ Spike record (verdict + findings the plan cites):
 
 **Status (2026-08-19):** the production arc is **CLOSED** — P1–P7
 done, all three gates decided (G2 done 2026-08-18, G3 retired
-`markoff-live` 2026-08-19). Full suite 315/315, perf budgets held,
-constitution clean.
+`markoff-live` 2026-08-19). A13 removed that tree; tag
+`archive/markoff-live-final` keeps the last supported snapshot. Full suite
+315/315, perf budgets held, constitution clean.
 
 **G1 accessibility arc CLOSED 2026-09-30. Canvas has no active arc.**
 Spec (normative): [`docs/specs/2026-08-19-g1-canvas-accessibility-design.md`](../../docs/specs/2026-08-19-g1-canvas-accessibility-design.md);

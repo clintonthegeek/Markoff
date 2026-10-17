@@ -9,7 +9,6 @@ project(Markoff VERSION 0.7.0 LANGUAGES CXX)
 #   - libs/markoff-canvas     (primary block-projection editor)
 #   - libs/markoff-source     (QPlainTextEdit-based source widget)
 #   - libs/markoff-styled     (QTextEdit-based inline-styled editor)
-#   - libs/markoff-live       (retired QML view; not part of the supported build)
 #   - libs/jkqtmathtext       (LaTeX math rendering, vendored)
 #
 # Can be built standalone OR consumed as a git submodule from a parent project.
@@ -91,7 +90,7 @@ find_package(collabtext CONFIG REQUIRED COMPONENTS core)
 add_subdirectory(libs/markoff-collabtext-vnext)
 
 add_subdirectory(libs/markoff-core)
-# jkqtmathtext — LaTeX math rendering for Math blocks (canvas / styled / live).
+# jkqtmathtext — LaTeX math rendering for Math blocks (canvas / styled).
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)
 endif()

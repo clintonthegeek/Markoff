@@ -65,10 +65,9 @@ scope for collision detection, the writer actor/counters/reservations, exact pre
 transaction metadata, the immutable accepted prefix, private-history completion
 state, export watermark, and exact opaque quarantine records already acknowledged
 by the caller. It also records whether an accepted MAB is a local prepared action
-or a remote acceptance without local reservations/history. MREF/4 remains
-readable without a receipt ledger; new writes use MREF/5, which also stores
-durable transport receipts for local accepted MABs. Earlier experimental MREF
-versions are rejected.
+or a remote acceptance without local reservations/history. Writers and
+readers use MREF/5 only. MREF/5 stores durable transport receipts for local
+accepted MABs. Every other MREF version is rejected.
 Quarantine writes are idempotent by exact bytes and appear in the
 next recovery snapshot. Updates use `QSaveFile` and synchronize the file and
 parent directory on Unix platforms; any failure after the atomic rename is
@@ -232,7 +231,7 @@ primitive, operation actor/counter, optional target block, exact payload,
 delivery sequence, action ID, bundle index/count, and the typed rejection
 reason. It can also carry the exact enclosing MAB/3 bytes so a document-level
 quarantine preserves action metadata and source snapshots for retry. MQR/2
-records are bounded to 26 MiB and the decoder remains compatible with MQR/1.
+records are bounded to 26 MiB. The decoder accepts MQR/2 only.
 A router encodes the record and calls
 `DocumentStorageSession::storeQuarantinedOperation()` before removing the
 envelope from its bounded hold. Provider failure is returned to the caller and

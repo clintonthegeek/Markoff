@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <markoff/core/BlockEdit.h>
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/core/UndoLog.h>
 #include <markoff/core/StructuralOp.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
 #include <memory>

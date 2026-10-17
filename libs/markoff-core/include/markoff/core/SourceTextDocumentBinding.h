@@ -135,8 +135,8 @@ private:
     /// separator, plus the in-block UTF-16 offset.
     int sepViewPosOf(Markoff::BlockId block, int byteInBlock) const;
 
-    /// Map a no-separator global byte offset (the space resolveTextAnchor
-    /// returns) to a sep-view QTextDocument position.
+    /// Map a no-separator global byte offset to a sep-view QTextDocument
+    /// position.
     int noSepByteToSepViewPos(quint32 noSepByte) const;
 
     /// Delete the sep-view byte range [sepLo, sepHi) from the model via

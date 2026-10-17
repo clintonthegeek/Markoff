@@ -67,9 +67,9 @@ does not close a task. Record the revision you ran.
   change needs a new immutable tag and a new acceptance record.
 - Candidate and reference-provider tests do not prove Corbomite's journal
   or a real network. Keep those gates named and unclosed.
-- `markoff-live` is retired. `markoff-source` stays untouched except for a
-  bug the current task owns. `markoff-styled` is bug-fix only outside the
-  migration.
+- The live leaf and the vendored CollabText submodule are gone. Do not
+  restore them. `markoff-source` stays untouched except for a bug the current
+  task owns. `markoff-styled` is bug-fix only outside the migration.
 - Library guides (`libs/*/CLAUDE.md`), `docs/INVARIANTS.md`, and
   `docs/VIEW-IMPLEMENTORS-GUIDE.md` apply when you touch those leaves.
   Canvas follows its constitution in the canvas spec.

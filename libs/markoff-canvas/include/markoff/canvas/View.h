@@ -532,7 +532,7 @@ public:
 
     // ---- Table row/col ops + alignment (contract-v2 P5.2) -----------------
     // Byte edits to the table block's own buffer via TableGeometry, each one
-    // UndoLog::Transaction (mirrors P5.1's appendTableRow). Act on the
+    // published action (mirrors P5.1's appendTableRow). Act on the
     // caret's current table cell (caretTableContext()); no-op while
     // read-only, with no document, or when the caret isn't in a table.
     // Guard rules matching GFM/Obsidian sense: the header row (row 0) can't
@@ -635,8 +635,8 @@ public:
     /// `QTextLayout::FormatRange`s built fresh in `paintEvent` alongside the
     /// local selection/find-highlight ranges (spec §3: the layout stays a
     /// pure derived cache, never a `setFormats()` mutation). Resolved from
-    /// each `Selection`'s scoped positions in candidate builds or TextAnchors
-    /// in legacy builds against the CURRENT document on every paint — never
+    /// each `Selection`'s scoped positions against the CURRENT document on
+    /// every paint — never
     /// cached CanvasCursor state — so an endpoint whose block no longer exists
     /// (or was never realized) just fails to resolve and is silently skipped;
     /// stale/departed-participant filtering
@@ -1121,7 +1121,7 @@ private:
     /// the two representations diverge).
     ///
     /// Kind-defining attrs (Heading level + form, Math display mode) are
-    /// written in the same `UndoLog::Transaction` as the kind (P1.1).
+    /// written in the same published action as the kind (P1.1).
     void promoteCaretBlockKind();
 
     /// Keeps an already-promoted Heading's `level` attr tracking its buffer
@@ -1159,11 +1159,10 @@ private:
 
     // ---- Remote presence (P6.2) -------------------------------------------
 
-    /// Resolves a Presence Selection's TextAnchor against the CURRENT
-    /// document: `{}` if the anchor is null or its origin block
-    /// (`TextAnchor::block()`) is not a live cache entry (departed/gone
-    /// content) — the anchor carries its actual block identity and local
-    /// position. Never cached;
+    /// Resolves a presence selection's scoped position against the CURRENT
+    /// document: `{}` if the position is null or its origin block is not a
+    /// live cache entry (departed/gone content). The position carries its
+    /// actual block identity and local offset. Never cached;
     /// called fresh every paint.
     std::optional<CanvasCursor> resolvePresenceAnchor(
         const Markoff::ScopedTextPosition &position) const;
@@ -1238,8 +1237,8 @@ public:
     // machinery, and a second insertion path here would bypass undo-
     // coalescing and risk the same class of onCommit-drops-ops bug.
     // Deletion (tryDeleteFreshPair) is not subject to that constraint —
-    // deleteCluster() itself already opens a bare UndoLog::Transaction for
-    // deletes, unrelated to the coalescing machinery, and this mirrors it.
+    // deleteCluster() already publishes its own delete action,
+    // unrelated to the coalescing machinery, and this mirrors it.
 
     /// One tracked "just auto-inserted" closer run: `byteOffset` is the
     /// closer's first byte in `block`, `length` its byte count (1 for the
@@ -1494,7 +1493,7 @@ public:
     /// P6.0: builds the `Markoff::FoldRef` that identifies `id` as a fold
     /// head — `kind` (canvas's `LongList`/`Callout` both map to core's
     /// generic `FoldRef::Kind::Block`; `Heading` maps directly), `start`
-    /// (the block-qualified `TextAnchor` at `id`'s byte 0), and
+    /// (the block-qualified position at `id`'s byte 0), and
     /// `headingLevel` for the Heading case (read off
     /// the same `AttrNames::Level` attribute `Folding::resolveFoldable`
     /// already reads). `headingPath` is left empty — see the P6.0 findings
@@ -1582,8 +1581,8 @@ public:
     /// to carry the way find-matches do.
     QHash<BlockId, QList<std::pair<int, int>>> m_occurrenceHighlightsByBlock;
     /// Remote-participant presences (P6.2). Kept as a flat list, NOT grouped
-    /// by block the way `m_findHighlightsByBlock` is: a Presence Selection's
-    /// range is named by two `TextAnchor`s, which resolve to a block only by
+    /// by block the way `m_findHighlightsByBlock` is: a presence selection's
+    /// range is named by two scoped positions, which resolve to a block only by
     /// re-consulting the document (`resolvePresenceAnchor`), so a per-block
     /// index built at `setRemotePresences` time would itself be exactly the
     /// kind of cached-resolved-position state the "never cached" rule (this
@@ -1627,12 +1626,9 @@ public:
     // typed one it does not) cannot be re-derived from document content at
     // all, the way fold SHAPE or delimiter-hiddenness can. The plan's F1
     // note offered two options: track it as view state, or derive it from
-    // the undo entry. Derivation was rejected: UndoLog::Transaction/
-    // UndoLog::Entry (core, unexported here) does not currently record
-    // "this transaction was specifically an auto-pair insert" as a tagged
-    // fact distinct from any other coalesced-printable transaction — adding
-    // that tag would be a core change this task's scope guard rules out
-    // ("markoff-core/ should NOT need changes"). View state it is.
+    // the undo entry. Derivation was rejected: accepted history does not
+    // record "this action was specifically an auto-pair insert" as a tagged
+    // fact distinct from any other coalesced printable edit. View state it is.
     //
     // Freshness rule (deliberately narrow, logged simplification vs. real
     // CodeMirror's per-position StateField that survives cursor motion):
@@ -1681,7 +1677,7 @@ public:
 
     // ---- Inline title (P4.9) -----------------------------------------
     // View-local widget state ONLY (spec §5.2: "not a document block") —
-    // the document, Session, and UndoLog know nothing of this. Off by
+    // the document and Session know nothing of this. Off by
     // default; not persisted here (EditorWidget's contract setter is the
     // consumer-facing surface, same "leaf state vs. contract state" split
     // readOnly/theme/fontScale already follow).
