@@ -7,6 +7,8 @@ qt_add_executable(markoff-collab-testapp
     InMemoryTransport.cpp
     CollabConsumer.h
     CollabConsumer.cpp
+    EphemeralPresence.h
+    EphemeralPresence.cpp
     MainWindow.h
     MainWindow.cpp
 )

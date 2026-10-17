@@ -26,6 +26,9 @@ public:
     using OnReceiptFn = std::function<void(ActionReceipt)>;
 
     void push(QString streamName, QByteArray blob);
+    /// Deliver one presence record to peers connected right now. A
+    /// disconnected peer never sees it, and reconnect does not replay it.
+    void pushEphemeral(QString streamName, QByteArray blob);
     void setOnInbound(OnInboundFn fn);
     /// Push one complete action envelope and remember it until an exact
     /// action-ID receipt returns from a peer.

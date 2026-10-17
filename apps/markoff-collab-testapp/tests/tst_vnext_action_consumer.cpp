@@ -3,6 +3,7 @@
 #include <QTest>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Selection.h>
 #include <markoff/core/StructuralOp.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
 
@@ -164,6 +165,68 @@ private Q_SLOTS:
         QVERIFY(!receiptsB.at(1).at(0).toByteArray().isEmpty());
         QVERIFY(!receiptsB.at(1).at(1).toByteArray().isEmpty());
         QCOMPARE(transportB.pendingActionCount(), qsizetype(0));
+    }
+
+    void presenceIsNotADocumentActionAndIsNotReplayed()
+    {
+        auto a = openPeer(QStringLiteral("presence-sideband"));
+        auto b = openPeer(QStringLiteral("presence-sideband"));
+        InMemoryTransport transportA(QStringLiteral("A"));
+        InMemoryTransport transportB(QStringLiteral("B"));
+        transportA.connectPeer(&transportB);
+        transportB.connectPeer(&transportA);
+        CollabConsumer consumerA(a.document.get(), &transportA);
+        CollabConsumer consumerB(b.document.get(), &transportB);
+        QSignalSpy actions(a.document.get(),
+            &Markoff::MarkoffDocument::localActionEnvelopeCommitted);
+        QSignalSpy receipts(&consumerA, &CollabConsumer::remoteActionReceiptReceived);
+        QSignalSpy presence(&consumerB, &CollabConsumer::remotePresenceReceived);
+
+        QCOMPARE(a.document->importInitialMarkdown(QByteArrayLiteral("Hello")).state,
+            Markoff::VNext::ActionPublicationState::committed);
+        QCOMPARE(onlyBlockText(*b.document), QByteArrayLiteral("Hello"));
+        QCOMPARE(actions.size(), 1);
+        QCOMPARE(receipts.size(), 1);
+        const auto block = a.document->iterateBlocks().front();
+        const auto anchor = a.document->boundaryTokenAt(block, 1, false);
+        const auto active = a.document->boundaryTokenAt(block, 1, true);
+        QVERIFY(anchor.ok());
+        QVERIFY(active.ok());
+        Markoff::Selection caret;
+        caret.kind = Markoff::Selection::Kind::Presence;
+        caret.participantId = QStringLiteral("replica-a");
+        caret.participantLabel = QStringLiteral("Replica A");
+        caret.presenceColor = QColor(0x22, 0x88, 0xCC);
+        caret.anchorPosition = Markoff::ScopedTextPosition{block, anchor.value()};
+        caret.activePosition = Markoff::ScopedTextPosition{block, active.value()};
+
+        QVERIFY(consumerA.publishPresence(caret));
+        QCOMPARE(presence.size(), 1);
+        const auto delivered = presence.at(0).at(0).value<Markoff::Selection>();
+        QCOMPARE(delivered.participantId, QStringLiteral("replica-a"));
+        QCOMPARE(delivered.anchorPosition->block, block);
+        QCOMPARE(delivered.anchorPosition->boundaryToken, anchor.value());
+        QCOMPARE(actions.size(), 1);
+        QCOMPARE(receipts.size(), 1);
+        QCOMPARE(transportA.pendingActionCount(), qsizetype(0));
+        QCOMPARE(onlyBlockText(*a.document), QByteArrayLiteral("Hello"));
+        QCOMPARE(onlyBlockText(*b.document), QByteArrayLiteral("Hello"));
+        QVERIFY(!a.document->canUndoForBlock(block));
+
+        transportA.disconnectPeer(&transportB);
+        QVERIFY(consumerA.publishPresence(caret));
+        QCOMPARE(presence.size(), 1);
+        transportA.connectPeer(&transportB);
+        QCOMPARE(presence.size(), 1);
+
+        Markoff::Selection edit;
+        edit.kind = Markoff::Selection::Kind::Primary;
+        edit.participantId = caret.participantId;
+        edit.anchorPosition = caret.anchorPosition;
+        edit.activePosition = caret.activePosition;
+        QVERIFY(!consumerA.publishPresence(edit));
+        QCOMPARE(presence.size(), 1);
+        QCOMPARE(actions.size(), 1);
     }
 };
 

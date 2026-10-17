@@ -11,6 +11,11 @@ void InMemoryTransport::push(QString streamName, QByteArray blob)
         if (peer) peer->deliverFromPeer(streamName, blob, 0);
 }
 
+void InMemoryTransport::pushEphemeral(QString streamName, QByteArray blob)
+{
+    push(std::move(streamName), std::move(blob));
+}
+
 void InMemoryTransport::setOnInbound(OnInboundFn fn) { m_onInbound = std::move(fn); }
 
 bool InMemoryTransport::pushAction(QString streamName, QByteArray actionId,

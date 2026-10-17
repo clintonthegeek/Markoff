@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #include "CollabConsumer.h"
+#include "EphemeralPresence.h"
 #include "InMemoryTransport.h"
 #include <markoff/core/MarkoffDocument.h>
 
@@ -9,6 +10,7 @@ CollabConsumer::CollabConsumer(Markoff::MarkoffDocument *doc,
                                 DeliveryMode mode)
     : QObject(parent), m_doc(doc), m_transport(transport)
 {
+    qRegisterMetaType<Markoff::Selection>();
     if (mode == DeliveryMode::actionBundles) {
         QObject::connect(m_doc,
             &Markoff::MarkoffDocument::localActionEnvelopeCommitted, this,
@@ -25,6 +27,14 @@ CollabConsumer::CollabConsumer(Markoff::MarkoffDocument *doc,
                 receipts.push_back({receipt.actionId,
                                     receipt.acceptedRevision.token});
             return receipts;
+        });
+        m_transport->setOnInbound([this](QString stream, QByteArray bytes, quint16) {
+            if (stream != QStringLiteral("markoff-presence"))
+                return;
+            const auto presence = decodeEphemeralPresence(bytes);
+            if (!presence)
+                return;
+            emit remotePresenceReceived(selectionFromEphemeralPresence(*presence));
         });
         m_transport->setOnReceipt([this](InMemoryTransport::ActionReceipt receipt) {
             auto stored = m_doc->acknowledgeOutboundActionReceipt(
@@ -55,4 +65,16 @@ bool CollabConsumer::sendActionEnvelope(QByteArray actionId, QByteArray mabBytes
 {
     return m_transport->pushAction(std::move(streamName), std::move(actionId),
                                   std::move(mabBytes));
+}
+
+bool CollabConsumer::publishPresence(const Markoff::Selection& selection)
+{
+    const auto presence = ephemeralPresenceFromSelection(selection);
+    if (!presence)
+        return false;
+    const auto bytes = encodeEphemeralPresence(*presence);
+    if (!bytes)
+        return false;
+    m_transport->pushEphemeral(QStringLiteral("markoff-presence"), *bytes);
+    return true;
 }

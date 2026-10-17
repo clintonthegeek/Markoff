@@ -19,7 +19,8 @@ The remaining Markoff work is a short tail:
 
 1. **A10, done.** One actor keeps 100 undoable actions. The action that would
    pass that depth records retirement of the oldest one.
-2. **A12, now.** Carry remote carets as ephemeral presence, separate from document history.
+2. **A12, done.** Remote carets travel as ephemeral MPR/1 messages. Dropping
+   one loses the caret and does not change document history.
 3. **A11 with A15.** Turn the reference provider's outbox, quarantine, and
    receipt behavior into checks a host provider must pass, and assemble the
    transition package.
@@ -157,9 +158,9 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 | A09 | Done | Import, replacement, reopen, and revision-bound export. |
 | A10 | Done | Retire undo history past 100 actions per actor. |
 | A11 | Later | Host-provider conformance checks. Fold them into A15. |
-| A12 | **Now** | Ephemeral remote presence. |
+| A12 | Done | Remote carets are ephemeral MPR/1 messages, not document actions. |
 | A13 | Done | Retired engine, live leaf, and unbuilt legacy branches are gone. |
-| A14 | Later | Acceptance record on the sources you are finishing. |
+| A14 | **Now** | Acceptance record on the sources you are finishing. |
 | A15 | Later | Transition package for a Corbomite agent. |
 | A16 | Later | Readiness signal. Requires A13–A15 done. |
 
@@ -204,18 +205,20 @@ recorded on `docs/STATUS.md`.
 
 ### A12 — ephemeral presence
 
-Canvas can rebase and paint a remote caret when a test supplies a scoped
-position, including detachment when the block disappears. There is no
-production path that carries one peer's caret to the other.
+Done 2026-10-17. `CollabConsumer::publishPresence` sends one `MPR/1` record
+on the in-memory transport. The transport does not queue it, receipt it, or
+replay it after reconnect. The collaboration test app publishes each
+editor's caret and paints the peer's caret from the message. A peer edit
+moves the scoped caret with the text. Removing the caret's block drops it.
+Accepted actions, undo, and receipts stay unchanged. Session folds and
+scoped selections are unchanged.
 
-**Do this.** Send presence as an ephemeral message on the existing
-collaboration consumer. Dropping it loses a caret and leaves document bytes,
-block identities, undo, and receipts unchanged. Cover two replicas: a caret
-tracks a peer edit, and a removed block drops the caret. Do not store carets
-in accepted MAB history.
-
-**Exit.** The two-replica test passes without a new document action for the
-caret update. Session folds and scoped selections stay on their current path.
+`QT_QPA_PLATFORM=offscreen ./build-dev/bin/tst_vnext_action_consumer` and
+`./build-dev/bin/tst_canvas_vnext_session_positions` passed, including
+`presenceIsNotADocumentActionAndIsNotReplayed` and
+`ephemeralPresenceTracksPeerEditAndDropsWithTheBlock`.
+`scopedSessionFoldsSyncAcrossViewsAndSerialization` passed in the same
+canvas run.
 
 ### A11 — provider conformance, done inside A15
 

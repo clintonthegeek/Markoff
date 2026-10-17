@@ -4,12 +4,62 @@
 #include "CollabConsumer.h"
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/canvas/EditorWidget.h>
+#include <markoff/canvas/View.h>
 #include <markoff/vnext/ActionPublicationCoordinator.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
+#include <algorithm>
+
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QVBoxLayout>
 #include <QWidget>
+
+namespace {
+
+void publishCaret(Markoff::MarkoffDocument* document,
+                  Markoff::Canvas::EditorWidget* editor,
+                  CollabConsumer* consumer,
+                  const QString& participantId,
+                  const QString& participantLabel,
+                  const QColor& color)
+{
+    if (!document || !editor || !editor->view() || !consumer
+        || !document->canStartOrdinaryAction())
+        return;
+    auto* view = editor->view();
+    const Markoff::BlockId block = view->caretBlock();
+    if (block.isNull())
+        return;
+    const int activeByte = std::max(0, view->caretByteOffset());
+    int anchorByte = activeByte;
+    if (view->hasSelection() && view->selectionAnchorBlock() == block)
+        anchorByte = std::max(0, view->selectionAnchorByteOffset());
+    const auto anchor = document->boundaryTokenAt(
+        block, static_cast<quint32>(anchorByte), false);
+    const auto active = document->boundaryTokenAt(
+        block, static_cast<quint32>(activeByte), true);
+    if (!anchor.ok() || !active.ok())
+        return;
+    Markoff::Selection selection;
+    selection.kind = Markoff::Selection::Kind::Presence;
+    selection.participantId = participantId;
+    selection.participantLabel = participantLabel;
+    selection.presenceColor = color;
+    selection.anchorPosition = Markoff::ScopedTextPosition{block, anchor.value()};
+    selection.activePosition = Markoff::ScopedTextPosition{block, active.value()};
+    (void)consumer->publishPresence(selection);
+}
+
+void showRemoteCaret(Markoff::Canvas::EditorWidget* editor,
+                     const Markoff::Selection& selection)
+{
+    if (!editor)
+        return;
+    editor->setRemotePresences(
+        {Markoff::Canvas::RemotePresence{selection}});
+}
+
+} // namespace
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -64,6 +114,33 @@ MainWindow::MainWindow(QWidget *parent)
     layout->addWidget(paneB);
     setCentralWidget(panes);
     resize(1400, 700);
+
+    QObject::connect(m_editorA->view(), &Markoff::Canvas::View::caretChanged, this,
+        [this] {
+            publishCaret(m_docA.get(), m_editorA, m_consumerA.get(),
+                QStringLiteral("replica-a"), QStringLiteral("Replica A"),
+                QColor(0x22, 0x88, 0xCC));
+        });
+    QObject::connect(m_editorB->view(), &Markoff::Canvas::View::caretChanged, this,
+        [this] {
+            publishCaret(m_docB.get(), m_editorB, m_consumerB.get(),
+                QStringLiteral("replica-b"), QStringLiteral("Replica B"),
+                QColor(0xCC, 0x66, 0x22));
+        });
+    QObject::connect(m_consumerA.get(), &CollabConsumer::remotePresenceReceived,
+        m_editorB, [this](const Markoff::Selection& selection) {
+            showRemoteCaret(m_editorB, selection);
+        });
+    QObject::connect(m_consumerB.get(), &CollabConsumer::remotePresenceReceived,
+        m_editorA, [this](const Markoff::Selection& selection) {
+            showRemoteCaret(m_editorA, selection);
+        });
+    publishCaret(m_docA.get(), m_editorA, m_consumerA.get(),
+        QStringLiteral("replica-a"), QStringLiteral("Replica A"),
+        QColor(0x22, 0x88, 0xCC));
+    publishCaret(m_docB.get(), m_editorB, m_consumerB.get(),
+        QStringLiteral("replica-b"), QStringLiteral("Replica B"),
+        QColor(0xCC, 0x66, 0x22));
 }
 
 MainWindow::~MainWindow()

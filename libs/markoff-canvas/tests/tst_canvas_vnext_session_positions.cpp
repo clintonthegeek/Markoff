@@ -16,9 +16,14 @@
 #include "A11yEventSpy.h"
 
 #include <markoff/canvas/EditorWidget.h>
+#include <markoff/canvas/View.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>
+#include <markoff/core/StructuralOp.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
+
+#include "CollabConsumer.h"
+#include "InMemoryTransport.h"
 #include <ReferenceProviderTestHooks.h>
 
 #include <memory>
@@ -435,6 +440,119 @@ private Q_SLOTS:
         QCoreApplication::processEvents();
         QVERIFY(editor.view()->remotePresencesForBlock(block).isEmpty());
         QCOMPARE(accessibleRoot->childCount(), 1);
+    }
+
+    void ephemeralPresenceTracksPeerEditAndDropsWithTheBlock()
+    {
+        auto sourceProvider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+        QVERIFY(sourceProvider.ok());
+        auto receiverProvider = Markoff::VNext::makeEphemeralDocumentStorageProvider();
+        QVERIFY(receiverProvider.ok());
+        const Markoff::VNext::DocumentStorageScope scope{
+            QStringLiteral("ephemeral-presence"), 1};
+        auto sourceOpen = Markoff::MarkoffDocument::open(
+            *sourceProvider.value(), scope, Markoff::VNext::StorageMode::ephemeral);
+        auto receiverOpen = Markoff::MarkoffDocument::open(
+            *receiverProvider.value(), scope, Markoff::VNext::StorageMode::ephemeral);
+        QVERIFY(sourceOpen.ok());
+        QVERIFY(receiverOpen.ok());
+        auto source = std::move(sourceOpen).value();
+        auto receiver = std::move(receiverOpen).value();
+
+        InMemoryTransport transportA(QStringLiteral("A"));
+        InMemoryTransport transportB(QStringLiteral("B"));
+        transportA.connectPeer(&transportB);
+        transportB.connectPeer(&transportA);
+        CollabConsumer consumerA(source.get(), &transportA);
+        CollabConsumer consumerB(receiver.get(), &transportB);
+        QSignalSpy sourceActions(source.get(),
+            &Markoff::MarkoffDocument::localActionEnvelopeCommitted);
+        QSignalSpy presence(&consumerB, &CollabConsumer::remotePresenceReceived);
+        QSignalSpy receipts(&consumerA, &CollabConsumer::remoteActionReceiptReceived);
+
+        QCOMPARE(source->importInitialMarkdown(QByteArrayLiteral("Hello world")).state,
+            Markoff::VNext::ActionPublicationState::committed);
+        QCOMPARE(sourceActions.size(), 1);
+        QCOMPARE(receipts.size(), 1);
+        QCOMPARE(receiver->iterateBlocks().size(), size_t{1});
+        const auto block = receiver->iterateBlocks().front();
+        QCOMPARE(source->iterateBlocks().front(), block);
+        QVERIFY(!source->canUndoForBlock(block));
+
+        const auto anchor = source->boundaryTokenAt(block, 1, false);
+        const auto active = source->boundaryTokenAt(block, 4, true);
+        QVERIFY(anchor.ok());
+        QVERIFY(active.ok());
+        Markoff::Selection caret;
+        caret.kind = Markoff::Selection::Kind::Presence;
+        caret.participantId = QStringLiteral("replica-a");
+        caret.participantLabel = QStringLiteral("Replica A");
+        caret.presenceColor = QColor(0x22, 0x88, 0xCC);
+        caret.anchorPosition = Markoff::ScopedTextPosition{block, anchor.value()};
+        caret.activePosition = Markoff::ScopedTextPosition{block, active.value()};
+
+        transportA.disconnectPeer(&transportB);
+        transportB.disconnectPeer(&transportA);
+        QVERIFY(consumerA.publishPresence(caret));
+        QCOMPARE(presence.size(), 0);
+        QCOMPARE(sourceActions.size(), 1);
+        QCOMPARE(receipts.size(), 1);
+        QCOMPARE(transportA.pendingActionCount(), qsizetype(0));
+        const auto droppedPending = source->pendingOutboundActions();
+        QVERIFY(droppedPending.ok());
+        QCOMPARE(droppedPending.value().size(), size_t{0});
+
+        transportA.connectPeer(&transportB);
+        transportB.connectPeer(&transportA);
+        QCOMPARE(presence.size(), 0);
+        QVERIFY(consumerA.publishPresence(caret));
+        QCOMPARE(presence.size(), 1);
+        QCOMPARE(sourceActions.size(), 1);
+        QCOMPARE(receipts.size(), 1);
+        QCOMPARE(receiver->blockText(block), QByteArrayLiteral("Hello world"));
+        QVERIFY(!source->canUndoForBlock(block));
+        QVERIFY(!receiver->canUndoForBlock(block));
+
+        Markoff::Canvas::EditorWidget editor;
+        editor.resize(400, 280);
+        editor.setDocument(receiver.get());
+        editor.show();
+        QCoreApplication::processEvents();
+        const auto delivered = presence.takeFirst().at(0).value<Markoff::Selection>();
+        editor.view()->setRemotePresences(
+            {Markoff::Canvas::RemotePresence{delivered}});
+        QCOMPARE(editor.view()->remotePresencesForBlock(block).size(), 1);
+        QCOMPARE(receiver->resolveBoundaryToken(block, anchor.value()).value(), quint32(1));
+
+        QCOMPARE(source->applyBlockEdit(
+            {block, 0, 0, QByteArrayLiteral("Oh, ")}).state,
+            Markoff::VNext::ActionPublicationState::committed);
+        QCOMPARE(receiver->blockText(block), QByteArrayLiteral("Oh, Hello world"));
+        QCOMPARE(receiver->resolveBoundaryToken(block, anchor.value()).value(), quint32(5));
+        QCOMPARE(receiver->resolveBoundaryToken(block, active.value()).value(), quint32(8));
+        QCOMPARE(editor.view()->remotePresencesForBlock(block).size(), 1);
+        QCOMPARE(sourceActions.size(), 2);
+        QCOMPARE(receipts.size(), 2);
+
+        QCOMPARE(source->applyStructural({
+            Markoff::StructuralOp::InsertEntry{
+                block, Markoff::BlockKind::Paragraph}}).state,
+            Markoff::VNext::ActionPublicationState::committed);
+        QCOMPARE(receiver->iterateBlocks().size(), size_t{2});
+        QCOMPARE(source->applyStructural({
+            Markoff::StructuralOp::RemoveEntry{block}}).state,
+            Markoff::VNext::ActionPublicationState::committed);
+        QCoreApplication::processEvents();
+        QVERIFY(editor.view()->remotePresencesForBlock(block).isEmpty());
+        QCOMPARE(receiver->iterateBlocks().size(), size_t{1});
+        source->undoD2();
+        QCOMPARE(source->iterateBlocks().size(), size_t{2});
+        source->undoD2();
+        QCOMPARE(source->iterateBlocks().size(), size_t{1});
+        source->undoD2();
+        QCOMPARE(source->blockText(block), QByteArrayLiteral("Hello world"));
+        QVERIFY(!source->canUndoForBlock(block));
+        QCOMPARE(receiver->blockText(block), QByteArrayLiteral("Hello world"));
     }
 
     void lineMovePublishesOneUndoablePayloadSwap()

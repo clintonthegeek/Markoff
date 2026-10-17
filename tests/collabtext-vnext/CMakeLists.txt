@@ -52,6 +52,7 @@ if(TARGET Markoff::Core)
         add_executable(tst_vnext_action_consumer
             ../../apps/markoff-collab-testapp/tests/tst_vnext_action_consumer.cpp
             ../../apps/markoff-collab-testapp/CollabConsumer.cpp
+            ../../apps/markoff-collab-testapp/EphemeralPresence.cpp
             ../../apps/markoff-collab-testapp/InMemoryTransport.cpp
         )
         set_target_properties(tst_vnext_action_consumer PROPERTIES AUTOMOC ON)

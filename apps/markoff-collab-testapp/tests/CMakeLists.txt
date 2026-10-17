@@ -18,7 +18,8 @@ set_tests_properties(tst_d5_in_memory_transport PROPERTIES
 qt_add_executable(tst_vnext_action_consumer
     tst_vnext_action_consumer.cpp
     ../InMemoryTransport.cpp
-    ../CollabConsumer.cpp)
+    ../CollabConsumer.cpp
+    ../EphemeralPresence.cpp)
 target_link_libraries(tst_vnext_action_consumer PRIVATE
     Qt6::Test Qt6::Core markoff_core)
 target_include_directories(tst_vnext_action_consumer PRIVATE ..)
