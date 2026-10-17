@@ -21,9 +21,9 @@ The remaining Markoff work is a short tail:
    pass that depth records retirement of the oldest one.
 2. **A12, done.** Remote carets travel as ephemeral MPR/1 messages. Dropping
    one loses the caret and does not change document history.
-3. **A11 with A15.** Turn the reference provider's outbox, quarantine, and
-   receipt behavior into checks a host provider must pass, and assemble the
-   transition package.
+3. **A11 and A15, done.** Provider-interface conformance is
+   `markoff_provider_interface_conformance`. The transition package is
+   `docs/handoff/2026-10-17-collabtext-transition-package.md`.
 4. **A14, done.** Debug, Release, and ASan/UBSan each passed 93/93.
    Installed Core and view consumers passed 2/2. The responsiveness probe
    missed some provisional budgets; those budgets stay as written.
@@ -159,12 +159,12 @@ suite was not re-run. A01–A09 stay done. What the tree actually contains:
 | A08 | Done | Provider-backed block, map, structural, paste, and format edits. A missing command is a new bug with a test. |
 | A09 | Done | Import, replacement, reopen, and revision-bound export. |
 | A10 | Done | Retire undo history past 100 actions per actor. |
-| A11 | Later | Host-provider conformance checks. Fold them into A15. |
+| A11 | Done | Provider-interface conformance, closed with A15. |
 | A12 | Done | Remote carets are ephemeral MPR/1 messages, not document actions. |
 | A13 | Done | Retired engine, live leaf, and unbuilt legacy branches are gone. |
 | A14 | Done | Acceptance recorded on `41544118`. Some probe budgets missed. |
-| A15 | **Now** | Transition package for a Corbomite agent. |
-| A16 | Later | Readiness signal. Requires A13–A15 done. |
+| A15 | Done | Transition package for a Corbomite agent. |
+| A16 | **Now** | Readiness signal. Requires A13–A15 done. |
 
 Done means the recorded behavior is in the tree. Reopen a done task only when
 a current test fails or a named command on its exit list is missing. Say which.
@@ -224,20 +224,14 @@ canvas run.
 
 ### A11 — provider conformance, done inside A15
 
-Reference-provider routing already accepts remote MABs, bounds deferred
-actions, persists quarantine, returns receipts after projection acceptance,
-and retries the outbox on reconnect. A real network stack is the host's job
-after A16.
-
-**Do this, when you reach A15.** Extract the checks a second provider must
-pass: exact outbox bytes, receipt clearing, reconnect replay, quarantine of a
-changed duplicate, and backpressure that leaves the envelope with the caller.
-Point those tests at the provider interface, with the reference provider as
-the known-good implementation.
-
-**Exit.** A host author can run those checks against a new provider without
-reading Markoff's document implementation. A11 closes in the same change as
-that part of A15.
+Done 2026-10-17 with A15.
+`tests/collabtext-vnext/tst_provider_interface_conformance.cpp` uses
+`DocumentStorageProvider` only. The reference provider is the known-good
+implementation. The test checks exact outbox bytes, receipt clearing,
+reopen of the remaining outbox, rejection of a changed remote duplicate,
+and a refused quarantine write that leaves the caller's envelope in place.
+CTest name `markoff_provider_interface_conformance`. It passed in the
+offscreen suite, 94/94. A host replaces the factory in that file's `main()`.
 
 ### A14 — acceptance on current sources
 
@@ -299,20 +293,18 @@ budgets are recorded and are not waived.
 
 ### A15 — transition package
 
-**Do this after A14.** Leave a package a new Corbomite agent can use without
-reconstructing this repository's history:
+Done 2026-10-17.
+`docs/handoff/2026-10-17-collabtext-transition-package.md` names the
+candidate, the Markoff build, the provider header and spec, the A11
+harness, and the open/import/edit/undo/replace/export/route/receipt calls.
+It lists A01–A14 and the evidence that closed each. Corbomite's journal,
+lease, and production network stay host work after A16. The A14 probe
+budget misses stay recorded there and are not reassigned.
 
-- Candidate tag, commit, package version, manifest, and the install steps.
-- Markoff revision and the build line above.
-- Provider header, provider spec, and the A11 conformance checks.
-- The mutation and save paths the host must call: open, import, edit, undo,
-  replace, export, route, receipt.
-- Limits: reference provider versus host journal, collection disabled,
-  presence behavior as A12 left it.
-
-**Exit.** The package names every prerequisite task and the evidence that
-closed it. No open Markoff requirement is moved onto Corbomite to make the
-list look finished.
+Offscreen `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'` on
+`build-dev` passed 94/94 in 28.09 s, including
+`markoff_provider_interface_conformance`. Package `0.2.0-alpha.5`,
+manifest v17, prefix `build-collabtext-alpha5/install`.
 
 ### A16 — signal Corbomite
 

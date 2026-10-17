@@ -30,6 +30,15 @@ add_executable(markoff_provider_scope_test tst_provider_scope.cpp)
 target_link_libraries(markoff_provider_scope_test PRIVATE Markoff::CollabTextVNext)
 add_test(NAME markoff_provider_scope_test COMMAND markoff_provider_scope_test)
 
+# A11. Talks only to DocumentStorageProvider. The reference provider is the
+# known-good implementation a host can replace in the test's main().
+add_executable(markoff_provider_interface_conformance
+    tst_provider_interface_conformance.cpp)
+target_link_libraries(markoff_provider_interface_conformance
+    PRIVATE Markoff::CollabTextVNext)
+add_test(NAME markoff_provider_interface_conformance
+    COMMAND markoff_provider_interface_conformance)
+
 if(TARGET Markoff::Core)
     add_executable(markoff_provider_backed_document_test
         tst_provider_backed_document.cpp
