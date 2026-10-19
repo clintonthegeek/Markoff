@@ -87,8 +87,9 @@ Vendored: `rapidyaml`, `jkqtmathtext`. Apps: `markoff-canvas-app`,
    (`BlockLayoutCache.cpp:478-486`); `engineDescription` returns
    `"<lang> (embed contract N)"` instead of a backend name; `Scene` kind is
    declared-unimplemented.
-7. **Smaller rot:** styled link hover still O(document) per block change
-   (`LinkInteraction.cpp:79-80`); source's session model (owns internally)
+7. **Smaller rot:** styled link hover's per-block re-walk on every document
+   change — **DONE** `b563e624` (cache keyed on the block's edit sequence +
+   structural sequence); source's session model (owns internally)
    differs from styled's (externally set) with no documented rationale;
    `markoff-text-units`' header ships under `markoff/core/` while CMake calls
    the target `Markoff::TextUnits`.
@@ -179,4 +180,5 @@ M13 (flat-view cache + binding sep index) and M18 (list-insert identity),
 plus a fix the cache exposed — `compensateReplacementAction` did not
 advance the edit sequences on multi-group undo/redo. Numbers and the two
 new rows they uncovered (action-publication cost; jkqtmathtext exit-time
-UAF) are on the board's Wave 3 section and close-out table.
+UAF) are on the board's Wave 3 section and close-out table. M17's
+remaining half landed as `b563e624`.

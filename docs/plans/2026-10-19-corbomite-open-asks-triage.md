@@ -48,7 +48,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 | M14 | P1 | OPEN | Graffodil literals as listed; `BatchRenderer.cpp:108` unconditional colour (cites `:112`) | M–L | Graffodil spec |
 | M15 | P1 | OPEN | Graffodil `GraphScene.cpp:75-78`; five scan sites; no `Spatial` consumer in Core | L | Graffodil spec |
 | M16 | P1 | OPEN | `SearchEngine.cpp:53-64`; no debounce `FindController.cpp:112-116` | S–M | core |
-| M17 | P1 | PARTIAL | coordinate fix landed in `LinkInteraction.cpp:47-71`; `handleMove:100-104` still O(document) per move | S | styled |
+| M17 | P1 | **DONE** `b563e624` | coordinate fix landed in `LinkInteraction.cpp:47-71`; hover cache now keyed on block edit sequence + structural sequence (was: dropped on every `d2DocumentChanged`), `handleMove:100-104` bail pinned by two regression tests | S | styled |
 | M18 | P1 | **DONE** `31b3152b` | `ScopedIdListStream::insertAfter` derives the inserted identity from the operation (was: two `visible_entries()` snapshots + O(N²) diff per insert); the pre-A13 anchors (`:4226-4234,3226,1842`) named the old file | M | core |
 | M19 | P1 | PARTIAL | `SugiyamaLayout.cpp:437-439` partial order; promotion loop `:497-524` exists but back edges keep `span <= 0` and no waypoints | M | Graffodil |
 | M20 | P2 | OPEN | `MarkdownView.h` has no `session()`; Styled has it; Source keeps a private `QPointer` | S–M | core + source |
@@ -90,8 +90,9 @@ slice is one commit under the repo's own board.
 **Progress (2026-10-19):** Wave 0b done; Wave 1 done (`0d974f1b`..`16e7bfe4`);
 Wave 2 done (`a910338d`..`253f1889`); M30 (`bc776efd`), M16's offset half
 (`3739dd7f`), M17's cache (`c68e6afd`) and M31's reuse API done; suite 95/95.
-Wave 0's reply is written; **M13 and M18 are DONE** (`31b3152b`, with the
-content-version gaps they exposed), M31's caller half and Waves 5–6 are open.
+Wave 0's reply is written; **M13, M18 and M17 are DONE** (`31b3152b`,
+`b563e624`, with the content-version gaps that work exposed), M31's caller
+half and Waves 5–6 are open.
 In Graffodil, M5 (`79357fc`), M6 (`fc778db`) and punch-list batch 1
 (`5c62d01`) are on `main`.
 
@@ -160,8 +161,11 @@ Order matters: build the index once, then use it.
    prefix twice per match. The 150 ms `FindController` debounce is **not**
    taken: the controller's match list is synchronous by contract, so that is a
    UI-behaviour decision.
-2. **M17** remaining — bail when the caret's block is unchanged;
-   throttle `handleMove`.
+2. **M17 — DONE** (`b563e624`). The styled hover cache is keyed on the
+   block's edit sequence + structural sequence, so an edit elsewhere no
+   longer forces a re-walk; two regression tests pin resolution across
+   edits. (The `handleMove` throttle is not needed: the cache bail covers
+   it.)
 3. **M13 — DONE** (`31b3152b`). `MarkoffDocument::flatView()` /
    `widgetFlatView()` cache on `d2EditSequence()`; the binding keeps a
    `SepViewIndex` (view bytes + per-block byte/UTF-16 offset tables) and
@@ -273,7 +277,6 @@ M19. Every remaining row is gated on something other than effort:
 | **New: action-publication cost** | ~300 ms/keystroke and ~550 ms per 50-block paste at 400 blocks; needs a profile before an optimization row |
 | **New: jkqtmathtext exit-time UAF** | vendored lib; `tst_canvas_render` aborts ~1/30 runs at exit. ASan: use-after-free in `initStaticStructures` static teardown, amplified by the lib being compiled into both `libmarkoff_canvas.so` and `libmarkoff_embed_math.so` (ODR violation on its globals). Punch-list, not an ask |
 | M16 debounce half | UI-behaviour decision |
-| M17 remaining | bail/throttle in styled link hover |
 | M31's other half | caller-side edit tracking; needs the binding to record byte edits |
 | Graffodil: `countCrossings`, guide-overlay churn, `computeRepulsion` region, `edgeWaypoints` key, M14, M15 | performance work and an API key change; M14/M15 need specs under Graffodil's own conventions |
 
