@@ -4,6 +4,12 @@
 #include <markoff/parser/TreeSitterParser.h>
 #include <markoff/parser/PerfProbe.h>
 
+#if defined(MARKOFF_PERF)
+#define MARKOFF_PERF_NOTE(name) ::Markoff::Perf::Probe::instance().note(name)
+#else
+#define MARKOFF_PERF_NOTE(name) do { } while (false)
+#endif
+
 namespace Markoff {
 
 InlineParseCache::InlineParseCache(MarkoffDocument &doc)
@@ -16,10 +22,10 @@ QList<SourceSpan> InlineParseCache::spansFor(BlockId id) const
     auto curSeq = m_doc.blockEditSequence(id);
     auto it = m_cache.find(id);
     if (it != m_cache.end() && it->cachedAtSeq == curSeq) {
-        Markoff::Perf::Probe::instance().note(QStringLiteral("core.InlineParseCache.hit"));
+        MARKOFF_PERF_NOTE("core.InlineParseCache.hit");
         return it->spans;
     }
-    Markoff::Perf::Probe::instance().note(QStringLiteral("core.InlineParseCache.miss"));
+    MARKOFF_PERF_NOTE("core.InlineParseCache.miss");
     auto spans = inlineSpansFor(m_doc.blockText(id));
     m_cache.insert(id, Entry{spans, curSeq});
     return spans;

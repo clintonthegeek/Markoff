@@ -283,17 +283,22 @@ bool TreeSitterParser::parse(const QString &text)
     collectInlineRanges(root, inlineRanges, m_utf8);
     m_inlineRanges.reserve(inlineRanges.size());
 
-    for (const TSRange &range : inlineRanges) {
-        MARKOFF_PERF_SCOPE("parser.inline_grammar_one_range");
-        ts_parser_set_included_ranges(m_inlineParser, &range, 1);
-        TSTree *tree = ts_parser_parse_string(m_inlineParser, nullptr,
-                                               m_utf8.constData(),
-                                               static_cast<uint32_t>(m_utf8.size()));
-        if (tree) {
-            m_inlineTrees.append(tree);
-            m_inlineRanges.push_back(ByteRange{range.start_byte, range.end_byte});
+    // One probe for the whole inline phase: a per-region scope cost a clock
+    // read plus a mutex round-trip per inline region, perturbing the very
+    // measurements this probe reports.
+    {
+        MARKOFF_PERF_SCOPE("parser.inline_grammar");
+        for (const TSRange &range : inlineRanges) {
+            ts_parser_set_included_ranges(m_inlineParser, &range, 1);
+            TSTree *tree = ts_parser_parse_string(m_inlineParser, nullptr,
+                                                   m_utf8.constData(),
+                                                   static_cast<uint32_t>(m_utf8.size()));
+            if (tree) {
+                m_inlineTrees.append(tree);
+                m_inlineRanges.push_back(ByteRange{range.start_byte, range.end_byte});
+            }
+            ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
         }
-        ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
     }
 
     m_valid = true;

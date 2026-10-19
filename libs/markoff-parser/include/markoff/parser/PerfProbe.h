@@ -1,27 +1,33 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// PerfProbe — debug-only per-stage timing accumulator.
+// PerfProbe — opt-in per-stage timing accumulator.
 //
-// Header-only singleton with a scoped RAII helper. Used by the table
-// typing-perf benchmark to attribute per-keystroke cost across the
-// parser → core → live → highlighter cascade. Probe sites are unconditional
-// (cost: one QElapsedTimer + one hash insert) and benign to leave in
-// non-benchmark builds.
+// Header-only singleton with a scoped RAII helper, used to attribute
+// per-keystroke cost across the parser → core → highlighter cascade.
+//
+// Compiled out unless MARKOFF_PERF is defined: with the probe on, every site
+// costs a clock read plus a mutex round-trip and a map insert, which is enough
+// to perturb the numbers the probe exists to measure (a 500-heading document
+// used to pay 500 of them per parse). Build with -DMARKOFF_PERF to enable.
 //
 // Usage:
 //   { MARKOFF_PERF_SCOPE("TreeSitterParser::parse"); ... }
 //   Markoff::Perf::Probe::instance().dump("after 20 keystrokes");
-//
-// JS sites call through TableEditBinding's Q_INVOKABLE perfTime/perfNote.
 #pragma once
 
-#include <QHash>
-#include <QString>
-#include <QElapsedTimer>
+#if !defined(MARKOFF_PERF)
+
+#define MARKOFF_PERF_SCOPE(name) do { } while (false)
+
+#else
+
 #include <QDebug>
-#include <QList>
+#include <QElapsedTimer>
+#include <QHash>
+#include <QLatin1String>
 #include <QMutex>
 #include <QMutexLocker>
+#include <QString>
 #include <algorithm>
 
 namespace Markoff::Perf {
@@ -35,27 +41,20 @@ class Probe {
 public:
     static Probe &instance() { static Probe p; return p; }
 
+    /// Hot path: `name` must be a string literal, so the key is its stable
+    /// address and no QString is built per call.
     void record(const char *name, qint64 ns)
     {
         QMutexLocker lk(&m_mu);
-        Stat &s = m_stats[QString::fromLatin1(name)];
+        Stat &s = m_stats[name];
         s.totalNs += ns;
         s.calls   += 1;
     }
 
-    void recordMs(const QString &name, double ms)
+    void note(const char *name)
     {
         QMutexLocker lk(&m_mu);
-        Stat &s = m_stats[name];
-        s.totalNs += static_cast<qint64>(ms * 1.0e6);
-        s.calls   += 1;
-    }
-
-    void note(const QString &name)
-    {
-        QMutexLocker lk(&m_mu);
-        Stat &s = m_stats[name];
-        s.calls += 1;
+        m_stats[name].calls += 1;
     }
 
     void reset()
@@ -71,7 +70,7 @@ public:
         QList<QPair<QString, Stat>> items;
         items.reserve(m_stats.size());
         for (auto it = m_stats.cbegin(); it != m_stats.cend(); ++it)
-            items.append({it.key(), it.value()});
+            items.append({QString::fromLatin1(it.key()), it.value()});
         std::sort(items.begin(), items.end(),
                   [](const auto &a, const auto &b) {
                       return a.second.totalNs > b.second.totalNs;
@@ -94,7 +93,7 @@ public:
 
 private:
     QMutex m_mu;
-    QHash<QString, Stat> m_stats;
+    QHash<const char *, Stat> m_stats;
 };
 
 class Scope {
@@ -112,3 +111,5 @@ private:
 #define MARKOFF_PERF_CONCAT(a, b)  MARKOFF_PERF_CONCAT_(a, b)
 #define MARKOFF_PERF_SCOPE(name)   \
     ::Markoff::Perf::Scope MARKOFF_PERF_CONCAT(_markoff_perf_scope_, __LINE__)(name)
+
+#endif // MARKOFF_PERF
