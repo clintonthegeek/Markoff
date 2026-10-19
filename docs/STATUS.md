@@ -22,7 +22,13 @@ M17's per-block link cache landed. The Wave 0 reply is written
 (`docs/handoff/2026-10-19-to-corbomite-open-asks-response.md`) and awaiting a
 send decision; M13/M18 are blocked on a reliable document-wide content version; M31's
 caller-side edit tracking, the Wave 5 decisions and the Graffodil perf/spec
-rows are the remainder (see the board's batch close-out table). Graffodil's M5, M6 and
+rows are the remainder (see the board's batch close-out table).
+
+New workfront proposal (no phase started):
+[`plans/2026-10-19-embedded-renderers-plan.md`](plans/2026-10-19-embedded-renderers-plan.md)
+— reconnaissance and plan for native embedded renderers (tables first, then
+math, Mermaid, Graphviz, Pikchr, …) in the live view. It carries the decisions
+that need an owner before Phase 1. Graffodil's M5, M6 and
 punch-list batch 1 and M19 are done in that repo. M11's enum disposition (implement or remove the three unimplemented
 flags) stays a decision.
 
