@@ -8,8 +8,8 @@ Written 2026-10-19 (the leaf had no guide before).
 ## Contract lives in core, not here
 
 - `markoff-core/include/markoff/core/CodeBlockProcessor.h` —
-  `kEmbedContractVersion` (currently 2), `RenderRequest`,
-  `CodeBlockProcessor` (languages/render/contractVersion).
+  `kEmbedContractVersion` (currently 3), `RenderRequest`,
+  `CodeBlockProcessor` (languages/name/render/contractVersion).
 - `markoff-core/include/markoff/core/EmbedRender.h` — `EmbedArtifact`
   (Missing/Pending/Ready/Failed), `EmbedRenderService` (artifact/request/
   supportedLanguages/engineDescription + artifactReady/artifactFailed),
@@ -67,6 +67,11 @@ Markoff installs nothing.
   until Corbomite's adapter moves; graphviz/pikchr/typst/… are unbuilt —
   the survey is `docs/research/mermade-and-others.md` and the phased plan
   is `docs/plans/2026-10-19-embedded-renderers-plan.md`.
-- `engineDescription` currently returns `"<lang> (embed contract N)"`, not a
-  human backend name; the contract asks for the latter ("mermaid-rs").
+- `engineDescription` reports the backend's `name()` ("jkqtmathtext" for
+  the math backend), falling back to "<lang> (embed contract N)" for a
+  backend that gives no name. The contract version moved to 3 when
+  `name()` was added — a version-2 backend is refused with a clear
+  message rather than called through a mismatched vtable.
 - No subprocess sandbox for process-backed engines yet.
+- The cache evicts by request order, not completion order, and an in-flight
+  render neither occupies a slot nor is an eviction victim.

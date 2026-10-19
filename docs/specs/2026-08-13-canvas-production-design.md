@@ -52,6 +52,21 @@ C1–C4 are **permanent** for `libs/markoff-canvas/`.
 half (a renamed guard passes grep) becomes part of every phase-close
 audit.
 
+**Async ruling (2026-10-19, embedded-renderer path).** C2 forbids
+view-side deferral — no `singleShot(0)`, no `Qt.callLater`, no queued
+connection inside the leaf. The embedded-renderer path does not violate
+it: the leaf owns no timer and no thread. It asks a
+`Markoff::EmbedRenderService` for an artifact, paints source until the
+artifact exists, and reacts to the service's `artifactReady` /
+`artifactFailed` signals. The service is a **foreign object** whose
+internal threading is its own business; the leaf's only rule is that it
+never *defers* work itself — it repaints when the service says an
+artifact is ready, and its layout cache stays keyed on
+`(BlockId, blockEditSequence)`. `View::setEmbedRenderService` is the
+seam that installs it. No new forbidden pattern is needed, so
+`check-constitution.sh` is unchanged: the guard greps the leaf for
+deferral constructs, and the leaf has none.
+
 **C4 amendment (the one substantive change).** The delimiter-reflow
 requirement (§5.1) introduces a per-entry **projection map**: the
 layout string omits delimiter runs, so the leaf maintains, per

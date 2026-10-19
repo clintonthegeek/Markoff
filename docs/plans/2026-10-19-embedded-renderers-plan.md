@@ -254,27 +254,36 @@ A small consumer, not an engine host:
   knowledge. Code review rule: runtime knows requests and artifacts, nothing
   about blocks, carets, or sessions.
 
-## 3. Phase 0 — prerequisites (do first, no engines)
+## 3. Phase 0 — prerequisites (do first, no engines) — DONE 2026-10-19
 
-1. **Restyle on attribute changes, then make the key general.**
-   - Minimum, now: canvas subscribes to `blocksChanged` and invalidates the
-     named entries (plus a per-block presentation sequence, since attributes are
-     not in `blockEditSequence`). Fixes the live checkbox/display-mode staleness
-     with a small diff.
-   - General: one monotonic document content version bumped by every mutating
-     path (text, structural, attribute, remote acceptance) and exposed, used in
-     the cache key and available to the render cache. This is the prerequisite
-     for M13/M18 and for keying embeds on more than the buffer sequence.
-   - Acceptance: a test flips `DisplayMode` and `Checked` and asserts the entry
-     restyles with no structural edit; a second asserts no restyle on an
-     unrelated block.
-2. **Restore the canvas rendering test harness.** Recreate the offscreen tests
-   that A13 deleted, at least: math pixmap active/inactive, mermaid fallback,
-   image placeholder, table geometry/paint, DPR scaling, theme switch. Use the
-   existing inspection predicates. Acceptance: `scripts/run-tests.sh -R canvas`
-   covers rendering again.
-3. **Record the async ruling** in the canvas spec §3 (service signal vs C2) and
-   extend `check-constitution.sh` only if a new forbidden pattern is needed.
+1. **Restyle on attribute changes, then make the key general.** — DONE.
+   - Minimum: canvas subscribes to `blocksChanged` and invalidates the named
+     entries. Kept: it restyles at once rather than at the next sync.
+   - General: the content version now advances on **every** mutating path.
+     `setBlockAttribute`, `removeBlockAttribute` and `changeBlockKind` bump
+     the block's edit sequence, and `acceptRemoteAction` bumps the sequence
+     of every block a remote action touched (text, attribute or kind) —
+     `c215ccf3`. So `d2EditSequence()` is a sound document-wide key, and the
+     per-block sequence is a sound key for that block's visible state.
+     `d2EditSequence()` is what the binding's sep-view index and the flat-view
+     cache key on.
+   - Tests: `attribute_write_increments`, `attribute_removal_increments`,
+     `kind_change_increments` (in `tst_foundation_edit_sequence`) and
+     `remote_action_bumps_the_content_version` pin the contract.
+2. **Restore the canvas rendering test harness.** — DONE
+   (`tst_canvas_render`, 14 cases): math pixmap active/inactive, mermaid
+   fallback (injected renderer paints; without one the source does), image
+   placeholder vs. resolved pixmap, table geometry/paint/alignment, find
+   highlight inside a cell, cell click + typing, the embed path end-to-end
+   (fenced block and display math through the runtime), and a theme switch
+   repainting with the new colours. DPR scaling is covered where it happens,
+   in the runtime (`tst_embed_runtime`, `tst_embed_math`); the canvas only
+   forwards its own device pixel ratio in the request.
+3. **Record the async ruling** in the canvas spec §3. — DONE: the ruling is
+   in `docs/specs/2026-08-13-canvas-production-design.md` §3. The leaf owns
+   no timer, no thread and no queued connection; it asks the service and
+   repaints when the service signals. No new forbidden pattern is needed, so
+   `check-constitution.sh` is unchanged.
 
 ## 4. Phase 1 — tables, the first customer — **started 2026-10-19**
 
