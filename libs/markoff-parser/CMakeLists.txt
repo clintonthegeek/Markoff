@@ -91,5 +91,18 @@ if(DEFINED KDE_INSTALL_LIBDIR)
     )
 endif()
 
-enable_testing()
-add_subdirectory(tests)
+# Tests follow the family switch (ASK-M36): a host that turns
+# MARKOFF_BUILD_TESTS off gets no parser test targets either.
+# Follows the family switch, which the Markoff root sets before adding this
+# leaf; a leaf configured on its own defaults to building its tests.
+if(NOT DEFINED MARKOFF_PARSER_BUILD_TESTS)
+    if(DEFINED MARKOFF_BUILD_TESTS)
+        set(MARKOFF_PARSER_BUILD_TESTS ${MARKOFF_BUILD_TESTS})
+    else()
+        set(MARKOFF_PARSER_BUILD_TESTS ON)
+    endif()
+endif()
+if(MARKOFF_PARSER_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif()

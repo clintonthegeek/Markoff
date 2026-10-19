@@ -47,8 +47,14 @@ if(DEFINED KDE_INSTALL_LIBDIR)
     )
 endif()
 
+# Follows the family switch, which the Markoff root sets before adding this
+# leaf; a leaf configured on its own defaults to building its tests.
 if(NOT DEFINED MARKOFF_SOURCE_BUILD_TESTS)
-    set(MARKOFF_SOURCE_BUILD_TESTS ON)
+    if(DEFINED MARKOFF_BUILD_TESTS)
+        set(MARKOFF_SOURCE_BUILD_TESTS ${MARKOFF_BUILD_TESTS})
+    else()
+        set(MARKOFF_SOURCE_BUILD_TESTS ON)
+    endif()
 endif()
 if(MARKOFF_SOURCE_BUILD_TESTS)
     enable_testing()

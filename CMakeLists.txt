@@ -67,6 +67,28 @@ if(TARGET c4core)
     set_target_properties(c4core PROPERTIES AUTOMOC OFF AUTOUIC OFF)
 endif()
 
+# The canonical test switch. ON for a standalone build, OFF when this project is
+# consumed as a subdirectory; every leaf follows it unless the consumer
+# overrides that leaf's own gate (MARKOFF_<LEAF>_BUILD_TESTS).
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_MARKOFF_TESTS_DEFAULT ON)
+else()
+    set(_MARKOFF_TESTS_DEFAULT OFF)
+endif()
+option(MARKOFF_BUILD_TESTS "Build the Markoff test suites" ${_MARKOFF_TESTS_DEFAULT})
+unset(_MARKOFF_TESTS_DEFAULT)
+foreach(_markoff_leaf_tests
+        MARKOFF_PARSER_BUILD_TESTS
+        MARKOFF_CORE_BUILD_TESTS
+        MARKOFF_SOURCE_BUILD_TESTS
+        MARKOFF_STYLED_BUILD_TESTS
+        MARKOFF_CANVAS_BUILD_TESTS)
+    if(NOT DEFINED ${_markoff_leaf_tests})
+        set(${_markoff_leaf_tests} ${MARKOFF_BUILD_TESTS})
+    endif()
+endforeach()
+unset(_markoff_leaf_tests)
+
 add_subdirectory(libs/markoff-parser)
 add_subdirectory(libs/markoff-text-units)
 
@@ -113,7 +135,8 @@ if(MARKOFF_BUILD_APPS)
 endif()
 unset(_MARKOFF_BUILD_APPS_DEFAULT)
 
-option(MARKOFF_BUILD_TESTS "Build Markoff integration tests" ON)
+# Tests are enabled for the whole tree when the canonical switch is on; the
+# per-leaf gates already follow it (see the top of this file).
 if(MARKOFF_BUILD_TESTS)
     enable_testing()
 endif()
@@ -122,7 +145,8 @@ endif()
 # link the installed CollabText::Core package through Markoff::CollabTextVNext.
 # CMAKE_PREFIX_PATH must include the selected installation.
 option(MARKOFF_BUILD_COLLABTEXT_VNEXT_TESTS
-    "Build installed-package consumer tests for the CollabText Core adapter" ON)
+    "Build installed-package consumer tests for the CollabText Core adapter"
+    ${MARKOFF_BUILD_TESTS})
 if(MARKOFF_BUILD_COLLABTEXT_VNEXT_TESTS)
     if(NOT MARKOFF_BUILD_TESTS)
         message(FATAL_ERROR "MARKOFF_BUILD_COLLABTEXT_VNEXT_TESTS requires MARKOFF_BUILD_TESTS=ON")
