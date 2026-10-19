@@ -123,6 +123,14 @@ Editor::~Editor()
         doc->destroySession(m_session.data());
 }
 
+Markoff::Session *Editor::session() const { return m_session.data(); }
+
+void Editor::setSession(Markoff::Session *s) {
+    if (m_session.data() == s) return;
+    m_session = s;
+    if (m_binding) m_binding->setSession(s);
+}
+
 void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     if (auto *prev = Markoff::MarkdownView::document()) {
         if (prev == doc) return;

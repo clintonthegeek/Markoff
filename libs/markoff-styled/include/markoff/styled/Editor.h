@@ -83,8 +83,8 @@ public:
     void pasteAsPlain() override;
 
     // Session
-    Markoff::Session *session() const;
-    void              setSession(Markoff::Session *);
+    Markoff::Session *session() const override;
+    void              setSession(Markoff::Session *) override;
 
     // Theme
     Markoff::Theme theme() const override;

@@ -26,6 +26,10 @@ public:
     explicit Editor(QWidget *parent = nullptr);
     ~Editor() override;
 
+    // Base session contract (ASK-M20): the leaf's own session, or nullptr.
+    Markoff::Session *session() const override;
+    void setSession(Markoff::Session *) override;
+
     // MarkdownView contract
     void setDocument(Markoff::MarkoffDocument *doc) override;
     Markoff::CursorPos cursorPosition() const override;

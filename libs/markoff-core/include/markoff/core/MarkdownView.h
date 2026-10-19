@@ -11,6 +11,7 @@
 namespace Markoff {
 class FindController;
 class MarkoffDocument;
+class Session;
 
 class MARKOFF_CORE_EXPORT MarkdownView : public QWidget {
     Q_OBJECT
@@ -65,6 +66,13 @@ public:
     // --- Undo/redo: base-implemented over undoD2; no-op while read-only. ---
     virtual void undo();
     virtual void redo();
+
+    // --- Session (ASK-M20). Part of the polymorphic contract so a consumer
+    //     holding a `MarkdownView *` can attach or read a session without
+    //     knowing the concrete leaf: Styled::Editor overrides both, the source
+    //     leaf exposes its own, and the base default is "no session". ---
+    virtual Session *session() const { return nullptr; }
+    virtual void setSession(Session *) {}
 
     // --- Theme / font scale: base stores + signals; leaves override to
     //     apply (call the base first to keep the store coherent). ---

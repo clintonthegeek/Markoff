@@ -49,6 +49,23 @@ private Q_SLOTS:
         QCOMPARE(fixture.document->sessions().size(), before);
     }
 
+    // ASK-M20: a consumer holding a MarkdownView* can reach the session — the
+    // accessor is on the base contract now, not only on the styled leaf.
+    void session_is_reachable_through_the_base_contract() {
+        Markoff::Source::Editor e;
+        auto fixture = openDocument(QByteArrayLiteral("hello"));
+        e.setDocument(fixture.document.get());
+        Markoff::Session *s = fixture.document->createSession();
+
+        Markoff::MarkdownView *base = &e;
+        QCOMPARE(base->session(), e.session());   // the leaf's own session
+        base->setSession(s);
+        QCOMPARE(base->session(), s);
+        QCOMPARE(e.session(), s);
+
+        fixture.document->destroySession(s);
+    }
+
     void document_deleted_under_editor_is_safe() {
         Markoff::Source::Editor e;
         auto fixture = openDocument(QByteArrayLiteral("hello world"));
