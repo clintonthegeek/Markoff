@@ -67,6 +67,12 @@ public:
     virtual void undo();
     virtual void redo();
 
+    /// Undo/redo availability for UI state (ASK-M9). False with no document,
+    /// while read-only, or when there is nothing to reverse; leaves may
+    /// override for a model of their own.
+    virtual bool canUndo() const;
+    virtual bool canRedo() const;
+
     // --- Session (ASK-M20). Part of the polymorphic contract so a consumer
     //     holding a `MarkdownView *` can attach or read a session without
     //     knowing the concrete leaf: Styled::Editor overrides both, the source

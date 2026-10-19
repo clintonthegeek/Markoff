@@ -54,6 +54,36 @@ private Q_SLOTS:
         QVERIFY(fixture.document->blockText(blocks.front()).isEmpty());
     }
 
+    void undo_availability_follows_the_local_history()
+    {
+        auto fixture = openCandidate(QStringLiteral("undo-availability"));
+        QCOMPARE(fixture.document->importInitialMarkdown(
+            QByteArrayLiteral("hello\n")).state,
+            VNext::ActionPublicationState::committed);
+
+        // An initial import is not an undoable local action.
+        QVERIFY(!fixture.document->canUndoD2());
+        QCOMPARE(fixture.document->d2UndoDepth(), qsizetype{0});
+        QVERIFY(!fixture.document->canRedoD2());
+
+        const auto block = fixture.document->iterateBlocks().front();
+        QCOMPARE(fixture.document->applyBlockEdit(
+            {block, 5, 0, QByteArrayLiteral("!")}).state,
+            VNext::ActionPublicationState::committed);
+        QVERIFY(fixture.document->canUndoD2());
+        QCOMPARE(fixture.document->d2UndoDepth(), qsizetype{1});
+        QVERIFY(!fixture.document->canRedoD2());
+
+        fixture.document->undoD2();
+        QVERIFY(!fixture.document->canUndoD2());
+        QCOMPARE(fixture.document->d2UndoDepth(), qsizetype{0});
+        QVERIFY(fixture.document->canRedoD2());
+
+        fixture.document->redoD2();
+        QVERIFY(fixture.document->canUndoD2());
+        QVERIFY(!fixture.document->canRedoD2());
+    }
+
     void frontmatter_edit_is_undoable_byte_for_byte()
     {
         auto fixture = openCandidate(QStringLiteral("frontmatter-undo"));

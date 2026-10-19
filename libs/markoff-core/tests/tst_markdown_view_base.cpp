@@ -109,6 +109,39 @@ private Q_SLOTS:
         QVERIFY(!v.caretRect().isValid());
     }
 
+    // ASK-M9: the view advertises undo/redo availability instead of leaving
+    // the actions enabled forever.
+    void undo_availability_reflects_the_document_and_read_only() {
+        MarkdownView v;
+        QVERIFY(!v.canUndo());
+        QVERIFY(!v.canRedo());
+
+        auto fixture = openCandidate(QStringLiteral("markdown-view-availability"));
+        MarkoffDocument& doc = *fixture.document;
+        v.setDocument(&doc);
+        QVERIFY(!v.canUndo());          // nothing but the initial import
+
+        const auto block = doc.iterateBlocks().front();
+        QCOMPARE(doc.applyBlockEdit({block, 5, 0, QByteArrayLiteral(" there")}).state,
+                 VNext::ActionPublicationState::committed);
+        QVERIFY(v.canUndo());
+        QVERIFY(!v.canRedo());
+
+        v.setReadOnly(true);
+        QVERIFY(!v.canUndo());          // read-only disables the action
+        v.setReadOnly(false);
+        QVERIFY(v.canUndo());
+
+        v.undo();
+        QVERIFY(!v.canUndo());
+        QVERIFY(v.canRedo());
+
+        MarkoffDocument *detached = fixture.document.release();
+        delete detached;
+        QVERIFY(!v.canUndo());
+        QVERIFY(!v.canRedo());
+    }
+
     // ASK-M8: a host may delete the document while a view still holds it
     // (ordinary Qt). The base must retire the pointer, tell listeners, and
     // leave every base accessor safe to call.

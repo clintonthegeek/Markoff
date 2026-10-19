@@ -493,6 +493,51 @@ bool actionIsRetired(const VNext::CrossStreamHistoryIndex& index,
     return false;
 }
 
+
+/// The action index local undo/redo walk, or nullopt when the document has no
+/// committed owner history yet. Shared so availability queries cannot drift
+/// from what undoD2()/redoD2() actually select.
+std::optional<VNext::CrossStreamHistoryIndex> decodedActionIndex(
+    const VNext::ProviderBackedDocumentState& lifecycle)
+{
+    const auto& recovery = lifecycle.recovery();
+    if (!recovery.localHistory) return std::nullopt;
+    const auto committed = std::find_if(recovery.acceptedRecords.cbegin(),
+        recovery.acceptedRecords.cend(), [&](const VNext::AcceptedStorageRecord& record) {
+            return record.transactionId == recovery.localHistory->committedTransactionId
+                && record.committedRevision == recovery.localHistory->acceptedRevision;
+        });
+    if (committed == recovery.acceptedRecords.cend()) return std::nullopt;
+    auto history = VNext::OwnerHistoryCodec::decode(recovery.localHistory->bytes,
+        lifecycle.storage().scope().documentKey.toUtf8().toStdString(),
+        lifecycle.storage().scope().epoch, lifecycle.storage().actor(),
+        recovery.localHistory->committedTransactionId, committed->priorRevision.token);
+    if (!history.ok()) return std::nullopt;
+    return std::move(history).value().actionIndex;
+}
+
+/// The predicate undoD2() selects its next action with.
+bool eventIsUndoable(const VNext::CrossStreamHistoryIndex& index,
+                     const VNext::ActionHistoryEvent& event)
+{
+    return (event.kind == VNext::ActionKind::edit
+            || event.kind == VNext::ActionKind::replacement)
+        && !actionIsCurrentlyUndone(index.events, event.actionId)
+        && !actionIsRetired(index, event);
+}
+
+/// The predicate redoD2() selects its next action with.
+bool eventIsRedoable(const VNext::CrossStreamHistoryIndex& index,
+                     const VNext::ActionHistoryEvent& event)
+{
+    if (event.kind != VNext::ActionKind::undo) return false;
+    return std::none_of(index.events.begin(), index.events.end(),
+        [&](const VNext::ActionHistoryEvent& later) {
+            return later.kind == VNext::ActionKind::redo
+                && later.parentActionId == event.actionId;
+        });
+}
+
 VNext::ActionPublicationResult publishDocumentMapCompensation(
     VNext::ProviderBackedDocumentState& lifecycle,
     const VNext::StorageRecoveryState& recovery,
@@ -1098,6 +1143,36 @@ void MarkoffDocument::compensateTextGroups(
     emit documentChanged();
 }
 
+bool MarkoffDocument::canUndoD2() const
+{
+    const auto index = decodedActionIndex(*d->lifecycle);
+    if (!index) return false;
+    return std::any_of(index->events.rbegin(), index->events.rend(),
+        [&](const VNext::ActionHistoryEvent& event) {
+            return eventIsUndoable(*index, event);
+        });
+}
+
+bool MarkoffDocument::canRedoD2() const
+{
+    const auto index = decodedActionIndex(*d->lifecycle);
+    if (!index) return false;
+    return std::any_of(index->events.rbegin(), index->events.rend(),
+        [&](const VNext::ActionHistoryEvent& event) {
+            return eventIsRedoable(*index, event);
+        });
+}
+
+qsizetype MarkoffDocument::d2UndoDepth() const
+{
+    const auto index = decodedActionIndex(*d->lifecycle);
+    if (!index) return 0;
+    return std::count_if(index->events.begin(), index->events.end(),
+        [&](const VNext::ActionHistoryEvent& event) {
+            return eventIsUndoable(*index, event);
+        });
+}
+
 void MarkoffDocument::undoD2()
 {
     using namespace VNext;
@@ -1116,9 +1191,7 @@ void MarkoffDocument::undoD2()
     if (!history.ok()) return;
     for (auto it = history.value().actionIndex.events.rbegin();
          it != history.value().actionIndex.events.rend(); ++it) {
-        if ((it->kind != ActionKind::edit && it->kind != ActionKind::replacement)
-            || actionIsCurrentlyUndone(history.value().actionIndex.events, it->actionId)
-            || actionIsRetired(history.value().actionIndex, *it))
+        if (!eventIsUndoable(history.value().actionIndex, *it))
             continue;
         if (it->kind == ActionKind::replacement) {
             compensateReplacementAction(*it, false);
@@ -1180,12 +1253,7 @@ void MarkoffDocument::redoD2()
     if (!history.ok()) return;
     for (auto it = history.value().actionIndex.events.rbegin();
          it != history.value().actionIndex.events.rend(); ++it) {
-        if (it->kind != ActionKind::undo) continue;
-        const bool redone = std::any_of(history.value().actionIndex.events.begin(),
-            history.value().actionIndex.events.end(), [&](const ActionHistoryEvent& later) {
-                return later.kind == ActionKind::redo && later.parentActionId == it->actionId;
-            });
-        if (redone) continue;
+        if (!eventIsRedoable(history.value().actionIndex, *it)) continue;
         const auto* parentRecord = acceptedAction(recovery, it->parentActionId);
         if (parentRecord) {
             auto parent = ActionBundleCodec::decode(parentRecord->bytes,

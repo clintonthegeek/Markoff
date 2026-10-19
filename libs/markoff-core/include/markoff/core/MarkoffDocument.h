@@ -262,6 +262,17 @@ public:
         const Markoff::StructuralOp &op);
 
     // ===== Durable undo/redo =====
+    /// True when undoD2() has a local action to reverse. Uses the same event
+    /// predicate undoD2() selects with, so a UI never advertises an undo that
+    /// cannot run (ASK-M9).
+    bool canUndoD2() const;
+
+    /// True when redoD2() has an undone local action to reapply.
+    bool canRedoD2() const;
+
+    /// Number of local actions undoD2() could still reverse, newest first.
+    qsizetype d2UndoDepth() const;
+
     /// Undo the most recent accepted local document action.
     void undoD2();
 

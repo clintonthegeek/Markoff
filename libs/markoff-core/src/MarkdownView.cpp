@@ -62,6 +62,18 @@ void MarkdownView::redo()
     if (auto *doc = document(); doc && !isReadOnly()) doc->redoD2();
 }
 
+bool MarkdownView::canUndo() const
+{
+    const auto *doc = document();
+    return doc && !isReadOnly() && doc->canUndoD2();
+}
+
+bool MarkdownView::canRedo() const
+{
+    const auto *doc = document();
+    return doc && !isReadOnly() && doc->canRedoD2();
+}
+
 Theme MarkdownView::theme() const { return m_theme; }
 void MarkdownView::setTheme(const Theme &t)
 {
