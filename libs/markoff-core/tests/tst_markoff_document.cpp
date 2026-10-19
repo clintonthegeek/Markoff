@@ -55,6 +55,35 @@ private Q_SLOTS:
         QVERIFY(fixture.document->blockText(blocks.front()).isEmpty());
     }
 
+    void frontmatter_edit_is_undoable_byte_for_byte()
+    {
+        auto fixture = openCandidate(QStringLiteral("frontmatter-undo"));
+        QCOMPARE(fixture.document->importInitialMarkdown(
+            QByteArrayLiteral("---\ntitle: Old\ncount: 1\n---\nBody\n")).state,
+            VNext::ActionPublicationState::committed);
+
+        const QByteArray before = fixture.document->serializeForSave();
+        QVERIFY(before.contains("title: Old"));
+
+        QCOMPARE(fixture.document->setFrontmatterValue(
+            QByteArrayLiteral("owner"), QByteArrayLiteral("clinton")).state,
+            VNext::ActionPublicationState::committed);
+        QCOMPARE(fixture.document->frontmatterValue(QByteArrayLiteral("owner")).value(),
+            QByteArrayLiteral("clinton"));
+        const QByteArray afterEdit = fixture.document->serializeForSave();
+        QVERIFY(afterEdit != before);
+        QVERIFY(afterEdit.contains("owner: clinton"));
+
+        // One undo reverses the whole edit, frontmatter byte-for-byte.
+        fixture.document->undoD2();
+        QVERIFY(!fixture.document->frontmatterValue(QByteArrayLiteral("owner")).has_value());
+        QCOMPARE(fixture.document->serializeForSave(), before);
+
+        // And it is redoable.
+        fixture.document->redoD2();
+        QCOMPARE(fixture.document->serializeForSave(), afterEdit);
+    }
+
     void imports_edits_and_undoes_accepted_actions()
     {
         auto fixture = openCandidate(QStringLiteral("edit-undo"));
