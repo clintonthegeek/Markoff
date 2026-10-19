@@ -42,6 +42,8 @@ app, but designed as a reusable widget library.
 | `libs/markoff-styled` | QTextEdit inline-styled view leaf |
 | `libs/markoff-source` | QPlainTextEdit source view leaf |
 | `libs/markoff-collabtext-vnext` | Adapter to the installed provider-backed CollabText Core package |
+| `libs/markoff-embed` | Embedded-renderer plugin runtime (contract in core: `CodeBlockProcessor`/`EmbedRenderService`) plus backends; `markoff_embed_math` is the first real engine |
+| `libs/markoff-text-units` | UTF-8↔UTF-16 boundary helpers (header ships as `<markoff/core/TextUnits.h>`) |
 | `libs/rapidyaml`, `libs/jkqtmathtext` | vendored third-party (YAML, LaTeX rendering) |
 | `apps/` | Provider-backed collaboration app |
 
@@ -85,13 +87,13 @@ The latest recorded result is in `docs/STATUS.md`.
 
 Pre-1.0, under active development (v0.7.x series). Canvas is the primary
 editing view; Source and Styled remain available. The API is not frozen. See
-`docs/STATUS.md` and `docs/plans/2026-10-12-collabtext-adoption-execution.md`
+`docs/STATUS.md` and `docs/plans/2026-10-19-corbomite-open-asks-triage.md`
 for current status and open work.
 
 ## For contributors / AI agents
 
 Start with `AGENTS.md` and `docs/STATUS.md`. The task list is
-`docs/plans/2026-10-12-collabtext-adoption-execution.md`. `CLAUDE.md`
+`docs/plans/2026-10-19-corbomite-open-asks-triage.md`. `CLAUDE.md`
 holds build rules and leaf layout. Design history is under `docs/specs/`
 and `docs/plans/`.
 

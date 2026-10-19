@@ -1,9 +1,9 @@
 # Embedded renderers in the live view — reconnaissance and plan
 
 Date: 2026-10-19. Status: proposal; no phase started. Driver: the survey in
-[`../../mermade-and-others.md`](../../mermade-and-others.md) (native renderers
-for extended Markdown; should be filed under `docs/research/` next time it is
-touched). Goal: one general embedding mechanism in Markoff's editing view, every
+[`../research/mermade-and-others.md`](../research/mermade-and-others.md) (native
+renderers for extended Markdown; filed under `docs/research/` on 2026-10-19).
+Goal: one general embedding mechanism in Markoff's editing view, every
 engine family reachable through it, tables first.
 
 **The live view is the canvas leaf.** Corbomite's `LivePreview` *is*

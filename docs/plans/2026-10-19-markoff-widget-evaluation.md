@@ -105,8 +105,8 @@ Vendored: `rapidyaml`, `jkqtmathtext`. Apps: `markoff-canvas-app`,
 | M37 canvas card mode | documented embedded mode + scroll ownership | M38/M39 answers already permit it |
 | M26 + M27 item 4 | packaging decision | latent on this toolchain |
 | M12 retention | policy decision + multi-doc soak | GC stays disabled by rule |
-| M11 enum disposition | implement-or-remove decision | flags currently refused loudly |
-| Embedded renderers Phases 2–4 | one named backend at a time | mermaid/graphviz/pikchr/… per `mermade-and-others.md` |
+| M11 enum disposition | **dispositioned 2026-10-19:** keep the enum values, keep refusing loudly, implement later as a named feature (recorded on the triage board) |
+| Embedded renderers Phases 2–4 | one named backend at a time | mermaid/graphviz/pikchr/… per `docs/research/mermade-and-others.md` |
 | Orca manual a11y pass | user request + `--direct` permission | deferred 2026-09-30 |
 | Wave 0 reply | send decision | written, unsent |
 
@@ -163,3 +163,15 @@ document.
 5. **Send the Wave 0 reply** — written, awaiting only the send decision.
 6. Then the decision-gated rows (M7, M37, M26/M27.4, M12) in whatever order the
    user rules on them; Graffodil Waves stay in that repo.
+
+## Actions taken on this evaluation (2026-10-19)
+
+Step 1 landed: the doc-correction commit fixed every stale pointer above
+(queue.md header + blocker note, triage board "Blocked" section + close-out
+table + Wave 3 + M13 anchor, repo `AGENTS.md` wave status, README task list +
+layout table, d-arc archived marker, STATUS verification line) and filed
+`mermade-and-others.md` under `docs/research/`. M11's disposition is recorded
+on the triage board: keep the enum values, keep refusing loudly, implement as a
+named feature later. Step 2 (the remote-bumps-sequence regression test) and
+steps 3–4 (M13, M18) are the code work that follows; this document is updated
+again when they land.

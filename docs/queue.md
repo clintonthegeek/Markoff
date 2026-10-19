@@ -2,7 +2,10 @@
 
 Dormant items and the old Discipline Log. **Not the active task list.**
 Current work is [`STATUS.md`](STATUS.md) and the
-[CollabText task board](plans/2026-10-12-collabtext-adoption-execution.md).
+[Corbomite open-asks board](plans/2026-10-19-corbomite-open-asks-triage.md).
+The CollabText adoption board
+([`plans/2026-10-12-collabtext-adoption-execution.md`](plans/2026-10-12-collabtext-adoption-execution.md))
+is closed.
 
 `markoff-core` and `markoff-canvas` are open for that board.
 `markoff-styled` is bug-fix-only outside it, and `markoff-source` stays
@@ -91,17 +94,8 @@ for why. Source mode is the escape hatch.
   source-reveal flip (seam landed 2026-05-30).
 - Release scaffolding: install/export rules + header tiering for a
   non-submodule consumer (LICENSE/README landed 2026-06-09).
-- **Canvas: remote CRDT edit leaves an already-measured block's layout
-  stale (found by the a11y arc, A3.4 probe 2026-09-29; pre-existing,
-  not a11y-specific).** `BlockLayoutCache::sync` decides staleness from
-  `doc.blockEditSequence(id)` (plus structural seq), which does not bump
-  on `applyRemoteOps` buffer edits. Repro: two replicas, realize block,
-  apply a remote insert of `"XYZ\n\n\n\n"` at 0 -> `blockText` updates but
-  `View::blockRect` height stays 33.3 (local edit: 113.3) and the realized
-  layout keeps its old line ranges (paint/hit-test/caret geometry wrong
-  until a local edit). Fix sketch: fold `bufferProxy(id)->editSequence()`
-  into the token (as `Accessibility.cpp` already does). Touches
-  canvas only, but verify against core's seq semantics first.
+- **Canvas: remote CRDT edit leaves an already-measured block's layout stale — OBSOLETE 2026-10-19, see below.** *(Original note, a11y arc A3.4 probe 2026-09-29: `BlockLayoutCache::sync` decides staleness from `doc.blockEditSequence(id)` (plus structural seq), which "does not bump on `applyRemoteOps` buffer edits"; fix sketch: "fold `bufferProxy(id)->editSequence()` into the token (as `Accessibility.cpp` already does)".)*
+  **Correction (evaluation `plans/2026-10-19-markoff-widget-evaluation.md`):** every symbol in the original note is gone from the tree. `applyRemoteOps` and `bufferProxy` have zero hits in `libs/`; the note predates the 2026-10-17 provider-backed port (`abf65566`). The current remote path — `MarkoffDocument::acceptRemoteAction` (`MarkoffDocumentVNext.cpp:1810`) — text-diffs before/after and bumps `blockEditSequences` on changed blocks (`:1885-1890`) plus `structuralEditSequence` on order/kind change, then emits `blocksChanged`/`d2DocumentChanged`; `routeRemoteAction` and `retryDeferredRemoteActions` funnel through it. `Accessibility.cpp:146-152`'s `bufferChangeToken` is exactly `blockEditSequence(id)` — nothing extra folded in, so the old "as Accessibility already does" sketch pointed at nothing. The M13/M18 rows on the triage board were parked behind this note; they are unblocked. If a two-replica stale-layout repro still exists, it is a different bug — file it with a failing case, do not revive this note.
 - **Canvas a11y limitations (G1 arc, A5.2 audit 2026-09-29; all decided-out
   or logged, none an oversight; plan findings log has the detail):**
   - Tables get role `Table` + Name/Description but **no

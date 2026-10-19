@@ -1,6 +1,13 @@
-# D-arc — Status Board
+# D-arc — Status Board (ARCHIVED)
 
-**This is the live status of the D-evolution work arc. Update after every commit, every spec amendment, every plan written, every dogfood pass.**
+> **Archived 2026-10-19.** This board is history, not a live status: the
+> D-evolution arc closed at §4.5 on 2026-05-08 and its pointer to a "live"
+> E-arc board was itself stale — E-arc now lives at
+> [`archive/e-arc/e-arc-status.md`](archive/e-arc/e-arc-status.md). Nothing
+> here describes the current tree. Current work: [`../STATUS.md`](../STATUS.md)
+> and [`../plans/2026-10-19-corbomite-open-asks-triage.md`](../plans/2026-10-19-corbomite-open-asks-triage.md).
+
+---
 
 **Last updated:** 2026-05-08 (§4.5 audit complete; D5 complete; §4.6 deferred until Corbomite ready; E-arc opened).
 **Working tree:** `.worktrees/foundation-exploration/`

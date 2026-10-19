@@ -2,7 +2,8 @@
 
 The CollabText adoption board is closed. The current workfront is the
 [Corbomite open-asks board](docs/plans/2026-10-19-corbomite-open-asks-triage.md):
-per-ask verdicts and a seven-wave order, no wave started. The readiness signal is
+per-ask verdicts and a seven-wave order; Waves 1–2 are complete and M13/M18
+were unblocked on 2026-10-19 (the board's "Unblocked" section). The readiness signal is
 [`docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md).
 For a later change in this repository, read these in order, then edit.
 

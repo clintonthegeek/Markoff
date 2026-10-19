@@ -108,5 +108,10 @@ cmake --build build-dev -j 4          # never more than -j 4
 scripts/run-tests.sh -R canvas        # offscreen; never --direct
 ```
 
+Two ctest binaries cover this leaf: `tst_canvas_render` (offscreen View +
+painted-pixel and interaction checks) and `tst_canvas_vnext_session_positions`
+(session/caret position round-trips against the provider-backed document).
+Run both; `-R canvas` catches them.
+
 Manual eyeball loop: the demo app takes a file argument and
 `MARKOFF_CANVAS_GRAB=<path.png>` renders offscreen to a file.

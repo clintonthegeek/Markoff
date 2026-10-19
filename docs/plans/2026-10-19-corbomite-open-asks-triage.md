@@ -42,9 +42,9 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 | M8 | P1 | OPEN | `MarkdownView.h:105`; no `destroyed` wiring in core/source/styled; canvas has the pattern, `EditorWidget.cpp:206-216`. Also carries M28's missing doc-destroyed regression test | M | core + leaves |
 | M9 | P1 | PARTIAL | `MarkdownView.h:64-66` has no availability query; `MarkoffDocument.h:266-278` has `undoD2/redoD2` + per-block `canUndoForBlock` only | S | core |
 | M10 | P1 | **CLOSED** — APIs deleted | `latestParse`, `parsedDocument`, `blockAnchorAt`, `blockByteRange`, `blockAt` absent | 0 | reply |
-| M11 | P1 | OPEN | `SearchEngine.h:27-33`; `SearchEngine.cpp:23-26` `Q_ASSERT` only; `FindController.h:17-18` still implies support | S–M | core |
+| M11 | P1 | OPEN — **disposition recorded 2026-10-19: keep the enum values, keep refusing loudly, implement later as a named feature** | `SearchEngine.h:27-33`; `SearchEngine.cpp:23-26` `Q_ASSERT` only; `FindController.h:17-18` still implies support | S–M | core |
 | M12 | P1 | **STALE** | `onSaveComplete`, `wantsAcksAtWatermark`, `ackedWatermark`, `collectGarbage` absent; `save()` = `snapshotForExport`/`acknowledgeExport`; collection is disabled by design | 0 + question | reply |
-| M13 | P1 | OPEN | `SourceTextDocumentBindingVNext.cpp:336-345,292,304`; uncached `widgetFlatView` `MarkoffDocumentVNext.cpp:4915`; `sepViewPosOf` `:231-238` | M | core |
+| M13 | P1 | OPEN — unblocked 2026-10-19 (see "Unblocked" section) | `SourceTextDocumentBindingVNext.cpp:336-345,292,304`; uncached `widgetFlatView` `MarkoffDocumentVNext.cpp:4982`; `sepViewPosOf` `:231-245` | M | core |
 | M14 | P1 | OPEN | Graffodil literals as listed; `BatchRenderer.cpp:108` unconditional colour (cites `:112`) | M–L | Graffodil spec |
 | M15 | P1 | OPEN | Graffodil `GraphScene.cpp:75-78`; five scan sites; no `Spatial` consumer in Core | L | Graffodil spec |
 | M16 | P1 | OPEN | `SearchEngine.cpp:53-64`; no debounce `FindController.cpp:112-116` | S–M | core |
@@ -90,7 +90,9 @@ slice is one commit under the repo's own board.
 **Progress (2026-10-19):** Wave 0b done; Wave 1 done (`0d974f1b`..`16e7bfe4`);
 Wave 2 done (`a910338d`..`253f1889`); M30 (`bc776efd`), M16's offset half
 (`3739dd7f`), M17's cache (`c68e6afd`) and M31's reuse API done; suite 95/95.
-Wave 0's reply is written; M13/M18, M31 and Waves 5–6 are open. In Graffodil,
+Wave 0's reply is written; M13/M18 are unblocked (see the "Unblocked"
+section — the cache-key hazard they were parked behind does not exist in the
+current tree), M31's caller half and Waves 5–6 are open. In Graffodil,
 M5 (`79357fc`), M6 (`fc778db`) and punch-list batch 1 (`5c62d01`) are on `main`.
 
 ### Wave 0 — Reply and close (no code) — WRITTEN 2026-10-19
@@ -149,7 +151,7 @@ libraries.
 
 Verification: full offscreen suite **95/95** in 38.27 s after M24/M11.
 
-### Wave 3 — Hot path (Markoff) — M16 partly done 2026-10-19
+### Wave 3 — Hot path (Markoff) — M16 partly done 2026-10-19; M13/M18 unblocked
 
 Order matters: build the index once, then use it.
 
@@ -162,8 +164,14 @@ Order matters: build the index once, then use it.
    throttle `handleMove`.
 3. **M13** cached flat view invalidated on edit sequence + a block-offset
    vector for binary-search sep↔block; coalesce `onQtContentsChange`.
+   Prerequisite (the regression test) is specified in the "Unblocked"
+   section; the key itself is maintained on every mutation path.
 4. **M18** remaining — row index (`BlockId → index`) for the paste and
-   removal loops.
+   removal loops. Current hotspot confirmed in the vnext adapter:
+   `ScopedIdListStream::insertAfter` snapshots `visible_entries()` twice per
+   insert and diffs the two lists (O(N) copies + O(N²) compare per inserted
+   block), so a k-block paste is O(k·N²). The pre-A13 anchors
+   (`:4226-4234,3226,1842`) no longer exist.
 
 Exit: before/after numbers on the probes named in the handoff; no budget
 regression.
@@ -253,21 +261,39 @@ M19. Every remaining row is gated on something other than effort:
 | M37 canvas card mode | needs a documented embedded mode + scroll ownership decision |
 | M26, M27 item 4 | packaging decision (latent on this toolchain) |
 | M12 | retention-policy decision + a measurement |
-| M13, M18 | blocked on a reliable document-wide content version (see below) |
+| M13, M18 | unblocked 2026-10-19 — the content-version key is maintained on every mutation path including remote (see "Unblocked" section); only the regression test precedes them |
 | M31's other half | caller-side edit tracking; needs the binding to record byte edits |
 | Graffodil: `countCrossings`, guide-overlay churn, `computeRepulsion` region, `edgeWaypoints` key, M14, M15 | performance work and an API key change; M14/M15 need specs under Graffodil's own conventions |
 
-## Blocked on an unreliable key (recorded, not started)
+## Unblocked 2026-10-19 — the "unreliable key" is reliable (M13, M18)
 
-**M13 and M18** want caches keyed on edit sequences: a cached flat view, a
-block-byte-offset vector for binary-search sep↔block resolution, and a
-`BlockId → index` map for paste/removal. The canvas staleness note in
-`docs/queue.md` is the evidence against starting: `d2EditSequence()` and
-`blockEditSequence(id)` do **not** bump on `applyRemoteOps`, so a cache keyed on
-them can serve stale text — a correctness risk, not a perf risk. They need a
-document-wide content version bumped at every mutation path (including remote
-application) before any cache can be keyed safely. That is the prerequisite
-task, and it is not in this batch.
+**This section replaced the earlier "Blocked on an unreliable key" note.**
+That note rested on `docs/queue.md`'s 2026-09-29 canvas staleness item, which
+cites `applyRemoteOps` and `bufferProxy` — neither symbol exists in the tree
+(zero hits in `libs/`); it describes the pre-port document.
+
+The current document maintains the key on **every** mutation path:
+
+- Local paths bump `blockEditSequences` / `structuralEditSequence` at
+  `MarkoffDocumentVNext.cpp:1137, 1561, 1784, 1885, 2845, 2989, 3129, 3285,
+  3437, 3935, 4291`; `d2EditSequence()` (`:4946`) sums them.
+- Remote application goes through `acceptRemoteAction` (`:1810`), reached by
+  `routeRemoteAction` (`:1918`) and `retryDeferredRemoteActions` (`:2089`).
+  It text-diffs before/after, bumps the changed blocks' sequences
+  (`:1885-1890`) and the structural sequence, then emits `blocksChanged` and
+  `d2DocumentChanged`. Landed with the provider-backed port `abf65566`
+  (2026-10-17), after the queue note was written.
+- Consumers keyed on the token: `BlockLayoutCache::sync:131`,
+  `InlineParseCache` via `inlineSpansFor:4962`, `Accessibility.cpp:148`.
+
+**Remaining prerequisite, now the only one:** a regression test pinning
+*remote action bumps the sequences* — `tst_foundation_edit_sequence` covers
+local monotonicity only, and two-replica convergence
+(`tst_markoff_document.cpp:379-406`) asserts content, not the version. With
+that test, M13's cached flat view and M18's row index are safe to build.
+
+M13 (cached flat view + block-offset vector + binary-search sep↔block) and
+M18 (row index for the paste/removal loops) are **open and schedulable**.
 
 ## Standstill rules that constrain this list
 

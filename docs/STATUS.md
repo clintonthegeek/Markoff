@@ -20,9 +20,13 @@ M11 — `a910338d`..`253f1889`); the pin publication (Wave 0b) is done and the
 pin stays `e8a8e7d1`. M30 (parser UTF-8 validation) landed ahead of Wave 3, and M16's offset half plus
 M17's per-block link cache landed. The Wave 0 reply is written
 (`docs/handoff/2026-10-19-to-corbomite-open-asks-response.md`) and awaiting a
-send decision; M13/M18 are blocked on a reliable document-wide content version; M31's
-caller-side edit tracking, the Wave 5 decisions and the Graffodil perf/spec
-rows are the remainder (see the board's batch close-out table).
+send decision; M13/M18 were **unblocked on 2026-10-19** (the cache-key hazard
+they were parked behind does not exist in the current tree — the triage board's
+"Unblocked" section and the evaluation
+[`plans/2026-10-19-markoff-widget-evaluation.md`](plans/2026-10-19-markoff-widget-evaluation.md)
+carry the evidence); M31's caller-side edit tracking, the Wave 5 decisions and
+the Graffodil perf/spec rows are the remainder (see the board's batch close-out
+table).
 
 Embedded-renderer plan, Phase 0/1 started: canvas restyles on attribute writes
 (`blocksChanged`), and tables now honour delimiter-row alignment, use the
@@ -71,6 +75,11 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 [`docs/handoff/2026-10-19-collabtext-master-integration-pin.md`](handoff/2026-10-19-collabtext-master-integration-pin.md).
 
 ## Latest verification
+
+2026-10-19, evaluation pass: offscreen `scripts/run-tests.sh` passed **98/98**
+in 30.60 s on the current tree (wire `build-dev`). Read-only audit of all
+leaves and docs recorded in
+[`plans/2026-10-19-markoff-widget-evaluation.md`](plans/2026-10-19-markoff-widget-evaluation.md).
 
 2026-10-19, through M17: offscreen `scripts/run-tests.sh` passed **95/95** in
 44.19 s on `c68e6afd` (wire `build-dev`, prefix `build-collabtext-alpha5/install`).
