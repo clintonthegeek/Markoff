@@ -87,8 +87,9 @@ clean-prefix `find_package(Corbomite)` cannot resolve the imported
 Waves are ordered by risk and unblocking value, not by ask number. Each
 slice is one commit under the repo's own board.
 
-**Progress (2026-10-19):** Wave 0b done; Wave 1 done (eight rows, commits
-`0d974f1b`..`16e7bfe4`, suite 95/95). Wave 0's reply and Waves 2–6 are open.
+**Progress (2026-10-19):** Wave 0b done; Wave 1 done (`0d974f1b`..`16e7bfe4`);
+Wave 2 done (`a910338d`..`253f1889`); suite 95/95. Wave 0's reply and Waves 3–6
+are open.
 
 ### Wave 0 — Reply and close (no code, do first)
 
@@ -125,31 +126,20 @@ ctest entries, and a `-DMARKOFF_PERF` build compiles the parser and core
 libraries.
 
 
-### Wave 2 — Lifetime, ownership, and wrong UI state (Markoff)
+### Wave 2 — Lifetime, ownership, and wrong UI state (Markoff) — DONE 2026-10-19
 
-Crash class and consumer-visible lies. One commit each:
+| Row | Commit | What changed |
+|---|---|---|
+| M8 | `a910338d` | `MarkdownView` retires its `QPointer` on `destroyed()` and emits `documentChanged(nullptr)`; all eight holders are `QPointer`s; base/styled/source tests delete the document under a live view (both leaf tests SIGSEGV on the parent commit) |
+| M21 | `750b2236` | `Source::Editor` destroys its owned session in `~Editor`; styled `setSession` emits `sessionChanged` on the session's death |
+| M20 | `0a5425be` | `virtual Session *session()` / `setSession()` on `MarkdownView`; Source implements both |
+| M9 | `08fa50b2` | `canUndoD2()` / `canRedoD2()` / `d2UndoDepth()` share the selection predicates with `undoD2`/`redoD2`; base `canUndo()`/`canRedo()` honour read-only |
+| M23 | `15093905` | styled context reports the table + exact cell inside a frame, and keeps the previous context at/after a frame instead of inventing one |
+| M25 | `34c7e00c` | `StyledFindAdapter::rebindDocument()`; `setDocument` re-points it, so highlights follow a swap |
+| M24 | `0cbd6deb` | `ClipboardCodec::restoreBlockMarkers()` shared by styled and source; source copy now keeps list/quote markers |
+| M11 | `253f1889` | unimplemented find flags are refused loudly instead of silently downgraded; `supports()` added. Implementing/removing the enum values remains a decision |
 
-1. **M8** — `QPointer<MarkoffDocument>` + `destroyed` retire in
-   `MarkdownView::setDocument`, then the five holders. Add the missing
-   doc-destroyed regression test (the retired live-leaf test is gone with
-   the leaf).
-2. **M20** — `virtual Session *session()` / `setSession()` on
-   `MarkdownView`, including the Source leaf.
-3. **M21** — destroy the owned session in `Source::Editor` teardown;
-   `destroyed` → null + emit in Styled.
-4. **M9** — document-wide `canUndoD2()` / `canRedoD2()` (and a
-   `canRedoForBlock`), plus virtual availability on `MarkdownView`.
-5. **M11** — decide remove-vs-implement. Removing `Regex`/`WholeWords`/
-   `Backwards` and adding `supports(FindFlag)` is the boring option and
-   matches the code; fix the `FindController.h` comment either way.
-6. **M23** — reuse `selectionInTrustworthyRegion` in the styled/source
-   context path; leave row/col to canvas.
-7. **M24** — lift the marker-restore helper into core and call it from
-   both leaves; add a Source clipboard test.
-8. **M25** — rewire `m_findAdapter` in `setDocument`.
-
-Exit: ASAN run of the affected leaf tests; one consumer-shaped test that
-deletes the document while attached.
+Verification: full offscreen suite **95/95** in 38.27 s after M24/M11.
 
 ### Wave 3 — Hot path (Markoff)
 

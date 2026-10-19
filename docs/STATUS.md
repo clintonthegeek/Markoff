@@ -14,10 +14,12 @@ stay in Corbomite.
 
 The new workfront is Corbomite's consolidated asks of 2026-10-18. The triage
 board records a per-ask verdict against this tree, the already-closed rows,
-and a seven-wave order. **Wave 1 is complete** (M3, M4, M35, M33, M36, M32,
-M34, M28 — commits `0d974f1b`..`16e7bfe4`); the pin publication (Wave 0b) is
-done and the pin stays `e8a8e7d1`. Wave 0's answer-and-close reply and
-Waves 2–6 have not started.
+and a seven-wave order. **Waves 1 and 2 are complete** (Wave 1: M3, M4, M35, M33, M36, M32, M34,
+M28 — `0d974f1b`..`16e7bfe4`; Wave 2: M8, M21, M20, M9, M23, M25, M24,
+M11 — `a910338d`..`253f1889`); the pin publication (Wave 0b) is done and the
+pin stays `e8a8e7d1`. Wave 0's answer-and-close reply and Waves 3–6 have not
+started. M11's enum disposition (implement or remove the three unimplemented
+flags) stays a decision.
 
 The triage corrected the ask document's own evidence: its markoff-core
 `file:line` citations predate A13 and name files that do not exist at
@@ -47,8 +49,8 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 
 ## Latest verification
 
-2026-10-19, Wave 1: offscreen `scripts/run-tests.sh` passed **95/95** in
-30.60 s on `16e7bfe4` (wire `build-dev`, prefix `build-collabtext-alpha5/install`).
+2026-10-19, Waves 1–2: offscreen `scripts/run-tests.sh` passed **95/95** in
+38.27 s on `253f1889` (wire `build-dev`, prefix `build-collabtext-alpha5/install`).
 Also checked: `-DMARKOFF_BUILD_TESTS=OFF` configures with zero ctest entries;
 a `-DMARKOFF_PERF` build compiles parser and core.
 
