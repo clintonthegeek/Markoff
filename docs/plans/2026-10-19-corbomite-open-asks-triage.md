@@ -89,13 +89,19 @@ slice is one commit under the repo's own board.
 
 **Progress (2026-10-19):** Wave 0b done; Wave 1 done (`0d974f1b`..`16e7bfe4`);
 Wave 2 done (`a910338d`..`253f1889`); M30 done (`bc776efd`); M16's offset half
-done (`3739dd7f`); suite 95/95. Wave 0's reply, the rest of Wave 3, M31 and
-Waves 5–6 are open. In Graffodil, M5 (`79357fc`) and M6 (`fc778db`) are done on
-`main`.
+(`3739dd7f`) and M17's cache (`c68e6afd`) done; suite 95/95 on `c68e6afd`.
+Wave 0's reply is written; M13/M18, M31 and Waves 5–6 are open. In Graffodil,
+M5 (`79357fc`), M6 (`fc778db`) and punch-list batch 1 (`5c62d01`) are on `main`.
 
-### Wave 0 — Reply and close (no code, do first)
+### Wave 0 — Reply and close (no code) — WRITTEN 2026-10-19
 
-Send one reply that: confirms M38 option 1 (one card document; paint
+The reply is
+[`../handoff/2026-10-19-to-corbomite-open-asks-response.md`](../handoff/2026-10-19-to-corbomite-open-asks-response.md):
+per-ask status, the rows we closed, the decision answers (M38 option 1, M39
+deliberate, M26/M27.4 deferred) and what is scheduled. Send it from the
+consumer's session; nothing here is hidden from them.
+
+Original intent, kept for the record — send one reply that: confirms M38 option 1 (one card document; paint
 holds a non-owning `const MarkoffDocument *`; `renderInto` already
 guarantees it); states M39 is deliberate and keeps the documented split;
 closes M2, M10, M22 and M12's mechanism, and M1/M29 as already fixed at
