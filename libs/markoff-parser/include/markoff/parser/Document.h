@@ -234,6 +234,12 @@ public:
 
     /// Structured frontmatter as a YamlValue tree (preserves key order, nesting,
     /// node styles). Returns empty YamlValue on missing/malformed YAML.
+    ///
+    /// Thread-safe and lazy: the parse runs once under `std::call_once`, and
+    /// the value is published before the once flag is set, so concurrent
+    /// readers see either the parsed value or (once) wait for it — never a
+    /// default-constructed YamlValue. Safe to call from a worker thread while
+    /// other threads read the rest of the document.
     YamlValue parsedFrontmatter() const;
 
     /// Diagnostic string for the most recent parse error, or empty.

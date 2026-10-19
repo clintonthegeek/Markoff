@@ -14,9 +14,10 @@ stay in Corbomite.
 
 The new workfront is Corbomite's consolidated asks of 2026-10-18. The triage
 board records a per-ask verdict against this tree, the already-closed rows,
-and a seven-wave order. No wave has started. First actions: send the
-answer-and-close reply (Wave 0), then the parser and build-hygiene fixes
-(Wave 1).
+and a seven-wave order. **Wave 1 is in progress:** M3 and M4 landed
+(parser state contract); the remaining Wave 1 rows are M35, M33's test,
+M36, M32, M34 and M28. Wave 0 (the answer-and-close reply) and Waves 2–6
+have not started; Wave 0b is done.
 
 The triage corrected the ask document's own evidence: its markoff-core
 `file:line` citations predate A13 and name files that do not exist at

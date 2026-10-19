@@ -87,6 +87,8 @@ clean-prefix `find_package(Corbomite)` cannot resolve the imported
 Waves are ordered by risk and unblocking value, not by ask number. Each
 slice is one commit under the repo's own board.
 
+**Wave 1 progress (2026-10-19):** M3 done, M4 done. Remaining rows below.
+
 ### Wave 0 — Reply and close (no code, do first)
 
 Send one reply that: confirms M38 option 1 (one card document; paint

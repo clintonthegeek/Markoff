@@ -6,6 +6,8 @@
 #include <QStringList>
 #include <QRegularExpression>
 
+#include <mutex>
+
 namespace Markoff {
 
 struct Document::Private {
@@ -19,10 +21,12 @@ struct Document::Private {
 
     DocumentQueryResult queries;
 
-    // Lazy-parsed
+    // Lazy-parsed frontmatter. Guarded so concurrent readers cannot race, and
+    // the value is written before the once flag publishes it (the previous
+    // flag-then-fill order could hand a second reader an empty YamlValue).
+    mutable std::once_flag parseOnce;
     mutable YamlValue cachedParsed;
     mutable QString cachedParseError;
-    mutable bool parsedOnce = false;
 };
 
 Document::Document()
@@ -376,15 +380,12 @@ QString Document::extractSubpath(const QString &subpath) const
 
 YamlValue Document::parsedFrontmatter() const
 {
-    if (d->parsedOnce)
-        return d->cachedParsed;
-
-    d->parsedOnce = true;
-    const QString raw = d->frontmatter;
-    if (raw.isEmpty())
-        return {};
-
-    d->cachedParsed = YamlValue::parse(raw, &d->cachedParseError);
+    std::call_once(d->parseOnce, [this] {
+        const QString raw = d->frontmatter;
+        if (raw.isEmpty())
+            return;
+        d->cachedParsed = YamlValue::parse(raw, &d->cachedParseError);
+    });
     return d->cachedParsed;
 }
 
