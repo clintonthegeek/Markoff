@@ -76,7 +76,11 @@ Punch list (24 rows): 15 Graffodil (all still present; two ask details are
 wrong — `edgeActionAt` does not copy paths, and `SpatialGrid` is not a
 `BatchNodeItem` member), 8 packaging/vendoring rows across collabtext,
 jkqtmathtext and rapidyaml, and 1 Markoff duplicate `Theme` member. Batch
-them by repo; do not open one task per row.
+them by repo; do not open one task per row. The collabtext integration of
+2026-10-19 added one more family item: `Corbomite/cmake/CorbomiteConfig.cmake.in`
+includes `CorbomiteTargets.cmake` without `find_dependency(collabtext)`, so a
+clean-prefix `find_package(Corbomite)` cannot resolve the imported
+`CollabText::Core` target — Corbomite-side, not an ask.
 
 ## Order
 
