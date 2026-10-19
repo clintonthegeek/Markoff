@@ -76,12 +76,10 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 
 ## Latest verification
 
-2026-10-19, M13/M18/M17 (`b563e624`): offscreen `scripts/run-tests.sh`
-passed **98/98** on the current tree (wire `build-dev`). Before/after
-numbers on the board's Wave 3 section. Note: `tst_canvas_render` aborts at
-process exit roughly 1 run in 30 — a pre-existing use-after-free in vendored
-jkqtmathtext's static teardown (ASan-confirmed, exit-time only), unrelated
-to these changes.
+2026-10-19, M13/M18/M17 and the content-version work (`b563e624`,
+`c215ccf3`, `092cd1d5`): offscreen `scripts/run-tests.sh` passed **98/98**.
+Before/after numbers on the board's Wave 3 section. The `tst_canvas_render`
+exit-time abort (vendored jkqtmathtext globals) is fixed in `673b1727`.
 
 2026-10-19, evaluation pass: offscreen `scripts/run-tests.sh` passed **98/98**
 in 30.60 s on the current tree (wire `build-dev`). Read-only audit of all
