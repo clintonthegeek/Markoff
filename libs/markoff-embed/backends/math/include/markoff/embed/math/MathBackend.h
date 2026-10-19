@@ -17,6 +17,8 @@ public:
         return {QStringLiteral("math"), QStringLiteral("latex"), QStringLiteral("katex")};
     }
 
+    QString name() const override { return QStringLiteral("jkqtmathtext"); }
+
     Markoff::RenderedBlock render(const Markoff::RenderRequest &request) override;
 };
 

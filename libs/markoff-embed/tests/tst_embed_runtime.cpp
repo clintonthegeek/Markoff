@@ -24,6 +24,7 @@ public:
         : m_renders(renders), m_version(version) {}
 
     QStringList languages() const override { return {QStringLiteral("fake")}; }
+    QString name() const override { return QStringLiteral("fake-engine"); }
     int contractVersion() const override { return m_version; }
 
     RenderedBlock render(const RenderRequest &request) override
@@ -195,15 +196,21 @@ private slots:
         QCOMPARE(runtime.artifact(c).state, EmbedArtifact::State::Ready);
     }
 
-    void engineDescriptionNamesTheBackendAndContract()
+    void engineDescriptionNamesTheBackend()
     {
         std::atomic<int> renders{0};
         CodeBlockProcessorRegistry registry;
         registry.registerProcessor(std::make_shared<FakeSvgProcessor>(&renders));
         Embed::EmbedRuntime runtime(&registry);
+
         QVERIFY(runtime.supportedLanguages().contains(QStringLiteral("fake")));
-        QVERIFY(runtime.engineDescription(QStringLiteral("fake"))
-                    .contains(QStringLiteral("embed contract")));
+        // The contract asks for the engine's name, so a host can explain
+        // which engine rendered a block.
+        QCOMPARE(runtime.engineDescription(QStringLiteral("fake")),
+                 QStringLiteral("fake-engine"));
+        QCOMPARE(runtime.engineDescription(QStringLiteral("FAKE")),
+                 QStringLiteral("fake-engine"));
+        // An unsupported language has no engine to name.
         QVERIFY(runtime.engineDescription(QStringLiteral("graphviz")).isEmpty());
     }
 };

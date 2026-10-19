@@ -64,7 +64,12 @@ EmbedArtifact EmbedRuntime::artifact(const RenderRequest &request) const
 void EmbedRuntime::request(const RenderRequest &request)
 {
     const QString key = embedArtifactKey(request);
-    if (m_cache.contains(key) || m_pending.contains(key))
+    if (m_cache.contains(key)) {
+        // A cache hit is a use: refresh the entry's recency.
+        touch(key);
+        return;
+    }
+    if (m_pending.contains(key))
         return;
 
     const auto fail = [this, key](const QString &error) {
@@ -99,6 +104,10 @@ void EmbedRuntime::request(const RenderRequest &request)
     pending.state = EmbedArtifact::State::Pending;
     m_cache.insert(key, pending);
     m_pending.insert(key);
+    // Recency is the order of requests, not of completions: a render that
+    // finishes late is still the oldest request, so it is the first eviction
+    // candidate.
+    m_lru.append(key);
 
     QPointer<EmbedRuntime> alive(this);
     m_pool.start([alive, processor, request, key] {
@@ -124,6 +133,8 @@ QString EmbedRuntime::engineDescription(const QString &language) const
     const auto processor = m_registry
         ? m_registry->processorFor(language.toLower()) : nullptr;
     if (!processor) return {};
+    const QString engine = processor->name();
+    if (!engine.isEmpty()) return engine;
     return QStringLiteral("%1 (embed contract %2)")
         .arg(language.toLower())
         .arg(processor->contractVersion());
@@ -184,7 +195,11 @@ void EmbedRuntime::store(const QString &key, EmbedArtifact artifact)
 {
     m_cache.insert(key, artifact);
     m_pending.remove(key);
-    touch(key);
+    // Recency is request order, not completion order: a render that finishes
+    // late is still the oldest request. Only add the key if it is not
+    // already tracked (a request registers it up front).
+    if (!m_lru.contains(key))
+        m_lru.append(key);
     evictIfNeeded();
 }
 
@@ -196,12 +211,26 @@ void EmbedRuntime::touch(const QString &key)
 
 void EmbedRuntime::evictIfNeeded()
 {
-    while (m_cache.size() > m_limit && !m_lru.isEmpty()) {
-        const QString victim = m_lru.first();
-        if (m_pending.contains(victim))
+    // The limit counts settled artifacts: a render still in flight does not
+    // occupy a cache slot, and it is never the victim. Eviction takes the
+    // oldest request first, so the result does not depend on which worker
+    // finished first.
+    int settled = 0;
+    for (auto it = m_cache.cbegin(); it != m_cache.cend(); ++it)
+        if (it->state != EmbedArtifact::State::Pending) ++settled;
+    while (settled > m_limit) {
+        QString victim;
+        for (const QString &key : m_lru) {
+            const auto entry = m_cache.constFind(key);
+            if (entry == m_cache.cend()) continue;
+            if (entry->state == EmbedArtifact::State::Pending) continue;
+            victim = key;
             break;
-        m_lru.removeFirst();
+        }
+        if (victim.isEmpty()) break;
+        m_lru.removeAll(victim);
         m_cache.remove(victim);
+        --settled;
     }
 }
 

@@ -12,7 +12,12 @@ namespace Markoff {
 /// Version of the renderer contract. A runtime refuses a backend built against
 /// a different version instead of calling through a mismatched vtable. Bump on
 /// any non-additive change to RenderRequest/RenderedBlock/this interface.
-inline constexpr int kEmbedContractVersion = 2;
+///
+/// 3 added `CodeBlockProcessor::name()`. A virtual with a default
+/// implementation still changes the vtable, so a backend built against
+/// version 2 must be recompiled — the version check is what makes that
+/// refusal explicit rather than a silent mismatch.
+inline constexpr int kEmbedContractVersion = 3;
 
 /// What a backend needs to render one block. Everything a renderer may vary on
 /// is here: source, available width, DPI scale, and the resolved colours (a
@@ -40,6 +45,12 @@ public:
     /// Languages this backend answers for, lower-case, without fences.
     /// Aliases are allowed ("mermaid", "mmd").
     virtual QStringList languages() const = 0;
+
+    /// Human-readable name of the engine behind this backend ("jkqtmathtext",
+    /// "mermaid-rs"). For diagnostics — the runtime reports it so a host can
+    /// explain which engine rendered a block. Empty is allowed: the backend
+    /// may not have a name worth showing.
+    virtual QString name() const { return {}; }
 
     /// Contract the backend was built against (default: this header's).
     virtual int contractVersion() const { return kEmbedContractVersion; }
