@@ -57,8 +57,12 @@ private:
     [[nodiscard]] ActionPublicationResult finishGap(
         const PreparedStorageTransaction& transaction,
         const AcceptedRevision& revision);
+    /// Validate a prepared MAB transaction against an already-read recovery
+    /// state. The caller (publish/publishGap) holds the state; passing it in
+    /// keeps one publish to a single recovery read.
     [[nodiscard]] CollabText::Result<void> validate(
-        const PreparedStorageTransaction& transaction) const;
+        const PreparedStorageTransaction& transaction,
+        const StorageRecoveryState& recovery) const;
     [[nodiscard]] CollabText::Result<void> validateGap(
         const PreparedStorageTransaction& transaction) const;
 

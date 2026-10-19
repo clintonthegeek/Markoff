@@ -71,7 +71,8 @@ ActionPublicationCoordinator::ActionPublicationCoordinator(DocumentStorageSessio
 {}
 
 CollabText::Result<void> ActionPublicationCoordinator::validate(
-    const PreparedStorageTransaction& transaction) const
+    const PreparedStorageTransaction& transaction,
+    const StorageRecoveryState& recovery) const
 {
     using namespace CollabText;
     const std::string document = documentName(m_session->scope().documentKey);
@@ -84,48 +85,53 @@ CollabText::Result<void> ActionPublicationCoordinator::validate(
     if (bundle.value().actionId != transaction.transactionId)
         return Error(ErrorCode::pin_conflict,
                      "MAB action ID does not match prepared transaction ID");
-    auto recovery = m_session->readRecoveryState();
-    if (!recovery.ok()) return recovery.error();
-    auto revisions = validateAcceptedPrefixRevisions(recovery.value());
+    auto revisions = validateAcceptedPrefixRevisions(recovery);
     if (!revisions.ok()) return revisions.error();
     if (bundle.value().kind == ActionKind::initialImport) {
         const auto source = SourceSnapshotCodec::decode(
             bundle.value().sourceSnapshot, document, m_session->scope().epoch);
         if (!source.ok()) return source.error();
-        if (recovery.value().initialImport) {
-            if (recovery.value().initialImport->transactionId != transaction.transactionId
-                || recovery.value().initialImport->sourceMarkdown
+        if (recovery.initialImport) {
+            if (recovery.initialImport->transactionId != transaction.transactionId
+                || recovery.initialImport->sourceMarkdown
                     != source.value().originalMarkdown)
                 return Error(ErrorCode::pin_conflict,
                              "initial MAB differs from the durable import intent");
         } else {
             const bool alreadyAccepted = std::any_of(
-                recovery.value().acceptedRecords.begin(),
-                recovery.value().acceptedRecords.end(),
+                recovery.acceptedRecords.begin(),
+                recovery.acceptedRecords.end(),
                 [&](const AcceptedStorageRecord& record) {
                     return record.transactionId == transaction.transactionId
-                        && record.format == transaction.sharedRecordFormat
-                        && record.bytes == transaction.sharedRecord;
+                    && record.format == transaction.sharedRecordFormat
+                    && record.bytes == transaction.sharedRecord;
                 });
             if (!alreadyAccepted)
                 return Error(ErrorCode::history_unavailable,
                              "initial MAB has no matching durable import intent");
         }
     } else {
-        if (recovery.value().initialImport)
+        if (recovery.initialImport)
             return Error(ErrorCode::history_unavailable,
                          "the pending initial import must be published before edits");
-        bool hasAcceptedInitialImport = false;
-        for (const auto& record : recovery.value().acceptedRecords) {
-            if (record.format != QByteArrayLiteral("MAB/3"))
-                continue;
-            const auto acceptedBundle = ActionBundleCodec::decode(
-                record.bytes, document, m_session->scope().epoch);
-            if (!acceptedBundle.ok()) return acceptedBundle.error();
-            if (acceptedBundle.value().kind == ActionKind::initialImport)
-                hasAcceptedInitialImport = true;
-        }
-        if (!hasAcceptedInitialImport)
+        // The first accepted MAB action must be the authorized initial import,
+        // and records are append-ordered, so the first MAB record carries that
+        // fact. Decoding only that record keeps publication O(1) in the
+        // accepted prefix; the previous loop decoded every record on every
+        // publish (O(history) per keystroke). A history whose first MAB is not
+        // the import is rejected here exactly as the loop rejected it.
+        const auto firstMab = std::find_if(
+            recovery.acceptedRecords.begin(), recovery.acceptedRecords.end(),
+            [&](const AcceptedStorageRecord& record) {
+                return record.format == QByteArrayLiteral("MAB/3");
+            });
+        if (firstMab == recovery.acceptedRecords.end())
+            return Error(ErrorCode::history_unavailable,
+                         "the first accepted MAB action must be an authorized initial import");
+        const auto acceptedBundle = ActionBundleCodec::decode(
+            firstMab->bytes, document, m_session->scope().epoch);
+        if (!acceptedBundle.ok()) return acceptedBundle.error();
+        if (acceptedBundle.value().kind != ActionKind::initialImport)
             return Error(ErrorCode::history_unavailable,
                          "the first accepted MAB action must be an authorized initial import");
     }
@@ -339,7 +345,7 @@ ActionPublicationResult ActionPublicationCoordinator::publish(
             Error(ErrorCode::counter_regression,
                   "action was staged against a stale accepted prefix"));
     }
-    auto valid = validate(transaction);
+    auto valid = validate(transaction, recovery.value());
     if (!valid.ok()) {
         if (!transaction.reservations.empty()) m_blocked = true;
         return result(ActionPublicationState::rejected, valid.error());
@@ -465,7 +471,7 @@ ActionPublicationResult ActionPublicationCoordinator::recover(
     }
     const bool isGap = transaction.sharedRecordFormat == QByteArrayLiteral("MTG/1")
         || transaction.sharedRecordFormat == QByteArrayLiteral("MMG/1");
-    auto valid = isGap ? validateGap(transaction) : validate(transaction);
+    auto valid = isGap ? validateGap(transaction) : validate(transaction, recovery.value());
     if (!valid.ok()) {
         m_blocked = true;
         return result(ActionPublicationState::rejected, valid.error());
