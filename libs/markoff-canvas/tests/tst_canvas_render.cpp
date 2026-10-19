@@ -79,12 +79,38 @@ public:
     }
 };
 
+/// The canvas's legacy mermaid seam: a consumer-injected renderer that turns
+/// a fenced mermaid block's source into a pixmap.
+class FakeMermaidRenderer final : public Markoff::Canvas::MermaidRenderer {
+public:
+    QPixmap render(const QString &) const override
+    {
+        QPixmap pixmap(40, 20);
+        pixmap.fill(QColor(0x22, 0x77, 0x33));
+        return pixmap;
+    }
+};
+
 int countColorPixels(const QImage &image, const QColor &color)
 {
     int count = 0;
     for (int y = 0; y < image.height(); ++y)
         for (int x = 0; x < image.width(); ++x)
             if (image.pixel(x, y) == color.rgb()) ++count;
+    return count;
+}
+
+/// Painted text is antialiased, so a colour match has to accept the blends
+/// between the ink colour and the background. This counts the pixels that are
+/// "mostly red" — ink red on white, in any blend.
+int countReddishPixels(const QImage &image)
+{
+    int count = 0;
+    for (int y = 0; y < image.height(); ++y)
+        for (int x = 0; x < image.width(); ++x) {
+            const QColor c = image.pixelColor(x, y);
+            if (c.red() > 140 && c.green() < 130 && c.blue() < 130) ++count;
+        }
     return count;
 }
 
@@ -357,6 +383,149 @@ private slots:
         // colour, so assert text exists above the table's row band as well as
         // inside it by checking the full image has a healthy amount of ink.
         QVERIFY2(countDarkPixels(painted) > 200, "cell/paragraph text did not paint");
+    }
+
+    // The legacy mermaid seam still paints: an injected renderer replaces the
+    // fenced block's source with its pixmap while the caret is outside it.
+    void mermaidBlockPaintsTheInjectedRendererPixmap()
+    {
+        auto fixture = openDocument(QByteArrayLiteral(
+            "intro\n\n```mermaid\nA-->B\n```\n\noutro"));
+        FakeMermaidRenderer renderer;
+        Markoff::Canvas::View view;
+        view.resize(600, 400);
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        theme.setColor(Markoff::Theme::Slot::EditorBackground, Qt::white);
+        theme.setColor(Markoff::Theme::Slot::TextDefault, QColor(20, 20, 20));
+        view.setTheme(theme);
+        view.setMermaidRenderer(&renderer);
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto blocks = fixture.document->iterateBlocks();
+        QCOMPARE(blocks.size(), size_t{3});
+        const Markoff::BlockId fence = blocks[1];
+        view.setCaretPosition(blocks[0], 0);   // caret outside the fence
+        QCoreApplication::processEvents();
+
+        QVERIFY2(view.isMermaidPixmapActive(fence),
+                 "the injected mermaid renderer did not take over the fence");
+        QVERIFY2(countColorPixels(view.grab().toImage(), QColor(0x22, 0x77, 0x33)) > 50,
+                 "the mermaid pixmap did not paint");
+    }
+
+    // Without a renderer the same block keeps painting its source — a service
+    // miss renders plain code, never a placeholder box.
+    void mermaidBlockFallsBackToSourceWithoutARenderer()
+    {
+        auto fixture = openDocument(QByteArrayLiteral(
+            "intro\n\n```mermaid\nA-->B\n```\n\noutro"));
+        Markoff::Canvas::View view;
+        view.resize(600, 400);
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        theme.setColor(Markoff::Theme::Slot::EditorBackground, Qt::white);
+        theme.setColor(Markoff::Theme::Slot::TextDefault, QColor(20, 20, 20));
+        view.setTheme(theme);
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto blocks = fixture.document->iterateBlocks();
+        view.setCaretPosition(blocks[0], 0);
+        QCoreApplication::processEvents();
+
+        QVERIFY2(!view.isMermaidPixmapActive(blocks[1]),
+                 "a mermaid block claimed a pixmap with no renderer set");
+        QVERIFY2(countDarkPixels(view.grab().toImage()) > 50,
+                 "the mermaid source text did not paint");
+    }
+
+    // An image block with no lookup paints the placeholder box; the label is
+    // the parsed alt text.
+    void imageBlockPaintsThePlaceholderWithoutALookup()
+    {
+        auto fixture = openDocument(QByteArrayLiteral(
+            "![a picture](pictures/cat.png)\n\ntail"));
+        Markoff::Canvas::View view;
+        view.resize(600, 400);
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        theme.setColor(Markoff::Theme::Slot::EditorBackground, Qt::white);
+        theme.setColor(Markoff::Theme::Slot::TextDefault, QColor(20, 20, 20));
+        view.setTheme(theme);
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto blocks = fixture.document->iterateBlocks();
+        QCOMPARE(blocks.size(), size_t{2});
+        const Markoff::BlockId image = blocks[0];
+        QVERIFY2(view.isImagePlaceholderActive(image),
+                 "an image block with no lookup did not paint its placeholder");
+        QVERIFY2(!view.isImagePixmapActive(image),
+                 "an image block with no lookup claimed a resolved pixmap");
+    }
+
+    // With a lookup that resolves, the image paints instead of the
+    // placeholder box.
+    void imageBlockPaintsTheResolvedPixmap()
+    {
+        auto fixture = openDocument(QByteArrayLiteral(
+            "![a picture](pictures/cat.png)\n\ntail"));
+        Markoff::Canvas::View view;
+        view.resize(600, 400);
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        theme.setColor(Markoff::Theme::Slot::EditorBackground, Qt::white);
+        theme.setColor(Markoff::Theme::Slot::TextDefault, QColor(20, 20, 20));
+        view.setTheme(theme);
+        view.setImageResourceLookup([](const QString &target) {
+            QPixmap pixmap(60, 40);
+            pixmap.fill(QColor(0xAA, 0x33, 0x55));
+            return pixmap;
+        });
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto blocks = fixture.document->iterateBlocks();
+        const Markoff::BlockId image = blocks[0];
+        QVERIFY2(view.isImagePixmapActive(image),
+                 "the resolved image did not replace the placeholder");
+        QVERIFY2(!view.isImagePlaceholderActive(image),
+                 "the placeholder stayed active with a resolved pixmap");
+        QVERIFY2(countColorPixels(view.grab().toImage(), QColor(0xAA, 0x33, 0x55)) > 50,
+                 "the resolved image pixmap did not paint");
+    }
+
+    // A theme switch restyles the document: the new text colour paints.
+    void themeSwitchRepaintsWithTheNewColours()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("hello world"));
+        Markoff::Canvas::View view;
+        view.resize(520, 300);
+        auto theme = [] {
+            Markoff::Theme t = Markoff::Theme::defaultLight();
+            t.setColor(Markoff::Theme::Slot::EditorBackground, Qt::white);
+            t.setColor(Markoff::Theme::Slot::TextDefault, QColor(20, 20, 20));
+            return t;
+        }();
+        view.setTheme(theme);
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const int darkBefore = countDarkPixels(view.grab().toImage());
+        QVERIFY2(darkBefore > 20, "the first theme's text did not paint");
+        QCOMPARE(countReddishPixels(view.grab().toImage()), 0);
+
+        theme.setColor(Markoff::Theme::Slot::TextDefault, QColor(200, 30, 30));
+        view.setTheme(theme);
+        QCoreApplication::processEvents();
+
+        QVERIFY2(countReddishPixels(view.grab().toImage()) > 20,
+                 "the theme switch did not repaint with the new text colour");
+        QVERIFY2(countDarkPixels(view.grab().toImage()) < darkBefore,
+                 "the old text colour kept painting after the theme switch");
     }
 };
 
