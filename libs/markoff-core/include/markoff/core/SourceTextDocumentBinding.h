@@ -3,6 +3,7 @@
 
 #include <QPointer>
 #include <optional>
+#include <vector>
 
 #include <QByteArray>
 #include <QHash>
@@ -12,6 +13,7 @@
 #include <QTextDocument>
 #include <QtGlobal>
 
+#include <markoff/core/Detail/FlatBlockResolve.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/MarkoffCoreExport.h>
 #include <markoff/core/Session.h>
@@ -114,6 +116,23 @@ private:
         Markoff::ScopedTextPosition anchor;
         Markoff::ScopedTextPosition active;
     };
+    /// Cached index over the sep view (the widget flat view). The view text and
+    /// the per-block (byte, UTF-16) offset tables are one projection,
+    /// invalidated together, keyed on the document's content version
+    /// (`d2EditSequence` — advanced by every mutation path, remote application
+    /// included). Replaces the O(blocks) sep walks with a binary search.
+    struct SepViewIndex {
+        quint64 version = 0;
+        bool valid = false;
+        QString view;                     ///< widgetFlatView decoded
+        QByteArray viewBytes;             ///< widgetFlatView bytes
+        std::vector<Markoff::BlockId> order;
+        std::vector<quint32> byteStart;   ///< block start in viewBytes
+        std::vector<quint32> qtStart;     ///< block start in view (UTF-16)
+        std::vector<quint32> byteLen;
+        std::vector<quint32> qtLen;
+        int notFoundPos = 0;              ///< sepViewPosOf fallback (view + seps)
+    };
     std::optional<SavedViewSelection> m_savedViewSelection;
 
     /// Called whenever the document or text-document pointer changes.
@@ -132,9 +151,19 @@ private:
     void syncFromSession();
 
     /// Sep-view (QTextDocument, UTF-16) position of `byteInBlock` within
-    /// `block`: sum of each preceding block's UTF-16 length + 2 per "\n\n"
-    /// separator, plus the in-block UTF-16 offset.
+    /// `block`: sum of each preceding block's UTF-16 length + 1 per '\n'
+    /// separator, plus the in-block UTF-16 offset. O(blocks) cheap compares
+    /// plus one in-block conversion — the index supplies the offsets.
     int sepViewPosOf(Markoff::BlockId block, int byteInBlock) const;
+
+    /// The cached sep-view index, rebuilt when the document's content version
+    /// moves. Never returns a stale view.
+    const SepViewIndex &sepViewIndex() const;
+
+    /// Binary-search replacement for Detail::findBlockAtSepByte over the
+    /// cached index. Same bias semantics.
+    std::optional<Markoff::Detail::BlockHit> findBlockAtSepByteCached(
+        quint32 sepOff, bool biasForward) const;
 
     /// Map a no-separator global byte offset to a sep-view QTextDocument
     /// position.
@@ -187,6 +216,8 @@ private:
     /// Set by a structural op to declare the intended post-edit caret; resolved
     /// + emitted at the tail of onD2DocumentChanged once the reverse diff settles.
     std::optional<PendingCaret> m_pendingCaret;
+
+    mutable SepViewIndex m_sepIndex;
 };
 
 }  // namespace Markoff

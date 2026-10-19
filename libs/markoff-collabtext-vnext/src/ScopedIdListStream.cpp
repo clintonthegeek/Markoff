@@ -163,26 +163,20 @@ CollabText::Result<LocalListOperation> ScopedIdListStream::insertAfter(
         if (!resolved.ok()) return resolved.error();
         anchor = std::move(resolved).value();
     }
-    auto before = m_engine->visible_entries();
-    if (!before.ok()) return before.error();
     auto operation = m_engine->try_insert_after(anchor, applicationValue);
     if (!operation.ok()) return operation.error();
-    auto afterEntries = m_engine->visible_entries();
-    if (!afterEntries.ok()) return afterEntries.error();
-    std::optional<BlockIdentity> inserted;
-    for (const auto& entry : afterEntries.value()) {
-        const bool existed = std::any_of(before.value().begin(), before.value().end(),
-            [&](const auto& prior) { return prior.identity == entry.identity; });
-        if (existed) continue;
-        if (inserted)
-            return CollabText::Error(CollabText::ErrorCode::invalid_identity,
-                                     "list insertion produced multiple new elements");
-        inserted = BlockIdentity{entry.identity.actor, entry.identity.counter};
-    }
-    if (!inserted)
+    // The insert operation's identity is the inserted element's identity: the
+    // engine mints one fresh element identity per insert, and remote dedup
+    // matches envelopes on it. Deriving it here replaces the previous
+    // double visible_entries() snapshot diff (two O(N) copies plus an O(N^2)
+    // compare per inserted block — a k-block paste was O(k*N^2)). The engine
+    // has just inserted the element, so no existence check is owed.
+    const auto identity = CollabText::Crdt::idlist_op_identity(operation.value());
+    if (!identity.actor.valid() || identity.counter == 0)
         return CollabText::Error(CollabText::ErrorCode::invalid_identity,
                                  "list insertion produced no structural element");
-    return wrap(std::move(operation).value(), inserted);
+    return wrap(std::move(operation).value(),
+                BlockIdentity{identity.actor, identity.counter});
 }
 
 CollabText::Result<LocalListOperation> ScopedIdListStream::remove(

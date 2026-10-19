@@ -448,6 +448,67 @@ private Q_SLOTS:
         QCOMPARE(documentB->blockText(originalBlocks[1]), QByteArrayLiteral("Bbeta"));
     }
 
+    void remote_action_bumps_the_content_version()
+    {
+        // The cache-key contract M13/M18 depend on: every mutation path,
+        // remote application included, advances blockEditSequence /
+        // structuralEditSequence, so d2EditSequence() is a sound cache key.
+        const QString key = QStringLiteral("remote-bumps-version");
+        auto providerA = VNext::makeEphemeralDocumentStorageProvider();
+        auto providerB = VNext::makeEphemeralDocumentStorageProvider();
+        QVERIFY(providerA.ok());
+        QVERIFY(providerB.ok());
+        auto openedA = MarkoffDocument::open(*providerA.value(), {key, 1},
+            VNext::StorageMode::ephemeral);
+        auto openedB = MarkoffDocument::open(*providerB.value(), {key, 1},
+            VNext::StorageMode::ephemeral);
+        QVERIFY(openedA.ok());
+        QVERIFY(openedB.ok());
+        auto a = std::move(openedA).value();
+        auto b = std::move(openedB).value();
+
+        QSignalSpy aActions(a.get(), &MarkoffDocument::localActionEnvelopeCommitted);
+        QCOMPARE(a->importInitialMarkdown(QByteArrayLiteral("alpha\n\nbeta")).state,
+            VNext::ActionPublicationState::committed);
+        QVERIFY(b->routeRemoteAction(aActions.takeFirst().at(1).toByteArray()).state
+            == RemoteActionRouteState::committed);
+        const auto blocks = b->iterateBlocks();
+        QCOMPARE(blocks.size(), size_t{2});
+
+        const auto versionBefore = b->d2EditSequence();
+        const auto structuralBefore = b->structuralEditSequence();
+        const auto firstBefore = b->blockEditSequence(blocks[0]);
+        const auto secondBefore = b->blockEditSequence(blocks[1]);
+
+        // A text-only remote edit bumps exactly the touched block's sequence.
+        QCOMPARE(a->applyBlockEdit({blocks[0], 5, 0, QByteArrayLiteral("!")}).state,
+            VNext::ActionPublicationState::committed);
+        QCOMPARE(aActions.size(), 1);
+        const auto mabA = aActions.takeFirst().at(1).toByteArray();
+        QCOMPARE(b->routeRemoteAction(mabA).state, RemoteActionRouteState::committed);
+        QCOMPARE(b->blockText(blocks[0]), QByteArrayLiteral("alpha!"));
+        QCOMPARE(b->blockEditSequence(blocks[0]), firstBefore + 1);
+        QCOMPARE(b->blockEditSequence(blocks[1]), secondBefore);
+        QCOMPARE(b->structuralEditSequence(), structuralBefore);
+        QVERIFY(b->d2EditSequence() > versionBefore);
+
+        // A structural remote action (split) advances the structural sequence.
+        QSignalSpy splitActions(a.get(), &MarkoffDocument::localActionEnvelopeCommitted);
+        QCOMPARE(a->applyBlockSplit({blocks[0], 3, 0, {}},
+            BlockKind::Paragraph).state,
+            VNext::ActionPublicationState::committed);
+        QCOMPARE(splitActions.size(), 1);
+        QCOMPARE(b->routeRemoteAction(splitActions.takeFirst().at(1).toByteArray()).state,
+            RemoteActionRouteState::committed);
+        QCOMPARE(b->iterateBlocks().size(), size_t{3});
+        QVERIFY(b->structuralEditSequence() > structuralBefore);
+
+        // Re-routing an already-accepted envelope is idempotent: no second bump.
+        const auto settled = b->d2EditSequence();
+        QCOMPARE(b->routeRemoteAction(mabA).state, RemoteActionRouteState::committed);
+        QCOMPARE(b->d2EditSequence(), settled);
+    }
+
     void deferred_remote_action_backpressure_preserves_retry()
     {
         const QString key = QStringLiteral("deferred-backpressure");

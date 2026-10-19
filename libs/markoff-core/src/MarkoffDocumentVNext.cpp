@@ -58,6 +58,17 @@ struct MarkoffDocument::Private {
     QHash<BlockId, quint64> blockEditSequences;
     quint64 structuralEditSequence = 0;
     mutable QHash<BlockId, QPair<quint64, QList<SourceSpan>>> inlineSpanCache;
+    // Flat-view caches. Keyed on d2EditSequence(), which every content-bearing
+    // mutation path advances: local edits bump blockEditSequences /
+    // structuralEditSequence, and acceptRemoteAction bumps them for remote
+    // actions too (MarkoffDocumentVNext.cpp:1885-1890). Attribute-only edits
+    // bump nothing and cannot change these views (they are block text only).
+    mutable QByteArray cachedWidgetFlatView;
+    mutable QByteArray cachedFlatView;
+    mutable quint64 widgetFlatViewVersion = 0;
+    mutable quint64 flatViewVersion = 0;
+    mutable bool widgetFlatViewValid = false;
+    mutable bool flatViewValid = false;
     QByteArray originalMarkdown;
     QHash<BlockId, SourceBlock> sourceBlocks;
     std::vector<BlockId> sourceBlockOrder;
@@ -1040,6 +1051,13 @@ void MarkoffDocument::compensateReplacementAction(
     } else {
         d->sourcePristine = false;
     }
+    // A replacement compensation can restore or remove blocks (the idList
+    // groups of a merge/split) and rewrite any block's text. Advance the
+    // content version wholesale so every cache keyed on blockEditSequence /
+    // d2EditSequence (flat views, inline spans, canvas block layout) sees the
+    // change instead of serving the pre-undo projection.
+    for (const auto block : iterateBlocks()) ++d->blockEditSequences[block];
+    ++d->structuralEditSequence;
     emit d2DocumentChanged();
     emit documentChanged();
     QList<BlockId> changedBlocks;
@@ -4970,6 +4988,9 @@ QList<SourceSpan> MarkoffDocument::inlineSpansFor(BlockId id) const
 
 QByteArray MarkoffDocument::flatView() const
 {
+    const quint64 version = d2EditSequence();
+    if (d->flatViewValid && d->flatViewVersion == version)
+        return d->cachedFlatView;
     QByteArray result;
     const auto blocks = iterateBlocks();
     for (size_t i = 0; i < blocks.size(); ++i) {
@@ -4977,11 +4998,17 @@ QByteArray MarkoffDocument::flatView() const
             result.append("\n\n");
         result.append(blockText(blocks[i]));
     }
+    d->cachedFlatView = result;
+    d->flatViewVersion = version;
+    d->flatViewValid = true;
     return result;
 }
 
 QByteArray MarkoffDocument::widgetFlatView() const
 {
+    const quint64 version = d2EditSequence();
+    if (d->widgetFlatViewValid && d->widgetFlatViewVersion == version)
+        return d->cachedWidgetFlatView;
     QByteArray result;
     const auto blocks = iterateBlocks();
     for (size_t i = 0; i < blocks.size(); ++i) {
@@ -4989,6 +5016,9 @@ QByteArray MarkoffDocument::widgetFlatView() const
             result.append('\n');
         result.append(blockText(blocks[i]));
     }
+    d->cachedWidgetFlatView = result;
+    d->widgetFlatViewVersion = version;
+    d->widgetFlatViewValid = true;
     return result;
 }
 
