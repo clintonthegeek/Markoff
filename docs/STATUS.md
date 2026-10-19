@@ -17,7 +17,8 @@ board records a per-ask verdict against this tree, the already-closed rows,
 and a seven-wave order. **Waves 1 and 2 are complete** (Wave 1: M3, M4, M35, M33, M36, M32, M34,
 M28 — `0d974f1b`..`16e7bfe4`; Wave 2: M8, M21, M20, M9, M23, M25, M24,
 M11 — `a910338d`..`253f1889`); the pin publication (Wave 0b) is done and the
-pin stays `e8a8e7d1`. Wave 0's answer-and-close reply and Waves 3–6 have not
+pin stays `e8a8e7d1`. M30 (parser UTF-8 validation) landed ahead of Wave 3.
+Wave 0's answer-and-close reply, Wave 3, M31 and Waves 5–6 have not
 started. M11's enum disposition (implement or remove the three unimplemented
 flags) stays a decision.
 
@@ -49,8 +50,8 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 
 ## Latest verification
 
-2026-10-19, Waves 1–2: offscreen `scripts/run-tests.sh` passed **95/95** in
-38.27 s on `253f1889` (wire `build-dev`, prefix `build-collabtext-alpha5/install`).
+2026-10-19, Waves 1–2 and M30: offscreen `scripts/run-tests.sh` passed **95/95** in
+39.95 s on `bc776efd` (wire `build-dev`, prefix `build-collabtext-alpha5/install`).
 Also checked: `-DMARKOFF_BUILD_TESTS=OFF` configures with zero ctest entries;
 a `-DMARKOFF_PERF` build compiles parser and core.
 

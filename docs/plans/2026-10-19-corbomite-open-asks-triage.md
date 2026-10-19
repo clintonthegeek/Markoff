@@ -88,8 +88,8 @@ Waves are ordered by risk and unblocking value, not by ask number. Each
 slice is one commit under the repo's own board.
 
 **Progress (2026-10-19):** Wave 0b done; Wave 1 done (`0d974f1b`..`16e7bfe4`);
-Wave 2 done (`a910338d`..`253f1889`); suite 95/95. Wave 0's reply and Waves 3–6
-are open.
+Wave 2 done (`a910338d`..`253f1889`); M30 done (`bc776efd`); suite 95/95.
+Wave 0's reply, Wave 3, M31 and Waves 5–6 are open.
 
 ### Wave 0 — Reply and close (no code, do first)
 
@@ -157,7 +157,14 @@ Order matters: build the index once, then use it.
 Exit: before/after numbers on the probes named in the handoff; no budget
 regression.
 
-### Wave 4 — Parser structure (Markoff)
+### Wave 4 — Parser structure (Markoff) — M30 done 2026-10-19
+
+**M30 done** (`bc776efd`), ahead of Wave 3 because it is correctness rather
+than speed: `src/Utf8OffsetMap.h` validates continuation bytes and rejects
+overlong/surrogate/truncated sequences; one malformed byte counts as one
+replacement character; the parser's table is clamped to the decoded string.
+The malformed-input maps are pinned in `tst_markoff_parser_validity`, and the
+full suite passes 95/95 in 39.95 s. `M31` is open.
 
 **M30 before M31**, because M31 rewrites the map builder that M30
 validates. M30: continuation-byte validation, invalid sequence = 1 byte,
