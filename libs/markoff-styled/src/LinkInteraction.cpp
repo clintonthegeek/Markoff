@@ -60,10 +60,15 @@ LinkInteraction::resolveLinkAt(int charPos, Qt::KeyboardModifiers mods) const {
     const QTextBlock block = cur.block();
     if (!block.isValid()) return std::nullopt;
 
-    if (m_cache.blockNumber != block.blockNumber()) {
+    if (m_cache.blockNumber != block.blockNumber()
+        || m_cache.structural != m_doc->structuralEditSequence()
+        || (!m_cache.id.isNull()
+            && m_doc->blockEditSequence(m_cache.id) != m_cache.sequence)) {
         m_cache.blockNumber = block.blockNumber();
         m_cache.id = Markoff::BlockId{};
         m_cache.linkSpans.clear();
+        m_cache.sequence = 0;
+        m_cache.structural = m_doc->structuralEditSequence();
 
         const QString plain = m_edit->toPlainText();
         const quint32 byteOffset =
@@ -72,6 +77,7 @@ LinkInteraction::resolveLinkAt(int charPos, Qt::KeyboardModifiers mods) const {
             m_doc, byteOffset, /*biasForward=*/true);
         if (hit) {
             m_cache.id = hit->blockId;
+            m_cache.sequence = m_doc->blockEditSequence(hit->blockId);
             for (const Markoff::SourceSpan &span : m_doc->inlineSpansFor(hit->blockId)) {
                 if (span.isLink || span.isWikilink)
                     m_cache.linkSpans.append(span);
@@ -100,16 +106,8 @@ LinkInteraction::resolveLinkAt(int charPos, Qt::KeyboardModifiers mods) const {
 void LinkInteraction::setMarkoffDocument(Markoff::MarkoffDocument *doc)
 {
     if (m_doc == doc) return;
-    QObject::disconnect(m_docChangedCon);
-    m_docChangedCon = {};
     m_doc = doc;
     m_cache = {};
-    if (doc) {
-        // Span offsets and block identity move with every edit: drop the cache
-        // rather than trying to validate it.
-        m_docChangedCon = connect(doc, &Markoff::MarkoffDocument::d2DocumentChanged,
-                                  this, [this] { m_cache = {}; });
-    }
 }
 
 void LinkInteraction::handlePress(QMouseEvent *e) {

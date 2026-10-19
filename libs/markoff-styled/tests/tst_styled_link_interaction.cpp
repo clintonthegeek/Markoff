@@ -208,6 +208,73 @@ private Q_SLOTS:
 
         QTRY_COMPARE(svc.hoverLefts.size(), 1);
     }
+
+    void hover_resolves_the_new_target_after_the_block_is_edited() {
+        // The per-block hover cache is keyed on the block's edit sequence: a
+        // text change to the hovered block must re-resolve its spans, not
+        // serve the pre-edit link (ASK-M17 remaining half).
+        Markoff::Styled::Editor e;
+        auto fixture = openCandidate(QStringLiteral("link-hover-stale"),
+            QByteArrayLiteral("a [one](http://1.test) b"));
+        auto& doc = *fixture.document;
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        RecordingLinkService svc;
+        e.setLinkService(&svc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTest::mouseMove(e.textEdit()->viewport(), QPoint(0, 0));
+        QTest::mouseMove(e.textEdit()->viewport(), pointForChar(e.textEdit(), 4));
+        QTRY_COMPARE(svc.hovers.size(), 1);
+        QCOMPARE(svc.hovers.back().activation.rawText, QStringLiteral("http://1.test"));
+
+        // Change the URL in place (same length, so char positions hold):
+        // 'a [one](http://[1].test) b' — the '1' is byte 15 of the block.
+        const auto block = doc.iterateBlocks().front();
+        QCOMPARE(doc.applyBlockEdit({block, 15, 1, QByteArrayLiteral("2")}).state,
+            Markoff::VNext::ActionPublicationState::committed);
+        QTest::qWait(50);
+
+        QTest::mouseMove(e.textEdit()->viewport(), QPoint(0, 0));
+        QTest::mouseMove(e.textEdit()->viewport(), pointForChar(e.textEdit(), 4));
+        QTRY_COMPARE(svc.hovers.size(), 2);
+        QCOMPARE(svc.hovers.back().activation.rawText, QStringLiteral("http://2.test"));
+    }
+
+    void hover_survives_an_edit_in_another_block() {
+        // An edit elsewhere must not invalidate the hovered block's cache —
+        // resolution stays correct across the unrelated change.
+        Markoff::Styled::Editor e;
+        auto fixture = openCandidate(QStringLiteral("link-hover-other-block"),
+            QByteArrayLiteral("a [one](http://1.test) b\n\nsecond block"));
+        auto& doc = *fixture.document;
+        auto *s = doc.createSession();
+        e.setSession(s);
+        e.setDocument(&doc);
+        RecordingLinkService svc;
+        e.setLinkService(&svc);
+        e.resize(400, 200);
+        e.show();
+        QTRY_VERIFY(e.isVisible());
+
+        QTest::mouseMove(e.textEdit()->viewport(), QPoint(0, 0));
+        QTest::mouseMove(e.textEdit()->viewport(), pointForChar(e.textEdit(), 4));
+        QTRY_COMPARE(svc.hovers.size(), 1);
+
+        const auto blocks = doc.iterateBlocks();
+        QCOMPARE(blocks.size(), size_t{2});
+        QCOMPARE(doc.applyBlockEdit({blocks[1], 0, 0, QByteArrayLiteral("X")}).state,
+            Markoff::VNext::ActionPublicationState::committed);
+        QTest::qWait(50);
+
+        QTest::mouseMove(e.textEdit()->viewport(), QPoint(0, 0));
+        QTest::mouseMove(e.textEdit()->viewport(), pointForChar(e.textEdit(), 4));
+        QTRY_COMPARE(svc.hovers.size(), 2);
+        QCOMPARE(svc.hovers.back().activation.rawText, QStringLiteral("http://1.test"));
+    }
 };
 
 QTEST_MAIN(TstStyledLinkInteraction)

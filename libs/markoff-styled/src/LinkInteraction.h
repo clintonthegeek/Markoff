@@ -54,15 +54,21 @@ private:
 
     /// The link spans of the block under the cursor. Mouse-move resolution only
     /// pays the document-level lookup (flat prefix, block resolve, span walk)
-    /// when the cursor enters a different block; within one block it is a
-    /// cached-list scan (ASK-M17). Cleared on every document edit.
+    /// when the cursor enters a different block or the entry went stale; within
+    /// one unchanged block it is a cached-list scan (ASK-M17). The entry is
+    /// keyed on the block's edit sequence plus the document's structural
+    /// sequence: an edit elsewhere — or a non-text change to this block — does
+    /// not force a re-walk, while a text change here or any insert/remove/
+    /// reorder does. The two sequences advance on every mutation path,
+    /// including remote application and multi-group undo/redo.
     struct BlockLinkCache {
         int                        blockNumber = -1;
         Markoff::BlockId           id;
+        quint64                    sequence = 0;
+        quint64                    structural = 0;
         QList<Markoff::SourceSpan> linkSpans;
     };
     mutable BlockLinkCache     m_cache;
-    QMetaObject::Connection    m_docChangedCon;
 };
 
 }  // namespace Markoff::Styled
