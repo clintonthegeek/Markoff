@@ -278,6 +278,16 @@ A small consumer, not an engine host:
 
 ## 4. Phase 1 — tables, the first customer — **started 2026-10-19**
 
+**Why the block-content extraction is deferred.** The measured/paint/hit-test
+contract needs two implementations to have a shape worth committing to; with
+only tables it would be an abstraction invented from one caller. The embed
+artifact is now the second implementation and is proven end-to-end, so the
+extraction is queued as one slice that migrates *both* (tables and the embed
+artifact's image content), rather than inventing the interface now and
+rewriting it after the second caller lands. Tables are already an explicit
+`BlockStyle` branch with real per-cell geometry; leaving them in place until
+then changes nothing users see.
+
 Status: attribute-change restyling (Phase 0 task 1) and the table basics landed
 (`tst_canvas_render`, 7 render/interaction cases; suite 96/96): escaped pipes,
 delimiter-row alignment at paint, width budget from the editor's column, find and
@@ -413,7 +423,7 @@ renderer is native.
 | 0 | attribute restyle + canvas cache key | S–M | **done** (`61100e19`) |
 | 0 | restored canvas render test harness | M | **done** (`tst_canvas_render`) |
 | 0 | constitution ruling recorded | S | spec §3 amended |
-| 1 | generic block-content contract; tables migrated | M | table output parity + gap tests |
+| 1 | generic block-content contract; tables migrated | M | **deferred 2026-10-19** — see note below |
 | 1 | table a11y decision; styled table theming | S–M | decision logged / theme test |
 | 2 | contract in core (request/result/version); registry evolved in place | M | **done** (`tst_embed_runtime`) |
 | 2 | `markoff-embed` runtime (cache, pool, SVG, process sandbox) | M–L | **cache/pool/SVG done**; sandbox open |
