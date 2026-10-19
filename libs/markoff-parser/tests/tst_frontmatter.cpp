@@ -19,6 +19,9 @@ private slots:
     void booleanValues();
     void numericValues();
     void noFrontmatter();
+    void closingFenceMustBeItsOwnLine();
+    void dashLinesAfterFrontmatterSurvive();
+    void emptyBlockHasNoRawContent();
 
     // New tests for ryml port
     void yaml12BooleanStrictness();
@@ -135,6 +138,50 @@ void TestFrontmatter::noFrontmatter()
     auto fm = doc->parsedFrontmatter();
     QVERIFY(fm.isNull());
     QVERIFY(!doc->frontmatterSpan().has_value());
+}
+
+// A closing fence is exactly `---` on its own line. The old prefix search
+// accepted `----`, `--- ` and `---foo` and then ate three of those dashes as if
+// they were the fence, truncating the body on the next round-trip.
+void TestFrontmatter::closingFenceMustBeItsOwnLine()
+{
+    const QStringList nearFences{
+        QStringLiteral("----"),
+        QStringLiteral("--- "),
+        QStringLiteral("---foo"),
+    };
+    for (const QString &fence : nearFences) {
+        const QString src = QStringLiteral("---\ntitle: Note\n") + fence
+            + QStringLiteral("\nBody text");
+        auto doc = Document::fromMarkdown(src);
+        QVERIFY2(!doc->frontmatterSpan().has_value(), qPrintable(fence));
+        QVERIFY2(doc->frontmatterRaw().isEmpty(), qPrintable(fence));
+        QCOMPARE(doc->markdownContent(), src);
+        // Nothing was recognised, so stripping the (absent) frontmatter is a
+        // byte-for-byte no-op — the source survives untouched.
+        QCOMPARE(doc->withFrontmatter(YamlValue()), src);
+    }
+}
+
+// The body may legitimately contain lines that start with dashes; only the
+// first complete fence closes the block, and the rest of the body must survive
+// in full.
+void TestFrontmatter::dashLinesAfterFrontmatterSurvive()
+{
+    auto doc = Document::fromMarkdown(QStringLiteral(
+        "---\ntitle: A\n---\nBody\n----\n---\nMore"));
+    QCOMPARE(doc->frontmatterRaw(), QStringLiteral("title: A"));
+    QCOMPARE(doc->markdownContent(), QStringLiteral("Body\n----\n---\nMore"));
+}
+
+// A closing fence on the line right after the opening one has no content at
+// all; QString::mid with a negative length used to return the rest of the file.
+void TestFrontmatter::emptyBlockHasNoRawContent()
+{
+    auto doc = Document::fromMarkdown(QStringLiteral("---\n---\nBody"));
+    QVERIFY(doc->frontmatterRaw().isEmpty());
+    QCOMPARE(doc->markdownContent(), QStringLiteral("Body"));
+    QCOMPARE(doc->withFrontmatter(YamlValue()), QStringLiteral("Body"));
 }
 
 // ---------------------------------------------------------------------------

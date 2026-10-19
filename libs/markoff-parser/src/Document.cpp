@@ -36,6 +36,32 @@ Document::Document()
 
 Document::~Document() = default;
 
+namespace {
+
+/// Index of the first newline-delimited `---` that is a complete closing
+/// fence: the three dashes must be followed by '\n', "\r\n", or end of
+/// string. A plain prefix search also accepted `----`, `--- ` and `---foo`,
+/// which silently cut the body short on round-trip. Returns -1 when no
+/// occurrence qualifies.
+int findClosingFence(const QString &source, int from)
+{
+    const int size = source.size();
+    int pos = from;
+    while (pos >= 0 && pos < size) {
+        pos = source.indexOf(QStringLiteral("\n---"), pos);
+        if (pos < 0)
+            return -1;
+        const int after = pos + 4;
+        const QChar next = (after < size) ? source.at(after) : QChar();
+        if (after >= size || next == QLatin1Char('\n') || next == QLatin1Char('\r'))
+            return pos;
+        pos = after;  // `----`, `--- `, `---foo`: keep looking
+    }
+    return -1;
+}
+
+} // namespace
+
 ExtractedSource Document::extract(const QString &source)
 {
     ExtractedSource out;
@@ -43,10 +69,13 @@ ExtractedSource Document::extract(const QString &source)
 
     // Extract frontmatter — track byte spans per Cluster A contract.
     if (source.startsWith(QStringLiteral("---\n")) || source.startsWith(QStringLiteral("---\r\n"))) {
-        int endPos = source.indexOf(QStringLiteral("\n---"), 3);
+        const int endPos = findClosingFence(source, 3);
         if (endPos >= 0) {
             int fmStart = source.indexOf(QLatin1Char('\n')) + 1;
-            out.frontmatter = source.mid(fmStart, endPos - fmStart);
+            // A closing fence immediately after the opening one means no
+            // content: endPos - fmStart is negative there, and QString::mid
+            // treats a negative length as "rest of the string".
+            out.frontmatter = source.mid(fmStart, qMax(0, endPos - fmStart));
             out.frontmatterBlockStart = 0;
 
             int afterFm = endPos + 4;  // "\n---"
@@ -55,17 +84,11 @@ ExtractedSource Document::extract(const QString &source)
             if (afterFm < source.size() && source[afterFm] == QLatin1Char('\n'))
                 ++afterFm;
 
+            // A closing fence at end of file with no trailing newline is
+            // reached through this same path; there is no separate branch.
             out.frontmatterEofClose = (afterFm >= source.size());
             out.frontmatterBlockEnd = afterFm;
             markdown = source.mid(afterFm);
-        } else if (source.endsWith(QStringLiteral("\n---"))) {
-            // Opening --- with closing --- at EOF, no trailing newline.
-            int fmStart = source.indexOf(QLatin1Char('\n')) + 1;
-            out.frontmatter = source.mid(fmStart, source.size() - fmStart - 4);
-            out.frontmatterBlockStart = 0;
-            out.frontmatterBlockEnd = source.size();
-            out.frontmatterEofClose = true;
-            markdown = QString();
         }
     }
 
@@ -182,18 +205,16 @@ bool Document::frontmatterHasEofClose() const
 
 QString Document::markdownContent() const
 {
-    // Return source with frontmatter stripped
-    if (d->frontmatter.isEmpty())
+    // Return source with frontmatter stripped. The extraction pass already
+    // recorded the exact span; re-searching here is what let a `----` line
+    // (accepted by the old prefix search) cut the body at the wrong place.
+    // The predicate is the recorded span, not the raw text: an empty
+    // frontmatter block ("---\n---\nBody") is present but has no text.
+    if (d->frontmatterBlockStart < 0 || d->frontmatterBlockEnd < 0
+        || d->frontmatterBlockEnd > d->source.size())
         return d->source;
 
-    // Find the end of frontmatter and return everything after
-    int endPos = d->source.indexOf(QStringLiteral("\n---"), 3);
-    if (endPos < 0)
-        return d->source;
-    int afterFm = endPos + 4;
-    if (afterFm < d->source.size() && d->source[afterFm] == QLatin1Char('\n'))
-        ++afterFm;
-    return d->source.mid(afterFm);
+    return d->source.mid(d->frontmatterBlockEnd);
 }
 
 int Document::footnoteCount() const
