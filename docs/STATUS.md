@@ -28,25 +28,27 @@ version bumps; M31's caller-side edit tracking, the Wave 5 decisions and
 the Graffodil perf/spec rows are the remainder (see the board's batch close-out
 table).
 
-Embedded-renderer plan, Phase 0/1 started: canvas restyles on attribute writes
-(`blocksChanged`), and tables now honour delimiter-row alignment, use the
-editor's column width, paint escaped pipes as one cell, and draw find highlights
-inside cells. New `tst_canvas_render` harness (offscreen View + painted-pixel and
-interaction checks). The embed plugin skeleton also landed: the contract
-(`RenderRequest`/`RenderedBlock`/`EmbedRenderService` + contract version) and
-`libs/markoff-embed` (cache, worker pool, SVG rasteriser), proven by a fake
-backend. Canvas now consumes the runtime: a fenced block with a registered
-backend paints source, asks the service, and paints the rasterised artifact when
-`artifactReady` arrives (tested end-to-end offscreen). Display math now takes
-the same path through `markoff_embed_math` (jkqtmathtext at the request's DPR,
-delimiter stripping and theme colours in the backend), so the first real engine
-is a plugin. Suite **98/98** in 25.60 s. Plan:
+Embedded-renderer plan, Phase 0 is **done** and Phase 1 has started. The
+content version now advances on every mutating path — attribute and kind
+writes included, and a remote action advances the version of every block it
+touched — so `d2EditSequence()` is a sound document-wide key and the
+per-block sequence a sound key for that block's visible state
+(`c215ccf3`). The canvas render harness covers the mermaid, image and theme
+paths (`5978ad86`); the canvas spec §3 records the async ruling. Tables
+honour delimiter-row alignment, use the editor's column width, paint escaped
+pipes as one cell, and draw find highlights inside cells. The embed plugin
+runtime reports the backend's engine name (contract version 3) and evicts by
+request order rather than completion order (`0b537c7f`); the vendored
+jkqtmathtext's exit-time use-after-free is fixed (`673b1727`), and
+`markoff-embed` has its own guide. Display math takes the plugin path
+through `markoff_embed_math` (jkqtmathtext at the request's DPR, delimiter
+stripping and theme colours in the backend), so the first real engine is a
+plugin. Suite **98/98**. Plan:
 [`plans/2026-10-19-embedded-renderers-plan.md`](plans/2026-10-19-embedded-renderers-plan.md)
-— reconnaissance and plan for native embedded renderers (tables first, then
-math, Mermaid, Graphviz, Pikchr, …) in the live view. It carries the decisions
-that need an owner before Phase 1. Graffodil's M5, M6 and
-punch-list batch 1 and M19 are done in that repo. M11's enum disposition (implement or remove the three unimplemented
-flags) stays a decision.
+— phases 2+ (the other engines) are unstarted. Graffodil's M5, M6 and
+punch-list batch 1 and M19 are done in that repo. M11's enum disposition
+(keep the enum values, refuse loudly, implement later as a named feature) is
+recorded.
 
 The triage corrected the ask document's own evidence: its markoff-core
 `file:line` citations predate A13 and name files that do not exist at
