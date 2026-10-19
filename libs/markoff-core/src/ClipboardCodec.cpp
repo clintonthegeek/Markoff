@@ -1151,4 +1151,19 @@ QByteArray markdownFromMime(const QMimeData *mime, PasteMode mode)
     return {};
 }
 
+QString restoreBlockMarkers(
+    const QString &selection,
+    const std::function<QByteArray(qsizetype lineIndex)> &markerAtLine)
+{
+    if (selection.isEmpty() || !markerAtLine) return selection;
+
+    QStringList lines = selection.split(QChar(0x2029));
+    for (qsizetype i = 0; i < lines.size(); ++i) {
+        const QByteArray marker = markerAtLine(i);
+        if (!marker.isEmpty())
+            lines[i] = QString::fromUtf8(marker) + lines[i];
+    }
+    return lines.join(QChar(0x2029));
+}
+
 }  // namespace Markoff::ClipboardCodec

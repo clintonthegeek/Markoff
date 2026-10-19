@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
 #include <QHash>
 #include <QPlainTextEdit>
 #include <QString>
@@ -10,6 +11,8 @@
 class QKeyEvent;
 class QMimeData;
 class QPaintEvent;
+
+namespace Markoff { class MarkoffDocument; }
 
 namespace Markoff::Source {
 namespace Detail {
@@ -41,7 +44,13 @@ public:
         return m_listItemMarkers.value(blockNumber);
     }
 
+    /// Model document behind this editor, used to restore list/quote markers
+    /// on Copy (the markers are painted outside the text). Not owned.
+    void setMarkoffDocument(Markoff::MarkoffDocument *doc) { m_document = doc; }
+
     /// Selection as markdown bytes (U+2029 paragraph separators → `\n`).
+    /// List/quote markers the leaf paints outside the text are restored so the
+    /// exported markdown keeps its structure.
     QByteArray selectedMarkdown() const;
 
     void copyWithFlavor(Markoff::ClipboardCodec::Flavor flavor);
@@ -56,6 +65,7 @@ protected:
 
 private:
     QHash<int, QString> m_listItemMarkers;
+    QPointer<Markoff::MarkoffDocument> m_document;
 };
 
 } // namespace Detail

@@ -169,6 +169,7 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     if (doc) {
         m_session = doc->createSession();
         m_binding->setMarkoffDocument(doc);
+        if (auto *ie = static_cast<InnerEditor *>(m_editor)) ie->setMarkoffDocument(doc);
         m_binding->setSession(m_session.data());
         m_paragraphMarginsCon = QObject::connect(
             doc, &Markoff::MarkoffDocument::d2DocumentChanged,
@@ -209,6 +210,7 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
         applyListItemMarkerDecorations();
     } else {
         m_binding->setMarkoffDocument(nullptr);
+        if (auto *ie = static_cast<InnerEditor *>(m_editor)) ie->setMarkoffDocument(nullptr);
     }
 }
 

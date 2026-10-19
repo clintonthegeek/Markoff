@@ -38,6 +38,7 @@ class TstSourceRichClipboard : public QObject {
     Q_OBJECT
 private slots:
     void copy_writesHtmlAndMarkdownMime();
+    void copy_restores_list_and_quote_markers();
     void copyAsPlain_stripsMarkers();
     void copyAsHtml_exclusiveNoPlain();
     void paste_htmlBecomesMarkdown();
@@ -69,6 +70,31 @@ void TstSourceRichClipboard::copy_writesHtmlAndMarkdownMime()
                  || QString::fromUtf8(mime->data(QStringLiteral("text/html")))
                         .contains(QStringLiteral("<strong>")),
              qPrintable(mime->html()));
+}
+
+// ASK-M24: the leaf paints list/quote markers outside the text, so a selection
+// is content-only; Copy must restore the markers or the pasted markdown loses
+// its List/BlockQuote structure.
+void TstSourceRichClipboard::copy_restores_list_and_quote_markers()
+{
+    auto fixtureDocument =
+        Markoff::Source::Tests::openCandidateDocument("- one\n- two\n");
+    auto& doc = *fixtureDocument.document;
+    Editor ed;
+    ed.setDocument(&doc);
+    ed.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&ed));
+    QTest::qWait(50);
+
+    selectAll(ed);
+    ed.copy();
+
+    const QMimeData *mime = QGuiApplication::clipboard()->mimeData();
+    QVERIFY(mime);
+    const QString md =
+        QString::fromUtf8(mime->data(QString::fromUtf8(kMarkdownMime)));
+    QVERIFY2(md.contains(QStringLiteral("- one")), qPrintable(md));
+    QVERIFY2(md.contains(QStringLiteral("- two")), qPrintable(md));
 }
 
 void TstSourceRichClipboard::copyAsPlain_stripsMarkers()

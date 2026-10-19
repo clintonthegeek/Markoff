@@ -7,6 +7,8 @@
 #include <QJsonDocument>
 #include <QString>
 
+#include <functional>
+
 class QMimeData;
 
 namespace Markoff::ClipboardCodec {
@@ -38,6 +40,20 @@ MARKOFF_CORE_EXPORT QByteArray rtfToMarkdown(const QByteArray &rtf);
 
 MARKOFF_CORE_EXPORT QString htmlToPlain(const QString &html);
 MARKOFF_CORE_EXPORT QString rtfToPlain(const QByteArray &rtf);
+
+/// Restore the list/quote display markers a leaf paints outside the text
+/// (native bullets, quote margins, gutter markers), so a selection exported as
+/// Markdown/HTML/RTF keeps its List/BlockQuote structure instead of re-parsing
+/// into plain paragraphs.
+///
+/// `selection` is QTextDocument selection text, whose paragraph separators are
+/// U+2029. `markerAtLine(i)` returns the bytes to prefix to line `i` (empty for
+/// a line that continues a block or has no marker); the caller owns the
+/// line → block mapping because it differs per leaf. The U+2029 separators are
+/// preserved in the result.
+MARKOFF_CORE_EXPORT QString restoreBlockMarkers(
+    const QString &selection,
+    const std::function<QByteArray(qsizetype lineIndex)> &markerAtLine);
 
 /// Default Copy writes every flavor; "Copy as X" writes one. `text/plain`
 /// on `All`/`Markdown` is the raw markdown (so round-trip paste keeps

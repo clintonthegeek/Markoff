@@ -10,6 +10,12 @@
 #include <QTextBlock>
 #include <QTextCursor>
 
+#include <markoff/core/ClipboardCodec.h>
+#include <markoff/core/Detail/FlatBlockResolve.h>
+#include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/SourceTextDocumentBinding.h>
+#include <markoff/core/BlockKind.h>
+
 namespace Markoff::Source::Detail {
 
 namespace {
@@ -32,7 +38,57 @@ InnerEditor::InnerEditor(QWidget *parent) : QPlainTextEdit(parent) {}
 
 QByteArray InnerEditor::selectedMarkdown() const
 {
-    QString sel = textCursor().selectedText();
+    const QTextCursor cur = textCursor();
+    QString sel = cur.selectedText();
+    if (sel.isEmpty())
+        return {};
+
+    // ListItem/BlockQuote markers are painted outside the text by this leaf, so
+    // selectedText() is content-only for those kinds; without restoring them a
+    // Copy-as-Markdown/HTML of a loaded list or quote pastes as body text
+    // (ASK-M24). Unlike styled, this leaf's QPlainTextEdit text is the whole
+    // flat view — one document block may span several lines — so a line starts
+    // a block exactly when its separator-view byte resolves to byte 0 of that
+    // block.
+    if (m_document) {
+        const QString flatText = toPlainText();
+        const int selStart = qMin(cur.anchor(), cur.position());
+        const QList<qsizetype> lineStarts = [&] {
+            QList<qsizetype> starts;
+            qsizetype at = 0;
+            starts.append(at);
+            for (qsizetype i = 0; i < sel.size(); ++i) {
+                if (sel.at(i) == QChar(0x2029)) {
+                    at = i + 1;
+                    starts.append(at);
+                }
+            }
+            return starts;
+        }();
+
+        sel = Markoff::ClipboardCodec::restoreBlockMarkers(
+            sel, [&](qsizetype i) -> QByteArray {
+                if (i < 0 || i >= lineStarts.size())
+                    return {};
+                const qsizetype lineStart = lineStarts[i];
+                if (sel.size() > lineStart && sel.at(lineStart) == QChar(0x2029))
+                    return {};  // empty line: no block begins here
+                const quint32 sepByte =
+                    Markoff::SourceTextDocumentBinding::qtPosToByteOffset(
+                        flatText, selStart + int(lineStart));
+                const auto hit = Markoff::Detail::findBlockAtSepByte(
+                    m_document.data(), sepByte, /*biasForward=*/true);
+                if (!hit || hit->byteInBlock != 0)
+                    return {};
+                const Markoff::BlockId id = hit->blockId;
+                if (m_document->blockKind(id) == Markoff::BlockKind::ListItem)
+                    return m_document->listItemDisplayMarker(id);
+                if (m_document->blockKind(id) == Markoff::BlockKind::BlockQuote)
+                    return m_document->blockQuoteDisplayMarker(id);
+                return {};
+            });
+    }
+
     sel.replace(QChar(0x2029), QLatin1Char('\n'));
     return sel.toUtf8();
 }
