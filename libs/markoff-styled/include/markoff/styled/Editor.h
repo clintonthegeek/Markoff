@@ -123,6 +123,7 @@ private:
 
     StructuralTextEdit                     *m_editor       = nullptr;
     QPointer<Markoff::Session>              m_session;
+    QMetaObject::Connection                 m_sessionDestroyed;
     Markoff::SourceTextDocumentBinding     *m_binding      = nullptr;
     StyleApplier                           *m_styleApplier = nullptr;
     DocHighlighter                         *m_highlighter  = nullptr;

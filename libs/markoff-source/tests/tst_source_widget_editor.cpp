@@ -36,6 +36,19 @@ class TstSourceWidgetEditor : public QObject {
 private Q_SLOTS:
     // ASK-M8: deleting the document under a live editor must leave the leaf
     // safe — the base retires the pointer, the binding holds a QPointer.
+    // ASK-M21: the leaf's owned session dies with the leaf instead of
+    // accumulating in the document across teardown.
+    void owned_session_is_destroyed_with_the_editor() {
+        auto fixture = openDocument(QByteArrayLiteral("hello"));
+        const int before = fixture.document->sessions().size();
+        {
+            Markoff::Source::Editor e;
+            e.setDocument(fixture.document.get());
+            QCOMPARE(fixture.document->sessions().size(), before + 1);
+        }
+        QCOMPARE(fixture.document->sessions().size(), before);
+    }
+
     void document_deleted_under_editor_is_safe() {
         Markoff::Source::Editor e;
         auto fixture = openDocument(QByteArrayLiteral("hello world"));

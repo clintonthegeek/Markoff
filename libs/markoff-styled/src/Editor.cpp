@@ -416,8 +416,23 @@ Markoff::Session *Editor::session() const { return m_session.data(); }
 
 void Editor::setSession(Markoff::Session *s) {
     if (m_session.data() == s) return;
+
+    QObject::disconnect(m_sessionDestroyed);
+    m_sessionDestroyed = {};
     m_session = s;
     if (m_binding) m_binding->setSession(s);
+
+    if (s) {
+        // The session is owned by the document. Without this the QPointer just
+        // went null and a consumer bound to sessionChanged never learned.
+        m_sessionDestroyed = QObject::connect(s, &QObject::destroyed, this, [this] {
+            m_sessionDestroyed = {};
+            m_session = nullptr;
+            if (m_binding) m_binding->setSession(nullptr);
+            emit sessionChanged();
+        });
+    }
+
     emit sessionChanged();
 }
 

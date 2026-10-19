@@ -59,6 +59,22 @@ private Q_SLOTS:
     // ASK-M8: the host may delete the document while the editor still holds
     // it. The base retires the pointer; the leaf must survive a repaint and a
     // base accessor afterwards instead of dereferencing freed memory.
+    // ASK-M21: the session is owned by the document; when it dies the leaf must
+    // emit sessionChanged rather than silently nulling its QPointer.
+    void session_death_emits_session_changed() {
+        Markoff::Styled::Editor e;
+        auto fixture = openDocument();
+        Markoff::Session *s = fixture.document->createSession();
+        e.setSession(s);
+        QCOMPARE(e.session(), s);
+
+        QSignalSpy spy(&e, &Markoff::Styled::Editor::sessionChanged);
+        fixture.document->destroySession(s);
+        QCoreApplication::sendPostedEvents(nullptr, QEvent::DeferredDelete);
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(e.session(), nullptr);
+    }
+
     void document_deleted_under_editor_is_safe() {
         Markoff::Styled::Editor e;
         auto fixture = openDocument();

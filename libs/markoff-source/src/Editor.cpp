@@ -114,7 +114,14 @@ Editor::Editor(QWidget *parent)
     m_editor->installEventFilter(this);
 }
 
-Editor::~Editor() = default;
+Editor::~Editor()
+{
+    // The session belongs to the document; destroy the one this leaf created so
+    // the document does not accumulate ghost sessions across leaf teardown
+    // (setDocument otherwise only destroys it on a document swap).
+    if (auto *doc = Markoff::MarkdownView::document(); m_session && doc)
+        doc->destroySession(m_session.data());
+}
 
 void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     if (auto *prev = Markoff::MarkdownView::document()) {
