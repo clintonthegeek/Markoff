@@ -34,6 +34,13 @@ public:
     Q_DECLARE_FLAGS(FindFlags, FindFlag)
     Q_FLAG(FindFlags)
 
+    /// Whether this build honours `flag`. Only CaseSensitive is implemented:
+    /// WholeWords, Regex and Backwards are declared and carry a Q_FLAG for
+    /// consumers and QML, but a search that requests them is refused loudly
+    /// rather than silently returning substring matches (ASK-M11). Callers
+    /// that need the others can grey them out via this query.
+    static bool supports(FindFlag flag);
+
     explicit SearchEngine(QObject *parent = nullptr);
     ~SearchEngine() override;
 

@@ -52,9 +52,10 @@ public:
     int  currentMatchIndex()  const   { return m_currentIndex; }
     bool isActive()           const   { return m_isActive; }
 
-    /// Optional flags. Default is case-insensitive (NoFlags). Whole-words /
-    /// regex are accepted by the underlying SearchEngine but UI work is
-    /// deferred (see spec § Out of scope).
+    /// Optional flags. Default is case-insensitive (NoFlags). Only
+    /// CaseSensitive is implemented: WholeWords/Regex/Backwards are declared
+    /// but refused by SearchEngine::findByBlock (which warns and returns no
+    /// matches) — see SearchEngine::supports().
     SearchEngine::FindFlags flags() const { return m_flags; }
     void setFlags(SearchEngine::FindFlags);
 

@@ -78,6 +78,30 @@ private Q_SLOTS:
         QCOMPARE(hits[1].matchStart, uint32_t(4));
         QCOMPARE(hits[1].matchLen,   uint32_t(3));
     }
+    // ASK-M11: the declared-but-unimplemented flags must not silently behave
+    // like a literal search. supports() is the query a UI greys out with, and
+    // asking for an unsupported flag returns no matches (with a warning).
+    void unsupported_flags_are_refused_not_silently_ignored() {
+        QVERIFY(SearchEngine::supports(SearchEngine::NoFlags));
+        QVERIFY(SearchEngine::supports(SearchEngine::CaseSensitive));
+        QVERIFY(!SearchEngine::supports(SearchEngine::WholeWords));
+        QVERIFY(!SearchEngine::supports(SearchEngine::Regex));
+        QVERIFY(!SearchEngine::supports(SearchEngine::Backwards));
+
+        auto fixture = openCandidate(QStringLiteral("search-flags"));
+        auto &doc = *fixture.document;
+        QCOMPARE(doc.importInitialMarkdown(QByteArrayLiteral("abc foo")).state,
+                 VNext::ActionPublicationState::committed);
+
+        // The literal search still works...
+        QCOMPARE(SearchEngine::findByBlock(doc, QStringLiteral("foo"),
+                                           SearchEngine::CaseSensitive).size(), 1);
+        // ...but a request for an unimplemented flag is not quietly downgraded.
+        QVERIFY(SearchEngine::findByBlock(doc, QStringLiteral("foo"),
+                                          SearchEngine::Regex).isEmpty());
+        QVERIFY(SearchEngine::findByBlock(doc, QStringLiteral("foo"),
+                                          SearchEngine::WholeWords).isEmpty());
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationSearchEngine)

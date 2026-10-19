@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
+#include <QDebug>
 #include <markoff/core/SearchEngine.h>
 
 #include <markoff/core/MarkoffDocument.h>
@@ -16,14 +17,25 @@ void SearchEngine::clearMatches(Session *sess)
 }
 
 // D2: per-block search — iterates blocks directly, no Session side-effects.
+bool SearchEngine::supports(FindFlag flag)
+{
+    return flag == NoFlags || flag == CaseSensitive;
+}
+
 QList<SearchHit> SearchEngine::findByBlock(const MarkoffDocument &doc,
                                             const QString &needle,
                                             FindFlags flags)
 {
-    // Only CaseSensitive is implemented for findByBlock; Regex and WholeWords
-    // are not yet supported and passing them is a programming error.
-    Q_ASSERT(!(flags & Regex));
-    Q_ASSERT(!(flags & WholeWords));
+    // Only CaseSensitive is implemented. The other flags are declared API, so
+    // a release build must not pretend to honour them: Q_ASSERT compiles out
+    // under NDEBUG, which made a "regex" search a silent literal search
+    // (ASK-M11). Refuse the request, loudly, and return no matches.
+    if (flags & (Regex | WholeWords | Backwards)) {
+        qWarning() << "Markoff::SearchEngine::findByBlock: unsupported FindFlags"
+                   << int(flags & (Regex | WholeWords | Backwards))
+                   << "- only CaseSensitive is implemented; returning no matches";
+        return {};
+    }
 
     QList<SearchHit> hits;
     if (needle.isEmpty()) return hits;
