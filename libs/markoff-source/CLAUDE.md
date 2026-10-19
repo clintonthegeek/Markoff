@@ -23,8 +23,9 @@ on every `d2DocumentChanged` (5pt top + 5pt bottom). Spec
 
 ## Public surface
 - `Markoff::Source::Editor` — `Markoff::MarkdownView` subclass composing an
-  inner `QPlainTextEdit`. Main public widget.
-- `Markoff::Source::FindBar` — standalone find UI.
+  inner `QPlainTextEdit`. Main public widget. Find runs through the base
+  `attachFindController(FindController *)` contract; there is no Source-owned
+  find bar.
 
 ### MarkdownView contract overrides (contract-v2 arc, 2026-06-09)
 

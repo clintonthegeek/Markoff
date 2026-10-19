@@ -1,4 +1,9 @@
 cmake_minimum_required(VERSION 3.19)
+# ctest selection labels. The whole suite here is fast and self-checking;
+# the manual load benchmark (perf_load_bench) deliberately stays out of ctest
+# because it needs an input file and prints numbers instead of asserting.
+set_property(DIRECTORY APPEND PROPERTY LABELS unit)
+
 find_package(Qt6 6.8 REQUIRED COMPONENTS Test Widgets)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_CXX_STANDARD 20)

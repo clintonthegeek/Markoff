@@ -16,7 +16,8 @@ target_link_libraries(markoff-collab-testapp PRIVATE
     Qt6::Core Qt6::Gui Qt6::Widgets markoff_core markoff_canvas)
 add_test(NAME markoff-collab-testapp-smoke COMMAND markoff-collab-testapp)
 set_tests_properties(markoff-collab-testapp-smoke PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS integration)
 
 enable_testing()
 add_subdirectory(tests)

@@ -107,6 +107,7 @@ if(MARKOFF_BUILD_APPS)
         enable_testing()
         add_test(NAME markoff-canvas-app-smoke COMMAND markoff-canvas-app)
         set_tests_properties(markoff-canvas-app-smoke PROPERTIES
-            ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+            ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+            LABELS integration)
     endif()
 endif()
