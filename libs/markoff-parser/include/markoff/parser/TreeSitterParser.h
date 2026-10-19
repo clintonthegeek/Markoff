@@ -39,15 +39,19 @@ public:
     ~TreeSitterParser();
 
     /// Parse markdown text from scratch. Returns true on success.
-    /// Discards any prior tree state. After parsing, use buildSpanMap()
-    /// to get formatting spans.
+    /// Discards any prior tree state — including on failure, so no accessor can
+    /// read a previous document's tree against this call's byte map. After a
+    /// false return, `hasTree()` is false and every accessor returns empty.
+    /// Afterwards, use buildSpanMap() to get formatting spans.
     bool parse(const QString &text);
 
     /// Walk the CST and extract headings, links, and tags as structured data.
     DocumentQueryResult buildDocumentQueries() const;
 
-    /// Check if a tree exists (parse was successful)
-    bool hasTree() const { return m_blockTree != nullptr; }
+    /// True when the last parse() completed and the trees are consistent with
+    /// utf8Source(). False before any parse and after a failed one, so callers
+    /// never read a new byte map against a stale tree.
+    bool hasTree() const { return m_valid; }
 
     /// A non-text block boundary found by the parser.
     struct BlockBoundary {
@@ -85,6 +89,7 @@ private:
     std::vector<ByteRange> m_inlineRanges;  // parallel to m_inlineTrees
     QByteArray m_utf8;
     QList<int> m_byteToChar;  // UTF-8 byte offset → QString char offset
+    bool m_valid = false;  // true only after a fully successful parse()
 };
 
 /// Parse a single block's UTF-8 content and return its inline formatting spans.

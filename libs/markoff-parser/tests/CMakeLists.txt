@@ -39,6 +39,11 @@ add_test(NAME tst_markoff_parser_frontmatter COMMAND tst_markoff_parser_frontmat
 target_link_libraries(tst_markoff_parser_frontmatter PRIVATE Qt6::Test markoff-parser)
 set_tests_properties(tst_markoff_parser_frontmatter PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
+add_executable(tst_markoff_parser_validity tst_parser_validity.cpp)
+add_test(NAME tst_markoff_parser_validity COMMAND tst_markoff_parser_validity)
+target_link_libraries(tst_markoff_parser_validity PRIVATE Qt6::Test markoff-parser)
+set_tests_properties(tst_markoff_parser_validity PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
 add_executable(tst_markoff_parser_splitter_table_passthrough tst_splitter_table_passthrough.cpp)
 add_test(NAME tst_markoff_parser_splitter_table_passthrough COMMAND tst_markoff_parser_splitter_table_passthrough)
 target_link_libraries(tst_markoff_parser_splitter_table_passthrough PRIVATE Qt6::Test markoff-parser)

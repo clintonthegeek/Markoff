@@ -247,11 +247,23 @@ TreeSitterParser::~TreeSitterParser()
 bool TreeSitterParser::parse(const QString &text)
 {
     MARKOFF_PERF_SCOPE("parser.TreeSitterParser::parse");
+
+    // Drop every tree before touching m_utf8: a failed parse must not leave the
+    // previous document's inline trees bound to the new byte map (inlineSpansFor
+    // then read stale, out-of-range spans instead of reporting a failure).
+    m_valid = false;
+    if (m_blockTree) {
+        ts_tree_delete(m_blockTree);
+        m_blockTree = nullptr;
+    }
+    for (TSTree *t : m_inlineTrees) ts_tree_delete(t);
+    m_inlineTrees.clear();
+    m_inlineRanges.clear();
+
     m_utf8 = text.toUtf8();
     m_byteToChar = buildByteToCharMap(m_utf8);
 
     // Phase 1: parse block structure
-    if (m_blockTree) ts_tree_delete(m_blockTree);
     {
         MARKOFF_PERF_SCOPE("parser.block_grammar");
         m_blockTree = ts_parser_parse_string(m_blockParser, nullptr,
@@ -266,10 +278,6 @@ bool TreeSitterParser::parse(const QString &text)
     // etc.) is parsed separately so each gets its own CST. This avoids
     // the boundary-crossing problem where set_included_ranges with multiple
     // ranges produces gap spans that span across heading/paragraph boundaries.
-    for (TSTree *t : m_inlineTrees) ts_tree_delete(t);
-    m_inlineTrees.clear();
-    m_inlineRanges.clear();
-
     TSNode root = ts_tree_root_node(m_blockTree);
     std::vector<TSRange> inlineRanges;
     collectInlineRanges(root, inlineRanges, m_utf8);
@@ -288,6 +296,7 @@ bool TreeSitterParser::parse(const QString &text)
         ts_parser_set_included_ranges(m_inlineParser, nullptr, 0);
     }
 
+    m_valid = true;
     return true;
 }
 
@@ -606,7 +615,7 @@ QList<SourceSpan> TreeSitterParser::buildSpanMap() const
     MARKOFF_PERF_SCOPE("parser.buildSpanMap");
     QList<SourceSpan> spans;
 
-    if (!m_blockTree)
+    if (!m_valid)
         return spans;
 
     // Collect inline region ranges (used for splitting and filtering)
@@ -870,7 +879,7 @@ static void collectBlockBoundaries(TSNode node,
 QList<TreeSitterParser::BlockBoundary> TreeSitterParser::findBlockBoundaries() const
 {
     QList<BlockBoundary> boundaries;
-    if (!m_blockTree)
+    if (!m_valid)
         return boundaries;
 
     TSNode root = ts_tree_root_node(m_blockTree);
@@ -1493,7 +1502,7 @@ DocumentQueryResult TreeSitterParser::buildDocumentQueries() const
 {
     DocumentQueryResult result;
 
-    if (!m_blockTree)
+    if (!m_valid)
         return result;
 
     // Walk block tree for headings
