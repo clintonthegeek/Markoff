@@ -16,7 +16,6 @@ find_package(KF6SyntaxHighlighting REQUIRED)
 # existing no-op MARKOFF_CORE_EXPORT macro needs no changes.
 add_library(markoff_core SHARED
     include/markoff/core/MarkoffCoreExport.h
-    include/markoff/core/Origin.h
     include/markoff/core/Selection.h
     include/markoff/core/FoldRef.h
     include/markoff/core/MarkoffDocument.h

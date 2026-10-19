@@ -39,7 +39,6 @@
 #include <markoff/core/ClipboardCodec.h>
 #include <markoff/core/Cmd/D2.h>
 #include <markoff/core/KindInference.h>
-#include <markoff/core/Origin.h>
 #include <markoff/core/LinkService.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/Session.h>

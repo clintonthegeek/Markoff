@@ -4,7 +4,6 @@
 #include <QTextEdit>
 
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>
 #include <markoff/styled/Editor.h>
 #include "CandidateDocumentFixture.h"

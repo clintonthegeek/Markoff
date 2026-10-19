@@ -6,7 +6,6 @@
 
 #include <markoff/source/Editor.h>
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
 #include <memory>

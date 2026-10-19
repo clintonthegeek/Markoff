@@ -6,7 +6,6 @@
 #include <QTemporaryDir>
 
 #include <markoff/core/MarkoffDocument.h>
-#include <markoff/core/Origin.h>
 #include <markoff/core/Session.h>
 #include <markoff/core/SessionParams.h>
 #include <markoff/core/Cmd/D2.h>
