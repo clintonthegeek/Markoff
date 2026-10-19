@@ -108,6 +108,38 @@ private Q_SLOTS:
         Markoff::MarkdownView v;
         QVERIFY(!v.caretRect().isValid());
     }
+
+    // ASK-M8: a host may delete the document while a view still holds it
+    // (ordinary Qt). The base must retire the pointer, tell listeners, and
+    // leave every base accessor safe to call.
+    void document_destroyed_while_attached_is_retired()
+    {
+        MarkdownView v;
+        auto fixture = openCandidate(QStringLiteral("markdown-view-destroyed"));
+        v.setDocument(fixture.document.get());
+        QVERIFY(v.document() != nullptr);
+
+        MarkoffDocument *reported = reinterpret_cast<MarkoffDocument *>(1);
+        int changed = 0;
+        QObject::connect(&v, &MarkdownView::documentChanged, &v,
+                         [&](MarkoffDocument *d) { ++changed; reported = d; });
+
+        fixture.document.reset();   // delete the document under the view
+
+        QCOMPARE(v.document(), nullptr);
+        QCOMPARE(changed, 1);
+        QCOMPARE(reported, nullptr);
+
+        // Every base accessor is safe on the retired view.
+        v.undo();
+        v.redo();
+        v.setReadOnly(true);
+        QCOMPARE(v.cursorPosition().line, 1);
+        QCOMPARE(v.cursorPosition().column, 1);
+        QVERIFY(!v.caretRect().isValid());
+        v.setDocument(nullptr);     // detaching again is a no-op, not a crash
+        QCOMPARE(v.document(), nullptr);
+    }
 };
 
 QTEST_MAIN(TstMarkdownViewBase)

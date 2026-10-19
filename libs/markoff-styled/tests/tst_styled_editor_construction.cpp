@@ -56,6 +56,24 @@ private Q_SLOTS:
         QCOMPARE(spy.count(), 1);
     }
 
+    // ASK-M8: the host may delete the document while the editor still holds
+    // it. The base retires the pointer; the leaf must survive a repaint and a
+    // base accessor afterwards instead of dereferencing freed memory.
+    void document_deleted_under_editor_is_safe() {
+        Markoff::Styled::Editor e;
+        auto fixture = openDocument();
+        e.setDocument(fixture.document.get());
+        QVERIFY(e.document() != nullptr);
+
+        fixture.document.reset();
+
+        QCOMPARE(e.document(), nullptr);
+        e.undo();
+        e.update();
+        QCOMPARE(e.cursorPosition().line, 1);
+        QCOMPARE(e.cursorPosition().column, 1);
+    }
+
     void session_setter_round_trips() {
         Markoff::Styled::Editor e;
         auto fixture = openDocument();

@@ -34,6 +34,22 @@ CandidateDocument openDocument(const QByteArray& markdown)
 class TstSourceWidgetEditor : public QObject {
     Q_OBJECT
 private Q_SLOTS:
+    // ASK-M8: deleting the document under a live editor must leave the leaf
+    // safe — the base retires the pointer, the binding holds a QPointer.
+    void document_deleted_under_editor_is_safe() {
+        Markoff::Source::Editor e;
+        auto fixture = openDocument(QByteArrayLiteral("hello world"));
+        e.setDocument(fixture.document.get());
+        QVERIFY(e.document() != nullptr);
+
+        fixture.document.reset();
+
+        QCOMPARE(e.document(), nullptr);
+        e.undo();
+        e.update();
+        QCOMPARE(e.cursorPosition().line, 1);
+    }
+
     void editor_constructs() {
         Markoff::Source::Editor e;
         QVERIFY(e.document() == nullptr);

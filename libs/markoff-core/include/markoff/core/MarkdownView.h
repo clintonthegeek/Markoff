@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 #include <QJsonObject>
+#include <QPointer>
 #include <QWidget>
 #include <markoff/core/CursorPos.h>
 #include <markoff/core/EditorContext.h>
@@ -102,7 +103,12 @@ signals:
     void contextChanged(const Markoff::EditorContext &ctx);
 
 private:
-    MarkoffDocument *m_document = nullptr;
+    /// QPointer, not a raw pointer: a leaf that keeps a document attached while
+    /// the host deletes it (ordinary Qt) must not dereference freed memory in
+    /// cursorPosition()/undo()/redo() or any leaf accessor. setDocument()
+    /// connects destroyed() to null this and emit documentChanged(nullptr).
+    QPointer<MarkoffDocument> m_document;
+    QMetaObject::Connection m_documentDestroyed;
     bool m_readOnly = false;
     Theme m_theme;
     qreal m_fontScale = 1.0;

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
 #include <markoff/core/OpaqueBlockRenderer.h>
 
 namespace Markoff { class MarkoffDocument; }
@@ -20,7 +21,7 @@ public:
     int  renderOpaque(QTextCursor &at, Markoff::BlockId id) override;
 
 private:
-    Markoff::MarkoffDocument *m_doc = nullptr;
+    QPointer<Markoff::MarkoffDocument> m_doc;
     qreal m_fontScale = 1.0;
 };
 

@@ -79,7 +79,7 @@ private:
 
     QPointer<QTextDocument>            m_textDocument;
     QPointer<QTextEdit>                m_textEdit;
-    Markoff::MarkoffDocument          *m_markoffDocument = nullptr;
+    QPointer<Markoff::MarkoffDocument> m_markoffDocument;
     const Markoff::Theme              *m_theme           = nullptr;
     qreal                              m_fontScale       = 1.0;
     bool                               m_applyingFormats = false;

@@ -2,6 +2,7 @@
 // (c) 2026 Markoff contributors, GPL-3.0-or-later.
 #pragma once
 
+#include <QPointer>
 #include <QAction>
 #include <QActionGroup>
 #include <QObject>
@@ -140,7 +141,7 @@ private:
     void setupTableActions();
 
     View                    *m_view     = nullptr;
-    Markoff::MarkoffDocument *m_document = nullptr;
+    QPointer<Markoff::MarkoffDocument> m_document;
 
     QAction *m_bold       = nullptr;
     QAction *m_italic     = nullptr;

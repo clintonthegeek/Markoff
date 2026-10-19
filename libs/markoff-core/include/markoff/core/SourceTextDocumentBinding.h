@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
 #include <optional>
 
 #include <QByteArray>
@@ -167,11 +168,11 @@ private:
     void applyBoundedTextDiff(int regionStart, const QString &actual,
                               const QString &expected);
 
-    Markoff::MarkoffDocument *m_markoffDocument = nullptr;
+    QPointer<Markoff::MarkoffDocument> m_markoffDocument;
     Markoff::Session         *m_session         = nullptr;
     QTextDocument            *m_textDocument    = nullptr;
 
-    Markoff::MarkoffDocument *m_subscribedDoc     = nullptr;  ///< what we're currently subscribed to
+    QPointer<Markoff::MarkoffDocument> m_subscribedDoc;  ///< what we're currently subscribed to
     Markoff::Session         *m_subscribedSession = nullptr;  ///< current session subscription
 
     bool m_applyingLocalEdit      = false;  ///< T12: set during applyLocalEdit ingestion

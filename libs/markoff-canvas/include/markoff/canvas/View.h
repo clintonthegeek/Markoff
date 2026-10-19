@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
 #include <functional>
 #include <memory>
 #include <optional>
@@ -1539,7 +1540,7 @@ public:
     bool hitTestFrontmatter(const QPoint &viewportPos) const;
     void paintFrontmatter(QPainter &p) const;
 
-    MarkoffDocument *m_doc = nullptr;
+    QPointer<MarkoffDocument> m_doc;
     Theme m_theme;
     /// Font-scale multiplier (P3.5). Threaded into every `m_cache->sync()`
     /// call; see `setFontScale()`.

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
 #include <QObject>
 #include <QPoint>
 #include <QString>
@@ -44,7 +45,7 @@ private:
     void handleLeave();
 
     QTextEdit                 *m_edit       = nullptr;
-    Markoff::MarkoffDocument  *m_doc        = nullptr;
+    QPointer<Markoff::MarkoffDocument> m_doc;
     Markoff::LinkService      *m_service    = nullptr;
     QString                    m_fromContext;
     QString                    m_currentHoveredRawText;

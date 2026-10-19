@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 #pragma once
 
+#include <QPointer>
 #include <QList>
 #include <QObject>
 #include <QString>
@@ -82,7 +83,7 @@ Q_SIGNALS:
 private:
     void recomputeMatches();
 
-    MarkoffDocument         *m_doc          = nullptr;
+    QPointer<MarkoffDocument> m_doc;
     QString                  m_needle;
     SearchEngine::FindFlags  m_flags        = SearchEngine::NoFlags;
     QList<Match>             m_matches;
