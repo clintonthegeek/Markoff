@@ -391,6 +391,18 @@ void View::setDocument(MarkoffDocument *doc)
         // cheat sheet.
         connect(m_doc, &MarkoffDocument::d2DocumentChanged,
                 this, &View::onDocumentChanged);
+        // Attribute writes emit blocksChanged but bump neither edit sequence,
+        // so the ordinary staleness test misses them (ASK-M9 follow-up: a
+        // checkbox or display-mode flip could paint its old state). Restyle the
+        // named blocks before the accompanying documentChanged pass.
+        connect(m_doc, &MarkoffDocument::blocksChanged, this,
+                [this](const QList<Markoff::BlockId> &ids) {
+                    if (!m_doc) return;
+                    m_cache->forceRestyle(ids);
+                    m_cache->setTextWidth(textWidth());
+                    m_cache->sync(*m_doc, m_theme, m_fontScale);
+                    viewport()->update();
+                });
         setPublicationPending(m_doc->providerState()
             == Markoff::VNext::ProviderDocumentState::recoveryRequired);
         connect(m_doc, &MarkoffDocument::tentativeBlockChanged, this,
@@ -5607,7 +5619,45 @@ void View::paintTable(QPainter &p, int entryIndex, qreal blockTop, qreal content
                                       cellRect.y() + kTableCellPadding);
                 p.setPen(e.style.foreground);
                 p.setFont(r == 0 ? headerFont : e.style.font);
-                cell.layout->draw(&p, textPos);
+
+                // Find and occurrence highlights are drawn here too: the
+                // per-block ranges are block byte offsets, so each range is
+                // intersected with the cell and mapped through that cell's
+                // own projection (the same draw-time FormatRange mechanism
+                // the normal block path uses — never a layout mutation).
+                QList<QTextLayout::FormatRange> formats;
+                const auto addRange = [&](int byteOffset, int byteLength,
+                                          const QColor &background) {
+                    const int lo = qMax(byteOffset, cell.startByte);
+                    const int hi = qMin(byteOffset + byteLength, cell.endByte);
+                    if (hi <= lo) return;
+                    const int qFrom = cell.projection.byteToLayoutQChar(
+                        lo - cell.startByte, ProjectionMap::SnapDirection::Left);
+                    const int qTo = cell.projection.byteToLayoutQChar(
+                        hi - cell.startByte, ProjectionMap::SnapDirection::Right);
+                    if (qTo <= qFrom) return;
+                    QTextCharFormat fmt;
+                    fmt.setBackground(background);
+                    formats.push_back({qFrom, qTo - qFrom, fmt});
+                };
+                if (const auto it = m_findHighlightsByBlock.constFind(e.id);
+                    it != m_findHighlightsByBlock.constEnd()) {
+                    for (const FindHighlight &h : it.value()) {
+                        addRange(h.byteOffset, h.byteLength,
+                                 m_theme.color(h.isCurrent
+                                     ? Theme::Slot::SearchActiveMatchBackground
+                                     : Theme::Slot::SearchMatchBackground));
+                    }
+                }
+                if (const auto it = m_occurrenceHighlightsByBlock.constFind(e.id);
+                    it != m_occurrenceHighlightsByBlock.constEnd()) {
+                    for (const auto &[byteOffset, byteLength] : it.value()) {
+                        addRange(byteOffset, byteLength,
+                                 m_theme.color(Theme::Slot::SelectionOccurrenceBackground));
+                    }
+                }
+
+                cell.layout->draw(&p, textPos, formats);
 
                 if (m_hasFocus && e.id == m_caret.block
                     && m_caret.byteOffset >= cell.startByte

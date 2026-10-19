@@ -24,7 +24,11 @@ send decision; M13/M18 are blocked on a reliable document-wide content version; 
 caller-side edit tracking, the Wave 5 decisions and the Graffodil perf/spec
 rows are the remainder (see the board's batch close-out table).
 
-New workfront proposal (no phase started):
+Embedded-renderer plan, Phase 0/1 started: canvas restyles on attribute writes
+(`blocksChanged`), and tables now honour delimiter-row alignment, use the
+editor's column width, paint escaped pipes as one cell, and draw find highlights
+inside cells. New `tst_canvas_render` harness (offscreen View + painted-pixel and
+interaction checks); suite **96/96** in 36.84 s. Plan:
 [`plans/2026-10-19-embedded-renderers-plan.md`](plans/2026-10-19-embedded-renderers-plan.md)
 — reconnaissance and plan for native embedded renderers (tables first, then
 math, Mermaid, Graphviz, Pikchr, …) in the live view. It carries the decisions

@@ -209,6 +209,11 @@ public:
     /// P5.4 embed seam. Not owned. Same re-realize-on-set behavior.
     void setEmbedRegistry(Markoff::EmbedRegistry *registry);
 
+    /// Force a restyle of `ids` on the next sync(). Attribute writes
+    /// (`DisplayMode`, `Checked`, `IndentLevel`, …) emit blocksChanged but bump
+    /// neither edit sequence, so the ordinary staleness test would skip them.
+    void forceRestyle(const QList<BlockId> &ids);
+
     /// Folding (P5.6): marks every entry whose id is in `hidden` as
     /// `Entry::folded` (clearing it on every other entry) and recomputes
     /// y-positions so hidden entries contribute zero height. Cheap: no
@@ -271,6 +276,7 @@ private:
     MermaidRenderer        *m_mermaidRenderer = nullptr;
     Markoff::EmbedRegistry *m_embedRegistry   = nullptr;
 
+    QSet<BlockId>       m_forcedRestyle;
     std::vector<Entry>  m_entries;
     QHash<BlockId, int> m_index;        //!< id → position in m_entries
     qreal   m_textWidth      = 0;

@@ -27,15 +27,21 @@ std::vector<Line> splitLines(const QByteArray &src)
     return lines;
 }
 
-/// Cells between adjacent unescaped '|' in `line` (escape handling for
-/// '\|' is a known limitation, same as the live leaf's tokenizer). A valid
-/// pipe-table line has at least two pipes (one on each side); returns
-/// nullopt otherwise.
+/// Cells between adjacent unescaped '|' in `line`. A pipe preceded by an odd
+/// number of backslashes is cell content (GFM `\|`), not a separator, so
+/// `| A \| B | C |` is two cells. The backslash stays in the cell's byte
+/// range: edits address the source, and the projection path has no
+/// substitution kind to unescape it for display yet.
 std::optional<std::vector<TableCellRange>> tokenizeLine(const QByteArray &src, Line line)
 {
     std::vector<int> pipes;
     for (int j = line.start; j < line.end; ++j) {
-        if (src[j] == '|')
+        if (src[j] != '|')
+            continue;
+        int backslashes = 0;
+        for (int k = j - 1; k >= line.start && src[k] == '\\'; --k)
+            ++backslashes;
+        if (backslashes % 2 == 0)
             pipes.push_back(j);
     }
     if (pipes.size() < 2)

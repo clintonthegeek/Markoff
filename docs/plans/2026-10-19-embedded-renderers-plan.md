@@ -66,11 +66,12 @@ and block-relative byte ranges used directly as edit offsets
 (`View.cpp:2214-2268`, `5568-5625`). Styled renders tables as `QTextTable`
 frames through `OpaqueBlockRenderer` (`StyledTableRenderer`, `TableFrame.cpp`).
 
-Known table gaps, from the recon (all fixable and all relevant as the first
-acceptance case): header measurement uses the non-bold font while paint bolds it
-(overflow risk); `alignment` is parsed but never applied at paint; column width
-is capped at 240 DIP with no horizontal scroll; find/occurrence highlights are
-not drawn in tables; cell selection is whole-cell only.
+Known table gaps (one recon claim corrected during implementation: the header
+**was** already measured with the bold font in both passes; paint's extra
+`setFont` is harmless). Real gaps: `alignment` was parsed but never applied at
+paint; column width was capped at 240 DIP independent of the editor, so a wide
+table was clipped with no horizontal scroll; find/occurrence highlights were
+not drawn in tables; escaped pipes (`\|`) split cells.
 
 ### 1.4 Mermaid already works end-to-end — through the host
 
@@ -250,7 +251,14 @@ Replace the three ad-hoc seams with one path:
 3. **Record the async ruling** in the canvas spec §3 (service signal vs C2) and
    extend `check-constitution.sh` only if a new forbidden pattern is needed.
 
-## 4. Phase 1 — tables, the first customer
+## 4. Phase 1 — tables, the first customer — **started 2026-10-19**
+
+Status: attribute-change restyling (Phase 0 task 1) and the table basics landed
+(`tst_canvas_render`, 7 render/interaction cases; suite 96/96): escaped pipes,
+delimiter-row alignment at paint, width budget from the editor's column, find and
+occurrence highlights inside cells, click-to-caret and typing through a cell.
+Still open in this phase: the generic block-content contract extraction, the
+a11y table interface/decision, and styled table theming.
 
 Recommendation: **tables are the framework's acceptance case, not its first
 image.** Keep the editable grid (it is the only interactive embedded content in

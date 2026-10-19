@@ -60,6 +60,12 @@ void BlockLayoutCache::setEmbedRegistry(Markoff::EmbedRegistry *registry)
     invalidateRealizedLayouts();
 }
 
+void BlockLayoutCache::forceRestyle(const QList<BlockId> &ids)
+{
+    for (const BlockId &id : ids)
+        m_forcedRestyle.insert(id);
+}
+
 void BlockLayoutCache::clear()
 {
     m_entries.clear();
@@ -100,9 +106,11 @@ void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme, qrea
             e = std::move(m_entries[*old]);
 
         const quint64 seq = doc.blockEditSequence(id);
+        const bool forced = m_forcedRestyle.contains(id);
         const bool stale = (!e.realized && e.height <= 0)  // never measured
                         || e.seq != seq
-                        || restyleAll;
+                        || restyleAll
+                        || forced;
 
         if (stale) {
             e.layout.reset();
@@ -118,6 +126,7 @@ void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme, qrea
 
     m_entries = std::move(next);
     m_index   = std::move(nextIndex);
+    m_forcedRestyle.clear();
     recomputePositions();
 }
 
@@ -189,12 +198,17 @@ void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &the
 
     QFont headerFont = e.style.font;
     headerFont.setBold(true);
-    // Column widths cap at a fixed budget rather than the text column
-    // width (plan T9: "capped"). P5.1 promotes this from a hard clip to a
-    // wrap budget: a cell whose natural width exceeds the cap wraps inside
-    // it (pass 2 below) instead of overflowing past the page margin.
-    constexpr qreal kMaxColumnWidth = 240.0;
+    // Column width budget: an equal share of the text column, so a table
+    // wraps to the editor instead of overflowing a fixed 240 DIP per column
+    // (with no horizontal scroll, an overflowed table was simply clipped).
+    // A cell whose natural width exceeds the share wraps inside it (pass 2);
+    // a narrow one keeps its natural width.
     constexpr qreal kMinColumnWidth = 40.0;
+    constexpr qreal kFallbackColumnWidth = 240.0;
+    const qreal available =
+        m_textWidth > 0 ? m_textWidth : kFallbackColumnWidth * std::max(1, cols);
+    const qreal kMaxColumnWidth =
+        std::max(kMinColumnWidth, available / std::max(1, cols));
 
     // Pass 1: every cell's own text + its natural (unwrapped) width, which
     // decides each column's FINAL width. Wrapping a cell needs that final
@@ -253,6 +267,15 @@ void BlockLayoutCache::realizeTable(const MarkoffDocument &doc, const Theme &the
             auto layout = std::make_unique<QTextLayout>(ct.text, rowFont);
             QTextOption opt;
             opt.setWrapMode(QTextOption::WrapAtWordBoundaryOrAnywhere);
+            // The delimiter row's alignment is now applied, not just parsed
+            // for the context menu (it used to be discarded at paint).
+            switch (parsed.alignment.empty()
+                        ? TableAlign::None : parsed.alignment[size_t(c)]) {
+            case TableAlign::Center: opt.setAlignment(Qt::AlignHCenter); break;
+            case TableAlign::Right:  opt.setAlignment(Qt::AlignRight);   break;
+            case TableAlign::Left:
+            case TableAlign::None:   opt.setAlignment(Qt::AlignLeft);    break;
+            }
             layout->setTextOption(opt);
 
             const qreal cellWidth =
