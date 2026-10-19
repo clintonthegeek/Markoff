@@ -69,6 +69,49 @@ private slots:
         QVERIFY(hasBlockText(qdoc, QStringLiteral("outro")));
     }
 
+    // ASK-M23: the context path mapped a table-frame position through the flat
+    // view, so past the first frame the reported blockKind was whatever block
+    // the raw position landed on. Inside a table frame it must report the table
+    // and the exact cell (the format verbs already guarded; context did not).
+    void context_inside_a_table_reports_the_cell() {
+        auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("intro\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\noutro"));
+        auto& doc = *fixture_doc.document;
+        Styled::Editor editor;
+        auto *s = doc.createSession();
+        editor.setSession(s);
+        editor.setDocument(&doc);
+        pumpEvents();
+
+        Markoff::EditorContext seen;
+        int calls = 0;
+        QObject::connect(&editor, &Markoff::MarkdownView::contextChanged, &editor,
+                         [&](const Markoff::EditorContext &ctx) { seen = ctx; ++calls; });
+
+        QTextTable *t = firstTable(editor.textEdit()->document());
+        QVERIFY(t != nullptr);
+        QTextCursor c = editor.textEdit()->textCursor();
+        c.setPosition(t->cellAt(1, 1).firstCursorPosition().position());
+        editor.textEdit()->setTextCursor(c);
+        pumpEvents();
+
+        QVERIFY(calls >= 1);
+        QCOMPARE(seen.blockKind, QString::fromLatin1(Markoff::BlockKindNames::Table));
+        QVERIFY(seen.inTable);
+        QCOMPARE(seen.tableRow, 1);
+        QCOMPARE(seen.tableCol, 1);
+
+        // Moving back into the trustworthy prefix reports the real block again.
+        QTextCursor before = editor.textEdit()->textCursor();
+        before.setPosition(0);
+        editor.textEdit()->setTextCursor(before);
+        pumpEvents();
+        QCOMPARE(seen.blockKind, QString::fromLatin1(Markoff::BlockKindNames::Paragraph));
+        QVERIFY(!seen.inTable);
+        QCOMPARE(seen.tableRow, -1);
+        QCOMPARE(seen.tableCol, -1);
+    }
+
     void materialization_does_not_mutate_model() {
         const QByteArray src = QByteArrayLiteral(
             "intro\n\n| A | B |\n|---|---|\n| 1 | 2 |\n\noutro");

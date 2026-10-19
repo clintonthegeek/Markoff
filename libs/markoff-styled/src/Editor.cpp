@@ -14,6 +14,7 @@
 #include <QTextBlock>
 #include <QTextEdit>
 #include <QTextFrame>
+#include <QTextTable>
 
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/BlockKind.h>
@@ -269,6 +270,21 @@ void Editor::detachFindController() {
 
 namespace {
 
+// True when the cursor's selection ends strictly before the first child frame
+// boundary. Before that boundary the two coordinate spaces agree; at or after
+// it a QTextDocument position has no matching byte in the flat view.
+bool cursorEndsBeforeFirstFrame(const QTextCursor &c, QTextDocument *qdoc) {
+    const QList<QTextFrame *> frames = qdoc->rootFrame()->childFrames();
+    if (frames.isEmpty()) return true;
+    int firstFramePos = INT_MAX;
+    for (QTextFrame *f : frames)
+        firstFramePos = qMin(firstFramePos, f->firstPosition());
+    // firstPosition() is the first position INSIDE the frame; the frame's
+    // opening boundary char sits one before it. A selection is trustworthy
+    // only if it ends strictly before that boundary.
+    return c.selectionEnd() < firstFramePos - 1;
+}
+
 // True when te's caret/selection sits in the frame-free prefix where
 // QTextEdit qt-positions == widgetFlatView qt-positions.
 bool selectionInTrustworthyRegion(QTextEdit *te) {
@@ -279,15 +295,7 @@ bool selectionInTrustworthyRegion(QTextEdit *te) {
                       " inside a table frame; edit the table in Source mode";
         return false;
     }
-    const QList<QTextFrame *> frames = qdoc->rootFrame()->childFrames();
-    if (frames.isEmpty()) return true;
-    int firstFramePos = INT_MAX;
-    for (QTextFrame *f : frames)
-        firstFramePos = qMin(firstFramePos, f->firstPosition());
-    // firstPosition() is the first position INSIDE the frame; the frame's
-    // opening boundary char sits one before it. A selection is trustworthy
-    // only if it ends strictly before that boundary.
-    if (c.selectionEnd() >= firstFramePos - 1) {
+    if (!cursorEndsBeforeFirstFrame(c, qdoc)) {
         qWarning() << "Markoff::Styled::Editor: format verbs are unavailable"
                       " at/after a table frame (cursor positions diverge from"
                       " the flat view); edit there in Source mode";
@@ -517,6 +525,32 @@ void Editor::recomputeContext()
     // (toPlainText() diverges once QTextTable frames are present).
     const QTextCursor cursor = m_editor->textCursor();
     const int qtPos = cursor.position();
+
+    // Inside a table frame a QTextDocument position has no matching byte in the
+    // flat view, so the raw mapping lands on the wrong block (ASK-M23: the
+    // format verbs guard on this, the context path did not). Report the table
+    // and the exact cell instead — the frame structure characters make the
+    // block lookup meaningless, but the QTextTable knows its cell precisely.
+    if (QTextTable *table = cursor.currentTable()) {
+        Markoff::EditorContext tableCtx;
+        tableCtx.blockKind = Markoff::BlockKindNames::Table;
+        tableCtx.inTable = true;
+        const QTextTableCell cell = table->cellAt(cursor);
+        if (cell.isValid()) {
+            tableCtx.tableRow = cell.row();
+            tableCtx.tableCol = cell.column();
+        }
+        if (tableCtx == m_lastContext) return;
+        m_lastContext = tableCtx;
+        emit contextChanged(tableCtx);
+        return;
+    }
+
+    // At or after a frame boundary (but not inside a table) the mapping is
+    // still unsound; keep the last context rather than an invented one.
+    if (!cursorEndsBeforeFirstFrame(cursor, m_editor->document()))
+        return;
+
     const QString flatText = QString::fromUtf8(doc->widgetFlatView());
     const quint32 sepByte =
         Markoff::SourceTextDocumentBinding::qtPosToByteOffset(flatText, qtPos);
