@@ -57,13 +57,27 @@ set(JKQTMATHTEXT_SOURCES
 qt_add_resources(FONT_RESOURCES resources/xits.qrc resources/firamath.qrc)
 
 # --- Static library target ---
+# STATIC with hidden visibility, not a plain static library. Two Markoff
+# shared libraries link this (markoff-canvas for Math blocks,
+# markoff-embed-math for the display-math backend). With default visibility
+# the dynamic linker merges jkqtmathtext's globals across both, so one object
+# ends up with two static destructors: the second teardown freed shared state
+# the first had already released (ASan: heap-use-after-free in a QHash
+# destructor at process exit; it aborted the canvas render test roughly 1 run
+# in 30, and ASan also reported the ODR violation). Hidden visibility gives
+# each consumer a private copy, so every global has exactly one owner and one
+# destructor, and the shipped artifact set is unchanged.
 add_library(jkqtmathtext STATIC
     ${JKQTCOMMON_SOURCES}
     ${JKQTMATHTEXT_SOURCES}
     ${FONT_RESOURCES}
 )
 
-set_target_properties(jkqtmathtext PROPERTIES POSITION_INDEPENDENT_CODE ON)
+set_target_properties(jkqtmathtext PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    CXX_VISIBILITY_PRESET hidden
+    VISIBILITY_INLINES_HIDDEN ON
+)
 
 target_compile_definitions(jkqtmathtext PUBLIC
     JKQTMATHTEXT_COMPILED_WITH_XITS
