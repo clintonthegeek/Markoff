@@ -241,6 +241,22 @@ acceptance run. See
 
 M1 and M29 stay closed: both are in the pinned tree.
 
+## Batch close-out (2026-10-19)
+
+Landed: Wave 1 (8 rows), Wave 2 (8 rows), M30, M16's offset half, M17, M31's
+reuse API, and the Wave 0 reply. Graffodil landed M5, M6, punch-list batch 1 and
+M19. Every remaining row is gated on something other than effort:
+
+| Remaining | Gate |
+|---|---|
+| M7 styled theme | needs an explicit exception to the styled bug-fix-only rule (feature-shaped) |
+| M37 canvas card mode | needs a documented embedded mode + scroll ownership decision |
+| M26, M27 item 4 | packaging decision (latent on this toolchain) |
+| M12 | retention-policy decision + a measurement |
+| M13, M18 | blocked on a reliable document-wide content version (see below) |
+| M31's other half | caller-side edit tracking; needs the binding to record byte edits |
+| Graffodil: `countCrossings`, guide-overlay churn, `computeRepulsion` region, `edgeWaypoints` key, M14, M15 | performance work and an API key change; M14/M15 need specs under Graffodil's own conventions |
+
 ## Blocked on an unreliable key (recorded, not started)
 
 **M13 and M18** want caches keyed on edit sequences: a cached flat view, a

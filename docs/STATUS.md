@@ -20,8 +20,9 @@ M11 — `a910338d`..`253f1889`); the pin publication (Wave 0b) is done and the
 pin stays `e8a8e7d1`. M30 (parser UTF-8 validation) landed ahead of Wave 3, and M16's offset half plus
 M17's per-block link cache landed. The Wave 0 reply is written
 (`docs/handoff/2026-10-19-to-corbomite-open-asks-response.md`) and awaiting a
-send decision; M13/M18 are blocked on a reliable document-wide content version (see the board);
-M31's caller-side edit tracking and Waves 5–6 are open. Graffodil's M5, M6 and
+send decision; M13/M18 are blocked on a reliable document-wide content version; M31's
+caller-side edit tracking, the Wave 5 decisions and the Graffodil perf/spec
+rows are the remainder (see the board's batch close-out table). Graffodil's M5, M6 and
 punch-list batch 1 and M19 are done in that repo. M11's enum disposition (implement or remove the three unimplemented
 flags) stays a decision.
 
