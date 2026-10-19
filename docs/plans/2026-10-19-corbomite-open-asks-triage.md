@@ -39,7 +39,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 | M5 | P0 | OPEN | Graffodil `BatchRenderer.cpp:28-32`; `synchronize()` `:128-129` | S | Graffodil |
 | M6 | P0 | OPEN | Graffodil `GraphEdgeItem.h:121-122`; `GraphScene.cpp:30-63`; `GraphEdgeItem.cpp:241-242` | M | Graffodil |
 | M7 | P1 | OPEN | `FormatPass.h:21` unused; `FormatPass.cpp:425` reads only `fontScale`; `computeBlockHash` `:217`; `StyleApplier.cpp:39`; `Theme.h` has no `operator==` | M–L | styled (exception) |
-| M8 | P1 | OPEN | `MarkdownView.h:105`; no `destroyed` wiring in core/source/styled; canvas has the pattern, `EditorWidget.cpp:206-216` | M | core + leaves |
+| M8 | P1 | OPEN | `MarkdownView.h:105`; no `destroyed` wiring in core/source/styled; canvas has the pattern, `EditorWidget.cpp:206-216`. Also carries M28's missing doc-destroyed regression test | M | core + leaves |
 | M9 | P1 | PARTIAL | `MarkdownView.h:64-66` has no availability query; `MarkoffDocument.h:266-278` has `undoD2/redoD2` + per-block `canUndoForBlock` only | S | core |
 | M10 | P1 | **CLOSED** — APIs deleted | `latestParse`, `parsedDocument`, `blockAnchorAt`, `blockByteRange`, `blockAt` absent | 0 | reply |
 | M11 | P1 | OPEN | `SearchEngine.h:27-33`; `SearchEngine.cpp:23-26` `Q_ASSERT` only; `FindController.h:17-18` still implies support | S–M | core |
@@ -59,7 +59,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 | M25 | P2 | OPEN | `Editor.cpp:82-175` never rewires `m_findAdapter`; `StyledFindAdapter.cpp:60-85,136-180` | S–M | styled |
 | M26 | P2 | OPEN — deliberate | `MarkoffCoreExport.h:4-7`; rationale recorded `markoff-core/CMakeLists.txt:9-16` | M | decision |
 | M27 | P2 | PARTIAL | apps gated (`CMakeLists.txt:101-114`); headers installed; item 4 open: PUBLIC `Markoff::Parser`/`CollabTextVNext` + `<collabtext/...>` in `MarkoffDocument.h:18-20` | S–M | core |
-| M28 | P2 | PARTIAL | no `LABELS`; `perf_load_bench` unregistered; no production doc-destroyed test; d5 test gone (item stale); `markoff-source/CLAUDE.md:27` `FindBar` stale; `UndoLog` moved to collabtext | M | all leaves |
+| M28 | P2 | PARTIAL — labels done, rest open | no `LABELS` (fixed in Wave 1); `perf_load_bench` stays unregistered on purpose; no production doc-destroyed test — lands with M8; d5 test gone (item stale); `markoff-source/CLAUDE.md:27` `FindBar` fixed; `UndoLog` moved to collabtext | S | core (doc-destroyed test) |
 | M29 | P0 | **CLOSED by redesign at the pin** | pin `Clock.cpp:164-178` keeps the documented asymmetric summary fold, `:179` adds `coverage_intersection`; `Buffer::compact` is gone (`collect_garbage` `:484`); `NetworkSim.cpp:262-265`; 3-replica coverage tests `tst_clock.cpp:167,190` | 0 | reply |
 | M30 | P1 | OPEN | `TreeSitterParser.cpp:204-223` lead byte only; duplicate table `SourceSpan.cpp:10-28` | M | parser |
 | M31 | P1 | OPEN | `TreeSitterParser.cpp:247-290` passes `nullptr` previous tree twice; zero-filled map | L | parser |
@@ -87,7 +87,8 @@ clean-prefix `find_package(Corbomite)` cannot resolve the imported
 Waves are ordered by risk and unblocking value, not by ask number. Each
 slice is one commit under the repo's own board.
 
-**Wave 1 progress (2026-10-19):** M3 done, M4 done. Remaining rows below.
+**Progress (2026-10-19):** Wave 0b done; Wave 1 done (eight rows, commits
+`0d974f1b`..`16e7bfe4`, suite 95/95). Wave 0's reply and Waves 2–6 are open.
 
 ### Wave 0 — Reply and close (no code, do first)
 
@@ -103,29 +104,26 @@ the letter.
 
 Exit: reply artefact under `docs/handoff/`; no build.
 
-### Wave 1 — Small, independent correctness and hygiene (Markoff)
+### Wave 1 — Small, independent correctness and hygiene (Markoff) — DONE 2026-10-19
 
-One commit each, in this order:
+All eight rows landed, one commit each:
 
-1. **M3** `parsedFrontmatter` — `std::call_once` computing inside the
-   initializer; document the threading contract in `Document.h`.
-2. **M4** parser validity — tear down inline trees at the top of
-   `parse()`, add `m_valid`, gate `inlineSpansFor`/`buildDocumentQueries`.
-3. **M35** closing-fence helper used at `:42` and `:186`; add the four
-   `tst_frontmatter` cases (`----`, `--- `, `---foo`, round-trip).
-4. **M33** acceptance test — set a key, assert one `undoD2()` restores
-   the previous frontmatter byte-for-byte. Fix only if it fails.
-5. **M36** canonical `MARKOFF_BUILD_TESTS` gate propagated to every
-   leaf, parser tests wrapped, canvas default OFF.
-6. **M32** compile `PerfProbe` out unless `MARKOFF_PERF`; key on
-   literal address; move the in-loop probe out of the loop.
-7. **M34** correct or delete `Origin.h` (no production reader remains).
-8. **M28 (labels only)** `LABELS` on every test; register
-   `perf_load_bench`; fix `markoff-source/CLAUDE.md:27`.
+| Row | Commit | What changed |
+|---|---|---|
+| M3 | `0d974f1b` | `parsedFrontmatter()` under `std::call_once`; threading contract in `Document.h` |
+| M4 | `2e3b54cf` | `parse()` drops every tree before touching the byte map; `m_valid` gates the accessors; new `tst_markoff_parser_validity` |
+| M35 | `5c0e5c6a` | `findClosingFence()` requires a complete fence; `markdownContent()` uses the recorded span; empty-frontmatter fix; four new `tst_frontmatter` cases |
+| M33 | `f7fe14f6` | acceptance test: frontmatter edit undone byte-for-byte (already delivered, no product change) |
+| M36 | `76c44019` | canonical `MARKOFF_BUILD_TESTS`, seeded into every leaf gate; parser tests gated; `-D...=OFF` configures clean |
+| M32 | `344288a7` | `PerfProbe` compiled out unless `MARKOFF_PERF`; literal-address keys; inline probe hoisted out of the loop |
+| M34 | `49a12c0e` | dead `Origin` enum deleted with its stale includes |
+| M28 | `16e7bfe4` | every ctest test labelled `unit`/`integration`; stale Source find doc fixed |
 
-Exit: focused tests each, then
-`scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`, plus a Release
-build for the parser rows (M4's guarantee only exists under `NDEBUG`).
+Verification: `scripts/run-tests.sh` (offscreen) passed **95/95** in
+30.60 s on `16e7bfe4`; a `-DMARKOFF_BUILD_TESTS=OFF` configure yields zero
+ctest entries, and a `-DMARKOFF_PERF` build compiles the parser and core
+libraries.
+
 
 ### Wave 2 — Lifetime, ownership, and wrong UI state (Markoff)
 

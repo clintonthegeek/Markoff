@@ -14,10 +14,10 @@ stay in Corbomite.
 
 The new workfront is Corbomite's consolidated asks of 2026-10-18. The triage
 board records a per-ask verdict against this tree, the already-closed rows,
-and a seven-wave order. **Wave 1 is in progress:** M3 and M4 landed
-(parser state contract); the remaining Wave 1 rows are M35, M33's test,
-M36, M32, M34 and M28. Wave 0 (the answer-and-close reply) and Waves 2–6
-have not started; Wave 0b is done.
+and a seven-wave order. **Wave 1 is complete** (M3, M4, M35, M33, M36, M32,
+M34, M28 — commits `0d974f1b`..`16e7bfe4`); the pin publication (Wave 0b) is
+done and the pin stays `e8a8e7d1`. Wave 0's answer-and-close reply and
+Waves 2–6 have not started.
 
 The triage corrected the ask document's own evidence: its markoff-core
 `file:line` citations predate A13 and name files that do not exist at
@@ -46,6 +46,11 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 [`docs/handoff/2026-10-19-collabtext-master-integration-pin.md`](handoff/2026-10-19-collabtext-master-integration-pin.md).
 
 ## Latest verification
+
+2026-10-19, Wave 1: offscreen `scripts/run-tests.sh` passed **95/95** in
+30.60 s on `16e7bfe4` (wire `build-dev`, prefix `build-collabtext-alpha5/install`).
+Also checked: `-DMARKOFF_BUILD_TESTS=OFF` configures with zero ctest entries;
+a `-DMARKOFF_PERF` build compiles parser and core.
 
 2026-10-19: collabtext refs re-checked after the integration push —
 `origin/master` contains `e8a8e7d1`, and the alpha.5 and integration tags
