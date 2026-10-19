@@ -33,8 +33,10 @@ interaction checks). The embed plugin skeleton also landed: the contract
 `libs/markoff-embed` (cache, worker pool, SVG rasteriser), proven by a fake
 backend. Canvas now consumes the runtime: a fenced block with a registered
 backend paints source, asks the service, and paints the rasterised artifact when
-`artifactReady` arrives (tested end-to-end offscreen). Suite **97/97** in
-27.74 s. Plan:
+`artifactReady` arrives (tested end-to-end offscreen). Display math now takes
+the same path through `markoff_embed_math` (jkqtmathtext at the request's DPR,
+delimiter stripping and theme colours in the backend), so the first real engine
+is a plugin. Suite **98/98** in 25.60 s. Plan:
 [`plans/2026-10-19-embedded-renderers-plan.md`](plans/2026-10-19-embedded-renderers-plan.md)
 — reconnaissance and plan for native embedded renderers (tables first, then
 math, Mermaid, Graphviz, Pikchr, …) in the live view. It carries the decisions

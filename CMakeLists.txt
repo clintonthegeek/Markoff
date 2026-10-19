@@ -120,6 +120,22 @@ add_subdirectory(libs/markoff-embed)
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)
 endif()
+# Optional embed backends. ON for a standalone build, OFF when consumed as a
+# subdirectory; a host opts in per backend. The runtime itself is always built
+# (it is small and engine-free); backends are where dependency and licence
+# weight lives.
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_MARKOFF_EMBED_BACKEND_DEFAULT ON)
+else()
+    set(_MARKOFF_EMBED_BACKEND_DEFAULT OFF)
+endif()
+option(MARKOFF_EMBED_MATH
+    "Build the jkqtmathtext display-math embed backend" ${_MARKOFF_EMBED_BACKEND_DEFAULT})
+if(MARKOFF_EMBED_MATH)
+    add_subdirectory(libs/markoff-embed/backends/math)
+endif()
+unset(_MARKOFF_EMBED_BACKEND_DEFAULT)
+
 add_subdirectory(libs/markoff-source)
 add_subdirectory(libs/markoff-styled)
 add_subdirectory(libs/markoff-canvas)

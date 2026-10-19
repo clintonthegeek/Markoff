@@ -13,6 +13,7 @@
 #include <markoff/core/CodeBlockProcessorRegistry.h>
 #include <markoff/core/EmbedRender.h>
 #include <markoff/embed/EmbedRuntime.h>
+#include <markoff/embed/math/MathBackend.h>
 
 #include <atomic>
 #include <memory>
@@ -287,6 +288,43 @@ private slots:
         QCOMPARE(countColorPixels(view.grab().toImage(), fill), 0);
         QTRY_VERIFY_WITH_TIMEOUT(
             countColorPixels(view.grab().toImage(), fill) > 50, 3000);
+    }
+
+    // Display math is the first real engine through the socket: a Math block
+    // with DisplayMode renders via the math backend instead of the leaf's own
+    // pixmap path.
+    void displayMathRendersThroughTheRuntime()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("$$\nx^2 + y^2\n$$\n\ntail"));
+        Markoff::CodeBlockProcessorRegistry registry;
+        registry.registerProcessor(std::make_shared<Markoff::Embed::MathBackend>());
+        Markoff::Embed::EmbedRuntime runtime(&registry);
+
+        Markoff::Canvas::View view;
+        view.resize(600, 400);
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        theme.setColor(Markoff::Theme::Slot::EditorBackground, Qt::white);
+        theme.setColor(Markoff::Theme::Slot::TextDefault, QColor(20, 20, 20));
+        view.setTheme(theme);
+        view.setEmbedRenderService(&runtime);
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto blocks = fixture.document->iterateBlocks();
+        QCOMPARE(blocks.size(), size_t{2});
+        const Markoff::BlockId math = blocks[0];
+        QCOMPARE(Markoff::Cmd::changeKind(*fixture.document, math,
+                     Markoff::BlockKind::Math,
+                     {Markoff::AttrNames::DisplayMode},
+                     {true}).state,
+                 Markoff::VNext::ActionPublicationState::committed);
+        view.setCaretPosition(blocks[1], 0);
+        QCoreApplication::processEvents();
+
+        QTRY_VERIFY_WITH_TIMEOUT(view.isEmbedArtifactActive(math), 3000);
+        QVERIFY2(!view.isMathPixmapActive(math),
+                 "the legacy math pixmap path should be bypassed");
     }
 
     // The painted table must actually appear: grid lines and cell text.

@@ -418,8 +418,8 @@ renderer is native.
 | 2 | contract in core (request/result/version); registry evolved in place | M | **done** (`tst_embed_runtime`) |
 | 2 | `markoff-embed` runtime (cache, pool, SVG, process sandbox) | M–L | **cache/pool/SVG done**; sandbox open |
 | 2 | canvas front-end: one embedded path; mermaid seam retired | M | **generic path done** (service lookup → source fallback → rasterised paint); legacy `MermaidRenderer` seam still present until Corbomite's adapter moves |
-| 2 | math backend (DPR/theme/cache) | S–M | 1x/2x, both themes, fallback |
-| 3 | mermaid backend, reproducible build, corpus | M | provenance recorded; golden tests |
+| 2 | math backend (DPR/theme/cache) | S–M | **done** (`markoff_embed_math`, `tst_embed_math`; canvas display math goes through it) |
+| 3 | mermaid backend, reproducible build, corpus | M | next: adapter around a pinned build |
 | 4 | Graphviz subprocess backend + sandbox | S–M | timeout/failure/fallback tests |
 | 5 | Pikchr backend (linked) | M | fuzz gate + golden tests |
 | 6–11 | WaveDrom, Svgbob, D2, PlantUML, Typst, Gnuplot | M each | per-engine corpus + matrix row |

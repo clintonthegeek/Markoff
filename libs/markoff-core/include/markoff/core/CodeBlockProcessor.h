@@ -12,7 +12,7 @@ namespace Markoff {
 /// Version of the renderer contract. A runtime refuses a backend built against
 /// a different version instead of calling through a mismatched vtable. Bump on
 /// any non-additive change to RenderRequest/RenderedBlock/this interface.
-inline constexpr int kEmbedContractVersion = 1;
+inline constexpr int kEmbedContractVersion = 2;
 
 /// What a backend needs to render one block. Everything a renderer may vary on
 /// is here: source, available width, DPI scale, and the resolved colours (a
@@ -24,6 +24,7 @@ struct MARKOFF_CORE_EXPORT RenderRequest {
     QSizeF  availableWidth{-1, -1};  ///< content column in DIP; -1 = unbounded
     qreal   devicePixelRatio = 1.0;
     qreal   fontScale = 1.0;
+    qreal   fontPixelSize = 0.0;   ///< resolved body/monospace size in DIP; 0 = backend default
     QColor  foreground;
     QColor  background;
     QString themeKey;        ///< stable hash of the colours above (front-end set)

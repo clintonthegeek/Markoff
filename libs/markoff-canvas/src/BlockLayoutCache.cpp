@@ -420,13 +420,28 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
     e.embedImage = QImage();
     e.embedKey.clear();
     e.embedLanguage.clear();
-    if (e.style.isCodeBlock && e.id != m_caretBlock && m_embedService) {
-        const Detail::CodeFenceInfo fence = Detail::parseCodeFence(text);
-        if (!fence.language.isEmpty() && fence.contentEnd > fence.contentStart) {
-            Markoff::RenderRequest request;
-            request.language = fence.language.toLower();
-            request.source = QString::fromUtf8(
-                text.mid(fence.contentStart, fence.contentEnd - fence.contentStart));
+    if ((e.style.isCodeBlock || e.style.isMathDisplay)
+        && e.id != m_caretBlock && m_embedService) {
+        Markoff::RenderRequest request;
+        bool haveSource = false;
+        if (e.style.isCodeBlock) {
+            const Detail::CodeFenceInfo fence = Detail::parseCodeFence(text);
+            if (!fence.language.isEmpty() && fence.contentEnd > fence.contentStart) {
+                request.language = fence.language.toLower();
+                request.source = QString::fromUtf8(
+                    text.mid(fence.contentStart, fence.contentEnd - fence.contentStart));
+                haveSource = true;
+            }
+        } else {
+            // Display math is an embed too: the backend strips the delimiters
+            // and the request carries the resolved font size.
+            request.language = QStringLiteral("math");
+            request.source = QString::fromUtf8(text);
+            request.fontPixelSize = e.style.font.pixelSize();
+            haveSource = !request.source.isEmpty();
+        }
+
+        if (haveSource) {
             request.availableWidth = QSizeF(m_textWidth, -1);
             request.devicePixelRatio = m_devicePixelRatio;
             request.fontScale = m_fontScale;
@@ -460,7 +475,8 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
     }
 
     e.mermaidPixmap = QPixmap();
-    if (e.style.isCodeBlock && e.id != m_caretBlock && m_mermaidRenderer) {
+    if (e.style.isCodeBlock && e.id != m_caretBlock && m_mermaidRenderer
+        && e.embedImage.isNull()) {
         const Detail::CodeFenceInfo fence = Detail::parseCodeFence(text);
         if (fence.language.compare(QStringLiteral("mermaid"), Qt::CaseInsensitive) == 0
             && fence.contentEnd > fence.contentStart) {
@@ -571,7 +587,7 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
     // painted at the current caret state — no separate invalidation path
     // needed.
     e.mathPixmap = QPixmap();
-    if (e.style.isMathDisplay && e.id != m_caretBlock) {
+    if (e.style.isMathDisplay && e.id != m_caretBlock && e.embedImage.isNull()) {
         const QString latex = Detail::stripMathDelimiters(QString::fromUtf8(text));
         e.mathPixmap = Detail::renderMathPixmap(
             latex, e.style.font.pixelSize(), e.style.foreground,

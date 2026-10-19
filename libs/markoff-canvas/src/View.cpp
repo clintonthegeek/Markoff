@@ -1020,6 +1020,14 @@ bool View::isMathPixmapActive(BlockId id) const
     return !m_cache->entries()[size_t(idx)].mathPixmap.isNull();
 }
 
+bool View::isEmbedArtifactActive(BlockId id) const
+{
+    const int idx = m_cache->indexOf(id);
+    if (idx < 0)
+        return false;
+    return !m_cache->entries()[size_t(idx)].embedImage.isNull();
+}
+
 bool View::isImagePixmapActive(BlockId id) const
 {
     const int idx = m_cache->indexOf(id);

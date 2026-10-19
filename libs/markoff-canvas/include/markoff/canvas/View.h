@@ -393,6 +393,11 @@ public:
     /// inspection surface only — nothing here is authority.
     bool isMathPixmapActive(BlockId id) const;
 
+    /// True when `id` currently has a ready embed artifact (the runtime path),
+    /// i.e. paint would draw it instead of source. Inspection/testing surface,
+    /// same convention as the pixmap predicates.
+    bool isEmbedArtifactActive(BlockId id) const;
+
     /// P5.4: whether `id`'s realized entry currently has a consumer-
     /// resolved image pixmap standing in for its text layout — true
     /// exactly when it's a standard-image-form Image block AND the
