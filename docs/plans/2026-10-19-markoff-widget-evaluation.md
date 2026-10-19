@@ -21,7 +21,7 @@ M-sized perf rows.
 |---|---|---|---|---|
 | `markoff-core` | 17 953 | 44 | document, undo, sessions, find, themes, `MarkdownView` base | solid; M13/M18/M27.4 open |
 | `markoff-canvas` | 15 643 | 2 | primary block-projection editor | production arc closed; M37 open |
-| `markoff-collabtext-vnext` | 11 552 | 0 | provider-backed engine adapter | works; **no own tests** |
+| `markoff-collabtext-vnext` | 11 552 | tests at `tests/collabtext-vnext/` (376 KB) | provider-backed engine adapter | works; well covered directly |
 | `markoff-parser` | 6 638 | 14 | tree-sitter + frontmatter | Wave-1 rows verified solid |
 | `markoff-styled` | 5 985 | 17 | inline-styled view (frozen, bug-fix only) | M7 half-present |
 | `markoff-source` | 2 700 | 10 | source view (frozen, bug-fix only) | stable |
@@ -71,9 +71,13 @@ Vendored: `rapidyaml`, `jkqtmathtext`. Apps: `markoff-canvas-app`,
 2. **Docs contradict the tree in five places** (details below): README task
    list, README layout table, repo `AGENTS.md` wave status, `queue.md` header,
    and `docs/d-arc` "live" status.
-3. **`markoff-collabtext-vnext` has 11.5k LOC and zero own test files.** Its
-   coverage arrives indirectly through core tests and the testapp; the router,
-   streams, and quarantine paths deserve direct tests.
+3. ~~**`markoff-collabtext-vnext` has 11.5k LOC and zero own test files.**~~
+   **Corrected 2026-10-19: false.** The adapter's tests live at repo-root
+   `tests/collabtext-vnext/` (376 KB across four binaries: provider
+   conformance, storage provider, provider-backed document, scope), not
+   under `libs/`. They cover quarantine persistence and retry, counter-gap
+   wire fixtures, deferred routing, backpressure, undo/redo across reopen,
+   and two-writer convergence directly. No gap here.
 4. **M7 is a feature-shaped half-implementation inside a frozen leaf.**
    `FormatPass.h:21` reads only `fontScale`; `StyleApplier.cpp:39` compares
    theme pointers; `Theme.h` has no `operator==`; `computeBlockHash:217` omits
