@@ -200,36 +200,29 @@ mostly S and should be one batch task; M19 is confined to
 `SugiyamaLayout.cpp`; M14/M15 need a spec and plan under Graffodil's own
 conventions before code.
 
-### Wave 0b — Publish the collabtext pin (minutes, alongside the reply)
+### Wave 0b — collabtext pin publication (DONE 2026-10-19)
 
-No code: M1 and M29 are already delivered at the installed pin. The
-engine line lives on `feat/fuguemax-placement`, tagged
-`collabtext-markoff-core-2026-10-13-alpha5`, and neither the branch nor
-the tag is on `origin`; GitHub holds only `master` (2 packaging commits,
-329 engine commits short) and `roadmap/reliability-v2`, which is an
-ancestor of the pin. So the commit Markoff requires is not fetchable by
-anyone else, which makes `docs/STATUS.md`'s "recreate the prefix"
-instruction unexecutable on the laptop or a fresh clone.
+Closed within a day of being recorded. collabtext merged the engine line into
+`master`, pushed the branch, every candidate tag, and a new annotated
+`collabtext-integration-2026-10-19` = `4d0177cd6c3f8802ec031327d0f7d9f314a97e6f`;
+`origin/master` now contains `e8a8e7d1`, so the prefix is recreatable.
 
-Actions: push the branch and tags to `origin`; then decide the trunk
-story — merge the engine line into `master` (carrying `master`'s two
-packaging commits forward) and re-tag, or leave the line as a published
-branch and keep documenting it as the pin. Only a change of commit
-requires a new acceptance record; publishing the same commit and tag does
-not.
+Markoff keeps `e8a8e7d1` — verified ancestor of the integration commit, with
+three lines of capability-manifest metadata as the only `libs/` delta, so the
+A14/A15 acceptance record still applies and no re-acceptance is owed now. The
+integration tag is the candidate for the next Core change that needs a fresh
+acceptance run. See
+[`../handoff/2026-10-19-collabtext-master-integration-pin.md`](../handoff/2026-10-19-collabtext-master-integration-pin.md).
 
-This wave is last on the board but not low value: both P0s are already
-fixed, and neither damages Corbomite today — its IdList path needs remote
-ops, which Corbomite does not carry on the wire yet, and destructive GC
-uses `collect_garbage`, not a watermark.
+M1 and M29 stay closed: both are in the pinned tree.
 
 ## Standstill rules that constrain this list
 
 - `markoff-styled` and `markoff-source` are bug-fix-only. Waves 1–3 are
   bug-shaped and may proceed; M7 and M37 are feature-shaped and need an
   explicit exception recorded on this board before code.
-- collabtext is an installed pinned package. Wave 0b is a publish action,
-  not an in-tree patch.
+- collabtext is an installed published package. A pin move is an acceptance
+  record, not an in-tree patch.
 - Physical collection and log pruning stay disabled. M12 cannot be
   "fixed" by enabling GC without changing that standing rule.
 - Graffodil's own convention requires a bug report for fixes and a spec
@@ -242,5 +235,4 @@ uses `collect_garbage`, not a watermark.
 - Then Wave 1 rows 5–8, then Wave 2 in full.
 - Graffodil M6/M5 can run in that repo in parallel; they share no code
   with Markoff.
-- Publish the collabtext pin branch and tags now — it is a hard
-  reproducibility dependency and costs minutes.
+- Wave 0b is done; the pin is published and unchanged.

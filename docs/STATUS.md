@@ -34,18 +34,25 @@ Root CMake requires that installed package. The prefix used for the
 acceptance runs is `build-collabtext-alpha5/install`. Recreate a missing
 prefix from the candidate's `docs/USING_VNEXT.md`.
 
-**Publishing gap (found 2026-10-19).** That commit is the tip of
-`feat/fuguemax-placement`; collabtext `master` does not contain it (329
-commits short, plus 2 packaging commits it does not have). Neither the tag
-nor the branch is on `origin` (GitHub lists only `master` and
-`roadmap/reliability-v2`; Codeberg holds `master` at `046d375`). Until it
-is pushed or merged and retagged, the pinned commit is reachable only from
-a local clone. Publish it before treating the prefix as reproducible.
+**Published 2026-10-19.** The tag and its branch are now on `origin`, and
+`origin/master` contains the commit too, so the prefix is recreatable on a
+fresh clone. `master` also carries the annotated integration tag
+`collabtext-integration-2026-10-19` = `4d0177cd6c3f8802ec031327d0f7d9f314a97e6f`.
+The pin stays at `e8a8e7d1`: the integration commit is a descendant of it, and
+the only `libs/` difference is three lines of capability-manifest metadata, so
+the A14/A15 acceptance record still applies. Move the pin to the integration
+tag when a Core change needs a fresh acceptance run. Inbound handoff:
+[`docs/handoff/2026-10-19-collabtext-master-integration-pin.md`](handoff/2026-10-19-collabtext-master-integration-pin.md).
 
 ## Latest verification
 
+2026-10-19: collabtext refs re-checked after the integration push —
+`origin/master` contains `e8a8e7d1`, and the alpha.5 and integration tags
+are on `origin` as annotated tags. Read-only: no build, no test run.
+
 2026-10-19: read-only audit of the Corbomite asks against Markoff
-`dca64686`, Graffodil `011b342f`, and collabtext `e4779644`. No build and
+`dca64686`, Graffodil `011b342f`, and collabtext at the pin `e8a8e7d1`
+plus the then-local `master` `e4779644`. No build and
 no test run; the triage makes source claims only, and each fix wave carries
 its own verification.
 
