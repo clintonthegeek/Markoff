@@ -60,19 +60,27 @@ QList<SearchHit> SearchEngine::findByBlock(const MarkoffDocument &doc,
                 from = idx + needleUtf8.size();
             }
         } else {
-            // Case-insensitive: convert block to QString once, search per u16 index,
-            // then map each match back to byte offsets.
+            // Case-insensitive: convert the block to QString once, search per
+            // u16 index, and carry a running UTF-16→UTF-8 byte cursor. The old
+            // form re-serialised the whole prefix twice per match, so a short
+            // needle in a large block was O(len x matches) (ASK-M16).
             const QString blockStr = QString::fromUtf8(blockBytes);
             int u16from = 0;
+            int u16at = 0;    // u16 index the byte cursor stands at
+            int byteAt = 0;   // UTF-8 byte offset of u16at
             for (;;) {
                 const int u16idx = blockStr.indexOf(needle, u16from, Qt::CaseInsensitive);
                 if (u16idx < 0) break;
+                if (u16idx > u16at) {
+                    byteAt += blockStr.mid(u16at, u16idx - u16at).toUtf8().size();
+                    u16at = u16idx;
+                }
                 const int u16end = u16idx + needle.size();
-                const uint32_t byteStart = static_cast<uint32_t>(
-                    blockStr.left(u16idx).toUtf8().size());
-                const uint32_t byteEnd = static_cast<uint32_t>(
-                    blockStr.left(u16end).toUtf8().size());
-                hits.append(SearchHit{id, byteStart, byteEnd - byteStart});
+                const int byteLen = blockStr.mid(u16at, u16end - u16at).toUtf8().size();
+                hits.append(SearchHit{id, static_cast<uint32_t>(byteAt),
+                                      static_cast<uint32_t>(byteLen)});
+                byteAt += byteLen;
+                u16at = u16end;
                 u16from = u16end;
             }
         }

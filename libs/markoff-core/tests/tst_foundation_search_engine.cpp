@@ -81,6 +81,27 @@ private Q_SLOTS:
     // ASK-M11: the declared-but-unimplemented flags must not silently behave
     // like a literal search. supports() is the query a UI greys out with, and
     // asking for an unsupported flag returns no matches (with a warning).
+    // ASK-M16: the case-insensitive path carried no byte cursor, so it
+    // re-serialised the block prefix twice per match. The offsets it reports
+    // must stay exact, including multibyte text before and between matches.
+    void case_insensitive_offsets_survive_multibyte_text() {
+        auto fixture = openCandidate(QStringLiteral("search-multibyte"));
+        auto &doc = *fixture.document;
+        const QByteArray block = QString::fromUtf8(
+            "\xC3\xA9t\xC3\xA9 foo \xF0\x9F\x8E\xB5 foo").toUtf8();
+        QCOMPARE(doc.importInitialMarkdown(block).state,
+                 VNext::ActionPublicationState::committed);
+
+        const auto hits = SearchEngine::findByBlock(
+            doc, QStringLiteral("FOO"), SearchEngine::NoFlags);
+        QCOMPARE(hits.size(), 2);
+        const QByteArray text = doc.blockText(doc.iterateBlocks().front());
+        QCOMPARE(text.mid(int(hits[0].matchStart), int(hits[0].matchLen)), QByteArray("foo"));
+        QCOMPARE(text.mid(int(hits[1].matchStart), int(hits[1].matchLen)), QByteArray("foo"));
+        // Second match sits after the 4-byte emoji.
+        QCOMPARE(int(hits[1].matchStart), text.indexOf("foo", int(hits[0].matchStart) + 1));
+    }
+
     void unsupported_flags_are_refused_not_silently_ignored() {
         QVERIFY(SearchEngine::supports(SearchEngine::NoFlags));
         QVERIFY(SearchEngine::supports(SearchEngine::CaseSensitive));
