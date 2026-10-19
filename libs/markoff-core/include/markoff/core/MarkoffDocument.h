@@ -304,11 +304,15 @@ public:
     /// Returns empty if the block is not found.
     QByteArray blockText(Markoff::BlockId id) const;
 
-    /// Returns an edit-sequence counter for a specific block's buffer.
-    /// Increments each time applyBlockEdit touches that block.
+    /// Returns an edit-sequence counter for a specific block. Increments each
+    /// time the block's visible state changes: its buffer, its attributes, or
+    /// its kind — locally, by a remote action, or through undo/redo. It is the
+    /// per-block content version every cache keys on.
     quint64 blockEditSequence(Markoff::BlockId id) const;
 
     /// Sum of the per-block edit sequences for document-level change tracking.
+    /// Advances on every content-bearing mutation, including attribute and
+    /// kind writes, remote application, and undo/redo.
     quint64 d2EditSequence() const noexcept;
 
     /// Increments on structural block changes, separately from per-block

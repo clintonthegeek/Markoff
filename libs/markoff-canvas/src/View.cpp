@@ -391,11 +391,11 @@ void View::setDocument(MarkoffDocument *doc)
         // cheat sheet.
         connect(m_doc, &MarkoffDocument::d2DocumentChanged,
                 this, &View::onDocumentChanged);
-        // Attribute writes emit blocksChanged but bump neither edit sequence,
-        // so the ordinary staleness test misses them (ASK-M9 follow-up: a
-        // checkbox or display-mode flip could paint its old state). Restyle the
-        // named blocks before the accompanying documentChanged pass.
-        connect(m_doc, &MarkoffDocument::blocksChanged, this,
+        // Attribute writes advance the block's edit sequence, so the ordinary
+        // staleness test catches them; this path restyles the named blocks
+        // right away rather than at the next paint (ASK-M9 follow-up: a
+        // checkbox or display-mode flip could paint its old state).
+        connect(m_doc, &Markoff::MarkoffDocument::blocksChanged, this,
                 [this](const QList<Markoff::BlockId> &ids) {
                     if (!m_doc) return;
                     m_cache->forceRestyle(ids);

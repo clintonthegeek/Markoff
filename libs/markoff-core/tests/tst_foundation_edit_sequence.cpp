@@ -2,6 +2,7 @@
 #include <QTest>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/AttrNames.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
 #include <memory>
 #include <stdexcept>
@@ -89,6 +90,46 @@ private Q_SLOTS:
             QVERIFY(cur > prev);
             prev = cur;
         }
+    }
+
+    void attribute_write_increments() {
+        // An attribute write changes what the block shows, so the content
+        // version must advance: version-keyed caches (canvas layout, inline
+        // spans, the embed render cache) would otherwise keep the old state.
+        auto fixture = openCandidate(QStringLiteral("edit-seq-attr"), QByteArrayLiteral("x"));
+        auto& d = *fixture.document;
+        const auto block = d.iterateBlocks().front();
+        const auto seq0 = d.d2EditSequence();
+        const auto blockSeq0 = d.blockEditSequence(block);
+        QCOMPARE(d.setBlockAttribute(block, AttrNames::Checked, true).state,
+                 VNext::ActionPublicationState::committed);
+        QVERIFY(d.d2EditSequence() > seq0);
+        QVERIFY(d.blockEditSequence(block) > blockSeq0);
+    }
+
+    void attribute_removal_increments() {
+        auto fixture = openCandidate(QStringLiteral("edit-seq-attr-remove"),
+                                     QByteArrayLiteral("x"));
+        auto& d = *fixture.document;
+        const auto block = d.iterateBlocks().front();
+        QCOMPARE(d.setBlockAttribute(block, AttrNames::Checked, true).state,
+                 VNext::ActionPublicationState::committed);
+        const auto seq0 = d.d2EditSequence();
+        QCOMPARE(d.removeBlockAttribute(block, AttrNames::Checked).state,
+                 VNext::ActionPublicationState::committed);
+        QVERIFY(d.d2EditSequence() > seq0);
+    }
+
+    void kind_change_increments() {
+        auto fixture = openCandidate(QStringLiteral("edit-seq-kind"), QByteArrayLiteral("x"));
+        auto& d = *fixture.document;
+        const auto block = d.iterateBlocks().front();
+        const auto seq0 = d.d2EditSequence();
+        const auto blockSeq0 = d.blockEditSequence(block);
+        QCOMPARE(d.changeBlockKind(block, BlockKind::Heading).state,
+                 VNext::ActionPublicationState::committed);
+        QVERIFY(d.d2EditSequence() > seq0);
+        QVERIFY(d.blockEditSequence(block) > blockSeq0);
     }
 
 };

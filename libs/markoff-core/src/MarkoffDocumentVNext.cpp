@@ -59,10 +59,9 @@ struct MarkoffDocument::Private {
     quint64 structuralEditSequence = 0;
     mutable QHash<BlockId, QPair<quint64, QList<SourceSpan>>> inlineSpanCache;
     // Flat-view caches. Keyed on d2EditSequence(), which every content-bearing
-    // mutation path advances: local edits bump blockEditSequences /
-    // structuralEditSequence, and acceptRemoteAction bumps them for remote
-    // actions too (MarkoffDocumentVNext.cpp:1885-1890). Attribute-only edits
-    // bump nothing and cannot change these views (they are block text only).
+    // mutation path advances: local edits, structural ops, attribute and kind
+    // writes, remote actions (acceptRemoteAction, MarkoffDocumentVNext.cpp
+    // :1910), and multi-group undo/redo.
     mutable QByteArray cachedWidgetFlatView;
     mutable QByteArray cachedFlatView;
     mutable quint64 widgetFlatViewVersion = 0;
@@ -1900,13 +1899,21 @@ VNext::ActionPublicationResult MarkoffDocument::acceptRemoteAction(
     for (const auto block : afterOrder) {
         if (!beforeText.contains(block) || beforeText.value(block) != blockText(block)) {
             markChanged(block);
-            ++d->blockEditSequences[block];
         }
     }
     for (const auto block : beforeOrder)
         if (!afterRows.contains(block)) markChanged(block);
     for (const auto block : afterOrder)
         if (!beforeRows.contains(block)) markChanged(block);
+
+    // Every block the action touched advances its version — text, attributes
+    // or kind. A version-keyed cache (canvas layout, inline spans, the embed
+    // render cache) must not keep serving the pre-action state. Blocks that
+    // left the projection are skipped: nothing can look them up any more.
+    for (const auto block : changed) {
+        if (!afterRows.contains(block)) continue;
+        ++d->blockEditSequences[block];
+    }
 
     if (structureChanged) ++d->structuralEditSequence;
     d->sourcePristine = false;
@@ -3661,11 +3668,15 @@ VNext::ActionPublicationResult MarkoffDocument::setBlockAttribute(
     if (!encoded.ok())
         return {ActionPublicationState::rejected, std::nullopt, encoded.error()};
     emit tentativeBlockChanged(id);
-    const auto publication = publishMapValue(*d->lifecycle, "block-attrs",
+    auto publication = publishMapValue(*d->lifecycle, "block-attrs",
         name, identity, encoded.value());
     if (publication.state == ActionPublicationState::committed
         || publication.state == ActionPublicationState::committedHistoryPending) {
         d->sourcePristine = false;
+        // An attribute write changes what the block shows; the content version
+        // must say so, or a version-keyed cache (canvas layout, inline spans,
+        // the embed render cache) keeps serving the pre-attribute state.
+        ++d->blockEditSequences[id];
         emit tentativeBlockCommitted(id);
         emit blocksChanged({id});
         emit d2DocumentChanged();
@@ -3687,10 +3698,13 @@ VNext::ActionPublicationResult MarkoffDocument::removeBlockAttribute(
             CollabText::Error(CollabText::ErrorCode::invalid_identity,
                 "attribute target has no structural identity")};
     emit tentativeBlockChanged(id);
-    const auto publication = publishMapValue(*d->lifecycle, "block-attrs",
+    auto publication = publishMapValue(*d->lifecycle, "block-attrs",
         name, identity, {}, true);
     if (publication.state == ActionPublicationState::committed
         || publication.state == ActionPublicationState::committedHistoryPending) {
+        // Same version contract as setBlockAttribute: the block's visible
+        // state changed, so the content version advances.
+        ++d->blockEditSequences[id];
         emit tentativeBlockCommitted(id);
         emit blocksChanged({id});
         emit d2DocumentChanged();
@@ -3791,6 +3805,9 @@ VNext::ActionPublicationResult MarkoffDocument::changeBlockKind(
         || publication.state == ActionPublicationState::committedHistoryPending) {
         d->sourcePristine = false;
         ++d->structuralEditSequence;
+        // The kind is part of the block's visible state: a version-keyed cache
+        // must not keep serving the pre-change presentation.
+        ++d->blockEditSequences[block];
         emit tentativeBlockCommitted(block);
         emit blocksChanged({block});
         emit d2DocumentChanged();

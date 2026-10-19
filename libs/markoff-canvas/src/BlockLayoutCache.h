@@ -229,8 +229,9 @@ public:
     void invalidateByEmbedKey(const QString &key);
 
     /// Force a restyle of `ids` on the next sync(). Attribute writes
-    /// (`DisplayMode`, `Checked`, `IndentLevel`, …) emit blocksChanged but bump
-    /// neither edit sequence, so the ordinary staleness test would skip them.
+    /// (`DisplayMode`, `Checked`, `IndentLevel`, …) also advance the block's
+    /// edit sequence, so the ordinary staleness test catches them; this path
+    /// restyles them at once instead of at the next sync.
     void forceRestyle(const QList<BlockId> &ids);
 
     /// Folding (P5.6): marks every entry whose id is in `hidden` as
