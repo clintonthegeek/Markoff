@@ -5,9 +5,10 @@ consolidated asks of 2026-10-18
 (`~/dev/Corbomite/docs/handoff/2026-10-18-to-markoff-consolidated-open-asks.md`),
 39 numbered asks plus a punch-list table that actually has **24** rows,
 not the 21 the document claims. Sources read at Markoff
-`dca64686`, Graffodil `011b342f`, collabtext working tree `e4779644`
-(`master`, which is **not** the pinned `e8a8e7d1`; the pin has no tag in
-that clone).
+`dca64686`, Graffodil `011b342f`, collabtext at both the installed pin
+`e8a8e7d1` (via `git show`) and the local `master` checkout `e4779644`.
+Collabtext `master` is **not** the pin: it is 329 commits behind the pin
+and carries 2 packaging commits the pin lacks.
 
 **How this was verified.** Read-only audit: every cited site was read in
 the current tree. Nothing was built or run, so no test count is claimed.
@@ -18,9 +19,11 @@ Where an ask cites a file that no longer exists, the verdict says so.
 `MarkoffDocumentPrivate.h`, `SourceTextDocumentBinding.cpp`) does not
 exist at that commit — the A13 rewrite replaced them with
 `MarkoffDocumentVNext.cpp` / `SourceTextDocumentBindingVNext.cpp`. Four
-rows are therefore already closed (M2, M10, M22, M12's mechanism) and
-four more are partly closed (M17, M18, M27, M28). The parser, view-leaf
-and Graffodil findings are real and current.
+core rows are therefore already closed (M2, M10, M22, M12's mechanism)
+and four more are partly closed (M17, M18, M27, M28); the two collabtext
+P0s, M1 and M29, are closed at the installed pin — a first pass read
+collabtext `master` instead of the pin and got them wrong. The parser,
+view-leaf and Graffodil findings are real and current.
 
 ## Verdicts
 
@@ -29,7 +32,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 
 | Ask | Handoff severity | Verdict | Current anchor | Size | Landing |
 |---|---|---|---|---|---|
-| M1 | P0 | OPEN in pin; fix exists untagged | collabtext `IdList.cpp:40,96,99,114,478-484`; `try_remove_at`/`try_insert_after` + tests on `roadmap/reliability-v2` | M | collabtext tag |
+| M1 | P0 | **CLOSED at the pin** | pin `IdList.cpp:160-200` (`try_remove_at` → `ErrorCode::unresolvable_anchor`), `:70-83` (`try_insert_after`), `:1218-1243` (`apply_concrete` returns false before observing); tests `tst_operation_validation.cpp:822,835,847,895` | 0 | reply |
 | M2 | P0 | **CLOSED** — mechanism removed | no `pendingOpPayloads`/`registerOp`/`localOpsProduced` anywhere; one action = one MAB, `routeRemoteAction` | 0 | reply |
 | M3 | P0 | OPEN | `Document.cpp:379-388` (`parsedOnce` set before parse; no mutex) | S | parser |
 | M4 | P0 | OPEN | `TreeSitterParser.cpp:247-290`, early return `:261`, teardown `:269-271` never reached | S | parser |
@@ -57,7 +60,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 | M26 | P2 | OPEN — deliberate | `MarkoffCoreExport.h:4-7`; rationale recorded `markoff-core/CMakeLists.txt:9-16` | M | decision |
 | M27 | P2 | PARTIAL | apps gated (`CMakeLists.txt:101-114`); headers installed; item 4 open: PUBLIC `Markoff::Parser`/`CollabTextVNext` + `<collabtext/...>` in `MarkoffDocument.h:18-20` | S–M | core |
 | M28 | P2 | PARTIAL | no `LABELS`; `perf_load_bench` unregistered; no production doc-destroyed test; d5 test gone (item stale); `markoff-source/CLAUDE.md:27` `FindBar` stale; `UndoLog` moved to collabtext | M | all leaves |
-| M29 | P0 | OPEN in pin; contract replaced | collabtext `Clock.cpp:164-178`; reliability-v2 has `coverage_intersection`, tests, and deletes `Buffer::compact` | M | collabtext tag |
+| M29 | P0 | **CLOSED by redesign at the pin** | pin `Clock.cpp:164-178` keeps the documented asymmetric summary fold, `:179` adds `coverage_intersection`; `Buffer::compact` is gone (`collect_garbage` `:484`); `NetworkSim.cpp:262-265`; 3-replica coverage tests `tst_clock.cpp:167,190` | 0 | reply |
 | M30 | P1 | OPEN | `TreeSitterParser.cpp:204-223` lead byte only; duplicate table `SourceSpan.cpp:10-28` | M | parser |
 | M31 | P1 | OPEN | `TreeSitterParser.cpp:247-290` passes `nullptr` previous tree twice; zero-filled map | L | parser |
 | M32 | P2 | OPEN | `PerfProbe.h:40-43`; in-loop probe `TreeSitterParser.cpp:279` | S | parser |
@@ -85,11 +88,12 @@ slice is one commit under the repo's own board.
 Send one reply that: confirms M38 option 1 (one card document; paint
 holds a non-owning `const MarkoffDocument *`; `renderInto` already
 guarantees it); states M39 is deliberate and keeps the documented split;
-closes M2, M10, M22 and M12's mechanism; asks them to re-verify the
-markoff-core rows against `dca64686`, since those cited files do not
-exist there; and hands back the half-closed M17/M18/M27/M28 rows as
-"partly delivered, rest scheduled". This deletes four consumer
-workarounds for the cost of writing the letter.
+closes M2, M10, M22 and M12's mechanism, and M1/M29 as already fixed at
+the installed pin; asks them to re-verify the markoff-core rows against
+`dca64686`, since those cited files do not exist there; and hands back the
+half-closed M17/M18/M27/M28 rows as "partly delivered, rest scheduled".
+This deletes more than four consumer workarounds for the cost of writing
+the letter.
 
 Exit: reply artefact under `docs/handoff/`; no build.
 
@@ -196,29 +200,36 @@ mostly S and should be one batch task; M19 is confined to
 `SugiyamaLayout.cpp`; M14/M15 need a spec and plan under Graffodil's own
 conventions before code.
 
-### Wave 7 — collabtext release train (decision, then release)
+### Wave 0b — Publish the collabtext pin (minutes, alongside the reply)
 
-M1 and M29 are already fixed/replaced on `roadmap/reliability-v2`. The
-work is: review that branch, cut one new immutable candidate tag, record
-a Markoff acceptance run, re-pin `docs/STATUS.md`, then let Corbomite
-move. M29 is a contract change, not just a bug fix: `Global::meet` stays
-a summary fold, `coverage_intersection` becomes the watermark API, and
-`Buffer::compact` is deleted. Do M1 first if the branch has to be split
-for any reason.
+No code: M1 and M29 are already delivered at the installed pin. The
+engine line lives on `feat/fuguemax-placement`, tagged
+`collabtext-markoff-core-2026-10-13-alpha5`, and neither the branch nor
+the tag is on `origin`; GitHub holds only `master` (2 packaging commits,
+329 engine commits short) and `roadmap/reliability-v2`, which is an
+ancestor of the pin. So the commit Markoff requires is not fetchable by
+anyone else, which makes `docs/STATUS.md`'s "recreate the prefix"
+instruction unexecutable on the laptop or a fresh clone.
 
-This wave is last on the board but not low value: both P0s already have
-fixes, and neither damages Corbomite today. Its IdList path needs remote
+Actions: push the branch and tags to `origin`; then decide the trunk
+story — merge the engine line into `master` (carrying `master`'s two
+packaging commits forward) and re-tag, or leave the line as a published
+branch and keep documenting it as the pin. Only a change of commit
+requires a new acceptance record; publishing the same commit and tag does
+not.
+
+This wave is last on the board but not low value: both P0s are already
+fixed, and neither damages Corbomite today — its IdList path needs remote
 ops, which Corbomite does not carry on the wire yet, and destructive GC
-is disabled here. The lead-time item is the tag decision, so start it in
-parallel with Wave 1 rather than after Wave 6.
+uses `collect_garbage`, not a watermark.
 
 ## Standstill rules that constrain this list
 
 - `markoff-styled` and `markoff-source` are bug-fix-only. Waves 1–3 are
   bug-shaped and may proceed; M7 and M37 are feature-shaped and need an
   explicit exception recorded on this board before code.
-- collabtext is an installed pinned package. Wave 7 cannot be an in-tree
-  patch; it is tag + acceptance + re-pin.
+- collabtext is an installed pinned package. Wave 0b is a publish action,
+  not an in-tree patch.
 - Physical collection and log pruning stay disabled. M12 cannot be
   "fixed" by enabling GC without changing that standing rule.
 - Graffodil's own convention requires a bug report for fixes and a spec
@@ -231,4 +242,5 @@ parallel with Wave 1 rather than after Wave 6.
 - Then Wave 1 rows 5–8, then Wave 2 in full.
 - Graffodil M6/M5 can run in that repo in parallel; they share no code
   with Markoff.
-- Decide Wave 7 now — a tag has lead time, and it gates both P0s.
+- Publish the collabtext pin branch and tags now — it is a hard
+  reproducibility dependency and costs minutes.

@@ -34,6 +34,14 @@ Root CMake requires that installed package. The prefix used for the
 acceptance runs is `build-collabtext-alpha5/install`. Recreate a missing
 prefix from the candidate's `docs/USING_VNEXT.md`.
 
+**Publishing gap (found 2026-10-19).** That commit is the tip of
+`feat/fuguemax-placement`; collabtext `master` does not contain it (329
+commits short, plus 2 packaging commits it does not have). Neither the tag
+nor the branch is on `origin` (GitHub lists only `master` and
+`roadmap/reliability-v2`; Codeberg holds `master` at `046d375`). Until it
+is pushed or merged and retagged, the pinned commit is reachable only from
+a local clone. Publish it before treating the prefix as reproducible.
+
 ## Latest verification
 
 2026-10-19: read-only audit of the Corbomite asks against Markoff
