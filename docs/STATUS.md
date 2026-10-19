@@ -1,22 +1,30 @@
 # Markoff — live status
 
-Updated 2026-10-17. One screen. Task detail lives on the
-[CollabText task board](plans/2026-10-12-collabtext-adoption-execution.md).
-The previous board text is
-[`archive/collabtext-adoption/2026-10-16-status-board.md`](archive/collabtext-adoption/2026-10-16-status-board.md).
+Updated 2026-10-19. One screen. The current task list is the
+[Corbomite open-asks board](plans/2026-10-19-corbomite-open-asks-triage.md).
+The closed CollabText board is
+[`plans/2026-10-12-collabtext-adoption-execution.md`](plans/2026-10-12-collabtext-adoption-execution.md).
 
 ## Now
 
-CollabText vNext adoption is closed. There is no open adoption task. The
-readiness signal is
-[`docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md).
-Corbomite may begin its transition. The implementation brief is
-[`docs/handoff/2026-10-17-collabtext-transition-package.md`](handoff/2026-10-17-collabtext-transition-package.md)
-and describes sources at `281e3bc1`.
+CollabText vNext adoption is closed; its readiness signal stands at
+[`docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md),
+and host storage, the lease, application wiring, and production acceptance
+stay in Corbomite.
 
-Host storage, the document lease in Corbomite, application wiring, and
-production network acceptance stay in the host. Physical collection stays
-disabled. A14's probe budget misses stay recorded and are not waived.
+The new workfront is Corbomite's consolidated asks of 2026-10-18. The triage
+board records a per-ask verdict against this tree, the already-closed rows,
+and a seven-wave order. No wave has started. First actions: send the
+answer-and-close reply (Wave 0), then the parser and build-hygiene fixes
+(Wave 1).
+
+The triage corrected the ask document's own evidence: its markoff-core
+`file:line` citations predate A13 and name files that do not exist at
+`dca64686`. M2, M10, M22 and M12's mechanism are already gone; M17, M18,
+M27, M28 and M33 are partly or differently delivered.
+
+Physical collection stays disabled. A14's probe budget misses stay recorded
+and are not waived.
 
 ## Pin
 
@@ -27,6 +35,11 @@ acceptance runs is `build-collabtext-alpha5/install`. Recreate a missing
 prefix from the candidate's `docs/USING_VNEXT.md`.
 
 ## Latest verification
+
+2026-10-19: read-only audit of the Corbomite asks against Markoff
+`dca64686`, Graffodil `011b342f`, and collabtext `e4779644`. No build and
+no test run; the triage makes source claims only, and each fix wave carries
+its own verification.
 
 2026-10-17, A16: documentation only. The signal above is the delivery.
 The suite was not re-run.

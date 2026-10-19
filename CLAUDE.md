@@ -10,8 +10,12 @@ and the evidence required for editing behavior.
 
 ## Current workfront
 
-The CollabText vNext adoption board is closed. There is no task marked
-**Now**. Read [`docs/STATUS.md`](docs/STATUS.md). The readiness signal is
+Corbomite's consolidated asks (2026-10-18) are the new workfront. The
+verdicts and the seven-wave order are on the
+[Corbomite open-asks board](docs/plans/2026-10-19-corbomite-open-asks-triage.md);
+no wave has started. Read [`docs/STATUS.md`](docs/STATUS.md) first.
+
+The CollabText vNext adoption board is closed. The readiness signal is
 [`docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md).
 Corbomite may begin its transition. Host storage, lease integration,
 application wiring, and production acceptance stay in Corbomite. Do not
