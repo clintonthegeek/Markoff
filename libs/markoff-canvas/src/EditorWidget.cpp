@@ -581,6 +581,11 @@ void EditorWidget::setEmbedRegistry(Markoff::EmbedRegistry *registry)
     if (m_view) m_view->setEmbedRegistry(registry);
 }
 
+void EditorWidget::setEmbedRenderService(Markoff::EmbedRenderService *service)
+{
+    if (m_view) m_view->setEmbedRenderService(service);
+}
+
 // --- Remote presence (P6.2) ---
 
 void EditorWidget::setRemotePresences(const QList<Markoff::Canvas::RemotePresence> &presences)

@@ -29,7 +29,7 @@ set_tests_properties(tst_canvas_vnext_session_positions
 # coverage the A13 cut deleted (math/table/mermaid/image render paths).
 add_executable(tst_canvas_render tst_canvas_render.cpp)
 target_link_libraries(tst_canvas_render
-    PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core)
+    PRIVATE Qt6::Test Qt6::Widgets markoff_canvas markoff_core Markoff::Embed)
 add_test(NAME tst_canvas_render COMMAND tst_canvas_render)
 set_tests_properties(tst_canvas_render
     PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

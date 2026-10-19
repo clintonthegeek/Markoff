@@ -10,6 +10,7 @@
 #include <QTextLayout>
 
 #include <markoff/core/BlockId.h>
+#include <markoff/core/EmbedRender.h>
 #include <markoff/core/Kf6SyntaxHighlightService.h>
 
 #include <markoff/canvas/MediaSeams.h>
@@ -113,6 +114,14 @@ public:
         /// renders plain monospace" precedent).
         QPixmap mermaidPixmap;
 
+        /// Embed artifact (fenced block with a registered backend): the
+        /// runtime's rasterised image, its cache key and language. Empty while
+        /// the request is pending or has no backend; paint then falls back to
+        /// the source layout (the mermaid/CodeHighlighting precedent).
+        QImage  embedImage;
+        QString embedKey;
+        QString embedLanguage;
+
         /// Parsed target/label for a `style.isImageBlock` or
         /// `style.isEmbedBlock` entry (P5.4) —
         /// `MediaBlocks::parseImageBlock`'s target/altOrAlias (plus, for
@@ -209,6 +218,16 @@ public:
     /// P5.4 embed seam. Not owned. Same re-realize-on-set behavior.
     void setEmbedRegistry(Markoff::EmbedRegistry *registry);
 
+    /// Embed runtime seam: when set, fenced blocks whose language has a
+    /// registered backend ask it for an artifact (non-blocking) and paint the
+    /// rasterised result instead of source. Not owned; reference only.
+    void setEmbedRenderService(Markoff::EmbedRenderService *service);
+    /// DPI scale the embed requests are rendered at (View keeps this current).
+    void setDevicePixelRatio(qreal dpr);
+    /// Force a restyle of the entry whose artifact key is `key` (the service's
+    /// completion signal carries only the key).
+    void invalidateByEmbedKey(const QString &key);
+
     /// Force a restyle of `ids` on the next sync(). Attribute writes
     /// (`DisplayMode`, `Checked`, `IndentLevel`, …) emit blocksChanged but bump
     /// neither edit sequence, so the ordinary staleness test would skip them.
@@ -274,12 +293,15 @@ private:
     /// rebuild time. See the setters' own doc comments.
     ImageResourceLookup    m_imageLookup;
     MermaidRenderer        *m_mermaidRenderer = nullptr;
+    Markoff::EmbedRenderService *m_embedService = nullptr;
+    qreal                  m_devicePixelRatio = 1.0;
     Markoff::EmbedRegistry *m_embedRegistry   = nullptr;
 
     QSet<BlockId>       m_forcedRestyle;
     std::vector<Entry>  m_entries;
     QHash<BlockId, int> m_index;        //!< id → position in m_entries
     qreal   m_textWidth      = 0;
+    qreal   m_fontScale      = 1.0;
     qreal   m_totalHeight    = 0;
     quint64 m_structuralSeq  = 0;
     BlockId m_caretBlock;                //!< null = no caret tracked

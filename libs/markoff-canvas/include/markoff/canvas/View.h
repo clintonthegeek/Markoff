@@ -40,6 +40,7 @@ namespace Markoff {
 class MarkoffDocument;
 class LinkService;
 class EmbedRegistry;
+class EmbedRenderService;
 class Session;
 }
 
@@ -234,6 +235,12 @@ public:
     /// while inside. `nullptr` (the default) means mermaid blocks always
     /// show as plain code (P4.6 monospace styling), never a placeholder.
     void setMermaidRenderer(MermaidRenderer *renderer);
+
+    /// Embed runtime seam (plugin model). When set, fenced blocks whose
+    /// language has a registered backend render through it; a null service (or
+    /// no backend, or a pending/failed render) paints source. The service is
+    /// not owned. `artifactReady` invalidates exactly the affected block.
+    void setEmbedRenderService(Markoff::EmbedRenderService *service);
     /// Obsidian-style block embeds (`![[target]]`) consult `registry` for
     /// `hasExtension()` only (this view never mounts a real
     /// `MarkdownRenderChild` — always placeholder-rendered, plan P5.4).
@@ -1549,6 +1556,8 @@ public:
     /// doc comment; `layoutWidthFor()` is the sole consumer.
     ContentWidthPolicy m_contentWidthPolicy;
     std::unique_ptr<BlockLayoutCache> m_cache;
+    /// Embed runtime seam (not owned). See setEmbedRenderService().
+    Markoff::EmbedRenderService *m_embedService = nullptr;
     quint64 m_paintCount = 0;
     CanvasCursor m_caret;
     std::optional<CanvasCursor> m_selectionAnchor;

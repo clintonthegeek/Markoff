@@ -15,6 +15,7 @@
 #include <markoff/canvas/View.h>  // Markoff::Canvas::RemotePresence (P6.2)
 
 namespace Markoff {
+class EmbedRenderService;
 class Session;
 class EmbedRegistry;
 }  // namespace Markoff
@@ -256,6 +257,8 @@ public:
     void setImageResourceLookup(Markoff::Canvas::ImageResourceLookup lookup);
     void setMermaidRenderer(Markoff::Canvas::MermaidRenderer *renderer);
     void setEmbedRegistry(Markoff::EmbedRegistry *registry);
+    /// Embed runtime seam; see View::setEmbedRenderService().
+    void setEmbedRenderService(Markoff::EmbedRenderService *service);
 
     // ---- Remote presence (contract-v2 P6.2) -------------------------------
     // Thin pass-through to the composed View — see View::setRemotePresences'

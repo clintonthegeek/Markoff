@@ -60,6 +60,28 @@ void BlockLayoutCache::setEmbedRegistry(Markoff::EmbedRegistry *registry)
     invalidateRealizedLayouts();
 }
 
+void BlockLayoutCache::setEmbedRenderService(Markoff::EmbedRenderService *service)
+{
+    m_embedService = service;
+    invalidateRealizedLayouts();
+}
+
+void BlockLayoutCache::setDevicePixelRatio(qreal dpr)
+{
+    if (qFuzzyCompare(m_devicePixelRatio, dpr)) return;
+    m_devicePixelRatio = dpr;
+    invalidateRealizedLayouts();
+}
+
+void BlockLayoutCache::invalidateByEmbedKey(const QString &key)
+{
+    if (key.isEmpty()) return;
+    for (Entry &e : m_entries) {
+        if (e.embedKey == key)
+            m_forcedRestyle.insert(e.id);
+    }
+}
+
 void BlockLayoutCache::forceRestyle(const QList<BlockId> &ids)
 {
     for (const BlockId &id : ids)
@@ -86,6 +108,7 @@ void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme, qrea
     // bump for those (it counts buffer edits only). Restyle everything in
     // that case. Content-only typing leaves this untouched, which is the
     // case that has to stay cheap.
+    m_fontScale = fontScale;
     const quint64 structural = doc.structuralEditSequence();
     const bool restyleAll = (structural != m_structuralSeq);
     m_structuralSeq = structural;
@@ -391,6 +414,51 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
     // all fall through to null — paintEvent's fallback is the normal
     // code-block text layout (CodeHighlighting's own "service miss
     // renders plain monospace" precedent; no placeholder box here).
+    // Embed runtime (plugin model): the generic path for any fenced language
+    // with a registered backend. The service lookup is non-blocking: a miss
+    // asks for the render and paints source until artifactReady arrives.
+    e.embedImage = QImage();
+    e.embedKey.clear();
+    e.embedLanguage.clear();
+    if (e.style.isCodeBlock && e.id != m_caretBlock && m_embedService) {
+        const Detail::CodeFenceInfo fence = Detail::parseCodeFence(text);
+        if (!fence.language.isEmpty() && fence.contentEnd > fence.contentStart) {
+            Markoff::RenderRequest request;
+            request.language = fence.language.toLower();
+            request.source = QString::fromUtf8(
+                text.mid(fence.contentStart, fence.contentEnd - fence.contentStart));
+            request.availableWidth = QSizeF(m_textWidth, -1);
+            request.devicePixelRatio = m_devicePixelRatio;
+            request.fontScale = m_fontScale;
+            request.foreground = e.style.foreground;
+            request.background = e.style.background.isValid()
+                ? e.style.background
+                : theme.color(Markoff::Theme::Slot::EditorBackground);
+            request.themeKey = Markoff::embedThemeKey(theme);
+
+            e.embedLanguage = request.language;
+            e.embedKey = Markoff::embedArtifactKey(request);
+            const Markoff::EmbedArtifact artifact = m_embedService->artifact(request);
+            switch (artifact.state) {
+            case Markoff::EmbedArtifact::State::Ready:
+                e.embedImage = artifact.block.image;
+                if (!e.embedImage.isNull()) {
+                    const qreal dpr = qMax(1.0, e.embedImage.devicePixelRatio());
+                    e.height = e.style.topMargin + e.style.bottomMargin
+                             + e.embedImage.height() / dpr;
+                }
+                break;
+            case Markoff::EmbedArtifact::State::Pending:
+                break;   // source until the runtime signals
+            case Markoff::EmbedArtifact::State::Missing:
+                m_embedService->request(request);
+                break;
+            case Markoff::EmbedArtifact::State::Failed:
+                break;   // source fallback
+            }
+        }
+    }
+
     e.mermaidPixmap = QPixmap();
     if (e.style.isCodeBlock && e.id != m_caretBlock && m_mermaidRenderer) {
         const Detail::CodeFenceInfo fence = Detail::parseCodeFence(text);

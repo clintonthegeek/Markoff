@@ -3,6 +3,8 @@
 
 #include <QCryptographicHash>
 
+#include <markoff/core/Theme.h>
+
 namespace Markoff {
 
 QString embedArtifactKey(const RenderRequest &request)
@@ -26,6 +28,20 @@ QString embedArtifactKey(const RenderRequest &request)
         .arg(heightBucket)
         .arg(dprBucket)
         .arg(scaleBucket);
+}
+
+QString embedThemeKey(const Theme &theme)
+{
+    QCryptographicHash hash(QCryptographicHash::Sha1);
+    const Theme::Slot themeSlots[] = {
+        Theme::Slot::TextDefault, Theme::Slot::CodeBlock,
+        Theme::Slot::CodeBlockBackground, Theme::Slot::Quote,
+        Theme::Slot::Link, Theme::Slot::EditorBackground,
+        Theme::Slot::Highlight,
+    };
+    for (const Theme::Slot slot : themeSlots)
+        hash.addData(theme.color(slot).name(QColor::HexArgb).toUtf8());
+    return QString::fromLatin1(hash.result().toHex());
 }
 
 EmbedRenderService::EmbedRenderService(QObject *parent) : QObject(parent) {}

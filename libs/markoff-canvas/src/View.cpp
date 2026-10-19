@@ -588,6 +588,37 @@ void View::setMermaidRenderer(MermaidRenderer *renderer)
     viewport()->update();
 }
 
+void View::setEmbedRenderService(Markoff::EmbedRenderService *service)
+{
+    if (m_embedService) {
+        QObject::disconnect(m_embedService, nullptr, this, nullptr);
+    }
+    m_embedService = service;
+    m_cache->setDevicePixelRatio(devicePixelRatioF());
+    m_cache->setEmbedRenderService(service);
+    if (service) {
+        connect(service, &Markoff::EmbedRenderService::artifactReady, this,
+                [this](const QString &key) {
+                    m_cache->invalidateByEmbedKey(key);
+                    // sync() consumes the forced-restyle set; realize alone
+                    // would leave the already-realized entry untouched.
+                    if (m_doc) {
+                        m_cache->setTextWidth(textWidth());
+                        m_cache->sync(*m_doc, m_theme, m_fontScale);
+                    }
+                    ensureLayoutForViewport();
+                    viewport()->update();
+                });
+        connect(service, &Markoff::EmbedRenderService::artifactFailed, this,
+                [this](const QString &key, const QString &) {
+                    m_cache->invalidateByEmbedKey(key);
+                    viewport()->update();
+                });
+    }
+    ensureLayoutForViewport();
+    viewport()->update();
+}
+
 void View::setEmbedRegistry(Markoff::EmbedRegistry *registry)
 {
     m_cache->setEmbedRegistry(registry);
@@ -5829,6 +5860,20 @@ void View::paintEvent(QPaintEvent *event)
                            e.mediaLabel.isEmpty() ? QStringLiteral("[no target]")
                                                    : e.mediaLabel);
             }
+            continue;
+        }
+
+        // Embed runtime (plugin model): a non-null embedImage means the caret
+        // is outside the block and the service had a ready artifact. Same
+        // centered placement as the block-level pixmap paths; a pending or
+        // failed render falls through to the source layout.
+        if (!e.embedImage.isNull()) {
+            const qreal dpr = qMax(1.0, e.embedImage.devicePixelRatio());
+            const qreal iw = e.embedImage.width() / dpr;
+            const qreal ih = e.embedImage.height() / dpr;
+            const qreal avail = margin + textWidth() - contentX;
+            const qreal px = contentX + qMax(qreal(0), (avail - iw) / 2.0);
+            p.drawImage(QRectF(px, contentY, iw, ih), e.embedImage);
             continue;
         }
 

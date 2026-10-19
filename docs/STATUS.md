@@ -31,7 +31,10 @@ inside cells. New `tst_canvas_render` harness (offscreen View + painted-pixel an
 interaction checks). The embed plugin skeleton also landed: the contract
 (`RenderRequest`/`RenderedBlock`/`EmbedRenderService` + contract version) and
 `libs/markoff-embed` (cache, worker pool, SVG rasteriser), proven by a fake
-backend. Suite **97/97** in 25.26 s. Plan:
+backend. Canvas now consumes the runtime: a fenced block with a registered
+backend paints source, asks the service, and paints the rasterised artifact when
+`artifactReady` arrives (tested end-to-end offscreen). Suite **97/97** in
+27.74 s. Plan:
 [`plans/2026-10-19-embedded-renderers-plan.md`](plans/2026-10-19-embedded-renderers-plan.md)
 — reconnaissance and plan for native embedded renderers (tables first, then
 math, Mermaid, Graphviz, Pikchr, …) in the live view. It carries the decisions

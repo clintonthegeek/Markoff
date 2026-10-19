@@ -10,6 +10,14 @@
 #include <markoff/canvas/View.h>
 #include "../src/TableGeometry.h"
 #include <markoff/core/AttrNames.h>
+#include <markoff/core/CodeBlockProcessorRegistry.h>
+#include <markoff/core/EmbedRender.h>
+#include <markoff/embed/EmbedRuntime.h>
+
+#include <atomic>
+#include <memory>
+
+#include <QThread>
 #include <markoff/core/Cmd/D2.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
@@ -52,6 +60,23 @@ int countDarkPixels(const QImage &image, int threshold = 128)
         }
     return count;
 }
+
+class FakeSvgBackend final : public Markoff::CodeBlockProcessor {
+public:
+    QStringList languages() const override { return {QStringLiteral("fake")}; }
+    Markoff::RenderedBlock render(const Markoff::RenderRequest &request) override
+    {
+        // Slow enough that the test can observe the source fallback first.
+        QThread::msleep(250);
+        Markoff::RenderedBlock block;
+        block.kind = Markoff::RenderedBlock::Kind::Svg;
+        block.svg = QStringLiteral(
+            "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"40\" height=\"20\">"
+            "<rect width=\"40\" height=\"20\" fill=\"#336699\"/></svg>").toUtf8();
+        block.fallbackText = request.source;
+        return block;
+    }
+};
 
 int countColorPixels(const QImage &image, const QColor &color)
 {
@@ -229,6 +254,39 @@ private slots:
         QVERIFY2(after.contains("X"), qPrintable(QString::fromUtf8(after)));
         // The pipe structure is intact: still one table block, two columns.
         QCOMPARE(view.tableCellRect(block, 1, 1).isValid(), true);
+    }
+
+    // Plugin path end-to-end in the leaf: a fenced block with a registered
+    // backend paints source until the runtime's artifact arrives, then the
+    // rasterised SVG — exactly the generic front-end the plan describes.
+    void embeddedFenceRendersThroughTheRuntime()
+    {
+        auto fixture = openDocument(QByteArrayLiteral(
+            "intro\n\n```fake\nA-->B\n```\n\noutro"));
+        Markoff::CodeBlockProcessorRegistry registry;
+        registry.registerProcessor(std::make_shared<FakeSvgBackend>());
+        Markoff::Embed::EmbedRuntime runtime(&registry);
+
+        Markoff::Canvas::View view;
+        view.resize(600, 400);
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        theme.setColor(Markoff::Theme::Slot::EditorBackground, Qt::white);
+        theme.setColor(Markoff::Theme::Slot::TextDefault, QColor(20, 20, 20));
+        view.setTheme(theme);
+        view.setEmbedRenderService(&runtime);
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto blocks = fixture.document->iterateBlocks();
+        QCOMPARE(blocks.size(), size_t{3});
+        view.setCaretPosition(blocks[0], 0);   // keep the fence's source hidden
+        QCoreApplication::processEvents();
+
+        const QColor fill(0x33, 0x66, 0x99);
+        QCOMPARE(countColorPixels(view.grab().toImage(), fill), 0);
+        QTRY_VERIFY_WITH_TIMEOUT(
+            countColorPixels(view.grab().toImage(), fill) > 50, 3000);
     }
 
     // The painted table must actually appear: grid lines and cell text.

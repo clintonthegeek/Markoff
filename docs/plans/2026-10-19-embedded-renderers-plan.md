@@ -228,7 +228,7 @@ links no runtime gets today's behaviour: source text.
   runtime is just one implementation of "render this source"); leaves see no
   difference.
 
-### 2.5 Front-end in each leaf
+### 2.5 Front-end in each leaf — **canvas done 2026-10-19**
 
 A small consumer, not an engine host:
 
@@ -417,7 +417,7 @@ renderer is native.
 | 1 | table a11y decision; styled table theming | S–M | decision logged / theme test |
 | 2 | contract in core (request/result/version); registry evolved in place | M | **done** (`tst_embed_runtime`) |
 | 2 | `markoff-embed` runtime (cache, pool, SVG, process sandbox) | M–L | **cache/pool/SVG done**; sandbox open |
-| 2 | canvas front-end: one embedded path; mermaid seam retired | M | mermaid via a backend, no paint-path render |
+| 2 | canvas front-end: one embedded path; mermaid seam retired | M | **generic path done** (service lookup → source fallback → rasterised paint); legacy `MermaidRenderer` seam still present until Corbomite's adapter moves |
 | 2 | math backend (DPR/theme/cache) | S–M | 1x/2x, both themes, fallback |
 | 3 | mermaid backend, reproducible build, corpus | M | provenance recorded; golden tests |
 | 4 | Graphviz subprocess backend + sandbox | S–M | timeout/failure/fallback tests |

@@ -11,6 +11,8 @@
 
 namespace Markoff {
 
+class Theme;
+
 /// What the front-end sees for one request: a cached artifact, a pending job,
 /// or a failure. `Missing` means "never requested"; asking again is free.
 struct MARKOFF_CORE_EXPORT EmbedArtifact {
@@ -24,6 +26,11 @@ struct MARKOFF_CORE_EXPORT EmbedArtifact {
 /// (the completion signal carries only this string). Width is bucketed to whole
 /// DIP and DPR to two decimals so sub-pixel churn does not thrash the cache.
 MARKOFF_CORE_EXPORT QString embedArtifactKey(const RenderRequest &request);
+
+/// Stable hash of the Theme slots an embedded renderer may use. A front-end
+/// puts this in RenderRequest::themeKey, so a theme change invalidates exactly
+/// the artifacts that were rendered for the old colours.
+MARKOFF_CORE_EXPORT QString embedThemeKey(const Theme &theme);
 
 /// The embed runtime contract. Declared in core so a leaf can consume it without
 /// depending on any runtime or backend; implemented by `markoff-embed` (or by a
