@@ -3,6 +3,7 @@
 
 #include <QEvent>
 #include <QMouseEvent>
+#include <QTextBlock>
 #include <QTextCursor>
 #include <QTextDocument>
 #include <QTextEdit>
@@ -46,35 +47,41 @@ bool LinkInteraction::eventFilter(QObject *obj, QEvent *event) {
 std::optional<Markoff::LinkActivation>
 LinkInteraction::resolveLinkAt(int charPos, Qt::KeyboardModifiers mods) const {
     if (!m_doc || !m_edit) return std::nullopt;
+    QTextDocument *qdoc = m_edit->document();
+    if (!qdoc) return std::nullopt;
+    if (charPos < 0 || charPos > qdoc->characterCount()) return std::nullopt;
 
-    // Convert Qt UTF-16 char position to UTF-8 byte offset in the
-    // document's flat view. The flat view is what the QTextDocument
-    // mirrors (per SourceTextDocumentBinding's contract), so a char
-    // offset there maps to the matching byte offset here.
-    const QString plain = m_edit->toPlainText();
-    if (charPos < 0 || charPos > plain.size()) return std::nullopt;
-    const QByteArray prefix = plain.left(charPos).toUtf8();
-    const quint32 byteOffset = static_cast<quint32>(prefix.size());
+    // The block under the cursor decides everything. Resolve it (and its link
+    // spans) once per block entry; a move within the same block only scans the
+    // cached list. The old path rebuilt the whole flat prefix and re-walked the
+    // block list on every mouse move (ASK-M17).
+    QTextCursor cur(qdoc);
+    cur.setPosition(charPos);
+    const QTextBlock block = cur.block();
+    if (!block.isValid()) return std::nullopt;
 
-    // Resolve the current flat-view byte offset directly to its visible block
-    // and block-local byte offset. This is a transient hit test, so it needs no
-    // persisted causal position token.
-    const auto hit = Markoff::Detail::findBlockAtSepByte(
-        m_doc, byteOffset, /*biasForward=*/false);
-    if (!hit) return std::nullopt;
-    const Markoff::BlockId id = hit->blockId;
-    const int blockByteOffset = static_cast<int>(hit->byteInBlock);
+    if (m_cache.blockNumber != block.blockNumber()) {
+        m_cache.blockNumber = block.blockNumber();
+        m_cache.id = Markoff::BlockId{};
+        m_cache.linkSpans.clear();
 
-    // Convert block-byte-offset to UTF-16 char offset within the
-    // block by converting the block-text prefix. Block text is
-    // typically <1KB; this conversion is cheap.
-    const QByteArray blockBytes = m_doc->blockText(id);
-    const QByteArray blockBytesPrefix = blockBytes.left(blockByteOffset);
-    const int blockCharPos = QString::fromUtf8(blockBytesPrefix).size();
+        const QString plain = m_edit->toPlainText();
+        const quint32 byteOffset =
+            static_cast<quint32>(plain.left(block.position()).toUtf8().size());
+        const auto hit = Markoff::Detail::findBlockAtSepByte(
+            m_doc, byteOffset, /*biasForward=*/true);
+        if (hit) {
+            m_cache.id = hit->blockId;
+            for (const Markoff::SourceSpan &span : m_doc->inlineSpansFor(hit->blockId)) {
+                if (span.isLink || span.isWikilink)
+                    m_cache.linkSpans.append(span);
+            }
+        }
+    }
+    if (m_cache.id.isNull()) return std::nullopt;
 
-    // Walk only this block's spans.
-    for (const Markoff::SourceSpan &span : m_doc->inlineSpansFor(id)) {
-        if (!span.isLink && !span.isWikilink) continue;
+    const int blockCharPos = cur.positionInBlock();
+    for (const Markoff::SourceSpan &span : m_cache.linkSpans) {
         if (blockCharPos < span.charOffset) continue;
         if (blockCharPos >= span.charOffset + span.charLength) continue;
 
@@ -88,6 +95,21 @@ LinkInteraction::resolveLinkAt(int charPos, Qt::KeyboardModifiers mods) const {
         return a;
     }
     return std::nullopt;
+}
+
+void LinkInteraction::setMarkoffDocument(Markoff::MarkoffDocument *doc)
+{
+    if (m_doc == doc) return;
+    QObject::disconnect(m_docChangedCon);
+    m_docChangedCon = {};
+    m_doc = doc;
+    m_cache = {};
+    if (doc) {
+        // Span offsets and block identity move with every edit: drop the cache
+        // rather than trying to validate it.
+        m_docChangedCon = connect(doc, &Markoff::MarkoffDocument::d2DocumentChanged,
+                                  this, [this] { m_cache = {}; });
+    }
 }
 
 void LinkInteraction::handlePress(QMouseEvent *e) {

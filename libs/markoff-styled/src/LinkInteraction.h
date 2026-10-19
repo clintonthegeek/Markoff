@@ -7,7 +7,9 @@
 #include <QString>
 #include <optional>
 
+#include <markoff/core/BlockId.h>
 #include <markoff/core/LinkActivation.h>
+#include <markoff/parser/SourceSpan.h>
 
 class QTextEdit;
 class QMouseEvent;
@@ -25,7 +27,7 @@ public:
     explicit LinkInteraction(QTextEdit *edit, QObject *parent = nullptr);
     ~LinkInteraction() override;
 
-    void setMarkoffDocument(Markoff::MarkoffDocument *doc) { m_doc = doc; }
+    void setMarkoffDocument(Markoff::MarkoffDocument *doc);
     void setLinkService(Markoff::LinkService *svc)         { m_service = svc; }
     void setFromContext(const QString &c)                  { m_fromContext = c; }
 
@@ -49,6 +51,18 @@ private:
     Markoff::LinkService      *m_service    = nullptr;
     QString                    m_fromContext;
     QString                    m_currentHoveredRawText;
+
+    /// The link spans of the block under the cursor. Mouse-move resolution only
+    /// pays the document-level lookup (flat prefix, block resolve, span walk)
+    /// when the cursor enters a different block; within one block it is a
+    /// cached-list scan (ASK-M17). Cleared on every document edit.
+    struct BlockLinkCache {
+        int                        blockNumber = -1;
+        Markoff::BlockId           id;
+        QList<Markoff::SourceSpan> linkSpans;
+    };
+    mutable BlockLinkCache     m_cache;
+    QMetaObject::Connection    m_docChangedCon;
 };
 
 }  // namespace Markoff::Styled
