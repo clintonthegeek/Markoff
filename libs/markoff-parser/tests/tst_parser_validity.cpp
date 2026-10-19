@@ -28,6 +28,7 @@ private slots:
     void concurrentFrontmatterReadsSeeTheParsedValue();
     void parserAccessorsAreEmptyBeforeAnyParse();
     void staleInlineSpansAreNeverObservable();
+    void malformed_utf8_maps_one_unit_per_invalid_byte();
     void reparsingReplacesTreesWholesale();
 };
 
@@ -102,6 +103,38 @@ void TestParserValidity::staleInlineSpansAreNeverObservable()
         QVERIFY(span.utf8Offset >= 0);
         QVERIFY(span.utf8Offset + span.utf8Length <= short2.size());
     }
+}
+
+// ASK-M30: the byte→char table inferred the sequence length from the lead
+// byte alone, so a Latin-1 byte swallowed the next two characters and a
+// truncated sequence swallowed the rest of the block — every offset derived
+// from the map (headings, links, tags, inline spans) was skewed. Invalid bytes
+// now each count as one replacement character. The table is exercised directly:
+// parse() takes a QString, so its own byte map is always over well-formed UTF-8,
+// while buildUtf8ToCharMap() is the public entry point that sees raw bytes.
+void TestParserValidity::malformed_utf8_maps_one_unit_per_invalid_byte()
+{
+    // Stray Latin-1 0xE9: every byte is one UTF-16 unit, so 'd' (byte 6) is 6.
+    const QByteArray latin1("abc \xE9 def");
+    QCOMPARE(Markoff::buildUtf8ToCharMap(latin1),
+             QList<int>({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
+
+    // Truncated 3-byte sequence: the lead and the stray continuation each count
+    // one, so 'd' (byte 7) is 7.
+    const QByteArray truncated("abc \xE2\x82 def");
+    QCOMPARE(Markoff::buildUtf8ToCharMap(truncated),
+             QList<int>({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10}));
+
+    // Control: a well-formed 4-byte sequence still maps to two UTF-16 units.
+    const QByteArray fourByte("\xF0\x9F\x8E\xB5 ok");
+    QCOMPARE(Markoff::buildUtf8ToCharMap(fourByte),
+             QList<int>({0, 0, 0, 0, 2, 3, 4, 5}));
+
+    // Overflowed / surrogate lead bytes are rejected the same way.
+    const QByteArray overlong("\xC0\xAF");
+    QCOMPARE(Markoff::buildUtf8ToCharMap(overlong), QList<int>({0, 1, 2}));
+    const QByteArray surrogate("\xED\xA0\x80");
+    QCOMPARE(Markoff::buildUtf8ToCharMap(surrogate), QList<int>({0, 1, 2, 3}));
 }
 
 void TestParserValidity::reparsingReplacesTreesWholesale()

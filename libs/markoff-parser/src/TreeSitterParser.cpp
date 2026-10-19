@@ -3,6 +3,8 @@
 #include <markoff/parser/SourceSpan.h>
 #include <markoff/parser/Document.h>
 #include <markoff/parser/PerfProbe.h>
+
+#include "Utf8OffsetMap.h"
 #include "WikilinkDecomposition.h"
 
 #include <tree_sitter/api.h>
@@ -201,28 +203,6 @@ static void collectInlineRanges(TSNode node, std::vector<TSRange> &ranges,
 // UTF-8 ↔ QString char mapping
 // ---------------------------------------------------------------------------
 
-static QList<int> buildByteToCharMap(const QByteArray &utf8)
-{
-    QList<int> map(utf8.size() + 1, 0);
-    int charIdx = 0;
-    int i = 0;
-    while (i < utf8.size()) {
-        map[i] = charIdx;
-        unsigned char c = static_cast<unsigned char>(utf8[i]);
-        int seqLen;
-        if (c < 0x80)       seqLen = 1;
-        else if (c < 0xE0)  seqLen = 2;
-        else if (c < 0xF0)  seqLen = 3;
-        else                 seqLen = 4;
-        for (int j = 1; j < seqLen && (i + j) < utf8.size(); ++j)
-            map[i + j] = charIdx;
-        charIdx += (seqLen == 4) ? 2 : 1;
-        i += seqLen;
-    }
-    map[utf8.size()] = charIdx;
-    return map;
-}
-
 // ---------------------------------------------------------------------------
 // TreeSitterParser
 // ---------------------------------------------------------------------------
@@ -261,7 +241,7 @@ bool TreeSitterParser::parse(const QString &text)
     m_inlineRanges.clear();
 
     m_utf8 = text.toUtf8();
-    m_byteToChar = buildByteToCharMap(m_utf8);
+    m_byteToChar = Markoff::Detail::buildByteToCharMap(m_utf8, text.size());
 
     // Phase 1: parse block structure
     {
