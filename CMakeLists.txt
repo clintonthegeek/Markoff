@@ -82,7 +82,8 @@ foreach(_markoff_leaf_tests
         MARKOFF_CORE_BUILD_TESTS
         MARKOFF_SOURCE_BUILD_TESTS
         MARKOFF_STYLED_BUILD_TESTS
-        MARKOFF_CANVAS_BUILD_TESTS)
+        MARKOFF_CANVAS_BUILD_TESTS
+        MARKOFF_EMBED_BUILD_TESTS)
     if(NOT DEFINED ${_markoff_leaf_tests})
         set(${_markoff_leaf_tests} ${MARKOFF_BUILD_TESTS})
     endif()
@@ -112,6 +113,9 @@ find_package(collabtext CONFIG REQUIRED COMPONENTS core)
 add_subdirectory(libs/markoff-collabtext-vnext)
 
 add_subdirectory(libs/markoff-core)
+# Optional embed runtime + backends. A host that links neither gets source-text
+# fallback for embedded content; no leaf depends on this.
+add_subdirectory(libs/markoff-embed)
 # jkqtmathtext — LaTeX math rendering for Math blocks (canvas / styled).
 if(NOT TARGET jkqtmathtext)
     add_subdirectory(libs/jkqtmathtext)

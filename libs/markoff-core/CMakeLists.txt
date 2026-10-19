@@ -39,6 +39,7 @@ add_library(markoff_core SHARED
     include/markoff/core/RenderedBlock.h
     include/markoff/core/CodeBlockProcessor.h
     include/markoff/core/CodeBlockProcessorRegistry.h
+    include/markoff/core/EmbedRender.h
     # --- Completion/ (public) ---
     include/markoff/core/CompletionTrigger.h
     include/markoff/core/CompletionContext.h
@@ -71,6 +72,7 @@ add_library(markoff_core SHARED
     src/SearchEngine.cpp
     src/FindController.cpp
     src/CodeBlockProcessorRegistry.cpp
+    src/EmbedRender.cpp
     src/CompletionProvider.cpp
     src/CompletionRegistry.cpp
     src/EmojiCompletionProvider.cpp

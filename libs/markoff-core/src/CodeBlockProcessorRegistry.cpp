@@ -11,9 +11,12 @@ void CodeBlockProcessorRegistry::registerProcessor(
     std::shared_ptr<CodeBlockProcessor> p)
 {
     if (!p) return;
-    const QString lang = p->language();
-    m_byLang.insert(lang, std::move(p));
-    Q_EMIT processorRegistered(lang);
+    for (const QString &language : p->languages()) {
+        const QString lang = language.toLower();
+        if (lang.isEmpty()) continue;
+        m_byLang.insert(lang, p);
+        Q_EMIT processorRegistered(lang);
+    }
 }
 
 void CodeBlockProcessorRegistry::unregisterProcessor(const QString &lang)
@@ -24,7 +27,7 @@ void CodeBlockProcessorRegistry::unregisterProcessor(const QString &lang)
 std::shared_ptr<CodeBlockProcessor>
 CodeBlockProcessorRegistry::processorFor(const QString &lang) const
 {
-    return m_byLang.value(lang);
+    return m_byLang.value(lang.toLower());
 }
 
 QStringList CodeBlockProcessorRegistry::registeredLanguages() const

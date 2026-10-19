@@ -11,9 +11,15 @@ using namespace Markoff;
 namespace {
 class FakeMermaidProcessor : public CodeBlockProcessor {
 public:
-    QString language() const override { return "mermaid"; }
-    RenderedBlock render(const QByteArray &, const Theme &) override
-    { RenderedBlock r; r.kind = RenderedBlock::Kind::Empty; return r; }
+    QStringList languages() const override { return {QStringLiteral("mermaid")}; }
+
+    RenderedBlock render(const RenderRequest &request) override
+    {
+        RenderedBlock block;
+        block.kind = RenderedBlock::Kind::Empty;
+        block.fallbackText = request.source;
+        return block;
+    }
 };
 }
 

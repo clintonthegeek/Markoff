@@ -146,7 +146,7 @@ QtSvg, threads, process management) is not forced on anyone.
   still a `CodeBlock` with an info string, and math is still `BlockKind::Math`.
   The plugin layer never reads or writes the document.
 
-### 2.2 Contract (core, header + tiny implementation)
+### 2.2 Contract (core, header + tiny implementation) — **landed 2026-10-19**
 
 Keep the existing names and headers — `CodeBlockProcessor`,
 `CodeBlockProcessorRegistry`, `MarkoffServices` — because Corbomite already
@@ -415,8 +415,8 @@ renderer is native.
 | 0 | constitution ruling recorded | S | spec §3 amended |
 | 1 | generic block-content contract; tables migrated | M | table output parity + gap tests |
 | 1 | table a11y decision; styled table theming | S–M | decision logged / theme test |
-| 2 | contract in core (request/result/version); registry evolved in place | M | fake backend round-trip |
-| 2 | `markoff-embed` runtime (cache, pool, SVG, process sandbox) | M–L | async, cancel, cache, sandbox tests |
+| 2 | contract in core (request/result/version); registry evolved in place | M | **done** (`tst_embed_runtime`) |
+| 2 | `markoff-embed` runtime (cache, pool, SVG, process sandbox) | M–L | **cache/pool/SVG done**; sandbox open |
 | 2 | canvas front-end: one embedded path; mermaid seam retired | M | mermaid via a backend, no paint-path render |
 | 2 | math backend (DPR/theme/cache) | S–M | 1x/2x, both themes, fallback |
 | 3 | mermaid backend, reproducible build, corpus | M | provenance recorded; golden tests |
