@@ -71,17 +71,24 @@ void StyledFindAdapter::attach(Markoff::FindController *fc)
             this, &StyledFindAdapter::onNavigationRequested);
     connect(m_controller, &Markoff::FindController::currentMatchChanged,
             this, &StyledFindAdapter::onMatchesChanged);
-    // A model change may rebuild frames/blocks wholesale via the binding's
-    // reverse path — re-derive highlight positions from the live document.
-    // This connection is made AFTER the binding's (attach follows
-    // setDocument), so FIFO delivery runs the reconciliation first.
-    if (auto *doc = m_editor ? m_editor->document() : nullptr) {
-        m_docChangedCon = connect(doc, &Markoff::MarkoffDocument::d2DocumentChanged,
-                                  this, &StyledFindAdapter::onMatchesChanged);
-    }
     if (m_editor) {
         m_themeChangedCon = connect(m_editor, &Editor::themeChanged,
                                     this, &StyledFindAdapter::onMatchesChanged);
+    }
+    rebindDocument();
+}
+
+void StyledFindAdapter::rebindDocument()
+{
+    QObject::disconnect(m_docChangedCon);
+    m_docChangedCon = {};
+    // A model change may rebuild frames/blocks wholesale via the binding's
+    // reverse path — re-derive highlight positions from the live document.
+    // This connection is made AFTER the binding's, so FIFO delivery runs the
+    // reconciliation first.
+    if (auto *doc = m_editor ? m_editor->document() : nullptr) {
+        m_docChangedCon = connect(doc, &Markoff::MarkoffDocument::d2DocumentChanged,
+                                  this, &StyledFindAdapter::onMatchesChanged);
     }
     onMatchesChanged();
 }

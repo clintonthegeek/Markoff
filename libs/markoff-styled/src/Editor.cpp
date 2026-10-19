@@ -178,6 +178,11 @@ void Editor::setDocument(Markoff::MarkoffDocument *doc) {
     }
 
     Markoff::MarkdownView::setDocument(doc);
+
+    // The find adapter subscribes to one document; setDocument() swaps it
+    // without detaching find, so re-point the adapter or highlights stop
+    // refreshing for the live document (ASK-M25).
+    if (m_findAdapter) m_findAdapter->rebindDocument();
 }
 
 Markoff::CursorPos Editor::cursorPosition() const {

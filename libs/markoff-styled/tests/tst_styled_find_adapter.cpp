@@ -63,6 +63,44 @@ private Q_SLOTS:
             QCOMPARE(s.cursor.selectedText(), QStringLiteral("target"));
     }
 
+    // ASK-M25: setDocument() re-wires the binding, style applier, link
+    // interaction and context hooks but never re-pointed the find adapter:
+    // after a swap the adapter kept listening to the retired document, so
+    // highlights stopped refreshing for the live one.
+    void find_adapter_follows_a_document_swap() {
+        Markoff::Styled::Editor e;
+        // The match lives in the SECOND block, so its BlockId is not one the
+        // next document mints.
+        auto first = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("first block\n\nsecond target here"));
+        e.setDocument(first.document.get());
+        QTest::qWait(50);
+
+        FindController fc(first.document.get());
+        fc.activate();
+        fc.setNeedle(QStringLiteral("target"));
+        e.attachFindController(&fc);
+        QCOMPARE(e.textEdit()->extraSelections().size(), 1);
+        QCOMPARE(e.textEdit()->extraSelections().first().cursor.selectedText(),
+                 QStringLiteral("target"));
+
+        // A single-block document: the match's block does not exist here, so
+        // the honest render is no highlight — and it must happen at swap time.
+        // With the adapter still bound to the retired document, nothing
+        // re-renders and the stale selection survives.
+        auto second = Markoff::Styled::Tests::openCandidateDocument(
+            QByteArrayLiteral("a completely different body"));
+        e.setDocument(second.document.get());
+        QTest::qWait(50);
+
+        // The match belongs to the retired document, whose block is not in
+        // this one: the adapter must re-derive at swap time and drop the
+        // highlight. Bound to the old document it never re-renders, and the
+        // stale selection survives.
+        QVERIFY(e.textEdit()->extraSelections().isEmpty());
+        e.detachFindController();
+    }
+
     void match_after_table_lands_at_visible_position() {
         Markoff::Styled::Editor e;
     auto fixture_doc = Markoff::Styled::Tests::openCandidateDocument(QByteArray(

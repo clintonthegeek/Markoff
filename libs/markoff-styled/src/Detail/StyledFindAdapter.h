@@ -49,6 +49,12 @@ public:
     void attach(Markoff::FindController *fc);
     void detach();
 
+    /// Re-subscribe the model-change hook to the editor's current document.
+    /// Editor::setDocument() swaps the document without detaching find, so
+    /// without this the adapter keeps listening to the retired document and
+    /// highlights stop refreshing after a swap (ASK-M25).
+    void rebindDocument();
+
 private slots:
     void onMatchesChanged();
     void onNavigationRequested(Markoff::FindController::Match);
