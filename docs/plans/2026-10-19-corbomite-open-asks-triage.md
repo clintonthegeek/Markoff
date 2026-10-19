@@ -88,8 +88,10 @@ Waves are ordered by risk and unblocking value, not by ask number. Each
 slice is one commit under the repo's own board.
 
 **Progress (2026-10-19):** Wave 0b done; Wave 1 done (`0d974f1b`..`16e7bfe4`);
-Wave 2 done (`a910338d`..`253f1889`); M30 done (`bc776efd`); suite 95/95.
-Wave 0's reply, Wave 3, M31 and Waves 5–6 are open.
+Wave 2 done (`a910338d`..`253f1889`); M30 done (`bc776efd`); M16's offset half
+done (`3739dd7f`); suite 95/95. Wave 0's reply, the rest of Wave 3, M31 and
+Waves 5–6 are open. In Graffodil, M5 (`79357fc`) and M6 (`fc778db`) are done on
+`main`.
 
 ### Wave 0 — Reply and close (no code, do first)
 
@@ -141,12 +143,15 @@ libraries.
 
 Verification: full offscreen suite **95/95** in 38.27 s after M24/M11.
 
-### Wave 3 — Hot path (Markoff)
+### Wave 3 — Hot path (Markoff) — M16 partly done 2026-10-19
 
 Order matters: build the index once, then use it.
 
-1. **M16** running UTF-16→UTF-8 offset; 150 ms debounce in
-   `FindController`.
+1. **M16 — offset half done** (`3739dd7f`): `findByBlock`'s case-insensitive
+   path carries one running byte cursor instead of re-serialising the block
+   prefix twice per match. The 150 ms `FindController` debounce is **not**
+   taken: the controller's match list is synchronous by contract, so that is a
+   UI-behaviour decision.
 2. **M17** remaining — bail when the caret's block is unchanged;
    throttle `handleMove`.
 3. **M13** cached flat view invalidated on edit sequence + a block-offset
@@ -193,9 +198,13 @@ before and after.
    removed streams, and destructive collection is disabled. Measure with
    a multi-document soak before changing policy.
 
-### Wave 6 — Graffodil (separate repo and process)
+### Wave 6 — Graffodil (separate repo and process) — M5/M6 done 2026-10-19
 
-Order: **M6 → M5 → punch-list batch → M19 → M14 → M15.** The two P0s are
+**M5 done** (`79357fc`, bug report + reproduction in `tst_batchrenderer`),
+**M6 done** (`fc778db`, `detachEndpoints`/`setEndpoints` + id-resolved tool
+targets; bug report + three `tst_tools` cases). Full Graffodil suite 16/16.
+
+Remaining order: **punch-list batch → M19 → M14 → M15.** The two P0s are
 teardown/dangling work on the same seam; the leaf's 15 punch-list rows are
 mostly S and should be one batch task; M19 is confined to
 `SugiyamaLayout.cpp`; M14/M15 need a spec and plan under Graffodil's own
