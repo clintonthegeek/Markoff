@@ -20,11 +20,11 @@ M11 — `a910338d`..`253f1889`); the pin publication (Wave 0b) is done and the
 pin stays `e8a8e7d1`. M30 (parser UTF-8 validation) landed ahead of Wave 3, and M16's offset half plus
 M17's per-block link cache landed. The Wave 0 reply is written
 (`docs/handoff/2026-10-19-to-corbomite-open-asks-response.md`) and awaiting a
-send decision; M13/M18 were **unblocked on 2026-10-19** (the cache-key hazard
-they were parked behind does not exist in the current tree — the triage board's
-"Unblocked" section and the evaluation
-[`plans/2026-10-19-markoff-widget-evaluation.md`](plans/2026-10-19-markoff-widget-evaluation.md)
-carry the evidence); M31's caller-side edit tracking, the Wave 5 decisions and
+send decision; M13/M18 landed `31b3152b` (flat-view cache + binding sep index,
+list-insert identity — numbers on the board) together with the content-version
+gaps that work exposed: `compensateReplacementAction` now advances the edit
+sequences on multi-group undo/redo, and a regression test pins remote-action
+version bumps; M31's caller-side edit tracking, the Wave 5 decisions and
 the Graffodil perf/spec rows are the remainder (see the board's batch close-out
 table).
 
@@ -75,6 +75,13 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 [`docs/handoff/2026-10-19-collabtext-master-integration-pin.md`](handoff/2026-10-19-collabtext-master-integration-pin.md).
 
 ## Latest verification
+
+2026-10-19, M13/M18 (`31b3152b`): offscreen `scripts/run-tests.sh` passed
+**98/98** on the current tree (wire `build-dev`). Before/after numbers on the
+board's Wave 3 section. Note: `tst_canvas_render` aborts at process exit
+roughly 1 run in 30 — a pre-existing use-after-free in vendored
+jkqtmathtext's static teardown (ASan-confirmed, exit-time only), unrelated to
+this change.
 
 2026-10-19, evaluation pass: offscreen `scripts/run-tests.sh` passed **98/98**
 in 30.60 s on the current tree (wire `build-dev`). Read-only audit of all

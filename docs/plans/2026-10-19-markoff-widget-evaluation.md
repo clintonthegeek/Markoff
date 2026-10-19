@@ -97,8 +97,8 @@ Vendored: `rapidyaml`, `jkqtmathtext`. Apps: `markoff-canvas-app`,
 
 | Item | Gate | Note |
 |---|---|---|
-| M13 cached flat view | **gate removed** (see Bad #1) | start now, after the regression test |
-| M18 paste/removal row index | **gate removed** | same |
+| M13 cached flat view | **DONE** `31b3152b` — 1515 → 0.40 µs/op; typing path unchanged (publication dominates) |
+| M18 paste/removal row index | **DONE** `31b3152b` — 50-block paste 879–1020 → 554–588 ms |
 | M31 caller-side edit tracking | binding must record byte edits | API ready, no caller |
 | M16 debounce half | UI-behaviour decision | controller is synchronous by contract |
 | M7 styled theme | explicit exception to bug-fix-only rule | three-part change, hash fix not optional |
@@ -166,12 +166,17 @@ document.
 
 ## Actions taken on this evaluation (2026-10-19)
 
-Step 1 landed: the doc-correction commit fixed every stale pointer above
-(queue.md header + blocker note, triage board "Blocked" section + close-out
-table + Wave 3 + M13 anchor, repo `AGENTS.md` wave status, README task list +
-layout table, d-arc archived marker, STATUS verification line) and filed
-`mermade-and-others.md` under `docs/research/`. M11's disposition is recorded
-on the triage board: keep the enum values, keep refusing loudly, implement as a
-named feature later. Step 2 (the remote-bumps-sequence regression test) and
-steps 3–4 (M13, M18) are the code work that follows; this document is updated
-again when they land.
+Step 1 landed (`6f112d6f`): the doc-correction commit fixed every stale
+pointer above (queue.md header + blocker note, triage board "Blocked"
+section + close-out table + Wave 3 + M13 anchor, repo `AGENTS.md` wave
+status, README task list + layout table, d-arc archived marker, STATUS
+verification line) and filed `mermade-and-others.md` under
+`docs/research/`. M11's disposition is recorded on the triage board: keep
+the enum values, keep refusing loudly, implement as a named feature later.
+
+Step 2–4 landed (`31b3152b`): the remote-bumps-sequence regression test,
+M13 (flat-view cache + binding sep index) and M18 (list-insert identity),
+plus a fix the cache exposed — `compensateReplacementAction` did not
+advance the edit sequences on multi-group undo/redo. Numbers and the two
+new rows they uncovered (action-publication cost; jkqtmathtext exit-time
+UAF) are on the board's Wave 3 section and close-out table.
