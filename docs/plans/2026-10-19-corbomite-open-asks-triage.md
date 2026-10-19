@@ -182,9 +182,10 @@ Order matters: build the index once, then use it.
 cost).** End-to-end typing through the binding costs ~300 ms/keystroke on a
 400-block document and grows with the action count — the flat view was
 ~2.3 ms of that. The dominant cost is per-action publication
-(`applyBlockEdit` → `publishStagedAction` → history decode/re-encode); a
-50-block paste is ~550 ms for the same reason. Needs its own row and a
-profile before anyone optimizes it. Not part of M13/M18.
+(`applyBlockEdit` → `publishStagedAction` → history decode/re-encode);
+a 50-block paste is ~550 ms for the same reason. Profiled 2026-10-19 and
+the contained part fixed in `092cd1d5`; the remaining quadratic needs an
+incremental owner-history design — see the close-out table's row.
 
 Exit: before/after numbers on the probes named in the handoff; no budget
 regression.
@@ -274,7 +275,7 @@ M19. Every remaining row is gated on something other than effort:
 | M37 canvas card mode | needs a documented embedded mode + scroll ownership decision |
 | M26, M27 item 4 | packaging decision (latent on this toolchain) |
 | M12 | retention-policy decision + a measurement |
-| **New: action-publication cost** | ~300 ms/keystroke and ~550 ms per 50-block paste at 400 blocks; needs a profile before an optimization row |
+| **New: action-publication cost** | **profiled 2026-10-19** (`092cd1d5` landed the contained part). Typing cost grows linearly with the action count — 50/83/130/186/259/339 ms per keystroke at 100…600 actions on a 50-block document — so a session is quadratic in keystrokes. perf: `applyBlockEdit` → `ProviderBackedDocumentState::publishAction` ≈67%, of which `ActionBundleCodec::decode` ≈39% (fixed: the accepted-prefix decode loop), `OwnerHistoryCodec::decode` ≈34% and `OwnerHistoryCodec::encode`/`CrossStreamHistoryCodec::encode` ≈31% (the whole history is decoded to append one event and re-encoded to store it, per action), plus `enforceActorUndoDepth` ≈10% and ~4 full `readRecoveryState()` assemblies per action. The remaining quadratic needs an incremental/append-only owner-history design (or a decoded-index cache plus append-only event storage) — a durability-spec change, not a hot patch |
 | **New: jkqtmathtext exit-time UAF** | vendored lib; `tst_canvas_render` aborts ~1/30 runs at exit. ASan: use-after-free in `initStaticStructures` static teardown, amplified by the lib being compiled into both `libmarkoff_canvas.so` and `libmarkoff_embed_math.so` (ODR violation on its globals). Punch-list, not an ask |
 | M16 debounce half | UI-behaviour decision |
 | M31's other half | caller-side edit tracking; needs the binding to record byte edits |
