@@ -228,14 +228,61 @@ bool TreeSitterParser::parse(const QString &text)
 {
     MARKOFF_PERF_SCOPE("parser.TreeSitterParser::parse");
 
-    // Drop every tree before touching m_utf8: a failed parse must not leave the
-    // previous document's inline trees bound to the new byte map (inlineSpansFor
-    // then read stale, out-of-range spans instead of reporting a failure).
+    // Same text as the last successful parse: the current trees already
+    // describe it, so there is nothing to do.
+    if (m_valid && m_hasParsed && m_lastText == text)
+        return true;
+
+    return parseWithPrevious(text, m_lastText == text ? m_blockTree : nullptr);
+}
+
+bool TreeSitterParser::reparse(const QString &text, quint32 editStart,
+                               quint32 oldEnd, quint32 newEnd)
+{
+    // No tree to update, or no knowledge of the text it describes: fall back
+    // to a fresh parse.
+    if (!m_valid || !m_blockTree || !m_hasParsed)
+        return parse(text);
+
+    const QByteArray oldUtf8 = m_lastText.toUtf8();
+    const QByteArray newUtf8 = text.toUtf8();
+    const auto pointOf = [](const QByteArray &bytes, quint32 byteOffset) {
+        TSPoint point{0, 0};
+        const quint32 limit = qMin<quint32>(byteOffset, quint32(bytes.size()));
+        for (quint32 i = 0; i < limit; ++i) {
+            if (bytes[int(i)] == '\n') {
+                ++point.row;
+                point.column = 0;
+            } else {
+                ++point.column;
+            }
+        }
+        return point;
+    };
+
+    TSInputEdit edit{};
+    edit.start_byte = editStart;
+    edit.old_end_byte = oldEnd;
+    edit.new_end_byte = newEnd;
+    edit.start_point = pointOf(oldUtf8, editStart);
+    edit.old_end_point = pointOf(oldUtf8, oldEnd);
+    edit.new_end_point = pointOf(newUtf8, newEnd);
+    ts_tree_edit(m_blockTree, &edit);
+
+    return parseWithPrevious(text, m_blockTree);
+}
+
+bool TreeSitterParser::parseWithPrevious(const QString &text, TSTree *previous)
+{
+    MARKOFF_PERF_SCOPE("parser.TreeSitterParser::parseWithPrevious");
+
+    // Drop every inline tree before touching m_utf8: a failed parse must not
+    // leave the previous document's inline CSTs bound to the new byte map
+    // (inlineSpansFor then read stale, out-of-range spans). The block tree is
+    // kept alive across the parse below and handed to tree-sitter as the
+    // previous tree, so unchanged subtrees are reused instead of re-parsed
+    // (ASK-M31); it is deleted as soon as the new tree exists.
     m_valid = false;
-    if (m_blockTree) {
-        ts_tree_delete(m_blockTree);
-        m_blockTree = nullptr;
-    }
     for (TSTree *t : m_inlineTrees) ts_tree_delete(t);
     m_inlineTrees.clear();
     m_inlineRanges.clear();
@@ -243,15 +290,21 @@ bool TreeSitterParser::parse(const QString &text)
     m_utf8 = text.toUtf8();
     m_byteToChar = Markoff::Detail::buildByteToCharMap(m_utf8, text.size());
 
-    // Phase 1: parse block structure
+    // Phase 1: parse block structure. The previous tree is passed so
+    // tree-sitter can reuse the subtrees whose byte ranges still match; the
+    // old tree is reference-counted and safe to delete immediately after.
     {
         MARKOFF_PERF_SCOPE("parser.block_grammar");
-        m_blockTree = ts_parser_parse_string(m_blockParser, nullptr,
+        m_blockTree = ts_parser_parse_string(m_blockParser, previous,
                                               m_utf8.constData(),
                                               static_cast<uint32_t>(m_utf8.size()));
+        if (previous) ts_tree_delete(previous);
     }
-    if (!m_blockTree)
+    if (!m_blockTree) {
+        m_hasParsed = false;
+        m_lastText.clear();
         return false;
+    }
 
     // Phase 2: parse inline content — ONE parse per inline region.
     // Each `inline` node in the block tree (heading text, paragraph text,
@@ -282,6 +335,8 @@ bool TreeSitterParser::parse(const QString &text)
     }
 
     m_valid = true;
+    m_hasParsed = true;
+    m_lastText = text;
     return true;
 }
 

@@ -30,6 +30,7 @@ private slots:
     void staleInlineSpansAreNeverObservable();
     void malformed_utf8_maps_one_unit_per_invalid_byte();
     void reparsingReplacesTreesWholesale();
+    void incremental_reparse_matches_a_fresh_parse();
 };
 
 void TestParserValidity::concurrentFrontmatterReadsSeeTheParsedValue()
@@ -135,6 +136,47 @@ void TestParserValidity::malformed_utf8_maps_one_unit_per_invalid_byte()
     QCOMPARE(Markoff::buildUtf8ToCharMap(overlong), QList<int>({0, 1, 2}));
     const QByteArray surrogate("\xED\xA0\x80");
     QCOMPARE(Markoff::buildUtf8ToCharMap(surrogate), QList<int>({0, 1, 2, 3}));
+}
+
+// ASK-M31: a caller that knows the edit gets tree reuse, and the result must be
+// identical to a fresh parse of the same text.
+void TestParserValidity::incremental_reparse_matches_a_fresh_parse()
+{
+    const QByteArray before = QByteArray(
+        "# Heading\n\nparagraph with **bold** and [link](https://x.y)\n\n"
+        "| A | B |\n|---|---|\n| 1 | 2 |\n\ntail #tag\n");
+    const QByteArray after = QByteArray(
+        "# Heading\n\nparagraph with **bold** and [link](https://x.y)\n\n"
+        "| A | B |\n|---|---|\n| 1 | 2 |\n\nanother paragraph #tag #two\n");
+
+    TreeSitterParser incremental;
+    QVERIFY(incremental.parse(QString::fromUtf8(before)));
+    // Replace the tail after the table: editStart at "tail", oldEnd after it,
+    // newEnd after the replacement.
+    const quint32 editStart = quint32(before.indexOf("tail"));
+    const quint32 oldEnd = quint32(before.size());
+    const quint32 newEnd = quint32(after.size());
+    QVERIFY(incremental.reparse(QString::fromUtf8(after), editStart, oldEnd, newEnd));
+
+    TreeSitterParser fresh;
+    QVERIFY(fresh.parse(QString::fromUtf8(after)));
+
+    const DocumentQueryResult a = incremental.buildDocumentQueries();
+    const DocumentQueryResult b = fresh.buildDocumentQueries();
+    QCOMPARE(a.headings.size(), b.headings.size());
+    QCOMPARE(a.links.size(), b.links.size());
+    QCOMPARE(a.tags.size(), b.tags.size());
+    QCOMPARE(a.topLevelBlocks.size(), b.topLevelBlocks.size());
+    for (int i = 0; i < a.topLevelBlocks.size(); ++i) {
+        QCOMPARE(int(a.topLevelBlocks[i].kind), int(b.topLevelBlocks[i].kind));
+        QCOMPARE(a.topLevelBlocks[i].byteStart, b.topLevelBlocks[i].byteStart);
+        QCOMPARE(a.topLevelBlocks[i].byteEnd, b.topLevelBlocks[i].byteEnd);
+    }
+    QCOMPARE(incremental.buildSpanMap().size(), fresh.buildSpanMap().size());
+
+    // Parsing the same text again is a no-op that keeps the same answers.
+    QVERIFY(incremental.parse(QString::fromUtf8(after)));
+    QCOMPARE(incremental.buildDocumentQueries().tags.size(), a.tags.size());
 }
 
 void TestParserValidity::reparsingReplacesTreesWholesale()

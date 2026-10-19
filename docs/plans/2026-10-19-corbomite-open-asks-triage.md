@@ -88,8 +88,8 @@ Waves are ordered by risk and unblocking value, not by ask number. Each
 slice is one commit under the repo's own board.
 
 **Progress (2026-10-19):** Wave 0b done; Wave 1 done (`0d974f1b`..`16e7bfe4`);
-Wave 2 done (`a910338d`..`253f1889`); M30 done (`bc776efd`); M16's offset half
-(`3739dd7f`) and M17's cache (`c68e6afd`) done; suite 95/95 on `c68e6afd`.
+Wave 2 done (`a910338d`..`253f1889`); M30 (`bc776efd`), M16's offset half
+(`3739dd7f`), M17's cache (`c68e6afd`) and M31's reuse API done; suite 95/95.
 Wave 0's reply is written; M13/M18, M31 and Waves 5–6 are open. In Graffodil,
 M5 (`79357fc`), M6 (`fc778db`) and punch-list batch 1 (`5c62d01`) are on `main`.
 
@@ -168,14 +168,23 @@ Order matters: build the index once, then use it.
 Exit: before/after numbers on the probes named in the handoff; no budget
 regression.
 
-### Wave 4 — Parser structure (Markoff) — M30 done 2026-10-19
+### Wave 4 — Parser structure (Markoff) — M30 done, M31's reuse API done 2026-10-19
 
 **M30 done** (`bc776efd`), ahead of Wave 3 because it is correctness rather
 than speed: `src/Utf8OffsetMap.h` validates continuation bytes and rejects
 overlong/surrogate/truncated sequences; one malformed byte counts as one
 replacement character; the parser's table is clamped to the decoded string.
 The malformed-input maps are pinned in `tst_markoff_parser_validity`, and the
-full suite passes 95/95 in 39.95 s. `M31` is open.
+full suite passes 95/95 in 39.95 s.
+
+**M31 partly done:** `parse()` no longer re-parses text it already holds, and a
+new `reparse(text, editStart, oldEnd, newEnd)` moves the previous tree to the new
+text with `ts_tree_edit` before parsing, so tree-sitter reuses unchanged
+subtrees. Verified by an equivalence oracle against a fresh parse
+(`tst_markoff_parser_validity`). Passing an *unedited* tree for different text is
+not valid — an earlier attempt did exactly that and produced a stale heading —
+so callers must supply the edit; no caller tracks edits yet, which is the
+remaining half of M31.
 
 **M30 before M31**, because M31 rewrites the map builder that M30
 validates. M30: continuation-byte validation, invalid sequence = 1 byte,
@@ -231,6 +240,18 @@ acceptance run. See
 [`../handoff/2026-10-19-collabtext-master-integration-pin.md`](../handoff/2026-10-19-collabtext-master-integration-pin.md).
 
 M1 and M29 stay closed: both are in the pinned tree.
+
+## Blocked on an unreliable key (recorded, not started)
+
+**M13 and M18** want caches keyed on edit sequences: a cached flat view, a
+block-byte-offset vector for binary-search sep↔block resolution, and a
+`BlockId → index` map for paste/removal. The canvas staleness note in
+`docs/queue.md` is the evidence against starting: `d2EditSequence()` and
+`blockEditSequence(id)` do **not** bump on `applyRemoteOps`, so a cache keyed on
+them can serve stale text — a correctness risk, not a perf risk. They need a
+document-wide content version bumped at every mutation path (including remote
+application) before any cache can be keyed safely. That is the prerequisite
+task, and it is not in this batch.
 
 ## Standstill rules that constrain this list
 

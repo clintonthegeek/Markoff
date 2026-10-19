@@ -45,6 +45,16 @@ public:
     /// Afterwards, use buildSpanMap() to get formatting spans.
     bool parse(const QString &text);
 
+    /// Re-parse after an edit, reusing the previous tree. `editStart` is a byte
+    /// offset in the previous text; `oldEnd` is the byte offset in the previous
+    /// text where the replaced range ended and `newEnd` the offset in `text`
+    /// where the replacement ends (both equal `editStart` for a pure insertion).
+    /// The tree is moved to the current text first, so unchanged subtrees are
+    /// reused instead of re-parsed (ASK-M31). Falls back to a fresh parse when
+    /// there is no tree to update.
+    bool reparse(const QString &text, quint32 editStart, quint32 oldEnd,
+                 quint32 newEnd);
+
     /// Walk the CST and extract headings, links, and tags as structured data.
     DocumentQueryResult buildDocumentQueries() const;
 
@@ -90,6 +100,14 @@ private:
     QByteArray m_utf8;
     QList<int> m_byteToChar;  // UTF-8 byte offset → QString char offset
     bool m_valid = false;  // true only after a fully successful parse()
+    /// Text the current trees describe, so parse() can skip an unchanged
+    /// document and reparse() knows what the edit offsets refer to.
+    QString m_lastText;
+    bool m_hasParsed = false;
+
+    /// Shared body of parse() and reparse(), with the tree-sitter previous tree
+    /// already validated/edited by the caller.
+    bool parseWithPrevious(const QString &text, TSTree *previous);
 };
 
 /// Parse a single block's UTF-8 content and return its inline formatting spans.
