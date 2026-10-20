@@ -3,7 +3,6 @@
 
 #include <QColor>
 #include <QImage>
-#include <QPixmap>
 
 #include <jkqtmathtext/jkqtmathtext.h>
 
@@ -38,11 +37,14 @@ RenderedBlock MathBackend::render(const RenderRequest &request)
     const qreal pixelSize = request.fontPixelSize > 0.0
         ? request.fontPixelSize
         : 16.0 * qMax<qreal>(0.25, request.fontScale);
-    // jkqtmathtext lays out at the pixel size it is given and only tags the
-    // result with a DPR, so render at size x DPR to get real HiDPI pixels and
-    // then divide the size back out for the DIP-space preferred size.
+    // The font is set at DIP size and the raster is scaled by the DPR, which
+    // is what drawIntoImage() is for: it lays the text out in DIP units and
+    // hands back a DPR-tagged image, so the glyphs stay crisp and the
+    // logical size is the DIP size. (Pre-multiplying the font by the DPR
+    // instead — the old pixmap path's shape — would double-count the scale
+    // and report twice the logical size.)
     const qreal dpr = qMax(1.0, request.devicePixelRatio);
-    math.setFontSizePixels(pixelSize * dpr);
+    math.setFontSizePixels(pixelSize);
     math.setFontColor(request.foreground.isValid() ? request.foreground : QColor(Qt::black));
     if (!math.parse(latex)) {
         block.kind = RenderedBlock::Kind::Error;
@@ -55,18 +57,22 @@ RenderedBlock MathBackend::render(const RenderRequest &request)
     // colour its block paints, so the raster never shows a seam.
     const QColor background = request.background.isValid()
         ? request.background : QColor(Qt::white);
-    const QPixmap pixmap = math.drawIntoPixmap(false, background, 0, dpr);
-    if (pixmap.isNull()) {
+    // A QImage, not a QPixmap: this runs on the embed runtime's worker
+    // thread, and QPixmap is a GUI-thread resource (Qt's own rule). The
+    // image path draws the same pixels and carries the DPR itself, so the
+    // artifact that crosses back to the GUI thread is unchanged.
+    const QImage image = math.drawIntoImage(false, background, 0, dpr);
+    if (image.isNull()) {
         block.kind = RenderedBlock::Kind::Error;
-        block.error = QStringLiteral("jkqtmathtext produced no pixmap");
+        block.error = QStringLiteral("jkqtmathtext produced no image");
         block.fallbackText = request.source;
         return block;
     }
 
     block.kind = RenderedBlock::Kind::Image;
-    block.image = pixmap.toImage();
+    block.image = image;
     block.image.setDevicePixelRatio(dpr);
-    block.preferredSize = QSizeF(pixmap.width() / dpr, pixmap.height() / dpr);
+    block.preferredSize = QSizeF(image.width() / dpr, image.height() / dpr);
     block.fallbackText = request.source;
     return block;
 }

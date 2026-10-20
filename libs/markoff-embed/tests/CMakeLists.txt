@@ -13,3 +13,9 @@ add_executable(tst_embed_runtime tst_embed_runtime.cpp)
 add_test(NAME tst_embed_runtime COMMAND tst_embed_runtime)
 target_link_libraries(tst_embed_runtime PRIVATE Qt6::Test Qt6::Widgets Markoff::Embed Markoff::Core)
 set_tests_properties(tst_embed_runtime PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+
+# Backends render on the embed runtime's worker thread, where QPixmap (a
+# GUI-thread resource) does not belong. The gate greps for it, the way the
+# canvas leaf's constitution gate does.
+add_test(NAME tst_embed_backend_threads
+         COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/check-backend-threads.sh)

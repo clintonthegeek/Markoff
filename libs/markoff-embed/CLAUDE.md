@@ -60,6 +60,21 @@ switch the root sets; a leaf configured alone defaults to ON. Export is
 gated on `KDE_INSTALL_LIBDIR` exactly like the other leaves — a standalone
 Markoff installs nothing.
 
+## Backend thread rule
+
+A backend's `render()` runs on the embed runtime's worker thread, so it
+must not touch GUI-thread resources — **`QPixmap` is the one that bites**
+(Qt's own rule: it is not thread-safe). Draw to a `QImage` and let the
+runtime deliver it. `libs/markoff-embed/tests/check-backend-threads.sh`
+greps the backend sources for `QPixmap` and is registered as a ctest
+(`tst_embed_backend_threads`).
+
+For jkqtmathtext specifically: set the font at **DIP** size and use
+`JKQTMathText::drawIntoImage()` — it lays the text out in DIP units and
+returns a DPR-tagged image that is already scaled. `drawIntoPixmap()`
+wants the font pre-multiplied by the DPR instead; the two shapes are not
+interchangeable, and mixing them reports twice the logical size.
+
 ## Known gaps (2026-10-19)
 
 - Only two backends exist: the fake (test) and math. Mermaid still runs on

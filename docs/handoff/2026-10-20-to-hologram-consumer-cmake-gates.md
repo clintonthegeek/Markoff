@@ -94,22 +94,37 @@ matching the fold precedent) rather than being excluded from it — indices
 never shift, and the accessibility tree truthfully reports the invisible
 title instead of silently losing a block.
 
-## One heads-up about your build
+## The prefix — and a correction to this note's first version
 
-Your `libs/markoff-family` submodule is still pinned at `6250066b` (the
-`archive/markoff-live-final` era), while your build resolves the family
-from a sibling `~/dev/Markoff` checkout or `COLLABTEXT_ROOT` — which is how
-today's port sees the provider-backed document. A fresh clone of Hologram
-*without* a sibling checkout would therefore build the pre-A13 API and
-fail. Worth either re-pinning the submodule to current `master` or making
-the sibling requirement explicit in your README/preset, so a clean checkout
-builds the same thing you are testing.
+The first version of this note said your `libs/markoff-family` submodule
+"is still pinned at `6250066b` (the `archive/markoff-live-final` era)" and
+that a fresh clone "would therefore build the pre-A13 API and fail". **That
+reading was wrong**, and Hologram corrected it: `archive/markoff-live-final-<n>-g<sha>`
+is what `git describe` prints for Markoff's *rolling* archive tag — `<n>` is
+the commit count past that tag, not a version or a branch, and not evidence
+that a pin sits in the live-leaf era. Your pin is `master` (re-pinned during
+the 2026-10-20 catch-up) and it is the provider-backed document you build.
+The same misreading applies to any pin reported that way — Corbomite's, for
+instance, reads `archive/markoff-live-final-173-ge0b96bf8`, which is 173
+commits *past* the archive marker on `master`. `git describe --tags` and
+`git branch --contains <sha>` tell the truth.
+
+The real fresh-clone gap is one level down, and it is not the pin: it is the
+**CollabText Core install prefix**. Markoff's document engine *is* that
+package, so a clone of Hologram alone has no
+`../Markoff/build-collabtext-alpha5/install` to find, and the configure
+fails on `find_package(collabtext)`. The family resolves that prefix from
+`COLLABTEXT_ROOT` or a sibling `~/dev/Markoff` checkout; making the
+requirement explicit rather than leaving CMake's generic "could not find a
+package configuration file provided by collabtext" to be decoded is the right
+call — thank you for making it explicit in your CMake.
 
 (For the record: the document model moved to a provider-backed
 `MarkoffDocument` — opened through a `DocumentStorageProvider` and seeded
 with `importInitialMarkdown` — and edits are block-scoped and return an
 `ActionPublicationResult` you must check. You have already ported to
-that; this note is only so the pin and the port do not drift apart.)
+that; this note is only so the prefix story and the port do not drift
+apart.)
 
 Thanks for the concrete ask — it made the family cheaper for every
 consumer, not just yours.
