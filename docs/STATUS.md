@@ -81,6 +81,20 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 
 ## Latest verification
 
+2026-10-20, painter-state leak (`f68a37c5`): `QPainter::drawRect` /
+`drawRoundedRect` / `drawText` FILL with the current brush. The fold
+affordance set the brush to the block's own foreground and the media
+placeholder set it to the code-block background, and neither cleared it —
+so the brush leaked into the next block's shapes. Visible damage: a table
+after a heading rendered as an unreadable dark slab, every cell filled
+with the heading's foreground colour. Both fills now clear the brush, and
+the placeholder's label no longer fills its own glyphs with its box's
+background colour. New test
+(`tableAfterHeadingDoesNotInheritTheChevronBrush`) fails without the fix
+and passes with it. Offscreen `scripts/run-tests.sh` passed **99/99** on
+the current tree (wire `build-dev`); the canvas constitution gate is clean
+(C1–C4 unchanged).
+
 2026-10-20, display-math carve-out (`58dd4784`): a `$$…$$` block loaded
 from disk stays `BlockKind::Paragraph` — kind promotion to Math only
 happens interactively — so neither the embed runtime nor the legacy
