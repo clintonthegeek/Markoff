@@ -5867,6 +5867,14 @@ void View::paintEvent(QPaintEvent *event)
             p.setPen(Qt::NoPen);
             p.setBrush(e.style.foreground);
             p.drawPath(tri);
+            // The chevron is the only thing here that wants a brush, and
+            // QPainter::drawRect/drawRoundedRect/drawText FILL with the
+            // current brush. A brush left set here would fill the next
+            // block's shapes — a table's cells, for one, which rendered as
+            // a dark slab after a heading (the heading's chevron colour
+            // filled every cell). Clear it so no block inherits painter
+            // state from the one before it.
+            p.setBrush(Qt::NoBrush);
         }
 
         if (e.style.background.isValid()) {
@@ -5932,6 +5940,10 @@ void View::paintEvent(QPaintEvent *event)
                 p.setPen(QPen(e.style.foreground, 1.0, Qt::DashLine));
                 p.setBrush(m_theme.color(Theme::Slot::CodeBlockBackground));
                 p.drawRoundedRect(box, 4.0, 4.0);
+                // drawText fills the glyphs with the current brush, so the
+                // placeholder's label must not be drawn with the box's own
+                // background colour — it would be invisible on itself.
+                p.setBrush(Qt::NoBrush);
                 p.setPen(e.style.foreground);
                 p.drawText(box, Qt::AlignCenter | Qt::TextWordWrap,
                            e.mediaLabel.isEmpty() ? QStringLiteral("[no target]")

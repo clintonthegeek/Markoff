@@ -385,6 +385,48 @@ private slots:
         QVERIFY2(countDarkPixels(painted) > 200, "cell/paragraph text did not paint");
     }
 
+    // A table after a heading must not inherit the heading's chevron brush:
+    // QPainter::drawRect FILLS with the current brush, so a brush left set
+    // by the fold affordance painted every table cell in the heading's own
+    // foreground — the table rendered as an unreadable dark slab.
+    void tableAfterHeadingDoesNotInheritTheChevronBrush()
+    {
+        auto fixture = openDocument(QByteArrayLiteral(
+            "# Heading\n\n| A | B |\n|---|---|\n| 1 | 2 |\n"));
+        Markoff::Canvas::View view;
+        view.resize(520, 400);
+        Markoff::Theme theme = Markoff::Theme::defaultLight();
+        theme.setColor(Markoff::Theme::Slot::EditorBackground, Qt::white);
+        theme.setColor(Markoff::Theme::Slot::TextDefault, QColor(20, 20, 20));
+        // The heading's foreground is exactly the colour the chevron brush
+        // would carry — make it unmistakable.
+        theme.setColor(Markoff::Theme::Slot::Heading1, QColor(255, 0, 0));
+        view.setTheme(theme);
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto blocks = fixture.document->iterateBlocks();
+        QVERIFY(blocks.size() >= 2);
+        const QRectF tableRect = view.blockRect(blocks[1]);
+        QVERIFY2(tableRect.height() > 10.0, "the table block has no height");
+
+        const QImage painted = view.grab().toImage();
+        if (const QString dump = qEnvironmentVariable("MARKOFF_CANVAS_RENDER_DUMP");
+            !dump.isEmpty())
+            painted.save(dump);
+
+        int headingColouredInTable = 0;
+        for (int y = int(tableRect.top()); y < int(tableRect.bottom()); ++y) {
+            for (int x = int(tableRect.left()); x < int(tableRect.right()); ++x) {
+                if (painted.pixelColor(x, y) == QColor(255, 0, 0))
+                    ++headingColouredInTable;
+            }
+        }
+        QVERIFY2(headingColouredInTable == 0,
+                 "the table's cells were filled with the heading's chevron brush");
+    }
+
     // The legacy mermaid seam still paints: an injected renderer replaces the
     // fenced block's source with its pixmap while the caret is outside it.
     void mermaidBlockPaintsTheInjectedRendererPixmap()
