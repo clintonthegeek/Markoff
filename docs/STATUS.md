@@ -81,6 +81,16 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 
 ## Latest verification
 
+2026-10-20, display-math carve-out (`58dd4784`): a `$$…$$` block loaded
+from disk stays `BlockKind::Paragraph` — kind promotion to Math only
+happens interactively — so neither the embed runtime nor the legacy
+math-pixmap path ever saw it, and it rendered as raw LaTeX in every
+consumer. `BlockPresentation`'s Paragraph case now content-sniffs it into
+the display-math presentation, mirroring the image carve-out above it (a
+presentation change, no document mutation). Offscreen `scripts/run-tests.sh`
+passed **99/99** on the current tree (wire `build-dev`); the canvas
+constitution gate is clean (C1–C4 unchanged).
+
 2026-10-19, M13/M18/M17, the content-version work and M37's card mode
 (`aae3727d`): offscreen `scripts/run-tests.sh` passed **99/99** on the
 current tree (wire `build-dev`); the canvas constitution gate is clean
