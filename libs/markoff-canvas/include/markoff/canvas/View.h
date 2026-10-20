@@ -194,6 +194,19 @@ public:
     void setTheme(const Theme &theme);
     const Theme &theme() const;
 
+    /// Embedded (card) mode. See `EditorWidget::setEmbeddedMode` — the
+    /// documented, host-facing seam — for the whole contract; this is the
+    /// leaf-internal half that does the work.
+    ///
+    /// In embedded mode the view is a *window onto* a document, not a
+    /// scroller: the vertical scrollbar is hidden, a wheel gesture does not
+    /// scroll (the host owns scrolling), and the title band and fold
+    /// affordances are not shown. The scroll RANGE stays live and correct,
+    /// so the host can still position the window through
+    /// `setScrollPositionVisualLine`.
+    void setEmbeddedMode(bool embedded);
+    bool embeddedMode() const { return m_embeddedMode; }
+
     /// Contract-v2 (P3.5): multiplies every block's font pixel size on top
     /// of the theme's own sizing (`BlockPresentation::fontForSlot`).
     /// Invalidates every cache entry's style AND layout (width/height both
@@ -1580,6 +1593,9 @@ public:
     bool m_hasFocus = false;
     /// Read-only gate authority (P3.3). See `setReadOnly`'s doc comment.
     bool m_readOnly = false;
+    /// Embedded (card) mode — see `setEmbeddedMode`'s doc comment. The host
+    /// owns geometry and scrolling; this view shows the window.
+    bool m_embeddedMode = false;
     bool m_publicationPending = false;
     bool m_reportedReadOnly = false;
     /// Find-match highlights (P3.4), grouped by block for O(1) lookup

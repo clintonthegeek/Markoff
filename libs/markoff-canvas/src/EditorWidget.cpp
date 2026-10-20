@@ -672,6 +672,26 @@ void EditorWidget::setReadOnly(bool ro)
         m_view->setReadOnly(ro);
 }
 
+void EditorWidget::setEmbeddedMode(bool embedded)
+{
+    if (m_embeddedMode == embedded)
+        return;
+    m_embeddedMode = embedded;
+    if (m_view)
+        m_view->setEmbeddedMode(embedded);
+    // A card arrives read-only: it is not the thing being edited until the
+    // user picks it. The host promotes the card being edited with the
+    // ordinary setReadOnly(false) — which is why this only ever turns
+    // read-only ON here, and never back off.
+    if (embedded)
+        setReadOnly(true);
+}
+
+bool EditorWidget::embeddedMode() const
+{
+    return m_embeddedMode;
+}
+
 QRect EditorWidget::caretRect() const
 {
     if (!m_view)

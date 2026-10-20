@@ -650,6 +650,33 @@ void View::setReadOnly(bool ro)
     syncReadOnlyState();
 }
 
+void View::setEmbeddedMode(bool embedded)
+{
+    if (m_embeddedMode == embedded)
+        return;
+    m_embeddedMode = embedded;
+    // A card shows a window onto a document; it does not scroll itself.
+    // The scroll RANGE stays live (the host drives the position through
+    // setScrollPositionVisualLine), so only the bar's POLICY changes —
+    // AlwaysOff hides the bar AND hands its space back to the content,
+    // which is what a card wants; the bar itself still carries the range
+    // and the value the host writes.
+    setVerticalScrollBarPolicy(embedded ? Qt::ScrollBarAlwaysOff
+                                       : Qt::ScrollBarAsNeeded);
+    // Chrome that has no meaning at card size: the inline title band and
+    // folding. The host's own title setting is NOT changed — the band is
+    // simply not shown while embedded, and comes back if the host re-enables
+    // it after leaving embedded mode. Fold STATE stays where it is (the
+    // session is the authority); only its APPLICATION is suppressed, so
+    // leaving embedded mode restores the folds exactly as they were.
+    refreshHiddenTitleBlock();
+    refreshFoldedBlocks();
+    // The title band's height is part of every block's y-offset, so the
+    // layout has to be re-derived after it changes.
+    ensureLayoutForViewport();
+    viewport()->update();
+}
+
 bool View::isReadOnly() const
 {
     if (m_readOnly || m_publicationPending)
@@ -1126,6 +1153,12 @@ void View::refreshFoldedBlocks()
     QSet<BlockId> hidden = hiddenBlocksFromFolds();
     if (!m_hiddenTitleBlock.isNull())
         hidden.insert(m_hiddenTitleBlock);
+    // Embedded (card) mode: fold STATE stays (the session is the authority),
+    // but its APPLICATION is suppressed — a card shows the document, and
+    // folding is inert there (no affordance, toggleFold is a no-op), so a
+    // card never hides content behind a body the user cannot expand.
+    if (m_embeddedMode)
+        hidden.clear();
     m_cache->setFoldedBlocks(hidden);
     // A4.1 (spec §4.4): the one funnel every fold / hidden-projection
     // change passes through — announce expandable/expanded/invisible diffs.
@@ -1247,6 +1280,11 @@ bool View::isBlockHidden(BlockId id) const
 
 void View::toggleFold(BlockId id)
 {
+    // Embedded (card) mode: folding is inert — a card is a window, not a
+    // folding editor. The fold state stays in the session, so leaving
+    // embedded mode restores it.
+    if (m_embeddedMode)
+        return;
     if (!m_doc || !isBlockFoldable(id))
         return;
 
@@ -1423,6 +1461,12 @@ qreal View::textWidth() const
 
 qreal View::titleBandHeight() const
 {
+    // Embedded (card) mode: the band is not shown, so it occupies no space
+    // either. The host's own title-visibility setting is untouched — the
+    // band comes back when the host re-enables it after leaving embedded
+    // mode.
+    if (m_embeddedMode)
+        return 0.0;
     if (!m_inlineTitleVisible)
         return 0.0;
     const QFontMetricsF fm(titleFont());
@@ -1505,6 +1549,9 @@ void View::setAccessibleDocumentName(const QString &name)
 
 bool View::hitTestTitle(const QPoint &viewportPos, int *outCharPos) const
 {
+    // Embedded (card) mode: the band is not shown, so it is not hit either.
+    if (m_embeddedMode)
+        return false;
     if (!m_inlineTitleVisible)
         return false;
     const qreal scrollY = verticalScrollBar()->value();
@@ -1621,6 +1668,9 @@ void View::handleTitleKeyPress(QKeyEvent *event)
 
 void View::paintTitle(QPainter &p) const
 {
+    // Embedded (card) mode: the band is not shown at card size.
+    if (m_embeddedMode)
+        return;
     if (!m_inlineTitleVisible)
         return;
 
@@ -2238,6 +2288,11 @@ std::optional<BlockId> View::taskCheckboxAt(const QPoint &viewportPos) const
 
 std::optional<BlockId> View::foldAffordanceAt(const QPoint &viewportPos) const
 {
+    // Embedded (card) mode: no fold affordance at card size, and folding
+    // is inert while embedded (toggleFold is a no-op), so a card never
+    // hides content behind a body the user cannot expand.
+    if (m_embeddedMode)
+        return std::nullopt;
     if (!m_doc || m_cache->entries().empty())
         return std::nullopt;
 
@@ -2556,6 +2611,11 @@ void View::ensureCaretVisible()
 
 void View::scrollCaretIntoView()
 {
+    // Embedded (card) mode: the host owns the scroll position — a card
+    // scrolls itself only when the host says so. The caret still moves and
+    // paints; the window stays where the host put it.
+    if (m_embeddedMode)
+        return;
     if (m_caret.block.isNull())
         return;
     const int idx = m_cache->indexOf(m_caret.block);
@@ -5429,6 +5489,15 @@ void View::mouseDoubleClickEvent(QMouseEvent *event)
 
 void View::wheelEvent(QWheelEvent *event)
 {
+    // Embedded (card) mode: the card does not scroll itself — the host owns
+    // the scroll position, and a card must never scroll independently of the
+    // canvas zoom. The event is left UNACCEPTED so it reaches the host (a
+    // QGraphicsProxyWidget forwards it to the scene), which can apply its
+    // own zoom.
+    if (m_embeddedMode) {
+        event->ignore();
+        return;
+    }
     // Ctrl+Scroll-to-zoom ([cluster-k] P3) — see the `fontScaleStepRequested`
     // signal's own doc comment (View.h) for why this can't just mutate
     // `m_fontScale` in place. `angleDelta().y()`'s SIGN, not its magnitude,
@@ -5779,7 +5848,7 @@ void View::paintEvent(QPaintEvent *event)
         // before all of them, same "gutter decoration first" order the
         // quote bar/callout header already follow), so every foldable
         // kind gets it without duplicating this block per branch.
-        if (isBlockFoldable(e.id)) {
+        if (!m_embeddedMode && isBlockFoldable(e.id)) {
             const QFontMetricsF gfm(e.style.font);
             const QRectF glyph = foldAffordanceRect(gfm, margin, contentY);
             QPainterPath tri;

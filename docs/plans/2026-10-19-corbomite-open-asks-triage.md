@@ -68,7 +68,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 | M34 | P2 | OPEN (doc only) | `Origin.h:14`; `Origin` has no production reader left | S | core |
 | M35 | P1 | OPEN | `Document.cpp:42` and `:186` (`markdownContent`; handoff cited `:191`) | S | parser |
 | M36 | P3 | OPEN | `markoff-parser/CMakeLists.txt:95` unconditional; canvas gate defaults ON | S | build |
-| M37 | P1 | OPEN | canvas `EditorWidget` ctor has no card/scroll mode; `View` is a `QAbstractScrollArea`; `renderInto` const overload already delivered (`DocumentRenderer.h:33-34`) | M | canvas |
+| M37 | P1 | **DONE** — card mode: `EditorWidget::setEmbeddedMode(true)`, host owns geometry/scroll/chrome; the card arrives read-only, the scrollbar is hidden and the wheel does not scroll it (range stays live for the host's `setScrollPositionVisualLine`), the title band and fold affordances are suppressed; spec §4.6, tests `tst_canvas_card_mode` | M | canvas |
 | M38 | P2 | **ANSWER** | one session per key confirmed; option 1 needs no API change | 0 | reply |
 | M39 | P2 | **DELIBERATE** | trim `:3906`, split `:4127+`, tail on last block `:4197+`; now documented `Cmd/D2.h:65-66` and asserted by `smart_paste_inserts_typed_blocks_as_one_action` | 0 | reply |
 
@@ -222,9 +222,12 @@ before and after.
    `Theme::operator==` + `StyleApplier` by value; read `opts.theme` at
    every colour site; add theme to `computeBlockHash`. The third is not
    optional — without it the first two have no visible effect.
-2. **M37** — card/embedded mode. Gated on the Wave 0 answers (done for
-   M38; M39 keeps the emulation viable). Needs a documented flag and
-   scroll ownership, not a second editor.
+2. **M37** — card/embedded mode. **DONE 2026-10-19**: `EditorWidget::setEmbeddedMode(true)`
+   — the host owns geometry, scrolling and chrome; the card arrives read-only
+   and the host promotes the card being edited; the scrollbar is hidden and the
+   wheel no longer scrolls the card (the range stays live for the host's
+   `setScrollPositionVisualLine`); the title band and fold affordances are
+   suppressed. Spec §4.6, tests `tst_canvas_card_mode`.
 3. **M26 + M27 item 4** — packaging. Both are latent on this toolchain
    and one contradicts a recorded deliberate choice. Recommend deferring
    M26 and doing item 4 (forward-declare the engine types, make the
@@ -272,7 +275,6 @@ M19. Every remaining row is gated on something other than effort:
 | Remaining | Gate |
 |---|---|
 | M7 styled theme | needs an explicit exception to the styled bug-fix-only rule (feature-shaped) |
-| M37 canvas card mode | needs a documented embedded mode + scroll ownership decision |
 | M26, M27 item 4 | packaging decision (latent on this toolchain) |
 | M12 | retention-policy decision + a measurement |
 | **New: action-publication cost** | **profiled 2026-10-19** (`092cd1d5` landed the contained part). Typing cost grows linearly with the action count — 50/83/130/186/259/339 ms per keystroke at 100…600 actions on a 50-block document — so a session is quadratic in keystrokes. perf: `applyBlockEdit` → `ProviderBackedDocumentState::publishAction` ≈67%, of which `ActionBundleCodec::decode` ≈39% (fixed: the accepted-prefix decode loop), `OwnerHistoryCodec::decode` ≈34% and `OwnerHistoryCodec::encode`/`CrossStreamHistoryCodec::encode` ≈31% (the whole history is decoded to append one event and re-encoded to store it, per action), plus `enforceActorUndoDepth` ≈10% and ~4 full `readRecoveryState()` assemblies per action. The remaining quadratic needs an incremental/append-only owner-history design (or a decoded-index cache plus append-only event storage) — a durability-spec change, not a hot patch |

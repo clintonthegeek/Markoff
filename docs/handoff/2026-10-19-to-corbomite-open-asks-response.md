@@ -32,7 +32,8 @@ already fixed in what we ship.
 | M29 | Replaced at the pinned commit: `Global::coverage_intersection()` is the watermark API, `Buffer::compact(watermark)` is deleted, `NetworkSim::compact_all` uses `collect_garbage`, and the 3-replica coverage tests exist. `Global::meet` remains the documented summary fold. |
 | M38 | **Option 1 confirmed.** One card document, shared by paint and edit. The paint pass may hold a non-owning `const MarkoffDocument *`; the `renderInto` pointer overload is `const` and is the intended shape. A second `open()` for the same key still returns `writer_conflict` — that limit is per document key and by design. |
 | M39 | **Deliberate.** Mid-block paste splits at the caret, trims the payload, and appends the tail to the last pasted block; `Cmd/D2.h` documents it and `smart_paste_inserts_typed_blocks_as_one_action` asserts it. Keep your flat-splice emulation. If the leading-whitespace trim blocks a concrete card-editor case, file that narrowly and we will treat it separately. |
-| M37 (render half) | Agreed and already delivered: both `renderInto` overloads are public and `const`; no change requested. The embeddable-card half stays open below. |
+| M37 (card half) | **Delivered 2026-10-19.** `Markoff::Canvas::EditorWidget::setEmbeddedMode(true)` is the documented embedded/card mode; `View::setEmbeddedMode` is the leaf-internal half. The card is a **window onto** the document: the vertical scrollbar is hidden and the wheel no longer scrolls it (the event is left unaccepted, so your `QGraphicsProxyWidget` can still apply the canvas zoom to it), the scroll *range* stays live so you position the window with the ordinary `setScrollPositionVisualLine` — no new scroll API — and the caret does not auto-scroll. The card arrives read-only; promote the card being edited with `setReadOnly(false)`. Chrome that has no meaning at card size is suppressed: the inline title band and the fold affordances (fold state itself is untouched and comes back when the card leaves the mode). Caret, selection, typing, links, find highlights and the accessibility tree all work in a card, and the leaf imposes no minimum size or size policy, so your card rectangle is yours to size. Spec §4.6, tests `tst_canvas_card_mode`. |
+| M37 (render half) | Agreed and already delivered: both `renderInto` overloads are public and `const`; no change requested. |
 
 ## Fixed in this cycle
 
@@ -59,10 +60,10 @@ already fixed in what we ship.
 
 ## Scheduled / open
 
-- **Wave 3 (hot path):** M17's remaining throttle, M13 (cached flat view + block index), M18 (row index). These need before/after probe numbers, so they are not landing as drive-by changes.
+- **Wave 3 (hot path):** **landed** — M13 (cached flat view + binding sep index), M18 (list-insert identity), M17's remaining half (hover cache keyed on the block's edit sequence), plus the content-version gap they exposed (attribute and kind writes now advance the version, and a remote action advances it for every block it touched). Before/after numbers are in our internal triage.
 - **M31:** incremental reparse; the largest item, after the map builder settles.
-- **M7:** the largest visible gap we agree with — theme plumbed into Styled and ignored. It is a feature inside a leaf we keep bug-fix-only, so it needs an explicit exception task before code. Expect `Theme::operator==`, theme reads at every colour site, and theme in `computeBlockHash` as one change.
-- **M37 (card half):** open; gated on a documented embedded mode and scroll ownership. M38/M39 answers remove the architectural blockers.
+- **M7:** the largest visible gap we agree on — theme plumbed into Styled and ignored. It is a feature inside a leaf we keep bug-fix-only, so it needs an explicit exception task before code. Expect `Theme::operator==`, theme reads at every colour site, and theme in `computeBlockHash` as one change.
+- **M37 (card half):** **delivered** — see the table above. The remaining half is host-side: sizing the card rectangle and promoting the card being edited.
 - **M26, M27 item 4:** packaging. Both are latent on this toolchain; M26 contradicts a recorded deliberate choice. Deferred until a non-submodule or MSVC consumer exists.
 - **M14, M15, M19 and the Graffodil punch list:** separate repo. M5 (`79357fc`) and M6 (`fc778db`) are fixed with bug reports and regressions; the rest follows.
 - **M28's doc-destroyed test:** landed with M8.

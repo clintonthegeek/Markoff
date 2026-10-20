@@ -101,6 +101,34 @@ logged as obsolete). Mechanism: spec §4.5; steps: plan gated task
 G-Q612. Below 6.12: keep the styled-text fallback; never build a
 shim.
 
+## Card (embedded) mode — 2026-10-19
+
+`EditorWidget::setEmbeddedMode(true)` turns this leaf into a **card**: a
+window onto a document that a host places in a rectangle of its choosing
+(a `QGraphicsProxyWidget` over a canvas card, for example). The host owns
+geometry, scrolling and chrome; the leaf keeps editing, caret, selection,
+links, find highlights and the accessibility tree working.
+
+What the mode changes:
+- **The scrollbar is hidden and the wheel no longer scrolls the card**
+  (the event is left unaccepted, so a host can still apply its own zoom
+  to it). The scroll *range* stays live, so the host positions the window
+  with the ordinary `setScrollPositionVisualLine`. The caret does not
+  auto-scroll either — the window stays where the host put it.
+- **Chrome with no meaning at card size is suppressed**: the inline title
+  band (and the H-arc hidden-title projection that goes with it) and the
+  fold affordances. Fold *state* is untouched — the session stays the
+  authority — but its application is off and `toggleFold` is a no-op, so
+  a card never hides content behind a body the user cannot expand.
+  Leaving embedded mode restores exactly what the host had.
+- **The card arrives read-only.** The host promotes the card the user is
+  actually editing with the ordinary `setReadOnly(false)`.
+
+The leaf imposes no minimum size and no size policy, so a card can be any
+size the host gives it. `View::setEmbeddedMode` is the leaf-internal half
+(`EditorWidget`'s is the documented, host-facing seam). Tests:
+`tst_canvas_card_mode` (8 cases).
+
 ## Build / test
 
 ```bash
@@ -108,10 +136,11 @@ cmake --build build-dev -j 4          # never more than -j 4
 scripts/run-tests.sh -R canvas        # offscreen; never --direct
 ```
 
-Two ctest binaries cover this leaf: `tst_canvas_render` (offscreen View +
-painted-pixel and interaction checks) and `tst_canvas_vnext_session_positions`
-(session/caret position round-trips against the provider-backed document).
-Run both; `-R canvas` catches them.
+Three ctest binaries cover this leaf: `tst_canvas_render` (offscreen View +
+painted-pixel and interaction checks), `tst_canvas_card_mode` (the card
+contract above) and `tst_canvas_vnext_session_positions` (session/caret
+position round-trips against the provider-backed document). Run all three;
+`-R canvas` catches them.
 
 Manual eyeball loop: the demo app takes a file argument and
 `MARKOFF_CANVAS_GRAB=<path.png>` renders offscreen to a file.

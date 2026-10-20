@@ -193,6 +193,45 @@ this leaf when the gate below opens:
   rejected 2026-08-14 as exactly the hack genre this arc exists to
   end. The gated task in the plan carries the implementation steps.
 
+### 4.6 Card (embedded) mode — the host owns geometry and scrolling
+
+Added 2026-10-19 for Corbomite's embeddable-card ask (ASK-M37, the
+render half of which was already delivered). A host that embeds this
+leaf in a card-sized rectangle — a `QGraphicsProxyWidget` over a canvas
+card — turns the mode on with `EditorWidget::setEmbeddedMode(true)` and
+owns the geometry from then on. **This is not a second editor:** the same
+document, the same caret, the same contract.
+
+Ruling, in the host's favour:
+
+- **The card is a window onto a document, not a scroller.** The vertical
+  scrollbar is hidden and a wheel gesture does not scroll the card — the
+  event is left *unaccepted*, so a host embedding the card in a scene can
+  still apply its own canvas zoom to it. The scroll **range** stays live
+  and correct, so the host positions the window with the ordinary
+  `setScrollPositionVisualLine` — no new scroll API. The caret does not
+  auto-scroll either: the window stays where the host put it.
+- **Chrome with no meaning at card size is suppressed**: the inline title
+  band (and the H-arc hidden-title projection that goes with it — a card
+  must not hide the document's first heading behind a band it does not
+  show) and the fold affordances. Fold *state* is untouched: the session
+  remains the authority, the application of folds is off while embedded,
+  and `toggleFold` is a no-op there, so a card never hides content behind
+  a body the user cannot expand. Leaving embedded mode restores exactly
+  what the host had.
+- **The card arrives read-only.** It is not the thing being edited until
+  the user picks it; the host promotes the card being edited with the
+  ordinary `setReadOnly(false)`. The mode only ever turns read-only ON.
+- Everything else is unchanged: caret, selection, typing, links, find
+  highlights and the accessibility tree all work in a card. The leaf
+  imposes no minimum size and no size policy, so a card can be any size
+  the host gives it.
+
+Constitution: C1–C4 are unchanged by this. The mode adds no deferral
+(the wheel is dropped, not postponed — the host's own gesture handling
+decides), no re-entrance guard, no second document model, and no new
+coordinate space.
+
 ## 5. Feature scope (the parity contract)
 
 ### 5.1 Already built (spike) — carried forward

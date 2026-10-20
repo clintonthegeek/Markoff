@@ -109,6 +109,35 @@ public:
 
     bool hasCursor() const override { return true; }
 
+    /// Embedded (card) mode. A host that embeds this leaf in a card-sized
+    /// rectangle (a `QGraphicsProxyWidget` over a canvas card, say) turns
+    /// this on and owns the geometry from then on.
+    ///
+    /// **What changes.** The leaf becomes a *window onto* a document rather
+    /// than a scroller:
+    /// - The vertical scrollbar is hidden and the wheel no longer scrolls
+    ///   the card (the event is left unaccepted, so a host can still apply
+    ///   its own zoom to it). The scroll RANGE stays live, so the host
+    ///   positions the window with the ordinary
+    ///   `setScrollPositionVisualLine` — the same call a non-embedded host
+    ///   already uses. The caret does not auto-scroll either; the window
+    ///   stays where the host put it.
+    /// - Chrome that has no meaning at card size is suppressed: the inline
+    ///   title band and the fold affordances. Fold state itself is
+    ///   untouched (the session remains the authority) and comes back when
+    ///   the card leaves embedded mode.
+    /// - The card arrives read-only. The host promotes the card the user
+    ///   is actually editing with the ordinary `setReadOnly(false)`.
+    ///
+    /// Everything else is unchanged: caret, selection, typing, links, find
+    /// highlights and the accessibility tree all work in a card.
+    ///
+    /// No-op if the mode is unchanged. The host owns size, position and
+    /// scroll; this leaf imposes no minimum size and no size policy, so a
+    /// card can be any size the host gives it.
+    void setEmbeddedMode(bool embedded);
+    bool embeddedMode() const;
+
     /// Base store (`isReadOnly()`/`hasEditing()` read it) + push to the
     /// composed `View`'s own `setReadOnly` — the single authority its six
     /// mutation-ingress gates read (P3.3, spec §4.2; mirrors
@@ -311,6 +340,10 @@ private:
     View *m_view = nullptr;
     CanvasActionController *m_actionController = nullptr;
     Markoff::Session *m_session = nullptr;
+    /// Embedded (card) mode — see `setEmbeddedMode`'s doc comment. The host
+    /// owns geometry, scrolling and chrome; this widget keeps the composed
+    /// `View` in step with it.
+    bool m_embeddedMode = false;
     QMetaObject::Connection m_docDestroyedCon;
     /// Last `CursorPos` this widget emitted `cursorPositionChanged` for —
     /// the change-gate `onViewCaretChanged` diffs against. Not a cursor
