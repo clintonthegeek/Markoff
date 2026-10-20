@@ -107,7 +107,7 @@ Vendored: `rapidyaml`, `jkqtmathtext`. Apps: `markoff-canvas-app`,
 | M31 caller-side edit tracking | binding must record byte edits | API ready, no caller |
 | M16 debounce half | UI-behaviour decision | controller is synchronous by contract |
 | M7 styled theme | explicit exception to bug-fix-only rule | three-part change, hash fix not optional |
-| M37 canvas card mode | documented embedded mode + scroll ownership | M38/M39 answers already permit it |
+| M37 canvas card mode | **DONE** `aae3727d` — `EditorWidget::setEmbeddedMode(true)`: host owns geometry/scroll/chrome, card arrives read-only, scrollbar hidden, wheel does not scroll it, title band and fold affordances suppressed (spec §4.6, `tst_canvas_card_mode`) |
 | M26 + M27 item 4 | packaging decision | latent on this toolchain |
 | M12 retention | policy decision + multi-doc soak | GC stays disabled by rule |
 | M11 enum disposition | **dispositioned 2026-10-19:** keep the enum values, keep refusing loudly, implement later as a named feature (recorded on the triage board) |
