@@ -20,13 +20,16 @@ M11 — `a910338d`..`253f1889`); the pin publication (Wave 0b) is done and the
 pin stays `e8a8e7d1`. M30 (parser UTF-8 validation) landed ahead of Wave 3, and M16's offset half plus
 M17's per-block link cache landed. The Wave 0 reply is written
 (`docs/handoff/2026-10-19-to-corbomite-open-asks-response.md`) and awaiting a
-send decision; M13/M18 landed `31b3152b` (flat-view cache + binding sep index,
-list-insert identity — numbers on the board) together with the content-version
-gaps that work exposed: `compensateReplacementAction` now advances the edit
-sequences on multi-group undo/redo, and a regression test pins remote-action
-version bumps; M31's caller-side edit tracking, the Wave 5 decisions and
-the Graffodil perf/spec rows are the remainder (see the board's batch close-out
-table).
+send decision; M13/M18/M17 landed `31b3152b`/`b563e624` (flat-view cache +
+binding sep index, list-insert identity, hover cache keyed on the block's edit
+sequence) together with the content-version gaps that work exposed:
+`compensateReplacementAction` now advances the edit sequences on multi-group
+undo/redo, attribute and kind writes advance them too, and a remote action
+advances the version of every block it touched (`c215ccf3`); M37's card half
+landed `aae3727d` (`EditorWidget::setEmbeddedMode` — the host owns geometry,
+scrolling and chrome; the card arrives read-only); M31's caller-side edit
+tracking, the Wave 5 decisions and the Graffodil perf/spec rows are the
+remainder (see the board's batch close-out table).
 
 Embedded-renderer plan, Phase 0 is **done** and Phase 1 has started. The
 content version now advances on every mutating path — attribute and kind
@@ -78,10 +81,12 @@ tag when a Core change needs a fresh acceptance run. Inbound handoff:
 
 ## Latest verification
 
-2026-10-19, M13/M18/M17 and the content-version work (`b563e624`,
-`c215ccf3`, `092cd1d5`): offscreen `scripts/run-tests.sh` passed **98/98**.
-Before/after numbers on the board's Wave 3 section. The `tst_canvas_render`
-exit-time abort (vendored jkqtmathtext globals) is fixed in `673b1727`.
+2026-10-19, M13/M18/M17, the content-version work and M37's card mode
+(`aae3727d`): offscreen `scripts/run-tests.sh` passed **99/99** on the
+current tree (wire `build-dev`); the canvas constitution gate is clean
+(C1–C4 unchanged by the card mode). Before/after numbers on the board's
+Wave 3 section. The `tst_canvas_render` exit-time abort (vendored
+jkqtmathtext globals) is fixed in `673b1727`.
 
 2026-10-19, evaluation pass: offscreen `scripts/run-tests.sh` passed **98/98**
 in 30.60 s on the current tree (wire `build-dev`). Read-only audit of all
