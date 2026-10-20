@@ -130,6 +130,26 @@ BlockStyle presentationFor(const MarkoffDocument &doc, BlockId id,
             s.isEmbedBlock = info.isEmbed;
             s.isImageBlock = !info.isEmbed;
         }
+
+        // Display-math shape, still tagged Paragraph — the same carve-out
+        // the image case above gets, for the same reason. Kind promotion to
+        // BlockKind::Math only happens interactively
+        // (View::promoteCaretBlockKind, fired from an actual document EDIT
+        // with the caret in this exact block), so a `$$…$$` block loaded
+        // from disk stays BlockKind::Paragraph and renders as ordinary
+        // paragraph text — the raw LaTeX source — in every consumer. The
+        // embed runtime (and the legacy math-pixmap path) both key on
+        // style.isMathDisplay, so without this carve-out neither engine
+        // ever sees a loaded display-math block. Content-sniffing it here
+        // mirrors the image carve-out exactly: a real presentation change,
+        // with no document mutation. The rule matches
+        // Markoff::inferBlockKind's math rule — a text starting with "$$"
+        // is display math.
+        if (text.trimmed().startsWith("$$")) {
+            s.font       = fontForSlot(theme, Theme::Slot::Math, fontScale);
+            s.foreground = theme.color(Theme::Slot::Math);
+            s.isMathDisplay = true;
+        }
         break;
     }
 
