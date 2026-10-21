@@ -85,10 +85,11 @@ The latest recorded result is in `docs/STATUS.md`.
 
 ## Status
 
-Pre-1.0, under active development (v0.7.x series). Canvas is the primary
-editing view; Source and Styled remain available. The API is not frozen. See
-`docs/STATUS.md` and `docs/plans/2026-10-19-corbomite-open-asks-triage.md`
-for current status and open work.
+Pre-1.0, under active development (v0.7.x series; current release **v0.7.1**).
+Canvas is the primary editing view; Source and Styled remain available. The API
+is not frozen. See `docs/STATUS.md` and
+`docs/plans/2026-10-19-corbomite-open-asks-triage.md` for current status and
+open work.
 
 ## For contributors / AI agents
 

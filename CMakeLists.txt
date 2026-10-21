@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.19)
-# Version tracks the v0.7.x tag series (see git tags v0.7.0-*).
-project(Markoff VERSION 0.7.0 LANGUAGES CXX)
+# Version tracks the v0.7.x tag series: v0.7.0-* are the point tags, v0.7.1
+# is the first release tag of the series (a consumer re-pin point).
+project(Markoff VERSION 0.7.1 LANGUAGES CXX)
 
 # Markoff-family libraries:
 #   - libs/rapidyaml          (ryml::ryml — YAML parser, vendored)

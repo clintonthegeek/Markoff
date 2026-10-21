@@ -63,6 +63,12 @@ and are not waived.
 
 ## Pin
 
+**Markoff release `v0.7.1` (2026-10-20).** The first *release* tag of the
+v0.7.x series — the `v0.7.0-*` tags are point tags inside it — and a
+consumer re-pin point (`project(Markoff VERSION 0.7.1)`). The release notes
+are the tag message.
+
+**The collabtext engine pin is unchanged by it:**
 `collabtext-markoff-core-2026-10-13-alpha5` at
 `e8a8e7d1a95dd50e23f38d6727921b47b814e44b` (0.2.0-alpha.5, manifest v17).
 Root CMake requires that installed package. The prefix used for the
@@ -79,7 +85,20 @@ the A14/A15 acceptance record still applies. Move the pin to the integration
 tag when a Core change needs a fresh acceptance run. Inbound handoff:
 [`docs/handoff/2026-10-19-collabtext-master-integration-pin.md`](handoff/2026-10-19-collabtext-master-integration-pin.md).
 
+**One caveat this release carries.** The alpha.5 acceptance record covers
+the *engine*, not this Core: the document model's content-version semantics
+changed (attribute and kind writes, and every block a remote action touched,
+now advance it), so **a fresh acceptance run (A14-equivalent) is owed before
+the pin is treated as verified for this release**.
+
 ## Latest verification
+
+2026-10-20, `v0.7.1` release: offscreen `scripts/run-tests.sh` passed
+**100/100** on the dev tree, and the **Release** configuration
+(`build-release`, CTest) passed **100/100** (9 integration + 91 unit). The
+canvas constitution gate (C1–C4) and the embed backend thread gate are
+clean. Read-only: no ASan/UBSan sweep at this commit — the last one covered
+the pre-card-mode tree.
 
 2026-10-20, painter-state leak (`f68a37c5`): `QPainter::drawRect` /
 `drawRoundedRect` / `drawText` FILL with the current brush. The fold
