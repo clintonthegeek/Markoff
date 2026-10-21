@@ -93,6 +93,16 @@ the pin is treated as verified for this release**.
 
 ## Latest verification
 
+2026-10-21, collabtext master's merged perf work (76 commits past the
+integration tag), measured against the same Markoff tree in Release with only
+the engine differing: per-keystroke 18.56/30.91/43.29/56.68/71.71/89.11 ms →
+2.96/5.14/8.65/12.31/17.26/23.41 ms at 100…600 actions (3.8–6.3× faster, and
+the history-growth slope ~4× shallower). Markoff's suite is **100/100** against
+it, and collabtext's own Debug suite is **104/104**. The engine work is
+**local** (75 commits ahead of `origin/master`) and upstream X05 is open, so
+the pin does not move yet — see
+[`handoff/2026-10-21-to-collabtext-perf-work-reaches-markoff.md`](handoff/2026-10-21-to-collabtext-perf-work-reaches-markoff.md).
+
 2026-10-20, `v0.7.1` release: offscreen `scripts/run-tests.sh` passed
 **100/100** on the dev tree, and the **Release** configuration
 (`build-release`, CTest) passed **100/100** (9 integration + 91 unit). The
