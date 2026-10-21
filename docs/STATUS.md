@@ -68,28 +68,47 @@ v0.7.x series — the `v0.7.0-*` tags are point tags inside it — and a
 consumer re-pin point (`project(Markoff VERSION 0.7.1)`). The release notes
 are the tag message.
 
-**The collabtext engine pin is unchanged by it:**
-`collabtext-markoff-core-2026-10-13-alpha5` at
-`e8a8e7d1a95dd50e23f38d6727921b47b814e44b` (0.2.0-alpha.5, manifest v17).
-Root CMake requires that installed package. The prefix used for the
-acceptance runs is `build-collabtext-alpha5/install`. Recreate a missing
-prefix from the candidate's `docs/USING_VNEXT.md`.
+**The collabtext engine pin moved on 2026-10-21** to
+`collabtext-perf-checkpoint-2026-10-21` at
+`16cc48f4969abc2940a7fb332b72af018075dab7` (package `0.2.0-alpha.5`,
+manifest v17 — the installed public API is identical to the alpha.5
+candidate's; only the manifest's Branch/Status lines differ). Root CMake
+requires that installed package. The prefix for the acceptance runs is
+`build-collabtext-perf-checkpoint/install`, rebuilt from the tag; recreate a
+missing prefix from the candidate's `docs/USING_VNEXT.md`.
 
-**Published 2026-10-19.** The tag and its branch are now on `origin`, and
-`origin/master` contains the commit too, so the prefix is recreatable on a
+**Acceptance for the new pin (2026-10-21):** Debug **100/100**, Release
+**100/100**, ASan+UBSan **100/100** (leak detection off — this runner's
+ptrace restriction blocks LeakSanitizer), with the relocated
+installed-package consumer tests (`markoff_provider_*`,
+`markoff_document_storage_provider_test`, `markoff_collabtext_vnext_probe`)
+green against the installed prefix. The engine's own Debug suite is 104/104 at
+the tag. This is the A14-equivalent run the previous caveat called for.
+
+**Before the move:** the pin was `collabtext-markoff-core-2026-10-13-alpha5`
+at `e8a8e7d1a95dd50e23f38d6727921b47b814e44b`; its prefix
+(`build-collabtext-alpha5/install`) is still present for rollback. The
+A14/A15 record covers that engine and the Core as it stood then.
+
+**Published 2026-10-19.** The alpha.5 tag and its branch are on `origin`, and
+`origin/master` contains the commit too, so that prefix is recreatable on a
 fresh clone. `master` also carries the annotated integration tag
 `collabtext-integration-2026-10-19` = `4d0177cd6c3f8802ec031327d0f7d9f314a97e6f`.
-The pin stays at `e8a8e7d1`: the integration commit is a descendant of it, and
-the only `libs/` difference is three lines of capability-manifest metadata, so
-the A14/A15 acceptance record still applies. Move the pin to the integration
-tag when a Core change needs a fresh acceptance run. Inbound handoff:
+Inbound handoff:
 [`docs/handoff/2026-10-19-collabtext-master-integration-pin.md`](handoff/2026-10-19-collabtext-master-integration-pin.md).
 
-**One caveat this release carries.** The alpha.5 acceptance record covers
-the *engine*, not this Core: the document model's content-version semantics
-changed (attribute and kind writes, and every block a remote action touched,
-now advance it), so **a fresh acceptance run (A14-equivalent) is owed before
-the pin is treated as verified for this release**.
+**What the pin move buys** — measured, same Markoff tree, Release, only the
+engine differing: per-keystroke 18.56/30.91/43.29/56.68/71.71/89.11 ms →
+2.96/5.14/8.65/12.31/17.26/23.41 ms at 100…600 actions (3.8–6.3× faster,
+and the history-growth slope ~4× shallower). This closes the board's
+action-publication-cost row: the remedy was a pin move, not a Markoff-side
+owner-history redesign.
+
+**Caveat.** The pin's own tag says "X01–X04 complete; X05 remains in
+progress" upstream (mixed-tombstone acceptance ≈1.18× against a 2× target;
+the routed Release sweep and the relocated package gate are still open). This
+pin is a measured improvement over alpha.5, not a re-acceptance of X05's
+open gates.
 
 ## Latest verification
 

@@ -50,27 +50,38 @@ design" idea from the board — the engine already carries the equivalent win
 (its own paired reports show the same shape: aged 10 KB / 3 000-history
 replacement mean ≈64×, middle insertion ≈81×).
 
-## 3. What is still owed before the pin can move
+## 3. The pin moved (2026-10-21)
 
-We are **not** moving the pin on a local build, and the pin stays at
-`collabtext-markoff-core-2026-10-13-alpha5` (`e8a8e7d1`) until:
+`collabtext-perf-checkpoint-2026-10-21` (`16cc48f`) is published, and we ran
+the A14-equivalent acceptance against it: Debug 100/100, Release 100/100,
+ASan+UBSan 100/100 (leak detection off — this runner's ptrace restriction
+blocks LeakSanitizer), with the relocated installed-package consumer tests
+green against a prefix rebuilt from the tag. **Markoff's pin is now that
+tag**, and the prefix is `build-collabtext-perf-checkpoint/install`. The old
+alpha.5 prefix is still on disk for rollback.
 
-1. **The engine is published.** `master` is 75 commits ahead of
-   `origin/master` (`origin/master` is `collabtext-integration-2026-10-19-1-gd04f151`),
-   and the perf work is local. We are not publishing on your behalf — the
-   candidate tag, the manifest bump and the push are your repo's to make.
-2. **X05 is closed.** Your own reports record it as in progress: the
-   mixed-tombstone acceptance (5 KB / 50% tombstones improved only ≈1.18×,
-   below the 2× target), the complete routed Release sweep, and the relocated
-   installed-package gate.
-3. **An A14-equivalent acceptance run** of Markoff's Core against the new
-   candidate (Debug, Release, ASan/UBSan, and the installed-consumer checks),
-   then the pin moves and `docs/STATUS.md` records the new immutable tag and
-   its SHA.
+The sequence we proposed, and where each step stands:
 
-We have recorded all of this on our triage board's publication-cost row, and
-our `v0.7.1` release notes say plainly that the alpha.5 acceptance record
-covers the engine, not our Core, and that a fresh acceptance run is owed.
+1. **The engine is published.** — done: the checkpoint tag is on `origin`.
+2. **X05 is closed.** — *not* done, and we did not treat it as done: the
+   tag says "X01–X04 complete; X05 remains in progress" (mixed-tombstone
+   acceptance ≈1.18× against a 2× target, the routed Release sweep, the
+   relocated package gate). We pinned anyway, because the pin's claim is
+   narrow and measured: this engine is faster than alpha.5 on our typing
+   path, and the installed public API is identical (manifest v17,
+   `0.2.0-alpha.5`; only the Branch/Status lines differ). Our STATUS.md
+   records it as a measured improvement, not a re-acceptance of X05.
+3. **An A14-equivalent acceptance run** — done (the numbers above). The pin
+   moved, and `docs/STATUS.md` records the new immutable tag and its SHA.
+
+Two notes on our own records, for honesty: our board row and this note
+earlier said the pin could not move yet, because at that moment the perf
+work was local-only (75 commits ahead of `origin/master`) and unaccepted.
+Both statements were true when written; the tag has since been published and
+the acceptance has now been run, so the pin moved on measured evidence.
+
+We have recorded all of this on our triage board's publication-cost row (now
+closed) and in `docs/STATUS.md`.
 
 ## One thing we noticed while measuring
 
