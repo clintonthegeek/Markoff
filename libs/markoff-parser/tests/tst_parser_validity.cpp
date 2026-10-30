@@ -31,6 +31,7 @@ private slots:
     void malformed_utf8_maps_one_unit_per_invalid_byte();
     void reparsingReplacesTreesWholesale();
     void incremental_reparse_matches_a_fresh_parse();
+    void incremental_reparse_byte_map_matches_fresh_parse();
 };
 
 void TestParserValidity::concurrentFrontmatterReadsSeeTheParsedValue()
@@ -190,6 +191,54 @@ void TestParserValidity::reparsingReplacesTreesWholesale()
     QVERIFY(parser.hasTree());
     // Spans from the first document must not survive into the second.
     QCOMPARE(parser.utf8Source(), QByteArray("no markup here"));
+}
+
+// ASK-M31 (second half): the incremental table update must leave every
+// byte→char offset identical to what a fresh parse of the same text
+// produces — including multi-byte sequences around and inside the edit.
+void TestParserValidity::incremental_reparse_byte_map_matches_fresh_parse()
+{
+    // The oracle: one multibyte edit carried by reparse() vs fresh.
+    const QString v0 = QStringLiteral(
+        "# Züge 🚆\n\nnaïve résumé — あいうえお ×7\n\n"
+        "段落 A **élégance** ⩽\n\n段落 B [link](https://x.y/『doc』)\n");
+    QString v1 = v0;
+    v1.replace(QStringLiteral("résumé"), QStringLiteral("résumé é40"));
+    v1.replace(QStringLiteral("×7"), QStringLiteral("×7+🚀"));
+
+    const QByteArray v0u = v0.toUtf8();
+    const QByteArray v1u = v1.toUtf8();
+    // Edits: two separate regions collapsed into ONE minimal edit spanning
+    // them (the session's diff produces exactly that).
+    qsizetype p = 0;
+    while (p < v0u.size() && p < v1u.size() && v0u[int(p)] == v1u[int(p)]) ++p;
+    while (p > 0 && (quint8(v0u[int(p)]) & 0xC0) == 0x80) --p;
+    qsizetype o = v0u.size(), n = v1u.size();
+    while (o > p && n > p && v0u[int(o - 1)] == v1u[int(n - 1)]) { --o; --n; }
+    while (o < v0u.size() && (quint8(v0u[int(o)]) & 0xC0) == 0x80) ++o;
+    while (n < v1u.size() && (quint8(v1u[int(n)]) & 0xC0) == 0x80) ++n;
+
+    TreeSitterParser incremental;
+    QVERIFY(incremental.parse(v0));
+    QVERIFY(incremental.reparse(v1, quint32(p), quint32(o), quint32(n)));
+    QVERIFY(incremental.hasTree());
+
+    TreeSitterParser fresh;
+    QVERIFY(fresh.parse(v1));
+    QVERIFY(fresh.hasTree());
+
+    // Every offset must agree, including the sentinel past the last byte.
+    QCOMPARE(incremental.utf8Source(), fresh.utf8Source());
+    for (int b = 0; b <= fresh.utf8Source().size(); ++b)
+        QCOMPARE(incremental.utf8ToCharOffset(b), fresh.utf8ToCharOffset(b));
+
+    // ...and the tree agree too (the edit must not desync the trees).
+    const DocumentQueryResult a = incremental.buildDocumentQueries();
+    const DocumentQueryResult b = fresh.buildDocumentQueries();
+    QCOMPARE(a.headings.size(), b.headings.size());
+    QCOMPARE(a.links.size(), b.links.size());
+    QCOMPARE(a.tags.size(), b.tags.size());
+    QCOMPARE(a.topLevelBlocks.size(), b.topLevelBlocks.size());
 }
 
 QTEST_MAIN(TestParserValidity)

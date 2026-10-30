@@ -12,6 +12,7 @@
 typedef struct TSParser TSParser;
 typedef struct TSTree TSTree;
 typedef struct TSNode TSNode;
+typedef struct TSInputEdit TSInputEdit;
 
 namespace Markoff {
 
@@ -106,8 +107,19 @@ private:
     bool m_hasParsed = false;
 
     /// Shared body of parse() and reparse(), with the tree-sitter previous tree
-    /// already validated/edited by the caller.
-    bool parseWithPrevious(const QString &text, TSTree *previous);
+    /// already validated/edited by the caller. When `edit` is non-null the
+    /// byte→char table is updated in place from the edit (ASK-M31: resize the
+    /// previous table, never zero-fill re-walk it); otherwise a fresh table is
+    /// built.
+    bool parseWithPrevious(const QString &text, TSTree *previous,
+                           const TSInputEdit *edit = nullptr);
+
+    /// ASK-M31(second half): update m_byteToChar in place for `edit` — byte
+    /// [start, oldEnd) replaced by [start, newEnd) — instead of re-walking the
+    /// whole UTF-8 text. Requires m_byteToChar to describe exactly
+    /// `previousUtf8Size + 1` entries.
+    void updateByteToCharInPlace(const TSInputEdit &edit, int previousUtf8Size,
+                                 int utf16Limit);
 };
 
 /// Parse a single block's UTF-8 content and return its inline formatting spans.

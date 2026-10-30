@@ -44,6 +44,7 @@ add_library(markoff-parser SHARED
     src/MarkdownSplitter.cpp
     src/TableHandler.cpp
     src/Document.cpp
+    src/ParserSession.cpp
     src/LinkTextParser.cpp
     src/YamlValue.cpp
     src/WikilinkDecomposition.cpp

@@ -269,10 +269,11 @@ bool TreeSitterParser::reparse(const QString &text, quint32 editStart,
     edit.new_end_point = pointOf(newUtf8, newEnd);
     ts_tree_edit(m_blockTree, &edit);
 
-    return parseWithPrevious(text, m_blockTree);
+    return parseWithPrevious(text, m_blockTree, &edit);
 }
 
-bool TreeSitterParser::parseWithPrevious(const QString &text, TSTree *previous)
+bool TreeSitterParser::parseWithPrevious(const QString &text, TSTree *previous,
+                                         const TSInputEdit *edit)
 {
     MARKOFF_PERF_SCOPE("parser.TreeSitterParser::parseWithPrevious");
 
@@ -287,8 +288,19 @@ bool TreeSitterParser::parseWithPrevious(const QString &text, TSTree *previous)
     m_inlineTrees.clear();
     m_inlineRanges.clear();
 
+    const int previousUtf8Size = m_utf8.size();
     m_utf8 = text.toUtf8();
-    m_byteToChar = Markoff::Detail::buildByteToCharMap(m_utf8, text.size());
+
+    // Byte→char map (ASK-M31, second half): an incremental re-parse resizes
+    // the previous table in place — no full re-walk, no zero-fill allocation.
+    // The invariant gate (`previousUtf8Size + 1 == size()`) falls back to a
+    // fresh build whenever the carried table is not the previous parse's.
+    if (edit && !m_byteToChar.isEmpty()
+        && previousUtf8Size + 1 == m_byteToChar.size()) {
+        updateByteToCharInPlace(*edit, previousUtf8Size, text.size());
+    } else {
+        m_byteToChar = Markoff::Detail::buildByteToCharMap(m_utf8, text.size());
+    }
 
     // Phase 1: parse block structure. The previous tree is passed so
     // tree-sitter can reuse the subtrees whose byte ranges still match; the
@@ -347,6 +359,67 @@ int TreeSitterParser::utf8ToCharOffset(int byteOffset) const
     return m_byteToChar[byteOffset];
 }
 
+void TreeSitterParser::updateByteToCharInPlace(const TSInputEdit &e,
+                                               int previousUtf8Size,
+                                               int utf16Limit)
+{
+    QList<int> &map = m_byteToChar;
+    const int start = int(e.start_byte);
+    const int oldEnd = int(e.old_end_byte);
+    const int newEnd = int(e.new_end_byte);
+    (void)previousUtf8Size;  // enforced by the caller's invariant gate
+    const int lastOld = map.size() - 1;         // == previousUtf8Size
+    const int ndelta = newEnd - oldEnd;
+
+    // Char offsets at the region edges of the PREVIOUS table.
+    const int startChar = start <= lastOld ? map[start] : map[lastOld];
+    const int oldEndChar = oldEnd <= lastOld ? map[oldEnd] : map[lastOld];
+
+    // Units the replacement carries, from the new bytes alone — computed
+    // before any table write so the tail shift below can read the intact
+    // previous entries (the replaced region and the tail overlap by
+    // construction: newEnd >= oldEnd, so the rescan LAST).
+    int newUnits = 0;
+    const int utf8Size = m_utf8.size();
+    int walk = start;
+    while (walk < newEnd) {
+        const int len = Detail::utf8SequenceLength(m_utf8.constData() + walk,
+                                                   utf8Size - walk);
+        const int advance = len > 0 ? len : 1;
+        newUnits += len == 4 ? 2 : 1;
+        walk += advance;
+    }
+    const int charDelta = newUnits - (oldEndChar - startChar);
+
+    // Shift the untouched tail [oldEnd, lastOld] by charDelta. Writes run
+    // from the back when growing, forward when shrinking; reads only intact
+    // previous entries because the rescan below happens last.
+    if (ndelta >= 0) {
+        map.resize(lastOld + 1 + ndelta);
+        for (int i = lastOld; i >= oldEnd; --i)
+            map[i + ndelta] = map[i] + charDelta;
+    } else {
+        for (int i = oldEnd; i <= lastOld; ++i)
+            map[i + ndelta] = map[i] + charDelta;
+        map.resize(lastOld + 1 + ndelta);
+    }
+
+    // Rescan the replaced region: entries [start, newEnd). Boundaries arrive
+    // scalar-aligned, so a well-formed sequence never spans an edge; a
+    // malformed byte counts one replacement, as in the fresh build.
+    int charIdx = startChar;
+    for (int i = start; i < newEnd; ++i) {
+        const int clamped = std::min(charIdx, utf16Limit);
+        map[i] = clamped;
+        const int len = Detail::utf8SequenceLength(m_utf8.constData() + i,
+                                                   utf8Size - i);
+        const int advance = len > 0 ? len : 1;
+        for (int j = 1; j < advance && i + j < newEnd; ++j)
+            map[i + j] = clamped;
+        charIdx = std::min(charIdx + (len == 4 ? 2 : 1), utf16Limit);
+        i += advance - 1;  // the loop's own ++i walks the sequence
+    }
+}
 // ---------------------------------------------------------------------------
 // CST → SourceSpan conversion
 // ---------------------------------------------------------------------------

@@ -158,12 +158,38 @@ ExtractedSource Document::extract(const QString &source)
     return out;
 }
 
+namespace Detail {
+
+/// One-shot helper shared by the one-shot fromMarkdown() path and the
+/// persistent ParserSession (ASK-M31): assembles the Document snapshot
+/// the two parse entry points both produce. Internal to the parser leaf;
+/// declared in src/SnapshotBuilder.h, friended in Document.
+std::unique_ptr<Document> buildDocumentSnapshot(const QString &source,
+                                                ExtractedSource &&extracted,
+                                                DocumentQueryResult &&q);
+
+} // namespace Detail
+
 std::unique_ptr<Document> Document::fromMarkdown(const QString &source)
 {
     ExtractedSource extracted = extract(source);
     TreeSitterParser parser;
     parser.parse(extracted.body);
     DocumentQueryResult q = parser.buildDocumentQueries();
+    return Detail::buildDocumentSnapshot(source, std::move(extracted),
+                                         std::move(q));
+}
+
+namespace Detail {
+
+/// One-shot helper shared by the one-shot fromMarkdown() path and the
+/// persistent ParserSession (ASK-M31): assembles the Document snapshot
+/// the two parse entry points both produce. Internal to the parser leaf;
+/// declared in src/SnapshotBuilder.h.
+std::unique_ptr<Document> buildDocumentSnapshot(const QString &source,
+                                                ExtractedSource &&extracted,
+                                                DocumentQueryResult &&q)
+{
     auto doc = std::unique_ptr<Document>(new Document());
     doc->d->source                = source;
     doc->d->frontmatter           = std::move(extracted.frontmatter);
@@ -175,6 +201,8 @@ std::unique_ptr<Document> Document::fromMarkdown(const QString &source)
     doc->d->queries               = q;
     return doc;
 }
+
+} // namespace Detail
 
 QString Document::sourceText() const
 {

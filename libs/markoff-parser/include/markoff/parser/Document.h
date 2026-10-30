@@ -202,11 +202,21 @@ struct ExtractedSource {
     QList<FootnoteRefInfo>   refs;       // ordered by sourceOffset (== first-occurrence order)
 };
 
+class Document;
+
+namespace Detail {
+/// Leaf-internal snapshot assembler (src/SnapshotBuilder.h), shared by
+/// Document::fromMarkdown() and the persistent ParserSession (ASK-M31).
+/// Declared here because Document's friend declaration below needs the
+/// name visible at that point.
+std::unique_ptr<Document> buildDocumentSnapshot(
+    const QString &source, ExtractedSource &&extracted, DocumentQueryResult &&q);
+} // namespace Detail
+
 class Document
 {
 public:
     ~Document();
-
     /// One-shot parse: extracts metadata, runs a fresh TreeSitterParser,
     /// bakes a snapshot. Convenience for callers that don't need a
     /// long-lived parser.
@@ -283,6 +293,11 @@ private:
 
     struct Private;
     std::unique_ptr<Private> d;
+
+    // The leaf-internal snapshot builder (src/SnapshotBuilder.h) assembles
+    // this snapshot directly so both parse entry points share one path.
+    friend std::unique_ptr<Document> Detail::buildDocumentSnapshot(
+        const QString &, ExtractedSource &&, DocumentQueryResult &&);
 };
 
 } // namespace Markoff
