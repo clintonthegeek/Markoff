@@ -38,7 +38,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 | M4 | P0 | OPEN | `TreeSitterParser.cpp:247-290`, early return `:261`, teardown `:269-271` never reached | S | parser |
 | M5 | P0 | OPEN | Graffodil `BatchRenderer.cpp:28-32`; `synchronize()` `:128-129` | S | Graffodil |
 | M6 | P0 | OPEN | Graffodil `GraphEdgeItem.h:121-122`; `GraphScene.cpp:30-63`; `GraphEdgeItem.cpp:241-242` | M | Graffodil |
-| M7 | P1 | OPEN | `FormatPass.h:21` unused; `FormatPass.cpp:425` reads only `fontScale`; `computeBlockHash` `:217`; `StyleApplier.cpp:39`; `Theme.h` has no `operator==` | M–L | styled (exception) |
+| M7 | P1 | **DONE** `6493ca5c` — the exception task Corbomite's residual ask granted. `Theme::operator==`/`!=`/`hasColor`/`contentHash` in core; three slots appended (InlineCodeBackground, FootnoteRef, HorizontalRule — at the END of the enum; JSON serializes slots by number); FormatPass reads the theme at every colour site through a hasColor-guarded resolver (light fallback = the old literals, so headless output is unchanged) and mixes the theme's contentHash into every block's gate hash; StyleApplier stores the theme by value and compares by content; both leaves' duplicate Theme members deleted (the base's store is the one authority) | M–L | styled (exception) |
 | M8 | P1 | OPEN | `MarkdownView.h:105`; no `destroyed` wiring in core/source/styled; canvas has the pattern, `EditorWidget.cpp:206-216`. Also carries M28's missing doc-destroyed regression test | M | core + leaves |
 | M9 | P1 | PARTIAL | `MarkdownView.h:64-66` has no availability query; `MarkoffDocument.h:266-278` has `undoD2/redoD2` + per-block `canUndoForBlock` only | S | core |
 | M10 | P1 | **CLOSED** — APIs deleted | `latestParse`, `parsedDocument`, `blockAnchorAt`, `blockByteRange`, `blockAt` absent | 0 | reply |
@@ -218,10 +218,12 @@ before and after.
 ### Wave 5 — Features that need a decision (Markoff)
 
 1. **M7** — the largest visible gap, but it is a feature in a frozen
-   leaf. Recommend opening one named exception task in three parts:
-   `Theme::operator==` + `StyleApplier` by value; read `opts.theme` at
-   every colour site; add theme to `computeBlockHash`. The third is not
-   optional — without it the first two have no visible effect.
+   leaf. **DONE 2026-10-31** (`6493ca5c`): the exception Corbomite's
+   residual ask granted. All three parts landed — `Theme::operator==` +
+   `contentHash` + `hasColor` in core; theme reads at every colour site
+   (a hasColor-guarded resolver, light fallback = the old literals);
+   theme in `computeBlockHash`; `StyleApplier` stores by value — and both
+   leaves' duplicate `Theme` members are deleted.
 2. **M37** — card/embedded mode. **DONE 2026-10-19**: `EditorWidget::setEmbeddedMode(true)`
    — the host owns geometry, scrolling and chrome; the card arrives read-only
    and the host promotes the card being edited; the scrollbar is hidden and the
@@ -274,7 +276,7 @@ M19. Every remaining row is gated on something other than effort:
 
 | Remaining | Gate |
 |---|---|
-| M7 styled theme | needs an explicit exception to the styled bug-fix-only rule (feature-shaped) |
+| M7 styled theme | ~~exception~~ **DONE** `6493ca5c` — the exception task Corbomite's residual ask granted |
 | M26, M27 item 4 | packaging decision (latent on this toolchain) |
 | M12 | retention-policy decision + a measurement |
 | **New: action-publication cost** | **CLOSED — the pin moved 2026-10-21.** The engine's merged perf work (collabtext `collabtext-perf-checkpoint-2026-10-21` = `16cc48f`, 76 commits past the integration tag) removes most of this; Markoff needed a **pin move**, not a redesign. Measured, same Markoff tree, Release, only the engine differing: per-keystroke 18.56/30.91/43.29/56.68/71.71/89.11 ms → 2.96/5.14/8.65/12.31/17.26/23.41 ms at 100…600 actions (3.8–6.3× faster, and the history-growth slope ~4× shallower). Acceptance for the new pin: Debug 100/100, Release 100/100, ASan+UBSan 100/100, relocated installed-package consumer tests green; engine's own Debug suite 104/104. Earlier profile (2026-10-19, `092cd1d5` landed the contained part): `applyBlockEdit` → `publishAction` ≈67%, of which `ActionBundleCodec::decode` ≈39% (fixed: the accepted-prefix decode loop), `OwnerHistoryCodec::decode` ≈34% and `encode` ≈31% (whole history decoded and re-encoded per action), `enforceActorUndoDepth` ≈10%, ~4 full `readRecoveryState()` assemblies per action. The Markoff-side incremental owner-history design is **dropped** — the engine carries the equivalent win. Left open: upstream X05 (mixed-tombstone acceptance ≈1.18× vs a 2× target, the routed Release sweep, the relocated package gate), so this pin is a measured improvement, not a re-acceptance of X05 |

@@ -9,26 +9,33 @@ version, per ask; the internal record is our triage board
 (`docs/plans/2026-10-19-corbomite-open-asks-triage.md`), which carries each
 row's commit and evidence.
 
-## 1. M7 — theme in the Styled leaf: SCHEDULED, first in the queue
+## 1. M7 — theme in the Styled leaf: **DONE** (`6493ca5c`)
 
-The exception you just granted is the gate the board was waiting on, and the
-shape is as we agreed. All anchors verified live at `v0.7.1`:
+The exception you granted was the gate the board was waiting on; the shape
+is exactly as we agreed, and every piece is in:
 
-- `FormatPass.cpp:217` — `computeBlockHash` has no theme input, so the hash
-  gate (`:464`) cannot see a theme change;
-- `StyleApplier.cpp:39-43` — `setTheme(const Theme *)` stores a pointer and
-  pointer-compares, so a *changed* theme at the *same* address is invisible;
-- `Theme.h` — no `operator==` (verified: none exists);
-- the hardcoded colours in `FormatPass` become the light fallback for
-  headless use (`DocumentRenderer::renderInto` has no theme);
-- the duplicate `Theme` member in both leaves —
-  `markoff-styled/include/markoff/styled/Editor.h:134` and
-  `markoff-source/include/markoff/source/Editor.h:146` — is deleted; the
-  base's own store (`MarkdownView::setTheme`/`theme()`) becomes the single
-  authority.
+- `Theme::operator==`/`!=` (value equality over every slot), plus
+  `hasColor(Slot)` and `contentHash()` — the last is an order-insensitive
+  signature over all five slot hashes, which is what the per-block hash
+  gate mixes in now, so **a theme change restyles the blocks that
+  changed**.
+- Every colour site reads the theme through a `hasColor`-guarded resolver:
+  a theme overrides only the slots it defines, and the fallback is the
+  light value the site hardcoded before — so **a theme-less (headless)
+  render is byte-identical to what you have today**.
+- Three slots were appended for the sites that had none —
+  `InlineCodeBackground`, `FootnoteRef`, `HorizontalRule` — appended at the
+  END of the enum on purpose: Theme's JSON serializes slots by *number*,
+  so inserting mid-enum would have silently re-coloured every persisted
+  theme. Light values match the literals they replaced bit for bit.
+- `StyleApplier::setTheme` stores the theme **by value** and compares by
+  content — a changed theme at the same address now restyles.
+- The duplicate `Theme` member is deleted in both leaves
+  (`markoff-styled/include/markoff/styled/Editor.h:134`,
+  `markoff-source/include/markoff/source/Editor.h:146`); the base's store
+  is the one authority.
 
-Scheduled **first** in the residual queue. The board records the exception
-task by name before code.
+Scheduled **first** in the residual queue — done first, too.
 
 ## 2. M31 — incremental reparse: SCHEDULED, second
 
