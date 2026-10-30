@@ -85,6 +85,14 @@ installed-package consumer tests (`markoff_provider_*`,
 green against the installed prefix. The engine's own Debug suite is 104/104 at
 the tag. This is the A14-equivalent run the previous caveat called for.
 
+**Release-tag convention (2026-10-31, on Corbomite's ask).** Every
+release-shaped tag states in its notes, on the first line, whether the API
+surface moves: `API: unchanged` (a fix release; a re-pin is routine) or
+`API: moved (...)` (what moved and what must be recompiled). `v0.7.1`
+carried this informally ("BREAKING for out-of-tree embed backends: the
+embed contract moves 2 → 3"); it is now a rule for every future tag, so a
+consumer's re-pin stays planned instead of incident-driven.
+
 **Before the move:** the pin was `collabtext-markoff-core-2026-10-13-alpha5`
 at `e8a8e7d1a95dd50e23f38d6727921b47b814e44b`; its prefix
 (`build-collabtext-alpha5/install`) is still present for rollback. The

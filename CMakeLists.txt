@@ -50,8 +50,15 @@ if(NOT DEFINED CMAKE_RUNTIME_OUTPUT_DIRECTORY)
 endif()
 
 # rapidyaml uses exceptions in its default callback — required for our
-# error-propagation contract in Markoff::Parser.
-set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL "" FORCE)
+# error-propagation contract in Markoff::Parser. Seeds the cache default
+# without forcing it: a consumer's explicit -D wins. NOTE the contract that
+# comes with that freedom — a consumer who sets it OFF gets a parser whose
+# error propagation cannot work; the option is theirs, the breakage is too.
+if(NOT DEFINED RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS)
+    set(RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS ON CACHE BOOL
+        "rapidyaml default callbacks throw (Markoff::Parser's error contract requires ON)")
+    message(STATUS "Markoff: RYML_DEFAULT_CALLBACK_USES_EXCEPTIONS defaulting ON (parser error contract)")
+endif()
 
 add_subdirectory(libs/rapidyaml)
 
