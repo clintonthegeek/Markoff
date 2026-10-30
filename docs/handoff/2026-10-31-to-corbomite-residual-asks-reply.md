@@ -89,13 +89,26 @@ theming, say so and we will swap them.
   (annotate every public symbol in core/canvas/source/styled with the usual
   `Q_DECL_EXPORT`/`Q_DECL_IMPORT` switch) but wide, so we will not do it
   speculatively.
-- **M27 item 4 (the engine dependency): SCHEDULED** — your volunteering as a
-  non-submodule consumer is exactly the trigger the old gate was waiting
-  for. The shape is unchanged from the ask: forward-declare the engine types
-  in `MarkoffDocument.h` (dropping the `<collabtext/...>` includes at
-  `:18-20`), make the engine link PRIVATE, and let the installed package
-  stop dragging collabtext's include tree into every consumer. Sized S–M;
-  scheduled third.
+- **M27 item 4 (the engine dependency): DEFERRED, and the deferral is now
+  written down, not just stated.** `docs/ALPHA_CAPABILITIES.md` (new, in
+  this repo, same name as collabtext's manifest) records the trigger and
+  the shape once. One honest correction to our own previous wording:
+  "forward-declare the engine types" is impossible — the public contract
+  returns `CollabText::Result<T>` **by value** in 15 signatures and
+  `CollabText::Error` by value in the remote-action route types, and a
+  value-shaped return cannot exist behind a forward declaration. The real
+  shape, now in the manifest: `Markoff::VNext::Result`/`Error` value
+  types owned by markoff (a narrow mirror with the engine's `ErrorCode`
+  table mirrored by number), a conversion seam inside `markoff_core`, and
+  the engine link flipped PRIVATE, after which including `markoff/core`
+  headers no longer drags the collabtext headers. We also say plainly
+  what stays: `markoff-collabtext-vnext`'s public headers name the engine
+  deliberately — that leaf is the engine/transport boundary and stays so
+  at every pin. Your volunteering as the first non-submodule consumer
+  (the Arch package) is the trigger; when it fires, the task above runs
+  as one planned change, sized M rather than S-M because of the value-type
+  seam. Until then the engine link stays PUBLIC so every consumer keeps
+  compiling.
 
 ## 4. M39's narrow case — yours, as agreed
 

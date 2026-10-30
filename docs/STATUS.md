@@ -41,7 +41,8 @@ advances the version of every block it touched (`c215ccf3`); M37's card half
 landed `aae3727d` (`EditorWidget::setEmbeddedMode` — the host owns geometry,
 scrolling and chrome; the card arrives read-only). The Wave 5 decisions and
 the Graffodil perf/spec rows are the remainder (see the board's batch
-close-out table).
+close-out table). M27 item 4 and M26 are recorded as deferred
+capabilities in [`docs/ALPHA_CAPABILITIES.md`](ALPHA_CAPABILITIES.md).
 
 Embedded-renderer plan, Phase 0 is **done** and Phase 1 has started. The
 content version now advances on every mutating path — attribute and kind
