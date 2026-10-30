@@ -98,6 +98,18 @@ installed-package consumer tests (`markoff_provider_*`,
 green against the installed prefix. The engine's own Debug suite is 104/104 at
 the tag. This is the A14-equivalent run the previous caveat called for.
 
+**M06 record supplied (2026-10-31).** collabtext's M06 row stays
+`not_started` until Markoff states acceptance of the exact candidate; the
+statement, evidence and paste-ready wording are at
+[`docs/handoff/2026-10-31-to-collabtext-m06-acceptance.md`](handoff/2026-10-31-to-collabtext-m06-acceptance.md).
+Re-verified at consumer revision `91759557` (code-bearing `4e470f0c`): a
+**fresh configure** of the full tree against the exact prefix is **101/101**
+offscreen, and the standalone consumer project configured against a
+**relocated copy** of the prefix is **4/4**. The run also caught and fixed a
+fresh-configure defect: the demo-app option was declared after the leaves
+that read it, so new trees silently skipped the canvas app and its smoke
+test; the option now precedes them.
+
 **Release-tag convention (2026-10-31, on Corbomite's ask).** Every
 release-shaped tag states in its notes, on the first line, whether the API
 surface moves: `API: unchanged` (a fix release; a re-pin is routine) or

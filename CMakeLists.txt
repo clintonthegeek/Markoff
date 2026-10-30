@@ -85,6 +85,19 @@ else()
 endif()
 option(MARKOFF_BUILD_TESTS "Build the Markoff test suites" ${_MARKOFF_TESTS_DEFAULT})
 unset(_MARKOFF_TESTS_DEFAULT)
+
+# Demo apps are default-ON for standalone builds and default-OFF when consumed
+# as a subdirectory. Declared here, above the leaves: markoff-canvas reads it
+# for its own app subdirectory and smoke test, and a fresh configure must see
+# the option before that leaf is added (a late declaration was silently
+# skipping the canvas app and its test on fresh trees).
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    set(_MARKOFF_BUILD_APPS_DEFAULT ON)
+else()
+    set(_MARKOFF_BUILD_APPS_DEFAULT OFF)
+endif()
+option(MARKOFF_BUILD_APPS "Build Markoff demo apps (markoff-collab-testapp, etc.)" ${_MARKOFF_BUILD_APPS_DEFAULT})
+unset(_MARKOFF_BUILD_APPS_DEFAULT)
 foreach(_markoff_leaf_tests
         MARKOFF_PARSER_BUILD_TESTS
         MARKOFF_CORE_BUILD_TESTS
@@ -148,20 +161,11 @@ add_subdirectory(libs/markoff-source)
 add_subdirectory(libs/markoff-styled)
 add_subdirectory(libs/markoff-canvas)
 
-# Demo apps are default-ON for standalone builds and default-OFF when consumed
-# as a subdirectory. The collaboration test app exercises the provider-backed
-# Canvas consumer.
-if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    set(_MARKOFF_BUILD_APPS_DEFAULT ON)
-else()
-    set(_MARKOFF_BUILD_APPS_DEFAULT OFF)
-endif()
-option(MARKOFF_BUILD_APPS "Build Markoff demo apps (markoff-collab-testapp, etc.)" ${_MARKOFF_BUILD_APPS_DEFAULT})
 # The collaboration test app exercises the provider-backed document path.
+# The option itself is declared above the leaves (markoff-canvas reads it).
 if(MARKOFF_BUILD_APPS)
     add_subdirectory(apps)
 endif()
-unset(_MARKOFF_BUILD_APPS_DEFAULT)
 
 # Tests are enabled for the whole tree when the canonical switch is on; the
 # per-leaf gates already follow it (see the top of this file).
