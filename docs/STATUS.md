@@ -28,8 +28,9 @@ The workfront is Corbomite's consolidated asks of 2026-10-18. The triage
 board records a per-ask verdict against this tree, the already-closed rows,
 and a seven-wave order. **Waves 1 and 2 are complete** (Wave 1: M3, M4, M35, M33, M36, M32, M34,
 M28 — `0d974f1b`..`16e7bfe4`; Wave 2: M8, M21, M20, M9, M23, M25, M24,
-M11 — `a910338d`..`253f1889`); the pin publication (Wave 0b) is done and the
-pin stays `e8a8e7d1`. M30 (parser UTF-8 validation) landed ahead of Wave 3, and M16's offset half plus
+M11 — `a910338d`..`253f1889`); the pin publication (Wave 0b) is done, and the
+pin has since moved to `collabtext-perf-checkpoint-2026-10-21` (`16cc48f`,
+recorded below and in the Pin section). M30 (parser UTF-8 validation) landed ahead of Wave 3, and M16's offset half plus
 M17's per-block link cache landed. The Wave 0 reply is written
 (`docs/handoff/2026-10-19-to-corbomite-open-asks-response.md`) and awaiting a
 send decision; M13/M18/M17 landed `31b3152b`/`b563e624` (flat-view cache +
@@ -43,6 +44,10 @@ scrolling and chrome; the card arrives read-only). The Wave 5 decisions and
 the Graffodil perf/spec rows are the remainder (see the board's batch
 close-out table). M27 item 4 and M26 are recorded as deferred
 capabilities in [`docs/ALPHA_CAPABILITIES.md`](ALPHA_CAPABILITIES.md).
+collabtext recorded Markoff's M06 acceptance on 2026-10-31 (`63be9a2`; the
+candidate is `16cc48f`, the consumer revision `78cac549`), and its reply notes
+X05 closed on 2026-10-30 with a newer supported tag — the pin here stays
+`16cc48f` until a pin-move acceptance runs.
 
 Embedded-renderer plan, Phase 0 is **done** and Phase 1 has started. The
 content version now advances on every mutating path — attribute and kind
@@ -98,10 +103,14 @@ installed-package consumer tests (`markoff_provider_*`,
 green against the installed prefix. The engine's own Debug suite is 104/104 at
 the tag. This is the A14-equivalent run the previous caveat called for.
 
-**M06 record supplied (2026-10-31).** collabtext's M06 row stays
-`not_started` until Markoff states acceptance of the exact candidate; the
-statement, evidence and paste-ready wording are at
-[`docs/handoff/2026-10-31-to-collabtext-m06-acceptance.md`](handoff/2026-10-31-to-collabtext-m06-acceptance.md).
+**M06 record supplied (2026-10-31) and recorded upstream.** collabtext's M06
+row stayed `not_started` until Markoff stated acceptance of the exact
+candidate; the statement, evidence and paste-ready wording are at
+[`docs/handoff/2026-10-31-to-collabtext-m06-acceptance.md`](handoff/2026-10-31-to-collabtext-m06-acceptance.md),
+and collabtext recorded it in `63be9a2` (M06 `complete` in its `TASKS.json`,
+wording in `markoff-core-response.md`, reply at
+`~/dev/collabtext/docs/handoff/2026-10-31-to-markoff-m06-recorded.md`). Q06 in
+that repo stays open.
 Re-verified at consumer revision `78cac549` (acceptance tree: code-bearing
 `4e470f0c` + the build-configuration fix in `78cac549`): a
 **fresh configure** of the full tree against the exact prefix is **101/101**
@@ -138,11 +147,21 @@ and the history-growth slope ~4× shallower). This closes the board's
 action-publication-cost row: the remedy was a pin move, not a Markoff-side
 owner-history redesign.
 
-**Caveat.** The pin's own tag says "X01–X04 complete; X05 remains in
-progress" upstream (mixed-tombstone acceptance ≈1.18× against a 2× target;
-the routed Release sweep and the relocated package gate are still open). This
-pin is a measured improvement over alpha.5, not a re-acceptance of X05's
-open gates.
+**X05, corrected 2026-10-31.** This pin's tag says "X01–X04 complete; X05
+remains in progress". That stopped being true on 2026-10-30: X05 acceptance was
+met — replacement and deletion splices now cross retained-run boundaries, five
+pinned Release pairs give an aged mixed 5-KB/50%-tombstone per-edit mean ratio
+of 0.263 (3.8×; worst pair 0.283) against a 2× target, with the 0%-tombstone
+control at 0.621; routed Debug, Release and leak-enabled ASan/UBSan each passed
+103/103; the relocated installed-package gates passed in all three; and the
+strict live gate passed in Release. A newer checkpoint was published:
+`collabtext-perf-checkpoint-2026-10-30` (`fd3c09e`), same package label
+(`0.2.0-alpha.5`) and manifest v17, with an installed API identical to this
+pin. Under the producer's newest-annotated-tag rule that newer tag is the
+supported pin; **this tree still pins `16cc48f`, and Markoff's M06 acceptance
+covers that candidate only — it is not extended to the newer tag.** Moving
+needs a rebuild and Markoff's own acceptance record on the new tag; the API
+being identical means no adoption work, and the move has not been made.
 
 ## Latest verification
 
@@ -151,9 +170,10 @@ integration tag), measured against the same Markoff tree in Release with only
 the engine differing: per-keystroke 18.56/30.91/43.29/56.68/71.71/89.11 ms →
 2.96/5.14/8.65/12.31/17.26/23.41 ms at 100…600 actions (3.8–6.3× faster, and
 the history-growth slope ~4× shallower). Markoff's suite is **100/100** against
-it, and collabtext's own Debug suite is **104/104**. The engine work is
-**local** (75 commits ahead of `origin/master`) and upstream X05 is open, so
-the pin does not move yet — see
+it, and collabtext's own Debug suite is **104/104**. At the time the engine
+work was **local** (75 commits ahead of `origin/master`) and upstream X05 was
+open, so the pin did not move that day; the tag and the acceptance have since
+landed (see the Pin section). Background:
 [`handoff/2026-10-21-to-collabtext-perf-work-reaches-markoff.md`](handoff/2026-10-21-to-collabtext-perf-work-reaches-markoff.md).
 
 2026-10-20, `v0.7.1` release: offscreen `scripts/run-tests.sh` passed
