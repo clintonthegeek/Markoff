@@ -1,18 +1,30 @@
 # Markoff — live status
 
-Updated 2026-10-19. One screen. The current task list is the
+Updated 2026-10-31. One screen. The current task list is the
 [Corbomite open-asks board](plans/2026-10-19-corbomite-open-asks-triage.md).
 The closed CollabText board is
 [`plans/2026-10-12-collabtext-adoption-execution.md`](plans/2026-10-12-collabtext-adoption-execution.md).
 
 ## Now
 
+Residual-asks reply drafted and two of Corbomite's residual asks are done:
+M7 (`6493ca5c` — theme stored BY VALUE in the applier + read at every
+FormatPass colour site + mixed into the block gate hash; Theme gained
+`operator==`/`hasColor`/`contentHash`; both leaves' duplicate Theme members
+deleted) and M31 (`4e470f0c` — `Markoff::ParserSession`, the persistent
+parse capability with body-vs-body auto-diff, plus the incremental
+resize/shift/rescan byte→char map; same-text re-read drops from 200–430 ms
+to ~8 ms on a 42 KiB vault, frontmatter-only edits too; the CST walk is the
+remaining dominant cost and is a separate ask). Reply:
+`docs/handoff/2026-10-31-to-corbomite-residual-asks-reply.md` still awaiting
+a send decision. Suite **101/101**.
+
 CollabText vNext adoption is closed; its readiness signal stands at
 [`docs/handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md`](handoff/2026-10-17-to-corbomite-ready-for-collabtext-transition.md),
 and host storage, the lease, application wiring, and production acceptance
 stay in Corbomite.
 
-The new workfront is Corbomite's consolidated asks of 2026-10-18. The triage
+The workfront is Corbomite's consolidated asks of 2026-10-18. The triage
 board records a per-ask verdict against this tree, the already-closed rows,
 and a seven-wave order. **Waves 1 and 2 are complete** (Wave 1: M3, M4, M35, M33, M36, M32, M34,
 M28 — `0d974f1b`..`16e7bfe4`; Wave 2: M8, M21, M20, M9, M23, M25, M24,
@@ -27,9 +39,9 @@ sequence) together with the content-version gaps that work exposed:
 undo/redo, attribute and kind writes advance them too, and a remote action
 advances the version of every block it touched (`c215ccf3`); M37's card half
 landed `aae3727d` (`EditorWidget::setEmbeddedMode` — the host owns geometry,
-scrolling and chrome; the card arrives read-only); M31's caller-side edit
-tracking, the Wave 5 decisions and the Graffodil perf/spec rows are the
-remainder (see the board's batch close-out table).
+scrolling and chrome; the card arrives read-only). The Wave 5 decisions and
+the Graffodil perf/spec rows are the remainder (see the board's batch
+close-out table).
 
 Embedded-renderer plan, Phase 0 is **done** and Phase 1 has started. The
 content version now advances on every mutating path — attribute and kind
@@ -46,7 +58,7 @@ jkqtmathtext's exit-time use-after-free is fixed (`673b1727`), and
 `markoff-embed` has its own guide. Display math takes the plugin path
 through `markoff_embed_math` (jkqtmathtext at the request's DPR, delimiter
 stripping and theme colours in the backend), so the first real engine is a
-plugin. Suite **98/98**. Plan:
+plugin. Suite **101/101** (added `tst_markoff_parser_session`). Plan:
 [`plans/2026-10-19-embedded-renderers-plan.md`](plans/2026-10-19-embedded-renderers-plan.md)
 — phases 2+ (the other engines) are unstarted. Graffodil's M5, M6 and
 punch-list batch 1 and M19 are done in that repo. M11's enum disposition

@@ -62,7 +62,7 @@ Sizes: **S** ≈ under a day, **M** ≈ 1–2 days, **L** ≈ more than that.
 | M28 | P2 | PARTIAL — labels done, rest open | no `LABELS` (fixed in Wave 1); `perf_load_bench` stays unregistered on purpose; no production doc-destroyed test — lands with M8; d5 test gone (item stale); `markoff-source/CLAUDE.md:27` `FindBar` fixed; `UndoLog` moved to collabtext | S | core (doc-destroyed test) |
 | M29 | P0 | **CLOSED by redesign at the pin** | pin `Clock.cpp:164-178` keeps the documented asymmetric summary fold, `:179` adds `coverage_intersection`; `Buffer::compact` is gone (`collect_garbage` `:484`); `NetworkSim.cpp:262-265`; 3-replica coverage tests `tst_clock.cpp:167,190` | 0 | reply |
 | M30 | P1 | OPEN | `TreeSitterParser.cpp:204-223` lead byte only; duplicate table `SourceSpan.cpp:10-28` | M | parser |
-| M31 | P1 | OPEN | `TreeSitterParser.cpp:247-290` passes `nullptr` previous tree twice; zero-filled map | L | parser |
+| M31 | P1 | **DONE** `4e470f0c` — `ParserSession` (public, persistent; body-vs-body auto-diff so no caller tracks edits; failed reparse falls back fresh; unchanged-body re-read reuses the cached query walk) + `parseWithPrevious` map update in place (resize/shift/rescan, no zero-fill; two overlap bugs the byte-map oracle caught are documented in the commit) | L | parser |
 | M32 | P2 | OPEN | `PerfProbe.h:40-43`; in-loop probe `TreeSitterParser.cpp:279` | S | parser |
 | M33 | P2 | **DELIVERED, differently** | `setFrontmatterValue`/`removeFrontmatterValue` `MarkoffDocumentVNext.cpp:4251-4278` via `publishMapValue:371`; acceptance undo test missing | S | core test |
 | M34 | P2 | OPEN (doc only) | `Origin.h:14`; `Origin` has no production reader left | S | core |
@@ -190,7 +190,7 @@ incremental owner-history design — see the close-out table's row.
 Exit: before/after numbers on the probes named in the handoff; no budget
 regression.
 
-### Wave 4 — Parser structure (Markoff) — M30 done, M31's reuse API done 2026-10-19
+### Wave 4 — Parser structure (Markoff) — M30 done 2026-10-19; M31 done 2026-10-31
 
 **M30 done** (`bc776efd`), ahead of Wave 3 because it is correctness rather
 than speed: `src/Utf8OffsetMap.h` validates continuation bytes and rejects
@@ -214,6 +214,34 @@ final `charIdx == text.size()` assertion, Latin-1 and truncated
 fixtures; cover the `SourceSpan.cpp` twin. M31: pass the previous tree,
 `resize` instead of zero-fill, incremental map; needs a parse benchmark
 before and after.
+
+**M31 done 2026-10-31** (`4e470f0c`), the remaining half plus the map:
+
+- `Markoff::ParserSession` is the persistent capability: `parse(source)`
+  returns the `fromMarkdown()` snapshot and diffs body-vs-body to derive
+  the minimal scalar-aligned edit itself — no caller tracks edits. A
+  failed re-parse falls back to a fresh parse instead of publishing an
+  empty snapshot; frontmatter-only changes never reach the parser; and
+  an unchanged-body re-read (Corbomite's vault/filter re-evaluation
+  case) reuses the cached query walk. Equivalence pinned in
+  `tst_markoff_parser_session` (9 slots: session-vs-`fromMarkdown`
+  through edits, multibyte edits, frontmatter-only edits, shrink-to-empty).
+- `parseWithPrevious` now updates the byte→char table in place — resize/shift/
+  rescan, no zero-fill — with every offset pinned equal to a fresh parse by
+  `incremental_reparse_byte_map_matches_fresh_parse`. Two overlap bugs the
+  oracle caught during the work (region-write before resize → heap smash on
+  growth; shift after rescan → double-bumped tail) are documented in the
+  commit.
+- Benchmark (42 KiB vault, 30 iterations, build-dev, offscreen; the box was
+  sharing CPU with other builds, so absolute times wobble): one-shot
+  `fromMarkdown` 200–430 ms/call; session with one contiguous edit
+  200–425 ms — break-even to ~1.6×, because `buildDocumentQueries`'s CST walk
+  (125–161 ms) dominates and is untouched by tree reuse; session re-reading
+  the SAME text 6.8–8.0 ms/call (~25–60×) — the reparse is skipped and the
+  cached query walk becomes a snapshot copy; frontmatter-only edits take the
+  same ~8 ms path. The walk itself is a new ask if Corbomite wants it.
+
+Suite 101/101 (`tst_markoff_parser_session` added).
 
 ### Wave 5 — Features that need a decision (Markoff)
 

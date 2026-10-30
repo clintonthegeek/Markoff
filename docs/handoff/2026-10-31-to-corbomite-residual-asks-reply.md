@@ -37,26 +37,44 @@ is exactly as we agreed, and every piece is in:
 
 Scheduled **first** in the residual queue — done first, too.
 
-## 2. M31 — incremental reparse: SCHEDULED, second
+## 2. M31 — incremental reparse: **DONE** (`4e470f0c`), the capability plus the map
 
-The reuse API already landed (`reparse(text, editStart, oldEnd, newEnd)` at
-`TreeSitterParser.cpp:239`, with an equivalence oracle against a fresh parse)
-but had no caller. Your ask names the capability you actually need, so the
-remaining half is now scoped as:
+Both halves Corbomite asked for landed, and the board's exit criterion (a
+paired benchmark) is in the commit message:
 
-- a **persistent parser capability on the parser leaf's public API** — an
-  object that holds the previous tree and last text, with `parse()` and
-  `reparse(text, editStart, oldEnd, newEnd)`, so a whole-vault re-parse per
-  filter evaluation reuses unchanged subtrees without our tracking your
-  edits;
-- the byte→char map built incrementally (resized on the edit span, not
-  re-derived as a fresh `4N`-byte table per parse);
-- a parse benchmark before and after — the board's own exit criterion.
+- **The persistent capability: `Markoff::ParserSession`** (public header
+  `include/markoff/parser/ParserSession.h`). `parse(source)` returns the same
+  snapshot `Document::fromMarkdown()` produces, and you never track edits:
+  the session diffs the new body against the last one, derives the minimal
+  scalar-aligned UTF-8 edit itself, and carries the tree, the byte map and
+  the query results together. A failed re-parse falls back to a fresh parse
+  instead of publishing an empty snapshot; a frontmatter-only change never
+  reaches the parser; and re-reading the *same* body (a filter re-evaluation
+  where the vault text did not change) skips the parse *and* the CST walk —
+  the cached query results become a snapshot copy.
 
-We will tell you the commit when it lands, per your ask. Scheduled **second**,
-behind M7 only because M7 is the larger visible gap you named first; if the
-vault re-parse cost bites harder than Reading-mode theming, say so and we
-will swap them.
+- **The byte→char map is now built incrementally**: on a re-parse the table
+  is resized and repaired (tail shifted by the byte/char deltas, only the
+  replaced region re-walked) — no zero-fill rebuild per parse. Every offset,
+  sentinel included, is pinned equal to a fresh parse in
+  `tst_markoff_parser_validity`; the work also caught two overlap bugs
+  (a heap smash on growth edits and a double-bumped tail from a stale
+  shift), both documented in the commit so they are findable later.
+
+- **The paired benchmark** (42 KiB vault, 30 iterations, offscreen; the box
+  was sharing CPU with other builds, so treat absolute numbers as load
+  bands, not precision):
+
+  | protocol | per call |
+  |---|---|
+  | one-shot `fromMarkdown` (today's path) | 200–430 ms |
+  | session, one contiguous edit | 200–425 ms |
+  | session, same text re-read | **6.8–8.0 ms** |
+  | session, frontmatter-only edit | **~8 ms** |
+
+Scheduled **second**, behind M7 only because M7 is the larger visible gap you
+named first; if the vault re-parse cost bites harder than Reading-mode
+theming, say so and we will swap them.
 
 ## 3. M26 / M27 item 4 — split, because they have different triggers
 
