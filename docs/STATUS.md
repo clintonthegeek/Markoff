@@ -110,9 +110,8 @@ candidate; the statement, evidence and paste-ready wording are at
 and collabtext recorded it in `63be9a2` (M06 `complete` in its `TASKS.json`,
 wording in `markoff-core-response.md`, reply at
 `~/dev/collabtext/docs/handoff/2026-10-31-to-markoff-m06-recorded.md`). Q06 in
-that repo stays open.
-Re-verified at consumer revision `78cac549` (acceptance tree: code-bearing
-`4e470f0c` + the build-configuration fix in `78cac549`): a
+that repo stays open. Re-verified at consumer revision `78cac549` (acceptance
+tree: code-bearing `4e470f0c` + the build-configuration fix in `78cac549`): a
 **fresh configure** of the full tree against the exact prefix is **101/101**
 offscreen, and the standalone consumer project configured against a
 **relocated copy** of the prefix is **4/4**. The run also caught and fixed a
