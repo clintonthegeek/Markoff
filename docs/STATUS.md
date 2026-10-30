@@ -102,7 +102,8 @@ the tag. This is the A14-equivalent run the previous caveat called for.
 `not_started` until Markoff states acceptance of the exact candidate; the
 statement, evidence and paste-ready wording are at
 [`docs/handoff/2026-10-31-to-collabtext-m06-acceptance.md`](handoff/2026-10-31-to-collabtext-m06-acceptance.md).
-Re-verified at consumer revision `91759557` (code-bearing `4e470f0c`): a
+Re-verified at consumer revision `78cac549` (acceptance tree: code-bearing
+`4e470f0c` + the build-configuration fix in `78cac549`): a
 **fresh configure** of the full tree against the exact prefix is **101/101**
 offscreen, and the standalone consumer project configured against a
 **relocated copy** of the prefix is **4/4**. The run also caught and fixed a

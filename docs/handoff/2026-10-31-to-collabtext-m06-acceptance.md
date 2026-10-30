@@ -13,9 +13,11 @@ candidate for this row. This is that statement, plus the evidence behind it.
 > **Markoff accepts `collabtext-perf-checkpoint-2026-10-21`
 > (`16cc48f4969abc2940a7fb332b72af018075dab7`, package `0.2.0-alpha.5`,
 > capability manifest v17) as the engine of its production document path**,
-> recorded at Markoff revision `91759557448f86fed8ee31e2f20f747a30f64d5d`
-> (the code-bearing revision is `4e470f0c`; the revisions above it are
-> documentation-only) on 2026-10-31.
+> recorded at Markoff revision `78cac549` — the commit that carries this
+> record; its tree is the acceptance build's tree (code-bearing revision
+> `4e470f0c` plus the build-configuration fix in `78cac549`; the
+> documentation-only revisions between them do not affect the result) —
+> on 2026-10-31.
 >
 > The acceptance is Markoff's own. Its provider seams ran against the
 > installed package at `build-collabtext-perf-checkpoint/install` (rebuilt
@@ -62,7 +64,7 @@ candidate for this row. This is that statement, plus the evidence behind it.
 
 | Item | Value |
 |---|---|
-| Consumer revision | Markoff `91759557448f86fed8ee31e2f20f747a30f64d5d`; code-bearing revision `4e470f0c` |
+| Consumer revision | Markoff `78cac549` (acceptance tree: code-bearing `4e470f0c` + build-configuration fix in `78cac549`) |
 | Producer | tag `collabtext-perf-checkpoint-2026-10-21` = `16cc48f4969abc2940a7fb332b72af018075dab7` |
 | Package | `0.2.0-alpha.5`, capability manifest v17, `CollabText::Core` component |
 | Prefix | `build-collabtext-perf-checkpoint/install` (rebuilt from the tag) |
