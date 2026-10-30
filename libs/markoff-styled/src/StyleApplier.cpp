@@ -8,8 +8,11 @@
 #include <QTextEdit>
 #include <QTimer>
 
+#include <memory>
+
 #include <markoff/core/Cmd/D2.h>
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/Theme.h>
 
 namespace Markoff::Styled {
 
@@ -37,8 +40,21 @@ void StyleApplier::setMarkoffDocument(Markoff::MarkoffDocument *doc) {
 }
 
 void StyleApplier::setTheme(const Markoff::Theme *theme) {
-    if (m_theme == theme) return;
-    m_theme = theme;
+    // M7: store the theme BY VALUE and compare by content. The old shape
+    // stored a pointer and pointer-compared, so a changed Theme written
+    // into the same address (a leaf's own Theme member, reassigned) was
+    // invisible and the leaf never restyled.
+    if (m_theme) {
+        if (!theme) {
+            m_theme.reset();
+            rerender();
+            return;
+        }
+        if (*m_theme == *theme) return;
+    } else if (!theme) {
+        return;   // still no theme: nothing changed
+    }
+    m_theme = std::make_unique<Markoff::Theme>(*theme);
     rerender();
 }
 
@@ -89,7 +105,7 @@ void StyleApplier::applyFormats() {
 
     FormatPass::Options opts;
     opts.fontScale = m_fontScale;
-    opts.theme     = m_theme;
+    opts.theme     = m_theme.get();   // by-value store (M7); null = headless fallback
     opts.inferKind = true;
     const FormatPass::Result r =
         FormatPass::apply(m_textDocument, m_markoffDocument, opts, &m_blockHashes);

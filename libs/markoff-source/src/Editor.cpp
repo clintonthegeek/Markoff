@@ -45,8 +45,7 @@ Editor::Editor(QWidget *parent)
     : Markoff::MarkdownView(parent),
       m_editor(new InnerEditor(this)),
       m_binding(new Markoff::SourceTextDocumentBinding(this)),
-      m_highlighter(new KSyntaxHighlighting::SyntaxHighlighter(this)),
-      m_theme(Markoff::Theme::defaultLight())
+      m_highlighter(new KSyntaxHighlighting::SyntaxHighlighter(this))
 {
     auto *layout = new QVBoxLayout(this);
     layout->setContentsMargins(0, 0, 0, 0);
@@ -300,11 +299,14 @@ void Editor::detachFindController()
     if (m_findAdapter) m_findAdapter->detach();
 }
 
-Markoff::Theme Editor::theme() const { return m_theme; }
+Markoff::Theme Editor::theme() const { return MarkdownView::theme(); }
 
 void Editor::setTheme(const Markoff::Theme &t) {
+    // M7: the leaf's own Theme member is gone — the base's store is the one
+    // authority, so this reads the theme from the argument (identical to
+    // what theme() now returns) and applies it to the palette, the syntax
+    // highlighter's light/dark selection, and the gutter.
     MarkdownView::setTheme(t);  // base stores + emits themeChanged
-    m_theme = t;
     QPalette p = m_editor->palette();
     p.setColor(QPalette::Base,            t.color(Markoff::Theme::Slot::EditorBackground));
     p.setColor(QPalette::Text,            t.color(Markoff::Theme::Slot::TextDefault));

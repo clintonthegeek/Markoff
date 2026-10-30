@@ -47,7 +47,12 @@ Editor::Editor(QWidget *parent)
 
     m_styleApplier = new StyleApplier(this);
     m_styleApplier->setTextDocument(m_editor->document());
-    m_styleApplier->setTheme(&m_theme);
+    // The base's theme store is the single authority (M7); the applier keeps
+    // its own by-value copy. theme() returns by value, so the temporary's
+    // address is only borrowed for this call — the applier has copied it by
+    // the time the expression ends.
+    const Markoff::Theme initialTheme = theme();
+    m_styleApplier->setTheme(&initialTheme);
     m_styleApplier->setTextEdit(m_editor);
 
     m_linkInteract = new LinkInteraction(m_editor, this);
@@ -451,15 +456,18 @@ void Editor::setSession(Markoff::Session *s) {
 
 // ---- Theme --------------------------------------------------------------
 
-Markoff::Theme Editor::theme() const { return m_theme; }
+Markoff::Theme Editor::theme() const { return MarkdownView::theme(); }
 
 void Editor::setTheme(const Markoff::Theme &t) {
-    // No same-value guard: Markoff::Theme has no operator==. Idempotent
-    // restyle on a same-theme set is cheap; consumers shouldn't see spurious
-    // themeChanged emissions in practice since theme changes are rare.
+    // M7: the leaf's own Theme member is gone — the base's store is the one
+    // authority, and the applier now keeps its own by-value copy (so a
+    // changed theme at the same address still restyles: Theme::operator==).
+    // No same-value guard needed here: the applier compares by content.
     MarkdownView::setTheme(t);  // base stores + emits themeChanged
-    m_theme = t;
-    if (m_styleApplier) m_styleApplier->setTheme(&m_theme);
+    // theme() returns by value; borrow the local's address for this call —
+    // the applier keeps its own by-value copy (M7), so nothing dangles.
+    const Markoff::Theme applied = MarkdownView::theme();
+    if (m_styleApplier) m_styleApplier->setTheme(&applied);
 }
 
 // ---- LinkService --------------------------------------------------------

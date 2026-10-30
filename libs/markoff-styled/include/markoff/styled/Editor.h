@@ -132,7 +132,6 @@ private:
     // Non-QObject; owned via unique_ptr (Editor's dtor is out-of-line in the
     // .cpp where StyledTableRenderer is a complete type).
     std::unique_ptr<StyledTableRenderer>    m_tableRenderer;
-    Markoff::Theme                          m_theme;
     Markoff::LinkService                   *m_linkService  = nullptr;
     mutable Markoff::DefaultLinkService    *m_defaultLink  = nullptr;
     QString                                 m_fromContext;

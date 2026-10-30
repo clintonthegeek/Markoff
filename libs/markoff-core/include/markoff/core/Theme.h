@@ -43,6 +43,11 @@ public:
         CodeComment, CodeDocumentation,
         CodePreprocessor, CodeAnnotation,
         FoldArrow, ScrollbarThumb,
+        // Appended (M7): the styled leaf's remaining colour sites had no
+        // slot and hardcoded their values. Appended at the END on purpose —
+        // Theme's JSON serializes slots by NUMBER, so inserting before an
+        // existing slot would silently re-colour every persisted theme.
+        InlineCodeBackground, FootnoteRef, HorizontalRule,
     };
     Q_ENUM(Slot)
 
@@ -60,6 +65,11 @@ public:
     QColor selectionBackground() const { return color(Slot::SelectionBackground); }
 
     QColor         color(Slot) const;
+    /// True when this theme actually defines `slot`'s colour. A consumer
+    /// overlaying its own colours per slot (rather than taking the theme's
+    /// fallback chain) queries this; `color()` alone cannot distinguish
+    /// "set to black" from "unset, fell back to TextDefault".
+    bool           hasColor(Slot) const;
     void           setColor(Slot, QColor);
     QTextCharFormat charFormat(Slot) const;
 
@@ -83,6 +93,29 @@ public:
 
     QJsonObject toJson() const;
     static Theme fromJson(const QJsonObject &);
+
+    /// An order-insensitive signature of this theme's full content (every
+    /// slot's colour, font, weight, italic and size multiplier). Equal
+    /// contents hash equal regardless of the slots' insertion order; a
+    /// content change changes the hash. This is what a cache keyed on
+    /// "the theme the block was rendered with" mixes into its key (M7:
+    /// the styled leaf's per-block hash gate).
+    quint64 contentHash() const;
+
+    /// Value equality over every slot's colour, font, weight, italic and
+    /// size multiplier — the comparison a restyle path needs to skip work
+    /// when the "new" theme is byte-identical to the one already applied
+    /// (M7: StyleApplier stored a pointer and pointer-compared, so a
+    /// changed theme at the same address was invisible).
+    friend bool operator==(const Theme &a, const Theme &b)
+    {
+        return a.m_colors   == b.m_colors
+            && a.m_fonts    == b.m_fonts
+            && a.m_bolds    == b.m_bolds
+            && a.m_italics  == b.m_italics
+            && a.m_sizeMul  == b.m_sizeMul;
+    }
+    friend bool operator!=(const Theme &a, const Theme &b) { return !(a == b); }
 
 private:
     QHash<int, QColor>    m_colors;

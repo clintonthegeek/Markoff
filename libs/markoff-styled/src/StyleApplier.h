@@ -36,7 +36,7 @@ public:
     Markoff::MarkoffDocument *markoffDocument() const noexcept { return m_markoffDocument; }
 
     void setTheme(const Markoff::Theme *theme);
-    const Markoff::Theme *theme() const noexcept { return m_theme; }
+    const Markoff::Theme *theme() const noexcept { return m_theme.get(); }
 
     void setFontScale(qreal s);
     qreal fontScale() const noexcept { return m_fontScale; }
@@ -80,7 +80,11 @@ private:
     QPointer<QTextDocument>            m_textDocument;
     QPointer<QTextEdit>                m_textEdit;
     QPointer<Markoff::MarkoffDocument> m_markoffDocument;
-    const Markoff::Theme              *m_theme           = nullptr;
+    /// M7: the theme stored BY VALUE (was: a borrowed pointer that
+    /// pointer-compared, so a changed theme at the same address was
+    /// invisible). Null = no theme supplied; FormatPass falls back to its
+    /// own light constants.
+    std::unique_ptr<Markoff::Theme>    m_theme;
     qreal                              m_fontScale       = 1.0;
     bool                               m_applyingFormats = false;
     int                                m_pendingScrollCapture = -1;

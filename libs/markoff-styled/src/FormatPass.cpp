@@ -21,6 +21,7 @@
 #include <markoff/core/BlockKind.h>
 #include <markoff/core/MarkoffDocument.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
+#include <markoff/core/Theme.h>
 #include <markoff/parser/SourceSpan.h>
 
 namespace {
@@ -53,6 +54,19 @@ inline qreal hruleMarginPt(qreal s)     { return emPt(s) * 0.60; }
 // ~1.5em keeps the bullet comfortably separated from text while letting
 // nested lists step in by visible-but-modest amounts.
 inline qreal docIndentWidthPx(qreal s) { return emPt(s) * 1.5; }
+
+/// M7: resolve a colour site from the theme when one is supplied, else the
+/// light fallback this file hardcoded before themes were plumbed. The
+/// fallback is per-slot and checked with Theme::hasColor — an EMPTY theme
+/// (the base MarkdownView's default) must not paint everything black, so a
+/// theme only overrides the slots it actually defines.
+inline QColor themeColor(const Markoff::Theme *theme,
+                         Markoff::Theme::Slot slot, QColor fallback)
+{
+    if (theme && theme->hasColor(slot))
+        return theme->color(slot);
+    return fallback;
+}
 
 QTextBlockFormat baseBlockFormat() {
     QTextBlockFormat fmt;
@@ -105,13 +119,13 @@ void applyParagraph(QTextCursor &cursor, qreal fontScale) {
     applyBlockCharFormat(cursor, cf);
 }
 
-void applyCodeBlock(QTextCursor &cursor, qreal fontScale) {
+void applyCodeBlock(QTextCursor &cursor, qreal fontScale, const Markoff::Theme *theme) {
     QTextBlockFormat bf = baseBlockFormat();
     bf.setLeftMargin(emPt(fontScale) * 1.0);
     bf.setTopMargin(codeBlockMarginPt(fontScale));
     bf.setBottomMargin(codeBlockMarginPt(fontScale));
-    bf.setBackground(QColor(245, 245, 245));  // Theme::CodeBlockBackground
-                                              // resolved in Task 9 wiring.
+    bf.setBackground(themeColor(theme, Markoff::Theme::Slot::CodeBlockBackground,
+                                QColor(245, 245, 245)));
     cursor.setBlockFormat(bf);
 
     QTextCharFormat cf;
@@ -121,7 +135,7 @@ void applyCodeBlock(QTextCursor &cursor, qreal fontScale) {
     applyBlockCharFormat(cursor, cf);
 }
 
-void applyBlockquote(QTextCursor &cursor, int depth, qreal fontScale) {
+void applyBlockquote(QTextCursor &cursor, int depth, qreal fontScale, const Markoff::Theme *theme) {
     QTextBlockFormat bf = baseBlockFormat();
     bf.setLeftMargin(emPt(fontScale) * qMax(1, depth));
     bf.setTopMargin(blockquoteMarginPt(fontScale));
@@ -130,7 +144,8 @@ void applyBlockquote(QTextCursor &cursor, int depth, qreal fontScale) {
 
     QTextCharFormat cf;
     cf.setFontPointSize(emPt(fontScale));
-    cf.setForeground(QColor(100, 100, 100));  // Theme::Quote.
+    cf.setForeground(themeColor(theme, Markoff::Theme::Slot::Quote,
+                                QColor(100, 100, 100)));
     applyBlockCharFormat(cursor, cf);
 }
 
@@ -165,7 +180,7 @@ void applyListItem(QTextCursor &cursor, int depth,
     Q_UNUSED(depth);
 }
 
-void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
+void applyHorizontalRule(QTextCursor &cursor, qreal fontScale, const Markoff::Theme *theme) {
     QTextBlockFormat bf = baseBlockFormat();
     bf.setTopMargin(hruleMarginPt(fontScale));
     bf.setBottomMargin(hruleMarginPt(fontScale));
@@ -174,13 +189,15 @@ void applyHorizontalRule(QTextCursor &cursor, qreal fontScale) {
     QTextCharFormat cf;
     cf.setFontFamilies({QStringLiteral("monospace")});
     cf.setFontFixedPitch(true);
-    cf.setForeground(QColor(180, 180, 180));
+    cf.setForeground(themeColor(theme, Markoff::Theme::Slot::HorizontalRule,
+                                QColor(180, 180, 180)));
     cf.setFontPointSize(emPt(fontScale));
     applyBlockCharFormat(cursor, cf);
 }
 
 QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
-                                  qreal /*fontScale*/) {
+                                  qreal /*fontScale*/,
+                                  const Markoff::Theme *theme) {
     QTextCharFormat fmt;
     if (span.bold)          fmt.setFontWeight(QFont::Bold);
     if (span.italic)        fmt.setFontItalic(true);
@@ -188,16 +205,20 @@ QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
     if (span.code) {
         fmt.setFontFamilies({QStringLiteral("monospace")});
         fmt.setFontFixedPitch(true);
-        fmt.setBackground(QColor(245, 245, 245));   // Theme::InlineCodeBackground
+        fmt.setBackground(themeColor(theme, Markoff::Theme::Slot::InlineCodeBackground,
+                                     QColor(245, 245, 245)));
     }
     if (span.highlight) {
-        fmt.setBackground(QColor(255, 240, 130));   // Theme::Highlight
+        fmt.setBackground(themeColor(theme, Markoff::Theme::Slot::Highlight,
+                                     QColor(255, 240, 130)));
     }
     if (span.isTag) {
-        fmt.setForeground(QColor(70, 130, 180));    // Theme::Tag
+        fmt.setForeground(themeColor(theme, Markoff::Theme::Slot::Tag,
+                                     QColor(70, 130, 180)));
     }
     if (span.isFootnoteRef) {
-        fmt.setForeground(QColor(150, 90, 150));    // Theme::FootnoteRef
+        fmt.setForeground(themeColor(theme, Markoff::Theme::Slot::FootnoteRef,
+                                     QColor(150, 90, 150)));
         fmt.setVerticalAlignment(QTextCharFormat::AlignSuperScript);
     }
     if (span.isLink || span.isWikilink) {
@@ -208,17 +229,28 @@ QTextCharFormat charFormatForSpan(const Markoff::SourceSpan &span,
                                           : span.linkTarget.url);
         fmt.setFontUnderline(true);
         fmt.setForeground(span.isWikilink
-                          ? QColor(120, 80, 200)    // Theme::WikiLink
-                          : QColor(40, 100, 200));  // Theme::Link
+                          ? themeColor(theme, Markoff::Theme::Slot::WikiLink,
+                                       QColor(120, 80, 200))
+                          : themeColor(theme, Markoff::Theme::Slot::Link,
+                                       QColor(40, 100, 200)));
     }
     return fmt;
+}
+
+/// M7: an order-insensitive signature of the theme's content, mixed into
+/// every block's gate hash — without it a theme change is invisible to the
+/// hash gate and changed blocks never restyle. Theme::contentHash() owns
+/// the fold; a null theme (headless) signs as 0.
+quint64 themeSignature(const Markoff::Theme *theme) {
+    return theme ? theme->contentHash() : 0;
 }
 
 quint64 computeBlockHash(Markoff::BlockKind kind,
                          const QByteArray &text,
                          const QList<Markoff::SourceSpan> &spans,
                          const QHash<Markoff::AttrName, Markoff::AttrValue> &attrs,
-                         qreal fontScale) {
+                         qreal fontScale,
+                         quint64 themeSignature_) {
     quint64 h = qHash(int(kind));
     h ^= qHash(text);
     h ^= quint64(text.size()) * 0x9E3779B97F4A7C15ULL;
@@ -265,6 +297,9 @@ quint64 computeBlockHash(Markoff::BlockKind kind,
     quint64 fsBits = 0;
     std::memcpy(&fsBits, &fontScale, sizeof(fsBits));
     h ^= fsBits;
+    // Mix in the theme signature (M7): a theme change must invalidate every
+    // block's gate hash, or changed blocks never restyle.
+    h ^= themeSignature_;
     return h;
 }
 
@@ -423,6 +458,10 @@ Result apply(QTextDocument *target,
     if (!target || !source) return out;
 
     const qreal fontScale = opts.fontScale;
+    // M7: the theme's signature, folded once per pass and mixed into every
+    // block's gate hash; the theme pointer goes to the colour sites.
+    const Markoff::Theme *theme = opts.theme;
+    const quint64 themeSig = themeSignature(theme);
 
     // Previous block IDs (for structural-change detection) — only meaningful
     // when a gate is supplied.
@@ -461,7 +500,7 @@ Result apply(QTextDocument *target,
             const Markoff::BlockKind kind = entry.kind;
             const QList<Markoff::SourceSpan> spans = source->inlineSpansFor(id);
             const auto attrs = source->blockAttrs(id);
-            const quint64 h = computeBlockHash(kind, text, spans, attrs, fontScale);
+            const quint64 h = computeBlockHash(kind, text, spans, attrs, fontScale, themeSig);
             const bool hashSkipped = gate && (gate->value(id, 0) == h);
             if (gate && !hashSkipped) (*gate)[id] = h;
             if (hashSkipped) ++out.hashSkips;
@@ -497,7 +536,7 @@ Result apply(QTextDocument *target,
                     } else if (kind == Markoff::BlockKind::Paragraph) {
                         applyParagraph(blkCursor, fontScale);
                     } else if (kind == Markoff::BlockKind::CodeBlock) {
-                        applyCodeBlock(blkCursor, fontScale);
+                        applyCodeBlock(blkCursor, fontScale, theme);
                     } else if (kind == Markoff::BlockKind::BlockQuote) {
                         // Depth from BlockQuoteDepth attr (queue #8.1).
                         int depth = 1;
@@ -505,7 +544,7 @@ Result apply(QTextDocument *target,
                             it != attrs.end()
                             && std::holds_alternative<int>(*it))
                             depth = qMax(1, std::get<int>(*it));
-                        applyBlockquote(blkCursor, depth, fontScale);
+                        applyBlockquote(blkCursor, depth, fontScale, theme);
                     } else if (kind == Markoff::BlockKind::ListItem) {
                         // Read structural attrs from the model rather than
                         // guessing from buffer text — the harvested ListItem
@@ -527,7 +566,7 @@ Result apply(QTextDocument *target,
                             checked = std::get<bool>(*it);
                         applyListItem(blkCursor, depth, markerStyle, checked, fontScale);
                     } else if (kind == Markoff::BlockKind::HorizontalRule) {
-                        applyHorizontalRule(blkCursor, fontScale);
+                        applyHorizontalRule(blkCursor, fontScale, theme);
                     } else {
                         applyParagraph(blkCursor, fontScale);
                     }
@@ -566,7 +605,7 @@ Result apply(QTextDocument *target,
                     QTextCursor c(target);
                     c.setPosition(spanStart);
                     c.setPosition(qMin(spanEnd, docLen), QTextCursor::KeepAnchor);
-                    c.mergeCharFormat(charFormatForSpan(span, fontScale));
+                    c.mergeCharFormat(charFormatForSpan(span, fontScale, theme));
                 }
             }
 

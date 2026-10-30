@@ -2,6 +2,8 @@
 #include <markoff/core/Theme.h>
 #include <markoff/core/CodeTokenKind.h>
 
+#include <cstring>
+
 namespace {
 
 /// Slots whose color paints a background rather than text/foreground.
@@ -19,6 +21,7 @@ bool isBackgroundSlot(Markoff::Theme::Slot s) {
         case S::BracketMatchBackground:
         case S::EditorBackground: case S::GutterBackground:
         case S::CodeBlockBackground: case S::QuoteBackground:
+        case S::InlineCodeBackground:
             return true;
         default:
             return false;
@@ -51,6 +54,35 @@ QColor Theme::color(Slot s) const
     const auto td = m_colors.constFind(static_cast<int>(Slot::TextDefault));
     if (td != m_colors.constEnd()) return td.value();
     return QColor(Qt::black);
+}
+
+bool Theme::hasColor(Slot s) const
+{
+    return m_colors.contains(static_cast<int>(s));
+}
+
+quint64 Theme::contentHash() const
+{
+    // XOR of per-entry hashes: order-insensitive, so two themes with equal
+    // content hash equal regardless of the order slots were set in (and
+    // regardless of QHash's own unspecified iteration order).
+    quint64 h = 0;
+    for (auto it = m_colors.cbegin(); it != m_colors.cend(); ++it)
+        h ^= (quint64(it.key()) * 0x9E3779B97F4A7C15ULL) ^ quint64(it.value().rgba64());
+    for (auto it = m_fonts.cbegin(); it != m_fonts.cend(); ++it)
+        h ^= (quint64(it.key()) * 0xBF58476D1CE4E5B9ULL) ^ qHash(it.value().toString());
+    for (auto it = m_bolds.cbegin(); it != m_bolds.cend(); ++it)
+        h ^= (quint64(it.key()) * 0x100000001B3ULL) ^ (it.value() ? 1ULL : 2ULL);
+    for (auto it = m_italics.cbegin(); it != m_italics.cend(); ++it)
+        h ^= (quint64(it.key()) * 0x27220A9ULL) ^ (it.value() ? 3ULL : 4ULL);
+    for (auto it = m_sizeMul.cbegin(); it != m_sizeMul.cend(); ++it) {
+        quint64 bits = 0;
+        const qreal v = it.value();
+        static_assert(sizeof(bits) == sizeof(v), "qreal must hash as its bits");
+        std::memcpy(&bits, &v, sizeof(bits));
+        h ^= (quint64(it.key()) * 0x85EBCA6BULL) ^ bits;
+    }
+    return h;
 }
 
 void Theme::setColor(Slot s, QColor c) { m_colors[static_cast<int>(s)] = std::move(c); }
@@ -153,6 +185,12 @@ Theme Theme::defaultLight()
     t.setColor(Slot::CodeBlock,        QColor("#222222"));
     t.setColor(Slot::CodeBlockBackground, QColor("#f4f4f4"));
     t.setColor(Slot::QuoteBackground,     QColor("#f4f4f4"));
+    // M7 — the styled leaf's remaining colour sites, promoted from
+    // hardcoded literals to slots. Light values match the literals they
+    // replace bit for bit, so a theme-less (headless) render is unchanged.
+    t.setColor(Slot::InlineCodeBackground, QColor("#f5f5f5"));
+    t.setColor(Slot::FootnoteRef,          QColor("#965a96"));
+    t.setColor(Slot::HorizontalRule,       QColor("#b4b4b4"));
     // Callout accents (P5.5) — one hue per Obsidian-vocabulary type, used
     // for the typed header (icon + label) and quote-bar; distinct from the
     // generic Quote slot so a callout reads differently from a plain
@@ -218,6 +256,11 @@ Theme Theme::defaultDark()
     t.setColor(Slot::Quote,            QColor("#aaaaaa"));
     t.setColor(Slot::CodeBlockBackground, QColor("#2d2d2d"));
     t.setColor(Slot::QuoteBackground,     QColor("#2d2d2d"));
+    // M7 — dark variants of the styled leaf's promoted slots: same
+    // "lighter/desaturated for dark" convention as the callout accents.
+    t.setColor(Slot::InlineCodeBackground, QColor("#2d2d2d"));
+    t.setColor(Slot::FootnoteRef,          QColor("#c080c0"));
+    t.setColor(Slot::HorizontalRule,       QColor("#606060"));
     // Callout accents, dark-palette variants (P5.5) — lighter/desaturated
     // so they stay legible on the dark editor background.
     t.setColor(Slot::CalloutNote,      QColor("#5b9bd5"));

@@ -143,7 +143,6 @@ private:
     KSyntaxHighlighting::SyntaxHighlighter *m_highlighter  = nullptr;
     Detail::Gutter                         *m_gutter        = nullptr;
     Detail::SourceFindAdapter              *m_findAdapter   = nullptr;
-    Markoff::Theme                          m_theme;
     QMetaObject::Connection                 m_paragraphMarginsCon;
     QMetaObject::Connection                 m_listMarkerCon;
     QMetaObject::Connection                 m_contextCursorCon;

@@ -216,6 +216,104 @@ private Q_SLOTS:
         QVERIFY(dark.isItalic(Theme::Slot::Quote));
         QVERIFY(dark.isBold(Theme::Slot::Heading3));
     }
+
+    // --- M7: value equality, content hash, and the slots the styled leaf's
+    // colour sites needed ---
+
+    void equality_compares_content_not_identity() {
+        const Theme a = Theme::defaultLight();
+        const Theme b = a;
+        QVERIFY(a == b);
+        QVERIFY(!(a != b));
+
+        // A same-content theme built independently (a copy through JSON, as
+        // a persisted theme comes back) must compare equal.
+        const Theme roundTripped = Theme::fromJson(a.toJson());
+        QVERIFY(a == roundTripped);
+
+        // One colour change must break equality.
+        Theme c = a;
+        c.setColor(Theme::Slot::Link, QColor("#ff0000"));
+        QVERIFY(a != c);
+        // A font change too.
+        Theme d = a;
+        d.setFont(Theme::FontRole::Body, QFont("monospace", 12));
+        QVERIFY(a != d);
+    }
+
+    void hasColor_distinguishes_set_from_fallback() {
+        Theme t;
+        // Unset: color() falls back (invalid for background slots,
+        // TextDefault for foreground ones) — hasColor must say "not set".
+        QVERIFY(!t.hasColor(Theme::Slot::CodeBlockBackground));
+        QVERIFY(!t.hasColor(Theme::Slot::Link));
+        QVERIFY(!t.color(Theme::Slot::CodeBlockBackground).isValid());
+
+        t.setColor(Theme::Slot::Link, QColor(Qt::black));
+        QVERIFY(t.hasColor(Theme::Slot::Link));
+        // Set-to-black must be distinguishable from unset-fell-back-to-black.
+        QVERIFY(t.color(Theme::Slot::Link).isValid());
+    }
+
+    void content_hash_tracks_every_changed_dimension() {
+        const Theme a = Theme::defaultLight();
+
+        QVERIFY(a.contentHash() == a.contentHash());  // stable across reads
+        const Theme same = Theme::fromJson(a.toJson());
+        QCOMPARE(same.contentHash(), a.contentHash()); // equal content, equal hash
+
+        Theme colourChanged = a;
+        colourChanged.setColor(Theme::Slot::Link, QColor("#ff0000"));
+        QVERIFY(colourChanged.contentHash() != a.contentHash());
+
+        Theme fontChanged = a;
+        fontChanged.setFont(Theme::FontRole::Body, QFont("monospace", 12));
+        QVERIFY(fontChanged.contentHash() != a.contentHash());
+
+        Theme boldChanged = a;
+        boldChanged.setBold(Theme::Slot::Link, true);
+        QVERIFY(boldChanged.contentHash() != a.contentHash());
+
+        Theme sizeChanged = a;
+        sizeChanged.setFontSizeMultiplier(Theme::Slot::Heading1, 2.5);
+        QVERIFY(sizeChanged.contentHash() != a.contentHash());
+
+        // An order-insensitive fold: two themes that set the same slots in a
+        // different ORDER hash equal.
+        Theme orderA; Theme orderB;
+        orderA.setColor(Theme::Slot::Link, QColor("#0066cc"));
+        orderA.setColor(Theme::Slot::Tag,  QColor("#a04080"));
+        orderB.setColor(Theme::Slot::Tag,  QColor("#a04080"));
+        orderB.setColor(Theme::Slot::Link, QColor("#0066cc"));
+        QCOMPARE(orderB.contentHash(), orderA.contentHash());
+
+        // A fresh, empty theme signs differently from a populated one.
+        QVERIFY(Theme().contentHash() != a.contentHash());
+    }
+
+    void promoted_styled_slots_round_trip_and_default_to_the_old_literals() {
+        // The three slots added for the styled leaf's colour sites must
+        // carry the exact values the leaf hardcoded before M7, so a
+        // theme-less render is unchanged.
+        const Theme light = Theme::defaultLight();
+        QCOMPARE(light.color(Theme::Slot::InlineCodeBackground), QColor(245, 245, 245));
+        QCOMPARE(light.color(Theme::Slot::FootnoteRef),          QColor(150, 90, 150));
+        QCOMPARE(light.color(Theme::Slot::HorizontalRule),       QColor(180, 180, 180));
+
+        // And they survive a JSON round trip (slots serialize by number; a
+        // persisted theme must come back with them).
+        const Theme back = Theme::fromJson(light.toJson());
+        QCOMPARE(back.color(Theme::Slot::InlineCodeBackground), QColor(245, 245, 245));
+        QCOMPARE(back.color(Theme::Slot::FootnoteRef),          QColor(150, 90, 150));
+        QCOMPARE(back.color(Theme::Slot::HorizontalRule),       QColor(180, 180, 180));
+
+        // The dark theme redefines them for its background.
+        const Theme dark = Theme::defaultDark();
+        QVERIFY(dark.color(Theme::Slot::InlineCodeBackground)
+                    != light.color(Theme::Slot::InlineCodeBackground));
+        QVERIFY(dark.color(Theme::Slot::HorizontalRule).lightness()
+                    < light.color(Theme::Slot::HorizontalRule).lightness());
+    }
 };
 
 QTEST_APPLESS_MAIN(TstFoundationTheme)
