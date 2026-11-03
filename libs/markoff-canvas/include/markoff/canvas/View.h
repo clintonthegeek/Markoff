@@ -1579,6 +1579,22 @@ public:
     quint64 m_paintCount = 0;
     CanvasCursor m_caret;
     std::optional<CanvasCursor> m_selectionAnchor;
+    /// Vertical-motion goal column (word-processor standard): the first
+    /// Key_Up/Key_Down of a run fixes the caret's current x as the target
+    /// for later moves in that run, so crossing a blank or too-short line
+    /// does not clamp the preview column to that line's edge. Own doc
+    /// comment in moveCaretVertically().
+    std::optional<qreal> m_caretGoalX;
+    /// Guard the goal against staleness: the caret position and document
+    /// edit sequence at the time the goal was (re)derived. Updated by
+    /// every moveCaretVertically() move; anything else that repositions
+    /// the caret or edits the document leaves the stamp behind, and the
+    /// next vertical move re-derives the goal from wherever the caret
+    /// then sits. Not a spec-state member — this is leaf-local input
+    /// kinematics, same "the document has no concept of this" class as
+    /// `m_selectionAnchor` (T5).
+    CanvasCursor m_caretGoalStamp;
+    quint64 m_caretGoalVersion = 0;
     /// F3/find-next fix (punch-list [cluster-k]): set by `ensureCaretVisible()`
     /// whenever it scrolls the caret into view, since that scroll target can
     /// be based on an unrealized block's ESTIMATED y. Consumed by

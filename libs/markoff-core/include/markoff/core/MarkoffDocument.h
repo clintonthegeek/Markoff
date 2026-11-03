@@ -172,9 +172,16 @@ public:
         const QList<BlockId>& removedBlocks);
     /// Atomically split a block into its retained prefix and a new block whose
     /// text begins with `newBlockPrefix` followed by the removed suffix.
+    /// `newBlockAttrNames`/`newBlockAttrValues` optionally seed the new
+    /// block's block-attrs entries in the same published action — the
+    /// structural continuation case (a list/quotation split exits its
+    /// marker and kind behind but must also carry indent/depth/marker
+    /// attrs), one action, one undo step, one remote envelope.
     [[nodiscard]] Markoff::VNext::ActionPublicationResult applyBlockSplit(
         const Markoff::BlockEdit& prefixEdit, BlockKind newBlockKind,
-        const QByteArray& newBlockPrefix = {});
+        const QByteArray& newBlockPrefix = {},
+        const QList<Markoff::AttrName>& newBlockAttrNames = {},
+        const QList<Markoff::AttrValue>& newBlockAttrValues = {});
     [[nodiscard]] Markoff::VNext::ActionPublicationResult changeBlockKind(
         BlockId block, BlockKind kind,
         const QList<AttrName>& attrNames = {},

@@ -1,6 +1,6 @@
 # Markoff — live status
 
-Updated 2026-10-31. One screen. The current task list is the
+Updated 2026-11-02. One screen. The current task list is the
 [Corbomite open-asks board](plans/2026-10-19-corbomite-open-asks-triage.md).
 The closed CollabText board is
 [`plans/2026-10-12-collabtext-adoption-execution.md`](plans/2026-10-12-collabtext-adoption-execution.md).
@@ -164,11 +164,39 @@ being identical means no adoption work, and the move has not been made.
 
 ## Latest verification
 
+2026-11-02, two editor-behavior fixes, both user-reported. (1) Vertical
+caret motion now keeps a run-scoped **goal column**: the first
+Key_Up/Key_Down of a run fixes the caret's current x for the rest of the
+run, so Down from column 20 across a blank separator paragraph (or a
+short wrapped line) no longer clamps the column to that line's edge —
+the goal re-derives automatically the moment anything else moves the
+caret or an edit lands (self-invalidating stamp: caret position +
+`d2EditSequence()`; no clear-site bookkeeping in other paths). Down past
+the document's last line now clamps to that line's END (Up at the top
+clamps to 0) instead of the caret refusing to move; Shift+Down at the
+bottom therefore selects to the document end exactly once. (2) Enter
+inside a list item or quotation continues the run: `applyBlockSplit` can
+now seed the new block's attrs in the same published action, and
+`StructuralKeyHandler` computes the continuation attrs — indent level,
+marker style, and quote depth/run ride along; ordered items advance the
+number (`1.` split → `2.`); a task item's continuation starts UNCHECKED
+with a fresh `Checked=false` write (the checkbox stays clickable —
+`toggleListItemChecked` refuses items without the attr). One action, one
+undo step, one remote envelope. New tests:
+`downAcrossBlankLineKeepsTheGoalColumn` +
+`upAtDocumentTopClampsToZero` (`tst_canvas_render`),
+`bulletContinuationEnterKeepsIndentLevelAndMarker` +
+`orderedContinuationEnterAdvancesTheMarkerNumber` +
+`taskContinuationEnterStartsUncheckedAndKeepsIndent`
+(`tst_binding_vnext`). Offscreen
+`scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'` passed
+**101/101** (wire `build-dev`).
+
 2026-10-21, collabtext master's merged perf work (76 commits past the
 integration tag), measured against the same Markoff tree in Release with only
 the engine differing: per-keystroke 18.56/30.91/43.29/56.68/71.71/89.11 ms →
-2.96/5.14/8.65/12.31/17.26/23.41 ms at 100…600 actions (3.8–6.3× faster, and
-the history-growth slope ~4× shallower). Markoff's suite is **100/100** against
+2.96/5.14/8.65/12.31/17.26/23.41 ms at 100…600 actions (3.8–6.3× faster, and the
+history-growth slope ~4× shallower). Markoff's suite is **100/100** against
 it, and collabtext's own Debug suite is **104/104**. At the time the engine
 work was **local** (75 commits ahead of `origin/master`) and upstream X05 was
 open, so the pin did not move that day; the tag and the acceptance have since

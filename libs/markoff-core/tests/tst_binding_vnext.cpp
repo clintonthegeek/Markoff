@@ -6,6 +6,7 @@
 #include <QTextCursor>
 
 #include <markoff/core/MarkoffDocument.h>
+#include <markoff/core/AttrNames.h>
 #include <markoff/core/SourceTextDocumentBinding.h>
 #include <markoff/vnext/DocumentStorageProvider.h>
 
@@ -34,6 +35,33 @@ Fixture openDocument(const QByteArray& markdown)
 }
 
 void pumpEvents() { QCoreApplication::processEvents(); }
+
+int intAttr(const QHash<Markoff::AttrName, Markoff::AttrValue>& attrs,
+            const Markoff::AttrName& name)
+{
+    const auto it = attrs.constFind(name);
+    if (it == attrs.cend()) return -1;
+    const auto* value = std::get_if<int>(&it.value());
+    return value ? *value : -1;
+}
+
+QString qstrAttr(const QHash<Markoff::AttrName, Markoff::AttrValue>& attrs,
+                 const Markoff::AttrName& name)
+{
+    const auto it = attrs.constFind(name);
+    if (it == attrs.cend()) return {};
+    const auto* value = std::get_if<QString>(&it.value());
+    return value ? *value : QString();
+}
+
+int boolAttr(const QHash<Markoff::AttrName, Markoff::AttrValue>& attrs,
+             const Markoff::AttrName& name)
+{
+    const auto it = attrs.constFind(name);
+    if (it == attrs.cend()) return -1;
+    const auto* value = std::get_if<bool>(&it.value());
+    return value ? (*value ? 1 : 0) : -1;
+}
 }
 
 class TstBindingVNext final : public QObject {
@@ -364,6 +392,98 @@ private Q_SLOTS:
         QCOMPARE(fixture.document->iterateBlocks().size(), size_t(3));
         QCOMPARE(fixture.document->blockText(fixture.document->iterateBlocks()[2]),
                  QByteArrayLiteral("Brld"));
+    }
+
+    // Enter inside a list item continues the run: the split-off item keeps
+    // the indent level and the marker style, one published action / one
+    // undo step. (Before the continuation attrs, the new item fell back to
+    // the kind defaults — an unindented top-level "-" bullet.)
+    void bulletContinuationEnterKeepsIndentLevelAndMarker()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("- one\n\npara"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding binding;
+        binding.setTextDocument(edit.document());
+        binding.setMarkoffDocument(fixture.document.get());
+
+        const auto before = fixture.document->iterateBlocks();
+        QVERIFY(fixture.document->blockKind(before[0]) == Markoff::BlockKind::ListItem);
+        QCOMPARE(fixture.document->setBlockAttribute(before[0],
+                   Markoff::AttrNames::IndentLevel, 2).state,
+                 Markoff::VNext::ActionPublicationState::committed);
+        pumpEvents();
+
+        QSignalSpy actionSpy(fixture.document.get(),
+            &Markoff::MarkoffDocument::localActionEnvelopeCommitted);
+        QVERIFY(binding.handleStructuralKey(Qt::Key_Return, Qt::NoModifier, 3, 3));
+        pumpEvents();
+
+        const auto after = fixture.document->iterateBlocks();
+        QCOMPARE(after.size(), size_t(3));  // item, continuation, para
+        QCOMPARE(fixture.document->blockText(after[0]), QByteArrayLiteral("one"));
+        QCOMPARE(fixture.document->blockText(after[1]), QByteArray{});
+        QVERIFY(fixture.document->blockKind(after[1]) == Markoff::BlockKind::ListItem);
+        const auto attrs = fixture.document->blockAttrs(after[1]);
+        QCOMPARE(intAttr(attrs, Markoff::AttrNames::IndentLevel), 2);
+        QCOMPARE(qstrAttr(attrs, Markoff::AttrNames::MarkerStyle), QStringLiteral("minus"));
+        // One published action, one undo step.
+        QCOMPARE(actionSpy.size(), 1);
+        fixture.document->undoD2();
+        pumpEvents();
+        QCOMPARE(fixture.document->iterateBlocks().size(), size_t(2));
+        QCOMPARE(intAttr(fixture.document->blockAttrs(before[0]),
+                         Markoff::AttrNames::IndentLevel), 2);
+    }
+
+    void orderedContinuationEnterAdvancesTheMarkerNumber()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("1. one\n\npara"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding binding;
+        binding.setTextDocument(edit.document());
+        binding.setMarkoffDocument(fixture.document.get());
+
+        QVERIFY(binding.handleStructuralKey(Qt::Key_Return, Qt::NoModifier, 3, 3));
+        pumpEvents();
+
+        const auto after = fixture.document->iterateBlocks();
+        QCOMPARE(after.size(), size_t(3));
+        QVERIFY(fixture.document->blockKind(after[1]) == Markoff::BlockKind::ListItem);
+        const auto attrs = fixture.document->blockAttrs(after[1]);
+        QCOMPARE(qstrAttr(attrs, Markoff::AttrNames::MarkerStyle), QStringLiteral("dot"));
+        QCOMPARE(intAttr(attrs, Markoff::AttrNames::MarkerNumber), 2);
+        QCOMPARE(intAttr(attrs, Markoff::AttrNames::IndentLevel), 0);
+    }
+
+    // A task item's continuation starts UNchecked: Checked is never copied,
+    // and the fresh `false` write must exist so the checkbox stays
+    // clickable (toggleListItemChecked refuses items without the attr).
+    void taskContinuationEnterStartsUncheckedAndKeepsIndent()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("- [x] done\n\npara"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding binding;
+        binding.setTextDocument(edit.document());
+        binding.setMarkoffDocument(fixture.document.get());
+
+        const auto before = fixture.document->iterateBlocks();
+        QCOMPARE(boolAttr(fixture.document->blockAttrs(before[0]),
+                          Markoff::AttrNames::Checked), 1);
+        QVERIFY(fixture.document->setBlockAttribute(before[0],
+                   Markoff::AttrNames::IndentLevel, 1).state
+                == Markoff::VNext::ActionPublicationState::committed);
+        pumpEvents();
+
+        QVERIFY(binding.handleStructuralKey(Qt::Key_Return, Qt::NoModifier, 4, 4));
+        pumpEvents();
+
+        const auto after = fixture.document->iterateBlocks();
+        QCOMPARE(after.size(), size_t(3));
+        QCOMPARE(fixture.document->blockText(after[0]), QByteArrayLiteral("done"));
+        const auto attrs = fixture.document->blockAttrs(after[1]);
+        QCOMPARE(qstrAttr(attrs, Markoff::AttrNames::MarkerStyle), QStringLiteral("task"));
+        QCOMPARE(boolAttr(attrs, Markoff::AttrNames::Checked), 0);
+        QCOMPARE(intAttr(attrs, Markoff::AttrNames::IndentLevel), 1);
     }
 };
 

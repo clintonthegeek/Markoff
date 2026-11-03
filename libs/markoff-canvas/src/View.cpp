@@ -4082,24 +4082,71 @@ void View::moveCaretVertically(bool forward)
     const int layoutPos = e.projection.byteToLayoutQChar(m_caret.byteOffset);
     const QTextLine curLine = e.layout->lineForTextPosition(layoutPos);
     const int lineNo = curLine.isValid() ? curLine.lineNumber() : 0;
-    const qreal x = curLine.isValid() ? curLine.cursorToX(layoutPos) : 0;
+
+    // Goal column ("target x"), word-processor standard: keep moving
+    // toward the x the run's first press measured, not wherever a
+    // clamped landing put the caret — Down from column 20 across a blank
+    // separator line must not collapse the column to 0, and past a
+    // short line the original column must come back on the next press.
+    // The goal is self-invalidating by stamp: the stamp records the
+    // caret position + the document edit sequence when the goal was
+    // derived, and every move this function performs re-stamps the
+    // landing position, so a run of Key_Up/Key_Down presses keeps the
+    // goal alive while anything else — a horizontal move (the caret
+    // lands on a different byte), a mouse placement (setCaret), an edit
+    // (edit sequence advance) — leaves the stamp behind and forces a
+    // re-derive on the next vertical move. No clear-site bookkeeping
+    // needed in any of those paths.
+    const quint64 version = m_doc->d2EditSequence();
+    qreal x = 0;
+    if (m_caretGoalX.has_value()
+        && m_caretGoalStamp.block == m_caret.block
+        && m_caretGoalStamp.byteOffset == m_caret.byteOffset
+        && m_caretGoalVersion == version) {
+        x = *m_caretGoalX;
+    } else {
+        x = curLine.isValid() ? curLine.cursorToX(layoutPos) : 0;
+        m_caretGoalX = x;
+    }
+
+    // One landing re-stamp per move below: the next run member sees the
+    // caret it produced and keeps the same x.
+    const auto restamp = [&]() {
+        m_caretGoalStamp = m_caret;
+        m_caretGoalVersion = version;
+    };
 
     const int targetLineNo = lineNo + (forward ? 1 : -1);
     if (targetLineNo >= 0 && targetLineNo < e.layout->lineCount()) {
         const QTextLine targetLine = e.layout->lineAt(targetLineNo);
         const int newQChar = targetLine.xToCursor(x);
         m_caret.byteOffset = e.projection.layoutQCharToByte(newQChar);
+        restamp();
         return;
     }
 
-    // Off the top/bottom of this block's layout: cross into the
-    // previous/next block, landing near the same x on its nearest edge
-    // line. Exact column affinity is not a criterion (plan T2). Folding
-    // (P5.6): the next VISIBLE entry, not a bare idx+-1 — see
-    // moveCaretHorizontally's identical reasoning.
+    // Off the top/bottom of this block's layout. Two cases.
+    //
+    // No visible neighbour: the run has reached a visual document edge.
+    // Qt's own cursor semantics (and every word processor) clamp rather
+    // than hold still there — Down from the document's last line lands
+    // the caret at the end of that line (document end), Up from the
+    // first line at its start — so a run that "walks off" the document
+    // ends cleanly at the edge instead of the caret refusing to move,
+    // and Shift+Down at the bottom selects through to the end of the
+    // document exactly once. A further press in the same direction is a
+    // no-op at the clamped position.
+    //
+    // Otherwise: cross into the previous/next block, landing near the
+    // same x on its nearest edge line. Exact column affinity is not a
+    // criterion (plan T2). Folding (P5.6): the next VISIBLE entry, not a
+    // bare idx+-1 — see moveCaretHorizontally's identical reasoning.
     const int nextIdx = nextVisibleEntryIndex(idx, forward);
-    if (nextIdx < 0)
+    if (nextIdx < 0) {
+        m_caret.byteOffset = forward ? int(m_doc->blockText(m_caret.block).size()) : 0;
+        restamp();
         return;
+    }
 
     const auto &target = m_cache->entries()[size_t(nextIdx)];
     m_caret.block = target.id;
@@ -4111,6 +4158,7 @@ void View::moveCaretVertically(bool forward)
     if (target.style.isTable) {
         if (target.tableCols <= 0 || target.tableCells.empty()) {
             m_caret.byteOffset = 0;
+            restamp();
             return;
         }
         int col = 0;
@@ -4125,16 +4173,19 @@ void View::moveCaretVertically(bool forward)
         const int row = forward ? 0 : rows - 1;
         const auto &cell = target.tableCells[size_t(row) * size_t(target.tableCols) + size_t(col)];
         m_caret.byteOffset = cell.startByte;
+        restamp();
         return;
     }
 
     if (!target.layout || target.layout->lineCount() == 0) {
         m_caret.byteOffset = 0;
+        restamp();
         return;
     }
     const QTextLine edgeLine = target.layout->lineAt(forward ? 0 : target.layout->lineCount() - 1);
     const int newQChar = edgeLine.xToCursor(x);
     m_caret.byteOffset = target.projection.layoutQCharToByte(newQChar);
+    restamp();
 }
 
 void View::moveCaretVerticallyInTable(int idx, bool forward)

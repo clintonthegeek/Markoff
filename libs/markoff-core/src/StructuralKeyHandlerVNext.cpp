@@ -17,7 +17,9 @@ bool accepted(const VNext::ActionPublicationResult& result)
 }
 
 StructuralResult split(MarkoffDocument& doc, BlockId block, BlockKind kind,
-                       uint32_t offset, uint32_t nextOffset = 0)
+                       uint32_t offset, uint32_t nextOffset = 0,
+                       const QList<AttrName>& attrNames = {},
+                       const QList<AttrValue>& attrValues = {})
 {
     const auto blocks = doc.iterateBlocks();
     const auto at = std::find(blocks.begin(), blocks.end(), block);
@@ -32,7 +34,8 @@ StructuralResult split(MarkoffDocument& doc, BlockId block, BlockKind kind,
     if (offset == 0) {
         const BlockId previous = *(at - 1);
         const uint32_t end = static_cast<uint32_t>(doc.blockText(previous).size());
-        const auto result = doc.applyBlockSplit({previous, end, 0, {}}, kind);
+        const auto result = doc.applyBlockSplit({previous, end, 0, {}}, kind, {},
+            attrNames, attrValues);
         if (!accepted(result)) return {};
         const auto after = doc.iterateBlocks();
         const auto previousIt = std::find(after.begin(), after.end(), previous);
@@ -40,7 +43,8 @@ StructuralResult split(MarkoffDocument& doc, BlockId block, BlockKind kind,
         return {true, *(previousIt + 1), nextOffset};
     }
     const auto result = doc.applyBlockSplit({block, offset,
-        static_cast<uint32_t>(text.size()) - offset, {}}, kind);
+        static_cast<uint32_t>(text.size()) - offset, {}}, kind, {},
+        attrNames, attrValues);
     if (!accepted(result)) return {};
     const auto after = doc.iterateBlocks();
     const auto current = std::find(after.begin(), after.end(), block);
@@ -101,10 +105,53 @@ StructuralResult StructuralKeyHandler::handle(MarkoffDocument& doc, BlockId bloc
         if (kind == BlockKind::ListItem || kind == BlockKind::BlockQuote)
             nextKind = kind;
         if (kind == BlockKind::Math && offset != length) return {};
+
+        // Continuation semantics (what typing Enter in a list item or
+        // quotation does in every word processor): the split-off block
+        // stays in its run — same indent level, same marker style, same
+        // quote depth/run — instead of falling back to the kind defaults
+        // (a top-level plain "-" bullet) that a bare split used to give.
+        // Two deliberate exceptions:
+        //   - ordered items advance the number: "1." continues as "2.";
+        //   - Checked is never copied. A task item's continuation starts
+        //     UNCHECKED, and the fresh `false` write must exist so the
+        //     checkbox stays clickable (toggleListItemChecked refuses to
+        //     toggle an item without the attr) — the same invariant the
+        //     parser maintains for every loaded task item.
+        QList<AttrName> continuationNames;
+        QList<AttrValue> continuationValues;
+        if (nextKind == kind) {
+            const auto attrs = doc.blockAttrs(block);
+            QString markerStyle;
+            if (const auto it = attrs.constFind(AttrNames::MarkerStyle);
+                it != attrs.cend())
+                if (const auto* style = std::get_if<QString>(&it.value()))
+                    markerStyle = *style;
+            const bool ordered = markerStyle == QStringLiteral("dot")
+                || markerStyle == QStringLiteral("paren");
+            const bool task = markerStyle == QStringLiteral("task");
+            for (auto it = attrs.constBegin(); it != attrs.constEnd(); ++it) {
+                if (it.key() == AttrNames::Checked) continue;
+                if (it.key() == AttrNames::MarkerNumber && !ordered) continue;
+                if (it.key() == AttrNames::MarkerNumber) {
+                    const auto* number = std::get_if<int>(&it.value());
+                    continuationNames.push_back(it.key());
+                    continuationValues.push_back(number && *number > 0 ? *number + 1 : 1);
+                    continue;
+                }
+                continuationNames.push_back(it.key());
+                continuationValues.push_back(it.value());
+            }
+            if (task) {
+                continuationNames.push_back(AttrNames::Checked);
+                continuationValues.push_back(false);
+            }
+        }
         if (kind == BlockKind::Paragraph || kind == BlockKind::Heading
             || kind == BlockKind::ListItem || kind == BlockKind::BlockQuote
             || kind == BlockKind::Math || kind == BlockKind::HorizontalRule)
-            return split(doc, block, nextKind, offset);
+            return split(doc, block, nextKind, offset, 0,
+                continuationNames, continuationValues);
         return {};
     }
     if (kind == BlockKind::ListItem && key == Qt::Key_Backspace && offset == 0) {

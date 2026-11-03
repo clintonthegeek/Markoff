@@ -12,6 +12,7 @@
 #include <markoff/core/AttrNames.h>
 #include <markoff/core/CodeBlockProcessorRegistry.h>
 #include <markoff/core/EmbedRender.h>
+#include <markoff/core/StructuralKeyHandler.h>
 #include <markoff/embed/EmbedRuntime.h>
 #include <markoff/embed/math/MathBackend.h>
 
@@ -568,6 +569,93 @@ private slots:
                  "the theme switch did not repaint with the new text colour");
         QVERIFY2(countDarkPixels(view.grab().toImage()) < darkBefore,
                  "the old text colour kept painting after the theme switch");
+    }
+
+    // Vertical caret motion, word-processor standard: the goal column set
+    // by the first Down of a run survives crossing a blank separator
+    // paragraph, and Down past the document's last line clamps to the end
+    // of that line (Up at the top clamps to 0) instead of the caret
+    // refusing to move. Identical paragraph text makes the column↔byte
+    // mapping exact without depending on font metrics.
+    void buildParagraphWithBlankAfter(Markoff::MarkoffDocument &doc,
+                                      Markoff::Canvas::View &view,
+                                      Markoff::BlockId *firstOut)
+    {
+        view.setDocument(&doc);
+        const auto first = doc.iterateBlocks().front();
+        // Enter at end → [para, ""], then Enter at the empty's start →
+        // [para, "", ""] — exactly what typing the separator paragraphs
+        // does. The first returned landing block is the final empty.
+        const auto firstEmpty = Markoff::StructuralKeyHandler::handle(
+            doc, first, Qt::Key_Return, int(Qt::NoModifier),
+            uint32_t(doc.blockText(first).size()));
+        const auto secondEmpty = Markoff::StructuralKeyHandler::handle(
+            doc, firstEmpty.caretBlock, Qt::Key_Return, int(Qt::NoModifier), 0);
+        QCOMPARE(doc.iterateBlocks().size(), size_t(3));
+        const auto filled = doc.applyBlockEdit(
+            {firstEmpty.caretBlock, 0, 0, QByteArrayLiteral("one two three")});
+        QCOMPARE(filled.state, Markoff::VNext::ActionPublicationState::committed);
+        QCOMPARE(doc.blockText(secondEmpty.caretBlock), QByteArray{});
+        *firstOut = first;
+    }
+
+    void downAcrossBlankLineKeepsTheGoalColumn()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("one two three"));
+        Markoff::Canvas::View view;
+        view.resize(520, 300);
+        Markoff::BlockId first;
+        buildParagraphWithBlankAfter(*fixture.document, view, &first);
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto after = fixture.document->iterateBlocks();
+        QCOMPARE(after.size(), size_t(3));
+        QCOMPARE(fixture.document->blockText(after[1]), QByteArray{});
+        QCOMPARE(fixture.document->blockText(after[2]),
+                 QByteArrayLiteral("one two three"));
+
+        // Column 4 of paragraph one, then two Downs across the blank line.
+        view.setCaretPosition(first, 4);
+        QTest::keyClick(view.viewport(), Qt::Key_Down);
+        QCOMPARE(view.caretByteOffset(), 0);   // the blank line
+        QTest::keyClick(view.viewport(), Qt::Key_Down);
+        QCOMPARE(view.caretBlock(), after[2]);
+        QCOMPARE(view.caretByteOffset(), 4);   // the bug was a landing at 0
+
+        // Down again: the trailing region is the document bottom, so the
+        // caret clamps to the end of the last line once.
+        QTest::keyClick(view.viewport(), Qt::Key_Down);
+        QCOMPARE(view.caretByteOffset(), 13);
+        QTest::keyClick(view.viewport(), Qt::Key_Down);
+        QCOMPARE(view.caretByteOffset(), 13);
+
+        // A horizontal move re-derives the goal: Down must come from the
+        // caret's real column again, not the stale one.
+        QTest::keyClick(view.viewport(), Qt::Key_Left);
+        QCOMPARE(view.caretByteOffset(), 12);
+
+        // Shift+Down extends to the same clamp with the anchor holding.
+        view.setCaretPosition(after[2], 4);
+        QTest::keyClick(view.viewport(), Qt::Key_Down, Qt::ShiftModifier);
+        QCOMPARE(view.caretByteOffset(), 13);
+    }
+
+    void upAtDocumentTopClampsToZero()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("one two three"));
+        Markoff::Canvas::View view;
+        view.resize(520, 300);
+        view.setDocument(fixture.document.get());
+        view.show();
+        QCoreApplication::processEvents();
+
+        const auto block = fixture.document->iterateBlocks().front();
+        view.setCaretPosition(block, 4);
+        QTest::keyClick(view.viewport(), Qt::Key_Up);
+        QCOMPARE(view.caretByteOffset(), 0);   // bug: stayed at 4
+        QTest::keyClick(view.viewport(), Qt::Key_Up);
+        QCOMPARE(view.caretByteOffset(), 0);
     }
 };
 

@@ -3173,7 +3173,9 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockMerge(
 
 VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
     const BlockEdit& prefixEdit, BlockKind newBlockKind,
-    const QByteArray& newBlockPrefix)
+    const QByteArray& newBlockPrefix,
+    const QList<AttrName>& newBlockAttrNames,
+    const QList<AttrValue>& newBlockAttrValues)
 {
     using namespace VNext;
     if (!d->lifecycle->canStartOrdinaryAction())
@@ -3193,6 +3195,18 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
         return {ActionPublicationState::rejected, std::nullopt,
             CollabText::Error(CollabText::ErrorCode::malformed,
                 "split must remove a suffix without inserting replacement text")};
+    if (newBlockAttrNames.size() != newBlockAttrValues.size())
+        return {ActionPublicationState::rejected, std::nullopt,
+            CollabText::Error(CollabText::ErrorCode::malformed,
+                "split attribute names and values differ in length")};
+    {
+        std::set<QByteArray> uniqueNames;
+        for (const auto& name : newBlockAttrNames)
+            if (!uniqueNames.insert(name).second)
+                return {ActionPublicationState::rejected, std::nullopt,
+                    CollabText::Error(CollabText::ErrorCode::malformed,
+                        "split attributes contain a duplicate name")};
+    }
     const QByteArray suffix = original.mid(prefixEdit.withinBlockByteOffset);
     const auto oldIdentity = toVNextIdentity(prefixEdit.blockId);
     if (!oldIdentity)
@@ -3254,6 +3268,27 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
     auto kindAssociation = toHistoryAssociation(kindOperation.value());
     if (!kindAssociation.ok()) return rollback(kindAssociation.error());
     event.groups.push_back(std::move(kindAssociation).value());
+
+    // The structural continuation attrs for the new block, if any —
+    // staged in the same action as the split itself so undo/redo and a
+    // remote peer see one indivisible edit.
+    if (!newBlockAttrNames.isEmpty()) {
+        auto attrsMapResult = d->lifecycle->stagingMapStream(
+            MapScope{document, "block-attrs", scope.epoch});
+        if (!attrsMapResult.ok()) return rollback(attrsMapResult.error());
+        for (int i = 0; i < newBlockAttrNames.size(); ++i) {
+            auto encoded = MarkoffMapValueCodec::encodeAttribute(newBlockAttrValues[i]);
+            if (!encoded.ok()) return rollback(encoded.error());
+            auto attrOperation = attrsMapResult.value()->set(
+                newBlockAttrNames[i], encoded.value(), newIdentity);
+            if (!attrOperation.ok()) return rollback(attrOperation.error());
+            auto attrAdded = stager.add(attrOperation.value());
+            if (!attrAdded.ok()) return rollback(attrAdded.error());
+            auto attrAssociation = toHistoryAssociation(attrOperation.value());
+            if (!attrAssociation.ok()) return rollback(attrAssociation.error());
+            event.groups.push_back(std::move(attrAssociation).value());
+        }
+    }
 
     auto oldTextStream = d->lifecycle->stagingTextStream(*oldIdentity);
     if (!oldTextStream.ok()) return rollback(oldTextStream.error());
