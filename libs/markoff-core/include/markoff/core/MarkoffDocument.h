@@ -62,6 +62,14 @@ struct RemoteActionRouteResult {
     std::vector<QByteArray> quarantined;
 };
 
+/// One block-attrs write against an already-existing block, published as
+/// part of the caller's action (see `MarkoffDocument::applyBlockSplit`).
+struct BlockAttrUpdate {
+    BlockId block;
+    AttrName name;
+    AttrValue value;
+};
+
 class Document;       // markoff-parser
 class Session;        // forward; defined in Session.h after this task
 
@@ -177,11 +185,16 @@ public:
     /// structural continuation case (a list/quotation split exits its
     /// marker and kind behind but must also carry indent/depth/marker
     /// attrs), one action, one undo step, one remote envelope.
+    /// `siblingAttrUpdates` optionally rewrites block-attrs entries of
+    /// already-existing blocks in that same action — the ordered-list
+    /// continuation case, where the items after the split point shift
+    /// their marker numbers so the run stays sequential.
     [[nodiscard]] Markoff::VNext::ActionPublicationResult applyBlockSplit(
         const Markoff::BlockEdit& prefixEdit, BlockKind newBlockKind,
         const QByteArray& newBlockPrefix = {},
         const QList<Markoff::AttrName>& newBlockAttrNames = {},
-        const QList<Markoff::AttrValue>& newBlockAttrValues = {});
+        const QList<Markoff::AttrValue>& newBlockAttrValues = {},
+        const QList<Markoff::BlockAttrUpdate>& siblingAttrUpdates = {});
     [[nodiscard]] Markoff::VNext::ActionPublicationResult changeBlockKind(
         BlockId block, BlockKind kind,
         const QList<AttrName>& attrNames = {},

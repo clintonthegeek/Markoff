@@ -3175,7 +3175,8 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
     const BlockEdit& prefixEdit, BlockKind newBlockKind,
     const QByteArray& newBlockPrefix,
     const QList<AttrName>& newBlockAttrNames,
-    const QList<AttrValue>& newBlockAttrValues)
+    const QList<AttrValue>& newBlockAttrValues,
+    const QList<BlockAttrUpdate>& siblingAttrUpdates)
 {
     using namespace VNext;
     if (!d->lifecycle->canStartOrdinaryAction())
@@ -3206,6 +3207,14 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
                 return {ActionPublicationState::rejected, std::nullopt,
                     CollabText::Error(CollabText::ErrorCode::malformed,
                         "split attributes contain a duplicate name")};
+    }
+    const auto visibleBlocks = iterateBlocks();
+    for (const auto& update : siblingAttrUpdates) {
+        if (std::find(visibleBlocks.begin(), visibleBlocks.end(), update.block)
+                == visibleBlocks.end())
+            return {ActionPublicationState::rejected, std::nullopt,
+                CollabText::Error(CollabText::ErrorCode::not_found,
+                    "split sibling attribute target is not visible")};
     }
     const QByteArray suffix = original.mid(prefixEdit.withinBlockByteOffset);
     const auto oldIdentity = toVNextIdentity(prefixEdit.blockId);
@@ -3290,6 +3299,31 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
         }
     }
 
+    // Attr rewrites against already-existing blocks (the ordered-list
+    // marker-number shift across the run after the split point), same
+    // action / undo step / envelope as everything else above.
+    if (!siblingAttrUpdates.isEmpty()) {
+        auto attrsMapResult = d->lifecycle->stagingMapStream(
+            MapScope{document, "block-attrs", scope.epoch});
+        if (!attrsMapResult.ok()) return rollback(attrsMapResult.error());
+        for (const auto& update : siblingAttrUpdates) {
+            const auto siblingIdentity = toVNextIdentity(update.block);
+            if (!siblingIdentity)
+                return rollback(CollabText::Error(CollabText::ErrorCode::invalid_identity,
+                    "split sibling attribute target has no structural identity"));
+            auto encoded = MarkoffMapValueCodec::encodeAttribute(update.value);
+            if (!encoded.ok()) return rollback(encoded.error());
+            auto attrOperation = attrsMapResult.value()->set(
+                update.name, encoded.value(), *siblingIdentity);
+            if (!attrOperation.ok()) return rollback(attrOperation.error());
+            auto attrAdded = stager.add(attrOperation.value());
+            if (!attrAdded.ok()) return rollback(attrAdded.error());
+            auto attrAssociation = toHistoryAssociation(attrOperation.value());
+            if (!attrAssociation.ok()) return rollback(attrAssociation.error());
+            event.groups.push_back(std::move(attrAssociation).value());
+        }
+    }
+
     auto oldTextStream = d->lifecycle->stagingTextStream(*oldIdentity);
     if (!oldTextStream.ok()) return rollback(oldTextStream.error());
     auto oldTextOperation = oldTextStream.value()->replaceUtf8(
@@ -3338,6 +3372,8 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
         else found->snapshot = item.snapshot;
     }
     for (const auto block : touched) emit tentativeBlockChanged(block);
+    for (const auto& update : siblingAttrUpdates)
+        emit tentativeBlockChanged(update.block);
     const auto publication = d->lifecycle->publishStagedAction(stager, owner.value());
     if (publication.state == ActionPublicationState::committed
         || publication.state == ActionPublicationState::committedHistoryPending) {
@@ -3349,6 +3385,13 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
             emit tentativeBlockCommitted(block);
             emit blocksChanged({block});
         }
+        for (const auto& update : siblingAttrUpdates) {
+            // Same version contract as setBlockAttribute: the block's
+            // visible state (its rendered marker) changed.
+            ++d->blockEditSequences[update.block];
+            emit tentativeBlockCommitted(update.block);
+            emit blocksChanged({update.block});
+        }
         const auto blocksAfter = iterateBlocks();
         const auto row = std::find(blocksAfter.begin(), blocksAfter.end(), *newBlock);
         if (row != blocksAfter.end())
@@ -3358,6 +3401,8 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
     } else if (publication.state == ActionPublicationState::absent
                || publication.state == ActionPublicationState::rejected) {
         for (const auto block : touched) emit tentativeBlockReverted(block);
+        for (const auto& update : siblingAttrUpdates)
+            emit tentativeBlockReverted(update.block);
     }
     return publication;
 }

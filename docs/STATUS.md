@@ -1,6 +1,6 @@
 # Markoff — live status
 
-Updated 2026-11-02. One screen. The current task list is the
+Updated 2026-11-03. One screen. The current task list is the
 [Corbomite open-asks board](plans/2026-10-19-corbomite-open-asks-triage.md).
 The closed CollabText board is
 [`plans/2026-10-12-collabtext-adoption-execution.md`](plans/2026-10-12-collabtext-adoption-execution.md).
@@ -163,6 +163,28 @@ needs a rebuild and Markoff's own acceptance record on the new tag; the API
 being identical means no adoption work, and the move has not been made.
 
 ## Latest verification
+
+2026-11-03, follow-up on the caret/list work's noted gap: an ordered-list
+Enter now keeps the RUN sequential, not just the split pair. The same-run
+walk assigns marker numbers downstream of the split point — "1./2./3."
+split inside "two" gives 1/2/2→NEW/3→"three"; every number shift is
+staged as `BlockAttrUpdate`s through `applyBlockSplit`'s new
+sibling-attr parameter, in the SAME action/undo step/remote envelope as
+the split itself (per-block edit sequences and `blocksChanged` for every
+shifted block, so canvas caches re-key correctly). Enter at position 0
+moves the walk start to the split block itself, and the empty
+continuation above it takes the adjacent previous item's next number
+(previously it always took src+1, skipping past the previous item).
+Walk rules: depth-skips nested lists' own runs; stops on a shallower
+item, a non-list block, or a different marker style; no write when a
+stored number already matches. Known remaining edge (pre-existing, NOT
+new): Enter at position 0 of the document's FIRST list item goes through
+`applyStructural`'s InsertEntry, which has no attr seeding — that empty
+item renders with the default "-" marker. New tests:
+`orderedContinuationEnterRenumbersTheFollowingRun` +
+`orderedEnterAtStartShiftsTheSplitBlockItself` (`tst_binding_vnext`).
+Offscreen `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'`
+passed **101/101** (wire `build-dev`).
 
 2026-11-02, two editor-behavior fixes, both user-reported. (1) Vertical
 caret motion now keeps a run-scoped **goal column**: the first

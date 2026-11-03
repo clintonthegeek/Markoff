@@ -455,6 +455,84 @@ private Q_SLOTS:
         QCOMPARE(intAttr(attrs, Markoff::AttrNames::IndentLevel), 0);
     }
 
+    // Splitting inside an ordered run must keep the run sequential: the
+    // continuation takes the next number and every same-run item after the
+    // split point shifts, in the same published action and undo step. (The
+    // numbers are the parsed list's per-item attrs; without the shift the
+    // continuation duplicates "three"'s number on save.)
+    void orderedContinuationEnterRenumbersTheFollowingRun()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("1. one\n\n2. two\n\n3. three"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding binding;
+        binding.setTextDocument(edit.document());
+        binding.setMarkoffDocument(fixture.document.get());
+
+        const auto before = fixture.document->iterateBlocks();
+        QCOMPARE(intAttr(fixture.document->blockAttrs(before[1]),
+                         Markoff::AttrNames::MarkerNumber), 2);
+        QCOMPARE(intAttr(fixture.document->blockAttrs(before[2]),
+                         Markoff::AttrNames::MarkerNumber), 3);
+
+        QSignalSpy actionSpy(fixture.document.get(),
+            &Markoff::MarkoffDocument::localActionEnvelopeCommitted);
+        // sep view is "one\ntwo\nthree": position 7 = end of "two".
+        QVERIFY(binding.handleStructuralKey(Qt::Key_Return, Qt::NoModifier, 7, 7));
+        pumpEvents();
+
+        const auto after = fixture.document->iterateBlocks();
+        QCOMPARE(after.size(), size_t(4));
+        QCOMPARE(fixture.document->blockText(after[1]), QByteArrayLiteral("two"));
+        QCOMPARE(intAttr(fixture.document->blockAttrs(after[1]),
+                         Markoff::AttrNames::MarkerNumber), 2);
+        QCOMPARE(intAttr(fixture.document->blockAttrs(after[2]),
+                         Markoff::AttrNames::MarkerNumber), 3);  // the continuation
+        QCOMPARE(intAttr(fixture.document->blockAttrs(after[3]),
+                         Markoff::AttrNames::MarkerNumber), 4);  // "three" shifted
+        // One published action covers the split, the continuation attrs and
+        // the shift, so undo gets all of it back in one step.
+        QCOMPARE(actionSpy.size(), 1);
+        fixture.document->undoD2();
+        pumpEvents();
+        QCOMPARE(fixture.document->iterateBlocks().size(), size_t(3));
+        QCOMPARE(intAttr(fixture.document->blockAttrs(before[2]),
+                         Markoff::AttrNames::MarkerNumber), 3);
+    }
+
+    // Enter at position 0 inserts the empty continuation BETWEEN the
+    // previous item and this one: it takes the previous item's next number
+    // and the split block itself shifts with the run.
+    void orderedEnterAtStartShiftsTheSplitBlockItself()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("1. one\n\n2. two\n\n3. three"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding binding;
+        binding.setTextDocument(edit.document());
+        binding.setMarkoffDocument(fixture.document.get());
+
+        // sep view "one\ntwo\nthree": position 4 = start of "two", so the
+        // empty continuation lands between the previous item and "two".
+        QVERIFY(binding.handleStructuralKey(Qt::Key_Return, Qt::NoModifier, 4, 4));
+        pumpEvents();
+
+        const auto after = fixture.document->iterateBlocks();
+        QCOMPARE(after.size(), size_t(4));
+        QCOMPARE(fixture.document->blockText(after[1]), QByteArray{});
+        QCOMPARE(intAttr(fixture.document->blockAttrs(after[1]),
+                         Markoff::AttrNames::MarkerNumber), 2);  // the continuation
+        QCOMPARE(intAttr(fixture.document->blockAttrs(after[1]),
+                         Markoff::AttrNames::IndentLevel), 0);
+        QCOMPARE(fixture.document->blockText(after[2]), QByteArrayLiteral("two"));
+        QCOMPARE(intAttr(fixture.document->blockAttrs(after[2]),
+                         Markoff::AttrNames::MarkerNumber), 3);  // "two" shifted
+        QCOMPARE(fixture.document->blockText(after[3]), QByteArrayLiteral("three"));
+        QCOMPARE(intAttr(fixture.document->blockAttrs(after[3]),
+                         Markoff::AttrNames::MarkerNumber), 4);  // run stays sequential
+        QCOMPARE(fixture.document->blockText(after[0]), QByteArrayLiteral("one"));
+        QCOMPARE(intAttr(fixture.document->blockAttrs(after[0]),
+                         Markoff::AttrNames::MarkerNumber), 1);  // "one" untouched
+    }
+
     // A task item's continuation starts UNchecked: Checked is never copied,
     // and the fresh `false` write must exist so the checkbox stays
     // clickable (toggleListItemChecked refuses items without the attr).

@@ -19,7 +19,8 @@ bool accepted(const VNext::ActionPublicationResult& result)
 StructuralResult split(MarkoffDocument& doc, BlockId block, BlockKind kind,
                        uint32_t offset, uint32_t nextOffset = 0,
                        const QList<AttrName>& attrNames = {},
-                       const QList<AttrValue>& attrValues = {})
+                       const QList<AttrValue>& attrValues = {},
+                       const QList<BlockAttrUpdate>& siblingUpdates = {})
 {
     const auto blocks = doc.iterateBlocks();
     const auto at = std::find(blocks.begin(), blocks.end(), block);
@@ -35,7 +36,7 @@ StructuralResult split(MarkoffDocument& doc, BlockId block, BlockKind kind,
         const BlockId previous = *(at - 1);
         const uint32_t end = static_cast<uint32_t>(doc.blockText(previous).size());
         const auto result = doc.applyBlockSplit({previous, end, 0, {}}, kind, {},
-            attrNames, attrValues);
+            attrNames, attrValues, siblingUpdates);
         if (!accepted(result)) return {};
         const auto after = doc.iterateBlocks();
         const auto previousIt = std::find(after.begin(), after.end(), previous);
@@ -44,7 +45,7 @@ StructuralResult split(MarkoffDocument& doc, BlockId block, BlockKind kind,
     }
     const auto result = doc.applyBlockSplit({block, offset,
         static_cast<uint32_t>(text.size()) - offset, {}}, kind, {},
-        attrNames, attrValues);
+        attrNames, attrValues, siblingUpdates);
     if (!accepted(result)) return {};
     const auto after = doc.iterateBlocks();
     const auto current = std::find(after.begin(), after.end(), block);
@@ -111,8 +112,13 @@ StructuralResult StructuralKeyHandler::handle(MarkoffDocument& doc, BlockId bloc
         // stays in its run — same indent level, same marker style, same
         // quote depth/run — instead of falling back to the kind defaults
         // (a top-level plain "-" bullet) that a bare split used to give.
-        // Two deliberate exceptions:
-        //   - ordered items advance the number: "1." continues as "2.";
+        // Deliberate exceptions:
+        //   - ordered items keep the run sequential: the continuation
+        //     takes the next number and every same-run item after the
+        //     split point shifts in the same action; an Enter at position
+        //     0 inserts an empty item ABOVE whose number continues from
+        //     the adjacent previous item (or the run's start number), so
+        //     the split block itself shifts too;
         //   - Checked is never copied. A task item's continuation starts
         //     UNCHECKED, and the fresh `false` write must exist so the
         //     checkbox stays clickable (toggleListItemChecked refuses to
@@ -120,23 +126,89 @@ StructuralResult StructuralKeyHandler::handle(MarkoffDocument& doc, BlockId bloc
         //     parser maintains for every loaded task item.
         QList<AttrName> continuationNames;
         QList<AttrValue> continuationValues;
+        QList<BlockAttrUpdate> siblingUpdates;
         if (nextKind == kind) {
             const auto attrs = doc.blockAttrs(block);
             QString markerStyle;
+            int srcIndent = 0;
+            int srcNumber = 0;
             if (const auto it = attrs.constFind(AttrNames::MarkerStyle);
                 it != attrs.cend())
                 if (const auto* style = std::get_if<QString>(&it.value()))
                     markerStyle = *style;
-            const bool ordered = markerStyle == QStringLiteral("dot")
-                || markerStyle == QStringLiteral("paren");
+            if (const auto it = attrs.constFind(AttrNames::IndentLevel);
+                it != attrs.cend())
+                if (const auto* value = std::get_if<int>(&it.value()))
+                    srcIndent = *value;
+            if (const auto it = attrs.constFind(AttrNames::MarkerNumber);
+                it != attrs.cend())
+                if (const auto* value = std::get_if<int>(&it.value()))
+                    srcNumber = *value;
+            const auto numberIn = [](const QHash<AttrName, AttrValue>& candidate,
+                                     int fallback = 0) {
+                const auto it = candidate.constFind(AttrNames::MarkerNumber);
+                if (it == candidate.cend()) return fallback;
+                const auto* value = std::get_if<int>(&it.value());
+                return value ? *value : fallback;
+            };
+            const auto indentIn = [&numberIn](const QHash<AttrName, AttrValue>& candidate) {
+                const auto it = candidate.constFind(AttrNames::IndentLevel);
+                if (it == candidate.cend()) return 0;
+                const auto* value = std::get_if<int>(&it.value());
+                return value ? *value : 0;
+            };
+            const auto orderedStyle = [](const QString& style) {
+                return style == QStringLiteral("dot") || style == QStringLiteral("paren");
+            };
+            const bool isOrdered = orderedStyle(markerStyle);
             const bool task = markerStyle == QStringLiteral("task");
+
+            // Ordered run: the continuation's own number, and where the
+            // downstream renumber walk starts. The walk only runs for a
+            // real run (a stored positive number); unseen numbers stay
+            // untouched, mirroring today's semantic for marker-less
+            // continuations.
+            int continuationNumber = 0;
+            int downstreamStartNumber = 0;
+            qsizetype downstreamFrom = -1;
+            const auto blocks = doc.iterateBlocks();
+            const auto srcIt = std::find(blocks.begin(), blocks.end(), block);
+            const qsizetype srcIndex =
+                srcIt == blocks.end() ? -1 : std::distance(blocks.begin(), srcIt);
+            if (isOrdered && srcNumber > 0 && srcIndex >= 0) {
+                continuationNumber = srcNumber + 1;
+                if (offset > 0) {
+                    // Continuation lands after this block; the number walk
+                    // starts one past the continuation's own number.
+                    downstreamFrom = srcIndex + 1;
+                    downstreamStartNumber = continuationNumber + 1;
+                } else if (srcIndex > 0) {
+                    // Enter at position 0 inserts the empty continuation
+                    // BETWEEN the previous block and this one. Adjacent
+                    // same-run previous: the continuation continues it and
+                    // this block leads the downstream walk; otherwise the
+                    // continuation takes this block's number as the run's
+                    // start and this block still shifts.
+                    const auto previous = doc.blockAttrs(blocks[size_t(srcIndex) - 1]);
+                    const int previousNumber = numberIn(previous, 0);
+                    if (doc.blockKind(blocks[size_t(srcIndex) - 1])
+                            == BlockKind::ListItem
+                        && indentIn(previous) == srcIndent
+                        && previousNumber > 0) {
+                        continuationNumber = previousNumber + 1;
+                    }
+                    downstreamFrom = srcIndex;
+                    downstreamStartNumber = continuationNumber + 1;
+                }
+            }
+
             for (auto it = attrs.constBegin(); it != attrs.constEnd(); ++it) {
                 if (it.key() == AttrNames::Checked) continue;
-                if (it.key() == AttrNames::MarkerNumber && !ordered) continue;
+                if (it.key() == AttrNames::MarkerNumber && !isOrdered) continue;
                 if (it.key() == AttrNames::MarkerNumber) {
-                    const auto* number = std::get_if<int>(&it.value());
                     continuationNames.push_back(it.key());
-                    continuationValues.push_back(number && *number > 0 ? *number + 1 : 1);
+                    continuationValues.push_back(continuationNumber > 0
+                        ? continuationNumber : 1);
                     continue;
                 }
                 continuationNames.push_back(it.key());
@@ -146,12 +218,38 @@ StructuralResult StructuralKeyHandler::handle(MarkoffDocument& doc, BlockId bloc
                 continuationNames.push_back(AttrNames::Checked);
                 continuationValues.push_back(false);
             }
+            if (downstreamFrom >= 0 && downstreamStartNumber > 0) {
+                // Same-run walk: contiguous list items at this indent and
+                // marker style renumber sequentially; deeper indents (a
+                // nested list's own run) are skipped over without a write;
+                // a shallower item, a non-list block, or a different marker
+                // style ends the run. Items whose stored number already
+                // matches get no write at all.
+                int nextNumber = downstreamStartNumber;
+                for (qsizetype i = downstreamFrom; i < blocks.size(); ++i) {
+                    if (doc.blockKind(blocks[i]) != BlockKind::ListItem) break;
+                    const auto sibling = doc.blockAttrs(blocks[i]);
+                    const int indent = indentIn(sibling);
+                    if (indent > srcIndent) continue;  // nested list's own run
+                    if (indent != srcIndent) break;
+                    QString siblingStyle;
+                    if (const auto it = sibling.constFind(AttrNames::MarkerStyle);
+                        it != sibling.cend())
+                        if (const auto* style = std::get_if<QString>(&it.value()))
+                            siblingStyle = *style;
+                    if (siblingStyle != markerStyle) break;
+                    if (numberIn(sibling, 0) != nextNumber)
+                        siblingUpdates.push_back(
+                            {blocks[i], AttrNames::MarkerNumber, nextNumber});
+                    ++nextNumber;
+                }
+            }
         }
         if (kind == BlockKind::Paragraph || kind == BlockKind::Heading
             || kind == BlockKind::ListItem || kind == BlockKind::BlockQuote
             || kind == BlockKind::Math || kind == BlockKind::HorizontalRule)
             return split(doc, block, nextKind, offset, 0,
-                continuationNames, continuationValues);
+                continuationNames, continuationValues, siblingUpdates);
         return {};
     }
     if (kind == BlockKind::ListItem && key == Qt::Key_Backspace && offset == 0) {
