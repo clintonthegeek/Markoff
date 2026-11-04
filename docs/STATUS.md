@@ -1,6 +1,6 @@
 # Markoff — live status
 
-Updated 2026-11-03. One screen. The current task list is the
+Updated 2026-11-04. One screen. The current task list is the
 [Corbomite open-asks board](plans/2026-10-19-corbomite-open-asks-triage.md).
 The closed CollabText board is
 [`plans/2026-10-12-collabtext-adoption-execution.md`](plans/2026-10-12-collabtext-adoption-execution.md).
@@ -163,6 +163,29 @@ needs a rebuild and Markoff's own acceptance record on the new tag; the API
 being identical means no adoption work, and the move has not been made.
 
 ## Latest verification
+
+2026-11-04, the remaining doc-start edge from the 11-03 entry is closed.
+Enter at position 0 of the document's FIRST list item no longer falls
+back to `applyStructural`'s bare `InsertEntry` (idList + maps, no text ops
+— no compensator shape, and no attr seeding: the empty item rendered with
+the default `-` marker). The split now **flips**: the first block sheds
+its whole text into a new block after it — the retained (now empty) first
+block keeps the run's start attrs, the new block carries the content with
+the continuation attrs (indent, style, `srcNumber+1`), and any later
+same-run items shift through the sibling-attr walk exactly like the
+mid-list case. The whole-text split produces text ops inside the action,
+so undo/redo dispatch on the normal mixed shape and revert in one step;
+a bare structural insert would have undone as a no-op (verified with a
+dispatch probe before choosing the flip). Identity note: the first
+item's BlockId now lands on the emptied retained block and the content
+block gets a fresh id — visible output is identical, remote presence
+anchors INTO the first item are the only thing that could observe it.
+`StructuralOp::InsertEntry` stays untouched (the scratch attr-seeding
+extension was reverted; no API change). New test:
+`orderedEnterAtDocumentStartShiftsTheFirstItem` (`tst_binding_vnext`,
+19/19 named tests in that target). Offscreen
+`scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'` passed
+**101/101** (wire `build-dev`).
 
 2026-11-03, follow-up on the caret/list work's noted gap: an ordered-list
 Enter now keeps the RUN sequential, not just the split pair. The same-run

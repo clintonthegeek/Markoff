@@ -27,10 +27,22 @@ StructuralResult split(MarkoffDocument& doc, BlockId block, BlockKind kind,
     if (at == blocks.end()) return {};
     const auto text = doc.blockText(block);
     if (offset == 0 && at == blocks.begin()) {
-        const auto result = doc.applyStructural(
-            StructuralOp{StructuralOp::InsertEntry{BlockId{}, kind}});
+        // Document-start continuation, no previous block to split. Flip
+        // the split instead: this block sheds its WHOLE text into a new
+        // block after it, keeping the run's start attrs on the retained
+        // (now empty) first block, while the continuation attrs flow to
+        // the new block exactly like the offset>0 case. The flip matters
+        // because a whole-text split produces text operations inside the
+        // action, so undoD2's compensation dispatches on the same
+        // mixed-list/map/text shape every other split polarises through;
+        // a bare applyStructural insert (idList + maps, no text) has no
+        // compensator and would undo as a no-op.
+        const auto result = doc.applyBlockSplit({block, 0,
+            static_cast<uint32_t>(text.size()), {}}, kind, {},
+            attrNames, attrValues, siblingUpdates);
         if (!accepted(result)) return {};
-        return {true, doc.iterateBlocks().front(), nextOffset};
+        // The caret lands at the start of the emptied retained block.
+        return {true, block, 0};
     }
     if (offset == 0) {
         const BlockId previous = *(at - 1);

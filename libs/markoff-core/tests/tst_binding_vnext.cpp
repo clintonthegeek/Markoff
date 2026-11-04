@@ -533,6 +533,50 @@ private Q_SLOTS:
                          Markoff::AttrNames::MarkerNumber), 1);  // "one" untouched
     }
 
+    // Enter at position 0 of the FIRST list item: no previous block to
+    // split, so the split flips — the first block sheds its whole text
+    // into a new block (which carries the continuation attrs), and the
+    // retained empty block keeps the run's start attrs. Text ops inside
+    // the action make it undoable in the normal mixed-shape step.
+    void orderedEnterAtDocumentStartShiftsTheFirstItem()
+    {
+        auto fixture = openDocument(QByteArrayLiteral("1. one"));
+        QPlainTextEdit edit;
+        Markoff::SourceTextDocumentBinding binding;
+        binding.setTextDocument(edit.document());
+        binding.setMarkoffDocument(fixture.document.get());
+
+        QVERIFY(binding.handleStructuralKey(Qt::Key_Return, Qt::NoModifier, 0, 0));
+        pumpEvents();
+
+        const auto after = fixture.document->iterateBlocks();
+        QCOMPARE(after.size(), size_t(2));
+        QCOMPARE(fixture.document->blockText(after[0]), QByteArray{});
+        QVERIFY(fixture.document->blockKind(after[0]) == Markoff::BlockKind::ListItem);
+        const auto retained = fixture.document->blockAttrs(after[0]);
+        QCOMPARE(qstrAttr(retained, Markoff::AttrNames::MarkerStyle),
+                 QStringLiteral("dot"));
+        QCOMPARE(intAttr(retained, Markoff::AttrNames::MarkerNumber), 1);
+        QCOMPARE(fixture.document->blockText(after[1]), QByteArrayLiteral("one"));
+        QVERIFY(fixture.document->blockKind(after[1]) == Markoff::BlockKind::ListItem);
+        const auto shifted = fixture.document->blockAttrs(after[1]);
+        QCOMPARE(qstrAttr(shifted, Markoff::AttrNames::MarkerStyle),
+                 QStringLiteral("dot"));
+        QCOMPARE(intAttr(shifted, Markoff::AttrNames::MarkerNumber), 2);
+        QCOMPARE(intAttr(shifted, Markoff::AttrNames::IndentLevel), 0);
+        // One action, one undo step: the flip, the copied attrs and the
+        // (empty) marker walk all revert together.
+        fixture.document->undoD2();
+        pumpEvents();
+        QCOMPARE(fixture.document->iterateBlocks().size(), size_t(1));
+        QCOMPARE(fixture.document->blockText(
+                     fixture.document->iterateBlocks().front()),
+                 QByteArrayLiteral("one"));
+        QCOMPARE(intAttr(fixture.document->blockAttrs(
+                             fixture.document->iterateBlocks().front()),
+                         Markoff::AttrNames::MarkerNumber), 1);
+    }
+
     // A task item's continuation starts UNchecked: Checked is never copied,
     // and the fresh `false` write must exist so the checkbox stays
     // clickable (toggleListItemChecked refuses items without the attr).
