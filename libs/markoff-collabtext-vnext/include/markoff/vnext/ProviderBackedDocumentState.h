@@ -50,6 +50,13 @@ public:
     [[nodiscard]] const AcceptedPrefixProjection& projection() const noexcept
     { return *m_projection; }
 
+    /// Monotonic counter bumped whenever the visible block set may change:
+    /// any committed action carrying an idList operation, every remote
+    /// acceptance, and every recovery rebuild. Pure text/map actions leave it
+    /// alone. Consumers may cache the visible block set keyed on this value.
+    [[nodiscard]] uint64_t visibilityGeneration() const noexcept
+    { return m_visibilityGeneration; }
+
     /// Next delivery sequence for a locally staged MAB:
     /// max(accepted MAB/3 deliverySequence) + 1 over the accepted prefix.
     /// Cached against the accepted-record count — a local commit advances the
@@ -105,7 +112,8 @@ private:
     [[nodiscard]] ActionPublicationResult publishAction(
         const PreparedStorageTransaction& transaction,
         const OwnerHistorySnapshot* stagedOwnerHistory,
-        const uint64_t* stagedDeliverySequence = nullptr);
+        const uint64_t* stagedDeliverySequence = nullptr,
+        bool stagedTouchesIdList = false);
 
     /// Delivery sequence of a fast-path local commit: trusted only when the
     /// exact-prefix fast path verified that the committed record is the sole
@@ -129,6 +137,7 @@ private:
     std::thread::id m_ownerThread;
     bool m_callActive = false;
     std::optional<DeliverySequenceCache> m_deliverySequenceCache;
+    uint64_t m_visibilityGeneration = 0;
     LocalActionCommittedFn m_onLocalActionCommitted;
     StateChangedFn m_onStateChanged;
 };

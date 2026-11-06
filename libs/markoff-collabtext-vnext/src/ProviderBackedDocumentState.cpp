@@ -223,13 +223,15 @@ Result<void> ProviderBackedDocumentState::authorizeInitialImport(
 ActionPublicationResult ProviderBackedDocumentState::publishAction(
     const PreparedStorageTransaction& transaction)
 {
-    return publishAction(transaction, nullptr, nullptr);
+    // Conservative: this overload's callers do not report the staged
+    // primitives, so every commit counts as a possible visibility change.
+    return publishAction(transaction, nullptr, nullptr, true);
 }
 
 ActionPublicationResult ProviderBackedDocumentState::publishAction(
     const PreparedStorageTransaction& transaction,
     const OwnerHistorySnapshot* stagedOwnerHistory,
-    const uint64_t* stagedDeliverySequence)
+    const uint64_t* stagedDeliverySequence, bool stagedTouchesIdList)
 {
     using namespace CollabText;
     if (std::this_thread::get_id() != m_ownerThread)
@@ -383,6 +385,10 @@ ActionPublicationResult ProviderBackedDocumentState::publishAction(
             m_recovery.acceptedRecords.size(), *stagedDeliverySequence + 1};
     }
     setState(stateFor(m_recovery));
+    if ((result.state == ActionPublicationState::committed
+         || result.state == ActionPublicationState::committedHistoryPending)
+        && stagedTouchesIdList)
+        ++m_visibilityGeneration;
     if (m_onLocalActionCommitted
         && (result.state == ActionPublicationState::committed
             || result.state == ActionPublicationState::committedHistoryPending)
@@ -395,6 +401,9 @@ ActionPublicationResult ProviderBackedDocumentState::acceptRemoteAction(
     const PreparedStorageTransaction& transaction)
 {
     using namespace CollabText;
+    // A remote action may add/remove visible blocks; the generation is
+    // bumped conservatively (remote acceptance is not a per-keystroke path).
+    ++m_visibilityGeneration;
     auto refuse = [](Error error) {
         return ActionPublicationResult{ActionPublicationState::rejected,
                                        std::nullopt, std::move(error)};
@@ -586,13 +595,20 @@ ActionPublicationResult ProviderBackedDocumentState::publishStagedAction(
             setState(ProviderDocumentState::recoveryRequired);
         return {ActionPublicationState::rejected, std::nullopt, transaction.error()};
     }
+    const bool touchesIdList = std::any_of(
+        stager.bundle().operations.begin(), stager.bundle().operations.end(),
+        [](const ActionOperation& operation) {
+            return operation.primitive == OperationPrimitive::idList;
+        });
     return publishAction(transaction.value(), &history,
-                         &stager.bundle().deliverySequence);
+                         &stager.bundle().deliverySequence, touchesIdList);
 }
 
 ActionPublicationResult ProviderBackedDocumentState::recoverActionAndRebuild(
     const PreparedStorageTransaction& transaction)
 {
+    // A recovery rebuild can change the visible set; bump conservatively.
+    ++m_visibilityGeneration;
     if (std::this_thread::get_id() != m_ownerThread)
         return {ActionPublicationState::rejected, std::nullopt,
             Error(ErrorCode::unsupported_operation,
@@ -671,6 +687,7 @@ ActionPublicationResult ProviderBackedDocumentState::publishGap(
     const PreparedStorageTransaction& transaction)
 {
     using namespace CollabText;
+    ++m_visibilityGeneration;
     if (std::this_thread::get_id() != m_ownerThread)
         return {ActionPublicationState::rejected, std::nullopt,
             Error(ErrorCode::unsupported_operation,

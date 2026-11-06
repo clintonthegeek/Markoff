@@ -429,6 +429,11 @@ Q_SIGNALS:
 private:
     struct Private;
     explicit MarkoffDocument(std::unique_ptr<Private> state);
+    /// O(1) membership test against the visible block set, cached across
+    /// calls and invalidated by the lifecycle's visibilityGeneration()
+    /// (bumped whenever a committed action carries an idList operation, a
+    /// remote action is accepted, or a recovery rebuild runs).
+    [[nodiscard]] bool blockIsVisible(BlockId id) const;
     [[nodiscard]] Markoff::VNext::ActionPublicationResult applyMarkdownSource(
         const QByteArray& source, bool replacement);
     void compensateReplacementAction(

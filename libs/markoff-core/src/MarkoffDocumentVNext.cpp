@@ -26,6 +26,7 @@
 #include <deque>
 #include <limits>
 #include <map>
+#include <optional>
 #include <set>
 #include <thread>
 #include <tuple>
@@ -58,6 +59,11 @@ struct MarkoffDocument::Private {
     QHash<BlockId, quint64> blockEditSequences;
     quint64 structuralEditSequence = 0;
     mutable QHash<BlockId, QPair<quint64, QList<SourceSpan>>> inlineSpanCache;
+    // Visible-block membership, rebuilt only when the lifecycle's
+    // visibilityGeneration changes (idList-bearing commits, remote accepts,
+    // recovery rebuilds) — pure text keystrokes reuse the set for free.
+    mutable QSet<BlockId> visibleBlocks;
+    mutable std::optional<uint64_t> visibleBlocksGeneration;
     // Flat-view caches. Keyed on d2EditSequence(), which every content-bearing
     // mutation path advances: local edits, structural ops, attribute and kind
     // writes, remote actions (acceptRemoteAction, MarkoffDocumentVNext.cpp
@@ -2705,9 +2711,7 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockEdit(const BlockEdit& 
             CollabText::Error(CollabText::ErrorCode::awaiting_state,
                               "document lifecycle does not permit an ordinary action")};
     }
-    const auto visibleBlocks = iterateBlocks();
-    if (std::find(visibleBlocks.begin(), visibleBlocks.end(), edit.blockId)
-        == visibleBlocks.end()) {
+    if (!blockIsVisible(edit.blockId)) {
         return {ActionPublicationState::rejected, std::nullopt,
             CollabText::Error(CollabText::ErrorCode::not_found,
                               "text edit targets a block that is not visible")};
@@ -3561,6 +3565,18 @@ std::vector<BlockId> MarkoffDocument::iterateBlocks() const
             result.push_back(*block);
     }
     return result;
+}
+
+bool MarkoffDocument::blockIsVisible(BlockId id) const
+{
+    const uint64_t generation = d->lifecycle->visibilityGeneration();
+    if (!d->visibleBlocksGeneration || *d->visibleBlocksGeneration != generation) {
+        d->visibleBlocks.clear();
+        for (const auto block : iterateBlocks())
+            d->visibleBlocks.insert(block);
+        d->visibleBlocksGeneration = generation;
+    }
+    return d->visibleBlocks.contains(id);
 }
 
 QByteArray MarkoffDocument::blockText(BlockId id) const
@@ -5032,8 +5048,7 @@ quint64 MarkoffDocument::structuralEditSequence() const noexcept
 
 QList<SourceSpan> MarkoffDocument::inlineSpansFor(BlockId id) const
 {
-    const auto blocks = iterateBlocks();
-    if (std::find(blocks.begin(), blocks.end(), id) == blocks.end()) return {};
+    if (!blockIsVisible(id)) return {};
     const quint64 sequence = blockEditSequence(id);
     const auto cached = d->inlineSpanCache.constFind(id);
     if (cached != d->inlineSpanCache.cend() && cached->first == sequence)
