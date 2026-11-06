@@ -86,22 +86,28 @@ v0.7.x series — the `v0.7.0-*` tags are point tags inside it — and a
 consumer re-pin point (`project(Markoff VERSION 0.7.1)`). The release notes
 are the tag message.
 
-**The collabtext engine pin moved on 2026-10-21** to
-`collabtext-perf-checkpoint-2026-10-21` at
-`16cc48f4969abc2940a7fb332b72af018075dab7` (package `0.2.0-alpha.5`,
-manifest v17 — the installed public API is identical to the alpha.5
-candidate's; only the manifest's Branch/Status lines differ). Root CMake
-requires that installed package. The prefix for the acceptance runs is
-`build-collabtext-perf-checkpoint/install`, rebuilt from the tag; recreate a
-missing prefix from the candidate's `docs/USING_VNEXT.md`.
+**The collabtext engine pin moved on 2026-11-06** to
+`collabtext-perf-checkpoint-2026-10-30` (`fd3c09e`, package `0.2.0-alpha.5`,
+manifest v17 — installed API identical to the previous pin; only the
+manifest's Branch/Status lines differ). Acceptance recorded 2026-11-06: the
+engine's own Release suite at the tag passed **103/103** (prefix rebuilt from
+the tag at `build-collabtext-perf-checkpoint-2026-10-30/install`), and a fresh
+Markoff configure+build against that prefix passed **101/101** offscreen
+(`build-accept-fd3c09e`). The producer's Debug/ASan-UBSan sweeps at this tag
+stand as recorded on 2026-10-30; this tree's acceptance is the Release/offscreen
+pair above. This closes the "newer tag not covered by M06" caveat: the move is
+now made on Markoff's own recorded run. The previous pin's prefix
+(`build-collabtext-perf-checkpoint/install`, `16cc48f`) stays on disk for
+rollback. X05 is closed at this tag (aged mixed-tombstone per-edit mean 0.263
+against the 2× target), flattening the per-keystroke history-growth slope
+further.
 
-**Acceptance for the new pin (2026-10-21):** Debug **100/100**, Release
-**100/100**, ASan+UBSan **100/100** (leak detection off — this runner's
-ptrace restriction blocks LeakSanitizer), with the relocated
-installed-package consumer tests (`markoff_provider_*`,
-`markoff_document_storage_provider_test`, `markoff_collabtext_vnext_probe`)
-green against the installed prefix. The engine's own Debug suite is 104/104 at
-the tag. This is the A14-equivalent run the previous caveat called for.
+**The 2026-10-21 pin move** (`collabtext-perf-checkpoint-2026-10-21`,
+`16cc48f`) had carried: per-keystroke 18.56/30.91/43.29/56.68/71.71/89.11 ms →
+2.96/5.14/8.65/12.31/17.26/23.41 ms at 100…600 actions (3.8–6.3× faster, and
+the history-growth slope ~4× shallower), closing the board's
+action-publication-cost row. The remedy was a pin move, not a Markoff-side
+owner-history redesign.
 
 **M06 record supplied (2026-10-31) and recorded upstream.** collabtext's M06
 row stayed `not_started` until Markoff stated acceptance of the exact
@@ -157,12 +163,38 @@ strict live gate passed in Release. A newer checkpoint was published:
 `collabtext-perf-checkpoint-2026-10-30` (`fd3c09e`), same package label
 (`0.2.0-alpha.5`) and manifest v17, with an installed API identical to this
 pin. Under the producer's newest-annotated-tag rule that newer tag is the
-supported pin; **this tree still pins `16cc48f`, and Markoff's M06 acceptance
-covers that candidate only — it is not extended to the newer tag.** Moving
-needs a rebuild and Markoff's own acceptance record on the new tag; the API
-being identical means no adoption work, and the move has not been made.
+supported pin; ~~this tree still pins `16cc48f`, and Markoff's M06 acceptance
+covers that candidate only — it is not extended to the newer tag.~~ **The move
+was made on 2026-11-06** — see the Pin section above: Markoff's own acceptance
+record on the new tag (engine Release 103/103, fresh-tree Markoff 101/101)
+closes the caveat; the API being identical meant no adoption work.
 
 ## Latest verification
+
+2026-11-06, the fast-typing perf pass + the SessionMode API + the pin move.
+Seven commits (`e5c953f3`..`454010ae`, plus the pin/docs commit): the
+redundant post-edit `d2DocumentChanged` flush dropped (the canvas ran the
+full `onDocumentChanged` pass twice per keystroke; the core "debounce" the
+comments cited does not exist), delivery-sequence scan cached (O(actions)
+MAB decodes per keystroke → O(1) amortized), `applyBlockEdit` reading the
+lifecycle's in-memory recovery state, O(1) visible-block membership keyed on
+a new `visibilityGeneration()`, `BlockLayoutCache::sync` single-block fast
+path, and a caret-invariance skip for the second inline rebuild. New API:
+`Markoff::VNext::SessionMode { collaborative, local }` (`open` gains a
+defaulted `sessionMode` parameter, new `sessionMode()` accessor); a local
+session skips the coordinator's replication self-validation only — durability,
+undo, identity, recovery identical — and refuses remote actions. Consumer
+handoff: [`docs/handoff/2026-11-06-to-corbomite-sessionmode-and-perf.md`](handoff/2026-11-06-to-corbomite-sessionmode-and-perf.md).
+Two new tests (`local_session_edits_undoes_and_recovers`,
+`open_defaults_to_collaborative_session_mode`, `tst_foundation_markoff_document`).
+Offscreen `scripts/run-tests.sh -E 'tst_realistic|tst_benchmark'` passed
+**101/101** after every commit (wire `build-dev`). Pin moved to
+`collabtext-perf-checkpoint-2026-10-30` (`fd3c09e`): engine Release suite
+**103/103** at the tag, fresh Markoff configure+build against the new prefix
+(`build-collabtext-perf-checkpoint-2026-10-30/install`) **101/101** offscreen
+(`build-accept-fd3c09e`). Deliberately not done: hidden source/styled
+visibility gating (needs a resync-on-show design, host-coordinated),
+per-action owner-history re-encode relaxation (upstream collabtext work).
 
 2026-11-04, the remaining doc-start edge from the 11-03 entry is closed.
 Enter at position 0 of the document's FIRST list item no longer falls
