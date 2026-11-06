@@ -302,27 +302,6 @@ QByteArray serializeAcceptedBlock(const MarkoffDocument& document, BlockId id)
     return BuiltinBlockSerializerRegistry::instance().get(kind)(kind, attrs, text);
 }
 
-CollabText::Result<uint64_t> nextDeliverySequence(
-    const VNext::StorageRecoveryState& recovery, const std::string& document,
-    uint64_t epoch)
-{
-    uint64_t next = 1;
-    for (const auto& accepted : recovery.acceptedRecords) {
-        if (accepted.format != QByteArrayLiteral("MAB/3"))
-            continue;
-        auto bundle = VNext::ActionBundleCodec::decode(accepted.bytes, document, epoch);
-        if (!bundle.ok())
-            return bundle.error();
-        if (bundle.value().deliverySequence >= next) {
-            if (bundle.value().deliverySequence == std::numeric_limits<uint64_t>::max())
-                return CollabText::Error(CollabText::ErrorCode::limit_exceeded,
-                    "document delivery sequence is exhausted");
-            next = bundle.value().deliverySequence + 1;
-        }
-    }
-    return next;
-}
-
 CollabText::Result<VNext::OwnerHistorySnapshot> ownerHistoryForAction(
     const VNext::StorageRecoveryState& recovery,
     VNext::DocumentStorageSession& storage, const std::string& document,
@@ -394,7 +373,7 @@ VNext::ActionPublicationResult publishMapValue(
     if (!recoveryResult.ok())
         return {ActionPublicationState::rejected, std::nullopt, recoveryResult.error()};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = lifecycle.nextDeliverySequence();
     if (!sequence.ok())
         return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
     auto stream = lifecycle.stagingMapStream(
@@ -621,7 +600,7 @@ VNext::ActionPublicationResult publishDocumentMapCompensation(
     local.priorValue = group.mapPriorValue;
     auto inverse = map.value()->compensate(local);
     if (!inverse.ok()) return {ActionPublicationState::rejected, std::nullopt, inverse.error()};
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = lifecycle.nextDeliverySequence();
     if (!sequence.ok()) return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
     ActionStager stager(document, scope.epoch, sequence.value(), actionId, kind);
@@ -919,7 +898,7 @@ void MarkoffDocument::compensateReplacementAction(
         if (!checkedSource.ok()) return;
     }
 
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok()) return;
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
     ActionStager stager(document, scope.epoch, sequence.value(), actionId, actionKind);
@@ -1076,7 +1055,7 @@ void MarkoffDocument::compensateTextGroups(
     const auto& scope = d->lifecycle->storage().scope();
     const std::string document = scope.documentKey.toUtf8().toStdString();
     const auto& recovery = d->lifecycle->recovery();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok()) return;
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
     const ActionKind actionKind = redo ? ActionKind::redo : ActionKind::undo;
@@ -1419,7 +1398,7 @@ void MarkoffDocument::undoForBlock(BlockId block)
     }
     if (!target || !targetGroup) return;
     uint64_t sequence = 1;
-    auto next = nextDeliverySequence(recovery, document, scope.epoch);
+    auto next = d->lifecycle->nextDeliverySequence();
     if (!next.ok()) return;
     sequence = next.value();
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
@@ -1649,7 +1628,7 @@ void MarkoffDocument::redoForBlock(BlockId block)
         }
     }
     if (!target) return;
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok()) return;
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
     ActionStager stager(document, scope.epoch, sequence.value(), actionId, ActionKind::redo);
@@ -2374,7 +2353,7 @@ VNext::ActionPublicationResult MarkoffDocument::applyMarkdownSource(
     if (replacement) actionId = QUuid::createUuid().toRfc4122();
     uint64_t sequence = 1;
     if (replacement) {
-        auto next = nextDeliverySequence(recovery, document, storageScope.epoch);
+        auto next = d->lifecycle->nextDeliverySequence();
         if (!next.ok())
             return {ActionPublicationState::rejected, std::nullopt, next.error()};
         sequence = next.value();
@@ -2768,31 +2747,15 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockEdit(const BlockEdit& 
         return rolledBack;
     }
     const auto& recovery = recoveryResult.value();
-    uint64_t deliverySequence = 1;
-    for (const auto& accepted : recovery.acceptedRecords) {
-        if (accepted.format != QByteArrayLiteral("MAB/3"))
-            continue;
-        const auto acceptedBundle = ActionBundleCodec::decode(
-            accepted.bytes, document, epoch);
-        if (!acceptedBundle.ok()) {
-            const auto rolledBack = d->lifecycle->publishStagedAction(
-                ActionStager(document, epoch, 1, actionId, ActionKind::edit),
-                OwnerHistorySnapshot{});
-            emit tentativeBlockReverted(edit.blockId);
-            return rolledBack;
-        }
-        if (acceptedBundle.value().deliverySequence >= deliverySequence) {
-            if (acceptedBundle.value().deliverySequence
-                == std::numeric_limits<uint64_t>::max()) {
-                const auto rolledBack = d->lifecycle->publishStagedAction(
-                    ActionStager(document, epoch, 1, actionId, ActionKind::edit),
-                    OwnerHistorySnapshot{});
-                emit tentativeBlockReverted(edit.blockId);
-                return rolledBack;
-            }
-            deliverySequence = acceptedBundle.value().deliverySequence + 1;
-        }
+    auto deliverySequenceResult = d->lifecycle->nextDeliverySequence();
+    if (!deliverySequenceResult.ok()) {
+        const auto rolledBack = d->lifecycle->publishStagedAction(
+            ActionStager(document, epoch, 1, actionId, ActionKind::edit),
+            OwnerHistorySnapshot{});
+        emit tentativeBlockReverted(edit.blockId);
+        return rolledBack;
     }
+    const uint64_t deliverySequence = deliverySequenceResult.value();
     ActionStager stager(document, epoch, deliverySequence, actionId, ActionKind::edit);
     auto staged = stager.add(local.value());
     if (!staged.ok()) {
@@ -2938,7 +2901,7 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockEdits(
     if (!recoveryResult.ok())
         return {ActionPublicationState::rejected, std::nullopt, recoveryResult.error()};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok())
         return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
@@ -3065,7 +3028,7 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockMerge(
     if (!recoveryResult.ok())
         return {ActionPublicationState::rejected, std::nullopt, recoveryResult.error()};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok())
         return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
 
@@ -3229,7 +3192,7 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockSplit(
     if (!recoveryResult.ok())
         return {ActionPublicationState::rejected, std::nullopt, recoveryResult.error()};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok())
         return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
@@ -3470,7 +3433,7 @@ VNext::ActionPublicationResult MarkoffDocument::replaceMatches(
     if (!recoveryResult.ok())
         return {ActionPublicationState::rejected, std::nullopt, recoveryResult.error()};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok())
         return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
@@ -3830,7 +3793,7 @@ VNext::ActionPublicationResult MarkoffDocument::changeBlockKind(
     if (!recoveryResult.ok())
         return {ActionPublicationState::rejected, std::nullopt, recoveryResult.error()};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok())
         return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
     auto kindStreamResult = d->lifecycle->stagingMapStream(
@@ -3926,7 +3889,7 @@ VNext::ActionPublicationResult MarkoffDocument::swapBlockPayload(
     if (!recoveryResult.ok())
         return {ActionPublicationState::rejected, std::nullopt, recoveryResult.error()};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok())
         return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
 
@@ -4159,7 +4122,7 @@ BlockPasteResult MarkoffDocument::pasteMarkdownReplacingRange(
     if (!recoveryResult.ok())
         return {{ActionPublicationState::rejected, std::nullopt, recoveryResult.error()}, target, byteOffset};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok())
         return {{ActionPublicationState::rejected, std::nullopt, sequence.error()}, target, byteOffset};
     auto listResult = d->lifecycle->stagingIdList();
@@ -4536,7 +4499,7 @@ VNext::ActionPublicationResult MarkoffDocument::applyStructural(
     if (!recoveryResult.ok())
         return {ActionPublicationState::rejected, std::nullopt, recoveryResult.error()};
     auto recovery = std::move(recoveryResult).value();
-    auto sequence = nextDeliverySequence(recovery, document, scope.epoch);
+    auto sequence = d->lifecycle->nextDeliverySequence();
     if (!sequence.ok())
         return {ActionPublicationState::rejected, std::nullopt, sequence.error()};
 

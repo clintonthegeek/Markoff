@@ -7,6 +7,7 @@
 
 #include <thread>
 #include <functional>
+#include <optional>
 
 namespace Markoff::VNext {
 
@@ -48,6 +49,13 @@ public:
     [[nodiscard]] const StorageRecoveryState& recovery() const noexcept { return m_recovery; }
     [[nodiscard]] const AcceptedPrefixProjection& projection() const noexcept
     { return *m_projection; }
+
+    /// Next delivery sequence for a locally staged MAB:
+    /// max(accepted MAB/3 deliverySequence) + 1 over the accepted prefix.
+    /// Cached against the accepted-record count — a local commit advances the
+    /// cache in memory, and any other prefix growth (remote acceptance,
+    /// recovery rebuild) falls back to one rescan over the accepted records.
+    [[nodiscard]] CollabText::Result<uint64_t> nextDeliverySequence();
 
     /// Borrow the owner-held tentative stream for one local action. These
     /// handles are owner-thread-only and must not be used to begin another
@@ -96,7 +104,16 @@ private:
     [[nodiscard]] CollabText::Result<void> restoreAcceptedProjection();
     [[nodiscard]] ActionPublicationResult publishAction(
         const PreparedStorageTransaction& transaction,
-        const OwnerHistorySnapshot* stagedOwnerHistory);
+        const OwnerHistorySnapshot* stagedOwnerHistory,
+        const uint64_t* stagedDeliverySequence = nullptr);
+
+    /// Delivery sequence of a fast-path local commit: trusted only when the
+    /// exact-prefix fast path verified that the committed record is the sole
+    /// append (any full-replay refresh leaves the cache cold for one rescan).
+    struct DeliverySequenceCache {
+        size_t acceptedRecordCount = 0;
+        uint64_t next = 1;
+    };
 
     ProviderBackedDocumentState(std::unique_ptr<DocumentStorageSession> storage,
         std::unique_ptr<ActionPublicationCoordinator> coordinator,
@@ -111,6 +128,7 @@ private:
     ProviderDocumentState m_state;
     std::thread::id m_ownerThread;
     bool m_callActive = false;
+    std::optional<DeliverySequenceCache> m_deliverySequenceCache;
     LocalActionCommittedFn m_onLocalActionCommitted;
     StateChangedFn m_onStateChanged;
 };

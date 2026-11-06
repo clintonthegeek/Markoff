@@ -4,6 +4,7 @@
 #include <markoff/vnext/ActionBundleCodec.h>
 
 #include <algorithm>
+#include <limits>
 #include <set>
 
 namespace Markoff::VNext {
@@ -34,6 +35,34 @@ bool sameRecord(const AcceptedStorageRecord& left,
 } // namespace
 
 using namespace CollabText;
+
+Result<uint64_t> ProviderBackedDocumentState::nextDeliverySequence()
+{
+    if (m_deliverySequenceCache
+        && m_deliverySequenceCache->acceptedRecordCount
+            == m_recovery.acceptedRecords.size())
+        return m_deliverySequenceCache->next;
+    const QByteArray documentBytes = m_storage->scope().documentKey.toUtf8();
+    const std::string document(documentBytes.constData(),
+                               static_cast<size_t>(documentBytes.size()));
+    const uint64_t epoch = m_storage->scope().epoch;
+    uint64_t next = 1;
+    for (const auto& accepted : m_recovery.acceptedRecords) {
+        if (accepted.format != QByteArrayLiteral("MAB/3"))
+            continue;
+        auto bundle = ActionBundleCodec::decode(accepted.bytes, document, epoch);
+        if (!bundle.ok()) return bundle.error();
+        if (bundle.value().deliverySequence >= next) {
+            if (bundle.value().deliverySequence == std::numeric_limits<uint64_t>::max())
+                return Error(ErrorCode::limit_exceeded,
+                             "document delivery sequence is exhausted");
+            next = bundle.value().deliverySequence + 1;
+        }
+    }
+    m_deliverySequenceCache = DeliverySequenceCache{
+        m_recovery.acceptedRecords.size(), next};
+    return next;
+}
 
 ProviderBackedDocumentState::ProviderBackedDocumentState(
     std::unique_ptr<DocumentStorageSession> storage,
@@ -194,12 +223,13 @@ Result<void> ProviderBackedDocumentState::authorizeInitialImport(
 ActionPublicationResult ProviderBackedDocumentState::publishAction(
     const PreparedStorageTransaction& transaction)
 {
-    return publishAction(transaction, nullptr);
+    return publishAction(transaction, nullptr, nullptr);
 }
 
 ActionPublicationResult ProviderBackedDocumentState::publishAction(
     const PreparedStorageTransaction& transaction,
-    const OwnerHistorySnapshot* stagedOwnerHistory)
+    const OwnerHistorySnapshot* stagedOwnerHistory,
+    const uint64_t* stagedDeliverySequence)
 {
     using namespace CollabText;
     if (std::this_thread::get_id() != m_ownerThread)
@@ -343,6 +373,15 @@ ActionPublicationResult ProviderBackedDocumentState::publishAction(
         }
     }
     m_recovery = std::move(recovery).value();
+    if (advancedStagedProjection && stagedDeliverySequence
+        && transaction.sharedRecordFormat == QByteArrayLiteral("MAB/3")
+        && *stagedDeliverySequence != std::numeric_limits<uint64_t>::max()) {
+        // The fast path verified the committed MAB is the sole append over
+        // the exact prefix it was staged against, so its delivery sequence
+        // is the prefix maximum; the next action needs one more.
+        m_deliverySequenceCache = DeliverySequenceCache{
+            m_recovery.acceptedRecords.size(), *stagedDeliverySequence + 1};
+    }
     setState(stateFor(m_recovery));
     if (m_onLocalActionCommitted
         && (result.state == ActionPublicationState::committed
@@ -547,7 +586,8 @@ ActionPublicationResult ProviderBackedDocumentState::publishStagedAction(
             setState(ProviderDocumentState::recoveryRequired);
         return {ActionPublicationState::rejected, std::nullopt, transaction.error()};
     }
-    return publishAction(transaction.value(), &history);
+    return publishAction(transaction.value(), &history,
+                         &stager.bundle().deliverySequence);
 }
 
 ActionPublicationResult ProviderBackedDocumentState::recoverActionAndRebuild(
