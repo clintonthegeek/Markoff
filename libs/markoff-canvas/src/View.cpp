@@ -2947,7 +2947,8 @@ void View::pasteConverted(const QMimeData *mime, bool asPlain)
 
     const auto result = Markoff::Cmd::pasteMarkdown(
         *m_doc, m_caret.block, uint32_t(m_caret.byteOffset), md);
-    m_doc->flushPendingD2Changed();
+    // No flush: pasteMarkdown's apply* paths emit d2DocumentChanged
+    // synchronously on commit.
 
     setCaretPosition(result.caretBlock, int(result.caretByteOffset));
     ensureCaretVisible();
@@ -2987,7 +2988,8 @@ void View::insertText(const QString &rawText)
         insertPrintable(lines.at(i));
     }
 
-    m_doc->flushPendingD2Changed();
+    // No flush: insertPrintable/tryStructuralKey emit d2DocumentChanged
+    // synchronously on every committed edit above.
     ensureCaretVisible();
     viewport()->update();
 }
@@ -4778,7 +4780,10 @@ void View::keyPressEvent(QKeyEvent *event)
                 m_doc->undoD2();
             else
                 m_doc->redoD2();
-            m_doc->flushPendingD2Changed();
+            // No flush: every successful undo/redo compensation path
+            // (undoForBlock/redoForBlock/compensate*) emits
+            // d2DocumentChanged synchronously; a no-op undo emitted
+            // nothing because nothing changed.
             ensureCaretVisible();
             viewport()->update();
         }
@@ -5118,13 +5123,12 @@ void View::keyPressEvent(QKeyEvent *event)
 
     if (isPrintable) {
         insertPrintable(event->text());
-        // Flush rather than wait for the debounced d2DocumentChanged (same
-        // reasoning as the undo/redo path above): T6's kind-promotion check
-        // runs from onDocumentChanged, and a typed "# " must read back as
-        // Heading before this handler returns, not one event-loop spin
-        // later.
-        if (m_doc)
-            m_doc->flushPendingD2Changed();
+        // No flush here: applyBlockEdit emits d2DocumentChanged
+        // synchronously on commit (core has no debounce), so T6's
+        // kind-promotion check in onDocumentChanged has already run by the
+        // time insertPrintable() returns. The flush this replaces re-ran
+        // the whole onDocumentChanged pass — a full O(blocks) cache sync,
+        // viewport re-realize and caret resolve — on every keystroke.
         ensureCaretVisible();
         viewport()->update();
         event->accept();
@@ -5693,9 +5697,9 @@ void View::inputMethodEvent(QInputMethodEvent *event)
         // onDocumentChanged()'s resolve-from-session step (P6.1) finds an
         // up-to-date anchor rather than a stale one.
         pushSelectionToSession();
-        // Kind promotion (T6) must see the committed text before this
-        // handler returns, same reasoning as the printable-key path.
-        m_doc->flushPendingD2Changed();
+        // No flush: applyBlockEdit above emitted d2DocumentChanged
+        // synchronously on commit, so kind promotion (T6) already saw the
+        // committed text before this handler returns.
     }
 
     // Empty commit + empty preedit = cancelled composition: clear the
