@@ -379,6 +379,14 @@ void BlockLayoutCache::restyleInline(const MarkoffDocument &doc, const Theme &th
     // reveal state, whenever it is first realized (spec §4.2).
     if (!e.realized)
         return;
+    // A caret/preedit change on a block whose last rebuild provably did not
+    // depend on the caret or preedit (no delimiter spans, no caret-substituted
+    // renderable, no preedit then or now) produces an identical layout —
+    // skip the rebuild. Per keystroke this is the second, otherwise
+    // unconditional rebuild of the edited block (ensureLayoutForViewport's
+    // realize already rebuilt it after the sync).
+    if (e.caretInvariant && e.id != m_preeditBlock)
+        return;
     rebuildInline(doc, theme, e);
 }
 
@@ -395,6 +403,17 @@ void BlockLayoutCache::rebuildInline(const MarkoffDocument &doc, const Theme &th
     QList<int> cursorsInBlock;
     if (e.id == m_caretBlock && m_caretByte >= 0)
         cursorsInBlock.push_back(int(coords::byteToQtPos(text, m_caretByte)));
+
+    // restyleInline's skip flag (see there): the rebuilt layout depends on
+    // the caret only through delimiter hiding (inlineFormatRanges' sole
+    // cursorsInBlock read), the caret-substituted embed render (code
+    // fence/mermaid/display math, built only when the caret is OUT), and
+    // preedit in this block. A block with none of those is caret-invariant.
+    e.caretInvariant =
+        std::none_of(spans.cbegin(), spans.cend(),
+                     [](const SourceSpan &s) { return s.isDelimiter; })
+        && !e.style.isCodeBlock && !e.style.isMathDisplay
+        && e.id != m_preeditBlock;
 
     const QList<std::pair<int, int>> omitted =
         Detail::omittedDelimiterRanges(spans, cursorsInBlock);

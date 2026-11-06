@@ -135,6 +135,14 @@ public:
         qreal   y        = 0;      //!< top of the block, document coords
         qreal   height   = 0;      //!< estimated, or exact once realized
         bool    realized = false;
+        /// Set by rebuildInline(): true when the rebuilt layout provably
+        /// does not depend on the caret — no delimiter spans (the only
+        /// spans inlineFormatRanges' hide logic reads cursorsInBlock for),
+        /// no caret-substituted rendering (code-fence source reveal,
+        /// display-math/mermaid pixmap), and no preedit in the block at
+        /// rebuild time. restyleInline() skips the rebuild for such
+        /// entries; any content/style change resets the layout anyway.
+        bool    caretInvariant = false;
 
         /// Folding (P5.6): true when this block is currently hidden by an
         /// active fold — its OWN `height` field is left untouched (still
