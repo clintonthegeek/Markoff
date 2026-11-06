@@ -2738,15 +2738,12 @@ VNext::ActionPublicationResult MarkoffDocument::applyBlockEdit(const BlockEdit& 
         return {ActionPublicationState::rejected, std::nullopt, local.error()};
 
     const QByteArray actionId = QUuid::createUuid().toRfc4122();
-    const auto recoveryResult = d->lifecycle->storage().readRecoveryState();
-    if (!recoveryResult.ok()) {
-        ActionStager failed(document, epoch, 1, actionId, ActionKind::edit);
-        const auto rolledBack = d->lifecycle->publishStagedAction(
-            failed, OwnerHistorySnapshot{});
-        emit tentativeBlockReverted(edit.blockId);
-        return rolledBack;
-    }
-    const auto& recovery = recoveryResult.value();
+    // The lifecycle's in-memory state is authoritative between lifecycle
+    // calls (every durable mutation refreshes it before returning); a fresh
+    // readRecoveryState() here copied the whole accepted prefix on every
+    // keystroke. `recovery` is not touched after publishStagedAction below
+    // (publish move-assigns m_recovery, which this reference then aliases).
+    const StorageRecoveryState& recovery = d->lifecycle->recovery();
     auto deliverySequenceResult = d->lifecycle->nextDeliverySequence();
     if (!deliverySequenceResult.ok()) {
         const auto rolledBack = d->lifecycle->publishStagedAction(
