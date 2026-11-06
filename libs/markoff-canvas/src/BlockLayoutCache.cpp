@@ -111,7 +111,48 @@ void BlockLayoutCache::sync(const MarkoffDocument &doc, const Theme &theme, qrea
     m_fontScale = fontScale;
     const quint64 structural = doc.structuralEditSequence();
     const bool restyleAll = (structural != m_structuralSeq);
+    const bool fontScaleChanged = (fontScale != m_syncedFontScale);
     m_structuralSeq = structural;
+    m_syncedFontScale = fontScale;
+
+    // Fast path: no structural change and no font-scale change since the
+    // last sync — the visible block set and their order are exactly the
+    // cached ones (every block set/order change bumps structuralEditSequence).
+    // Restyle only the entries whose edit sequence moved or that were
+    // force-restyled, then re-prefix-sum the y positions from the first
+    // changed entry. The per-keystroke case: no iterateBlocks() allocation,
+    // no entry/index rebuild, no full position pass.
+    if (!restyleAll && !fontScaleChanged && !m_entries.empty()) {
+        size_t firstChanged = m_entries.size();
+        for (size_t i = 0; i < m_entries.size(); ++i) {
+            Entry &e = m_entries[i];
+            const bool forced = m_forcedRestyle.contains(e.id);
+            const quint64 seq = doc.blockEditSequence(e.id);
+            if (!forced && (e.realized || e.height > 0) && e.seq == seq)
+                continue;
+            e.layout.reset();
+            e.realized = false;
+            e.seq      = seq;
+            e.style    = presentationFor(doc, e.id, theme, fontScale);
+            e.height   = estimateHeight(doc, e);
+            if (firstChanged == m_entries.size())
+                firstChanged = i;
+        }
+        m_forcedRestyle.clear();
+        if (firstChanged < m_entries.size()) {
+            // Positions above firstChanged are unchanged; its y is the
+            // (folded-aware) sum of everything above it.
+            qreal y = firstChanged == 0 ? qreal(0) : m_entries[firstChanged].y;
+            for (size_t i = firstChanged; i < m_entries.size(); ++i) {
+                Entry &e = m_entries[i];
+                e.y = y;
+                if (!e.folded)
+                    y += e.height;
+            }
+            m_totalHeight = y;
+        }
+        return;
+    }
 
     const std::vector<BlockId> order = doc.iterateBlocks();
 

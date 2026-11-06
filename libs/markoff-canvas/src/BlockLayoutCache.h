@@ -303,6 +303,7 @@ private:
     QHash<BlockId, int> m_index;        //!< id → position in m_entries
     qreal   m_textWidth      = 0;
     qreal   m_fontScale      = 1.0;
+    qreal   m_syncedFontScale = 1.0;
     qreal   m_totalHeight    = 0;
     quint64 m_structuralSeq  = 0;
     BlockId m_caretBlock;                //!< null = no caret tracked
