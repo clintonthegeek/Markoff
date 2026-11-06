@@ -49,6 +49,12 @@ public:
         const PreparedStorageTransaction& transaction,
         const std::function<CollabText::Result<void>(const StorageRecoveryState&)>& rebuild);
     [[nodiscard]] bool blocked() const noexcept { return m_blocked; }
+    /// Publication self-checks (staged-MAB validation against the rebuilt
+    /// owner history, accepted-prefix revision chain validation) exist to
+    /// catch replication-intent mistakes before they become durable. A local
+    /// session — single writer, no transport — turns them off; every other
+    /// guarantee, including durability and recovery, is unchanged.
+    void setSelfCheckEnabled(bool enabled) noexcept { m_selfCheckEnabled = enabled; }
 
 private:
     [[nodiscard]] ActionPublicationResult finishCommitted(
@@ -68,6 +74,7 @@ private:
 
     DocumentStorageSession* m_session;
     bool m_blocked = false;
+    bool m_selfCheckEnabled = true;
     bool m_absenceNeedsRebuild = false;
     bool m_absenceRebuilt = false;
 };

@@ -64,6 +64,7 @@ struct MarkoffDocument::Private {
     // recovery rebuilds) — pure text keystrokes reuse the set for free.
     mutable QSet<BlockId> visibleBlocks;
     mutable std::optional<uint64_t> visibleBlocksGeneration;
+    VNext::SessionMode sessionMode = VNext::SessionMode::collaborative;
     // Flat-view caches. Keyed on d2EditSequence(), which every content-bearing
     // mutation path advances: local edits, structural ops, attribute and kind
     // writes, remote actions (acceptRemoteAction, MarkoffDocumentVNext.cpp
@@ -736,9 +737,10 @@ CollabText::Result<std::unique_ptr<MarkoffDocument>> MarkoffDocument::open(
     VNext::DocumentStorageProvider &provider,
     const VNext::DocumentStorageScope &scope,
     VNext::StorageMode mode,
-    const BlockSerializerRegistry *registry)
+    const BlockSerializerRegistry *registry,
+    VNext::SessionMode sessionMode)
 {
-    auto lifecycle = VNext::ProviderBackedDocumentState::open(provider, scope, mode);
+    auto lifecycle = VNext::ProviderBackedDocumentState::open(provider, scope, mode, sessionMode);
     if (!lifecycle.ok())
         return lifecycle.error();
     auto finalized = finalizePendingReservations(*lifecycle.value());
@@ -746,6 +748,7 @@ CollabText::Result<std::unique_ptr<MarkoffDocument>> MarkoffDocument::open(
 
     auto privateState = std::make_unique<Private>(
         std::move(lifecycle).value(), registry);
+    privateState->sessionMode = sessionMode;
     const auto& storageRecovery = privateState->lifecycle->recovery();
     std::map<QByteArray, RemoteActionQuarantine> heldWaits;
     const auto isWaitReason = [](CollabText::ErrorCode code) {
@@ -855,6 +858,11 @@ CollabText::Result<std::unique_ptr<MarkoffDocument>> MarkoffDocument::open(
 VNext::ProviderDocumentState MarkoffDocument::providerState() const noexcept
 {
     return d->lifecycle->state();
+}
+
+Markoff::VNext::SessionMode MarkoffDocument::sessionMode() const noexcept
+{
+    return d->sessionMode;
 }
 
 bool MarkoffDocument::canStartOrdinaryAction() const noexcept
@@ -1813,6 +1821,10 @@ VNext::ActionPublicationResult MarkoffDocument::acceptRemoteAction(
     const QByteArray& mabBytes)
 {
     using namespace VNext;
+    if (d->sessionMode == VNext::SessionMode::local)
+        return {ActionPublicationState::rejected, std::nullopt,
+            CollabText::Error(CollabText::ErrorCode::unsupported_operation,
+                "a local session does not accept remote actions")};
     const auto& scope = d->lifecycle->storage().scope();
     const std::string document = scope.documentKey.toUtf8().toStdString();
     auto bundle = ActionBundleCodec::decode(mabBytes, document, scope.epoch);
@@ -1933,6 +1945,12 @@ RemoteActionRouteResult MarkoffDocument::routeRemoteAction(const QByteArray& mab
         routed.state = RemoteActionRouteState::rejected;
         routed.diagnostic.emplace(CollabText::ErrorCode::unsupported_operation,
             "remote action routing must run on the document owner thread");
+        return routed;
+    }
+    if (d->sessionMode == VNext::SessionMode::local) {
+        routed.state = RemoteActionRouteState::rejected;
+        routed.diagnostic.emplace(CollabText::ErrorCode::unsupported_operation,
+            "a local session does not accept remote actions");
         return routed;
     }
     const auto& scope = d->lifecycle->storage().scope();

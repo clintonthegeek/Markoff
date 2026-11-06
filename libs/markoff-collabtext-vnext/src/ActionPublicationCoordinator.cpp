@@ -259,16 +259,18 @@ ActionPublicationResult ActionPublicationCoordinator::finishCommitted(
         m_blocked = true;
         return {ActionPublicationState::committed, revision, recovery.error()};
     }
-    auto revisions = validateAcceptedPrefixRevisions(recovery.value());
-    if (!revisions.ok()) {
-        m_blocked = true;
-        return {ActionPublicationState::committed, revision, revisions.error()};
+    if (m_selfCheckEnabled) {
+        auto revisions = validateAcceptedPrefixRevisions(recovery.value());
+        if (!revisions.ok()) {
+            m_blocked = true;
+            return {ActionPublicationState::committed, revision, revisions.error()};
+        }
     }
     m_blocked = !recovery.value().unresolvedTransactions.empty()
         || !recovery.value().unresolvedReservations.empty();
     if (m_blocked) {
         return {ActionPublicationState::committed, revision,
-            CollabText::Error(CollabText::ErrorCode::history_unavailable,
+            CollabText::Error(ErrorCode::history_unavailable,
                 "action committed, but other transactions or reservations still require recovery")};
     }
     return {ActionPublicationState::committed, revision, std::nullopt};
@@ -320,10 +322,12 @@ ActionPublicationResult ActionPublicationCoordinator::publish(
         m_blocked = true;
         return result(ActionPublicationState::uncertain, recovery.error());
     }
-    auto revisions = validateAcceptedPrefixRevisions(recovery.value());
-    if (!revisions.ok()) {
-        m_blocked = true;
-        return result(ActionPublicationState::uncertain, revisions.error());
+    if (m_selfCheckEnabled) {
+        auto revisions = validateAcceptedPrefixRevisions(recovery.value());
+        if (!revisions.ok()) {
+            m_blocked = true;
+            return result(ActionPublicationState::uncertain, revisions.error());
+        }
     }
     const bool unrelatedReservation = std::any_of(
         recovery.value().unresolvedReservations.begin(),
@@ -345,10 +349,12 @@ ActionPublicationResult ActionPublicationCoordinator::publish(
             Error(ErrorCode::counter_regression,
                   "action was staged against a stale accepted prefix"));
     }
-    auto valid = validate(transaction, recovery.value());
-    if (!valid.ok()) {
-        if (!transaction.reservations.empty()) m_blocked = true;
-        return result(ActionPublicationState::rejected, valid.error());
+    if (m_selfCheckEnabled) {
+        auto valid = validate(transaction, recovery.value());
+        if (!valid.ok()) {
+            if (!transaction.reservations.empty()) m_blocked = true;
+            return result(ActionPublicationState::rejected, valid.error());
+        }
     }
 
     auto prepared = m_session->prepare(transaction);

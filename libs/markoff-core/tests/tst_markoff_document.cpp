@@ -84,6 +84,59 @@ private Q_SLOTS:
         QVERIFY(!fixture.document->canRedoD2());
     }
 
+    void local_session_edits_undoes_and_recovers()
+    {
+        // Local mode is a single-writer session: typing, undo, redo and
+        // crash-recovery semantics are identical to collaborative mode; only
+        // the replication self-validation work is skipped.
+        auto providerResult = VNext::makeEphemeralDocumentStorageProvider();
+        QVERIFY(providerResult.ok());
+        auto provider = std::move(providerResult).value();
+        auto opened = MarkoffDocument::open(*provider, {QStringLiteral("local-session"), 1},
+            VNext::StorageMode::ephemeral, nullptr, VNext::SessionMode::local);
+        QVERIFY(opened.ok());
+        auto document = std::move(opened).value();
+        QCOMPARE(document->sessionMode(), VNext::SessionMode::local);
+
+        QCOMPARE(document->importInitialMarkdown(
+            QByteArrayLiteral("hello\n")).state,
+            VNext::ActionPublicationState::committed);
+        const auto block = document->iterateBlocks().front();
+        QCOMPARE(document->applyBlockEdit(
+            {block, 5, 0, QByteArrayLiteral("!")}).state,
+            VNext::ActionPublicationState::committed);
+        QCOMPARE(document->blockText(block), QByteArrayLiteral("hello!"));
+
+        document->undoD2();
+        QCOMPARE(document->blockText(block), QByteArrayLiteral("hello"));
+        document->redoD2();
+        QCOMPARE(document->blockText(block), QByteArrayLiteral("hello!"));
+
+        // Recovery across reopen is unchanged: same text, undo still usable.
+        document.reset();
+        auto reopened = MarkoffDocument::open(*provider, {QStringLiteral("local-session"), 1},
+            VNext::StorageMode::ephemeral, nullptr, VNext::SessionMode::local);
+        QVERIFY(reopened.ok());
+        document = std::move(reopened).value();
+        const auto reopenedBlock = document->iterateBlocks().front();
+        QCOMPARE(document->blockText(reopenedBlock), QByteArrayLiteral("hello!"));
+        QVERIFY(document->canUndoD2());
+        document->undoD2();
+        QCOMPARE(document->blockText(reopenedBlock), QByteArrayLiteral("hello"));
+
+        // And a local session refuses remote actions outright.
+        const auto refused = document->acceptRemoteAction(QByteArray());
+        QCOMPARE(refused.state, VNext::ActionPublicationState::rejected);
+        QVERIFY(refused.diagnostic.has_value());
+        QCOMPARE(refused.diagnostic->code(), CollabText::ErrorCode::unsupported_operation);
+    }
+
+    void open_defaults_to_collaborative_session_mode()
+    {
+        auto fixture = openCandidate(QStringLiteral("default-mode"));
+        QCOMPARE(fixture.document->sessionMode(), VNext::SessionMode::collaborative);
+    }
+
     void frontmatter_edit_is_undoable_byte_for_byte()
     {
         auto fixture = openCandidate(QStringLiteral("frontmatter-undo"));

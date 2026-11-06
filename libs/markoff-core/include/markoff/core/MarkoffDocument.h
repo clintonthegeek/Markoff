@@ -93,12 +93,19 @@ public:
     /// Open a document only after provider recovery and accepted-prefix replay
     /// complete. Storage and scope remain caller-owned; the returned document
     /// owns its lifecycle session and candidate projection.
+    /// `sessionMode` defaults to collaborative. A local session declares a
+    /// single-writer document that never receives remote actions: publication
+    /// self-validation is skipped while durability, undo, identity and
+    /// recovery semantics stay identical. Remote actions offered to a local
+    /// session are refused as in collaborative mode.
     [[nodiscard]] static CollabText::Result<std::unique_ptr<MarkoffDocument>> open(
         Markoff::VNext::DocumentStorageProvider &provider,
         const Markoff::VNext::DocumentStorageScope &scope,
         Markoff::VNext::StorageMode mode,
-        const Markoff::BlockSerializerRegistry *registry = nullptr);
+        const Markoff::BlockSerializerRegistry *registry = nullptr,
+        Markoff::VNext::SessionMode sessionMode = Markoff::VNext::SessionMode::collaborative);
 
+    [[nodiscard]] Markoff::VNext::SessionMode sessionMode() const noexcept;
     [[nodiscard]] Markoff::VNext::ProviderDocumentState providerState() const noexcept;
     [[nodiscard]] bool canStartOrdinaryAction() const noexcept;
     /// Rebuilds accepted state after a proven-absent publication and records

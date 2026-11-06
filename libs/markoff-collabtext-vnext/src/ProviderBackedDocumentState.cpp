@@ -69,19 +69,20 @@ ProviderBackedDocumentState::ProviderBackedDocumentState(
     std::unique_ptr<ActionPublicationCoordinator> coordinator,
     StorageRecoveryState recovery,
     std::unique_ptr<AcceptedPrefixProjection> projection,
-    ProviderDocumentState state)
+    ProviderDocumentState state, SessionMode sessionMode)
     : m_storage(std::move(storage))
     , m_coordinator(std::move(coordinator))
     , m_recovery(std::move(recovery))
     , m_projection(std::move(projection))
     , m_state(state)
     , m_ownerThread(std::this_thread::get_id())
+    , m_sessionMode(sessionMode)
 {}
 
 Result<std::unique_ptr<ProviderBackedDocumentState>>
 ProviderBackedDocumentState::open(
     DocumentStorageProvider& provider, const DocumentStorageScope& scope,
-    StorageMode mode)
+    StorageMode mode, SessionMode sessionMode)
 {
     auto opened = provider.open(scope, mode);
     if (!opened.ok()) return opened.error();
@@ -92,6 +93,7 @@ ProviderBackedDocumentState::open(
     auto recovery = std::move(recovered).value();
 
     auto coordinator = std::make_unique<ActionPublicationCoordinator>(*storage);
+    coordinator->setSelfCheckEnabled(sessionMode != SessionMode::local);
     if (!recovery.unresolvedTransactions.empty()) {
         for (const auto& transaction : recovery.unresolvedTransactions) {
             const auto outcome = coordinator->recover(transaction);
@@ -122,7 +124,7 @@ ProviderBackedDocumentState::open(
     const auto state = stateFor(recovery);
     return std::unique_ptr<ProviderBackedDocumentState>(
         new ProviderBackedDocumentState(std::move(storage), std::move(coordinator),
-            std::move(recovery), std::move(projection).value(), state));
+            std::move(recovery), std::move(projection).value(), state, sessionMode));
 }
 
 Result<ScopedIdListStream*> ProviderBackedDocumentState::stagingIdList()
@@ -401,6 +403,10 @@ ActionPublicationResult ProviderBackedDocumentState::acceptRemoteAction(
     const PreparedStorageTransaction& transaction)
 {
     using namespace CollabText;
+    if (m_sessionMode == SessionMode::local)
+        return {ActionPublicationState::rejected, std::nullopt,
+            Error(ErrorCode::unsupported_operation,
+                  "a local session does not accept remote actions")};
     // A remote action may add/remove visible blocks; the generation is
     // bumped conservatively (remote acceptance is not a per-keystroke path).
     ++m_visibilityGeneration;

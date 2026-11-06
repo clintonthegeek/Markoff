@@ -25,6 +25,16 @@ struct DocumentStorageScope {
 
 enum class StorageMode { durable, ephemeral };
 
+/// Editing-session mode. `collaborative` is the default: every staged action
+/// is validated as a replicable remote operation. `local` declares a
+/// single-writer session that never receives remote actions; the publication
+/// self-checks that exist to catch replication-intent mistakes are skipped.
+/// Durability, undo, identity and recovery semantics are identical in both
+/// modes — only the redundant self-validation work is relaxed. A local
+/// session may not accept remote actions (they are refused as today); to
+/// collaborate, reopen the document in collaborative mode.
+enum class SessionMode { collaborative, local };
+
 /// Equality token for an accepted prefix. Always nonempty, including an empty
 /// prefix. It is neither a Core causal frontier nor a numeric edit sequence.
 struct AcceptedRevision {

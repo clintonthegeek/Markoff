@@ -32,7 +32,7 @@ public:
     using StateChangedFn = std::function<void()>;
     [[nodiscard]] static CollabText::Result<std::unique_ptr<ProviderBackedDocumentState>>
     open(DocumentStorageProvider& provider, const DocumentStorageScope& scope,
-         StorageMode mode);
+         StorageMode mode, SessionMode sessionMode = SessionMode::collaborative);
 
     [[nodiscard]] ProviderDocumentState state() const noexcept { return m_state; }
     [[nodiscard]] bool canStartOrdinaryAction() const noexcept
@@ -56,6 +56,10 @@ public:
     /// alone. Consumers may cache the visible block set keyed on this value.
     [[nodiscard]] uint64_t visibilityGeneration() const noexcept
     { return m_visibilityGeneration; }
+
+    /// The session mode this lifecycle was opened with. A local session
+    /// refuses remote actions outright.
+    [[nodiscard]] SessionMode sessionMode() const noexcept { return m_sessionMode; }
 
     /// Next delivery sequence for a locally staged MAB:
     /// max(accepted MAB/3 deliverySequence) + 1 over the accepted prefix.
@@ -127,7 +131,7 @@ private:
         std::unique_ptr<ActionPublicationCoordinator> coordinator,
         StorageRecoveryState recovery,
         std::unique_ptr<AcceptedPrefixProjection> projection,
-        ProviderDocumentState state);
+        ProviderDocumentState state, SessionMode sessionMode);
 
     std::unique_ptr<DocumentStorageSession> m_storage;
     std::unique_ptr<ActionPublicationCoordinator> m_coordinator;
@@ -138,6 +142,7 @@ private:
     bool m_callActive = false;
     std::optional<DeliverySequenceCache> m_deliverySequenceCache;
     uint64_t m_visibilityGeneration = 0;
+    SessionMode m_sessionMode = SessionMode::collaborative;
     LocalActionCommittedFn m_onLocalActionCommitted;
     StateChangedFn m_onStateChanged;
 };
