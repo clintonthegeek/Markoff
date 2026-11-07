@@ -81,6 +81,16 @@ and are not waived.
 
 ## Pin
 
+**Markoff release `v0.7.2` (2026-11-07).** The per-keystroke perf pass for
+Corbomite (six commits `e5c953f3`…`888a3626`, plus the tip docs commit) plus
+the API move: `Markoff::VNext::SessionMode` (`collaborative`|`local`),
+`MarkoffDocument::open` gains a defaulted `sessionMode` parameter, and a new
+`sessionMode()` accessor. A consumer re-pin must recompile (the defaulted
+parameter plus the new enum move the installed ABI) — the tag notes carry the
+release-tag convention's `API: moved` line. Corbomite pinned this tag's
+target (`984037d7`) the day the tag was cut and opens documents in
+`SessionMode::local` by default.
+
 **Markoff release `v0.7.1` (2026-10-20).** The first *release* tag of the
 v0.7.x series — the `v0.7.0-*` tags are point tags inside it — and a
 consumer re-pin point (`project(Markoff VERSION 0.7.1)`). The release notes
